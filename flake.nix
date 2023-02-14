@@ -3,21 +3,19 @@
 
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
-    nixpkgs-master.url = "nixpkgs/master";
     home-manager = {
-      url = "github:nix-community/home-manager/release-20.09";
+      url = "github:nix-community/home-manager/release-22.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixos-hardware.url = "github:nixos/nixos-hardware";
   };
 
-  outputs = inputs@{
+  outputs = {
     self
     , nixpkgs
-    , nixpkgs-master
-    , home-manager,
-    ...
-  }: let
+    , home-manager
+    , ...
+  } @ inputs: let
     system = "x86_64-linux";
 
     pkgs = import nixpkgs {
@@ -27,42 +25,31 @@
       };
     };
 
-    master = import nixpkgs-master {
-      inherit system;
-      config = {
-        allowUnfree = true;
-      };
-    };
-
     lib = nixpkgs.lib;
 
-    home = [
-      home-manager.nixosModules.home-manager
-      {
-        home-manager.useGlobalPkgs = true;
-        home-manager.useUserPackages = true;
-        home-manager.users.tom = lib.mkMerge [
-          ./users/tom/home.nix
-        ];
-      }
-    ];
+    mkHome = home-manager.lib.homeManagerConfiguration;
   in {
-    packages."${system}" =
-      mapModules ./packages (p: pkgs.callPackage p {});
-    ];
-
     nixosConfigurations = {
       drakkar = nixpkgs.lib.nixosSystem {
         inherit system;
         modules = [
-          ./hosts/drakkar.nix
-          common
-        ] ++ home;
-        specialArgs = {
-          inherit inputs;
-          inherit home-manager;
-        };
+          ./hosts/drakkar/configuration.nix
+        ];
+        #specialArgs = {
+        #  inherit inputs;
+        #};
+      };
+    };
+
+    homeConfigurations."tom@drakkar" = mkHome {
+      pkgs = self.outputs.nixosConfigurations.drakkar.pkgs;
+      modules = [
+        ./users/tom/home.nix
+      ];
+      extraSpecialArgs = {
+        inherit self inputs;
       };
     };
   };
 }
+
