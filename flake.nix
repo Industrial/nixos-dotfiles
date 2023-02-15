@@ -26,8 +26,6 @@
     };
 
     lib = nixpkgs.lib;
-
-    mkHome = home-manager.lib.homeManagerConfiguration;
   in {
     nixosConfigurations = {
       drakkar = nixpkgs.lib.nixosSystem {
@@ -41,14 +39,12 @@
       };
     };
 
-    homeConfigurations."tom@drakkar" = mkHome {
-      pkgs = self.outputs.nixosConfigurations.drakkar.pkgs;
+    homeConfigurations.tom = home-manager.lib.homeManagerConfiguration {
+      inherit pkgs;
+
       modules = [
         ./users/tom/home.nix
       ];
-      extraSpecialArgs = {
-        inherit self inputs;
-      };
     };
   };
 }

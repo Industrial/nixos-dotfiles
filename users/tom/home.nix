@@ -1,10 +1,32 @@
-{ pkgs, inputs, nixpkgs, config, lib, ... }:
+{ pkgs
+, inputs
+, nixpkgs
+, config
+, lib
+, system
+, ... }:
 
 {
-  #programs.home-manager.enable = true;
-  #home.username = "tom";
-  #home.homeDirectory = "/home/tom";
-  #home.stateVersion = "21.05";
+  home = {
+    username = "tom";
+    homeDirectory = "/home/tom";
+    stateVersion = "21.05";
+  };
+
+  nixpkgs = {
+    config = {
+      inherit system;
+      allowUnfree = true;
+      allowBroken = true;
+      experimental-features = [ "nix-command" "flakes" ];
+    };
+  };
+
+  programs = {
+    home-manager = {
+      enable = true;
+    };
+  };
 
   imports = [
     ./features/git
@@ -14,82 +36,85 @@
     ./features/zsh
   ];
 
-  home.packages = [
-    pkgs.bitwarden
-    pkgs.bookworm
-    pkgs.chromium
-    pkgs.direnv
-    pkgs.discord
-    pkgs.docker-compose
-    pkgs.element-desktop
-    pkgs.exa
-    pkgs.fd
-    pkgs.filezilla
-    pkgs.firefox
-    pkgs.fzf
-    pkgs.gcc
-    pkgs.gitkraken
-    pkgs.gnomeExtensions.material-shell
-    pkgs.htop
-    pkgs.lutris
-    pkgs.meld
-    pkgs.nethogs
-    pkgs.ripgrep
-    pkgs.slack
-    pkgs.spotify
-    pkgs.starship
-    pkgs.steam
-    pkgs.transmission-gtk
-    pkgs.vit
-    pkgs.vlc
-    pkgs.xclip
-    pkgs.xsel
-    pkgs.zeal
-    pkgs.yubikey-manager-qt
-    pkgs.yubikey-personalization-gui
+  home.packages = with pkgs; [
+    bitwarden
+    bookworm
+    chromium
+    direnv
+    discord
+    docker-compose
+    element-desktop
+    exa
+    fd
+    filezilla
+    firefox
+    fzf
+    gcc
+    gitkraken
+    gnomeExtensions.material-shell
+    htop
+    lutris
+    meld
+    nethogs
+    ripgrep
+    slack
+
+    # TODO: Get this to work..
+    #spotify
+
+    starship
+    steam
+    transmission-gtk
+    vit
+    vlc
+    xclip
+    xsel
+    zeal
+    yubikey-manager-qt
+    yubikey-personalization-gui
 
     # Tor
-    pkgs.tor-browser-bundle-bin
+    tor-browser-bundle-bin
 
     # Python
-    pkgs.stdenv.cc.cc.lib
-    pkgs.python3
-    pkgs.virtualenv
-    pkgs.poetry
+    stdenv.cc.cc.lib
+    python3
+    virtualenv
+    poetry
 
     # Neovim
-    pkgs.luajitPackages.luacheck
-    pkgs.nodePackages.bash-language-server
-    pkgs.nodePackages.dockerfile-language-server-nodejs
-    pkgs.nodePackages.stylelint
-    pkgs.nodePackages.typescript-language-server
-    pkgs.nodePackages.vim-language-server
-    pkgs.nodePackages.vscode-langservers-extracted
-    pkgs.nodePackages.yaml-language-server
-    pkgs.pyright
-    pkgs.python-language-server
-    pkgs.sumneko-lua-language-server
+    luajitPackages.luacheck
+    nodePackages.bash-language-server
+    nodePackages.dockerfile-language-server-nodejs
+    nodePackages.stylelint
+    nodePackages.typescript-language-server
+    nodePackages.vim-language-server
+    nodePackages.vscode-langservers-extracted
+    nodePackages.yaml-language-server
+    pyright
+    python-language-server
+    sumneko-lua-language-server
 
     # World of Warcraft
-    pkgs.alsa-lib
-    pkgs.alsa-plugins
-    pkgs.giflib
-    pkgs.gnutls
-    pkgs.gtk3
-    pkgs.libgcrypt
-    pkgs.libgpg-error
-    pkgs.libjpeg
-    pkgs.libnghttp2
-    pkgs.libpng
-    pkgs.libpulseaudio
-    pkgs.libva
-    pkgs.libxslt
-    pkgs.mpg123
-    pkgs.ncurses
-    pkgs.ocl-icd
-    pkgs.openal
-    pkgs.sqlite
-    pkgs.v4l-utils
-    pkgs.xorg.libXcomposite
+    alsa-lib
+    alsa-plugins
+    giflib
+    gnutls
+    gtk3
+    libgcrypt
+    libgpg-error
+    libjpeg
+    libnghttp2
+    libpng
+    libpulseaudio
+    libva
+    libxslt
+    mpg123
+    ncurses
+    ocl-icd
+    openal
+    sqlite
+    v4l-utils
+    xorg.libXcomposite
   ];
 }

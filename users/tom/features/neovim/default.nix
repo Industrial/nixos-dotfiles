@@ -8,6 +8,21 @@
 
     extraPackages = [
       pkgs.nodejs-16_x
+      pkgs.nodejs-16_x.pkgs."@astrojs/language-server"
+      #pkgs.nodejs-16_x.pkgs."@cucumber/language-server"
+      #pkgs.nodejs-16_x.pkgs."@johnnymorganz/stylua-bin"
+      pkgs.nodejs-16_x.pkgs.bash-language-server
+      #pkgs.nodejs-16_x.pkgs.cssmodules-language-server
+      #pkgs.nodejs-16_x.pkgs.dot-language-server
+      pkgs.nodejs-16_x.pkgs.eslint
+      pkgs.nodejs-16_x.pkgs.eslint_d
+      pkgs.nodejs-16_x.pkgs.graphql-language-service-cli
+      #pkgs.nodejs-16_x.pkgs.stylelint-lsp
+      pkgs.nodejs-16_x.pkgs.typescript
+      pkgs.nodejs-16_x.pkgs.typescript-language-server
+      pkgs.nodejs-16_x.pkgs.vim-language-server
+      pkgs.nodejs-16_x.pkgs.vscode-langservers-extracted
+      pkgs.nodejs-16_x.pkgs.yaml-language-server
     ];
 
     extraConfig = ''
