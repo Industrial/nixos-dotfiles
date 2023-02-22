@@ -149,19 +149,11 @@
         };
       }
       {
-        name = "havamal-bash";
+        name = "Hávamál";
         src = pkgs.fetchgit {
           url = "https://github.com/Industrial/havamal-bash";
-          rev = "v0.1.0";
-          sha256 = "sha256-EewgCobzZtyaO5hAlQ8sttQVclOi35S3tnqz1PxMj1w=";
-        };
-      }
-      {
-        name = "communism";
-        src = pkgs.fetchgit {
-          url = "https://github.com/victoria-riley-barnett/Communism";
-          rev = "v1.4";
-          sha256 = "sha256-cpJlnNC97fOzecTe1Xl3ZKJQqNKmZ17IugeO5AaEaDE=";
+          rev = "v0.2.0";
+          sha256 = "sha256-ikltDhriLYw0nsr4BcpKaEu2iRYSNuEtHeOtX30EzC4=";
         };
       }
     ];

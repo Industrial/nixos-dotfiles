@@ -1,12 +1,12 @@
-{ pkgs
-, inputs
-, nixpkgs
-, config
-, lib
-, system
-, ... }:
-
 {
+  pkgs,
+  inputs,
+  nixpkgs,
+  config,
+  lib,
+  system,
+  ...
+}: {
   home = {
     username = "tom";
     homeDirectory = "/home/tom";
@@ -18,7 +18,7 @@
       inherit system;
       allowUnfree = true;
       allowBroken = true;
-      experimental-features = [ "nix-command" "flakes" ];
+      experimental-features = ["nix-command" "flakes"];
     };
   };
 
@@ -33,10 +33,12 @@
     ./features/neovim
     ./features/taskwarrior
     ./features/tmux
+    ./features/vscode
     ./features/zsh
   ];
 
   home.packages = with pkgs; [
+    appimage-run
     bitwarden
     bookworm
     chromium
@@ -53,7 +55,7 @@
     gitkraken
     gnomeExtensions.material-shell
     htop
-    lutris
+    lutris-unwrapped
     meld
     nethogs
     ripgrep
@@ -81,19 +83,6 @@
     python3
     virtualenv
     poetry
-
-    # Neovim
-    luajitPackages.luacheck
-    nodePackages.bash-language-server
-    nodePackages.dockerfile-language-server-nodejs
-    nodePackages.stylelint
-    nodePackages.typescript-language-server
-    nodePackages.vim-language-server
-    nodePackages.vscode-langservers-extracted
-    nodePackages.yaml-language-server
-    pyright
-    python-language-server
-    sumneko-lua-language-server
 
     # World of Warcraft
     alsa-lib

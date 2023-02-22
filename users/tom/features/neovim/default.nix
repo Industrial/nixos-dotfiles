@@ -1,70 +1,77 @@
-{ pkgs, config, ... }:
-
 {
+  pkgs,
+  lib,
+  config,
+  ...
+}: {
   programs.neovim = {
     enable = true;
     viAlias = true;
     vimAlias = true;
 
-    extraPackages = [
-      pkgs.nodejs-16_x
-      pkgs.nodejs-16_x.pkgs."@astrojs/language-server"
-      #pkgs.nodejs-16_x.pkgs."@cucumber/language-server"
-      #pkgs.nodejs-16_x.pkgs."@johnnymorganz/stylua-bin"
-      pkgs.nodejs-16_x.pkgs.bash-language-server
-      #pkgs.nodejs-16_x.pkgs.cssmodules-language-server
-      #pkgs.nodejs-16_x.pkgs.dot-language-server
-      pkgs.nodejs-16_x.pkgs.eslint
-      pkgs.nodejs-16_x.pkgs.eslint_d
-      pkgs.nodejs-16_x.pkgs.graphql-language-service-cli
-      #pkgs.nodejs-16_x.pkgs.stylelint-lsp
-      pkgs.nodejs-16_x.pkgs.typescript
-      pkgs.nodejs-16_x.pkgs.typescript-language-server
-      pkgs.nodejs-16_x.pkgs.vim-language-server
-      pkgs.nodejs-16_x.pkgs.vscode-langservers-extracted
-      pkgs.nodejs-16_x.pkgs.yaml-language-server
+    extraPackages = with pkgs; [
+      alejandra
+      nil
+      nixfmt
+      nodePackages."@astrojs/language-server"
+      nodePackages.bash-language-server
+      nodePackages.dockerfile-language-server-nodejs
+      nodePackages.eslint
+      nodePackages.eslint_d
+      nodePackages.graphql-language-service-cli
+      nodePackages.stylelint
+      nodePackages.typescript
+      nodePackages.typescript-language-server
+      nodePackages.vim-language-server
+      nodePackages.vscode-langservers-extracted
+      nodePackages.yaml-language-server
+      nodejs-16_x
+      pyright
+      python-language-server
+      stylua
+      sumneko-lua-language-server
+      luajitPackages.luacheck
     ];
 
     extraConfig = ''
       lua require('initialize')
     '';
 
-    plugins = [
-      { plugin = pkgs.vimPlugins.vim-sleuth; }
-      { plugin = pkgs.vimPlugins.base16-vim; }
-      { plugin = pkgs.vimPlugins.which-key-nvim; }
-      { plugin = pkgs.vimPlugins.moonscript-vim; }
-      #{ plugin = pkgs.vimPlugins.nvim-moonmaker; }
-      { plugin = pkgs.vimPlugins.nvim-web-devicons; }
+    plugins = with pkgs.vimPlugins; [
+      base16-vim
+      bufferline-nvim
+      cmp-buffer
+      cmp-cmdline
+      cmp-nvim-lsp
+      cmp-nvim-lsp-signature-help
+      cmp-path
+      copilot-vim
+      indent-blankline-nvim
+      lspkind-nvim
+      lualine-nvim
+      moonscript-vim
+      null-ls-nvim
+      nvim-autopairs
+      nvim-cmp
+      nvim-comment
+      nvim-dap
+      nvim-dap-python
+      nvim-dap-ui
+      nvim-lspconfig
       {
-        plugin = pkgs.vimPlugins.nvim-tree-lua;
+        plugin = nvim-tree-lua;
         config = ''
           packadd nvim-tree.lua
         '';
       }
-      { plugin = pkgs.vimPlugins.nvim-treesitter.withAllGrammars; }
-      { plugin = pkgs.vimPlugins.nvim-autopairs; }
-      { plugin = pkgs.vimPlugins.lspkind-nvim; }
-      { plugin = pkgs.vimPlugins.nvim-cmp; }
-      { plugin = pkgs.vimPlugins.nvim-lspconfig; }
-      { plugin = pkgs.vimPlugins.cmp-nvim-lsp; }
-      { plugin = pkgs.vimPlugins.cmp-nvim-lsp-signature-help; }
-      { plugin = pkgs.vimPlugins.cmp-buffer; }
-      { plugin = pkgs.vimPlugins.cmp-path; }
-      { plugin = pkgs.vimPlugins.cmp-cmdline; }
-      { plugin = pkgs.vimPlugins.null-ls-nvim; }
-      { plugin = pkgs.vimPlugins.telescope-dap-nvim; }
-      { plugin = pkgs.vimPlugins.nvim-dap-ui; }
-      { plugin = pkgs.vimPlugins.nvim-dap; }
-      { plugin = pkgs.vimPlugins.nvim-dap-python; }
-      { plugin = pkgs.vimPlugins.bufferline-nvim; }
-      { plugin = pkgs.vimPlugins.nvim-comment; }
-      { plugin = pkgs.vimPlugins.trouble-nvim; }
-      { plugin = pkgs.vimPlugins.indent-blankline-nvim; }
-      { plugin = pkgs.vimPlugins.plenary-nvim; }
-      { plugin = pkgs.vimPlugins.telescope-nvim; }
-      { plugin = pkgs.vimPlugins.lualine-nvim; }
-      { plugin = pkgs.vimPlugins.copilot-vim; }
+      nvim-treesitter.withAllGrammars
+      nvim-web-devicons
+      plenary-nvim
+      telescope-dap-nvim
+      telescope-nvim
+      trouble-nvim
+      which-key-nvim
+      vim-sleuth
     ];
   };
 }

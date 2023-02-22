@@ -11,6 +11,4 @@ sudo ./result/activate
 rm -f ./result
 
 # Build HomeManager
-nix build '.#homeConfigurations.tom.activationPackage'
-sudo ./result/activate
-rm -f ./result
+home-manager switch --flake '.'

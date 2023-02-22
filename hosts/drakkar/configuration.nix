@@ -201,6 +201,35 @@ in
     shells = with pkgs; [
       zsh
     ];
+
+    systemPackages = with pkgs; [
+      # GFX Benchmark
+      glmark2
+      unigine-superposition
+      unigine-tropics
+      unigine-valley
+      unigine-heaven
+
+      (wineWowPackages.staging.override {
+        wineRelease = "staging";
+        #gettextSupport = true;
+        #fontconfigSupport = true;
+        #alsaSupport = true;
+        #gtkSupport = true;
+        #openglSupport = true;
+        #tlsSupport = true;
+        #gstreamerSupport = true;
+        #openclSupport = true;
+        #pulseaudioSupport = true;
+        #udevSupport = true;
+        vulkanSupport = true;
+        mingwSupport = true;
+      })
+      winetricks
+      #(winetricks.override {
+      #  wine = wineWowPackages.staging;
+      #})
+    ];
   };
 
   virtualisation = {

@@ -1,6 +1,8 @@
-{ pkgs, config, ... }:
-
 {
+  pkgs,
+  config,
+  ...
+}: {
   programs.tmux = {
     aggressiveResize = false;
     baseIndex = 1;
@@ -30,8 +32,8 @@
     };
 
     plugins = with pkgs; [
-      { plugin = tmuxPlugins.yank; }
-      { plugin = tmuxPlugins.pain-control; }
+      {plugin = tmuxPlugins.yank;}
+      {plugin = tmuxPlugins.pain-control;}
     ];
   };
 }
