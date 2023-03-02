@@ -4,15 +4,9 @@
   modulesPath,
   inputs,
   ...
-}: let
-  #home-manager = builtins.fetchTarball {
-  #  url = "https://github.com/nix-community/home-manager/archive/master.tar.gz";
-  #  sha256 = "sha256:1nxhd86lfpfw24yfvkrrf4hnw0xcmwb495qbxl1dqhgv76ayxa2r";
-  #};
-in {
+}: {
   imports = [
     ./hardware-configuration.nix
-    #(import "${home-manager}/nixos")
   ];
 
   nix = {
