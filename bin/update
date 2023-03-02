@@ -5,6 +5,9 @@ set -e
 # Update channels
 sudo nix-channel --update
 
+# Update nix
+nix flake update
+
 # Build the system
 sudo nixos-rebuild build --flake '.#drakkar'
 sudo ./result/activate
