@@ -60,9 +60,10 @@
     nethogs
     ripgrep
     slack
+    libreoffice
 
     # TODO: Get this to work..
-    #spotify
+    spotify
 
     starship
     steam

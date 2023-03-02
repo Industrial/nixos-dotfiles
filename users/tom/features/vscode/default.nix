@@ -123,15 +123,11 @@
       "javascript.updateImportsOnFileMove.enabled" = "always";
       "jupyter.askForKernelRestart" = false;
       "markdown.preview.fontSize" = 16;
-      "python.formatting.blackArgs" = [
-        "-l 180"
-      ];
+      "python.experiments.enabled" = true;
+      "python.formatting.blackArgs" = ["-l 180"];
       "python.formatting.provider" = "black";
       "python.linting.enabled" = true;
-      "python.linting.flake8Args" = [
-        "--ignore"
-        "E501,W503,W504"
-      ];
+      "python.linting.flake8Args" = ["--ignore" "E501,W503,W504"];
       "python.linting.flake8Enabled" = true;
       "python.linting.mypyEnabled" = true;
       "references.preferredLocation" = "view";
@@ -156,6 +152,7 @@
       "window.zoomLevel" = 2;
       "workbench.colorTheme" = "Base16 Light Tomorrow";
       "workbench.editor.enablePreview" = false;
+      "workbench.enableExperiments" = true;
       "workbench.iconTheme" = "material-icon-theme";
       "workbench.list.openMode" = "doubleClick";
       "workbench.startupEditor" = "none";

@@ -1,15 +1,18 @@
-{ config, pkgs, modulesPath, inputs, ... }:
-
-let
-  home-manager = builtins.fetchTarball {
-    url = "https://github.com/nix-community/home-manager/archive/master.tar.gz";
-    sha256 = "sha256:1nxhd86lfpfw24yfvkrrf4hnw0xcmwb495qbxl1dqhgv76ayxa2r";
-  };
-in
 {
+  config,
+  pkgs,
+  modulesPath,
+  inputs,
+  ...
+}: let
+  #home-manager = builtins.fetchTarball {
+  #  url = "https://github.com/nix-community/home-manager/archive/master.tar.gz";
+  #  sha256 = "sha256:1nxhd86lfpfw24yfvkrrf4hnw0xcmwb495qbxl1dqhgv76ayxa2r";
+  #};
+in {
   imports = [
     ./hardware-configuration.nix
-    (import "${home-manager}/nixos")
+    #(import "${home-manager}/nixos")
   ];
 
   nix = {
@@ -123,12 +126,31 @@ in
       #drivers = with pkgs; [ cups-brother-ql-570 ];
     };
 
+    # Sound
     pipewire = {
       enable = true;
 
       alsa = {
         enable = true;
         support32Bit = true;
+      };
+
+      pulse = {
+        enable = true;
+      };
+
+      config = {
+        pipewire = {
+          "context.properties" = {
+            #"link.max-buffers" = 64;
+            "link.max-buffers" = 16; # version < 3 clients can't handle more than this
+            "log.level" = 2; # https://docs.pipewire.org/page_daemon.html
+            #"default.clock.rate" = 48000;
+            #"default.clock.quantum" = 1024;
+            #"default.clock.min-quantum" = 32;
+            #"default.clock.max-quantum" = 8192;
+          };
+        };
       };
     };
 
@@ -203,6 +225,11 @@ in
     ];
 
     systemPackages = with pkgs; [
+      # Sound
+      helvum
+      qpwgraph
+      pavucontrol
+
       # GFX Benchmark
       glmark2
       unigine-superposition
@@ -220,10 +247,10 @@ in
         #tlsSupport = true;
         #gstreamerSupport = true;
         #openclSupport = true;
-        #pulseaudioSupport = true;
         #udevSupport = true;
         vulkanSupport = true;
         mingwSupport = true;
+        pulseaudioSupport = true;
       })
       winetricks
       #(winetricks.override {
