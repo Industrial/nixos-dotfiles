@@ -1,53 +1,55 @@
-{ pkgs, config, ... }:
-
 {
+  pkgs,
+  config,
+  ...
+}: {
   programs.git = {
     enable = true;
-    userName  = "Tom Wieland";
+    userName = "Tom Wieland";
     userEmail = "tom.wieland@gmail.com";
     aliases = {
-      a   = "add";
-      A   = "add -A";
-      aa  = "add -A";
-      b   = "branch";
-      ba  = "branch --all";
-      bd  = "branch -d";
-      cb  = "checkout -b";
-      cm  = "commit -m";
-      co  = "checkout";
-      cp  = "cherry-pick";
+      a = "add";
+      A = "add -A";
+      aa = "add -A";
+      b = "branch";
+      ba = "branch --all";
+      bd = "branch -d";
+      cb = "checkout -b";
+      cm = "commit -m";
+      co = "checkout";
+      cp = "cherry-pick";
       cpa = "cherry-pick --abort";
       cpc = "cherry-pick --continue";
-      d   = "diff";
-      dc  = "diff --cached";
-      dt  = "difftool -y";
+      d = "diff";
+      dc = "diff --cached";
+      dt = "difftool -y";
       dtd = "difftool -y --dir-diff";
-      f   = "fetch -p --all";
-      l   = "log --oneline --graph --decorate=full";
-      la  = "log --all --oneline --graph --decorate=full";
-      lg  = "log";
-      m   = "merge";
-      mt  = "mergetool";
-      p   = "pull";
-      pa  = "pull -a";
-      ps  = "push -u";
+      f = "fetch -p --all";
+      l = "log --oneline --graph --decorate=full";
+      la = "log --all --oneline --graph --decorate=full";
+      lg = "log";
+      m = "merge";
+      mt = "mergetool";
+      p = "pull";
+      pa = "pull -a";
+      ps = "push -u";
       psf = "push -u -f";
       psa = "push origin --all";
-      rb  = "rebase";
+      rb = "rebase";
       rba = "rebase --abort";
       rbc = "rebase --continue";
       rbs = "rebase --skip";
       rbi = "rebase -i";
-      rn  = "reset HEAD@{1}";
-      rp  = "reset HEAD~1";
-      rs  = "reset";
+      rn = "reset HEAD@{1}";
+      rp = "reset HEAD~1";
+      rs = "reset";
       rsh = "reset --hard HEAD^";
       rss = "reset --soft HEAD^";
-      r   = "remote --verbose";
-      ru  = "remote update -p";
-      s   = "status";
-      sh  = "stash";
-      t   = "tag";
+      r = "remote --verbose";
+      ru = "remote update -p";
+      s = "status";
+      sh = "stash";
+      t = "tag";
     };
     extraConfig = {
       init = {

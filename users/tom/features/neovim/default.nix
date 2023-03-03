@@ -11,6 +11,7 @@
 
     extraPackages = with pkgs; [
       alejandra
+      luajitPackages.luacheck
       nil
       nixfmt
       nodePackages."@astrojs/language-server"
@@ -27,10 +28,9 @@
       nodePackages.yaml-language-server
       nodejs-16_x
       pyright
-      python-language-server
+      python311Packages.python-lsp-server
       stylua
       sumneko-lua-language-server
-      luajitPackages.luacheck
     ];
 
     extraConfig = ''

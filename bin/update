@@ -15,3 +15,9 @@ rm -f ./result
 
 # Build HomeManager
 home-manager switch --flake '.'
+
+# Clean old generations
+nix-env --delete-generations old
+
+# Clean the store
+nix-store --gc

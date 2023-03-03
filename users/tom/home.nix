@@ -30,6 +30,7 @@
 
   imports = [
     ./features/git
+    ./features/mpv
     ./features/neovim
     ./features/taskwarrior
     ./features/tmux
@@ -55,16 +56,13 @@
     gitkraken
     gnomeExtensions.material-shell
     htop
+    libreoffice
     lutris-unwrapped
     meld
     nethogs
     ripgrep
     slack
-    libreoffice
-
-    # TODO: Get this to work..
     spotify
-
     starship
     steam
     transmission-gtk
@@ -72,9 +70,8 @@
     vlc
     xclip
     xsel
-    zeal
-    yubikey-manager-qt
     yubikey-personalization-gui
+    zeal
 
     # Tor
     tor-browser-bundle-bin

@@ -1,13 +1,15 @@
-{ pkgs, config, ... }:
-
 {
+  pkgs,
+  config,
+  ...
+}: {
   programs.taskwarrior = {
     enable = true;
     config = {
       confirmation = false;
       report.minimal.filter = "status:pending";
-      report.active.columns = [ "id" "start" "entry.age" "priority" "project" "due" "description" ];
-      report.active.labels  = [ "ID" "Started" "Age" "Priority" "Project" "Due" "Description" ];
+      report.active.columns = ["id" "start" "entry.age" "priority" "project" "due" "description"];
+      report.active.labels = ["ID" "Started" "Age" "Priority" "Project" "Due" "Description"];
       taskd = {
         certificate = "/home/tom/.taskwarrior_certs/default-client.cert.pem";
         key = "/home/tom/.taskwarrior_certs/default-client.key.pem";

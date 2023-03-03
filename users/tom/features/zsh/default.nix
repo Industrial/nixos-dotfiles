@@ -1,6 +1,8 @@
-{ pkgs, config, ... }:
-
 {
+  pkgs,
+  config,
+  ...
+}: {
   programs.zsh = {
     enable = true;
     shellAliases = {};
@@ -52,7 +54,7 @@
         --sort Extension \
         $1
       }
-      
+
       c() {
         cd $1 && l
       }
@@ -134,7 +136,7 @@
       }
       {
         name = "base16-shell";
-          src = pkgs.fetchgit {
+        src = pkgs.fetchgit {
           url = "https://github.com/tinted-theming/base16-shell";
           rev = "64b96b17fc1d7cb16fb5c64b5dbed7f8b2379f6d";
           sha256 = "sha256-SnvGz5MANQPYZIgIriv3Ly4YcvSpQLwMsZDEO3qwKNI=";
