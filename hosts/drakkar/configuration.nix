@@ -90,30 +90,6 @@
   };
 
   services = {
-    xserver = {
-      enable = true;
-
-      layout = "us";
-      xkbVariant = "";
-
-      displayManager = {
-        gdm = {
-          enable = true;
-          wayland = true;
-        };
-      };
-
-      desktopManager = {
-        gnome = {
-          enable = true;
-        };
-      };
-
-      videoDrivers = [
-        "amdgpu"
-      ];
-    };
-
     printing = {
       enable = true;
       # TODO: Find correct driver.
@@ -203,6 +179,7 @@
         extraGroups = [
           "wheel"
           "networkmanager"
+          "plugdev"
         ];
         packages = with pkgs; [];
       };
@@ -225,11 +202,11 @@
       pavucontrol
 
       # GFX Benchmark
-      glmark2
-      unigine-superposition
-      unigine-tropics
-      unigine-valley
-      unigine-heaven
+      #glmark2
+      #unigine-superposition
+      #unigine-tropics
+      #unigine-valley
+      #unigine-heaven
 
       (wineWowPackages.staging.override {
         wineRelease = "staging";

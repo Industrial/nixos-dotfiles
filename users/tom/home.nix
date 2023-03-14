@@ -30,6 +30,7 @@
 
   imports = [
     ./features/git
+    ./features/gnome
     ./features/mpv
     ./features/neovim
     ./features/taskwarrior
@@ -39,6 +40,8 @@
   ];
 
   home.packages = with pkgs; [
+    usbutils
+    android-tools
     appimage-run
     bitwarden
     bookworm
@@ -46,7 +49,6 @@
     direnv
     discord
     docker-compose
-    element-desktop
     exa
     fd
     filezilla
@@ -73,6 +75,9 @@
     yubikey-personalization-gui
     zeal
 
+    # Matrix
+    cinny-desktop
+
     # Tor
     tor-browser-bundle-bin
 
@@ -81,6 +86,9 @@
     python3
     virtualenv
     poetry
+
+    # Java
+    jre8
 
     # World of Warcraft
     alsa-lib

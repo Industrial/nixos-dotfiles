@@ -391,6 +391,16 @@
         };
       })
 
+      # Auto Completion
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "vscode-chatgpt";
+          publisher = "gencay";
+          version = "3.9.2";
+          sha256 = "sha256-OJk3bp8Pnt/9JD2Ezlp09G7CNoyYbZu6uCc0/eaCTCo=";
+        };
+      })
+
       # Testing
       # TODO: Download Error
       #(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
