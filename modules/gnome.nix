@@ -4,6 +4,8 @@
       xserver = {
         enable = true;
 
+        dpi = 96;
+
         layout = "us";
         xkbVariant = "";
 
@@ -34,38 +36,45 @@
             gnome-tour
           ])
           ++ (with pkgs.gnome; [
-            #cheese # webcam tool
-            gnome-music
-            gedit # text editor
+            atomix # puzzle game
             epiphany # web browser
             geary # email reader
+            gedit # text editor
             gnome-characters
-            tali # poker game
-            iagno # go game
-            hitori # sudoku game
-            atomix # puzzle game
-            yelp # Help view
             gnome-contacts
             gnome-initial-setup
+            gnome-music
+            hitori # sudoku game
+            iagno # go game
+            tali # poker game
+            yelp # Help view
           ]);
       };
 
-      # TODO: GNOME Extensions
       systemPackages = with pkgs; [
-        #gnomeExtensions.
-        gnome.gnome-tweaks
-        gnome.gnome-terminal
         gnome.dconf-editor
-        gnome.vinagre
-        gnome.seahorse
-        gnome.nautilus
-        gnome.gnome-system-monitor
+        gnome.gnome-control-center
+        gnome.gnome-disk-utility
+        gnome.gnome-remote-desktop
+        gnome.gnome-screenshot
         gnome.gnome-shell
         gnome.gnome-shell-extensions
-        gnome.gnome-screenshot
-        gnome.gnome-remote-desktop
-        gnome.gnome-disk-utility
-        gnome.gnome-control-center
+        gnome.gnome-system-monitor
+        gnome.gnome-terminal
+        gnome.gnome-tweaks
+        gnome.nautilus
+        gnome.seahorse
+        #gnome.vinagre
+        gnomeExtensions.applications-menu
+        gnomeExtensions.dash-to-panel
+        gnomeExtensions.gtile
+        gnomeExtensions.openweather
+        gnomeExtensions.places-status-indicator
+        gnomeExtensions.removable-drive-menu
+        gnomeExtensions.sound-output-device-chooser
+        gnomeExtensions.tray-icons-reloaded
+        gnomeExtensions.user-themes
+        gnomeExtensions.vitals
       ];
     };
 

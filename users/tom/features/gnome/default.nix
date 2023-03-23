@@ -33,7 +33,18 @@
         disabled-extensions = ["material-shell@papyelgringo"];
         disable-extension-version-validation = false;
         disable-user-extensions = false;
-        enabled-extensions = [];
+        enabled-extensions = with pkgs; [
+          gnomeExtensions.applications-menu.extensionUuid
+          gnomeExtensions.dash-to-panel.extensionUuid
+          gnomeExtensions.gtile.extensionUuid
+          gnomeExtensions.openweather.extensionUuid
+          gnomeExtensions.places-status-indicator.extensionUuid
+          gnomeExtensions.removable-drive-menu.extensionUuid
+          gnomeExtensions.sound-output-device-chooser.extensionUuid
+          gnomeExtensions.tray-icons-reloaded.extensionUuid
+          gnomeExtensions.user-themes.extensionUuid
+          gnomeExtensions.vitals.extensionUuid
+        ];
         favorite-apps = [
           "firefox.desktop"
           "org.gnome.Nautilus.desktop"
@@ -128,12 +139,12 @@
         begin-move = [""];
         begin-resize = [""];
         close = ["<Super><Control>q"];
-        cycle-group = ["<Super>Tab"];
-        cycle-group-backward = ["<Super><Shift>Tab"];
+        cycle-group = [""];
+        cycle-group-backward = [""];
         cycle-panels = [""];
         cycle-panels-backward = [""];
-        cycle-windows = [""];
-        cycle-windows-backward = [""];
+        cycle-windows = ["<Super>Tab"];
+        cycle-windows-backward = ["<Super><Shift>Tab"];
         lower = [""];
         maximize = [""];
         maximize-horizontally = [""];

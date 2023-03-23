@@ -3,21 +3,29 @@
 set -e
 
 # Update channels
+echo "> sudo nix-channel --update"
 sudo nix-channel --update
 
 # Update nix
+echo "> nix flake update"
 nix flake update
 
 # Build the system
-sudo nixos-rebuild build --flake '.#drakkar'
+echo "> sudo nixos-rebuild build --flake '.#drakkar' --show-trace"
+sudo nixos-rebuild build --flake '.#drakkar' --show-trace
+echo "> sudo ./result/activate"
 sudo ./result/activate
+echo "> rm -f ./result"
 rm -f ./result
 
 # Build HomeManager
+echo "> home-manager switch --flake '.'"
 home-manager switch --flake '.'
 
 # Clean old generations
+echo "> nix-env --delete-generations old"
 nix-env --delete-generations old
 
 # Clean the store
+echo "> nix-store --gc"
 nix-store --gc

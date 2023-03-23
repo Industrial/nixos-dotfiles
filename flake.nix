@@ -27,18 +27,19 @@
     nixosConfigurations = {
       drakkar = nixpkgs.lib.nixosSystem {
         inherit system;
-        modules = with self.nixosModules; [
-          {config = {nix.registry.nixpkgs.flake = nixpkgs;};}
+        modules = [
+          #{config = {nix.registry.nixpkgs.flake = nixpkgs;};}
           ./hosts/drakkar/configuration.nix
-          home-manager.nixosModules.home-manager
-          gnome
+          ./modules/gnome.nix
+          #home-manager.nixosModules.home-manager
+          #gnome
         ];
       };
     };
 
     # TODO: Rewrite hosts/drakkar/configuration.nix to modules.
     nixosModules = {
-      gnome = import ./modules/gnome.nix {inherit pkgs;};
+      #gnome = import ./modules/gnome.nix {inherit pkgs;};
     };
 
     homeConfigurations.tom = home-manager.lib.homeManagerConfiguration {
