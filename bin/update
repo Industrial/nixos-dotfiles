@@ -19,8 +19,8 @@ echo "> rm -f ./result"
 rm -f ./result
 
 # Build HomeManager
-echo "> home-manager switch --flake '.'"
-home-manager switch --flake '.'
+echo "> home-manager switch --flake '.' --show-trace"
+home-manager switch --flake '.' --show-trace
 
 echo "> nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix"
 nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix

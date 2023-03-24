@@ -2,41 +2,51 @@
   description = "System Flake";
 
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
-
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixos-hardware.url = "github:nixos/nixos-hardware";
     home-manager = {
       url = "github:nix-community/home-manager/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    nixos-hardware.url = "github:nixos/nixos-hardware";
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = {
-    nixpkgs,
-    home-manager,
-    ...
-  }: let
-    system = "x86_64-linux";
-
-    pkgs = import nixpkgs {
-      inherit system;
-      config = {allowUnfree = true;};
-    };
-  in {
-    nixosConfigurations = {
-      drakkar = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = [
-          ./hosts/drakkar/configuration.nix
-          ./modules/gnome.nix
-        ];
+  outputs = inputs: let
+    local-overlays = import ./overlays;
+    overlays = [
+      local-overlays
+    ];
+    lib = import ./lib {inherit inputs overlays;};
+  in
+    {
+      nixosConfigurations = {
+        drakkar = lib.mkSystem {
+          hostname = "drakkar";
+          system = "x86_64-linux";
+          users = ["tom"];
+        };
       };
-    };
 
-    homeConfigurations.tom = home-manager.lib.homeManagerConfiguration {
-      inherit pkgs;
-      modules = [./users/tom/home.nix];
-    };
-  };
+      homeConfigurations = {
+        "tom@drakkar" = lib.mkHome {
+          hostname = "drakkar";
+          system = "x86_64-linux";
+          username = "tom";
+          stateVersion = "20.09";
+        };
+      };
+    }
+    // inputs.flake-utils.lib.eachDefaultSystem
+    (
+      system: let
+        pkgs = import inputs.nixpkgs {
+          inherit system overlays;
+        };
+      in {
+        devShell = pkgs.mkShell {
+          buildInputs = with pkgs; [home-manager git];
+          NIX_CONFIG = "experimental-features = nix-command flakes";
+        };
+      }
+    );
 }
