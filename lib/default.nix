@@ -1,4 +1,5 @@
 {
+  pkgs,
   inputs,
   overlays,
 }: {
@@ -18,10 +19,7 @@
           {
             networking.hostName = hostname;
 
-            nixpkgs = {
-              inherit overlays;
-              config.allowUnfree = true;
-            };
+            nixpkgs.pkgs = pkgs;
 
             nix.registry =
               inputs.nixpkgs.lib.mapAttrs'
@@ -42,20 +40,15 @@
       extraSpecialArgs = {
         inherit system hostname inputs;
       };
-      pkgs = builtins.getAttr system inputs.nixpkgs.outputs.legacyPackages;
+      #pkgs = pkgs;
       modules = [
         ../users/${username}/home
         {
-          nixpkgs = {
-            inherit overlays;
-            config.allowUnfree = true;
-          };
+          nixpkgs.pkgs = pkgs;
           programs = {
             home-manager.enable = true;
             git.enable = true;
           };
-          # ???
-          # systemd.user.startServices = "sd-switch";
           home = {
             inherit username stateVersion;
             homeDirectory = "/home/${username}";

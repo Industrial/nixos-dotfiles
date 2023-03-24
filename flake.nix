@@ -16,7 +16,13 @@
     overlays = [
       local-overlays
     ];
-    lib = import ./lib {inherit inputs overlays;};
+    pkgs = import inputs.nixpkgs {
+      inherit overlays;
+      config.allowUnfree = true;
+    };
+    lib = import ./lib {
+      inherit inputs overlays pkgs;
+    };
   in
     {
       nixosConfigurations = {
@@ -38,11 +44,7 @@
     }
     // inputs.flake-utils.lib.eachDefaultSystem
     (
-      system: let
-        pkgs = import inputs.nixpkgs {
-          inherit system overlays;
-        };
-      in {
+      system: {
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [home-manager git];
           NIX_CONFIG = "experimental-features = nix-command flakes";
