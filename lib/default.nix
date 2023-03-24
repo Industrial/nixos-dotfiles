@@ -18,9 +18,6 @@
           ../hosts/${hostname}
           {
             networking.hostName = hostname;
-
-            nixpkgs.pkgs = pkgs;
-
             nix.registry =
               inputs.nixpkgs.lib.mapAttrs'
               (n: v: inputs.nixpkgs.lib.nameValuePair n {flake = v;})
@@ -40,11 +37,10 @@
       extraSpecialArgs = {
         inherit system hostname inputs;
       };
-      #pkgs = pkgs;
+      pkgs = pkgs;
       modules = [
         ../users/${username}/home
         {
-          nixpkgs.pkgs = pkgs;
           programs = {
             home-manager.enable = true;
             git.enable = true;

@@ -12,13 +12,17 @@
   };
 
   outputs = inputs: let
+    hostname = "drakkar";
+    system = "x86_64-linux";
     local-overlays = import ./overlays;
     overlays = [
       local-overlays
     ];
     pkgs = import inputs.nixpkgs {
       inherit overlays;
+      system = system;
       config.allowUnfree = true;
+      config.allowBroken = false;
     };
     lib = import ./lib {
       inherit inputs overlays pkgs;
@@ -27,16 +31,16 @@
     {
       nixosConfigurations = {
         drakkar = lib.mkSystem {
-          hostname = "drakkar";
-          system = "x86_64-linux";
+          hostname = hostname;
+          system = system;
           users = ["tom"];
         };
       };
 
       homeConfigurations = {
         "tom@drakkar" = lib.mkHome {
-          hostname = "drakkar";
-          system = "x86_64-linux";
+          hostname = hostname;
+          system = system;
           username = "tom";
           stateVersion = "20.09";
         };
