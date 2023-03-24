@@ -29,7 +29,7 @@
         inherit system;
         modules = [
           ./hosts/drakkar/configuration.nix
-          # ./modules/gnome.nix
+          ./modules/gnome.nix
         ];
       };
     };
