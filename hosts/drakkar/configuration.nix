@@ -1,10 +1,4 @@
-{
-  config,
-  pkgs,
-  modulesPath,
-  inputs,
-  ...
-}: {
+{pkgs, ...}: {
   imports = [
     ./hardware-configuration.nix
   ];
@@ -26,24 +20,6 @@
         efiSysMountPoint = "/boot/efi";
       };
     };
-
-    initrd = {
-      secrets = {
-        "/crypto_keyfile.bin" = null;
-      };
-
-      luks.devices = {
-        "luks-9e4e63a2-fdcb-47fa-bb41-1cff46dfb69c" = {
-          device = "/dev/disk/by-uuid/9e4e63a2-fdcb-47fa-bb41-1cff46dfb69c";
-          keyFile = "/crypto_keyfile.bin";
-        };
-      };
-    };
-  };
-
-  fileSystems."/data" = {
-    device = "/dev/sda1";
-    fsType = "ext4";
   };
 
   networking = {
@@ -123,27 +99,6 @@
         };
       };
     };
-
-    tor = {
-      enable = true;
-      settings = {
-        ExitNodes = "{us},{gb} StrictNodes 1";
-      };
-    };
-
-    yggdrasil = {
-      enable = true;
-      persistentKeys = false;
-      settings = {
-        # Public peers can be found at
-        # https://github.com/yggdrasil-network/public-peers
-        Peers = [
-          "tls://23.137.249.65:443"
-          "tls://ygg-nl.incognet.io:8884"
-          "tls://94.103.82.150:8080"
-        ];
-      };
-    };
   };
 
   hardware = {
@@ -181,7 +136,7 @@
           "networkmanager"
           "plugdev"
         ];
-        packages = with pkgs; [];
+        packages = [];
       };
     };
   };
@@ -198,15 +153,7 @@
     systemPackages = with pkgs; [
       # Sound
       helvum
-      qpwgraph
       pavucontrol
-
-      # GFX Benchmark
-      #glmark2
-      #unigine-superposition
-      #unigine-tropics
-      #unigine-valley
-      #unigine-heaven
 
       (wineWowPackages.staging.override {
         wineRelease = "staging";
@@ -227,10 +174,6 @@
 
       # NTLM Support for wine
       samba
-
-      #(winetricks.override {
-      #  wine = wineWowPackages.staging;
-      #})
     ];
   };
 

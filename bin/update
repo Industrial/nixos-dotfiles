@@ -22,10 +22,6 @@ rm -f ./result
 echo "> home-manager switch --flake '.'"
 home-manager switch --flake '.'
 
-# Clean old generations
-echo "> nix-env --delete-generations old"
-nix-env --delete-generations old
+echo "> nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix"
+nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix
 
-# Clean the store
-echo "> nix-store --gc"
-nix-store --gc
