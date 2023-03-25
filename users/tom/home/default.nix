@@ -1,8 +1,4 @@
-{
-  config,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   imports = [
     ./features/git
     ./features/gnome
@@ -15,6 +11,10 @@
   ];
 
   home = {
+    username = "tom";
+    homeDirectory = "/home/tom";
+    stateVersion = "20.09";
+
     sessionVariables = {
       EDITOR = "nvim";
       GIT_EDITOR = "nvim";

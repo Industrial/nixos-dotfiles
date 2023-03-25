@@ -18,6 +18,10 @@
     ./hardware-configuration.nix
   ];
 
+  networking = {
+    hostName = "drakkar";
+  };
+
   environment = {
     systemPackages = with pkgs; [
       # Sound
