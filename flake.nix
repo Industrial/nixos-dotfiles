@@ -19,8 +19,7 @@
       local-overlays
     ];
     pkgs = import inputs.nixpkgs {
-      inherit overlays;
-      system = system;
+      inherit system overlays;
       config.allowUnfree = true;
       config.allowBroken = false;
     };
