@@ -24,25 +24,55 @@
       config.allowUnfree = true;
       config.allowBroken = false;
     };
-    lib = import ./lib {
-      inherit inputs overlays pkgs;
-    };
+    users = ["tom"];
   in
     {
       nixosConfigurations = {
-        drakkar = lib.mkSystem {
-          hostname = hostname;
-          system = system;
-          users = ["tom"];
+        drakkar = inputs.nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = {
+            inherit inputs system hostname;
+          };
+          modules =
+            [
+              ./hosts/${hostname}
+              {
+                networking.hostName = hostname;
+                # TODO: find out what this does.
+                nix.registry =
+                  # What does the quote do?
+                  inputs.nixpkgs.lib.mapAttrs'
+                  (n: v: inputs.nixpkgs.lib.nameValuePair n {flake = v;})
+                  inputs;
+              }
+            ]
+            ++ inputs.nixpkgs.lib.forEach users (u: ./users/${u}/system);
         };
       };
 
       homeConfigurations = {
-        "tom@drakkar" = lib.mkHome {
-          hostname = hostname;
-          system = system;
-          username = "tom";
-          stateVersion = "20.09";
+        "tom@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
+          extraSpecialArgs = {
+            inherit system hostname inputs;
+          };
+          pkgs = pkgs;
+          modules = [
+            #/users/${username}/home
+            ./users/tom/home
+            {
+              programs = {
+                home-manager.enable = true;
+                git.enable = true;
+              };
+              home = {
+                #inherit username stateVersion;
+                #homeDirectory = "/home/${username}";
+                username = "tom";
+                stateVersion = "20.09";
+                homeDirectory = "/home/tom";
+              };
+            }
+          ];
         };
       };
     }

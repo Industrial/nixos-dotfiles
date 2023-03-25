@@ -44,7 +44,7 @@
       gnomeExtensions.material-shell
       htop
       libreoffice
-      lutris-unwrapped
+      lutris
       meld
       nethogs
       ripgrep
