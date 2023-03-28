@@ -44,7 +44,6 @@
       gnomeExtensions.material-shell
       htop
       libreoffice
-      lutris
       meld
       nethogs
       ripgrep
@@ -59,6 +58,7 @@
       xsel
       yubikey-personalization-gui
       zeal
+      #lutris-unwrapped
 
       # Matrix
       cinny-desktop

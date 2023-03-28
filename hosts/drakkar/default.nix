@@ -47,6 +47,8 @@
 
       # NTLM Support for wine
       samba
+
+      lutris
     ];
   };
 
