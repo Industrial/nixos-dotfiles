@@ -20,6 +20,7 @@
       "[typescript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "[typescriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "debug.console.fontSize" = 16;
+      "debug.javascript.autoAttachFilter" = "smart";
       "editor.acceptSuggestionOnCommitCharacter" = false;
       "editor.acceptSuggestionOnEnter" = "on";
       "editor.autoClosingBrackets" = "always";

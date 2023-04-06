@@ -43,7 +43,7 @@
       gitkraken
       gnomeExtensions.material-shell
       htop
-      libreoffice
+      #libreoffice
       meld
       nethogs
       ripgrep

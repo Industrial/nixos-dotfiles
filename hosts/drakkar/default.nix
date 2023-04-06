@@ -52,6 +52,12 @@
     ];
   };
 
+  services = {
+    flatpak = {
+      enable = true;
+    };
+  };
+
   system = {
     stateVersion = "23.05";
   };

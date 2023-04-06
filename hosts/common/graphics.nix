@@ -18,5 +18,9 @@
     variables = {
       AMD_VULKAN_ICD = "RADV";
     };
+
+    systemPackages = with pkgs; [
+      rocminfo
+    ];
   };
 }

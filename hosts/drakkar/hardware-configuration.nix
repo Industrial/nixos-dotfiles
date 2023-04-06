@@ -39,13 +39,13 @@
   # still possible to use this option, but it's recommended to use it in conjunction
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
-  # networking.interfaces.br-01fcf3637eef.useDHCP = lib.mkDefault true;
-  # networking.interfaces.br-0b657dccfd06.useDHCP = lib.mkDefault true;
-  # networking.interfaces.br-33faedecac78.useDHCP = lib.mkDefault true;
-  # networking.interfaces.br-efdfa9f8b904.useDHCP = lib.mkDefault true;
+  # networking.interfaces.br-2532a9e6a3b8.useDHCP = lib.mkDefault true;
+  # networking.interfaces.br-8cd12f68c62c.useDHCP = lib.mkDefault true;
   # networking.interfaces.docker0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.tun0.useDHCP = lib.mkDefault true;
+  # networking.interfaces.veth518f04a.useDHCP = lib.mkDefault true;
+  # networking.interfaces.vetha5b3bb2.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
