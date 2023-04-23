@@ -44,8 +44,6 @@
   # networking.interfaces.docker0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.tun0.useDHCP = lib.mkDefault true;
-  # networking.interfaces.veth518f04a.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vetha5b3bb2.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
