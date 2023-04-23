@@ -24,6 +24,7 @@
       export GIT_EDITOR=nvim
       export PAGER=less
 
+      unalias l
       l() {
         exa \
         --colour=always \
@@ -40,6 +41,7 @@
         $1
       }
 
+      unalias ll
       ll() {
         exa \
         --colour=always \
