@@ -48,7 +48,12 @@
       # NTLM Support for wine
       samba
 
-      lutris
+      overlay_lutris
+
+      # Node.js + Global Packages
+      nodejs-19_x
+      # overlay
+      overlay_promptr
     ];
   };
 
