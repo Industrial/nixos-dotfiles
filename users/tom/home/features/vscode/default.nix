@@ -1,9 +1,4 @@
-{
-  pkgs,
-  config,
-  lib,
-  ...
-}: {
+{pkgs, ...}: {
   programs.vscode = {
     enable = true;
     package = pkgs.vscodium;
@@ -15,6 +10,7 @@
       "[json]"."editor.defaultFormatter" = "vscode.json-language-features";
       "[jsonc]"."editor.defaultFormatter" = "vscode.json-language-features";
       "[python]"."editor.defaultFormatter" = "ms-python.python";
+      "[python]"."editor.formatOnType" = false;
       "[python]"."editor.guides.indentation" = true;
       "[python]"."editor.tabSize" = 4;
       "[typescript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
@@ -41,8 +37,8 @@
       "editor.gotoLocation.multipleTypeDefinitions" = "gotoAndPeek";
       "editor.inlineSuggest.enabled" = true;
       "editor.largeFileOptimizations" = false;
-      "editor.quickSuggestions"."other" = "on";
       "editor.quickSuggestions"."comments" = "on";
+      "editor.quickSuggestions"."other" = "on";
       "editor.quickSuggestions"."strings" = "on";
       "editor.quickSuggestionsDelay" = 10;
       "editor.snippetSuggestions" = "top";
@@ -97,29 +93,17 @@
       "eslint.format.enable" = true;
       "eslint.lintTask.enable" = true;
       "eslint.trace.server" = "verbose";
-      "eslint.validate" = [
-        "javascript"
-        "javascriptreact"
-        "json"
-        "jsonc"
-        "typescript"
-        "typescriptreact"
-      ];
+      "eslint.validate" = ["javascript" "javascriptreact" "json" "jsonc" "typescript" "typescriptreact"];
       "explorer.confirmDelete" = false;
       "explorer.confirmDragAndDrop" = false;
       "extensions.experimental.affinity"."asvetliakov.vscode-neovim" = 1;
       "files.watcherExclude"."**/.git/objects/**" = true;
       "files.watcherExclude"."**/.git/subtree-cache/**" = true;
-      "files.watcherExclude"."**/node_modules/*/**" = true;
       "files.watcherExclude"."**/.hg/store/**" = true;
+      "files.watcherExclude"."**/node_modules/*/**" = true;
       "git.autofetch" = true;
       "git.confirmSync" = false;
       "git.enableSmartCommit" = true;
-      "github.copilit.enable"."*" = true;
-      "github.copilit.enable"."yaml" = false;
-      "github.copilit.enable"."plaintext" = false;
-      "github.copilit.enable"."markdown" = true;
-      "github.copilot.inlineSuggest.enable" = true;
       "http.proxyStrictSSL" = false;
       "javascript.updateImportsOnFileMove.enabled" = "always";
       "jupyter.askForKernelRestart" = false;
@@ -130,10 +114,11 @@
       "python.linting.enabled" = true;
       "python.linting.flake8Args" = ["--ignore" "E501,W503,W504"];
       "python.linting.flake8Enabled" = true;
-      "python.linting.mypyEnabled" = true;
+      "python.linting.mypyEnabled" = false;
       "references.preferredLocation" = "view";
       "scm.inputFontSize" = 16;
       "security.workspace.trust.untrustedFiles" = "open";
+      "tabnine.experimentalAutoImports" = true;
       "terminal.integrated.copyOnSelection" = true;
       "terminal.integrated.enableMultiLinePasteWarning" = false;
       "terminal.integrated.fontSize" = 16;
@@ -355,10 +340,6 @@
         command = "workbench.action.navigateRight";
       }
       {
-        key = "ctrl+shift+enter";
-        command = "github.copilot.generate";
-      }
-      {
         key = "ctrl+enter";
         command = "editor.action.inlineSuggest.trigger";
       }
@@ -371,37 +352,74 @@
         command = "editor.action.inlineSuggest.showPrevious";
       }
     ];
-    extensions = [
-      # Editing
+
+    extensions = with pkgs.vscode-extensions; [
+      # Themes
+      zhuangtongfa.material-theme
+      pkief.material-icon-theme
+
+      # Vim
+      vscodevim.vim
+      # asvetliakov.vscode-neovim
+
+      # Visual Feedback
+      usernamehw.errorlens
+      vspacecode.whichkey
+
+      # Remote Development
       (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
         mktplcRef = {
-          name = "vim";
-          publisher = "vscodevim";
-          version = "1.24.3";
-          sha256 = "sha256-4fPoRBttWVE8Z3e4O6Yrkf04iOu9ElspQFP57HOPVAk=";
+          name = "vscode-remote-extensionpack";
+          publisher = "ms-vscode-remote";
+          version = "0.24.0";
+          sha256 = "sha256-6v4JWpyMxqTDIjEOL3w25bdTN+3VPFH7HdaSbgIlCmo=";
         };
       })
 
-      # Visual Information
+      # Completion
+      tabnine.tabnine-vscode
+
+      # File Types
+      ## GraphQL
+      graphql.vscode-graphql
+      ## Markdown
+      yzhang.markdown-all-in-one
+      # JavaScript / TypeScript
+      dbaeumer.vscode-eslint
+      denoland.vscode-deno
+      # Python
+      ms-python.python
+      ms-pyright.pyright
+      tamasfe.even-better-toml
+      # Nix
+      bbenoist.nix
+      jnoortheen.nix-ide
+      # YAML
+      redhat.vscode-yaml
+      # Docker
+      ms-azuretools.vscode-docker
+      # Dotenv
+      mikestead.dotenv
+      # Git
+      mhutchie.git-graph
       (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
         mktplcRef = {
-          name = "errorlens";
-          publisher = "usernamehw";
-          version = "3.7.0";
-          sha256 = "sha256-/+bkVFI5dJo8shmJlRu+Ms3SVGsWi5g1T1V86p3Mk1U=";
+          name = "vscode-git-extension-pack";
+          publisher = "sugatoray";
+          version = "1.1.1";
+          sha256 = "sha256-0b1H5mzhBkf4By67rF3xZXRkfzoNYlvoYCGG+F7Kans=";
         };
       })
 
-      # Auto Completion
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "vscode-chatgpt";
-          publisher = "gencay";
-          version = "3.9.2";
-          sha256 = "sha256-OJk3bp8Pnt/9JD2Ezlp09G7CNoyYbZu6uCc0/eaCTCo=";
-        };
-      })
-
+      # TODO: Download Error
+      #(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+      #  mktplcRef = {
+      #    name = "alejandra";
+      #    publisher = "kamadorueda";
+      #    version = "1.4.0";
+      #    sha256 = "sha256-mLgXO0wiG2/UWP5ynV1eboLfH3yoJVBM3T2vU+Dx084=";
+      #  };
+      #})
       # Testing
       # TODO: Download Error
       #(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
@@ -435,103 +453,6 @@
       #    publisher = "ms-playwright";
       #    version = "1.0.7";
       #    sha256 = "sha256-hCSgMb9kdZu9fK+2G+oM6vWzISb37jFtr33Q3KynRy4=";
-      #  };
-      #})
-
-      # File Types
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "vscode-graphql";
-          publisher = "GraphQL";
-          version = "0.3.53";
-          sha256 = "sha256-zEjtAXFGEjB7d1EaHddiusSIQCnai7Pc6oTbY+RE1kM=";
-        };
-      })
-
-      # JavaScript / TypeScript
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "vscode-eslint";
-          publisher = "dbaeumer";
-          version = "2.4.0";
-          sha256 = "sha256-7MUQJkLPOF3oO0kpmfP3bWbS3aT7J0RF7f74LW55BQs=";
-        };
-      })
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "astro-vscode";
-          publisher = "astro-build";
-          version = "0.28.0";
-          sha256 = "sha256-ff4VcgLtaDu8pM2Y+HvvJRxcgsy78T2CILarUMqyuJ0=";
-        };
-      })
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "material-icon-theme";
-          publisher = "PKief";
-          version = "4.24.0";
-          sha256 = "sha256-hJy+ymnlF9a2vvN/HhJ5N75lIc2afzkq+S0Cv/KnD3M=";
-        };
-      })
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "bracket-pair-colorizer-2";
-          publisher = "CoenraadS";
-          version = "0.1.4";
-          sha256 = "sha256-YHylV6OHt5W/2jprD5ukNLzfedQwRHLOya2saHDmSiM=";
-        };
-      })
-
-      # Python
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "python";
-          publisher = "ms-python";
-          version = "2023.2.0";
-          sha256 = "sha256-By36L9SqsGPtJa9WqO+MdAZVzMnGqkSnu4DcquugmbI=";
-        };
-      })
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "pyright";
-          publisher = "ms-pyright";
-          version = "1.1.294";
-          sha256 = "sha256-mLgXO0wiG2/UWP5ynV1eboLfH3yoJVBM3T2vU+Dx084=";
-        };
-      })
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "even-better-toml";
-          publisher = "tamasfe";
-          version = "0.19.0";
-          sha256 = "sha256-MqSQarNThbEf1wHDTf1yA46JMhWJN46b08c7tV6+1nU=";
-        };
-      })
-
-      # Nix
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "Nix";
-          publisher = "bbenoist";
-          version = "1.0.1";
-          sha256 = "sha256-qwxqOGublQeVP2qrLF94ndX/Be9oZOn+ZMCFX1yyoH0=";
-        };
-      })
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "nix-ide";
-          publisher = "jnoortheen";
-          version = "0.2.1";
-          sha256 = "sha256-yC4ybThMFA2ncGhp8BYD7IrwYiDU3226hewsRvJYKy4=";
-        };
-      })
-      # TODO: Download Error
-      #(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-      #  mktplcRef = {
-      #    name = "alejandra";
-      #    publisher = "kamadorueda";
-      #    version = "1.4.0";
-      #    sha256 = "sha256-mLgXO0wiG2/UWP5ynV1eboLfH3yoJVBM3T2vU+Dx084=";
       #  };
       #})
     ];
