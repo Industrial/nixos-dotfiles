@@ -6,6 +6,9 @@ set -e
 echo "> sudo nix-channel --update"
 sudo nix-channel --update
 
+echo "> nix-env -u --always"
+nix-env -u --always
+
 # Update nix
 echo "> nix flake update"
 nix flake update
@@ -25,3 +28,9 @@ home-manager switch --flake '.' --show-trace
 echo "> nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix"
 nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix
 
+echo "> sudo nix-collect-garbage"
+sudo nix-collect-garbage
+
+# Remove everything
+# sudo nix-collect-garbage -d
+#
