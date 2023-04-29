@@ -105,7 +105,7 @@
         tmux send-keys -t system:media "mpv --no-video --loop $HOME/Music/1-minute-of-silence.mp3" Enter
         tmux select-window -t system:media
         tmux split-window -h
-        tmux send-keys -t system:media "alsamixer -c 2" Enter
+        tmux send-keys -t system:media "pulsemixer" Enter
 
         tmux new-window -a -t system:media -n taskwarrior -c "$HOME"
         tmux send-keys -t system:taskwarrior "vit" Enter
@@ -114,6 +114,11 @@
 
         tmux attach -t system
       }
+
+      export PATH=~/.npm-packages/bin:$PATH
+      export NODE_PATH=~/.npm-packages/lib/node_modules
+
+      source ~/.dotfiles/users/tom/home/features/zsh/secrets.zsh
     '';
 
     plugins = [
@@ -164,7 +169,7 @@
         src = pkgs.fetchgit {
           url = "https://github.com/Industrial/havamal-bash";
           rev = "v0.2.0";
-          sha256 = "sha256-ikltDhriLYw0nsr4BcpKaEu2iRYSNuEtHeOtX30EzC4=";
+          sha256 = "sha256-gBlNGfd5thYLERuDZzB1Sf7vyDfoNVv8ql+/aekSc8k=";
         };
       }
     ];

@@ -1,13 +1,13 @@
 {pkgs, ...}: {
   imports = [
-    ./features/git
-    ./features/gnome
-    ./features/mpv
-    ./features/neovim
-    ./features/taskwarrior
-    ./features/tmux
-    ./features/vscode
-    ./features/zsh
+    #./features/gnome.nix
+    ./features/git.nix
+    ./features/mpv.nix
+    ./features/neovim.nix
+    ./features/taskwarrior.nix
+    ./features/tmux.nix
+    ./features/vscode.nix
+    ./features/zsh.nix
   ];
 
   home = {

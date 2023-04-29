@@ -1,36 +1,28 @@
 #!/usr/bin/env bash
-# Stop on error
 set -e
 
-# Update channels
 echo "> sudo nix-channel --update"
+sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
 sudo nix-channel --update
 
 echo "> nix-env -u --always"
 nix-env -u --always
 
-# Update nix
 echo "> nix flake update"
-nix flake update
+nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update
 
-# Build the system
-echo "> sudo nixos-rebuild build --flake '.#drakkar' --show-trace"
-sudo nixos-rebuild build --flake '.#drakkar' --show-trace
-echo "> sudo ./result/activate"
-sudo ./result/activate
-echo "> rm -f ./result"
-rm -f ./result
+echo "> sudo nixos-rebuild switch --flake '.#drakkar' --show-trace"
+sudo nixos-rebuild switch --flake '.#drakkar' --show-trace
 
-# Build HomeManager
 echo "> home-manager switch --flake '.' --show-trace"
 home-manager switch --flake '.' --show-trace
 
-echo "> nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix"
-nixos-generate-config --show-hardware-config > hosts/drakkar/hardware-configuration.nix
+echo "> nixos-generate-config --show-hardware-config > hardware-configuration.nix"
+nixos-generate-config --show-hardware-config > hardware-configuration.nix
 
-echo "> sudo nix-collect-garbage"
-sudo nix-collect-garbage
+#echo "> sudo nix-collect-garbage"
+#sudo nix-collect-garbage
 
 # Remove everything
 # sudo nix-collect-garbage -d
-#
+
