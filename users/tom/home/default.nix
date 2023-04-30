@@ -1,13 +1,14 @@
 {pkgs, ...}: {
   imports = [
     #./features/gnome.nix
+    #./features/zsh.nix
+    ./features/fish
     ./features/git.nix
     ./features/mpv.nix
     ./features/neovim.nix
     ./features/taskwarrior.nix
     ./features/tmux.nix
     ./features/vscode.nix
-    ./features/zsh.nix
   ];
 
   home = {
@@ -19,6 +20,7 @@
       EDITOR = "nvim";
       GIT_EDITOR = "nvim";
       VISUAL = "nvim";
+      PAGER = "nvim";
       DIFFPROG = "nvim -d";
       MANPAGER = "nvim +Man!";
       MANWIDTH = 999;

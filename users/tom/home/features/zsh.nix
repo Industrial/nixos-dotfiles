@@ -20,9 +20,8 @@
         [ -s "$BASE16_SHELL_PATH/profile_helper.sh" ] && \
         source "$BASE16_SHELL_PATH/profile_helper.sh"
 
-      export EDITOR=nvim
-      export GIT_EDITOR=nvim
-      export PAGER=less
+      export PATH=~/.npm-packages/bin:$PATH
+      export NODE_PATH=~/.npm-packages/lib/node_modules
 
       unalias l
       l() {
@@ -114,11 +113,6 @@
 
         tmux attach -t system
       }
-
-      export PATH=~/.npm-packages/bin:$PATH
-      export NODE_PATH=~/.npm-packages/lib/node_modules
-
-      source ~/.dotfiles/users/tom/home/features/zsh/secrets.zsh
     '';
 
     plugins = [
@@ -140,30 +134,30 @@
           sha256 = "sha256-KQ7UKudrpqUwI6gMluDTVN0qKpB15PI5P1YHHCBIlpg=";
         };
       }
-      {
-        name = "fzf-tab";
-        src = pkgs.fetchgit {
-          url = "https://github.com/Aloxaf/fzf-tab";
-          rev = "ffb7b776be492333b94cf0be87456b62a1f26e2f";
-          sha256 = "sha256-bIlnYKjjOC6h5/Gg7xBg+i2TBk+h82wmHgAJPhzMsek=";
-        };
-      }
+      #{
+      #  name = "fzf-tab";
+      #  src = pkgs.fetchgit {
+      #    url = "https://github.com/Aloxaf/fzf-tab";
+      #    rev = "ffb7b776be492333b94cf0be87456b62a1f26e2f";
+      #    sha256 = "sha256-bIlnYKjjOC6h5/Gg7xBg+i2TBk+h82wmHgAJPhzMsek=";
+      #  };
+      #}
       {
         name = "base16-shell";
         src = pkgs.fetchgit {
           url = "https://github.com/tinted-theming/base16-shell";
-          rev = "64b96b17fc1d7cb16fb5c64b5dbed7f8b2379f6d";
-          sha256 = "sha256-SnvGz5MANQPYZIgIriv3Ly4YcvSpQLwMsZDEO3qwKNI=";
+          rev = "d0737249d4c8bb26dc047ea9fba0054ae7024c04";
+          sha256 = "sha256-X6Pcu/LM9PSaUwLxHoklXNkSEz+X1+cIt8lmu6tViMk=";
         };
       }
-      {
-        name = "zsh-fzf-history-search";
-        src = pkgs.fetchgit {
-          url = "https://github.com/joshskidmore/zsh-fzf-history-search";
-          rev = "446da4a412048ae3ea16e5a355f953385d965742";
-          sha256 = "sha256-nGwnClIEvs8scQzDBTqCt6gu9PdM3WunGduUq0sQ5BQ=";
-        };
-      }
+      #{
+      #  name = "zsh-fzf-history-search";
+      #  src = pkgs.fetchgit {
+      #    url = "https://github.com/joshskidmore/zsh-fzf-history-search";
+      #    rev = "446da4a412048ae3ea16e5a355f953385d965742";
+      #    sha256 = "sha256-nGwnClIEvs8scQzDBTqCt6gu9PdM3WunGduUq0sQ5BQ=";
+      #  };
+      #}
       {
         name = "Hávamál";
         src = pkgs.fetchgit {

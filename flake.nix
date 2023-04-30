@@ -90,29 +90,16 @@
             services.pipewire.pulse.enable = true;
 
             # Shell
-            programs.zsh.enable = true;
-            programs.zsh.enableCompletion = true;
-            programs.zsh.autosuggestions.enable = true;
-            programs.zsh.syntaxHighlighting.enable = true;
-            users.users.tom.shell = pkgs.zsh;
+            programs.fish.enable = true;
+            users.users.tom.shell = pkgs.fish;
 
             # Window Manager
             services.xserver.enable = true;
             services.xserver.dpi = 96;
             services.xserver.layout = "us";
             services.xserver.xkbVariant = "";
-            #services.xserver.displayManager.defaultSession = "xfce+xmonad";
             services.xserver.displayManager.defaultSession = "xfce";
             services.xserver.desktopManager.xfce.enable = true;
-            #services.xserver.desktopManager.xfce.noDesktop = true;
-            #services.xserver.desktopManager.xfce.enableXfwm = false;
-            #services.xserver.windowManager.xmonad.enable = true;
-            #services.xserver.windowManager.xmonad.enableContribAndExtras = true;
-            #services.xserver.windowManager.xmonad.extraPackages = [
-            #  pkgs.haskellPackages.xmonad-contrib
-            #  pkgs.haskellPackages.xmonad-extras
-            #  pkgs.haskellPackages.xmonad
-            #];
             services.xserver.videoDrivers = ["amdgpu"];
 
             # Fonts
