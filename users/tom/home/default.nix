@@ -5,6 +5,7 @@
     ./features/base16-shell
     ./features/fish
     ./features/git
+    ./features/lutris
     ./features/mpv
     ./features/neovim
     ./features/taskwarrior
@@ -61,7 +62,6 @@
       xsel
       yubikey-personalization-gui
       zeal
-      #lutris-unwrapped
 
       # Matrix
       cinny-desktop
