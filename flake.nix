@@ -22,6 +22,7 @@
         inherit system;
 
         modules = [
+          ./features/xfce
           ({...}: {
             imports = [
               ./hardware-configuration.nix

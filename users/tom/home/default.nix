@@ -11,6 +11,7 @@
     ./features/taskwarrior
     ./features/tmux
     ./features/vscode
+    ./features/xfce
   ];
 
   home = {
