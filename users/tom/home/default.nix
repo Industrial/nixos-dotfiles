@@ -2,6 +2,7 @@
   imports = [
     #./features/gnome
     #./features/zsh
+    ./features/base16-shell
     ./features/fish
     ./features/git
     ./features/mpv
