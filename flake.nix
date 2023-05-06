@@ -52,25 +52,15 @@
               };
             };
 
-            # Beyond All Reason
-            xdg.portal.enable = true;
-            xdg.portal.extraPortals = [pkgs.xdg-desktop-portal-gtk];
-            services.flatpak.enable = true;
-
             # Packages
             environment.systemPackages = with pkgs; [
               # Git (needed for home-manager / flakes)
               git
 
               # Node.js + Global Packages
-              nodejs-19_x
+              #nodejs-19_x
               # overlay
               #promptr
-
-              # Beyond All Reason
-              openal
-              #openal-soft
-              xdg-desktop-portal-gtk
             ];
           })
         ];
@@ -83,10 +73,10 @@
         modules = [
           inputs.stylix.homeManagerModules.stylix
           #./features/home/gnome
+          #./features/home/lutris
           #./features/home/zsh
           ./features/home/fish
           ./features/home/git
-          ./features/home/lutris
           ./features/home/matrix
           ./features/home/mpv
           ./features/home/neovim
@@ -113,7 +103,6 @@
 
               packages = with pkgs; [
                 #libreoffice
-                android-tools
                 appimage-run
                 bitwarden
                 bookworm
@@ -128,33 +117,38 @@
                 fzf
                 gcc
                 gitkraken
-                gnomeExtensions.material-shell
                 htop
                 meld
                 nethogs
                 ripgrep
                 slack
                 spotify
-                starship
                 steam
                 transmission-gtk
                 unzip
-                usbutils
                 vit
                 vlc
+                yubikey-personalization-gui
+
+                # TODO: What for?
+                android-tools
+                usbutils
+
+                # TODO: Add these to tmux setup
                 xclip
                 xsel
-                yubikey-personalization-gui
-                zeal
+
+                # TODO: Add to fish setup
+                starship
 
                 # Tor
-                tor-browser-bundle-bin
+                #tor-browser-bundle-bin
 
                 # Python
-                stdenv.cc.cc.lib
-                python3
-                virtualenv
-                poetry
+                #stdenv.cc.cc.lib
+                #python3
+                #virtualenv
+                #poetry
 
                 # Java
                 jre8

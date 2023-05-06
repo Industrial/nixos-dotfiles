@@ -1,3 +1,4 @@
+# TODO: Git diff support
 {pkgs, ...}: {
   programs.neovim = {
     enable = true;
@@ -5,6 +6,7 @@
     vimAlias = true;
 
     extraPackages = with pkgs; [
+      (pkgs.lua.withPackages (ps: [ps.luafilesystem ps.moonscript]))
       alejandra
       luajitPackages.luacheck
       nil
