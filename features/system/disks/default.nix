@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{...}: {
   fileSystems."/" = {
     device = "/dev/disk/by-uuid/3269a0d8-8ccf-4f75-9bae-10a549389942";
     fsType = "ext4";

@@ -1,8 +1,6 @@
-{environment, pkgs, ...}:
-let
-  havamalPlugin = pkgs.callPackage ./havamal.nix { };
-in
-{
+{pkgs, ...}: let
+  havamalPlugin = pkgs.callPackage ./havamal.nix {};
+in {
   home.packages = with pkgs; [
     base16-schemes
     exa
@@ -17,12 +15,27 @@ in
   ];
   programs.fish.enable = true;
   programs.fish.plugins = [
-    { name = "autopair"; src = pkgs.fishPlugins.autopair.src; }
-    { name = "bass"; src = pkgs.fishPlugins.bass.src; }
-    { name = "done"; src = pkgs.fishPlugins.done.src; }
-    { name = "fzf"; src = pkgs.fishPlugins.fzf.src; }
-    { name = "grc"; src = pkgs.fishPlugins.grc.src; }
-    { name = "Hávamál"; src = havamalPlugin.src; }
+    #{ name = "autopair"; src = pkgs.fishPlugins.autopair.src; }
+    {
+      name = "bass";
+      src = pkgs.fishPlugins.bass.src;
+    }
+    {
+      name = "done";
+      src = pkgs.fishPlugins.done.src;
+    }
+    {
+      name = "fzf";
+      src = pkgs.fishPlugins.fzf.src;
+    }
+    {
+      name = "grc";
+      src = pkgs.fishPlugins.grc.src;
+    }
+    {
+      name = "Hávamál";
+      src = havamalPlugin.src;
+    }
   ];
 
   programs.fish.shellAbbrs = {
@@ -60,7 +73,7 @@ in
       --group-directories-first \
       --sort Extension \
       --all \
-      $1
+      $argv
     end
 
     function ll
@@ -75,7 +88,7 @@ in
       --classify \
       --group-directories-first \
       --sort Extension \
-      $1
+      $argv
     end
 
     function tmux-sessions
@@ -123,25 +136,11 @@ in
 
     # Starship Shell
     starship init fish | source
-
-    # Hávamál
   '';
 
   programs.fish.interactiveShellInit = ''
     # Disable greeting
-    set fish_greeting
-
-    # # Base16 Shell
-    # set BASE16_SHELL "$HOME/.config/base16-shell/"
-    # source "$BASE16_SHELL/profile_helper.fish"
-
-    # # Promptline
-    # function fish_prompt
-    #   env FISH_VERSION=$FISH_VERSION PROMPTLINE_LAST_EXIT_CODE=$status bash ~/.promptline.sh left
-    # end
-
-    # function fish_right_prompt
-    #   env FISH_VERSION=$FISH_VERSION PROMPTLINE_LAST_EXIT_CODE=$status bash ~/.promptline.sh right
-    # end
+    function fish_greeting
+    end
   '';
 }

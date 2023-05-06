@@ -1,8 +1,4 @@
-{
-  pkgs,
-  config,
-  ...
-}: {
+{pkgs, ...}: {
   programs.tmux = {
     aggressiveResize = false;
     baseIndex = 1;

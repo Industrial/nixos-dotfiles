@@ -1,5 +1,4 @@
-{ pkgs, ... }:
-
+{pkgs, ...}:
 pkgs.fishPlugins.buildFishPlugin rec {
   pname = "Hávamál";
   version = "v0.3.1";
@@ -15,6 +14,6 @@ pkgs.fishPlugins.buildFishPlugin rec {
     description = "Prints a random havamal stanza";
     homepage = "https://github.com/Industrial/havamal-bash";
     license = licenses.unlicense;
-    maintainers = with maintainers; [ Industrial ];
+    maintainers = with maintainers; [Industrial];
   };
 }

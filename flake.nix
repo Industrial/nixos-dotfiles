@@ -44,6 +44,19 @@
               ./hardware-configuration.nix
             ];
 
+            hardware.bluetooth.enable = true;
+            services.blueman.enable = true;
+            hardware.bluetooth.settings = {
+              General = {
+                Enable = "Source,Sink,Media,Socket";
+              };
+            };
+
+            # Beyond All Reason
+            xdg.portal.enable = true;
+            xdg.portal.extraPortals = [pkgs.xdg-desktop-portal-gtk];
+            services.flatpak.enable = true;
+
             # Packages
             environment.systemPackages = with pkgs; [
               # Git (needed for home-manager / flakes)
@@ -53,6 +66,11 @@
               nodejs-19_x
               # overlay
               #promptr
+
+              # Beyond All Reason
+              openal
+              #openal-soft
+              xdg-desktop-portal-gtk
             ];
           })
         ];
@@ -66,7 +84,6 @@
           inputs.stylix.homeManagerModules.stylix
           #./features/home/gnome
           #./features/home/zsh
-          ./features/home/base16-shell
           ./features/home/fish
           ./features/home/git
           ./features/home/lutris
@@ -95,7 +112,7 @@
               };
 
               packages = with pkgs; [
-                usbutils
+                #libreoffice
                 android-tools
                 appimage-run
                 bitwarden
@@ -113,7 +130,6 @@
                 gitkraken
                 gnomeExtensions.material-shell
                 htop
-                #libreoffice
                 meld
                 nethogs
                 ripgrep
@@ -122,6 +138,8 @@
                 starship
                 steam
                 transmission-gtk
+                unzip
+                usbutils
                 vit
                 vlc
                 xclip

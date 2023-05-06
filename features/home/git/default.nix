@@ -1,8 +1,4 @@
-{
-  pkgs,
-  config,
-  ...
-}: {
+{...}: {
   programs.git = {
     enable = true;
     userName = "Tom Wieland";

@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{...}: {
   services.xserver.enable = true;
   services.xserver.dpi = 96;
   services.xserver.layout = "us";
