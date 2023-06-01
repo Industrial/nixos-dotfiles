@@ -16,7 +16,7 @@ comment = () ->
   vim.keymap.set "v", "<C-/>", ":\"<,\">CommentToggle<cr>",
     noremap: true
 
-() ->
+(() ->
   -- make movement keys wrap to the next/previous line
   vim.opt.whichwrap = "b,s,h,l,<,>,[,]"
 
@@ -29,3 +29,4 @@ comment = () ->
 
   mouse!
   comment!
+)!

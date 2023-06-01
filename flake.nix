@@ -52,10 +52,18 @@
               };
             };
 
+            # virtualisation.virtualbox.host.enable = true;
+            # virtualisation.virtualbox.guest.enable = true;
+            # virtualisation.virtualbox.guest.x11 = true;
+
             # Packages
             environment.systemPackages = with pkgs; [
               # Git (needed for home-manager / flakes)
               git
+              p7zip
+              xfce.thunar-archive-plugin
+              unrar
+              xarchiver
 
               # Node.js + Global Packages
               #nodejs-19_x
@@ -73,13 +81,14 @@
         modules = [
           inputs.stylix.homeManagerModules.stylix
           #./features/home/gnome
-          #./features/home/lutris
+          #./features/home/matrix
           #./features/home/zsh
           ./features/home/fish
           ./features/home/git
-          ./features/home/matrix
+          ./features/home/lutris
           ./features/home/mpv
           ./features/home/neovim
+          ./features/home/ruby
           ./features/home/stylix
           ./features/home/taskwarrior
           ./features/home/tmux
@@ -104,9 +113,9 @@
               packages = with pkgs; [
                 #libreoffice
                 appimage-run
-                bitwarden
-                bookworm
-                chromium
+                #bitwarden
+                #bookworm
+                #chromium
                 direnv
                 discord
                 docker-compose
@@ -116,30 +125,27 @@
                 firefox
                 fzf
                 gcc
-                gitkraken
+                #gitkraken
                 htop
                 meld
-                nethogs
+                #nethogs
                 ripgrep
-                slack
+                #slack
                 spotify
-                steam
+                #steam
                 transmission-gtk
                 unzip
                 vit
                 vlc
-                yubikey-personalization-gui
+                #yubikey-personalization-gui
 
                 # TODO: What for?
-                android-tools
-                usbutils
+                #android-tools
+                #usbutils
 
                 # TODO: Add these to tmux setup
                 xclip
                 xsel
-
-                # TODO: Add to fish setup
-                starship
 
                 # Tor
                 #tor-browser-bundle-bin
@@ -151,7 +157,7 @@
                 #poetry
 
                 # Java
-                jre8
+                #jre8
               ];
             };
           })

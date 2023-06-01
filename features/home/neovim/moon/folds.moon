@@ -1,4 +1,4 @@
-() ->
+(() ->
   foldMode = require "lib.fold-mode"
   whichkey = require "which-key"
 
@@ -19,3 +19,4 @@
   }
 
   foldMode.defaultFoldMode!
+)!

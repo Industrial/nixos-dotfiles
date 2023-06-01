@@ -1,4 +1,4 @@
-() ->
+(() ->
   whichkey = require "which-key"
   nvimtree = require "nvim-tree"
 
@@ -28,3 +28,4 @@
   }, {
     prefix: "<leader>"
   }
+)!

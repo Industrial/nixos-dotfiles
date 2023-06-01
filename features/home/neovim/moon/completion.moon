@@ -443,6 +443,26 @@ languageServerProtocol = () ->
         useLibraryCodeForTypes: true
   }
 
+  -- PureScript
+  lspconfig.purescriptls.setup {
+    capabilities: capabilities
+    flags: flags
+    cmd: { "purescript-language-server", "--stdio" }
+    filetypes: { "purescript" }
+    settings:
+      purescript:
+        addSpagoSources: true
+        addNpmPath: true
+        formatter: "purs-tidy"
+  }
+  -- TODO: Couldn't get this to parse unless it was in a function.
+  (() ->
+    vim.g.purescript_disable_indent = 1
+    vim.g.purescript_unicode_conceal_enable = 1
+    vim.g.purescript_unicode_conceal_disable_common = 0
+    vim.g.purescript_unicode_conceal_enable_discretionary = 1
+  )!
+
   whichkey.register {
     l:
       name: "LSP"
@@ -510,7 +530,7 @@ languageServerProtocol = () ->
         }
   }
 
-() ->
+(() ->
   -- TODO: Document.
   vim.opt.completeopt = {
     "menu",
@@ -526,6 +546,7 @@ languageServerProtocol = () ->
 
   astparser!
   completepairs!
-  copilot!
+  --copilot!
   diagnosticsigns!
   languageServerProtocol!
+)!

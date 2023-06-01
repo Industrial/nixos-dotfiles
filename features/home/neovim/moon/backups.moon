@@ -25,7 +25,8 @@ undoFiles = () ->
   -- Directory to put undo files in.
   vim.opt.undodir = vim.fn.expand "~/.config/nvim/undo"
 
-() ->
+(() ->
   backupFiles!
   swapFiles!
   undoFiles!
+)!

@@ -43,5 +43,6 @@
     xfce.xfce4-whiskermenu-plugin
     xfce.xfce4-windowck-plugin
     xfce.xfce4-xkb-plugin
+    (pkgs.xfce.thunar.override {thunarPlugins = [pkgs.xfce.thunar-archive-plugin];})
   ];
 }

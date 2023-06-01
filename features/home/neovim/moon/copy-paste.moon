@@ -1,4 +1,4 @@
-() ->
+(() ->
   -- Global copy/paste register delete/yank/paste in normal mode.
   vim.keymap.set "n", "<leader>d", '"+d', {}
   vim.keymap.set "n", "<leader>y", '"+y', {}
@@ -15,3 +15,4 @@
   vim.keymap.set "v", "<C-x>", '"+d', {}
   -- Paste from Global Copy/Paste Register in Insert Mode.
   vim.keymap.set "i", "<C-v>", '<esc>"+pi', {}
+)!

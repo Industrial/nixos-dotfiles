@@ -7,5 +7,7 @@
     "networkmanager"
     "plugdev"
     "wheel"
+    # "vboxusers"
   ];
+  # users.extraGroups.vboxusers.members = ["tom"];
 }

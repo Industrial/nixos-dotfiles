@@ -5,6 +5,7 @@
     enableUpdateCheck = true;
     enableExtensionUpdateCheck = true;
     userSettings = {
+      "[haskell]"."editor.defaultFormatter" = "haskell.haskell";
       "[javascript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "[javascriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "[json]"."editor.defaultFormatter" = "vscode.json-language-features";
@@ -13,6 +14,7 @@
       "[python]"."editor.formatOnType" = false;
       "[python]"."editor.guides.indentation" = true;
       "[python]"."editor.tabSize" = 4;
+      "[ruby]"."editor.defaultFormatter" = "rebornix.ruby";
       "[typescript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "[typescriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "debug.console.fontSize" = 16;
@@ -116,6 +118,26 @@
       "python.linting.flake8Enabled" = true;
       "python.linting.mypyEnabled" = false;
       "references.preferredLocation" = "view";
+      #"ruby.format" = "rubocop";
+      "ruby.useBundler" = false;
+      "ruby.useLanguageServer" = false;
+      "rubyLsp.enableExperimentalFeatures" = true;
+      "rubyLsp.enabledFeatures" = {
+        "codeActions" = true;
+        "codeLens" = true;
+        "completion" = true;
+        "diagnostics" = true;
+        "documentHighlights" = true;
+        "documentLink" = true;
+        "documentSymbols" = true;
+        "foldingRanges" = true;
+        "formatting" = true;
+        "hover" = true;
+        "inlayHint" = true;
+        "onTypeFormatting" = true;
+        "selectionRanges" = true;
+        "semanticHighlighting" = true;
+      };
       "scm.inputFontSize" = 16;
       "security.workspace.trust.untrustedFiles" = "open";
       "tabnine.experimentalAutoImports" = true;
@@ -388,7 +410,7 @@
       dbaeumer.vscode-eslint
       denoland.vscode-deno
       # Python
-      ms-python.python
+      #ms-python.python
       ms-pyright.pyright
       tamasfe.even-better-toml
       # Nix
@@ -408,6 +430,34 @@
           publisher = "sugatoray";
           version = "1.1.1";
           sha256 = "sha256-0b1H5mzhBkf4By67rF3xZXRkfzoNYlvoYCGG+F7Kans=";
+        };
+      })
+      # Ruby
+      rebornix.ruby
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "solargraph";
+          publisher = "castwide";
+          version = "0.24.0";
+          sha256 = "sha256-7mMzN+OdJ5R9CVaBJMzW218wMG5ETvNrUTST9/kjjV0=";
+        };
+      })
+      # Haskell
+      haskell.haskell
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "vscode-ghc-simple";
+          publisher = "dramforever";
+          version = "0.2.3";
+          sha256 = "sha256-dxp7Av3WuUOjJPXNeHTbHQclqwe8epUquvWx3Tq5p90=";
+        };
+      })
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "haskell-ghcid";
+          publisher = "ndmitchell";
+          version = "0.3.1";
+          sha256 = "sha256-Ke7P8EJ3ghYG1qyf+w8c2xJlGrRGkJgJwvt0MSb9O+Y=";
         };
       })
 
@@ -457,4 +507,11 @@
       #})
     ];
   };
+
+  home.packages = with pkgs; [
+    rubyPackages.solargraph
+
+    ghc
+    haskellPackages.haskell-language-server
+  ];
 }

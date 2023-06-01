@@ -81,7 +81,7 @@ interface = () ->
 
   dapui.setup!
 
-() ->
+(() ->
   whichkey = require "which-key"
   dapui = require "dapui"
 
@@ -104,3 +104,4 @@ interface = () ->
   lua!
   --nodejs!
   python!
+)!

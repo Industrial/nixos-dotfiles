@@ -1,7 +1,7 @@
 base16 = () ->
   vim.g.base16colorspace = 256
 
-() ->
+(() ->
   -- Enables 24-bit RGB color in the TUI.
   vim.opt.termguicolors = true
 
@@ -17,3 +17,4 @@ base16 = () ->
   --   vim.cmd "colorscheme base16-#{current_theme_name}"
 
   -- vim.cmd "colorscheme base16-tomorrow-night"
+)!

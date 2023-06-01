@@ -8,7 +8,7 @@ smartBufferWipeout = () ->
   vim.cmd "bnext"
   vim.cmd "bwipeout #{lastBuffer}"
 
-() ->
+(() ->
   whichkey = require "which-key"
 
   -- load filetype plugins, indentation and turn syntax highlighting on
@@ -38,3 +38,4 @@ smartBufferWipeout = () ->
   }, {
     prefix: "<leader>"
   }
+)!

@@ -1,41 +1,24 @@
 {pkgs, ...}: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {};
 in {
-  home.packages = with pkgs; [
-    base16-schemes
-    exa
-    fishPlugins.autopair
-    fishPlugins.bass
-    fishPlugins.done
-    fishPlugins.fzf
-    fishPlugins.grc
-    fzf
-    grc
-    starship
-  ];
+  # Enable HomeManager Fish, not system fish.
   programs.fish.enable = true;
+
+  # Make sure the fish plugins and their dependencies are installed in environment.systemPackages.
   programs.fish.plugins = [
-    #{ name = "autopair"; src = pkgs.fishPlugins.autopair.src; }
     {
       name = "bass";
       src = pkgs.fishPlugins.bass.src;
     }
     {
-      name = "done";
-      src = pkgs.fishPlugins.done.src;
-    }
-    {
       name = "fzf";
       src = pkgs.fishPlugins.fzf.src;
     }
-    {
-      name = "grc";
-      src = pkgs.fishPlugins.grc.src;
-    }
-    {
-      name = "Hávamál";
-      src = havamalPlugin.src;
-    }
+    # TODO: Make it only run on interactive shells
+    #{
+    #  name = "Hávamál";
+    #  src = havamalPlugin.src;
+    #}
   ];
 
   programs.fish.shellAbbrs = {
@@ -104,7 +87,7 @@ in {
       tmux split-window -v "nethogs"
 
       tmux new-window -a -t system:processes -n configuration -c "$HOME/.dotfiles"
-      tmux send-keys -t system:configuration "nvim /etc/nixos/configuration.nix" Enter
+      tmux send-keys -t system:configuration "nvim flake.nix" Enter
       tmux select-window -t system:configuration
       tmux split-window -h
       tmux send-keys -t system:configuration "c $HOME/.dotfiles" Enter

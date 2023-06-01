@@ -1,4 +1,4 @@
-() ->
+(() ->
   whichkey = require "which-key"
 
   -- Splitting a window horizontally (:split) will put the new window below the current one.
@@ -37,3 +37,4 @@
   }, {
     prefix: "<leader>"
   }
+)!

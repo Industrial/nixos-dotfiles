@@ -1,12 +1,21 @@
 # TODO: Git diff support
-{pkgs, ...}: {
+{pkgs, ...}: let
+  myneovim = pkgs.neovim.overrideAttrs (attrs: {
+    nativeBuildInputs =
+      attrs.nativeBuildInputs
+      ++ [
+        (pkgs.lua.withPackages (ps: [ps.luafilesystem ps.moonscript]))
+      ];
+  });
+in {
   programs.neovim = {
     enable = true;
+    #package = myneovim;
+
     viAlias = true;
     vimAlias = true;
 
     extraPackages = with pkgs; [
-      (pkgs.lua.withPackages (ps: [ps.luafilesystem ps.moonscript]))
       alejandra
       luajitPackages.luacheck
       nil
@@ -17,22 +26,22 @@
       nodePackages.eslint
       nodePackages.eslint_d
       nodePackages.graphql-language-service-cli
+      nodePackages.purescript-language-server
+      nodePackages.purs-tidy
       nodePackages.stylelint
       nodePackages.typescript
       nodePackages.typescript-language-server
       nodePackages.vim-language-server
       nodePackages.vscode-langservers-extracted
       nodePackages.yaml-language-server
-      nodejs-16_x
+      nodejs_20
+      purescript
       pyright
       python311Packages.python-lsp-server
+      spago
       stylua
       sumneko-lua-language-server
     ];
-
-    extraConfig = ''
-      lua require('initialize')
-    '';
 
     plugins = with pkgs.vimPlugins; [
       base16-vim
@@ -64,11 +73,16 @@
       nvim-treesitter.withAllGrammars
       nvim-web-devicons
       plenary-nvim
+      purescript-vim
       telescope-dap-nvim
       telescope-nvim
       trouble-nvim
-      which-key-nvim
       vim-sleuth
+      which-key-nvim
     ];
+
+    extraConfig = ''
+      luafile ${./init.lua}
+    '';
   };
 }

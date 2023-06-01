@@ -1,4 +1,4 @@
-() ->
+(() ->
   whichkey = require "which-key"
   trouble = require "trouble"
 
@@ -21,3 +21,4 @@
   }, {
     prefix: "<leader>"
   }
+)!

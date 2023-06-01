@@ -20,24 +20,24 @@ whichkey.setup {
 -- },
 }
 
-(require 'backups')!
-(require 'buffers')!
-(require 'colorschemes')!
-(require 'completion')!
-(require 'copy-paste')!
-(require 'debugger')!
-(require 'file-tabs')!
-(require 'file-tree-sidebar')!
-(require 'folds')!
-(require 'indentation')!
-(require 'line-numbers')!
-(require 'movement')!
-(require 'quickfix')!
-(require 'save-file')!
-(require 'search')!
-(require 'splits')!
-(require 'status-line')!
-(require 'visual-information')!
+--(require 'backups')!
+--(require 'buffers')!
+--(require 'colorschemes')!
+--(require 'completion')!
+--(require 'copy-paste')!
+--(require 'debugger')!
+--(require 'file-tabs')!
+--(require 'file-tree-sidebar')!
+--(require 'folds')!
+--(require 'indentation')!
+--(require 'line-numbers')!
+--(require 'movement')!
+--(require 'quickfix')!
+--(require 'save-file')!
+--(require 'search')!
+--(require 'splits')!
+--(require 'status-line')!
+--(require 'visual-information')!
 
 -- Disable NetRW
 vim.g.loaded_netrw = 1

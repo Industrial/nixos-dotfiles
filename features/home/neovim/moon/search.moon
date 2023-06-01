@@ -56,6 +56,7 @@ findModalDialog = () ->
     prefix: "<leader>"
   }
 
-() ->
+(() ->
   bufferSearch!
   findModalDialog!
+)!
