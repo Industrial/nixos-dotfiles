@@ -79,17 +79,18 @@
       "tom@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
         pkgs = pkgs;
         modules = [
-          #inputs.stylix.homeManagerModules.stylix
           #./features/home/gnome
           #./features/home/matrix
+          #./features/home/stylix
           #./features/home/zsh
+          #inputs.stylix.homeManagerModules.stylix
+          ./features/home/bat
           ./features/home/fish
           ./features/home/git
           ./features/home/lutris
           ./features/home/mpv
           ./features/home/neovim
           ./features/home/ruby
-          #./features/home/stylix
           ./features/home/taskwarrior
           ./features/home/tmux
           ./features/home/vscode
@@ -103,11 +104,11 @@
               sessionVariables = {
                 EDITOR = "nvim";
                 GIT_EDITOR = "nvim";
-                VISUAL = "nvim";
-                PAGER = "nvim";
+                #VISUAL = "nvim";
+                #PAGER = "nvim";
                 DIFFPROG = "nvim -d";
-                MANPAGER = "nvim +Man!";
-                MANWIDTH = 999;
+                #MANPAGER = "nvim +Man!";
+                #MANWIDTH = 999;
               };
 
               packages = with pkgs; [
@@ -146,18 +147,6 @@
                 # TODO: Add these to tmux setup
                 xclip
                 xsel
-
-                # Tor
-                #tor-browser-bundle-bin
-
-                # Python
-                #stdenv.cc.cc.lib
-                #python3
-                #virtualenv
-                #poetry
-
-                # Java
-                #jre8
               ];
             };
           })

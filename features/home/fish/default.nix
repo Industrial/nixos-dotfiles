@@ -32,6 +32,10 @@ in {
   };
 
   programs.fish.shellInit = ''
+    function cat --wraps bat
+      bat $argv
+    end
+
     function c
       cd $argv
       l
