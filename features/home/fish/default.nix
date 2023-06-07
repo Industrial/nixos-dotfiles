@@ -32,8 +32,14 @@ in {
   };
 
   programs.fish.shellInit = ''
+    # Replacement for cat
     function cat --wraps bat
       bat $argv
+    end
+
+    # Replacement for du
+    function du --wraps dust
+      dust $argv
     end
 
     function c

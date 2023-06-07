@@ -85,6 +85,7 @@
           #./features/home/zsh
           #inputs.stylix.homeManagerModules.stylix
           ./features/home/bat
+          ./features/home/dust
           ./features/home/fish
           ./features/home/git
           ./features/home/lutris
