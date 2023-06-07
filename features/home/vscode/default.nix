@@ -10,6 +10,7 @@
       "[javascriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "[json]"."editor.defaultFormatter" = "vscode.json-language-features";
       "[jsonc]"."editor.defaultFormatter" = "vscode.json-language-features";
+      "[purescript]"."editor.defaultFormatter" = "nwolverson.ide-purescript";
       "[python]"."editor.defaultFormatter" = "ms-python.python";
       "[python]"."editor.formatOnType" = false;
       "[python]"."editor.guides.indentation" = true;
@@ -117,8 +118,8 @@
       "python.linting.flake8Args" = ["--ignore" "E501,W503,W504"];
       "python.linting.flake8Enabled" = true;
       "python.linting.mypyEnabled" = false;
+      "purescript.formatter" = "purs-tidy";
       "references.preferredLocation" = "view";
-      #"ruby.format" = "rubocop";
       "ruby.useBundler" = false;
       "ruby.useLanguageServer" = false;
       "rubyLsp.enableExperimentalFeatures" = true;
@@ -460,6 +461,23 @@
           sha256 = "sha256-Ke7P8EJ3ghYG1qyf+w8c2xJlGrRGkJgJwvt0MSb9O+Y=";
         };
       })
+      # PureScript
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "language-purescript";
+          publisher = "nwolverson";
+          version = "0.2.8";
+          sha256 = "sha256-2uOwCHvnlQQM8s8n7dtvIaMgpW8ROeoUraM02rncH9o=";
+        };
+      })
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "ide-purescript";
+          publisher = "nwolverson";
+          version = "0.26.1";
+          sha256 = "sha256-ccTuoDSZKf1WsTRX2TxXeHy4eRuOXsAc7rvNZ2b56MU=";
+        };
+      })
 
       # TODO: Download Error
       #(pkgs.vscode-utils.buildVscodeMarketplaceExtension {
@@ -509,9 +527,17 @@
   };
 
   home.packages = with pkgs; [
+    # Ruby
     rubyPackages.solargraph
 
+    # Haskell
     ghc
     haskellPackages.haskell-language-server
+
+    # PureScript
+    nodePackages.purescript-language-server
+    nodePackages.purs-tidy
+    purescript
+    spago
   ];
 }

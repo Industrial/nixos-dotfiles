@@ -25,65 +25,65 @@ completepairs = () ->
   nvimAutoPairs = require "nvim-autopairs"
   nvimAutoPairs.setup {}
 
-copilot = () ->
-  vim.g.copilot_enabled = true
-  vim.g.copilot_filetypes =
-    "*": true
-
-  -- When I turn off mappings by using these options, automatic
-  -- completion stops working, so turn the mappings off manually.
-  -- Set the maps first to ensure that they exist before trying
-  -- to unmap them when reloading the config.
-  -- vim.g.copilot_no_maps = true
-  -- vim.g.copilot_no_tab_map = true
-
-  isDisplayingSuggestion = () ->
-    displayedSuggestion = vim.fn["copilot#GetDisplayedSuggestion"]!
-    displayedSuggestion and string.len(displayedSuggestion.text) > 0
-
-  nextSuggestion = () ->
-    if isDisplayingSuggestion! then
-      vim.fn["copilot#Next"]!
-    else
-      vim.fn["copilot#Suggest"]!
-
-  previousSuggestion = () ->
-    vim.fn["copilot#Previous"]!
-
-  dismissSuggestion = () ->
-    if isDisplayingSuggestion! then
-      vim.fn["copilot#Dismiss"]!
-      "<esc>"
-    else
-      "<esc>"
-
-  -- Unset default keybindings.
-  vim.keymap.set "i", "<C-]>", "", {}
-  vim.keymap.del "i", "<C-]>"
-
-  vim.keymap.set "i", "<M-]>", "", {}
-  vim.keymap.del "i", "<M-]>"
-
-  vim.keymap.set "i", "<M-[>", "", {}
-  vim.keymap.del "i", "<M-[>"
-
-  vim.keymap.set "i", "<M-\\>", "", {}
-  vim.keymap.del "i", "<M-\\>"
-
-  vim.keymap.set "i", "<C-j>", nextSuggestion, {
-    script: true
-  }
-
-  vim.keymap.set "i", "<C-k>", previousSuggestion, {
-    script: true
-  }
-
-  vim.keymap.set "i", "<esc>", dismissSuggestion, {
-    script: true
-    expr: true
-  }
-
-  -- vim.defer_fn configure, 100
+-- copilot = () ->
+--   vim.g.copilot_enabled = true
+--   vim.g.copilot_filetypes =
+--     "*": true
+-- 
+--   -- When I turn off mappings by using these options, automatic
+--   -- completion stops working, so turn the mappings off manually.
+--   -- Set the maps first to ensure that they exist before trying
+--   -- to unmap them when reloading the config.
+--   -- vim.g.copilot_no_maps = true
+--   -- vim.g.copilot_no_tab_map = true
+-- 
+--   isDisplayingSuggestion = () ->
+--     displayedSuggestion = vim.fn["copilot#GetDisplayedSuggestion"]!
+--     displayedSuggestion and string.len(displayedSuggestion.text) > 0
+-- 
+--   nextSuggestion = () ->
+--     if isDisplayingSuggestion! then
+--       vim.fn["copilot#Next"]!
+--     else
+--       vim.fn["copilot#Suggest"]!
+-- 
+--   previousSuggestion = () ->
+--     vim.fn["copilot#Previous"]!
+-- 
+--   dismissSuggestion = () ->
+--     if isDisplayingSuggestion! then
+--       vim.fn["copilot#Dismiss"]!
+--       "<esc>"
+--     else
+--       "<esc>"
+-- 
+--   -- Unset default keybindings.
+--   vim.keymap.set "i", "<C-]>", "", {}
+--   vim.keymap.del "i", "<C-]>"
+-- 
+--   vim.keymap.set "i", "<M-]>", "", {}
+--   vim.keymap.del "i", "<M-]>"
+-- 
+--   vim.keymap.set "i", "<M-[>", "", {}
+--   vim.keymap.del "i", "<M-[>"
+-- 
+--   vim.keymap.set "i", "<M-\\>", "", {}
+--   vim.keymap.del "i", "<M-\\>"
+-- 
+--   vim.keymap.set "i", "<C-j>", nextSuggestion, {
+--     script: true
+--   }
+-- 
+--   vim.keymap.set "i", "<C-k>", previousSuggestion, {
+--     script: true
+--   }
+-- 
+--   vim.keymap.set "i", "<esc>", dismissSuggestion, {
+--     script: true
+--     expr: true
+--   }
+-- 
+--   -- vim.defer_fn configure, 100
 
 diagnosticsigns = () ->
   vimLSPProtocol = require "vim.lsp.protocol"
@@ -318,14 +318,6 @@ languageServerProtocol = () ->
     flags: flags
   }
 
-  -- StyleLint
-  lspconfig.stylelint_lsp.setup {
-    capabilities: capabilities
-    flags: flags
-    cmd: { "stylelint-lsp", "--stdio" }
-    filetypes: { "css", "scss", "less" }
-  }
-
   -- TypeScript
   lspconfig.tsserver.setup {
     capabilities: capabilities
@@ -479,6 +471,15 @@ languageServerProtocol = () ->
     }
   }
 
+  -- TODO: gitsigns executable
+  -- TODO: shellcheck executable
+  -- TODO: commitlint executable
+  -- TODO: flake8 executable
+  -- TODO: markdownlint executable
+  -- TODO: autopep8 executable
+  -- TODO: black executable
+  -- TODO: lua-format executable
+
   -- TODO: add refactoring.nvim to nixos
   -- TODO: add gitsigns.nvim to nixos
   null_ls = require "null-ls"
@@ -495,18 +496,20 @@ languageServerProtocol = () ->
       null_ls.builtins.code_actions.gitsigns,
       null_ls.builtins.code_actions.refactoring,
       null_ls.builtins.code_actions.shellcheck,
+      null_ls.builtins.code_actions.statix,
       null_ls.builtins.diagnostics.commitlint,
       null_ls.builtins.diagnostics.eslint_d,
       null_ls.builtins.diagnostics.fish,
       null_ls.builtins.diagnostics.flake8,
       null_ls.builtins.diagnostics.luacheck,
-      null_ls.builtins.diagnostics.markdownlint,
-      null_ls.builtins.diagnostics.stylelint,
+      null_ls.builtins.diagnostics.statix,
+      null_ls.builtins.diagnostics.tsc,
       null_ls.builtins.formatting.alejandra,
       null_ls.builtins.formatting.autopep8,
       null_ls.builtins.formatting.black,
       null_ls.builtins.formatting.eslint_d,
       null_ls.builtins.formatting.lua_format,
+      null_ls.builtins.formatting.purs_tidy,
 
       -- Using Alejandra instead.
       --null_ls.builtins.formatting.nixfmt,

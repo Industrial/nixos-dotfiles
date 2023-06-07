@@ -39,6 +39,7 @@ in {
       pyright
       python311Packages.python-lsp-server
       spago
+      statix
       stylua
       sumneko-lua-language-server
     ];
@@ -51,7 +52,6 @@ in {
       cmp-nvim-lsp
       cmp-nvim-lsp-signature-help
       cmp-path
-      copilot-vim
       indent-blankline-nvim
       lspkind-nvim
       lualine-nvim

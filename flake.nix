@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager/master";
-    stylix.url = "github:danth/stylix";
+    #stylix.url = "github:danth/stylix";
   };
 
   outputs = inputs: let
@@ -79,7 +79,7 @@
       "tom@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
         pkgs = pkgs;
         modules = [
-          inputs.stylix.homeManagerModules.stylix
+          #inputs.stylix.homeManagerModules.stylix
           #./features/home/gnome
           #./features/home/matrix
           #./features/home/zsh
@@ -89,7 +89,7 @@
           ./features/home/mpv
           ./features/home/neovim
           ./features/home/ruby
-          ./features/home/stylix
+          #./features/home/stylix
           ./features/home/taskwarrior
           ./features/home/tmux
           ./features/home/vscode

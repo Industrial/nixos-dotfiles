@@ -29,57 +29,6 @@ completepairs = function()
   local nvimAutoPairs = require("nvim-autopairs")
   return nvimAutoPairs.setup({ })
 end
-local copilot
-copilot = function()
-  vim.g.copilot_enabled = true
-  vim.g.copilot_filetypes = {
-    ["*"] = true
-  }
-  local isDisplayingSuggestion
-  isDisplayingSuggestion = function()
-    local displayedSuggestion = vim.fn["copilot#GetDisplayedSuggestion"]()
-    return displayedSuggestion and string.len(displayedSuggestion.text) > 0
-  end
-  local nextSuggestion
-  nextSuggestion = function()
-    if isDisplayingSuggestion() then
-      return vim.fn["copilot#Next"]()
-    else
-      return vim.fn["copilot#Suggest"]()
-    end
-  end
-  local previousSuggestion
-  previousSuggestion = function()
-    return vim.fn["copilot#Previous"]()
-  end
-  local dismissSuggestion
-  dismissSuggestion = function()
-    if isDisplayingSuggestion() then
-      vim.fn["copilot#Dismiss"]()
-      return "<esc>"
-    else
-      return "<esc>"
-    end
-  end
-  vim.keymap.set("i", "<C-]>", "", { })
-  vim.keymap.del("i", "<C-]>")
-  vim.keymap.set("i", "<M-]>", "", { })
-  vim.keymap.del("i", "<M-]>")
-  vim.keymap.set("i", "<M-[>", "", { })
-  vim.keymap.del("i", "<M-[>")
-  vim.keymap.set("i", "<M-\\>", "", { })
-  vim.keymap.del("i", "<M-\\>")
-  vim.keymap.set("i", "<C-j>", nextSuggestion, {
-    script = true
-  })
-  vim.keymap.set("i", "<C-k>", previousSuggestion, {
-    script = true
-  })
-  return vim.keymap.set("i", "<esc>", dismissSuggestion, {
-    script = true,
-    expr = true
-  })
-end
 local diagnosticsigns
 diagnosticsigns = function()
   local vimLSPProtocol = require("vim.lsp.protocol")
@@ -319,19 +268,6 @@ languageServerProtocol = function()
       capabilities = capabilities,
       flags = flags
     }),
-    lspconfig.stylelint_lsp.setup({
-      capabilities = capabilities,
-      flags = flags,
-      cmd = {
-        "stylelint-lsp",
-        "--stdio"
-      },
-      filetypes = {
-        "css",
-        "scss",
-        "less"
-      }
-    }),
     lspconfig.tsserver.setup({
       capabilities = capabilities,
       flags = flags
@@ -503,9 +439,18 @@ languageServerProtocol = function()
     lspconfig.purescriptls.setup({
       capabilities = capabilities,
       flags = flags,
+      cmd = {
+        "purescript-language-server",
+        "--stdio"
+      },
+      filetypes = {
+        "purescript"
+      },
       settings = {
         purescript = {
-          addNpmPath = true
+          addSpagoSources = true,
+          addNpmPath = true,
+          formatter = "purs-tidy"
         }
       }
     }),
@@ -564,18 +509,20 @@ languageServerProtocol = function()
       null_ls.builtins.code_actions.gitsigns,
       null_ls.builtins.code_actions.refactoring,
       null_ls.builtins.code_actions.shellcheck,
+      null_ls.builtins.code_actions.statix,
       null_ls.builtins.diagnostics.commitlint,
       null_ls.builtins.diagnostics.eslint_d,
       null_ls.builtins.diagnostics.fish,
       null_ls.builtins.diagnostics.flake8,
       null_ls.builtins.diagnostics.luacheck,
-      null_ls.builtins.diagnostics.markdownlint,
-      null_ls.builtins.diagnostics.stylelint,
+      null_ls.builtins.diagnostics.statix,
+      null_ls.builtins.diagnostics.tsc,
       null_ls.builtins.formatting.alejandra,
       null_ls.builtins.formatting.autopep8,
       null_ls.builtins.formatting.black,
       null_ls.builtins.formatting.eslint_d,
-      null_ls.builtins.formatting.lua_format
+      null_ls.builtins.formatting.lua_format,
+      null_ls.builtins.formatting.purs_tidy
     },
     on_attach = function(client, bufnr)
       if client.supports_method("textDocument/formatting") then
