@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager/master";
-    #stylix.url = "github:danth/stylix";
+    stylix.url = "github:danth/stylix";
   };
 
   outputs = inputs: let
@@ -81,9 +81,7 @@
         modules = [
           #./features/home/gnome
           #./features/home/matrix
-          #./features/home/stylix
           #./features/home/zsh
-          #inputs.stylix.homeManagerModules.stylix
           ./features/home/bat
           ./features/home/dust
           ./features/home/fish
@@ -92,10 +90,12 @@
           ./features/home/mpv
           ./features/home/neovim
           ./features/home/ruby
+          ./features/home/stylix
           ./features/home/taskwarrior
           ./features/home/tmux
           ./features/home/vscode
           ./features/home/xfce
+          inputs.stylix.homeManagerModules.stylix
           ({...}: {
             home = {
               username = "tom";
@@ -113,11 +113,7 @@
               };
 
               packages = with pkgs; [
-                #libreoffice
                 appimage-run
-                #bitwarden
-                #bookworm
-                #chromium
                 direnv
                 discord
                 docker-compose
@@ -127,23 +123,14 @@
                 firefox
                 fzf
                 gcc
-                #gitkraken
                 htop
                 meld
-                #nethogs
                 ripgrep
-                #slack
                 spotify
-                #steam
                 transmission-gtk
                 unzip
                 vit
                 vlc
-                #yubikey-personalization-gui
-
-                # TODO: What for?
-                #android-tools
-                #usbutils
 
                 # TODO: Add these to tmux setup
                 xclip
