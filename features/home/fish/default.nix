@@ -116,6 +116,35 @@ in {
       tmux attach -t system
     end
 
+    function zellij-sessions
+      echo "> zellij kill-all-sessions"
+      zellij kill-all-sessions
+
+      echo "> zellij --session system"
+      zellij --session system
+
+      echo "> zellij --session system action rename-tab scratch"
+      zellij --session system action rename-tab scratch
+
+      echo "> zellij --session system action new-tab --layout vertical --name processes"
+      zellij --session system action new-tab --layout vertical --name processes
+
+      echo "> zellij --session system action new-tab --layout vertical --name configuration"
+      zellij --session system action new-tab --layout vertical --name configuration
+
+      echo "> zellij --session system action new-tab --layout vertical --name media"
+      zellij --session system action new-tab --layout vertical --name media
+
+      echo "> zellij --session system action new-tab --layout vertical --name taskwarrior"
+      zellij --session system action new-tab --layout vertical --name taskwarrior
+
+      echo "> zellij --session system action new-tab --layout vertical --name code"
+      zellij --session system action new-tab --layout vertical --name code
+
+      echo "> zellij attach system"
+      zellij attach system
+    end
+
     # Use vim keybindings.
     fish_vi_key_bindings
 

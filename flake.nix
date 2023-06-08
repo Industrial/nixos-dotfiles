@@ -95,6 +95,7 @@
           ./features/home/tmux
           ./features/home/vscode
           ./features/home/xfce
+          ./features/home/zellij
           inputs.stylix.homeManagerModules.stylix
           ({...}: {
             home = {

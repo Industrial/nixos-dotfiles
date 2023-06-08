@@ -1,0 +1,44 @@
+layout {
+  tab name="scratch" {
+    pane {
+      cwd = "~"
+    }
+  }
+
+  tab name="processes" {
+    pane {
+      cwd = "~"
+      command "htop"
+    }
+  }
+
+  tab name="configuration" {
+    pane {
+      cwd = "~/.dotfiles"
+      command "nvim"
+    }
+    pane split_direction="horizontal" {
+      cwd = "~/.dotfiles"
+    }
+  }
+
+  tab name="media" {
+    pane {
+      cwd = "~"
+      command "pulsemixer"
+    }
+  }
+
+  tab name="taskwarrior" {
+    pane {
+      cwd = "~"
+      command "vit"
+    }
+  }
+
+  tab name="code" {
+    pane {
+      cwd = "~/Code"
+    }
+  }
+}
