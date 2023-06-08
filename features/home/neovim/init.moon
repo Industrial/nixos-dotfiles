@@ -295,7 +295,7 @@ languageServerProtocol = () ->
     debounce_text_changes: 150
   }
 
-  vim.keymap.set "n", "K", vim.lsp.buf.hover, {
+  vim.keymap.set "n", "<S-k>", vim.lsp.buf.hover, {
     noremap: true
     silent: true
   }
@@ -545,8 +545,8 @@ languageServerProtocol = () ->
       prefix: "<leader>"
     }
   }
+  vim.keymap.set "n", "<C-O>", vim.lsp.buf.code_action, {}
 
-  -- TODO: gitsigns executable
   -- TODO: shellcheck executable
   -- TODO: commitlint executable
   -- TODO: flake8 executable
@@ -556,7 +556,6 @@ languageServerProtocol = () ->
   -- TODO: lua-format executable
 
   -- TODO: add refactoring.nvim to nixos
-  -- TODO: add gitsigns.nvim to nixos
   null_ls = require "null-ls"
   augroup = vim.api.nvim_create_augroup "LspFormatting", {}
   null_ls.setup {
@@ -568,7 +567,6 @@ languageServerProtocol = () ->
       -- null_ls.builtins.formatting.stylelint,
       null_ls.builtins.code_actions.eslint_d,
       null_ls.builtins.code_actions.gitrebase,
-      null_ls.builtins.code_actions.gitsigns,
       null_ls.builtins.code_actions.refactoring,
       null_ls.builtins.code_actions.shellcheck,
       null_ls.builtins.code_actions.statix,

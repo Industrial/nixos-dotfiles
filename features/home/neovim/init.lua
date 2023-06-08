@@ -263,7 +263,7 @@ languageServerProtocol = function()
   local flags = {
     debounce_text_changes = 150
   }
-  vim.keymap.set("n", "K", vim.lsp.buf.hover, {
+  vim.keymap.set("n", "<S-k>", vim.lsp.buf.hover, {
     noremap = true,
     silent = true
   })
@@ -601,13 +601,13 @@ languageServerProtocol = function()
       prefix = "<leader>"
     })
   })
+  vim.keymap.set("n", "<C-O>", vim.lsp.buf.code_action, { })
   local null_ls = require("null-ls")
   local augroup = vim.api.nvim_create_augroup("LspFormatting", { })
   return null_ls.setup({
     sources = {
       null_ls.builtins.code_actions.eslint_d,
       null_ls.builtins.code_actions.gitrebase,
-      null_ls.builtins.code_actions.gitsigns,
       null_ls.builtins.code_actions.refactoring,
       null_ls.builtins.code_actions.shellcheck,
       null_ls.builtins.code_actions.statix,

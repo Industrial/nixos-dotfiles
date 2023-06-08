@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+echo "> compiling neovim config"
+cd features/home/neovim
+bin/compile
+cd ../../..
+
 echo "> sudo nix-channel --update"
 sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
 sudo nix-channel --update
