@@ -82,6 +82,7 @@
           #./features/home/gnome
           #./features/home/matrix
           #./features/home/zsh
+          ./features/home/alacritty
           ./features/home/bat
           ./features/home/dust
           ./features/home/fish
@@ -132,6 +133,7 @@
                 unzip
                 vit
                 vlc
+                path-of-building
 
                 # TODO: Add these to tmux setup
                 xclip

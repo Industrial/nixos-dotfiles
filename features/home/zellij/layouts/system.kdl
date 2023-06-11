@@ -1,44 +1,102 @@
 layout {
   tab name="scratch" {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+
     pane {
-      cwd = "~"
+      cwd "/home/tom"
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
     }
   }
 
   tab name="processes" {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+
     pane {
-      cwd = "~"
+      cwd "/home/tom"
       command "htop"
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
     }
   }
 
   tab name="configuration" {
-    pane {
-      cwd = "~/.dotfiles"
-      command "nvim"
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
     }
-    pane split_direction="horizontal" {
-      cwd = "~/.dotfiles"
+
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom/.dotfiles"
+        command "nvim"
+      }
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom/.dotfiles"
+        }
+      }
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
     }
   }
 
   tab name="media" {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+
     pane {
-      cwd = "~"
+      cwd "/home/tom"
       command "pulsemixer"
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
     }
   }
 
   tab name="taskwarrior" {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+
     pane {
-      cwd = "~"
+      cwd "/home/tom"
       command "vit"
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
     }
   }
 
   tab name="code" {
-    pane {
-      cwd = "~/Code"
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
     }
+
+    pane {
+      cwd "/home/tom/Code"
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
+    }
+  }
+}
+
+keybinds {
+  normal {
+    unbind "Ctrl q"
   }
 }

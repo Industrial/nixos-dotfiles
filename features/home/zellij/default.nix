@@ -1,36 +1,37 @@
 {...}: {
   programs.zellij.enable = true;
 
-  programs.zellij.enableFishIntegration = true;
+  #programs.zellij.enableFishIntegration = true;
 
   programs.zellij.settings = {
-    on_force_close = "detach";
-    simplified_ui = false;
-    default_shell = "fish";
-    pane_frames = true;
+    layout_dir = "/home/tom/.dotfiles/features/home/zellij/layouts";
+    theme_dir = "/home/tom/.dotfiles/features/home/zellij/themes";
     theme = "default";
     default_layout = "system";
     default_mode = "normal";
+
+    default_shell = "fish";
+    on_force_close = "detach";
+    simplified_ui = false;
+    pane_frames = true;
     mouse_mode = true;
     scroll_buffer_size = 10000;
     copy_command = "xclip -selection clipboard";
     copy_clipboard = "system";
     copy_on_select = true;
     scrollback_editor = "$EDITOR";
-    mirror_session = false;
-    layout_dir = "$HOME/.dotfiles/features/home/zellij/layouts";
-    theme_dir = "$HOME/.dotfiles/features/home/zellij/themes";
+    mirror_session = true;
     auto_layouts = true;
 
     ui = {
       pane_frames = {
         rounded_corners = true;
-        hide_session_name = true;
+        hide_session_name = false;
       };
     };
 
-    # keybinds = {
-    # };
+    # Not supported correctly, put them in the layout files.
+    keybinds = {};
 
     themes = {
       nord = {

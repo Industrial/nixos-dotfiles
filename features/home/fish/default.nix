@@ -27,8 +27,10 @@ in {
     g = "git";
     n = "npm";
     p = "pnpm";
-    ta = "tmux attach -t";
+    #ta = "tmux attach -t";
     y = "yarn";
+    z = "zellij --session system";
+    za = "zellij attach system";
   };
 
   programs.fish.shellInit = ''
@@ -47,11 +49,11 @@ in {
       l
     end
 
-    function cl
-      clear
-      tmux clear-history
-      clear
-    end
+    #function cl
+    #  clear
+    #  tmux clear-history
+    #  clear
+    #end
 
     function l
       exa \
@@ -84,66 +86,37 @@ in {
       $argv
     end
 
-    function tmux-sessions
-      tmux kill-server
+    #function tmux-sessions
+    #  tmux kill-server
 
-      sleep 1
+    #  sleep 1
 
-      tmux new-session -d -s system -n scratch -c "$HOME"
+    #  tmux new-session -d -s system -n scratch -c "$HOME"
 
-      tmux new-window -a -t system:scratch -n processes -c "$HOME"
-      tmux send-keys -t system:processes "htop" Enter
-      tmux select-window -t system:processes
-      tmux split-window -v "nethogs"
+    #  tmux new-window -a -t system:scratch -n processes -c "$HOME"
+    #  tmux send-keys -t system:processes "htop" Enter
+    #  tmux select-window -t system:processes
+    #  tmux split-window -v "nethogs"
 
-      tmux new-window -a -t system:processes -n configuration -c "$HOME/.dotfiles"
-      tmux send-keys -t system:configuration "nvim flake.nix" Enter
-      tmux select-window -t system:configuration
-      tmux split-window -h
-      tmux send-keys -t system:configuration "c $HOME/.dotfiles" Enter
+    #  tmux new-window -a -t system:processes -n configuration -c "$HOME/.dotfiles"
+    #  tmux send-keys -t system:configuration "nvim flake.nix" Enter
+    #  tmux select-window -t system:configuration
+    #  tmux split-window -h
+    #  tmux send-keys -t system:configuration "c $HOME/.dotfiles" Enter
 
-      tmux new-window -a -t system:configuration -n media -c "$HOME"
-      tmux send-keys -t system:media "mpv --no-video --loop $HOME/Music/1-minute-of-silence.mp3" Enter
-      tmux select-window -t system:media
-      tmux split-window -h
-      tmux send-keys -t system:media "pulsemixer" Enter
+    #  tmux new-window -a -t system:configuration -n media -c "$HOME"
+    #  tmux send-keys -t system:media "mpv --no-video --loop $HOME/Music/1-minute-of-silence.mp3" Enter
+    #  tmux select-window -t system:media
+    #  tmux split-window -h
+    #  tmux send-keys -t system:media "pulsemixer" Enter
 
-      tmux new-window -a -t system:media -n taskwarrior -c "$HOME"
-      tmux send-keys -t system:taskwarrior "vit" Enter
+    #  tmux new-window -a -t system:media -n taskwarrior -c "$HOME"
+    #  tmux send-keys -t system:taskwarrior "vit" Enter
 
-      tmux new-window -a -t system:taskwarrior -n code -c "$HOME/Code/code9"
+    #  tmux new-window -a -t system:taskwarrior -n code -c "$HOME/Code/code9"
 
-      tmux attach -t system
-    end
-
-    function zellij-sessions
-      echo "> zellij kill-all-sessions"
-      zellij kill-all-sessions
-
-      echo "> zellij --session system"
-      zellij --session system
-
-      echo "> zellij --session system action rename-tab scratch"
-      zellij --session system action rename-tab scratch
-
-      echo "> zellij --session system action new-tab --layout vertical --name processes"
-      zellij --session system action new-tab --layout vertical --name processes
-
-      echo "> zellij --session system action new-tab --layout vertical --name configuration"
-      zellij --session system action new-tab --layout vertical --name configuration
-
-      echo "> zellij --session system action new-tab --layout vertical --name media"
-      zellij --session system action new-tab --layout vertical --name media
-
-      echo "> zellij --session system action new-tab --layout vertical --name taskwarrior"
-      zellij --session system action new-tab --layout vertical --name taskwarrior
-
-      echo "> zellij --session system action new-tab --layout vertical --name code"
-      zellij --session system action new-tab --layout vertical --name code
-
-      echo "> zellij attach system"
-      zellij attach system
-    end
+    #  tmux attach -t system
+    #end
 
     # Use vim keybindings.
     fish_vi_key_bindings

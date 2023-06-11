@@ -1,0 +1,50 @@
+layout {
+  tab name="scratch" {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+
+    pane {
+      cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
+    }
+  }
+
+  tab name="editor" {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+        command "nvim"
+      }
+
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+          command "deno task build:watch"
+        }
+
+        pane split_direction="vertical" {
+          cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+          command "deno task start"
+        }
+      }
+    }
+
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
+    }
+  }
+}
+
+keybinds {
+  normal {
+    unbind "Ctrl q"
+  }
+}
