@@ -177,10 +177,13 @@ diagnosticsigns = function()
 end
 local languageServerProtocol
 languageServerProtocol = function()
-  local lspkind = require("lspkind")
-  lspkind.init({ })
   local cmp = require("cmp")
-  lspkind = require("lspkind")
+  local cmpNvimLSP = require("cmp_nvim_lsp")
+  local lspconfig = require("lspconfig")
+  local lspkind = require("lspkind")
+  local whichkey = require("which-key")
+  local denoNvim = require("deno-nvim")
+  lspkind.init({ })
   cmp.setup({
     sorting = {
       priority_weight = 2,
@@ -256,9 +259,6 @@ languageServerProtocol = function()
       }
     })
   })
-  local whichkey = require("which-key")
-  local lspconfig = require("lspconfig")
-  local cmpNvimLSP = require("cmp_nvim_lsp")
   local capabilities = cmpNvimLSP.default_capabilities()
   local flags = {
     debounce_text_changes = 150
@@ -561,6 +561,11 @@ languageServerProtocol = function()
       vim.g.purescript_unicode_conceal_disable_common = 0
       vim.g.purescript_unicode_conceal_enable_discretionary = 1
     end)(),
+    denoNvim.setup({
+      server = {
+        capabilites = capabilites
+      }
+    }),
     whichkey.register({
       l = {
         name = "LSP",

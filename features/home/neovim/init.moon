@@ -208,11 +208,15 @@ diagnosticsigns = () ->
       numhl: ""
 
 languageServerProtocol = () ->
+  cmp = require "cmp"
+  cmpNvimLSP = require "cmp_nvim_lsp"
+  lspconfig = require "lspconfig"
   lspkind = require "lspkind"
+  whichkey = require "which-key"
+  denoNvim = require "deno-nvim"
+
   lspkind.init {}
 
-  cmp = require "cmp"
-  lspkind = require "lspkind"
   cmp.setup {
     sorting:
       priority_weight: 2
@@ -287,9 +291,6 @@ languageServerProtocol = () ->
       }
     }
 
-  whichkey = require "which-key"
-  lspconfig = require "lspconfig"
-  cmpNvimLSP = require "cmp_nvim_lsp"
   capabilities = cmpNvimLSP.default_capabilities!
   flags = {
     debounce_text_changes: 150
@@ -529,6 +530,12 @@ languageServerProtocol = () ->
     vim.g.purescript_unicode_conceal_disable_common = 0
     vim.g.purescript_unicode_conceal_enable_discretionary = 1
   )!
+
+  -- Deno
+  denoNvim.setup {
+    server:
+      capabilites: capabilites
+  }
 
   whichkey.register {
     l:

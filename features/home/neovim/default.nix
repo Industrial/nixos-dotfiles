@@ -1,16 +1,18 @@
 # TODO: Git diff support
 {pkgs, ...}: let
-  myneovim = pkgs.neovim.overrideAttrs (attrs: {
-    nativeBuildInputs =
-      attrs.nativeBuildInputs
-      ++ [
-        (pkgs.lua.withPackages (ps: [ps.luafilesystem ps.moonscript]))
-      ];
-  });
+  deno-nvim = pkgs.vimUtils.buildVimPluginFrom2Nix rec {
+    pname = "deno-nvim";
+    version = "master";
+    src = pkgs.fetchFromGitHub {
+      owner = "sigmaSd";
+      repo = pname;
+      rev = "4bc9b5db13e8152b01aed51ce0451cdd38ca6743";
+      sha256 = "sha256-5mNg8Gv0Mwo10a5SMESZlIJSYSoXPNgdgjkSYXYr578=";
+    };
+  };
 in {
   programs.neovim = {
     enable = true;
-    #package = myneovim;
 
     viAlias = true;
     vimAlias = true;
@@ -52,6 +54,7 @@ in {
       cmp-nvim-lsp
       cmp-nvim-lsp-signature-help
       cmp-path
+      deno-nvim
       indent-blankline-nvim
       lspkind-nvim
       lualine-nvim
@@ -64,12 +67,6 @@ in {
       nvim-dap-python
       nvim-dap-ui
       nvim-lspconfig
-      {
-        plugin = nvim-tree-lua;
-        config = ''
-          packadd nvim-tree.lua
-        '';
-      }
       nvim-treesitter.withAllGrammars
       nvim-web-devicons
       plenary-nvim
@@ -79,6 +76,12 @@ in {
       trouble-nvim
       vim-sleuth
       which-key-nvim
+      {
+        plugin = nvim-tree-lua;
+        config = ''
+          packadd nvim-tree.lua
+        '';
+      }
     ];
 
     extraConfig = ''
