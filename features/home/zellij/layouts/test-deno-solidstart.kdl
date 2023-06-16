@@ -5,7 +5,7 @@ layout {
     }
 
     pane {
-      cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+      cwd "/home/tom/Code/code9/deno/test-deno-solidstart"
     }
 
     pane size=1 borderless=true {
@@ -20,19 +20,19 @@ layout {
 
     pane split_direction="vertical" {
       pane {
-        cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+        cwd "/home/tom/Code/code9/deno/test-deno-solidstart"
         command "nvim"
       }
 
       pane split_direction="horizontal" {
         pane {
-          cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+          cwd "/home/tom/Code/code9/deno/test-deno-solidstart"
           command "direnv"
           args "exec" "." "deno" "task" "build:watch"
         }
 
         pane split_direction="vertical" {
-          cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+          cwd "/home/tom/Code/code9/deno/test-deno-solidstart"
           command "direnv"
           args "exec" "." "deno" "task" "start"
         }
@@ -50,7 +50,7 @@ layout {
     }
 
     pane {
-      cwd "/home/tom/Code/code9/deno/deno-fresh-purescript"
+      cwd "/home/tom/Code/code9/deno/test-deno-solidstart"
       command "lazygit"
     }
 
