@@ -182,7 +182,6 @@ languageServerProtocol = function()
   local lspconfig = require("lspconfig")
   local lspkind = require("lspkind")
   local whichkey = require("which-key")
-  local denoNvim = require("deno-nvim")
   lspkind.init({ })
   cmp.setup({
     sorting = {
@@ -561,11 +560,7 @@ languageServerProtocol = function()
       vim.g.purescript_unicode_conceal_disable_common = 0
       vim.g.purescript_unicode_conceal_enable_discretionary = 1
     end)(),
-    denoNvim.setup({
-      server = {
-        capabilites = capabilites
-      }
-    }),
+    lspconfig.denols.setup({ }),
     whichkey.register({
       l = {
         name = "LSP",

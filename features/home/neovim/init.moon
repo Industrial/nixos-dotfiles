@@ -213,7 +213,6 @@ languageServerProtocol = () ->
   lspconfig = require "lspconfig"
   lspkind = require "lspkind"
   whichkey = require "which-key"
-  denoNvim = require "deno-nvim"
 
   lspkind.init {}
 
