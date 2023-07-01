@@ -1,16 +1,5 @@
 # TODO: Git diff support
-{pkgs, ...}: let
-  deno-nvim = pkgs.vimUtils.buildVimPluginFrom2Nix rec {
-    pname = "deno-nvim";
-    version = "master";
-    src = pkgs.fetchFromGitHub {
-      owner = "sigmaSd";
-      repo = pname;
-      rev = "4bc9b5db13e8152b01aed51ce0451cdd38ca6743";
-      sha256 = "sha256-5mNg8Gv0Mwo10a5SMESZlIJSYSoXPNgdgjkSYXYr578=";
-    };
-  };
-in {
+{pkgs, ...}: {
   programs.neovim = {
     enable = true;
 
@@ -54,7 +43,6 @@ in {
       cmp-nvim-lsp
       cmp-nvim-lsp-signature-help
       cmp-path
-      deno-nvim
       indent-blankline-nvim
       lspkind-nvim
       lualine-nvim

@@ -532,10 +532,7 @@ languageServerProtocol = () ->
   )!
 
   -- Deno
-  denoNvim.setup {
-    server:
-      capabilites: capabilites
-  }
+  lspconfig.denols.setup {}
 
   whichkey.register {
     l:
