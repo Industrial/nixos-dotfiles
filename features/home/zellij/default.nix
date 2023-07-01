@@ -6,7 +6,7 @@
   programs.zellij.settings = {
     layout_dir = "/home/tom/.dotfiles/features/home/zellij/layouts";
     theme_dir = "/home/tom/.dotfiles/features/home/zellij/themes";
-    theme = "default";
+    theme = "stylix";
     default_layout = "system";
     default_mode = "normal";
 
