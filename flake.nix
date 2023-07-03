@@ -5,6 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager/master";
     stylix.url = "github:danth/stylix";
+    hyprland.url = "github:hyprwm/Hyprland";
   };
 
   outputs = inputs: let
@@ -42,6 +43,7 @@
           ({...}: {
             imports = [
               ./hardware-configuration.nix
+              # inputs.hyprland.nixosModules.default
             ];
 
             hardware.bluetooth.enable = true;
@@ -51,6 +53,16 @@
                 Enable = "Source,Sink,Media,Socket";
               };
             };
+
+            # programs.hyprland = {
+            #   enable = true;
+            #   package = inputs.hyprland.packages.${pkgs.system}.default;
+            #   xwayland = {
+            #     enable = true;
+            #     hidpi = false;
+            #   };
+            #   nvidiaPatches = false;
+            # };
 
             # virtualisation.virtualbox.host.enable = true;
             # virtualisation.virtualbox.guest.enable = true;
@@ -77,7 +89,8 @@
 
     homeConfigurations = {
       "tom@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
-        pkgs = pkgs;
+        inherit pkgs;
+
         modules = [
           #./features/home/gnome
           #./features/home/matrix
@@ -87,6 +100,7 @@
           ./features/home/dust
           ./features/home/fish
           ./features/home/git
+          ./features/home/hyprland
           ./features/home/lutris
           ./features/home/mpv
           ./features/home/neovim
@@ -97,6 +111,7 @@
           ./features/home/vscode
           ./features/home/xfce
           ./features/home/zellij
+          inputs.hyprland.homeManagerModules.default
           inputs.stylix.homeManagerModules.stylix
           ({...}: {
             home = {
@@ -138,6 +153,9 @@
                 # TODO: Add these to tmux setup
                 xclip
                 xsel
+
+                # Sqlite
+                sqlite
               ];
             };
           })
