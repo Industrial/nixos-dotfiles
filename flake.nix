@@ -5,7 +5,6 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager/master";
     stylix.url = "github:danth/stylix";
-    hyprland.url = "github:hyprwm/Hyprland";
   };
 
   outputs = inputs: let
@@ -23,6 +22,7 @@
         inherit system;
 
         modules = [
+          ./features/system/bluetooth
           ./features/system/boot
           ./features/system/console
           ./features/system/disks
@@ -37,36 +37,14 @@
           ./features/system/shell
           ./features/system/sound
           ./features/system/time
+          ./features/system/tor
           ./features/system/users
           ./features/system/window-manager
           ./features/system/xfce
           ({...}: {
             imports = [
               ./hardware-configuration.nix
-              # inputs.hyprland.nixosModules.default
             ];
-
-            hardware.bluetooth.enable = true;
-            services.blueman.enable = true;
-            hardware.bluetooth.settings = {
-              General = {
-                Enable = "Source,Sink,Media,Socket";
-              };
-            };
-
-            # programs.hyprland = {
-            #   enable = true;
-            #   package = inputs.hyprland.packages.${pkgs.system}.default;
-            #   xwayland = {
-            #     enable = true;
-            #     hidpi = false;
-            #   };
-            #   nvidiaPatches = false;
-            # };
-
-            # virtualisation.virtualbox.host.enable = true;
-            # virtualisation.virtualbox.guest.enable = true;
-            # virtualisation.virtualbox.guest.x11 = true;
 
             # Packages
             environment.systemPackages = with pkgs; [
@@ -98,20 +76,24 @@
           ./features/home/alacritty
           ./features/home/bat
           ./features/home/dust
+          ./features/home/exa
+          ./features/home/fd
           ./features/home/fish
+          ./features/home/fzf
           ./features/home/git
-          ./features/home/hyprland
+          ./features/home/htop
           ./features/home/lutris
           ./features/home/mpv
           ./features/home/neovim
+          ./features/home/ripgrep
           ./features/home/ruby
           ./features/home/stylix
           ./features/home/taskwarrior
-          ./features/home/tmux
+          ./features/home/unzip
+          ./features/home/vit
           ./features/home/vscode
           ./features/home/xfce
           ./features/home/zellij
-          inputs.hyprland.homeManagerModules.default
           inputs.stylix.homeManagerModules.stylix
           ({...}: {
             home = {
@@ -130,32 +112,42 @@
               };
 
               packages = with pkgs; [
-                appimage-run
+                # NixOS
                 direnv
-                discord
+
+                # Docker
                 docker-compose
-                exa
-                fd
-                filezilla
-                firefox
-                fzf
-                gcc
-                htop
-                meld
-                ripgrep
-                spotify
-                transmission-gtk
-                unzip
-                vit
-                vlc
-                path-of-building
 
-                # TODO: Add these to tmux setup
-                xclip
-                xsel
-
+                # Development
                 # Sqlite
                 sqlite
+                gcc
+
+                # Git
+                meld
+
+                # Internet
+                filezilla
+                firefox
+                transmission-gtk
+
+                # Media
+                spotify
+                vlc
+                obs-studio
+                obsidian
+
+                # Social
+                discord
+
+                # Games
+                path-of-building
+
+                # Window Manager
+                slock
+
+                # Other
+                appimage-run
               ];
             };
           })

@@ -1,6 +1,6 @@
-# Bat is a replacement for Cat
+# I need unzip.
 {pkgs, ...}: {
   home.packages = with pkgs; [
-    bat
+    unzip
   ];
 }

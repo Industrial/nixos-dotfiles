@@ -1,6 +1,6 @@
-# Bat is a replacement for Cat
+# FD is a file finder.
 {pkgs, ...}: {
   home.packages = with pkgs; [
-    bat
+    fd
   ];
 }

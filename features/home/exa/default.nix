@@ -1,6 +1,6 @@
-# Bat is a replacement for Cat
+# exa is a ls replacement.
 {pkgs, ...}: {
   home.packages = with pkgs; [
-    bat
+    exa
   ];
 }

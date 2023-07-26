@@ -1,6 +1,6 @@
-# Bat is a replacement for Cat
+# vit is a taskwarrior client.
 {pkgs, ...}: {
   home.packages = with pkgs; [
-    bat
+    vit
   ];
 }

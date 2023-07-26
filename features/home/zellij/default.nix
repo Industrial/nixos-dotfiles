@@ -1,4 +1,4 @@
-{...}: {
+{pkgs, ...}: {
   programs.zellij.enable = true;
 
   #programs.zellij.enableFishIntegration = true;
@@ -49,4 +49,9 @@
       };
     };
   };
+
+  home.packages = with pkgs; [
+    xclip
+    xsel
+  ];
 }
