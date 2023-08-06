@@ -1,5 +1,11 @@
+# XFCE Packages.
+# TODO: Incorporate ~/Repositories/configuration-xfce into this.
+# TODO: Incorporate cloning git@github.com:calandoa/movescreen.git into ~/Repositories/movescreen
 {pkgs, ...}: {
   home.packages = with pkgs; [
+    # Required for the movescreen.py script.
+    python3Full
+
     xfce.libxfce4ui
     xfce.libxfce4util
     xfce.xfce4-appfinder

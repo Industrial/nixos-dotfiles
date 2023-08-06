@@ -20,24 +20,30 @@
     nixosConfigurations = {
       drakkar = inputs.nixpkgs.lib.nixosSystem {
         inherit system;
+        inherit pkgs;
 
         modules = [
           ./features/system/bluetooth
           ./features/system/boot
+          ./features/system/chromium
           ./features/system/console
           ./features/system/disks
           ./features/system/docker
           ./features/system/fonts
+          ./features/system/git
           ./features/system/graphics
           ./features/system/i18n
           ./features/system/lutris
           ./features/system/networking
           ./features/system/nix
+          ./features/system/p7zip
           ./features/system/printing
           ./features/system/shell
           ./features/system/sound
+          ./features/system/starship
           ./features/system/time
           ./features/system/tor
+          ./features/system/unrar
           ./features/system/users
           ./features/system/window-manager
           ./features/system/xfce
@@ -48,17 +54,23 @@
 
             # Packages
             environment.systemPackages = with pkgs; [
-              # Git (needed for home-manager / flakes)
-              git
-              p7zip
               xfce.thunar-archive-plugin
-              unrar
               xarchiver
+
+              # Python
+              python3Full
+              xorg.xwininfo
+              wmctrl
 
               # Node.js + Global Packages
               #nodejs-19_x
               # overlay
               #promptr
+
+              # Fish
+              # TODO: Put in system fish feature. Not installable with home manager.
+              fishPlugins.bass
+              fishPlugins.fzf
             ];
           })
         ];
@@ -74,26 +86,39 @@
           #./features/home/matrix
           #./features/home/zsh
           ./features/home/alacritty
+          ./features/home/appimage-run
+          ./features/home/base16-schemes
           ./features/home/bat
+          ./features/home/direnv
+          ./features/home/discord
+          ./features/home/docker-compose
           ./features/home/dust
           ./features/home/exa
           ./features/home/fd
+          ./features/home/filezilla
+          ./features/home/firefox
           ./features/home/fish
           ./features/home/fzf
           ./features/home/git
           ./features/home/htop
           ./features/home/lutris
+          ./features/home/meld
           ./features/home/mpv
           ./features/home/neovim
+          ./features/home/obs-studio
+          ./features/home/obsidian
           ./features/home/ripgrep
           ./features/home/ruby
+          ./features/home/spotify
+          ./features/home/sqlite
           ./features/home/stylix
           ./features/home/taskwarrior
+          ./features/home/transmission
           ./features/home/unzip
           ./features/home/vit
+          ./features/home/vlc
           ./features/home/vscode
           ./features/home/xfce
-          ./features/home/zellij
           inputs.stylix.homeManagerModules.stylix
           ({...}: {
             home = {
@@ -112,42 +137,11 @@
               };
 
               packages = with pkgs; [
-                # NixOS
-                direnv
-
-                # Docker
-                docker-compose
-
-                # Development
-                # Sqlite
-                sqlite
-                gcc
-
-                # Git
-                meld
-
-                # Internet
-                filezilla
-                firefox
-                transmission-gtk
-
-                # Media
-                spotify
-                vlc
-                obs-studio
-                obsidian
-
-                # Social
-                discord
-
                 # Games
                 path-of-building
 
                 # Window Manager
                 slock
-
-                # Other
-                appimage-run
               ];
             };
           })
