@@ -82,9 +82,6 @@
         inherit pkgs;
 
         modules = [
-          #./features/home/gnome
-          #./features/home/matrix
-          #./features/home/zsh
           ./features/home/alacritty
           ./features/home/appimage-run
           ./features/home/base16-schemes
@@ -100,7 +97,9 @@
           ./features/home/fish
           ./features/home/fzf
           ./features/home/git
+          #./features/home/gnome
           ./features/home/htop
+          #./features/home/hyprland
           ./features/home/lutris
           ./features/home/meld
           ./features/home/mpv
@@ -108,17 +107,20 @@
           ./features/home/obs-studio
           ./features/home/obsidian
           ./features/home/ripgrep
-          ./features/home/ruby
+          #./features/home/ruby
           ./features/home/spotify
           ./features/home/sqlite
           ./features/home/stylix
           ./features/home/taskwarrior
           ./features/home/transmission
           ./features/home/unzip
-          ./features/home/vit
+          #./features/home/vit
           ./features/home/vlc
           ./features/home/vscode
+          ./features/home/world-of-warcraft
           ./features/home/xfce
+          ./features/home/zellij
+          #./features/home/zsh
           inputs.stylix.homeManagerModules.stylix
           ({...}: {
             home = {
