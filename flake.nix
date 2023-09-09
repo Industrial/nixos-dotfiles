@@ -31,6 +31,7 @@
           ./features/system/docker
           ./features/system/fonts
           ./features/system/git
+          ./features/system/glances
           ./features/system/graphics
           ./features/system/i18n
           ./features/system/lutris

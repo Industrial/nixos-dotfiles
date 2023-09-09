@@ -20,7 +20,7 @@ layout {
 
     pane {
       cwd "/home/tom"
-      command "htop"
+      command "glances"
     }
 
     pane size=1 borderless=true {
@@ -34,10 +34,6 @@ layout {
     }
 
     pane split_direction="vertical" {
-      pane {
-        cwd "/home/tom/.dotfiles"
-        command "nvim"
-      }
       pane split_direction="horizontal" {
         pane {
           cwd "/home/tom/.dotfiles"
@@ -58,21 +54,6 @@ layout {
     pane {
       cwd "/home/tom"
       command "pulsemixer"
-    }
-
-    pane size=1 borderless=true {
-      plugin location="zellij:status-bar"
-    }
-  }
-
-  tab name="taskwarrior" {
-    pane size=1 borderless=true {
-      plugin location="zellij:tab-bar"
-    }
-
-    pane {
-      cwd "/home/tom"
-      command "vit"
     }
 
     pane size=1 borderless=true {
