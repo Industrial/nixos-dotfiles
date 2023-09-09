@@ -400,7 +400,7 @@
       "editor.quickSuggestions"."other" = "on";
       "editor.quickSuggestions"."strings" = "on";
       "editor.quickSuggestionsDelay" = 10;
-      "editor.snippetSuggestions" = "top";
+      "editor.snippetSuggestions" = "bottom";
       "editor.suggest.filterGraceful" = true;
       "editor.suggest.insertMode" = "insert";
       "editor.suggest.localityBonus" = false;
