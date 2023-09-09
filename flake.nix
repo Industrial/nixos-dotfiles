@@ -103,7 +103,7 @@
           ./features/home/lutris
           ./features/home/meld
           ./features/home/mpv
-          ./features/home/neovim
+          # ./features/home/neovim
           ./features/home/obs-studio
           ./features/home/obsidian
           ./features/home/ripgrep
