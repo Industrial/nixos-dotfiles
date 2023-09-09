@@ -6,6 +6,11 @@ cd features/home/neovim
 bin/compile
 cd ../../..
 
+echo "> clearing zellij cache"
+cd features/home/zellij
+bin/clear-cache
+cd ../../..
+
 echo "> sudo nix-channel --update"
 sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
 sudo nix-channel --update
@@ -30,4 +35,3 @@ nixos-generate-config --show-hardware-config > hardware-configuration.nix
 
 # Remove everything
 # sudo nix-collect-garbage -d
-
