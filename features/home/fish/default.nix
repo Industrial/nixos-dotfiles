@@ -56,7 +56,7 @@ in {
     #end
 
     function l
-      exa \
+      eza \
       --colour=always \
       --icons \
       --long \
@@ -72,7 +72,7 @@ in {
     end
 
     function ll
-      exa \
+      eza \
       --colour=always \
       --icons \
       --long \

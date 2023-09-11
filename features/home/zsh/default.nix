@@ -21,7 +21,7 @@
 
       unalias l
       l() {
-        exa \
+        eza \
         --colour=always \
         --icons \
         --long \
@@ -38,7 +38,7 @@
 
       unalias ll
       ll() {
-        exa \
+        eza \
         --colour=always \
         --icons \
         --long \

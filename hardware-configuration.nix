@@ -42,9 +42,9 @@
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.podman0.useDHCP = lib.mkDefault true;
   # networking.interfaces.veth0.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vethc7969f3.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vethd3c6e15.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vethdb94a51.useDHCP = lib.mkDefault true;
+  # networking.interfaces.veth1d7ecf4.useDHCP = lib.mkDefault true;
+  # networking.interfaces.veth6aa7d2f.useDHCP = lib.mkDefault true;
+  # networking.interfaces.veth719126b.useDHCP = lib.mkDefault true;
   # networking.interfaces.wlp17s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";

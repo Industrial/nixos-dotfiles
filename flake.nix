@@ -91,7 +91,7 @@
           ./features/home/discord
           ./features/home/docker-compose
           ./features/home/dust
-          ./features/home/exa
+          ./features/home/eza
           ./features/home/fd
           ./features/home/filezilla
           ./features/home/firefox
