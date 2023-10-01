@@ -15,10 +15,10 @@ in {
       src = pkgs.fishPlugins.fzf.src;
     }
     # TODO: Make it only run on interactive shells
-    #{
-    #  name = "Hávamál";
-    #  src = havamalPlugin.src;
-    #}
+    {
+     name = "Hávamál";
+     src = havamalPlugin.src;
+    }
   ];
 
   programs.fish.shellAbbrs = {
