@@ -72,6 +72,10 @@
               # TODO: Put in system fish feature. Not installable with home manager.
               fishPlugins.bass
               fishPlugins.fzf
+
+              # Disk tools
+              e2fsprogs
+              gparted
             ];
           })
         ];
