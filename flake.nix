@@ -91,6 +91,7 @@
           ./features/home/discord
           ./features/home/docker-compose
           ./features/home/dust
+          ./features/home/evince
           ./features/home/eza
           ./features/home/fd
           ./features/home/filezilla
