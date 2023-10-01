@@ -743,6 +743,10 @@
         key = "ctrl+[";
         command = "editor.action.inlineSuggest.showPrevious";
       }
+      {
+        key = "ctrl+p";
+        command = "workbench.action.quickOpen";
+      }
     ];
 
     extensions = with pkgs.vscode-extensions; [
