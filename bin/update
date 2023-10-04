@@ -11,6 +11,9 @@ cd features/home/zellij
 bin/clear-cache
 cd ../../..
 
+echo "> nixos-generate-config --show-hardware-config > hardware-configuration.nix"
+nixos-generate-config --show-hardware-config > hardware-configuration.nix
+
 echo "> sudo nix-channel --update"
 sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
 sudo nix-channel --update
@@ -26,9 +29,6 @@ sudo nixos-rebuild switch --flake '.#drakkar' --show-trace
 
 echo "> home-manager switch --flake '.' --show-trace"
 home-manager switch --flake '.' --show-trace
-
-echo "> nixos-generate-config --show-hardware-config > hardware-configuration.nix"
-nixos-generate-config --show-hardware-config > hardware-configuration.nix
 
 #echo "> sudo nix-collect-garbage"
 #sudo nix-collect-garbage

@@ -20,11 +20,6 @@
 
   boot.initrd.luks.devices."luks-ad3a6779-1b73-408b-b4b6-20856da6081d".device = "/dev/disk/by-uuid/ad3a6779-1b73-408b-b4b6-20856da6081d";
 
-  fileSystems."/boot/efi" =
-    { device = "/dev/disk/by-uuid/4698-4C1F";
-      fsType = "vfat";
-    };
-
   swapDevices = [ ];
 
   # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
@@ -32,7 +27,12 @@
   # still possible to use this option, but it's recommended to use it in conjunction
   # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
   networking.useDHCP = lib.mkDefault true;
+  # networking.interfaces.br-f0f09e2ede19.useDHCP = lib.mkDefault true;
+  # networking.interfaces.docker0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
+  # networking.interfaces.veth17b7af6.useDHCP = lib.mkDefault true;
+  # networking.interfaces.veth7c15af4.useDHCP = lib.mkDefault true;
+  # networking.interfaces.vetha0721e6.useDHCP = lib.mkDefault true;
   # networking.interfaces.wlp17s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
