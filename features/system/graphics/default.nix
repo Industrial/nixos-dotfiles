@@ -1,9 +1,9 @@
 {pkgs, ...}: {
   hardware.opengl.enable = true;
   hardware.opengl.extraPackages = with pkgs; [
-    rocm-opencl-icd
-    rocm-opencl-runtime
-    rocm-runtime
+    rocmPackages.clr
+    rocmPackages.clr.icd
+    rocmPackages.rocm-runtime
   ];
   hardware.opengl.driSupport = true;
   hardware.opengl.driSupport32Bit = true;
@@ -13,6 +13,6 @@
   };
 
   environment.systemPackages = with pkgs; [
-    rocminfo
+    rocmPackages.rocminfo
   ];
 }

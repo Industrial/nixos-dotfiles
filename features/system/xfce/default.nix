@@ -1,7 +1,9 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
+    xarchiver
     xfce.libxfce4ui
     xfce.libxfce4util
+    xfce.thunar-archive-plugin
     xfce.xfce4-appfinder
     xfce.xfce4-battery-plugin
     xfce.xfce4-clipman-plugin
@@ -39,5 +41,10 @@
     xfce.xfce4-whiskermenu-plugin
     xfce.xfce4-windowck-plugin
     xfce.xfce4-xkb-plugin
+
+    # WmCtrl: Change and move windows to desktops/monitors
+    python3Full
+    xorg.xwininfo
+    wmctrl
   ];
 }

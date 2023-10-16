@@ -1,6 +1,6 @@
 {...}: {
   fileSystems."/" = {
-    device = "/dev/disk/by-uuid/3269a0d8-8ccf-4f75-9bae-10a549389942";
+    device = "/dev/disk/by-uuid/e21dfbf4-4d89-4715-818f-d02ca94a6162";
     fsType = "ext4";
   };
   # fileSystems."/data" = {
