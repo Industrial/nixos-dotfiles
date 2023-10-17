@@ -23,12 +23,15 @@
         inherit pkgs;
 
         modules = [
+          #./features/system/haskell.nix
+          #./features/system/hyprland
           ./features/system/bluetooth
           ./features/system/boot
           ./features/system/chromium
           ./features/system/console
           ./features/system/disks
           ./features/system/docker
+          ./features/system/dwm
           ./features/system/fish
           ./features/system/fonts
           ./features/system/git
@@ -64,13 +67,13 @@
         inherit pkgs;
 
         modules = [
-          #./features/home/neovim
           #./features/home/gnome
           #./features/home/hyprland
           #./features/home/ruby
           #./features/home/vit
           #./features/home/zsh
           ./features/home/alacritty
+          ./features/home/ansifilter
           ./features/home/appimage-run
           ./features/home/base16-schemes
           ./features/home/bat
@@ -92,6 +95,7 @@
           ./features/home/lutris
           ./features/home/meld
           ./features/home/mpv
+          ./features/home/neovim
           ./features/home/obs-studio
           ./features/home/obsidian
           ./features/home/ripgrep

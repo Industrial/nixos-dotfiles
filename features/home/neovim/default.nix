@@ -29,10 +29,11 @@
       purescript
       pyright
       python311Packages.python-lsp-server
-      spago
+      #spago
       statix
       stylua
       sumneko-lua-language-server
+      gcc
     ];
 
     plugins = with pkgs.vimPlugins; [
