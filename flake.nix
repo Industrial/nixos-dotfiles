@@ -47,17 +47,13 @@
           ./features/system/shell
           ./features/system/sound
           ./features/system/starship
+          ./features/system/system
           ./features/system/time
           ./features/system/tor
           ./features/system/unrar
           ./features/system/users
           ./features/system/window-manager
           ./features/system/xfce
-          ({...}: {
-            imports = [
-              ./hardware-configuration.nix
-            ];
-          })
         ];
       };
     };
@@ -85,12 +81,14 @@
           ./features/home/evince
           ./features/home/eza
           ./features/home/fd
+          ./features/home/feh
           ./features/home/filezilla
           ./features/home/firefox
           ./features/home/fish
           ./features/home/fzf
           ./features/home/git
           ./features/home/gparted
+          ./features/home/home
           ./features/home/htop
           ./features/home/lutris
           ./features/home/meld
@@ -112,23 +110,6 @@
           ./features/home/yubikey-manager
           ./features/home/zellij
           inputs.stylix.homeManagerModules.stylix
-          ({...}: {
-            home = {
-              username = "tom";
-              homeDirectory = "/home/tom";
-              stateVersion = "20.09";
-
-              sessionVariables = {
-                EDITOR = "nvim";
-                GIT_EDITOR = "nvim";
-                #VISUAL = "nvim";
-                #PAGER = "nvim";
-                DIFFPROG = "nvim -d";
-                #MANPAGER = "nvim +Man!";
-                #MANWIDTH = 999;
-              };
-            };
-          })
         ];
       };
     };
