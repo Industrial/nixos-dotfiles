@@ -22,20 +22,23 @@ layout {
     }
   }
 
-  tab name="configuration" {
-    pane split_direction="vertical" {
-      pane split_direction="horizontal" {
-        pane {
-          cwd "/home/tom/.dotfiles"
-        }
-      }
-    }
-  }
-
   tab name="media" {
     pane {
       cwd "/home/tom"
       command "pulsemixer"
+    }
+  }
+
+  tab name="files" {
+    pane {
+      cwd "/home/tom"
+      command "ranger"
+    }
+  }
+
+  tab name="configuration" {
+    pane {
+      cwd "/home/tom/.dotfiles"
     }
   }
 
