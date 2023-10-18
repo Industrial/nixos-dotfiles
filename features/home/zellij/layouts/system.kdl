@@ -20,7 +20,7 @@ layout {
 
     pane {
       cwd "/home/tom"
-      command "glances"
+      command "btop"
     }
 
     pane size=1 borderless=true {

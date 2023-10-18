@@ -31,11 +31,9 @@
           ./features/system/console
           ./features/system/disks
           ./features/system/docker
-          ./features/system/dwm
           ./features/system/fish
           ./features/system/fonts
           ./features/system/git
-          ./features/system/glances
           ./features/system/graphics
           ./features/system/home-manager
           ./features/system/i18n
@@ -73,10 +71,12 @@
           ./features/home/appimage-run
           ./features/home/base16-schemes
           ./features/home/bat
+          ./features/home/btop
           ./features/home/direnv
           ./features/home/discord
           ./features/home/docker-compose
           ./features/home/dust
+          ./features/home/dwm
           ./features/home/e2fsprogs
           ./features/home/evince
           ./features/home/eza
@@ -96,6 +96,7 @@
           ./features/home/neovim
           ./features/home/obs-studio
           ./features/home/obsidian
+          ./features/home/ranger
           ./features/home/ripgrep
           ./features/home/spotify
           ./features/home/sqlite

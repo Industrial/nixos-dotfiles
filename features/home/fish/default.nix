@@ -34,6 +34,9 @@ in {
   };
 
   programs.fish.shellInit = ''
+    # PATH
+    fish_add_path $HOME/.bin
+
     # Replacement for cat
     function cat --wraps bat
       bat $argv
@@ -44,17 +47,18 @@ in {
       dust $argv
     end
 
+    # CD alias
     function c
       cd $argv
       l
     end
 
-    #function cl
-    #  clear
-    #  tmux clear-history
-    #  clear
-    #end
+    # Clear alias
+    function cl
+      clear
+    end
 
+    # LS alias
     function l
       eza \
       --colour=always \
@@ -71,6 +75,7 @@ in {
       $argv
     end
 
+    # LS alias (no hidden files)
     function ll
       eza \
       --colour=always \
@@ -85,38 +90,6 @@ in {
       --sort Extension \
       $argv
     end
-
-    #function tmux-sessions
-    #  tmux kill-server
-
-    #  sleep 1
-
-    #  tmux new-session -d -s system -n scratch -c "$HOME"
-
-    #  tmux new-window -a -t system:scratch -n processes -c "$HOME"
-    #  tmux send-keys -t system:processes "htop" Enter
-    #  tmux select-window -t system:processes
-    #  tmux split-window -v "nethogs"
-
-    #  tmux new-window -a -t system:processes -n configuration -c "$HOME/.dotfiles"
-    #  tmux send-keys -t system:configuration "nvim flake.nix" Enter
-    #  tmux select-window -t system:configuration
-    #  tmux split-window -h
-    #  tmux send-keys -t system:configuration "c $HOME/.dotfiles" Enter
-
-    #  tmux new-window -a -t system:configuration -n media -c "$HOME"
-    #  tmux send-keys -t system:media "mpv --no-video --loop $HOME/Music/1-minute-of-silence.mp3" Enter
-    #  tmux select-window -t system:media
-    #  tmux split-window -h
-    #  tmux send-keys -t system:media "pulsemixer" Enter
-
-    #  tmux new-window -a -t system:media -n taskwarrior -c "$HOME"
-    #  tmux send-keys -t system:taskwarrior "vit" Enter
-
-    #  tmux new-window -a -t system:taskwarrior -n code -c "$HOME/Code/code9"
-
-    #  tmux attach -t system
-    #end
 
     # Use vim keybindings.
     fish_vi_key_bindings
