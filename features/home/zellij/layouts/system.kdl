@@ -1,38 +1,28 @@
 layout {
-  tab name="scratch" {
+  default_tab_template {
     pane size=1 borderless=true {
       plugin location="zellij:tab-bar"
     }
-
-    pane {
-      cwd "/home/tom"
-    }
-
+    children
     pane size=1 borderless=true {
       plugin location="zellij:status-bar"
+    }
+  }
+
+  tab name="scratch" {
+    pane {
+      cwd "/home/tom"
     }
   }
 
   tab name="processes" {
-    pane size=1 borderless=true {
-      plugin location="zellij:tab-bar"
-    }
-
     pane {
       cwd "/home/tom"
       command "btop"
     }
-
-    pane size=1 borderless=true {
-      plugin location="zellij:status-bar"
-    }
   }
 
   tab name="configuration" {
-    pane size=1 borderless=true {
-      plugin location="zellij:tab-bar"
-    }
-
     pane split_direction="vertical" {
       pane split_direction="horizontal" {
         pane {
@@ -40,38 +30,18 @@ layout {
         }
       }
     }
-
-    pane size=1 borderless=true {
-      plugin location="zellij:status-bar"
-    }
   }
 
   tab name="media" {
-    pane size=1 borderless=true {
-      plugin location="zellij:tab-bar"
-    }
-
     pane {
       cwd "/home/tom"
       command "pulsemixer"
     }
-
-    pane size=1 borderless=true {
-      plugin location="zellij:status-bar"
-    }
   }
 
   tab name="code" {
-    pane size=1 borderless=true {
-      plugin location="zellij:tab-bar"
-    }
-
     pane {
       cwd "/home/tom/Code"
-    }
-
-    pane size=1 borderless=true {
-      plugin location="zellij:status-bar"
     }
   }
 }
