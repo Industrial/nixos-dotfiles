@@ -497,7 +497,6 @@
       # };
       "scm.inputFontSize" = 16;
       "security.workspace.trust.untrustedFiles" = "open";
-      "tabnine.experimentalAutoImports" = true;
       "terminal.integrated.copyOnSelection" = true;
       "terminal.integrated.enableMultiLinePasteWarning" = false;
       "terminal.integrated.fontSize" = 16;

@@ -3,4 +3,6 @@
   imports = [
     ../../../hardware-configuration.nix
   ];
+
+  programs.dconf.enable = true;
 }
