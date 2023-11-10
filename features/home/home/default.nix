@@ -1,7 +1,6 @@
-# This is the home feature. It should at least be included.
-{pkgs, ...}: {
-  home.username = "tom";
-  home.homeDirectory = "/home/tom";
+{pkgs, c9config, ...}: {
+  home.username = c9config.username;
+  home.homeDirectory = "/home/${c9config.username}";
   home.stateVersion = "20.09";
 
   home.sessionVariables.EDITOR = "nvim";

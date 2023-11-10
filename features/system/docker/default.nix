@@ -36,28 +36,28 @@
     #   #   "/home/tom/.tabby:/data"
     #   # ];
     # };
-    octobot = {
-      image = "drakkarsoftware/octobot";
-      autoStart = true;
-      ports = [
-        "5001:5001"
-      ];
-      volumes = [
-        "/home/tom/.dotfiles/features/home/lab/crypto/octobot/logs:/octobot/logs"
-        "/home/tom/.dotfiles/features/home/lab/crypto/octobot/tentacles:/octobot/tentacles"
-        "/home/tom/.dotfiles/features/home/lab/crypto/octobot/users:/octobot/users"
-      ];
-    };
-    graphhopper = {
-      image = "israelhikingmap/graphhopper";
-      autoStart = true;
-      ports = [
-        "5002:8989"
-        "5003:8990"
-      ];
-      volumes = [
-        "/home/tom/.dotfiles/features/home/lab/maps/graphhopper/data:/data"
-      ];
-    };
+    # octobot = {
+    #   image = "drakkarsoftware/octobot";
+    #   autoStart = true;
+    #   ports = [
+    #     "5001:5001"
+    #   ];
+    #   volumes = [
+    #     "/home/tom/.dotfiles/features/home/lab/crypto/octobot/logs:/octobot/logs"
+    #     "/home/tom/.dotfiles/features/home/lab/crypto/octobot/tentacles:/octobot/tentacles"
+    #     "/home/tom/.dotfiles/features/home/lab/crypto/octobot/users:/octobot/users"
+    #   ];
+    # };
+    # graphhopper = {
+    #   image = "israelhikingmap/graphhopper";
+    #   autoStart = true;
+    #   ports = [
+    #     "5002:8989"
+    #     "5003:8990"
+    #   ];
+    #   volumes = [
+    #     "/home/tom/.dotfiles/features/home/lab/maps/graphhopper/data:/data"
+    #   ];
+    # };
   };
 }
