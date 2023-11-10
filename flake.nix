@@ -18,13 +18,18 @@
     };
   in {
     nixosConfigurations = {
-      drakkar = inputs.nixpkgs.lib.nixosSystem {
+      langhus = inputs.nixpkgs.lib.nixosSystem {
         inherit system;
         inherit pkgs;
 
         modules = [
-          #./features/system/haskell.nix
-          #./features/system/hyprland
+          (import ./features/system/networking {
+            inherit system;
+            inherit pkgs;
+            options = {
+              hostname = "langhus";
+            };
+          })
           ./features/system/bluetooth
           ./features/system/boot
           ./features/system/chromium
@@ -38,7 +43,6 @@
           ./features/system/home-manager
           ./features/system/i18n
           ./features/system/lutris
-          ./features/system/networking
           ./features/system/nix
           ./features/system/p7zip
           ./features/system/printing
@@ -53,12 +57,15 @@
           ./features/system/users
           ./features/system/window-manager
           ./features/system/xfce
+
+          #./features/system/haskell.nix
+          #./features/system/hyprland
         ];
       };
     };
 
     homeConfigurations = {
-      "tom@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
+      "tom@langhus" = inputs.home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
 
         modules = [

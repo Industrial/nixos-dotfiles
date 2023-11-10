@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
+USER=${1:-"tom"}
+echo "> user: ${USER}"
+
+HOST=${2:-"langhus"}
+echo "> host: ${HOST}"
+
 echo "> compiling neovim config"
 cd features/home/neovim
 bin/compile
@@ -24,11 +30,11 @@ nix-env -u --always
 echo "> nix flake update"
 nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update
 
-echo "> sudo nixos-rebuild switch --flake '.#drakkar' --show-trace"
-sudo nixos-rebuild switch --flake '.#drakkar' --show-trace
+echo "> sudo nixos-rebuild switch --flake '.#${HOST}' --show-trace"
+sudo nixos-rebuild switch --flake ".#${HOST}" --show-trace
 
-echo "> home-manager switch --flake '.' --show-trace"
-home-manager switch --flake '.' --show-trace
+echo "> home-manager switch --flake '.#${USER}@${HOST}' --show-trace"
+home-manager switch --flake ".#${USER}@${HOST}" --show-trace
 
 #echo "> sudo nix-collect-garbage"
 #sudo nix-collect-garbage
