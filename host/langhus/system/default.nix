@@ -1,5 +1,6 @@
 {pkgs, ...}: {
   imports = [
+    ./hardware-configuration.nix
     ../../../features/system/bluetooth
     ../../../features/system/boot
     ../../../features/system/chromium

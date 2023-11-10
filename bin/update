@@ -18,7 +18,7 @@ bin/clear-cache
 cd ../../..
 
 echo "> nixos-generate-config --show-hardware-config > hardware-configuration.nix"
-nixos-generate-config --show-hardware-config > hardware-configuration.nix
+nixos-generate-config --show-hardware-config > ./host/${HOST}/system/hardware-configuration.nix
 
 echo "> sudo nix-channel --update"
 sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
