@@ -26,14 +26,15 @@ static const Rule rules[] = {
 	 *	WM_CLASS(STRING) = instance, class
 	 *	WM_NAME(STRING) = title
 	 */
-	/* class      instance    title       tags mask     isfloating   monitor */
-	{ "Gimp",         NULL,       NULL,       0,            1,           -1 },
-	{ "Chromium",     NULL,       NULL,       0,            0,           -1 },
-	{ "Firefox",      NULL,       NULL,       0,            0,           -1 },
-	{ "Obsidian",     NULL,       NULL,       0,            0,           -1 },
-	{ "Spotify",      NULL,       NULL,       0,            0,           -1 },
-	{ "Discord",      NULL,       NULL,       0,            0,           -1 },
-	{ "Transmission", NULL,       NULL,       0,            0,           -1 },
+	/* class               instance    title       tags mask     isfloating   monitor */
+	{ "Gimp",              NULL,       NULL,       0,            1,           -1 },
+	{ "Chromium",          NULL,       NULL,       0,            0,           -1 },
+	{ "Firefox",           NULL,       NULL,       0,            0,           -1 },
+	{ "Obsidian",          NULL,       NULL,       0,            0,           -1 },
+	{ "Spotify",           NULL,       NULL,       0,            0,           -1 },
+	{ "Discord",           NULL,       NULL,       0,            0,           -1 },
+	{ "Transmission",      NULL,       NULL,       0,            0,           -1 },
+	{ "World of Warcraft", NULL,       NULL,       0,            0,           -1 },
 };
 
 /* layout(s) */
@@ -52,7 +53,7 @@ static const Layout layouts[] = {
 /* key definitions */
 #define MODKEY Mod4Mask
 #define TAGKEYS(KEY,TAG) \
-	{ MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
+	{ MODKEY,                       KEY,      viewall,        {.ui = 1 << TAG} }, \
 	{ MODKEY|ShiftMask,             KEY,      toggleview,     {.ui = 1 << TAG} }, \
 	{ MODKEY|ControlMask,           KEY,      tag,            {.ui = 1 << TAG} }, \
 	{ MODKEY|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },

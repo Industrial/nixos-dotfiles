@@ -45,6 +45,7 @@
           ./features/system/shell
           ./features/system/sound
           ./features/system/starship
+          ./features/system/syncthing
           ./features/system/system
           ./features/system/time
           ./features/system/tor
@@ -61,56 +62,81 @@
         inherit pkgs;
 
         modules = [
-          #./features/home/gnome
-          #./features/home/hyprland
-          #./features/home/ruby
-          #./features/home/vit
-          #./features/home/zsh
-          ./features/home/alacritty
+          ./features/home/home
+
+          # CLI
           ./features/home/ansifilter
           ./features/home/appimage-run
           ./features/home/base16-schemes
           ./features/home/bat
           ./features/home/btop
           ./features/home/direnv
-          ./features/home/discord
-          ./features/home/docker-compose
           ./features/home/dust
-          ./features/home/dwm
           ./features/home/e2fsprogs
-          ./features/home/evince
           ./features/home/eza
           ./features/home/fd
-          ./features/home/feh
-          ./features/home/filezilla
-          ./features/home/firefox
           ./features/home/fish
           ./features/home/fzf
-          ./features/home/git
-          ./features/home/gparted
-          ./features/home/home
           ./features/home/htop
-          ./features/home/lutris
-          ./features/home/meld
-          ./features/home/mpv
           ./features/home/neovim
-          ./features/home/obs-studio
-          ./features/home/obsidian
           ./features/home/ranger
           ./features/home/ripgrep
-          ./features/home/spotify
-          ./features/home/sqlite
-          ./features/home/stylix
           ./features/home/taskwarrior
-          ./features/home/transmission
           ./features/home/unzip
-          ./features/home/vlc
-          ./features/home/vscode
-          ./features/home/world-of-warcraft
-          ./features/home/xfce
-          ./features/home/yubikey-manager
           ./features/home/zellij
+
+          # Window Manager / Desktop
+          ./features/home/dwm
+          ./features/home/xfce
+
+          # Network
+          ./features/home/filezilla
+          ./features/home/firefox
+          ./features/home/transmission
+
+          # Programming
+          ./features/home/docker-compose
+          ./features/home/git
+          ./features/home/gitkraken
+          ./features/home/sqlite
+          ./features/home/vscode
+
+          # Communication
+          ./features/home/discord
+
+          # Media
+          ./features/home/mpv
+          ./features/home/obs-studio
+          ./features/home/spotify
+          ./features/home/vlc
+
+          # GUI / Window Manager
+          ./features/home/alacritty
+          ./features/home/evince
+          ./features/home/feh
+          ./features/home/gimp
+          ./features/home/gparted
+          ./features/home/gscreenshot
+          ./features/home/inkscape
+          ./features/home/meld
+          ./features/home/obsidian
+          ./features/home/stylix
+          ./features/home/yubikey-manager
           inputs.stylix.homeManagerModules.stylix
+
+          # Games
+          ./features/home/lutris
+          ./features/home/world-of-warcraft
+
+          # Crypto
+          ./features/home/monero
+
+          # Unused
+          #./features/home/gnome
+          #./features/home/hyprland
+          #./features/home/ruby
+          #./features/home/vit
+          #./features/home/zsh
         ];
       };
     };

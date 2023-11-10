@@ -35,6 +35,13 @@
             hash = "sha256-MEF/vSN3saZlvL4b26mp/7XyKG3Lp0FD0vTYPULuQXA=";
           })
 
+          # Switch All Monitor Tags
+          # Switches the selected tag of all monitors.
+          (pkgs.fetchpatch {
+            url = "https://dwm.suckless.org/patches/switch_all_monitor_tags/dwm-switchallmonitortags-6.3.diff";
+            hash = "sha256-nqP3l3dEBXfx1SjsO3pkj9HMJiD0AndYhDMTUtIOhx0=";
+          })
+
           # Move Stack
           # `pushup` and `pushdown` provide a way to move clients inside the
           # clients list.
