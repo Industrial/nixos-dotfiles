@@ -66,6 +66,22 @@
           ./host/langhus/system
         ];
       };
+
+      drakkar = inputs.nixpkgs.lib.nixosSystem {
+        inherit system;
+        inherit pkgs;
+
+        specialArgs = {
+          inherit inputs;
+          c9config = args.c9config // {
+            hostname = "drakkar";
+          };
+        };
+
+        modules = [
+          ./host/drakkar/system
+        ];
+      };
     };
 
     homeConfigurations = {
@@ -81,6 +97,21 @@
 
         modules = [
           ./host/langhus/home-manager
+        ];
+      };
+
+      "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+
+        extraSpecialArgs = {
+          inherit inputs;
+          c9config = args.c9config // {
+            hostname = "drakkar";
+          };
+        };
+
+        modules = [
+          ./host/drakkar/home-manager
         ];
       };
     };

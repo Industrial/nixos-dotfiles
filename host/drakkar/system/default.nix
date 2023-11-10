@@ -1,0 +1,31 @@
+{pkgs, ...}: {
+  imports = [
+    ../../../features/system/bluetooth
+    ../../../features/system/boot
+    ../../../features/system/chromium
+    ../../../features/system/console
+    ../../../features/system/disks
+    ../../../features/system/docker
+    ../../../features/system/fish
+    ../../../features/system/fonts
+    ../../../features/system/git
+    ../../../features/system/graphics
+    ../../../features/system/home-manager
+    ../../../features/system/i18n
+    ../../../features/system/lutris
+    ../../../features/system/networking
+    ../../../features/system/nix
+    ../../../features/system/p7zip
+    ../../../features/system/printing
+    ../../../features/system/shell
+    ../../../features/system/sound
+    ../../../features/system/starship
+    ../../../features/system/syncthing
+    ../../../features/system/system
+    ../../../features/system/time
+    ../../../features/system/unrar
+    ../../../features/system/users
+    ../../../features/system/window-manager
+    ../../../features/system/xfce
+  ];
+}
