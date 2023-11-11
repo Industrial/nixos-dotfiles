@@ -1,4 +1,5 @@
 # Syncthing syncs things.
+# TODO: c9config.username
 {pkgs, ...}: {
   services = {
     syncthing = {

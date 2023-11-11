@@ -1,15 +1,15 @@
 {pkgs, ...}: {
   imports = [
+    ./graphics
+    ./hardware-configuration.nix
     ../../../features/system/bluetooth
     ../../../features/system/boot
     ../../../features/system/chromium
     ../../../features/system/console
-    ../../../features/system/disks
     ../../../features/system/docker
     ../../../features/system/fish
     ../../../features/system/fonts
     ../../../features/system/git
-    ../../../features/system/graphics
     ../../../features/system/home-manager
     ../../../features/system/i18n
     ../../../features/system/lutris

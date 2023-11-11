@@ -15,4 +15,6 @@
   environment.systemPackages = with pkgs; [
     rocmPackages.rocminfo
   ];
+
+  services.xserver.videoDrivers = ["amdgpu"];
 }

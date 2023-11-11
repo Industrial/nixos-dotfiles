@@ -1,3 +1,4 @@
+# TODO: c9config username
 {pkgs, ...}: {
   system.stateVersion = "22.11";
   nix.package = pkgs.nixFlakes;
