@@ -8,14 +8,14 @@ HOST=${2:-"langhus"}
 echo "> host: ${HOST}"
 
 echo "> compiling neovim config"
-cd features/home/neovim
+cd features/home/cli/neovim
 bin/compile
-cd ../../..
+cd ../../../..
 
 echo "> clearing zellij cache"
-cd features/home/zellij
+cd features/home/cli/zellij
 bin/clear-cache
-cd ../../..
+cd ../../../..
 
 echo "> nixos-generate-config --show-hardware-config > hardware-configuration.nix"
 nixos-generate-config --show-hardware-config > ./host/${HOST}/system/hardware-configuration.nix

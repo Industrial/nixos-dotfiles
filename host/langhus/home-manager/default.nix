@@ -1,71 +1,79 @@
 {pkgs, inputs, ...}: {
   imports = [
-    ../../../features/home/home
-
     # CLI
-    ../../../features/home/ansifilter
-    ../../../features/home/appimage-run
-    ../../../features/home/base16-schemes
-    ../../../features/home/bat
-    ../../../features/home/btop
-    ../../../features/home/direnv
-    ../../../features/home/dust
-    ../../../features/home/e2fsprogs
-    ../../../features/home/eza
-    ../../../features/home/fd
-    ../../../features/home/fish
-    ../../../features/home/fzf
-    ../../../features/home/htop
-    ../../../features/home/neovim
-    ../../../features/home/ranger
-    ../../../features/home/ripgrep
-    ../../../features/home/unzip
-    ../../../features/home/zellij
-
-    # Window Manager / Desktop
-    ../../../features/home/dwm
-    ../../../features/home/xfce
-
-    # Network
-    ../../../features/home/filezilla
-    ../../../features/home/firefox
-    ../../../features/home/transmission
-
-    # Programming
-    ../../../features/home/docker-compose
-    ../../../features/home/git
-    ../../../features/home/gitkraken
-    ../../../features/home/sqlite
-    ../../../features/home/vscode
+    ../../../features/home/cli/ansifilter
+    ../../../features/home/cli/appimage-run
+    ../../../features/home/cli/base16-schemes
+    ../../../features/home/cli/bat
+    ../../../features/home/cli/btop
+    ../../../features/home/cli/direnv
+    ../../../features/home/cli/dust
+    ../../../features/home/cli/e2fsprogs
+    ../../../features/home/cli/eza
+    ../../../features/home/cli/fd
+    ../../../features/home/cli/fish
+    ../../../features/home/cli/fzf
+    ../../../features/home/cli/htop
+    ../../../features/home/cli/neovim
+    ../../../features/home/cli/ranger
+    ../../../features/home/cli/ripgrep
+    # ../../../features/home/cli/taskwarrior
+    ../../../features/home/cli/unzip
+    # ../../../features/home/cli/vit
+    ../../../features/home/cli/zellij
+    # ../../../features/home/cli/zsh
 
     # Communication
-    ../../../features/home/discord
+    ../../../features/home/communication/discord
 
-    # Media
-    ../../../features/home/mpv
-    ../../../features/home/obs-studio
-    ../../../features/home/spotify
-    ../../../features/home/vlc
-
-    # GUI / Window Manager
-    ../../../features/home/alacritty
-    ../../../features/home/evince
-    ../../../features/home/feh
-    ../../../features/home/gimp
-    ../../../features/home/gparted
-    ../../../features/home/gscreenshot
-    ../../../features/home/inkscape
-    ../../../features/home/meld
-    ../../../features/home/obsidian
-    ../../../features/home/stylix
-    ../../../features/home/yubikey-manager
-    inputs.stylix.homeManagerModules.stylix
+    # Crypto
+    ../../../features/home/crypto/monero
 
     # Games
     ../../../features/home/games/lutris
     ../../../features/home/games/world-of-warcraft
 
-    # Crypto
-    ../../../features/home/monero
+    # Home
+    ../../../features/home/home
+
+    # Lab
+
+    # Media
+    ../../../features/home/media/mpv
+    ../../../features/home/media/obs-studio
+    ../../../features/home/media/spotify
+    ../../../features/home/media/vlc
+
+    # Network
+    ../../../features/home/network/filezilla
+    ../../../features/home/network/firefox
+    ../../../features/home/network/transmission
+
+    # Programming
+    ../../../features/home/programming/docker-compose
+    ../../../features/home/programming/git
+    ../../../features/home/programming/gitkraken
+    ../../../features/home/programming/meld
+    # ../../../features/home/programming/ruby
+    ../../../features/home/programming/sqlite
+
+    # Window Manager
+    ../../../features/home/window-manager/alacritty
+    ../../../features/home/window-manager/dwm
+    ../../../features/home/window-manager/evince
+    ../../../features/home/window-manager/feh
+    ../../../features/home/window-manager/gimp
+    # ../../../features/home/window-manager/gnome
+    ../../../features/home/window-manager/gparted
+    ../../../features/home/window-manager/gscreenshot
+    ../../../features/home/window-manager/hyprland
+    ../../../features/home/window-manager/inkscape
+    ../../../features/home/window-manager/obsidian
+    ../../../features/home/window-manager/slock
+    ../../../features/home/window-manager/stylix
+    ../../../features/home/window-manager/vscode
+    ../../../features/home/window-manager/xfce
+    ../../../features/home/window-manager/yubikey-manager
+    inputs.stylix.homeManagerModules.stylix
   ];
 }
