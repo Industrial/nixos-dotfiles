@@ -62,8 +62,8 @@
     inputs.stylix.homeManagerModules.stylix
 
     # Games
-    ../../../features/home/lutris
-    ../../../features/home/world-of-warcraft
+    ../../../features/home/games/lutris
+    ../../../features/home/games/world-of-warcraft
 
     # Crypto
     ../../../features/home/monero
