@@ -4,5 +4,10 @@ set -e
 HOST=${1:-"smithja"}
 echo "bin/osx-update-darwin-rebuild-flake > host: ${HOST}"
 
+if [ -f "/etc/shells" ]; then
+  echo "bin/osx-update-darwin-rebuild-flake > sudo mv /etc/shells /etc/shells.before-nix-darwin"
+  sudo mv /etc/shells /etc/shells.before-nix-darwin
+fi
+
 echo "bin/osx-update-darwin-rebuild-flake > nix run nix-darwin -- switch --flake \".#${HOST}\" --show-trace"
 nix run nix-darwin -- switch --flake ".#${HOST}" --show-trace

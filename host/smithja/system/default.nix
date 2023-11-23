@@ -26,5 +26,11 @@
   nixpkgs.hostPlatform = "aarch64-darwin";
   services.nix-daemon.enable = true;
 
+  # Use shells from nix. `chsh -s /run/current-system/sw/bin/fish`
+  programs.bash.enable = true;
+  programs.zsh.enable = true;
+  programs.fish.enable = true;
+  environment.shells = with pkgs; [ bashInteractive fish zsh ];
+
   system.stateVersion = 4;
 }
