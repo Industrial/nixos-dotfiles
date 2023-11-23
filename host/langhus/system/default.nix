@@ -13,23 +13,25 @@
     ../../../features/system/network/syncthing
     # ../../../features/system/network/tor
 
+    # Nix
+    ../../../features/system/nixos/nix
+
     # Operating System
-    ../../../features/system/operating-system/bluetooth
-    ../../../features/system/operating-system/boot
-    ../../../features/system/operating-system/console
-    ../../../features/system/operating-system/fonts
-    ../../../features/system/operating-system/home-manager
-    ../../../features/system/operating-system/i18n
-    ../../../features/system/operating-system/lutris
-    ../../../features/system/operating-system/networking
-    ../../../features/system/operating-system/nix
-    ../../../features/system/operating-system/printing
-    ../../../features/system/operating-system/shell
-    ../../../features/system/operating-system/sound
-    ../../../features/system/operating-system/system
-    ../../../features/system/operating-system/time
-    ../../../features/system/operating-system/users
-    ../../../features/system/operating-system/window-manager
+    ../../../features/system/nixos/bluetooth
+    ../../../features/system/nixos/boot
+    ../../../features/system/nixos/console
+    ../../../features/system/nixos/fonts
+    ../../../features/system/nixos/home-manager
+    ../../../features/system/nixos/i18n
+    ../../../features/system/nixos/lutris
+    ../../../features/system/nixos/networking
+    ../../../features/system/nixos/printing
+    ../../../features/system/nixos/shell
+    ../../../features/system/nixos/sound
+    ../../../features/system/nixos/system
+    ../../../features/system/nixos/time
+    ../../../features/system/nixos/users
+    ../../../features/system/nixos/window-manager
 
     # Programming
     ../../../features/system/programming/docker

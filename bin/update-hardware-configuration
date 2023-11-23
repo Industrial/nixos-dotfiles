@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -e
+
+HOST=${2:-"langhus"}
+echo "bin/update-hardware-configuration > host: ${HOST}"
+
+echo "bin/update-hardware-configuration > nixos-generate-config --show-hardware-config > ./host/${HOST}/system/hardware-configuration.nix"
+nixos-generate-config --show-hardware-config > ./host/${HOST}/system/hardware-configuration.nix

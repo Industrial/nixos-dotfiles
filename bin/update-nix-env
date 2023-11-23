@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+
+echo "bin/update-nix-env > nix-env -u --always"
+nix-env -u --always

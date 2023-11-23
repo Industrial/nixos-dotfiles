@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -e
+
+HOST=${1:-"smithja"}
+echo "bin/osx-update-darwin-rebuild-flake > host: ${HOST}"
+
+echo "bin/osx-update-darwin-rebuild-flake > nix run nix-darwin -- switch --flake \".#${HOST}\" --show-trace"
+nix run nix-darwin -- switch --flake ".#${HOST}" --show-trace

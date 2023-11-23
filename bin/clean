@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -e
-
-echo "> delete old generations"
-nix-env -p /nix/var/nix/profiles/system --delete-generations +2
-
-echo "> collect garbage"
-sudo nix-collect-garbage --delete-older-than 30d

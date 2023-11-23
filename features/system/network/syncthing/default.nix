@@ -1,12 +1,12 @@
 # Syncthing syncs things.
 # TODO: c9config.username
-{pkgs, ...}: {
+{c9config, pkgs, ...}: {
   services = {
     syncthing = {
       enable = true;
-      user = "tom";
-      dataDir = "/home/tom/Documents";
-      configDir = "/home/tom/Documents/.config/syncthing";
+      user = c9config.username;
+      dataDir = "${c9config.userdir}/Documents";
+      configDir = "${c9config.userdir}/Documents/.config/syncthing";
     };
   };
 }

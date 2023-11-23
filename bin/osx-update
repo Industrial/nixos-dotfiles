@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-HOST=${1:-"langhus"}
+HOST=${1:-"smithja"}
 echo "bin/update > host: ${HOST}"
 
-USER=${2:-"tom"}
+USER=${2:-"twieland"}
 echo "bin/update > user: ${USER}"
 
 bin/update-neovim
 bin/update-zellij
-bin/update-hardware-configuration "${HOST}"
+# bin/update-hardware-configuration "${HOST}"
 bin/update-nix-env
 bin/update-flake
-bin/update-nixos-rebuild-flake "${HOST}"
+bin/osx-update-darwin-rebuild-flake "${HOST}"
 bin/update-home-manager "${HOST}" "${USER}"

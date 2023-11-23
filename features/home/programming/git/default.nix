@@ -1,8 +1,8 @@
-{pkgs, ...}: {
+{c9config, pkgs, ...}: {
   programs.git = {
     enable = true;
-    userName = "Tom Wieland";
-    userEmail = "tom.wieland@gmail.com";
+    userName = c9config.userfullname;
+    userEmail = c9config.useremail;
     aliases = {
       a = "add";
       A = "add -A";

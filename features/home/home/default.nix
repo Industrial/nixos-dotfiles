@@ -1,7 +1,7 @@
 {pkgs, c9config, ...}: {
   home.username = c9config.username;
-  home.homeDirectory = "/home/${c9config.username}";
-  home.stateVersion = "20.09";
+  home.homeDirectory = c9config.userdir;
+  home.stateVersion = "23.11";
 
   home.sessionVariables.EDITOR = "nvim";
   home.sessionVariables.GIT_EDITOR = "nvim";

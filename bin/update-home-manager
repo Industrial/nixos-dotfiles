@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+HOST=${1:-"langhus"}
+echo "bin/update-home-manager > host: ${HOST}"
+
+USER=${2:-"tom"}
+echo "bin/update-home-manager > user: ${USER}"
+
+echo "bin/update-home-manager > home-manager switch --flake \".#${USER}@${HOST}\" --show-trace"
+home-manager switch --flake ".#${USER}@${HOST}" --show-trace

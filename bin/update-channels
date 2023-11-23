@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+echo "bin/update-channels > sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager"
+sudo nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
+
+echo "bin/update-channels > sudo nix-channel --add https://github.com/LnL7/nix-darwin/archive/master.tar.gz darwin"
+sudo nix-channel --add https://github.com/LnL7/nix-darwin/archive/master.tar.gz darwin
+
+echo "bin/update-channels > sudo nix-channel --update"
+sudo nix-channel --update
