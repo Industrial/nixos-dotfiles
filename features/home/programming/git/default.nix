@@ -1,4 +1,8 @@
-{c9config, pkgs, ...}: {
+{
+  c9config,
+  pkgs,
+  ...
+}: {
   programs.git = {
     enable = true;
     userName = c9config.userfullname;

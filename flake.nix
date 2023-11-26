@@ -49,9 +49,11 @@
 
         specialArgs = {
           inherit inputs;
-          c9config = args.c9config // {
-            hostname = "langhus";
-          };
+          c9config =
+            args.c9config
+            // {
+              hostname = "langhus";
+            };
         };
 
         modules = [
@@ -67,9 +69,11 @@
 
         specialArgs = {
           inherit inputs;
-          c9config = args.c9config // {
-            hostname = "drakkar";
-          };
+          c9config =
+            args.c9config
+            // {
+              hostname = "drakkar";
+            };
         };
 
         modules = [
@@ -87,13 +91,15 @@
 
         specialArgs = {
           inherit inputs;
-          c9config = args.c9config // {
-            hostname = "smithja";
-            username = "twieland";
-            userfullname = "Tom Wieland";
-            useremail = "twieland@suitsupply.com";
-            userdir = "/Users/twieland";
-          };
+          c9config =
+            args.c9config
+            // {
+              hostname = "smithja";
+              username = "twieland";
+              userfullname = "Tom Wieland";
+              useremail = "twieland@suitsupply.com";
+              userdir = "/Users/twieland";
+            };
         };
 
         modules = [
@@ -111,9 +117,11 @@
 
         extraSpecialArgs = {
           inherit inputs;
-          c9config = args.c9config // {
-            hostname = "langhus";
-          };
+          c9config =
+            args.c9config
+            // {
+              hostname = "langhus";
+            };
         };
 
         modules = [
@@ -129,9 +137,11 @@
 
         extraSpecialArgs = {
           inherit inputs;
-          c9config = args.c9config // {
-            hostname = "drakkar";
-          };
+          c9config =
+            args.c9config
+            // {
+              hostname = "drakkar";
+            };
         };
 
         modules = [
@@ -147,13 +157,15 @@
 
         extraSpecialArgs = {
           inherit inputs;
-          c9config = args.c9config // {
-            hostname = "smithja";
-            username = "twieland";
-            userfullname = "Tom Wieland";
-            useremail = "twieland@suitsupply.com";
-            userdir = "/Users/twieland";
-          };
+          c9config =
+            args.c9config
+            // {
+              hostname = "smithja";
+              username = "twieland";
+              userfullname = "Tom Wieland";
+              useremail = "twieland@suitsupply.com";
+              userdir = "/Users/twieland";
+            };
         };
 
         modules = [

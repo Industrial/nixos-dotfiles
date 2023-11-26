@@ -1,4 +1,8 @@
-{c9config, pkgs, ...}: {
+{
+  c9config,
+  pkgs,
+  ...
+}: {
   system.stateVersion = "22.11";
   nix.package = pkgs.nixFlakes;
   nix.extraOptions = ''

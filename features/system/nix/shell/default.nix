@@ -1,4 +1,8 @@
-{c9config, pkgs, ...}: {
+{
+  c9config,
+  pkgs,
+  ...
+}: {
   # Enable system fish.
   programs.fish.enable = true;
   # TODO: c9config.username

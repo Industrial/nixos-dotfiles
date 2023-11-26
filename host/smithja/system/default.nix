@@ -30,7 +30,7 @@
   programs.bash.enable = true;
   programs.zsh.enable = true;
   programs.fish.enable = true;
-  environment.shells = with pkgs; [ bashInteractive fish zsh ];
+  environment.shells = with pkgs; [bashInteractive fish zsh];
 
   system.stateVersion = 4;
 }

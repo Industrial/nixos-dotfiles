@@ -1,5 +1,9 @@
 # DWM is a window manager.
-{pkgs, config, ...}: {
+{
+  pkgs,
+  config,
+  ...
+}: {
   nixpkgs.overlays = [
     (self: super: {
       dwm = super.dwm.overrideAttrs (oldAttrs: rec {

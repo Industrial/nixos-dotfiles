@@ -1,4 +1,8 @@
-{pkgs, c9config, ...}: {
+{
+  pkgs,
+  c9config,
+  ...
+}: {
   home.username = c9config.username;
   home.homeDirectory = c9config.userdir;
   home.stateVersion = "23.11";

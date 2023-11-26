@@ -1,4 +1,8 @@
-{c9config, pkgs, ...}: {
+{
+  c9config,
+  pkgs,
+  ...
+}: {
   programs.zellij.enable = true;
 
   #programs.zellij.enableFishIntegration = true;

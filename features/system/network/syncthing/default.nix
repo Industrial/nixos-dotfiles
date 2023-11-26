@@ -1,6 +1,10 @@
 # Syncthing syncs things.
 # TODO: c9config.username
-{c9config, pkgs, ...}: {
+{
+  c9config,
+  pkgs,
+  ...
+}: {
   services = {
     syncthing = {
       enable = true;
