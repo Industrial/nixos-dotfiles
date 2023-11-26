@@ -801,14 +801,14 @@ in {
       })
 
       # Completion
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "vscode-tabby";
-          publisher = "TabbyML";
-          version = "0.1.1";
-          sha256 = "sha256-ta7TIHzI/pDmCgPAfkLxzULU1xFaNzMDGOo0pXKgHl4=";
-        };
-      })
+      # (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+      #   mktplcRef = {
+      #     name = "vscode-tabby";
+      #     publisher = "TabbyML";
+      #     version = "0.1.1";
+      #     sha256 = "sha256-ta7TIHzI/pDmCgPAfkLxzULU1xFaNzMDGOo0pXKgHl4=";
+      #   };
+      # })
 
       # Testing
       (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
