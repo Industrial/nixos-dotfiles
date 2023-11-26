@@ -43,6 +43,7 @@
     # Lab
 
     # Media
+    ../../../features/home/media/eog
     ../../../features/home/media/mpv
     ../../../features/home/media/obs-studio
     ../../../features/home/media/spotify
