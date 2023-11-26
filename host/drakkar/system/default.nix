@@ -1,7 +1,8 @@
 {pkgs, ...}: {
   imports = [
     ./graphics
-    ./hardware-configuration.nix
+    # TODO: Include this on the drakkar system and commit it.
+    # ./hardware-configuration.nix
 
     # CLI
     ../../../features/system/cli/fish
