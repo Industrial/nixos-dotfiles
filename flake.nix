@@ -61,25 +61,25 @@
         ];
       };
 
-      drakkar = inputs.nixpkgs.lib.nixosSystem {
-        pkgs = import inputs.nixpkgs {
-          inherit system;
-          config = args.nixpkgsConfig;
-        };
+      # drakkar = inputs.nixpkgs.lib.nixosSystem {
+      #   pkgs = import inputs.nixpkgs {
+      #     inherit system;
+      #     config = args.nixpkgsConfig;
+      #   };
 
-        specialArgs = {
-          inherit inputs;
-          c9config =
-            args.c9config
-            // {
-              hostname = "drakkar";
-            };
-        };
+      #   specialArgs = {
+      #     inherit inputs;
+      #     c9config =
+      #       args.c9config
+      #       // {
+      #         hostname = "drakkar";
+      #       };
+      #   };
 
-        modules = [
-          ./host/drakkar/system
-        ];
-      };
+      #   modules = [
+      #     ./host/drakkar/system
+      #   ];
+      # };
     };
 
     darwinConfigurations = {
@@ -129,25 +129,25 @@
         ];
       };
 
-      "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
-        pkgs = import inputs.nixpkgs {
-          inherit system;
-          config = args.nixpkgsConfig;
-        };
+      # "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
+      #   pkgs = import inputs.nixpkgs {
+      #     inherit system;
+      #     config = args.nixpkgsConfig;
+      #   };
 
-        extraSpecialArgs = {
-          inherit inputs;
-          c9config =
-            args.c9config
-            // {
-              hostname = "drakkar";
-            };
-        };
+      #   extraSpecialArgs = {
+      #     inherit inputs;
+      #     c9config =
+      #       args.c9config
+      #       // {
+      #         hostname = "drakkar";
+      #       };
+      #   };
 
-        modules = [
-          ./host/drakkar/home-manager
-        ];
-      };
+      #   modules = [
+      #     ./host/drakkar/home-manager
+      #   ];
+      # };
 
       "twieland@smithja" = inputs.home-manager.lib.homeManagerConfiguration {
         pkgs = import inputs.nixpkgs {
