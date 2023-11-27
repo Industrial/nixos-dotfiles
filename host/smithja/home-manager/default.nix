@@ -34,7 +34,7 @@
     # Programming
     ../../../features/home/programming/git
     ../../../features/home/programming/gitkraken
-    ../../../features/home/programming/insomnia
+    ../../../features/home/programming/nodejs
 
     # Window Manager
     ../../../features/home/window-manager/gimp
