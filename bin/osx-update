@@ -14,4 +14,4 @@ bin/update-nix-env
 bin/update-flake
 bin/osx-update-darwin-rebuild-flake "${HOST}"
 bin/update-home-manager "${HOST}" "${USER}"
-bin/osx-update-login-shell
+bin/osx-update-login-shell "${USER}"
