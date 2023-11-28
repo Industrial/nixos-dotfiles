@@ -65,7 +65,6 @@
       #     inherit system;
       #     config = args.nixpkgsConfig;
       #   };
-
       #   specialArgs = {
       #     inherit inputs;
       #     c9config =
@@ -74,7 +73,6 @@
       #         hostname = "drakkar";
       #       };
       #   };
-
       #   modules = [
       #     ./host/drakkar/system
       #   ];
@@ -129,12 +127,11 @@
         ];
       };
 
-      "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
-        pkgs = import inputs.nixpkgs {
-          inherit system;
-          config = args.nixpkgsConfig;
-        };
-
+      # "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
+      #   pkgs = import inputs.nixpkgs {
+      #     inherit system;
+      #     config = args.nixpkgsConfig;
+      #   };
       #   extraSpecialArgs = {
       #     inherit inputs;
       #     c9config =
@@ -143,7 +140,6 @@
       #         hostname = "drakkar";
       #       };
       #   };
-
       #   modules = [
       #     ./host/drakkar/home-manager
       #   ];
