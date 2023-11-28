@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{c9config, pkgs, ...}: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {};
 in {
   # Enable HomeManager Fish, not system fish.
@@ -36,6 +36,8 @@ in {
   programs.fish.shellInit = ''
     # PATH
     fish_add_path $HOME/.bin
+    # TODO: Only do this on OSX
+    fish_add_path /opt/homebrew/bin
 
     # Replacement for cat
     function cat --wraps bat
