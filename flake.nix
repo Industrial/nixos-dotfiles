@@ -24,8 +24,6 @@
   };
 
   outputs = inputs: let
-    system = "x86_64-linux";
-
     # Will be passed into modules.
     args = {
       nixpkgsConfig = {
@@ -37,13 +35,14 @@
         userfullname = "Tom Wieland";
         useremail = "tom.wieland@gmail.com";
         userdir = "/home/tom";
+        system = "x86_64-linux";
       };
     };
   in {
     nixosConfigurations = {
       langhus = inputs.nixpkgs.lib.nixosSystem {
         pkgs = import inputs.nixpkgs {
-          inherit system;
+          system = args.c9config.system;
           config = args.nixpkgsConfig;
         };
 
@@ -99,6 +98,7 @@
               userfullname = "Tom Wieland";
               useremail = "twieland@suitsupply.com";
               userdir = "/Users/twieland";
+              system = "aarch64-darwin";
             };
         };
 
@@ -111,7 +111,7 @@
     homeConfigurations = {
       "${args.c9config.username}@langhus" = inputs.home-manager.lib.homeManagerConfiguration {
         pkgs = import inputs.nixpkgs {
-          inherit system;
+          system = args.c9config.system;
           config = args.nixpkgsConfig;
         };
 
@@ -129,11 +129,11 @@
         ];
       };
 
-      # "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
-      #   pkgs = import inputs.nixpkgs {
-      #     inherit system;
-      #     config = args.nixpkgsConfig;
-      #   };
+      "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
+        pkgs = import inputs.nixpkgs {
+          inherit system;
+          config = args.nixpkgsConfig;
+        };
 
       #   extraSpecialArgs = {
       #     inherit inputs;
@@ -165,6 +165,7 @@
               userfullname = "Tom Wieland";
               useremail = "twieland@suitsupply.com";
               userdir = "/Users/twieland";
+              system = "aarch64-darwin";
             };
         };
 
