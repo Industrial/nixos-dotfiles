@@ -30,7 +30,7 @@ in {
       "[nix]"."editor.formatOnPaste" = true;
       "[nix]"."editor.formatOnSave" = true;
       "[nix]"."editor.formatOnType" = false;
-      # "[purescript]"."editor.defaultFormatter" = "nwolverson.ide-purescript";
+      "[purescript]"."editor.defaultFormatter" = "nwolverson.ide-purescript";
       "[python]"."editor.defaultFormatter" = "ms-python.python";
       "[python]"."editor.formatOnType" = false;
       "[python]"."editor.guides.indentation" = true;
@@ -480,6 +480,7 @@ in {
       "files.watcherExclude"."**/.git/objects/**" = true;
       "files.watcherExclude"."**/.git/subtree-cache/**" = true;
       "files.watcherExclude"."**/.hg/store/**" = true;
+      "files.watcherExclude"."**/.spago/**" = true;
       "files.watcherExclude"."**/node_modules/*/**" = true;
       "git.autofetch" = true;
       "git.confirmSync" = false;
@@ -495,7 +496,11 @@ in {
       "python.linting.flake8Args" = ["--ignore" "E501,W503,W504"];
       "python.linting.flake8Enabled" = true;
       "python.linting.mypyEnabled" = false;
+      "purescript.addSpagoSources" = true;
+      "purescript.buildCommand" = "spago build --purs-args --json-errors";
+      "purescript.buildOpenedFiles" = true;
       "purescript.formatter" = "purs-tidy";
+      "purescript.outputDirectory" = "output";
       "references.preferredLocation" = "view";
       # "ruby.useBundler" = false;
       # "ruby.useLanguageServer" = false;
