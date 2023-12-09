@@ -5,11 +5,12 @@
 }: {
   programs.zellij.enable = true;
 
-  #programs.zellij.enableFishIntegration = true;
+  # TODO: Describe why I don't want this.
+  programs.zellij.enableFishIntegration = false;
 
   programs.zellij.settings = {
-    layout_dir = "${c9config.userdir}/.dotfiles/features/home/zellij/layouts";
-    theme_dir = "${c9config.userdir}/.dotfiles/features/home/zellij/themes";
+    layout_dir = "${c9config.userdir}/.dotfiles/features/home/cli/zellij/layouts";
+    theme_dir = "${c9config.userdir}/.dotfiles/features/home/cli/zellij/themes";
     theme = "stylix";
     default_layout = "system";
     default_mode = "normal";
@@ -36,22 +37,6 @@
 
     # Not supported correctly, put them in the layout files.
     keybinds = {};
-
-    themes = {
-      nord = {
-        fg = "#D8DEE9";
-        bg = "#2E3440";
-        black = "#3B4252";
-        red = "#BF616A";
-        green = "#A3BE8C";
-        yellow = "#EBCB8B";
-        blue = "#81A1C1";
-        magenta = "#B48EAD";
-        cyan = "#88C0D0";
-        white = "#E5E9F0";
-        orange = "#D08770";
-      };
-    };
   };
 
   home.packages = with pkgs; [
