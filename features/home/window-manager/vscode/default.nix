@@ -395,6 +395,12 @@ in {
         "base16-zenburn-dark"
         "base16-zenburn-light"
       ];
+      "cody.autocomplete.completeSuggestWidgetSelection" = true;
+      "cody.autocomplete.enabled" = true;
+      "cody.autocomplete.formatOnAccept" = true;
+      "cody.codeActions.enabled" = true;
+      "cody.commandCodeLenses" = true;
+      "cody.telemetry.level" = "off";
       "debug.console.fontSize" = 16;
       "debug.javascript.autoAttachFilter" = "smart";
       "editor.acceptSuggestionOnCommitCharacter" = false;
@@ -416,6 +422,7 @@ in {
       "editor.gotoLocation.multipleReferences" = "gotoAndPeek";
       "editor.gotoLocation.multipleTypeDefinitions" = "gotoAndPeek";
       "editor.inlineSuggest.enabled" = true;
+      "editor.inlineSuggest.suppressSuggestions" = true;
       "editor.largeFileOptimizations" = false;
       "editor.quickSuggestions"."comments" = "on";
       "editor.quickSuggestions"."other" = "on";
@@ -855,6 +862,15 @@ in {
           publisher = "sugatoray";
           version = "1.1.1";
           sha256 = "sha256-0b1H5mzhBkf4By67rF3xZXRkfzoNYlvoYCGG+F7Kans=";
+        };
+      })
+      # Cody
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "cody-ai";
+          publisher = "sourcegraph";
+          version = "1.0.1";
+          sha256 = "sha256-YUJ22okVvz3YYi/+FX0Mnm/430wyP1YKQMEH654+Ezc=";
         };
       })
       # # Ruby
