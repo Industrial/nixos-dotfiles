@@ -55,11 +55,12 @@
     ../../../features/home/network/transmission
 
     # Programming
+    # ../../../features/home/programming/ruby
     ../../../features/home/programming/docker-compose
     ../../../features/home/programming/git
     ../../../features/home/programming/gitkraken
+    ../../../features/home/programming/insomnia
     ../../../features/home/programming/meld
-    # ../../../features/home/programming/ruby
     ../../../features/home/programming/sqlite
 
     # Window Manager
