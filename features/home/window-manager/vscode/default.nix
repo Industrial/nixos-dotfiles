@@ -408,7 +408,7 @@ in {
       "editor.autoClosingBrackets" = "always";
       "editor.autoClosingDelete" = "always";
       "editor.autoClosingQuotes" = "always";
-      "editor.codeActionsOnSave"."source.fixAll" = true;
+      "editor.codeActionsOnSave"."source.fixAll" = "explicit";
       "editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "editor.fontFamily" = "'Fira Code', 'FiraCode Nerd Font', 'ProFontWindows Nerd Font', 'Droid Sans Mono', 'monospace', monospace, 'Droid Sans Fallback'";
       "editor.fontLigatures" = true;
@@ -471,7 +471,7 @@ in {
       "editor.suggestOnTriggerCharacters" = true;
       "editor.suggestSelection" = "first";
       "editor.tabSize" = 2;
-      "editor.wordBasedSuggestions" = true;
+      "editor.wordBasedSuggestions" = "matchingDocuments";
       "emmet.includeLanguages" = {};
       "emmet.showAbbreviationSuggestions" = false;
       "emmet.showExpandedAbbreviation" = "never";
