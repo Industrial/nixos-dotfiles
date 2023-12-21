@@ -35,7 +35,6 @@ in {
       "[python]"."editor.formatOnType" = false;
       "[python]"."editor.guides.indentation" = true;
       "[python]"."editor.tabSize" = 4;
-      # "[ruby]"."editor.defaultFormatter" = "rebornix.ruby";
       "[typescript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "[typescriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
       "alejandra.program" = "alejandra";
@@ -395,12 +394,6 @@ in {
         "base16-zenburn-dark"
         "base16-zenburn-light"
       ];
-      "cody.autocomplete.completeSuggestWidgetSelection" = true;
-      "cody.autocomplete.enabled" = true;
-      "cody.autocomplete.formatOnAccept" = true;
-      "cody.codeActions.enabled" = true;
-      "cody.commandCodeLenses" = true;
-      "cody.telemetry.level" = "off";
       "debug.console.fontSize" = 16;
       "debug.javascript.autoAttachFilter" = "smart";
       "editor.acceptSuggestionOnCommitCharacter" = false;
@@ -422,7 +415,8 @@ in {
       "editor.gotoLocation.multipleReferences" = "gotoAndPeek";
       "editor.gotoLocation.multipleTypeDefinitions" = "gotoAndPeek";
       "editor.inlineSuggest.enabled" = true;
-      "editor.inlineSuggest.suppressSuggestions" = true;
+      "editor.inlineSuggest.suppressSuggestions" = false;
+      "editor.inlineSuggest.showToolbar" = "always";
       "editor.largeFileOptimizations" = false;
       "editor.quickSuggestions"."comments" = "on";
       "editor.quickSuggestions"."other" = "on";
@@ -509,25 +503,6 @@ in {
       "purescript.formatter" = "purs-tidy";
       "purescript.outputDirectory" = "output";
       "references.preferredLocation" = "view";
-      # "ruby.useBundler" = false;
-      # "ruby.useLanguageServer" = false;
-      # "rubyLsp.enableExperimentalFeatures" = true;
-      # "rubyLsp.enabledFeatures" = {
-      #   "codeActions" = true;
-      #   "codeLens" = true;
-      #   "completion" = true;
-      #   "diagnostics" = true;
-      #   "documentHighlights" = true;
-      #   "documentLink" = true;
-      #   "documentSymbols" = true;
-      #   "foldingRanges" = true;
-      #   "formatting" = true;
-      #   "hover" = true;
-      #   "inlayHint" = true;
-      #   "onTypeFormatting" = true;
-      #   "selectionRanges" = true;
-      #   "semanticHighlighting" = true;
-      # };
       "scm.inputFontSize" = 16;
       "security.workspace.trust.untrustedFiles" = "open";
       "terminal.integrated.copyOnSelection" = true;
@@ -756,28 +731,85 @@ in {
         command = "workbench.action.navigateDown";
       }
       {
-        key = "alt+enter";
-        command = "editor.action.inlineSuggest.trigger";
+        # "ctrl+j": Selects the next suggestion in the suggestions widget when
+        # the widget is visible.
+        key = "ctrl+j";
+        command = "selectNextSuggestion";
+        when = "suggestWidgetVisible";
       }
       {
-        key = "ctrl+l";
-        command = "workbench.action.navigateRight";
+        # "ctrl+k": Selects the previous suggestion in the suggestions widget
+        # when the widget is visible.
+        key = "ctrl+k";
+        command = "selectPrevSuggestion";
+        when = "suggestWidgetVisible";
+      }
+      {
+        # "ctrl+j": Selects the next item in the Quick Open dialog when it is
+        # open.
+        key = "ctrl+j";
+        command = "workbench.action.quickOpenSelectNext";
+        when = "inQuickOpen";
+      }
+      {
+        # "ctrl+k": Selects the previous item in the Quick Open dialog when it
+        # is open.
+        key = "ctrl+k";
+        command = "workbench.action.quickOpenSelectPrevious";
+        when = "inQuickOpen";
+      }
+
+      # Put these here explicitly so they work on OSX (instead of CMD).
+      {
+        key = "ctrl+p";
+        command = "workbench.action.quickOpen";
+      }
+      {
+        key = "ctrl+shift+p";
+        command = "workbench.action.showCommands";
+      }
+
+      # AI Autocompletion
+      {
+        key = "alt+enter";
+        command = "editor.action.inlineSuggest.trigger";
+        when = "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible";
       }
       {
         key = "ctrl+enter";
         command = "editor.action.inlineSuggest.trigger";
+        when = "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible";
       }
       {
         key = "ctrl+]";
         command = "editor.action.inlineSuggest.showNext";
+        when = "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible";
       }
       {
         key = "ctrl+[";
         command = "editor.action.inlineSuggest.showPrevious";
+        when = "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible";
+      }
+      # Copilot
+      {
+        key = "ctrl+shift+enter";
+        command = "github.copilot.generate";
+        when = "editorTextFocus && github.copilot.activated && !inInteractiveInput && !inInteractiveEditorFocused";
       }
       {
-        key = "ctrl+p";
-        command = "workbench.action.quickOpen";
+        key = "ctrl+/";
+        command = "github.copilot.acceptCursorPanelSolution";
+        when = "github.copilot.activated && github.copilot.panelVisible";
+      }
+      {
+        key = "alt+[";
+        command = "github.copilot.previousPanelSolution";
+        when = "github.copilot.activated && github.copilot.panelVisible";
+      }
+      {
+        key = "alt+]";
+        command = "github.copilot.nextPanelSolution";
+        when = "github.copilot.activated && github.copilot.panelVisible";
       }
     ];
 
@@ -813,22 +845,20 @@ in {
       })
 
       # Completion
-      # (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-      #   mktplcRef = {
-      #     name = "vscode-tabby";
-      #     publisher = "TabbyML";
-      #     version = "0.1.1";
-      #     sha256 = "sha256-ta7TIHzI/pDmCgPAfkLxzULU1xFaNzMDGOo0pXKgHl4=";
-      #   };
-      # })
-
-      # Testing
       (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
         mktplcRef = {
-          name = "vitest-explorer";
-          publisher = "ZixuanChen";
-          version = "0.2.20";
-          sha256 = "sha256-W6db4zYqYwbnAENHVgpIZJnRO1u8cznh1XQeyDp5pOc=";
+          name = "copilot";
+          publisher = "github";
+          version = "1.143.601";
+          sha256 = "sha256-Ge/q1fAfhI5EuJFLHZqZyuPahHSgES7G0ns9FbS9vzA=";
+        };
+      })
+      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+        mktplcRef = {
+          name = "copilot-chat";
+          publisher = "github";
+          version = "0.12.2023122001";
+          sha256 = "sha256-LsDcdlw+TdkCeHxpvY9qjAWEFjl9OXU7RNV9VLVFSdg=";
         };
       })
 
@@ -864,25 +894,6 @@ in {
           sha256 = "sha256-0b1H5mzhBkf4By67rF3xZXRkfzoNYlvoYCGG+F7Kans=";
         };
       })
-      # Cody
-      (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-        mktplcRef = {
-          name = "cody-ai";
-          publisher = "sourcegraph";
-          version = "1.0.1";
-          sha256 = "sha256-YUJ22okVvz3YYi/+FX0Mnm/430wyP1YKQMEH654+Ezc=";
-        };
-      })
-      # # Ruby
-      # rebornix.ruby
-      # (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-      #   mktplcRef = {
-      #     name = "solargraph";
-      #     publisher = "castwide";
-      #     version = "0.24.0";
-      #     sha256 = "sha256-7mMzN+OdJ5R9CVaBJMzW218wMG5ETvNrUTST9/kjjV0=";
-      #   };
-      # })
       # # Haskell
       # haskell.haskell
       # (pkgs.vscode-utils.buildVscodeMarketplaceExtension {
