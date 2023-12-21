@@ -14,9 +14,13 @@
     home-manager.url = "github:nix-community/home-manager/master";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
-    # generate iso/qcow2/docker/... image from nixos configuration
-    nixos-generators.url = "github:nix-community/nixos-generators";
-    nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
+    # # generate iso/qcow2/docker/... image from nixos configuration
+    # nixos-generators.url = "github:nix-community/nixos-generators";
+    # nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Nix VSCode Extensions
+    nix-vscode-extensions.url = "github:nix-community/nix-vscode-extensions";
+    nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
 
     # Stylix
     stylix.url = "github:danth/stylix";
@@ -60,26 +64,6 @@
           ./host/langhus/system
         ];
       };
-
-      # drakkar = inputs.nixpkgs.lib.nixosSystem {
-      #   pkgs = import inputs.nixpkgs {
-      #     inherit system;
-      #     config = args.nixpkgsConfig;
-      #   };
-
-      #   specialArgs = {
-      #     inherit inputs;
-      #     c9config =
-      #       args.c9config
-      #       // {
-      #         hostname = "drakkar";
-      #       };
-      #   };
-
-      #   modules = [
-      #     ./host/drakkar/system
-      #   ];
-      # };
     };
 
     darwinConfigurations = {
@@ -128,26 +112,6 @@
           ./host/langhus/home-manager
         ];
       };
-
-      # "${args.c9config.username}@drakkar" = inputs.home-manager.lib.homeManagerConfiguration {
-      #   pkgs = import inputs.nixpkgs {
-      #     inherit system;
-      #     config = args.nixpkgsConfig;
-      #   };
-
-      #   extraSpecialArgs = {
-      #     inherit inputs;
-      #     c9config =
-      #       args.c9config
-      #       // {
-      #         hostname = "drakkar";
-      #       };
-      #   };
-
-      #   modules = [
-      #     ./host/drakkar/home-manager
-      #   ];
-      # };
 
       "twieland@smithja" = inputs.home-manager.lib.homeManagerConfiguration {
         pkgs = import inputs.nixpkgs {
