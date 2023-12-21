@@ -48,6 +48,7 @@ in {
 
       # File Types
       ## GraphQL
+      extensions.vscode-marketplace.graphql.vscode-graphql-syntax
       extensions.vscode-marketplace.graphql.vscode-graphql
       ## Markdown
       extensions.vscode-marketplace.yzhang.markdown-all-in-one
@@ -77,7 +78,7 @@ in {
       extensions.vscode-marketplace.dramforever.vscode-ghc-simple
       extensions.vscode-marketplace.ndmitchell.haskell-ghcid
       ## PureScript
-      extensions.vscode-marketplace.nwolverson.ide-purescript
+      extensions.vscode-marketplace.nwolverson.language-purescript
       extensions.vscode-marketplace.nwolverson.ide-purescript
 
       # Testing
