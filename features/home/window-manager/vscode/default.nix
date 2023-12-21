@@ -23,7 +23,13 @@ in {
     userSettings = {
       # "[haskell]"."editor.defaultFormatter" = "haskell.haskell";
       "[javascript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
+      "[javascript]"."editor.formatOnPaste" = true;
+      "[javascript]"."editor.formatOnSave" = true;
+      "[javascript]"."editor.formatOnType" = false;
       "[javascriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
+      "[javascriptreact]"."editor.formatOnPaste" = true;
+      "[javascriptreact]"."editor.formatOnSave" = true;
+      "[javascriptreact]"."editor.formatOnType" = false;
       "[json]"."editor.defaultFormatter" = "vscode.json-language-features";
       "[jsonc]"."editor.defaultFormatter" = "vscode.json-language-features";
       "[nix]"."editor.defaultFormatter" = "kamadorueda.alejandra";
@@ -36,7 +42,13 @@ in {
       "[python]"."editor.guides.indentation" = true;
       "[python]"."editor.tabSize" = 4;
       "[typescript]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
+      "[typescript]"."editor.formatOnPaste" = true;
+      "[typescript]"."editor.formatOnSave" = true;
+      "[typescript]"."editor.formatOnType" = false;
       "[typescriptreact]"."editor.defaultFormatter" = "dbaeumer.vscode-eslint";
+      "[typescriptreact]"."editor.formatOnPaste" = true;
+      "[typescriptreact]"."editor.formatOnSave" = true;
+      "[typescriptreact]"."editor.formatOnType" = false;
       "alejandra.program" = "alejandra";
       "base16.generator.activatedThemes" = [
         "base16-3024-dark"
