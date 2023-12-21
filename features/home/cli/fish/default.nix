@@ -1,4 +1,8 @@
-{pkgs, ...}: let
+{
+  c9config,
+  pkgs,
+  ...
+}: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {};
 in {
   # Enable HomeManager Fish, not system fish.
@@ -36,6 +40,11 @@ in {
   programs.fish.shellInit = ''
     # PATH
     fish_add_path $HOME/.bin
+    ${
+      if pkgs.system == "darwin"
+      then ''fish_add_path /opt/homebrew/bin''
+      else ""
+    }
 
     # Replacement for cat
     function cat --wraps bat
@@ -104,6 +113,22 @@ in {
 
     # Starship Shell
     starship init fish | source
+
+    # OSX Settings
+    ${
+      if pkgs.system == "darwin"
+      then ''
+        defaults write -g ApplePressAndHoldEnabled -bool false
+        defaults write -g AppleInterfaceStyle Dark
+        defaults write -g KeyRepeat -int 2
+        defaults write -g InitialKeyRepeat -int 15
+        defaults write -g AppleShowAllFiles -bool true
+        defaults write -g NSAutomaticQuoteSubstitutionEnabled -bool false
+        defaults write -g NSAutomaticQuoteSubstitutionEnabled -bool false
+        defaults write -g com.apple.gamed Disabled -bool true
+      ''
+      else ""
+    }
   '';
 
   programs.fish.interactiveShellInit = ''
