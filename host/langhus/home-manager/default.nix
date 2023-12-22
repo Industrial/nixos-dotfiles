@@ -35,6 +35,7 @@
 
     # Games
     ../../../features/home/games/lutris
+    ../../../features/home/games/path-of-building
     ../../../features/home/games/world-of-warcraft
 
     # Home
