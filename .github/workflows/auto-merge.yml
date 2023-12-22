@@ -1,4 +1,4 @@
-name: Auto Merge on Checks Pass
+name: Auto-Merge on Checks Pass
 
 on:
   pull_request:
@@ -6,29 +6,17 @@ on:
       - synchronize
       - opened
       - reopened
+      - labeled
 
 jobs:
-  merge:
+  auto-merge:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v2
+
+      - name: Auto-Merge
+        uses: pascalgn/automerge-action@v0.14.0
         with:
-          fetch-depth: 0 # Fetch all history to determine the current branch
-
-      - name: Set Git Config
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
-      - name: Merge Pull Request
-        run: |
-          # Get the current branch
-          current_branch=$(git symbolic-ref --short HEAD)
-
-          # Merge the pull request's base branch into the current branch
-          git merge --no-ff ${{ github.event.before }}
-
-          # Push the changes back to the repository
-          git push origin $current_branch
+          github_token: ${{ secrets.GITHUB_TOKEN }}
