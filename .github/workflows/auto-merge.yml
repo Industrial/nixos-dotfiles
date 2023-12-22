@@ -1,0 +1,19 @@
+name: Auto Merge on Checks Pass
+on:
+  pull_request:
+    types:
+      - synchronize
+      - opened
+      - reopened
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+      - name: Merge Pull Request
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git merge --no-ff ${{ github.event.before }}
+          git push origin HEAD
