@@ -1,19 +1,34 @@
 name: Auto Merge on Checks Pass
+
 on:
   pull_request:
     types:
       - synchronize
       - opened
       - reopened
+
 jobs:
   merge:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
-      - name: Merge Pull Request
+        with:
+          fetch-depth: 0 # Fetch all history to determine the current branch
+
+      - name: Set Git Config
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+
+      - name: Merge Pull Request
+        run: |
+          # Get the current branch
+          current_branch=$(git symbolic-ref --short HEAD)
+
+          # Merge the pull request's base branch into the current branch
           git merge --no-ff ${{ github.event.before }}
-          git push origin HEAD
+
+          # Push the changes back to the repository
+          git push origin $current_branch
