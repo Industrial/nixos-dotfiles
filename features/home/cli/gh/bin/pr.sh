@@ -37,3 +37,7 @@ fi
 # Set the PR to auto-merge and delete the branch when merged.
 echo "pr > Setting the PR to auto-merge and delete the branch when merged."
 gh pr merge --auto --delete-branch --squash "${BRANCH_NAME}"
+
+# Fetch the latest changes from the remote.
+echo "pr > Fetching the latest changes from the remote."
+git fetch origin
