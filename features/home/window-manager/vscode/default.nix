@@ -23,9 +23,9 @@
 in {
   programs.vscode = {
     enable = true;
-    package = pkgs.vscodium;
-    enableUpdateCheck = true;
-    enableExtensionUpdateCheck = true;
+    # package = pkgs.vscodium;
+    enableUpdateCheck = false;
+    enableExtensionUpdateCheck = false;
     userSettings = userSettings;
     keybindings = keybindings;
     extensions = with pkgs.vscode-extensions; [
@@ -43,8 +43,8 @@ in {
       extensions.vscode-marketplace.vspacecode.whichkey
 
       # Completion
-      extensions.vscode-marketplace.github.copilot
-      extensions.vscode-marketplace.github.copilot-chat
+      pkgs.vscode-extensions.github.copilot
+      pkgs.vscode-extensions.github.copilot-chat
 
       # File Types
       ## GraphQL

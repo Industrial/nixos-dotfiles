@@ -5,7 +5,7 @@
 }: {
   home.username = c9config.username;
   home.homeDirectory = c9config.userdir;
-  home.stateVersion = "23.11";
+  home.stateVersion = c9config.stateVersion;
 
   home.sessionVariables.EDITOR = "nvim";
   home.sessionVariables.GIT_EDITOR = "nvim";

@@ -2,6 +2,9 @@
   inputs = {
     # Nixpkgs
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # nixpkgs.url = "github:nixos/nixpkgs/nixos-23.11";
+
+    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
     # Flake Utils
     flake-utils.url = "github:numtide/flake-utils";
@@ -12,6 +15,7 @@
 
     # Home Manager
     home-manager.url = "github:nix-community/home-manager/master";
+    # home-manager.url = "github:nix-community/home-manager/release-23.11";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
     # # generate iso/qcow2/docker/... image from nixos configuration
@@ -40,6 +44,7 @@
         useremail = "tom.wieland@gmail.com";
         userdir = "/home/tom";
         system = "x86_64-linux";
+        stateVersion = "23.11";
       };
     };
   in {
