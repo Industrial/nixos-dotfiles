@@ -15,6 +15,7 @@
     ../../../features/home/cli/fd
     ../../../features/home/cli/fish
     ../../../features/home/cli/fzf
+    ../../../features/home/cli/gh
     ../../../features/home/cli/htop
     ../../../features/home/cli/neovim
     ../../../features/home/cli/ranger

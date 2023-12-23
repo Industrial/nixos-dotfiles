@@ -17,15 +17,13 @@
     ../../../features/home/cli/fd
     ../../../features/home/cli/fish
     ../../../features/home/cli/fzf
+    ../../../features/home/cli/gh
     ../../../features/home/cli/htop
     ../../../features/home/cli/neovim
     ../../../features/home/cli/ranger
     ../../../features/home/cli/ripgrep
-    # ../../../features/home/cli/taskwarrior
     ../../../features/home/cli/unzip
-    # ../../../features/home/cli/vit
     ../../../features/home/cli/zellij
-    # ../../../features/home/cli/zsh
 
     # Communication
     ../../../features/home/communication/discord
