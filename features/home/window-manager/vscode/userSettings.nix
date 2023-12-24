@@ -18,7 +18,7 @@
   "[nix]"."editor.formatOnSave" = true;
   "[nix]"."editor.formatOnType" = false;
   "[purescript]"."editor.defaultFormatter" = "nwolverson.ide-purescript";
-  "[python]"."editor.defaultFormatter" = "ms-python.python";
+  "[python]"."editor.defaultFormatter" = "black";
   "[python]"."editor.formatOnType" = false;
   "[python]"."editor.guides.indentation" = true;
   "[python]"."editor.tabSize" = 4;
@@ -135,10 +135,6 @@
   "python.experiments.enabled" = true;
   "python.formatting.blackArgs" = ["-l 180"];
   "python.formatting.provider" = "black";
-  "python.linting.enabled" = true;
-  "python.linting.flake8Args" = ["--ignore" "E501,W503,W504"];
-  "python.linting.flake8Enabled" = true;
-  "python.linting.mypyEnabled" = false;
   "references.preferredLocation" = "view";
   "scm.inputFontSize" = 16;
   "security.workspace.trust.untrustedFiles" = "open";
