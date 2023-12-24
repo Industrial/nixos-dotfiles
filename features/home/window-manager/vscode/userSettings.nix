@@ -135,11 +135,6 @@
   "python.experiments.enabled" = true;
   "python.formatting.blackArgs" = ["-l 180"];
   "python.formatting.provider" = "black";
-  # TODO: Deprecated
-  # "python.linting.enabled" = true;
-  # "python.linting.flake8Args" = ["--ignore" "E501,W503,W504"];
-  # "python.linting.flake8Enabled" = true;
-  # "python.linting.mypyEnabled" = false;
   "references.preferredLocation" = "view";
   "scm.inputFontSize" = 16;
   "security.workspace.trust.untrustedFiles" = "open";
