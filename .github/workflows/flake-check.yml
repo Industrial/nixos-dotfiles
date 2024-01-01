@@ -9,6 +9,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/flake-checker-action@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/magic-nix-cache-action@main
+      # - uses: DeterminateSystems/nix-installer-action@main
+      # - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix flake check
+      - name: Add label
+        if: success() # This step will run only if the previous steps were successful
+        uses: actions/github-script@v5
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const issue_number = context.payload.pull_request.number;
+            const repository = context.repo;
+            github.pulls.createAutoMerge({
+              ...repository,
+              pull_number: issue_number,
+              merge_method: 'squash'
+            });
