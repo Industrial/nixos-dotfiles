@@ -20,7 +20,7 @@ jobs:
         run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
         id: extract_branch
       - name: Enable Pull Request Automerge
-        run: gh pr merge --rebase --delete-branch --auto "${{steps.extract_branch.outputs.branch}}"
+        run: gh pr merge --squash --delete-branch --auto "${{steps.extract_branch.outputs.branch}}"
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install Nix
