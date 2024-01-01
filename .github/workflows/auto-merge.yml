@@ -32,6 +32,8 @@ jobs:
           MERGE_LABELS: ""
           MERGE_METHOD: "squash"
           MERGE_READY_STATE: "clean"
+          MERGE_RETRIES: 10
+          MERGE_RETRY_SLEEP: 60000
           MERGE_REQUIRED_APPROVALS: "0"
           UPDATE_LABELS: ""
           UPDATE_METHOD: "rebase"
