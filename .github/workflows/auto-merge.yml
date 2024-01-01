@@ -1,22 +1,36 @@
-name: Auto-Merge on Checks Pass
-
+name: AutoMerge
 on:
   pull_request:
     types:
+      - labeled
+      - unlabeled
       - synchronize
       - opened
+      - edited
+      - ready_for_review
       - reopened
-      - labeled
-
+      - unlocked
+  pull_request_review:
+    types:
+      - submitted
+  check_suite:
+    types:
+      - completed
+  status: {}
 jobs:
-  auto-merge:
+  automerge:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v2
-
-      - name: Auto-Merge
-        uses: pascalgn/automerge-action@v0.14.0
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - id: automerge
+        name: automerge
+        uses: "pascalgn/automerge-action@v0.15.6"
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          MERGE_LABELS: ""
+          MERGE_METHOD: "squash"
+          MERGE_FORKS: "false"
+          MERGE_REQUIRED_APPROVALS: "1"
+          MERGE_DELETE_BRANCH: "true"
+          MERGE_ERROR_FAILS: "true"
+          UPDATE_LABELS: ""
+          UPDATE_METHOD: "rebase"
