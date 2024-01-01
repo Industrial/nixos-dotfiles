@@ -13,12 +13,16 @@ jobs:
     name: Flake Check
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Enable Pull Request Automerge
         run: gh pr merge --merge --auto "1"
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - uses: actions/checkout@v3
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/flake-checker-action@v4
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Flake Check
+        uses: DeterminateSystems/flake-checker-action@v4
       # - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix flake check
+      - name: Run Flake Check
+        run: nix flake check
