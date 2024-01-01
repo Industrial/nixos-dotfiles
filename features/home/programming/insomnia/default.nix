@@ -1,6 +1,6 @@
 # Insomnia is a HTTP test tool.
 {
-  c9config,
+  settings,
   pkgs,
   ...
 }: {

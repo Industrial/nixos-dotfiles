@@ -1,4 +1,4 @@
-{c9config, ...}: {
+{settings, ...}: {
   virtualisation.docker.enable = true;
 
   # # TODO: Split this out into it's own feature
@@ -10,7 +10,7 @@
   #   #   cmd = ["serve" "--model" "TabbyML/SantaCoder-1B"];
   #   #   ports = ["4001:8080"];
   #   #   volumes = [
-  #   #     "${c9config.userdir}/.tabby:/data"
+  #   #     "${settings.userdir}/.tabby:/data"
   #   #   ];
   #   # };
   #   # cryptpad = {
@@ -22,7 +22,7 @@
   #   #     "4002:3001"
   #   #   ];
   #   #   # volumes = [
-  #   #   #   "${c9config.userdir}/.tabby:/data"
+  #   #   #   "${settings.userdir}/.tabby:/data"
   #   #   # ];
   #   # };
   #   # etherpad = {
@@ -33,7 +33,7 @@
   #   #     "4002:3001"
   #   #   ];
   #   #   # volumes = [
-  #   #   #   "${c9config.userdir}/.tabby:/data"
+  #   #   #   "${settings.userdir}/.tabby:/data"
   #   #   # ];
   #   # };
   #   # octobot = {
@@ -43,9 +43,9 @@
   #   #     "5001:5001"
   #   #   ];
   #   #   volumes = [
-  #   #     "${c9config.userdir}/.dotfiles/features/home/lab/crypto/octobot/logs:/octobot/logs"
-  #   #     "${c9config.userdir}/.dotfiles/features/home/lab/crypto/octobot/tentacles:/octobot/tentacles"
-  #   #     "${c9config.userdir}/.dotfiles/features/home/lab/crypto/octobot/users:/octobot/users"
+  #   #     "${settings.userdir}/.dotfiles/features/home/lab/crypto/octobot/logs:/octobot/logs"
+  #   #     "${settings.userdir}/.dotfiles/features/home/lab/crypto/octobot/tentacles:/octobot/tentacles"
+  #   #     "${settings.userdir}/.dotfiles/features/home/lab/crypto/octobot/users:/octobot/users"
   #   #   ];
   #   # };
   #   # graphhopper = {
@@ -56,7 +56,7 @@
   #   #     "5003:8990"
   #   #   ];
   #   #   volumes = [
-  #   #     "${c9config.userdir}/.dotfiles/features/home/lab/maps/graphhopper/data:/data"
+  #   #     "${settings.userdir}/.dotfiles/features/home/lab/maps/graphhopper/data:/data"
   #   #   ];
   #   # };
   # };

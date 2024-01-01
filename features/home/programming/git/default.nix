@@ -1,12 +1,12 @@
 {
-  c9config,
+  settings,
   pkgs,
   ...
 }: {
   programs.git = {
     enable = true;
-    userName = c9config.userfullname;
-    userEmail = c9config.useremail;
+    userName = settings.userfullname;
+    userEmail = settings.useremail;
     aliases = {
       a = "add";
       aa = "add -A";

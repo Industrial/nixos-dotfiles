@@ -1,5 +1,5 @@
 {
-  c9config,
+  settings,
   inputs,
   pkgs,
   ...

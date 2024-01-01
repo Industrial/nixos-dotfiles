@@ -32,3 +32,12 @@ If you hit the limit of derivations or you are just very happy with what you've 
 ```bash
 bin/collect-garbage
 ```
+
+## TODO
+- Tests
+- Security
+  - Keys
+  - Scanner
+  - Network
+  - VPN
+  - Honeypots

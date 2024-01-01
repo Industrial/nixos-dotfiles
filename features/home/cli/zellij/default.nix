@@ -1,5 +1,5 @@
 {
-  c9config,
+  settings,
   pkgs,
   ...
 }: {
@@ -9,8 +9,8 @@
   programs.zellij.enableFishIntegration = false;
 
   programs.zellij.settings = {
-    layout_dir = "${c9config.userdir}/.dotfiles/features/home/cli/zellij/layouts";
-    theme_dir = "${c9config.userdir}/.dotfiles/features/home/cli/zellij/themes";
+    layout_dir = "${settings.userdir}/.dotfiles/features/home/cli/zellij/layouts";
+    theme_dir = "${settings.userdir}/.dotfiles/features/home/cli/zellij/themes";
     theme = "stylix";
     default_layout = "system";
     default_mode = "normal";
