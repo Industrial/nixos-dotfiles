@@ -25,8 +25,11 @@ jobs:
           script: |
             const issue_number = context.payload.pull_request.number;
             const repository = context.repo;
-            github.pulls.createAutoMerge({
-              ...repository,
+            github.request(`PUT /repos/${repository.owner}/${repository.repo}/pulls/${issue_number}/auto-merge`, {
+              owner: repository.owner,
+              repo: repository.repo,
               pull_number: issue_number,
               merge_method: 'squash'
+            }).catch(error => {
+              console.log(error.message);
             });
