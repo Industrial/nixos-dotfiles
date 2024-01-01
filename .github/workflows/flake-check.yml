@@ -1,7 +1,12 @@
 name: Flake Check
 
 on:
-  push:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - auto_merge_enabled
 
 jobs:
   flake-check:
@@ -12,8 +17,8 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@v4
       # - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix flake check
-      - name: Add label
-        if: success() # This step will run only if the previous steps were successful
+      - name: Auto Merge
+        if: success()
         uses: actions/github-script@v5
         with:
           github-token: ${{secrets.GITHUB_TOKEN}}
