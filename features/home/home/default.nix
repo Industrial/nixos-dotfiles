@@ -1,11 +1,11 @@
 {
   pkgs,
-  c9config,
+  settings,
   ...
 }: {
-  home.username = c9config.username;
-  home.homeDirectory = c9config.userdir;
-  home.stateVersion = c9config.stateVersion;
+  home.username = settings.username;
+  home.homeDirectory = settings.userdir;
+  home.stateVersion = settings.stateVersion;
 
   home.sessionVariables.EDITOR = "nvim";
   home.sessionVariables.GIT_EDITOR = "nvim";

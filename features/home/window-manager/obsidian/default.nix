@@ -1,6 +1,6 @@
 # Note Taker.
 {
-  c9config,
+  settings,
   pkgs,
   ...
 }: {

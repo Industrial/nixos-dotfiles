@@ -1,4 +1,8 @@
-{c9config, pkgs, ...}: {
+{
+  settings,
+  pkgs,
+  ...
+}: {
   imports = [
     # CLI
     ../../../features/system/cli/fish
@@ -23,7 +27,7 @@
   # TODO: This should be taken care of for all hosts / systems.
   nix.settings.experimental-features = "nix-command flakes";
 
-  nixpkgs.hostPlatform = c9config.system;
+  nixpkgs.hostPlatform = settings.system;
   services.nix-daemon.enable = true;
 
   # Use shells from nix. `chsh -s /run/current-system/sw/bin/fish`

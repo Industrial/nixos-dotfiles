@@ -1,8 +1,8 @@
 {
   pkgs,
-  c9config,
+  settings,
   ...
 }: {
   networking.networkmanager.enable = true;
-  networking.hostName = c9config.hostname;
+  networking.hostName = settings.hostname;
 }

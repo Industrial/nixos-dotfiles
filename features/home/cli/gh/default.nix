@@ -1,6 +1,6 @@
 # gh is a GitHub CLI tool.
 {
-  c9config,
+  settings,
   pkgs,
   ...
 }: let

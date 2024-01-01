@@ -30,3 +30,9 @@ jobs:
       # - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run Flake Check
         run: nix flake check
+      - name: Build
+        run: bin/update langhus tom
+      - name: Test Langhus System
+        run: nix test .#nixosTests.langhusSystem
+      - name: Test Langhus HomeManager
+        run: nix test .#nixosTests.langhusHomeManager

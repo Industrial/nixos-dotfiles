@@ -1,12 +1,12 @@
 {
   pkgs,
-  c9config,
+  settings,
   ...
 }: {
-  users.users.${c9config.username} = {
+  users.users.${settings.username} = {
     isNormalUser = true;
-    home = c9config.userdir;
-    description = c9config.userfullname;
+    home = settings.userdir;
+    description = settings.userfullname;
     extraGroups = [
       "audio"
       "networkmanager"
