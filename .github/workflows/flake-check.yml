@@ -10,6 +10,7 @@ on:
 
 jobs:
   flake-check:
+    name: Flake Check
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
