@@ -13,7 +13,7 @@ jobs:
     name: Flake Check
     runs-on: ubuntu-22.04
     steps:
-      - name: Auto Merge
+      - name: AutoMerge
         if: success()
         uses: actions/github-script@v5
         with:
