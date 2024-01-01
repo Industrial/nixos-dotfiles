@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Enable Pull Request Automerge
-        run: gh pr merge --rebase --delete-branch --auto
+        run: gh pr merge --rebase --delete-branch --auto "${GITHUB_REF##*/}"
         env:
           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install Nix
