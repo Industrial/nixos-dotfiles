@@ -13,24 +13,20 @@ jobs:
     name: Flake Check
     runs-on: ubuntu-22.04
     steps:
-      - name: AutoMerge
-        if: success()
-        uses: actions/github-script@v5
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            const issue_number = context.payload.pull_request.number;
-            const repository = context.repo;
-            github.request(`PUT /repos/${repository.owner}/${repository.repo}/pulls/${issue_number}/auto-merge`, {
-              owner: repository.owner,
-              repo: repository.repo,
-              pull_number: issue_number,
-              merge_method: 'squash'
-            }).catch(error => {
-              console.log(error.message);
-            });
-      - uses: actions/checkout@v3
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/flake-checker-action@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: extract_branch
+      - name: Enable Pull Request Automerge
+        run: gh pr merge --squash --delete-branch --auto "${{steps.extract_branch.outputs.branch}}"
+        env:
+          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Flake Check
+        uses: DeterminateSystems/flake-checker-action@v4
       # - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix flake check
+      - name: Run Flake Check
+        run: nix flake check
