@@ -6,9 +6,6 @@
     # Flake Utils
     flake-utils.url = "github:numtide/flake-utils";
 
-    # Flake Parts
-    flake-parts.url = "github:hercules-ci/flake-parts";
-
     # Nix Darwin
     nix-darwin.url = "github:lnl7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
@@ -34,27 +31,36 @@
     flake-parts,
     nixpkgs,
     ...
-  }:
-    flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = nixpkgs.lib.systems.flakeExposed;
-      imports = [
-        ./host
-      ];
-      perSystem = {
-        config,
-        self',
-        inputs',
-        pkgs,
-        system,
-        ...
-      }: {
-        _module.args.pkgs = import nixpkgs {
-          inherit system;
-          config = {
-            allowUnfree = true;
-            allowBroken = false;
-          };
-        };
-      };
+  }: let
+    systemConfig = import ./lib/systemConfig.nix;
+
+    settings = {
+      hostname = "langhus";
+      stateVersion = "24.05";
+      system = "x86_64-linux";
+      userdir = "/home/tom";
+      useremail = "tom.wieland@gmail.com";
+      userfullname = "Tom Wieland";
+      username = "tom";
     };
+
+    darwinSettings = {
+      hostname = "smithja";
+      stateVersion = "24.05";
+      system = "aarch64-darwin";
+      userdir = "/Users/twieland";
+      useremail = "twieland@suitsupply.com";
+      userfullname = "Tom Wieland";
+      username = "twieland";
+    };
+
+    nixosConfiguration = systemConfig inputs settings;
+    darwinConfiguration = systemConfig inputs darwinSettings;
+  in {
+    nixosConfigurations.${settings.hostname} = nixosConfiguration.systemConfiguration;
+    homeConfigurations."${settings.username}@${settings.hostname}" = nixosConfiguration.homeConfiguration;
+
+    darwinConfigurations.${darwinSettings.hostname} = darwinConfiguration.systemConfiguration;
+    homeConfigurations."${darwinSettings.username}@${darwinSettings.hostname}" = darwinConfiguration.homeConfiguration;
+  };
 }
