@@ -11,6 +11,7 @@
 
     # Network
     ../../../features/system/network/syncthing
+    ../../../features/system/network/mullvad-vpn
     # ../../../features/system/network/tor
 
     # Nix

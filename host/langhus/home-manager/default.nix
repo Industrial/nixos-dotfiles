@@ -51,6 +51,7 @@
     # Network
     ../../../features/home/network/filezilla
     ../../../features/home/network/firefox
+    # ../../../features/home/network/mullvad-vpn
     ../../../features/home/network/transmission
 
     # Programming
