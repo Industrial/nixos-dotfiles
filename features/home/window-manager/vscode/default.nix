@@ -81,10 +81,6 @@ in {
       ## Git
       extensions.vscode-marketplace.mhutchie.git-graph
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
-      ## Haskell
-      extensions.vscode-marketplace.haskell.haskell
-      extensions.vscode-marketplace.dramforever.vscode-ghc-simple
-      extensions.vscode-marketplace.ndmitchell.haskell-ghcid
       ## PureScript
       extensions.vscode-marketplace.nwolverson.language-purescript
       extensions.vscode-marketplace.nwolverson.ide-purescript
@@ -107,10 +103,6 @@ in {
     # Nix
     # TODO: Try the `nil` language server with the VSCode extension
     alejandra
-
-    # # Haskell
-    ghc
-    haskellPackages.haskell-language-server
 
     # PureScript
     nodePackages.purescript-language-server
