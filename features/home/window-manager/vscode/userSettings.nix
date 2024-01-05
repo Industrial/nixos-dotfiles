@@ -141,11 +141,11 @@
   "python.analysis.fixAll" = ["source.unusedImports" "source.convertImportFormat"];
   "python.analysis.importFormat" = "absolute";
   "python.analysis.include" = ["src/**/*"];
-  "python.analysis.inlayHints.callArgumentNames" = "all";
+  "python.analysis.inlayHints.callArgumentNames" = "off";
   "python.analysis.inlayHints.functionReturnTypes" = true;
   "python.analysis.inlayHints.variableTypes" = true;
   "python.analysis.reportMissingTypeStubs" = false;
-  "python.analysis.typeCheckingMode" = "strict";
+  "python.analysis.typeCheckingMode" = "standard";
   "python.experiments.enabled" = false;
   "python.languageServer" = "Pylance";
   "references.preferredLocation" = "view";
