@@ -19,6 +19,7 @@
     ../../../features/system/nix/shell
 
     # Lab
+    ../../../features/lab/media/invidious
     ../../../features/lab/monitoring/grafana
     ../../../features/lab/monitoring/prometheus
     ../../../features/lab/passwords/vaultwarden
