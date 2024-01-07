@@ -1,1 +1,0 @@
-from .trends import GoogleTrendsEvaluator

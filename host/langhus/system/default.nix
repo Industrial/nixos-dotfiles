@@ -18,6 +18,10 @@
     ../../../features/system/nix/home-manager
     ../../../features/system/nix/shell
 
+    # Lab
+    ../../../features/lab/monitoring/grafana
+    ../../../features/lab/monitoring/prometheus
+
     # Operating System
     ../../../features/system/nixos/bluetooth
     ../../../features/system/nixos/boot
@@ -29,6 +33,7 @@
     ../../../features/system/nixos/networking
     ../../../features/system/nixos/nix
     ../../../features/system/nixos/printing
+    ../../../features/system/nixos/security
     ../../../features/system/nixos/sound
     ../../../features/system/nixos/system
     ../../../features/system/nixos/time

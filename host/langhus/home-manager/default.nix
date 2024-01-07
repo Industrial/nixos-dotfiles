@@ -49,9 +49,10 @@
     ../../../features/home/media/vlc
 
     # Network
+    # ../../../features/home/network/mullvad-vpn
     ../../../features/home/network/filezilla
     ../../../features/home/network/firefox
-    # ../../../features/home/network/mullvad-vpn
+    ../../../features/home/network/tor-browser
     ../../../features/home/network/transmission
 
     # Programming
