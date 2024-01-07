@@ -46,6 +46,9 @@
     ../../../features/system/programming/git
     # ../../../features/system/programming/haskell.nix
 
+    # Security
+    ../../../features/system/security/clamav
+
     # Window Manager
     ../../../features/system/window-manager/chromium
     # ../../../features/system/window-manager/hyprland
