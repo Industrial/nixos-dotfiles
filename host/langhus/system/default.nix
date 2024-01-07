@@ -21,6 +21,8 @@
     # Lab
     ../../../features/lab/monitoring/grafana
     ../../../features/lab/monitoring/prometheus
+    ../../../features/lab/passwords/vaultwarden
+    ../../../features/lab/proxy/nginx
 
     # Operating System
     ../../../features/system/nixos/bluetooth
