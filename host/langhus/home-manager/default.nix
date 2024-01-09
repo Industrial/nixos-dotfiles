@@ -1,4 +1,5 @@
 {
+  settings,
   pkgs,
   inputs,
   ...
@@ -63,6 +64,9 @@
     ../../../features/home/programming/insomnia
     ../../../features/home/programming/meld
     ../../../features/home/programming/sqlite
+
+    # Security
+    ../../../features/home/security/bitwarden
 
     # Window Manager
     ../../../features/home/window-manager/alacritty
