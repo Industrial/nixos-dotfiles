@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  settings,
+  pkgs,
+  ...
+}: {
   imports = [
     ./graphics
     ./hardware-configuration.nix
@@ -37,6 +41,7 @@
     ../../../features/system/nixos/nix
     ../../../features/system/nixos/printing
     ../../../features/system/nixos/security
+    ../../../features/system/nixos/security/apparmor
     ../../../features/system/nixos/sound
     ../../../features/system/nixos/system
     ../../../features/system/nixos/time
@@ -49,6 +54,9 @@
 
     # Security
     ../../../features/system/security/clamav
+
+    # # Virtualization
+    # ../../../features/system/virtualization/virtualbox
 
     # Window Manager
     ../../../features/system/window-manager/chromium
