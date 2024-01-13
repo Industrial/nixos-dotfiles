@@ -35,7 +35,7 @@
   # networking.interfaces.br-81ae72d89004.useDHCP = lib.mkDefault true;
   # networking.interfaces.docker0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
-  # networking.interfaces.veth66767c2.useDHCP = lib.mkDefault true;
+  # networking.interfaces.wg-mullvad.useDHCP = lib.mkDefault true;
   # networking.interfaces.wlp17s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
