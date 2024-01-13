@@ -11,22 +11,17 @@
   programs.zellij.settings = {
     layout_dir = "${settings.userdir}/.dotfiles/features/home/cli/zellij/layouts";
     theme_dir = "${settings.userdir}/.dotfiles/features/home/cli/zellij/themes";
-    theme = "stylix";
+
+    auto_layouts = true;
+    copy_command = "xclip -selection clipboard";
     default_layout = "system";
     default_mode = "normal";
-
     default_shell = "fish";
-    on_force_close = "detach";
-    simplified_ui = false;
-    pane_frames = true;
     mouse_mode = true;
+    on_force_close = "quit";
     scroll_buffer_size = 10000;
-    copy_command = "xclip -selection clipboard";
-    copy_clipboard = "system";
-    copy_on_select = true;
-    scrollback_editor = "$EDITOR";
-    mirror_session = true;
-    auto_layouts = true;
+    session_serialization = false;
+    theme = "stylix";
 
     ui = {
       pane_frames = {
