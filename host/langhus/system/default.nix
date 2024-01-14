@@ -13,6 +13,9 @@
     ../../../features/system/cli/starship
     ../../../features/system/cli/unrar
 
+    # Hardware
+    ../../../features/system/hardware/zsa-keyboard
+
     # Network
     ../../../features/system/network/syncthing
     ../../../features/system/network/mullvad-vpn
