@@ -3,7 +3,7 @@
   pkgs,
   ...
 }: {
-  # https://configure.zsa.io/moonlander/layouts/qZnL4/latest/0
+  # https://configure.zsa.io/moonlander/layouts/ZRrJ7/latest/0
 
   hardware.keyboard.zsa.enable = true;
 
