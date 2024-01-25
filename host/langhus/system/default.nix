@@ -18,7 +18,7 @@
 
     # Network
     ../../../features/system/network/syncthing
-    ../../../features/system/network/mullvad-vpn
+    # ../../../features/system/network/mullvad-vpn
     # ../../../features/system/network/tor
 
     # Nix
@@ -57,6 +57,7 @@
 
     # Security
     ../../../features/system/security/clamav
+    ../../../features/system/security/yubikey
 
     # # Virtualization
     # ../../../features/system/virtualization/virtualbox

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+HOST=${1:-"vm"}
+echo "bin/update > host: ${HOST}"
+
+# USER=${2:-"tom"}
+# echo "bin/update > user: ${USER}"
+
+# bin/update-nix-env
+# bin/update-flake
+
+bin/vm-update-nixos-rebuild-flake "${HOST}"

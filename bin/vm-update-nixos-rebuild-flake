@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+HOST=${1:-"langhus"}
+echo "bin/vm-update-nixos-rebuild-flake > host: ${HOST}"
+
+echo "bin/vm-update-nixos-rebuild-flake > sudo nixos-rebuild build-vm --flake \".#${HOST}\" --show-trace"
+sudo nixos-rebuild build-vm \
+  --flake ".#${HOST}" \
+  --show-trace \
+  --option eval-cache false

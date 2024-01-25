@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -e
+
+if [ -f vm.qcow2 ]; then
+  rm vm.qcow2
+fi
+
+./result/bin/run-vm-vm

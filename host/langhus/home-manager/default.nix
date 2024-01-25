@@ -50,7 +50,6 @@
     ../../../features/home/media/vlc
 
     # Network
-    # ../../../features/home/network/mullvad-vpn
     ../../../features/home/network/filezilla
     ../../../features/home/network/firefox
     ../../../features/home/network/tor-browser
@@ -84,7 +83,7 @@
     ../../../features/home/window-manager/stylix
     ../../../features/home/window-manager/vscode
     ../../../features/home/window-manager/xfce
-    ../../../features/home/window-manager/yubikey-manager
+    # ../../../features/home/window-manager/yubikey-manager
     inputs.stylix.homeManagerModules.stylix
   ];
 }

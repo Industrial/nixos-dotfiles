@@ -54,13 +54,27 @@
       username = "twieland";
     };
 
+    vmSettings = {
+      hostname = "vm";
+      stateVersion = "24.05";
+      system = "x86_64-linux";
+      userdir = "/Users/tom";
+      useremail = "tom.wieland@gmail.com";
+      userfullname = "Tom Wieland";
+      username = "tom";
+    };
+
     nixosConfiguration = systemConfig inputs settings;
     darwinConfiguration = systemConfig inputs darwinSettings;
+    vmConfiguration = systemConfig inputs vmSettings;
   in {
     nixosConfigurations.${settings.hostname} = nixosConfiguration.systemConfiguration;
     homeConfigurations."${settings.username}@${settings.hostname}" = nixosConfiguration.homeConfiguration;
 
     darwinConfigurations.${darwinSettings.hostname} = darwinConfiguration.systemConfiguration;
     homeConfigurations."${darwinSettings.username}@${darwinSettings.hostname}" = darwinConfiguration.homeConfiguration;
+
+    nixosConfigurations.${vmSettings.hostname} = vmConfiguration.systemConfiguration;
+    # homeConfigurations."${vmSettings.username}@${vmSettings.hostname}" = vmConfiguration.homeConfiguration;
   };
 }
