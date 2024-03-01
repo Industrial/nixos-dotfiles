@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+source lib/lowercase.bash
+
+HOST=$(lowercase ${1:-"smithja"})
+echo "bin/update-hardware-configuration > host: ${HOST}"
+
+USER=$(lowercase ${2:-$USER})
+echo "bin/update-hardware-configuration > user: ${USER}"
+
+echo "bin/update-hardware-configuration > nixos-generate-config --show-hardware-config > ./host/${HOST}/system/hardware-configuration.nix"
+nixos-generate-config --show-hardware-config > ./host/${HOST}/system/hardware-configuration.nix

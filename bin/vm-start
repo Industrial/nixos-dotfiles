@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "bin/vm-start > sudo systemctl start microvm@vm.service"
+
+sudo systemctl start microvm@vm.service;

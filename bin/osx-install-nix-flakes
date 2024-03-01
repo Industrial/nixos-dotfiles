@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+
+echo "bin/osx-install-nix-flakes"
+nix-env -iA nixpkgs.nixFlakes

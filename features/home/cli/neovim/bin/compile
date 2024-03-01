@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+nix-shell -p luajitPackages.moonscript --run "moonc -o init.lua init.moon"

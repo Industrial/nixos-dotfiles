@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -e
+
+echo "bin/update-zellij > clearing zellij cache"
+cd features/home/cli/zellij
+bin/clear-cache
+cd ../../../..

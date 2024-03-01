@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+set -e
+
+echo "bin/vm-stop > sudo systemctl stop microvm@vm.service"
+
+sudo systemctl stop microvm@vm.service;

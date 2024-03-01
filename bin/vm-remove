@@ -1,0 +1,11 @@
+
+#!/usr/bin/env bash
+set -e
+
+source lib/lowercase.bash
+
+HOST=$(lowercase ${1:-"vm"})
+echo "bin/vm-update > host: ${HOST}"
+
+echo "bin/vm-update > sudo rm -rf \"/var/lib/microvms/${HOST}\""
+sudo rm -rf "/var/lib/microvms/${HOST}"
