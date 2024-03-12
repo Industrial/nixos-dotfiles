@@ -51,6 +51,7 @@
     inputs.microvm.nixosModules.host
 
     # Programming
+    ../../../features/system/programming/ollama
 
     # # Window Manager
     # ../../../features/system/window-manager/xfce
