@@ -60,6 +60,7 @@ in {
       ## Python
       extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
       extensions.vscode-marketplace.ms-python.black-formatter
+      extensions.vscode-marketplace.ms-python.debugpy
       extensions.vscode-marketplace.ms-python.flake8
       extensions.vscode-marketplace.ms-python.isort
       extensions.vscode-marketplace.ms-python.python
