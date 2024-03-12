@@ -181,7 +181,7 @@
   "vitest.showFailMessages" = true;
   "window.autoDetectColorScheme" = true;
   "window.zoomLevel" = 2;
-  "workbench.colorTheme" = "Stylix";
+  # "workbench.colorTheme" = "Stylix";
   "workbench.editor.enablePreview" = false;
   "workbench.enableExperiments" = true;
   "workbench.iconTheme" = "material-icon-theme";
