@@ -28,7 +28,7 @@
     ../../../features/home/communication/discord
 
     # Crypto
-    # ../../../features/home/crypto/monero
+    ../../../features/home/crypto/monero
 
     # Filesystems
     ../../../features/home/filesystems/gparted
