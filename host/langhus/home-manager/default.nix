@@ -67,6 +67,7 @@
     ../../../features/home/office/lxqt-archiver
 
     # Programming
+    ../../../features/home/programming/android-tools
     ../../../features/home/programming/docker-compose
     ../../../features/home/programming/git
     ../../../features/home/programming/gitkraken
