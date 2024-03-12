@@ -39,6 +39,7 @@
     # Games
     ../../../features/home/games/lutris
     ../../../features/home/games/path-of-building
+    ../../../features/home/games/steam
 
     # Home
     ../../../features/home/home
