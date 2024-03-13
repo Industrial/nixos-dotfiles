@@ -6,6 +6,23 @@
   imports = [
     # CLI
     ../../../features/system/cli/fish
+    ../../../features/system/cli/bat
+    ../../../features/system/cli/btop
+    ../../../features/system/cli/direnv
+    ../../../features/system/cli/e2fsprogs
+    ../../../features/system/cli/eza
+    ../../../features/system/cli/fd
+    ../../../features/system/cli/fzf
+    ../../../features/system/cli/gh
+    ../../../features/system/cli/neofetch
+    ../../../features/system/cli/p7zip
+    ../../../features/system/cli/ranger
+    ../../../features/system/cli/ripgrep
+    ../../../features/system/cli/unrar
+    ../../../features/system/cli/unzip
+
+    # Communication
+    ../../../features/system/communication/discord
 
     # Nix
     ../../../features/system/nix/home-manager
