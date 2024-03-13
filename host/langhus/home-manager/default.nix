@@ -72,7 +72,7 @@
     ../../../features/home/programming/docker-compose
     ../../../features/home/programming/git
     ../../../features/home/programming/gitkraken
-    ../../../features/home/programming/nixd
+    # TODO: Fix. There was a security issue: CVE-2024-27297
     ../../../features/home/programming/nodejs
     ../../../features/home/programming/sqlite
     ../../../features/home/programming/vscode
