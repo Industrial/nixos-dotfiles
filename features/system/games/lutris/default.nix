@@ -3,7 +3,7 @@
   pkgs,
   ...
 }: {
-  home.packages = with pkgs; [
+  environment.systemPackages = with pkgs; [
     (wineWowPackages.staging.override {
       wineRelease = "staging";
       gettextSupport = true;

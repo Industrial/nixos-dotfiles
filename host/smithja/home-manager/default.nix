@@ -7,7 +7,6 @@
   imports = [
     # CLI
     ../../../features/home/cli/fish
-    ../../../features/home/cli/neovim
     ../../../features/home/cli/zellij
 
     # Home

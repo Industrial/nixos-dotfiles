@@ -38,6 +38,7 @@
     ../../../features/system/finance/homebank
 
     # Games
+    ../../../features/system/games/lutris
     ../../../features/system/games/path-of-building
     ../../../features/system/games/steam
 
@@ -62,7 +63,7 @@
     ../../../features/system/network/firefox
     ../../../features/system/network/syncthing
     ../../../features/system/network/tor-browser
-    ../../../features/system/networking/nginx
+    ../../../features/system/network/nginx
 
     # Nix
     ../../../features/system/nix/home-manager
@@ -113,6 +114,8 @@
     ../../../features/system/security/yubikey-manager
 
     # # Window Manager
-    # ../../../features/system/window-manager/xfce
+    ../../../features/system/window-manager/xfce
+    # ../../../features/system/window-manager/xmonad
+    # ../../../features/system/window-manager/dwm
   ];
 }

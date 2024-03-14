@@ -112,7 +112,7 @@
     })
   ];
 
-  home.packages = with pkgs; [
+  environment.systemPackages = with pkgs; [
     dmenu
     dunst
     my-dwm

@@ -9,7 +9,6 @@ echo "bin/update > host: ${HOST}"
 USER=$(lowercase ${2:-$USER})
 echo "bin/update > user: ${USER}"
 
-bin/update-neovim
 bin/update-zellij
 bin/update-hardware-configuration "${HOST}"
 bin/update-nix-env
