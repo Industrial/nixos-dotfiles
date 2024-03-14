@@ -8,14 +8,6 @@
     ./graphics
     ./hardware-configuration.nix
 
-    # Lab
-    ../../../features/lab/media/invidious
-    ../../../features/lab/monitoring/grafana
-    ../../../features/lab/monitoring/prometheus
-    ../../../features/lab/documents/cryptpad
-    ../../../features/lab/passwords/vaultwarden
-    ../../../features/lab/proxy/nginx
-
     # CLI
     ../../../features/system/cli/bat
     ../../../features/system/cli/btop
@@ -53,6 +45,7 @@
     ../../../features/system/hardware/zsa-keyboard
 
     # Media
+    ../../../features/system/media/invidious
     ../../../features/system/media/lxqt-pavucontrol-qt
     ../../../features/system/media/lxqt-screengrab
     ../../../features/system/media/okular
@@ -60,13 +53,16 @@
     ../../../features/system/media/vlc
 
     # Monitoring
+    ../../../features/system/monitoring/grafana
     ../../../features/system/monitoring/lxqt-qps
+    ../../../features/system/monitoring/prometheus
 
     # Network
     ../../../features/system/network/chromium
     ../../../features/system/network/firefox
     ../../../features/system/network/syncthing
     ../../../features/system/network/tor-browser
+    ../../../features/system/networking/nginx
 
     # Nix
     ../../../features/system/nix/home-manager
@@ -94,10 +90,11 @@
     inputs.microvm.nixosModules.host
 
     # Office
+    ../../../features/system/office/cryptpad
     ../../../features/system/office/evince
-    ../../../features/system/office/obsidian
-    ../../../features/system/office/lxqt-pcmanfm-qt
     ../../../features/system/office/lxqt-archiver
+    ../../../features/system/office/lxqt-pcmanfm-qt
+    ../../../features/system/office/obsidian
 
     # Programming
     ../../../features/system/programming/android-tools
@@ -111,6 +108,7 @@
 
     # Security
     ../../../features/system/security/bitwarden
+    ../../../features/system/security/vaultwarden
     ../../../features/system/security/veracrypt
     ../../../features/system/security/yubikey-manager
 
