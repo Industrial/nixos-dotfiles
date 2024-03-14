@@ -24,12 +24,12 @@
       dt = "difftool -y";
       dtd = "difftool -y --dir-diff";
       f = "fetch -p --all";
-      l = "log --oneline --graph --decorate=full";
+      l = "log";
+      ll = "log --oneline --graph --decorate=full";
       la = "log --all --oneline --graph --decorate=full";
-      lg = "log";
       m = "merge";
       mt = "mergetool";
-      od = "push origin -d";
+      od = "push origin --no-verify -d";
       p = "pull";
       pa = "pull -a";
       ps = "push -u";

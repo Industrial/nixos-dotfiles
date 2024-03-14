@@ -5,13 +5,13 @@
 }: {
   imports = [
     # CLI
-    ../../../features/system/cli/fish
     ../../../features/system/cli/bat
     ../../../features/system/cli/btop
     ../../../features/system/cli/direnv
     ../../../features/system/cli/e2fsprogs
     ../../../features/system/cli/eza
     ../../../features/system/cli/fd
+    ../../../features/system/cli/fish
     ../../../features/system/cli/fzf
     ../../../features/system/cli/gh
     ../../../features/system/cli/neofetch
@@ -23,6 +23,19 @@
 
     # Communication
     ../../../features/system/communication/discord
+
+    # Media
+    ../../../features/system/media/spotify
+
+    # Office
+    ../../../features/system/office/evince
+    ../../../features/system/office/obsidian
+
+    # Programming
+    # ../../../features/system/programming/nixd
+    ../../../features/system/programming/gitkraken
+    ../../../features/system/programming/nodejs
+    ../../../features/system/programming/sqlite
 
     # Nix
     ../../../features/system/nix/home-manager

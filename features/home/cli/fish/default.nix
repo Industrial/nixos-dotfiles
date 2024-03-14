@@ -111,7 +111,7 @@ in {
     end
 
     # Direnv
-    direnv hook fish | source
+    /run/current-system/sw/bin/direnv hook fish | source
 
     # Starship Shell
     starship init fish | source

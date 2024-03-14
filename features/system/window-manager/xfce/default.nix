@@ -5,10 +5,12 @@
   ...
 }: {
   environment.systemPackages = with pkgs; [
+    (pkgs.xfce.thunar.override {thunarPlugins = [pkgs.xfce.thunar-archive-plugin];})
+    python3Full
+    wmctrl
     xarchiver
     xfce.libxfce4ui
     xfce.libxfce4util
-    xfce.thunar-archive-plugin
     xfce.xfce4-appfinder
     xfce.xfce4-battery-plugin
     xfce.xfce4-clipman-plugin
@@ -46,10 +48,6 @@
     xfce.xfce4-whiskermenu-plugin
     xfce.xfce4-windowck-plugin
     xfce.xfce4-xkb-plugin
-
-    # WmCtrl: Change and move windows to desktops/monitors
-    python3Full
     xorg.xwininfo
-    wmctrl
   ];
 }
