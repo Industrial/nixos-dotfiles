@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "bin/osx-install-nix-conf"
+echo "bin/install-osx-nix-conf"
 mkdir -p "${HOME}/.config/nix"
 cat <<EOF >"${HOME}/.config/nix/nix.conf"
 experimental-features = nix-command flakes

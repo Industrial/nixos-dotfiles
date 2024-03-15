@@ -4,7 +4,7 @@ set -e
 source lib/lowercase.bash
 
 HOST=$(lowercase ${1:-"vm"})
-echo "bin/vm-update > host: ${HOST}"
+echo "bin/update-vm > host: ${HOST}"
 
 # bin/update-nix-env
 # bin/update-flake
@@ -15,10 +15,10 @@ echo "bin/vm-update > host: ${HOST}"
 
 # Create or update the MicroVM.
 if [ ! -d "/var/lib/microvms/${HOST}" ]; then
-  echo "bin/vm-update > sudo microvm -f \"git+file://${PWD}\" -c \"${HOST}\""
+  echo "bin/update-vm > sudo microvm -f \"git+file://${PWD}\" -c \"${HOST}\""
   sudo microvm -f "git+file://${PWD}" -c "${HOST}"
 else
-  echo "bin/vm-update > sudo microvm -f \"git+file://${PWD}\" -u \"${HOST}\""
+  echo "bin/update-vm > sudo microvm -f \"git+file://${PWD}\" -u \"${HOST}\""
   sudo microvm -f "git+file://${PWD}" -u "${HOST}"
 fi
 

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -e
+
+source lib/lowercase.bash
+
+HOST=$(lowercase ${1:-"smithja"})
+echo "bin/update-osx-rebuild-flake > host: ${HOST}"
+
+USER=$(lowercase ${2:-$USER})
+echo "bin/update-osx-rebuild-flake > user: ${USER}"
+
+if [ -f "/etc/shells" ]; then
+  echo "bin/update-osx-rebuild-flake > sudo mv /etc/shells /etc/shells.before-nix-darwin"
+  sudo mv /etc/shells /etc/shells.before-nix-darwin
+fi
+
+echo "bin/update-osx-rebuild-flake > nix run nix-darwin -- switch --flake \".#${HOST}\" --show-trace"
+nix run nix-darwin -- switch --flake ".#${HOST}" --show-trace

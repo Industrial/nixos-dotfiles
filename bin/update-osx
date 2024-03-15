@@ -3,18 +3,18 @@ set -e
 
 source lib/lowercase.bash
 
-HOST=$(lowercase ${2:-"langhus"})
-echo "bin/update > host: ${HOST}"
+HOST=$(lowercase ${1:-"smithja"})
+echo "bin/update-osx > host: ${HOST}"
 
 USER=$(lowercase ${2:-$USER})
-echo "bin/update > user: ${USER}"
+echo "bin/update-osx > user: ${USER}"
 
-# bin/update-zellij
-bin/update-hardware-configuration "${HOST}"
+bin/update-neovim
+bin/update-zellij
+# bin/update-hardware-configuration "${HOST}"
 bin/update-nix-env
 bin/update-flake
-bin/update-nixos-rebuild-flake "${HOST}"
+bin/update-osx-darwin-rebuild-flake "${HOST}"
 features/home/programming/vscode/bin/clear-cache
 bin/update-home-manager "${HOST}" "${USER}"
 bin/update-login-shell "${USER}"
-bin/delete-collectgarbage

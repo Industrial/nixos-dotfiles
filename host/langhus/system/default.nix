@@ -118,5 +118,6 @@
     # ../../../features/system/window-manager/dwm
     # ../../../features/system/window-manager/xmonad
     ../../../features/system/window-manager/xfce
+    ../../../features/system/window-manager/alacritty
   ];
 }

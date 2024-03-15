@@ -2,6 +2,6 @@
 
 set -e
 
-echo "bin/vm-stop > sudo systemctl stop microvm@vm.service"
+echo "bin/stop-vm > sudo systemctl stop microvm@vm.service"
 
 sudo systemctl stop microvm@vm.service;

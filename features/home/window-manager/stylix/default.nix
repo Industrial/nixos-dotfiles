@@ -41,7 +41,7 @@ in {
   stylix.base16Scheme = "${tinted-theming-schemes}/share/schemes/equilibrium-gray-dark.yaml";
   stylix.fonts.emoji.name = "Noto Color Emoji";
   stylix.fonts.emoji.package = pkgs.noto-fonts-emoji;
-  stylix.fonts.monospace.name = "Fira Code";
+  stylix.fonts.monospace.name = "IosevkaTerm Nerd Font Mono";
   stylix.fonts.monospace.package = pkgs.nerdfonts;
   stylix.fonts.sansSerif.name = "DejaVu Sans";
   stylix.fonts.sansSerif.package = pkgs.dejavu_fonts;

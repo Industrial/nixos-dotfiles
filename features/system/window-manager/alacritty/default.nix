@@ -3,22 +3,17 @@
   pkgs,
   ...
 }: {
-  programs.alacritty.enable = true;
+  environment.systemPackages = with pkgs; [
+    alacritty
+  ];
 
-  programs.alacritty.settings = {
-    font = pkgs.lib.mkForce {
-      normal = {
-        family = "IosevkaTerm Nerd Font Mono";
-        style = "Regular";
-      };
-      bold = {
-        style = "Bold";
-      };
-      italic = {
-        style = "Italic";
-      };
-
-      size = 12.0;
-    };
+  system.activationScripts.linkFile = {
+    text = ''
+      mkdir -p /home/${settings.username}/.config/alacritty
+      ln -sf ${pkgs.writeTextFile {
+        name = "alacritty.toml";
+        text = builtins.readFile ./.config/alacritty/alacritty.toml;
+      }} /home/${settings.username}/.config/alacritty/alacritty.toml
+    '';
   };
 }

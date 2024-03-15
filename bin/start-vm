@@ -2,6 +2,6 @@
 
 set -e
 
-echo "bin/vm-start > sudo systemctl start microvm@vm.service"
+echo "bin/start-vm > sudo systemctl start microvm@vm.service"
 
 sudo systemctl start microvm@vm.service;

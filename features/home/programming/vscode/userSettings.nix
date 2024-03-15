@@ -35,7 +35,6 @@
   "[typescriptreact]"."editor.formatOnSave" = true;
   "[typescriptreact]"."editor.formatOnType" = false;
   "alejandra.program" = "alejandra";
-  "debug.console.fontSize" = 16;
   "debug.javascript.autoAttachFilter" = "disabled";
   "diffEditor.codeLens" = true;
   "editor.acceptSuggestionOnCommitCharacter" = false;
@@ -45,9 +44,6 @@
   "editor.autoClosingQuotes" = "always";
   "editor.codeActionsOnSave"."source.fixAll" = "explicit";
   "editor.codeActionsOnSave"."source.organizeImports" = "explicit";
-  "editor.fontLigatures" = true;
-  "editor.fontSize" = 16;
-  "editor.fontWeight" = "500";
   "editor.formatOnPaste" = true;
   "editor.formatOnSave" = true;
   "editor.gotoLocation.multipleDeclarations" = "gotoAndPeek";
@@ -132,7 +128,6 @@
   "javascript.updateImportsOnFileMove.enabled" = "always";
   "jupyter.askForKernelRestart" = false;
   "jupyter.notebookFileRoot" = "$\{workspaceRoot\}";
-  "markdown.preview.fontSize" = 16;
   "nix.enableLanguageServer" = true;
   "nix.formatterPath" = "alejandra";
   "nix.serverPath" = "nixd";
@@ -156,11 +151,9 @@
   "python.experiments.enabled" = false;
   "python.languageServer" = "Pylance";
   "references.preferredLocation" = "view";
-  "scm.inputFontSize" = 16;
   "security.workspace.trust.untrustedFiles" = "open";
   "terminal.integrated.copyOnSelection" = true;
   "terminal.integrated.enableMultiLinePasteWarning" = false;
-  "terminal.integrated.fontSize" = 16;
   "terminal.integrated.tabs.enableAnimation" = true;
   "terminal.integrated.tabs.enabled" = true;
   "terminal.integrated.tabs.focusMode" = "singleClick";
@@ -181,12 +174,38 @@
   "vitest.showFailMessages" = true;
   "window.autoDetectColorScheme" = true;
   "window.zoomLevel" = 2;
-  # "workbench.colorTheme" = "Stylix";
   "workbench.editor.enablePreview" = false;
   "workbench.enableExperiments" = true;
   "workbench.iconTheme" = "material-icon-theme";
   "workbench.list.openMode" = "doubleClick";
   "workbench.startupEditor" = "none";
+
+  # Fonts
+  "chat.editor.fontFamily" = "default";
+  "chat.editor.fontSize" = 12;
+  "debug.console.fontFamily" = "default";
+  "debug.console.fontSize" = 12;
+  "editor.codeLensFontFamily" = "default";
+  "editor.codeLensFontSize" = 12;
+  "editor.experimentalInlineEdit.fontFamily" = "default";
+  "editor.fontLigatures" = true;
+  "editor.fontSize" = 12;
+  "editor.fontWeight" = "500";
+  "editor.inlayHints.fontFamily" = "default";
+  "editor.inlayHints.fontSize" = 12;
+  "editor.inlineSuggest.fontFamily" = "default";
+  "editor.suggestFontSize" = 12;
+  "errorLens.fontFamily" = "default";
+  "errorLens.fontSize" = "";
+  "markdown.preview.fontFamily" = "default";
+  "markdown.preview.fontSize" = 12;
+  "notebook.markup.fontSize" = 12;
+  "notebook.output.fontFamily" = "default";
+  "notebook.output.fontSize" = 12;
+  "scm.inputFontFamily" = "default";
+  "scm.inputFontSize" = 12;
+  "screencastMode.fontSize" = 64;
+  "terminal.integrated.fontSize" = 12;
 
   # "whichkey.bindingOverrides" = [
   #   {

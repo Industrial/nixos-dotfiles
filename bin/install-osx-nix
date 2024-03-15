@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -e
 
-echo "bin/osx-install-nix"
+echo "bin/install-osx-nix"
 sh <(curl -L https://nixos.org/nix/install)

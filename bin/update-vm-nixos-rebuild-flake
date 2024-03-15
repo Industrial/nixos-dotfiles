@@ -4,9 +4,9 @@ set -e
 source lib/lowercase.bash
 
 HOST=$(lowercase ${1:-"vm"})
-echo "bin/vm-update-nixos-rebuild-flake > host: ${HOST}"
+echo "bin/update-vm-nixos-rebuild-flake > host: ${HOST}"
 
-echo "bin/vm-update-nixos-rebuild-flake > sudo nixos-rebuild build-vm --flake \".#${HOST}\" --show-trace"
+echo "bin/update-vm-nixos-rebuild-flake > sudo nixos-rebuild build-vm --flake \".#${HOST}\" --show-trace"
 sudo nixos-rebuild build-vm \
   --flake ".#${HOST}" \
   --show-trace \
