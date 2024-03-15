@@ -18,6 +18,7 @@
     ../../../features/system/cli/p7zip
     ../../../features/system/cli/ranger
     ../../../features/system/cli/ripgrep
+    ../../../features/system/cli/starship
     ../../../features/system/cli/unrar
     ../../../features/system/cli/unzip
 

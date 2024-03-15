@@ -6,7 +6,6 @@
 }: {
   imports = [
     # CLI
-    ../../../features/home/cli/fish
     ../../../features/home/cli/zellij
 
     # Home

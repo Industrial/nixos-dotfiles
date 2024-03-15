@@ -42,11 +42,6 @@ in {
   programs.fish.shellInit = ''
     # PATH
     fish_add_path $HOME/.bin
-    ${
-      if pkgs.system == "darwin"
-      then ''fish_add_path /opt/homebrew/bin''
-      else ""
-    }
 
     # Replacement for cat
     function cat --wraps bat
