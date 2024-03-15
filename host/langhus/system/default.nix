@@ -24,7 +24,11 @@
     ../../../features/system/cli/ripgrep
     ../../../features/system/cli/starship
     ../../../features/system/cli/unrar
-    ../../../features/vendor_conf.d/
+    ../../../features/system/cli/zellij
+
+    # Communication
+    ../../../features/system/communication/discord
+
     # Crypto
     ../../../features/system/crypto/monero
 
@@ -67,6 +71,8 @@
     ../../../features/system/nix/shell
 
     # NixOS
+    # ../../../features/system/nixos/security/apparmor
+    #../../../features/system/nixos/security/clamav
     ../../../features/system/nixos/bluetooth
     ../../../features/system/nixos/boot
     ../../../features/system/nixos/console
@@ -77,8 +83,6 @@
     ../../../features/system/nixos/nix
     ../../../features/system/nixos/printing
     ../../../features/system/nixos/security
-    # ../../../features/system/nixos/security/apparmor
-    #../../../features/system/nixos/security/clamav
     ../../../features/system/nixos/security/yubikey
     ../../../features/system/nixos/sound
     ../../../features/system/nixos/system
@@ -95,14 +99,14 @@
     ../../../features/system/office/obsidian
 
     # Programming
+    # TODO: Fix. There was a security issue: CVE-2024-27297
+    # ../../../features/system/programming/nixd
     ../../../features/system/programming/android-tools
     ../../../features/system/programming/docker-compose
     ../../../features/system/programming/gitkraken
-    # TODO: Fix. There was a security issue: CVE-2024-27297
-    # ../../../features/system/programming/nixd
-    ../../../features/system/programming/sqlite
     ../../../features/system/programming/nodejs
     ../../../features/system/programming/ollama
+    ../../../features/system/programming/sqlite
 
     # Security
     ../../../features/system/security/bitwarden
@@ -110,9 +114,9 @@
     ../../../features/system/security/veracrypt
     ../../../features/system/security/yubikey-manager
 
-    # # Window Manager
-    ../../../features/system/window-manager/xfce
-    # ../../../features/system/window-manager/xmonad
+    # Window Manager
     # ../../../features/system/window-manager/dwm
+    # ../../../features/system/window-manager/xmonad
+    ../../../features/system/window-manager/xfce
   ];
 }

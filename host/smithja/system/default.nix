@@ -21,6 +21,7 @@
     ../../../features/system/cli/starship
     ../../../features/system/cli/unrar
     ../../../features/system/cli/unzip
+    ../../../features/system/cli/zellij
 
     # Communication
     ../../../features/system/communication/discord

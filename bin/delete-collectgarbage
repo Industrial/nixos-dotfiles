@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -e
+
+echo "bin/delete-collectgarbage > sudo nix-collect-garbage -d"
+sudo nix-collect-garbage -d
