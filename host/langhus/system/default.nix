@@ -103,10 +103,12 @@
     # ../../../features/system/programming/nixd
     ../../../features/system/programming/android-tools
     ../../../features/system/programming/docker-compose
+    ../../../features/system/programming/git
     ../../../features/system/programming/gitkraken
     ../../../features/system/programming/nodejs
     ../../../features/system/programming/ollama
     ../../../features/system/programming/sqlite
+    ../../../features/system/programming/vscode
 
     # Security
     ../../../features/system/security/bitwarden

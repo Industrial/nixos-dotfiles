@@ -9,7 +9,7 @@ echo "bin/update-nixos > host: ${HOST}"
 USER=$(lowercase ${2:-$USER})
 echo "bin/update-nixos > user: ${USER}"
 
-features/home/programming/vscode/bin/clear-cache
+features/system/programming/vscode/bin/clear-cache
 features/system/cli/zellij/bin/clear-cache
 bin/update-hardware-configuration "${HOST}"
 bin/update-nix-env

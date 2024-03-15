@@ -1,0 +1,115 @@
+[
+  {
+    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
+    "key": "ctrl+tab"
+  },
+  {
+    "command": "workbench.action.nextEditor",
+    "key": "ctrl+tab"
+  },
+  {
+    "command": "-workbench.action.nextEditor",
+    "key": "ctrl+pagedown"
+  },
+  {
+    "command": "workbench.action.previousEditor",
+    "key": "ctrl+shift+tab"
+  },
+  {
+    "command": "-workbench.action.previousEditor",
+    "key": "ctrl+pageup"
+  },
+  {
+    "command": "-workbench.action.quickOpenLeastRecentlyUsedEditorInGroup",
+    "key": "ctrl+shift+tab"
+  },
+  {
+    "command": "editor.action.showHover",
+    "key": "ctrl+shift+k",
+    "when": "editorTextFocus"
+  },
+  {
+    "command": "workbench.action.navigateLeft",
+    "key": "ctrl+h"
+  },
+  {
+    "command": "workbench.action.navigateRight",
+    "key": "ctrl+l"
+  },
+  {
+    "command": "workbench.action.navigateUp",
+    "key": "ctrl+k"
+  },
+  {
+    "command": "workbench.action.navigateDown",
+    "key": "ctrl+j"
+  },
+  {
+    "command": "selectNextSuggestion",
+    "key": "ctrl+j",
+    "when": "suggestWidgetVisible"
+  },
+  {
+    "command": "selectPrevSuggestion",
+    "key": "ctrl+k",
+    "when": "suggestWidgetVisible"
+  },
+  {
+    "command": "workbench.action.quickOpenSelectNext",
+    "key": "ctrl+j",
+    "when": "inQuickOpen"
+  },
+  {
+    "command": "workbench.action.quickOpenSelectPrevious",
+    "key": "ctrl+k",
+    "when": "inQuickOpen"
+  },
+  {
+    "command": "workbench.action.quickOpen",
+    "key": "ctrl+p"
+  },
+  {
+    "command": "workbench.action.showCommands",
+    "key": "ctrl+shift+p"
+  },
+  {
+    "command": "editor.action.inlineSuggest.trigger",
+    "key": "alt+enter",
+    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+  {
+    "command": "editor.action.inlineSuggest.trigger",
+    "key": "ctrl+enter",
+    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+  {
+    "command": "editor.action.inlineSuggest.showNext",
+    "key": "ctrl+]",
+    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+  {
+    "command": "editor.action.inlineSuggest.showPrevious",
+    "key": "ctrl+[",
+    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+  {
+    "command": "github.copilot.generate",
+    "key": "ctrl+shift+enter",
+    "when": "editorTextFocus && github.copilot.activated && !inInteractiveInput && !inInteractiveEditorFocused"
+  },
+  {
+    "command": "github.copilot.acceptCursorPanelSolution",
+    "key": "ctrl+/",
+    "when": "github.copilot.activated && github.copilot.panelVisible"
+  },
+  {
+    "command": "github.copilot.previousPanelSolution",
+    "key": "alt+[",
+    "when": "github.copilot.activated && github.copilot.panelVisible"
+  },
+  {
+    "command": "github.copilot.nextPanelSolution",
+    "key": "alt+]",
+    "when": "github.copilot.activated && github.copilot.panelVisible"
+  }
+]

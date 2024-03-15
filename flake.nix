@@ -79,6 +79,5 @@
     homeConfigurations."${darwinSettings.username}@${darwinSettings.hostname}" = darwinConfiguration.homeConfiguration;
 
     nixosConfigurations.${vmSettings.hostname} = vmConfiguration.systemConfiguration;
-    # homeConfigurations."${vmSettings.username}@${vmSettings.hostname}" = vmConfiguration.homeConfiguration;
   };
 }

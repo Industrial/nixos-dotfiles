@@ -1,9 +1,0 @@
-{
-  settings,
-  pkgs,
-  inputs,
-  ...
-}: {
-  imports = [
-  ];
-}

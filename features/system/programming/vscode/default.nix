@@ -4,31 +4,10 @@
   pkgs,
   ...
 }: let
-  spagoPkgs =
-    import (builtins.fetchGit {
-      name = "spago-0.20.7";
-      url = "https://github.com/NixOS/nixpkgs/";
-      ref = "refs/heads/nixpkgs-unstable";
-      rev = "d1c3fea7ecbed758168787fe4e4a3157e52bc808";
-    }) {
-      system = pkgs.system;
-    };
-
-  spagoOld = spagoPkgs.haskellPackages.spago;
-
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
 
-  userSettings = import ./userSettings.nix;
-  keybindings = import ./keybindings.nix;
-in {
-  programs.vscode = {
-    enable = true;
-    # package = pkgs.vscodium;
-    enableUpdateCheck = false;
-    enableExtensionUpdateCheck = false;
-    userSettings = userSettings;
-    keybindings = keybindings;
-    extensions = with pkgs.vscode-extensions; [
+  vscodeWithExtensions = pkgs.vscode-with-extensions.override {
+    vscodeExtensions = [
       # Themes
       extensions.vscode-marketplace.zhuangtongfa.material-theme
       extensions.vscode-marketplace.pkief.material-icon-theme
@@ -43,8 +22,8 @@ in {
       extensions.vscode-marketplace.vspacecode.whichkey
 
       # Completion
-      pkgs.vscode-extensions.github.copilot
-      pkgs.vscode-extensions.github.copilot-chat
+      extensions.vscode-marketplace.github.copilot
+      extensions.vscode-marketplace-release.github.copilot-chat
 
       # File Types
       ## GraphQL
@@ -82,15 +61,6 @@ in {
       ## Git
       extensions.vscode-marketplace.mhutchie.git-graph
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
-      ## PureScript
-      extensions.vscode-marketplace.nwolverson.language-purescript
-      extensions.vscode-marketplace.nwolverson.ide-purescript
-      ## MoonScript
-      extensions.vscode-marketplace.vgalaktionov.moonscript
-      ## Haskell
-      extensions.vscode-marketplace.haskell.haskell
-      extensions.vscode-marketplace.hoovercj.haskell-linter
-      extensions.vscode-marketplace.justusadam.language-haskell
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
@@ -106,20 +76,27 @@ in {
       # extensions.vscode-marketplace.ms-vscode.vscode-speech
     ];
   };
+in {
+  environment.systemPackages = with pkgs; [
+    vscodeWithExtensions
 
-  home.packages = with pkgs; [
     # Nix
-    # TODO: Try the `nil` language server with the VSCode extension
+    # TODO: integrate nixd here.
     alejandra
-
-    # PureScript
-    nodePackages.purescript-language-server
-    nodePackages.purs-tidy
-    purescript
-    spagoOld
-
-    # Haskell
-    hlint
-    haskell-language-server
   ];
+
+  system.activationScripts.linkFile = {
+    text = ''
+      mkdir -p /home/${settings.username}/.config/Code/User
+      ln -sf ${pkgs.writeTextFile {
+        name = "keybindings.json";
+        text = builtins.readFile ./.config/Code/User/keybindings.json;
+      }} /home/${settings.username}/.config/Code/User/keybindings.json
+
+      ln -sf ${pkgs.writeTextFile {
+        name = "settings.json";
+        text = builtins.readFile ./.config/Code/User/settings.json;
+      }} /home/${settings.username}/.config/Code/User/settings.json
+    '';
+  };
 }
