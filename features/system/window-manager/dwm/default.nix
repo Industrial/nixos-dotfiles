@@ -1,7 +1,6 @@
 # DWM is a window manager.
 {
   settings,
-  config,
   pkgs,
   ...
 }: {
