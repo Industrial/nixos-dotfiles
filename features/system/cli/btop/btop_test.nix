@@ -2,9 +2,9 @@ let
   pkgs = import <nixpkgs> {};
   settings = import ../../../../host/test/settings.nix;
   feature = import ./default.nix {inherit pkgs settings;};
-in {
-  testPackages = {
-    expr = builtins.elem pkgs.lemmy feature.environment.systemPackages;
+in [
+  {
+    actual = builtins.elem pkgs.btop feature.environment.systemPackages;
     expected = true;
-  };
-}
+  }
+]

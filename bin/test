@@ -13,4 +13,4 @@
 # echo "All tests passed"
 # exit 0
 
-nix eval --raw .#tests --allow-dirty --impure
+nix eval --raw .#tests --allow-dirty --impure --show-trace

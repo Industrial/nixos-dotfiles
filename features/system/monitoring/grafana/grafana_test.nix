@@ -1,10 +1,60 @@
 let
   pkgs = import <nixpkgs> {};
-  settings = import ../../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in {
-  testPackages = {
-    expr = builtins.elem pkgs.grafana feature.environment.systemPackages;
-    expected = true;
+  config = {
+    services = {
+      prometheus = {
+        listenAddress = "testaddress";
+        port = 9090;
+      };
+    };
   };
-}
+  settings = import ../../../../host/test/settings.nix;
+  feature = import ./default.nix {inherit pkgs settings config;};
+in [
+  {
+    actual = feature.services.grafana.enable;
+    expected = true;
+  }
+  {
+    actual = feature.services.grafana.settings.analytics;
+    expected = {
+      feedback_links_enabled = false;
+      reporting_enabled = false;
+    };
+  }
+  {
+    actual = feature.services.grafana.settings.security.disable_gravatar;
+    expected = true;
+  }
+  {
+    actual = feature.services.grafana.settings.server;
+    expected = {
+      domain = "localhost";
+      enforce_domain = false;
+      http_addr = "127.0.0.1";
+      http_port = 9000;
+    };
+  }
+  {
+    actual = feature.services.grafana.provision.datasources.settings.datasources;
+    expected = [
+      {
+        name = "Prometheus";
+        type = "prometheus";
+        access = "proxy";
+        url = "http://${config.services.prometheus.listenAddress}:${toString config.services.prometheus.port}";
+        isDefault = true;
+      }
+    ];
+  }
+  {
+    actual = feature.services.grafana.provision.dashboards.settings.providers;
+    expected = [
+      {
+        options.name = "default";
+        options.type = "file";
+        options.path = ./dashboards/host.json;
+      }
+    ];
+  }
+]

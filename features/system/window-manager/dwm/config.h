@@ -52,7 +52,6 @@ static const Rule rules[] = {
 	{ "Spotify",           NULL,       NULL,       0,            0,           -1 },
 	{ "Discord",           NULL,       NULL,       0,            0,           -1 },
 	{ "Transmission",      NULL,       NULL,       0,            0,           -1 },
-	{ "World of Warcraft", NULL,       NULL,       0,            0,           -1 },
 };
 
 /* key definitions */

@@ -5,12 +5,8 @@
   pkgs,
   ...
 }: {
-  services = {
-    syncthing = {
-      enable = true;
-      user = settings.username;
-      dataDir = "${settings.userdir}/Documents";
-      configDir = "${settings.userdir}/Documents/.config/syncthing";
-    };
-  };
+  services.syncthing.enable = true;
+  services.syncthing.user = settings.username;
+  services.syncthing.dataDir = "${settings.userdir}/Documents";
+  services.syncthing.configDir = "${settings.userdir}/Documents/.config/syncthing";
 }

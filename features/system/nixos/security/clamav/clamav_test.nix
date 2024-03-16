@@ -2,9 +2,21 @@ let
   pkgs = import <nixpkgs> {};
   settings = import ../../../../host/test/settings.nix;
   feature = import ./default.nix {inherit pkgs settings;};
-in {
-  testPackages = {
-    expr = builtins.elem pkgs.clamav feature.environment.systemPackages;
+in [
+  {
+    actual = feature.services.clamav.daemon.enable;
     expected = true;
-  };
-}
+  }
+  {
+    actual = feature.services.clamav.updater.enable;
+    expected = true;
+  }
+  {
+    actual = feature.services.clamav.scanner.enable;
+    expected = true;
+  }
+  {
+    actual = feature.services.clamav.scanner.interval;
+    expected = "Weekly Sunday 12:00:00";
+  }
+]
