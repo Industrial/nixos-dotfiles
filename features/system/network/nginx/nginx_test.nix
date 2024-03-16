@@ -4,10 +4,12 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "nginx_test";
     actual = feature.services.nginx.enable;
     expected = true;
   }
   {
+    name = "nginx_test";
     actual = feature.services.nginx.recommendedGzipSettings;
     expected = true;
   }

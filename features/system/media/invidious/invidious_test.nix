@@ -4,10 +4,12 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "invidious_test";
     actual = feature.services.invidious.enable;
     expected = true;
   }
   {
+    name = "invidious_test";
     actual = feature.services.invidious.port;
     expected = 4000;
   }

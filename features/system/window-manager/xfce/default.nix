@@ -5,12 +5,13 @@
   ...
 }: {
   environment.systemPackages = with pkgs; [
-    (pkgs.xfce.thunar.override {thunarPlugins = [pkgs.xfce.thunar-archive-plugin];})
+    # (pkgs.xfce.thunar.override {thunarPlugins = [pkgs.xfce.thunar-archive-plugin];})
     python3Full
     wmctrl
     xarchiver
     xfce.libxfce4ui
     xfce.libxfce4util
+    xfce.thunar
     xfce.xfce4-appfinder
     xfce.xfce4-battery-plugin
     xfce.xfce4-clipman-plugin

@@ -4,7 +4,8 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
-    actual = builtins.elem pkgs.mpv feature.environment.systemPackages;
+    name = "mpv_test";
+    actual = builtins.elem pkgs.mpv-unwrapped feature.environment.systemPackages;
     expected = true;
   }
 ]

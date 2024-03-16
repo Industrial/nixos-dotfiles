@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "starship_test";
     actual = builtins.elem pkgs.starship feature.environment.systemPackages;
     expected = true;
   }

@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "transmission_test";
     actual = builtins.elem pkgs.transmission-gtk feature.environment.systemPackages;
     expected = true;
   }

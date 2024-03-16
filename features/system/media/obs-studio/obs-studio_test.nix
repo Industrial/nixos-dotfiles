@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "obs-studio_test";
     actual = builtins.elem pkgs.obs-studio feature.environment.systemPackages;
     expected = true;
   }

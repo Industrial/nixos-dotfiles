@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "obsidian_test";
     actual = builtins.elem pkgs.obsidian feature.environment.systemPackages;
     expected = true;
   }

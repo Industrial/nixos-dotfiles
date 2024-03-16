@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "unrar_test";
     actual = builtins.elem pkgs.unrar feature.environment.systemPackages;
     expected = true;
   }

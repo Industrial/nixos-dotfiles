@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "gh_test";
     actual = builtins.elem pkgs.gh feature.environment.systemPackages;
     expected = true;
   }

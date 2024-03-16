@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "appimage-run_test";
     actual = builtins.elem pkgs.appimage-run feature.environment.systemPackages;
     expected = true;
   }

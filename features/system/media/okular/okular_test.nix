@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "okular_test";
     actual = builtins.elem pkgs.okular feature.environment.systemPackages;
     expected = true;
   }

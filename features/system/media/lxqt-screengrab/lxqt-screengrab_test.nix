@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "lxqt-screengrab_test";
     actual = builtins.elem pkgs.lxqt.screengrab feature.environment.systemPackages;
     expected = true;
   }

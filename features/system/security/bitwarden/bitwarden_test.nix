@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "bitwarden_test";
     actual = builtins.elem pkgs.bitwarden feature.environment.systemPackages;
     expected = true;
   }

@@ -4,10 +4,12 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "i18n_test";
     actual = feature.i18n.defaultLocale;
     expected = "en_US.UTF-8";
   }
   {
+    name = "i18n_test";
     actual = feature.i18n.extraLocaleSettings;
     expected = {
       LC_ADDRESS = "nl_NL.UTF-8";

@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "discord_test";
     actual = builtins.elem pkgs.discord feature.environment.systemPackages;
     expected = true;
   }

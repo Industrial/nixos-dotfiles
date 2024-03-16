@@ -12,10 +12,12 @@ let
   feature = import ./default.nix {inherit pkgs settings config;};
 in [
   {
+    name = "grafana_test";
     actual = feature.services.grafana.enable;
     expected = true;
   }
   {
+    name = "grafana_test";
     actual = feature.services.grafana.settings.analytics;
     expected = {
       feedback_links_enabled = false;
@@ -23,10 +25,12 @@ in [
     };
   }
   {
+    name = "grafana_test";
     actual = feature.services.grafana.settings.security.disable_gravatar;
     expected = true;
   }
   {
+    name = "grafana_test";
     actual = feature.services.grafana.settings.server;
     expected = {
       domain = "localhost";
@@ -36,6 +40,7 @@ in [
     };
   }
   {
+    name = "grafana_test";
     actual = feature.services.grafana.provision.datasources.settings.datasources;
     expected = [
       {
@@ -48,6 +53,7 @@ in [
     ];
   }
   {
+    name = "grafana_test";
     actual = feature.services.grafana.provision.dashboards.settings.providers;
     expected = [
       {

@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "docker_test";
     actual = feature.virtualisation.docker.enable;
     expected = true;
   }

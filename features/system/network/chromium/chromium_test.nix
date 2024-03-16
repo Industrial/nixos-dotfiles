@@ -4,7 +4,8 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
-    actual = builtins.elem pkgs.chromium feature.environment.systemPackages;
+    name = "chromium_test";
+    actual = builtins.elem pkgs.ungoogled-chromium feature.environment.systemPackages;
     expected = true;
   }
 ]

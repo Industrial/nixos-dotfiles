@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "btop_test";
     actual = builtins.elem pkgs.btop feature.environment.systemPackages;
     expected = true;
   }

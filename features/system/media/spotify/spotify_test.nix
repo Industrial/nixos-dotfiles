@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "spotify_test";
     actual = builtins.elem pkgs.spotify feature.environment.systemPackages;
     expected = true;
   }

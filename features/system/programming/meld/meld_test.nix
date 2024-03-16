@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "meld_test";
     actual = builtins.elem pkgs.meld feature.environment.systemPackages;
     expected = true;
   }

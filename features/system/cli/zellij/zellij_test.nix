@@ -5,6 +5,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "zellij_test";
     actual = builtins.elem pkgs.zellij feature.environment.systemPackages;
     expected = true;
   }

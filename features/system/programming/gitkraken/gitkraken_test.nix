@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "gitkraken_test";
     actual = builtins.elem pkgs.gitkraken feature.environment.systemPackages;
     expected = true;
   }

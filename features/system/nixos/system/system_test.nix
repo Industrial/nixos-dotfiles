@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "system_test";
     actual = feature.programs.dconf.enable;
     expected = true;
   }

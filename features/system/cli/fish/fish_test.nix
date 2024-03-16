@@ -4,7 +4,9 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
-    actual = builtins.elem pkgs.fish feature.environment.systemPackages;
+    name = "fish_test";
+    actual = builtins.elem pkgs.fishPlugins.bass feature.environment.systemPackages;
     expected = true;
   }
+  # TODO: Test everything
 ]

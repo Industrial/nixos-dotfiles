@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "ollama_test";
     actual = feature.services.ollama.enable;
     expected = true;
   }

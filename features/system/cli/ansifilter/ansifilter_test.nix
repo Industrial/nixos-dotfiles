@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "ansifilter_test";
     actual = builtins.elem pkgs.ansifilter feature.environment.systemPackages;
     expected = true;
   }

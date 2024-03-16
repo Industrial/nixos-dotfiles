@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "lxqt-pavucontrol-qt_test";
     actual = builtins.elem pkgs.lxqt.pavucontrol-qt feature.environment.systemPackages;
     expected = true;
   }

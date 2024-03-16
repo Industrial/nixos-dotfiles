@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "neofetch_test";
     actual = builtins.elem pkgs.neofetch feature.environment.systemPackages;
     expected = true;
   }

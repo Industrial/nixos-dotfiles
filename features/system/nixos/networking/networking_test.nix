@@ -4,10 +4,12 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "networking_test";
     actual = feature.networking.networkmanager.enable;
     expected = true;
   }
   {
+    name = "networking_test";
     actual = feature.networking.hostName;
     expected = settings.hostname;
   }

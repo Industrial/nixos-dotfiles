@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "time_test";
     actual = feature.time.timeZone;
     expected = "Europe/Amsterdam";
   }

@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "fzf_test";
     actual = builtins.elem pkgs.fzf feature.environment.systemPackages;
     expected = true;
   }

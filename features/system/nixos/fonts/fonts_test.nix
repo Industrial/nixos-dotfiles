@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "fonts_test";
     actual = builtins.elem pkgs.nerdfonts feature.fonts.packages;
     expected = true;
   }

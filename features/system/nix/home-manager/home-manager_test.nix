@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "home-manager_test";
     actual = builtins.elem pkgs.home-manager feature.environment.systemPackages;
     expected = true;
   }

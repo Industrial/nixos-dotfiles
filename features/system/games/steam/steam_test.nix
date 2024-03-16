@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "steam_test";
     actual = builtins.elem pkgs.steam feature.environment.systemPackages;
     expected = true;
   }

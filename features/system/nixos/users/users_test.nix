@@ -4,18 +4,22 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "users_test";
     actual = feature.users.users.${settings.username}.isNormalUser;
     expected = true;
   }
   {
+    name = "users_test";
     actual = feature.users.users.${settings.username}.home;
     expected = settings.userdir;
   }
   {
+    name = "users_test";
     actual = feature.users.users.${settings.username}.description;
     expected = settings.userfullname;
   }
   {
+    name = "users_test";
     actual = feature.users.users.${settings.username}.extraGroups;
     expected = ["audio" "networkmanager" "plugdev" "wheel"];
   }

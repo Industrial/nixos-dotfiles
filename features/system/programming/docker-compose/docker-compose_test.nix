@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "docker-compose_test";
     actual = builtins.elem pkgs.docker-compose feature.environment.systemPackages;
     expected = true;
   }

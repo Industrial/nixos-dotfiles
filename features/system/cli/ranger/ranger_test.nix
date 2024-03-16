@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "ranger_test";
     actual = builtins.elem pkgs.ranger feature.environment.systemPackages;
     expected = true;
   }

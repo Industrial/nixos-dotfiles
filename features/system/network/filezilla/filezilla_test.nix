@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "filezilla_test";
     actual = builtins.elem pkgs.filezilla feature.environment.systemPackages;
     expected = true;
   }

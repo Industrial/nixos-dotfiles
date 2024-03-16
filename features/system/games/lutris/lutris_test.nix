@@ -8,6 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "lutris_test";
     actual = builtins.elem pkgs.lutris feature.environment.systemPackages;
     expected = true;
   }

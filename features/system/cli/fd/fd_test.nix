@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "fd_test";
     actual = builtins.elem pkgs.fd feature.environment.systemPackages;
     expected = true;
   }

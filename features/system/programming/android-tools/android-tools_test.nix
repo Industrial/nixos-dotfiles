@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "android-tools_test";
     actual = builtins.elem pkgs.android-tools feature.environment.systemPackages;
     expected = true;
   }

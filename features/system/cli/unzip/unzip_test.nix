@@ -4,6 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
+    name = "unzip_test";
     actual = builtins.elem pkgs.unzip feature.environment.systemPackages;
     expected = true;
   }
