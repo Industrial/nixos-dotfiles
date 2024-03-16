@@ -120,7 +120,9 @@
     # Window Manager
     # ../../../features/system/window-manager/dwm
     # ../../../features/system/window-manager/xmonad
-    ../../../features/system/window-manager/xfce
     ../../../features/system/window-manager/alacritty
+    ../../../features/system/window-manager/stylix
+    ../../../features/system/window-manager/xfce
+    inputs.stylix.nixosModules.stylix
   ];
 }

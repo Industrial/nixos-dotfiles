@@ -33,7 +33,7 @@
     };
   });
 in {
-  home.packages = with pkgs; [
+  environment.systemPackages = with pkgs; [
     tinted-theming-schemes
   ];
 
@@ -49,5 +49,4 @@ in {
   stylix.fonts.serif.package = pkgs.dejavu_fonts;
   stylix.image = ./wallpaper.jpg;
   stylix.polarity = "dark";
-  stylix.targets.vscode.enable = true;
 }

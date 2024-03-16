@@ -263,10 +263,10 @@
   "vitest.showFailMessages": true,
   "window.autoDetectColorScheme": true,
   "window.zoomLevel": 2,
-  "workbench.colorTheme": "Stylix",
+  "workbench.colorTheme": "base16-equilibrium-gray-dark",
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
   "workbench.iconTheme": "material-icon-theme",
   "workbench.list.openMode": "doubleClick",
-  "workbench.startupEditor": "none"
+  "workbench.startupEditor": "none",
 }

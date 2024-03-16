@@ -44,18 +44,6 @@
     smithjaSettings = import ./host/smithja/settings.nix;
     vmSettings = import ./host/vm/settings.nix;
 
-    # createConfigurations = directoryPath: let
-    #   hostDirectoryNames = builtins.attrNames (builtins.readDir directoryPath);
-    # in
-    #   builtins.listToAttrs (map (hostDirectoryName: let
-    #       settings = import ./${directoryPath}/${hostDirectoryName}/settings.nix;
-    #       config = systemConfig inputs settings;
-    #     in {
-    #       name = "nixosConfigurations.${settings.hostname}";
-    #       value = config.systemConfiguration;
-    #     })
-    #     hostDirectoryNames);
-
     langhusConfiguration = systemConfig inputs langhusSettings;
     smithjaConfiguration = systemConfig inputs smithjaSettings;
     vmConfiguration = systemConfig inputs vmSettings;
@@ -67,7 +55,6 @@
     homeConfigurations."${smithjaSettings.username}@${smithjaSettings.hostname}" = smithjaConfiguration.homeConfiguration;
 
     nixosConfigurations.${vmSettings.hostname} = vmConfiguration.systemConfiguration;
-    # createConfigurations ./host;
 
     tests = inputs.nixtest.run ./.;
   };
