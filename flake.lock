@@ -427,6 +427,21 @@
         "type": "github"
       }
     },
+    "nixtest": {
+      "locked": {
+        "lastModified": 1689623844,
+        "narHash": "sha256-VvOQ7iuwsdZzUh213N5cHzaMKmqbX6qWwXoMGXRcE1o=",
+        "owner": "jetpack-io",
+        "repo": "nixtest",
+        "rev": "82e49b045e50a6c0597ab7d613d44c5a323241ab",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jetpack-io",
+        "repo": "nixtest",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "cryptpad": "cryptpad",
@@ -436,6 +451,7 @@
         "nix-darwin": "nix-darwin",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpkgs": "nixpkgs",
+        "nixtest": "nixtest",
         "stylix": "stylix"
       }
     },

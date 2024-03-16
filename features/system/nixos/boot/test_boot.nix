@@ -4,7 +4,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in {
   testPackages = {
-    expr = builtins.elem pkgs.unzip feature.environment.systemPackages;
+    expr = builtins.elem pkgs.boot feature.environment.systemPackages;
     expected = true;
   };
 }

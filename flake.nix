@@ -14,6 +14,9 @@
     home-manager.url = "github:nix-community/home-manager/master";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
+    # NixTest
+    nixtest.url = "github:jetpack-io/nixtest";
+
     # # generate iso/qcow2/docker/... image from nixos configuration
     # nixos-generators.url = "github:nix-community/nixos-generators";
     # nixos-generators.inputs.nixpkgs.follows = "nixpkgs";
@@ -65,5 +68,7 @@
 
     nixosConfigurations.${vmSettings.hostname} = vmConfiguration.systemConfiguration;
     # createConfigurations ./host;
+
+    tests = inputs.nixtest.run ./.;
   };
 }
