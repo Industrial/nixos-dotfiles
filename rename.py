@@ -1,16 +1,28 @@
+import glob
 import os
-import re
 
 
-def rename_files(directory):
-    for filename in os.listdir(directory):
-        if filename.startswith("test_") and filename.endswith(".nix"):
-            new_filename = re.sub(r"^test_(.*).nix$", r"\1_test.nix", filename)
-            os.rename(
-                os.path.join(directory, filename), os.path.join(directory, new_filename)
-            )
-        elif os.path.isdir(os.path.join(directory, filename)):
-            rename_files(os.path.join(directory, filename))
+def replace_content(file_path):
+    with open(file_path, "r") as file:
+        content = file.read()
+
+    # Extract the 'something' part from the '<something>_test.nix' filename
+    filename = os.path.basename(file_path)
+    something = filename.split("_test.nix")[0]
+
+    old_format = f"in {{\n  testPackages = {{\n    expr = builtins.elem pkgs.{something} feature.environment.systemPackages;\n    expected = true;\n  }};\n}}"
+    new_format = f"in [\n  {{\n    actual = builtins.elem pkgs.{something} feature.environment.systemPackages;\n    expected = true;\n  }}\n]"
+
+    content = content.replace(old_format, new_format)
+
+    with open(file_path, "w") as file:
+        file.write(content)
 
 
-rename_files(".")
+def main():
+    for file_path in glob.glob("**/*_test.nix", recursive=True):
+        replace_content(file_path)
+
+
+if __name__ == "__main__":
+    main()
