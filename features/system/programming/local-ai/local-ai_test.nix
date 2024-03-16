@@ -12,11 +12,11 @@ in [
     expected = true;
   }
   {
-    actual = builtins.elem "phi-2" feature.virtualisation.oci-containers.containers.localai.cmd;
+    actual = ["phi-2"] feature.virtualisation.oci-containers.containers.localai.cmd;
     expected = true;
   }
   {
-    actual = builtins.elem "8080:8080" feature.virtualisation.oci-containers.containers.localai.ports;
+    actual = ["8080:8080"] feature.virtualisation.oci-containers.containers.localai.ports;
     expected = true;
   }
 ]
