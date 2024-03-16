@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+TEST_DIR=$PWD
+
+for TEST_FILE in $(find $TEST_DIR -type f -name 'test_*.nix')
+do
+  nix-unit $TEST_FILE
+  if [ $? -ne 0 ]
+  then
+    echo "Test $TEST_FILE failed"
+    exit 1
+  fi
+done
+
+echo "All tests passed"
+exit 0

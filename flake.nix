@@ -37,47 +37,33 @@
 
   outputs = inputs @ {nixpkgs, ...}: let
     systemConfig = import ./lib/systemConfig.nix;
+    langhusSettings = import ./host/langhus/settings.nix;
+    smithjaSettings = import ./host/smithja/settings.nix;
+    vmSettings = import ./host/vm/settings.nix;
 
-    settings = {
-      hostname = "langhus";
-      stateVersion = "24.05";
-      system = "x86_64-linux";
-      userdir = "/home/tom";
-      useremail = "tom.wieland@gmail.com";
-      userfullname = "Tom Wieland";
-      username = "tom";
-    };
+    # createConfigurations = directoryPath: let
+    #   hostDirectoryNames = builtins.attrNames (builtins.readDir directoryPath);
+    # in
+    #   builtins.listToAttrs (map (hostDirectoryName: let
+    #       settings = import ./${directoryPath}/${hostDirectoryName}/settings.nix;
+    #       config = systemConfig inputs settings;
+    #     in {
+    #       name = "nixosConfigurations.${settings.hostname}";
+    #       value = config.systemConfiguration;
+    #     })
+    #     hostDirectoryNames);
 
-    darwinSettings = {
-      hostname = "smithja";
-      stateVersion = "24.05";
-      system = "aarch64-darwin";
-      userdir = "/Users/twieland";
-      useremail = "twieland@suitsupply.com";
-      userfullname = "Tom Wieland";
-      username = "twieland";
-    };
-
-    vmSettings = {
-      hostname = "vm";
-      stateVersion = "24.05";
-      system = "x86_64-linux";
-      userdir = "/home/tom";
-      useremail = "tom.wieland@gmail.com";
-      userfullname = "Tom Wieland";
-      username = "tom";
-    };
-
-    nixosConfiguration = systemConfig inputs settings;
-    darwinConfiguration = systemConfig inputs darwinSettings;
+    langhusConfiguration = systemConfig inputs langhusSettings;
+    smithjaConfiguration = systemConfig inputs smithjaSettings;
     vmConfiguration = systemConfig inputs vmSettings;
   in {
-    nixosConfigurations.${settings.hostname} = nixosConfiguration.systemConfiguration;
-    homeConfigurations."${settings.username}@${settings.hostname}" = nixosConfiguration.homeConfiguration;
+    nixosConfigurations.${langhusSettings.hostname} = langhusConfiguration.systemConfiguration;
+    homeConfigurations."${langhusSettings.username}@${langhusSettings.hostname}" = langhusConfiguration.homeConfiguration;
 
-    darwinConfigurations.${darwinSettings.hostname} = darwinConfiguration.systemConfiguration;
-    homeConfigurations."${darwinSettings.username}@${darwinSettings.hostname}" = darwinConfiguration.homeConfiguration;
+    darwinConfigurations.${smithjaSettings.hostname} = smithjaConfiguration.systemConfiguration;
+    homeConfigurations."${smithjaSettings.username}@${smithjaSettings.hostname}" = smithjaConfiguration.homeConfiguration;
 
     nixosConfigurations.${vmSettings.hostname} = vmConfiguration.systemConfiguration;
+    # createConfigurations ./host;
   };
 }

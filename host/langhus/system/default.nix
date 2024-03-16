@@ -68,6 +68,7 @@
 
     # Nix
     ../../../features/system/nix/home-manager
+    ../../../features/system/nix/nix-unit
     ../../../features/system/nix/shell
 
     # NixOS

@@ -15,7 +15,6 @@
 
       # Vim
       extensions.vscode-marketplace.vscodevim.vim
-      # asvetliakov.vscode-neovim
 
       # Visual Feedback
       extensions.vscode-marketplace.usernamehw.errorlens
@@ -73,7 +72,7 @@
       # extensions.vscode-marketplace.ms-vscode-remote.vscode-remote-extensionpack
 
       # # Text to Speech
-      # extensions.vscode-marketplace.ms-vscode.vscode-speech
+      extensions.vscode-marketplace.ms-vscode.vscode-speech
     ];
   };
 in {
@@ -81,8 +80,8 @@ in {
     vscodeWithExtensions
 
     # Nix
-    # TODO: integrate nixd here.
     alejandra
+    # nixd
   ];
 
   system.activationScripts.linkFile = {
