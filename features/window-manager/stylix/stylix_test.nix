@@ -1,8 +1,9 @@
 let
   pkgs = import <nixpkgs> {};
+  lib = pkgs.lib;
   settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-  tinted-theming-schemes = import ./derivations/tinted-theming-schemes.nix;
+  feature = import ./default.nix {inherit pkgs settings lib;};
+  tinted-theming-schemes = (import ./derivations/tinted-theming-schemes.nix {inherit pkgs lib;}).tinted-theming-schemes;
 in [
   # {
   #   name = "stylix_test";

@@ -2,10 +2,9 @@
   settings,
   pkgs,
   lib,
-  fetchFromGitHub,
   ...
 }: let
-  tinted-theming-schemes = import ./derivations/tinted-theming-schemes.nix;
+  tinted-theming-schemes = (import ./derivations/tinted-theming-schemes.nix {inherit pkgs lib;}).tinted-theming-schemes;
 in {
   environment.systemPackages = with pkgs; [
     tinted-theming-schemes

@@ -1,5 +1,9 @@
 {
-  pkgs.stdenv.mkDerivation (finalAttrs: {
+  pkgs,
+  lib,
+  ...
+}: {
+  tinted-theming-schemes = pkgs.stdenv.mkDerivation (finalAttrs: {
     pname = "tinted-theming-schemes";
     version = "spec-0.11";
 
