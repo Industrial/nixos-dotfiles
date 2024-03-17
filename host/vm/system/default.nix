@@ -9,116 +9,116 @@
     inputs.microvm.nixosModules.microvm
 
     # CLI
-    ../../../features/system/cli/bat
-    ../../../features/system/cli/btop
-    ../../../features/system/cli/direnv
-    ../../../features/system/cli/e2fsprogs
-    ../../../features/system/cli/eza
-    ../../../features/system/cli/fd
-    ../../../features/system/cli/fish
-    ../../../features/system/cli/fzf
-    ../../../features/system/cli/gh
-    ../../../features/system/cli/neofetch
-    ../../../features/system/cli/p7zip
-    ../../../features/system/cli/ranger
-    ../../../features/system/cli/ripgrep
-    ../../../features/system/cli/starship
-    ../../../features/system/cli/unrar
-    ../../../features/system/cli/zellij
+    ../../../features/cli/bat
+    ../../../features/cli/btop
+    ../../../features/cli/direnv
+    ../../../features/cli/e2fsprogs
+    ../../../features/cli/eza
+    ../../../features/cli/fd
+    ../../../features/cli/fish
+    ../../../features/cli/fzf
+    ../../../features/cli/gh
+    ../../../features/cli/neofetch
+    ../../../features/cli/p7zip
+    ../../../features/cli/ranger
+    ../../../features/cli/ripgrep
+    ../../../features/cli/starship
+    ../../../features/cli/unrar
+    ../../../features/cli/zellij
 
     # Communication
-    ../../../features/system/communication/discord
+    ../../../features/communication/discord
 
     # Crypto
-    ../../../features/system/crypto/monero
+    ../../../features/crypto/monero
 
     # Filesystems
-    ../../../features/system/filesystems/gparted
+    ../../../features/filesystems/gparted
 
     # Finance
-    ../../../features/system/finance/homebank
+    ../../../features/finance/homebank
 
     # Games
-    ../../../features/system/games/lutris
-    ../../../features/system/games/path-of-building
-    ../../../features/system/games/steam
+    ../../../features/games/lutris
+    ../../../features/games/path-of-building
+    ../../../features/games/steam
 
     # Hardware
-    ../../../features/system/hardware/zsa-keyboard
+    ../../../features/hardware/zsa-keyboard
 
     # Media
-    ../../../features/system/media/invidious
-    ../../../features/system/media/lxqt-pavucontrol-qt
-    ../../../features/system/media/lxqt-screengrab
-    ../../../features/system/media/okular
-    ../../../features/system/media/spotify
-    ../../../features/system/media/vlc
+    ../../../features/media/invidious
+    ../../../features/media/lxqt-pavucontrol-qt
+    ../../../features/media/lxqt-screengrab
+    ../../../features/media/okular
+    ../../../features/media/spotify
+    ../../../features/media/vlc
 
     # Monitoring
-    ../../../features/system/monitoring/grafana
-    ../../../features/system/monitoring/lxqt-qps
-    ../../../features/system/monitoring/prometheus
+    ../../../features/monitoring/grafana
+    ../../../features/monitoring/lxqt-qps
+    ../../../features/monitoring/prometheus
 
     # Network
-    ../../../features/system/network/chromium
-    ../../../features/system/network/firefox
-    ../../../features/system/network/syncthing
-    ../../../features/system/network/tor-browser
-    ../../../features/system/network/nginx
+    ../../../features/network/chromium
+    ../../../features/network/firefox
+    ../../../features/network/syncthing
+    ../../../features/network/tor-browser
+    ../../../features/network/nginx
 
     # Nix
-    ../../../features/system/nix/shell
+    ../../../features/nix/shell
 
     # NixOS
-    # ../../../features/system/nixos/security/apparmor
-    #../../../features/system/nixos/security/clamav
-    ../../../features/system/nixos/bluetooth
-    ../../../features/system/nixos/boot
-    ../../../features/system/nixos/console
-    ../../../features/system/nixos/docker
-    ../../../features/system/nixos/fonts
-    ../../../features/system/nixos/i18n
-    ../../../features/system/nixos/networking
-    ../../../features/system/nixos/nix
-    ../../../features/system/nixos/printing
-    ../../../features/system/nixos/security
-    ../../../features/system/nixos/security/yubikey
-    ../../../features/system/nixos/sound
-    ../../../features/system/nixos/system
-    ../../../features/system/nixos/time
-    ../../../features/system/nixos/users
-    ../../../features/system/nixos/window-manager
+    # ../../../features/nixos/security/apparmor
+    #../../../features/nixos/security/clamav
+    ../../../features/nixos/bluetooth
+    ../../../features/nixos/boot
+    ../../../features/nixos/console
+    ../../../features/nixos/docker
+    ../../../features/nixos/fonts
+    ../../../features/nixos/i18n
+    ../../../features/nixos/networking
+    ../../../features/nixos/nix
+    ../../../features/nixos/printing
+    ../../../features/nixos/security
+    ../../../features/nixos/security/yubikey
+    ../../../features/nixos/sound
+    ../../../features/nixos/system
+    ../../../features/nixos/time
+    ../../../features/nixos/users
+    ../../../features/nixos/window-manager
     inputs.microvm.nixosModules.host
 
     # Office
-    ../../../features/system/office/cryptpad
-    ../../../features/system/office/evince
-    ../../../features/system/office/lxqt-archiver
-    ../../../features/system/office/lxqt-pcmanfm-qt
-    ../../../features/system/office/obsidian
+    ../../../features/office/cryptpad
+    ../../../features/office/evince
+    ../../../features/office/lxqt-archiver
+    ../../../features/office/lxqt-pcmanfm-qt
+    ../../../features/office/obsidian
 
     # Programming
     # TODO: Fix. There was a security issue: CVE-2024-27297
-    # ../../../features/system/programming/nixd
-    ../../../features/system/programming/android-tools
-    ../../../features/system/programming/docker-compose
-    ../../../features/system/programming/git
-    ../../../features/system/programming/gitkraken
-    ../../../features/system/programming/nodejs
-    ../../../features/system/programming/ollama
-    ../../../features/system/programming/sqlite
+    # ../../../features/programming/nixd
+    ../../../features/programming/android-tools
+    ../../../features/programming/docker-compose
+    ../../../features/programming/git
+    ../../../features/programming/gitkraken
+    ../../../features/programming/nodejs
+    ../../../features/programming/ollama
+    ../../../features/programming/sqlite
 
     # Security
-    ../../../features/system/security/bitwarden
-    ../../../features/system/security/vaultwarden
-    ../../../features/system/security/veracrypt
-    ../../../features/system/security/yubikey-manager
+    ../../../features/security/bitwarden
+    ../../../features/security/vaultwarden
+    ../../../features/security/veracrypt
+    ../../../features/security/yubikey-manager
 
     # Window Manager
-    # ../../../features/system/window-manager/dwm
-    # ../../../features/system/window-manager/xmonad
-    ../../../features/system/window-manager/xfce
-    ../../../features/system/window-manager/alacritty
+    # ../../../features/window-manager/dwm
+    # ../../../features/window-manager/xmonad
+    ../../../features/window-manager/xfce
+    ../../../features/window-manager/alacritty
 
     {
       users.users.root.password = "";

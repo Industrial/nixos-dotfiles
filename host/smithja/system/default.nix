@@ -5,44 +5,44 @@
 }: {
   imports = [
     # CLI
-    ../../../features/system/cli/bat
-    ../../../features/system/cli/btop
-    ../../../features/system/cli/direnv
-    ../../../features/system/cli/e2fsprogs
-    ../../../features/system/cli/eza
-    ../../../features/system/cli/fd
-    ../../../features/system/cli/fish
-    ../../../features/system/cli/fzf
-    ../../../features/system/cli/gh
-    ../../../features/system/cli/neofetch
-    ../../../features/system/cli/p7zip
-    ../../../features/system/cli/ranger
-    ../../../features/system/cli/ripgrep
-    ../../../features/system/cli/starship
-    ../../../features/system/cli/unrar
-    ../../../features/system/cli/unzip
-    ../../../features/system/cli/zellij
+    ../../../features/cli/bat
+    ../../../features/cli/btop
+    ../../../features/cli/direnv
+    ../../../features/cli/e2fsprogs
+    ../../../features/cli/eza
+    ../../../features/cli/fd
+    ../../../features/cli/fish
+    ../../../features/cli/fzf
+    ../../../features/cli/gh
+    ../../../features/cli/neofetch
+    ../../../features/cli/p7zip
+    ../../../features/cli/ranger
+    ../../../features/cli/ripgrep
+    ../../../features/cli/starship
+    ../../../features/cli/unrar
+    ../../../features/cli/unzip
+    ../../../features/cli/zellij
 
     # Communication
-    ../../../features/system/communication/discord
+    ../../../features/communication/discord
 
     # Media
-    ../../../features/system/media/spotify
+    ../../../features/media/spotify
 
     # Office
-    ../../../features/system/office/evince
-    ../../../features/system/office/obsidian
+    ../../../features/office/evince
+    ../../../features/office/obsidian
 
     # Programming
-    # ../../../features/system/programming/nixd
-    ../../../features/system/programming/git
-    ../../../features/system/programming/gitkraken
-    ../../../features/system/programming/nodejs
-    ../../../features/system/programming/sqlite
+    # ../../../features/programming/nixd
+    ../../../features/programming/git
+    ../../../features/programming/gitkraken
+    ../../../features/programming/nodejs
+    ../../../features/programming/sqlite
 
     # Nix
-    ../../../features/system/nix/nix-unit
-    ../../../features/system/nix/shell
+    ../../../features/nix/nix-unit
+    ../../../features/nix/shell
   ];
 
   # TODO: Put this in a module.
