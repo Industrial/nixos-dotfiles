@@ -88,7 +88,7 @@
     ../../../features/nixos/window-manager
 
     # Office
-    ../../../features/office/cryptpad
+    # ../../../features/office/cryptpad
     ../../../features/office/evince
     ../../../features/office/lxqt-archiver
     ../../../features/office/lxqt-pcmanfm-qt

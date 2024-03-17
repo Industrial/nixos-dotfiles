@@ -34,6 +34,7 @@
   networking.useDHCP = lib.mkDefault true;
   # networking.interfaces.br-81ae72d89004.useDHCP = lib.mkDefault true;
   # networking.interfaces.br-c591b662b851.useDHCP = lib.mkDefault true;
+  # networking.interfaces.br0.useDHCP = lib.mkDefault true;
   # networking.interfaces.docker0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
   # networking.interfaces.veth135ba55.useDHCP = lib.mkDefault true;

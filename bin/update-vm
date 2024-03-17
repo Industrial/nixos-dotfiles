@@ -6,11 +6,6 @@ source lib/lowercase.bash
 HOST=$(lowercase ${1:-"vm"})
 echo "bin/update-vm > host: ${HOST}"
 
-features/programming/vscode/bin/clear-cache
-features/cli/zellij/bin/clear-cache
-bin/update-nix-env
-bin/update-flake
-
 # Create or update the MicroVM.
 if [ ! -d "/var/lib/microvms/${HOST}" ]; then
   echo "bin/update-vm > sudo microvm -f \"git+file://${PWD}\" -c \"${HOST}\""
@@ -19,5 +14,3 @@ else
   echo "bin/update-vm > sudo microvm -f \"git+file://${PWD}\" -u \"${HOST}\""
   sudo microvm -f "git+file://${PWD}" -u "${HOST}"
 fi
-
-bin/delete-collectgarbage

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-
 set -e
 
-echo "bin/start-vm > sudo systemctl start microvm@vm.service"
+source lib/lowercase.bash
 
-sudo systemctl start microvm@vm.service;
+HOST=$(lowercase ${1:-"vm"})
+echo "bin/update-vm > host: ${HOST}"
+
+echo "bin/start-vm > sudo systemctl start microvm@${HOST}.service"
+
+sudo systemctl start "microvm@${HOST}.service";

@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-
 set -e
 
-echo "bin/stop-vm > sudo systemctl stop microvm@vm.service"
+source lib/lowercase.bash
 
-sudo systemctl stop microvm@vm.service;
+HOST=$(lowercase ${1:-"vm"})
+echo "bin/update-vm > host: ${HOST}"
+
+echo "bin/stop-vm > sudo systemctl stop microvm@${HOST}.service"
+
+sudo systemctl stop "microvm@${HOST}.service";
