@@ -4,7 +4,7 @@ let
       allowUnfree = true;
     };
   };
-  settings = import ../../../../host/test/settings.nix;
+  settings = import ../../../host/test/settings.nix;
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {

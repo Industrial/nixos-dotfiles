@@ -1,6 +1,6 @@
 let
   pkgs = import <nixpkgs> {};
-  settings = import ../../../../host/test/settings.nix;
+  settings = import ../../../host/test/settings.nix;
   inputs = import ../../../../host/test/inputs.nix;
   feature = import ./default.nix {inherit pkgs settings inputs;};
 in [
