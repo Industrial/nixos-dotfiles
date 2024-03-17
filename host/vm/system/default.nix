@@ -67,7 +67,6 @@
     ../../../features/system/network/nginx
 
     # Nix
-    ../../../features/system/nix/home-manager
     ../../../features/system/nix/shell
 
     # NixOS

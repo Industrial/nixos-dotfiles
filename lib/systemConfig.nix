@@ -28,14 +28,6 @@ let
       else if settings.system == "aarch64-darwin"
       then inputs.nix-darwin.lib.darwinSystem commonConfig
       else throw "Unsupported system: ${settings.system}";
-
-    homeConfiguration = inputs.home-manager.lib.homeManagerConfiguration {
-      pkgs = pkgs;
-      extraSpecialArgs = specialArgs;
-      modules = [
-        ../host/${settings.hostname}/home-manager
-      ];
-    };
   };
 in
   systemConfig

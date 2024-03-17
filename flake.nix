@@ -10,10 +10,6 @@
     nix-darwin.url = "github:lnl7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Home Manager
-    home-manager.url = "github:nix-community/home-manager/master";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
-
     # NixTest
     nixtest.url = "github:jetpack-io/nixtest";
 
@@ -43,18 +39,10 @@
     langhusSettings = import ./host/langhus/settings.nix;
     smithjaSettings = import ./host/smithja/settings.nix;
     vmSettings = import ./host/vm/settings.nix;
-
-    langhusConfiguration = systemConfig inputs langhusSettings;
-    smithjaConfiguration = systemConfig inputs smithjaSettings;
-    vmConfiguration = systemConfig inputs vmSettings;
   in {
-    nixosConfigurations.${langhusSettings.hostname} = langhusConfiguration.systemConfiguration;
-    homeConfigurations."${langhusSettings.username}@${langhusSettings.hostname}" = langhusConfiguration.homeConfiguration;
-
-    darwinConfigurations.${smithjaSettings.hostname} = smithjaConfiguration.systemConfiguration;
-    homeConfigurations."${smithjaSettings.username}@${smithjaSettings.hostname}" = smithjaConfiguration.homeConfiguration;
-
-    nixosConfigurations.${vmSettings.hostname} = vmConfiguration.systemConfiguration;
+    nixosConfigurations.${langhusSettings.hostname} = (systemConfig inputs langhusSettings).systemConfiguration;
+    darwinConfigurations.${smithjaSettings.hostname} = (systemConfig inputs smithjaSettings).systemConfiguration;
+    nixosConfigurations.${vmSettings.hostname} = (systemConfig inputs vmSettings).systemConfiguration;
 
     tests = inputs.nixtest.run ./.;
   };

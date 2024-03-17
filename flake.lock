@@ -308,27 +308,6 @@
     "home-manager": {
       "inputs": {
         "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1710532761,
-        "narHash": "sha256-SUXGZNrXX05YA9G6EmgupxhOr3swI1gcxLUeDMUhrEY=",
-        "owner": "nix-community",
-        "repo": "home-manager",
-        "rev": "206f457fffdb9a73596a4cb2211a471bd305243d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "ref": "master",
-        "repo": "home-manager",
-        "type": "github"
-      }
-    },
-    "home-manager_2": {
-      "inputs": {
-        "nixpkgs": [
           "stylix",
           "nixpkgs"
         ]
@@ -398,11 +377,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1710551715,
-        "narHash": "sha256-WBAmG1uNtJVYCs4Io/sM2+TLEx5pB+H4+KmFcnOiH6M=",
+        "lastModified": 1710638327,
+        "narHash": "sha256-NHF3ttYfPzLnB5R3YrGK54J3XJTv2iGrUVywWh1FPGk=",
         "owner": "nix-community",
         "repo": "nix-vscode-extensions",
-        "rev": "bd33101378be629de0c528099676a29e3391d9e8",
+        "rev": "167037243ed2eb106b8a4bbf7c6ce86628afbd5b",
         "type": "github"
       },
       "original": {
@@ -446,7 +425,6 @@
       "inputs": {
         "cryptpad": "cryptpad",
         "flake-utils": "flake-utils_2",
-        "home-manager": "home-manager",
         "microvm": "microvm",
         "nix-darwin": "nix-darwin",
         "nix-vscode-extensions": "nix-vscode-extensions",
@@ -484,7 +462,7 @@
         "base16-vim": "base16-vim",
         "flake-compat": "flake-compat_2",
         "gnome-shell": "gnome-shell",
-        "home-manager": "home-manager_2",
+        "home-manager": "home-manager",
         "nixpkgs": [
           "nixpkgs"
         ]

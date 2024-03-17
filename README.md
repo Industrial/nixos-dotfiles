@@ -25,6 +25,7 @@ Run one command to update your entire system.
 ### NixOS
 ```bash
 bin/update-nixos
+im
 ```
 
 ### OSX
