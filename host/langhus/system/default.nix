@@ -7,6 +7,7 @@
   imports = [
     ./graphics
     ./hardware-configuration.nix
+    inputs.microvm.nixosModules.host
 
     # CLI
     ../../../features/cli/bat
@@ -89,7 +90,6 @@
     ../../../features/nixos/time
     ../../../features/nixos/users
     ../../../features/nixos/window-manager
-    inputs.microvm.nixosModules.host
 
     # Office
     ../../../features/office/cryptpad

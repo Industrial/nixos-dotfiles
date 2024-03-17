@@ -70,8 +70,6 @@
     ../../../features/nix/shell
 
     # NixOS
-    # ../../../features/nixos/security/apparmor
-    #../../../features/nixos/security/clamav
     ../../../features/nixos/bluetooth
     ../../../features/nixos/boot
     ../../../features/nixos/console
@@ -88,7 +86,6 @@
     ../../../features/nixos/time
     ../../../features/nixos/users
     ../../../features/nixos/window-manager
-    inputs.microvm.nixosModules.host
 
     # Office
     ../../../features/office/cryptpad
@@ -98,8 +95,6 @@
     ../../../features/office/obsidian
 
     # Programming
-    # TODO: Fix. There was a security issue: CVE-2024-27297
-    # ../../../features/programming/nixd
     ../../../features/programming/android-tools
     ../../../features/programming/docker-compose
     ../../../features/programming/git
@@ -115,8 +110,6 @@
     ../../../features/security/yubikey-manager
 
     # Window Manager
-    # ../../../features/window-manager/dwm
-    # ../../../features/window-manager/xmonad
     ../../../features/window-manager/xfce
     ../../../features/window-manager/alacritty
 
