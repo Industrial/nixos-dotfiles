@@ -39,9 +39,6 @@ I have several services configured to run locally on some hosts:
   - Media:
     - Invidious (YouTube):
       - http://localhost:4000
-    - Lemmy (Out of order):
-      - http://localhost:4001
-      - http://localhost:4002
   - Documents:
     - Cryptpad:
       - http://localhost:4020
