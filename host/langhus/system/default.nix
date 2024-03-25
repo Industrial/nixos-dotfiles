@@ -68,6 +68,7 @@
     ../../../features/network/nginx
 
     # Nix
+    ../../../features/nix
     ../../../features/nix/nix-unit
     ../../../features/nix/shell
 

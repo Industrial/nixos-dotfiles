@@ -6,17 +6,12 @@
 }: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {inherit settings pkgs;};
 in {
-  environment.systemPackages = with pkgs; [
-    fishPlugins.bass
-  ];
-
   environment.etc."fish/config.fish".text = ''
     # Disable greeting
     function fish_greeting
     end
 
     # Enable Fish plugins
-    source ${pkgs.fishPlugins.bass}/share/fish/vendor_functions.d/bass.fish
     source ${havamalPlugin}/share/fish/vendor_conf.d/Hávamál.fish
 
     # Shell abbreviations
@@ -40,6 +35,11 @@ in {
 
     # PATH
     fish_add_path $HOME/.bin
+
+    # Terminal CheatSheet
+    function cheatsheet
+      curl "cheat.sh/$argv"
+    end
 
     # Replacement for cat
     function cat --wraps bat
@@ -111,7 +111,7 @@ in {
   '';
 
   # Add condition for darwin system
-  system.activationScripts.shellInit.text = pkgs.lib.optionalString (pkgs.system == "darwin") ''
+  system.activationScripts.shellInit.text = pkgs.lib.optionalString (pkgs.system == "aarch64-darwin") ''
     defaults write -g ApplePressAndHoldEnabled -bool false
     defaults write -g AppleInterfaceStyle Dark
     defaults write -g KeyRepeat -int 2

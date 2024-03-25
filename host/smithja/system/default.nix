@@ -39,23 +39,13 @@
     ../../../features/programming/gitkraken
     ../../../features/programming/nodejs
     ../../../features/programming/sqlite
+    ../../../features/programming/vscode
 
     # Nix
+    ../../../features/nix
     ../../../features/nix/nix-unit
     ../../../features/nix/shell
   ];
 
-  # TODO: Put this in a module.
-  nix.package = pkgs.nixFlakes;
-
-  # TODO: This should be taken care of for all hosts / systems.
-  nix.settings.experimental-features = "nix-command flakes";
-
-  nixpkgs.hostPlatform = settings.system;
   services.nix-daemon.enable = true;
-
-  programs.bash.enable = true;
-  environment.shells = with pkgs; [bashInteractive fish];
-
-  system.stateVersion = 4;
 }
