@@ -4,6 +4,7 @@
   pkgs,
   ...
 }: {
+  programs.gnupg.agent.pinentryPackage = pkgs.pinentry-gtk2;
   environment.systemPackages = with pkgs; [
     # (pkgs.xfce.thunar.override {thunarPlugins = [pkgs.xfce.thunar-archive-plugin];})
     python3Full
