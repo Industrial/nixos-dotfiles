@@ -318,6 +318,7 @@
       },
       "locked": {
 <<<<<<< HEAD
+<<<<<<< HEAD
         "lastModified": 1711159783,
         "narHash": "sha256-nwl2Cygq7NrV9QcebJE/T/vXv7w+zLERD7ygHz0F5g8=",
         "owner": "astro",
@@ -330,6 +331,13 @@
         "repo": "microvm.nix",
         "rev": "0e2223d8fd459725850bd9aff7e9d68ec329769a",
 >>>>>>> 9b1305e (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
+=======
+        "lastModified": 1711159783,
+        "narHash": "sha256-nwl2Cygq7NrV9QcebJE/T/vXv7w+zLERD7ygHz0F5g8=",
+        "owner": "astro",
+        "repo": "microvm.nix",
+        "rev": "d31f7c7d3194c51372134832a3a2a256773c161a",
+>>>>>>> ecd43c3 (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
         "type": "github"
       },
       "original": {
@@ -345,11 +353,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1710717205,
-        "narHash": "sha256-Wf3gHh5uV6W1TV/A8X8QJf99a5ypDSugY4sNtdJDe0A=",
+        "lastModified": 1711591334,
+        "narHash": "sha256-9d5ilxxq4CXw44eFw8VFrRneAKex7D8xjn95mwZjgf4=",
         "owner": "lnl7",
         "repo": "nix-darwin",
-        "rev": "bcc8afd06e237df060c85bad6af7128e05fd61a3",
+        "rev": "f0dd0838c3558b59dc3b726d8ab89f5b5e35c297",
         "type": "github"
       },
       "original": {
@@ -368,6 +376,7 @@
       },
       "locked": {
 <<<<<<< HEAD
+<<<<<<< HEAD
         "lastModified": 1711329441,
         "narHash": "sha256-wa567C8H/aW1IEKl4E2GhDQPAgZKPojdY37vxAwQxkc=",
         "owner": "nix-community",
@@ -380,6 +389,13 @@
         "repo": "nix-vscode-extensions",
         "rev": "931bc7b3df7fa8892094a36aed49177133e01787",
 >>>>>>> 9b1305e (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
+=======
+        "lastModified": 1711588589,
+        "narHash": "sha256-Oi/5RvuCNs9ECnnu+C6C4trXCFuW0xjbYhBTfmtaeyM=",
+        "owner": "nix-community",
+        "repo": "nix-vscode-extensions",
+        "rev": "f3e0798765e10b1799ac486850a2b7b6144e5660",
+>>>>>>> ecd43c3 (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
         "type": "github"
       },
       "original": {
@@ -390,6 +406,7 @@
     },
     "nixpkgs": {
       "locked": {
+<<<<<<< HEAD
 <<<<<<< HEAD
         "lastModified": 1711163522,
         "narHash": "sha256-YN/Ciidm+A0fmJPWlHBGvVkcarYWSC+s3NTPk/P+q3c=",
@@ -403,6 +420,13 @@
         "repo": "nixpkgs",
         "rev": "b06025f1533a1e07b6db3e75151caa155d1c7eb3",
 >>>>>>> 9b1305e (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
+=======
+        "lastModified": 1711523803,
+        "narHash": "sha256-UKcYiHWHQynzj6CN/vTcix4yd1eCu1uFdsuarupdCQQ=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2726f127c15a4cc9810843b96cad73c7eb39e443",
+>>>>>>> ecd43c3 (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
         "type": "github"
       },
       "original": {
@@ -474,6 +498,7 @@
       },
       "locked": {
 <<<<<<< HEAD
+<<<<<<< HEAD
         "lastModified": 1711224130,
         "narHash": "sha256-RyOvyQASi5lvKLH5ISiGGkdX1eJxYF25aQALGfN9U0k=",
         "owner": "danth",
@@ -486,6 +511,13 @@
         "repo": "stylix",
         "rev": "2221c7d61b2e10b17df6c6795b4678fb59a0a92a",
 >>>>>>> 9b1305e (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
+=======
+        "lastModified": 1711615973,
+        "narHash": "sha256-43KrbzuVf4ZnJ849OInG/yt+Fq6hIiITxRj02U5mUeM=",
+        "owner": "danth",
+        "repo": "stylix",
+        "rev": "75fd247712ac54d756b7c0bb7150dc6858d29522",
+>>>>>>> ecd43c3 (refactor(host/langhus): Update flake.lock and hardware-configuration.nix)
         "type": "github"
       },
       "original": {

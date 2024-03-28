@@ -34,12 +34,6 @@
   networking.useDHCP = lib.mkDefault true;
   # networking.interfaces.br0.useDHCP = lib.mkDefault true;
   # networking.interfaces.enp16s0.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vm-firewall-in.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vm-firewall-out.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vm-i2pd-in.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vm-i2pd-out.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vm-tor-in.useDHCP = lib.mkDefault true;
-  # networking.interfaces.vm-tor-out.useDHCP = lib.mkDefault true;
   # networking.interfaces.wlp17s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
