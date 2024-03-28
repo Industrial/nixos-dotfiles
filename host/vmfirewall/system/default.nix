@@ -30,6 +30,7 @@
     # ../../../features/monitoring/prometheus
 
     # Nix
+    ../../../features/nix
     ../../../features/nix/shell
 
     # NixOS
@@ -37,7 +38,6 @@
     # ../../../features/nixos/console
     # ../../../features/nixos/fonts
     # ../../../features/nixos/i18n
-    ../../../features/nixos/nix
     # ../../../features/nixos/security
     # ../../../features/nixos/system
     # ../../../features/nixos/time

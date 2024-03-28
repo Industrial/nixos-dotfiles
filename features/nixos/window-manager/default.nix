@@ -7,10 +7,4 @@
   services.xserver.dpi = 96;
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.desktopManager.xfce.enable = true;
-
-  # services.xserver.displayManager.lightdm.enable = false;
-  # services.xserver.displayManager.startx.enable = false;
-  # environment.systemPackages = with pkgs; [
-  #   xorg.xinit
-  # ];
 }

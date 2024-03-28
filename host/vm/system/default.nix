@@ -67,6 +67,7 @@
     ../../../features/network/nginx
 
     # Nix
+    ../../../features/nix
     ../../../features/nix/shell
 
     # NixOS
@@ -77,7 +78,6 @@
     ../../../features/nixos/fonts
     ../../../features/nixos/i18n
     ../../../features/nixos/networking
-    ../../../features/nixos/nix
     ../../../features/nixos/printing
     ../../../features/nixos/security
     ../../../features/nixos/security/yubikey

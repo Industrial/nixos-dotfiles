@@ -82,7 +82,6 @@
     ../../../features/nixos/console
     ../../../features/nixos/fonts
     ../../../features/nixos/i18n
-    ../../../features/nixos/nix
     ../../../features/nixos/printing
     ../../../features/nixos/security
     ../../../features/nixos/security/yubikey
