@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+source lib/lowercase.bash
+
+HOST=$(lowercase ${1:-"vm"})
+echo "bin/restart-vm > host: ${HOST}"
+
+# Catch the error if the service is not running
+bin/stop-vm ${HOST} || true
+
+bin/update-vm ${HOST}
+bin/start-vm ${HOST}
