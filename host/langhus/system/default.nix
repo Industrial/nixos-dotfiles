@@ -102,7 +102,7 @@
     # Programming
     # ../../../features/programming/android-tools
     # ../../../features/programming/docker-compose
-    # ../../../features/programming/gitkraken
+    ../../../features/programming/gitkraken
     # TODO: Fix. There was a security issue: CVE-2024-27297
     # ../../../features/programming/nixd
     # ../../../features/programming/nodejs
