@@ -60,6 +60,8 @@
       ## Git
       extensions.vscode-marketplace.mhutchie.git-graph
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
+      ## PlantUML
+      extensions.vscode-marketplace.jebbs.plantuml
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
