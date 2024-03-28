@@ -126,6 +126,7 @@
     inputs.stylix.nixosModules.stylix
 
     {
+      networking.hostName = settings.hostname;
       networking.useNetworkd = true;
       systemd.network.enable = true;
       systemd.network.networks."10-lan".matchConfig.Name = ["enp16s0" "vm-*"];
@@ -133,7 +134,7 @@
       systemd.network.netdevs."br0".netdevConfig.Name = "br0";
       systemd.network.netdevs."br0".netdevConfig.Kind = "bridge";
       systemd.network.networks."10-lan-bridge".matchConfig.Name = "br0";
-      systemd.network.networks."10-lan-bridge".networkConfig.Address = ["192.168.8.21/24" "2001:db8::a/64"];
+      systemd.network.networks."10-lan-bridge".networkConfig.Address = ["192.168.8.20/24" "2001:db8::a/64"];
       systemd.network.networks."10-lan-bridge".networkConfig.Gateway = "192.168.8.1";
       systemd.network.networks."10-lan-bridge".networkConfig.DNS = "192.168.8.1";
       systemd.network.networks."10-lan-bridge".networkConfig.IPv6AcceptRA = true;
