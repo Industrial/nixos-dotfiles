@@ -4,6 +4,6 @@
   system = "x86_64-linux";
   userdir = "/home/vm";
   useremail = "vmfirewall@vm.com";
-  userfullname = "VirtualMachine Firewall";
+  userfullname = "VirtualMachineFirewall";
   username = "vm";
 }

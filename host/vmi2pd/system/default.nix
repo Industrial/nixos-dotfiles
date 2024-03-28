@@ -80,43 +80,57 @@
       microvm.interfaces = [
         {
           type = "tap";
-          id = "vm-firewall-in";
+          id = "vm-i2pd-in";
           mac = "02:00:00:00:00:01";
         }
         {
           type = "tap";
-          id = "vm-firewall-out";
+          id = "vm-i2pd-out";
           mac = "02:00:00:00:00:02";
         }
       ];
       systemd.network.enable = true;
-      systemd.network.networks."21-lan".matchConfig.Type = "ether";
-      systemd.network.networks."21-lan".networkConfig.Address = ["192.168.8.21/24" "2001:db8::b/64"];
-      systemd.network.networks."21-lan".networkConfig.Gateway = "192.168.8.1";
-      systemd.network.networks."21-lan".networkConfig.DNS = ["192.168.8.1"];
-      systemd.network.networks."21-lan".networkConfig.IPv6AcceptRA = true;
-      systemd.network.networks."21-lan".networkConfig.DHCP = "no";
+      systemd.network.networks."22-lan".matchConfig.Type = "ether";
+      systemd.network.networks."22-lan".networkConfig.Address = ["192.168.8.22/24" "2001:db8::c/64"];
+      systemd.network.networks."22-lan".networkConfig.Gateway = "192.168.8.1";
+      systemd.network.networks."22-lan".networkConfig.DNS = ["192.168.8.1"];
+      systemd.network.networks."22-lan".networkConfig.IPv6AcceptRA = true;
+      systemd.network.networks."22-lan".networkConfig.DHCP = "no";
+      # # Send all traffic from the vm-i2pd-out interface to the vmfirewall virtual machine.
+      # systemd.network.networks."20-lan".networkConfig.PostUp = "ip route add default via 192.168.8.21 dev vm-i2pd-out";
       services.openssh.enable = true;
       services.openssh.settings.PermitRootLogin = "yes";
       services.openssh.settings.PasswordAuthentication = true;
       networking.firewall.enable = true;
-      networking.firewall.allowedTCPPorts = [9050 4444 22];
+      networking.firewall.allowedTCPPorts = [4444 4447 22];
       networking.firewall.allowedUDPPorts = [];
       networking.nat.enable = true;
-      networking.nat.internalInterfaces = ["vm-firewall-in"];
-      networking.nat.externalInterface = "vm-firewall-out";
-      networking.nat.forwardPorts = [
-        # Forward Tor traffic
-        {
-          destination = "vmtor:9050";
-          sourcePort = 9050;
-        }
-        # Forward I2PD traffic
-        {
-          destination = "vmi2pd:4444";
-          sourcePort = 4444;
-        }
-      ];
+      networking.nat.internalInterfaces = ["vm-i2pd-in"];
+      networking.nat.externalInterface = "vm-i2pd-out";
+      networking.nat.forwardPorts = [];
+    }
+
+    {
+      services.i2pd = {
+        enable = true;
+        enableIPv4 = false;
+        enableIPv6 = true;
+        ifname = "vm-i2pd-out";
+        # proto = {
+        #   # httpProxy = {
+        #   #   enable = true;
+        #   # };
+        #   socksProxy = {
+        #     enable = true;
+        #     address = "127.0.0.1";
+        #   };
+        # };
+        # # app = {
+        # #   enable = true;
+        # #   httpProxy = "vm-i2pd-in";
+        # #   socksProxy = "vm-i2pd-out";
+        # # };
+      };
     }
   ];
 }
