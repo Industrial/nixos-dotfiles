@@ -62,6 +62,9 @@
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
       ## PlantUML
       extensions.vscode-marketplace.jebbs.plantuml
+      ## AutoHotkey
+      # extensions.vscode-marketplace.mark-wiemer.vscode-autohotkey-plus-plus
+      extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
