@@ -10,6 +10,8 @@
     inputs.microvm.nixosModules.host
 
     # CLI
+    ../../../features/cli/ansifilter
+    ../../../features/cli/appimage-run
     ../../../features/cli/bat
     ../../../features/cli/btop
     ../../../features/cli/direnv
@@ -25,6 +27,7 @@
     ../../../features/cli/ripgrep
     ../../../features/cli/starship
     ../../../features/cli/unrar
+    ../../../features/cli/unzip
     ../../../features/cli/zellij
 
     # Communication
