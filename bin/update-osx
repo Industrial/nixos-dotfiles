@@ -11,7 +11,5 @@ echo "bin/update-osx > user: ${USER}"
 
 features/programming/vscode/bin/clear-cache
 features/cli/zellij/bin/clear-cache
-bin/update-nix-env
-bin/update-flake
 bin/update-osx-rebuild-flake "${HOST}"
 bin/update-login-shell "${USER}"
