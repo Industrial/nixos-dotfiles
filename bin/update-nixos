@@ -12,7 +12,5 @@ echo "bin/update-nixos > user: ${USER}"
 features/programming/vscode/bin/clear-cache
 features/cli/zellij/bin/clear-cache
 bin/update-hardware-configuration "${HOST}"
-bin/update-nix-env
-bin/update-flake
 bin/update-nixos-rebuild-flake "${HOST}"
 bin/update-login-shell "${USER}"
