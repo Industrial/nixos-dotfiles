@@ -14,8 +14,8 @@ in [
     expected = 96;
   }
   {
-    name = "window-manager_test/services.xserver.displayManager.gdm.enable";
-    actual = feature.services.xserver.displayManager.gdm.enable;
+    name = "window-manager_test/services.xserver.displayManager.lightdm.enable";
+    actual = feature.services.xserver.displayManager.lightdm.enable;
     expected = true;
   }
   {
