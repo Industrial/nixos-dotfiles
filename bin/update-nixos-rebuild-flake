@@ -7,7 +7,4 @@ HOST=$(lowercase ${1:-"langhus"})
 echo "bin/update-nixos-rebuild-flake > host: ${HOST}"
 
 echo "bin/update-nixos-rebuild-flake > sudo nixos-rebuild switch --flake \".#${HOST}\" --show-trace"
-sudo nixos-rebuild switch \
-  --flake ".#${HOST}" \
-  --show-trace \
-  --option eval-cache false
+sudo nixos-rebuild switch --flake ".#${HOST}" --show-trace --option eval-cache false
