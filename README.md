@@ -24,12 +24,13 @@ Run one command to update your entire system.
 
 ### NixOS
 ```bash
+bin/update-repositories
 bin/update-nixos
-im
 ```
 
 ### OSX
 ```bash
+bin/update-repositories
 bin/update-osx
 ```
 
