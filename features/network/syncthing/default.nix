@@ -1,5 +1,4 @@
 # Syncthing syncs things.
-# TODO: settings.username
 {
   settings,
   pkgs,
