@@ -1,5 +1,7 @@
 let
-  systemConfig = inputs: settings: let
+  systemConfig = inputs: systemPath: settingsPath: let
+    system = import systemPath;
+    settings = import settingsPath;
     pkgs = import inputs.nixpkgs {
       stateVersion = settings.stateVersion;
       system = settings.system;
@@ -18,16 +20,17 @@ let
       pkgs = pkgs;
       specialArgs = specialArgs;
       modules = [
-        ../host/${settings.hostname}/system
+        system
       ];
     };
-  in {
     systemConfiguration =
       if settings.system == "x86_64-linux"
       then inputs.nixpkgs.lib.nixosSystem commonConfig
       else if settings.system == "aarch64-darwin"
       then inputs.nix-darwin.lib.darwinSystem commonConfig
       else throw "Unsupported system: ${settings.system}";
+  in {
+    systemConfiguration = systemConfiguration;
   };
 in
   systemConfig

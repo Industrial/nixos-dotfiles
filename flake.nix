@@ -31,17 +31,9 @@
     systemConfig = import ./lib/systemConfig.nix;
     langhusSettings = import ./host/langhus/settings.nix;
     smithjaSettings = import ./host/smithja/settings.nix;
-    # vmSettings = import ./host/vm/settings.nix;
-    vmFirewallSettings = import ./host/vmfirewall/settings.nix;
-    vmTorSettings = import ./host/vmtor/settings.nix;
-    vmI2PDSettings = import ./host/vmi2pd/settings.nix;
   in {
-    nixosConfigurations.${langhusSettings.hostname} = (systemConfig inputs langhusSettings).systemConfiguration;
-    darwinConfigurations.${smithjaSettings.hostname} = (systemConfig inputs smithjaSettings).systemConfiguration;
-    # nixosConfigurations.${vmSettings.hostname} = (systemConfig inputs vmSettings).systemConfiguration;
-    nixosConfigurations.${vmFirewallSettings.hostname} = (systemConfig inputs vmFirewallSettings).systemConfiguration;
-    nixosConfigurations.${vmTorSettings.hostname} = (systemConfig inputs vmTorSettings).systemConfiguration;
-    nixosConfigurations.${vmI2PDSettings.hostname} = (systemConfig inputs vmI2PDSettings).systemConfiguration;
+    nixosConfigurations.${langhusSettings.hostname} = (systemConfig inputs ./host/langhus/system ./host/langhus/settings.nix).systemConfiguration;
+    darwinConfigurations.${smithjaSettings.hostname} = (systemConfig inputs ./host/langhus/system ./host/langhus/settings.nix).systemConfiguration;
     tests = inputs.nixtest.run ./.;
   };
 }
