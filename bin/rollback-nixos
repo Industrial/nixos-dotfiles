@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+source lib/lowercase.bash
+
+PREVIOUS_GENERATION=$(lowercase ${1:-"$(bin/list-generations | tail -n 2 | head -n 1)"})
+echo "bin/rollback-nixos > switch-to-generation > ${PREVIOUS_GENERATION}"
+
+sudo "/nix/var/nix/profiles/${PREVIOUS_GENERATION}/bin/switch-to-configuration" switch
