@@ -3,7 +3,9 @@
   inputs,
   pkgs,
   ...
-}: {
+}: let
+  systemConfig = import ../../../lib/systemConfig.nix;
+in {
   imports = [
     ./graphics
     ./hardware-configuration.nix
@@ -60,15 +62,18 @@
 
     # Monitoring
     ../../../features/monitoring/grafana
+    ../../../features/monitoring/homepage-dashboard
     ../../../features/monitoring/lxqt-qps
     ../../../features/monitoring/prometheus
 
     # Network
     ../../../features/network/chromium
     ../../../features/network/firefox
-    ../../../features/network/syncthing
-    ../../../features/network/tor-browser
+    ../../../features/network/i2pd
     ../../../features/network/nginx
+    ../../../features/network/syncthing
+    ../../../features/network/tor
+    ../../../features/network/tor-browser
 
     # Nix
     ../../../features/nix
@@ -102,14 +107,13 @@
     ../../../features/office/obsidian
 
     # Programming
-    # ../../../features/programming/android-tools
-    # ../../../features/programming/docker-compose
-    ../../../features/programming/gitkraken
-    # TODO: Fix. There was a security issue: CVE-2024-27297
-    # ../../../features/programming/nixd
-    # ../../../features/programming/nodejs
     # ../../../features/programming/ollama
-    # ../../../features/programming/sqlite
+    ../../../features/programming/android-tools
+    ../../../features/programming/docker-compose
+    ../../../features/programming/gitkraken
+    ../../../features/programming/nixd
+    ../../../features/programming/nodejs
+    ../../../features/programming/sqlite
     ../../../features/programming/git
     ../../../features/programming/vscode
 
@@ -128,9 +132,12 @@
     inputs.stylix.nixosModules.stylix
 
     {
+      # networking.networkmanager.enable = true;
       networking.hostName = settings.hostname;
       networking.useNetworkd = true;
       systemd.network.enable = true;
+
+      # Simple Configuration (Static IP Address)
       systemd.network.networks."10-lan".matchConfig.Name = ["enp16s0" "vm-*"];
       systemd.network.networks."10-lan".networkConfig.Bridge = "br0";
       systemd.network.netdevs."br0".netdevConfig.Name = "br0";
@@ -141,6 +148,86 @@
       systemd.network.networks."10-lan-bridge".networkConfig.DNS = "192.168.8.1";
       systemd.network.networks."10-lan-bridge".networkConfig.IPv6AcceptRA = true;
       systemd.network.networks."10-lan-bridge".linkConfig.RequiredForOnline = "routable";
+
+      microvm.vms = let
+        vmTorSettings = import ../../../virtual-machines/vmtor/settings.nix;
+        vmTorPkgs = import inputs.nixpkgs {
+          stateVersion = vmTorSettings.stateVersion;
+          system = vmTorSettings.system;
+          hostPlatform = vmTorSettings.system;
+          config = {
+            allowUnfree = true;
+            allowBroken = false;
+          };
+        };
+      in {
+        vmtor = {
+          pkgs = vmTorPkgs;
+          specialArgs = {
+            inherit inputs;
+            settings = vmTorSettings;
+          };
+          config = {
+            imports = [
+              {
+                system.stateVersion = vmTorSettings.stateVersion;
+                users.users.root.password = "";
+
+                # Show the output of this command in `journalctl -u microvm@vmtor.service`;
+                programs.bash.loginShellInit = "systemctl status sshd";
+                services.getty.autologinUser = "root";
+
+                services.openssh.enable = true;
+                services.openssh.settings.PasswordAuthentication = true;
+                services.openssh.settings.PermitRootLogin = "yes";
+
+                systemd.network.enable = true;
+                systemd.network.networks."23-lan".matchConfig.Type = "ether";
+                systemd.network.networks."23-lan".networkConfig.Address = ["192.168.8.23/24" "2001:db8::d/64"];
+                systemd.network.networks."23-lan".networkConfig.DHCP = "no";
+                systemd.network.networks."23-lan".networkConfig.DNS = ["192.168.8.1"];
+                systemd.network.networks."23-lan".networkConfig.Gateway = "192.168.8.1";
+                systemd.network.networks."23-lan".networkConfig.IPv6AcceptRA = true;
+
+                microvm = {
+                  volumes = [
+                    {
+                      mountPoint = "/var";
+                      image = "var.img";
+                      size = 256;
+                    }
+                  ];
+                  shares = [
+                    {
+                      # use "virtiofs" for MicroVMs that are started by systemd
+                      proto = "9p";
+                      tag = "ro-store";
+                      # a host's /nix/store will be picked up so that no
+                      # squashfs/erofs will be built for it.
+                      source = "/nix/store";
+                      mountPoint = "/nix/.ro-store";
+                    }
+                  ];
+                  interfaces = [
+                    {
+                      type = "tap";
+                      id = "vm-tor-in";
+                      mac = "23:00:00:00:00:01";
+                    }
+                    {
+                      type = "tap";
+                      id = "vm-tor-ex";
+                      mac = "23:00:00:00:00:02";
+                    }
+                  ];
+                  hypervisor = "qemu";
+                  socket = "control.socket";
+                };
+              }
+            ];
+          };
+        };
+      };
     }
   ];
 }
