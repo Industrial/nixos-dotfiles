@@ -3,7 +3,7 @@ set -e
 
 source lib/lowercase.bash
 
-HOST=$(lowercase ${2:-"langhus"})
+HOST=$(lowercase ${1:-"langhus"})
 echo "bin/update-nixos > host: ${HOST}"
 
 USER=$(lowercase ${2:-$USER})
