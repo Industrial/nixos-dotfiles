@@ -46,7 +46,7 @@
     githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
       inherit (self) checks;
     };
-    checks.x86_64-linux.nixosConfigurations = self.nixosConfigurations;
+    checks.x86_64-linux.langhus = self.nixosConfigurations.${langhusSettings.hostname};
 
     tests = inputs.nixtest.run ./.;
   };
