@@ -19,7 +19,7 @@ jobs:
       - name: Install Flake Check
         uses: DeterminateSystems/flake-checker-action@v4
       - name: Run Flake Check
-        run: nix flake check
+        run: nix flake check --impure
       - name: Update Channels
         run: bin/update-channels
       - name: Unit Test
