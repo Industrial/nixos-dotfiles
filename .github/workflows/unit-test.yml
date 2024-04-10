@@ -1,0 +1,26 @@
+name: Unit Test
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/*"
+      - "bugfix/*"
+
+jobs:
+  unit-test:
+    name: Unit Test
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Flake Check
+        uses: DeterminateSystems/flake-checker-action@v4
+      - name: Run Flake Check
+        run: nix flake check
+      - name: Update Channels
+        run: bin/update-channels
+      - name: Unit Test
+        run: bin/test
