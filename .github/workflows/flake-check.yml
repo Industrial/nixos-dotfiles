@@ -1,12 +1,17 @@
 name: Flake Check
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - auto_merge_enabled
+  push:
+    branches:
+      - main
+      - "feature/*"
+      - "bugfix/*"
+  # pull_request:
+  #   types:
+  #     - opened
+  #     - synchronize
+  #     - reopened
+  #     - auto_merge_enabled
 
 jobs:
   flake-check:
@@ -15,18 +20,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Extract branch name
-        shell: bash
-        run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
-        id: extract_branch
-      - name: Enable Pull Request Automerge
-        run: gh pr merge --squash --delete-branch --auto "${{steps.extract_branch.outputs.branch}}"
-        env:
-          GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      # - name: Extract branch name
+      #   shell: bash
+      #   run: echo "branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+      #   id: extract_branch
+      # - name: Enable Pull Request Automerge
+      #   run: gh pr merge --squash --delete-branch --auto "${{steps.extract_branch.outputs.branch}}"
+      #   env:
+      #     GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
+      - name: Install Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Install Flake Check
         uses: DeterminateSystems/flake-checker-action@v4
-      # - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run Flake Check
         run: nix flake check
