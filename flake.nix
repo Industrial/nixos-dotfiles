@@ -46,7 +46,7 @@
     githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
       inherit (self) checks;
     };
-    checks.x86_64-linux.langhus = self.nixosConfigurations.${langhusSettings.hostname};
+    checks.x86_64-linux.cli_ansifilter = import ./features/cli/ansifilter;
 
     tests = inputs.nixtest.run ./.;
   };
