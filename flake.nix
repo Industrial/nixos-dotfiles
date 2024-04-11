@@ -36,20 +36,41 @@
     nixpkgs,
     ...
   }: let
+    flake-checks = import ./checks;
     systemConfig = import ./lib/systemConfig.nix;
     langhusSettings = import ./host/langhus/settings.nix;
     smithjaSettings = import ./host/smithja/settings.nix;
+
+    files = [
+      ./flake.nix
+    ];
   in {
     nixosConfigurations.${langhusSettings.hostname} = (systemConfig inputs ./host/langhus/system ./host/langhus/settings.nix).systemConfiguration;
     darwinConfigurations.${smithjaSettings.hostname} = (systemConfig inputs ./host/langhus/system ./host/langhus/settings.nix).systemConfiguration;
 
+    checks = {
+      x86_64-linux = {
+        shfmt-check = import ./checks/shfmt.nix {
+          inherit nixpkgs;
+          path = ./bin;
+        };
+        shellcheck-check = import ./checks/shellcheck.nix {
+          inherit nixpkgs;
+          path = ./bin;
+        };
+        alejandra-check = import ./checks/alejandra.nix {
+          inherit nixpkgs;
+          path = ./.;
+          excludes = [
+            ./host/langhus/system/hardware-configuration.nix
+          ];
+        };
+      };
+    };
     githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
       inherit (self) checks;
     };
-    # checks.x86_64-linux.cli_ansifilter = import ./features/cli/ansifilter;
-    checks.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-    # checks.x86_64-linux.default = self.packages.x86_64-linux.hello;
 
-    tests = inputs.nixtest.run ./.;
+    # tests = inputs.nixtest.run ./.;
   };
 }
