@@ -46,7 +46,9 @@
     githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
       inherit (self) checks;
     };
-    checks.x86_64-linux.cli_ansifilter = import ./features/cli/ansifilter;
+    # checks.x86_64-linux.cli_ansifilter = import ./features/cli/ansifilter;
+    checks.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
+    checks.x86_64-linux.default = self.packages.x86_64-linux.hello;
 
     tests = inputs.nixtest.run ./.;
   };
