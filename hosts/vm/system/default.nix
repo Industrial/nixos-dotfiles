@@ -38,11 +38,6 @@
     # Finance
     ../../../features/finance/homebank
 
-    # Games
-    ../../../features/games/lutris
-    ../../../features/games/path-of-building
-    ../../../features/games/steam
-
     # Hardware
     ../../../features/hardware/zsa-keyboard
 
