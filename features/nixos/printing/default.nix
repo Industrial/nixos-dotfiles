@@ -6,6 +6,7 @@
   services.printing.enable = true;
 
   environment.systemPackages = with pkgs; [
-    cnijfilter2
+    # # Unfree License
+    # cnijfilter2
   ];
 }

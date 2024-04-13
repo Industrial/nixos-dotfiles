@@ -4,6 +4,7 @@
   ...
 }: {
   environment.systemPackages = with pkgs; [
-    steam
+    # Unfree License
+    # steam
   ];
 }
