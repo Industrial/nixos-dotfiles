@@ -26,7 +26,6 @@
     ../../../features/cli/ranger
     ../../../features/cli/ripgrep
     ../../../features/cli/starship
-    # ../../../features/cli/unrar
     ../../../features/cli/unzip
     ../../../features/cli/zellij
 
@@ -105,7 +104,7 @@
     # ../../../features/office/obsidian
 
     # Programming
-    # ../../../features/programming/ollama
+    ../../../features/programming/ollama
     ../../../features/programming/android-tools
     ../../../features/programming/docker-compose
     # ../../../features/programming/gitkraken
@@ -113,6 +112,9 @@
     ../../../features/programming/nodejs
     ../../../features/programming/sqlite
     ../../../features/programming/git
+    inputs.nixvim.nixosModules.nixvim
+    # inputs.nixvim.nixDarwinModules.nixvim
+    ../../../features/programming/neovim
     # ../../../features/programming/vscode
 
     # Security

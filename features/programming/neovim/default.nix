@@ -1,84 +1,112 @@
-# TODO: Git diff support
 {
+  inputs,
   settings,
   pkgs,
+  lib,
   ...
-}: {
-  programs.neovim = {
-    enable = true;
+}: let
+  options = import ./options;
+in {
+  imports = [
+    ./backup-files.nix
+    ./buffer-search.nix
+    ./buffers.nix
+    ./color-scheme.nix
+    ./completion.nix
+    ./copy-paste.nix
+    ./debug-adapter-protocol.nix
+    ./diagnostic-signs.nix
+    ./file-tabs.nix
+    ./file-tree-sidebar.nix
+    ./find-modal-dialog.nix
+    ./folds.nix
+    ./git.nix
+    ./keybind-menu.nix
+    ./language-support.nix
+    ./line-numbers.nix
+    ./movement.nix
+    ./quickfix.nix
+    ./refactoring.nix
+    ./saving-files.nix
+    ./splits.nix
+    ./status-line.nix
+    ./swap-files.nix
+    ./tab-line.nix
+    ./testing.nix
+    ./undo-files.nix
+    ./visual-information.nix
 
-    viAlias = true;
-    vimAlias = true;
+    ./initialize.nix
+  ];
 
-    extraPackages = with pkgs; [
-      alejandra
-      luajitPackages.luacheck
-      nil
-      nixfmt
-      nodePackages."@astrojs/language-server"
-      nodePackages.bash-language-server
-      nodePackages.dockerfile-language-server-nodejs
-      nodePackages.eslint
-      nodePackages.eslint_d
-      nodePackages.graphql-language-service-cli
-      nodePackages.purescript-language-server
-      nodePackages.purs-tidy
-      nodePackages.stylelint
-      nodePackages.typescript
-      nodePackages.typescript-language-server
-      nodePackages.vim-language-server
-      nodePackages.vscode-langservers-extracted
-      nodePackages.yaml-language-server
-      nodejs_20
-      purescript
-      pyright
-      python311Packages.python-lsp-server
-      #spago
-      statix
-      stylua
-      sumneko-lua-language-server
-      gcc
-    ];
+  programs.nixvim.enable = true;
 
-    plugins = with pkgs.vimPlugins; [
-      base16-vim
-      bufferline-nvim
-      cmp-buffer
-      cmp-cmdline
-      cmp-nvim-lsp
-      cmp-nvim-lsp-signature-help
-      cmp-path
-      indent-blankline-nvim
-      lspkind-nvim
-      lualine-nvim
-      moonscript-vim
-      null-ls-nvim
-      nvim-autopairs
-      nvim-cmp
-      nvim-comment
-      nvim-dap
-      nvim-dap-python
-      nvim-dap-ui
-      nvim-lspconfig
-      nvim-treesitter.withAllGrammars
-      nvim-web-devicons
-      plenary-nvim
-      purescript-vim
-      telescope-dap-nvim
-      telescope-nvim
-      trouble-nvim
-      vim-sleuth
-      which-key-nvim
-      {
-        plugin = nvim-tree-lua;
-        config = ''
-          packadd nvim-tree.lua
-        '';
-      }
-    ];
+  programs.nixvim.plugins = {
+    # - Telescope
+    # TODO: https://github.com/nix-community/nixvim/tree/main/plugins/telescope
+    # TODO: Map keys correctly. I want keys for file search, buffer search, and git search.
+    telescope = {
+      enable = true;
+    };
 
-    extraConfig = ''
-      luafile ${./init.lua}
-    '';
+    # - UI
+    # - Utils
+    startify = {
+      enable = true;
+    };
+    auto-session = {
+      enable = true;
+    };
+    autoclose = {
+      enable = true;
+    };
+    endwise = {
+      enable = true;
+    };
+    # TODO: Check out.
+    # TODO: https://github.com/folke/flash.nvim
+    # flash = {
+    #   enable = true;
+    # };
+    # Give hints for vim motions.
+    # hardtime = {
+    #   enable = true;
+    # };
+    illuminate = {
+      enable = true;
+    };
+    # TODO: https://github.com/nix-community/nixvim/blob/main/plugins/utils/nix-develop.nix
+    # nix-develop = {
+    #   enable = true;
+    # };
+    # # TODO: https://github.com/nix-community/nixvim/blob/main/plugins/utils/ollama.nix
+    # ollama = {
+    #   enable = true;
+    # };
+    # https://github.com/akinsho/toggleterm.nvim
+    toggleterm = {
+      enable = true;
+    };
+    # https://github.com/moll/vim-bbye
+    vim-bbye = {
+      enable = true;
+    };
+    wilder = {
+      enable = true;
+    };
   };
+
+  programs.nixvim.globals = {
+    # Disable NetRW
+    loaded_netrw = 1;
+    loaded_netrwPlugin = 1;
+
+    # Set the map leader to space
+    mapleader = " ";
+  };
+
+  environment.systemPackages = with pkgs; [
+    xsel
+    xclip
+  ];
 }

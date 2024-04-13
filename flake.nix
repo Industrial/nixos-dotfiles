@@ -32,6 +32,10 @@
     microvm.url = "github:astro/microvm.nix";
     microvm.inputs.nixpkgs.follows = "nixpkgs";
 
+    # NixVim
+    nixvim.url = "github:nix-community/nixvim";
+    nixvim.inputs.nixpkgs.follows = "nixpkgs";
+
     # Nix VSCode Extensions
     nix-vscode-extensions.url = "github:nix-community/nix-vscode-extensions";
     nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
@@ -48,8 +52,10 @@
   outputs = inputs:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       systems = [
+        "aarch64-darwin"
+        "aarch64-linux"
+        "x86_64-darwin"
         "x86_64-linux"
-        # "aarch64-darwin"
       ];
 
       imports = [
@@ -58,14 +64,21 @@
         # inputs.flake-root.flakeModule
       ];
 
-      perSystem = {system, ...}: {
-        _module.args.pkgs = import inputs.nixpkgs {
-          inherit system;
-          config = {
-            allowUnfree = true;
-          };
-        };
-      };
+      # perSystem = {system, lib, inputs', ...}: {
+      #   _module.args.pkgs = inputs'.nixpkgs // {
+      #     inherit system;
+      #     config = {
+      #       allowUnfree = true;
+      #       allowBroken = false;
+      #     };
+      #   };
+      #   # _module.args.pkgs = import inputs'.nixpkgs {
+      #   #   inherit system;
+      #   #   config = lib.mkForce {
+      #   #     allowUnfree = true;
+      #   #   };
+      #   # };
+      # };
 
       # perSystem = {
       #   config,
