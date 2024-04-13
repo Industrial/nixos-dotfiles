@@ -28,6 +28,7 @@ in {
     ./quickfix.nix
     ./refactoring.nix
     ./saving-files.nix
+    ./searching.nix
     ./splits.nix
     ./status-line.nix
     ./swap-files.nix
@@ -35,6 +36,7 @@ in {
     ./testing.nix
     ./undo-files.nix
     ./visual-information.nix
+    ./wildmenu.nix
 
     ./initialize.nix
   ];
@@ -42,36 +44,14 @@ in {
   programs.nixvim.enable = true;
 
   programs.nixvim.plugins = {
-    # - Telescope
-    # TODO: https://github.com/nix-community/nixvim/tree/main/plugins/telescope
-    # TODO: Map keys correctly. I want keys for file search, buffer search, and git search.
-    telescope = {
-      enable = true;
-    };
-
     # - UI
     # - Utils
-    startify = {
-      enable = true;
-    };
-    autoclose = {
-      enable = true;
-    };
-    endwise = {
-      enable = true;
-    };
-    # TODO: Check out.
-    # TODO: https://github.com/folke/flash.nvim
-    # flash = {
-    #   enable = true;
-    # };
+    autoclose.enable = true;
+    endwise.enable = true;
     # Give hints for vim motions.
     # hardtime = {
     #   enable = true;
     # };
-    illuminate = {
-      enable = true;
-    };
     # TODO: https://github.com/nix-community/nixvim/blob/main/plugins/utils/nix-develop.nix
     # nix-develop = {
     #   enable = true;
@@ -81,16 +61,7 @@ in {
     #   enable = true;
     # };
     # https://github.com/akinsho/toggleterm.nvim
-    toggleterm = {
-      enable = true;
-    };
-    # https://github.com/moll/vim-bbye
-    vim-bbye = {
-      enable = true;
-    };
-    wilder = {
-      enable = true;
-    };
+    toggleterm.enable = true;
   };
 
   programs.nixvim.globals = {

@@ -21,4 +21,6 @@
   #   noremap: true
   # vim.keymap.set "v", "<C-/>", ":\"<,\">CommentToggle<cr>",
   #   noremap: true
+
+  programs.nixvim.plugins.vim-bbye.enable = true;
 }

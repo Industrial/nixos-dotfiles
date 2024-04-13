@@ -12,17 +12,17 @@
     {
       mode = "n";
       key = "<Tab>";
-      action = ":bn<cr>";
+      action = "<cmd>bn<cr>";
     }
     {
       mode = "n";
       key = "<S-Tab>";
-      action = ":bp<cr>";
+      action = "<cmd>bp<cr>";
     }
     {
       mode = "n";
       key = "<C-Q>";
-      action = ":execute \"bnext|bdelete\" bufnr(\"%\")<CR>";
+      action = "<cmd>Bwipeout<cr>";
     }
   ];
 
@@ -31,8 +31,8 @@
       b = {
         name = "Buffers",
         b = { "<cmd>Telescope buffers<cr>", "Buffers" },
-        d = { "<cmd>execute \"bnext|bdelete\" bufnr(\"%\")<CR>", "Delete" },
-        w = { "<cmd>execute \"bnext|bwipeout\" bufnr(\"%\")<CR>", "Wipeout" },
+        d = { "<cmd>Bdelete<cr>", "Delete" },
+        w = { "<cmd>Bwipeout<cr>", "Wipeout" },
         n = { "<cmd>bn<cr>", "Next" },
         p = { "<cmd>bp<cr>", "Previous" },
       },
