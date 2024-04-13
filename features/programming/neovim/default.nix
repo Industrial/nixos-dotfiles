@@ -54,9 +54,6 @@ in {
     startify = {
       enable = true;
     };
-    auto-session = {
-      enable = true;
-    };
     autoclose = {
       enable = true;
     };

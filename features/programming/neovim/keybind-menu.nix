@@ -43,5 +43,5 @@
 
   # This sets the timeout of map leaders to 0, causing which-key to pop up
   # immediately for all possible keybindings.
-  programs.nixvim.options.timeoutlen = 0;
+  programs.nixvim.opts.timeoutlen = 0;
 }
