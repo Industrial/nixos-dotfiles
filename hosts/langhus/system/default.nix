@@ -38,9 +38,6 @@
     # Filesystems
     ../../../features/filesystems/gparted
 
-    # Finance
-    ../../../features/finance/homebank
-
     # Games
     # ../../../features/games/lutris
     # ../../../features/games/path-of-building
