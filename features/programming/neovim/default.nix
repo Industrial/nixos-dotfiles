@@ -12,7 +12,6 @@ in {
     ./buffer-search.nix
     ./buffers.nix
     ./color-scheme.nix
-    ./completion.nix
     ./copy-paste.nix
     ./debug-adapter-protocol.nix
     ./diagnostic-signs.nix
