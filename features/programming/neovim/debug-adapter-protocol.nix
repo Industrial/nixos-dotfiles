@@ -1,8 +1,4 @@
 {...}: {
-  programs.nixvim.plugins = {
-    # - Debug Adapter Protocol
-    dap = {
-      enable = true;
-    };
-  };
+  # TODO: Actually use this.
+  programs.nixvim.plugins.dap.enable = true;
 }

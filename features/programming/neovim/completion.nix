@@ -13,4 +13,6 @@
 
   # - Completion
   # TODO: https://github.com/nix-community/nixvim/tree/main/plugins/completion
+  # programs.nixvim.plugins.cmp.enable = true;
+  # programs.nixvim.plugins.copilot-lua.enable = true;
 }

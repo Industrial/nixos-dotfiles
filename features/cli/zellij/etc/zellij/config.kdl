@@ -126,6 +126,7 @@ keybinds clear-defaults=true {
     bind "Alt o" { SwitchToMode "Normal"; }
     //bind "Alt s" { SwitchToMode "Scroll"; }
     bind "d" { Detach; }
+    // TODO: When I enable this I get an error.
     //bind "w" {
     //  //LaunchOrFocusPlugin "session-manager" {
     //  //  floating true
