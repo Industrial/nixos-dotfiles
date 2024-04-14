@@ -1,14 +1,14 @@
 {pkgs,...}: {
   environment.systemPackages = with pkgs; [
+    # nodePackages.cssmodules-language-server
+    # nodePackages.dot-language-server
     alejandra
     eslint_d
     lua-language-server
     luaPackages.luacheck
     nixd
     nodePackages.bash-language-server
-    # nodePackages.cssmodules-language-server
     nodePackages.dockerfile-language-server-nodejs
-    # nodePackages.dot-language-server
     nodePackages.eslint
     nodePackages.graphql-language-service-cli
     nodePackages.typescript
@@ -36,8 +36,8 @@
   programs.nixvim.plugins.direnv.enable = true;
 
   programs.nixvim.extraPlugins = with pkgs.vimPlugins; [
-    nvim-lspconfig
     lspkind-nvim
+    nvim-lspconfig
   ];
   programs.nixvim.plugins.none-ls.enable = true;
   programs.nixvim.plugins.cmp.enable = true;
@@ -576,6 +576,12 @@
         auto_trigger = true,
       }
     })
+    cmp.event:on('menu_opened', function()
+      vim.b.copilot_suggestion_hidden = true
+    end)
+    cmp.event:on('menu_closed', function()
+      vim.b.copilot_suggestion_hidden = false
+    end)
     copilotCMP.setup()
   '';
 }

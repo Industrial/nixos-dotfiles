@@ -12,6 +12,7 @@ in {
     ./buffer-search.nix
     ./buffers.nix
     ./color-scheme.nix
+    ./commenting.nix
     ./copy-paste.nix
     ./debug-adapter-protocol.nix
     ./diagnostic-signs.nix
@@ -47,10 +48,6 @@ in {
     # - Utils
     autoclose.enable = true;
     endwise.enable = true;
-    # Give hints for vim motions.
-    # hardtime = {
-    #   enable = true;
-    # };
     # TODO: https://github.com/nix-community/nixvim/blob/main/plugins/utils/nix-develop.nix
     # nix-develop = {
     #   enable = true;
