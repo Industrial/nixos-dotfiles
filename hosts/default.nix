@@ -9,6 +9,7 @@
   in {
     nixosConfigurations = {
       langhus = import ./langhus {inherit inputs specialArgs;};
+      smithja = import ./smithja {inherit inputs specialArgs;};
     };
   };
 }
