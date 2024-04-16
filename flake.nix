@@ -64,21 +64,14 @@
         # inputs.flake-root.flakeModule
       ];
 
-      # perSystem = {system, lib, inputs', ...}: {
-      #   _module.args.pkgs = inputs'.nixpkgs // {
-      #     inherit system;
-      #     config = {
-      #       allowUnfree = true;
-      #       allowBroken = false;
-      #     };
-      #   };
-      #   # _module.args.pkgs = import inputs'.nixpkgs {
-      #   #   inherit system;
-      #   #   config = lib.mkForce {
-      #   #     allowUnfree = true;
-      #   #   };
-      #   # };
-      # };
+      perSystem = {system, lib, inputs, ...}: {
+        _module.args.pkgs = import inputs.nixpkgs {
+          inherit system;
+          config = lib.mkForce {
+            allowUnfree = true;
+          };
+        };
+      };
 
       # perSystem = {
       #   config,
