@@ -1,9 +1,6 @@
 {...}: {
   # https://github.com/nvim-neo-tree/neo-tree.nvim
-  # :Neotree filesystem reveal left
-  programs.nixvim.plugins.neo-tree = {
-    enable = true;
-  };
+  programs.nixvim.plugins.neo-tree.enable = true;
 
   programs.nixvim.extraConfigLua = ''
     require("which-key").register({

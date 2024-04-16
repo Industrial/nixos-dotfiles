@@ -2,7 +2,7 @@
   programs.nixvim.colorschemes = {
     base16 = {
       enable = true;
-      colorscheme = lib.mkDefault "equilibrium-gray-dark";
+      colorscheme = lib.mkDefault "gruvbox-dark-medium";
     };
   };
 

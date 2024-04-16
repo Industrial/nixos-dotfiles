@@ -1,5 +1,9 @@
 {pkgs,...}: {
   environment.systemPackages = with pkgs; [
+    # luajit
+    # luajitPackages.plenary-nvim
+    vimPlugins.plenary-nvim
+
     # nodePackages.cssmodules-language-server
     # nodePackages.dot-language-server
     alejandra
@@ -54,7 +58,7 @@
     local copilotCMP = require('copilot_cmp')
     local lspconfig = require('lspconfig')
     local lspkind = require('lspkind')
-    --local whichkey = require('whichkey')
+    local whichKey = require('which-key')
 
     cmp.setup({
       priority_weight = 2,
@@ -470,46 +474,45 @@
       }
     })
 
-    -- lspconfig.denols.setup({ }),
-    --whichkey.register({
-    --  l = {
-    --    name = "LSP",
-    --    d = {
-    --      vim.lsp.buf.definition,
-    --      "Definition"
-    --    },
-    --    D = {
-    --      vim.lsp.buf.declaration,
-    --      "Declaration"
-    --    },
-    --    h = {
-    --      vim.lsp.buf.hover,
-    --      "Hover"
-    --    },
-    --    i = {
-    --      vim.lsp.buf.implementation,
-    --      "Implementation"
-    --    },
-    --    r = {
-    --      vim.lsp.buf.references,
-    --      "References"
-    --    },
-    --    R = {
-    --      vim.lsp.buf.rename,
-    --      "Rename"
-    --    },
-    --    a = {
-    --      vim.lsp.buf.code_action,
-    --      "Code Action"
-    --    },
-    --    k = {
-    --      vim.lsp.buf.signature_help,
-    --      "Signature Help"
-    --    }
-    --  }
-    --}, {
-    --  prefix = "<leader>"
-    --})
+    whichKey.register({
+      l = {
+        name = "LSP",
+        d = {
+          vim.lsp.buf.definition,
+          "Definition"
+        },
+        D = {
+          vim.lsp.buf.declaration,
+          "Declaration"
+        },
+        h = {
+          vim.lsp.buf.hover,
+          "Hover"
+        },
+        i = {
+          vim.lsp.buf.implementation,
+          "Implementation"
+        },
+        r = {
+          vim.lsp.buf.references,
+          "References"
+        },
+        R = {
+          vim.lsp.buf.rename,
+          "Rename"
+        },
+        a = {
+          vim.lsp.buf.code_action,
+          "Code Action"
+        },
+        k = {
+          vim.lsp.buf.signature_help,
+          "Signature Help"
+        }
+      }
+    }, {
+      prefix = "<leader>"
+    })
 
     local capabilities = cmpNvimLSP.default_capabilities()
     -- lspconfig['SOMETHING'].setup({

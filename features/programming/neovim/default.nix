@@ -1,3 +1,5 @@
+# TODO: Copilot Chat: https://github.com/nix-community/nixvim/issues/1425
+
 {
   inputs,
   settings,
@@ -21,6 +23,7 @@ in {
     ./find-modal-dialog.nix
     ./folds.nix
     ./git.nix
+    ./indentation.nix
     ./keybind-menu.nix
     ./language-support.nix
     ./line-numbers.nix
@@ -33,6 +36,7 @@ in {
     ./status-line.nix
     ./swap-files.nix
     ./tab-line.nix
+    ./terminal.nix
     ./testing.nix
     ./undo-files.nix
     ./visual-information.nix
@@ -52,12 +56,6 @@ in {
     # nix-develop = {
     #   enable = true;
     # };
-    # # TODO: https://github.com/nix-community/nixvim/blob/main/plugins/utils/ollama.nix
-    # ollama = {
-    #   enable = true;
-    # };
-    # https://github.com/akinsho/toggleterm.nvim
-    toggleterm.enable = true;
   };
 
   programs.nixvim.globals = {

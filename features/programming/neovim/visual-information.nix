@@ -2,6 +2,9 @@
   # Shows the context you are in on the top of the buffer.
   programs.nixvim.plugins.barbecue.enable = true;
 
+  # Shows indentation levels with thin vertical lines.
+  programs.nixvim.plugins.indent-blankline.enable = true;
+
   # Display a column with signs when necessary.
   programs.nixvim.opts.signcolumn = "auto";
 
