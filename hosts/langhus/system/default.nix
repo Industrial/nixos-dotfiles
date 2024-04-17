@@ -30,7 +30,7 @@
     ../../../features/cli/zellij
 
     # Communication
-    # ../../../features/communication/discord
+    ../../../features/communication/discord
 
     # Crypto
     ../../../features/crypto/monero
@@ -39,9 +39,9 @@
     ../../../features/filesystems/gparted
 
     # Games
-    # ../../../features/games/lutris
-    # ../../../features/games/path-of-building
-    # ../../../features/games/steam
+    ../../../features/games/lutris
+    ../../../features/games/path-of-building
+    ../../../features/games/steam
 
     # Hardware
     ../../../features/hardware/zsa-keyboard
@@ -51,7 +51,7 @@
     ../../../features/media/lxqt-pavucontrol-qt
     ../../../features/media/lxqt-screengrab
     ../../../features/media/okular
-    # ../../../features/media/spotify
+    ../../../features/media/spotify
     ../../../features/media/vlc
 
     # Monitoring
@@ -72,6 +72,7 @@
     # Nix
     ../../../features/nix
     ../../../features/nix/nix-unit
+    ../../../features/nix/nixpkgs
     ../../../features/nix/shell
 
     # NixOS
@@ -98,26 +99,25 @@
     ../../../features/office/evince
     ../../../features/office/lxqt-archiver
     ../../../features/office/lxqt-pcmanfm-qt
-    # ../../../features/office/obsidian
+    ../../../features/office/obsidian
 
     # Programming
-    ../../../features/programming/ollama
     ../../../features/programming/android-tools
     ../../../features/programming/docker-compose
-    # ../../../features/programming/gitkraken
+    ../../../features/programming/git
+    ../../../features/programming/gitkraken
+    ../../../features/programming/neovim
     ../../../features/programming/nixd
     ../../../features/programming/nodejs
+    ../../../features/programming/ollama
     ../../../features/programming/sqlite
-    ../../../features/programming/git
+    ../../../features/programming/vscode
     inputs.nixvim.nixosModules.nixvim
-    # inputs.nixvim.nixDarwinModules.nixvim
-    ../../../features/programming/neovim
-    # ../../../features/programming/vscode
 
     # Security
     # ../../../features/security/vaultwarden
-    # ../../../features/security/veracrypt
-    # ../../../features/security/yubikey-manager
+    ../../../features/security/veracrypt
+    ../../../features/security/yubikey-manager
     ../../../features/security/bitwarden
 
     # Window Manager

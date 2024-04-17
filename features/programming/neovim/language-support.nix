@@ -1,4 +1,4 @@
-{pkgs,...}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     # luajit
     # luajitPackages.plenary-nvim
@@ -6,23 +6,43 @@
 
     # nodePackages.cssmodules-language-server
     # nodePackages.dot-language-server
+
+    # Nix formatter.
     alejandra
-    eslint_d
+
+    # Fix common misspellings in source code.
+    codespell
+
+    # Lua Language Server
     lua-language-server
+
+    # Lua Static Analyzer
     luaPackages.luacheck
+
+    # Nix Language Server
     nixd
+
+    # Bash Language Server
     nodePackages.bash-language-server
+
+    # Docker Language Server
     nodePackages.dockerfile-language-server-nodejs
+
+    # TypeScript / JavaScript formatter
     nodePackages.eslint
+
     nodePackages.graphql-language-service-cli
     nodePackages.typescript
     nodePackages.typescript-language-server
     nodePackages.vim-language-server
     nodePackages.vscode-langservers-extracted
     python311Packages.autopep8
+    python311Packages.black
     python311Packages.flake8
+    python311Packages.isort
     shellcheck
     statix
+    stylua
   ];
 
   # - Languages
@@ -39,6 +59,7 @@
   programs.nixvim.plugins.ts-context-commentstring.enable = true;
   programs.nixvim.plugins.direnv.enable = true;
 
+  # TODO: Document all these.
   programs.nixvim.extraPlugins = with pkgs.vimPlugins; [
     lspkind-nvim
     nvim-lspconfig
@@ -50,6 +71,66 @@
   programs.nixvim.plugins.cmp-path.enable = true;
   programs.nixvim.plugins.cmp-cmdline.enable = true;
   programs.nixvim.plugins.copilot-cmp.enable = true;
+
+  # Code Formatter
+  programs.nixvim.plugins.conform-nvim = {
+    enable = true;
+
+    formattersByFt = {
+      lua = ["stylua"];
+
+      nix = ["alejandra"];
+
+      javascript = ["eslint"];
+
+      typescript = ["eslint"];
+
+      # Run on all file types.
+      "*" = ["codespell"];
+
+      # Run on file types that don't have other formatters configured.
+      "_" = ["trim_whitespace"];
+    };
+
+    formatOnSave = {
+      lspFallback = true;
+      timeoutMs = 500;
+    };
+  };
+
+  programs.nixvim.plugins.nvim-lightbulb = {
+    enable = true;
+
+    settings = {
+      sign = {
+        enabled = true;
+      };
+
+      virtual_text = {
+        enabled = false;
+      };
+
+      float = {
+        enabled = false;
+      };
+
+      status_text = {
+        enabled = true;
+      };
+
+      number = {
+        enabled = false;
+      };
+
+      line = {
+        enabled = false;
+      };
+
+      autocmd = {
+        enabled = true;
+      };
+    };
+  };
 
   programs.nixvim.extraConfigLua = ''
     local cmp = require('cmp')
@@ -523,51 +604,56 @@
       mode = 'symbol_text',
     })
 
-    vim.keymap.set("n", "<C-O>", vim.lsp.buf.code_action, { })
-    local none_ls = require("null-ls")
-    local augroup = vim.api.nvim_create_augroup("LspFormatting", { })
-    none_ls.setup({
-      sources = {
-        -- none_ls.builtins.code_actions.eslint,
-        none_ls.builtins.code_actions.gitrebase,
-        none_ls.builtins.code_actions.refactoring,
-        -- none_ls.builtins.code_actions.shellcheck,
-        none_ls.builtins.code_actions.statix,
-        none_ls.builtins.diagnostics.commitlint,
-        -- none_ls.builtins.diagnostics.eslint,
-        none_ls.builtins.diagnostics.fish,
-        -- none_ls.builtins.diagnostics.flake8,
-        -- none_ls.builtins.diagnostics.luacheck,
-        none_ls.builtins.diagnostics.statix,
-        -- none_ls.builtins.diagnostics.tsc,
-        none_ls.builtins.formatting.alejandra,
-        -- none_ls.builtins.formatting.autopep8,
-        none_ls.builtins.formatting.black,
-        -- none_ls.builtins.formatting.eslint,
-        -- none_ls.builtins.formatting.lua_format,
-        -- none_ls.builtins.formatting.purs_tidy
-      },
-      on_attach = function(client, bufnr)
-        if client.supports_method("textDocument/formatting") then
-          vim.api.nvim_clear_autocmds({
-            group = augroup,
-            buffer = bufnr
-          })
-          return vim.api.nvim_create_autocmd("BufWritePre", {
-            group = augroup,
-            buffer = bufnr,
-            callback = function()
-              return vim.lsp.buf.format({
-                bufnr = bufnr,
-                filter = function(filterClient)
-                  return filterClient.name ~= "tsserver"
-                end
-              })
-            end
-          })
-        end
-      end
-    })
+    --vim.keymap.set("n", "<C-O>", vim.lsp.buf.code_action, { })
+    --local none_ls = require("null-ls")
+    --local augroup = vim.api.nvim_create_augroup("LspFormatting", { })
+    --none_ls.setup({
+    --  debug = true,
+    --  sources = {
+    --    -- -- none_ls.builtins.code_actions.eslint,
+    --    -- none_ls.builtins.code_actions.gitrebase,
+    --    -- none_ls.builtins.code_actions.refactoring,
+    --    -- -- none_ls.builtins.code_actions.shellcheck,
+    --    -- none_ls.builtins.code_actions.statix,
+    --    -- none_ls.builtins.diagnostics.commitlint,
+    --    -- -- none_ls.builtins.diagnostics.eslint,
+    --    -- none_ls.builtins.diagnostics.fish,
+    --    -- -- none_ls.builtins.diagnostics.flake8,
+    --    -- -- none_ls.builtins.diagnostics.luacheck,
+    --    -- none_ls.builtins.diagnostics.statix,
+    --    -- -- none_ls.builtins.diagnostics.tsc,
+    --    -- none_ls.builtins.formatting.alejandra,
+    --    none_ls.builtins.formatting.nixfmt,
+    --    -- -- none_ls.builtins.formatting.autopep8,
+    --    none_ls.builtins.formatting.black,
+    --    none_ls.builtins.formatting.isort,
+    --    -- -- none_ls.builtins.formatting.eslint,
+    --    -- -- none_ls.builtins.formatting.lua_format,
+    --    -- -- none_ls.builtins.formatting.purs_tidy
+    --  },
+    --  -- on_attach = function(client, bufnr)
+    --  --   if not client.supports_method("textDocument/formatting") then
+    --  --     return
+    --  --   end
+    --  --   vim.api.nvim_clear_autocmds({
+    --  --     group = augroup,
+    --  --     buffer = bufnr
+    --  --   })
+    --  --   vim.api.nvim_create_autocmd("BufWritePre", {
+    --  --     group = augroup,
+    --  --     buffer = bufnr,
+    --  --     callback = function()
+    --  --       vim.lsp.buf.format({ async = false })
+    --  --       -- return vim.lsp.buf.format({
+    --  --       --   bufnr = bufnr,
+    --  --       --   filter = function(filterClient)
+    --  --       --     return filterClient.name ~= "tsserver"
+    --  --       --   end
+    --  --       -- })
+    --  --     end
+    --  --   })
+    --  -- end
+    --})
 
     copilot.setup({
       panel = {
@@ -586,5 +672,7 @@
       vim.b.copilot_suggestion_hidden = false
     end)
     copilotCMP.setup()
+
+
   '';
 }

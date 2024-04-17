@@ -26,6 +26,23 @@
     }
   ];
 
+  # programs.nixvim.extraConfigLua = let
+  #   toLuaObject = programs.nixvim.lib.helpers.toLuaObject;
+  # in ''
+  #   require("which-key").register(${nixvim.lib.helpers.toLuaObject({
+  #     b = {
+  #       name = "Buffers";
+  #       b = [ "<cmd>Telescope buffers<cr>" "Buffers" ];
+  #       d = [ "<cmd>Bdelete<cr>" "Delete" ];
+  #       w = [ "<cmd>Bwipeout<cr>" "Wipeout" ];
+  #       n = [ "<cmd>bn<cr>" "Next" ];
+  #       p = [ "<cmd>bp<cr>" "Previous" ];
+  #     };
+  #   })}, ${nixvim.lib.helpers.toLuaObject({
+  #     prefix = "<leader>";
+  #   })})
+  # '';
+
   programs.nixvim.extraConfigLua = ''
     require("which-key").register({
       b = {

@@ -1,5 +1,6 @@
 {
   settings,
+  inputs,
   pkgs,
   ...
 }: {
@@ -29,22 +30,31 @@
     # Media
     ../../../features/media/spotify
 
+    # Nix
+    ../../../features/nix
+    ../../../features/nix/nixpkgs
+    ../../../features/nix/nix-unit
+    ../../../features/nix/shell
+
     # Office
     ../../../features/office/evince
     ../../../features/office/obsidian
 
     # Programming
-    # ../../../features/programming/nixd
     ../../../features/programming/git
     ../../../features/programming/gitkraken
+    ../../../features/programming/neovim
+    ../../../features/programming/nixd
     ../../../features/programming/nodejs
     ../../../features/programming/sqlite
     ../../../features/programming/vscode
+    inputs.nixvim.nixDarwinModules.nixvim
 
-    # Nix
-    ../../../features/nix
-    ../../../features/nix/nix-unit
-    ../../../features/nix/shell
+    # Security
+    # ../../../features/security/vaultwarden
+    ../../../features/security/veracrypt
+    ../../../features/security/yubikey-manager
+    ../../../features/security/bitwarden
   ];
 
   services.nix-daemon.enable = true;

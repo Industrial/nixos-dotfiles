@@ -20,7 +20,6 @@ in {
     ./diagnostic-signs.nix
     ./file-tabs.nix
     ./file-tree-sidebar.nix
-    ./find-modal-dialog.nix
     ./folds.nix
     ./git.nix
     ./indentation.nix
