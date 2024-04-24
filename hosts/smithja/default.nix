@@ -5,7 +5,7 @@
 }: let
   settings = import ./settings.nix;
 in
-  inputs.nixpkgs.lib.nixosSystem {
+  inputs.nix-darwin.lib.darwinSystem {
     specialArgs =
       specialArgs
       // {

@@ -1,6 +1,13 @@
-{settings, pkgs, ...}: {
-  nixpkgs.config = {
-    allowUnfree = true;
-    allowBroken = false;
+{
+  settings,
+  pkgs,
+  ...
+}: {
+  nixpkgs = {
+    hostPlatform = settings.hostPlatform;
+    config = {
+      allowUnfree = true;
+      allowBroken = false;
+    };
   };
 }
