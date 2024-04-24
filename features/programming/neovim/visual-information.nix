@@ -8,14 +8,14 @@
   # Highlights usages of the keyword under the cursor (using TreeSitter / LSP)
   programs.nixvim.plugins.illuminate.enable = true;
 
-  # Panel for showing warnings and errors.
-  programs.nixvim.plugins.trouble = {
-    enable = true;
+  # # Panel for showing warnings and errors.
+  # programs.nixvim.plugins.trouble = {
+  #   enable = true;
 
-    settings = {
-      position = "right";
-    };
-  };
+  #   settings = {
+  #     position = "right";
+  #   };
+  # };
 
   # # Popup for output messages.
   # programs.nixvim.plugins.noice.enable = true;
