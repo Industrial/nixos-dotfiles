@@ -9,6 +9,8 @@
   in {
     nixosConfigurations = {
       langhus = import ./langhus {inherit inputs specialArgs;};
+    };
+    darwinConfigurations = {
       smithja = import ./smithja {inherit inputs specialArgs;};
     };
   };

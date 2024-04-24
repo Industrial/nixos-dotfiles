@@ -23,7 +23,6 @@
     ../../../features/cli/ranger
     ../../../features/cli/ripgrep
     ../../../features/cli/starship
-    ../../../features/cli/unrar
     ../../../features/cli/zellij
 
     # Communication

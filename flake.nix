@@ -9,7 +9,7 @@
 
     # Flake Parts
     flake-parts.url = "github:hercules-ci/flake-parts";
-    flake-parts.inputs.nixpkgs.follows = "nixpkgs";
+
     # mission-control.url = "github:Platonic-Systems/mission-control";
     # mission-control.inputs.nixpkgs.follows = "nixpkgs";
     # flake-root.url = "github:srid/flake-root";
@@ -64,7 +64,12 @@
         # inputs.flake-root.flakeModule
       ];
 
-      perSystem = {system, lib, inputs, ...}: {
+      perSystem = {
+        system,
+        lib,
+        inputs,
+        ...
+      }: {
         _module.args.pkgs = import inputs.nixpkgs {
           inherit system;
           config = lib.mkForce {
