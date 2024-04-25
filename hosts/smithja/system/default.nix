@@ -6,8 +6,8 @@
 }: {
   imports = [
     # CLI
+    # ../../../features/cli/appimage-run
     ../../../features/cli/ansifilter
-    ../../../features/cli/appimage-run
     ../../../features/cli/bat
     ../../../features/cli/btop
     ../../../features/cli/direnv
@@ -53,13 +53,13 @@
     inputs.nixvim.nixDarwinModules.nixvim
 
     # Security
+    # ../../../features/security/bitwarden
     # ../../../features/security/vaultwarden
-    ../../../features/security/veracrypt
-    ../../../features/security/yubikey-manager
-    ../../../features/security/bitwarden
+    # ../../../features/security/veracrypt
+    # ../../../features/security/yubikey-manager
 
     # Window Manager
-    ../../../features/window-manager/hyper
+    # ../../../features/window-manager/hyper
   ];
 
   services.nix-daemon.enable = true;
