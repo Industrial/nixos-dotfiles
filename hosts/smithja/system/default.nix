@@ -15,6 +15,7 @@
     ../../../features/cli/fish
     ../../../features/cli/fzf
     ../../../features/cli/gh
+    ../../../features/cli/lazygit
     ../../../features/cli/neofetch
     ../../../features/cli/p7zip
     ../../../features/cli/ranger
@@ -55,6 +56,9 @@
     ../../../features/security/veracrypt
     ../../../features/security/yubikey-manager
     ../../../features/security/bitwarden
+
+    # Window Manager
+    ../../../features/window-manager/hyper
   ];
 
   services.nix-daemon.enable = true;
