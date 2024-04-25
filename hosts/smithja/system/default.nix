@@ -6,6 +6,8 @@
 }: {
   imports = [
     # CLI
+    ../../../features/cli/ansifilter
+    ../../../features/cli/appimage-run
     ../../../features/cli/bat
     ../../../features/cli/btop
     ../../../features/cli/direnv
