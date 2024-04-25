@@ -21,11 +21,13 @@
     ../../../features/cli/fish
     ../../../features/cli/fzf
     ../../../features/cli/gh
+    ../../../features/cli/lazygit
     ../../../features/cli/neofetch
     ../../../features/cli/p7zip
     ../../../features/cli/ranger
     ../../../features/cli/ripgrep
     ../../../features/cli/starship
+    ../../../features/cli/unrar
     ../../../features/cli/unzip
     ../../../features/cli/zellij
 
@@ -68,6 +70,7 @@
     ../../../features/network/syncthing
     ../../../features/network/tor
     ../../../features/network/tor-browser
+    ../../../features/network/transmission
 
     # Nix
     ../../../features/nix
@@ -124,6 +127,7 @@
     # ../../../features/window-manager/dwm
     # ../../../features/window-manager/xmonad
     ../../../features/window-manager/alacritty
+    ../../../features/window-manager/hyper
     ../../../features/window-manager/stylix
     ../../../features/window-manager/xfce
     inputs.stylix.nixosModules.stylix
