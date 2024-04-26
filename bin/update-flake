@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+bin/update-channels
+
 echo "bin/update-flake > nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update"
 nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update
+
