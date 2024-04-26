@@ -1,8 +1,8 @@
-{lib,...}: {
+{lib, ...}: {
   programs.nixvim.colorschemes = {
     base16 = {
       enable = true;
-      colorscheme = lib.mkDefault "gruvbox-dark-medium";
+      colorscheme = lib.mkDefault "atelier-estuary";
     };
   };
 

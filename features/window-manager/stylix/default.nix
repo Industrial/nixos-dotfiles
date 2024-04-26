@@ -10,8 +10,12 @@ in {
     tinted-theming-schemes
   ];
 
+  # atelier-cave
+  # atelier-estuary
+  # atelier-plateau
+
   stylix.autoEnable = true;
-  stylix.base16Scheme = "${tinted-theming-schemes}/share/schemes/gruvbox-dark-medium.yaml";
+  stylix.base16Scheme = "${tinted-theming-schemes}/share/schemes/atelier-estuary.yaml";
   stylix.fonts.emoji.name = "Noto Color Emoji";
   stylix.fonts.emoji.package = pkgs.noto-fonts-emoji;
   stylix.fonts.monospace.name = "IosevkaTerm Nerd Font Mono";
