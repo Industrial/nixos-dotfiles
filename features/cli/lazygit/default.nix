@@ -3,7 +3,15 @@
   pkgs,
   ...
 }: {
-  environment.systemPackages = with pkgs; [
-    lazygit
-  ];
+  programs.lazygit = {
+    enable = true;
+
+    settings = {
+      git = {
+        log = {
+          showWholeGraph = true;
+        };
+      };
+    };
+  };
 }
