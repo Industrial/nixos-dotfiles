@@ -44,9 +44,8 @@
     ../../../features/office/obsidian
 
     # Programming
-    ../../../features/programming/android-tools
     ../../../features/programming/bun
-    ../../../features/programming/docker-compose
+    ../../../features/programming/deno
     ../../../features/programming/git
     ../../../features/programming/gitkraken
     ../../../features/programming/glogg
