@@ -6,6 +6,7 @@
 }: {
   imports = [
     # CLI
+    # TODO: Not available on darwin
     # ../../../features/cli/appimage-run
     ../../../features/cli/ansifilter
     ../../../features/cli/bat
@@ -18,6 +19,7 @@
     ../../../features/cli/fzf
     ../../../features/cli/gh
     ../../../features/cli/killall
+    ../../../features/cli/jira-cli
     ../../../features/cli/lazygit
     ../../../features/cli/neofetch
     ../../../features/cli/p7zip
@@ -49,16 +51,19 @@
     ../../../features/programming/git
     ../../../features/programming/gitkraken
     ../../../features/programming/glogg
-    ../../../features/programming/insomnia
-    ../../../features/programming/local-ai
+    # TODO: Not available on darwin
+    # ../../../features/programming/insomnia
+    # TODO: Not available on darwin
+    # ../../../features/programming/local-ai
     ../../../features/programming/meld
     ../../../features/programming/neovim
     ../../../features/programming/nixd
     ../../../features/programming/nodejs
-    ../../../features/programming/ollama
+    # TODO: Not available on darwin
+    # ../../../features/programming/ollama
     ../../../features/programming/sqlite
     ../../../features/programming/vscode
-    inputs.nixvim.nixosModules.nixvim
+    inputs.nixvim.nixDarwinModules.nixvim
 
     # Security
     # ../../../features/security/bitwarden
