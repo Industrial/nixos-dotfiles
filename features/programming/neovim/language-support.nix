@@ -31,6 +31,9 @@
     # TypeScript / JavaScript formatter
     nodePackages.eslint
 
+    # Rust based formatter
+    dprint
+
     nodePackages.graphql-language-service-cli
     nodePackages.typescript
     nodePackages.typescript-language-server
@@ -48,6 +51,7 @@
   # - Languages
   # https://github.com/mfussenegger/nvim-lint
   programs.nixvim.plugins.lint.enable = true;
+
   programs.nixvim.plugins.nix.enable = true;
   programs.nixvim.plugins.treesitter.enable = true;
   programs.nixvim.plugins.treesitter.indent = true;
@@ -81,9 +85,11 @@
 
       nix = ["alejandra"];
 
-      javascript = ["eslint"];
+      javascript = ["dprint"];
 
-      typescript = ["eslint"];
+      typescript = ["dprint"];
+
+      json = ["dprint"];
 
       # Run on all file types.
       "*" = ["codespell"];
