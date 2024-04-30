@@ -21,6 +21,7 @@
     ../../../features/cli/fish
     ../../../features/cli/fzf
     ../../../features/cli/gh
+    ../../../features/cli/killall
     ../../../features/cli/lazygit
     ../../../features/cli/neofetch
     ../../../features/cli/p7zip
@@ -106,6 +107,7 @@
 
     # Programming
     ../../../features/programming/android-tools
+    ../../../features/programming/bun
     ../../../features/programming/docker-compose
     ../../../features/programming/git
     ../../../features/programming/gitkraken
