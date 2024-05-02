@@ -1,14 +1,11 @@
 # TODO: Copilot Chat: https://github.com/nix-community/nixvim/issues/1425
-
 {
   inputs,
   settings,
   pkgs,
   lib,
   ...
-}: let
-  options = import ./options;
-in {
+}: {
   imports = [
     ./backup-files.nix
     ./buffer-search.nix
@@ -18,6 +15,7 @@ in {
     ./copy-paste.nix
     ./debug-adapter-protocol.nix
     ./diagnostic-signs.nix
+    ./editing.nix
     ./file-tabs.nix
     ./file-tree-sidebar.nix
     ./folds.nix
@@ -45,17 +43,6 @@ in {
   ];
 
   programs.nixvim.enable = true;
-
-  programs.nixvim.plugins = {
-    # - UI
-    # - Utils
-    autoclose.enable = true;
-    endwise.enable = true;
-    # TODO: https://github.com/nix-community/nixvim/blob/main/plugins/utils/nix-develop.nix
-    # nix-develop = {
-    #   enable = true;
-    # };
-  };
 
   programs.nixvim.globals = {
     # Disable NetRW

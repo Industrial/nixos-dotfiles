@@ -1,14 +1,13 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    # luajit
-    # luajitPackages.plenary-nvim
+    # Lua Library, dependency
     vimPlugins.plenary-nvim
+
+    # Lua formatter
+    stylua
 
     # nodePackages.cssmodules-language-server
     # nodePackages.dot-language-server
-
-    # Nix formatter.
-    alejandra
 
     # Fix common misspellings in source code.
     codespell
@@ -34,18 +33,34 @@
     # Rust based formatter
     dprint
 
+    # GraphQL Language Server
     nodePackages.graphql-language-service-cli
+
+    # TypeScript
     nodePackages.typescript
+
+    # TypeScript Language Server
     nodePackages.typescript-language-server
+
+    # Vim Language Server
     nodePackages.vim-language-server
+
+    # VSCode standard language servers
     nodePackages.vscode-langservers-extracted
+
+    # Python tooling
     python311Packages.autopep8
     python311Packages.black
     python311Packages.flake8
     python311Packages.isort
+
+    # Bash Linter
     shellcheck
+
+    # Nix static analyzer
     statix
-    stylua
+    # Nix formatter.
+    alejandra
   ];
 
   # - Languages
@@ -53,8 +68,11 @@
   programs.nixvim.plugins.lint.enable = true;
 
   programs.nixvim.plugins.nix.enable = true;
-  programs.nixvim.plugins.treesitter.enable = true;
-  programs.nixvim.plugins.treesitter.indent = true;
+  programs.nixvim.plugins.treesitter = {
+    enable = true;
+    indent = true;
+  };
+
   programs.nixvim.plugins.hmts.enable = true;
   programs.nixvim.plugins.rainbow-delimiters.enable = true;
   programs.nixvim.plugins.treesitter-context.enable = true;
@@ -65,8 +83,11 @@
 
   # TODO: Document all these.
   programs.nixvim.extraPlugins = with pkgs.vimPlugins; [
-    lspkind-nvim
+    # Official NVIM Language support.
     nvim-lspconfig
+
+    # Add pictograms to completion items.
+    lspkind-nvim
   ];
   programs.nixvim.plugins.none-ls.enable = true;
   programs.nixvim.plugins.cmp.enable = true;
@@ -504,7 +525,7 @@
       flags = flags
     })
 
-    -- VimLS
+    -- Vim Language Server
     lspconfig.vimls.setup({
       capabilities = capabilities,
       flags = flags,
@@ -612,6 +633,7 @@
 
     --vim.keymap.set("n", "<C-O>", vim.lsp.buf.code_action, { })
     --local none_ls = require("null-ls")
+
     --local augroup = vim.api.nvim_create_augroup("LspFormatting", { })
     --none_ls.setup({
     --  debug = true,
@@ -678,7 +700,5 @@
       vim.b.copilot_suggestion_hidden = false
     end)
     copilotCMP.setup()
-
-
   '';
 }
