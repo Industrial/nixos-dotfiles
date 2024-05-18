@@ -1,9 +1,9 @@
 {
-  "[haskell]": {
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
-  },
+  // "[haskell]": {
+  //   "editor.formatOnPaste": true,
+  //   "editor.formatOnSave": true,
+  //   "editor.formatOnType": false
+  // },
   "[javascript]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint",
     "editor.formatOnPaste": true,
@@ -28,19 +28,19 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": false
   },
-  "[purescript]": {
-    "editor.defaultFormatter": "nwolverson.ide-purescript"
-  },
-  "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter",
-    "editor.detectIndentation": false,
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false,
-    "editor.guides.indentation": true,
-    "editor.insertSpaces": true,
-    "editor.tabSize": 4
-  },
+  // "[purescript]": {
+  //   "editor.defaultFormatter": "nwolverson.ide-purescript"
+  // },
+  // "[python]": {
+  //   "editor.defaultFormatter": "ms-python.black-formatter",
+  //   "editor.detectIndentation": false,
+  //   "editor.formatOnPaste": true,
+  //   "editor.formatOnSave": true,
+  //   "editor.formatOnType": false,
+  //   "editor.guides.indentation": true,
+  //   "editor.insertSpaces": true,
+  //   "editor.tabSize": 4
+  // },
   "[typescript]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint",
     "editor.formatOnPaste": true,
@@ -175,11 +175,11 @@
   "git.autofetch": true,
   "git.confirmSync": false,
   "git.enableSmartCommit": true,
-  "haskell.hlint.executablePath": "hlint",
+  // "haskell.hlint.executablePath": "hlint",
   "http.proxyStrictSSL": false,
   "javascript.updateImportsOnFileMove.enabled": "always",
-  "jupyter.askForKernelRestart": false,
-  "jupyter.notebookFileRoot": "${workspaceRoot}",
+  // "jupyter.askForKernelRestart": false,
+  // "jupyter.notebookFileRoot": "${workspaceRoot}",
   "markdown.preview.fontFamily": "default",
   "markdown.preview.fontSize": 12,
   "nix.enableLanguageServer": true,
@@ -188,44 +188,44 @@
   "notebook.markup.fontSize": 12,
   "notebook.output.fontFamily": "default",
   "notebook.output.fontSize": 12,
-  "purescript.addSpagoSources": true,
-  "purescript.buildCommand": "spago build --purs-args --json-errors",
-  "purescript.buildOpenedFiles": true,
-  "purescript.formatter": "purs-tidy",
-  "purescript.outputDirectory": "output",
-  "python.analysis.autoFormatStrings": true,
-  "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticMode": "workspace",
-  "python.analysis.exclude": [
-    "**/.git",
-    "**/.ipynb_checkpoints",
-    "**/.mypy_cache",
-    "**/.pytest_cache",
-    "**/.venv",
-    "**/.vscode",
-    "**/__pycache__",
-    "**/build",
-    "**/data",
-    "**/dist",
-    "**/jupyter_execute",
-    "**/node_modules",
-    "**/venv"
-  ],
-  "python.analysis.fixAll": [
-    "source.unusedImports",
-    "source.convertImportFormat"
-  ],
-  "python.analysis.importFormat": "absolute",
-  "python.analysis.include": [
-    "src/**/*"
-  ],
-  "python.analysis.inlayHints.callArgumentNames": "off",
-  "python.analysis.inlayHints.functionReturnTypes": true,
-  "python.analysis.inlayHints.variableTypes": true,
-  "python.analysis.reportMissingTypeStubs": false,
-  "python.analysis.typeCheckingMode": "standard",
-  "python.experiments.enabled": false,
-  "python.languageServer": "Pylance",
+  // "purescript.addSpagoSources": true,
+  // "purescript.buildCommand": "spago build --purs-args --json-errors",
+  // "purescript.buildOpenedFiles": true,
+  // "purescript.formatter": "purs-tidy",
+  // "purescript.outputDirectory": "output",
+  // "python.analysis.autoFormatStrings": true,
+  // "python.analysis.autoImportCompletions": true,
+  // "python.analysis.diagnosticMode": "workspace",
+  // "python.analysis.exclude": [
+  //   "**/.git",
+  //   "**/.ipynb_checkpoints",
+  //   "**/.mypy_cache",
+  //   "**/.pytest_cache",
+  //   "**/.venv",
+  //   "**/.vscode",
+  //   "**/__pycache__",
+  //   "**/build",
+  //   "**/data",
+  //   "**/dist",
+  //   "**/jupyter_execute",
+  //   "**/node_modules",
+  //   "**/venv"
+  // ],
+  // "python.analysis.fixAll": [
+  //   "source.unusedImports",
+  //   "source.convertImportFormat"
+  // ],
+  // "python.analysis.importFormat": "absolute",
+  // "python.analysis.include": [
+  //   "src/**/*"
+  // ],
+  // "python.analysis.inlayHints.callArgumentNames": "off",
+  // "python.analysis.inlayHints.functionReturnTypes": true,
+  // "python.analysis.inlayHints.variableTypes": true,
+  // "python.analysis.reportMissingTypeStubs": false,
+  // "python.analysis.typeCheckingMode": "standard",
+  // "python.experiments.enabled": false,
+  // "python.languageServer": "Pylance",
   "references.preferredLocation": "view",
   "scm.inputFontFamily": "default",
   "scm.inputFontSize": 12,
@@ -248,20 +248,20 @@
   "update.mode": "none",
   "vim.foldfix": true,
   "vim.hlsearch": true,
-  "vitest.commandLine": "pnpm vitest",
-  "vitest.enable": true,
-  "vitest.exclude": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/cypress/**",
-    "**/.{idea,git,cache,output,temp}/**"
-  ],
-  "vitest.include": [
-    "**/*.ts"
-  ],
-  "vitest.nodeEnv": null,
-  "vitest.showFailMessages": true,
-  "window.autoDetectColorScheme": true,
+  // "vitest.commandLine": "pnpm vitest",
+  // "vitest.enable": true,
+  // "vitest.exclude": [
+  //   "**/node_modules/**",
+  //   "**/dist/**",
+  //   "**/cypress/**",
+  //   "**/.{idea,git,cache,output,temp}/**"
+  // ],
+  // "vitest.include": [
+  //   "**/*.ts"
+  // ],
+  // "vitest.nodeEnv": null,
+  // "vitest.showFailMessages": true,
+  "window.autoDetectColorScheme": false,
   "window.zoomLevel": 2,
   "workbench.colorTheme": "base16-equilibrium-gray-dark",
   "workbench.editor.enablePreview": false,

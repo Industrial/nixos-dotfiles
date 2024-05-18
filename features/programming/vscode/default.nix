@@ -69,42 +69,10 @@
       # # extensions.vscode-marketplace.mark-wiemer.vscode-autohotkey-plus-plus
       # extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
 
-      # ## Python
-      # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
-      # extensions.vscode-marketplace.ms-python.black-formatter
-      # extensions.vscode-marketplace.ms-python.debugpy
-      # extensions.vscode-marketplace.ms-python.flake8
-      # extensions.vscode-marketplace.ms-python.isort
-      # extensions.vscode-marketplace.ms-python.python
-      # extensions.vscode-marketplace.ms-python.vscode-pylance
-      # extensions.vscode-marketplace.tamasfe.even-better-toml
-      # ## Jupyter
-      # extensions.vscode-marketplace.ms-toolsai.jupyter
-      # extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
-      ## Nix
-      extensions.vscode-marketplace.bbenoist.nix
-      extensions.vscode-marketplace.jnoortheen.nix-ide
-      extensions.vscode-marketplace.kamadorueda.alejandra
-      ## YAML
-      extensions.vscode-marketplace.redhat.vscode-yaml
-      # ## Docker
-      # extensions.vscode-marketplace.ms-azuretools.vscode-docker
-      ## Dotenv
-      extensions.vscode-marketplace.mikestead.dotenv
-      ## Git
-      extensions.vscode-marketplace.mhutchie.git-graph
-      extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
-      # ## PlantUML
-      # extensions.vscode-marketplace.jebbs.plantuml
-      # ## AutoHotkey
-      # # extensions.vscode-marketplace.mark-wiemer.vscode-autohotkey-plus-plus
-      # extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
-
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
       extensions.vscode-marketplace.ms-playwright.playwright
       extensions.vscode-marketplace.ms-vscode.test-adapter-converter
-      # extensions.vscode-marketplace.vitest.explorer
 
       # # Remote / SSH
       # extensions.vscode-marketplace.ms-vscode-remote.remote-ssh
