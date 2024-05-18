@@ -109,6 +109,7 @@
     ../../../features/programming/android-tools
     ../../../features/programming/bun
     ../../../features/programming/docker-compose
+    ../../../features/programming/edgedb
     ../../../features/programming/git
     ../../../features/programming/gitkraken
     ../../../features/programming/glogg
