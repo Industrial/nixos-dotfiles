@@ -1,2 +1,7 @@
 #!/usr/bin/env bash
+set -e
+
+echo "features > programming > vscode > clear-cache"
+
 rm -rf "${HOME}/.vscode*"
+
