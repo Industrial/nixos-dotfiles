@@ -36,6 +36,7 @@
         extensions.vscode-marketplace.denoland.vscode-deno
         extensions.vscode-marketplace.ms-vscode.js-debug
         extensions.vscode-marketplace.ms-vscode.js-debug-companion
+        extensions.vscode-marketplace.oven.bun-vscode
         # ## Python
         # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
         # extensions.vscode-marketplace.ms-python.black-formatter
@@ -90,11 +91,11 @@
       ];
   };
 in {
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = [
     vscodeWithExtensions
 
     # Nix
-    alejandra
+    pkgs.alejandra
     # nixd
   ];
 
