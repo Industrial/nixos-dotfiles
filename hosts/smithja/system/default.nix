@@ -20,7 +20,7 @@
     ../../../features/cli/gh
     ../../../features/cli/killall
     ../../../features/cli/jira-cli
-    ../../../features/cli/lazygit
+    # ../../../features/cli/lazygit
     ../../../features/cli/neofetch
     ../../../features/cli/p7zip
     ../../../features/cli/ranger
@@ -56,14 +56,15 @@
     # TODO: Not available on darwin
     # ../../../features/programming/local-ai
     ../../../features/programming/meld
-    ../../../features/programming/neovim
     ../../../features/programming/nixd
     ../../../features/programming/nodejs
     # TODO: Not available on darwin
     # ../../../features/programming/ollama
     ../../../features/programming/sqlite
     ../../../features/programming/vscode
-    inputs.nixvim.nixDarwinModules.nixvim
+    # TODO: Throwing an error at the moment.
+    # ../../../features/programming/neovim
+    # inputs.nixvim.nixDarwinModules.nixvim
 
     # Security
     # ../../../features/security/bitwarden
