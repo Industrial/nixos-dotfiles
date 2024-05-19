@@ -32,6 +32,9 @@ in {
     set -x XDG_CONFIG_HOME "$HOME/.config"
     set -x XDG_DATA_HOME "$HOME/.local/share"
     set -x XDG_STATE_HOME "$HOME/.local/state"
+    # TODO: Someone on Discord told me this is a bad idea and I should patch
+    #       specific software instead (Continue VSCode Plugin).
+    set -x LD_LIBRARY_PATH "${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
 
     # PATH
     fish_add_path $HOME/.bin
