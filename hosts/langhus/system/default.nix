@@ -6,7 +6,7 @@
 }: {
   imports = [
     ./graphics
-    ./hardware-configuration.nix
+    #./hardware-configuration.nix
     inputs.microvm.nixosModules.host
 
     # CLI
