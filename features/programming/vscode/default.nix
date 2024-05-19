@@ -9,8 +9,6 @@
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscodeExtensions = [
       # Themes
-      extensions.vscode-marketplace.zhuangtongfa.material-theme
-      extensions.vscode-marketplace.pkief.material-icon-theme
       extensions.vscode-marketplace.tintedtheming.base16-tinted-themes
 
       # Vim
