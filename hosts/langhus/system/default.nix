@@ -116,13 +116,11 @@
     ../../../features/programming/insomnia
     ../../../features/programming/local-ai
     ../../../features/programming/meld
-    ../../../features/programming/neovim
     ../../../features/programming/nixd
     ../../../features/programming/nodejs
     ../../../features/programming/ollama
     ../../../features/programming/sqlite
     ../../../features/programming/vscode
-    inputs.nixvim.nixosModules.nixvim
 
     # Security
     ../../../features/security/bitwarden

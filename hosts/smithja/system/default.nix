@@ -105,14 +105,12 @@
     # TODO: Not available on darwin
     # ../../../features/programming/local-ai
     ../../../features/programming/meld
-    ../../../features/programming/neovim
     ../../../features/programming/nixd
     ../../../features/programming/nodejs
     # TODO: Not available on darwin
     # ../../../features/programming/ollama
     ../../../features/programming/sqlite
     ../../../features/programming/vscode
-    inputs.nixvim.nixDarwinModules.nixvim
 
     # Security
     # ../../../features/security/bitwarden
