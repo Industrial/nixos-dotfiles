@@ -20,6 +20,7 @@
     ../../../features/cli/fzf
     ../../../features/cli/gh
     ../../../features/cli/killall
+    ../../../features/cli/jira-cli
     ../../../features/cli/lazygit
     ../../../features/cli/neofetch
     ../../../features/cli/p7zip
@@ -106,6 +107,7 @@
     # Programming
     ../../../features/programming/android-tools
     ../../../features/programming/bun
+    ../../../features/programming/deno
     ../../../features/programming/docker-compose
     ../../../features/programming/edgedb
     ../../../features/programming/git
@@ -123,10 +125,10 @@
     inputs.nixvim.nixosModules.nixvim
 
     # Security
+    ../../../features/security/bitwarden
     # ../../../features/security/vaultwarden
     ../../../features/security/veracrypt
     ../../../features/security/yubikey-manager
-    ../../../features/security/bitwarden
 
     # Window Manager
     # ../../../features/window-manager/dwm
