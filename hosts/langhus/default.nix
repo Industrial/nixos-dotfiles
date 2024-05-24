@@ -23,6 +23,6 @@ in
         inherit settings;
       };
     modules = [
-      ./system
+      ./system.nix
     ];
   }

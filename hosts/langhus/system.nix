@@ -4,7 +4,7 @@
   ...
 }: {
   imports = [
-    ./graphics
+    ./graphics.nix
     inputs.microvm.nixosModules.host
 
     # CLI
