@@ -1,12 +1,10 @@
 {
   settings,
   inputs,
-  pkgs,
   ...
 }: {
   imports = [
     ./graphics
-    #./hardware-configuration.nix
     inputs.microvm.nixosModules.host
 
     # CLI

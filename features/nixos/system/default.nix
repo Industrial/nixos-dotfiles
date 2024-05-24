@@ -12,11 +12,11 @@
     fsType = "ext4";
   };
 
-  fileSystems."/data" = {
-    device = "/dev/disk/by-uuid/8e4e7085-e78b-439b-be0e-2c2423b47062";
-    fsType = "ext4";
-    options = ["gid=data"];
-  };
+  #fileSystems."/data" = {
+  #  device = "/dev/disk/by-uuid/8e4e7085-e78b-439b-be0e-2c2423b47062";
+  #  fsType = "ext4";
+  #  options = ["gid=data"];
+  #};
 
   boot.initrd.luks.devices."luks-84a867b7-d458-474b-9af8-71c23a3dfb95".device = "/dev/disk/by-uuid/84a867b7-d458-474b-9af8-71c23a3dfb95";
 

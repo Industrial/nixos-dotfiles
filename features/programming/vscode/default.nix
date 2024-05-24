@@ -19,8 +19,8 @@
       extensions.vscode-marketplace.vspacecode.whichkey
 
       # Completion
-      # extensions.vscode-marketplace.github.copilot
-      # extensions.vscode-marketplace-release.github.copilot-chat
+      extensions.vscode-marketplace.github.copilot
+      extensions.vscode-marketplace-release.github.copilot-chat
       extensions.vscode-marketplace.continue.continue
 
       # File Types
