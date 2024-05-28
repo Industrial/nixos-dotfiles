@@ -15,9 +15,6 @@
     # flake-root.url = "github:srid/flake-root";
     # flake-root.inputs.nixpkgs.follows = "nixpkgs";
 
-    # # Flake Utils
-    # flake-utils.url = "github:numtide/flake-utils";
-
     # NixTest
     nixtest.url = "github:jetpack-io/nixtest";
 
@@ -49,8 +46,25 @@
     cryptpad.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
+  outputs = inputs @ {
+    self,
+    flake-parts,
+    nixpkgs,
+    ...
+  }: let 
+    darwin-builder = nixpkgs.lib.nixosSystem {
+      system = "aarch64-linux";
+      modules = [
+        "${nixpkgs}/nixos/modules/profiles/macos-builder.nix"
+        {
+          virtualisation = {
+            host.pkgs = nixpkgs.legacyPackages."aarch64-linux";
+            darwin-builder.workingDirectory = "/var/lib/darwin-builder";
+          };
+        }
+      ];
+    };
+  in inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       systems = [
         "aarch64-darwin"
         "aarch64-linux"
@@ -63,6 +77,55 @@
         # inputs.mission-control.flakeModule
         # inputs.flake-root.flakeModule
       ];
+
+      flake = {
+        nixosModules.base = {pkgs, ...}: {
+          system.stateVersion = "23.11";
+
+          # Configure networking
+          networking.useDHCP = false;
+          networking.interfaces.eth0.useDHCP = true;
+
+          # Create user "test"
+          services.getty.autologinUser = "test";
+          users.users.test.isNormalUser = true;
+
+          # Enable passwordless ‘sudo’ for the "test" user
+          users.users.test.extraGroups = ["wheel"];
+          security.sudo.wheelNeedsPassword = false;
+        };
+        nixosModules.vm = {...}: {
+          virtualisation.vmVariant.virtualisation.graphics = false;
+        };
+        nixosConfigurations.darwinVM = nixpkgs.lib.nixosSystem {
+          system = "aarch64-linux";
+          modules = [
+            self.nixosModules.base
+            self.nixosModules.vm
+            {
+              virtualisation.vmVariant.virtualisation.host.pkgs = nixpkgs.legacyPackages.aarch64-darwin;
+            }
+          ];
+        };
+        packages.aarch64-darwin.darwinVM = self.nixosConfigurations.darwinVM.config.system.build.vm;
+
+        nix.distributedBuilds = true;
+        nix.buildMachines = [{
+          hostName = "ssh://builder@localhost";
+          system = "aarch64-linux";
+          maxJobs = 4;
+          supportedFeatures = [ "kvm" "benchmark" "big-parallel" ];
+        }];
+        launchd.daemons.darwin-builder = {
+          command = "${darwin-builder.config.system.build.macos-builder-installer}/bin/create-builder";
+          serviceConfig = {
+            KeepAlive = true;
+            RunAtLoad = true;
+            StandardOutPath = "/var/log/darwin-builder.log";
+            StandardErrorPath = "/var/log/darwin-builder.log";
+          };
+        };
+      };
 
       perSystem = {
         system,
@@ -77,113 +140,28 @@
           };
         };
       };
-
-      # perSystem = {
-      #   config,
-      #   inputs',
-      #   lib,
-      #   pkgs,
-      #   self',
-      #   self,
-      #   system,
-      #   ...
-      # }: {
-      #   _module.args.pkgs = import self.inputs.nixpkgs {
-      #     inherit system;
-      #     overlays = [self.overlays.default];
-      #     config = {
-      #       allowUnfree = true;
-      #       allowBroken = false;
-      #     };
-      #   };
-      # };
     };
 
-  # outputs = inputs @ {
-  #   self,
-  #   nixpkgs,
-  #   flake-parts,
-  #   ...
-  # }: let
-  #   flake-checks = import ./checks;
-  #   systemConfig = import ./lib/systemConfig.nix;
-  #   langhusSettings = import ./hosts/langhus/settings.nix;
-  #   smithjaSettings = import ./hosts/smithja/settings.nix;
-
-  #   files = [
-  #     ./flake.nix
-  #   ];
-  # in
-  # flake-parts.lib.mkFlake {inherit inputs;} {
-  #   systems = [
-  #     "x86_64-linux"
-  #     # "aarch64-darwin"
-  #   ];
-
-  #   imports = [
-  #     ./hosts
-  #     # inputs.mission-control.flakeModule
-  #     # inputs.flake-root.flakeModule
-  #   ];
-
-  #   # flake = {
-  #   #   darwinConfigurations = {
-  #   #     ${smithjaSettings.hostname} = (systemConfig inputs pkgs ./hosts/langhus/system ./hosts/langhus/settings.nix).systemConfiguration;
-  #   #   };
-  #   # };
-
-  #   # devShells.default = pkgs.mkShell {
-  #   #   nativeBuildInputs = with pkgs; [
-  #   #     pkgs.nixpkgs-fmt
-  #   #     pkgs.shellcheck
-  #   #     pkgs.alejandra
-  #   #   ];
-  #   #   inputsFrom = [
-  #   #     config.mission-control.devShell
-  #   #     config.flake-root.devShell
-  #   #   ];
-  #   # };
-
-  #   # mission-control = {
-  #   #   wrapperName = "run";
-  #   #   scripts = {
-  #   #     build = {
-  #   #       description = "Nix file formatter";
-  #   #       exec = ''
-  #   #         alejandra -c -e $FLAKE_ROOT/host/langhus/system/hardware-configuration.nix .
-  #   #       '';
-  #   #       category = "Lint";
-  #   #     };
-  #   #   };
-  #   # };
-
-  #   # checks = {
-  #   #   pre-commit-check = inputs.pre-commit-hooks.lib.x86_64-linux.run {
-  #   #     src = ./.;
-  #   #     hooks = {
-  #   #       nixpkgs-fmt.enable = true;
-  #   #     };
-  #   #   };
-  #   #   x86_64-linux = {
-  #   #     shfmt-bin = with import nixpkgs {system = "x86_64-linux";};
-  #   #       pkgs.runCommand "shfmt-bin" {
-  #   #         nativeBuildInputs = [shfmt];
-  #   #       } "shfmt -d -s -i 2 -ci ${./bin}";
-  #   #     shellcheck-bin = with import nixpkgs {system = "x86_64-linux";};
-  #   #       pkgs.runCommand "shellcheck-bin" {
-  #   #         nativeBuildInputs = [shellcheck];
-  #   #       } "shellcheck -x ${./bin}/*";
-  #   #     alejandra-nix = with import nixpkgs {system = "x86_64-linux";};
-  #   #       pkgs.runCommand "alejandra-nix" {
-  #   #         nativeBuildInputs = [alejandra];
-  #   #       } "alejandra -c -e ./hosts/langhus/system/hardware-configuration.nix ${./.}";
-  #   #   };
-  #   # };
-
-  #   # githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
-  #   #   inherit (self) checks;
-  #   # };
-
-  #   # tests = inputs.nixtest.run ./.;
+  # checks = {
+  #   pre-commit-check = inputs.pre-commit-hooks.lib.x86_64-linux.run {
+  #     src = ./.;
+  #     hooks = {
+  #       nixpkgs-fmt.enable = true;
+  #     };
+  #   };
+  #   x86_64-linux = {
+  #     shfmt-bin = with import nixpkgs {system = "x86_64-linux";};
+  #       pkgs.runCommand "shfmt-bin" {
+  #         nativeBuildInputs = [shfmt];
+  #       } "shfmt -d -s -i 2 -ci ${./bin}";
+  #     shellcheck-bin = with import nixpkgs {system = "x86_64-linux";};
+  #       pkgs.runCommand "shellcheck-bin" {
+  #         nativeBuildInputs = [shellcheck];
+  #       } "shellcheck -x ${./bin}/*";
+  #     alejandra-nix = with import nixpkgs {system = "x86_64-linux";};
+  #       pkgs.runCommand "alejandra-nix" {
+  #         nativeBuildInputs = [alejandra];
+  #       } "alejandra -c -e ./hosts/langhus/system/hardware-configuration.nix ${./.}";
+  #   };
   # };
 }

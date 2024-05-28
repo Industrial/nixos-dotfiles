@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{...}: {
   users.users.root.password = "";
   microvm = {
     volumes = [
