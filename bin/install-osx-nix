@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+exec > >(tee ./logs/install-osx-nix) 2>&1
 
 echo "bin/install-osx-nix"
 sh <(curl -L https://nixos.org/nix/install)

@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-set -e
-
-echo "bin/update-neovim > compiling neovim config"
-cd features/home/cli/neovim
-bin/compile
-cd ../../../..

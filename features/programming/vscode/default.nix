@@ -1,11 +1,9 @@
 {
-  settings,
   inputs,
   pkgs,
   ...
 }: let
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
-
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscodeExtensions = [
       # Themes
@@ -21,7 +19,7 @@
       # Completion
       extensions.vscode-marketplace.github.copilot
       extensions.vscode-marketplace-release.github.copilot-chat
-      extensions.vscode-marketplace.continue.continue
+      # extensions.vscode-marketplace.continue.continue
 
       # File Types
       ## GraphQL
@@ -86,21 +84,6 @@ in {
 
     # Nix
     pkgs.alejandra
-    # nixd
+    pkgs.nixd
   ];
-
-  system.activationScripts.linkFile = {
-    text = ''
-      mkdir -p /home/${settings.username}/.config/Code/User
-      ln -sf ${pkgs.writeTextFile {
-        name = "keybindings.json";
-        text = builtins.readFile ./.config/Code/User/keybindings.json;
-      }} /home/${settings.username}/.config/Code/User/keybindings.json
-
-      ln -sf ${pkgs.writeTextFile {
-        name = "settings.json";
-        text = builtins.readFile ./.config/Code/User/settings.json;
-      }} /home/${settings.username}/.config/Code/User/settings.json
-    '';
-  };
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+exec > >(tee ./logs/restart-vm) 2>&1
 
 source lib/lowercase.bash
 

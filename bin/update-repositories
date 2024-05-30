@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+exec > >(tee ./logs/update-repositories) 2>&1
 
 bin/update-nix-env
 bin/update-flake

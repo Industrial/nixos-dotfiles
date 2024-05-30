@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -e
+exec > >(tee ./logs/update-login-shell) 2>&1
 
 source lib/lowercase.bash
 

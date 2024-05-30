@@ -1,9 +1,4 @@
-{
-  settings,
-  inputs,
-  pkgs,
-  ...
-}: {
+{...}: {
   imports = [
     #inputs.microvm.nixosModules.host
 
@@ -17,11 +12,12 @@
     ../../features/cli/e2fsprogs
     ../../features/cli/eza
     ../../features/cli/fd
+    ../../features/cli/fh
     ../../features/cli/fish
     ../../features/cli/fzf
     ../../features/cli/gh
-    ../../features/cli/killall
     ../../features/cli/jira-cli
+    ../../features/cli/killall
     # ../../features/cli/lazygit
     ../../features/cli/neofetch
     ../../features/cli/p7zip

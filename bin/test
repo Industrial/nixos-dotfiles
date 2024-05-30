@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
+set -e
+exec > >(tee ./logs/test) 2>&1
 
 nix eval --raw .#tests --allow-dirty --impure

@@ -1,7 +1,7 @@
 {
   inputs = {
     # Nixpkgs
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1.*.tar.gz";
 
     # Nix Darwin
     nix-darwin.url = "github:lnl7/nix-darwin";
@@ -9,6 +9,9 @@
 
     # Flake Parts
     flake-parts.url = "github:hercules-ci/flake-parts";
+
+    # Flake Schemas
+    flake-schemas.url = "https://flakehub.com/f/DeterminateSystems/flake-schemas/*.tar.gz";
 
     # mission-control.url = "github:Platonic-Systems/mission-control";
     # mission-control.inputs.nixpkgs.follows = "nixpkgs";
@@ -30,7 +33,7 @@
     microvm.inputs.nixpkgs.follows = "nixpkgs";
 
     # NixVim
-    nixvim.url = "github:nix-community/nixvim";
+    nixvim.url = "https://flakehub.com/f/nix-community/nixvim/0.1.*.tar.gz";
     nixvim.inputs.nixpkgs.follows = "nixpkgs";
 
     # Nix VSCode Extensions
@@ -38,17 +41,18 @@
     nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
 
     # Stylix
-    stylix.url = "github:danth/stylix";
+    stylix.url = "https://flakehub.com/f/danth/stylix/0.1.*.tar.gz";
     stylix.inputs.nixpkgs.follows = "nixpkgs";
 
     # Cryptpad
-    cryptpad.url = "github:michaelshmitty/cryptpad-flake";
+    cryptpad.url = "https://flakehub.com/f/michaelshmitty/cryptpad/2.2.0.tar.gz";
     cryptpad.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = inputs @ {
     self,
     flake-parts,
+    flake-schemas,
     nixpkgs,
     ...
   }: let 
@@ -64,7 +68,7 @@
         }
       ];
     };
-  in inputs.flake-parts.lib.mkFlake {inherit inputs;} {
+  in flake-parts.lib.mkFlake {inherit inputs;} {
       systems = [
         "aarch64-darwin"
         "aarch64-linux"
@@ -79,6 +83,13 @@
       ];
 
       flake = {
+        # TODO: Check how to write schemas for outputs. This might be more of a
+        # reusable library thing.
+        # TODO: Write checks for my flake.
+        # TODO: Re-integrate unit tests.
+        # TODO: Look for a proper testing framework.
+        schemas = flake-schemas.schemas;
+
         nixosModules.base = {pkgs, ...}: {
           system.stateVersion = "23.11";
 
@@ -94,9 +105,11 @@
           users.users.test.extraGroups = ["wheel"];
           security.sudo.wheelNeedsPassword = false;
         };
+
         nixosModules.vm = {...}: {
           virtualisation.vmVariant.virtualisation.graphics = false;
         };
+
         nixosConfigurations.darwinVM = nixpkgs.lib.nixosSystem {
           system = "aarch64-linux";
           modules = [
@@ -105,26 +118,38 @@
             {
               virtualisation.vmVariant.virtualisation.host.pkgs = nixpkgs.legacyPackages.aarch64-darwin;
             }
+            # (import (nixpkgs.path + "/nixos/modules/profiles/macos-builder.nix"))
           ];
         };
         packages.aarch64-darwin.darwinVM = self.nixosConfigurations.darwinVM.config.system.build.vm;
 
-        nix.distributedBuilds = true;
-        nix.buildMachines = [{
-          hostName = "ssh://builder@localhost";
-          system = "aarch64-linux";
-          maxJobs = 4;
-          supportedFeatures = [ "kvm" "benchmark" "big-parallel" ];
-        }];
-        launchd.daemons.darwin-builder = {
-          command = "${darwin-builder.config.system.build.macos-builder-installer}/bin/create-builder";
-          serviceConfig = {
-            KeepAlive = true;
-            RunAtLoad = true;
-            StandardOutPath = "/var/log/darwin-builder.log";
-            StandardErrorPath = "/var/log/darwin-builder.log";
+        nix = {
+          linux-builder = {
+            enable = true;
+            # ephemeral = true;
+            # maxJobs = 4;
           };
+          trusted-users = [ "@admin" ];
         };
+
+        # nix.distributedBuilds = true;
+        # nix.buildMachines = [{
+        #   hostName = "ssh://builder@localhost";
+        #   system = "aarch64-linux";
+        #   maxJobs = 4;
+        #   supportedFeatures = [ "kvm" "benchmark" "big-parallel" ];
+        # }];
+        # launchd.agents = {
+        #   darwin-builder = {
+        #     command = "${darwin-builder.config.system.build.macos-builder-installer}/bin/create-builder";
+        #     serviceConfig = {
+        #       KeepAlive = true;
+        #       RunAtLoad = true;
+        #       StandardOutPath = "/var/log/darwin-builder.log";
+        #       StandardErrorPath = "/var/log/darwin-builder.log";
+        #     };
+        #   };
+        # };
       };
 
       perSystem = {
