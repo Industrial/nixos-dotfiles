@@ -1,6 +1,10 @@
-{...}: {
-  users.users.root.password = "";
+{
+  settings,
+  ...
+}: {
   microvm = {
+    socket = "control.socket";
+    hypervisor = "qemu";
     volumes = [
       {
         mountPoint = "/var";
@@ -19,7 +23,5 @@
         mountPoint = "/nix/.ro-store";
       }
     ];
-    hypervisor = "qemu";
-    socket = "control.socket";
   };
 }

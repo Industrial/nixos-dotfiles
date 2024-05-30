@@ -10,19 +10,11 @@
     # Flake Parts
     flake-parts.url = "github:hercules-ci/flake-parts";
 
-    # Flake Schemas
-    flake-schemas.url = "https://flakehub.com/f/DeterminateSystems/flake-schemas/*.tar.gz";
+    # # NixTest
+    # nixtest.url = "github:jetpack-io/nixtest";
 
-    # mission-control.url = "github:Platonic-Systems/mission-control";
-    # mission-control.inputs.nixpkgs.follows = "nixpkgs";
-    # flake-root.url = "github:srid/flake-root";
-    # flake-root.inputs.nixpkgs.follows = "nixpkgs";
-
-    # NixTest
-    nixtest.url = "github:jetpack-io/nixtest";
-
-    # Nix PreCommit Hooks
-    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+    # # Nix PreCommit Hooks
+    # pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
 
     # Nix Github Actions
     nix-github-actions.url = "github:nix-community/nix-github-actions";
@@ -52,7 +44,6 @@
   outputs = inputs @ {
     self,
     flake-parts,
-    flake-schemas,
     nixpkgs,
     ...
   }: let 
@@ -78,18 +69,9 @@
 
       imports = [
         ./hosts
-        # inputs.mission-control.flakeModule
-        # inputs.flake-root.flakeModule
       ];
 
       flake = {
-        # TODO: Check how to write schemas for outputs. This might be more of a
-        # reusable library thing.
-        # TODO: Write checks for my flake.
-        # TODO: Re-integrate unit tests.
-        # TODO: Look for a proper testing framework.
-        schemas = flake-schemas.schemas;
-
         nixosModules.base = {pkgs, ...}: {
           system.stateVersion = "23.11";
 
@@ -126,8 +108,8 @@
         nix = {
           linux-builder = {
             enable = true;
-            # ephemeral = true;
-            # maxJobs = 4;
+            ephemeral = true;
+            maxJobs = 4;
           };
           trusted-users = [ "@admin" ];
         };

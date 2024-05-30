@@ -165,7 +165,10 @@
   "git.autofetch": true,
   "git.confirmSync": false,
   "git.enableSmartCommit": true,
-  "github.copilot.editor.enableAutoCompletions": true,
+  "github.copilot.editor.enableAutoCompletions": false,
+  "github.copilot.enable": {
+    "*": false
+  },
   // "haskell.hlint.executablePath": "hlint",
   "http.proxyStrictSSL": false,
   "javascript.updateImportsOnFileMove.enabled": "always",
@@ -253,4 +256,5 @@
   "workbench.enableExperiments": true,
   "workbench.list.openMode": "doubleClick",
   "workbench.startupEditor": "none",
+  "supermaven.otherWarning": false,
 }

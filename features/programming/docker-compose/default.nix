@@ -1,6 +1,5 @@
 # Docker Compose.
 {
-  settings,
   pkgs,
   ...
 }: {

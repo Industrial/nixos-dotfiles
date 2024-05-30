@@ -62,7 +62,8 @@
     # Nix
     ../../features/nix
     ../../features/nix/nixpkgs
-    ../../features/nix/nix-unit
+    # TODO: Not available on darwin
+    # ../../features/nix/nix-unit
     ../../features/nix/shell
 
     # # NixOS

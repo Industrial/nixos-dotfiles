@@ -15,11 +15,12 @@
       # Visual Feedback
       extensions.vscode-marketplace.usernamehw.errorlens
       extensions.vscode-marketplace.vspacecode.whichkey
+      extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
       # Completion
-      extensions.vscode-marketplace.github.copilot
       extensions.vscode-marketplace-release.github.copilot-chat
-      # extensions.vscode-marketplace.continue.continue
+      # extensions.vscode-marketplace.github.copilot
+      extensions.vscode-marketplace.supermaven.supermaven
 
       # File Types
       ## GraphQL
