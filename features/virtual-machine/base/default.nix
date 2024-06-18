@@ -17,22 +17,11 @@
     };
   };
 
-  users = {
-    users = {
-      test = {
-        extraGroups = ["wheel"];
-        isNormalUser = true;
-      };
-    };
-  };
-
-  #virtualisation = {
-  #  vmVariant = {
-  #    virtualisation = {
-  #      graphics = false;
-  #      host = {
-  #        pkgs = pkgs;
-  #      };
+  #users = {
+  #  users = {
+  #    test = {
+  #      extraGroups = ["wheel"];
+  #      isNormalUser = true;
   #    };
   #  };
   #};
@@ -44,6 +33,6 @@
   };
 
   services.getty = {
-    autologinUser = "test";
+    autologinUser = settings.username;
   };
 }

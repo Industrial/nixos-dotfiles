@@ -3,7 +3,16 @@
   pkgs,
   ...
 }: {
-  services.openssh.enable = true;
-  services.openssh.settings.PermitRootLogin = "yes";
-  services.openssh.settings.PasswordAuthentication = true;
+  services = {
+    openssh = {
+      enable = true;
+      #ports = [
+      #  22
+      #];
+      #settings = {
+      #  UseDns = true;
+      #  PermitRootLogin = "yes";
+      #};
+    };
+  };
 }

@@ -1,7 +1,12 @@
 {
-  settings,
-  pkgs,
   ...
 }: {
-  time.timeZone = "Europe/Amsterdam";
+  services = {
+    ntpd-rs = {
+      enable = true;
+      metrics = {
+        enable = true;
+      };
+    };
+  };
 }

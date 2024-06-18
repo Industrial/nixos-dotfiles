@@ -1,6 +1,4 @@
 {
-  settings,
-  pkgs,
   ...
 }: {
   # services.tor.client.port = 9051;

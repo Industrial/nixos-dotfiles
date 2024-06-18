@@ -1,10 +1,10 @@
 {
-  // "[haskell]": {
-  //   "editor.defaultFormatter": "haskell.haskell",
-  //   "editor.formatOnPaste": true,
-  //   "editor.formatOnSave": true,
-  //   "editor.formatOnType": false
-  // },
+  "[haskell]": {
+    "editor.defaultFormatter": "haskell.haskell",
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": false
+  },
   "[javascript]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint",
     "editor.formatOnPaste": true,
@@ -29,19 +29,19 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": false
   },
-  // "[purescript]": {
-  //   "editor.defaultFormatter": "nwolverson.ide-purescript"
-  // },
-  // "[python]": {
-  //   "editor.defaultFormatter": "ms-python.black-formatter",
-  //   "editor.detectIndentation": false,
-  //   "editor.formatOnPaste": true,
-  //   "editor.formatOnSave": true,
-  //   "editor.formatOnType": false,
-  //   "editor.guides.indentation": true,
-  //   "editor.insertSpaces": true,
-  //   "editor.tabSize": 4
-  // },
+  "[purescript]": {
+    "editor.defaultFormatter": "nwolverson.ide-purescript"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.detectIndentation": false,
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": false,
+    "editor.guides.indentation": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
+  },
   "[typescript]": {
     "editor.defaultFormatter": "dbaeumer.vscode-eslint",
     "editor.formatOnPaste": true,
@@ -178,44 +178,44 @@
   "nix.enableLanguageServer": true,
   "nix.formatterPath": "alejandra",
   "nix.serverPath": "nixd",
-  // "purescript.addSpagoSources": true,
-  // "purescript.buildCommand": "spago build --purs-args --json-errors",
-  // "purescript.buildOpenedFiles": true,
-  // "purescript.formatter": "purs-tidy",
-  // "purescript.outputDirectory": "output",
-  // "python.analysis.autoFormatStrings": true,
-  // "python.analysis.autoImportCompletions": true,
-  // "python.analysis.diagnosticMode": "workspace",
-  // "python.analysis.exclude": [
-  //   "**/.git",
-  //   "**/.ipynb_checkpoints",
-  //   "**/.mypy_cache",
-  //   "**/.pytest_cache",
-  //   "**/.venv",
-  //   "**/.vscode",
-  //   "**/__pycache__",
-  //   "**/build",
-  //   "**/data",
-  //   "**/dist",
-  //   "**/jupyter_execute",
-  //   "**/node_modules",
-  //   "**/venv"
-  // ],
-  // "python.analysis.fixAll": [
-  //   "source.unusedImports",
-  //   "source.convertImportFormat"
-  // ],
-  // "python.analysis.importFormat": "absolute",
-  // "python.analysis.include": [
-  //   "src/**/*"
-  // ],
-  // "python.analysis.inlayHints.callArgumentNames": "off",
-  // "python.analysis.inlayHints.functionReturnTypes": true,
-  // "python.analysis.inlayHints.variableTypes": true,
-  // "python.analysis.reportMissingTypeStubs": false,
-  // "python.analysis.typeCheckingMode": "standard",
-  // "python.experiments.enabled": false,
-  // "python.languageServer": "Pylance",
+  "purescript.addSpagoSources": true,
+  "purescript.buildCommand": "spago build --purs-args --json-errors",
+  "purescript.buildOpenedFiles": true,
+  "purescript.formatter": "purs-tidy",
+  "purescript.outputDirectory": "output",
+  "python.analysis.autoFormatStrings": true,
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.exclude": [
+    "**/.git",
+    "**/.ipynb_checkpoints",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
+    "**/.venv",
+    "**/.vscode",
+    "**/__pycache__",
+    "**/build",
+    "**/data",
+    "**/dist",
+    "**/jupyter_execute",
+    "**/node_modules",
+    "**/venv"
+  ],
+  "python.analysis.fixAll": [
+    "source.unusedImports",
+    "source.convertImportFormat"
+  ],
+  "python.analysis.importFormat": "absolute",
+  "python.analysis.include": [
+    "src/**/*"
+  ],
+  "python.analysis.inlayHints.callArgumentNames": "off",
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.inlayHints.variableTypes": true,
+  "python.analysis.reportMissingTypeStubs": false,
+  "python.analysis.typeCheckingMode": "standard",
+  "python.experiments.enabled": false,
+  "python.languageServer": "Pylance",
   "references.preferredLocation": "view",
   "scm.inputFontFamily": "default",
   "scm.inputFontSize": 12,
@@ -251,7 +251,6 @@
   "vitest.nodeEnv": null,
   "vitest.showFailMessages": true,
   "window.autoDetectColorScheme": true,
-  "window.zoomLevel": 2,
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
   "workbench.list.openMode": "doubleClick",
