@@ -2,7 +2,17 @@
 set -e
 exec > >(tee ./logs/update-flake) 2>&1
 
+source lib/lowercase.bash
+
+HOST=$(lowercase ${1:-"smithja"})
+echo "bin/update-osx-rebuild-flake > host: ${HOST}"
+
+USER=$(lowercase ${2:-$USER})
+echo "bin/update-osx-rebuild-flake > user: ${USER}"
+
 bin/update-channels
 
-echo "bin/update-flake > nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update"
-nix --extra-experimental-features nix-command --extra-experimental-features flakes flake update
+echo "bin/update-flake > nix flake update"
+cd "./hosts/${HOST}"
+nix flake update
+cd "../.."
