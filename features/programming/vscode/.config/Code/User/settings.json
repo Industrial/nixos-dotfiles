@@ -256,4 +256,5 @@
   "workbench.list.openMode": "doubleClick",
   "workbench.startupEditor": "none",
   "supermaven.otherWarning": false,
+  "editor.wordWrap": "off",
 }
