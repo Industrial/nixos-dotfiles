@@ -8,28 +8,32 @@
     nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
     # ansifilter.url = "path:./../../features/cli/ansifilter";
     # ansifilter.inputs.nixpkgs.follows = "nixpkgs";
-    aria2.url = "path:./../../features/cli/aria2";
-    aria2.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Unfortunately, for now, these paths need to be absolute.
+    # TODO: Create a helper that makes it absolute paths and adds the
+    #       `inputs.nixpkgs.follows = "nixpkgs";`.
+    aria2.url = "path:/Users/twieland/.dotfiles/features/cli/aria2";
+    # aria2.inputs.nixpkgs.follows = "nixpkgs";
   };
-  outputs = inputs@{ ... }: let
-    settings = {
-      hostname = "smithja";
-      stateVersion = "24.05";
-      system = "aarch64-darwin";
-      hostPlatform = {
-        config = "aarch64-apple-darwin";
-        system = "aarch64-darwin";
-      };
-      userdir = "/Users/twieland";
-      useremail = "twieland@suitsupply.com";
-      userfullname = "Tom Wieland";
-      username = "twieland";
-    };
-  in inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+  outputs = inputs@{ ... }: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
     systems = inputs.nixpkgs.lib.systems.flakeExposed;
     flake = {
       darwinConfigurations = {
-        smithja = inputs.nix-darwin.lib.darwinSystem {
+        smithja = let
+          settings = {
+            hostname = "smithja";
+            stateVersion = "24.05";
+            system = "aarch64-darwin";
+            hostPlatform = {
+              config = "aarch64-apple-darwin";
+              system = "aarch64-darwin";
+            };
+            userdir = "/Users/twieland";
+            useremail = "twieland@suitsupply.com";
+            userfullname = "Tom Wieland";
+            username = "twieland";
+          };
+        in inputs.nix-darwin.lib.darwinSystem {
           system = "aarch64-darwin";
           specialArgs = {
             inherit inputs;
@@ -40,48 +44,47 @@
           modules = [
             # inputs.ansifilter.nixosModules
             inputs.aria2.nixosModules.aria2
-            # ../../features/cli/aria2
-            ../../features/cli/bat
-            # ../../features/cli/btop
-            ../../features/cli/direnv
-            # ../../features/cli/e2fsprogs
-            ../../features/cli/eza
-            # ../../features/cli/fd
-            # ../../features/cli/fh
-            ../../features/cli/fish
-            ../../features/cli/fzf
-            # ../../features/cli/gh
-            # ../../features/cli/jira-cli
-            # ../../features/cli/killall
-            # ../../features/cli/neofetch
-            # ../../features/cli/p7zip
-            # ../../features/cli/ranger
-            # ../../features/cli/ripgrep
-            ../../features/cli/starship
-            # ../../features/cli/unrar
-            # ../../features/cli/unzip
-            # ../../features/cli/zellij
-            ../../features/communication/discord
-            # ../../features/crypto/monero
-            ../../features/media/spotify
-            # ../../features/network/sshuttle
-            ../../features/nix
-            ../../features/nix/nix-daemon
-            ../../features/nix/nixpkgs
-            ../../features/nix/shell
-            # ../../features/office/evince
-            ../../features/office/obsidian
-            # ../../features/programming/bun
-            # ../../features/programming/deno
-            # ../../features/programming/edgedb
-            ../../features/programming/git
-            ../../features/programming/gitkraken
-            # ../../features/programming/glogg
-            # ../../features/programming/meld
-            # ../../features/programming/nixd
-            # ../../features/programming/nodejs
-            # ../../features/programming/sqlite
-            ../../features/programming/vscode
+            features/cli/bat
+            # features/cli/btop
+            features/cli/direnv
+            # features/cli/e2fsprogs
+            features/cli/eza
+            # features/cli/fd
+            # features/cli/fh
+            features/cli/fish
+            features/cli/fzf
+            # features/cli/gh
+            # features/cli/jira-cli
+            # features/cli/killall
+            # features/cli/neofetch
+            # features/cli/p7zip
+            # features/cli/ranger
+            # features/cli/ripgrep
+            features/cli/starship
+            # features/cli/unrar
+            # features/cli/unzip
+            # features/cli/zellij
+            features/communication/discord
+            # features/crypto/monero
+            features/media/spotify
+            # features/network/sshuttle
+            features/nix
+            features/nix/nix-daemon
+            features/nix/nixpkgs
+            features/nix/shell
+            # features/office/evince
+            features/office/obsidian
+            # features/programming/bun
+            # features/programming/deno
+            # features/programming/edgedb
+            features/programming/git
+            features/programming/gitkraken
+            # features/programming/glogg
+            # features/programming/meld
+            # features/programming/nixd
+            # features/programming/nodejs
+            # features/programming/sqlite
+            features/programming/vscode
 
             # {
             #   homebrew.enable = true;

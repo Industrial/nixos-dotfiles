@@ -17,6 +17,6 @@ if [ -f "/etc/shells" ]; then
 fi
 
 echo "bin/update-osx-rebuild-flake > nix run nix-darwin -- switch --flake \".#${HOST}\" --show-trace"
-cd "./hosts/${HOST}"
+# cd "./hosts/${HOST}"
 nix run nix-darwin -- switch --flake ".#${HOST}" --show-trace
-cd "../.."
+# cd "../.."
