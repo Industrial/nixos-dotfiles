@@ -6,6 +6,10 @@
 }: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {inherit settings pkgs;};
 in {
+  programs.fish.enable = true;
+  environment.shells = with pkgs; [fish];
+  users.users."${settings.username}".shell = pkgs.fish;
+
   environment.etc."fish/config.fish".text = ''
     # Disable greeting
     function fish_greeting
@@ -15,19 +19,14 @@ in {
     source ${havamalPlugin}/share/fish/vendor_conf.d/Hávamál.fish
 
     # Shell abbreviations
-    alias dc='docker-compose'
-    alias dcl='docker-compose logs'
     alias g='git'
-    alias n='npm'
-    alias p='pnpm'
-    alias y='yarn'
-    alias z='zellij --session system'
-    alias za='zellij attach system'
+    # alias z='zellij --session system'
+    # alias za='zellij attach system'
 
-    # Variables
-    set -x EDITOR "nvim"
-    set -x GIT_EDITOR "nvim"
-    set -x DIFFPROG "nvim -d"
+    # # Variables
+    # set -x EDITOR "vim"
+    # set -x GIT_EDITOR "vim"
+    # set -x DIFFPROG "vim -d"
     set -x XDG_CACHE_HOME "$HOME/.cache"
     set -x XDG_CONFIG_HOME "$HOME/.config"
     set -x XDG_DATA_HOME "$HOME/.local/share"
@@ -35,68 +34,6 @@ in {
     # TODO: Someone on Discord told me this is a bad idea and I should patch
     #       specific software instead (Continue VSCode Plugin).
     set -x LD_LIBRARY_PATH "${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
-
-    # PATH
-    fish_add_path $HOME/.bin
-
-    # Terminal CheatSheet
-    function cheatsheet
-      curl "cheat.sh/$argv"
-    end
-
-    # Replacement for cat
-    function cat --wraps bat
-      bat $argv
-    end
-
-    # Replacement for du
-    function du --wraps dust
-      dust $argv
-    end
-
-    # CD alias
-    function c
-      cd $argv
-      l
-    end
-
-    # Clear alias
-    function cl
-      clear
-    end
-
-    # LS alias
-    function l
-      eza \
-      --colour=always \
-      --icons \
-      --long \
-        --group \
-        --header \
-        --time-style long-iso \
-        --git \
-      --classify \
-      --group-directories-first \
-      --sort Extension \
-      --all \
-      $argv
-    end
-
-    # LS alias (no hidden files)
-    function ll
-      eza \
-      --colour=always \
-      --icons \
-      --long \
-        --group \
-        --header \
-        --time-style long-iso \
-        --git \
-      --classify \
-      --group-directories-first \
-      --sort Extension \
-      $argv
-    end
 
     # Use vim keybindings.
     fish_vi_key_bindings

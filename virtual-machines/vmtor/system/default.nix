@@ -13,7 +13,6 @@
 
     # Nix
     ../../../features/nix
-    ../../../features/nix/shell
 
     # NixOS
     ../../../features/nixos/boot

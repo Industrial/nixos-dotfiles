@@ -84,6 +84,8 @@
       ## AutoHotkey
       # extensions.vscode-marketplace.mark-wiemer.vscode-autohotkey-plus-plus
       extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
+      ## EdgeDB
+      extensions.vscode-marketplace.magicstack.edgedb
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer

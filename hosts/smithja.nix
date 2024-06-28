@@ -29,7 +29,11 @@
       ../features/cli/aria2
       ../features/cli/bat
       ../features/cli/btop
+      ../features/cli/c
+      ../features/cli/cheatsheet
       ../features/cli/direnv
+      ../features/cli/du
+      ../features/cli/dust
       ../features/cli/e2fsprogs
       ../features/cli/eza
       ../features/cli/fd
@@ -38,6 +42,8 @@
       ../features/cli/fzf
       ../features/cli/gh
       ../features/cli/killall
+      ../features/cli/l
+      ../features/cli/ll
       ../features/cli/neofetch
       ../features/cli/p7zip
       ../features/cli/ranger
@@ -53,7 +59,6 @@
       ../features/nix
       ../features/nix/nix-daemon
       ../features/nix/nixpkgs
-      ../features/nix/shell
       ../features/office/evince
       ../features/office/obsidian
       ../features/programming/bun

@@ -77,7 +77,6 @@
     ../../features/nix
     ../../features/nix/nix-unit
     ../../features/nix/nixpkgs
-    ../../features/nix/shell
 
     # NixOS
     # ../../features/nixos/docker
