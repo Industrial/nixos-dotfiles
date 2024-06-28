@@ -40,6 +40,7 @@
       ../features/cli/fh
       ../features/cli/fish
       ../features/cli/fzf
+      ../features/cli/g
       ../features/cli/gh
       ../features/cli/killall
       ../features/cli/l
@@ -54,6 +55,7 @@
       ../features/cli/zellij
       ../features/communication/discord
       ../features/crypto/monero
+      ../features/darwin/settings
       ../features/media/spotify
       ../features/network/sshuttle
       ../features/nix
