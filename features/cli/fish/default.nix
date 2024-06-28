@@ -1,4 +1,3 @@
-# Fish Plugins, not installable with home manager.
 {
   settings,
   pkgs,
