@@ -10,6 +10,7 @@
   outputs = inputs@{ ... }: inputs.flake-parts.lib.mkFlake { inherit inputs; } {
     systems = inputs.nixpkgs.lib.systems.flakeExposed;
     flake = {
+      nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
       darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
     };
   };
