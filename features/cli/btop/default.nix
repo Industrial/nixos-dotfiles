@@ -1,9 +1,5 @@
 # Btop is a htop replacement
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     btop
   ];

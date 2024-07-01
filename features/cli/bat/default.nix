@@ -1,9 +1,5 @@
 # Bat is a replacement for Cat
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     bat
   ];

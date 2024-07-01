@@ -4,7 +4,7 @@ exec > >(tee ./logs/update-flake) 2>&1
 
 source lib/lowercase.bash
 
-HOST=$(lowercase ${1:-"smithja"})
+HOST=$(lowercase ${1:-"langhus"})
 echo "bin/update-osx-rebuild-flake > host: ${HOST}"
 
 USER=$(lowercase ${2:-$USER})
@@ -13,6 +13,4 @@ echo "bin/update-osx-rebuild-flake > user: ${USER}"
 bin/update-channels
 
 echo "bin/update-flake > nix flake update"
-cd "./hosts/${HOST}"
 nix flake update
-cd "../.."

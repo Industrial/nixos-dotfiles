@@ -5,21 +5,31 @@
 }: let
   version = "1.90.1";
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
-  archive_fmt = if pkgs.stdenv.isDarwin then "zip" else "tar.gz";
+  archive_fmt =
+    if pkgs.stdenv.isDarwin
+    then "zip"
+    else "tar.gz";
   throwSystem = throw "Unsupported system: ${pkgs.system}";
-  plat = {
-    x86_64-linux = "linux-x64";
-    x86_64-darwin = "darwin";
-    aarch64-linux = "linux-arm64";
-    aarch64-darwin = "darwin-arm64";
-    armv7l-linux = "linux-armhf";
-  }.${pkgs.system} or throwSystem;
+  plat =
+    {
+      x86_64-linux = "linux-x64";
+      x86_64-darwin = "darwin";
+      aarch64-linux = "linux-arm64";
+      aarch64-darwin = "darwin-arm64";
+      armv7l-linux = "linux-armhf";
+    }
+    .${pkgs.system}
+    or throwSystem;
   vscodePatched = pkgs.vscode.overrideAttrs (oldAttrs: {
     version = version;
     src = pkgs.fetchurl {
       name = "VSCode_${version}_${plat}.${archive_fmt}";
       url = "https://update.code.visualstudio.com/${version}/${plat}/stable";
-      sha256 = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
+      # TODO: This checksum changes per platform so supply them er platform.
+      # Darwin
+      #sha256 = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
+      # NixOS
+      sha256 = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
     };
   });
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "features > programming > vscode > link-files-darwin"
+echo "features > programming > vscode > link-files-nixos"
 
 currentDirectoryPath=$(pwd)
 settingsSourceFilePath="${currentDirectoryPath}/features/programming/vscode/.config/Code/User/settings.json"

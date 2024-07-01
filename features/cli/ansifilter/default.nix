@@ -2,11 +2,7 @@
 # Examples:
 # * Remove control characters:
 #   $ cat dirty.txt | ansifilter --text > clean.txt
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     ansifilter
   ];
