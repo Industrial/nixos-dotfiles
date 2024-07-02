@@ -1,8 +1,5 @@
 # Docker Compose.
-{
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     docker-compose
   ];

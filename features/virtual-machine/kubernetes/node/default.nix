@@ -1,7 +1,4 @@
-{
-  pkgs,
-  ...
-}: let
+{pkgs, ...}: let
   kubeMasterIP = "10.1.1.2";
   kubeMasterHostname = "api.kube";
   kubeMasterAPIServerPort = 6443;
@@ -18,8 +15,7 @@ in {
 
   services.kubernetes = let
     api = "https://${kubeMasterHostname}:${toString kubeMasterAPIServerPort}";
-  in
-  {
+  in {
     roles = ["node"];
     masterAddress = kubeMasterHostname;
     easyCerts = true;

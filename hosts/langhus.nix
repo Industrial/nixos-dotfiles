@@ -53,9 +53,9 @@
         ../features/communication/discord
         ../features/crypto/monero
         ../features/filesystems/gparted
-        # ../features/games/lutris
-        # ../features/games/path-of-building
-        # ../features/games/steam
+        ../features/games/lutris
+        ../features/games/path-of-building
+        ../features/games/steam
         ../features/hardware/zsa-keyboard
         ../features/media/eog
         ../features/media/invidious

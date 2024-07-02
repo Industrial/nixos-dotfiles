@@ -1,7 +1,4 @@
-{
-  pkgs,
-  ...
-}: let
+{pkgs, ...}: let
   c = pkgs.stdenv.mkDerivation {
     name = "c";
     version = "1.0";

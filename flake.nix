@@ -37,5 +37,8 @@
         nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
         darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
       };
+      perSystem = {pkgs, ...}: {
+        formatter = pkgs.alejandra;
+      };
     };
 }

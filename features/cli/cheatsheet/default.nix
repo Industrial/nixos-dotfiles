@@ -1,12 +1,9 @@
-{
-  pkgs,
-  ...
-}: let
+{pkgs, ...}: let
   cheatsheet = pkgs.stdenv.mkDerivation {
     name = "cheatsheet";
     version = "1.0";
     src = ./.;
-    buildInputs = [ pkgs.dust ];
+    buildInputs = [pkgs.dust];
     installPhase = ''
       mkdir -p $out/bin
       echo '#!/usr/bin/env bash' > $out/bin/cheatsheet

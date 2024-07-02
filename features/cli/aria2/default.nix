@@ -10,10 +10,7 @@
 #   $ aria2c -M mydownloads.meta4
 # * Download a BitTorrent file:
 #   $ aria2c mytorrent.torrent
-{
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     aria2
   ];
