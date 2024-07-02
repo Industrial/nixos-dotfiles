@@ -6,6 +6,10 @@
     # Flake Parts
     flake-parts.url = "github:hercules-ci/flake-parts";
 
+    # Nix GitHub Actions
+    nix-github-actions.url = "github:nix-community/nix-github-actions";
+    nix-github-actions.inputs.nixpkgs.follows = "nixpkgs";
+
     # Nix Darwin
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
@@ -37,8 +41,19 @@
         nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
         darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
       };
-      perSystem = {pkgs, ...}: {
+      perSystem = {
+        self,
+        pkgs,
+        ...
+      }: {
         formatter = pkgs.alejandra;
+        githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
+          inherit (self) checks;
+        };
+        checks = {
+          hello = pkgs.hello;
+          default = pkgs.hello;
+        };
       };
     };
 }
