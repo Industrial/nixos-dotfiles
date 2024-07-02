@@ -34,13 +34,18 @@
     cryptpad.url = "https://flakehub.com/f/michaelshmitty/cryptpad/2.2.0.tar.gz";
     cryptpad.inputs.nixpkgs.follows = "nixpkgs";
   };
-  outputs = inputs @ {self, ...}:
+  outputs = inputs @ {self, ...}: let
+    githubActionsSystems = ["x86_64-linux" "x86_64-darwin"];
+  in
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       systems = inputs.nixpkgs.lib.systems.flakeExposed;
       flake = {
+        # Creates a GitHub Actions matrix for the checks.
         githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
-          inherit (self) checks;
+          # Only run checks on the systems that we support on GitHub Actions.
+          checks = inputs.nixpkgs.lib.getAttrs githubActionsSystems self.checks;
         };
+
         nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
         darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
       };
