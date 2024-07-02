@@ -34,22 +34,18 @@
     cryptpad.url = "https://flakehub.com/f/michaelshmitty/cryptpad/2.2.0.tar.gz";
     cryptpad.inputs.nixpkgs.follows = "nixpkgs";
   };
-  outputs = inputs @ {...}:
+  outputs = inputs @ {self, ...}:
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       systems = inputs.nixpkgs.lib.systems.flakeExposed;
       flake = {
-        nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
-        darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
-      };
-      perSystem = {
-        self,
-        pkgs,
-        ...
-      }: {
-        formatter = pkgs.alejandra;
         githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
           inherit (self) checks;
         };
+        nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
+        darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
+      };
+      perSystem = {pkgs, ...}: {
+        formatter = pkgs.alejandra;
         checks = {
           hello = pkgs.hello;
           default = pkgs.hello;
