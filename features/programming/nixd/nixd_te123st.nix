@@ -8,7 +8,7 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
-    actual = builtins.elem pkgs.nixd feature.environment.systemPackages;
+    expr = builtins.elem pkgs.nixd feature.environment.systemPackages;
     expected = true;
   }
 ]

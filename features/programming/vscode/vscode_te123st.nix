@@ -11,11 +11,11 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
-    actual = builtins.elem pkgs.vscodeWithExtensions feature.environment.systemPackages;
+    expr = builtins.elem pkgs.vscodeWithExtensions feature.environment.systemPackages;
     expected = true;
   }
   {
-    actual = builtins.elem pkgs.alejandra feature.environment.systemPackages;
+    expr = builtins.elem pkgs.alejandra feature.environment.systemPackages;
     expected = true;
   }
 ]

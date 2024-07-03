@@ -10,6 +10,11 @@
     nix-github-actions.url = "github:nix-community/nix-github-actions";
     nix-github-actions.inputs.nixpkgs.follows = "nixpkgs";
 
+    # Nix Unit
+    nix-unit.url = "github:nix-community/nix-unit";
+    nix-unit.inputs.nixpkgs.follows = "nixpkgs";
+    nix-unit.inputs.flake-parts.follows = "flake-parts";
+
     # Nix Darwin
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
@@ -40,6 +45,32 @@
     inputs.flake-parts.lib.mkFlake {inherit inputs;} {
       systems = inputs.nixpkgs.lib.systems.flakeExposed;
       flake = {
+        tests = let
+          settings = {
+            hostname = "testhostname";
+            stateVersion = "24.05";
+            system = "x86_64-linux";
+            hostPlatform = {
+              system = "x86_64-linux";
+            };
+            userdir = "/Users/test";
+            useremail = "test@test.com";
+            userfullname = "Chadster McChaddington";
+            username = "test";
+          };
+        in {
+          features = import ./features/tests.nix {
+            inherit inputs settings;
+            pkgs = import inputs.nixpkgs {
+              # TODO: How can I abstract away the system with flake-parts?
+              system = "x86_64-linux";
+              config = {
+                allowUnfree = true;
+              };
+            };
+          };
+        };
+
         # Creates a GitHub Actions matrix for the checks.
         githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
           # Only run checks on the systems that we support on GitHub Actions.
@@ -49,12 +80,32 @@
         nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
         darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
       };
-      perSystem = {pkgs, ...}: {
+      perSystem = {
+        pkgs,
+        system,
+        ...
+      }: let
+      in {
         formatter = pkgs.alejandra;
-        checks = {
-          hello = pkgs.hello;
-          default = pkgs.hello;
-        };
+
+        # # tests = import ./tests {inherit inputs;};
+        # checks = {
+        #   # tests =
+        #   #   inputs.nixpkgs.legacyPackages.${system}.runCommand "tests"
+        #   #   {
+        #   #     nativeBuildInputs = [inputs.nix-unit.packages.${system}.default];
+        #   #   } ''
+        #   #     #!/usr/bin/env bash
+        #   #     export HOME="$(realpath .)"
+        #   #     # The nix derivation must be able to find all used inputs in the
+        #   #     # nix-store because it cannot download it during buildTime.
+        #   #     nix-unit --eval-store "$HOME" \
+        #   #       --extra-experimental-features flakes \
+        #   #       --override-input nixpkgs ${inputs.nixpkgs} \
+        #   #       --flake ${self}#tests
+        #   #     touch $out
+        #   #   '';
+        # };
       };
     };
 }

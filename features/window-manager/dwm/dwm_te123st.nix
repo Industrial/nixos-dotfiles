@@ -4,15 +4,15 @@ let
   feature = import ./default.nix {inherit pkgs settings;};
 in [
   {
-    actual = builtins.elem pkgs.slock feature.environment.systemPackages;
+    expr = builtins.elem pkgs.slock feature.environment.systemPackages;
     expected = true;
   }
   {
-    actual = builtins.elem "my-dwm" (builtins.attrNames feature.nixpkgs.overlays);
+    expr = builtins.elem "my-dwm" (builtins.attrNames feature.nixpkgs.overlays);
     expected = true;
   }
   {
-    actual = builtins.fetchurl {
+    expr = builtins.fetchurl {
       url = "https://dwm.suckless.org/patches/autostart/dwm-autostart-20210120-cb3f58a.diff";
       hash = "sha256-mrHh4o9KBZDp2ReSeKodWkCz5ahCLuE6Al3NR2r2OJg=";
     };
