@@ -1,12 +1,18 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.loader.efi.efiSysMountPoint = "/boot/efi";
-  boot.initrd.secrets = {
-    "/crypto_keyfile.bin" = null;
+{...}: {
+  boot = {
+    loader = {
+      systemd-boot = {
+        enable = true;
+      };
+      efi = {
+        canTouchEfiVariables = true;
+        efiSysMountPoint = "/boot/efi";
+      };
+    };
+    initrd = {
+      secrets = {
+        "/crypto_keyfile.bin" = null;
+      };
+    };
   };
 }

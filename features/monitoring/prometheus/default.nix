@@ -1,28 +1,29 @@
-{
-  config,
-  pkgs,
-  settings,
-  ...
-}: {
-  services.prometheus.enable = true;
-  services.prometheus.listenAddress = "localhost";
-  services.prometheus.port = 9001;
-
-  services.prometheus.exporters.node.enable = true;
-  services.prometheus.exporters.node.port = 9002;
-  services.prometheus.exporters.node.enabledCollectors = ["systemd"];
-
-  services.prometheus.scrapeConfigs = [
-    {
-      job_name = "nodes";
-      scrape_interval = "1s";
-      static_configs = [
+{...}: {
+  services = {
+    prometheus = {
+      enable = true;
+      listenAddress = "localhost";
+      port = 9001;
+      exporters = {
+        node = {
+          enable = true;
+          port = 9002;
+          enabledCollectors = ["systemd"];
+        };
+      };
+      scrapeConfigs = [
         {
-          targets = [
-            "${config.services.prometheus.listenAddress}:${toString config.services.prometheus.exporters.node.port}"
+          job_name = "nodes";
+          scrape_interval = "1s";
+          static_configs = [
+            {
+              targets = [
+                "localhost:9002"
+              ];
+            }
           ];
         }
       ];
-    }
-  ];
+    };
+  };
 }

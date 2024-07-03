@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{...}: {
   services.homepage-dashboard.enable = true;
 
   # https://gethomepage.dev/latest/configs/settings/

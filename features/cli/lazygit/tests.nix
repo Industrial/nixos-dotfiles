@@ -1,10 +1,10 @@
-{
+args @ {
   inputs,
   settings,
   pkgs,
   ...
 }: let
-  feature = import ./default.nix {inherit inputs pkgs settings;};
+  feature = import ./default.nix args;
 in {
   test_programs = {
     expr = feature.programs.lazygit.enable;
