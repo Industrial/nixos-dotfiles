@@ -40,7 +40,7 @@ jobs:
       - name: Install Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Unit Test
-        run: nix-unit --flake .#tests
+        run: nix run nixpkgs#nix-unit --flake .#tests
   # build-nixos:
   #   name: Build NixOS
   #   runs-on: ubuntu-latest
