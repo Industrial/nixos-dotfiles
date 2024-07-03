@@ -1,11 +1,10 @@
 name: Unit Test
 
 on:
+  pull_request:
   push:
     branches:
       - main
-      - "feature/*"
-      - "bugfix/*"
 
 jobs:
   # flake-check:
@@ -32,7 +31,7 @@ jobs:
   #       run: nix flake check
   unit-test:
     name: Unit Test
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,16 +40,16 @@ jobs:
       - name: Install Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Unit Test
-        run: bin/test
-  build-nixos:
-    name: Build NixOS
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@main
-      - name: Install Magic Nix Cache
-        uses: DeterminateSystems/magic-nix-cache-action@main
-      - name: Unit Test
-        run: bin/update-nixos langhus tom
+        run: nix-unit --flake .#tests
+  # build-nixos:
+  #   name: Build NixOS
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+  #     - name: Install Nix
+  #       uses: DeterminateSystems/nix-installer-action@main
+  #     - name: Install Magic Nix Cache
+  #       uses: DeterminateSystems/magic-nix-cache-action@main
+  #     - name: Unit Test
+  #       run: bin/update-nixos langhus tom
