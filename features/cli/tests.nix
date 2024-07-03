@@ -28,6 +28,7 @@
   lazygit = import ./lazygit/tests.nix {inherit inputs settings pkgs;};
   ll = import ./ll/tests.nix {inherit inputs settings pkgs;};
   neofetch = import ./neofetch/tests.nix {inherit inputs settings pkgs;};
+  nushell = import ./nushell/tests.nix {inherit inputs settings pkgs;};
   p7zip = import ./p7zip/tests.nix {inherit inputs settings pkgs;};
   ranger = import ./ranger/tests.nix {inherit inputs settings pkgs;};
   ripgrep = import ./ripgrep/tests.nix {inherit inputs settings pkgs;};

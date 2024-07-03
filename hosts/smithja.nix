@@ -46,6 +46,7 @@
         ../features/cli/l
         ../features/cli/ll
         ../features/cli/neofetch
+        ../features/cli/nushell
         ../features/cli/p7zip
         ../features/cli/ranger
         ../features/cli/ripgrep
