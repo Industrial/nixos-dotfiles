@@ -1,11 +1,8 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "system_test";
-    actual = feature.programs.dconf.enable;
+args @ {...}: let
+  feature = import ./default.nix args;
+in {
+  test_programs_dconf_enable = {
+    expr = feature.programs.dconf.enable;
     expected = true;
-  }
-]
+  };
+}

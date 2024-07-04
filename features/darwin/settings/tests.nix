@@ -1,9 +1,4 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: let
+args @ {...}: let
   feature = import ./implementation.nix args;
 in {
 }

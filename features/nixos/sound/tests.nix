@@ -1,41 +1,32 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "sound_test";
-    actual = feature.sound.enable;
+args @ {...}: let
+  feature = import ./default.nix args;
+in {
+  test_sound_enable = {
+    expr = feature.sound.enable;
     expected = false;
-  }
-  {
-    name = "sound_test";
-    actual = feature.hardware.pulseaudio.enable;
+  };
+  test_hardware_pulseaudio_enable = {
+    expr = feature.hardware.pulseaudio.enable;
     expected = false;
-  }
-  {
-    name = "sound_test";
-    actual = feature.security.rtkit.enable;
+  };
+  test_security_rtkit_enable = {
+    expr = feature.security.rtkit.enable;
     expected = true;
-  }
-  {
-    name = "sound_test";
-    actual = feature.services.pipewire.enable;
+  };
+  test_services_pipewire_enable = {
+    expr = feature.services.pipewire.enable;
     expected = true;
-  }
-  {
-    name = "sound_test";
-    actual = feature.services.pipewire.alsa.enable;
+  };
+  test_services_pipewire_alsa_enable = {
+    expr = feature.services.pipewire.alsa.enable;
     expected = true;
-  }
-  {
-    name = "sound_test";
-    actual = feature.services.pipewire.alsa.support32Bit;
+  };
+  test_services_pipewire_alsa_support32Bit = {
+    expr = feature.services.pipewire.alsa.support32Bit;
     expected = true;
-  }
-  {
-    name = "sound_test";
-    actual = feature.services.pipewire.pulse.enable;
+  };
+  test_services_pipewire_pulse_enable = {
+    expr = feature.services.pipewire.pulse.enable;
     expected = true;
-  }
-]
+  };
+}

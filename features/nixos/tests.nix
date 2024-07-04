@@ -13,5 +13,5 @@ args @ {...}: {
   system = import ./system/tests.nix args;
   time = import ./time/tests.nix args;
   users = import ./users/tests.nix args;
-  window-managers = import ./window-managers/tests.nix args;
+  window-manager = import ./window-manager/tests.nix args;
 }

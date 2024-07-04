@@ -1,9 +1,4 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: {
+args @ {...}: {
   ansifilter = import ./ansifilter/tests.nix args;
   appimage-run = import ./appimage-run/tests.nix args;
   aria2 = import ./aria2/tests.nix args;

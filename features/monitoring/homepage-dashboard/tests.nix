@@ -1,4 +1,4 @@
-args @ {pkgs, ...}: let
+args @ {...}: let
   feature = import ./default.nix args;
 in {
   # TODO: The rest of the settings need to be tested.

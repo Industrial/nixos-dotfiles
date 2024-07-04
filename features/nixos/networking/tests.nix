@@ -1,16 +1,12 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "networking_test";
-    actual = feature.networking.networkmanager.enable;
+args @ {settings, ...}: let
+  feature = import ./default.nix args;
+in {
+  test_networking_networkmanager_enable = {
+    expr = feature.networking.networkmanager.enable;
     expected = true;
-  }
-  {
-    name = "networking_test";
-    actual = feature.networking.hostName;
+  };
+  test_networking_hostName = {
+    expr = feature.networking.hostName;
     expected = settings.hostname;
-  }
-]
+  };
+}

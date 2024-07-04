@@ -1,26 +1,20 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "clamav_test";
-    actual = feature.services.clamav.daemon.enable;
+args @ {...}: let
+  feature = import ./default.nix args;
+in {
+  test_services_clamav_daemon_enable = {
+    expr = feature.services.clamav.daemon.enable;
     expected = true;
-  }
-  {
-    name = "clamav_test";
-    actual = feature.services.clamav.updater.enable;
+  };
+  test_services_clamav_updater_enable = {
+    expr = feature.services.clamav.updater.enable;
     expected = true;
-  }
-  {
-    name = "clamav_test";
-    actual = feature.services.clamav.scanner.enable;
+  };
+  test_services_clamav_scanner_enable = {
+    expr = feature.services.clamav.scanner.enable;
     expected = true;
-  }
-  {
-    name = "clamav_test";
-    actual = feature.services.clamav.scanner.interval;
+  };
+  test_services_clamav_scanner_interval = {
+    expr = feature.services.clamav.scanner.interval;
     expected = "Weekly Sunday 12:00:00";
-  }
-]
+  };
+}

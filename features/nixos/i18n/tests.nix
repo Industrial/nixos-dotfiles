@@ -1,16 +1,12 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "i18n_test";
-    actual = feature.i18n.defaultLocale;
+args @ {...}: let
+  feature = import ./default.nix args;
+in {
+  test_i18n_defaultLocale = {
+    expr = feature.i18n.defaultLocale;
     expected = "en_US.UTF-8";
-  }
-  {
-    name = "i18n_test";
-    actual = feature.i18n.extraLocaleSettings;
+  };
+  test_i18n_extraLocaleSettings = {
+    expr = feature.i18n.extraLocaleSettings;
     expected = {
       LC_ADDRESS = "nl_NL.UTF-8";
       LC_IDENTIFICATION = "nl_NL.UTF-8";
@@ -22,5 +18,5 @@ in [
       LC_TELEPHONE = "nl_NL.UTF-8";
       LC_TIME = "nl_NL.UTF-8";
     };
-  }
-]
+  };
+}

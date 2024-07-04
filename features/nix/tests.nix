@@ -1,5 +1,4 @@
 args @ {
-  inputs,
   settings,
   pkgs,
   ...

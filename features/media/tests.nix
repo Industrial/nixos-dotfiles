@@ -1,9 +1,4 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: {
+args @ {...}: {
   eog = import ./eog/tests.nix args;
   invidious = import ./invidious/tests.nix args;
   lxqt-pavucontrol-qt = import ./lxqt-pavucontrol-qt/tests.nix args;

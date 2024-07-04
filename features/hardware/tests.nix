@@ -1,8 +1,3 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: {
+args @ {...}: {
   zsa-keyboard = import ./zsa-keyboard/tests.nix args;
 }

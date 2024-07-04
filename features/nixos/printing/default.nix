@@ -1,12 +1,8 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   services.printing.enable = true;
 
   environment.systemPackages = with pkgs; [
-    # # Unfree License
-    # cnijfilter2
+    # Unfree License
+    cnijfilter2
   ];
 }

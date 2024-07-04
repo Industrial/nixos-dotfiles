@@ -1,9 +1,4 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: let
+args @ {...}: let
   feature = import ./default.nix args;
 in {
   test_programs = {

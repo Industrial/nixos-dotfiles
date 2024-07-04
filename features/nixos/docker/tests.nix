@@ -1,11 +1,8 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "docker_test";
-    actual = feature.virtualisation.docker.enable;
+args @ {...}: let
+  feature = import ./default.nix args;
+in {
+  test_virtualisation_docker_enable = {
+    expr = feature.virtualisation.docker.enable;
     expected = true;
-  }
-]
+  };
+}

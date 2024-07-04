@@ -1,20 +1,12 @@
-let
-  pkgs = import <nixpkgs> {
-    config = {
-      allowUnfree = true;
-    };
+args @ {pkgs, ...}: let
+  feature = import ./default.nix args;
+in {
+  test_services_printing_enable = {
+    expr = feature.services.printing.enable;
+    expected = true;
   };
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "printing_test";
-    actual = feature.services.printing.enable;
+  test_systemPackages = {
+    expr = builtins.elem pkgs.cnijfilter2 feature.environment.systemPackages;
     expected = true;
-  }
-  {
-    name = "printing_test";
-    actual = builtins.elem pkgs.cnijfilter2 feature.environment.systemPackages;
-    expected = true;
-  }
-]
+  };
+}

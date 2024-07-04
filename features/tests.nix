@@ -10,8 +10,8 @@ args @ {...}: {
   monitoring = import ./monitoring/tests.nix args;
   network = import ./network/tests.nix args;
   nix = import ./nix/tests.nix args;
+  nixos = import ./nixos/tests.nix args;
   # TODO: complete
-  # nixos = import ./nixos/tests.nix args;
   # office = import ./office/tests.nix args;
   # programming = import ./programming/tests.nix args;
   # security = import ./security/tests.nix args;

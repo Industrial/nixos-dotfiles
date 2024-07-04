@@ -1,8 +1,3 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: {
+args @ {...}: {
   discord = import ./discord/tests.nix args;
 }

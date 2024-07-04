@@ -1,8 +1,3 @@
-args @ {
-  inputs,
-  settings,
-  pkgs,
-  ...
-}: {
+args @ {...}: {
   monero = import ./monero/tests.nix args;
 }
