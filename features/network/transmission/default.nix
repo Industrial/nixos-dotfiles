@@ -1,10 +1,13 @@
 # Bittorrent client.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    transmission-gtk
+    transmission_4
+    transmission_4-qt
   ];
+
+  services = {
+    transmission = {
+      enable = true;
+    };
+  };
 }

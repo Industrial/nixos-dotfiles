@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{...}: {
   services = {
     openssh = {
       enable = true;

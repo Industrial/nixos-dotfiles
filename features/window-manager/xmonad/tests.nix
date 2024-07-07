@@ -1,33 +1,26 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "xmonad_test";
-    actual = feature.xsession.windowManager.xmonad.enable;
+args @ {pkgs, ...}: let
+  feature = import ./default.nix args;
+in {
+  test_xsession_windowManager_xmonad_enable = {
+    expr = feature.xsession.windowManager.xmonad.enable;
     expected = true;
-  }
-  {
-    name = "xmonad_test";
-    actual = feature.xsession.windowManager.xmonad.enableContribAndExtras;
+  };
+  test_xsession_windowManager_xmonad_enableContribAndExtras = {
+    expr = feature.xsession.windowManager.xmonad.enableContribAndExtras;
     expected = true;
-  }
-  {
-    name = "xmonad_test";
-    actual = feature.xsession.windowManager.xmonad.config;
+  };
+  test_xsession_windowManager_xmonad_config = {
+    expr = feature.xsession.windowManager.xmonad.config;
     expected = ./xmonad.hs;
-  }
-  {
-    name = "xmonad_test";
-    actual = feature.xsession.windowManager.xmonad.libFiles.autostart;
+  };
+  test_xsession_windowManager_xmonad_libFiles_autostart = {
+    expr = feature.xsession.windowManager.xmonad.libFiles.autostart;
     expected = pkgs.writeText "autostart" ''
       #!/usr/bin/env bash
     '';
-  }
-  {
-    name = "xmonad_test";
-    actual = feature.home.file.".xinitrc".source;
+  };
+  test_home_file_xinitrc_source = {
+    expr = feature.home.file.".xinitrc".source;
     expected = ./.xinitrc;
-  }
-]
+  };
+}

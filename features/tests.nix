@@ -11,10 +11,9 @@ args @ {...}: {
   network = import ./network/tests.nix args;
   nix = import ./nix/tests.nix args;
   nixos = import ./nixos/tests.nix args;
-  # TODO: complete
-  # office = import ./office/tests.nix args;
-  # programming = import ./programming/tests.nix args;
-  # security = import ./security/tests.nix args;
-  # virtual-machine = import ./virtual-machine/tests.nix args;
-  # window-manager = import ./window-manager/tests.nix args;
+  office = import ./office/tests.nix args;
+  programming = import ./programming/tests.nix args;
+  security = import ./security/tests.nix args;
+  virtual-machine = import ./virtual-machine/tests.nix args;
+  window-manager = import ./window-manager/tests.nix args;
 }

@@ -1,16 +1,12 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "nodejs_test";
-    actual = builtins.elem pkgs.nodejs feature.environment.systemPackages;
+args @ {pkgs, ...}: let
+  feature = import ./default.nix args;
+in {
+  test_environment_systemPackages_nodejs = {
+    expr = builtins.elem pkgs.nodejs feature.environment.systemPackages;
     expected = true;
-  }
-  {
-    name = "nodejs_test";
-    actual = builtins.elem pkgs.nodePackages.pnpm feature.environment.systemPackages;
+  };
+  test_environment_systemPackages_pnpm = {
+    expr = builtins.elem pkgs.nodePackages.pnpm feature.environment.systemPackages;
     expected = true;
-  }
-]
+  };
+}

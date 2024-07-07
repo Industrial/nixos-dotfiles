@@ -21,4 +21,10 @@ in {
     expr = feature.users.users.${settings.username}.extraGroups;
     expected = ["audio" "networkmanager" "plugdev" "wheel" "data"];
   };
+  test_systemd_tmpfiles_rules = {
+    expr = feature.systemd.tmpfiles.rules;
+    expected = [
+      "d /data 0770 root data - -"
+    ];
+  };
 }

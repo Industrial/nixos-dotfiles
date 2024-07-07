@@ -1,7 +1,7 @@
 args @ {...}: let
   feature = import ./default.nix args;
 in {
-  test_systemPackages = {
+  test_environment_systemPackages = {
     expr = feature.services.nix-daemon.enable;
     expected = true;
   };

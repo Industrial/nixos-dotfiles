@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{settings, ...}: {
   system = {
     stateVersion = settings.stateVersion;
   };

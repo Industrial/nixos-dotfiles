@@ -1,4 +1,4 @@
-{settings, ...}: {
+{...}: {
   microvm = {
     socket = "control.socket";
     hypervisor = "qemu";

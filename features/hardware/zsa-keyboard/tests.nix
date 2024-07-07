@@ -10,7 +10,7 @@ in {
     expr = feature.hardware.keyboard.zsa.enable;
     expected = true;
   };
-  test_systemPackages = {
+  test_environment_systemPackages = {
     expr = builtins.elem pkgs.wally-cli feature.environment.systemPackages;
     expected = true;
   };

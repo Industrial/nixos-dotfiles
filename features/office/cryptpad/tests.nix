@@ -1,42 +1,32 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  inputs = import ../../../../host/test/inputs.nix;
-  feature = import ./default.nix {inherit pkgs settings inputs;};
-in [
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.enable;
+args @ {...}: let
+  feature = import ./default.nix args;
+in {
+  test_services_cryptpad_enable = {
+    expr = feature.services.cryptpad.enable;
     expected = true;
-  }
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.configureNginx;
+  };
+  test_services_cryptpad_configureNginx = {
+    expr = feature.services.cryptpad.configureNginx;
     expected = false;
-  }
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.settings.httpUnsafeOrigin;
+  };
+  test_services_cryptpad_settings_httpUnsafeOrigin = {
+    expr = feature.services.cryptpad.settings.httpUnsafeOrigin;
     expected = "http://127.0.0.1:4020";
-  }
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.settings.httpSafeOrigin;
+  };
+  test_services_cryptpad_settings_httpSafeOrigin = {
+    expr = feature.services.cryptpad.settings.httpSafeOrigin;
     expected = "http://127.0.0.1:4020";
-  }
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.settings.httpAddress;
+  };
+  test_services_cryptpad_settings_httpAddress = {
+    expr = feature.services.cryptpad.settings.httpAddress;
     expected = "127.0.0.1";
-  }
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.settings.httpPort;
+  };
+  test_services_cryptpad_settings_httpPort = {
+    expr = feature.services.cryptpad.settings.httpPort;
     expected = 4020;
-  }
-  {
-    name = "cryptpad_test";
-    actual = feature.services.cryptpad.settings.adminKeys;
+  };
+  test_services_cryptpad_settings_adminKeys = {
+    expr = feature.services.cryptpad.settings.adminKeys;
     expected = ["[tom@127.0.0.1:4020/f5bdoXYd9Jlw0pao6HRYE7jMcLl0Ky3+tvI-OG4kBZI=]"];
-  }
-]
+  };
+}

@@ -1,0 +1,58 @@
+# Lidarr is a music collection manager for Usenet and BitTorrent users
+{pkgs, ...}: let
+  port = 8686;
+in {
+  environment = {
+    systemPackages = with pkgs; [
+      lidarr
+    ];
+  };
+
+  # TODO: Do we want this to be available on the network?
+  # networking = {
+  #   firewwall = {
+  #     allowedTCPPorts = [
+  #       8686
+  #     ];
+  #   };
+  # };
+
+  systemd = {
+    services = {
+      lidarr = {
+        description = "Lidarr Daemon";
+        wantedBy = ["multi-user.target"];
+        after = ["network.target"];
+        serviceConfig = {
+          Type = "simple";
+          User = "lidarr";
+          Group = "data";
+          ExecStart = "${pkgs.lidarr}/bin/Lidarr --nobrowser --data=/data/lidarr";
+          Restart = "always";
+          RestartSec = 5;
+        };
+      };
+    };
+
+    tmpfiles = {
+      rules = [
+        "d /data/lidarr 0770 lidarr data - -"
+      ];
+    };
+  };
+
+  users = {
+    users = {
+      lidarr = {
+        isSystemUser = true;
+        home = "/home/lidarr";
+        createHome = true;
+        group = "lidarr";
+        extraGroups = ["data"];
+      };
+    };
+    groups = {
+      lidarr = {};
+    };
+  };
+}

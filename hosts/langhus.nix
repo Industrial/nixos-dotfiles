@@ -60,11 +60,16 @@
         ../features/hardware/zsa-keyboard
         ../features/media/eog
         ../features/media/invidious
+        ../features/media/lidarr
         ../features/media/lxqt-pavucontrol-qt
         ../features/media/lxqt-screengrab
         ../features/media/mpv
         ../features/media/obs-studio
         ../features/media/okular
+        ../features/media/prowlarr
+        ../features/media/radarr
+        ../features/media/readarr
+        ../features/media/sonarr
         ../features/media/spotify
         ../features/media/vlc
         ../features/monitoring/grafana

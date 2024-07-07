@@ -1,16 +1,16 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "alacritty_test";
-    actual = builtins.elem pkgs.alacritty feature.environment.systemPackages;
+args @ {
+  pkgs,
+  settings,
+  ...
+}: let
+  feature = import ./default.nix args;
+in {
+  test_environment_systemPackages = {
+    expr = builtins.elem pkgs.alacritty feature.environment.systemPackages;
     expected = true;
-  }
-  {
-    name = "alacritty_test";
-    actual = feature.system.activationScripts.linkFile.text;
+  };
+  test_system_activationScripts_linkFile_text = {
+    expr = feature.system.activationScripts.linkFile.text;
     expected = ''
       mkdir -p /home/${settings.username}/.config/alacritty
       ln -sf ${pkgs.writeTextFile {
@@ -18,5 +18,5 @@ in [
         text = builtins.readFile ./.config/alacritty/alacritty.toml;
       }} /home/${settings.username}/.config/alacritty/alacritty.toml
     '';
-  }
-]
+  };
+}

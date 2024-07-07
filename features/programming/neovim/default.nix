@@ -1,11 +1,5 @@
 # TODO: Copilot Chat: https://github.com/nix-community/nixvim/issues/1425
-{
-  inputs,
-  settings,
-  pkgs,
-  lib,
-  ...
-}: {
+{pkgs, ...}: {
   imports = [
     ./backup-files.nix
     ./buffer-search.nix

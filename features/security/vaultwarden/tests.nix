@@ -1,31 +1,24 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "vaultwarden_test";
-    actual = feature.services.vaultwarden.enable;
+args @ {pkgs, ...}: let
+  feature = import ./default.nix args;
+in {
+  test_services_vaultwarden_enable = {
+    expr = feature.services.vaultwarden.enable;
     expected = true;
-  }
-  {
-    name = "vaultwarden_test";
-    actual = feature.services.vaultwarden.config.ROCKET_ADDRESS;
+  };
+  test_services_vaultwarden_config_ROCKET_ADDRESS = {
+    expr = feature.services.vaultwarden.config.ROCKET_ADDRESS;
     expected = "127.0.0.1";
-  }
-  {
-    name = "vaultwarden_test";
-    actual = feature.services.vaultwarden.config.ROCKET_PORT;
+  };
+  test_services_vaultwarden_config_ROCKET_PORT = {
+    expr = feature.services.vaultwarden.config.ROCKET_PORT;
     expected = 7000;
-  }
-  {
-    name = "vaultwarden_test";
-    actual = feature.services.vaultwarden.config.DOMAIN;
+  };
+  test_services_vaultwarden_config_DOMAIN = {
+    expr = feature.services.vaultwarden.config.DOMAIN;
     expected = "http://localhost";
-  }
-  {
-    name = "vaultwarden_test";
-    actual = feature.services.vaultwarden.config.SIGNUPS_ALLOWED;
+  };
+  test_services_vaultwarden_config_SIGNUPS_ALLOWED = {
+    expr = feature.services.vaultwarden.config.SIGNUPS_ALLOWED;
     expected = false;
-  }
-]
+  };
+}

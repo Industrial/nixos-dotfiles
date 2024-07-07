@@ -5,7 +5,7 @@ in {
     expr = feature.services.printing.enable;
     expected = true;
   };
-  test_systemPackages = {
+  test_environment_systemPackages = {
     expr = builtins.elem pkgs.cnijfilter2 feature.environment.systemPackages;
     expected = true;
   };

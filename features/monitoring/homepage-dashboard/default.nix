@@ -73,6 +73,41 @@
             description = "Invidious is an alternative front-end to YouTube";
           };
         }
+        {
+          Lidarr = {
+            icon = "http://localhost:8686/Content/Images/logo.svg";
+            href = "http://localhost:8686";
+            description = "Lidarr is a music collection manager for Usenet and BitTorrent users";
+          };
+        }
+        {
+          Radarr = {
+            icon = "http://localhost:7878/Content/Images/logo.svg";
+            href = "http://localhost:7878";
+            description = "Radarr is a movie collection manager for Usenet and BitTorrent users";
+          };
+        }
+        {
+          Readarr = {
+            icon = "http://localhost:8787/Content/Images/logo.svg";
+            href = "http://localhost:8787";
+            description = "Readarr is a book collection manager for Usenet and BitTorrent users";
+          };
+        }
+        {
+          Prowlarr = {
+            icon = "http://localhost:9696/Content/Images/logo.svg";
+            href = "http://localhost:9696";
+            description = "Prowlarr is a software that allows you to manage multiple indexers for your torrent client";
+          };
+        }
+        {
+          Sonarr = {
+            icon = "http://localhost:8989/Content/Images/logo.svg";
+            href = "http://localhost:8989";
+            description = "Sonarr is a software that helps you find, download and organize your TV shows";
+          };
+        }
       ];
     }
     {

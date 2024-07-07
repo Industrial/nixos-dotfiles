@@ -1,9 +1,4 @@
-# evince is a document reader (gnome).
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     evince
   ];

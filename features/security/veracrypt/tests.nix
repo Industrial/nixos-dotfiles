@@ -1,15 +1,8 @@
-let
-  pkgs = import <nixpkgs> {
-    config = {
-      allowUnfree = true;
-    };
-  };
-  settings = import ../../../host/test/settings.nix;
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    name = "veracrypt_test";
-    actual = builtins.elem pkgs.veracrypt feature.environment.systemPackages;
+args @ {pkgs, ...}: let
+  feature = import ./default.nix args;
+in {
+  test_environment_systemPackages = {
+    expr = builtins.elem pkgs.veracrypt feature.environment.systemPackages;
     expected = true;
-  }
-]
+  };
+}

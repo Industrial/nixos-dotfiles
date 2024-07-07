@@ -1,5 +1,4 @@
 {
-  settings,
   pkgs,
   lib,
   ...
@@ -13,17 +12,30 @@ in {
   # atelier-cave
   # atelier-estuary
   # atelier-plateau
+  # equilibrium-gray-dark.yaml
 
-  stylix.autoEnable = true;
-  stylix.base16Scheme = "${tinted-theming-schemes}/share/schemes/atelier-estuary.yaml";
-  stylix.fonts.emoji.name = "Noto Color Emoji";
-  stylix.fonts.emoji.package = pkgs.noto-fonts-emoji;
-  stylix.fonts.monospace.name = "IosevkaTerm Nerd Font Mono";
-  stylix.fonts.monospace.package = pkgs.nerdfonts;
-  stylix.fonts.sansSerif.name = "DejaVu Sans";
-  stylix.fonts.sansSerif.package = pkgs.dejavu_fonts;
-  stylix.fonts.serif.name = "DejaVu Serif";
-  stylix.fonts.serif.package = pkgs.dejavu_fonts;
-  stylix.image = ./wallpaper.jpg;
-  stylix.polarity = "dark";
+  stylix = {
+    autoEnable = true;
+    base16Scheme = "${tinted-theming-schemes}/share/schemes/atelier-estuary.yaml";
+    fonts = {
+      emoji = {
+        name = "Noto Color Emoji";
+        package = pkgs.noto-fonts-emoji;
+      };
+      monospace = {
+        name = "IosevkaTerm Nerd Font Mono";
+        package = pkgs.nerdfonts;
+      };
+      sansSerif = {
+        name = "DejaVu Sans";
+        package = pkgs.dejavu_fonts;
+      };
+      serif = {
+        name = "DejaVu Serif";
+        package = pkgs.dejavu_fonts;
+      };
+    };
+    image = ./wallpaper.jpg;
+    polarity = "dark";
+  };
 }

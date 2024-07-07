@@ -1,21 +1,17 @@
-let
-  pkgs = import <nixpkgs> {};
-  settings = import ../../../hosts/test/settings.nix;
-  # inputs = {
-  #   nix-vscode-extensions = {
-  #     extensions = {
-  #     };
-  #     ${pkgs.system};
-  #   };
+args @ {pkgs, ...}: let
+  feature = import ./default.nix args;
+in {
+  # TODO: Test this correctly.
+  # test_environment_systemPackages_vscode-with-extensions = {
+  #   expr = builtins.elem pkgs.vscode-with-extensions feature.environment.systemPackages;
+  #   expected = true;
   # };
-  feature = import ./default.nix {inherit pkgs settings;};
-in [
-  {
-    expr = builtins.elem pkgs.vscodeWithExtensions feature.environment.systemPackages;
-    expected = true;
-  }
-  {
+  test_environment_systemPackages_alejandra = {
     expr = builtins.elem pkgs.alejandra feature.environment.systemPackages;
     expected = true;
-  }
-]
+  };
+  test_environment_systemPackages_nixd = {
+    expr = builtins.elem pkgs.nixd feature.environment.systemPackages;
+    expected = true;
+  };
+}
