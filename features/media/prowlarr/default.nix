@@ -12,7 +12,7 @@ in {
   # networking = {
   #   firewwall = {
   #     allowedTCPPorts = [
-  #       8686
+  #       9696
   #     ];
   #   };
   # };
@@ -33,14 +33,28 @@ in {
         };
       };
     };
+
+    tmpfiles = {
+      rules = [
+        "d /data/prowlarr 0770 prowlarr data - -"
+        "d /data/prowlarr/data 0770 prowlarr data - -"
+      ];
+    };
   };
 
   users = {
     users = {
       prowlarr = {
         isSystemUser = true;
-        group = "data";
+        home = "/home/prowlarr";
+        createHome = true;
+        group = "prowlarr";
+        extraGroups = ["data"];
       };
+    };
+
+    groups = {
+      prowlarr = {};
     };
   };
 }

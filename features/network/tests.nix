@@ -8,5 +8,4 @@ args @ {...}: {
   syncthing = import ./syncthing/tests.nix args;
   tor = import ./tor/tests.nix args;
   tor-browser = import ./tor-browser/tests.nix args;
-  transmission = import ./transmission/tests.nix args;
 }

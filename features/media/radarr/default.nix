@@ -33,14 +33,28 @@ in {
         };
       };
     };
+
+    tmpfiles = {
+      rules = [
+        "d /data/radarr 0770 radarr data - -"
+        "d /data/radarr/data 0770 radarr data - -"
+      ];
+    };
   };
 
   users = {
     users = {
       radarr = {
         isSystemUser = true;
-        group = "data";
+        home = "/home/radarr";
+        createHome = true;
+        group = "radarr";
+        extraGroups = ["data"];
       };
+    };
+
+    groups = {
+      radarr = {};
     };
   };
 }

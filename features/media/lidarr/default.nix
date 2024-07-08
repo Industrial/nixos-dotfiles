@@ -37,6 +37,7 @@ in {
     tmpfiles = {
       rules = [
         "d /data/lidarr 0770 lidarr data - -"
+        "d /data/lidarr/data 0770 lidarr data - -"
       ];
     };
   };
@@ -51,6 +52,7 @@ in {
         extraGroups = ["data"];
       };
     };
+
     groups = {
       lidarr = {};
     };

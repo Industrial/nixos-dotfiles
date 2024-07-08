@@ -1,10 +1,6 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     # Image Viewer
-    gnome.eog
+    eog
   ];
 }

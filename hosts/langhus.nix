@@ -71,7 +71,9 @@
         ../features/media/readarr
         ../features/media/sonarr
         ../features/media/spotify
+        ../features/media/transmission
         ../features/media/vlc
+        # ../features/media/whisparr
         ../features/monitoring/grafana
         ../features/monitoring/homepage-dashboard
         ../features/monitoring/lxqt-qps
@@ -84,7 +86,6 @@
         ../features/network/syncthing
         ../features/network/tor
         ../features/network/tor-browser
-        ../features/network/transmission
         ../features/nix
         #../features/nix/nix-daemon
         ../features/nix/nix-unit

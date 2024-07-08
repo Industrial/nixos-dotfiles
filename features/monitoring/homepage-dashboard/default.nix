@@ -74,6 +74,13 @@
           };
         }
         {
+          Transmission = {
+            icon = "https://transmissionbt.com/assets/images/Transmission_icon.png";
+            href = "http://localhost:9091";
+            description = "A Fast, Easy and Free Bittorrent Client For macOS, Windows and Linux";
+          };
+        }
+        {
           Lidarr = {
             icon = "http://localhost:8686/Content/Images/logo.svg";
             href = "http://localhost:8686";
@@ -106,6 +113,13 @@
             icon = "http://localhost:8989/Content/Images/logo.svg";
             href = "http://localhost:8989";
             description = "Sonarr is a software that helps you find, download and organize your TV shows";
+          };
+        }
+        {
+          Whisparr = {
+            icon = "http://localhost:6969/Content/Images/logo.svg";
+            href = "http://localhost:6969";
+            description = "Whisparr is a software that helps you find, download and organize your PORN ITS PORN";
           };
         }
       ];

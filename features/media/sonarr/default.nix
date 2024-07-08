@@ -33,14 +33,28 @@ in {
         };
       };
     };
+
+    tmpfiles = {
+      rules = [
+        "d /data/sonarr 0770 sonarr data - -"
+        "d /data/sonarr/data 0770 sonarr data - -"
+      ];
+    };
   };
 
   users = {
     users = {
       sonarr = {
         isSystemUser = true;
-        group = "data";
+        home = "/home/sonarr";
+        createHome = true;
+        group = "sonarr";
+        extraGroups = ["data"];
       };
+    };
+
+    groups = {
+      sonarr = {};
     };
   };
 }
