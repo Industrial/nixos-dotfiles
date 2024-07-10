@@ -8,15 +8,6 @@ in {
     ];
   };
 
-  # TODO: Do we want this to be available on the network?
-  # networking = {
-  #   firewwall = {
-  #     allowedTCPPorts = [
-  #       8686
-  #     ];
-  #   };
-  # };
-
   systemd = {
     services = {
       lidarr = {

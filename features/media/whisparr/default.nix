@@ -9,15 +9,6 @@ in {
     ];
   };
 
-  # TODO: Do we want this to be available on the network?
-  # networking = {
-  #   firewwall = {
-  #     allowedTCPPorts = [
-  #       8686
-  #     ];
-  #   };
-  # };
-
   systemd = {
     services = {
       whisparr = {
@@ -28,7 +19,7 @@ in {
           Type = "simple";
           User = "whisparr";
           Group = "data";
-          ExecStart = "${pkgs.whisparr}/bin/Whisparr --nobrowser --data /data/whisparr";
+          ExecStart = "${pkgs.whisparr}/bin/Whisparr --nobrowser --data=/data/whisparr";
           Restart = "always";
           RestartSec = 5;
         };

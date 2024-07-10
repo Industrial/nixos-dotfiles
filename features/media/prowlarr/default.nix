@@ -8,15 +8,6 @@ in {
     ];
   };
 
-  # TODO: Do we want this to be available on the network?
-  # networking = {
-  #   firewwall = {
-  #     allowedTCPPorts = [
-  #       9696
-  #     ];
-  #   };
-  # };
-
   systemd = {
     services = {
       prowlarr = {
@@ -27,7 +18,7 @@ in {
           Type = "simple";
           User = "prowlarr";
           Group = "data";
-          ExecStart = "${pkgs.prowlarr}/bin/Prowlarr --nobrowser --data /data/prowlarr";
+          ExecStart = "${pkgs.prowlarr}/bin/Prowlarr --nobrowser --data=/data/prowlarr";
           Restart = "always";
           RestartSec = 5;
         };

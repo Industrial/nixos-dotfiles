@@ -8,15 +8,6 @@ in {
     ];
   };
 
-  # TODO: Do we want this to be available on the network?
-  # networking = {
-  #   firewwall = {
-  #     allowedTCPPorts = [
-  #       8686
-  #     ];
-  #   };
-  # };
-
   systemd = {
     services = {
       readarr = {
@@ -27,7 +18,7 @@ in {
           Type = "simple";
           User = "readarr";
           Group = "data";
-          ExecStart = "${pkgs.readarr}/bin/Readarr --nobrowser --data /data/readarr";
+          ExecStart = "${pkgs.readarr}/bin/Readarr --nobrowser --data=/data/readarr";
           Restart = "always";
           RestartSec = 5;
         };

@@ -1,39 +1,151 @@
 args @ {pkgs, ...}: let
   feature = import ./default.nix args;
 in {
-  test_environment_systemPackages = {
-    expr = builtins.elem pkgs.radarr feature.environment.systemPackages;
-    expected = true;
-  };
-  test_systemd_services_radarr_description = {
-    expr = feature.systemd.services.radarr.description;
-    expected = "Radarr Daemon";
-  };
-  test_systemd_services_radarr_wantedBy = {
-    expr = builtins.elem "multi-user.target" feature.systemd.services.radarr.wantedBy;
-    expected = true;
-  };
-  test_systemd_services_radarr_after = {
-    expr = builtins.elem "network.target" feature.systemd.services.radarr.after;
-    expected = true;
-  };
-  test_systemd_services_radarr_serviceConfig_Type = {
-    expr = feature.systemd.services.radarr.serviceConfig;
-    expected = {
-      Type = "simple";
-      User = "radarr";
-      Group = "data";
-      ExecStart = "${pkgs.radarr}/bin/Radarr --nobrowser --data /data/radarr";
-      Restart = "always";
-      RestartSec = 5;
+  environment = {
+    systemPackages = {
+      test = {
+        expr = builtins.elem pkgs.whisparr feature.environment.systemPackages;
+        expected = true;
+      };
     };
   };
-  test_users_users_radarr_isSystemUser = {
-    expr = feature.users.users.radarr.isSystemUser;
-    expected = true;
+
+  systemd = {
+    services = {
+      whisparr = {
+        description = {
+          test = {
+            expr = feature.systemd.services.whisparr.description;
+            expected = "Whisparr Daemon";
+          };
+        };
+
+        wantedBy = {
+          test = {
+            expr = builtins.elem "multi-user.target" feature.systemd.services.whisparr.wantedBy;
+            expected = true;
+          };
+        };
+
+        after = {
+          test = {
+            expr = builtins.elem "network.target" feature.systemd.services.whisparr.after;
+            expected = true;
+          };
+        };
+
+        serviceConfig = {
+          Type = {
+            test = {
+              expr = feature.systemd.services.whisparr.serviceConfig.Type;
+              expected = "simple";
+            };
+          };
+
+          User = {
+            test = {
+              expr = feature.systemd.services.whisparr.serviceConfig.User;
+              expected = "whisparr";
+            };
+          };
+
+          Group = {
+            test = {
+              expr = feature.systemd.services.whisparr.serviceConfig.Group;
+              expected = "data";
+            };
+          };
+
+          ExecStart = {
+            test = {
+              expr = feature.systemd.services.whisparr.serviceConfig.ExecStart;
+              expected = "${pkgs.whisparr}/bin/Whisparr --nobrowser --data=/data/whisparr";
+            };
+          };
+
+          Restart = {
+            test = {
+              expr = feature.systemd.services.whisparr.serviceConfig.Restart;
+              expected = "always";
+            };
+          };
+
+          RestartSec = {
+            test = {
+              expr = feature.systemd.services.whisparr.serviceConfig.RestartSec;
+              expected = 5;
+            };
+          };
+        };
+      };
+    };
+
+    tmpfiles = {
+      rules = {
+        data-whisparr = {
+          data = {
+            expr = builtins.elem "d /data/whisparr 0770 whisparr data - -" feature.systemd.tmpfiles.rules;
+            expected = true;
+          };
+        };
+
+        data-whisparr-data = {
+          data = {
+            expr = builtins.elem "d /data/whisparr/data 0770 whisparr data - -" feature.systemd.tmpfiles.rules;
+            expected = true;
+          };
+        };
+      };
+    };
   };
-  test_users_users_radarr_group = {
-    expr = feature.users.users.radarr.group;
-    expected = "data";
+
+  users = {
+    users = {
+      whisparr = {
+        isSystemUser = {
+          test = {
+            expr = feature.users.users.whisparr.isSystemUser;
+            expected = true;
+          };
+        };
+
+        home = {
+          test = {
+            expr = feature.users.users.whisparr.home;
+            expected = "/home/whisparr";
+          };
+        };
+
+        createHome = {
+          test = {
+            expr = feature.users.users.whisparr.createHome;
+            expected = true;
+          };
+        };
+
+        group = {
+          test = {
+            expr = feature.users.users.whisparr.group;
+            expected = "whisparr";
+          };
+        };
+
+        extraGroups = {
+          test = {
+            expr = feature.users.users.whisparr.extraGroups;
+            expected = ["data"];
+          };
+        };
+      };
+    };
+
+    groups = {
+      whisparr = {
+        test = {
+          expr = feature.users.groups.whisparr;
+          expected = {};
+        };
+      };
+    };
   };
 }
