@@ -64,18 +64,18 @@
       extensions.vscode-marketplace.ms-vscode.js-debug-companion
       extensions.vscode-marketplace.oven.bun-vscode
       extensions.vscode-marketplace.vitest.explorer
-      ## Python
-      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
-      extensions.vscode-marketplace.ms-python.black-formatter
-      extensions.vscode-marketplace.ms-python.debugpy
-      extensions.vscode-marketplace.ms-python.flake8
-      extensions.vscode-marketplace.ms-python.isort
-      extensions.vscode-marketplace.ms-python.python
-      extensions.vscode-marketplace.ms-python.vscode-pylance
-      extensions.vscode-marketplace.tamasfe.even-better-toml
-      ## Jupyter
-      extensions.vscode-marketplace.ms-toolsai.jupyter
-      extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
+      ### Python
+      #extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
+      #extensions.vscode-marketplace.ms-python.black-formatter
+      #extensions.vscode-marketplace.ms-python.debugpy
+      #extensions.vscode-marketplace.ms-python.flake8
+      #extensions.vscode-marketplace.ms-python.isort
+      #extensions.vscode-marketplace.ms-python.python
+      #extensions.vscode-marketplace.ms-python.vscode-pylance
+      #extensions.vscode-marketplace.tamasfe.even-better-toml
+      ### Jupyter
+      #extensions.vscode-marketplace.ms-toolsai.jupyter
+      #extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
       ## Nix
       extensions.vscode-marketplace.bbenoist.nix
       extensions.vscode-marketplace.jnoortheen.nix-ide
@@ -101,14 +101,9 @@
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
       extensions.vscode-marketplace.ms-playwright.playwright
       extensions.vscode-marketplace.ms-vscode.test-adapter-converter
+
+      # WhichKey
       extensions.vscode-marketplace.vspacecode.whichkey
-
-      # Remote / SSH
-      extensions.vscode-marketplace.ms-vscode-remote.remote-ssh
-      extensions.vscode-marketplace.ms-vscode-remote.vscode-remote-extensionpack
-
-      # Text to Speech
-      extensions.vscode-marketplace.ms-vscode.vscode-speech
     ];
   };
 in {
