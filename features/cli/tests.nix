@@ -12,6 +12,7 @@ args @ {...}: {
   dust = import ./dust/tests.nix args;
   e2fsprogs = import ./e2fsprogs/tests.nix args;
   eza = import ./eza/tests.nix args;
+  fastfetch = import ./fastfetch/tests.nix args;
   fd = import ./fd/tests.nix args;
   fh = import ./fh/tests.nix args;
   fish = import ./fish/tests.nix args;
@@ -22,7 +23,6 @@ args @ {...}: {
   l = import ./l/tests.nix args;
   lazygit = import ./lazygit/tests.nix args;
   ll = import ./ll/tests.nix args;
-  neofetch = import ./neofetch/tests.nix args;
   nushell = import ./nushell/tests.nix args;
   p7zip = import ./p7zip/tests.nix args;
   ranger = import ./ranger/tests.nix args;

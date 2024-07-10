@@ -32,6 +32,7 @@
         ../features/cli/dust
         ../features/cli/e2fsprogs
         ../features/cli/eza
+        ../features/cli/fastfetch
         ../features/cli/fd
         ../features/cli/fh
         ../features/cli/fish
@@ -42,7 +43,6 @@
         ../features/cli/l
         ../features/cli/lazygit
         ../features/cli/ll
-        ../features/cli/neofetch
         ../features/cli/nushell
         ../features/cli/p7zip
         ../features/cli/ranger

@@ -2,7 +2,7 @@ args @ {pkgs, ...}: let
   feature = import ./default.nix args;
 in {
   test_environment_systemPackages = {
-    expr = builtins.elem pkgs.neofetch feature.environment.systemPackages;
+    expr = builtins.elem pkgs.fastfetch feature.environment.systemPackages;
     expected = true;
   };
 }
