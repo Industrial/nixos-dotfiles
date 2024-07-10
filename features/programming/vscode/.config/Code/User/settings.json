@@ -249,6 +249,26 @@
     "**/*.ts"
   ],
   "vitest.nodeEnv": null,
+  "vim.normalModeKeyBindingsNonRecursive": [
+    {
+      "before": [
+        "<space>"
+      ],
+      "commands": [
+        "whichkey.show"
+      ]
+    }
+  ],
+  "vim.visualModeKeyBindingsNonRecursive": [
+    {
+      "before": [
+        "<space>"
+      ],
+      "commands": [
+        "whichkey.show"
+      ]
+    }
+  ],
   "vitest.showFailMessages": true,
   "window.autoDetectColorScheme": true,
   "workbench.editor.enablePreview": false,

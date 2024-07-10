@@ -101,6 +101,7 @@
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
       extensions.vscode-marketplace.ms-playwright.playwright
       extensions.vscode-marketplace.ms-vscode.test-adapter-converter
+      extensions.vscode-marketplace.vspacecode.whichkey
 
       # Remote / SSH
       extensions.vscode-marketplace.ms-vscode-remote.remote-ssh
