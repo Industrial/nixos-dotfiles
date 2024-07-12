@@ -20,7 +20,7 @@
     }
     .${pkgs.system}
     or throwSystem;
-  vscodePatched = pkgs.vscode.overrideAttrs (oldAttrs: {
+  vscodePatched = pkgs.vscode.overrideAttrs {
     version = version;
     src = pkgs.fetchurl {
       name = "VSCode_${version}_${plat}.${archive_fmt}";
@@ -31,7 +31,7 @@
       # NixOS
       sha256 = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
     };
-  });
+  };
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = vscodePatched;
     vscodeExtensions = [
@@ -96,6 +96,10 @@
       extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
       ## EdgeDB
       extensions.vscode-marketplace.magicstack.edgedb
+      ## Erlang
+      extensions.vscode-marketplace.pgourlain.erlang
+      ## Gleam
+      extensions.vscode-marketplace.gleam.gleam
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer

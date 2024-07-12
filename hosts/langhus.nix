@@ -129,6 +129,7 @@
         ../features/programming/edgedb
         ../features/programming/git
         ../features/programming/gitkraken
+        ../features/programming/gleam
         ../features/programming/glogg
         # ../features/programming/insomnia
         # ../features/programming/local-ai
