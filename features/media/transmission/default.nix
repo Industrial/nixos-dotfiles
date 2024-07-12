@@ -8,6 +8,7 @@
   services = {
     transmission = {
       enable = true;
+      package = pkgs.transmission_4;
       user = "transmission";
       group = pkgs.lib.mkForce "data";
       home = "/home/transmission";

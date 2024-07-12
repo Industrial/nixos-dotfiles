@@ -6,6 +6,10 @@
     # Flake Parts
     flake-parts.url = "github:hercules-ci/flake-parts";
 
+    # Nix Git Hooks
+    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+
     # Nix GitHub Actions
     nix-github-actions.url = "github:nix-community/nix-github-actions";
     nix-github-actions.inputs.nixpkgs.follows = "nixpkgs";
@@ -80,30 +84,29 @@
         nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
         darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
       };
+
       perSystem = {
-        pkgs,
         system,
+        pkgs,
         ...
       }: let
       in {
         formatter = pkgs.alejandra;
 
         checks = {
-          tests =
-            inputs.nixpkgs.legacyPackages.${system}.runCommand "tests"
-            {
-              nativeBuildInputs = [inputs.nix-unit.packages.${system}.default];
-            } ''
-              #!/usr/bin/env bash
-              export HOME="$(realpath .)"
-              # The nix derivation must be able to find all used inputs in the
-              # nix-store because it cannot download it during buildTime.
-              nix-unit --eval-store "$HOME" \
-                --extra-experimental-features flakes \
-                --override-input nixpkgs ${inputs.nixpkgs} \
-                --flake ${self}#tests
-              touch $out
-            '';
+          pre-commit-check = import ./checks/pre-commit.nix {inherit inputs system pkgs;};
+          # tests = import ./checks/tests.nix {inherit inputs self system pkgs;};
+        };
+
+        devShells = {
+          default = pkgs.mkShell {
+            inherit (self.checks.${system}.pre-commit-check) shellHook;
+            buildInputs = self.checks.${system}.pre-commit-check.enabledPackages;
+            inputsFrom = [];
+            packages = with pkgs; [
+              direnv
+            ];
+          };
         };
       };
     };

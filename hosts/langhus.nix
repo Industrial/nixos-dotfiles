@@ -74,7 +74,8 @@
         ../features/media/readarr
         ../features/media/sonarr
         ../features/media/spotify
-        ../features/media/transmission
+        # TODO: Got a build error...
+        #../features/media/transmission
         ../features/media/vlc
         # ../features/media/whisparr
         ../features/monitoring/grafana
