@@ -55,6 +55,7 @@
         ../features/communication/discord
         # ../features/crypto/monero
         # ../features/filesystems/gparted
+        # ../features/games/flatpak
         ../features/games/lutris
         ../features/games/path-of-building
         ../features/games/steam
@@ -74,8 +75,7 @@
         ../features/media/readarr
         ../features/media/sonarr
         ../features/media/spotify
-        # TODO: Got a build error...
-        #../features/media/transmission
+        ../features/media/transmission
         ../features/media/vlc
         # ../features/media/whisparr
         ../features/monitoring/grafana

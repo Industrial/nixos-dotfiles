@@ -89,8 +89,7 @@
         system,
         pkgs,
         ...
-      }: let
-      in {
+      }: {
         formatter = pkgs.alejandra;
 
         checks = {

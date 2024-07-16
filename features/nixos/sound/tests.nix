@@ -1,32 +1,72 @@
-args @ {...}: let
+args @ {pkgs, ...}: let
   feature = import ./default.nix args;
 in {
-  test_sound_enable = {
-    expr = feature.sound.enable;
-    expected = false;
+  hardware = {
+    pulseaudio = {
+      enable = {
+        test = {
+          expr = feature.hardware.pulseaudio.enable;
+          expected = false;
+        };
+      };
+    };
   };
-  test_hardware_pulseaudio_enable = {
-    expr = feature.hardware.pulseaudio.enable;
-    expected = false;
+
+  security = {
+    rtkit = {
+      enable = {
+        test = {
+          expr = feature.security.rtkit.enable;
+          expected = true;
+        };
+      };
+    };
   };
-  test_security_rtkit_enable = {
-    expr = feature.security.rtkit.enable;
-    expected = true;
+
+  services = {
+    pipewire = {
+      enable = {
+        test = {
+          expr = feature.services.pipewire.enable;
+          expected = true;
+        };
+      };
+      alsa = {
+        enable = {
+          test = {
+            expr = feature.services.pipewire.alsa.enable;
+            expected = true;
+          };
+        };
+        support32Bit = {
+          test = {
+            expr = feature.services.pipewire.alsa.support32Bit;
+            expected = true;
+          };
+        };
+      };
+      pulse = {
+        enable = {
+          test = {
+            expr = feature.services.pipewire.pulse.enable;
+            expected = true;
+          };
+        };
+      };
+    };
   };
-  test_services_pipewire_enable = {
-    expr = feature.services.pipewire.enable;
-    expected = true;
-  };
-  test_services_pipewire_alsa_enable = {
-    expr = feature.services.pipewire.alsa.enable;
-    expected = true;
-  };
-  test_services_pipewire_alsa_support32Bit = {
-    expr = feature.services.pipewire.alsa.support32Bit;
-    expected = true;
-  };
-  test_services_pipewire_pulse_enable = {
-    expr = feature.services.pipewire.pulse.enable;
-    expected = true;
+
+  environment = {
+    systemPackages = {
+      test_pavucontrol = {
+        expr = builtins.elem pkgs.pavucontrol feature.environment.systemPackages;
+        expected = true;
+      };
+
+      test_pulsemixer = {
+        expr = builtins.elem pkgs.pulsemixer feature.environment.systemPackages;
+        expected = true;
+      };
+    };
   };
 }

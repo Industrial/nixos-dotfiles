@@ -2,13 +2,15 @@
   inputs,
   self,
   system,
+  pkgs,
   ...
 }:
-inputs.nixpkgs.legacyPackages.${system}.runCommand "tests"
+pkgs.runCommand "tests"
 {
-  nativeBuildInputs = [inputs.nix-unit.packages.${system}.default];
+  nativeBuildInputs = [
+    inputs.nix-unit.packages.${system}.default
+  ];
 } ''
-  #!/usr/bin/env bash
   export HOME="$(realpath .)"
   # The nix derivation must be able to find all used inputs in the nix-store
   # because it cannot download it during buildTime.
