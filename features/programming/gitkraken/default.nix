@@ -1,9 +1,5 @@
 # Gitkraken is a git GUI.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     gitkraken
   ];

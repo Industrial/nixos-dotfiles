@@ -1,9 +1,5 @@
 # LXQT Archiver is an archiving tool for the LXQT desktop environment.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     lxqt.lxqt-archiver
   ];

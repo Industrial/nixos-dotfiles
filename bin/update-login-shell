@@ -4,7 +4,7 @@ exec > >(tee ./logs/update-login-shell) 2>&1
 
 source lib/lowercase.bash
 
-USER=$(lowercase ${1:-$USER})
+USER=$(lowercase "${1:-$USER}")
 echo "bin/update-login-shell > user: ${USER}"
 
 echo "bin/update-login-shell > chsh -s /run/current-system/sw/bin/fish"

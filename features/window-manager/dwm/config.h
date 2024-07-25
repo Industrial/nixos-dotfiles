@@ -123,7 +123,7 @@ static const Key keys[] = {
 	{ MODKEY|ControlMask|ShiftMask, XK_q,      quit,           {0} },
 
 	// Restart DWM (restartsig patch)
-	{ MODKEY|ControlMask|ShiftMask, XK_r,      quit,           {1} }, 
+	{ MODKEY|ControlMask|ShiftMask, XK_r,      quit,           {1} },
 };
 
 /* button definitions */

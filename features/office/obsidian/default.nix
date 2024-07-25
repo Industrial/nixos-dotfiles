@@ -1,9 +1,5 @@
 # Note Taker.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     obsidian
   ];

@@ -1,4 +1,4 @@
-args @ {pkgs, ...}: let
+args @ {...}: let
   feature = import ./default.nix args;
 in {
   test_microvm_socket = {

@@ -1,9 +1,5 @@
 # I need unzip.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     unzip
   ];

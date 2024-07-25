@@ -1,9 +1,5 @@
 # Tor Browser Bundle.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     tor-browser-bundle-bin
   ];

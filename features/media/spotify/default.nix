@@ -1,9 +1,5 @@
 # Music Library & Player.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     spotify
   ];

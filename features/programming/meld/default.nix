@@ -1,9 +1,5 @@
 # Meld is a diff viewer.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     meld
   ];

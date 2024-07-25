@@ -88,7 +88,7 @@
       prefix = "<leader>"
     })
   '';
-}
-# vim.keymap.set({'x'},      'R',     flash.treesitter_search, { noremap = true })
-# vim.keymap.set({'c'},      '<c-s>', flash.toggle,            { noremap = true })
 
+  # vim.keymap.set({'x'},      'R',     flash.treesitter_search, { noremap = true })
+  # vim.keymap.set({'c'},      '<c-s>', flash.toggle,            { noremap = true })
+}

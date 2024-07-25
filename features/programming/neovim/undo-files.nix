@@ -1,8 +1,4 @@
-{
-  config,
-  settings,
-  ...
-}: {
+{settings, ...}: {
   # Use undo files.
   programs.nixvim.opts.undofile = true;
 

@@ -1,9 +1,5 @@
 # Syncthing syncs things.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{settings, ...}: {
   services.syncthing.enable = true;
   services.syncthing.user = settings.username;
   services.syncthing.dataDir = "${settings.userdir}/Documents";

@@ -1,9 +1,5 @@
 # Chat.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     discord
   ];

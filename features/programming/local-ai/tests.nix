@@ -1,4 +1,4 @@
-args @ {pkgs, ...}: let
+args @ {...}: let
   feature = import ./default.nix args;
 in {
   test_virtualisation_oci-containers_containers_localai_image = {

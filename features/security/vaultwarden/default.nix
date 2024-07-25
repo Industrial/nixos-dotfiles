@@ -1,8 +1,4 @@
-{
-  pkgs,
-  settings,
-  ...
-}: {
+{...}: {
   services.vaultwarden.enable = true;
   services.vaultwarden.config.ROCKET_ADDRESS = "127.0.0.1";
   services.vaultwarden.config.ROCKET_PORT = 7000;

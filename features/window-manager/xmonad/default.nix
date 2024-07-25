@@ -1,10 +1,6 @@
 # xmonad is a tiling window manager for X. It is written in Haskell, and is
 # extensible in that language.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   xsession.windowManager.xmonad.enable = true;
   xsession.windowManager.xmonad.enableContribAndExtras = true;
   xsession.windowManager.xmonad.config = ./xmonad.hs;

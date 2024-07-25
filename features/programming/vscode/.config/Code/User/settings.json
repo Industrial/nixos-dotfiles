@@ -169,7 +169,6 @@
   "github.copilot.enable": {
     "*": false
   },
-  // "haskell.hlint.executablePath": "hlint",
   "http.proxyStrictSSL": false,
   "javascript.updateImportsOnFileMove.enabled": "always",
   "jupyter.askForKernelRestart": false,
@@ -276,5 +275,5 @@
   "workbench.list.openMode": "doubleClick",
   "workbench.startupEditor": "none",
   "supermaven.otherWarning": false,
-  "editor.wordWrap": "off",
+  "editor.wordWrap": "off"
 }

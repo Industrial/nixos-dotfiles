@@ -1,9 +1,5 @@
 # Slock is a screen lock.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     slock
   ];

@@ -1,9 +1,5 @@
 # The web browser.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     firefox
   ];

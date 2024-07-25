@@ -37,12 +37,7 @@
 # ssh -o IdentityFile=~/.ssh/<priv_key> \
 #     -p <port> \
 #     <user>@[<Yggdrasil network address>]
-{
-  settings,
-  config,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   # Note on services on yggdrasil: for every service, you need to
   # open ports in firewall:
   # in this example:

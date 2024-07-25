@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}:
+{pkgs, ...}:
 pkgs.fishPlugins.buildFishPlugin rec {
   pname = "Hávamál";
   version = "v0.3.1";

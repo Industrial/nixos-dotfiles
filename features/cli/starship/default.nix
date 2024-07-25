@@ -1,9 +1,5 @@
 # Prompt.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     starship
   ];

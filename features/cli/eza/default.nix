@@ -1,9 +1,5 @@
 # eza is a ls replacement.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     eza
   ];

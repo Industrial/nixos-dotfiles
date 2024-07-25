@@ -1,9 +1,5 @@
 # SqLite.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     sqlite
   ];

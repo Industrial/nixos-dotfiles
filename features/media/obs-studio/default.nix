@@ -1,9 +1,5 @@
 # Screen Recorder and Streamer.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     obs-studio
   ];

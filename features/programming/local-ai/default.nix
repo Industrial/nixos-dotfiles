@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{...}: {
   # docker run -ti -p 8080:8080 localai/localai:v2.5.1-ffmpeg-core phi-2
   virtualisation.oci-containers.containers = {
     localai = {

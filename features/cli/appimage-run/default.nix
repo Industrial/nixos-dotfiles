@@ -1,9 +1,5 @@
 # AppImage Runtime.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     appimage-run
   ];

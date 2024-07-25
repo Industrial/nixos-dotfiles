@@ -41,12 +41,12 @@ main = xmonad $ def
 
 -- main = xmonad $ def
 --   { terminal = "alacritty",
--- 
+--
 --     -- focusFollowsMouse = True,
 --     -- clickJustFocuses = False,
--- 
+--
 --     modMask = mod4Mask,
--- 
+--
 --     -- workspaces = [
 --     --   "1:Browser",
 --     --   "2:Editor",
@@ -59,26 +59,26 @@ main = xmonad $ def
 --     --   "9:Office",
 --     --   "0:Scratch"
 --     -- ],
--- 
+--
 --     -- borderWidth = 1,
 --     -- normalBorderColor = "#000000",
 --     -- focusedBorderColor = "#336699",
--- 
+--
 --     -- key bindings
 --     -- keys = myKeys,
 --     -- mouseBindings = myMouseBindings,
--- 
+--
 --     -- hooks, layouts
 --     -- layoutHook = avoidStruts myLayout,
 --     -- manageHook = manageSpawn <+> manageDocks <+> manageHook defaultConfig,
--- 
+--
 --     -- TODO: Find out what this does
 --     -- handleEventHook = mempty,
--- 
+--
 --     -- logHook = dynamicLogWithPP xmobarPP {
 --     --   ppOutput = hPutStrLn xmproc
 --     -- },
--- 
+--
 --     -- startupHook = myStartupHook
 --   }
 --   `additionalKeysP`
@@ -173,10 +173,10 @@ main = xmonad $ def
 --     -- mod-button1, Set the window to floating mode and move by dragging
 --     ((modm, button1), \w -> focus w >> mouseMoveWindow w
 --                                     >> windows StackSet.shiftMaster),
--- 
+--
 --     -- mod-button2, Raise the window to the top of the stack
 --     ((modm, button2), \w -> focus w >> windows StackSet.shiftMaster),
--- 
+--
 --     -- mod-button3, Set the window to floating mode and resize by dragging
 --     ((modm, button3), \w -> focus w >> mouseResizeWindow w
 --                                      >> windows StackSet.shiftMaster)

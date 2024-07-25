@@ -1,9 +1,5 @@
 # Insomnia is a HTTP test tool.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     insomnia
   ];

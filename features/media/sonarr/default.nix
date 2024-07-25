@@ -1,6 +1,6 @@
 # Sonarr is a software that helps you find, download and organize your TV shows.
 {pkgs, ...}: let
-  port = 8989;
+  # port = 8989;
 in {
   environment = {
     systemPackages = with pkgs; [

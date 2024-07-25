@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{settings, ...}: {
   nixpkgs = {
     hostPlatform = settings.hostPlatform;
     config = {

@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   services.dbus.apparmor = "enabled";
   security.apparmor.enable = true;
   # security.apparmor.policies = {};

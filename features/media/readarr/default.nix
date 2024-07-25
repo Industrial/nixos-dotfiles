@@ -1,6 +1,6 @@
 # Readarr is a movie collection manager for Usenet and BitTorrent users
 {pkgs, ...}: let
-  port = 7878;
+  # port = 7878;
 in {
   environment = {
     systemPackages = with pkgs; [

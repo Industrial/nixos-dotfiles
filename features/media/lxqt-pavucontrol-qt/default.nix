@@ -2,11 +2,7 @@
 # PulseAudio sound server.
 # TODO: When I start this, it's not tiled/fullscreen but floating. Try to get
 #       this window to tile.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     lxqt.pavucontrol-qt
   ];

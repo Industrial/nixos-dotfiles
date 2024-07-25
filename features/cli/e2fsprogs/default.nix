@@ -1,9 +1,5 @@
 # e2fsprogs contains hard disk tools. https://en.wikipedia.org/wiki/E2fsprogs
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     e2fsprogs
   ];

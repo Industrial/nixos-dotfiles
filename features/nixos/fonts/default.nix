@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   # fonts.fonts = with pkgs; [
   #   (pkgs.iosevka.override {
   #     set = "term";

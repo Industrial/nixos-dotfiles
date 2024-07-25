@@ -4,10 +4,10 @@ exec > >(tee ./logs/update-nixos) 2>&1
 
 source lib/lowercase.bash
 
-HOST=$(lowercase ${1:-"langhus"})
+HOST=$(lowercase "${1:-"langhus"}")
 echo "bin/update-nixos > host: ${HOST}"
 
-USER=$(lowercase ${2:-$USER})
+USER=$(lowercase "${2:-$USER}")
 echo "bin/update-nixos > user: ${USER}"
 
 features/programming/vscode/bin/clear-cache

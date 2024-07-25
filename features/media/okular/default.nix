@@ -1,9 +1,5 @@
 # Okular is a universal document viewer.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     okular
   ];

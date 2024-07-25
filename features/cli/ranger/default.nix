@@ -1,9 +1,5 @@
 # Ranger is a file browser for the command line.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     ranger
   ];

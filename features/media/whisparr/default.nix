@@ -1,7 +1,7 @@
 # TODO: Whisparr is not available on NixOS yet.
 # Whisparr is a software that helps you find, download and organize your PORN ITS PORN
 {pkgs, ...}: let
-  port = 6969;
+  # port = 6969;
 in {
   environment = {
     systemPackages = with pkgs; [

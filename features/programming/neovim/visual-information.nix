@@ -1,4 +1,4 @@
-{lib, ...}: {
+{...}: {
   # Shows the context you are in on the top of the buffer.
   programs.nixvim.plugins.barbecue.enable = true;
 

@@ -1,9 +1,5 @@
 # PCManFM-QT is a file manager for the LXQT desktop.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     lxqt.pcmanfm-qt
   ];

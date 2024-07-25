@@ -1,6 +1,6 @@
 # Lidarr is a music collection manager for Usenet and BitTorrent users
 {pkgs, ...}: let
-  port = 8686;
+  # port = 8686;
 in {
   environment = {
     systemPackages = with pkgs; [

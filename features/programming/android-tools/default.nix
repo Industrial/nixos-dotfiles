@@ -1,9 +1,5 @@
 # Android Developer Tools.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     android-tools
   ];

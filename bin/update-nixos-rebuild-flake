@@ -4,7 +4,7 @@ exec > >(tee ./logs/update-nixos-rebuild-flake) 2>&1
 
 source lib/lowercase.bash
 
-HOST=$(lowercase ${1:-"langhus"})
+HOST=$(lowercase "${1:-"langhus"}")
 echo "bin/update-nixos-rebuild-flake > host: ${HOST}"
 
 echo "bin/update-nixos-rebuild-flake > sudo nixos-rebuild switch --flake \".#${HOST}\" --show-trace"

@@ -1,9 +1,5 @@
 # gparted is a disk partition manager
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     gparted
   ];

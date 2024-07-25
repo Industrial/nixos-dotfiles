@@ -1,9 +1,5 @@
 # FD is a file finder.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     fd
   ];

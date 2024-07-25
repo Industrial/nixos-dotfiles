@@ -1,9 +1,5 @@
 # NixD is a Nix Language Server.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     nixd
   ];

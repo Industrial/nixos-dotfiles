@@ -1,8 +1,4 @@
-{
-  config,
-  settings,
-  ...
-}: {
+{settings, ...}: {
   # Use swap files.
   programs.nixvim.opts.swapfile = true;
 

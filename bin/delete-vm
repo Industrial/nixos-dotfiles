@@ -4,7 +4,7 @@ exec > >(tee ./logs/delete-vm) 2>&1
 
 source lib/lowercase.bash
 
-HOST=$(lowercase ${1:-"vm"})
+HOST=$(lowercase "${1:-"vm"}")
 echo "bin/delete-vm > host: ${HOST}"
 
 echo "bin/delete-vm > sudo rm -rf \"/var/lib/microvms/${HOST}\""

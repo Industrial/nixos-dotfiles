@@ -1,9 +1,5 @@
 # Video Player.
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     vlc
   ];

@@ -1,3 +1,3 @@
 lowercase() {
-  echo "$1" | awk '{print tolower($0)}'
+    echo "$1" | awk '{print tolower($0)}'
 }
