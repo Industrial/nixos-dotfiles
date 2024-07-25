@@ -134,6 +134,28 @@
         "url": "https://flakehub.com/f/michaelshmitty/cryptpad/2.2.0.tar.gz"
       }
     },
+    "fenix": {
+      "inputs": {
+        "nixpkgs": [
+          "microvm",
+          "nixpkgs"
+        ],
+        "rust-analyzer-src": "rust-analyzer-src"
+      },
+      "locked": {
+        "lastModified": 1720420198,
+        "narHash": "sha256-OIuDb6pHDyGpo7YMFyuRzMLcHm7mRvlYOz0Ht7ps2sU=",
+        "owner": "nix-community",
+        "repo": "fenix",
+        "rev": "abc0549e3560189462a7d394cc9d50af4608d103",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "fenix",
+        "type": "github"
+      }
+    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -260,11 +282,11 @@
         "systems": "systems_2"
       },
       "locked": {
-        "lastModified": 1705309234,
-        "narHash": "sha256-uNRRNRKmJyCRC/8y1RqBkqWBLM034y4qN7EprSdmgyA=",
+        "lastModified": 1710146030,
+        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "1ef2e671c3b0c19053962c07dbda38332dcebf26",
+        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
         "type": "github"
       },
       "original": {
@@ -454,6 +476,7 @@
     },
     "microvm": {
       "inputs": {
+        "fenix": "fenix",
         "flake-utils": "flake-utils_2",
         "nixpkgs": [
           "nixpkgs"
@@ -461,11 +484,11 @@
         "spectrum": "spectrum"
       },
       "locked": {
-        "lastModified": 1720034501,
-        "narHash": "sha256-fzZpuVnhw5uOtA4OuXw3a+Otpy8C+QV0Uu5XfhGEPSg=",
+        "lastModified": 1721849618,
+        "narHash": "sha256-+cKh/zzyzOfOC7GryAVMESpvTckOVJ+cQC01JJi1z8k=",
         "owner": "astro",
         "repo": "microvm.nix",
-        "rev": "a808af7775f508a2afedd1e4940a382fe1194f21",
+        "rev": "2f56d58cae49d6b66adc42aa3c52051a83f6a176",
         "type": "github"
       },
       "original": {
@@ -481,11 +504,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1721086468,
-        "narHash": "sha256-OF642LVDj5Icr0tXlY9P54vna4OP10IMhIhhiKwIRpw=",
+        "lastModified": 1721719500,
+        "narHash": "sha256-nnkqjv4Y37Hydjh6HE9wW4kSkV5Q7q4iIXlL5lwUFOw=",
         "owner": "LnL7",
         "repo": "nix-darwin",
-        "rev": "7522a30d328f885d20c2815bd05eb711bc69644c",
+        "rev": "884f3fe6d9bf056ba0017c132c39c1f0d07d4fec",
         "type": "github"
       },
       "original": {
@@ -548,11 +571,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1719805962,
-        "narHash": "sha256-Dni1ROoo0BOpHPb1wG8/i42KbtwVoTFtj8f5njAL36U=",
+        "lastModified": 1721673399,
+        "narHash": "sha256-95eJgIXyE4ZR1jPA+w6HJbUQE6Nk94DKL2zmOa2b1Z0=",
         "owner": "nix-community",
         "repo": "nix-unit",
-        "rev": "2bf863fe0d0c0edbefa4366e16e88449aa023185",
+        "rev": "b8ecd7909f444c18e8714444b9bebcfa28653635",
         "type": "github"
       },
       "original": {
@@ -570,11 +593,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1721093492,
-        "narHash": "sha256-sj7W21ovwTx5fQrMPMPdkmYXdmaKOB2oGI52ucs3pOI=",
+        "lastModified": 1721870946,
+        "narHash": "sha256-w/yVwaDIHGpbWy07n5dFghNEAbbUGMC1+2nxKy2bAXA=",
         "owner": "nix-community",
         "repo": "nix-vscode-extensions",
-        "rev": "5183b60f8c07a346fae7763df5c7cbca95aabff9",
+        "rev": "500be2a1404429cfccdb4bf71e515cc38f206a25",
         "type": "github"
       },
       "original": {
@@ -585,16 +608,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1720957393,
-        "narHash": "sha256-oedh2RwpjEa+TNxhg5Je9Ch6d3W1NKi7DbRO1ziHemA=",
+        "lastModified": 1721881299,
+        "narHash": "sha256-6giG4XARihRq5BFeb+j5m/QfMYUkPc8Rk881+VJLzWM=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "693bc46d169f5af9c992095736e82c3488bf7dbb",
+        "rev": "afd2f214b0387394bd4a5f4d339ceaf08f271a42",
         "type": "github"
       },
       "original": {
         "owner": "nixos",
-        "ref": "nixos-unstable",
+        "ref": "nixos-unstable-small",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -715,14 +738,31 @@
         "stylix": "stylix"
       }
     },
+    "rust-analyzer-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1720344064,
+        "narHash": "sha256-STmaV9Zu74QtkGGrbr9uMhskwagfCjJqOAYapXabiuk=",
+        "owner": "rust-lang",
+        "repo": "rust-analyzer",
+        "rev": "a5b21ea0aa644dffd7cf958b43f11f221d53404e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rust-lang",
+        "ref": "nightly",
+        "repo": "rust-analyzer",
+        "type": "github"
+      }
+    },
     "spectrum": {
       "flake": false,
       "locked": {
-        "lastModified": 1708358594,
-        "narHash": "sha256-e71YOotu2FYA67HoC/voJDTFsiPpZNRwmiQb4f94OxQ=",
+        "lastModified": 1720264467,
+        "narHash": "sha256-xzM92n3Q9L90faJIJrkrTtTx+JqCGRHMkHWztkV4PuY=",
         "ref": "refs/heads/main",
-        "rev": "6d0e73864d28794cdbd26ab7b37259ab0e1e044c",
-        "revCount": 614,
+        "rev": "fb59d42542049f586c84b0f8bb86ff3be338e9d3",
+        "revCount": 674,
         "type": "git",
         "url": "https://spectrum-os.org/git/spectrum"
       },
@@ -748,12 +788,12 @@
         ]
       },
       "locked": {
-        "lastModified": 1720818679,
-        "narHash": "sha256-u9PqY7O6TN42SLeb0e6mnYAgQOoQmclaVSHfLKMpmu0=",
-        "rev": "29148118cc33f08b71058e1cda7ca017f5300b51",
-        "revCount": 382,
+        "lastModified": 1721816671,
+        "narHash": "sha256-gk+ktb6smoyYmjM5Je2EYxyVLDrFNmRHDzf3iUoElJU=",
+        "rev": "c974c17cd089dcbfb16fbde028dd00bcc05e3f73",
+        "revCount": 386,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/danth/stylix/0.1.382%2Brev-29148118cc33f08b71058e1cda7ca017f5300b51/0190a8ca-5335-759d-aafa-172bf00b95a1/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/danth/stylix/0.1.386%2Brev-c974c17cd089dcbfb16fbde028dd00bcc05e3f73/0190e446-7b7a-7f99-acce-29ebc781c609/source.tar.gz"
       },
       "original": {
         "type": "tarball",

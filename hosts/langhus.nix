@@ -20,9 +20,11 @@
         settings = settings;
       };
       modules = [
-        ../features/cli/ansifilter
+        # TODO: Don't really use it anymore.
+        # ../features/cli/ansifilter
         ../features/cli/appimage-run
-        ../features/cli/aria2
+        # TODO: Don't really use it anymore.
+        # ../features/cli/aria2
         ../features/cli/bat
         ../features/cli/btop
         ../features/cli/c
@@ -31,22 +33,27 @@
         ../features/cli/direnv
         ../features/cli/du
         ../features/cli/dust
-        ../features/cli/e2fsprogs
+        # TODO: Can't remember which program I used. Enable when needed or just
+        #       decide to use `nix-shell -p` instead.
+        # ../features/cli/e2fsprogs
         ../features/cli/eza
         ../features/cli/fastfetch
         ../features/cli/fd
-        ../features/cli/fh
+        # TODO: Don't use FlakeHub anymore.
+        # ../features/cli/fh
         ../features/cli/fish
         ../features/cli/fzf
         ../features/cli/g
-        ../features/cli/gh
+        # TODO: Don't use GitHub CLI anymore.
+        # ../features/cli/gh
         ../features/cli/killall
         ../features/cli/l
         ../features/cli/lazygit
         ../features/cli/ll
         ../features/cli/nushell
         ../features/cli/p7zip
-        ../features/cli/ranger
+        # TODO: Don't use ranger anymore.
+        # ../features/cli/ranger
         ../features/cli/ripgrep
         ../features/cli/starship
         ../features/cli/unrar
@@ -99,7 +106,7 @@
         ../features/nixos/bluetooth
         ../features/nixos/boot
         ../features/nixos/console
-        # ../features/nixos/docker
+        ../features/nixos/docker
         ../features/nixos/fonts
         ../features/nixos/graphics
         ../features/nixos/i18n
@@ -123,13 +130,15 @@
         # ../features/office/lxqt-pcmanfm-qt
         ../features/office/obsidian
         # ../features/programming/android-tools
-        ../features/programming/bun
+        # TODO: Use bun in project flakes, not globally.
+        # ../features/programming/bun
         # ../features/programming/deno
-        # ../features/programming/docker-compose
-        ../features/programming/edgedb
+        ../features/programming/docker-compose
+        # TODO: Use this in project flakes, not globally.
+        # ../features/programming/edgedb
         ../features/programming/git
         ../features/programming/gitkraken
-        ../features/programming/gleam
+        # ../features/programming/gleam
         ../features/programming/glogg
         # ../features/programming/insomnia
         # ../features/programming/local-ai
