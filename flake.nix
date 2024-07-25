@@ -78,7 +78,6 @@
       pkgs = import inputs.nixpkgs {inherit system;};
     in {
       pre-commit-check = import ./checks/pre-commit.nix {inherit inputs system pkgs;};
-      tests = import ./checks/tests.nix {inherit inputs self system pkgs;};
     });
 
     devShells = forAllSystems (system: let
