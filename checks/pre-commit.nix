@@ -53,5 +53,13 @@ inputs.pre-commit-hooks.lib.${system}.run {
     fix-byte-order-marker.enable = true;
     forbid-new-submodules.enable = true;
     trim-trailing-whitespace.enable = true;
+
+    unit-tests = {
+      enable = true;
+      name = "Unit tests";
+      entry = "nix run nixpkgs#nix-unit -- --flake .#tests";
+      pass_filenames = false;
+      stages = ["pre-push"];
+    };
   };
 }
