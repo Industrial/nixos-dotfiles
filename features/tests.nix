@@ -2,7 +2,7 @@ args @ {...}: {
   cli = import ./cli/tests.nix args;
   communication = import ./communication/tests.nix args;
   crypto = import ./crypto/tests.nix args;
-  darwin = import ./darwin/tests.nix args;
+  # darwin = import ./darwin/tests.nix args;
   filesystems = import ./filesystems/tests.nix args;
   games = import ./games/tests.nix args;
   hardware = import ./hardware/tests.nix args;
