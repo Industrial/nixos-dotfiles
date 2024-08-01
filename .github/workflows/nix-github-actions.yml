@@ -20,6 +20,7 @@ jobs:
         run: |
           set -Eeu
           matrix="$(nix eval --json '.#githubActions.matrix')"
+          echo "matrix=$matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   nix-build:
