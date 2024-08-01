@@ -42,7 +42,7 @@
   outputs = inputs @ {self, ...}: let
     forAllSystems = import ./lib/forAllSystems.nix inputs.nixpkgs;
   in {
-    githubActions = import ./github-actions.nix {inherit inputs;};
+    githubActions = import ./github-actions.nix {inherit self inputs;};
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
 
