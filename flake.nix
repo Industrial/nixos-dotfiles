@@ -45,25 +45,25 @@
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
 
-    tests = forAllSystems ({
+    tests = forAllSystems ["x86_64-linux"] ({
       system,
       pkgs,
     }:
       import ./tests.nix {inherit inputs system pkgs;});
 
-    githubActions = forAllSystems ({
+    githubActions = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
       system,
       pkgs,
     }:
       import ./github-actions.nix {inherit inputs system pkgs;});
 
-    checks = forAllSystems ({
+    checks = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
       system,
       pkgs,
     }:
       import ./checks.nix {inherit inputs system pkgs;});
 
-    devShells = forAllSystems ({
+    devShells = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
       system,
       pkgs,
     }:

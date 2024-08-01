@@ -1,5 +1,5 @@
-nixpkgs: f:
-nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed (system:
+nixpkgs: systems: f:
+nixpkgs.lib.genAttrs systems (system:
     f {
       inherit system;
       pkgs = import nixpkgs {

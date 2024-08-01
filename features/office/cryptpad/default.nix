@@ -3,11 +3,6 @@
   hostname = "127.0.0.1";
   port = 4020;
 in {
-  # imports = [
-  #   inputs.cryptpad.nixosModules.cryptpad
-  # ];
-  # nixpkgs.overlays = [inputs.cryptpad.overlays.default];
-
   services.cryptpad.enable = true;
   services.cryptpad.configureNginx = false;
   services.cryptpad.settings.httpUnsafeOrigin = "${protocol}://${hostname}:${toString port}";
