@@ -1,4 +1,13 @@
 {settings, ...}: {
-  networking.networkmanager.enable = true;
-  networking.hostName = settings.hostname;
+  networking = {
+    hostName = settings.hostname;
+    networkmanager = {
+      enable = true;
+    };
+    firewall = {
+      enable = true;
+      allowedTCPPorts = [];
+      allowedUDPPorts = [];
+    };
+  };
 }

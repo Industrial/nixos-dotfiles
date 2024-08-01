@@ -40,57 +40,33 @@
     cryptpad.inputs.nixpkgs.follows = "nixpkgs";
   };
   outputs = inputs @ {self, ...}: let
-    forAllSystems = inputs.nixpkgs.lib.genAttrs inputs.nixpkgs.lib.systems.flakeExposed;
+    forAllSystems = import ./lib/forAllSystems.nix inputs.nixpkgs;
   in {
-    tests = let
-      settings = {
-        hostname = "testhostname";
-        stateVersion = "24.05";
-        system = "x86_64-linux";
-        hostPlatform = {
-          system = "x86_64-linux";
-        };
-        userdir = "/Users/test";
-        useremail = "test@test.com";
-        userfullname = "Chadster McChaddington";
-        username = "test";
-      };
-    in {
-      features = import ./features/tests.nix {
-        inherit inputs settings;
-        pkgs = import inputs.nixpkgs {
-          system = "x86_64-linux";
-          config = {
-            allowUnfree = true;
-          };
-        };
-      };
-    };
-
-    githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
-      checks = inputs.nixpkgs.lib.getAttrs ["x86_64-linux" "aarch64-darwin"] self.checks;
-    };
-
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
 
-    checks = forAllSystems (system: let
-      pkgs = import inputs.nixpkgs {inherit system;};
-    in {
-      pre-commit-check = import ./checks/pre-commit.nix {inherit inputs system pkgs;};
-    });
+    tests = forAllSystems ({
+      system,
+      pkgs,
+    }:
+      import ./tests.nix {inherit inputs system pkgs;});
 
-    devShells = forAllSystems (system: let
-      pkgs = import inputs.nixpkgs {inherit system;};
-    in {
-      default = pkgs.mkShell {
-        inherit (self.checks.${system}.pre-commit-check) shellHook;
-        buildInputs = self.checks.${system}.pre-commit-check.enabledPackages;
-        inputsFrom = [];
-        packages = with pkgs; [
-          direnv
-        ];
-      };
-    });
+    githubActions = forAllSystems ({
+      system,
+      pkgs,
+    }:
+      import ./github-actions.nix {inherit inputs system pkgs;});
+
+    checks = forAllSystems ({
+      system,
+      pkgs,
+    }:
+      import ./checks.nix {inherit inputs system pkgs;});
+
+    devShells = forAllSystems ({
+      system,
+      pkgs,
+    }:
+      import ./devshells.nix {inherit self system pkgs;});
   };
 }
