@@ -42,6 +42,7 @@
   outputs = inputs @ {self, ...}: let
     forAllSystems = import ./lib/forAllSystems.nix inputs.nixpkgs;
   in {
+    githubActions = import ./github-actions.nix {inherit inputs;};
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
 
@@ -50,12 +51,6 @@
       pkgs,
     }:
       import ./tests.nix {inherit inputs system pkgs;});
-
-    githubActions = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
-      system,
-      pkgs,
-    }:
-      import ./github-actions.nix {inherit inputs system pkgs;});
 
     checks = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
       system,
