@@ -54,10 +54,6 @@
         # ../features/hardware/zsa-keyboard
         ../features/media/invidious
         ../features/media/lidarr
-        # TODO: I seem to like the XFCE one better. Remove it?
-        # ../features/media/lxqt-pavucontrol-qt
-        # TODO: I seem to like the XFCE one better. Remove it?
-        # ../features/media/lxqt-screengrab
         # ../features/media/mpv
         # ../features/media/obs-studio
         ../features/media/okular
@@ -71,8 +67,6 @@
         # ../features/media/whisparr
         ../features/monitoring/grafana
         ../features/monitoring/homepage-dashboard
-        # TODO: Remove the XFCE Process Monitor?
-        # ../features/monitoring/lxqt-qps
         ../features/monitoring/prometheus
         ../features/network/chromium
         # ../features/network/filezilla
@@ -106,10 +100,6 @@
         ../features/nixos/window-manager
         ../features/office/cryptpad
         # ../features/office/evince
-        # TODO: What to do with lxqt?
-        # ../features/office/lxqt-archiver
-        # TODO: This one is really shit. XFCE one (Thunar) is better.
-        # ../features/office/lxqt-pcmanfm-qt
         ../features/office/obsidian
         # ../features/programming/android-tools
         # TODO: Use bun in project flakes, not globally.
