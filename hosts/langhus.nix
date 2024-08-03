@@ -41,8 +41,6 @@
         ../features/cli/ll
         ../features/cli/nushell
         ../features/cli/p7zip
-        # TODO: Don't use ranger anymore.
-        # ../features/cli/ranger
         ../features/cli/ripgrep
         ../features/cli/starship
         ../features/cli/unrar

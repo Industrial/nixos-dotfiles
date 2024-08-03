@@ -29,13 +29,6 @@ layout {
     }
   }
 
-  tab name="files" {
-    pane {
-      cwd "/home/tom"
-      command "ranger"
-    }
-  }
-
   tab name="configuration" {
     pane {
       cwd "/home/tom/.dotfiles"

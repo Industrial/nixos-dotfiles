@@ -21,7 +21,6 @@ args @ {...}: {
   ll = import ./ll/tests.nix args;
   nushell = import ./nushell/tests.nix args;
   p7zip = import ./p7zip/tests.nix args;
-  ranger = import ./ranger/tests.nix args;
   ripgrep = import ./ripgrep/tests.nix args;
   starship = import ./starship/tests.nix args;
   unrar = import ./unrar/tests.nix args;
