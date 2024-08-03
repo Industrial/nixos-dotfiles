@@ -51,7 +51,6 @@
         ../features/communication/discord
         ../features/darwin/settings
         ../features/media/spotify
-        ../features/network/sshuttle
         ../features/nix
         ../features/nix/nix-daemon
         ../features/nix/nixpkgs
