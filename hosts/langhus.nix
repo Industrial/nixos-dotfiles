@@ -105,7 +105,6 @@
         ../features/programming/gitkraken
         ../features/programming/glogg
         # ../features/programming/insomnia
-        # ../features/programming/local-ai
         ../features/programming/meld
         # ../features/programming/neovim
         ../features/programming/nixd

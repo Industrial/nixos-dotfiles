@@ -8,7 +8,6 @@ args @ {...}: {
   gitkraken = import ./gitkraken/tests.nix args;
   glogg = import ./glogg/tests.nix args;
   insomnia = import ./insomnia/tests.nix args;
-  local-ai = import ./local-ai/tests.nix args;
   meld = import ./meld/tests.nix args;
   neovim = import ./neovim/tests.nix args;
   nixd = import ./nixd/tests.nix args;
