@@ -20,8 +20,6 @@
         settings = settings;
       };
       modules = [
-        # TODO: Don't really use it anymore.
-        # ../features/cli/ansifilter
         ../features/cli/appimage-run
         # TODO: Don't really use it anymore.
         # ../features/cli/aria2

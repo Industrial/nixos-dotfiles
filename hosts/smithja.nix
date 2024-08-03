@@ -25,7 +25,6 @@
           };
       };
       modules = [
-        ../features/cli/ansifilter
         ../features/cli/aria2
         ../features/cli/bat
         ../features/cli/btop
