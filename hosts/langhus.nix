@@ -53,7 +53,6 @@
         # ../features/hardware/zsa-keyboard
         ../features/media/invidious
         ../features/media/lidarr
-        # ../features/media/obs-studio
         ../features/media/okular
         ../features/media/prowlarr
         ../features/media/radarr
