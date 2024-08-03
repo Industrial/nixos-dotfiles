@@ -29,9 +29,6 @@
         ../features/cli/direnv
         ../features/cli/du
         ../features/cli/dust
-        # TODO: Can't remember which program I used. Enable when needed or just
-        #       decide to use `nix-shell -p` instead.
-        # ../features/cli/e2fsprogs
         ../features/cli/eza
         ../features/cli/fastfetch
         ../features/cli/fd

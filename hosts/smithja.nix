@@ -32,7 +32,6 @@
         ../features/cli/direnv
         ../features/cli/du
         ../features/cli/dust
-        ../features/cli/e2fsprogs
         ../features/cli/eza
         ../features/cli/fd
         ../features/cli/fh
