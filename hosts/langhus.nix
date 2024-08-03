@@ -84,8 +84,6 @@
         ../features/nixos/i18n
         ../features/nixos/networking
         # ../features/nixos/security/apparmor
-        # TODO: Really? Anti Virus?
-        # ../features/nixos/security/clamav
         ../features/nixos/security/yubikey
         ../features/nixos/sound
         ../features/nixos/system
