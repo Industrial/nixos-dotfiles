@@ -52,7 +52,6 @@
         ../features/games/path-of-building
         ../features/games/steam
         # ../features/hardware/zsa-keyboard
-        # ../features/media/eog
         ../features/media/invidious
         ../features/media/lidarr
         # TODO: I seem to like the XFCE one better. Remove it?

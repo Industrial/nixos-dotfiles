@@ -1,5 +1,4 @@
 args @ {...}: {
-  eog = import ./eog/tests.nix args;
   invidious = import ./invidious/tests.nix args;
   lidarr = import ./lidarr/tests.nix args;
   lxqt-pavucontrol-qt = import ./lxqt-pavucontrol-qt/tests.nix args;
