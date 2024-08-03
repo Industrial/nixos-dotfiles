@@ -15,7 +15,6 @@ args @ {...}: {
   fish = import ./fish/tests.nix args;
   fzf = import ./fzf/tests.nix args;
   g = import ./g/tests.nix args;
-  gh = import ./gh/tests.nix args;
   killall = import ./killall/tests.nix args;
   l = import ./l/tests.nix args;
   lazygit = import ./lazygit/tests.nix args;

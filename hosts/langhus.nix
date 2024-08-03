@@ -35,8 +35,6 @@
         ../features/cli/fish
         ../features/cli/fzf
         ../features/cli/g
-        # TODO: Don't use GitHub CLI anymore.
-        # ../features/cli/gh
         ../features/cli/killall
         ../features/cli/l
         ../features/cli/lazygit
