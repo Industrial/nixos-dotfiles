@@ -7,7 +7,6 @@ args @ {...}: {
   graphics = import ./graphics/tests.nix args;
   i18n = import ./i18n/tests.nix args;
   networking = import ./networking/tests.nix args;
-  printing = import ./printing/tests.nix args;
   security = import ./security/tests.nix args;
   sound = import ./sound/tests.nix args;
   system = import ./system/tests.nix args;

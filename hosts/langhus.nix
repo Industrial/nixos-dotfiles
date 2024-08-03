@@ -98,8 +98,6 @@
         ../features/nixos/graphics
         ../features/nixos/i18n
         ../features/nixos/networking
-        # TODO: Paper? Forest Rewilding.
-        # ../features/nixos/printing
         # ../features/nixos/security/apparmor
         # TODO: Really? Anti Virus?
         # ../features/nixos/security/clamav
