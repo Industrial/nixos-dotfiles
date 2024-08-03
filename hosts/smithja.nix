@@ -56,7 +56,6 @@
         ../features/nix
         ../features/nix/nix-daemon
         ../features/nix/nixpkgs
-        ../features/office/evince
         ../features/office/obsidian
         ../features/programming/bun
         ../features/programming/deno
