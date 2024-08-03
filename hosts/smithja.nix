@@ -49,7 +49,6 @@
         ../features/cli/unzip
         ../features/cli/zellij
         ../features/communication/discord
-        ../features/crypto/monero
         ../features/darwin/settings
         ../features/media/spotify
         ../features/network/sshuttle

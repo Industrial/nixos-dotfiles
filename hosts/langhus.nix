@@ -47,7 +47,6 @@
         ../features/cli/unzip
         ../features/cli/zellij
         ../features/communication/discord
-        # ../features/crypto/monero
         ../features/games/lutris
         ../features/games/path-of-building
         ../features/games/steam
