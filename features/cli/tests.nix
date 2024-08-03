@@ -8,7 +8,6 @@ args @ {...}: {
   direnv = import ./direnv/tests.nix args;
   du = import ./du/tests.nix args;
   dust = import ./dust/tests.nix args;
-  e2fsprogs = import ./e2fsprogs/tests.nix args;
   eza = import ./eza/tests.nix args;
   fastfetch = import ./fastfetch/tests.nix args;
   fd = import ./fd/tests.nix args;
