@@ -68,7 +68,6 @@
         ../features/monitoring/homepage-dashboard
         ../features/monitoring/prometheus
         ../features/network/chromium
-        # ../features/network/filezilla
         ../features/network/firefox
         # ../features/network/i2pd
         # ../features/network/nginx

@@ -1,6 +1,5 @@
 args @ {...}: {
   chromium = import ./chromium/tests.nix args;
-  filezilla = import ./filezilla/tests.nix args;
   firefox = import ./firefox/tests.nix args;
   i2pd = import ./i2pd/tests.nix args;
   nginx = import ./nginx/tests.nix args;
