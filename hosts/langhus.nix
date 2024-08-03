@@ -32,8 +32,6 @@
         ../features/cli/eza
         ../features/cli/fastfetch
         ../features/cli/fd
-        # TODO: Don't use FlakeHub anymore.
-        # ../features/cli/fh
         ../features/cli/fish
         ../features/cli/fzf
         ../features/cli/g

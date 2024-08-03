@@ -12,7 +12,6 @@ args @ {...}: {
   eza = import ./eza/tests.nix args;
   fastfetch = import ./fastfetch/tests.nix args;
   fd = import ./fd/tests.nix args;
-  fh = import ./fh/tests.nix args;
   fish = import ./fish/tests.nix args;
   fzf = import ./fzf/tests.nix args;
   g = import ./g/tests.nix args;

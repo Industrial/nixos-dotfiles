@@ -34,7 +34,6 @@
         ../features/cli/dust
         ../features/cli/eza
         ../features/cli/fd
-        ../features/cli/fh
         ../features/cli/fish
         ../features/cli/fzf
         ../features/cli/g
