@@ -48,7 +48,6 @@
         ../features/cli/zellij
         ../features/communication/discord
         # ../features/crypto/monero
-        # ../features/filesystems/gparted
         ../features/games/lutris
         ../features/games/path-of-building
         ../features/games/steam
