@@ -109,7 +109,6 @@
         # ../features/programming/neovim
         ../features/programming/nixd
         ../features/programming/nodejs
-        # ../features/programming/ollama
         ../features/programming/vscode
         # ../features/security/veracrypt
         # ../features/security/yubikey-manager
