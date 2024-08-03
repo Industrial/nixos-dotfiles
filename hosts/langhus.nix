@@ -111,7 +111,6 @@
         ../features/programming/nodejs
         # ../features/programming/ollama
         ../features/programming/vscode
-        # ../features/security/vaultwarden
         # ../features/security/veracrypt
         # ../features/security/yubikey-manager
         # ../features/virtual-machine/base
