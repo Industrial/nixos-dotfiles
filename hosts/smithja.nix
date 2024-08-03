@@ -64,7 +64,6 @@
         ../features/programming/meld
         ../features/programming/nixd
         ../features/programming/nodejs
-        ../features/programming/sqlite
         ../features/programming/vscode
 
         # {

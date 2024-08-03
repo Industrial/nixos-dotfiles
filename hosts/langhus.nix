@@ -111,7 +111,6 @@
         ../features/programming/nixd
         ../features/programming/nodejs
         # ../features/programming/ollama
-        # ../features/programming/sqlite
         ../features/programming/vscode
         # ../features/security/bitwarden
         # ../features/security/vaultwarden
