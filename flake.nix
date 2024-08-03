@@ -34,15 +34,11 @@
     # Stylix
     stylix.url = "https://flakehub.com/f/danth/stylix/0.1.*.tar.gz";
     stylix.inputs.nixpkgs.follows = "nixpkgs";
-
-    # Cryptpad
-    cryptpad.url = "https://flakehub.com/f/michaelshmitty/cryptpad/2.2.0.tar.gz";
-    cryptpad.inputs.nixpkgs.follows = "nixpkgs";
   };
   outputs = inputs @ {self, ...}: let
     forAllSystems = import ./lib/forAllSystems.nix inputs.nixpkgs;
   in {
-    githubActions = import ./github-actions.nix {inherit self inputs;};
+    githubActions = import ./github-actions.nix ["x86_64-linux" "aarch64-darwin"] {inherit self inputs;};
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
 

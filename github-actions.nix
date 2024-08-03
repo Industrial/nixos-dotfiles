@@ -1,9 +1,9 @@
-{
+systems: {
   inputs,
   self,
   ...
 }: {
   matrix = inputs.nix-github-actions.lib.mkGithubMatrix {
-    checks = inputs.nixpkgs.lib.getAttrs ["x86_64-linux" "aarch64-darwin"] self.checks;
+    checks = inputs.nixpkgs.lib.getAttrs systems self.checks;
   };
 }
