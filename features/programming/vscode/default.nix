@@ -98,8 +98,6 @@
       extensions.vscode-marketplace.magicstack.edgedb
       ## Erlang
       extensions.vscode-marketplace.pgourlain.erlang
-      ## Gleam
-      extensions.vscode-marketplace.gleam.gleam
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer

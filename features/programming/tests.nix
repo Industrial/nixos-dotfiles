@@ -6,7 +6,6 @@ args @ {...}: {
   edgedb = import ./edgedb/tests.nix args;
   git = import ./git/tests.nix args;
   gitkraken = import ./gitkraken/tests.nix args;
-  gleam = import ./gleam/tests.nix args;
   glogg = import ./glogg/tests.nix args;
   insomnia = import ./insomnia/tests.nix args;
   local-ai = import ./local-ai/tests.nix args;
