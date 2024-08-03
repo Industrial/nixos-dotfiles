@@ -21,8 +21,6 @@
       };
       modules = [
         ../features/cli/appimage-run
-        # TODO: Don't really use it anymore.
-        # ../features/cli/aria2
         ../features/cli/bat
         ../features/cli/btop
         ../features/cli/c

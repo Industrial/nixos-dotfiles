@@ -1,6 +1,5 @@
 args @ {...}: {
   appimage-run = import ./appimage-run/tests.nix args;
-  aria2 = import ./aria2/tests.nix args;
   bat = import ./bat/tests.nix args;
   btop = import ./btop/tests.nix args;
   c = import ./c/tests.nix args;
