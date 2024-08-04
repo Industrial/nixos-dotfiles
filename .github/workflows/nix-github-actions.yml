@@ -1,12 +1,12 @@
+---
 name: Nix Flake actions
-
+# yamllint disable-line rule:truthy
 on:
   pull_request:
   push:
     branches:
       - master
       - main
-
 jobs:
   nix-matrix:
     runs-on: ubuntu-latest
@@ -22,7 +22,6 @@ jobs:
           matrix="$(nix eval --json '.#githubActions.matrix')"
           echo "matrix=$matrix"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
   nix-build:
     needs: nix-matrix
     runs-on: ${{ matrix.os }}

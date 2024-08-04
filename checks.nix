@@ -21,7 +21,7 @@
       # YAML
       check-yaml.enable = true;
       yamllint.enable = true;
-      yamlfmt.enable = true;
+      # yamlfmt.enable = true;
 
       # TOML
       check-toml.enable = true;
