@@ -40,8 +40,12 @@
   in {
     githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
       checks = {
-        "x86_64-linux" = {
-          hello = inputs.nixpkgs.legacyPackages.x86_64-linux.hello;
+        # "x86_64-linux" = {
+        #   hello = inputs.nixpkgs.legacyPackages.x86_64-linux.hello;
+        # };
+        "x86_64-linux" = import ./checks.nix {
+          inherit inputs;
+          system = "x86_64-linux";
         };
       };
     };
@@ -77,6 +81,10 @@
         pkgs,
       }:
         import ./tests.nix {inherit inputs system pkgs;});
+
+    checks = {
+      "x86_64-linux" = {};
+    };
 
     # checks = forAllSystems ({
     #   system,

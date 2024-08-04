@@ -3,64 +3,66 @@
   system,
   ...
 }: {
-  pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
-    src = ./.;
-    hooks = {
-      # Nix
-      alejandra.enable = true;
-      deadnix.enable = true;
-      flake-checker.enable = true;
+  hello = inputs.nixpkgs.legacyPackages.x86_64-linux.hello;
 
-      # Bash
-      shellcheck.enable = true;
-      beautysh.enable = true;
+  # pre-commit-check = inputs.pre-commit-hooks.lib.${system}.run {
+  #   src = ./.;
+  #   hooks = {
+  #     # Nix
+  #     alejandra.enable = true;
+  #     deadnix.enable = true;
+  #     flake-checker.enable = true;
 
-      # Markdown
-      markdownlint.enable = true;
+  #     # Bash
+  #     shellcheck.enable = true;
+  #     beautysh.enable = true;
 
-      # YAML
-      check-yaml.enable = true;
-      yamllint.enable = true;
-      yamlfmt.enable = true;
+  #     # Markdown
+  #     markdownlint.enable = true;
 
-      # TOML
-      check-toml.enable = true;
-      taplo.enable = true;
+  #     # YAML
+  #     check-yaml.enable = true;
+  #     yamllint.enable = true;
+  #     yamlfmt.enable = true;
 
-      # JSON
-      check-json.enable = true;
-      pretty-format-json.enable = true;
+  #     # TOML
+  #     check-toml.enable = true;
+  #     taplo.enable = true;
 
-      # Git
-      check-merge-conflicts.enable = true;
-      commitizen = {
-        enable = true;
-        stages = ["commit-msg"];
-      };
+  #     # JSON
+  #     check-json.enable = true;
+  #     pretty-format-json.enable = true;
 
-      # TypeScript / JavaScript
-      eslint.enable = true;
+  #     # Git
+  #     check-merge-conflicts.enable = true;
+  #     commitizen = {
+  #       enable = true;
+  #       stages = ["commit-msg"];
+  #     };
 
-      # Generic
-      check-added-large-files.enable = true;
-      check-case-conflicts.enable = true;
-      check-executables-have-shebangs.enable = true;
-      check-shebang-scripts-are-executable.enable = true;
-      check-symlinks.enable = true;
-      detect-aws-credentials.enable = true;
-      detect-private-keys.enable = true;
-      end-of-file-fixer.enable = true;
-      fix-byte-order-marker.enable = true;
-      forbid-new-submodules.enable = true;
-      trim-trailing-whitespace.enable = true;
+  #     # TypeScript / JavaScript
+  #     eslint.enable = true;
 
-      unit-tests = {
-        enable = true;
-        name = "Unit tests";
-        entry = "nix run nixpkgs#nix-unit -- --flake .#tests";
-        pass_filenames = false;
-        stages = ["pre-push"];
-      };
-    };
-  };
+  #     # Generic
+  #     check-added-large-files.enable = true;
+  #     check-case-conflicts.enable = true;
+  #     check-executables-have-shebangs.enable = true;
+  #     check-shebang-scripts-are-executable.enable = true;
+  #     check-symlinks.enable = true;
+  #     detect-aws-credentials.enable = true;
+  #     detect-private-keys.enable = true;
+  #     end-of-file-fixer.enable = true;
+  #     fix-byte-order-marker.enable = true;
+  #     forbid-new-submodules.enable = true;
+  #     trim-trailing-whitespace.enable = true;
+
+  #     unit-tests = {
+  #       enable = true;
+  #       name = "Unit tests";
+  #       entry = "nix run nixpkgs#nix-unit -- --flake .#tests";
+  #       pass_filenames = false;
+  #       stages = ["pre-push"];
+  #     };
+  #   };
+  # };
 }
