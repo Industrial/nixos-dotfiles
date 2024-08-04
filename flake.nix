@@ -3,6 +3,10 @@
     # Nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
 
+    # For All Systems
+    for-all-systems.url = "github:Industrial/for-all-systems/v1.0.1";
+    for-all-systems.inputs.nixpkgs.follows = "nixpkgs";
+
     # Nix Git Hooks
     pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
     pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
@@ -36,7 +40,7 @@
     stylix.inputs.nixpkgs.follows = "nixpkgs";
   };
   outputs = inputs @ {self, ...}: let
-    forAllSystems = import ./lib/forAllSystems.nix inputs.nixpkgs;
+    forAllSystems = inputs.for-all-systems.forAllSystems inputs.nixpkgs;
   in {
     githubActions = import ./github-actions.nix ["x86_64-linux" "aarch64-darwin"] {inherit self inputs;};
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
