@@ -40,15 +40,20 @@
   in {
     githubActions = {
       matrix = inputs.nix-github-actions.lib.mkGithubMatrix {
-        checks =
-          inputs.for-all-systems.forAllSystems {
-            nixpkgs = inputs.nixpkgs;
-            systems = ["x86_64-linux" "aarch64-darwin"];
-          } ({
-            system,
-            pkgs,
-          }:
-            import ./checks.nix {inherit inputs system pkgs;});
+        checks = {
+          "x86_64-linux" = import ./checks.nix {
+            inherit inputs;
+            system = "x86_64-linux";
+          };
+        };
+        # inputs.for-all-systems.forAllSystems {
+        #   nixpkgs = inputs.nixpkgs;
+        #   systems = ["x86_64-linux" "aarch64-darwin"];
+        # } ({
+        #   system,
+        #   pkgs,
+        # }:
+        #   import ./checks.nix {inherit inputs system pkgs;});
       };
     };
 
