@@ -39,16 +39,6 @@
     forAllSystems = inputs.for-all-systems.forAllSystems {nixpkgs = inputs.nixpkgs;};
   in {
     githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
-      # checks = {
-      #   # "x86_64-linux" = {
-      #   #   hello = inputs.nixpkgs.legacyPackages.x86_64-linux.hello;
-      #   # };
-      #   "x86_64-linux" = import ./checks.nix {
-      #     inherit inputs;
-      #     system = "x86_64-linux";
-      #   };
-      # };
-
       checks =
         inputs.for-all-systems.forAllSystems {
           nixpkgs = inputs.nixpkgs;
@@ -59,25 +49,6 @@
         }:
           import ./checks.nix {inherit inputs system pkgs;});
     };
-
-    # githubActions = {
-    #   matrix = inputs.nix-github-actions.lib.mkGithubMatrix {
-    #     checks = {
-    #       "x86_64-linux" = import ./checks.nix {
-    #         inherit inputs;
-    #         system = "x86_64-linux";
-    #       };
-    #     };
-    #     # inputs.for-all-systems.forAllSystems {
-    #     #   nixpkgs = inputs.nixpkgs;
-    #     #   systems = ["x86_64-linux" "aarch64-darwin"];
-    #     # } ({
-    #     #   system,
-    #     #   pkgs,
-    #     # }:
-    #     #   import ./checks.nix {inherit inputs system pkgs;});
-    #   };
-    # };
 
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
@@ -92,15 +63,11 @@
       }:
         import ./tests.nix {inherit inputs system pkgs;});
 
-    checks = {
-      "x86_64-linux" = {};
-    };
-
-    # checks = forAllSystems ({
-    #   system,
-    #   pkgs,
-    # }:
-    #   import ./checks.nix {inherit inputs system pkgs;});
+    checks = forAllSystems ({
+      system,
+      pkgs,
+    }:
+      import ./checks.nix {inherit inputs system pkgs;});
 
     devShells = forAllSystems ({
       system,
