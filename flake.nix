@@ -34,10 +34,6 @@
     # Nix VSCode Extensions
     nix-vscode-extensions.url = "github:nix-community/nix-vscode-extensions";
     nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
-
-    # Stylix
-    stylix.url = "https://flakehub.com/f/danth/stylix/0.1.*.tar.gz";
-    stylix.inputs.nixpkgs.follows = "nixpkgs";
   };
   outputs = inputs @ {self, ...}: let
     forAllSystems = inputs.for-all-systems.forAllSystems {nixpkgs = inputs.nixpkgs;};

@@ -45,7 +45,6 @@
         ../features/cli/starship
         ../features/cli/unrar
         ../features/cli/unzip
-        ../features/cli/zellij
         ../features/communication/discord
         ../features/games/lutris
         ../features/games/path-of-building
@@ -116,13 +115,7 @@
         # ../features/virtual-machine/microvm
         # ../features/virtual-machine/ssh
         ../features/window-manager/alacritty
-        # ../features/window-manager/dwm
-        ../features/window-manager/hyper
-        # ../features/window-manager/slock
-        inputs.stylix.nixosModules.stylix
-        ../features/window-manager/stylix
         ../features/window-manager/xfce
-        # ../features/window-manager/xmonad
       ];
     };
 }
