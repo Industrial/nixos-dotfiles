@@ -8,8 +8,8 @@
     for-all-systems.inputs.nixpkgs.follows = "nixpkgs";
 
     # Nix Git Hooks
-    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
-    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    git-hooks.url = "github:cachix/git-hooks.nix";
+    git-hooks.inputs.nixpkgs.follows = "nixpkgs";
 
     # Nix GitHub Actions
     nix-github-actions.url = "github:nix-community/nix-github-actions";

@@ -9,6 +9,7 @@
     inputsFrom = [];
     packages = with pkgs; [
       direnv
+      pre-commit
     ];
   };
 }

@@ -133,6 +133,7 @@
   "editor.suggestSelection": "first",
   "editor.tabSize": 2,
   "editor.wordBasedSuggestions": "matchingDocuments",
+  "editor.wordWrap": "off",
   "emmet.includeLanguages": {},
   "emmet.showAbbreviationSuggestions": false,
   "emmet.showExpandedAbbreviation": "never",
@@ -219,6 +220,7 @@
   "scm.inputFontFamily": "default",
   "scm.inputFontSize": 12,
   "security.workspace.trust.untrustedFiles": "open",
+  "supermaven.otherWarning": false,
   "terminal.integrated.copyOnSelection": true,
   "terminal.integrated.enableMultiLinePasteWarning": "never",
   "terminal.integrated.fontFamily": "'IosevkaTerm Nerd Font Mono'",
@@ -236,18 +238,6 @@
   "update.mode": "none",
   "vim.foldfix": true,
   "vim.hlsearch": true,
-  "vitest.commandLine": "pnpm vitest",
-  "vitest.enable": true,
-  "vitest.exclude": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/cypress/**",
-    "**/.{idea,git,cache,output,temp}/**"
-  ],
-  "vitest.include": [
-    "**/*.ts"
-  ],
-  "vitest.nodeEnv": null,
   "vim.normalModeKeyBindingsNonRecursive": [
     {
       "before": [
@@ -268,12 +258,22 @@
       ]
     }
   ],
+  "vitest.commandLine": "pnpm vitest",
+  "vitest.enable": true,
+  "vitest.exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/cypress/**",
+    "**/.{idea,git,cache,output,temp}/**"
+  ],
+  "vitest.include": [
+    "**/*.ts"
+  ],
+  "vitest.nodeEnv": null,
   "vitest.showFailMessages": true,
   "window.autoDetectColorScheme": true,
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
   "workbench.list.openMode": "doubleClick",
-  "workbench.startupEditor": "none",
-  "supermaven.otherWarning": false,
-  "editor.wordWrap": "off"
+  "workbench.startupEditor": "none"
 }
