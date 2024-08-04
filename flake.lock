@@ -303,16 +303,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1722772919,
-        "narHash": "sha256-HdescU50Ei56lBWfOrMEt0i+leqtDUxLB6yA6tdDJtI=",
+        "lastModified": 1722774074,
+        "narHash": "sha256-OTxfuFIpTsZWjEQ3J54OipY6klHz1JGQ1tQZTDnNiaM=",
         "owner": "Industrial",
         "repo": "for-all-systems",
-        "rev": "f9f23c6ea5409e2955147a771e39a91fd1e9eea5",
+        "rev": "3bfe2f0ba3a17f4ae2ecd90a9911c6b780014e84",
         "type": "github"
       },
       "original": {
         "owner": "Industrial",
-        "ref": "v1.0.1",
         "repo": "for-all-systems",
         "type": "github"
       }

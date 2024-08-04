@@ -4,7 +4,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable-small";
 
     # For All Systems
-    for-all-systems.url = "github:Industrial/for-all-systems/v1.0.1";
+    for-all-systems.url = "github:Industrial/for-all-systems";
     for-all-systems.inputs.nixpkgs.follows = "nixpkgs";
 
     # Nix Git Hooks
@@ -40,25 +40,29 @@
     stylix.inputs.nixpkgs.follows = "nixpkgs";
   };
   outputs = inputs @ {self, ...}: let
-    forAllSystems = inputs.for-all-systems.forAllSystems inputs.nixpkgs;
+    forAllSystems = inputs.for-all-systems.forAllSystems {nixpkgs = inputs.nixpkgs;};
   in {
     githubActions = import ./github-actions.nix ["x86_64-linux" "aarch64-darwin"] {inherit self inputs;};
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
 
-    tests = forAllSystems ["x86_64-linux"] ({
-      system,
-      pkgs,
-    }:
-      import ./tests.nix {inherit inputs system pkgs;});
+    tests =
+      inputs.for-all-systems.forAllSystems {
+        nixpkgs = inputs.nixpkgs;
+        systems = ["x86_64-linux"];
+      } ({
+        system,
+        pkgs,
+      }:
+        import ./tests.nix {inherit inputs system pkgs;});
 
-    checks = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
+    checks = forAllSystems ({
       system,
       pkgs,
     }:
       import ./checks.nix {inherit inputs system pkgs;});
 
-    devShells = forAllSystems inputs.nixpkgs.lib.systems.flakeExposed ({
+    devShells = forAllSystems ({
       system,
       pkgs,
     }:
