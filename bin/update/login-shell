@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
+echo "> update > login-shell"
+exec > >(tee ./logs/update-login-shell) 2>&1
 set -e
 
 source lib/lowercase.bash
@@ -11,7 +11,8 @@ source lib/user.bash
 echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
-nix-unit --flake .#tests
+echo "> chsh -s /run/current-system/sw/bin/fish"
+sudo chsh -s /run/current-system/sw/bin/fish "${C9_USER}"
 
 echo "> cd ../.."
 cd "../.."

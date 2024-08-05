@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
+echo "> vm > restart"
+exec > >(tee ./logs/vm-restart) 2>&1
 set -e
 
 source lib/lowercase.bash
@@ -11,7 +11,10 @@ source lib/user.bash
 echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
-nix-unit --flake .#tests
+# Catch the error if the service is not running
+bin/vm/stop "${C9_HOST}" || true
+bin/vm/update "${C9_HOST}"
+bin/vim/start "${C9_HOST}"
 
 echo "> cd ../.."
 cd "../.."

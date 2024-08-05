@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+echo "> update > repositories"
+exec > >(tee ./logs/update-repositories) 2>&1
+set -e
+
+source lib/lowercase.bash
+source lib/host.bash
+source lib/system.bash
+source lib/user.bash
+
+# echo "> cd ./systems/${C9_SYSTEM}"
+# cd "./systems/${C9_SYSTEM}"
+
+bin/update/nix-env
+bin/update/flake
+
+# echo "> cd ../.."
+# cd "../.."

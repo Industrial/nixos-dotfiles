@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -e
-exec > >(tee ./logs/delete-collectgarbage) 2>&1
-
-echo "bin/delete-collectgarbage > sudo nix-collect-garbage -d"
-sudo nix-collect-garbage -d

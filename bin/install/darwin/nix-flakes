@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
+echo "> install > darwin > nix-flakes"
+exec > >(tee ./logs/install-osx-nix-flakes) 2>&1
 set -e
 
 source lib/lowercase.bash
@@ -11,7 +11,7 @@ source lib/user.bash
 echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
-nix-unit --flake .#tests
+nix-env -iA nixpkgs.nixFlakes
 
 echo "> cd ../.."
 cd "../.."

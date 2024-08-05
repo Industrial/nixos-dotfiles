@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
+echo "> delete > collectgarbage"
+exec > >(tee ./logs/delete-collectgarbage) 2>&1
 set -e
 
 source lib/lowercase.bash
@@ -11,7 +11,8 @@ source lib/user.bash
 echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
-nix-unit --flake .#tests
+echo "> sudo nix-collect-garbage -d"
+sudo nix-collect-garbage -d
 
 echo "> cd ../.."
 cd "../.."

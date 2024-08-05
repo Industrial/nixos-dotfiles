@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
-set -e
+echo "> lint"
 exec > >(tee ./logs/lint) 2>&1
+set -e
+
+source lib/lowercase.bash
+source lib/host.bash
+source lib/system.bash
+source lib/user.bash
+
+echo "> cd ./systems/${C9_SYSTEM}"
+cd "./systems/${C9_SYSTEM}"
 
 # I didn't get this to work on all files with `nix flake check` so I'm using
 # `pre-commit` directly.
-echo "bin/lint > pre-commit run --all-files"
+echo "> pre-commit run --all-files"
 pre-commit run --all-files
+
+echo "> cd ../.."
+cd "../.."

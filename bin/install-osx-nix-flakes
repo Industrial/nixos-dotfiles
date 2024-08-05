@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -e
-exec > >(tee ./logs/install-osx-nix-flakes) 2>&1
-
-echo "bin/install-osx-nix-flakes"
-nix-env -iA nixpkgs.nixFlakes

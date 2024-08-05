@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
+echo "> update > flake"
+exec > >(tee ./logs/update-flake) 2>&1
 set -e
 
 source lib/lowercase.bash
@@ -8,10 +8,13 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
+bin/update/channels
+
 echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
-nix-unit --flake .#tests
+echo "> nix flake update"
+nix flake update
 
 echo "> cd ../.."
 cd "../.."

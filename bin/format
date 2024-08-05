@@ -1,2 +1,17 @@
 #!/usr/bin/env bash
+echo "> format"
+exec > >(tee ./logs/format) 2>&1
+set -e
+
+source lib/lowercase.bash
+source lib/host.bash
+source lib/system.bash
+source lib/user.bash
+
+echo "> cd ./systems/${C9_SYSTEM}"
+cd "./systems/${C9_SYSTEM}"
+
 nix fmt
+
+echo "> cd ../.."
+cd "../.."

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
+echo "> vm > stop"
+exec > >(tee ./logs/vm-stop) 2>&1
 set -e
 
 source lib/lowercase.bash
@@ -11,7 +11,8 @@ source lib/user.bash
 echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
-nix-unit --flake .#tests
+echo "> sudo systemctl stop microvm@${C9_HOST}.service"
+sudo systemctl stop "microvm@${C9_HOST}.service"
 
 echo "> cd ../.."
 cd "../.."

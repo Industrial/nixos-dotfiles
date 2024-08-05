@@ -20,16 +20,22 @@
     }
     .${pkgs.system}
     or throwSystem;
+  sha256 =
+    {
+      x86_64-linux = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
+      x86_64-darwin = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
+      aarch64-linux = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
+      aarch64-darwin = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
+      armv7l-linux = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
+    }
+    .${pkgs.system}
+    or throwSystem;
   vscodePatched = pkgs.vscode.overrideAttrs {
     version = version;
     src = pkgs.fetchurl {
+      inherit sha256;
       name = "VSCode_${version}_${plat}.${archive_fmt}";
       url = "https://update.code.visualstudio.com/${version}/${plat}/stable";
-      # TODO: This checksum changes per platform so supply them er platform.
-      # Darwin
-      #sha256 = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
-      # NixOS
-      sha256 = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
     };
   };
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {

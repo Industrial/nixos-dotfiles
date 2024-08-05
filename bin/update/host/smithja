@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+echo "> update > host > smithja"
+exec > >(tee ./logs/update-hos-smithja) 2>&1
+set -e
+
+export C9_SYSTEM="darwin"
+export C9_HOST="smithja"
+export C9_USER="twieland"
+
+bin/update/repositories
+bin/update/system
