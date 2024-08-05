@@ -216,6 +216,7 @@
   "python.analysis.typeCheckingMode": "standard",
   "python.experiments.enabled": false,
   "python.languageServer": "Pylance",
+  "python.terminal.activateEnvironment": false,
   "references.preferredLocation": "view",
   "scm.inputFontFamily": "default",
   "scm.inputFontSize": 12,
