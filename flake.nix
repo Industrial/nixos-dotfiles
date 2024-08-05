@@ -38,17 +38,7 @@
   outputs = inputs @ {self, ...}: let
     forAllSystems = inputs.for-all-systems.forAllSystems {nixpkgs = inputs.nixpkgs;};
   in {
-    githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
-      checks =
-        inputs.for-all-systems.forAllSystems {
-          nixpkgs = inputs.nixpkgs;
-          systems = ["x86_64-linux" "aarch64-darwin"];
-        } ({
-          system,
-          pkgs,
-        }:
-          import ./checks.nix {inherit inputs system pkgs;});
-    };
+    githubActions = import ./github-actions.nix {inherit inputs;};
 
     nixosConfigurations = {} // (import ./hosts/langhus.nix {inherit inputs;});
     darwinConfigurations = {} // (import ./hosts/smithja.nix {inherit inputs;});
