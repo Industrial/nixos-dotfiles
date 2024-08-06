@@ -77,7 +77,7 @@
         ../features/nixos/bluetooth
         ../features/nixos/boot
         ../features/nixos/console
-        ../features/nixos/docker
+        # ../features/nixos/docker
         ../features/nixos/fonts
         ../features/nixos/graphics
         ../features/nixos/i18n
@@ -95,7 +95,7 @@
         # TODO: Use bun in project flakes, not globally.
         # ../features/programming/bun
         # ../features/programming/deno
-        ../features/programming/docker-compose
+        # ../features/programming/docker-compose
         # TODO: Use this in project flakes, not globally.
         # ../features/programming/edgedb
         ../features/programming/git
