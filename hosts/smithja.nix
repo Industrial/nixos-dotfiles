@@ -112,6 +112,7 @@
         # ../features/programming/neovim
         ../features/programming/nixd
         ../features/programming/nodejs
+        ../features/programming/python
         ../features/programming/vscode
         # ../features/security/veracrypt
         # ../features/security/yubikey-manager

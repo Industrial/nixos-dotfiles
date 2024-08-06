@@ -12,5 +12,6 @@ args @ {...}: {
   neovim = import ./neovim/tests.nix args;
   nixd = import ./nixd/tests.nix args;
   nodejs = import ./nodejs/tests.nix args;
+  python = import ./python/tests.nix args;
   vscode = import ./vscode/tests.nix args;
 }
