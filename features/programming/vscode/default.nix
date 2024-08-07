@@ -53,8 +53,8 @@
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
       # Completion
-      extensions.vscode-marketplace-release.github.copilot-chat
-      extensions.vscode-marketplace.github.copilot
+      # extensions.vscode-marketplace-release.github.copilot-chat
+      # extensions.vscode-marketplace.github.copilot
       extensions.vscode-marketplace.supermaven.supermaven
 
       # File Types

@@ -108,7 +108,7 @@
         ../features/programming/nodejs
         ../features/programming/python
         ../features/programming/vscode
-        # ../features/security/veracrypt
+        ../features/security/veracrypt
         # ../features/security/yubikey-manager
         # ../features/virtual-machine/base
         # ../features/virtual-machine/kubernetes/master

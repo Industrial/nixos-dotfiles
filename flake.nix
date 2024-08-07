@@ -1,25 +1,20 @@
 {
   inputs = {
-    # Nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-
-    # For All Systems
     for-all-systems.url = "github:Industrial/for-all-systems";
     for-all-systems.inputs.nixpkgs.follows = "nixpkgs";
-
-    # Nix Git Hooks
+    flake-checks.url = "github:Industrial/flake-checks";
+    flake-checks.inputs.nixpkgs.follows = "nixpkgs";
+    flake-devshells.url = "github:Industrial/flake-devshells";
+    flake-devshells.inputs.nixpkgs.follows = "nixpkgs";
+    flake-github-actions.url = "github:Industrial/flake-github-actions";
+    flake-github-actions.inputs.nixpkgs.follows = "nixpkgs";
     git-hooks.url = "github:cachix/git-hooks.nix";
     git-hooks.inputs.nixpkgs.follows = "nixpkgs";
-
-    # Nix GitHub Actions
     nix-github-actions.url = "github:nix-community/nix-github-actions";
     nix-github-actions.inputs.nixpkgs.follows = "nixpkgs";
-
-    # Nix Unit
     nix-unit.url = "github:nix-community/nix-unit";
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
-
-    # Nix Darwin
     nix-darwin.url = "github:LnL7/nix-darwin";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
   };
@@ -27,7 +22,10 @@
   outputs = inputs @ {self, ...}: let
     forAllSystems = inputs.for-all-systems.forAllSystems {nixpkgs = inputs.nixpkgs;};
   in {
-    githubActions = import ./common/github-actions.nix {inherit inputs;};
+    githubActions = inputs.flake-github-actions.github-actions {
+      systems = ["x86_64-linux" "aarch64-darwin"];
+      checks = inputs.flake-checks.checks;
+    } {inherit inputs;};
 
     tests =
       inputs.for-all-systems.forAllSystems {
@@ -36,19 +34,33 @@
       } ({
         system,
         pkgs,
-      }:
-        import ./common/tests.nix {inherit inputs system pkgs;});
+      }: let
+        settings = {
+          hostname = "testhostname";
+          stateVersion = "24.05";
+          system = "x86_64-linux";
+          hostPlatform = {
+            system = "x86_64-linux";
+          };
+          userdir = "/Users/test";
+          useremail = "test@test.com";
+          userfullname = "Chadster McChaddington";
+          username = "test";
+        };
+      in {
+        features = import ./features/tests.nix {
+          inherit inputs settings pkgs;
+        };
+      });
 
-    checks = forAllSystems ({
-      system,
-      pkgs,
-    }:
-      import ./common/checks.nix {inherit inputs system pkgs;});
+    checks =
+      forAllSystems ({system, ...}:
+        inputs.flake-checks.checks {inherit inputs system;});
 
     devShells = forAllSystems ({
       system,
       pkgs,
     }:
-      import ./common/devshells.nix {inherit self system pkgs;});
+      inputs.flake-devshells.devshells {packages = with pkgs; [direnv pre-commit];} {inherit self system pkgs;});
   };
 }
