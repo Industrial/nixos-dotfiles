@@ -36,11 +36,11 @@
         pkgs,
       }: let
         settings = {
+          inherit system;
           hostname = "testhostname";
           stateVersion = "24.05";
-          system = "x86_64-linux";
           hostPlatform = {
-            system = "x86_64-linux";
+            inherit system;
           };
           userdir = "/Users/test";
           useremail = "test@test.com";
