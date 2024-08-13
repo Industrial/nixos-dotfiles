@@ -1,5 +1,17 @@
 [
   {
+    "command": "workbench.action.terminal.toggleTerminal",
+    "key": "cmd+`"
+  },
+  {
+    "command": "workbench.action.terminal.toggleTerminal",
+    "key": "ctrl+`"
+  },
+  {
+    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
+    "key": "ctrl+tab"
+  },
+  {
     "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
     "key": "ctrl+tab"
   },
@@ -91,25 +103,5 @@
     "command": "editor.action.inlineSuggest.showPrevious",
     "key": "ctrl+[",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
-  },
-  {
-    "command": "github.copilot.generate",
-    "key": "ctrl+shift+enter",
-    "when": "editorTextFocus && github.copilot.activated && !inInteractiveInput && !inInteractiveEditorFocused"
-  },
-  {
-    "command": "github.copilot.acceptCursorPanelSolution",
-    "key": "ctrl+/",
-    "when": "github.copilot.activated && github.copilot.panelVisible"
-  },
-  {
-    "command": "github.copilot.previousPanelSolution",
-    "key": "alt+[",
-    "when": "github.copilot.activated && github.copilot.panelVisible"
-  },
-  {
-    "command": "github.copilot.nextPanelSolution",
-    "key": "alt+]",
-    "when": "github.copilot.activated && github.copilot.panelVisible"
   }
 ]
