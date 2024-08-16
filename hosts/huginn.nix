@@ -23,6 +23,8 @@ in {
         inherit inputs settings;
       };
       modules = [
+        /etc/nixos/hardware-configuration.nix
+
         ../features/cli/appimage-run
         ../features/cli/bat
         ../features/cli/btop
