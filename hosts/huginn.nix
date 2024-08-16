@@ -1,5 +1,5 @@
 {inputs, ...}: let
-  name = "langhus";
+  name = "huginn";
   system = "x86_64-linux";
   username = "tom";
   version = "24.05";
@@ -88,7 +88,8 @@ in {
         ../features/nixos/security/apparmor
         ../features/nixos/security/yubikey
         ../features/nixos/sound
-        ../features/nixos/system
+        # TODO: This is for langhus!
+        #../features/nixos/system
         ../features/nixos/time
         ../features/nixos/users
         ../features/nixos/window-manager

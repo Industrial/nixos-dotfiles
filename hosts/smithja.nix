@@ -1,7 +1,9 @@
-{inputs, ...}: {
-  smithja = let
+{inputs, ...}: let
+  name = "smithja";
+in {
+  "${name}" = let
     settings = {
-      hostname = "smithja";
+      hostname = "${name}";
       stateVersion = "24.05";
       system = "aarch64-darwin";
       hostPlatform = {
