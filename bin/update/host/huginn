@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+echo "> update > host > huginn"
+exec > >(tee ./logs/update-hos-huginn) 2>&1
+set -e
+
+export C9_SYSTEM="nixos"
+export C9_HOST="huginn"
+export C9_USER="tom"
+
+bin/update/repositories
+bin/update/system
