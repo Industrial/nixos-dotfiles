@@ -14,7 +14,7 @@ echo "> cd ./systems/${C9_SYSTEM}"
 cd "./systems/${C9_SYSTEM}"
 
 echo "> nix flake update"
-nix flake update
+nix --experimental-features "nix-command flakes" flake update
 
 echo "> cd ../.."
 cd "../.."
