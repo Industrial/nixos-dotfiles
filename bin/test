@@ -8,4 +8,4 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-nix-unit --flake .#tests
+time nix-unit --flake .#tests
