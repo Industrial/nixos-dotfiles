@@ -8,8 +8,8 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
+# echo "> cd ./systems/${C9_SYSTEM}"
+# cd "./systems/${C9_SYSTEM}"
 
 # Use shell globbing to list matching files
 for file in /nix/var/nix/profiles/system-*; do
@@ -18,5 +18,5 @@ for file in /nix/var/nix/profiles/system-*; do
     fi
 done
 
-echo "> cd ../.."
-cd "../.."
+# echo "> cd ../.."
+# cd "../.."

@@ -7,7 +7,7 @@ export C9_SYSTEM="nixos"
 export C9_HOST="huginn"
 export C9_USER="tom"
 
-features/window-manager/gnome/bin/dconf-load
+#features/window-manager/gnome/bin/dconf-load
 
 bin/update/repositories
 bin/update/system

@@ -50,7 +50,7 @@
         rss = reset --soft HEAD^
         ru = remote update -p
         s = status
-        sh = stash
+        st = stash
         t = tag
       [init]
         defaultBranch = main

@@ -23,8 +23,6 @@ in {
         inherit inputs settings;
       };
       modules = [
-        /etc/nixos/hardware-configuration.nix
-
         ../features/cli/appimage-run
         ../features/cli/bat
         ../features/cli/btop
@@ -115,7 +113,7 @@ in {
         #../features/programming/python
         ../features/programming/vscode
         #../features/security/veracrypt
-        # ../features/security/yubikey-manager
+        ../features/security/yubikey-manager
         # ../features/virtual-machine/base
         # ../features/virtual-machine/kubernetes/master
         # ../features/virtual-machine/kubernetes/node
