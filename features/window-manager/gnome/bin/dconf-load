@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+echo "> dconf-load"
+exec > >(tee ./logs/dconf-load) 2>&1
+set -e
+
+source lib/lowercase.bash
+source lib/host.bash
+source lib/system.bash
+source lib/user.bash
+
+echo "> > features/window-manager/gnome/dconf/dump.conf dconf load /"
+> features/window-manager/gnome/dconf/dump.conf dconf load /

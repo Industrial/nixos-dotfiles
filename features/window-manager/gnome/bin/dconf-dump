@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+echo "> dconf-dump"
+exec > >(tee ./logs/dconf-dump) 2>&1
+set -e
+
+source lib/lowercase.bash
+source lib/host.bash
+source lib/system.bash
+source lib/user.bash
+
+echo "> dconf dump / > features/window-manager/gnome/dconf/dump.conf"
+dconf dump / > features/window-manager/gnome/dconf/dump.conf

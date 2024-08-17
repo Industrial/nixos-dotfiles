@@ -18,7 +18,7 @@ in {
     };
   in
     inputs.nixpkgs.lib.nixosSystem {
-      system = settings.system;
+      inherit system;
       specialArgs = {
         inherit inputs settings;
       };
@@ -51,24 +51,24 @@ in {
         ../features/cli/unrar
         ../features/cli/unzip
         ../features/communication/discord
-        ../features/games/lutris
-        ../features/games/path-of-building
-        ../features/games/steam
+        #../features/games/lutris
+        #../features/games/path-of-building
+        #../features/games/steam
         # ../features/hardware/zsa-keyboard
-        ../features/media/invidious
-        ../features/media/lidarr
-        ../features/media/okular
-        ../features/media/prowlarr
-        ../features/media/radarr
-        ../features/media/readarr
-        ../features/media/sonarr
+        #../features/media/invidious
+        #../features/media/lidarr
+        #../features/media/okular
+        #../features/media/prowlarr
+        #../features/media/radarr
+        #../features/media/readarr
+        #../features/media/sonarr
         ../features/media/spotify
         ../features/media/transmission
         ../features/media/vlc
-        # ../features/media/whisparr
-        ../features/monitoring/grafana
-        ../features/monitoring/homepage-dashboard
-        ../features/monitoring/prometheus
+        ## ../features/media/whisparr
+        #../features/monitoring/grafana
+        #../features/monitoring/homepage-dashboard
+        #../features/monitoring/prometheus
         ../features/network/chromium
         ../features/network/firefox
         # ../features/network/i2pd
@@ -95,7 +95,7 @@ in {
         ../features/nixos/time
         ../features/nixos/users
         ../features/nixos/window-manager
-        ../features/office/cryptpad
+        #../features/office/cryptpad
         ../features/office/obsidian
         # ../features/programming/android-tools
         # TODO: Use bun in project flakes, not globally.
@@ -105,24 +105,61 @@ in {
         # TODO: Use this in project flakes, not globally.
         # ../features/programming/edgedb
         ../features/programming/git
-        ../features/programming/gitkraken
-        ../features/programming/glogg
+        #../features/programming/gitkraken
+        #../features/programming/glogg
         # ../features/programming/insomnia
-        ../features/programming/meld
+        #../features/programming/meld
         # ../features/programming/neovim
         ../features/programming/nixd
-        ../features/programming/nodejs
-        ../features/programming/python
+        #../features/programming/nodejs
+        #../features/programming/python
         ../features/programming/vscode
-        ../features/security/veracrypt
+        #../features/security/veracrypt
         # ../features/security/yubikey-manager
         # ../features/virtual-machine/base
         # ../features/virtual-machine/kubernetes/master
         # ../features/virtual-machine/kubernetes/node
         # ../features/virtual-machine/microvm
         # ../features/virtual-machine/ssh
-        ../features/window-manager/alacritty
-        ../features/window-manager/xfce
+        #../features/window-manager/alacritty
+        ../features/window-manager/gnome
+
+        ({
+          config,
+          lib,
+          # pkgs,
+          modulesPath,
+          ...
+        }: {
+          imports = [
+            (modulesPath + "/installer/scan/not-detected.nix")
+          ];
+
+          boot.initrd.availableKernelModules = ["xhci_pci" "nvme" "usbhid" "uas" "sd_mod" "rtsx_usb_sdmmc"];
+          boot.initrd.kernelModules = [];
+          boot.kernelModules = ["kvm-intel"];
+          boot.extraModulePackages = [];
+
+          fileSystems."/" = {
+            device = "/dev/disk/by-uuid/f3adb911-b6a6-47ac-9490-ea200135ad8b";
+            fsType = "ext4";
+          };
+
+          boot.initrd.luks.devices."luks-43521c75-c1cb-4b8a-875e-209640141530".device = "/dev/disk/by-uuid/43521c75-c1cb-4b8a-875e-209640141530";
+
+          fileSystems."/boot" = {
+            device = "/dev/disk/by-uuid/3BE3-A3FE";
+            fsType = "vfat";
+            options = ["fmask=0077" "dmask=0077"];
+          };
+
+          swapDevices = [];
+
+          networking.useDHCP = lib.mkDefault true;
+
+          nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+          hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+        })
       ];
     };
 }

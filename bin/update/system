@@ -30,4 +30,11 @@ echo "> cd ../.."
 cd "../.."
 
 bin/update/login-shell "${C9_USER}"
-features/programming/vscode/bin/link-files-darwin
+
+if [ "${C9_SYSTEM}" == "nixos" ]; then
+    features/programming/vscode/bin/link-files-nixos
+fi
+
+if [ "${C9_SYSTEM}" == "darwin" ]; then
+    features/programming/vscode/bin/link-files-darwin
+fi
