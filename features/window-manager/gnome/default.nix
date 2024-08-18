@@ -32,6 +32,7 @@
     systemPackages = with pkgs; [
       # - Media
       #   - Audio
+      gnome.gnome-music
       gnome.gnome-sound-recorder
       spot
       totem
@@ -41,6 +42,7 @@
       evince
       #   - Images
       eog
+      gnome-photos
       gnome-screenshot
       shotwell
       #   - Video
@@ -64,35 +66,41 @@
       gnome-font-viewer
 
       # - Email
+      # Email client.
       geary
 
       # - Development
+      # Git GUI.
       gitg
+
+      # - Games
+      gnome.gnome-chess
+      gnome.gnome-sudoku
+
+      # - System
+      # Edit Gnome / Dconf settings.
+      dconf-editor
+      gnome.gnome-applets
+      gnome.gnome-backgrounds
+      gnome-system-monitor
 
       gnome-console
       gnome-decoder
       gnome-graphs
-      gnome-photos
-      gnome-system-monitor
       gnome-tweaks
-      gnome.gnome-applets
-      gnome.gnome-backgrounds
       gnome.gnome-bluetooth
       gnome.gnome-characters
-      gnome.gnome-chess
       gnome.gnome-clocks
       gnome.gnome-color-manager
       gnome.gnome-contacts
       gnome.gnome-control-center
       gnome.gnome-logs
       gnome.gnome-maps
-      gnome.gnome-music
       gnome.gnome-nettool
       gnome.gnome-panel
       gnome.gnome-session
       gnome.gnome-shell
       gnome.gnome-shell-extensions
-      gnome.gnome-sudoku
       gnome.gnome-weather
       nautilus
       papers

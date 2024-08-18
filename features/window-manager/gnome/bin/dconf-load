@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "> dconf-load"
+echo "> features > window-manager > gnome > dconf > load"
 exec > >(tee ./logs/dconf-load) 2>&1
 set -e
 

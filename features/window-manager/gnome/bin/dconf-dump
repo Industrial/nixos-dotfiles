@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "> dconf-dump"
+echo "> features > window-manager > gnome > dconf > dump"
 exec > >(tee ./logs/dconf-dump) 2>&1
 set -e
 
