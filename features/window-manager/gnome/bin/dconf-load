@@ -8,5 +8,5 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-echo "> > features/window-manager/gnome/dconf/dump.conf dconf load /"
-> features/window-manager/gnome/dconf/dump.conf dconf load /
+echo "> cat features/window-manager/gnome/dconf/dump.conf | dconf load /"
+cat features/window-manager/gnome/dconf/dump.conf | dconf load /
