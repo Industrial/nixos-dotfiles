@@ -63,6 +63,12 @@
       system,
       pkgs,
     }:
-      inputs.flake-devshells.devshells {packages = with pkgs; [direnv pre-commit];} {inherit self system pkgs;});
+      inputs.flake-devshells.devshells {
+        packages = with pkgs; [
+          direnv
+          jq
+          pre-commit
+        ];
+      } {inherit self system pkgs;});
   };
 }

@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# Query the API and get the response
+response=$(curl -s "https://prometheus.nixos.org/api/v1/query?query=channel_revision")
+
+# Extract all the nixos-##.## strings
+versions=$(echo "$response" | jq -r '.data.result[].metric.channel' | grep -o 'nixos-[0-9]*\.[0-9]*')
+
+# Sort the versions and get the largest number
+# Using sort -V to sort by version
+largest_version=$(echo "$versions" | sort -V | tail -n 1)
+
+# Remove the 'nixos-' part to get only the version number
+version_number="${largest_version//nixos-/}"
+
+# Output the version number
+echo "$version_number"
