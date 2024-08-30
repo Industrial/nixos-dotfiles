@@ -5,8 +5,9 @@
     nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
   };
   outputs = inputs @ {...}: {
-    nixosConfigurations = {}
-    // (import ../../hosts/langhus.nix {inherit inputs;})
-    // (import ../../hosts/huginn.nix {inherit inputs;});
+    nixosConfigurations =
+      {}
+      // (import ../../hosts/langhus.nix {inherit inputs;})
+      // (import ../../hosts/huginn.nix {inherit inputs;});
   };
 }

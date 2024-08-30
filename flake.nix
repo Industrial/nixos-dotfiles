@@ -24,6 +24,10 @@
   outputs = inputs @ {self, ...}: let
     forAllSystems = inputs.for-all-systems.forAllSystems {nixpkgs = inputs.nixpkgs;};
   in {
+    formatter =
+      forAllSystems ({pkgs, ...}:
+        pkgs.alejandra);
+
     githubActions = inputs.flake-github-actions.github-actions {
       systems = ["x86_64-linux" "aarch64-darwin"];
       checks = inputs.flake-checks.checks;
@@ -55,9 +59,10 @@
         };
       });
 
-    checks =
-      forAllSystems ({system, ...}:
-        inputs.flake-checks.checks {inherit inputs system;});
+    checks = forAllSystems ({system, ...}:
+      inputs.flake-checks.checks {
+        inherit inputs system;
+      });
 
     devShells = forAllSystems ({
       system,

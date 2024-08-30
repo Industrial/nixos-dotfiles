@@ -8,13 +8,7 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
-
 # I didn't get this to work on all files with `nix flake check` so I'm using
 # `pre-commit` directly.
 echo "> pre-commit run --all-files"
-pre-commit run --all-files
-
-echo "> cd ../.."
-cd "../.."
+time pre-commit run --all-files

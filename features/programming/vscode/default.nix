@@ -65,31 +65,31 @@
       extensions.vscode-marketplace.yzhang.markdown-all-in-one
       ## JavaScript / TypeScript
       extensions.vscode-marketplace.dbaeumer.vscode-eslint
-      extensions.vscode-marketplace.denoland.vscode-deno
-      extensions.vscode-marketplace.ms-vscode.js-debug
-      extensions.vscode-marketplace.ms-vscode.js-debug-companion
+      # extensions.vscode-marketplace.denoland.vscode-deno
+      # extensions.vscode-marketplace.ms-vscode.js-debug
+      # extensions.vscode-marketplace.ms-vscode.js-debug-companion
       extensions.vscode-marketplace.oven.bun-vscode
       extensions.vscode-marketplace.vitest.explorer
-      ## Python
-      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
-      extensions.vscode-marketplace.ms-python.black-formatter
-      extensions.vscode-marketplace.ms-python.debugpy
-      extensions.vscode-marketplace.ms-python.flake8
-      extensions.vscode-marketplace.ms-python.isort
-      extensions.vscode-marketplace.ms-python.python
-      extensions.vscode-marketplace.ms-python.vscode-pylance
-      extensions.vscode-marketplace.tamasfe.even-better-toml
-      ## Jupyter
-      extensions.vscode-marketplace.ms-toolsai.jupyter
-      extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
+      # ## Python
+      # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
+      # extensions.vscode-marketplace.ms-python.black-formatter
+      # extensions.vscode-marketplace.ms-python.debugpy
+      # extensions.vscode-marketplace.ms-python.flake8
+      # extensions.vscode-marketplace.ms-python.isort
+      # extensions.vscode-marketplace.ms-python.python
+      # extensions.vscode-marketplace.ms-python.vscode-pylance
+      # extensions.vscode-marketplace.tamasfe.even-better-toml
+      # ## Jupyter
+      # extensions.vscode-marketplace.ms-toolsai.jupyter
+      # extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
       ## Nix
       extensions.vscode-marketplace.bbenoist.nix
       extensions.vscode-marketplace.jnoortheen.nix-ide
       extensions.vscode-marketplace.kamadorueda.alejandra
       ## YAML
       extensions.vscode-marketplace.redhat.vscode-yaml
-      ## Docker
-      extensions.vscode-marketplace.ms-azuretools.vscode-docker
+      # ## Docker
+      # extensions.vscode-marketplace.ms-azuretools.vscode-docker
       ## Dotenv
       extensions.vscode-marketplace.mikestead.dotenv
       ## Git
@@ -102,8 +102,13 @@
       extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
       ## EdgeDB
       extensions.vscode-marketplace.magicstack.edgedb
-      ## Erlang
-      extensions.vscode-marketplace.pgourlain.erlang
+      # ## Erlang
+      # extensions.vscode-marketplace.pgourlain.erlang
+      # ## Haskell
+      extensions.vscode-marketplace.haskell.haskell
+      extensions.vscode-marketplace.hoovercj.haskell-linter
+      extensions.vscode-marketplace.justusadam.language-haskell
+      extensions.vscode-marketplace.phoityne.phoityne-vscode
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
@@ -121,5 +126,10 @@ in {
     # Nix
     pkgs.alejandra
     pkgs.nixd
+
+    # Haskell
+    pkgs.ghc
+    pkgs.haskell-language-server
+    pkgs.hlint
   ];
 }

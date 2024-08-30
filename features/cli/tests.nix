@@ -5,6 +5,7 @@ args @ {...}: {
   c = import ./c/tests.nix args;
   cheatsheet = import ./cheatsheet/tests.nix args;
   cl = import ./cl/tests.nix args;
+  create-ssh-key = import ./create-ssh-key/tests.nix args;
   direnv = import ./direnv/tests.nix args;
   du = import ./du/tests.nix args;
   dust = import ./dust/tests.nix args;
