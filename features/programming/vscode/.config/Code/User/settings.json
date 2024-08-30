@@ -170,6 +170,7 @@
   "github.copilot.enable": {
     "*": false
   },
+  "haskell.manageHLS": "PATH",
   "http.proxyStrictSSL": false,
   "javascript.updateImportsOnFileMove.enabled": "always",
   "jupyter.askForKernelRestart": false,
@@ -276,6 +277,5 @@
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
   "workbench.list.openMode": "doubleClick",
-  "workbench.startupEditor": "none",
-  "haskell.manageHLS": "PATH"
+  "workbench.startupEditor": "none"
 }
