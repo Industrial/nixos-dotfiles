@@ -3,7 +3,7 @@
   pkgs,
   ...
 }: let
-  version = "1.90.1";
+  version = "1.92.0";
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
   archive_fmt =
     if pkgs.stdenv.isDarwin
@@ -23,9 +23,9 @@
   sha256 =
     {
       x86_64-linux = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
-      x86_64-darwin = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
+      x86_64-darwin = "sha256-dTR+dG9Zf9v02uLs5SLBUcFgRTJjhPOpVpM1d6FlFQY=";
       aarch64-linux = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
-      aarch64-darwin = "sha256-dKlq7K0Oh96Z2gWVLgK6G/e/Y5MlibPy2aAj4cYQK6g=";
+      aarch64-darwin = "sha256-dTR+dG9Zf9v02uLs5SLBUcFgRTJjhPOpVpM1d6FlFQY=";
       armv7l-linux = "sha256-n9q14COlOmnEzLDF7ZkHwu3Y76lOb/fG9fqxTXZYPg0=";
     }
     .${pkgs.system}
@@ -110,13 +110,10 @@
       extensions.vscode-marketplace.justusadam.language-haskell
       extensions.vscode-marketplace.phoityne.phoityne-vscode
 
-      # Testing
-      extensions.vscode-marketplace.hbenl.vscode-test-explorer
-      extensions.vscode-marketplace.ms-playwright.playwright
-      extensions.vscode-marketplace.ms-vscode.test-adapter-converter
-
-      # WhichKey
-      extensions.vscode-marketplace.vspacecode.whichkey
+      # # Testing
+      # extensions.vscode-marketplace.hbenl.vscode-test-explorer
+      # extensions.vscode-marketplace.ms-playwright.playwright
+      # extensions.vscode-marketplace.ms-vscode.test-adapter-converter
     ];
   };
 in {
