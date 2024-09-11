@@ -33,6 +33,7 @@ in {
         ../features/cli/c
         ../features/cli/cheatsheet
         ../features/cli/cl
+        ../features/cli/create-ssh-key
         ../features/cli/direnv
         ../features/cli/du
         ../features/cli/dust
