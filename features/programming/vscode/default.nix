@@ -125,7 +125,7 @@ in {
     pkgs.nixd
 
     # Haskell
-    pkgs.ghc
+    #pkgs.ghc
     pkgs.haskell-language-server
     pkgs.hlint
   ];

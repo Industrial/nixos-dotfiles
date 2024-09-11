@@ -50,6 +50,7 @@ in {
         ../features/cli/unrar
         ../features/cli/unzip
         ../features/communication/discord
+        ../features/communication/fractal
         #../features/games/lutris
         #../features/games/path-of-building
         #../features/games/steam
