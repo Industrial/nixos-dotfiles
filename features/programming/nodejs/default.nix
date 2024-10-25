@@ -1,6 +1,6 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    nodejs
-    nodePackages.pnpm
+    nodejs_22
+    corepack_22
   ];
 }

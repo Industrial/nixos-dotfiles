@@ -8,11 +8,5 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-# echo "> cd ./systems/${C9_SYSTEM}"
-# cd "./systems/${C9_SYSTEM}"
-
 bin/update/nix-env
 bin/update/flake
-
-# echo "> cd ../.."
-# cd "../.."

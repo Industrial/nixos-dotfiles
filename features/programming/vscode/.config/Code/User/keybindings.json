@@ -1,107 +1,122 @@
 [
   {
-    "command": "workbench.action.terminal.toggleTerminal",
-    "key": "cmd+`"
+    "key": "cmd+`",
+    "command": "workbench.action.terminal.toggleTerminal"
   },
   {
-    "command": "workbench.action.terminal.toggleTerminal",
-    "key": "ctrl+`"
+    "key": "ctrl+`",
+    "command": "workbench.action.terminal.toggleTerminal"
+  },
+
+  // Change Ctrl + Tab behavior to switch between editors like browser tabs.
+  {
+    "key": "ctrl+tab",
+    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup"
   },
   {
-    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
-    "key": "ctrl+tab"
+    "key": "ctrl+shift+tab",
+    "command": "-workbench.action.quickOpenLeastRecentlyUsedEditorInGroup"
   },
   {
-    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
-    "key": "ctrl+tab"
+    "key": "ctrl+tab",
+    "command": "workbench.action.nextEditor"
   },
   {
-    "command": "workbench.action.nextEditor",
-    "key": "ctrl+tab"
+    "key": "ctrl+shift+tab",
+    "command": "workbench.action.previousEditor"
   },
+
   {
-    "command": "-workbench.action.nextEditor",
-    "key": "ctrl+pagedown"
-  },
-  {
-    "command": "workbench.action.previousEditor",
-    "key": "ctrl+shift+tab"
-  },
-  {
-    "command": "-workbench.action.previousEditor",
-    "key": "ctrl+pageup"
-  },
-  {
-    "command": "-workbench.action.quickOpenLeastRecentlyUsedEditorInGroup",
-    "key": "ctrl+shift+tab"
-  },
-  {
-    "command": "editor.action.showHover",
     "key": "ctrl+shift+k",
+    "command": "editor.action.showHover",
     "when": "editorTextFocus"
   },
+
+  // Use Ctrl + HJKL to navigate between editors.
   {
-    "command": "workbench.action.navigateLeft",
-    "key": "ctrl+h"
+    "key": "ctrl+h",
+    "command": "workbench.action.navigateLeft"
   },
   {
-    "command": "workbench.action.navigateRight",
-    "key": "ctrl+l"
+    "key": "ctrl+j",
+    "command": "workbench.action.navigateDown"
   },
   {
-    "command": "workbench.action.navigateUp",
-    "key": "ctrl+k"
+    "key": "ctrl+k",
+    "command": "workbench.action.navigateUp"
   },
   {
-    "command": "workbench.action.navigateDown",
-    "key": "ctrl+j"
+    "key": "ctrl+l",
+    "command": "workbench.action.navigateRight"
   },
+
+  // Use Ctrl + J/K to navigate in suggestions.
   {
+    "key": "ctrl+j",
     "command": "selectNextSuggestion",
-    "key": "ctrl+j",
     "when": "suggestWidgetVisible"
   },
   {
+    "key": "ctrl+k",
     "command": "selectPrevSuggestion",
-    "key": "ctrl+k",
     "when": "suggestWidgetVisible"
   },
   {
-    "command": "workbench.action.quickOpenSelectNext",
     "key": "ctrl+j",
+    "command": "workbench.action.quickOpenSelectNext",
     "when": "inQuickOpen"
   },
   {
-    "command": "workbench.action.quickOpenSelectPrevious",
     "key": "ctrl+k",
+    "command": "workbench.action.quickOpenSelectPrevious",
     "when": "inQuickOpen"
   },
+
   {
-    "command": "workbench.action.quickOpen",
-    "key": "ctrl+p"
+    "key": "ctrl+p",
+    "command": "workbench.action.quickOpen"
   },
   {
-    "command": "workbench.action.showCommands",
-    "key": "ctrl+shift+p"
+    "key": "ctrl+shift+p",
+    "command": "workbench.action.showCommands"
+  },
+
+  // Suggestions
+  {
+    "key": "alt+space",
+    "command": "editor.action.triggerSuggest",
+    "when": "editorHasCompletionItemProvider && textInputFocus && !editorReadonly && !suggestWidgetVisible"
   },
   {
-    "command": "editor.action.inlineSuggest.trigger",
     "key": "alt+enter",
-    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
-  },
-  {
     "command": "editor.action.inlineSuggest.trigger",
+    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+  {
     "key": "ctrl+enter",
+    "command": "editor.action.inlineSuggest.trigger",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
   },
   {
-    "command": "editor.action.inlineSuggest.showNext",
-    "key": "ctrl+]",
-    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
-  },
-  {
-    "command": "editor.action.inlineSuggest.showPrevious",
     "key": "ctrl+[",
+    "command": "editor.action.inlineSuggest.showPrevious",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+  {
+    "key": "ctrl+]",
+    "command": "editor.action.inlineSuggest.showNext",
+    "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
+  },
+
+  // Unbind these vim keybinds.
+  {
+    "key": "ctrl+space",
+    "command": "-extension.vim_ctrl+space",
+    "when": "editorTextFocus && vim.active && vim.use<C-space> && !inDebugRepl && vim.mode != 'Insert'"
+  },
+  {
+    "key": "ctrl+backspace",
+    "command": "-deleteLeft",
+    "when": "textInputFocus"
   }
 ]

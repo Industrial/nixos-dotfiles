@@ -1,33 +1,28 @@
 {
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.detectIndentation": false,
+    "editor.guides.indentation": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
   "[haskell]": {
     "editor.defaultFormatter": "haskell.haskell",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
   },
   "[javascript]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
+    "editor.defaultFormatter": "biomejs.biome",
   },
   "[javascriptreact]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
+    "editor.defaultFormatter": "biomejs.biome",
   },
   "[json]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[jsonc]": {
-    "editor.defaultFormatter": "vscode.json-language-features"
+    "editor.defaultFormatter": "biomejs.biome"
   },
   "[nix]": {
     "editor.defaultFormatter": "kamadorueda.alejandra",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
   },
   "[purescript]": {
     "editor.defaultFormatter": "nwolverson.ide-purescript"
@@ -35,24 +30,15 @@
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.detectIndentation": false,
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false,
     "editor.guides.indentation": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4
   },
   "[typescript]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
+    "editor.defaultFormatter": "biomejs.biome",
   },
   "[typescriptreact]": {
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "editor.formatOnType": false
+    "editor.defaultFormatter": "biomejs.biome",
   },
   "alejandra.program": "alejandra",
   "debug.console.fontSize": 16,
@@ -65,14 +51,16 @@
   "editor.autoClosingQuotes": "always",
   "editor.codeActionsOnSave": {
     "source.fixAll": "explicit",
-    "source.organizeImports": "explicit"
+    "source.organizeImports.biome": "explicit"
   },
+  "editor.defaultFormatter": "biomejs.biome",
   "editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "editor.fontLigatures": true,
   "editor.fontSize": 16,
   "editor.fontWeight": "500",
   "editor.formatOnPaste": true,
   "editor.formatOnSave": true,
+  "editor.formatOnType": false,
   "editor.gotoLocation.multipleDeclarations": "gotoAndPeek",
   "editor.gotoLocation.multipleDefinitions": "gotoAndPeek",
   "editor.gotoLocation.multipleImplementations": "gotoAndPeek",
@@ -138,7 +126,8 @@
   "emmet.showAbbreviationSuggestions": false,
   "emmet.showExpandedAbbreviation": "never",
   "emmet.showSuggestionsAsSnippets": true,
-  "eslint.enable": true,
+  "biome.enabled": true,
+  "eslint.enable": false,
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
   "eslint.trace.server": "verbose",
@@ -234,8 +223,20 @@
   "terminal.integrated.tabs.location": "left",
   "terminal.integrated.tabs.showActions": "always",
   "terminal.integrated.tabs.showActiveTerminal": "always",
-  "testExplorer.onReload": "reset",
-  "testExplorer.showOnRun": true,
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.experimental.updateImportsOnPaste": true,
+  "typescript.format.enable": false,
+  "typescript.format.insertSpaceAfterTypeAssertion": true,
+  "typescript.inlayHints.enumMemberValues.enabled": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.parameterNames.enabled": "all",
+  "typescript.inlayHints.parameterTypes.enabled": true,
+  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+  "typescript.inlayHints.variableTypes.enabled": true,
+  "typescript.preferGoToSourceDefinition": true,
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.tsserver.web.typeAcquisition.enabled": true,
   "typescript.updateImportsOnFileMove.enabled": "always",
   "update.mode": "none",
   "vim.foldfix": true,
@@ -260,23 +261,28 @@
       ]
     }
   ],
-  "vitest.commandLine": "pnpm vitest",
-  "vitest.enable": true,
-  "vitest.exclude": [
-    "**/node_modules/**",
-    "**/dist/**",
-    "**/cypress/**",
-    "**/.{idea,git,cache,output,temp}/**"
-  ],
-  "vitest.include": [
-    "**/*.ts"
-  ],
   "vitest.nodeEnv": null,
-  "vitest.showFailMessages": true,
   "window.autoDetectColorScheme": true,
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
   "workbench.list.openMode": "doubleClick",
   "workbench.startupEditor": "none",
-  "haskell.formattingProvider": "fourmolu"
+  "haskell.formattingProvider": "fourmolu",
+  "javascript.inlayHints.parameterNames.suppressWhenArgumentMatchesName": false,
+  "editor.inlayHints.enabled": "off",
+  "rust-analyzer.procMacro.ignored": {
+    "leptos_macro": [
+        // optional:
+        // "component",
+        "server"
+    ],
+  },
+  "rust-analyzer.cargo.features": ["ssr"],
+  "rust-analyzer.rustfmt.overrideCommand": [
+    "leptosfmt",
+    "-t",
+    "2",
+    "--stdin",
+    "--rustfmt"
+  ],
 }

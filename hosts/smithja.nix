@@ -54,7 +54,8 @@ in {
         ../features/cli/unrar
         ../features/cli/unzip
         ../features/communication/discord
-        ../features/communication/fractal
+        #../features/communication/fractal
+        ../features/darwin/apple_sdk
         ../features/darwin/settings
         # ../features/games/lutris
         # ../features/games/path-of-building
@@ -111,6 +112,7 @@ in {
         ../features/programming/git
         ../features/programming/gitkraken
         ../features/programming/glogg
+        ../features/programming/haskell
         # ../features/programming/insomnia
         ../features/programming/meld
         # ../features/programming/neovim

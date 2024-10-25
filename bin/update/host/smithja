@@ -7,5 +7,6 @@ export C9_SYSTEM="darwin"
 export C9_HOST="smithja"
 export C9_USER="twieland"
 
-bin/update/repositories
+# bin/update/repositories
 bin/update/system
+# bin/delete/collectgarbage

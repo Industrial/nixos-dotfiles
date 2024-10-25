@@ -105,6 +105,7 @@ in {
         # TODO: Use this in project flakes, not globally.
         # ../features/programming/edgedb
         ../features/programming/git
+        ../features/programming/haskell
         #../features/programming/gitkraken
         #../features/programming/glogg
         # ../features/programming/insomnia
