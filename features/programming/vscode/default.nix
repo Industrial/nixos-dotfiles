@@ -60,6 +60,7 @@
       extensions.vscode-marketplace.mikestead.dotenv
       ## Git
       extensions.vscode-marketplace.donjayamanne.githistory
+      extensions.vscode-marketplace.eamodio.gitlens
       extensions.vscode-marketplace.mhutchie.git-graph
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
       ## PlantUML
@@ -90,6 +91,9 @@
 in {
   environment.systemPackages = [
     vscodeWithExtensions
+
+    # TypeScript
+    pkgs.biome
 
     # Nix
     pkgs.alejandra
