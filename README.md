@@ -51,10 +51,20 @@ bin/start-vm
 
 ## Clean
 
-If you hit the limit of derivations or you are just very happy with what you've got:
+If you hit the limit of derivations or you are just very happy with what you've
+got:
 
 ```bash
 bin/delete-generations
+```
+
+## Development
+
+```bash
+bin/format
+bin/lint
+bin/check
+bin/test
 ```
 
 ## Lab

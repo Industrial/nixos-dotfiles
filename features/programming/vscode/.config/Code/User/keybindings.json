@@ -1,122 +1,110 @@
 [
   {
-    "key": "cmd+`",
-    "command": "workbench.action.terminal.toggleTerminal"
+    "command": "workbench.action.terminal.toggleTerminal",
+    "key": "cmd+`"
   },
   {
-    "key": "ctrl+`",
-    "command": "workbench.action.terminal.toggleTerminal"
-  },
-
-  // Change Ctrl + Tab behavior to switch between editors like browser tabs.
-  {
-    "key": "ctrl+tab",
-    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup"
+    "command": "workbench.action.terminal.toggleTerminal",
+    "key": "ctrl+`"
   },
   {
-    "key": "ctrl+shift+tab",
-    "command": "-workbench.action.quickOpenLeastRecentlyUsedEditorInGroup"
+    "command": "-workbench.action.quickOpenPreviousRecentlyUsedEditorInGroup",
+    "key": "ctrl+tab"
   },
   {
-    "key": "ctrl+tab",
-    "command": "workbench.action.nextEditor"
+    "command": "-workbench.action.quickOpenLeastRecentlyUsedEditorInGroup",
+    "key": "ctrl+shift+tab"
   },
   {
-    "key": "ctrl+shift+tab",
-    "command": "workbench.action.previousEditor"
+    "command": "workbench.action.nextEditor",
+    "key": "ctrl+tab"
   },
-
   {
-    "key": "ctrl+shift+k",
+    "command": "workbench.action.previousEditor",
+    "key": "ctrl+shift+tab"
+  },
+  {
     "command": "editor.action.showHover",
+    "key": "ctrl+shift+k",
     "when": "editorTextFocus"
   },
-
-  // Use Ctrl + HJKL to navigate between editors.
   {
-    "key": "ctrl+h",
-    "command": "workbench.action.navigateLeft"
+    "command": "workbench.action.navigateLeft",
+    "key": "ctrl+h"
   },
   {
-    "key": "ctrl+j",
-    "command": "workbench.action.navigateDown"
+    "command": "workbench.action.navigateDown",
+    "key": "ctrl+j"
   },
   {
-    "key": "ctrl+k",
-    "command": "workbench.action.navigateUp"
+    "command": "workbench.action.navigateUp",
+    "key": "ctrl+k"
   },
   {
-    "key": "ctrl+l",
-    "command": "workbench.action.navigateRight"
+    "command": "workbench.action.navigateRight",
+    "key": "ctrl+l"
   },
-
-  // Use Ctrl + J/K to navigate in suggestions.
   {
-    "key": "ctrl+j",
     "command": "selectNextSuggestion",
-    "when": "suggestWidgetVisible"
-  },
-  {
-    "key": "ctrl+k",
-    "command": "selectPrevSuggestion",
-    "when": "suggestWidgetVisible"
-  },
-  {
     "key": "ctrl+j",
-    "command": "workbench.action.quickOpenSelectNext",
-    "when": "inQuickOpen"
+    "when": "suggestWidgetVisible"
   },
   {
+    "command": "selectPrevSuggestion",
     "key": "ctrl+k",
-    "command": "workbench.action.quickOpenSelectPrevious",
+    "when": "suggestWidgetVisible"
+  },
+  {
+    "command": "workbench.action.quickOpenSelectNext",
+    "key": "ctrl+j",
     "when": "inQuickOpen"
   },
-
   {
-    "key": "ctrl+p",
-    "command": "workbench.action.quickOpen"
+    "command": "workbench.action.quickOpenSelectPrevious",
+    "key": "ctrl+k",
+    "when": "inQuickOpen"
   },
   {
-    "key": "ctrl+shift+p",
-    "command": "workbench.action.showCommands"
+    "command": "workbench.action.quickOpen",
+    "key": "ctrl+p"
   },
-
-  // Suggestions
   {
-    "key": "alt+space",
+    "command": "workbench.action.showCommands",
+    "key": "ctrl+shift+p"
+  },
+  {
     "command": "editor.action.triggerSuggest",
+    "key": "alt+space",
     "when": "editorHasCompletionItemProvider && textInputFocus && !editorReadonly && !suggestWidgetVisible"
   },
   {
+    "command": "editor.action.inlineSuggest.trigger",
     "key": "alt+enter",
-    "command": "editor.action.inlineSuggest.trigger",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
   },
   {
+    "command": "editor.action.inlineSuggest.trigger",
     "key": "ctrl+enter",
-    "command": "editor.action.inlineSuggest.trigger",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
   },
   {
-    "key": "ctrl+[",
     "command": "editor.action.inlineSuggest.showPrevious",
+    "key": "ctrl+[",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
   },
   {
-    "key": "ctrl+]",
     "command": "editor.action.inlineSuggest.showNext",
+    "key": "ctrl+]",
     "when": "editorTextFocus && !editorHasSelection && !inlineSuggestionsVisible"
   },
-
-  // Unbind these vim keybinds.
   {
-    "key": "ctrl+space",
     "command": "-extension.vim_ctrl+space",
+    "key": "ctrl+space",
     "when": "editorTextFocus && vim.active && vim.use<C-space> && !inDebugRepl && vim.mode != 'Insert'"
   },
   {
-    "key": "ctrl+backspace",
     "command": "-deleteLeft",
+    "key": "ctrl+backspace",
     "when": "textInputFocus"
   }
 ]

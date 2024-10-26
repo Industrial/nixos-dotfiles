@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+echo "> lint"
+exec > >(tee ./logs/check) 2>&1
+set -e
+
+source lib/lowercase.bash
+source lib/host.bash
+source lib/system.bash
+source lib/user.bash
+
+# I didn't get this to work on all files with `nix flake check` so I'm using
+# `pre-commit` directly.
+echo "> nix flake check"
+time nix flake check
