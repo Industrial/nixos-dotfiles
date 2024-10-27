@@ -1,0 +1,260 @@
+import XMonad
+
+import XMonad.Util.EZConfig
+import XMonad.Util.Ungrab
+
+main :: IO ()
+main = xmonad $ def
+    { modMask = mod4Mask
+    }
+
+-- -- XMonad itself.
+-- import XMonad
+-- import XMonad.Util.EZConfig
+-- import XMonad.Util.Ungrab
+
+-- -- XMobar
+-- import System.IO
+-- import XMonad.Hooks.DynamicLog
+-- import XMonad.Hooks.ManageDocks
+-- import XMonad.Util.EZConfig
+-- import XMonad.Util.Run(spawnPipe)
+-- import XMonad.Actions.SpawnOn
+
+-- -- Layouts
+-- import XMonad.Layout.Grid
+-- import XMonad.Layout.Reflect(reflectHoriz)
+-- import XMonad.Layout.Tabbed
+
+-- -- Used for quitting the X session.
+-- import System.Exit
+
+-- -- Puspose unknown.
+-- import Data.Monoid
+-- import XMonad.Actions.CycleWS
+-- import qualified Data.Map        as Map
+-- import qualified XMonad.StackSet as StackSet
+
+-- xmproc <- spawnPipe "xmobar ~/.xmonad/.xmobarrc"
+-- main :: IO ()
+-- main = xmonad def
+
+-- main = xmonad $ def
+--   { terminal = "alacritty",
+--
+--     -- focusFollowsMouse = True,
+--     -- clickJustFocuses = False,
+--
+--     modMask = mod4Mask,
+--
+--     -- workspaces = [
+--     --   "1:Browser",
+--     --   "2:Editor",
+--     --   "3:Terminal",
+--     --   "4:Git",
+--     --   "5:Media",
+--     --   "6:Social",
+--     --   "7:Games",
+--     --   "8:System",
+--     --   "9:Office",
+--     --   "0:Scratch"
+--     -- ],
+--
+--     -- borderWidth = 1,
+--     -- normalBorderColor = "#000000",
+--     -- focusedBorderColor = "#336699",
+--
+--     -- key bindings
+--     -- keys = myKeys,
+--     -- mouseBindings = myMouseBindings,
+--
+--     -- hooks, layouts
+--     -- layoutHook = avoidStruts myLayout,
+--     -- manageHook = manageSpawn <+> manageDocks <+> manageHook defaultConfig,
+--
+--     -- TODO: Find out what this does
+--     -- handleEventHook = mempty,
+--
+--     -- logHook = dynamicLogWithPP xmobarPP {
+--     --   ppOutput = hPutStrLn xmproc
+--     -- },
+--
+--     -- startupHook = myStartupHook
+--   }
+--   `additionalKeysP`
+--     [ -- launch a terminal
+--       ("M-t", spawn "alacritty")
+--       -- launch dmenu
+--     , ("M-p", spawn "dmenu_run -fn 'monospace:size=10'")
+--       -- close focused window
+--     , ("M-C-q", kill)
+--     --   -- Rotate through the available layout algorithms
+--     -- , ("M-<Tab>", sendMessage NextLayout)
+--     --   -- Rotate backwards through the available layout algorithms
+--     -- , ("M-C-<Tab>", sendMessage PreviousLayout)
+--     --   -- Reset the layouts on the current workspace to default
+--     -- , ("M-C-S-<Tab>", setLayout $ XMonad.layoutHook conf)
+--       -- Move focus to the next window
+--     , ("M-j", windows StackSet.focusDown)
+--       -- Move focus to the previous window
+--     , ("M-k", windows StackSet.focusUp)
+--       -- Swap the focused window with the next window
+--     , ("M-C-j", windows StackSet.swapDown)
+--       -- Swap the focused window with the previous window
+--     , ("M-C-k", windows StackSet.swapUp)
+--       -- Go to the previous workspace
+--     , ("M-h", prevWS)
+--       -- Go to the next workspace
+--     , ("M-l", nextWS)
+--       -- Move to the previous workspace
+--     , ("M-C-h", shiftToPrev >> prevWS)
+--       -- Move to the next workspace
+--     , ("M-C-l", shiftToNext >> nextWS)
+--       -- Increment the number of windows in the master area
+--     , ("M-C-,", sendMessage (IncMasterN 1))
+--       -- Deincrement the number of windows in the master area
+--     , ("M-C-.", sendMessage (IncMasterN (-1)))
+--       -- Shrink the master area
+--     , ("M-C-,", sendMessage Shrink)
+--       -- Expand the master area
+--     , ("M-C-.", sendMessage Expand)
+--       -- Swap the focused window and the master window
+--     , ("M-<Space>", windows StackSet.swapMaster)
+--       -- Toggle the status bar gap
+--       -- Use this binding with avoidStruts from Hooks.ManageDocks.
+--       -- See also the statusBar function from Hooks.DynamicLog.
+--     , ("M-C-b", sendMessage ToggleStruts)
+--       -- Push window back into tiling
+--     , ("M-C-S-b", withFocused $ windows . StackSet.sink)
+--       -- Restart xmonad
+--     , ("M-C-S-r", spawn "xmonad --recompile; xmonad --restart")
+--       -- Quit xmonad
+--     , ("M-C-S-q", io exitSuccess)
+--   ]
+
+-- myLayout = tiled ||| reflectHoriz tiled ||| Grid ||| simpleTabbed ||| Full
+--   where
+--     tiled        = Tall tiledNmaster tiledDelta tiledRatio
+--     tiledNmaster = 1
+--     tiledDelta   = 1/100
+--     tiledRatio   = 1/2
+
+-- myStartupHook = do
+--   spawn "~/.xmonad/lib/autostart"
+--   -- spawnOn "Q:Browser" "chromium-browser --new-window https://github.com"
+--   -- spawnOn "W:Editor" "~/.bin/terminal"
+--   -- spawnOn "E:Terminal" "~/.bin/terminal"
+--   -- spawnOn "R:Git" "gitfiend"
+--   -- spawnOn "T:Media" "spotify"
+--   -- spawnOn "T:Media" "~/.bin/terminal -e sh -c \"tmux attach -t media\""
+--   -- spawnOn "Y:Social" "slack"
+--   -- spawnOn "Y:Social" "discord"
+--   -- spawnOn "Y:Social" "~/.bin/terminal -e sh -c \"tmux attach -t social\""
+--   -- spawnOn "I:System" "~/.bin/terminal -e sh -c \"tmux attach -t system\""
+--   -- spawnOn "I:System" "xdman"
+--   -- spawnOn "U:Games" "lutris"
+--   -- spawnOn "O:Office" "chromium-browser --new-window https://google.com"
+--   -- spawnOn "P:Scratch" "~/.bin/terminal"
+
+-- myTheme = defaultTheme {
+--   activeColor       = "#336699",
+--   activeBorderColor = "#336699",
+--   activeTextColor   = "#336699",
+--   inactiveColor       = "#333333",
+--   inactiveBorderColor = "#333333",
+--   inactiveTextColor   = "#333333",
+--   urgentColor       = "#ff0000",
+--   urgentBorderColor = "#ff0000",
+--   urgentTextColor   = "#ff0000"
+-- }
+
+-- myMouseBindings XConfig {XMonad.modMask = modm} = Map.fromList
+--   [
+--     -- mod-button1, Set the window to floating mode and move by dragging
+--     ((modm, button1), \w -> focus w >> mouseMoveWindow w
+--                                     >> windows StackSet.shiftMaster),
+--
+--     -- mod-button2, Raise the window to the top of the stack
+--     ((modm, button2), \w -> focus w >> windows StackSet.shiftMaster),
+--
+--     -- mod-button3, Set the window to floating mode and resize by dragging
+--     ((modm, button3), \w -> focus w >> mouseResizeWindow w
+--                                      >> windows StackSet.shiftMaster)
+--   ]
+
+-- myKeys conf@ XConfig {XMonad.modMask = modm}  = Map.fromList $
+--   [
+--     -- launch a terminal
+--     ((modm, xK_t), spawn $ XMonad.terminal conf),
+--     -- launch dmenu
+--     ((modm, xK_p), spawn "dmenu_run -fn 'monospace:size=10'"),
+--     -- close focused window
+--     ((modm .|. controlMask, xK_q), kill),
+--     -- Rotate through the available layout algorithms
+--     ((modm, xK_Tab ), sendMessage NextLayout),
+--     -- Rotate through the available layout algorithms
+--     ((modm .|. controlMask, xK_Tab ), sendMessage PreviousLayout),
+--     --  Reset the layouts on the current workspace to default
+--     ((modm .|. controlMask .|. shiftMask, xK_Tab), setLayout $ XMonad.layoutHook conf),
+--     -- Move focus to the next window
+--     ((modm, xK_j), windows StackSet.focusDown),
+--     -- Move focus to the previous window
+--     ((modm, xK_k), windows StackSet.focusUp),
+--     -- Swap the focused window with the next window
+--     ((modm .|. controlMask, xK_j), windows StackSet.swapDown),
+--     -- Swap the focused window with the previous window
+--     ((modm .|. controlMask, xK_k), windows StackSet.swapUp),
+--     -- Go to the previous workspace
+--     ((modm, xK_h), prevWS),
+--     -- Go to the next workspace
+--     ((modm, xK_l), nextWS),
+--     -- Move to the previous workspace
+--     ((modm .|. controlMask, xK_h), shiftToPrev >> prevWS),
+--     -- Move to the next workspace
+--     ((modm .|. controlMask, xK_l), shiftToNext >> nextWS),
+--     -- Increment the number of windows in the master area
+--     ((modm .|. controlMask, xK_comma), sendMessage (IncMasterN 1)),
+--     -- Deincrement the number of windows in the master area
+--     ((modm .|. controlmask, xK_period), sendMessage (IncMasterN (-1))),
+--     -- Shrink the master area
+--     ((modm .|. controlMask .|. shiftMask, xK_comma), sendMessage Shrink),
+--     -- Expand the master area
+--     ((modm .|. controlMask .|. shiftMask, xK_period), sendMessage Expand),
+--     -- Swap the focused window and the master window
+--     ((modm, xK_space), windows StackSet.swapMaster),
+--     -- Toggle the status bar gap
+--     -- Use this binding with avoidStruts from Hooks.ManageDocks.
+--     -- See also the statusBar function from Hooks.DynamicLog.
+--     ((modm .|. controlMask, xK_b), sendMessage ToggleStruts),
+--     -- Push window back into tiling
+--     ((modm .|. controlMask .|. controlMask, xK_b), withFocused $ windows . StackSet.sink),
+--     -- Restart xmonad
+--     ((modm .|. controlMask .|. shiftMask, xK_r), spawn "xmonad --recompile; xmonad --restart"),
+--     -- Quit xmonad
+--     ((modm .|. controlMask .|. shiftMask, xK_q), io exitSuccess)
+--   ]
+--   ++
+--   --
+--   -- mod-[1..9], Switch to workspace N
+--   --
+--   -- mod-[1..9], Switch to workspace N
+--   -- mod-shift-[1..9], Move client to workspace N
+--   --
+--   [
+--     ((m .|. modm, k), windows $ f i)
+--       | (i, k) <- zip (XMonad.workspaces conf)
+--         [
+--           xK_1, xK_2, xK_3, xK_4, xK_5, xK_6, xK_7, xK_8, xK_9, xK_0
+--         ],
+--         (f, m) <- [(StackSet.greedyView, 0), (StackSet.shift, shiftMask)]
+--   ]
+--   ++
+--   --
+--   -- mod-{u,i,o}, Switch to physical/Xinerama screens 1, 2, 3
+--   -- mod-shift-{u,i,o}, Move client to screen 1, 2, 3
+--   --
+--   [
+--     ((m .|. modm .|. controlMask, key), screenWorkspace sc >>= flip whenJust (windows . f))
+--       | (key, sc) <- zip [xK_o, xK_i, xK_u] [0..],
+--         (f, m) <- [(StackSet.view, 0), (StackSet.shift, shiftMask)]
+--   ]
