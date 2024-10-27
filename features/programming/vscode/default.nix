@@ -18,7 +18,8 @@
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
       # Completion
-      extensions.vscode-marketplace.supermaven.supermaven
+      #extensions.vscode-marketplace.supermaven.supermaven
+      extensions.vscode-marketplace.saoudrizwan.claude-dev
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
