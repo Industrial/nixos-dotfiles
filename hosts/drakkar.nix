@@ -82,7 +82,7 @@ in {
         ../features/nixos/bluetooth
         ../features/nixos/boot
         ../features/nixos/console
-        # ../features/nixos/docker
+        ../features/nixos/docker
         ../features/nixos/fonts
         ../features/nixos/graphics
         ../features/nixos/i18n
@@ -101,7 +101,7 @@ in {
         # TODO: Use bun in project flakes, not globally.
         # ../features/programming/bun
         # ../features/programming/deno
-        # ../features/programming/docker-compose
+        ../features/programming/docker-compose
         # TODO: Use this in project flakes, not globally.
         # ../features/programming/edgedb
         ../features/programming/git
@@ -149,17 +149,6 @@ in {
           swapDevices = [
             {device = "/dev/disk/by-uuid/d7a6a603-e5e3-401f-8237-99bc29182994";}
           ];
-
-          # # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
-          # # (the default) this is the recommended approach. When using systemd-networkd it's
-          # # still possible to use this option, but it's recommended to use it in conjunction
-          # # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
-          # networking.useDHCP = pkgs.lib.mkDefault true;
-          # # networking.interfaces.enp62s0.useDHCP = lib.mkDefault true;
-          # # networking.interfaces.wlp61s0.useDHCP = lib.mkDefault true;
-
-          # nixpkgs.hostPlatform = pkgs.lib.mkDefault "x86_64-linux";
-          # hardware.cpu.intel.updateMicrocode = pkgs.lib.mkDefault config.hardware.enableRedistributableFirmware;
         }
       ];
     };
