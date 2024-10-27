@@ -25,4 +25,5 @@ args @ {...}: {
   starship = import ./starship/tests.nix args;
   unrar = import ./unrar/tests.nix args;
   unzip = import ./unzip/tests.nix args;
+  zellij = import ./zellij/tests.nix args;
 }
