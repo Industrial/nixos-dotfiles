@@ -117,6 +117,7 @@ in {
         ../features/programming/vscode
         #../features/security/veracrypt
         ../features/security/yubikey-manager
+        ../features/security/keepassxc
         # ../features/virtual-machine/base
         # ../features/virtual-machine/kubernetes/master
         # ../features/virtual-machine/kubernetes/node

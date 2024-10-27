@@ -51,24 +51,24 @@ in {
         ../features/cli/unzip
         ../features/communication/discord
         ../features/communication/fractal
-        ../features/games/lutris
-        ../features/games/path-of-building
-        ../features/games/steam
+        #../features/games/lutris
+        #../features/games/path-of-building
+        #../features/games/steam
         # ../features/hardware/zsa-keyboard
-        ../features/media/invidious
-        ../features/media/lidarr
-        ../features/media/okular
-        ../features/media/prowlarr
-        ../features/media/radarr
-        ../features/media/readarr
-        ../features/media/sonarr
+        #../features/media/invidious
+        #../features/media/lidarr
+        #../features/media/okular
+        #../features/media/prowlarr
+        #../features/media/radarr
+        #../features/media/readarr
+        #../features/media/sonarr
         ../features/media/spotify
         ../features/media/transmission
         ../features/media/vlc
-        # ../features/media/whisparr
-        ../features/monitoring/grafana
-        ../features/monitoring/homepage-dashboard
-        ../features/monitoring/prometheus
+        ## ../features/media/whisparr
+        #../features/monitoring/grafana
+        #../features/monitoring/homepage-dashboard
+        #../features/monitoring/prometheus
         ../features/network/chromium
         ../features/network/firefox
         # ../features/network/i2pd
@@ -90,11 +90,12 @@ in {
         ../features/nixos/security/apparmor
         ../features/nixos/security/yubikey
         ../features/nixos/sound
-        ../features/nixos/system
+        # TODO: This is for langhus!
+        #../features/nixos/system
         ../features/nixos/time
         ../features/nixos/users
         ../features/nixos/window-manager
-        ../features/office/cryptpad
+        #../features/office/cryptpad
         ../features/office/obsidian
         # ../features/programming/android-tools
         # TODO: Use bun in project flakes, not globally.
@@ -104,25 +105,62 @@ in {
         # TODO: Use this in project flakes, not globally.
         # ../features/programming/edgedb
         ../features/programming/git
-        ../features/programming/gitkraken
-        ../features/programming/glogg
         ../features/programming/haskell
+        #../features/programming/gitkraken
+        #../features/programming/glogg
         # ../features/programming/insomnia
-        ../features/programming/meld
+        #../features/programming/meld
         # ../features/programming/neovim
         ../features/programming/nixd
-        ../features/programming/nodejs
-        ../features/programming/python
+        #../features/programming/nodejs
+        #../features/programming/python
         ../features/programming/vscode
-        ../features/security/veracrypt
-        # ../features/security/yubikey-manager
+        #../features/security/veracrypt
+        ../features/security/yubikey-manager
+        ../features/security/keepassxc
         # ../features/virtual-machine/base
         # ../features/virtual-machine/kubernetes/master
         # ../features/virtual-machine/kubernetes/node
         # ../features/virtual-machine/microvm
         # ../features/virtual-machine/ssh
-        ../features/window-manager/alacritty
+        #../features/window-manager/alacritty
+        ../features/window-manager/gnome
         ../features/window-manager/xfce
+
+        {
+          boot.initrd.availableKernelModules = ["xhci_pci" "ahci" "nvme" "usbhid" "uas" "sd_mod" "rtsx_pci_sdmmc"];
+          boot.initrd.kernelModules = [];
+          boot.kernelModules = ["kvm-intel"];
+          boot.extraModulePackages = [];
+
+          fileSystems."/" = {
+            device = "/dev/disk/by-uuid/7aca8703-57c7-4805-aadb-d17c68b28c81";
+            fsType = "ext4";
+          };
+
+          boot.initrd.luks.devices."luks-b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5".device = "/dev/disk/by-uuid/b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5";
+
+          fileSystems."/boot" = {
+            device = "/dev/disk/by-uuid/A32E-E364";
+            fsType = "vfat";
+            options = ["fmask=0077" "dmask=0077"];
+          };
+
+          swapDevices = [
+            {device = "/dev/disk/by-uuid/d7a6a603-e5e3-401f-8237-99bc29182994";}
+          ];
+
+          # # Enables DHCP on each ethernet and wireless interface. In case of scripted networking
+          # # (the default) this is the recommended approach. When using systemd-networkd it's
+          # # still possible to use this option, but it's recommended to use it in conjunction
+          # # with explicit per-interface declarations with `networking.interfaces.<interface>.useDHCP`.
+          # networking.useDHCP = pkgs.lib.mkDefault true;
+          # # networking.interfaces.enp62s0.useDHCP = lib.mkDefault true;
+          # # networking.interfaces.wlp61s0.useDHCP = lib.mkDefault true;
+
+          # nixpkgs.hostPlatform = pkgs.lib.mkDefault "x86_64-linux";
+          # hardware.cpu.intel.updateMicrocode = pkgs.lib.mkDefault config.hardware.enableRedistributableFirmware;
+        }
       ];
     };
 }
