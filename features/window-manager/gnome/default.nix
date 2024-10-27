@@ -62,7 +62,7 @@
       file-roller
       gnome-calculator
       gnome-calendar
-      gnome-dictionary
+      wordbook # gnome-dictionary
       gnome-font-viewer
 
       # - Email
