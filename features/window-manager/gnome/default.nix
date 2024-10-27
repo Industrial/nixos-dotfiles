@@ -32,8 +32,8 @@
     systemPackages = with pkgs; [
       # - Media
       #   - Audio
-      gnome.gnome-music
-      gnome.gnome-sound-recorder
+      gnome-music
+      gnome-sound-recorder
       spot
       totem
       #   - Bittorrent
@@ -74,34 +74,34 @@
       gitg
 
       # - Games
-      gnome.gnome-chess
-      gnome.gnome-sudoku
+      gnome-chess
+      gnome-sudoku
 
       # - System
       # Edit Gnome / Dconf settings.
       dconf-editor
-      gnome.gnome-applets
-      gnome.gnome-backgrounds
+      gnome-applets
+      gnome-backgrounds
       gnome-system-monitor
 
       gnome-console
       gnome-decoder
       gnome-graphs
       gnome-tweaks
-      gnome.gnome-bluetooth
-      gnome.gnome-characters
-      gnome.gnome-clocks
-      gnome.gnome-color-manager
-      gnome.gnome-contacts
-      gnome.gnome-control-center
-      gnome.gnome-logs
-      gnome.gnome-maps
-      gnome.gnome-nettool
-      gnome.gnome-panel
-      gnome.gnome-session
-      gnome.gnome-shell
-      gnome.gnome-shell-extensions
-      gnome.gnome-weather
+      gnome-bluetooth
+      gnome-characters
+      gnome-clocks
+      gnome-color-manager
+      gnome-contacts
+      gnome-control-center
+      gnome-logs
+      gnome-maps
+      gnome-nettool
+      gnome-panel
+      gnome-session
+      gnome-shell
+      gnome-shell-extensions
+      gnome-weather
       nautilus
       papers
       seahorse
