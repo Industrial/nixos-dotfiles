@@ -1,6 +1,6 @@
-# FileZilla is a SFTP Client.
+# Browser
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    ungoogled-chromium
+    chromium
   ];
 }
