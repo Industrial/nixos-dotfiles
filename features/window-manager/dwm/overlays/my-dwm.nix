@@ -14,14 +14,14 @@
         hash = "sha256-mrHh4o9KBZDp2ReSeKodWkCz5ahCLuE6Al3NR2r2OJg=";
       })
 
-      # Restart
-      # DWM can now be restarted via MOD+CTRL+SHIFT+Q or by kill -HUP dwmpid
-      # In addition, a signal handler was added so that dwm cleanly quits by
-      # kill -TERM dwmpid.
-      (pkgs.fetchpatch {
-        url = "https://dwm.suckless.org/patches/restartsig/dwm-restartsig-20180523-6.2.diff";
-        hash = "sha256-OEvtUpbXZrAC/jlcjxigfCQIGYTnr9kFnXOUi7Xzc2k=";
-      })
+      # # Restart
+      # # DWM can now be restarted via MOD+CTRL+SHIFT+Q or by kill -HUP dwmpid
+      # # In addition, a signal handler was added so that dwm cleanly quits by
+      # # kill -TERM dwmpid.
+      # (pkgs.fetchpatch {
+      #   url = "https://dwm.suckless.org/patches/restartsig/dwm-restartsig-20180523-6.2.diff";
+      #   hash = "sha256-OEvtUpbXZrAC/jlcjxigfCQIGYTnr9kFnXOUi7Xzc2k=";
+      # })
 
       # Active Monitor
       # By default you only see which monitor is active, when there is at

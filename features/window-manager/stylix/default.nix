@@ -4,19 +4,20 @@
   ...
 }: let
   tinted-theming-schemes = (import ./derivations/tinted-theming-schemes.nix {inherit pkgs lib;}).tinted-theming-schemes;
-in {
-  environment.systemPackages = with pkgs; [
-    tinted-theming-schemes
-  ];
 
   # atelier-cave
   # atelier-estuary
   # atelier-plateau
   # equilibrium-gray-dark.yaml
+  theme = "equilibrium-gray-dark";
+in {
+  environment.systemPackages = with pkgs; [
+    tinted-theming-schemes
+  ];
 
   stylix = {
     autoEnable = true;
-    base16Scheme = "${tinted-theming-schemes}/share/schemes/atelier-estuary.yaml";
+    base16Scheme = "${tinted-theming-schemes}/share/schemes/${theme}.yaml";
     fonts = {
       emoji = {
         name = "Noto Color Emoji";

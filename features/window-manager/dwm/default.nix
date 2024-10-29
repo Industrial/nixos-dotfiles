@@ -6,14 +6,35 @@ in {
   nixpkgs.overlays = [dwmOverlay];
 
   environment.systemPackages = with pkgs; [
+    # DWM
+    my-dwm
+
+    # Screen Lock
     slock
+
+    # Ctrl-p Menu
     dmenu
+
+    # TODO: ???
     dunst
-    # my-dwm
+
+    # TODO: ???
     picom
   ];
 
-  #home.file.".xinitrc".source = ./.xinitrc;
-  home.file."dwm/autostart.sh".source = ./autostart.sh;
-  home.file."dwm/autostart_blocking.sh".source = ./autostart_blocking.sh;
+  services = {
+    xserver = {
+      displayManager = {
+        session = [
+          {
+            manage = "desktop";
+            name = "dwm";
+            start = ''
+              ${pkgs.my-dwm}/bin/dwm
+            '';
+          }
+        ];
+      };
+    };
+  };
 }

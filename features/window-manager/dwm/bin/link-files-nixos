@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > window-manager > dwm > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+
+ln -sf "${currentDirectoryPath}/features/window-manager/dwm/conf/.xinitrc" "${HOME}/.xinitrc"
+ln -sf "${currentDirectoryPath}/features/window-manager/dwm/conf/dwm" "${HOME}/dwm"
