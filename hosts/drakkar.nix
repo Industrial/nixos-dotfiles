@@ -123,9 +123,18 @@ in {
         # ../features/virtual-machine/kubernetes/node
         # ../features/virtual-machine/microvm
         # ../features/virtual-machine/ssh
-        #../features/window-manager/alacritty
-        ../features/window-manager/gnome
+        ../features/virtual-machine/virtualbox
+        ../features/window-manager/alacritty
+        ../features/window-manager/dwm
+        #../features/window-manager/gnome
+        #../features/window-manager/hyper
+        ../features/window-manager/slock
+        inputs.stylix.nixosModules.stylix
+        ../features/window-manager/stylix
         ../features/window-manager/xfce
+        #../features/window-manager/xmonad
+        ../features/window-manager/xsel
+        ../features/window-manager/xclip
 
         {
           boot.initrd.availableKernelModules = ["xhci_pci" "ahci" "nvme" "usbhid" "uas" "sd_mod" "rtsx_pci_sdmmc"];
