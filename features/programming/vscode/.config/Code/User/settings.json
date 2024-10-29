@@ -267,9 +267,9 @@
     }
   ],
   "vitest.nodeEnv": null,
-  "window.autoDetectColorScheme": true,
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
   "workbench.list.openMode": "doubleClick",
-  "workbench.startupEditor": "none"
+  "workbench.startupEditor": "none",
+  "workbench.colorTheme": "base16-equilibrium-gray-dark"
 }
