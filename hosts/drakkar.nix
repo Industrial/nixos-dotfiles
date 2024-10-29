@@ -133,21 +133,26 @@ in {
           boot.kernelModules = ["kvm-intel"];
           boot.extraModulePackages = [];
 
-          fileSystems."/" = {
-            device = "/dev/disk/by-uuid/7aca8703-57c7-4805-aadb-d17c68b28c81";
-            fsType = "ext4";
-          };
-
-          boot.initrd.luks.devices."luks-b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5".device = "/dev/disk/by-uuid/b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5";
-
+          # /boot
           fileSystems."/boot" = {
             device = "/dev/disk/by-uuid/A32E-E364";
             fsType = "vfat";
             options = ["fmask=0077" "dmask=0077"];
           };
 
+          # /
+          boot.initrd.luks.devices."luks-b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5".device = "/dev/disk/by-uuid/b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5";
+          fileSystems."/" = {
+            device = "/dev/disk/by-uuid/7aca8703-57c7-4805-aadb-d17c68b28c81";
+            fsType = "ext4";
+          };
+
+          # swap
+          boot.initrd.luks.devices."luks-2c489d7f-4cfb-4c08-994e-96212646fc55".device = "/dev/disk/by-uuid/2c489d7f-4cfb-4c08-994e-96212646fc55";
           swapDevices = [
-            {device = "/dev/disk/by-uuid/d7a6a603-e5e3-401f-8237-99bc29182994";}
+            {
+              device = "/dev/disk/by-uuid/d7a6a603-e5e3-401f-8237-99bc29182994";
+            }
           ];
         }
       ];
