@@ -115,7 +115,7 @@ in {
         #../features/programming/nodejs
         #../features/programming/python
         ../features/programming/vscode
-        #../features/security/veracrypt
+        ../features/security/veracrypt
         ../features/security/yubikey-manager
         ../features/security/keepassxc
         # ../features/virtual-machine/base
