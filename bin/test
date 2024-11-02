@@ -8,4 +8,5 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
+echo "> test > nix-unit --flake .#tests"
 time nix-unit --flake .#tests

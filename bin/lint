@@ -10,5 +10,5 @@ source lib/user.bash
 
 # I didn't get this to work on all files with `nix flake check` so I'm using
 # `pre-commit` directly.
-echo "> pre-commit run --all-files"
+echo "> lint > pre-commit run --all-files"
 time pre-commit run --all-files

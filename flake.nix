@@ -152,8 +152,30 @@
 
     githubActions = inputs.flake-github-actions.github-actions {
       inherit systems;
-      checks = inputs.flake-checks.checks;
+      checks = self.checks;
     } {inherit inputs;};
+
+    tests = forAllSystems ({
+      system,
+      pkgs,
+    }: let
+      settings = {
+        inherit system;
+        hostname = "testhostname";
+        stateVersion = "24.05";
+        hostPlatform = {
+          inherit system;
+        };
+        userdir = "/Users/test";
+        useremail = "test@test.com";
+        userfullname = "Chadster McChaddington";
+        username = "test";
+      };
+    in {
+      features = import ./features/tests.nix {
+        inherit inputs settings pkgs;
+      };
+    });
 
     # tests =
     #   inputs.for-all-systems.forAllSystems {
