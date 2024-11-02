@@ -1,7 +1,5 @@
-# Prowlarr is a software that allows you to manage multiple indexers for your torrent client.
-{pkgs, ...}: let
-  # port = 9696;
-in {
+# Prowlarr is a software that allows you to manage multiple indexers for your torrent client. Port = 9696.
+{pkgs, ...}: {
   environment = {
     systemPackages = with pkgs; [
       prowlarr

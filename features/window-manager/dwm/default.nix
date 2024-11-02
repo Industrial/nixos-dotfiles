@@ -1,7 +1,7 @@
 # DWM is a window manager.
 {pkgs, ...}: let
   dwmOverlay = import ./overlays/my-dwm.nix {inherit pkgs;};
-  # overlayedPkgs = import pkgs {overlays = [dwmOverlay];};
+  # overlaidPkgs = import pkgs {overlays = [dwmOverlay];};
 in {
   nixpkgs.overlays = [dwmOverlay];
 

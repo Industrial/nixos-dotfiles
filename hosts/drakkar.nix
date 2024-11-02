@@ -90,8 +90,8 @@ in {
         ../features/nixos/security/apparmor
         ../features/nixos/security/yubikey
         ../features/nixos/sound
-        # TODO: This is for langhus!
-        #../features/nixos/system
+        # TODO: This specifies disks. Don't do that! Inline it in this config, copy it from the hardware-configuration.nix
+        # ../features/nixos/system
         ../features/nixos/time
         ../features/nixos/users
         ../features/nixos/window-manager

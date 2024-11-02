@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{settings, ...}: {
   system.stateVersion = settings.stateVersion;
   #nix.package = pkgs.nixVersions.stable;
   nix.settings.experimental-features = "nix-command flakes";

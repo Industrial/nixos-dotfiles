@@ -8,7 +8,7 @@
       # Autostart
       # This patch will make dwm run "~/.dwm/autostart_blocking.sh" and
       # "~/.dwm/autostart.sh &" before entering the handler loop. One or
-      # both of these files can be ommited.
+      # both of these files can be omitted.
       (pkgs.fetchpatch {
         url = "https://dwm.suckless.org/patches/autostart/dwm-autostart-20210120-cb3f58a.diff";
         hash = "sha256-mrHh4o9KBZDp2ReSeKodWkCz5ahCLuE6Al3NR2r2OJg=";

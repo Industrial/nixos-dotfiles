@@ -3,7 +3,7 @@
   pkgs,
   ...
 }: let
-  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
+  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.92.0";
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscodeExtensions = [
       # Themes
@@ -18,8 +18,9 @@
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
       # Completion
-      #extensions.vscode-marketplace.supermaven.supermaven
+      # extensions.vscode-marketplace.continue.continue
       extensions.vscode-marketplace.saoudrizwan.claude-dev
+      extensions.vscode-marketplace.supermaven.supermaven
 
       # Testing
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
@@ -37,18 +38,18 @@
       # extensions.vscode-marketplace.denoland.vscode-deno
       extensions.vscode-marketplace.oven.bun-vscode
       extensions.vscode-marketplace.vitest.explorer
-      # ## Python
-      # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
-      # extensions.vscode-marketplace.ms-python.black-formatter
-      # extensions.vscode-marketplace.ms-python.debugpy
-      # extensions.vscode-marketplace.ms-python.flake8
-      # extensions.vscode-marketplace.ms-python.isort
-      # extensions.vscode-marketplace.ms-python.python
-      # extensions.vscode-marketplace.ms-python.vscode-pylance
-      # extensions.vscode-marketplace.tamasfe.even-better-toml
-      # ## Jupyter
-      # extensions.vscode-marketplace.ms-toolsai.jupyter
-      # extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
+      ## Python
+      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
+      extensions.vscode-marketplace.ms-python.black-formatter
+      extensions.vscode-marketplace.ms-python.debugpy
+      extensions.vscode-marketplace.ms-python.flake8
+      extensions.vscode-marketplace.ms-python.isort
+      extensions.vscode-marketplace.ms-python.python
+      extensions.vscode-marketplace.ms-python.vscode-pylance
+      extensions.vscode-marketplace.tamasfe.even-better-toml
+      ## Jupyter
+      extensions.vscode-marketplace.ms-toolsai.jupyter
+      #extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
       ## Nix
       extensions.vscode-marketplace.bbenoist.nix
       extensions.vscode-marketplace.jnoortheen.nix-ide

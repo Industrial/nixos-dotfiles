@@ -1,7 +1,5 @@
-# Sonarr is a software that helps you find, download and organize your TV shows.
-{pkgs, ...}: let
-  # port = 8989;
-in {
+# Sonarr is a software that helps you find, download and organize your TV shows. Port = 8989.
+{pkgs, ...}: {
   environment = {
     systemPackages = with pkgs; [
       sonarr

@@ -52,6 +52,9 @@ in {
 
           # Starship Shell
           starship init fish | source
+
+          # Homebrew
+          eval "$(/opt/homebrew/bin/brew shellenv)"
         '';
       };
     };
