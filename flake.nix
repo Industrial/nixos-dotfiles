@@ -150,11 +150,9 @@
       forAllSystems ({system, ...}:
         treefmtEval.${system}.config.build.wrapper);
 
-    githubActions = inputs.flake-github-actions.github-actions {
-      inherit systems;
-      # Use the linux system on github actions.
-      checks = self.checks.x86_64-linux;
-    } {inherit inputs;};
+    githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
+      checks = inputs.nixpkgs.lib.getAttrs ["x86_64-linux" "x86_64-darwin"] self.checks;
+    };
 
     tests = forAllSystems ({
       system,
