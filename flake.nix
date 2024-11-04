@@ -150,9 +150,12 @@
       forAllSystems ({system, ...}:
         treefmtEval.${system}.config.build.wrapper);
 
-    githubActions = inputs.nix-github-actions.lib.mkGithubMatrix {
-      checks = inputs.nixpkgs.lib.getAttrs ["x86_64-linux" "x86_64-darwin"] self.checks;
-    };
+    githubActions = let
+      supportedSystems = ["x86_64-linux"];
+    in
+      inputs.nix-github-actions.lib.mkGithubMatrix {
+        checks = inputs.nixpkgs.lib.getAttrs supportedSystems self.checks;
+      };
 
     tests = forAllSystems ({
       system,
