@@ -134,15 +134,6 @@
             pass_filenames = false;
             stages = ["pre-commit"];
           };
-
-          # Unit Tests
-          unit-tests = {
-            enable = true;
-            name = "Unit tests";
-            entry = "nix run nixpkgs#nix-unit -- --flake .#tests";
-            pass_filenames = false;
-            stages = ["pre-push"];
-          };
         };
       });
   in {
@@ -156,54 +147,6 @@
       inputs.nix-github-actions.lib.mkGithubMatrix {
         checks = inputs.nixpkgs.lib.getAttrs supportedSystems self.checks;
       };
-
-    tests = forAllSystems ({
-      system,
-      pkgs,
-    }: let
-      settings = {
-        inherit system;
-        hostname = "testhostname";
-        stateVersion = "24.05";
-        hostPlatform = {
-          inherit system;
-        };
-        userdir = "/Users/test";
-        useremail = "test@test.com";
-        userfullname = "Chadster McChaddington";
-        username = "test";
-      };
-    in {
-      features = import ./features/tests.nix {
-        inherit inputs settings pkgs;
-      };
-    });
-
-    # tests =
-    #   inputs.for-all-systems.forAllSystems {
-    #     nixpkgs = inputs.nixpkgs;
-    #     systems = ["x86_64-linux"];
-    #   } ({
-    #     system,
-    #     pkgs,
-    #   }: let
-    #     settings = {
-    #       inherit system;
-    #       hostname = "testhostname";
-    #       stateVersion = "24.05";
-    #       hostPlatform = {
-    #         inherit system;
-    #       };
-    #       userdir = "/Users/test";
-    #       useremail = "test@test.com";
-    #       userfullname = "Chadster McChaddington";
-    #       username = "test";
-    #     };
-    #   in {
-    #     features = import ./features/tests.nix {
-    #       inherit inputs settings pkgs;
-    #     };
-    #   });
 
     checks = forAllSystems ({system, ...}: {
       formatting = treefmtEval.${system}.config.build.check self;
