@@ -1,25 +1,5 @@
 {
   "nodes": {
-    "flake-checks": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1724183270,
-        "narHash": "sha256-otJZZ2BtLzbDjiXrznQrc7Pz1UyPBpDDWtQsD3PAlfo=",
-        "owner": "Industrial",
-        "repo": "flake-checks",
-        "rev": "ecffafcda75d5fdfaff0ee0562b0a162263ac549",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Industrial",
-        "repo": "flake-checks",
-        "type": "github"
-      }
-    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -33,46 +13,6 @@
       "original": {
         "owner": "edolstra",
         "repo": "flake-compat",
-        "type": "github"
-      }
-    },
-    "flake-devshells": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1727022419,
-        "narHash": "sha256-gjeOen+sOrFBV3zZ/iONSmb0uGDcE7qDZnCpW3IoyXk=",
-        "owner": "Industrial",
-        "repo": "flake-devshells",
-        "rev": "fa9710933725266d23cd0deeed6de050f20816d1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Industrial",
-        "repo": "flake-devshells",
-        "type": "github"
-      }
-    },
-    "flake-github-actions": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1722964341,
-        "narHash": "sha256-nIvFd/XQ0eOO8VeV5ClxHZxngLU0hQy1OFwtOw87sq4=",
-        "owner": "Industrial",
-        "repo": "flake-github-actions",
-        "rev": "0030710d547639a5491213a5813e8ebdddfbe731",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Industrial",
-        "repo": "flake-github-actions",
         "type": "github"
       }
     },
@@ -194,9 +134,6 @@
     },
     "root": {
       "inputs": {
-        "flake-checks": "flake-checks",
-        "flake-devshells": "flake-devshells",
-        "flake-github-actions": "flake-github-actions",
         "for-all-systems": "for-all-systems",
         "git-hooks": "git-hooks",
         "nix-github-actions": "nix-github-actions",

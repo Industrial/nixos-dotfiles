@@ -1,8 +1,11 @@
 {
   inputs = {
+    # Nix Packages.
     nixpkgs = {
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
+
+    # Nix Flake Utilities.
     for-all-systems = {
       url = "github:Industrial/for-all-systems";
       inputs = {
@@ -11,38 +14,24 @@
         };
       };
     };
-    flake-checks = {
-      url = "github:Industrial/flake-checks";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-    flake-devshells = {
-      url = "github:Industrial/flake-devshells";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-    flake-github-actions = {
-      url = "github:Industrial/flake-github-actions";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
+
+    # Git Hooks.
     git-hooks = {
       url = "github:cachix/git-hooks.nix";
       inputs = {
         nixpkgs.follows = "nixpkgs";
       };
     };
+
+    # GitHub Actions.
     nix-github-actions = {
       url = "github:nix-community/nix-github-actions";
       inputs = {
         nixpkgs.follows = "nixpkgs";
       };
     };
+
+    # Nix Format.
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
       inputs = {
