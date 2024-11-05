@@ -21,28 +21,8 @@ in {
       inherit inputs settings;
     };
     modules = [
-      # Coming automatically pulls from the remote repository and deploys to
-      # the local machine.
       inputs.comin.nixosModules.comin
-      {
-        services.comin = {
-          enable = true;
-          flakeSubdirectory = "systems/nixos";
-          hostname = "${settings.hostname}";
-          remotes = [
-            {
-              name = "origin";
-              url = "https://github.com/Industrial/nixos-dotfiles.git";
-              branches = {
-                main = {
-                  name = "main";
-                };
-              };
-            }
-          ];
-        };
-      }
-
+      ../features/ci/comin
       #../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
@@ -86,9 +66,9 @@ in {
       ../features/media/transmission
       ../features/media/vlc
       ## ../features/media/whisparr
-      #../features/monitoring/grafana
-      #../features/monitoring/homepage-dashboard
-      #../features/monitoring/prometheus
+      ../features/monitoring/grafana
+      ../features/monitoring/homepage-dashboard
+      ../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
@@ -115,7 +95,7 @@ in {
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
-      #../features/office/cryptpad
+      ../features/office/cryptpad
       ../features/office/obsidian
       #../features/programming/android-tools
       # TODO: Use bun in project flakes, not globally.
