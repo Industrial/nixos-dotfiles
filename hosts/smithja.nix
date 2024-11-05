@@ -1,16 +1,19 @@
 {inputs, ...}: let
+  name = "smithja";
+  system = "aarch64-darwin";
+  username = "twieland";
+  version = "24.05";
   settings = {
-    hostname = "smithja";
-    stateVersion = "24.05";
-    system = "aarch64-darwin";
+    inherit system username;
+    hostname = "${name}";
+    stateVersion = "${version}";
     hostPlatform = {
+      inherit system;
       config = "aarch64-apple-darwin";
-      system = "aarch64-darwin";
     };
-    userdir = "/Users/twieland";
-    useremail = "twieland@suitsupply.com";
-    userfullname = "Tom Wieland";
-    username = "twieland";
+    userdir = "/home/${username}";
+    useremail = "${username}@${system}.local";
+    userfullname = "${username}";
   };
 in {
   "${settings.hostname}" = inputs.nix-darwin.lib.darwinSystem {
@@ -24,28 +27,6 @@ in {
         };
     };
     modules = [
-      # Coming automatically pulls from the remote repository and deploys to
-      # the local machine.
-      inputs.comin.nixosModules.comin
-      {
-        services.comin = {
-          enable = true;
-          flakeSubdirectory = "systems/darwin";
-          hostname = "${settings.hostname}";
-          remotes = [
-            {
-              name = "origin";
-              url = "git@github.com:Industrial/nixos-dotfiles.git";
-              branches = {
-                main = {
-                  name = "main";
-                };
-              };
-            }
-          ];
-        };
-      }
-
       # ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
