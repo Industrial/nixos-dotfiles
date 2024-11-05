@@ -32,7 +32,7 @@ in {
           remotes = [
             {
               name = "origin";
-              url = "git@github.com:Industrial/nixos-dotfiles.git";
+              url = "https://github.com/Industrial/nixos-dotfiles.git";
               branches = {
                 main = {
                   name = "main";
@@ -43,7 +43,7 @@ in {
         };
       }
 
-      ../features/cli/appimage-run
+      #../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c
@@ -54,7 +54,7 @@ in {
       ../features/cli/du
       ../features/cli/dust
       ../features/cli/eza
-      ../features/cli/fastfetch
+      #../features/cli/fastfetch
       ../features/cli/fd
       ../features/cli/fish
       ../features/cli/fzf
@@ -63,7 +63,7 @@ in {
       ../features/cli/l
       ../features/cli/lazygit
       ../features/cli/ll
-      ../features/cli/nushell
+      #../features/cli/nushell
       ../features/cli/p7zip
       ../features/cli/ripgrep
       ../features/cli/starship
@@ -74,7 +74,7 @@ in {
       #../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
-      # ../features/hardware/zsa-keyboard
+      #../features/hardware/zsa-keyboard
       #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -91,12 +91,12 @@ in {
       #../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
-      # ../features/network/i2pd
+      #../features/network/i2pd
       ../features/network/syncthing
-      # ../features/network/tor
-      ../features/network/tor-browser
+      #../features/network/tor
+      #../features/network/tor-browser
       ../features/nix
-      # ../features/nix/nix-daemon
+      #../features/nix/nix-daemon
       ../features/nix/nix-unit
       ../features/nix/nixpkgs
       ../features/nixos/bluetooth
@@ -117,32 +117,32 @@ in {
       ../features/nixos/window-manager
       #../features/office/cryptpad
       ../features/office/obsidian
-      # ../features/programming/android-tools
+      #../features/programming/android-tools
       # TODO: Use bun in project flakes, not globally.
-      # ../features/programming/bun
-      # ../features/programming/deno
+      #../features/programming/bun
+      #../features/programming/deno
       ../features/programming/docker-compose
       # TODO: Use this in project flakes, not globally.
-      # ../features/programming/edgedb
+      #../features/programming/edgedb
       ../features/programming/git
-      ../features/programming/haskell
+      #../features/programming/haskell
       #../features/programming/gitkraken
       #../features/programming/glogg
-      # ../features/programming/insomnia
+      #../features/programming/insomnia
       #../features/programming/meld
-      # ../features/programming/neovim
-      ../features/programming/nixd
+      #../features/programming/neovim
+      #../features/programming/nixd
       #../features/programming/nodejs
       #../features/programming/python
       ../features/programming/vscode
       ../features/security/veracrypt
       ../features/security/yubikey-manager
       ../features/security/keepassxc
-      # ../features/virtual-machine/base
-      # ../features/virtual-machine/kubernetes/master
-      # ../features/virtual-machine/kubernetes/node
-      # ../features/virtual-machine/microvm
-      # ../features/virtual-machine/ssh
+      #../features/virtual-machine/base
+      #../features/virtual-machine/kubernetes/master
+      #../features/virtual-machine/kubernetes/node
+      #../features/virtual-machine/microvm
+      #../features/virtual-machine/ssh
       ../features/virtual-machine/virtualbox
       ../features/window-manager/alacritty
       ../features/window-manager/dwm
@@ -186,7 +186,7 @@ in {
 
         # Graphics
         hardware = {
-          opengl = {
+          graphics = {
             enable = true;
           };
           nvidia = {
@@ -195,17 +195,19 @@ in {
               enable = true;
             };
 
-            # Nvidia power management. Experimental, and can cause
-            # sleep/suspend to fail. Enable this if you have graphical
-            # corruption issues or application crashes after waking up from
-            # sleep. This fixes it by saving the entire VRAM memory to /tmp/
-            # instead of just the bare essentials.
-            powerManagement.enable = false;
+            powerManagement = {
+              # Nvidia power management. Experimental, and can cause
+              # sleep/suspend to fail. Enable this if you have graphical
+              # corruption issues or application crashes after waking up from
+              # sleep. This fixes it by saving the entire VRAM memory to /tmp/
+              # instead of just the bare essentials.
+              enable = true;
 
-            # Fine-grained power management. Turns off GPU when not in use.
-            # Experimental and only works on modern Nvidia GPUs (Turing or
-            # newer).
-            powerManagement.finegrained = false;
+              # Fine-grained power management. Turns off GPU when not in use.
+              # Experimental and only works on modern Nvidia GPUs (Turing or
+              # newer).
+              finegrained = false;
+            };
 
             # Use the NVidia open source kernel module (not to be confused
             # with the independent third-party "nouveau" open source driver).
