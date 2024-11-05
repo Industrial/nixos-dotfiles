@@ -23,6 +23,9 @@
       extensions.vscode-marketplace.supermaven.supermaven
 
       # Testing
+      # This adapter converter is needed for other language test adapter
+      # extensions like Test Explorer UI
+      extensions.vscode-marketplace.ms-vscode.test-adapter-converter
       extensions.vscode-marketplace.hbenl.vscode-test-explorer
 
       # File Types
