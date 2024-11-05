@@ -101,6 +101,7 @@ in {
       # TODO: Use bun in project flakes, not globally.
       #../features/programming/bun
       #../features/programming/deno
+      ../features/programming/devenv
       ../features/programming/docker-compose
       # TODO: Use this in project flakes, not globally.
       #../features/programming/edgedb
