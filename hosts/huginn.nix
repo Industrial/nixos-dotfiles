@@ -53,6 +53,7 @@ in {
       #../features/games/path-of-building
       #../features/games/steam
       # ../features/hardware/zsa-keyboard
+      ../features/media/gimp
       #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular

@@ -68,6 +68,7 @@ in {
       # ../features/media/radarr
       # ../features/media/readarr
       # ../features/media/sonarr
+      ../features/media/gimp
       ../features/media/spotify
       # ../features/media/transmission
       # ../features/media/vlc
