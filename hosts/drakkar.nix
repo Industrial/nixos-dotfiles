@@ -99,7 +99,6 @@ in {
       ../features/office/cryptpad
       ../features/office/obsidian
       #../features/programming/android-tools
-      #../features/programming/deno
       ../features/programming/devenv
       ../features/programming/docker-compose
       # TODO: Use this in project flakes, not globally.
