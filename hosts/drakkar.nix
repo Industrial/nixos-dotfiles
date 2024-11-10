@@ -56,7 +56,7 @@ in {
       #../features/games/steam
       #../features/hardware/zsa-keyboard
       ../features/media/gimp
-      #../features/media/invidious
+      ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
       #../features/media/prowlarr
