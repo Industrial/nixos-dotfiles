@@ -107,7 +107,6 @@ in {
       #../features/programming/insomnia
       #../features/programming/meld
       #../features/programming/neovim
-      #../features/programming/nodejs
       #../features/programming/python
       ../features/programming/vscode
       ../features/security/veracrypt
