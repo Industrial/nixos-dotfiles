@@ -47,6 +47,7 @@ in {
       ../features/cli/starship
       ../features/cli/unrar
       ../features/cli/unzip
+      ../features/cli/zellij
       ../features/communication/discord
       ../features/communication/fractal
       #../features/games/lutris

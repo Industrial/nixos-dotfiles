@@ -49,6 +49,7 @@ in {
       ../features/cli/starship
       ../features/cli/unrar
       ../features/cli/unzip
+      ../features/cli/zellij
       ../features/communication/discord
       ../features/communication/fractal
       ../features/games/lutris
@@ -63,10 +64,10 @@ in {
       #../features/media/radarr
       #../features/media/readarr
       #../features/media/sonarr
+      ##../features/media/whisparr
       ../features/media/spotify
       ../features/media/transmission
       ../features/media/vlc
-      ## ../features/media/whisparr
       ../features/monitoring/grafana
       ../features/monitoring/homepage-dashboard
       ../features/monitoring/prometheus
