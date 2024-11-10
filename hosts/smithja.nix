@@ -61,6 +61,7 @@ in {
       # ../features/games/lutris
       # ../features/games/path-of-building
       # ../features/games/steam
+      # ../features/games/wowup
       # ../features/hardware/zsa-keyboard
       # ../features/media/invidious
       # ../features/media/lidarr
