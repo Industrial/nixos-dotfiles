@@ -159,6 +159,18 @@ in {
           }
         ];
 
+        # data
+        fileSystems."/data" = {
+          device = "/dev/disk/by-uuid/b5a4ef1a-b35b-4708-9528-62f155680753";
+          fsType = "ext4";
+        };
+
+        # games
+        fileSystems."/games" = {
+          device = "/dev/disk/by-uuid/10921065-05ea-4be2-b499-c19a736e3f33";
+          fsType = "ext4";
+        };
+
         # Graphics
         hardware = {
           graphics = {
