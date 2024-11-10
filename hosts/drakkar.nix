@@ -101,8 +101,6 @@ in {
       #../features/programming/android-tools
       ../features/programming/devenv
       ../features/programming/docker-compose
-      # TODO: Use this in project flakes, not globally.
-      #../features/programming/edgedb
       ../features/programming/git
       #../features/programming/haskell
       #../features/programming/gitkraken
