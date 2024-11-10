@@ -95,6 +95,7 @@ in {
       # ../features/nixos/graphics
       # ../features/nixos/i18n
       # ../features/nixos/networking
+      # ../features/security/tailscale
       # ../features/nixos/security/apparmor
       # ../features/nixos/security/yubikey
       # ../features/nixos/sound

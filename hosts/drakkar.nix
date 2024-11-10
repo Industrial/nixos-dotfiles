@@ -110,9 +110,10 @@ in {
       #../features/programming/neovim
       #../features/programming/python
       ../features/programming/vscode
+      ../features/security/tailscale
+      ../features/security/keepassxc
       ../features/security/veracrypt
       ../features/security/yubikey-manager
-      ../features/security/keepassxc
       #../features/virtual-machine/base
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
