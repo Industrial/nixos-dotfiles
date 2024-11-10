@@ -105,7 +105,6 @@ in {
       # ../features/programming/insomnia
       #../features/programming/meld
       # ../features/programming/neovim
-      ../features/programming/nixd
       #../features/programming/nodejs
       #../features/programming/python
       ../features/programming/vscode
