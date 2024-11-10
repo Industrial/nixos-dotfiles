@@ -109,7 +109,6 @@ in {
       ../features/programming/git
       ../features/programming/gitkraken
       ../features/programming/glogg
-      ../features/programming/haskell
       # ../features/programming/insomnia
       ../features/programming/meld
       # ../features/programming/neovim

@@ -100,7 +100,6 @@ in {
       ../features/programming/devenv
       # ../features/programming/docker-compose
       ../features/programming/git
-      ../features/programming/haskell
       #../features/programming/gitkraken
       #../features/programming/glogg
       # ../features/programming/insomnia
