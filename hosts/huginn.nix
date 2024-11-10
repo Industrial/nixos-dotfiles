@@ -97,8 +97,6 @@ in {
       #../features/office/cryptpad
       ../features/office/obsidian
       # ../features/programming/android-tools
-      # TODO: Use bun in project flakes, not globally.
-      # ../features/programming/bun
       # ../features/programming/deno
       ../features/programming/devenv
       # ../features/programming/docker-compose
