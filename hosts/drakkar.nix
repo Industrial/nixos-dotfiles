@@ -121,7 +121,7 @@ in {
       #../features/virtual-machine/ssh
       ../features/virtual-machine/virtualbox
       ../features/window-manager/alacritty
-      ../features/window-manager/dwm
+      #../features/window-manager/dwm
       #../features/window-manager/gnome
       #../features/window-manager/hyper
       ../features/window-manager/slock
