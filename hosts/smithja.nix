@@ -47,7 +47,6 @@ in {
       ../features/cli/l
       # ../features/cli/lazygit
       ../features/cli/ll
-      ../features/cli/nushell
       ../features/cli/p7zip
       ../features/cli/ripgrep
       ../features/cli/starship
