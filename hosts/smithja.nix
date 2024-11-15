@@ -56,6 +56,7 @@ in {
       ../features/communication/discord
       #../features/communication/fractal
       ../features/darwin/apple_sdk
+      ../features/darwin/nix-daemon
       ../features/darwin/settings
       # ../features/games/lutris
       # ../features/games/path-of-building
@@ -84,7 +85,6 @@ in {
       # ../features/network/tor
       # ../features/network/tor-browser
       ../features/nix
-      ../features/nix/nix-daemon
       ../features/nix/nix-unit
       ../features/nix/nixpkgs
       # ../features/nixos/bluetooth

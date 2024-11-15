@@ -23,7 +23,7 @@ in {
     modules = [
       inputs.comin.nixosModules.comin
       ../features/ci/comin
-      #../features/cli/appimage-run
+      ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c
@@ -53,9 +53,9 @@ in {
       ../features/communication/fractal
       ../features/games/lutris
       ../features/games/wowup
-      #../features/games/path-of-building
+      ../features/games/path-of-building
       #../features/games/steam
-      #../features/hardware/zsa-keyboard
+      ../features/hardware/zsa-keyboard
       ../features/media/gimp
       ../features/media/invidious
       #../features/media/lidarr
@@ -76,8 +76,9 @@ in {
       #../features/network/i2pd
       ../features/network/syncthing
       #../features/network/tor
-      #../features/network/tor-browser
+      ../features/network/tor-browser
       ../features/nix
+      # This is for Darwin only.
       #../features/nix/nix-daemon
       ../features/nix/nix-unit
       ../features/nix/nixpkgs
@@ -121,6 +122,7 @@ in {
       #../features/virtual-machine/ssh
       ../features/virtual-machine/virtualbox
       ../features/window-manager/alacritty
+      # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
       #../features/window-manager/gnome
       #../features/window-manager/hyper

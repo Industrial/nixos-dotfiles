@@ -76,7 +76,8 @@ in {
       # ../features/network/tor
       ../features/network/tor-browser
       ../features/nix
-      # ../features/nix/nix-daemon
+      # This is for Darwin only.
+      #../features/nix/nix-daemon
       ../features/nix/nix-unit
       ../features/nix/nixpkgs
       ../features/nixos/bluetooth
