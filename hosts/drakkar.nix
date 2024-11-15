@@ -34,7 +34,7 @@ in {
       ../features/cli/du
       ../features/cli/dust
       ../features/cli/eza
-      #../features/cli/fastfetch
+      ../features/cli/fastfetch
       ../features/cli/fd
       ../features/cli/fish
       ../features/cli/fzf
