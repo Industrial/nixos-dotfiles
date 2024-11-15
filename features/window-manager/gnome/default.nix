@@ -120,8 +120,9 @@
       gnomeExtensions.vitals
       #   - Workspaces
       gnomeExtensions.simple-workspaces-bar
-      #   - Key Manager
-      gnomeExtensions.keyman
+      # TODO: This one is no longer available?
+      # #   - Key Manager
+      # gnomeExtensions.keyman
       #   - WiFi QR Code
       gnomeExtensions.wifi-qrcode
       #   - Media Controls
