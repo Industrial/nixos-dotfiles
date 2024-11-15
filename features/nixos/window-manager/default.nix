@@ -8,10 +8,6 @@
       # autoRepeatInterval
 
       displayManager = {
-        lightdm = {
-          enable = true;
-        };
-
         session = [
           {
             manage = "desktop";

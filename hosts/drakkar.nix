@@ -124,12 +124,12 @@ in {
       ../features/window-manager/alacritty
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
-      #../features/window-manager/gnome
+      ../features/window-manager/gnome
       #../features/window-manager/hyper
       ../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix
-      ../features/window-manager/xfce
+      #../features/window-manager/xfce
       #../features/window-manager/xmonad
       ../features/window-manager/xsel
       ../features/window-manager/xclip
