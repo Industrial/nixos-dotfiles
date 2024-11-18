@@ -88,6 +88,7 @@ in {
       ../features/nixos/graphics
       ../features/nixos/i18n
       ../features/nixos/networking
+      ../features/nixos/networking/dns.nix
       ../features/nixos/security/apparmor
       ../features/nixos/security/yubikey
       ../features/nixos/sound
