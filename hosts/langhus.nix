@@ -21,6 +21,8 @@ in {
       inherit inputs settings;
     };
     modules = [
+      inputs.comin.nixosModules.comin
+      ../features/ci/comin
       ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop

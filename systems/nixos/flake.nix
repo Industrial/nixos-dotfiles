@@ -5,21 +5,21 @@
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
 
-    # Nix VS Code Extensions.
-    nix-vscode-extensions = {
-      url = "github:nix-community/nix-vscode-extensions";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
-    # Git Pull Based Deployment System.
+    # Comin: Git Pull Based Deployment System.
     comin = {
       url = "github:nlewo/comin";
       inputs = {
         nixpkgs = {
           follows = "nixpkgs";
         };
+      };
+    };
+
+    # Nix VS Code Extensions.
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
       };
     };
 

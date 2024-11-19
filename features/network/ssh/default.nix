@@ -4,7 +4,7 @@
       enable = true;
 
       # Disable password authentication.
-      passwordAuthentication = false;
+      passwordAuthentication = true;
 
       # Disable SFTP.
       allowSFTP = false;
