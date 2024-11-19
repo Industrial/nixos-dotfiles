@@ -74,6 +74,7 @@ in {
       ../features/network/chromium
       ../features/network/firefox
       # ../features/network/i2pd
+      ../features/network/ssh
       ../features/network/syncthing
       # ../features/network/tor
       ../features/network/tor-browser
