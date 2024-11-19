@@ -98,6 +98,8 @@ in {
       # ../features/nixos/networking/dns.nix
       # ../features/nixos/networking/firewall.nix
       # ../features/nixos/security/apparmor
+      # ../features/nixos/security/no-defaults
+      # ../features/nixos/security/sudo
       # ../features/nixos/security/yubikey
       # ../features/nixos/sound
       # ../features/nixos/system

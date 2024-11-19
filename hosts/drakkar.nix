@@ -94,6 +94,8 @@ in {
       ../features/nixos/networking/dns.nix
       ../features/nixos/networking/firewall.nix
       ../features/nixos/security/apparmor
+      ../features/nixos/security/no-defaults
+      ../features/nixos/security/sudo
       ../features/nixos/security/yubikey
       ../features/nixos/sound
       # TODO: This specifies disks. Don't do that! Inline it in this config, copy it from the hardware-configuration.nix
