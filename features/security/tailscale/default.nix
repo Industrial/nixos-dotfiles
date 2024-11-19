@@ -1,4 +1,4 @@
-{stdenv, ...}: {
+{pkgs, ...}: {
   services = {
     tailscale = {
       enable = true;
@@ -6,7 +6,7 @@
   };
 
   networking =
-    if stdenv.isLinux
+    if pkgs.stdenv.isLinux
     then {
       firewall = {
         trustedInterfaces = ["tailscale0"];
