@@ -3,6 +3,8 @@
     settings = {
       trusted-users = ["root" "${settings.username}"];
     };
+
+    allowedUsers = ["@wheel"];
   };
 
   users = {
