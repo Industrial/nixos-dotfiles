@@ -49,31 +49,32 @@ in {
       ../features/cli/unrar
       ../features/cli/unzip
       ../features/cli/zellij
-      ../features/communication/discord
-      ../features/communication/fractal
+      #../features/communication/discord
+      #../features/communication/fractal
       #../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
       #../features/games/wowup
       # ../features/hardware/zsa-keyboard
-      ../features/media/gimp
-      #../features/media/invidious
+      #../features/media/gimp
+      ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
       #../features/media/prowlarr
       #../features/media/radarr
       #../features/media/readarr
       #../features/media/sonarr
-      ../features/media/spotify
+      #../features/media/spotify
       ../features/media/transmission
-      ../features/media/vlc
+      #../features/media/vlc
       ## ../features/media/whisparr
-      #../features/monitoring/grafana
-      #../features/monitoring/homepage-dashboard
-      #../features/monitoring/prometheus
+      ../features/monitoring/grafana
+      ../features/monitoring/homepage-dashboard
+      ../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       # ../features/network/i2pd
+      ../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
       # ../features/network/tor

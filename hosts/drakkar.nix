@@ -57,7 +57,7 @@ in {
       #../features/games/steam
       ../features/hardware/zsa-keyboard
       ../features/media/gimp
-      ../features/media/invidious
+      #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
       #../features/media/prowlarr
@@ -66,14 +66,15 @@ in {
       #../features/media/sonarr
       ##../features/media/whisparr
       ../features/media/spotify
-      ../features/media/transmission
+      #../features/media/transmission
       ../features/media/vlc
-      ../features/monitoring/grafana
-      ../features/monitoring/homepage-dashboard
-      ../features/monitoring/prometheus
+      #../features/monitoring/grafana
+      #../features/monitoring/homepage-dashboard
+      #../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
+      # ../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
       #../features/network/tor
