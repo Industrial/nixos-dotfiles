@@ -96,7 +96,6 @@ in {
       # ../features/nixos/i18n
       # ../features/nixos/networking
       # ../features/nixos/networking/dns.nix
-      # ../features/security/tailscale
       # ../features/nixos/security/apparmor
       # ../features/nixos/security/yubikey
       # ../features/nixos/sound
@@ -118,6 +117,7 @@ in {
       # ../features/programming/neovim
       ../features/programming/python
       ../features/programming/vscode
+      ../features/security/tailscale
       # ../features/security/veracrypt
       # ../features/security/yubikey-manager
       # ../features/virtual-machine/base
