@@ -5,10 +5,5 @@
       enable = true;
       dns = "none";
     };
-    firewall = {
-      enable = true;
-      allowedTCPPorts = [];
-      allowedUDPPorts = [];
-    };
   };
 }
