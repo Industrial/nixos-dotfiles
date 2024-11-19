@@ -114,7 +114,7 @@ in {
       ../features/programming/vscode
       #../features/security/veracrypt
       ../features/security/yubikey-manager
-      # ../features/security/tailscale
+      ../features/security/tailscale
       ../features/security/keepassxc
       # ../features/virtual-machine/base
       # ../features/virtual-machine/kubernetes/master
