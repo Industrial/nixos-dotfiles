@@ -110,7 +110,6 @@ in {
     pkgs.hlint
 
     # PureScript
-    pkgs.nodejs_22
     pkgs.nodePackages.purescript-psa
     pkgs.nodePackages.purs-tidy
     pkgs.nodePackages.purty
