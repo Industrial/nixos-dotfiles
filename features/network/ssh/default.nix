@@ -1,6 +1,6 @@
 {...}: {
   services = {
-    ssh = {
+    sshd = {
       enable = true;
     };
     sshguard = {
