@@ -1,4 +1,4 @@
-{...}: {
+{settings, ...}: {
   services = {
     homepage-dashboard = {
       enable = true;
@@ -47,22 +47,40 @@
             {
               Grafana = {
                 icon = "https://grafana.com/img/fav32.png";
-                href = "http://localhost:9000";
+                href = "http://${settings.hostname}:9000";
                 description = "Grafana dashboard for monitoring";
               };
             }
             {
               Prometheus = {
                 icon = "https://prometheus.io/assets/prometheus_logo_grey.svg";
-                href = "http://localhost:9001";
+                href = "http://${settings.hostname}:9001";
                 description = "Prometheus monitoring system and time series database";
               };
             }
             {
               Syncthing = {
                 icon = "https://raw.githubusercontent.com/syncthing/syncthing/main/assets/logo.ico";
-                href = "http://localhost:8384";
+                href = "http://${settings.hostname}:8384";
                 description = "Syncthing is a continuous file synchronization program";
+              };
+            }
+          ];
+        }
+        {
+          Search = [
+            {
+              SearXNG = {
+                icon = "https://invidious.snopyta.org/favicon.ico";
+                href = "http://${settings.hostname}:4001";
+                description = "SearXNG is a free anonymous google";
+              };
+            }
+            {
+              Invidious = {
+                icon = "https://invidious.snopyta.org/favicon.ico";
+                href = "http://${settings.hostname}:4000";
+                description = "Invidious is an alternative front-end to YouTube";
               };
             }
           ];
@@ -70,58 +88,51 @@
         {
           Media = [
             {
-              Invidious = {
-                icon = "https://invidious.snopyta.org/favicon.ico";
-                href = "http://localhost:4000";
-                description = "Invidious is an alternative front-end to YouTube";
-              };
-            }
-            {
               Transmission = {
                 icon = "https://transmissionbt.com/assets/images/Transmission_icon.png";
-                href = "http://localhost:9091";
+                href = "http://${settings.hostname}:9091";
                 description = "A Fast, Easy and Free Bittorrent Client For macOS, Windows and Linux";
               };
             }
             {
               Lidarr = {
-                icon = "http://localhost:8686/Content/Images/logo.svg";
-                href = "http://localhost:8686";
+                icon = "http://${settings.hostname}:8686/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:8686";
                 description = "Lidarr is a music collection manager for Usenet and BitTorrent users";
               };
             }
             {
               Radarr = {
-                icon = "http://localhost:7878/Content/Images/logo.svg";
-                href = "http://localhost:7878";
+                icon = "http://${settings.hostname}:7878/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:7878";
                 description = "Radarr is a movie collection manager for Usenet and BitTorrent users";
               };
             }
             {
               Readarr = {
-                icon = "http://localhost:8787/Content/Images/logo.svg";
-                href = "http://localhost:8787";
+                icon = "http://${settings.hostname}:8787/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:8787";
                 description = "Readarr is a book collection manager for Usenet and BitTorrent users";
               };
             }
             {
               Prowlarr = {
-                icon = "http://localhost:9696/Content/Images/logo.svg";
-                href = "http://localhost:9696";
+                icon = "http://${settings.hostname}:9696/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:9696";
                 description = "Prowlarr is a software that allows you to manage multiple indexers for your torrent client";
               };
             }
             {
               Sonarr = {
-                icon = "http://localhost:8989/Content/Images/logo.svg";
-                href = "http://localhost:8989";
+                icon = "http://${settings.hostname}:8989/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:8989";
                 description = "Sonarr is a software that helps you find, download and organize your TV shows";
               };
             }
             {
               Whisparr = {
-                icon = "http://localhost:6969/Content/Images/logo.svg";
-                href = "http://localhost:6969";
+                icon = "http://${settings.hostname}:6969/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:6969";
                 description = "Whisparr is a software that helps you find, download and organize your PORN ITS PORN";
               };
             }
