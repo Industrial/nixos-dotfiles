@@ -19,8 +19,8 @@
         X11Forwarding no
         AllowAgentForwarding no
         AllowStreamLocalForwarding no
-        AuthenticationMethods publickey
       '';
+      # AuthenticationMethods publickey
     };
 
     # Set up sshguard, which will block SSH connections from unknown hosts.
