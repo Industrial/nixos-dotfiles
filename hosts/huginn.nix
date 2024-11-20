@@ -122,7 +122,7 @@ in {
       ../features/security/tailscale
       ../features/security/keepassxc
       # ../features/virtual-machine/base
-      ../features/virtual-machine/kubernetes/master
+      # ../features/virtual-machine/kubernetes/master
       # ../features/virtual-machine/kubernetes/node
       # ../features/virtual-machine/microvm
       # ../features/virtual-machine/ssh
