@@ -123,6 +123,7 @@ in {
       ../features/security/veracrypt
       ../features/security/yubikey-manager
       #../features/virtual-machine/base
+      ../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
       #../features/virtual-machine/microvm
