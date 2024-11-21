@@ -5,9 +5,9 @@
     src = ./.;
     installPhase = ''
       mkdir -p $out/bin
-      echo '#!/usr/bin/env bash' > $out/bin/g
-      echo 'pnpm "$@"' >> $out/bin/g
-      chmod +x $out/bin/g
+      echo '#!/usr/bin/env bash' > $out/bin/p
+      echo 'pnpm "$@"' >> $out/bin/p
+      chmod +x $out/bin/p
     '';
   };
 in {
