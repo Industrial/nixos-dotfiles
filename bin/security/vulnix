@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+echo "> security > vulnix"
+exec > >(tee ./logs/security-vulnix) 2>&1
+
+echo "> security > vulnix > vulnix --system"
+nix-shell -p vulnix --run "vulnix --system"

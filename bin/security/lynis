@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+echo "> security > lynis"
+exec > >(tee ./logs/security-lynis) 2>&1
+
+if [ ! -d ".tmp" ]; then
+  echo "> security > lynis > mkdir -p .tmp"
+  mkdir -p .tmp
+fi
+
+if [ ! -d ".tmp/lynis" ]; then
+  echo "> security > lynis > git clone"
+  git clone https://github.com/CISOfy/lynis.git ./.tmp/lynis
+
+  echo "> security > lynis > cd .tmp/lynis"
+  cd .tmp/lynis
+else
+  echo "> security > lynis > cd .tmp/lynis"
+  cd .tmp/lynis
+
+  echo "> security > lynis > git pull"
+  git pull
+fi
+
+echo "> security > lynis > lynis audit system"
+./lynis audit system \
+  --no-colors \
+  --pentest \
+  --verbose
+
+echo "> security > lynis > cd ../.."
+cd ../..

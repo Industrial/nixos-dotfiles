@@ -1,6 +1,7 @@
 /**/*.qcow2
 /.direnv/
 /.pre-commit-config.yaml
+/.tmp
 /keys/
 /logs/
 /result
