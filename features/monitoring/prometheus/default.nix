@@ -2,7 +2,7 @@
   services = {
     prometheus = {
       enable = true;
-      listenAddress = "localhost";
+      listenAddress = "0.0.0.0";
       port = 9001;
       exporters = {
         node = {
@@ -18,7 +18,7 @@
           static_configs = [
             {
               targets = [
-                "localhost:9002"
+                "0.0.0.0:9002"
               ];
             }
           ];

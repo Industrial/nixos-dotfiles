@@ -25,7 +25,7 @@
                 name = "Prometheus";
                 type = "prometheus";
                 access = "proxy";
-                url = "http://localhost:9001";
+                url = "http://0.0.0.0:9001";
                 isDefault = true;
               }
             ];
