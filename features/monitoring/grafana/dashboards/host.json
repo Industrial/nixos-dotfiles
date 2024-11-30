@@ -23311,8 +23311,8 @@
       {
         "current": {
           "selected": true,
-          "text": "localhost:9002",
-          "value": "localhost:9002"
+          "text": "0.0.0.0:9002",
+          "value": "0.0.0.0:9002"
         },
         "datasource": {
           "type": "prometheus",

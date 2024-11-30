@@ -74,19 +74,19 @@ I have several services configured to run locally on some hosts:
 - Langhus:
   - Media:
     - Invidious (YouTube):
-      - [http://localhost:4000]
+      - [http://0.0.0.0:4000]
   - Documents:
     - Cryptpad:
-      - [http://localhost:4020]
+      - [http://0.0.0.0:4020]
   - Passwords:
     - Vaultwarden:
-      - [http://localhost:7000]
+      - [http://0.0.0.0:7000]
   - Monitoring:
     - Grafana:
-      - [http://localhost:9000]
+      - [http://0.0.0.0:9000]
     - Prometheus:
-      - [http://localhost:9001]
-      - [http://localhost:9002]
+      - [http://0.0.0.0:9001]
+      - [http://0.0.0.0:9002]
 
 ## TODO
 
