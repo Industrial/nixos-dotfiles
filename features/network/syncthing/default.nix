@@ -1,5 +1,5 @@
 # Syncthing syncs things.
-# http://localhost:8384
+# http://0.0.0.0:8384
 {
   settings,
   # pkgs,

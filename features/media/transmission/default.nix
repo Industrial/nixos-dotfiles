@@ -1,26 +1,36 @@
 # A Fast, Easy and Free Bittorrent Client For macOS, Windows and Linux.
-{pkgs, ...}: {
+# This feature is set up to run on my server, huginn, which happens to be a
+# tablet. The Data directory is an SD Card.
+{
+  settings,
+  pkgs,
+  ...
+}: let
+  username = "transmission";
+  homeDirectoryPath = "/home/${username}";
+  dataDirectoryPath = "/run/media/${settings.username}/Data";
+in {
   environment.systemPackages = with pkgs; [
     transmission_4
     transmission_4-qt
   ];
 
   services = {
-    transmission = {
+    "${username}" = {
       enable = true;
       package = pkgs.transmission_4;
-      user = "transmission";
+      user = "${username}";
       group = pkgs.lib.mkForce "data";
-      home = "/home/transmission";
+      home = homeDirectoryPath;
       openFirewall = false;
       openPeerPorts = false;
       openRPCPort = false;
       downloadDirPermissions = "770";
       settings = {
-        download-dir = "/data/transmission/downloads";
-        incomplete-dir = "/data/transmission/incomplete";
+        download-dir = "${dataDirectoryPath}/transmission/downloads";
+        incomplete-dir = "${dataDirectoryPath}/transmission/incomplete";
         incomplete-dir-enabled = true;
-        watch-dir = "/data/transmission/watch";
+        watch-dir = "${dataDirectoryPath}/transmission/watch";
         watch-dir-enabled = true;
       };
     };
@@ -28,16 +38,16 @@
 
   users = {
     users = {
-      transmission = {
+      "${username}" = {
         isSystemUser = true;
-        home = "/home/transmission";
+        home = homeDirectoryPath;
         createHome = true;
-        group = pkgs.lib.mkForce "transmission";
+        group = pkgs.lib.mkForce "${username}";
         extraGroups = ["data"];
       };
     };
     groups = {
-      transmission = {};
+      "${username}" = {};
     };
   };
 }
