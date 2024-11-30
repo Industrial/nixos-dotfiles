@@ -7,10 +7,11 @@
 }: {
   services = {
     syncthing = {
-      enable = true;
-      user = settings.username;
-      dataDir = "${settings.userdir}/Documents";
       configDir = "${settings.userdir}/Documents/.config/syncthing";
+      dataDir = "${settings.userdir}/Documents";
+      enable = true;
+      guiAddress = "${settings.hostname}:8384";
+      user = settings.username;
     };
   };
 
