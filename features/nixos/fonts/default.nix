@@ -10,6 +10,7 @@
   # ];
 
   fonts.packages = with pkgs; [
-    nerdfonts
+    terminus-nerdfont
+    # nerdfonts
   ];
 }

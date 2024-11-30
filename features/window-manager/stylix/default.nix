@@ -25,7 +25,8 @@ in {
       };
       monospace = {
         name = "IosevkaTerm Nerd Font Mono";
-        package = pkgs.nerdfonts;
+        # package = pkgs.nerdfonts;
+        package = pkgs.terminus-nerdfont;
       };
       sansSerif = {
         name = "DejaVu Sans";
