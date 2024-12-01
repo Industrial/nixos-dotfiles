@@ -1,27 +1,35 @@
 # Plex is a media server
-{pkgs, ...}: {
+{pkgs, ...}: let
+  user = "plex";
+  group = "data";
+in {
   services = {
     plex = {
       enable = true;
       dataDir = "/run/media/tom/Data/Videos";
       openFirewall = true;
-      group = "data";
-      user = "plex";
+      inherit user group;
+    };
+  };
+
+  nix = {
+    settings = {
+      trusted-users = [user];
     };
   };
 
   users = {
     users = {
-      plex = {
+      "${user}" = {
+        inherit group;
         isSystemUser = true;
-        home = "/home/plex";
+        home = "/home/${user}";
         createHome = true;
-        group = "data";
-        extraGroups = ["data"];
+        extraGroups = [];
       };
     };
-    groups = {
-      plex = {};
-    };
+    # groups = {
+    #   plex = {};
+    # };
   };
 }
