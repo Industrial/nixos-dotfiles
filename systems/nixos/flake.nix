@@ -32,6 +32,14 @@
         };
       };
     };
+
+    # Generate Kubernetes Configurations with Nix.
+    kubenix = {
+      url = "github:hall/kubenix";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
   outputs = inputs @ {...}: {
     nixosConfigurations =
