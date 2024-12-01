@@ -1,10 +1,9 @@
 {settings, ...}: {
   nix = {
     settings = {
+      allowed-users = ["@wheel"];
       trusted-users = ["root" "${settings.username}"];
     };
-
-    allowedUsers = ["@wheel"];
   };
 
   users = {
