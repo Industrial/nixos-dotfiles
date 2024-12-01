@@ -6,7 +6,7 @@ in {
   services = {
     plex = {
       enable = true;
-      dataDir = "/run/media/tom/Data/Videos";
+      dataDir = "/home/${user}/data";
       openFirewall = true;
       inherit user group;
     };
