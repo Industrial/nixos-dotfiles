@@ -10,7 +10,8 @@
   # ];
 
   fonts.packages = with pkgs; [
-    terminus-nerdfont
-    # nerdfonts
+    nerd-fonts.terminess-ttf
+    nerd-fonts.iosevka
+    nerd-fonts.iosevka-term
   ];
 }
