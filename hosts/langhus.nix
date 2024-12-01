@@ -61,7 +61,6 @@ in {
       ../features/media/invidious
       ../features/media/lidarr
       ../features/media/okular
-      # ../features/media/plex
       ../features/media/prowlarr
       ../features/media/radarr
       ../features/media/readarr
