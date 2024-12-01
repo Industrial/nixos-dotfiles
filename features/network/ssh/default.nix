@@ -3,14 +3,16 @@
     openssh = {
       enable = true;
 
-      # Disable password authentication.
-      passwordAuthentication = true;
+      settings = {
+        # Enable password authentication.
+        PasswordAuthentication = true;
+
+        # Disable challenge response authentication.
+        KbdInteractiveAuthentication = false;
+      };
 
       # Disable SFTP.
       allowSFTP = false;
-
-      # Disable challenge response authentication.
-      challengeResponseAuthentication = false;
 
       # Disable TCP port forwarding, X11 forwarding, agent forwarding, stream
       # local forwarding and only allow public key authentication.
