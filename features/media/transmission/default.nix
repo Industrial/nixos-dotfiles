@@ -26,6 +26,8 @@ in {
       openPeerPorts = false;
       openRPCPort = false;
       downloadDirPermissions = "770";
+      # Alternative Web Interface
+      webHome = pkgs.flood-for-transmission;
       settings = {
         download-dir = "${dataDirectoryPath}/transmission/downloads";
         incomplete-dir = "${dataDirectoryPath}/transmission/incomplete";
