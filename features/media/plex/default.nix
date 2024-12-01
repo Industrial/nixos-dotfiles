@@ -5,7 +5,7 @@
       enable = true;
       dataDir = "/run/media/tom/Data/Videos";
       openFirewall = true;
-      group = "data";
+      group = "plex";
       user = "plex";
     };
   };
