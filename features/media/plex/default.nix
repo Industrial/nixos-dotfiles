@@ -10,18 +10,18 @@
     };
   };
 
-  # users = {
-  #   users = {
-  #     plex = {
-  #       isSystemUser = false;
-  #       home = "/home/plex";
-  #       createHome = false;
-  #       group = "plex";
-  #       extraGroups = ["data"];
-  #     };
-  #   };
-  #   groups = {
-  #     plex = {};
-  #   };
-  # };
+  users = {
+    users = {
+      plex = {
+        isSystemUser = true;
+        home = "/home/plex";
+        createHome = false;
+        group = "data";
+        extraGroups = [];
+      };
+    };
+    # groups = {
+    #   plex = {};
+    # };
+  };
 }
