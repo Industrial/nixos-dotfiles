@@ -5,24 +5,23 @@
       enable = true;
       dataDir = "/run/media/tom/Data/Videos";
       openFirewall = true;
-      group = "plex";
+      group = "data";
       user = "plex";
     };
   };
 
-  users = {
-    users = {
-      plex = {
-        isSystemUser = false;
-        home = "/home/plex";
-        createHome = false;
-        group = "plex";
-        extraGroups = ["data"];
-      };
-    };
-
-    groups = {
-      plex = {};
-    };
-  };
+  # users = {
+  #   users = {
+  #     plex = {
+  #       isSystemUser = false;
+  #       home = "/home/plex";
+  #       createHome = false;
+  #       group = "plex";
+  #       extraGroups = ["data"];
+  #     };
+  #   };
+  #   groups = {
+  #     plex = {};
+  #   };
+  # };
 }
