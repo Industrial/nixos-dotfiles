@@ -15,13 +15,13 @@
       plex = {
         isSystemUser = true;
         home = "/home/plex";
-        createHome = false;
+        createHome = true;
         group = "data";
-        extraGroups = [];
+        extraGroups = ["data"];
       };
     };
-    # groups = {
-    #   plex = {};
-    # };
+    groups = {
+      plex = {};
+    };
   };
 }
