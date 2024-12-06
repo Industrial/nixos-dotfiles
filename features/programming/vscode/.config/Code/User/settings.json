@@ -84,6 +84,7 @@
   "editor.insertSpaces": true,
   "editor.largeFileOptimizations": false,
   "editor.lineHeight": 16,
+  "editor.minimap.enabled": false,
   "editor.minimap.sectionHeaderFontSize": 12,
   "editor.quickSuggestions": {
     "comments": "on",

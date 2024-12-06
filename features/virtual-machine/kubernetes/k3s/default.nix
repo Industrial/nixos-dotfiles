@@ -1,4 +1,23 @@
-{...}: {
+{
+  inputs,
+  settings,
+  pkgs,
+  ...
+}: let
+  manifests = {
+    immich = {
+      enable = true;
+      source =
+        (import ../services/immich {
+          kubenix = inputs.kubenix;
+          system = settings.system;
+        })
+        .config
+        .kubernetes
+        .result;
+    };
+  };
+in {
   # I turned this off because I don't want to expose it. I'm using tailscale so
   # I don't need to expose it.
   # networking = {
@@ -18,11 +37,13 @@
     k3s = {
       enable = true;
       role = "server";
-      extraFlags = [
-        # "--debug"
-        # "--no-deploy traefik"
-        # "--cluster-cidr 10.24.0.0/16"
-      ];
+      inherit manifests;
     };
+  };
+
+  environment = {
+    systemPackages = with pkgs; [
+      kubernetes-helm
+    ];
   };
 }
