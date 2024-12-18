@@ -27,6 +27,7 @@ in {
         };
     };
     modules = [
+      # ../features/ai/ollama
       # ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop

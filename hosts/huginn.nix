@@ -21,6 +21,7 @@ in {
       inherit inputs settings;
     };
     modules = [
+      # ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
       ../features/cli/appimage-run
