@@ -44,6 +44,7 @@ in {
       ../features/cli/fish
       ../features/cli/fzf
       ../features/cli/g
+      ../features/cli/jq
       ../features/cli/killall
       ../features/cli/l
       # ../features/cli/lazygit
