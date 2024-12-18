@@ -18,7 +18,7 @@
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
       # Completion
-      # extensions.vscode-marketplace.continue.continue
+      extensions.vscode-marketplace.continue.continue
       extensions.vscode-marketplace.saoudrizwan.claude-dev
       extensions.vscode-marketplace.supermaven.supermaven
 
