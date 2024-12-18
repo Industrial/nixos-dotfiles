@@ -1,10 +1,12 @@
 # nix eval -f . --json config.kubernetes.generated --show-trace
 {
+  settings ? {hostname = "localhost";},
   system ? builtins.currentSystem,
   kubenix ?
     import (fetchTarball {
       url = "https://github.com/hall/kubenix/archive/master.tar.gz";
     }),
+  ...
 }: (kubenix.evalModules.${system} {
   module = {kubenix, ...}: {
     imports = [
@@ -26,6 +28,35 @@
                     existingClaim = "library-pvc";
                   };
                 };
+              };
+            };
+          };
+        };
+        resources = {
+          ingresses = {
+            immich = {
+              spec = {
+                rules = [
+                  {
+                    host = "immich.${settings.hostname}";
+                    http = {
+                      paths = [
+                        {
+                          path = "/";
+                          pathType = "Prefix";
+                          backend = {
+                            service = {
+                              name = "immich";
+                              port = {
+                                number = 8096;
+                              };
+                            };
+                          };
+                        }
+                      ];
+                    };
+                  }
+                ];
               };
             };
           };

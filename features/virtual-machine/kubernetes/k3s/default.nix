@@ -4,46 +4,58 @@
   pkgs,
   ...
 }: let
-  manifests = {
-    immich = {
-      enable = true;
-      source =
-        (import ../services/immich {
-          kubenix = inputs.kubenix;
-          system = settings.system;
-        })
-        .config
-        .kubernetes
-        .result;
-    };
-  };
-in {
-  # I turned this off because I don't want to expose it. I'm using tailscale so
-  # I don't need to expose it.
-  # networking = {
-  #   firewall = {
-  #     allowedTCPPorts = [
-  #       6443 # k3s: required so that pods can reach the API server (running on port 6443 by default)
-  #       # 2379 # k3s, etcd clients: required if using a "High Availability Embedded etcd" configuration
-  #       # 2380 # k3s, etcd peers: required if using a "High Availability Embedded etcd" configuration
-  #     ];
-  #     allowedUDPPorts = [
-  #       # 8472 # k3s, flannel: required if using multi-node for inter-node networking
-  #     ];
-  #   };
-  # };
+  generateManifests = import ../lib/generateManifests.nix {inherit inputs settings pkgs;};
+  generateHostEntries = import ../lib/generateHostEntries.nix {inherit settings;};
 
+  # List of services to deploy
+  services = [
+    # "immich"
+    "baserow"
+    "jellyfin"
+    "pairdrop"
+    "portainer"
+    "rsshub"
+  ];
+
+  # Generate manifests for services
+  manifests = generateManifests services;
+
+  # Generate host entries for services
+  extraHosts = generateHostEntries services;
+in {
   services = {
     k3s = {
       enable = true;
       role = "server";
       inherit manifests;
+      extraFlags = "--disable traefik=false"; # Explicitly enable Traefik
     };
   };
 
-  environment = {
-    systemPackages = with pkgs; [
-      kubernetes-helm
-    ];
+  networking = {
+    firewall = {
+      allowedTCPPorts = [
+        # Kubernetes API server
+        6443
+        # Kubelet API
+        10250
+        # HTTP for Traefik ingress
+        80
+        # HTTPS for Traefik ingress
+        443
+      ];
+      allowedUDPPorts = [
+        # Flannel VXLAN
+        8472
+      ];
+    };
+
+    inherit extraHosts;
   };
+
+  # environment = {
+  #   systemPackages = with pkgs; [
+  #     kubernetes-helm
+  #   ];
+  # };
 }

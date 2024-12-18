@@ -14,21 +14,12 @@
     kubernetes = {
       helm = {
         releases = {
-          devtron = {
+          portainer = {
             chart = kubenix.lib.helm.fetch {
-              repo = "https://helm.devtron.ai";
-              chart = "devtron-operator";
-              sha256 = "sha256-BZ93s2cWQg4ghdFp6sMHpN46tEjeZRxOfrpAqyy93Fs=";
+              repo = "https://portainer.github.io/k8s/";
+              chart = "portainer";
+              sha256 = "sha256-w0QuzLHf57AaokEKIoX+IrHiCMmaYdTmS/6P4Cju4sA=";
             };
-            # values = {
-            #   immich = {
-            #     persistence = {
-            #       library = {
-            #         existingClaim = "library-pvc";
-            #       };
-            #     };
-            #   };
-            # };
           };
         };
       };
