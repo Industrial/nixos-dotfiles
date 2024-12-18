@@ -229,6 +229,11 @@ in {
             videoDrivers = ["nvidia"];
           };
         };
+        nixpkgs = {
+          config = {
+            cudaSupport = true;
+          };
+        };
       }
     ];
   };
