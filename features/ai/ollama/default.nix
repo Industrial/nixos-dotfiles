@@ -10,4 +10,17 @@
       ollama-cuda
     ];
   };
+  services = {
+    # TODO: This fails at the moment
+    # ollama = {
+    #   enable = true;
+    #   loadModels = [
+    #     # "codegemma"
+    #   ];
+    # };
+    nextjs-ollama-llm-ui = {
+      enable = true;
+      port = 5001;
+    };
+  };
 }
