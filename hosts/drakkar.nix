@@ -21,6 +21,8 @@ in {
       inherit inputs settings;
     };
     modules = [
+      # ../features/programming/aide
+      #../features/ai/n8n
       ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
@@ -54,12 +56,12 @@ in {
       ../features/cli/zellij
       ../features/communication/discord
       ../features/communication/fractal
-      ../features/games/lutris
-      ../features/games/wowup
-      ../features/games/path-of-building
-      #../features/games/steam
-      ../features/hardware/zsa-keyboard
-      ../features/media/gimp
+      #../features/games/lutris
+      #../features/games/wowup
+      #../features/games/path-of-building
+      ../features/games/steam
+      #../features/hardware/zsa-keyboard
+      #../features/media/gimp
       #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -81,7 +83,7 @@ in {
       ../features/network/ssh
       ../features/network/syncthing
       #../features/network/tor
-      ../features/network/tor-browser
+      #../features/network/tor-browser
       ../features/nix
       # This is for Darwin only.
       #../features/nix/nix-daemon
@@ -107,7 +109,7 @@ in {
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
-      ../features/office/cryptpad
+      #../features/office/cryptpad
       ../features/office/obsidian
       #../features/programming/android-tools
       ../features/programming/devenv
@@ -125,18 +127,18 @@ in {
       ../features/security/veracrypt
       ../features/security/yubikey-manager
       #../features/virtual-machine/base
-      ../features/virtual-machine/kubernetes/k3s
+      ##../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
       #../features/virtual-machine/microvm
       #../features/virtual-machine/ssh
-      ../features/virtual-machine/virtualbox
+      #../features/virtual-machine/virtualbox
       ../features/window-manager/alacritty
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
       ../features/window-manager/gnome
       #../features/window-manager/hyper
-      ../features/window-manager/slock
+      #../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix
       #../features/window-manager/xfce
