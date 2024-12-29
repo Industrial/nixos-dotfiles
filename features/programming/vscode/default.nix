@@ -16,11 +16,11 @@
       extensions.vscode-marketplace.usernamehw.errorlens
       extensions.vscode-marketplace.vspacecode.whichkey
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
-
       # Completion
-      extensions.vscode-marketplace.continue.continue
-      extensions.vscode-marketplace.saoudrizwan.claude-dev
       extensions.vscode-marketplace.supermaven.supermaven
+      extensions.vscode-marketplace.saoudrizwan.claude-dev
+      extensions.vscode-marketplace.continue.continue
+      extensions.vscode-marketplace.rjmacarthy.twinny
 
       # Testing
       # This adapter converter is needed for other language test adapter
