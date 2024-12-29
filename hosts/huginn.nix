@@ -21,6 +21,7 @@ in {
       inherit inputs settings;
     };
     modules = [
+      # ../features/ai/n8n
       # ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
