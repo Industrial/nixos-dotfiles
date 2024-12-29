@@ -10,10 +10,10 @@
   # List of services to deploy
   services = [
     # "immich"
-    "baserow"
+    # "baserow"
     "jellyfin"
     "pairdrop"
-    "portainer"
+    # "portainer"
     "rsshub"
   ];
 
