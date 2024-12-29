@@ -9,7 +9,8 @@ export C9_USER="tom"
 
 features/window-manager/gnome/bin/dconf-load
 
-# bin/update/repositories
+bin/delete/collectgarbage
+bin/update/repositories
 bin/update/system
 
 features/window-manager/gnome/bin/dconf-dump
