@@ -4,6 +4,19 @@
   ...
 }: let
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.95.2";
+  continue = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
+    mktplcRef = {
+      name = "continue";
+      publisher = "Continue";
+      version = "0.9.248";
+      sha256 = "sha256-sbbEM8OFjiGjtHwTfiDqjt904v0ZLcVKrGK5YBVRw2k=";
+      arch = "linux-x64";
+    };
+    nativeBuildInputs = [
+      pkgs.autoPatchelfHook
+    ];
+    buildInputs = [pkgs.stdenv.cc.cc.lib];
+  };
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscodeExtensions = [
       # Themes
@@ -19,8 +32,9 @@
       # Completion
       extensions.vscode-marketplace.supermaven.supermaven
       extensions.vscode-marketplace.saoudrizwan.claude-dev
-      extensions.vscode-marketplace.continue.continue
-      extensions.vscode-marketplace.rjmacarthy.twinny
+      # extensions.vscode-marketplace.continue.continue
+      continue
+      # extensions.vscode-marketplace.rjmacarthy.twinny
 
       # Testing
       # This adapter converter is needed for other language test adapter
