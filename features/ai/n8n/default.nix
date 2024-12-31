@@ -9,6 +9,7 @@
   };
   services = {
     n8n = {
+      # https://localhost:5678
       enable = true;
     };
   };
