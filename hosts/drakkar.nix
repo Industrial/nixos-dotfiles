@@ -21,7 +21,7 @@ in {
       inherit inputs settings;
     };
     modules = [
-      #../features/ai/n8n
+      ../features/ai/n8n
       ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
@@ -55,7 +55,7 @@ in {
       ../features/cli/zellij
       ../features/communication/discord
       ../features/communication/fractal
-      #../features/games/lutris
+      ../features/games/lutris
       #../features/games/wowup
       #../features/games/path-of-building
       ../features/games/steam
