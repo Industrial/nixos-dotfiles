@@ -53,14 +53,14 @@ in {
       ../features/cli/unrar
       ../features/cli/unzip
       ../features/cli/zellij
-      #../features/communication/discord
-      #../features/communication/fractal
+      ../features/communication/discord
+      ../features/communication/fractal
       #../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
       #../features/games/wowup
-      # ../features/hardware/zsa-keyboard
-      #../features/media/gimp
+      ../features/hardware/zsa-keyboard
+      ../features/media/gimp
       ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -70,7 +70,7 @@ in {
       #../features/media/sonarr
       #../features/media/spotify
       ../features/media/transmission
-      #../features/media/vlc
+      ../features/media/vlc
       ## ../features/media/whisparr
       ../features/monitoring/grafana
       ../features/monitoring/homepage-dashboard
@@ -81,7 +81,7 @@ in {
       ../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
-      # ../features/network/tor
+      ../features/network/tor
       ../features/network/tor-browser
       ../features/nix
       # This is for Darwin only.
@@ -91,7 +91,7 @@ in {
       ../features/nixos/bluetooth
       ../features/nixos/boot
       ../features/nixos/console
-      # ../features/nixos/docker
+      ../features/nixos/docker
       ../features/nixos/fonts
       ../features/nixos/graphics
       ../features/nixos/i18n
@@ -110,29 +110,40 @@ in {
       ../features/nixos/window-manager
       #../features/office/cryptpad
       ../features/office/obsidian
-      # ../features/programming/android-tools
+      ../features/programming/android-tools
       ../features/programming/devenv
-      # ../features/programming/docker-compose
+      ../features/programming/docker-compose
       ../features/programming/git
-      #../features/programming/gitkraken
-      #../features/programming/glogg
-      # ../features/programming/insomnia
-      #../features/programming/meld
-      # ../features/programming/neovim
-      #../features/programming/python
+      ../features/programming/gitkraken
+      ../features/programming/glogg
+      ../features/programming/insomnia
+      ../features/programming/meld
+      ../features/programming/neovim
+      ../features/programming/python
       ../features/programming/vscode
-      #../features/security/veracrypt
+      ../features/security/veracrypt
       ../features/security/yubikey-manager
       ../features/security/tailscale
       ../features/security/keepassxc
       # ../features/virtual-machine/base
       ../features/virtual-machine/kubernetes/k3s
-      # ../features/virtual-machine/kubernetes/master
-      # ../features/virtual-machine/kubernetes/node
-      # ../features/virtual-machine/microvm
-      # ../features/virtual-machine/ssh
-      #../features/window-manager/alacritty
+      #../features/virtual-machine/kubernetes/master
+      #../features/virtual-machine/kubernetes/node
+      #../features/virtual-machine/microvm
+      #../features/virtual-machine/ssh
+      #../features/virtual-machine/virtualbox
+      ../features/window-manager/alacritty
+      # TODO: There was an erro building dwm so I'm disabling it for now.
+      #../features/window-manager/dwm
       ../features/window-manager/gnome
+      ../features/window-manager/hyper
+      ../features/window-manager/slock
+      inputs.stylix.nixosModules.stylix
+      ../features/window-manager/stylix
+      #../features/window-manager/xfce
+      #../features/window-manager/xmonad
+      ../features/window-manager/xsel
+      ../features/window-manager/xclip
 
       ({
         config,
