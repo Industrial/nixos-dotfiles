@@ -21,7 +21,7 @@ in {
       inherit inputs settings;
     };
     modules = [
-      ../features/ai/n8n
+      # ../features/ai/n8n
       ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
@@ -60,7 +60,7 @@ in {
       #../features/games/path-of-building
       ../features/games/steam
       ../features/hardware/zsa-keyboard
-      ../features/media/gimp
+      # ../features/media/gimp
       #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -118,7 +118,7 @@ in {
       ../features/programming/glogg
       ../features/programming/insomnia
       ../features/programming/meld
-      ../features/programming/neovim
+      # ../features/programming/neovim
       ../features/programming/python
       ../features/programming/vscode
       ../features/security/tailscale
@@ -136,7 +136,7 @@ in {
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
       ../features/window-manager/gnome
-      ../features/window-manager/hyper
+      # ../features/window-manager/hyper
       ../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix
