@@ -15,7 +15,7 @@
 in {
   imports = [
     inputs.nixvim.nixosModules.nixvim
-    # neovimModule
+    neovimModule
     ./backup-files.nix
     ./buffer-search.nix
     ./buffers.nix
@@ -65,7 +65,7 @@ in {
 
   environment = {
     systemPackages = with pkgs; [
-      nvim
+      # nvim
       xsel
       xclip
     ];
