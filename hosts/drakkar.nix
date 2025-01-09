@@ -56,11 +56,11 @@ in {
       ../features/communication/discord
       ../features/communication/fractal
       ../features/games/lutris
-      #../features/games/wowup
+      ../features/games/wowup
       #../features/games/path-of-building
       ../features/games/steam
-      #../features/hardware/zsa-keyboard
-      #../features/media/gimp
+      ../features/hardware/zsa-keyboard
+      ../features/media/gimp
       #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -70,19 +70,19 @@ in {
       #../features/media/sonarr
       ##../features/media/whisparr
       ../features/media/spotify
-      #../features/media/transmission
+      ../features/media/transmission
       ../features/media/vlc
-      #../features/monitoring/grafana
-      #../features/monitoring/homepage-dashboard
-      #../features/monitoring/prometheus
+      ../features/monitoring/grafana
+      ../features/monitoring/homepage-dashboard
+      ../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
-      # ../features/network/searx
+      #../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
-      #../features/network/tor
-      #../features/network/tor-browser
+      ../features/network/tor
+      ../features/network/tor-browser
       ../features/nix
       # This is for Darwin only.
       #../features/nix/nix-daemon
@@ -110,23 +110,23 @@ in {
       ../features/nixos/window-manager
       #../features/office/cryptpad
       ../features/office/obsidian
-      #../features/programming/android-tools
+      ../features/programming/android-tools
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
-      #../features/programming/gitkraken
-      #../features/programming/glogg
-      #../features/programming/insomnia
-      #../features/programming/meld
-      #../features/programming/neovim
-      #../features/programming/python
+      ../features/programming/gitkraken
+      ../features/programming/glogg
+      ../features/programming/insomnia
+      ../features/programming/meld
+      ../features/programming/neovim
+      ../features/programming/python
       ../features/programming/vscode
       ../features/security/tailscale
       ../features/security/keepassxc
       ../features/security/veracrypt
       ../features/security/yubikey-manager
       #../features/virtual-machine/base
-      ##../features/virtual-machine/kubernetes/k3s
+      ../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
       #../features/virtual-machine/microvm
@@ -136,8 +136,8 @@ in {
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
       ../features/window-manager/gnome
-      #../features/window-manager/hyper
-      #../features/window-manager/slock
+      ../features/window-manager/hyper
+      ../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix
       #../features/window-manager/xfce
