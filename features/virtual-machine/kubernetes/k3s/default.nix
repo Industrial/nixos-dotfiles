@@ -13,7 +13,7 @@
     # "baserow"
     "jellyfin"
     "pairdrop"
-    # "portainer"
+    "portainer"
     "rsshub"
   ];
 
