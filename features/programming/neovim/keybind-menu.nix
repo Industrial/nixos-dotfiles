@@ -4,7 +4,7 @@
     enable = true;
 
     plugins = {
-      marks = false;
+      # marks = false;
       registers = true;
       spelling = {
         enabled = true;

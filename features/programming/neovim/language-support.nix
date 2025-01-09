@@ -97,33 +97,26 @@
   programs.nixvim.plugins.cmp-cmdline.enable = true;
   programs.nixvim.plugins.copilot-cmp.enable = true;
 
-  # Code Formatter
-  programs.nixvim.plugins.conform-nvim = {
-    enable = true;
-
-    formattersByFt = {
-      lua = ["stylua"];
-
-      nix = ["alejandra"];
-
-      javascript = ["dprint"];
-
-      typescript = ["dprint"];
-
-      json = ["dprint"];
-
-      # Run on all file types.
-      "*" = ["codespell"];
-
-      # Run on file types that don't have other formatters configured.
-      "_" = ["trim_whitespace"];
-    };
-
-    formatOnSave = {
-      lspFallback = true;
-      timeoutMs = 500;
-    };
-  };
+  # TODO: Plugin no longer exists
+  # # Code Formatter
+  # programs.nixvim.plugins.conform-nvim = {
+  #   enable = true;
+  #   formattersByFt = {
+  #     lua = ["stylua"];
+  #     nix = ["alejandra"];
+  #     javascript = ["dprint"];
+  #     typescript = ["dprint"];
+  #     json = ["dprint"];
+  #     # Run on all file types.
+  #     "*" = ["codespell"];
+  #     # Run on file types that don't have other formatters configured.
+  #     "_" = ["trim_whitespace"];
+  #   };
+  #   formatOnSave = {
+  #     lspFallback = true;
+  #     timeoutMs = 500;
+  #   };
+  # };
 
   programs.nixvim.plugins.nvim-lightbulb = {
     enable = true;

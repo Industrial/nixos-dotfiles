@@ -1,6 +1,21 @@
 # TODO: Copilot Chat: https://github.com/nix-community/nixvim/issues/1425
-{pkgs, ...}: {
+{
+  pkgs,
+  inputs,
+  settings,
+  ...
+}: let
+  nixvim' = inputs.nixvim.legacyPackages."${settings.system}";
+  nvim = nixvim'.makeNixvim {};
+  neovimModule = (
+    if pkgs.stdenv.isDarwin
+    then inputs.nixvim.nixDarwinModules.nixvim
+    else inputs.nixvim.nixosModules.nixvim
+  );
+in {
   imports = [
+    inputs.nixvim.nixosModules.nixvim
+    # neovimModule
     ./backup-files.nix
     ./buffer-search.nix
     ./buffers.nix
@@ -15,6 +30,7 @@
     ./folds.nix
     ./git.nix
     ./indentation.nix
+    ./initialize.nix
     ./keybind-menu.nix
     ./language-support.nix
     ./line-numbers.nix
@@ -32,23 +48,26 @@
     ./undo-files.nix
     ./visual-information.nix
     ./wildmenu.nix
-
-    ./initialize.nix
   ];
 
-  programs.nixvim.enable = true;
-
-  programs.nixvim.globals = {
-    # Disable NetRW
-    loaded_netrw = 1;
-    loaded_netrwPlugin = 1;
-
-    # Set the map leader to space
-    mapleader = " ";
+  programs = {
+    nixvim = {
+      enable = true;
+      globals = {
+        # Disable NetRW
+        loaded_netrw = 1;
+        loaded_netrwPlugin = 1;
+        # Set the map leader to space
+        mapleader = " ";
+      };
+    };
   };
 
-  environment.systemPackages = with pkgs; [
-    xsel
-    xclip
-  ];
+  environment = {
+    systemPackages = with pkgs; [
+      nvim
+      xsel
+      xclip
+    ];
+  };
 }
