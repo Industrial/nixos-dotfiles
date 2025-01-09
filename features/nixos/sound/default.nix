@@ -1,10 +1,4 @@
 {pkgs, ...}: {
-  hardware = {
-    pulseaudio = {
-      enable = false;
-    };
-  };
-
   security = {
     rtkit = {
       enable = true;
@@ -12,6 +6,10 @@
   };
 
   services = {
+    pulseaudio = {
+      enable = false;
+    };
+
     pipewire = {
       enable = true;
       alsa = {
