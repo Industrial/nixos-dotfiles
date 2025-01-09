@@ -18,6 +18,8 @@
     buildInputs = [pkgs.stdenv.cc.cc.lib];
   };
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
+    # TODO: Can't run cursor with this setup.
+    # vscode = pkgs.code-cursor.vscode;
     vscodeExtensions = [
       # Themes
       extensions.vscode-marketplace.tintedtheming.base16-tinted-themes
