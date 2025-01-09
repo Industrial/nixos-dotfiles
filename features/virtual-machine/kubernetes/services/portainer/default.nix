@@ -18,7 +18,7 @@
             chart = kubenix.lib.helm.fetch {
               repo = "https://portainer.github.io/k8s/";
               chart = "portainer";
-              sha256 = "sha256-w0QuzLHf57AaokEKIoX+IrHiCMmaYdTmS/6P4Cju4sA=";
+              sha256 = "sha256-HHDEzeGnCLqqyolyRmzIW7Cyfj03znww2VYRQ6JZYx0=";
             };
           };
         };
