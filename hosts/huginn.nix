@@ -111,6 +111,7 @@ in {
       #../features/office/cryptpad
       ../features/office/obsidian
       ../features/programming/android-tools
+      ../features/programming/bun
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
@@ -136,6 +137,7 @@ in {
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
       ../features/window-manager/gnome
+      # ../features/window-manager/river
       ../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix

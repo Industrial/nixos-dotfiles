@@ -34,6 +34,7 @@ bin/update/login-shell "${C9_USER}"
 if [ "${C9_SYSTEM}" == "nixos" ]; then
     features/programming/vscode/bin/link-files-nixos
     features/window-manager/dwm/bin/link-files-nixos
+    features/window-manager/river/bin/link-files-nixos
 fi
 
 if [ "${C9_SYSTEM}" == "darwin" ]; then

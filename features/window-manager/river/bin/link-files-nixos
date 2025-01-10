@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "features > window-manager > river > link-files-nixos"
+
+echo "features > window-manager > river > link-files-nixos > cd features/window-manager/river"
+cd features/window-manager/river
+
+currentDirectoryPath=$(pwd)
+sourceDirectoryPath="${currentDirectoryPath}/.config"
+
+baseDirectoryPath="${XDG_CONFIG_HOME:-$HOME/.config}"
+targetDirectoryPath="${baseDirectoryPath}/river"
+
+echo "features > window-manager > river > link-files-nixos > ln -sf \"${sourceDirectoryPath}\" \"${targetDirectoryPath}\""
+ln -sf "${sourceDirectoryPath}" "${targetDirectoryPath}"
+
+echo "features > window-manager > river > link-files-nixos > cd \"${targetDirectoryPath}\""
+cd "${targetDirectoryPath}"
+
+echo "features > window-manager > river > link-files-nixos > bun install"
+bun install

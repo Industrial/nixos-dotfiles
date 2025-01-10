@@ -1,0 +1,14 @@
+{
+  "name": "river-configuration",
+  "module": "configuration.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "river-wm-js": "^0.1.0"
+  }
+}
