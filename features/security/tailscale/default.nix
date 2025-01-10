@@ -4,10 +4,15 @@
   ...
 }: {
   services = {
-    tailscale = {
-      enable = true;
-      useRoutingFeatures = "client";
-    };
+    tailscale =
+      if pkgs.stdenv.isLinux
+      then {
+        enable = true;
+        useRoutingFeatures = "client";
+      }
+      else {
+        enable = true;
+      };
   };
 
   networking =

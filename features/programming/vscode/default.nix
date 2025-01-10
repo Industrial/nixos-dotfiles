@@ -18,9 +18,17 @@
     buildInputs = [pkgs.stdenv.cc.cc.lib];
   };
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
-    # TODO: Can't run cursor with this setup.
-    # vscode = pkgs.code-cursor.vscode;
-    vscodeExtensions = [
+    vscodeExtensions =
+      # Only add continue on Linux.
+      # (
+      #   if pkgs.stdenv.isLinux
+      #   then [
+      #     continue
+      #   ]
+      #   else []
+      # )
+      # +
+      [
       # Themes
       extensions.vscode-marketplace.tintedtheming.base16-tinted-themes
 
@@ -34,8 +42,6 @@
       # Completion
       extensions.vscode-marketplace.supermaven.supermaven
       extensions.vscode-marketplace.saoudrizwan.claude-dev
-      # extensions.vscode-marketplace.continue.continue
-      continue
       # extensions.vscode-marketplace.rjmacarthy.twinny
 
       # Testing
