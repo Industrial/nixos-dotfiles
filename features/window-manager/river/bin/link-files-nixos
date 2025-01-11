@@ -9,14 +9,22 @@ cd features/window-manager/river
 currentDirectoryPath=$(pwd)
 sourceDirectoryPath="${currentDirectoryPath}/.config"
 
-baseDirectoryPath="${XDG_CONFIG_HOME:-$HOME/.config}"
-targetDirectoryPath="${baseDirectoryPath}/river"
+targetBaseDirectoryPath="${XDG_CONFIG_HOME:-$HOME/.config}"
 
-echo "features > window-manager > river > link-files-nixos > ln -sf \"${sourceDirectoryPath}\" \"${targetDirectoryPath}\""
-ln -sf "${sourceDirectoryPath}" "${targetDirectoryPath}"
+riverSourceDirectoryPath="${sourceDirectoryPath}/river"
+riverTargetDirectoryPath="${targetBaseDirectoryPath}/river"
 
-echo "features > window-manager > river > link-files-nixos > cd \"${targetDirectoryPath}\""
-cd "${targetDirectoryPath}"
+polyBarSourceDirectoryPath="${sourceDirectoryPath}/polybar"
+polyBarTargetDirectoryPath="${targetBaseDirectoryPath}/polybar"
 
-echo "features > window-manager > river > link-files-nixos > bun install"
-bun install
+echo "features > window-manager > river > link-files-nixos > rm -rf \"${riverTargetDirectoryPath}\""
+rm -rf "${riverTargetDirectoryPath}"
+
+echo "features > window-manager > river > link-files-nixos > mkdir -p \"${targetBaseDirectoryPath}\""
+mkdir -p "${targetBaseDirectoryPath}"
+
+echo "features > window-manager > river > link-files-nixos > ln -sf \"${riverSourceDirectoryPath}\" \"${riverTargetDirectoryPath}\""
+ln -sf "${riverSourceDirectoryPath}" "${riverTargetDirectoryPath}"
+
+echo "features > window-manager > river > link-files-nixos > ln -sf \"${polyBarSourceDirectoryPath}\" \"${polyBarTargetDirectoryPath}\""
+ln -sf "${polyBarSourceDirectoryPath}" "${polyBarTargetDirectoryPath}"

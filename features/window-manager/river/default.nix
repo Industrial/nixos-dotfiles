@@ -15,6 +15,15 @@
   environment = {
     systemPackages = with pkgs; [
       bun
+
+      # Top Bar
+      polybarFull
+
+      # Notification Daemon
+      mako
+
+      # Application Launcher
+      rofi
     ];
   };
 }
