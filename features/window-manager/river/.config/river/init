@@ -17,7 +17,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 // cmd('polybar example')
 
 // Terminal
-await cmd('riverctl map normal Super Return spawn alacritty')
+await cmd('riverctl map normal Super Return spawn ghostty')
 
 // App Launcher
 await cmd('riverctl map normal Super+Shift Return spawn "rofi -show drun"')
@@ -212,6 +212,12 @@ await cmd('riverctl rule-add -app-id "float*" -title "foo" float')
 
 // Make all views with app-id "bar" and any title use client-side decorations
 await cmd('riverctl rule-add -app-id "bar" csd')
+
+// Notification Daemon
+cmd('mako')
+
+// Top Bar
+cmd('waybar')
 
 // Layout Generator
 

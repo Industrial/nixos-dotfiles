@@ -17,7 +17,8 @@
       bun
 
       # Top Bar
-      polybarFull
+      waybar
+      # polybarFull
 
       # Notification Daemon
       mako
