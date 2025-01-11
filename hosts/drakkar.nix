@@ -58,12 +58,12 @@ in {
       ../features/communication/weechat
       ../features/crypto/monero
       ../features/games/lutris
-      ../features/games/wowup
       #../features/games/path-of-building
       ../features/games/steam
+      ../features/games/wowup
       ../features/hardware/zsa-keyboard
-      # ../features/media/gimp
-      #../features/media/invidious
+      ../features/media/gimp
+      ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
       #../features/media/prowlarr
@@ -110,6 +110,7 @@ in {
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
+      # TODO: Run this in Kubernetes instead.
       #../features/office/cryptpad
       ../features/office/obsidian
       ../features/programming/android-tools
@@ -124,8 +125,8 @@ in {
       # ../features/programming/neovim
       ../features/programming/python
       ../features/programming/vscode
-      ../features/security/tailscale
       ../features/security/keepassxc
+      ../features/security/tailscale
       ../features/security/veracrypt
       ../features/security/yubikey-manager
       #../features/virtual-machine/base

@@ -55,6 +55,8 @@ in {
       ../features/cli/zellij
       ../features/communication/discord
       ../features/communication/fractal
+      ../features/communication/weechat
+      ../features/crypto/monero
       #../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
@@ -69,9 +71,10 @@ in {
       #../features/media/readarr
       #../features/media/sonarr
       #../features/media/spotify
+      ## ../features/media/whisparr
+      ../features/media/spotify
       ../features/media/transmission
       ../features/media/vlc
-      ## ../features/media/whisparr
       ../features/monitoring/grafana
       ../features/monitoring/homepage-dashboard
       ../features/monitoring/prometheus
@@ -103,11 +106,12 @@ in {
       ../features/nixos/security/sudo
       ../features/nixos/security/yubikey
       ../features/nixos/sound
-      # TODO: This is for langhus!
+      # TODO: This specifies disks. Don't do that! Inline it in this config, copy it from the hardware-configuration.nix
       #../features/nixos/system
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
+      # TODO: Run this in Kubernetes instead.
       #../features/office/cryptpad
       ../features/office/obsidian
       ../features/programming/android-tools
@@ -122,10 +126,10 @@ in {
       # ../features/programming/neovim
       ../features/programming/python
       ../features/programming/vscode
+      ../features/security/keepassxc
+      ../features/security/tailscale
       ../features/security/veracrypt
       ../features/security/yubikey-manager
-      ../features/security/tailscale
-      ../features/security/keepassxc
       # ../features/virtual-machine/base
       ../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
@@ -137,7 +141,7 @@ in {
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
       ../features/window-manager/gnome
-      # ../features/window-manager/river
+      #../features/window-manager/river
       ../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix
