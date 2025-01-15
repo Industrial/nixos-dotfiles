@@ -4,12 +4,14 @@
     systemPackages = with pkgs; [
       arti
     ];
-    variables = {
-      http_proxy = "socks5://127.0.0.1:9150";
-      https_proxy = "socks5://127.0.0.1:9150";
-      HTTP_PROXY = "socks5://127.0.0.1:9150";
-      HTTPS_PROXY = "socks5://127.0.0.1:9150";
-    };
+    # TODO: Turned these off, as not all programs work correctly (bunjs, for
+    # example). I'll have to set it manually for each program.
+    # variables = {
+    #   http_proxy = "socks5://127.0.0.1:9150";
+    #   https_proxy = "socks5://127.0.0.1:9150";
+    #   HTTP_PROXY = "socks5://127.0.0.1:9150";
+    #   HTTPS_PROXY = "socks5://127.0.0.1:9150";
+    # };
   };
   users = {
     users = {
