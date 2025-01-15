@@ -10,17 +10,11 @@ const cmd = async (command: string) => {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
-// TODO: Get PolyBar working.
-// // Kill running polybar instances
-// await cmd('polybar-msg cmd quit')
-// // Start polybar (in the background)
-// cmd('polybar example')
-
 // Terminal
-await cmd('riverctl map normal Super Return spawn ghostty')
+await cmd('riverctl map normal Super Return spawn alacritty')
 
 // App Launcher
-await cmd('riverctl map normal Super+Shift Return spawn "rofi -show drun"')
+await cmd('riverctl map normal Super+Shift P spawn "rofi -show drun"')
 
 // Close Window
 await cmd('riverctl map normal Super Backspace close')
@@ -174,15 +168,15 @@ const tags: Array<[TagName, TagKeybind, TagMask, TagPrograms]> = [
 ]
 
 for (const [name, key, tag, programs] of tags) {
-  // Swap to the tag
-  await cmd(`riverctl set-focused-tags ${tag}`)
-  await delay(200)
-  // Start programs
-  for (const program of programs) {
-    cmd(`${program}`)
-  }
-  // Wait a second
-  await delay(500)
+  // // Swap to the tag
+  // await cmd(`riverctl set-focused-tags ${tag}`)
+  // await delay(200)
+  // // Start programs
+  // for (const program of programs) {
+  //   cmd(`${program}`)
+  // }
+  // // Wait a second
+  // await delay(500)
 
   // Set keybinds
   // Super+[1-9] to focus tag [0-8]
