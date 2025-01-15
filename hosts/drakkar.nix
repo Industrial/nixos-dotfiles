@@ -62,7 +62,8 @@ in {
       ../features/games/steam
       ../features/games/wowup
       ../features/hardware/zsa-keyboard
-      ../features/media/gimp
+      # TODO: This is breaking at the moment..
+      #../features/media/gimp
       ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
