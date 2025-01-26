@@ -29,7 +29,6 @@ in {
     modules = [
       # ../features/ai/n8n
       # ../features/ai/ollama
-      # ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c

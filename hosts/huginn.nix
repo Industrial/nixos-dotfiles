@@ -25,7 +25,6 @@ in {
       # ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
-      ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c
