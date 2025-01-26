@@ -100,7 +100,6 @@ in {
       ../features/nixos/security/apparmor
       ../features/nixos/security/no-defaults
       ../features/nixos/security/sudo
-      ../features/nixos/security/yubikey
       ../features/nixos/sound
       ../features/nixos/time
       ../features/nixos/users
@@ -123,7 +122,6 @@ in {
       ../features/security/keepassxc
       ../features/security/tailscale
       ../features/security/veracrypt
-      ../features/security/yubikey-manager
       # ../features/virtual-machine/base
       ../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
