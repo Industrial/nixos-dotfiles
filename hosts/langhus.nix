@@ -58,21 +58,16 @@ in {
       ../features/communication/weechat
       # ../features/crypto/monero
       ../features/games/lutris
-      #../features/games/path-of-building
-      # ../features/games/steam
       ../features/games/wowup
-      # ../features/hardware/zsa-keyboard
-      # TODO: This is breaking at the moment..
-      ../features/media/calibre
-      #../features/media/gimp
-      # ../features/media/invidious
+      #../features/media/invidious
+      #../features/media/whisparr
       #../features/media/lidarr
       #../features/media/okular
       #../features/media/prowlarr
       #../features/media/radarr
       #../features/media/readarr
       #../features/media/sonarr
-      ##../features/media/whisparr
+      ../features/media/calibre
       ../features/media/spotify
       ../features/media/transmission
       ../features/media/vlc

@@ -63,11 +63,7 @@ in {
       ../features/darwin/nix-daemon
       ../features/darwin/settings
       # ../features/games/lutris
-      # ../features/games/path-of-building
-      # ../features/games/steam
       # ../features/games/wowup
-      # ../features/hardware/zsa-keyboard
-      ../features/media/calibre
       # ../features/media/invidious
       # ../features/media/lidarr
       # ../features/media/okular
@@ -75,11 +71,11 @@ in {
       # ../features/media/radarr
       # ../features/media/readarr
       # ../features/media/sonarr
-      ../features/media/gimp
-      ../features/media/spotify
       # ../features/media/transmission
       # ../features/media/vlc
       # ../features/media/whisparr
+      ../features/media/calibre
+      ../features/media/spotify
       # ../features/monitoring/grafana
       # ../features/monitoring/homepage-dashboard
       # ../features/monitoring/prometheus
