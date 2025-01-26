@@ -22,10 +22,10 @@ in {
     };
     modules = [
       # ../features/ai/n8n
-      ../features/ai/ollama
+      # ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
-      ../features/cli/appimage-run
+      # ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c
@@ -56,15 +56,16 @@ in {
       ../features/communication/discord
       ../features/communication/fractal
       ../features/communication/weechat
-      ../features/crypto/monero
-      ../features/games/lutris
+      # ../features/crypto/monero
+      # ../features/games/lutris
       #../features/games/path-of-building
-      ../features/games/steam
-      ../features/games/wowup
-      ../features/hardware/zsa-keyboard
+      # ../features/games/steam
+      # ../features/games/wowup
+      # ../features/hardware/zsa-keyboard
       # TODO: This is breaking at the moment..
+      ../features/media/calibre
       #../features/media/gimp
-      ../features/media/invidious
+      # ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
       #../features/media/prowlarr
@@ -89,7 +90,6 @@ in {
       ../features/nix
       # This is for Darwin only.
       #../features/nix/nix-daemon
-      ../features/nix/nix-unit
       ../features/nix/nixpkgs
       ../features/nixos/bluetooth
       ../features/nixos/boot
@@ -104,10 +104,8 @@ in {
       ../features/nixos/security/apparmor
       ../features/nixos/security/no-defaults
       ../features/nixos/security/sudo
-      ../features/nixos/security/yubikey
+      # ../features/nixos/security/yubikey
       ../features/nixos/sound
-      # TODO: This specifies disks. Don't do that! Inline it in this config, copy it from the hardware-configuration.nix
-      # ../features/nixos/system
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
@@ -129,9 +127,9 @@ in {
       ../features/security/keepassxc
       ../features/security/tailscale
       ../features/security/veracrypt
-      ../features/security/yubikey-manager
+      # ../features/security/yubikey-manager
       #../features/virtual-machine/base
-      ../features/virtual-machine/kubernetes/k3s
+      # ../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
       #../features/virtual-machine/microvm
@@ -140,10 +138,10 @@ in {
       ../features/window-manager/alacritty
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
-      ../features/window-manager/ghostty
+      # ../features/window-manager/ghostty
       ../features/window-manager/gnome
-      ../features/window-manager/river
-      ../features/window-manager/slock
+      # ../features/window-manager/river
+      # ../features/window-manager/slock
       inputs.stylix.nixosModules.stylix
       ../features/window-manager/stylix
       #../features/window-manager/xfce

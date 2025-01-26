@@ -67,6 +67,7 @@ in {
       # ../features/games/steam
       # ../features/games/wowup
       # ../features/hardware/zsa-keyboard
+      ../features/media/calibre
       # ../features/media/invidious
       # ../features/media/lidarr
       # ../features/media/okular
@@ -91,7 +92,6 @@ in {
       # ../features/network/tor
       # ../features/network/tor-browser
       ../features/nix
-      ../features/nix/nix-unit
       ../features/nix/nixpkgs
       # ../features/nixos/bluetooth
       # ../features/nixos/boot
@@ -108,7 +108,6 @@ in {
       # ../features/nixos/security/sudo
       # ../features/nixos/security/yubikey
       # ../features/nixos/sound
-      # ../features/nixos/system
       # ../features/nixos/time
       # ../features/nixos/users
       # ../features/nixos/window-manager

@@ -73,6 +73,7 @@ in {
       #../features/media/sonarr
       #../features/media/spotify
       ## ../features/media/whisparr
+      ../features/media/calibre
       ../features/media/spotify
       ../features/media/transmission
       ../features/media/vlc
@@ -90,7 +91,6 @@ in {
       ../features/nix
       # This is for Darwin only.
       #../features/nix/nix-daemon
-      ../features/nix/nix-unit
       ../features/nix/nixpkgs
       ../features/nixos/bluetooth
       ../features/nixos/boot
@@ -107,8 +107,6 @@ in {
       ../features/nixos/security/sudo
       ../features/nixos/security/yubikey
       ../features/nixos/sound
-      # TODO: This specifies disks. Don't do that! Inline it in this config, copy it from the hardware-configuration.nix
-      #../features/nixos/system
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager

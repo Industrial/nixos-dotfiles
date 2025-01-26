@@ -22,10 +22,10 @@ in {
     };
     modules = [
       # ../features/ai/n8n
-      # ../features/ai/ollama
+      ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
-      ../features/cli/appimage-run
+      # ../features/cli/appimage-run
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c
@@ -55,43 +55,46 @@ in {
       ../features/cli/zellij
       ../features/communication/discord
       ../features/communication/fractal
+      ../features/communication/weechat
+      # ../features/crypto/monero
       ../features/games/lutris
-      ../features/games/path-of-building
-      ../features/games/steam
+      #../features/games/path-of-building
+      # ../features/games/steam
       ../features/games/wowup
       # ../features/hardware/zsa-keyboard
-      ../features/media/gimp
-      ../features/media/invidious
-      ../features/media/lidarr
-      ../features/media/okular
-      ../features/media/prowlarr
-      ../features/media/radarr
-      ../features/media/readarr
-      ../features/media/sonarr
+      # TODO: This is breaking at the moment..
+      ../features/media/calibre
+      #../features/media/gimp
+      # ../features/media/invidious
+      #../features/media/lidarr
+      #../features/media/okular
+      #../features/media/prowlarr
+      #../features/media/radarr
+      #../features/media/readarr
+      #../features/media/sonarr
+      ##../features/media/whisparr
       ../features/media/spotify
-      #../features/media/transmission
+      ../features/media/transmission
       ../features/media/vlc
-      # ../features/media/whisparr
-      ../features/monitoring/grafana
-      ../features/monitoring/homepage-dashboard
-      ../features/monitoring/prometheus
+      # ../features/monitoring/grafana
+      # ../features/monitoring/homepage-dashboard
+      # ../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
-      # ../features/network/i2pd
-      ../features/network/searx
+      #../features/network/i2pd
+      #../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
       # ../features/network/tor
-      ../features/network/tor-browser
+      # ../features/network/tor-browser
       ../features/nix
       # This is for Darwin only.
       #../features/nix/nix-daemon
-      ../features/nix/nix-unit
       ../features/nix/nixpkgs
       ../features/nixos/bluetooth
       ../features/nixos/boot
       ../features/nixos/console
-      # ../features/nixos/docker
+      ../features/nixos/docker
       ../features/nixos/fonts
       ../features/nixos/graphics
       ../features/nixos/i18n
@@ -103,35 +106,93 @@ in {
       ../features/nixos/security/sudo
       ../features/nixos/security/yubikey
       ../features/nixos/sound
-      ../features/nixos/system
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
-      ../features/office/cryptpad
+      # TODO: Run this in Kubernetes instead.
+      #../features/office/cryptpad
       ../features/office/obsidian
       # ../features/programming/android-tools
+      ../features/programming/bun
       ../features/programming/devenv
-      # ../features/programming/docker-compose
+      ../features/programming/docker-compose
       ../features/programming/git
       ../features/programming/gitkraken
       ../features/programming/glogg
-      # ../features/programming/insomnia
+      ../features/programming/insomnia
       ../features/programming/meld
       # ../features/programming/neovim
       ../features/programming/python
       ../features/programming/vscode
-      ../features/security/veracrypt
-      ../features/security/yubikey-manager
-      # ../features/security/tailscale
       ../features/security/keepassxc
-      # ../features/virtual-machine/base
-      ../features/virtual-machine/kubernetes/k3s
-      # ../features/virtual-machine/kubernetes/master
-      # ../features/virtual-machine/kubernetes/node
-      # ../features/virtual-machine/microvm
-      # ../features/virtual-machine/ssh
+      ../features/security/tailscale
+      ../features/security/veracrypt
+      # ../features/security/yubikey-manager
+      #../features/virtual-machine/base
+      # ../features/virtual-machine/kubernetes/k3s
+      #../features/virtual-machine/kubernetes/master
+      #../features/virtual-machine/kubernetes/node
+      #../features/virtual-machine/microvm
+      #../features/virtual-machine/ssh
+      #../features/virtual-machine/virtualbox
       ../features/window-manager/alacritty
-      ../features/window-manager/xfce
+      # TODO: There was an erro building dwm so I'm disabling it for now.
+      #../features/window-manager/dwm
+      # ../features/window-manager/ghostty
+      ../features/window-manager/gnome
+      # ../features/window-manager/river
+      # ../features/window-manager/slock
+      inputs.stylix.nixosModules.stylix
+      ../features/window-manager/stylix
+      #../features/window-manager/xfce
+      #../features/window-manager/xmonad
+      ../features/window-manager/xsel
+      ../features/window-manager/xclip
+
+      {
+        boot.initrd.availableKernelModules = ["xhci_pci" "nvme" "ahci" "usbhid" "usb_storage" "sd_mod"];
+        boot.initrd.kernelModules = [];
+        boot.kernelModules = ["kvm-amd"];
+        boot.extraModulePackages = [];
+
+        fileSystems."/" = {
+          device = "/dev/disk/by-uuid/bc826c8e-d4fb-495c-a987-8f32b91b7a76";
+          fsType = "ext4";
+        };
+
+        boot.initrd.luks.devices."luks-5ddd44e1-b6a3-49e7-a65d-350d71b78725".device = "/dev/disk/by-uuid/5ddd44e1-b6a3-49e7-a65d-350d71b78725";
+
+        fileSystems."/boot" = {
+          device = "/dev/disk/by-uuid/D633-38E5";
+          fsType = "vfat";
+          options = ["fmask=0077" "dmask=0077"];
+        };
+
+        swapDevices = [
+          {device = "/dev/disk/by-uuid/07bfb47d-2c76-4640-abf4-7531eb0b9ee1";}
+        ];
+
+        # Graphics
+        hardware = {
+          graphics = {
+            enable = true;
+          };
+          amdgpu = {
+            # opencl = {
+            #   enable = true;
+            # };
+            initrd = {
+              enable = true;
+            };
+            amdvlk = {
+              enable = true;
+              # support32Bit = {
+              #   enable = true;
+              # };
+            };
+          };
+        };
+      }
     ];
   };
 }
