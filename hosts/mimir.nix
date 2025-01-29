@@ -168,20 +168,6 @@ in {
           };
         };
 
-        # ZFS
-        boot = {
-          supportedFilesystems = [
-            "ext4"
-            "zfs"
-          ];
-          zfs = {
-            forceImportRoot = false;
-          };
-        };
-        networking = {
-          hostId = "05e3385d"; # head -c4 /dev/urandom | od -A none -t x4
-        };
-
         # swapDevices = [
         #   {
         #     device = "/dev/disk/by-uuid/1d7ad2c2-f3e6-4e20-afef-8f73d3b030dd";
@@ -205,6 +191,32 @@ in {
         #     };
         #   };
         # };
+      }
+
+      {
+        # ZFS
+        boot = {
+          supportedFilesystems = [
+            "ext4"
+            "zfs"
+          ];
+          zfs = {
+            forceImportRoot = false;
+          };
+        };
+        networking = {
+          hostId = "05e3385d"; # head -c4 /dev/urandom | od -A none -t x4
+        };
+        fileSystems = {
+          "/mnt/well" = {
+            device = "well";
+            fsType = "zfs";
+          };
+          "/mnt/well/services" = {
+            device = "well/services";
+            fsType = "zfs";
+          };
+        };
       }
     ];
   };
