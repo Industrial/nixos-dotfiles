@@ -152,7 +152,16 @@ in {
               };
             };
           };
+
           kernelModules = ["kvm-amd"];
+
+          supportedFilesystems = [
+            "ext4"
+            "zfs"
+          ];
+          zfs = {
+            forceImportRoot = false;
+          };
         };
 
         fileSystems = {
