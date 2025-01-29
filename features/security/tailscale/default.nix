@@ -16,11 +16,11 @@
       nameservers = ["100.100.100.100"];
       search = ["${settings.hostname}"];
 
-      extraHosts = ''
-        100.89.5.118 jellyfin.drakkar
-        100.89.5.118 baserow.drakkar
-        100.89.5.118 pairdrop.drakkar
-      '';
+      # extraHosts = ''
+      #   100.89.58.60 jellyfin.mimir
+      #   100.89.58.60 baserow.mimir
+      #   100.89.58.60 pairdrop.mimir
+      # '';
 
       firewall = {
         trustedInterfaces = ["tailscale0"];

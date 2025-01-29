@@ -142,7 +142,7 @@
           LLM = [
             {
               Ollama = {
-                icon = "";
+                # icon = "";
                 href = "http://0.0.0.0:5001/drive";
                 description = "Fully-featured, beautiful web interface for Ollama LLMs - built with NextJS. Deploy with a single click.";
               };

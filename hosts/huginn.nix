@@ -58,6 +58,7 @@ in {
       ../features/crypto/monero
       #../features/games/lutris
       #../features/games/wowup
+      ../features/hardware/zsa-keyboard
       ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -88,23 +89,18 @@ in {
       ../features/nix/nixpkgs
       ../features/nixos/bluetooth
       ../features/nixos/boot
-      ../features/nixos/console
       ../features/nixos/docker
       ../features/nixos/fonts
       ../features/nixos/graphics
-      ../features/nixos/i18n
       ../features/nixos/networking
       ../features/nixos/networking/dns.nix
       ../features/nixos/networking/firewall.nix
-      ../features/nixos/security/apparmor
       ../features/nixos/security/no-defaults
       ../features/nixos/security/sudo
       ../features/nixos/sound
-      ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
       ../features/office/obsidian
-      ../features/programming/android-tools
       ../features/programming/bun
       ../features/programming/devenv
       ../features/programming/docker-compose

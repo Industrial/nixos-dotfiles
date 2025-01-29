@@ -70,6 +70,7 @@ in {
       # ../features/media/radarr
       # ../features/media/readarr
       # ../features/media/sonarr
+      ../features/media/spotify
       # ../features/media/transmission
       # ../features/media/vlc
       # ../features/media/whisparr
@@ -90,23 +91,18 @@ in {
       ../features/nix/nixpkgs
       # ../features/nixos/bluetooth
       # ../features/nixos/boot
-      # ../features/nixos/console
       # ../features/nixos/docker
       # ../features/nixos/fonts
       # ../features/nixos/graphics
-      # ../features/nixos/i18n
       # ../features/nixos/networking
       # ../features/nixos/networking/dns.nix
       # ../features/nixos/networking/firewall.nix
-      # ../features/nixos/security/apparmor
       # ../features/nixos/security/no-defaults
       # ../features/nixos/security/sudo
       # ../features/nixos/sound
-      # ../features/nixos/time
       # ../features/nixos/users
       # ../features/nixos/window-manager
       ../features/office/obsidian
-      # ../features/programming/android-tools
       ../features/programming/devenv
       # ../features/programming/docker-compose
       ../features/programming/git

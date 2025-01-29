@@ -23,6 +23,44 @@ in (kubenix.evalModules.${system} {
               chart = "${serviceName}";
               sha256 = "sha256-m2CvD4VjWvk0dPpcRnzfq0w6bdKPiTQrfO9tKgFL3Yk=";
             };
+            values = {
+              persistence = {
+                config = {
+                  enabled = true;
+                  existingClaim = null;
+                };
+                media = {
+                  enabled = true;
+                  existingClaim = null;
+                };
+              };
+              volumes = [
+                {
+                  name = "config-volume";
+                  hostPath = {
+                    path = "/data/jellyfin/config";
+                    type = "Directory";
+                  };
+                }
+                {
+                  name = "media-volume";
+                  hostPath = {
+                    path = "/data/jellyfin/media";
+                    type = "Directory";
+                  };
+                }
+              ];
+              volumeMounts = [
+                {
+                  name = "config-volume";
+                  mountPath = "/config";
+                }
+                {
+                  name = "media-volume";
+                  mountPath = "/media";
+                }
+              ];
+            };
           };
         };
       };
