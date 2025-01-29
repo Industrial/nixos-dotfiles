@@ -52,16 +52,16 @@ in {
       ../features/cli/unrar
       ../features/cli/unzip
       ../features/cli/zellij
-      ../features/communication/discord
-      ../features/communication/fractal
-      ../features/communication/teams
-      ../features/communication/weechat
+      #../features/communication/discord
+      #../features/communication/fractal
+      #../features/communication/teams
+      #../features/communication/weechat
       #../features/crypto/monero
-      ../features/games/lutris
+      #../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
-      ../features/games/wowup
-      ../features/hardware/zsa-keyboard
+      #../features/games/wowup
+      #../features/hardware/zsa-keyboard
       #../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
@@ -69,10 +69,10 @@ in {
       #../features/media/radarr
       #../features/media/readarr
       #../features/media/sonarr
-      ##../features/media/whisparr
+      #../features/media/whisparr
       ../features/media/spotify
-      ../features/media/transmission
-      ../features/media/vlc
+      #../features/media/transmission
+      #../features/media/vlc
       #../features/monitoring/grafana
       #../features/monitoring/homepage-dashboard
       #../features/monitoring/prometheus
@@ -102,7 +102,7 @@ in {
       ../features/nixos/users
       ../features/nixos/window-manager
       ../features/office/obsidian
-      ../features/programming/bun
+      #../features/programming/bun
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
@@ -112,10 +112,10 @@ in {
       #../features/programming/meld
       # ../features/programming/neovim
       ../features/programming/python
-      ../features/programming/vscode
+      #../features/programming/vscode
       ../features/security/keepassxc
       ../features/security/tailscale
-      ../features/security/veracrypt
+      #../features/security/veracrypt
       # ../features/security/yubikey-manager
       #../features/virtual-machine/base
       ../features/virtual-machine/kubernetes/k3s
@@ -167,11 +167,11 @@ in {
           };
         };
 
-        swapDevices = [
-          {
-            device = "/dev/disk/by-uuid/1d7ad2c2-f3e6-4e20-afef-8f73d3b030dd";
-          }
-        ];
+        # swapDevices = [
+        #   {
+        #     device = "/dev/disk/by-uuid/1d7ad2c2-f3e6-4e20-afef-8f73d3b030dd";
+        #   }
+        # ];
 
         # # Graphics
         # hardware = {
