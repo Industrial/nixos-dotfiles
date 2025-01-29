@@ -22,7 +22,7 @@ in {
     };
     modules = [
       # ../features/ai/n8n
-      ../features/ai/ollama
+      # ../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
       ../features/cli/bat
@@ -102,8 +102,6 @@ in {
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
-      # TODO: Run this in Kubernetes instead.
-      #../features/office/cryptpad
       ../features/office/obsidian
       # ../features/programming/android-tools
       ../features/programming/bun
@@ -160,9 +158,10 @@ in {
           options = ["fmask=0077" "dmask=0077"];
         };
 
-        swapDevices = [
-          {device = "/dev/disk/by-uuid/07bfb47d-2c76-4640-abf4-7531eb0b9ee1";}
-        ];
+        # TODO: This wasn't found.
+        # swapDevices = [
+        #   {device = "/dev/disk/by-uuid/07bfb47d-2c76-4640-abf4-7531eb0b9ee1";}
+        # ];
 
         # Graphics
         hardware = {

@@ -75,9 +75,6 @@ I have several services configured to run locally on some hosts:
   - Media:
     - Invidious (YouTube):
       - [http://0.0.0.0:4000]
-  - Documents:
-    - Cryptpad:
-      - [http://0.0.0.0:4020]
   - Passwords:
     - Vaultwarden:
       - [http://0.0.0.0:7000]

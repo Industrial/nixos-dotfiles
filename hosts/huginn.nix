@@ -103,8 +103,6 @@ in {
       ../features/nixos/time
       ../features/nixos/users
       ../features/nixos/window-manager
-      # TODO: Run this in Kubernetes instead.
-      #../features/office/cryptpad
       ../features/office/obsidian
       ../features/programming/android-tools
       ../features/programming/bun

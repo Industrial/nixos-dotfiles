@@ -71,7 +71,7 @@
       #extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
       ## Nix
       extensions.vscode-marketplace.bbenoist.nix
-      extensions.vscode-marketplace.jnoortheen.nix-ide
+      #extensions.vscode-marketplace.jnoortheen.nix-ide
       extensions.vscode-marketplace.kamadorueda.alejandra
       ## YAML
       extensions.vscode-marketplace.redhat.vscode-yaml

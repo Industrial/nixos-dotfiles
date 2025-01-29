@@ -13,6 +13,9 @@
   services = {
     ollama = {
       enable = true;
+      host = "[::]";
+      port = 11434;
+      # acceleration = "rocm";
       loadModels = [
         "codegemma"
       ];
