@@ -63,12 +63,12 @@ in {
       #../features/games/wowup
       #../features/hardware/zsa-keyboard
       ../features/media/invidious
-      # ../features/media/lidarr
-      # ../features/media/okular
+      ../features/media/lidarr
+      #../features/media/okular
       ../features/media/prowlarr
-      # ../features/media/radarr
-      # ../features/media/readarr
-      # ../features/media/sonarr
+      ../features/media/radarr
+      ../features/media/readarr
+      ../features/media/sonarr
       #../features/media/whisparr
       ../features/media/spotify
       #../features/media/transmission
