@@ -73,9 +73,9 @@ in {
       ../features/media/spotify
       #../features/media/transmission
       #../features/media/vlc
-      #../features/monitoring/grafana
-      #../features/monitoring/homepage-dashboard
-      #../features/monitoring/prometheus
+      ../features/monitoring/grafana
+      ../features/monitoring/homepage-dashboard
+      ../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
