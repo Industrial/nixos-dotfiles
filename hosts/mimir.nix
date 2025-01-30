@@ -67,7 +67,7 @@ in {
       #../features/media/okular
       ../features/media/prowlarr
       ../features/media/radarr
-      #../features/media/readarr
+      ../features/media/readarr
       # TODO: This is insecure at the moment. NixOS Doesn't let me build it. :(
       #../features/media/sonarr
       #../features/media/whisparr
