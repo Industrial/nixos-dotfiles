@@ -68,7 +68,7 @@ in {
       ../features/media/prowlarr
       ../features/media/radarr
       #../features/media/readarr
-      #../features/media/sonarr
+      ../features/media/sonarr
       #../features/media/whisparr
       ../features/media/spotify
       #../features/media/transmission

@@ -1,5 +1,7 @@
 # Radarr is a movie collection manager for Usenet and BitTorrent users. Port = 7878.
-{pkgs, ...}: {
+{pkgs, ...}: let
+  directoryPath = "/mnt/well/services/prowlarr";
+in {
   environment = {
     systemPackages = with pkgs; [
       radarr
@@ -16,7 +18,7 @@
           Type = "simple";
           User = "radarr";
           Group = "data";
-          ExecStart = "${pkgs.radarr}/bin/Radarr --nobrowser --data=/data/radarr";
+          ExecStart = "${pkgs.radarr}/bin/Radarr --nobrowser --data=${directoryPath}";
           Restart = "always";
           RestartSec = 5;
         };
@@ -25,8 +27,8 @@
 
     tmpfiles = {
       rules = [
-        "d /data/radarr 0770 radarr data - -"
-        "d /data/radarr/data 0770 radarr data - -"
+        "d ${directoryPath} 0770 radarr data - -"
+        "d ${directoryPath}/data 0770 radarr data - -"
       ];
     };
   };
