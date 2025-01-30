@@ -67,8 +67,8 @@ in {
       #../features/media/okular
       ../features/media/prowlarr
       ../features/media/radarr
-      ../features/media/readarr
-      ../features/media/sonarr
+      #../features/media/readarr
+      #../features/media/sonarr
       #../features/media/whisparr
       ../features/media/spotify
       #../features/media/transmission
@@ -82,8 +82,8 @@ in {
       ../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
-      # ../features/network/tor
-      # ../features/network/tor-browser
+      #../features/network/tor
+      #../features/network/tor-browser
       ../features/nix
       # This is for Darwin only.
       #../features/nix/nix-daemon
@@ -110,13 +110,13 @@ in {
       #../features/programming/glogg
       #../features/programming/insomnia
       #../features/programming/meld
-      # ../features/programming/neovim
+      #../features/programming/neovim
       ../features/programming/python
       #../features/programming/vscode
       ../features/security/keepassxc
       ../features/security/tailscale
       #../features/security/veracrypt
-      # ../features/security/yubikey-manager
+      #../features/security/yubikey-manager
       #../features/virtual-machine/base
       ../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
