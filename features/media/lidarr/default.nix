@@ -1,5 +1,7 @@
 # Lidarr is a music collection manager for Usenet and BitTorrent users, port = 8686.
-{pkgs, ...}: {
+{pkgs, ...}: let
+  directoryPath = "/mnt/well/services/lidarr";
+in {
   environment = {
     systemPackages = with pkgs; [
       lidarr
@@ -16,7 +18,7 @@
           Type = "simple";
           User = "lidarr";
           Group = "data";
-          ExecStart = "${pkgs.lidarr}/bin/Lidarr --nobrowser --data=/data/lidarr";
+          ExecStart = "${pkgs.lidarr}/bin/Lidarr --nobrowser --data=${directoryPath}";
           Restart = "always";
           RestartSec = 5;
         };
@@ -25,8 +27,8 @@
 
     tmpfiles = {
       rules = [
-        "d /data/lidarr 0770 lidarr data - -"
-        "d /data/lidarr/data 0770 lidarr data - -"
+        "d ${directoryPath} 0770 lidarr data - -"
+        "d ${directoryPath}/data 0770 lidarr data - -"
       ];
     };
   };

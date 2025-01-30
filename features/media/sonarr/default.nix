@@ -1,5 +1,7 @@
 # Sonarr is a software that helps you find, download and organize your TV shows. Port = 8989.
-{pkgs, ...}: {
+{pkgs, ...}: let
+  directoryPath = "/mnt/well/services/prowlarr";
+in {
   environment = {
     systemPackages = with pkgs; [
       sonarr
@@ -16,7 +18,7 @@
           Type = "simple";
           User = "sonarr";
           Group = "data";
-          ExecStart = "${pkgs.sonarr}/bin/NzbDrone --nobrowser --data=/data/sonarr";
+          ExecStart = "${pkgs.sonarr}/bin/NzbDrone --nobrowser --data=${directoryPath}";
           Restart = "always";
           RestartSec = 5;
         };
@@ -25,8 +27,8 @@
 
     tmpfiles = {
       rules = [
-        "d /data/sonarr 0770 sonarr data - -"
-        "d /data/sonarr/data 0770 sonarr data - -"
+        "d ${directoryPath} 0770 sonarr data - -"
+        "d ${directoryPath}/data 0770 sonarr data - -"
       ];
     };
   };
