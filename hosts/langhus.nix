@@ -67,7 +67,7 @@ in {
       #../features/media/readarr
       #../features/media/sonarr
       ../features/media/spotify
-      ../features/media/transmission
+      #../features/media/transmission
       ../features/media/vlc
       #../features/monitoring/grafana
       #../features/monitoring/homepage-dashboard

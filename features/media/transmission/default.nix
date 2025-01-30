@@ -8,7 +8,7 @@
 }: let
   username = "transmission";
   homeDirectoryPath = "/home/${username}";
-  dataDirectoryPath = "/run/media/${settings.username}/Data";
+  dataDirectoryPath = "/mnt/well/services/transmission/data";
 in {
   environment.systemPackages = with pkgs; [
     transmission_4
@@ -29,10 +29,10 @@ in {
       # Alternative Web Interface
       webHome = pkgs.flood-for-transmission;
       settings = {
-        download-dir = "${dataDirectoryPath}/transmission/downloads";
-        incomplete-dir = "${dataDirectoryPath}/transmission/incomplete";
+        download-dir = "${dataDirectoryPath}/downloads";
+        incomplete-dir = "${dataDirectoryPath}/incomplete";
         incomplete-dir-enabled = true;
-        watch-dir = "${dataDirectoryPath}/transmission/watch";
+        watch-dir = "${dataDirectoryPath}/watch";
         watch-dir-enabled = true;
       };
     };

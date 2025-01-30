@@ -70,7 +70,7 @@ in {
       #./features/media/whisparr
       ../features/media/calibre
       ../features/media/spotify
-      ../features/media/transmission
+      # ../features/media/transmission
       ../features/media/vlc
       ../features/monitoring/grafana
       ../features/monitoring/homepage-dashboard
