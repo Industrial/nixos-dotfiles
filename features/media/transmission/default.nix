@@ -16,7 +16,7 @@ in {
   ];
 
   services = {
-    "${username}" = {
+    transmission = {
       enable = true;
       package = pkgs.transmission_4;
       user = "${username}";

@@ -1,6 +1,6 @@
 # Sonarr is a software that helps you find, download and organize your TV shows. Port = 8989.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/prowlarr";
+  directoryPath = "/mnt/well/services/sonarr";
 in {
   environment = {
     systemPackages = with pkgs; [

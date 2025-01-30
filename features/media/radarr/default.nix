@@ -1,6 +1,6 @@
 # Radarr is a movie collection manager for Usenet and BitTorrent users. Port = 7878.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/prowlarr";
+  directoryPath = "/mnt/well/services/radarr";
 in {
   environment = {
     systemPackages = with pkgs; [
