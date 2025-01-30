@@ -9,6 +9,7 @@
   ...
 }: let
   serviceName = "jellyfin";
+  servicePort = 8096;
 in (kubenix.evalModules.${system} {
   module = {kubenix, ...}: {
     imports = [
@@ -86,7 +87,7 @@ in (kubenix.evalModules.${system} {
                           service = {
                             name = "${serviceName}";
                             port = {
-                              number = 8096;
+                              number = servicePort;
                             };
                           };
                         };

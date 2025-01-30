@@ -1,4 +1,8 @@
 {...}: {
-  services.invidious.enable = true;
-  services.invidious.port = 4000;
+  services = {
+    invidious = {
+      enable = true;
+      port = 4000;
+    };
+  };
 }

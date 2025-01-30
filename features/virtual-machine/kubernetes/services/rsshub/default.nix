@@ -1,3 +1,4 @@
+# nix eval -f . --json config.kubernetes.generated --show-trace
 {
   pkgs ? import <nixpkgs> {},
   settings ? {hostname = "localhost";},
@@ -9,6 +10,7 @@
   ...
 }: let
   serviceName = "rsshub";
+  servicePort = 80;
 in (kubenix.evalModules.${system} {
   module = {kubenix, ...}: {
     imports = [
@@ -48,7 +50,7 @@ in (kubenix.evalModules.${system} {
                           service = {
                             name = "${serviceName}";
                             port = {
-                              number = 80;
+                              number = servicePort;
                             };
                           };
                         };

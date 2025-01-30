@@ -11,10 +11,14 @@
   services = [
     # "immich"
     # "baserow"
+    "dashboard"
     "jellyfin"
+    "kube-ops-view"
     "pairdrop"
     "portainer"
+    "prowlarr"
     "rsshub"
+    "skooner"
   ];
 
   # Generate manifests for services
