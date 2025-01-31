@@ -136,6 +136,13 @@
                 description = "Whisparr is a software that helps you find, download and organize your PORN ITS PORN";
               };
             }
+            {
+              Jellyfin = {
+                # icon = "http://${settings.hostname}:8096/Content/Images/logo.svg";
+                href = "http://${settings.hostname}:8096";
+                description = "Jellyfin is a Free Software Media System that puts you in control of managing and streaming your media.";
+              };
+            }
           ];
         }
         {
