@@ -70,7 +70,7 @@ in {
       ../features/media/readarr
       # TODO: This is insecure at the moment. NixOS Doesn't let me build it. :(
       #../features/media/sonarr
-      #../features/media/whisparr
+      ../features/media/whisparr
       ../features/media/spotify
       ../features/media/transmission
       #../features/media/vlc

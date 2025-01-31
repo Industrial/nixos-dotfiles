@@ -28,7 +28,7 @@ in {
     tmpfiles = {
       rules = [
         "d ${directoryPath} 0770 readarr data - -"
-        "d ${directoryPath} 0770 readarr data - -"
+        "d ${directoryPath}/data 0770 readarr data - -"
       ];
     };
   };
