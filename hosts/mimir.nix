@@ -2,7 +2,7 @@
   name = "mimir";
   system = "x86_64-linux";
   username = "tom";
-  version = "24.05";
+  version = "24.11";
   settings = {
     inherit system username;
     hostname = "${name}";

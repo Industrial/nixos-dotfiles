@@ -1,6 +1,6 @@
 {
   hostname = "vmi2pd";
-  stateVersion = "24.05";
+  stateVersion = "24.11";
   system = "x86_64-linux";
   userdir = "/home/vm";
   useremail = "vmi2pd@vm.com";

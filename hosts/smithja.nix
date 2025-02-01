@@ -2,7 +2,7 @@
   name = "smithja";
   system = "aarch64-darwin";
   username = "twieland";
-  version = "24.05";
+  version = "24.11";
   settings = {
     inherit system username;
     hostname = "${name}";
