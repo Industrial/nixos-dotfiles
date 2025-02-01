@@ -56,8 +56,8 @@ in {
       #../features/communication/fractal
       #../features/communication/weechat
       #../features/crypto/monero
-      #../features/games/lutris
-      #../features/games/wowup
+      ../features/games/lutris
+      ../features/games/wowup
       #../features/hardware/zsa-keyboard
       #../features/media/invidious
       #../features/media/lidarr
