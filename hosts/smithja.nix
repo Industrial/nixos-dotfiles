@@ -74,7 +74,7 @@ in {
       # ../features/media/transmission
       # ../features/media/vlc
       # ../features/media/whisparr
-      ../features/media/calibre
+      # ../features/media/calibre
       ../features/media/spotify
       # ../features/monitoring/grafana
       # ../features/monitoring/homepage-dashboard
