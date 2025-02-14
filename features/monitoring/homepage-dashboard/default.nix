@@ -86,6 +86,17 @@
           ];
         }
         {
+          News = [
+            {
+              TinyTinyRSS = {
+                icon = "https://tt-rss.org/images/ttrss-icon.png";
+                href = "http://${settings.hostname}:9312";
+                description = "News";
+              };
+            }
+          ];
+        }
+        {
           Media = [
             {
               Transmission = {
