@@ -63,20 +63,20 @@ in {
       #../features/games/steam
       #../features/games/wowup
       #../features/media/invidious
-      #../features/media/jellyfin
-      #../features/media/lidarr
+      ../features/media/jellyfin
+      ../features/media/lidarr
       ##../features/media/okular
-      #../features/media/prowlarr
-      #../features/media/radarr
-      #../features/media/readarr
-      ## TODO: This is insecure at the moment. NixOS Doesn't let me build it. :(
-      ##../features/media/sonarr
-      #../features/media/whisparr
-      #../features/media/spotify
+      ../features/media/prowlarr
+      ../features/media/radarr
+      ../features/media/readarr
+      ../features/media/sonarr
+      ../features/media/spotify
+      ../features/media/tiny-tiny-rss
       ../features/media/transmission
       ../features/media/vlc
+      ../features/media/whisparr
       #../features/monitoring/grafana
-      #../features/monitoring/homepage-dashboard
+      ../features/monitoring/homepage-dashboard
       #../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
@@ -141,7 +141,13 @@ in {
       ../features/window-manager/xsel
       ../features/window-manager/xclip
 
-      {
+      ({pkgs, ...}: {
+        # environment = {
+        #   systemPackages = with pkgs; [
+        #     linuxKernel.packages.linux_libre.rtl8852au
+        #   ];
+        # };
+
         boot = {
           initrd = {
             availableKernelModules = ["nvme" "xhci_pci" "ahci" "usbhid" "usb_storage" "sd_mod"];
@@ -156,7 +162,15 @@ in {
             };
           };
 
-          kernelModules = ["kvm-amd"];
+          # kernelPackages = with pkgs; [
+          #   linuxKernel.packages.linux_libre.rtl8852au
+          # ];
+
+          kernelModules = [
+            "kvm-amd"
+
+            # "rtl8852au"
+          ];
         };
 
         fileSystems = {
@@ -176,8 +190,10 @@ in {
         #     device = "/dev/disk/by-uuid/1d7ad2c2-f3e6-4e20-afef-8f73d3b030dd";
         #   }
         # ];
+      })
 
-        # Graphics
+      # Graphics
+      {
         hardware = {
           amdgpu = {
             opencl = {
@@ -196,8 +212,8 @@ in {
         };
       }
 
+      # ZFS
       {
-        # ZFS
         boot = {
           supportedFilesystems = [
             "ext4"
