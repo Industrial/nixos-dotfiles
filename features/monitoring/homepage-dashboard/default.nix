@@ -138,7 +138,7 @@
             }
             {
               Jellyfin = {
-                # icon = "http://${settings.hostname}:8096/Content/Images/logo.svg";
+                icon = "http://${settings.hostname}:8096/web/assets/img/banner-light.png";
                 href = "http://${settings.hostname}:8096";
                 description = "Jellyfin is a Free Software Media System that puts you in control of managing and streaming your media.";
               };
