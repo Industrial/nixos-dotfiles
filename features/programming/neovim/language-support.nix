@@ -63,23 +63,48 @@
     alejandra
   ];
 
-  # - Languages
-  # https://github.com/mfussenegger/nvim-lint
-  programs.nixvim.plugins.lint.enable = true;
+  programs = {
+    nixvim = {
+      plugins = {
+        # https://github.com/mfussenegger/nvim-lint
+        lint = {
+          enable = true;
+        };
 
-  programs.nixvim.plugins.nix.enable = true;
-  programs.nixvim.plugins.treesitter = {
-    enable = true;
-    indent = true;
+        # TreeSitter
+        treesitter = {
+          enable = true;
+          indent = true;
+        };
+        treesitter-context = {
+          enable = true;
+        };
+        treesitter-refactor = {
+          enable = true;
+        };
+
+        # Nix
+        nix = {
+          enable = true;
+        };
+        # Nix DirEnv
+        direnv = {
+          enable = true;
+        };
+
+        # TypeScript
+        ts-autotag = {
+          enable = true;
+        };
+        ts-context-commentstring = {
+          enable = true;
+        };
+      };
+    };
   };
 
   programs.nixvim.plugins.hmts.enable = true;
   programs.nixvim.plugins.rainbow-delimiters.enable = true;
-  programs.nixvim.plugins.treesitter-context.enable = true;
-  programs.nixvim.plugins.treesitter-refactor.enable = true;
-  programs.nixvim.plugins.ts-autotag.enable = true;
-  programs.nixvim.plugins.ts-context-commentstring.enable = true;
-  programs.nixvim.plugins.direnv.enable = true;
 
   # TODO: Document all these.
   programs.nixvim.extraPlugins = with pkgs.vimPlugins; [
@@ -117,40 +142,6 @@
   #     timeoutMs = 500;
   #   };
   # };
-
-  programs.nixvim.plugins.nvim-lightbulb = {
-    enable = true;
-
-    settings = {
-      sign = {
-        enabled = true;
-      };
-
-      virtual_text = {
-        enabled = false;
-      };
-
-      float = {
-        enabled = false;
-      };
-
-      status_text = {
-        enabled = true;
-      };
-
-      number = {
-        enabled = false;
-      };
-
-      line = {
-        enabled = false;
-      };
-
-      autocmd = {
-        enabled = true;
-      };
-    };
-  };
 
   programs.nixvim.extraConfigLua = ''
     local cmp = require('cmp')
@@ -513,7 +504,7 @@
     })
 
     -- TypeScript
-    lspconfig.tsserver.setup({
+    lspconfig.ts_ls.setup({
       capabilities = capabilities,
       flags = flags
     })
@@ -575,44 +566,16 @@
       }
     })
 
-    whichKey.register({
-      l = {
-        name = "LSP",
-        d = {
-          vim.lsp.buf.definition,
-          "Definition"
-        },
-        D = {
-          vim.lsp.buf.declaration,
-          "Declaration"
-        },
-        h = {
-          vim.lsp.buf.hover,
-          "Hover"
-        },
-        i = {
-          vim.lsp.buf.implementation,
-          "Implementation"
-        },
-        r = {
-          vim.lsp.buf.references,
-          "References"
-        },
-        R = {
-          vim.lsp.buf.rename,
-          "Rename"
-        },
-        a = {
-          vim.lsp.buf.code_action,
-          "Code Action"
-        },
-        k = {
-          vim.lsp.buf.signature_help,
-          "Signature Help"
-        }
-      }
-    }, {
-      prefix = "<leader>"
+    whichKey.add({
+      { "<leader>l", group = "LSP" },
+      { "<leader>lD", vim.lsp.buf.declaration, desc = "Declaration" },
+      { "<leader>lR", vim.lsp.buf.rename, desc = "Rename" },
+      { "<leader>la", vim.lsp.buf.code_action, desc = "Code Action" },
+      { "<leader>ld", vim.lsp.buf.definition, desc = "Definition" },
+      { "<leader>lh", vim.lsp.buf.hover, desc = "Hover" },
+      { "<leader>li", vim.lsp.buf.implementation, desc = "Implementation" },
+      { "<leader>lk", vim.lsp.buf.signature_help, desc = "Signature Help" },
+      { "<leader>lr", vim.lsp.buf.references, desc = "References" },
     })
 
     local capabilities = cmpNvimLSP.default_capabilities()
@@ -668,7 +631,7 @@
     --  --       -- return vim.lsp.buf.format({
     --  --       --   bufnr = bufnr,
     --  --       --   filter = function(filterClient)
-    --  --       --     return filterClient.name ~= "tsserver"
+    --  --       --     return filterClient.name ~= "ts_ls"
     --  --       --   end
     --  --       -- })
     --  --     end

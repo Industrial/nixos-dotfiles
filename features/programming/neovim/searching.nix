@@ -38,39 +38,31 @@
       noremap = true,
       silent = true,
     })
-    require("which-key").register({
-      f = {
-        name = "Find",
-        ["/"] = { telescopeBuiltin.current_buffer_fuzzy_find, "in buffer" },
-        C = { telescopeBuiltin.command_history, "command history" },
-        b = { telescopeBuiltin.buffers, "buffers" },
-        c = { telescopeBuiltin.commands, "commands" },
-        g = {
-          name = "Git",
-          b = { telescopeBuiltin.git_branches, "branches" },
-          c = { telescopeBuiltin.git_commits, "commits" },
-          d = { telescopeBuiltin.git_bcommits, "diff" },
-          s = { telescopeBuiltin.git_status, "status" },
-          t = { telescopeBuiltin.git_stash, "stash" },
-        },
-        f = { telescopeBuiltin.live_grep, "in files" },
-        h = { telescopeBuiltin.help_tags, "help tags" },
-        p = { findFiles, "files" },
-        q = { telescopeBuiltin.quickfix, "quickfix" },
-        r = { telescopeBuiltin.registers, "registers" },
-        l = {
-          name = "LSP",
-          a = { telescopeBuiltin.lsp_code_actions, "code actions" },
-          d = { telescopeBuiltin.lsp_definitions, "definitions" },
-          t = { telescopeBuiltin.lsp_type_definitions, "type definitions" },
-          i = { telescopeBuiltin.lsp_implementations, "implementations" },
-          r = { telescopeBuiltin.lsp_references, "references" },
-          s = { telescopeBuiltin.lsp_document_symbols, "document symbols" },
-          w = { telescopeBuiltin.lsp_workspace_symbols, "workspace symbols" },
-        },
-      },
-    }, {
-      prefix = "<leader>"
+
+    require("which-key").add({
+      { "<leader>f", group = "Find" },
+      { "<leader>f/", telescopeBuiltin.current_buffer_fuzzy_find, desc = "in buffer" },
+      { "<leader>fC", telescopeBuiltin.command_history, desc = "command history" },
+      { "<leader>fb", telescopeBuiltin.buffers, desc = "buffers" },
+      { "<leader>fc", telescopeBuiltin.commands, desc = "commands" },
+      { "<leader>ff", telescopeBuiltin.live_grep, desc = "in files" },
+      { "<leader>fg", group = "Git" },
+      { "<leader>fgb", telescopeBuiltin.git_branches, desc = "branches" },
+      { "<leader>fgc", telescopeBuiltin.git_commits, desc = "commits" },
+      { "<leader>fgd", telescopeBuiltin.git_bcommits, desc = "diff" },
+      { "<leader>fgs", telescopeBuiltin.git_status, desc = "status" },
+      { "<leader>fgt", telescopeBuiltin.git_stash, desc = "stash" },
+      { "<leader>fh", telescopeBuiltin.help_tags, desc = "help tags" },
+      { "<leader>fl", group = "LSP" },
+      { "<leader>fld", telescopeBuiltin.lsp_definitions, desc = "definitions" },
+      { "<leader>fli", telescopeBuiltin.lsp_implementations, desc = "implementations" },
+      { "<leader>flr", telescopeBuiltin.lsp_references, desc = "references" },
+      { "<leader>fls", telescopeBuiltin.lsp_document_symbols, desc = "document symbols" },
+      { "<leader>flt", telescopeBuiltin.lsp_type_definitions, desc = "type definitions" },
+      { "<leader>flw", telescopeBuiltin.lsp_workspace_symbols, desc = "workspace symbols" },
+      { "<leader>fp", telescopeBuiltin.find_files, desc = "files" },
+      { "<leader>fq", telescopeBuiltin.quickfix, desc = "quickfix" },
+      { "<leader>fr", telescopeBuiltin.registers, desc = "registers" },
     })
 
     local flash = require('flash')
@@ -78,14 +70,10 @@
     vim.keymap.set({'n', 'x'}, 's',     flash.jump,              { noremap = true })
     vim.keymap.set({'n', 'x'}, 'S',     flash.treesitter,        { noremap = true })
 
-    require("which-key").register({
-      s = {
-        name = "Search",
-        s = { flash.jump, "Search" },
-        S = { flash.treesitter, "TreeSitter" },
-      },
-    }, {
-      prefix = "<leader>"
+    require("which-key").add({
+      { "<leader>s", group = "Search" },
+      { "<leader>sS", flash.jump, desc = "TreeSitter" },
+      { "<leader>ss", flash.treesitter, desc = "Search" },
     })
   '';
 

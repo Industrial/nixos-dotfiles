@@ -1,16 +1,22 @@
 {...}: {
-  # https://github.com/nvim-neo-tree/neo-tree.nvim
-  programs.nixvim.plugins.neo-tree.enable = true;
+  programs = {
+    nixvim = {
+      plugins = {
+        # https://github.com/nvim-neo-tree/neo-tree.nvim
+        neo-tree = {
+          enable = true;
+        };
+      };
 
-  programs.nixvim.extraConfigLua = ''
-    require("which-key").register({
-      t = {
-        name = "Tree",
-        t = { "<cmd>Neotree toggle<cr>", "Toggle" },
-        f = { "<cmd>Neotree reveal<cr>", "Find File" },
-      }
-    }, {
-      prefix = "<leader>"
-    })
-  '';
+      extraConfigLua = ''
+        local whichKey = require("which-key")
+
+        whichKey.add({
+          { "<leader>t", group = "Tree" },
+          { "<leader>tf", "<cmd>Neotree reveal<cr>", desc = "Find File" },
+          { "<leader>tt", "<cmd>Neotree toggle<cr>", desc = "Toggle" },
+        })
+      '';
+    };
+  };
 }

@@ -1,12 +1,66 @@
 {...}: {
-  # Shows the context you are in on the top of the buffer.
-  programs.nixvim.plugins.barbecue.enable = true;
+  programs = {
+    nixvim = {
+      plugins = {
+        nvim-lightbulb = {
+          enable = true;
 
-  # Shows indentation levels with thin vertical lines.
-  programs.nixvim.plugins.indent-blankline.enable = true;
+          settings = {
+            sign = {
+              enabled = true;
+            };
 
-  # Highlights usages of the keyword under the cursor (using TreeSitter / LSP)
-  programs.nixvim.plugins.illuminate.enable = true;
+            virtual_text = {
+              enabled = false;
+            };
+
+            float = {
+              enabled = false;
+            };
+
+            status_text = {
+              enabled = true;
+            };
+
+            number = {
+              enabled = false;
+            };
+
+            line = {
+              enabled = false;
+            };
+
+            autocmd = {
+              enabled = true;
+            };
+          };
+        };
+
+        # Shows the context you are in on the top of the buffer.
+        barbecue = {
+          enable = true;
+        };
+
+        # Shows indentation levels with thin vertical lines.
+        indent-blankline = {
+          enable = true;
+        };
+
+        # Highlights usages of the keyword under the cursor (using TreeSitter / LSP)
+        illuminate = {
+          enable = true;
+        };
+      };
+
+      opts = {
+        # Display a column with signs when necessary.
+        signcolumn = "auto:1-9";
+
+        # Highlight the line the cursor is on.
+        cursorline = true;
+      };
+    };
+  };
 
   # # Panel for showing warnings and errors.
   # programs.nixvim.plugins.trouble = {
@@ -19,10 +73,4 @@
 
   # # Popup for output messages.
   # programs.nixvim.plugins.noice.enable = true;
-
-  # Display a column with signs when necessary.
-  programs.nixvim.opts.signcolumn = "auto:1-9";
-
-  # Highlight the line the cursor is on.
-  programs.nixvim.opts.cursorline = true;
 }
