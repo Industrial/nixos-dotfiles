@@ -52,36 +52,36 @@ in {
       ../features/cli/unrar
       ../features/cli/unzip
       ../features/cli/zellij
-      #../features/communication/discord
-      #../features/communication/fractal
-      #../features/communication/teams
-      #../features/communication/weechat
-      #../features/crypto/monero
+      ../features/communication/discord
+      ../features/communication/fractal
+      ../features/communication/teams
+      ../features/communication/telegram
+      ../features/communication/weechat
+      ../features/crypto/monero
       #../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
       #../features/games/wowup
-      #../features/hardware/zsa-keyboard
-      ../features/media/invidious
-      ../features/media/jellyfin
-      ../features/media/lidarr
-      #../features/media/okular
-      ../features/media/prowlarr
-      ../features/media/radarr
-      ../features/media/readarr
-      # TODO: This is insecure at the moment. NixOS Doesn't let me build it. :(
-      #../features/media/sonarr
-      ../features/media/whisparr
-      ../features/media/spotify
+      #../features/media/invidious
+      #../features/media/jellyfin
+      #../features/media/lidarr
+      ##../features/media/okular
+      #../features/media/prowlarr
+      #../features/media/radarr
+      #../features/media/readarr
+      ## TODO: This is insecure at the moment. NixOS Doesn't let me build it. :(
+      ##../features/media/sonarr
+      #../features/media/whisparr
+      #../features/media/spotify
       ../features/media/transmission
-      #../features/media/vlc
-      ../features/monitoring/grafana
-      ../features/monitoring/homepage-dashboard
-      ../features/monitoring/prometheus
+      ../features/media/vlc
+      #../features/monitoring/grafana
+      #../features/monitoring/homepage-dashboard
+      #../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
-      ../features/network/searx
+      #../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
       #../features/network/tor
@@ -104,7 +104,7 @@ in {
       ../features/nixos/users
       ../features/nixos/window-manager
       ../features/office/obsidian
-      #../features/programming/bun
+      ../features/programming/bun
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
@@ -112,12 +112,13 @@ in {
       #../features/programming/glogg
       #../features/programming/insomnia
       #../features/programming/meld
-      #../features/programming/neovim
+      # ../features/programming/neovim
+      ../features/programming/node
       ../features/programming/python
-      #../features/programming/vscode
+      ../features/programming/vscode
       ../features/security/keepassxc
       ../features/security/tailscale
-      #../features/security/veracrypt
+      ../features/security/veracrypt
       #../features/security/yubikey-manager
       #../features/virtual-machine/base
       #../features/virtual-machine/kubernetes/k3s
@@ -176,23 +177,23 @@ in {
         #   }
         # ];
 
-        # # Graphics
-        # hardware = {
-        #   amdgpu = {
-        #     opencl = {
-        #       enable = true;
-        #     };
-        #     initrd = {
-        #       enable = true;
-        #     };
-        #     amdvlk = {
-        #       enable = true;
-        #       support32Bit = {
-        #         enable = true;
-        #       };
-        #     };
-        #   };
-        # };
+        # Graphics
+        hardware = {
+          amdgpu = {
+            opencl = {
+              enable = true;
+            };
+            initrd = {
+              enable = true;
+            };
+            amdvlk = {
+              enable = true;
+              support32Bit = {
+                enable = true;
+              };
+            };
+          };
+        };
       }
 
       {
