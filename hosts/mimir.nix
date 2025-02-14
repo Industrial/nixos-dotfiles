@@ -62,10 +62,10 @@ in {
       #../features/games/path-of-building
       #../features/games/steam
       #../features/games/wowup
-      #../features/media/invidious
+      ../features/media/invidious
       ../features/media/jellyfin
       ../features/media/lidarr
-      ##../features/media/okular
+      ../features/media/okular
       ../features/media/prowlarr
       ../features/media/radarr
       ../features/media/readarr
@@ -75,13 +75,13 @@ in {
       ../features/media/transmission
       ../features/media/vlc
       ../features/media/whisparr
-      #../features/monitoring/grafana
+      ../features/monitoring/grafana
       ../features/monitoring/homepage-dashboard
-      #../features/monitoring/prometheus
+      ../features/monitoring/prometheus
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
-      #../features/network/searx
+      ../features/network/searx
       ../features/network/ssh
       ../features/network/syncthing
       #../features/network/tor
@@ -108,11 +108,11 @@ in {
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
-      #../features/programming/gitkraken
-      #../features/programming/glogg
-      #../features/programming/insomnia
-      #../features/programming/meld
-      # ../features/programming/neovim
+      ../features/programming/gitkraken
+      ../features/programming/glogg
+      ../features/programming/insomnia
+      ../features/programming/meld
+      ../features/programming/neovim
       ../features/programming/node
       ../features/programming/python
       ../features/programming/vscode

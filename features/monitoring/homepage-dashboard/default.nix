@@ -101,7 +101,8 @@
             {
               Transmission = {
                 icon = "https://transmissionbt.com/assets/images/Transmission_icon.png";
-                href = "http://${settings.hostname}:9091";
+                # TODO: Apparently this one doesn't work on the hostname.
+                href = "http://localhost:9091";
                 description = "BitTorrent";
               };
             }
