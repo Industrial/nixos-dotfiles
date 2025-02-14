@@ -21,6 +21,8 @@ in {
       inherit inputs settings;
     };
     modules = [
+      inputs.nixos-hardware.starlabs.starlite.i5
+
       # ../features/ai/n8n
       # ../features/ai/ollama
       inputs.comin.nixosModules.comin
@@ -58,7 +60,6 @@ in {
       ../features/crypto/monero
       #../features/games/lutris
       #../features/games/wowup
-      ../features/hardware/zsa-keyboard
       ../features/media/invidious
       #../features/media/lidarr
       #../features/media/okular
