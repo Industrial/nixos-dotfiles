@@ -5,6 +5,16 @@
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
 
+    # Hardware Support.
+    nixos-hardware = {
+      url = "github:NixOS/nixos-hardware/master";
+      inputs = {
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
+      };
+    };
+
     # Comin: Git Pull Based Deployment System.
     comin = {
       url = "github:nlewo/comin";
