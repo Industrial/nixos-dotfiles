@@ -1,7 +1,8 @@
 # TODO: Whisparr is not available on NixOS yet.
 # Whisparr is a software that helps you find, download and organize your PORN ITS PORN. Port = 6969.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/whisparr";
+  name = "whisparr";
+  directoryPath = "/mnt/well/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [
@@ -11,13 +12,13 @@ in {
 
   systemd = {
     services = {
-      whisparr = {
+      "${name}" = {
         description = "Whisparr Daemon";
         wantedBy = ["multi-user.target"];
         after = ["network.target"];
         serviceConfig = {
           Type = "simple";
-          User = "whisparr";
+          User = "${name}";
           Group = "data";
           ExecStart = "${pkgs.whisparr}/bin/Whisparr --nobrowser --data=${directoryPath}";
           Restart = "always";
@@ -28,25 +29,25 @@ in {
 
     tmpfiles = {
       rules = [
-        "d ${directoryPath} 0770 whisparr data - -"
-        "d ${directoryPath}/data 0770 whisparr data - -"
+        "d ${directoryPath} 0770 ${name} data - -"
+        "d ${directoryPath}/data 0770 ${name} data - -"
       ];
     };
   };
 
   users = {
     users = {
-      whisparr = {
+      "${name}" = {
         isSystemUser = true;
-        home = "/home/whisparr";
+        home = "/home/${name}";
         createHome = true;
-        group = "whisparr";
+        group = "${name}";
         extraGroups = ["data"];
       };
     };
 
     groups = {
-      whisparr = {};
+      "${name}" = {};
     };
   };
 }

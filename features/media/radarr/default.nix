@@ -1,6 +1,7 @@
 # Radarr is a movie collection manager for Usenet and BitTorrent users. Port = 7878.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/radarr";
+  name = "radarr";
+  directoryPath = "/mnt/well/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [
@@ -10,13 +11,13 @@ in {
 
   systemd = {
     services = {
-      radarr = {
+      "${name}" = {
         description = "Radarr Daemon";
         wantedBy = ["multi-user.target"];
         after = ["network.target"];
         serviceConfig = {
           Type = "simple";
-          User = "radarr";
+          User = "${name}";
           Group = "data";
           ExecStart = "${pkgs.radarr}/bin/Radarr --nobrowser --data=${directoryPath}";
           Restart = "always";
@@ -27,25 +28,25 @@ in {
 
     tmpfiles = {
       rules = [
-        "d ${directoryPath} 0770 radarr data - -"
-        "d ${directoryPath}/data 0770 radarr data - -"
+        "d ${directoryPath} 0770 ${name} data - -"
+        "d ${directoryPath}/data 0770 ${name} data - -"
       ];
     };
   };
 
   users = {
     users = {
-      radarr = {
+      "${name}" = {
         isSystemUser = true;
-        home = "/home/radarr";
+        home = "/home/${name}";
         createHome = true;
-        group = "radarr";
+        group = "${name}";
         extraGroups = ["data"];
       };
     };
 
     groups = {
-      radarr = {};
+      "${name}" = {};
     };
   };
 }

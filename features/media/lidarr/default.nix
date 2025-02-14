@@ -1,6 +1,7 @@
 # Lidarr is a music collection manager for Usenet and BitTorrent users, port = 8686.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/lidarr";
+  name = "lidarr";
+  directoryPath = "/mnt/well/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [
@@ -10,13 +11,13 @@ in {
 
   systemd = {
     services = {
-      lidarr = {
+      "${name}" = {
         description = "Lidarr Daemon";
         wantedBy = ["multi-user.target"];
         after = ["network.target"];
         serviceConfig = {
           Type = "simple";
-          User = "lidarr";
+          User = "${name}";
           Group = "data";
           ExecStart = "${pkgs.lidarr}/bin/Lidarr --nobrowser --data=${directoryPath}";
           Restart = "always";
@@ -27,25 +28,25 @@ in {
 
     tmpfiles = {
       rules = [
-        "d ${directoryPath} 0770 lidarr data - -"
-        "d ${directoryPath}/data 0770 lidarr data - -"
+        "d ${directoryPath} 0770 ${name} data - -"
+        "d ${directoryPath}/data 0770 ${name} data - -"
       ];
     };
   };
 
   users = {
     users = {
-      lidarr = {
+      "${name}" = {
         isSystemUser = true;
-        home = "/home/lidarr";
+        home = "/home/${name}";
         createHome = true;
-        group = "lidarr";
+        group = "${name}";
         extraGroups = ["data"];
       };
     };
 
     groups = {
-      lidarr = {};
+      "${name}" = {};
     };
   };
 }

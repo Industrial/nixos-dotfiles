@@ -1,6 +1,7 @@
 # Readarr is a movie collection manager for Usenet and BitTorrent users. Port = 7878.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/radarr";
+  name = "readarr";
+  directoryPath = "/mnt/well/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [
@@ -10,13 +11,13 @@ in {
 
   systemd = {
     services = {
-      readarr = {
+      "${name}" = {
         description = "Readarr Daemon";
         wantedBy = ["multi-user.target"];
         after = ["network.target"];
         serviceConfig = {
           Type = "simple";
-          User = "readarr";
+          User = "${name}";
           Group = "data";
           ExecStart = "${pkgs.readarr}/bin/Readarr --nobrowser --data=${directoryPath}";
           Restart = "always";
@@ -27,25 +28,25 @@ in {
 
     tmpfiles = {
       rules = [
-        "d ${directoryPath} 0770 readarr data - -"
-        "d ${directoryPath}/data 0770 readarr data - -"
+        "d ${directoryPath} 0770 ${name} data - -"
+        "d ${directoryPath}/data 0770 ${name} data - -"
       ];
     };
   };
 
   users = {
     users = {
-      readarr = {
+      "${name}" = {
         isSystemUser = true;
-        home = "/home/readarr";
+        home = "/home/${name}";
         createHome = true;
-        group = "readarr";
+        group = "${name}";
         extraGroups = ["data"];
       };
     };
 
     groups = {
-      readarr = {};
+      "${name}" = {};
     };
   };
 }

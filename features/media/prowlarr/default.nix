@@ -1,6 +1,7 @@
 # Prowlarr is a software that allows you to manage multiple indexers for your torrent client. Port = 9696.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/prowlarr";
+  name = "prowlarr";
+  directoryPath = "/mnt/well/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [
@@ -10,13 +11,13 @@ in {
 
   systemd = {
     services = {
-      prowlarr = {
+      "${name}" = {
         description = "Prowlarr Daemon";
         wantedBy = ["multi-user.target"];
         after = ["network.target"];
         serviceConfig = {
           Type = "simple";
-          User = "prowlarr";
+          User = "${name}";
           Group = "data";
           ExecStart = "${pkgs.prowlarr}/bin/Prowlarr --nobrowser --data=${directoryPath}";
           Restart = "always";
@@ -27,25 +28,25 @@ in {
 
     tmpfiles = {
       rules = [
-        "d ${directoryPath} 0770 prowlarr data - -"
-        "d ${directoryPath}/data 0770 prowlarr data - -"
+        "d ${directoryPath} 0770 ${name} data - -"
+        "d ${directoryPath}/data 0770 ${name} data - -"
       ];
     };
   };
 
   users = {
     users = {
-      prowlarr = {
+      "${name}" = {
         isSystemUser = true;
-        home = "/home/prowlarr";
+        home = "/home/${name}";
         createHome = true;
-        group = "prowlarr";
+        group = "${name}";
         extraGroups = ["data"];
       };
     };
 
     groups = {
-      prowlarr = {};
+      "${name}" = {};
     };
   };
 }

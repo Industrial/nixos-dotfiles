@@ -1,6 +1,7 @@
 # Sonarr is a software that helps you find, download and organize your TV shows. Port = 8989.
 {pkgs, ...}: let
-  directoryPath = "/mnt/well/services/sonarr";
+  name = "sonarr";
+  directoryPath = "/mnt/well/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [
@@ -10,13 +11,13 @@ in {
 
   systemd = {
     services = {
-      sonarr = {
+      "${name}" = {
         description = "Sonarr Daemon";
         wantedBy = ["multi-user.target"];
         after = ["network.target"];
         serviceConfig = {
           Type = "simple";
-          User = "sonarr";
+          User = "${name}";
           Group = "data";
           ExecStart = "${pkgs.sonarr}/bin/NzbDrone --nobrowser --data=${directoryPath}";
           Restart = "always";
@@ -27,25 +28,25 @@ in {
 
     tmpfiles = {
       rules = [
-        "d ${directoryPath} 0770 sonarr data - -"
-        "d ${directoryPath}/data 0770 sonarr data - -"
+        "d ${directoryPath} 0770 ${name} data - -"
+        "d ${directoryPath}/data 0770 ${name} data - -"
       ];
     };
   };
 
   users = {
     users = {
-      sonarr = {
+      "${name}" = {
         isSystemUser = true;
-        home = "/home/sonarr";
+        home = "/home/${name}";
         createHome = true;
-        group = "sonarr";
+        group = "${name}";
         extraGroups = ["data"];
       };
     };
 
     groups = {
-      sonarr = {};
+      "${name}" = {};
     };
   };
 }
