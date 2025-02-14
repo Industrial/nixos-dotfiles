@@ -91,56 +91,56 @@
               Transmission = {
                 icon = "https://transmissionbt.com/assets/images/Transmission_icon.png";
                 href = "http://${settings.hostname}:9091";
-                description = "A Fast, Easy and Free Bittorrent Client For macOS, Windows and Linux";
+                description = "BitTorrent";
               };
             }
             {
               Lidarr = {
                 icon = "http://${settings.hostname}:8686/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:8686";
-                description = "Lidarr is a music collection manager for Usenet and BitTorrent users";
+                description = "Music";
               };
             }
             {
               Radarr = {
                 icon = "http://${settings.hostname}:7878/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:7878";
-                description = "Radarr is a movie collection manager for Usenet and BitTorrent users";
+                description = "Movies";
               };
             }
             {
               Readarr = {
                 icon = "http://${settings.hostname}:8787/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:8787";
-                description = "Readarr is a book collection manager for Usenet and BitTorrent users";
+                description = "Books";
               };
             }
             {
               Prowlarr = {
                 icon = "http://${settings.hostname}:9696/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:9696";
-                description = "Prowlarr is a software that allows you to manage multiple indexers for your torrent client";
+                description = "Indexer";
               };
             }
             {
               Sonarr = {
                 icon = "http://${settings.hostname}:8989/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:8989";
-                description = "Sonarr is a software that helps you find, download and organize your TV shows";
+                description = "TV Shows";
               };
             }
             {
               Whisparr = {
                 icon = "http://${settings.hostname}:6969/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:6969";
-                description = "Whisparr is a software that helps you find, download and organize your PORN ITS PORN";
+                description = "Porn";
               };
             }
             {
               Jellyfin = {
                 icon = "http://${settings.hostname}:8096/web/assets/img/banner-light.png";
                 href = "http://${settings.hostname}:8096";
-                description = "Jellyfin is a Free Software Media System that puts you in control of managing and streaming your media.";
+                description = "Media Player";
               };
             }
           ];
