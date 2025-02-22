@@ -35,16 +35,6 @@
       };
     };
 
-    # Neovim
-    nixvim = {
-      url = "github:nix-community/nixvim";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Stylix.
     stylix = {
       url = "github:danth/stylix";

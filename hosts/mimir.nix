@@ -58,10 +58,10 @@ in {
       ../features/communication/telegram
       ../features/communication/weechat
       ../features/crypto/monero
-      #../features/games/lutris
+      ../features/games/lutris
       #../features/games/path-of-building
       #../features/games/steam
-      #../features/games/wowup
+      ../features/games/wowup
       ../features/media/invidious
       ../features/media/jellyfin
       ../features/media/lidarr
@@ -112,7 +112,6 @@ in {
       ../features/programming/glogg
       ../features/programming/insomnia
       ../features/programming/meld
-      ../features/programming/neovim
       ../features/programming/node
       ../features/programming/python
       ../features/programming/vscode

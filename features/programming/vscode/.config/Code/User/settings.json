@@ -159,7 +159,6 @@
   "explorer.confirmDelete": false,
   "explorer.confirmDragAndDrop": false,
   "extensions.autoCheckUpdates": false,
-  "extensions.experimental.affinity": { "asvetliakov.vscode-neovim": 1 },
   "files.watcherExclude": {
     "**/.git/objects/**": true,
     "**/.git/subtree-cache/**": true,
