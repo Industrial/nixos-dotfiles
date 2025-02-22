@@ -76,7 +76,8 @@
       nautilus
 
       # - Tiling Window Manager
-      gnomeExtensions.pop-shell
+      #gnomeExtensions.pop-shell
+      gnomeExtensions.tiling-shell
       # - Transparent Inactive Windows
       gnomeExtensions.focus
       # - Bar Indicators
