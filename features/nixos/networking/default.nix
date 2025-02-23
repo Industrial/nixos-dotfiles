@@ -1,9 +1,13 @@
-{settings, ...}: {
+{
+  settings,
+  lib,
+  ...
+}: {
   networking = {
     hostName = settings.hostname;
     networkmanager = {
       enable = true;
-      dns = "none";
+      dns = lib.mkDefault "none";
     };
   };
 }
