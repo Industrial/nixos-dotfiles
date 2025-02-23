@@ -8,11 +8,6 @@
     # Hardware Support.
     nixos-hardware = {
       url = "github:NixOS/nixos-hardware/master";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
     };
 
     # Comin: Git Pull Based Deployment System.
@@ -49,7 +44,19 @@
     kubenix = {
       url = "github:hall/kubenix";
       inputs = {
-        nixpkgs.follows = "nixpkgs";
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
+      };
+    };
+
+    # MicroVM
+    microvm = {
+      url = "github:astro/microvm.nix";
+      inputs = {
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
       };
     };
   };
