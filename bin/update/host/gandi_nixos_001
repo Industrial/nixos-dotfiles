@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+echo "> update > host > mimir"
+exec > >(tee ./logs/update-host-mimir) 2>&1
+set -e
+
+export C9_SYSTEM="nixos"
+export C9_HOST="gandi_nixos_001"
+export C9_USER="tom"
+
+# features/window-manager/gnome/bin/dconf-load
+
+bin/update/repositories
+bin/update/system
+
+# features/window-manager/gnome/bin/dconf-dump
