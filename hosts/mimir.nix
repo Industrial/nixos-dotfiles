@@ -123,7 +123,11 @@ in {
       #../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
-      #../features/virtual-machine/microvm
+
+      # TODO: My host totally messed up so I'm disabling microvm for now.
+      # inputs.microvm.nixosModules.microvm
+      # ../features/virtual-machine/microvm/host
+
       #../features/virtual-machine/ssh
       #../features/virtual-machine/virtualbox
       ../features/window-manager/alacritty
