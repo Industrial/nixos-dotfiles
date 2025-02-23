@@ -6,14 +6,12 @@
   imports = [
     inputs.microvm.nixosModules.microvm
 
-    # # Monitoring
-    # ../../../features/monitoring/prometheus
-
     # Nix
     ../../../features/nix
 
     # NixOS
     ../../../features/nixos/boot
+    ../../../features/nixos/networking
     ../../../features/nixos/users
 
     # Virtual Machine
@@ -21,24 +19,38 @@
     ../../../features/virtual-machine/ssh
 
     {
-      systemd.network.enable = true;
-      # networking.firewall.enable = false;ether
-      networking.hostName = settings.hostname;
+      systemd = {
+        network = {
+          enable = true;
+        };
+      };
 
-      # microvm.interfaces = [
-      #   # InternalInterface
-      #   {
-      #     type = "tap";
-      #     id = "vm-firewall-in";
-      #     mac = "21:00:00:00:00:01";
-      #   }
-      #   # ExternalInterface
-      #   {
-      #     type = "tap";
-      #     id = "vm-firewall-ex";
-      #     mac = "21:00:00:00:00:02";
-      #   }
-      # ];
+      # networking = {
+      #   hostName = settings.hostname;
+      #   networkmanager = {
+      #     enable = true;
+      #     dns = "none";
+      #   };
+      #   # networking.firewall.enable = false;ether
+      # };
+
+      microvm = {
+        interfaces = [
+          # Internal Interface
+          {
+            type = "tap";
+            id = "vm-firewall-in";
+            mac = "21:00:00:00:00:01";
+          }
+
+          # External Interface
+          {
+            type = "tap";
+            id = "vm-firewall-ex";
+            mac = "21:00:00:00:00:02";
+          }
+        ];
+      };
 
       # # Inbound Traffic
       # systemd.network.networks."21-lan".matchConfig.Type = "ether";
