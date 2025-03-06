@@ -11,6 +11,7 @@
 
     # Nix
     ../../../features/nix
+    ../../../features/nix/users/trusted-users.nix
 
     # NixOS
     ../../../features/nixos/boot

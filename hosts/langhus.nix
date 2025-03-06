@@ -80,9 +80,8 @@ in {
       #../features/network/tor
       #../features/network/tor-browser
       ../features/nix
-      # This is for Darwin only.
-      #../features/nix/nix-daemon
       ../features/nix/nixpkgs
+      ../features/nix/users/trusted-users.nix
       ../features/nixos/bluetooth
       ../features/nixos/boot
       #../features/nixos/docker
@@ -97,6 +96,7 @@ in {
       ../features/nixos/users
       ../features/nixos/window-manager
       ../features/office/obsidian
+      ../features/programming/bun
       ../features/programming/devenv
       #../features/programming/docker-compose
       ../features/programming/git
