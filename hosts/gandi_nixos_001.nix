@@ -40,6 +40,7 @@ in {
       ../features/cli/fish
       ../features/cli/fzf
       ../features/cli/g
+      ../features/cli/gpg
       ../features/cli/jq
       ../features/cli/killall
       ../features/cli/l
@@ -65,7 +66,6 @@ in {
       # ../features/media/invidious
       # ../features/media/jellyfin
       # ../features/media/lidarr
-      # ../features/media/okular
       # ../features/media/prowlarr
       # ../features/media/radarr
       # ../features/media/readarr

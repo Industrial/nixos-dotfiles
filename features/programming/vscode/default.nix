@@ -3,20 +3,8 @@
   pkgs,
   ...
 }: let
-  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.95.2";
-  continue = pkgs.vscode-utils.buildVscodeMarketplaceExtension {
-    mktplcRef = {
-      name = "continue";
-      publisher = "Continue";
-      version = "0.9.248";
-      sha256 = "sha256-sbbEM8OFjiGjtHwTfiDqjt904v0ZLcVKrGK5YBVRw2k=";
-      arch = "linux-x64";
-    };
-    nativeBuildInputs = [
-      pkgs.autoPatchelfHook
-    ];
-    buildInputs = [pkgs.stdenv.cc.cc.lib];
-  };
+  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
+  #.forVSCodeVersion "1.98.0";
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscodeExtensions = [
       # Themes
@@ -30,6 +18,7 @@
       extensions.vscode-marketplace.vspacecode.whichkey
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
       # Completion
+      # TODO: Somehow nixpkgs.config.allowUnfree isn't working at the moment.
       # extensions.vscode-marketplace.supermaven.supermaven
       extensions.vscode-marketplace.saoudrizwan.claude-dev
       # extensions.vscode-marketplace.rjmacarthy.twinny
@@ -48,9 +37,9 @@
       extensions.vscode-marketplace.yzhang.markdown-all-in-one
       extensions.vscode-marketplace.geeklearningio.graphviz-markdown-preview
       ## JavaScript / TypeScript
-      extensions.vscode-marketplace.dbaeumer.vscode-eslint
+      extensions.vscode-marketplace.firsttris.vscode-jest-runner
       extensions.vscode-marketplace.biomejs.biome
-      # extensions.vscode-marketplace.denoland.vscode-deno
+      extensions.vscode-marketplace.dbaeumer.vscode-eslint
       extensions.vscode-marketplace.oven.bun-vscode
       extensions.vscode-marketplace.vitest.explorer
       ## Python
@@ -69,21 +58,19 @@
       extensions.vscode-marketplace.bbenoist.nix
       #extensions.vscode-marketplace.jnoortheen.nix-ide
       extensions.vscode-marketplace.kamadorueda.alejandra
-      ## YAML
-      extensions.vscode-marketplace.redhat.vscode-yaml
+      # ## YAML
+      # extensions.vscode-marketplace.redhat.vscode-yaml
       # ## Docker
       # extensions.vscode-marketplace.ms-azuretools.vscode-docker
       ## Dotenv
       extensions.vscode-marketplace.mikestead.dotenv
       ## Git
       extensions.vscode-marketplace.donjayamanne.githistory
-      extensions.vscode-marketplace.eamodio.gitlens
-      extensions.vscode-marketplace.mhutchie.git-graph
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
       # ## PlantUML
       # extensions.vscode-marketplace.jebbs.plantuml
-      ## AutoHotkey
-      extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
+      # ## AutoHotkey
+      # extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
       # ## EdgeDB
       # extensions.vscode-marketplace.magicstack.edgedb
       # ## Haskell

@@ -22,7 +22,7 @@ in {
     };
     modules = [
       # ../features/ai/n8n
-      ../features/ai/ollama
+      #../features/ai/ollama
       inputs.comin.nixosModules.comin
       ../features/ci/comin
       ../features/cli/bat
@@ -40,6 +40,7 @@ in {
       ../features/cli/fish
       ../features/cli/fzf
       ../features/cli/g
+      ../features/cli/gpg
       ../features/cli/jq
       ../features/cli/killall
       ../features/cli/l
@@ -59,13 +60,12 @@ in {
       ../features/communication/weechat
       ../features/crypto/monero
       ../features/games/lutris
-      #../features/games/path-of-building
+      ../features/games/path-of-building
       #../features/games/steam
       ../features/games/wowup
       ../features/media/invidious
       ../features/media/jellyfin
       ../features/media/lidarr
-      ../features/media/okular
       ../features/media/prowlarr
       ../features/media/radarr
       ../features/media/readarr

@@ -1,27 +1,15 @@
 {
-  "[haskell]": {
-    "editor.defaultFormatter": "haskell.haskell"
-  },
-  "[javascript]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[javascriptreact]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
+  "[haskell]": { "editor.defaultFormatter": "haskell.haskell" },
+  "[javascript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[javascriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
   "[json]": {
     "editor.defaultFormatter": "biomejs.biome",
     "editor.insertSpaces": true,
     "editor.tabSize": 2
   },
-  "[jsonc]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[nix]": {
-    "editor.defaultFormatter": "kamadorueda.alejandra"
-  },
-  "[purescript]": {
-    "editor.defaultFormatter": "nwolverson.ide-purescript"
-  },
+  "[jsonc]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[nix]": { "editor.defaultFormatter": "kamadorueda.alejandra" },
+  "[purescript]": { "editor.defaultFormatter": "nwolverson.ide-purescript" },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.detectIndentation": false,
@@ -36,12 +24,8 @@
     "editor.insertSpaces": true,
     "editor.tabSize": 2
   },
-  "[typescript]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
-  "[typescriptreact]": {
-    "editor.defaultFormatter": "biomejs.biome"
-  },
+  "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
   "alejandra.program": "alejandra",
   "biome.enabled": true,
   "chat.editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
@@ -94,13 +78,10 @@
   "editor.quickSuggestionsDelay": 10,
   "editor.snippetSuggestions": "bottom",
   "editor.suggest.filterGraceful": true,
-  "editor.suggestFontSize": 12,
   "editor.suggest.insertMode": "insert",
   "editor.suggest.localityBonus": false,
   "editor.suggest.matchOnWordStartOnly": true,
-  "editor.suggestOnTriggerCharacters": true,
   "editor.suggest.preview": true,
-  "editor.suggestSelection": "first",
   "editor.suggest.shareSuggestSelections": true,
   "editor.suggest.showClasses": true,
   "editor.suggest.showColors": true,
@@ -135,6 +116,9 @@
   "editor.suggest.showVariables": true,
   "editor.suggest.showWords": true,
   "editor.suggest.snippetsPreventQuickSuggestions": true,
+  "editor.suggestFontSize": 12,
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.suggestSelection": "first",
   "editor.tabSize": 2,
   "editor.wordBasedSuggestions": "matchingDocuments",
   "editor.wordWrap": "off",
@@ -179,6 +163,12 @@
   "haskell.manageHLS": "PATH",
   "http.proxyStrictSSL": false,
   "javascript.updateImportsOnFileMove.enabled": "always",
+  "jestrunner.debugOptions": {
+    "runtimeExecutable": "bun",
+    "runtimeArgs": ["test", "--inspect-wait=localhost:6499/"]
+  },
+  "jestrunner.jestCommand": "bun test",
+  "jestrunner.jestPath": "${file}",
   "jupyter.askForKernelRestart": false,
   "jupyter.notebookFileRoot": "${workspaceRoot}",
   "markdown.preview.fontSize": 12,
@@ -239,6 +229,7 @@
   "scm.inputFontFamily": "'IosevkaTerm Nerd Font Mono'",
   "scm.inputFontSize": 12,
   "security.workspace.trust.untrustedFiles": "open",
+  "supermaven.enableFixWithSupermaven": true,
   "supermaven.otherWarning": false,
   "terminal.integrated.copyOnSelection": true,
   "terminal.integrated.enableMultiLinePasteWarning": "never",
@@ -261,8 +252,8 @@
   "typescript.inlayHints.parameterTypes.enabled": true,
   "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
   "typescript.inlayHints.variableTypes.enabled": true,
-  "typescript.preferences.preferTypeOnlyAutoImports": true,
   "typescript.preferGoToSourceDefinition": true,
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
   "typescript.suggest.completeFunctionCalls": true,
   "typescript.tsserver.web.typeAcquisition.enabled": true,
   "typescript.updateImportsOnFileMove.enabled": "always",
