@@ -62,7 +62,7 @@ in {
       ../features/games/lutris
       ../features/games/path-of-building
       #../features/games/steam
-      ../features/games/wowup
+      #../features/games/wowup
       ../features/media/invidious
       ../features/media/jellyfin
       ../features/media/lidarr
