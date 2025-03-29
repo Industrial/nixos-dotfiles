@@ -68,6 +68,9 @@
       // (import ../../hosts/huginn.nix {inherit inputs;})
       // (import ../../hosts/langhus.nix {inherit inputs;})
       // (import ../../hosts/mimir.nix {inherit inputs;})
-      // (import ../../hosts/vm_test.nix {inherit inputs;});
+      // (import ../../hosts/vm_test.nix {inherit inputs;})
+      // (import ../../hosts/vm_web.nix {inherit inputs;})
+      // (import ../../hosts/vm_database.nix {inherit inputs;})
+      // (import ../../hosts/vm_management.nix {inherit inputs;});
   };
 }

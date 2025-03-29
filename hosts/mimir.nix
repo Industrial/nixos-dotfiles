@@ -125,6 +125,7 @@ in {
       #../features/virtual-machine/kubernetes/node
       inputs.microvm.nixosModules.host
       ../features/virtual-machine/microvm/host
+      ../features/virtual-machine/microvm/web/host-network.nix
       #../features/virtual-machine/ssh
       #../features/virtual-machine/virtualbox
 

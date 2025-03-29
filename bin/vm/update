@@ -11,7 +11,7 @@ source lib/user.bash
 # echo "> cd ./systems/${C9_SYSTEM}"
 # cd "./systems/${C9_SYSTEM}"
 
-SYSTEM_PATH="systems/${C9_HOST}"
+SYSTEM_PATH="systems/${C9_SYSTEM}"
 REPO_PATH="/home/tom/.dotfiles"
 GIT_PATH="git+file://${REPO_PATH}?dir=${SYSTEM_PATH}"
 
