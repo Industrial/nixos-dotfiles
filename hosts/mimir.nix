@@ -124,14 +124,7 @@ in {
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
       inputs.microvm.nixosModules.host
-      {
-        microvm = {
-          autostart = [
-            "vm_test"
-          ];
-        };
-      }
-      # ../features/virtual-machine/microvm/host
+      ../features/virtual-machine/microvm/host
       #../features/virtual-machine/ssh
       #../features/virtual-machine/virtualbox
 

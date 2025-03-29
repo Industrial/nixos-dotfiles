@@ -22,14 +22,7 @@ in {
     };
     modules = [
       inputs.microvm.nixosModules.microvm
-      {
-        networking = {
-          hostName = name;
-        };
-        microvm = {
-          hypervisor = "qemu";
-        };
-      }
+      ../features/virtual-machine/microvm/base
     ];
   };
 }

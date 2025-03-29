@@ -8,21 +8,21 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
+# echo "> cd ./systems/${C9_SYSTEM}"
+# cd "./systems/${C9_SYSTEM}"
+
+SYSTEM_PATH="systems/${C9_HOST}"
+REPO_PATH="/home/tom/.dotfiles"
+GIT_PATH="git+file://${REPO_PATH}?dir=${SYSTEM_PATH}"
 
 # Create or update the MicroVM.
 if [ ! -d "/var/lib/microvms/${C9_HOST}" ]; then
-    SYSTEM_PATH="systems/${C9_HOST}"
-    REPO_PATH="/home/tom/.dotfiles"
-    GIT_PATH="git+file://${REPO_PATH}?dir=${SYSTEM_PATH}"
-
     echo "> sudo microvm -f \"${GIT_PATH}\" -c \"${C9_HOST}\""
     sudo microvm -f "${GIT_PATH}" -c "${C9_HOST}"
 else
-    echo "> sudo microvm -f \"git+file://${PWD}\" -u \"${C9_HOST}\""
-    sudo microvm -f "git+file://${PWD}" -u "${C9_HOST}"
+    echo "> sudo microvm -f \"${GIT_PATH}\" -u \"${C9_HOST}\""
+    sudo microvm -f "${GIT_PATH}" -u "${C9_HOST}"
 fi
 
-echo "> cd ../.."
-cd "../.."
+# echo "> cd ../.."
+# cd "../.."

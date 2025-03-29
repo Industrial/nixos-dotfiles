@@ -8,11 +8,11 @@ source lib/host.bash
 source lib/system.bash
 source lib/user.bash
 
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
+# echo "> cd ./systems/${C9_SYSTEM}"
+# cd "./systems/${C9_SYSTEM}"
 
 echo "> sudo systemctl start microvm@${C9_HOST}.service"
 sudo systemctl start "microvm@${C9_HOST}.service"
 
-echo "> cd ../.."
-cd "../.."
+# echo "> cd ../.."
+# cd "../.."
