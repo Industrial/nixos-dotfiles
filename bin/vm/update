@@ -13,8 +13,12 @@ cd "./systems/${C9_SYSTEM}"
 
 # Create or update the MicroVM.
 if [ ! -d "/var/lib/microvms/${C9_HOST}" ]; then
-    echo "> sudo microvm -f \"git+file://${PWD}\" -c \"${C9_HOST}\""
-    sudo microvm -f "git+file://${PWD}" -c "${C9_HOST}"
+    SYSTEM_PATH="systems/${C9_HOST}"
+    REPO_PATH="/home/tom/.dotfiles"
+    GIT_PATH="git+file://${REPO_PATH}?dir=${SYSTEM_PATH}"
+
+    echo "> sudo microvm -f \"${GIT_PATH}\" -c \"${C9_HOST}\""
+    sudo microvm -f "${GIT_PATH}" -c "${C9_HOST}"
 else
     echo "> sudo microvm -f \"git+file://${PWD}\" -u \"${C9_HOST}\""
     sudo microvm -f "git+file://${PWD}" -u "${C9_HOST}"

@@ -67,6 +67,7 @@
       // (import ../../hosts/gandi_nixos_001.nix {inherit inputs;})
       // (import ../../hosts/huginn.nix {inherit inputs;})
       // (import ../../hosts/langhus.nix {inherit inputs;})
-      // (import ../../hosts/mimir.nix {inherit inputs;});
+      // (import ../../hosts/mimir.nix {inherit inputs;})
+      // (import ../../hosts/vm_test.nix {inherit inputs;});
   };
 }

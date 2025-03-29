@@ -118,17 +118,23 @@ in {
       ../features/security/tailscale
       ../features/security/veracrypt
       #../features/security/yubikey-manager
+
       #../features/virtual-machine/base
       #../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
-
-      # TODO: My host totally messed up so I'm disabling microvm for now.
-      # inputs.microvm.nixosModules.microvm
+      inputs.microvm.nixosModules.host
+      {
+        microvm = {
+          autostart = [
+            "vm_test"
+          ];
+        };
+      }
       # ../features/virtual-machine/microvm/host
-
       #../features/virtual-machine/ssh
       #../features/virtual-machine/virtualbox
+
       ../features/window-manager/alacritty
       # TODO: There was an erro building dwm so I'm disabling it for now.
       #../features/window-manager/dwm
