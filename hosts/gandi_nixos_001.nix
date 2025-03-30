@@ -105,16 +105,17 @@ in {
       # ../features/nixos/window-manager
       # ../features/office/obsidian
       # ../features/programming/bun
-      ../features/programming/devenv
       # ../features/programming/docker-compose
-      ../features/programming/git
       # ../features/programming/gitkraken
       # ../features/programming/glogg
       # ../features/programming/insomnia
       # ../features/programming/meld
+      # ../features/programming/neovim
       # ../features/programming/node
       # ../features/programming/python
       # ../features/programming/vscode
+      ../features/programming/devenv
+      ../features/programming/git
       # ../features/security/keepassxc
       # ../features/security/tailscale
       # ../features/security/veracrypt

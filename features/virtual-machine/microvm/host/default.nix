@@ -1,4 +1,10 @@
-{...}: {
+{pkgs, ...}: {
+  environment = {
+    systemPackages = with pkgs; [
+      cloud-hypervisor
+    ];
+  };
+
   # Enable networkd for network configuration
   networking = {
     useNetworkd = true;
@@ -23,6 +29,7 @@
   microvm = {
     autostart = [
       "vm_test"
+      "vm_tor"
       "vm_web"
       # "vm_database"
       # "vm_management"

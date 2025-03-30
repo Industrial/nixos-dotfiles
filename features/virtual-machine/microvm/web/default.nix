@@ -38,17 +38,13 @@
           ];
           routes = [
             {
-              routeConfig = {
-                Destination = "10.0.0.0/32";
-                GatewayOnLink = true;
-              };
+              Destination = "10.0.0.0/32";
+              GatewayOnLink = true;
             }
             {
-              routeConfig = {
-                Destination = "0.0.0.0/0";
-                Gateway = "10.0.0.0";
-                GatewayOnLink = true;
-              };
+              Destination = "0.0.0.0/0";
+              Gateway = "10.0.0.0";
+              GatewayOnLink = true;
             }
           ];
           networkConfig = {
@@ -78,39 +74,6 @@
         mkdir -p /var/www/html
         echo "<html><body><h1>vm_web Web Server</h1><p>This is the web server VM in our routed network setup.</p></body></html>" > /var/www/html/index.html
       '';
-    };
-  };
-
-  services = {
-    openssh = {
-      enable = true;
-      # Allow password-less login (for testing only)
-      settings = {
-        PermitRootLogin = "yes";
-        PasswordAuthentication = true;
-      };
-      extraConfig = ''
-        # Allow empty passwords (for testing only)
-        PermitEmptyPasswords yes
-      '';
-    };
-  };
-
-  # Create a user with an empty password for testing
-  users = {
-    users = {
-      "${settings.username}" = {
-        isNormalUser = true;
-        extraGroups = ["wheel"]; # Enable sudo
-        initialPassword = "";
-      };
-    };
-  };
-
-  # Allow sudo without password
-  security = {
-    sudo = {
-      wheelNeedsPassword = false;
     };
   };
 }

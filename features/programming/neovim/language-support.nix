@@ -74,7 +74,12 @@
         # TreeSitter
         treesitter = {
           enable = true;
-          indent = true;
+          autoLoad = true;
+          settings = {
+            indent = {
+              enable = true;
+            };
+          };
         };
         treesitter-context = {
           enable = true;

@@ -96,14 +96,15 @@ in {
       ../features/nixos/users
       ../features/nixos/window-manager
       ../features/office/obsidian
+      #../features/programming/docker-compose
       ../features/programming/bun
       ../features/programming/devenv
-      #../features/programming/docker-compose
       ../features/programming/git
       ../features/programming/gitkraken
       ../features/programming/glogg
       ../features/programming/insomnia
       ../features/programming/meld
+      ../features/programming/neovim
       ../features/programming/python
       ../features/programming/vscode
       ../features/security/keepassxc

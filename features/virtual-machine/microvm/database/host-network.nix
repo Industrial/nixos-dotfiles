@@ -14,14 +14,10 @@
           # Routes to the VM
           routes = [
             {
-              routeConfig = {
-                Destination = "10.0.2.1/32";
-              };
+              Destination = "10.0.2.1/32";
             }
             {
-              routeConfig = {
-                Destination = "fd02::1/128";
-              };
+              Destination = "fd02::1/128";
             }
           ];
           # Enable routing

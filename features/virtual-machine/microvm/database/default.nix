@@ -33,39 +33,29 @@
     ];
     routes = [
       {
-        routeConfig = {
-          # Route to the host
-          Destination = "10.0.2.0/32";
-          GatewayOnLink = true;
-        };
+        # Route to the host
+        Destination = "10.0.2.0/32";
+        GatewayOnLink = true;
       }
       {
-        routeConfig = {
-          # Route to VM1 (Web Server)
-          Destination = "10.0.1.1/32";
-          Gateway = "10.0.2.0";
-        };
+        # Route to VM1 (Web Server)
+        Destination = "10.0.1.1/32";
+        Gateway = "10.0.2.0";
       }
       {
-        routeConfig = {
-          # IPv6 route to VM1
-          Destination = "fd01::1/128";
-          Gateway = "fd02::";
-        };
+        # IPv6 route to VM1
+        Destination = "fd01::1/128";
+        Gateway = "fd02::";
       }
       {
-        routeConfig = {
-          # Route to VM3 (Management)
-          Destination = "10.0.3.1/32";
-          Gateway = "10.0.2.0";
-        };
+        # Route to VM3 (Management)
+        Destination = "10.0.3.1/32";
+        Gateway = "10.0.2.0";
       }
       {
-        routeConfig = {
-          # IPv6 route to VM3
-          Destination = "fd03::1/128";
-          Gateway = "fd02::";
-        };
+        # IPv6 route to VM3
+        Destination = "fd03::1/128";
+        Gateway = "fd02::";
       }
     ];
     networkConfig = {

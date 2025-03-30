@@ -33,55 +33,41 @@
     ];
     routes = [
       {
-        routeConfig = {
-          # Route to the host
-          Destination = "10.0.3.0/32";
-          GatewayOnLink = true;
-        };
+        # Route to the host
+        Destination = "10.0.3.0/32";
+        GatewayOnLink = true;
       }
       {
-        routeConfig = {
-          # Default route for limited internet access
-          Destination = "0.0.0.0/0";
-          Gateway = "10.0.3.0";
-          GatewayOnLink = true;
-        };
+        # Default route for limited internet access
+        Destination = "0.0.0.0/0";
+        Gateway = "10.0.3.0";
+        GatewayOnLink = true;
       }
       {
-        routeConfig = {
-          # IPv6 default route
-          Destination = "::/0";
-          Gateway = "fd03::";
-          GatewayOnLink = true;
-        };
+        # IPv6 default route
+        Destination = "::/0";
+        Gateway = "fd03::";
+        GatewayOnLink = true;
       }
       {
-        routeConfig = {
-          # Route to VM1 (Web Server)
-          Destination = "10.0.1.1/32";
-          Gateway = "10.0.3.0";
-        };
+        # Route to VM1 (Web Server)
+        Destination = "10.0.1.1/32";
+        Gateway = "10.0.3.0";
       }
       {
-        routeConfig = {
-          # IPv6 route to VM1
-          Destination = "fd01::1/128";
-          Gateway = "fd03::";
-        };
+        # IPv6 route to VM1
+        Destination = "fd01::1/128";
+        Gateway = "fd03::";
       }
       {
-        routeConfig = {
-          # Route to VM2 (Database)
-          Destination = "10.0.2.1/32";
-          Gateway = "10.0.3.0";
-        };
+        # Route to VM2 (Database)
+        Destination = "10.0.2.1/32";
+        Gateway = "10.0.3.0";
       }
       {
-        routeConfig = {
-          # IPv6 route to VM2
-          Destination = "fd02::1/128";
-          Gateway = "fd03::";
-        };
+        # IPv6 route to VM2
+        Destination = "fd02::1/128";
+        Gateway = "fd03::";
       }
     ];
     networkConfig = {

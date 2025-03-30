@@ -3,10 +3,10 @@
   systemd = {
     network = {
       networks = {
-        # VM Web Server (10.0.0.1/32)
-        "30-vm_web" = {
+        # VM Tor (10.0.0.2/32)
+        "30-vm_tor" = {
           matchConfig = {
-            Name = "vm_web";
+            Name = "vm_tor";
           };
 
           # Host's addresses on this interface
@@ -17,7 +17,7 @@
           # Routes to the VM
           routes = [
             {
-              Destination = "10.0.0.1/32";
+              Destination = "10.0.0.2/32";
             }
           ];
 
@@ -36,17 +36,22 @@
       # Grant internet access
       internalIPs = ["10.0.0.0/24"];
 
-      # Port forwarding for the web server (vm_web)
+      # Port forwarding for the tor server (vm_tor)
       forwardPorts = [
         {
-          destination = "10.0.0.1:80";
+          destination = "10.0.0.2:9050";
           proto = "tcp";
-          sourcePort = 5080; # Host port
+          sourcePort = 9050; # Host port
         }
         {
-          destination = "10.0.0.1:443";
+          destination = "10.0.0.2:9051";
           proto = "tcp";
-          sourcePort = 5443; # Host port
+          sourcePort = 9051; # Host port
+        }
+        {
+          destination = "10.0.0.2:53";
+          proto = "udp";
+          sourcePort = 53; # Host port
         }
       ];
     };
@@ -54,13 +59,8 @@
     # Firewall rules to control VM-to-VM communication
     firewall = {
       # Open ports on the host for the forwarded services
-      allowedTCPPorts = [5022 5080 5443];
-      # # Allow vm_web (Web Server) to access vm_database (Database Server)
-      # extraCommands = ''
-      #   # vm_web to vm_database access (database connections)
-      #   iptables -A FORWARD -s 10.0.1.1/32 -d 10.0.2.1/32 -p tcp --dport 5432 -j ACCEPT
-      #   #ip6tables -A FORWARD -s fd01::1/128 -d fd02::1/128 -p tcp --dport 5432 -j ACCEPT
-      # '';
+      allowedTCPPorts = [9050 9051];
+      allowedUDPPorts = [53];
     };
   };
 }

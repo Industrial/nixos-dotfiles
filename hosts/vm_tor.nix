@@ -1,5 +1,5 @@
 {inputs, ...}: let
-  name = "vm_web";
+  name = "vm_tor";
   system = "x86_64-linux";
   username = "tom";
   version = "24.11";
@@ -24,7 +24,7 @@ in {
       inputs.microvm.nixosModules.microvm
       ../features/virtual-machine/microvm/base
       ../features/virtual-machine/microvm/ssh
-      ../features/virtual-machine/microvm/web
+      ../features/virtual-machine/microvm/tor
     ];
   };
 }
