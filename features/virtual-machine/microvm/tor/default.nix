@@ -83,30 +83,30 @@
     };
   };
 
-  # # Use Tor for DNS.
-  # services = {
-  #   tor = {
-  #     settings = {
-  #       DNSPort = [
-  #         {
-  #           addr = "127.0.0.1";
-  #           port = 53;
-  #         }
-  #       ];
-  #     };
-  #   };
-  #   resolved = {
-  #     # For caching DNS requests.
-  #     enable = true;
-  #     # Overwrite compiled-in fallback DNS servers.
-  #     fallbackDns = [""];
-  #   };
-  # };
-  # networking = {
-  #   nameservers = ["127.0.0.1"];
-  #   firewall = {
-  #     # DNS port - adjust if needed
-  #     allowedUDPPorts = [53];
-  #   };
-  # };
+  # Use Tor for DNS.
+  services = {
+    tor = {
+      settings = {
+        DNSPort = [
+          {
+            addr = "127.0.0.1";
+            port = 53;
+          }
+        ];
+      };
+    };
+    resolved = {
+      # For caching DNS requests.
+      enable = true;
+      # Overwrite compiled-in fallback DNS servers.
+      fallbackDns = [""];
+    };
+  };
+  networking = {
+    nameservers = ["127.0.0.1"];
+    firewall = {
+      # DNS port - adjust if needed
+      allowedUDPPorts = [53];
+    };
+  };
 }
