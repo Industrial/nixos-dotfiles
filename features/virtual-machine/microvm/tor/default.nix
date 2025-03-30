@@ -27,8 +27,6 @@
         # TODO: Disable this one!
         9051
       ];
-      # DNS port - adjust if needed
-      allowedUDPPorts = [53];
     };
   };
 
@@ -68,52 +66,47 @@
   services = {
     tor = {
       enable = true;
-      # settings = {
-      #   SOCKSPort = 9050;
-      #   ControlPort = 9051;
-      # };
-      # Disable GeoIP to prevent the Tor client from estimating the locations of
-      # Tor nodes it connects to
       enableGeoIP = false;
       client = {
         enable = true;
         dns = {
           enable = true;
         };
-        # socksListenAddress = {
-        #   IsolateDestAddr = true;
-        #   addr = "127.0.0.1";
-        #   port = 9050;
-        # };
+        socksListenAddress = {
+          addr = "0.0.0.0";
+          port = 9050;
+        };
       };
       torsocks = {
         enable = true;
-        # server = "127.0.0.1:9050";
-        # fasterServer = "127.0.0.1:9063";
       };
     };
   };
 
-  # Use Tor for DNS.
-  services = {
-    tor = {
-      settings = {
-        DNSPort = [
-          {
-            addr = "127.0.0.1";
-            port = 53;
-          }
-        ];
-      };
-    };
-    resolved = {
-      # For caching DNS requests.
-      enable = true;
-      # Overwrite compiled-in fallback DNS servers.
-      fallbackDns = [""];
-    };
-  };
-  networking = {
-    nameservers = ["127.0.0.1"];
-  };
+  # # Use Tor for DNS.
+  # services = {
+  #   tor = {
+  #     settings = {
+  #       DNSPort = [
+  #         {
+  #           addr = "127.0.0.1";
+  #           port = 53;
+  #         }
+  #       ];
+  #     };
+  #   };
+  #   resolved = {
+  #     # For caching DNS requests.
+  #     enable = true;
+  #     # Overwrite compiled-in fallback DNS servers.
+  #     fallbackDns = [""];
+  #   };
+  # };
+  # networking = {
+  #   nameservers = ["127.0.0.1"];
+  #   firewall = {
+  #     # DNS port - adjust if needed
+  #     allowedUDPPorts = [53];
+  #   };
+  # };
 }
