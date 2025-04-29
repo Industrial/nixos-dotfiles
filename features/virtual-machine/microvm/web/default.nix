@@ -1,7 +1,4 @@
-{
-  settings,
-  ...
-}: {
+{settings, ...}: {
   # vm_web - Web Server Configuration
   microvm = {
     interfaces = [

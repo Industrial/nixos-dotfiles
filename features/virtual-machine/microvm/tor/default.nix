@@ -1,7 +1,4 @@
-{
-  settings,
-  ...
-}: {
+{settings, ...}: {
   # vm_tor - Tor Configuration
   microvm = {
     interfaces = [

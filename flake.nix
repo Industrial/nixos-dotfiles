@@ -190,11 +190,18 @@
           forbid-new-submodules.enable = true;
           trim-trailing-whitespace.enable = true;
 
-          # Nix fmt and Flake Check
-          format-and-check = {
+          nix-fmt = {
             enable = true;
-            name = "Fmt and Check";
-            entry = "nix fmt && nix flake check";
+            name = "Nix fmt";
+            entry = "nix fmt";
+            pass_filenames = false;
+            stages = ["pre-commit"];
+          };
+
+          nix-flake-check = {
+            enable = true;
+            name = "Nix flake check";
+            entry = "nix flake check";
             pass_filenames = false;
             stages = ["pre-commit"];
           };
@@ -205,16 +212,16 @@
       forAllSystems ({system, ...}:
         treefmtEval.${system}.config.build.wrapper);
 
+    checks = forAllSystems ({system, ...}: {
+      formatting = treefmtEval.${system}.config.build.check self;
+    });
+
     githubActions = let
       supportedSystems = ["x86_64-linux"];
     in
       inputs.nix-github-actions.lib.mkGithubMatrix {
         checks = inputs.nixpkgs.lib.getAttrs supportedSystems self.checks;
       };
-
-    checks = forAllSystems ({system, ...}: {
-      formatting = treefmtEval.${system}.config.build.check self;
-    });
 
     devShells = forAllSystems ({
       pkgs,

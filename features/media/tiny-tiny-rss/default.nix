@@ -1,7 +1,4 @@
-{
-  settings,
-  ...
-}: {
+{settings, ...}: {
   services = {
     tt-rss = {
       enable = true;
