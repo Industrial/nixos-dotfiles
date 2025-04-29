@@ -30,6 +30,15 @@
       };
     };
 
+    cursor = {
+      url = "github:omarcresp/cursor-flake/main";
+      inputs = {
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
+      };
+    };
+
     # Nix VS Code Extensions.
     nix-vscode-extensions = {
       url = "github:nix-community/nix-vscode-extensions";
@@ -81,6 +90,7 @@
       // (import ../../hosts/vm_database.nix {inherit inputs;})
       // (import ../../hosts/vm_management.nix {inherit inputs;})
       // (import ../../hosts/vm_test.nix {inherit inputs;})
+      // (import ../../hosts/vm_target.nix {inherit inputs;})
       // (import ../../hosts/vm_tor.nix {inherit inputs;})
       // (import ../../hosts/vm_web.nix {inherit inputs;});
   };
