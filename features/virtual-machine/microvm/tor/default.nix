@@ -9,7 +9,6 @@
       {
         type = "tap";
         id = "vm_tor";
-        # New MAC address
         mac = "02:00:00:01:00:02";
       }
     ];
