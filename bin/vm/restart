@@ -5,16 +5,9 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
-
-# echo "> cd ./systems/${C9_SYSTEM}"
-# cd "./systems/${C9_SYSTEM}"
 
 # Catch the error if the service is not running
 bin/vm/stop "${C9_HOST}" || true
 bin/vm/update "${C9_HOST}"
 bin/vm/start "${C9_HOST}"
-
-# echo "> cd ../.."
-# cd "../.."

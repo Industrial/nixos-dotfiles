@@ -5,16 +5,9 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
 
 bin/update/channels
 
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
-
 echo "> nix flake update"
 nix --experimental-features "nix-command flakes" flake update
-
-echo "> cd ../.."
-cd "../.."

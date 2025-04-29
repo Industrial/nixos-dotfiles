@@ -3,7 +3,6 @@ echo "> update > host > drakkar"
 exec > >(tee ./logs/update-hos-drakkar) 2>&1
 set -e
 
-export C9_SYSTEM="nixos"
 export C9_HOST="drakkar"
 export C9_USER="tom"
 

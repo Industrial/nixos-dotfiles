@@ -5,14 +5,7 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
-
-# echo "> cd ./systems/${C9_SYSTEM}"
-# cd "./systems/${C9_SYSTEM}"
 
 echo "> sudo rm -rf \"/var/lib/microvms/${C9_HOST}\""
 sudo rm -rf "/var/lib/microvms/${C9_HOST}"
-
-# echo "> cd ../.."
-# cd "../.."

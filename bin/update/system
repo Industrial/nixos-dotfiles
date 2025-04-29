@@ -1,42 +1,19 @@
 #!/usr/bin/env bash
-echo "> update > darwin"
-exec > >(tee ./logs/update-darwin) 2>&1
+echo "> update > system"
+exec > >(tee ./logs/update-sytem) 2>&1
 set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
 
 features/programming/vscode/bin/clear-cache
 
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
-
-if [ "${C9_SYSTEM}" == "darwin" ]; then
-    # TODO: Document this.
-    if [ -f "/etc/shells" ]; then
-        echo "> sudo mv /etc/shells /etc/shells.before-nix-darwin"
-        sudo mv /etc/shells /etc/shells.before-nix-darwin
-    fi
-    echo "> nix run nix-darwin -- switch --flake \".#${C9_HOST}\" --show-trace"
-    nix run nix-darwin -- switch --flake ".#${C9_HOST}" --show-trace
-else
-    echo "> sudo nixos-rebuild switch --flake \".#${C9_HOST}\" --show-trace"
-    sudo nixos-rebuild switch --flake ".#${C9_HOST}" --show-trace --option eval-cache false
-fi
-
-echo "> cd ../.."
-cd "../.."
+echo "> sudo nixos-rebuild switch --flake \".#${C9_HOST}\" --show-trace"
+sudo nixos-rebuild switch --flake ".#${C9_HOST}" --show-trace --option eval-cache false
 
 bin/update/login-shell "${C9_USER}"
 
-if [ "${C9_SYSTEM}" == "nixos" ]; then
-    features/programming/vscode/bin/link-files-nixos
-    features/window-manager/dwm/bin/link-files-nixos
-    features/window-manager/river/bin/link-files-nixos
-fi
-
-if [ "${C9_SYSTEM}" == "darwin" ]; then
-    features/programming/vscode/bin/link-files-darwin
-fi
+features/programming/vscode/bin/link-files-nixos
+features/window-manager/dwm/bin/link-files-nixos
+features/window-manager/river/bin/link-files-nixos

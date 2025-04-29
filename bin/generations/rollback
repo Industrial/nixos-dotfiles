@@ -5,15 +5,8 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
-
-# echo "> cd ./systems/${C9_SYSTEM}"
-# cd "./systems/${C9_SYSTEM}"
 
 PREVIOUS_GENERATION=$(lowercase "${1:-"$(bin/generations/list | tail -n 2 | head -n 1)"}")
 echo "> switch-to-generation > ${PREVIOUS_GENERATION}"
 sudo "/nix/var/nix/profiles/${PREVIOUS_GENERATION}/bin/switch-to-configuration" switch
-
-# echo "> cd ../.."
-# cd "../.."

@@ -5,15 +5,10 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
 
-# echo "> cd ./systems/${C9_SYSTEM}"
-# cd "./systems/${C9_SYSTEM}"
-
-SYSTEM_PATH="systems/${C9_SYSTEM}"
 REPO_PATH="/home/tom/.dotfiles"
-GIT_PATH="git+file://${REPO_PATH}?dir=${SYSTEM_PATH}"
+GIT_PATH="git+file://${REPO_PATH}?dir=."
 
 # Create or update the MicroVM.
 if [ ! -d "/var/lib/microvms/${C9_HOST}" ]; then
@@ -23,6 +18,3 @@ else
     echo "> sudo microvm -f \"${GIT_PATH}\" -u \"${C9_HOST}\""
     sudo microvm -f "${GIT_PATH}" -u "${C9_HOST}"
 fi
-
-# echo "> cd ../.."
-# cd "../.."

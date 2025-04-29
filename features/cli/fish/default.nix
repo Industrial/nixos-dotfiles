@@ -4,12 +4,6 @@
   ...
 }: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {inherit settings pkgs;};
-  homebrewShellEnv =
-    if pkgs.stdenv.isDarwin
-    then ''
-      eval "$(/opt/homebrew/bin/brew shellenv)"
-    ''
-    else "";
 in {
   programs = {
     fish = {
@@ -60,9 +54,6 @@ in {
 
           # Starship Shell
           starship init fish | source
-
-          # Homebrew
-          ${homebrewShellEnv}
         '';
       };
     };

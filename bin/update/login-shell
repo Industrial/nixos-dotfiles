@@ -5,14 +5,7 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
-
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
 
 echo "> chsh -s /run/current-system/sw/bin/fish"
 sudo chsh -s /run/current-system/sw/bin/fish "${C9_USER}"
-
-echo "> cd ../.."
-cd "../.."

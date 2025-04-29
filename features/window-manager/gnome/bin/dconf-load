@@ -5,7 +5,6 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
 
 echo "> cat features/window-manager/gnome/dconf/dump.conf | dconf load /"

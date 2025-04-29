@@ -5,14 +5,7 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
-
-echo "> cd ./systems/${C9_SYSTEM}"
-cd "./systems/${C9_SYSTEM}"
 
 echo "> nix-env -p /nix/var/nix/profiles/system --delete-generations +2"
 sudo nix-env -p /nix/var/nix/profiles/system --delete-generations +2
-
-echo "> cd ../.."
-cd "../.."

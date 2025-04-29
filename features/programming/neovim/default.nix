@@ -6,21 +6,11 @@
 }: let
   # nixvimLib = inputs.nixvim.lib.${system};
   # nixvim' = inputs.nixvim.legacyPackages."${settings.system}";
-  neovimModule =
-    if pkgs.stdenv.isDarwin
-    then inputs.nixvim.nixDarwinModules.nixvim
-    else inputs.nixvim.nixosModules.nixvim;
-  # nixvimModule = {
-  #   inherit pkgs;
-  #   module = neovimModule;
-  #   # extraSpecialArgs = {};
-  # };
   # nvim = nixvim'.makeNixvim {};
   # nvim = nixvim'.makeNixvimWithModule nixvimModule;
 in {
   imports = [
     inputs.nixvim.nixosModules.nixvim
-    # neovimModule
 
     ./backup-files.nix
     ./buffer-search.nix

@@ -5,7 +5,6 @@ set -e
 
 source lib/lowercase.bash
 source lib/host.bash
-source lib/system.bash
 source lib/user.bash
 
 # I didn't get this to work on all files with `nix flake check` so I'm using
