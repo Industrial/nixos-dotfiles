@@ -104,6 +104,7 @@ in {
       ../features/nixos/window-manager
       ../features/office/obsidian
       ../features/programming/bun
+      ../features/programming/cursor
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
@@ -126,6 +127,7 @@ in {
       #../features/virtual-machine/kubernetes/node
       inputs.microvm.nixosModules.host
       ../features/virtual-machine/microvm/host
+      ../features/virtual-machine/microvm/target/host-network.nix
       ../features/virtual-machine/microvm/tor/host-network.nix
       ../features/virtual-machine/microvm/web/host-network.nix
       #../features/virtual-machine/ssh

@@ -98,6 +98,7 @@ in {
       ../features/office/obsidian
       #../features/programming/docker-compose
       ../features/programming/bun
+      ../features/programming/cursor
       ../features/programming/devenv
       ../features/programming/git
       ../features/programming/gitkraken

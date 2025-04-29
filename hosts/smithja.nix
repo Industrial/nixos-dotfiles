@@ -106,6 +106,7 @@ in {
       # ../features/programming/docker-compose
       # ../features/programming/insomnia
       ../features/programming/bun
+      ../features/programming/cursor
       ../features/programming/devenv
       ../features/programming/git
       ../features/programming/gitkraken

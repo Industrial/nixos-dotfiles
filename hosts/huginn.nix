@@ -102,6 +102,7 @@ in {
       ../features/nixos/window-manager
       ../features/office/obsidian
       ../features/programming/bun
+      ../features/programming/cursor
       ../features/programming/devenv
       ../features/programming/docker-compose
       ../features/programming/git
