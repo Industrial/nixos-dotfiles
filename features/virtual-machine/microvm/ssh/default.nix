@@ -1,6 +1,5 @@
 {
   settings,
-  pkgs,
   ...
 }: {
   services = {

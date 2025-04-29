@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{...}: {
   # Configure the tap interfaces for each VM with static addressing
   systemd = {
     network = {

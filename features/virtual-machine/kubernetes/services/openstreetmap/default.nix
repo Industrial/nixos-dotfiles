@@ -1,6 +1,4 @@
 {
-  pkgs ? import <nixpkgs> {},
-  settings ? {hostname = "localhost";},
   system ? builtins.currentSystem,
   kubenix ?
     import (fetchTarball {

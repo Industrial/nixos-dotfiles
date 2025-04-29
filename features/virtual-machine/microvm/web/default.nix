@@ -1,6 +1,5 @@
 {
   settings,
-  pkgs,
   ...
 }: {
   # vm_web - Web Server Configuration

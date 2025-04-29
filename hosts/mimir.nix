@@ -147,7 +147,7 @@ in {
       ../features/window-manager/xsel
       ../features/window-manager/xclip
 
-      ({pkgs, ...}: {
+      ({...}: {
         # environment = {
         #   systemPackages = with pkgs; [
         #     linuxKernel.packages.linux_libre.rtl8852au

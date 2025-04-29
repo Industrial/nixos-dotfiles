@@ -3,12 +3,7 @@
   pkgs,
   inputs,
   ...
-}: let
-  # nixvimLib = inputs.nixvim.lib.${system};
-  # nixvim' = inputs.nixvim.legacyPackages."${settings.system}";
-  # nvim = nixvim'.makeNixvim {};
-  # nvim = nixvim'.makeNixvimWithModule nixvimModule;
-in {
+}: {
   imports = [
     inputs.nixvim.nixosModules.nixvim
 

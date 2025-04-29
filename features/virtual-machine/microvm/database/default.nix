@@ -77,9 +77,9 @@
       host all all fd03::1/128 md5
     '';
     initialScript = pkgs.writeText "postgres-init.sql" ''
-      CREATE USER ${username} WITH SUPERUSER PASSWORD 'password';
-      CREATE DATABASE ${username} WITH OWNER ${username};
-      CREATE DATABASE appdb WITH OWNER ${username};
+      CREATE USER ${settings.username} WITH SUPERUSER PASSWORD 'password';
+      CREATE DATABASE ${settings.username} WITH OWNER ${settings.username};
+      CREATE DATABASE appdb WITH OWNER ${settings.username};
     '';
   };
 

@@ -1,8 +1,4 @@
-{
-  settings,
-  inputs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     inputs.microvm.nixosModules.microvm
 

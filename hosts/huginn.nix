@@ -21,7 +21,7 @@ in {
       inherit inputs settings;
     };
     modules = [
-      inputs.nixos-hardware.starlabs.starlite.i5
+      # inputs.nixos-hardware.starlabs.starlite.i5
 
       # ../features/ai/n8n
       # ../features/ai/ollama

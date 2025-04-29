@@ -1,8 +1,4 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{settings, ...}: {
   # Don't install virtualbox to systemPackages. It will make it unusable.
   # Instead use the options below.
   virtualisation = {

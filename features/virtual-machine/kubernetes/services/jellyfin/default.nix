@@ -22,7 +22,7 @@ in (kubenix.evalModules.${system} {
             chart = kubenix.lib.helm.fetch {
               repo = "https://jellyfin.github.io/jellyfin-helm";
               chart = "${serviceName}";
-              sha256 = "sha256-m2CvD4VjWvk0dPpcRnzfq0w6bdKPiTQrfO9tKgFL3Yk=";
+              sha256 = "sha256-uqdSUZ034DXIGsEyJEh7XXmy+Ru6ovrhw8SOf4ZqKBQ=";
             };
             values = {
               persistence = {

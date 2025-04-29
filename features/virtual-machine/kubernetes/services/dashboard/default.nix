@@ -23,7 +23,7 @@ in (kubenix.evalModules.${system} {
             chart = kubenix.lib.helm.fetch {
               repo = "https://kubernetes.github.io/dashboard/";
               chart = "kubernetes-dashboard";
-              sha256 = "sha256-qs4aqsTJvcPgGx70Pzvjc5SMEg6ZwhsE4dEKQ8Yp9lc=";
+              sha256 = "sha256-GFqw37DvM5xXnd8XVs4bd2y8oumWx3G9kMP2YqSw9Lg=";
             };
           };
         };

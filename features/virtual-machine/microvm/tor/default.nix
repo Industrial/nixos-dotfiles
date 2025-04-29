@@ -1,6 +1,5 @@
 {
   settings,
-  pkgs,
   ...
 }: {
   # vm_tor - Tor Configuration
