@@ -21,6 +21,9 @@ in {
       inherit inputs settings;
     };
     modules = [
+      ./mimir/filesystems.nix
+      ./mimir/graphics.nix
+      
       # ../features/ai/n8n
       #../features/ai/ollama
       inputs.comin.nixosModules.comin
@@ -146,103 +149,6 @@ in {
       #../features/window-manager/xmonad
       ../features/window-manager/xsel
       ../features/window-manager/xclip
-
-      ({...}: {
-        # environment = {
-        #   systemPackages = with pkgs; [
-        #     linuxKernel.packages.linux_libre.rtl8852au
-        #   ];
-        # };
-
-        boot = {
-          initrd = {
-            availableKernelModules = ["nvme" "xhci_pci" "ahci" "usbhid" "usb_storage" "sd_mod"];
-            kernelModules = [];
-
-            luks = {
-              devices = {
-                "luks-2e6aa037-7c61-401f-a2e6-2dc001b01959" = {
-                  device = "/dev/disk/by-uuid/2e6aa037-7c61-401f-a2e6-2dc001b01959";
-                };
-              };
-            };
-          };
-
-          # kernelPackages = with pkgs; [
-          #   linuxKernel.packages.linux_libre.rtl8852au
-          # ];
-
-          kernelModules = [
-            "kvm-amd"
-
-            # "rtl8852au"
-          ];
-        };
-
-        fileSystems = {
-          "/" = {
-            device = "/dev/disk/by-uuid/2743ae56-b79c-43c6-8f3e-e83242f1136f";
-            fsType = "ext4";
-          };
-          "/boot" = {
-            device = "/dev/disk/by-uuid/5191-DCD7";
-            fsType = "vfat";
-            options = ["fmask=0077" "dmask=0077"];
-          };
-        };
-
-        # swapDevices = [
-        #   {
-        #     device = "/dev/disk/by-uuid/1d7ad2c2-f3e6-4e20-afef-8f73d3b030dd";
-        #   }
-        # ];
-      })
-
-      # Graphics
-      {
-        hardware = {
-          amdgpu = {
-            opencl = {
-              enable = true;
-            };
-            initrd = {
-              enable = true;
-            };
-            amdvlk = {
-              enable = true;
-              support32Bit = {
-                enable = true;
-              };
-            };
-          };
-        };
-      }
-
-      # ZFS
-      {
-        boot = {
-          supportedFilesystems = [
-            "ext4"
-            "zfs"
-          ];
-          zfs = {
-            forceImportRoot = false;
-          };
-        };
-        networking = {
-          hostId = "05e3385d"; # head -c4 /dev/urandom | od -A none -t x4
-        };
-        fileSystems = {
-          "/mnt/well" = {
-            device = "well";
-            fsType = "zfs";
-          };
-          "/mnt/well/services" = {
-            device = "well/services";
-            fsType = "zfs";
-          };
-        };
-      }
     ];
   };
 }

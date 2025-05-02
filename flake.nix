@@ -113,6 +113,14 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+
+    # NixOS Anywhere
+    nixos-anywhere = {
+      url = "github:nix-community/nixos-anywhere";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
 
   outputs = inputs @ {self, ...}: let
