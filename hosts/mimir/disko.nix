@@ -1,3 +1,4 @@
+# sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- --mode destroy,format,mount ./hosts/mimir/disko.nix
 {...}: {
   disko.devices = {
     disk = {
@@ -7,13 +8,14 @@
         content = {
           type = "gpt";
           partitions = {
-            boot = {
+	    boot = {
               size = "512M";
               type = "EF00";
               content = {
                 type = "filesystem";
                 format = "vfat";
                 mountpoint = "/boot";
+                extraArgs = [ "-F" "32" ]; # Force FAT32
               };
             };
             luks = {
@@ -21,13 +23,15 @@
               content = {
                 type = "luks";
                 name = "cryptroot";
+                #allowDiscards = true;
+                keyFile = null;
                 content = {
                   type = "btrfs";
                   mountpoint = "/";
                   subvolumes = {
                     "@root" = { mountpoint = "/"; };
                     "@nix" = { mountpoint = "/nix"; };
-                    "@persist" = { mountpoint = "/persist"; };
+                    # Add more subvolumes if needed
                   };
                 };
               };
@@ -36,8 +40,8 @@
         };
       };
 
-      hdds = {
-        device = [ "/dev/sda" "/dev/sdb" "/dev/sdc" "/dev/sdd" ];
+      hdd-a = {
+        device = "/dev/sda";
         type = "disk";
         content = {
           type = "gpt";
@@ -45,49 +49,71 @@
             data = {
               size = "100%";
               content = {
-                type = "luks";
-                name = "cryptdata";
-                content = {
-                  type = "btrfs";
-                  mountpoint = "/data";
-                  options = [ "nofail" "compress=zstd" ];
-                  raid = {
-                    level = 5;
-                    devices = [
-                      "/dev/mapper/cryptdata-a"
-                      "/dev/mapper/cryptdata-b"
-                      "/dev/mapper/cryptdata-c"
-                      "/dev/mapper/cryptdata-d"
-                    ];
-                  };
-                };
+                type = "btrfs";
+              };
+            };
+          };
+        };
+      };
+      hdd-b = {
+        device = "/dev/sdb";
+        type = "disk";
+        content = {
+          type = "gpt";
+          partitions = {
+            data = {
+              size = "100%";
+              content = {
+                type = "btrfs";
+              };
+            };
+          };
+        };
+      };
+      hdd-c = {
+        device = "/dev/sdc";
+        type = "disk";
+        content = {
+          type = "gpt";
+          partitions = {
+            data = {
+              size = "100%";
+              content = {
+                type = "btrfs";
+              };
+            };
+          };
+        };
+      };
+      hdd-d = {
+        device = "/dev/sdd";
+        type = "disk";
+        content = {
+          type = "gpt";
+          partitions = {
+            data = {
+              size = "100%";
+              content = {
+                type = "btrfs";
               };
             };
           };
         };
       };
     };
-
-    luks = {
-      cryptroot = {
-        device = "/dev/nvme0n1p2";
-        allowDiscards = true;
-        keyFile = null;
-      };
-
-      cryptdata-a = { device = "/dev/sda1"; };
-      cryptdata-b = { device = "/dev/sdb1"; };
-      cryptdata-c = { device = "/dev/sdc1"; };
-      cryptdata-d = { device = "/dev/sdd1"; };
-    };
-
-    swapDevices = [
-      {
-        device = "/dev/mapper/cryptroot";
-        size = "8G";
-        priority = 1;
-        resumeDevice = true;
-      }
-    ];
   };
-} 
+
+  #fileSystems."/data" = {
+  #  fsType = "btrfs";
+  #  device = "/dev/disk/by-label/data"; # Label must match mkfs
+  #  mountOptions = [ "compress=zstd" ];
+  #};
+
+  #disko.postMountCommands = ''
+  #  mkfs.btrfs -L data -m raid5 -d raid5 \
+  #    /dev/sda1 /dev/sdb1 /dev/sdc1 /dev/sdd1
+  #  mkdir -p /mnt/data
+  #  mount -o compress=zstd LABEL=data /mnt/data
+  #'';
+}
+

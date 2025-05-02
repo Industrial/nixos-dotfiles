@@ -21,6 +21,8 @@ in {
       inherit inputs settings;
     };
     modules = [
+      inputs.disko.nixosModules.disko
+      ./mimir/disko.nix
       ./mimir/filesystems.nix
       ./mimir/graphics.nix
       
