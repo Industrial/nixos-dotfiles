@@ -28,8 +28,10 @@ in {
       
       # ../features/ai/n8n
       #../features/ai/ollama
-      inputs.comin.nixosModules.comin
-      ../features/ci/comin
+
+      # inputs.comin.nixosModules.comin
+      # ../features/ci/comin
+
       ../features/cli/bat
       ../features/cli/btop
       ../features/cli/c
@@ -58,39 +60,46 @@ in {
       ../features/cli/unrar
       ../features/cli/unzip
       ../features/cli/zellij
-      ../features/communication/discord
-      ../features/communication/fractal
-      ../features/communication/teams
-      ../features/communication/telegram
-      ../features/communication/weechat
-      ../features/crypto/monero
-      ../features/games/lutris
-      ../features/games/path-of-building
+
+      #../features/communication/discord
+      #../features/communication/fractal
+      #../features/communication/teams
+      #../features/communication/telegram
+      #../features/communication/weechat
+
+      #../features/crypto/monero
+
+      #../features/games/lutris
+      #../features/games/path-of-building
       #../features/games/steam
       #../features/games/wowup
-      ../features/media/invidious
-      ../features/media/jellyfin
-      ../features/media/lidarr
-      ../features/media/prowlarr
-      ../features/media/radarr
-      ../features/media/readarr
-      ../features/media/sonarr
+
+      #../features/media/invidious
+      #../features/media/jellyfin
+      #../features/media/lidarr
+      #../features/media/prowlarr
+      #../features/media/radarr
+      #../features/media/readarr
+      #../features/media/sonarr
       ../features/media/spotify
-      ../features/media/tiny-tiny-rss
-      ../features/media/transmission
+      #../features/media/tiny-tiny-rss
+      #../features/media/transmission
       ../features/media/vlc
-      ../features/media/whisparr
-      ../features/monitoring/grafana
-      ../features/monitoring/homepage-dashboard
-      ../features/monitoring/prometheus
+      #../features/media/whisparr
+
+      #../features/monitoring/grafana
+      #../features/monitoring/homepage-dashboard
+      #../features/monitoring/prometheus
+
       ../features/network/chromium
       ../features/network/firefox
       #../features/network/i2pd
-      ../features/network/searx
-      ../features/network/ssh
+      #../features/network/searx
+      #../features/network/ssh
       ../features/network/syncthing
       #../features/network/tor
       #../features/network/tor-browser
+
       ../features/nix
       ../features/nix/nixpkgs
       ../features/nix/users/trusted-users.nix
@@ -107,7 +116,9 @@ in {
       ../features/nixos/sound
       ../features/nixos/users
       ../features/nixos/window-manager
+
       ../features/office/obsidian
+
       ../features/programming/bun
       ../features/programming/cursor
       ../features/programming/devenv
@@ -121,20 +132,21 @@ in {
       ../features/programming/node
       ../features/programming/python
       ../features/programming/vscode
-      ../features/security/keepassxc
-      ../features/security/tailscale
-      ../features/security/veracrypt
+
+      #../features/security/keepassxc
+      #../features/security/tailscale
+      #../features/security/veracrypt
       #../features/security/yubikey-manager
 
       #../features/virtual-machine/base
       #../features/virtual-machine/kubernetes/k3s
       #../features/virtual-machine/kubernetes/master
       #../features/virtual-machine/kubernetes/node
-      inputs.microvm.nixosModules.host
-      ../features/virtual-machine/microvm/host
-      ../features/virtual-machine/microvm/target/host-network.nix
-      ../features/virtual-machine/microvm/tor/host-network.nix
-      ../features/virtual-machine/microvm/web/host-network.nix
+      #inputs.microvm.nixosModules.host
+      #../features/virtual-machine/microvm/host
+      #../features/virtual-machine/microvm/target/host-network.nix
+      #../features/virtual-machine/microvm/tor/host-network.nix
+      #../features/virtual-machine/microvm/web/host-network.nix
       #../features/virtual-machine/ssh
       #../features/virtual-machine/virtualbox
 

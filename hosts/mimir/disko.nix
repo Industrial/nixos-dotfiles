@@ -1,4 +1,4 @@
-# sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- --mode destroy,format,mount ./hosts/mimir/disko.nix
+# sudo nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- --mode destroy,format,mount ./hosts/mimir/disko.nix --yes-wipe-all-disks
 {...}: {
   disko.devices = {
     disk = {
@@ -8,14 +8,14 @@
         content = {
           type = "gpt";
           partitions = {
-	    boot = {
+	          boot = {
               size = "512M";
               type = "EF00";
               content = {
                 type = "filesystem";
                 format = "vfat";
                 mountpoint = "/boot";
-                extraArgs = [ "-F" "32" ]; # Force FAT32
+                extraArgs = [ "-F" "32" ];
               };
             };
             luks = {
@@ -23,7 +23,6 @@
               content = {
                 type = "luks";
                 name = "cryptroot";
-                #allowDiscards = true;
                 keyFile = null;
                 content = {
                   type = "btrfs";
@@ -31,7 +30,6 @@
                   subvolumes = {
                     "@root" = { mountpoint = "/"; };
                     "@nix" = { mountpoint = "/nix"; };
-                    # Add more subvolumes if needed
                   };
                 };
               };
@@ -102,12 +100,6 @@
       };
     };
   };
-
-  #fileSystems."/data" = {
-  #  fsType = "btrfs";
-  #  device = "/dev/disk/by-label/data"; # Label must match mkfs
-  #  mountOptions = [ "compress=zstd" ];
-  #};
 
   #disko.postMountCommands = ''
   #  mkfs.btrfs -L data -m raid5 -d raid5 \
