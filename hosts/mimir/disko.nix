@@ -16,6 +16,11 @@
                 format = "vfat";
                 mountpoint = "/boot";
                 extraArgs = [ "-F" "32" ];
+                mountOptions = [
+                  "umask=0077"
+                  "dmask=0077"
+                  "fmask=0077"
+                ];
               };
             };
             luks = {
