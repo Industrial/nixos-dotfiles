@@ -113,7 +113,6 @@
           inputs.disko.nixosModules.disko
           ./disko.nix
           ./filesystems.nix
-          ./graphics.nix
 
           # ../features/ai/n8n
           #../features/ai/ollama
@@ -193,6 +192,7 @@
           #../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
+          ../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
           ../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix
