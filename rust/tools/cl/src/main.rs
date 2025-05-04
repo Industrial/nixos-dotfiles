@@ -1,5 +1,5 @@
-use std::process::Command;
 use std::env;
+use std::process::Command;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -24,12 +24,9 @@ fn main() {
 
     // Execute the clear command based on OS
     let status = if cfg!(target_os = "windows") {
-        Command::new("cmd")
-            .args(["/C", "cls"])
-            .status()
+        Command::new("cmd").args(["/C", "cls"]).status()
     } else {
-        Command::new("clear")
-            .status()
+        Command::new("clear").status()
     };
 
     // Handle any errors
