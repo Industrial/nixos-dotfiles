@@ -82,6 +82,7 @@ priority = 3
 
 [formatter.javascript]
 command = "biome"
+options = ["format", "--write"]
 includes = ["*.{js,jsx,ts,tsx,json}"]
 priority = 4
 
