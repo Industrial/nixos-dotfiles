@@ -126,9 +126,30 @@
       url = "github:nix-community/disko";
       inputs = {
         nixpkgs = {
-	  follows = "nixpkgs";
-	};
+          follows = "nixpkgs";
+        };
       };
+    };
+
+    # Devenv
+    devenv = {
+      url = "github:cachix/devenv";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
+
+    # Rust toolchain
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
+
+    flake-utils = {
+      url = "github:numtide/flake-utils";
     };
   };
 

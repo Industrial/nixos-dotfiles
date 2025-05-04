@@ -25,12 +25,12 @@ in {
       ./mimir/disko.nix
       ./mimir/filesystems.nix
       ./mimir/graphics.nix
-      
+
       # ../features/ai/n8n
       #../features/ai/ollama
 
-      # inputs.comin.nixosModules.comin
-      # ../features/ci/comin
+      inputs.comin.nixosModules.comin
+      ../features/ci/comin
 
       ../features/cli/bat
       ../features/cli/btop
@@ -61,7 +61,7 @@ in {
       ../features/cli/unzip
       ../features/cli/zellij
 
-      #../features/communication/discord
+      ../features/communication/discord
       #../features/communication/fractal
       #../features/communication/teams
       #../features/communication/telegram
@@ -133,7 +133,7 @@ in {
       ../features/programming/python
       ../features/programming/vscode
 
-      #../features/security/keepassxc
+      ../features/security/keepassxc
       #../features/security/tailscale
       #../features/security/veracrypt
       #../features/security/yubikey-manager
