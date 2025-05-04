@@ -1,14 +1,21 @@
 {pkgs, ...}: let
-  cl = pkgs.stdenv.mkDerivation {
-    name = "cl";
-    version = "1.0";
-    src = ./.;
-    installPhase = ''
-      mkdir -p $out/bin
-      echo '#!/usr/bin/env bash' > $out/bin/cl
-      echo 'clear' >> $out/bin/cl
-      chmod +x $out/bin/cl
-    '';
+  cl = pkgs.rustPlatform.buildRustPackage {
+    pname = "cl";
+    version = "0.1.0";
+    src = ../../../rust/tools/cl;
+
+    cargoLock = {
+      lockFile = ../../../rust/tools/cl/Cargo.lock;
+      outputHashes = {
+      };
+    };
+
+    meta = with pkgs.lib; {
+      description = "A simple terminal clear command written in Rust";
+      homepage = "https://github.com/yourusername/dotfiles";
+      license = licenses.mit;
+      maintainers = [];
+    };
   };
 in {
   environment.systemPackages = [
