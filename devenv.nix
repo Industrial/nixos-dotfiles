@@ -1,10 +1,4 @@
-{
-  pkgs,
-  lib,
-  config,
-  inputs,
-  ...
-}: {
+{pkgs, ...}: {
   # https://devenv.sh/basics/
   env = {
     RUST_BACKTRACE = "1";
@@ -25,13 +19,13 @@
     git
     jq
     nixpkgs-fmt
-    alejandra
     pre-commit
     treefmt
     commitizen
     nodejs
 
     # treefmt
+    alejandra
     actionlint
     deadnix
     beautysh
