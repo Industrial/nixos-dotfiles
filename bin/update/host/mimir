@@ -3,9 +3,6 @@ echo "> update > host > mimir"
 exec > >(tee ./logs/update-host-mimir) 2>&1
 set -e
 
-export C9_HOST="mimir"
-export C9_USER="tom"
-
 features/window-manager/gnome/bin/dconf-load
 
 bin/update/repositories

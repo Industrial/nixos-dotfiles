@@ -3,11 +3,8 @@ echo "> update > flake"
 exec > >(tee ./logs/update-flake) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 bin/update/channels
 
 echo "> nix flake update"
+cd "hosts/$(hostname)"
 nix --experimental-features "nix-command flakes" flake update

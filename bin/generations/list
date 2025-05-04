@@ -3,10 +3,6 @@ echo "> generations > list"
 exec > >(tee ./logs/list-generations) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 # Use shell globbing to list matching files
 for file in /nix/var/nix/profiles/system-*; do
     if [[ -e "$file" ]]; then

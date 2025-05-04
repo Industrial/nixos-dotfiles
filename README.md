@@ -43,10 +43,10 @@ bin/update-osx
 ### Update VM
 
 ```bash
-C9_HOST=vm_test bin/vm/update
-C9_HOST=vm_test bin/vm/stop
-C9_HOST=vm_test bin/vm/delete
-C9_HOST=vm_test bin/vm/start
+bin/vm/update
+bin/vm/stop
+bin/vm/delete
+bin/vm/start
 ```
 
 ## Clean

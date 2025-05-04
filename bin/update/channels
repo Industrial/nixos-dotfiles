@@ -3,9 +3,5 @@ echo "> update > channels"
 exec > >(tee ./logs/update-channels) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 echo "> sudo nix-channel --update"
 sudo nix-channel --update

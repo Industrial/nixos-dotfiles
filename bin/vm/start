@@ -3,9 +3,5 @@ echo "> vm > start"
 exec > >(tee ./logs/vm-start) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
-echo "> sudo systemctl start microvm@${C9_HOST}.service"
-sudo systemctl start "microvm@${C9_HOST}.service"
+echo "> sudo systemctl start microvm@$(hostname).service"
+sudo systemctl start "microvm@$(hostname).service"

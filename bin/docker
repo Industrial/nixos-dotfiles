@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-# This runs a Docker container with Nix Flakes installed.
-docker run --rm -it nixpkgs/nix-flakes

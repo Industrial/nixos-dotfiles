@@ -3,11 +3,7 @@ echo "> vm > restart"
 exec > >(tee ./logs/vm-restart) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 # Catch the error if the service is not running
-bin/vm/stop "${C9_HOST}" || true
-bin/vm/update "${C9_HOST}"
-bin/vm/start "${C9_HOST}"
+bin/vm/stop "$(hostname)" || true
+bin/vm/update "$(hostname)"
+bin/vm/start "$(hostname)"

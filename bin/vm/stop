@@ -3,9 +3,5 @@ echo "> vm > stop"
 exec > >(tee ./logs/vm-stop) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
-echo "> sudo systemctl stop microvm@${C9_HOST}.service"
-sudo systemctl stop "microvm@${C9_HOST}.service"
+echo "> sudo systemctl stop microvm@$(hostname).service"
+sudo systemctl stop "microvm@$(hostname).service"

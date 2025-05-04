@@ -3,9 +3,5 @@ echo "> delete > collectgarbage"
 exec > >(tee ./logs/delete-collectgarbage) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 echo "> sudo nix-collect-garbage -d"
 sudo nix-collect-garbage -d

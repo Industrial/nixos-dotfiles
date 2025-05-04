@@ -3,9 +3,5 @@ echo "> update > login-shell"
 exec > >(tee ./logs/update-login-shell) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 echo "> chsh -s /run/current-system/sw/bin/fish"
-sudo chsh -s /run/current-system/sw/bin/fish "${C9_USER}"
+sudo chsh -s /run/current-system/sw/bin/fish "tom"

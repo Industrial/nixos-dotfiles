@@ -3,7 +3,7 @@ echo "> repl"
 exec > >(tee ./logs/repl) 2>&1
 set -e
 
-echo "> repl > now execute: f=builtins.getFlake \"${PWD}\""
+echo "> repl > cd hosts/$(hostname)"
 
-nix repl \
-    --extra-experimental-features "flakes repl-flake" ".#"
+cd "hosts/$(hostname)"
+nix repl --extra-experimental-features "flakes repl-flake" ".#"

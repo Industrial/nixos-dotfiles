@@ -3,9 +3,5 @@ echo "> update > repositories"
 exec > >(tee ./logs/update-repositories) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 bin/update/nix-env
 bin/update/flake

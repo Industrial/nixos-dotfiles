@@ -3,9 +3,5 @@ echo "> features > window-manager > gnome > dconf > load"
 exec > >(tee ./logs/dconf-load) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 echo "> cat features/window-manager/gnome/dconf/dump.conf | dconf load /"
 cat features/window-manager/gnome/dconf/dump.conf | dconf load /

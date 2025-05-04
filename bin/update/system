@@ -3,16 +3,16 @@ echo "> update > system"
 exec > >(tee ./logs/update-sytem) 2>&1
 set -e
 
-source lib/lowercase.bash
-source lib/host.bash
-source lib/user.bash
-
 features/programming/vscode/bin/clear-cache
 
-echo "> sudo nixos-rebuild switch --flake \".#${C9_HOST}\" --show-trace"
-sudo nixos-rebuild switch --flake ".#${C9_HOST}" --show-trace --option eval-cache false
+echo "> update > system > cd hosts/$(hostname)"
+cd "hosts/$(hostname)"
 
-bin/update/login-shell "${C9_USER}"
+echo "> update > system > sudo nixos-rebuild switch --flake \".#$(hostname)\" --show-trace"
+sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
+
+cd ../..
+bin/update/login-shell "tom"
 
 features/programming/vscode/bin/link-files-nixos
 features/window-manager/dwm/bin/link-files-nixos

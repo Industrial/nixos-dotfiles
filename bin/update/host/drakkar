@@ -3,9 +3,6 @@ echo "> update > host > drakkar"
 exec > >(tee ./logs/update-hos-drakkar) 2>&1
 set -e
 
-export C9_HOST="drakkar"
-export C9_USER="tom"
-
 features/window-manager/gnome/bin/dconf-load
 
 bin/update/repositories

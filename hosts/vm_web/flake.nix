@@ -100,17 +100,35 @@
   };
 
   outputs = inputs @ {self, ...}: {
-    nixosConfigurations =
-      {}
-      // (import ./hosts/drakkar.nix {inherit inputs;})
-      // (import ./hosts/huginn.nix {inherit inputs;})
-      // (import ./hosts/langhus.nix {inherit inputs;})
-      // (import ./hosts/mimir.nix {inherit inputs;})
-      // (import ./hosts/vm_database.nix {inherit inputs;})
-      // (import ./hosts/vm_management.nix {inherit inputs;})
-      // (import ./hosts/vm_target.nix {inherit inputs;})
-      // (import ./hosts/vm_test.nix {inherit inputs;})
-      // (import ./hosts/vm_tor.nix {inherit inputs;})
-      // (import ./hosts/vm_web.nix {inherit inputs;});
+    nixosConfigurations = let
+      name = "vm_web";
+      system = "x86_64-linux";
+      username = "tom";
+      version = "24.11";
+      settings = {
+        inherit system username;
+        hostname = "${name}";
+        stateVersion = "${version}";
+        hostPlatform = {
+          inherit system;
+        };
+        userdir = "/home/${username}";
+        useremail = "${username}@${system}.local";
+        userfullname = "${username}";
+      };
+    in {
+      "${settings.hostname}" = inputs.nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = {
+          inherit inputs settings;
+        };
+        modules = [
+          inputs.microvm.nixosModules.microvm
+          ../features/virtual-machine/microvm/base
+          ../features/virtual-machine/microvm/ssh
+          ../features/virtual-machine/microvm/web
+        ];
+      };
+    };
   };
 }

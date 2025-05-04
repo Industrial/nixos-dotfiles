@@ -3,7 +3,7 @@
   # local machine.
   services.comin = {
     enable = true;
-    flakeSubdirectory = "systems/nixos";
+    flakeSubdirectory = "hosts/${settings.hostname}";
     hostname = "${settings.hostname}";
     remotes = [
       {
