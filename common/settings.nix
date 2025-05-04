@@ -1,8 +1,8 @@
 {
-  system,
+  system ? "x86_64-linux",
   hostname,
-  username,
-  version,
+  username ? "tom",
+  version ? "24.11",
 }: {
   inherit system username;
   settings = {

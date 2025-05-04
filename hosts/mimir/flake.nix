@@ -101,14 +101,11 @@
 
   outputs = inputs @ {self, ...}: {
     nixosConfigurations = let
-      system = "x86_64-linux";
       hostname = "mimir";
-      username = "tom";
-      version = "24.11";
-      settings = (import ../../common/settings.nix {inherit system hostname username version;}).settings;
+      settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
     in {
       "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
-        inherit system;
+        inherit (settings) system;
         specialArgs = {
           inherit inputs settings;
         };
@@ -248,9 +245,6 @@
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
           #../../features/window-manager/xfce
-          #../../features/window-manager/xmonad
-          ../../features/window-manager/xsel
-          ../../features/window-manager/xclip
         ];
       };
     };

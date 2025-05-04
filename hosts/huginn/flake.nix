@@ -101,24 +101,11 @@
 
   outputs = inputs @ {self, ...}: {
     nixosConfigurations = let
-      name = "huginn";
-      system = "x86_64-linux";
-      username = "tom";
-      version = "24.11";
-      settings = {
-        inherit system username;
-        hostname = "${name}";
-        stateVersion = "${version}";
-        hostPlatform = {
-          inherit system;
-        };
-        userdir = "/home/${username}";
-        useremail = "${username}@${system}.local";
-        userfullname = "${username}";
-      };
+      hostname = "huginn";
+      settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
     in {
-      "${settings.hostname}" = inputs.nixpkgs.lib.nixosSystem {
-        inherit system;
+      "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
+        inherit (settings) system;
         specialArgs = {
           inherit inputs settings;
         };
@@ -238,43 +225,6 @@
           #../features/window-manager/xmonad
           ../features/window-manager/xsel
           ../features/window-manager/xclip
-
-          ({
-            config,
-            lib,
-            # pkgs,
-            modulesPath,
-            ...
-          }: {
-            imports = [
-              (modulesPath + "/installer/scan/not-detected.nix")
-            ];
-
-            boot.initrd.availableKernelModules = ["xhci_pci" "nvme" "usbhid" "uas" "sd_mod" "rtsx_usb_sdmmc"];
-            boot.initrd.kernelModules = [];
-            boot.kernelModules = ["kvm-intel"];
-            boot.extraModulePackages = [];
-
-            fileSystems."/" = {
-              device = "/dev/disk/by-uuid/f3adb911-b6a6-47ac-9490-ea200135ad8b";
-              fsType = "ext4";
-            };
-
-            boot.initrd.luks.devices."luks-43521c75-c1cb-4b8a-875e-209640141530".device = "/dev/disk/by-uuid/43521c75-c1cb-4b8a-875e-209640141530";
-
-            fileSystems."/boot" = {
-              device = "/dev/disk/by-uuid/3BE3-A3FE";
-              fsType = "vfat";
-              options = ["fmask=0077" "dmask=0077"];
-            };
-
-            swapDevices = [];
-
-            networking.useDHCP = lib.mkDefault true;
-
-            nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-            hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-          })
         ];
       };
     };

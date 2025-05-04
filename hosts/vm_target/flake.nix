@@ -101,24 +101,11 @@
 
   outputs = inputs @ {self, ...}: {
     nixosConfigurations = let
-      name = "vm_target";
-      system = "x86_64-linux";
-      username = "tom";
-      version = "24.11";
-      settings = {
-        inherit system username;
-        hostname = "${name}";
-        stateVersion = "${version}";
-        hostPlatform = {
-          inherit system;
-        };
-        userdir = "/home/${username}";
-        useremail = "${username}@${system}.local";
-        userfullname = "${username}";
-      };
+      hostname = "vm_target";
+      settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
     in {
-      "${settings.hostname}" = inputs.nixpkgs.lib.nixosSystem {
-        inherit system;
+      "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
+        inherit (settings) system;
         specialArgs = {
           inherit inputs settings;
         };

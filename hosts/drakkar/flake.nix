@@ -102,23 +102,10 @@
   outputs = inputs @ {self, ...}: {
     nixosConfigurations = let
       name = "drakkar";
-      system = "x86_64-linux";
-      username = "tom";
-      version = "24.11";
-      settings = {
-        inherit system username;
-        hostname = "${name}";
-        stateVersion = "${version}";
-        hostPlatform = {
-          inherit system;
-        };
-        userdir = "/home/${username}";
-        useremail = "${username}@${system}.local";
-        userfullname = "${username}";
-      };
+      settings = (import ../../common/settings.nix {hostname = name;}).settings;
     in {
-      "${settings.hostname}" = inputs.nixpkgs.lib.nixosSystem {
-        inherit system;
+      "${name}" = inputs.nixpkgs.lib.nixosSystem {
+        inherit (settings) system;
         specialArgs = {
           inherit inputs settings;
         };
@@ -246,98 +233,6 @@
           #../features/window-manager/xmonad
           ../features/window-manager/xsel
           ../features/window-manager/xclip
-
-          {
-            boot.initrd.availableKernelModules = ["xhci_pci" "ahci" "nvme" "usbhid" "uas" "sd_mod" "rtsx_pci_sdmmc"];
-            boot.initrd.kernelModules = [];
-            boot.kernelModules = ["kvm-intel"];
-            boot.extraModulePackages = [];
-
-            # /boot
-            fileSystems."/boot" = {
-              device = "/dev/disk/by-uuid/A32E-E364";
-              fsType = "vfat";
-              options = ["fmask=0077" "dmask=0077"];
-            };
-
-            # /
-            boot.initrd.luks.devices."luks-b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5".device = "/dev/disk/by-uuid/b72e827b-19c5-43a4-8a20-d9cd0dd7f0b5";
-            fileSystems."/" = {
-              device = "/dev/disk/by-uuid/7aca8703-57c7-4805-aadb-d17c68b28c81";
-              fsType = "ext4";
-            };
-
-            # swap
-            boot.initrd.luks.devices."luks-2c489d7f-4cfb-4c08-994e-96212646fc55".device = "/dev/disk/by-uuid/2c489d7f-4cfb-4c08-994e-96212646fc55";
-            swapDevices = [
-              {
-                device = "/dev/disk/by-uuid/d7a6a603-e5e3-401f-8237-99bc29182994";
-              }
-            ];
-
-            # data
-            fileSystems."/data" = {
-              device = "/dev/disk/by-uuid/b5a4ef1a-b35b-4708-9528-62f155680753";
-              fsType = "ext4";
-            };
-
-            # games
-            fileSystems."/games" = {
-              device = "/dev/disk/by-uuid/10921065-05ea-4be2-b499-c19a736e3f33";
-              fsType = "ext4";
-            };
-
-            # Graphics
-            hardware = {
-              graphics = {
-                enable = true;
-              };
-              nvidia = {
-                # Modesetting is required.
-                modesetting = {
-                  enable = true;
-                };
-
-                powerManagement = {
-                  # Nvidia power management. Experimental, and can cause
-                  # sleep/suspend to fail. Enable this if you have graphical
-                  # corruption issues or application crashes after waking up from
-                  # sleep. This fixes it by saving the entire VRAM memory to /tmp/
-                  # instead of just the bare essentials.
-                  enable = true;
-
-                  # Fine-grained power management. Turns off GPU when not in use.
-                  # Experimental and only works on modern Nvidia GPUs (Turing or
-                  # newer).
-                  finegrained = false;
-                };
-
-                # Use the NVidia open source kernel module (not to be confused
-                # with the independent third-party "nouveau" open source driver).
-                # Support is limited to the Turing and later architectures. Full
-                # list of supported GPUs is at:
-                # https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus
-                # Only available from driver 515.43.04+ Currently
-                # alpha-quality/buggy, so false is currently the recommended
-                # setting.
-                open = false;
-
-                # Enable the Nvidia settings menu, accessible via
-                # `nvidia-settings`.
-                nvidiaSettings = true;
-              };
-            };
-            services = {
-              xserver = {
-                videoDrivers = ["nvidia"];
-              };
-            };
-            nixpkgs = {
-              config = {
-                cudaSupport = true;
-              };
-            };
-          }
         ];
       };
     };

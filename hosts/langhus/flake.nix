@@ -101,24 +101,11 @@
 
   outputs = inputs @ {self, ...}: {
     nixosConfigurations = let
-      name = "langhus";
-      system = "x86_64-linux";
-      username = "tom";
-      version = "24.11";
-      settings = {
-        inherit system username;
-        hostname = "${name}";
-        stateVersion = "${version}";
-        hostPlatform = {
-          inherit system;
-        };
-        userdir = "/home/${username}";
-        useremail = "${username}@${system}.local";
-        userfullname = "${username}";
-      };
+      hostname = "langhus";
+      settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
     in {
-      "${settings.hostname}" = inputs.nixpkgs.lib.nixosSystem {
-        inherit system;
+      "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
+        inherit (settings) system;
         specialArgs = {
           inherit inputs settings;
         };
@@ -233,63 +220,6 @@
           #../features/window-manager/xmonad
           ../features/window-manager/xsel
           ../features/window-manager/xclip
-
-          {
-            boot = {
-              initrd = {
-                availableKernelModules = ["xhci_pci" "nvme" "ahci" "usbhid" "usb_storage" "sd_mod"];
-                kernelModules = [];
-
-                luks = {
-                  devices = {
-                    "luks-5ddd44e1-b6a3-49e7-a65d-350d71b78725" = {
-                      device = "/dev/disk/by-uuid/5ddd44e1-b6a3-49e7-a65d-350d71b78725";
-                    };
-                  };
-                };
-              };
-              kernelModules = ["kvm-amd"];
-              extraModulePackages = [];
-            };
-
-            fileSystems = {
-              "/" = {
-                device = "/dev/disk/by-uuid/bc826c8e-d4fb-495c-a987-8f32b91b7a76";
-                fsType = "ext4";
-              };
-              "/boot" = {
-                device = "/dev/disk/by-uuid/D633-38E5";
-                fsType = "vfat";
-                options = ["fmask=0077" "dmask=0077"];
-              };
-            };
-
-            # TODO: This wasn't found.
-            # swapDevices = [
-            #   {device = "/dev/disk/by-uuid/07bfb47d-2c76-4640-abf4-7531eb0b9ee1";}
-            # ];
-
-            # Graphics
-            hardware = {
-              graphics = {
-                enable = true;
-              };
-              amdgpu = {
-                # opencl = {
-                #   enable = true;
-                # };
-                initrd = {
-                  enable = true;
-                };
-                amdvlk = {
-                  enable = true;
-                  # support32Bit = {
-                  #   enable = true;
-                  # };
-                };
-              };
-            };
-          }
         ];
       };
     };
