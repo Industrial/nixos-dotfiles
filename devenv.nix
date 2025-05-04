@@ -24,12 +24,16 @@
     direnv
     git
     jq
+    nixpkgs-fmt
+    alejandra
+    pre-commit
+    treefmt
+    commitizen
+    nodejs
 
     # treefmt
-    treefmt
-    deadnix
-    alejandra
     actionlint
+    deadnix
     beautysh
     biome
     yamlfmt
@@ -50,6 +54,7 @@
   scripts = {
     rust-version.exec = "rustc --version";
     cargo-version.exec = "cargo --version";
+    commit.exec = "git-cz";
   };
 
   enterShell = ''
@@ -62,6 +67,10 @@
     hooks = {
       treefmt = {
         enable = true;
+      };
+      commitizen = {
+        enable = true;
+        stages = ["commit-msg"];
       };
     };
   };
