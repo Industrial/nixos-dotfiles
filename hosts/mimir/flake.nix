@@ -101,23 +101,13 @@
 
   outputs = inputs @ {self, ...}: {
     nixosConfigurations = let
-      name = "mimir";
       system = "x86_64-linux";
+      hostname = "mimir";
       username = "tom";
       version = "24.11";
-      settings = {
-        inherit system username;
-        hostname = "${name}";
-        stateVersion = "${version}";
-        hostPlatform = {
-          inherit system;
-        };
-        userdir = "/home/${username}";
-        useremail = "${username}@${system}.local";
-        userfullname = "${username}";
-      };
+      settings = (import ../../common/settings.nix {inherit system hostname username version;}).settings;
     in {
-      "${settings.hostname}" = inputs.nixpkgs.lib.nixosSystem {
+      "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = {
           inherit inputs settings;
@@ -172,22 +162,17 @@
           #../../features/crypto/monero
 
           #../../features/games/lutris
-          #../../features/games/path-of-building
-          #../../features/games/steam
           #../../features/games/wowup
 
           #../../features/media/invidious
-          #../../features/media/jellyfin
           #../../features/media/lidarr
           #../../features/media/prowlarr
           #../../features/media/radarr
           #../../features/media/readarr
           #../../features/media/sonarr
-          ../../features/media/spotify
-          #../../features/media/tiny-tiny-rss
+          #../../features/media/spotify
           #../../features/media/transmission
-          ../../features/media/vlc
-          #../../features/media/whisparr
+          #../../features/media/vlc
 
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
@@ -197,7 +182,7 @@
           ../../features/network/firefox
           #../../features/network/i2pd
           #../../features/network/searx
-          #../../features/network/ssh
+          ../../features/network/ssh
           ../../features/network/syncthing
           #../../features/network/tor
           #../../features/network/tor-browser
@@ -205,9 +190,10 @@
           ../../features/nix
           ../../features/nix/nixpkgs
           ../../features/nix/users/trusted-users.nix
+
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
-          ../../features/nixos/docker
+          #../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
           ../../features/nixos/networking
