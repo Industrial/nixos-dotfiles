@@ -23,11 +23,10 @@
       # Tor port - adjust if needed
       allowedTCPPorts = [
         # SSH
-        22
+        #22
 
         # Tor
         9050
-        # TODO: Disable this one!
         #9051
       ];
     };

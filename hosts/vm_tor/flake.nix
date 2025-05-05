@@ -29,7 +29,7 @@
         modules = [
           inputs.microvm.nixosModules.microvm
           ../../features/virtual-machine/microvm/base
-          ../../features/virtual-machine/microvm/ssh
+          #../../features/virtual-machine/microvm/ssh
           ../../features/virtual-machine/microvm/tor
         ];
       };
