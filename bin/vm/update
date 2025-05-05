@@ -3,14 +3,17 @@ echo "> vm > update"
 exec > >(tee ./logs/vm-update) 2>&1
 set -e
 
+VM_NAME="$1"
+echo "> vm > update > ${VM_NAME}"
+
 REPO_PATH="/home/tom/.dotfiles"
-GIT_PATH="git+file://${REPO_PATH}?dir=."
+GIT_PATH="git+file://${REPO_PATH}?dir=./hosts/${VM_NAME}"
 
 # Create or update the MicroVM.
-if [ ! -d "/var/lib/microvms/$(hostname)" ]; then
-    echo "> sudo microvm -f \"${GIT_PATH}\" -c \"$(hostname)\""
-    sudo microvm -f "${GIT_PATH}" -c "$(hostname)"
+if [ ! -d "/var/lib/microvms/${VM_NAME}" ]; then
+    echo "> vm > update > sudo microvm -f \"${GIT_PATH}\" -c \"${VM_NAME}\""
+    sudo microvm -f "${GIT_PATH}" -c "${VM_NAME}"
 else
-    echo "> sudo microvm -f \"${GIT_PATH}\" -u \"$(hostname)\""
-    sudo microvm -f "${GIT_PATH}" -u "$(hostname)"
+    echo "> vm > update > sudo microvm -f \"${GIT_PATH}\" -u \"${VM_NAME}\""
+    sudo microvm -f "${GIT_PATH}" -u "${VM_NAME}"
 fi

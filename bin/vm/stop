@@ -3,5 +3,8 @@ echo "> vm > stop"
 exec > >(tee ./logs/vm-stop) 2>&1
 set -e
 
-echo "> sudo systemctl stop microvm@$(hostname).service"
-sudo systemctl stop "microvm@$(hostname).service"
+VM_NAME="$1"
+echo "> vm > stop > ${VM_NAME}"
+
+echo "> vm > stop > sudo systemctl stop microvm@${VM_NAME}.service"
+sudo systemctl stop "microvm@${VM_NAME}.service"

@@ -3,7 +3,8 @@ echo "> vm > restart"
 exec > >(tee ./logs/vm-restart) 2>&1
 set -e
 
-# Catch the error if the service is not running
-bin/vm/stop "$(hostname)" || true
-bin/vm/update "$(hostname)"
-bin/vm/start "$(hostname)"
+VM_NAME="$1"
+echo "> vm > restart > ${VM_NAME}"
+
+echo "> vm > restart > sudo systemctl restart microvm@${VM_NAME}.service"
+sudo systemctl restart "microvm@${VM_NAME}.service"

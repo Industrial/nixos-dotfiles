@@ -3,5 +3,8 @@ echo "> vm > delete"
 exec > >(tee ./logs/vm-delete) 2>&1
 set -e
 
-echo "> sudo rm -rf \"/var/lib/microvms/$(hostname)\""
-sudo rm -rf "/var/lib/microvms/$(hostname)"
+VM_NAME="$1"
+echo "> vm > delete > ${VM_NAME}"
+
+echo "> vm > delete > sudo rm -rf \"/var/lib/microvms/${VM_NAME}\""
+sudo rm -rf "/var/lib/microvms/${VM_NAME}"

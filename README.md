@@ -1,12 +1,9 @@
-# NixOS Dotfiles (Linux and OSX)
+# NixOS Dotfiles
 
 My NixOS configuration. I have separated out all software into features and
 avoided [HomeManager](https://github.com/nix-community/home-manager) to make it
 more portable. The caveat is that you have to configure everything manually but
 hey it's nix so that's pretty easy!
-
-It configures a NixOS machine, an OSX machine and a Virtual Machine (using
-[MicroVM](https://github.com/astro/microvm.nix)).
 
 ## Installation
 
@@ -14,39 +11,10 @@ It configures a NixOS machine, an OSX machine and a Virtual Machine (using
 git clone git@github.com:Industrial/nixos-dotfiles.git ~/.dotfiles
 ```
 
-### Installation on OSX
-
-```bash
-bin/install-osx-nix
-bin/install-osx-nix-flakes
-bin/install-osx-nix-conf
-```
-
 ## Update
 
-Run one command to update your entire system.
-
-### Update NixOS
-
 ```bash
-bin/update-repositories
-bin/update-nixos
-```
-
-### Update OSX
-
-```bash
-bin/update-repositories
-bin/update-osx
-```
-
-### Update VM
-
-```bash
-bin/vm/update
-bin/vm/stop
-bin/vm/delete
-bin/vm/start
+bin/update/host/<name>
 ```
 
 ## Clean
@@ -67,20 +35,22 @@ bin/check
 bin/test
 ```
 
-## Lab
+## Virtual Machines
 
-I have several services configured to run locally on some hosts:
+I have an ongoing project to use
+[MicroVM](https://astro.github.io/microvm.nix/intro.html) to run containerized
+services in virtual machines (rather then say, docker containers or bare metal)
+in order to provide a secure environment for the processes to run and to expose
+them to the internet. The plan is to create a setup that works a bit like
+QubesOS and have one VM run Tor and to run all network traffic of other VM's
+through this one.
 
-- Langhus:
-  - Media:
-    - Invidious (YouTube):
-      - [http://0.0.0.0:4000]
-  - Passwords:
-    - Vaultwarden:
-      - [http://0.0.0.0:7000]
-  - Monitoring:
-    - Grafana:
-      - [http://0.0.0.0:9000]
-    - Prometheus:
-      - [http://0.0.0.0:9001]
-      - [http://0.0.0.0:9002]
+### Update VM
+
+```bash
+bin/vm/update <name>
+bin/vm/stop <name>
+bin/vm/delete <name>
+bin/vm/start <name>
+```
+

@@ -160,15 +160,16 @@
           #../../features/games/lutris
           #../../features/games/wowup
 
+          # TODO: Broken. Need another YouTube client.
           #../../features/media/invidious
           #../../features/media/lidarr
           #../../features/media/prowlarr
           #../../features/media/radarr
           #../../features/media/readarr
           #../../features/media/sonarr
-          #../../features/media/spotify
+          ../../features/media/spotify
           #../../features/media/transmission
-          #../../features/media/vlc
+          ../../features/media/vlc
 
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
@@ -227,10 +228,10 @@
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
           #../../features/virtual-machine/kubernetes/node
-          #inputs.microvm.nixosModules.host
-          #../../features/virtual-machine/microvm/host
+          inputs.microvm.nixosModules.host
+          ../../features/virtual-machine/microvm/host
           #../../features/virtual-machine/microvm/target/host-network.nix
-          #../../features/virtual-machine/microvm/tor/host-network.nix
+          ../../features/virtual-machine/microvm/tor/host-network.nix
           #../../features/virtual-machine/microvm/web/host-network.nix
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox

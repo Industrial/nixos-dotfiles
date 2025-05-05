@@ -1,3 +1,7 @@
+# A virtual machine running Tor. Can be used from the host machine or other
+# virtual machines.
+# Proxy: 10.0.0.2:9050
+# Test: curl -s --socks5-hostname 10.0.0.2:9050 http://www.showmyip.gr
 {settings, ...}: {
   # vm_tor - Tor Configuration
   microvm = {
@@ -18,9 +22,13 @@
       enable = true;
       # Tor port - adjust if needed
       allowedTCPPorts = [
+        # SSH
+        22
+
+        # Tor
         9050
         # TODO: Disable this one!
-        9051
+        #9051
       ];
     };
   };
