@@ -1,58 +1,65 @@
 # A virtual machine running Tor. Can be used from the host machine or other
 # virtual machines.
+# SSH: ssh tom@10.0.0.2
 # Proxy: 10.0.0.2:9050
 # Test: curl -s --socks5-hostname 10.0.0.2:9050 http://www.showmyip.gr
-{settings, ...}: {
-  # vm_tor - Tor Configuration
+{settings, ...}: let
+  id = "vm_tor";
+  mac = "02:00:00:01:00:02";
+  ip = "10.0.0.2";
+  gateway_ip = "10.0.0.0";
+  internal_ip = "0.0.0.0";
+in {
   microvm = {
     interfaces = [
       {
         type = "tap";
-        id = "vm_tor";
-        mac = "02:00:00:01:00:02";
+        id = id;
+        mac = mac;
       }
     ];
   };
 
-  # Network configuration
   networking = {
     useNetworkd = true;
     hostName = settings.hostname;
+    nameservers = ["${internal_ip}"];
     firewall = {
       enable = true;
-      # Tor port - adjust if needed
       allowedTCPPorts = [
         # SSH
-        #22
+        22
 
         # Tor
         9050
         #9051
       ];
+
+      allowedUDPPorts = [
+        # DNS
+        53
+      ];
     };
   };
 
-  # Static IP configuration
   systemd = {
     network = {
       networks = {
         "10-eth" = {
           matchConfig = {
-            # New MAC address
-            MACAddress = "02:00:00:01:00:02";
+            MACAddress = mac;
           };
           address = [
-            # New IP address
-            "10.0.0.2/32"
+            "${ip}/32"
           ];
           routes = [
             {
-              Destination = "10.0.0.0/32";
+              Destination = "${gateway_ip}/32";
               GatewayOnLink = true;
             }
             {
-              Destination = "0.0.0.0/0";
-              Gateway = "10.0.0.0";
+              Destination = "${internal_ip}/0";
+              Gateway = "${gateway_ip}";
               GatewayOnLink = true;
             }
           ];
@@ -75,40 +82,25 @@
           enable = true;
         };
         socksListenAddress = {
-          addr = "0.0.0.0";
+          addr = "${internal_ip}";
           port = 9050;
         };
       };
       torsocks = {
         enable = true;
       };
-    };
-  };
-
-  # Use Tor for DNS.
-  services = {
-    tor = {
       settings = {
         DNSPort = [
           {
-            addr = "127.0.0.1";
+            addr = "${internal_ip}";
             port = 53;
           }
         ];
       };
     };
     resolved = {
-      # For caching DNS requests.
       enable = true;
-      # Overwrite compiled-in fallback DNS servers.
       fallbackDns = [""];
-    };
-  };
-  networking = {
-    nameservers = ["127.0.0.1"];
-    firewall = {
-      # DNS port - adjust if needed
-      allowedUDPPorts = [53];
     };
   };
 }

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+echo "> vm > log"
+exec > >(tee ./logs/vm-log) 2>&1
+set -e
+
+VM_NAME="$1"
+echo "> vm > log > ${VM_NAME}"
+
+echo "> vm > log > sudo journalctl -u microvm@${VM_NAME}.service -f"
+sudo journalctl -u "microvm@${VM_NAME}.service" -f

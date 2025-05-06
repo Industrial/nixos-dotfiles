@@ -150,12 +150,12 @@
           ../../features/cli/zellij
 
           ../../features/communication/discord
-          #../../features/communication/fractal
-          #../../features/communication/teams
-          #../../features/communication/telegram
-          #../../features/communication/weechat
+          ../../features/communication/fractal
+          ../../features/communication/teams
+          ../../features/communication/telegram
+          ../../features/communication/weechat
 
-          #../../features/crypto/monero
+          ../../features/crypto/monero
 
           #../../features/games/lutris
           #../../features/games/wowup
@@ -230,7 +230,7 @@
           #../../features/virtual-machine/kubernetes/node
           inputs.microvm.nixosModules.host
           ../../features/virtual-machine/microvm/host
-          #../../features/virtual-machine/microvm/target/host-network.nix
+          ../../features/virtual-machine/microvm/target/host-network.nix
           ../../features/virtual-machine/microvm/tor/host-network.nix
           #../../features/virtual-machine/microvm/web/host-network.nix
           #../../features/virtual-machine/ssh

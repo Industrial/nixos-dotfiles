@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+echo "> vm > status"
+exec > >(tee ./logs/vm-status) 2>&1
+set -e
+
+VM_NAME="$1"
+echo "> vm > status > ${VM_NAME}"
+
+echo "> vm > status > sudo systemctl status microvm@${VM_NAME}.service"
+sudo systemctl status "microvm@${VM_NAME}.service"
