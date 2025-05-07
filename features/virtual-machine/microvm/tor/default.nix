@@ -5,7 +5,7 @@
 # Test: curl -s --socks5-hostname 10.0.0.2:9050 http://www.showmyip.gr
 {settings, ...}: let
   id = "vm_tor";
-  mac = "02:00:00:01:00:02";
+  mac = "02:00:00:01:01:01";
   ip = "10.0.0.2";
   gateway_ip = "10.0.0.0";
   internal_ip = "0.0.0.0";
