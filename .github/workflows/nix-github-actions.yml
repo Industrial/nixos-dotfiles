@@ -22,3 +22,16 @@ jobs:
         run: nix profile install nixpkgs#devenv
       - name: DevEnv > Test
         run: devenv test
+  nix-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install > Checkout
+        uses: actions/checkout@v4
+      - name: Install > Nix
+        uses: cachix/install-nix-action@v26
+      - name: Install > Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: devenv
+      - name: Run Nix Tests
+        run: nix-build tests/default.nix

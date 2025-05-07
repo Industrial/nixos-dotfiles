@@ -1,4 +1,8 @@
-{settings, pkgs, ...}: {
+{
+  settings,
+  pkgs,
+  ...
+}: {
   system = {
     stateVersion = settings.stateVersion;
   };
@@ -35,13 +39,16 @@
       SDL_VIDEODRIVER = "wayland";
       CLUTTER_BACKEND = "wayland";
     };
-    systemPackages = with pkgs; [
-      xdg-utils # Required
-    ] ++ map (package:
-      lib.attrByPath (lib.splitString "." package) (throw "Package ${package} not found in nixpkgs") pkgs
-    ) (
-      builtins.filter (package: package != "") (lib.splitString " " packages)
-    );
+    systemPackages = with pkgs;
+      [
+        xdg-utils # Required
+      ]
+      ++ map (
+        package:
+          lib.attrByPath (lib.splitString "." package) (throw "Package ${package} not found in nixpkgs") pkgs
+      ) (
+        builtins.filter (package: package != "") (lib.splitString " " packages)
+      );
   };
 
   systemd = {
@@ -56,7 +63,7 @@
             Restart = "on-failure";
             RestartSec = 5;
           };
-          wantedBy = [ "default.target" ];
+          wantedBy = ["default.target"];
         };
       };
     };

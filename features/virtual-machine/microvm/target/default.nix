@@ -127,12 +127,12 @@ in {
   environment = {
     systemPackages = with pkgs; [
       # Network testing tools
-      curl       # for HTTP requests
-      dig        # DNS lookup
-      inetutils  # for hostname, ping, etc.
-      iproute2   # for ip command
-      jq         # for JSON processing
-      netcat     # for testing TCP connections
+      curl # for HTTP requests
+      dig # DNS lookup
+      inetutils # for hostname, ping, etc.
+      iproute2 # for ip command
+      jq # for JSON processing
+      netcat # for testing TCP connections
       traceroute # for tracing network routes
     ];
   };
