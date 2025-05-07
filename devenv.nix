@@ -49,6 +49,7 @@
     rust-version.exec = "rustc --version";
     cargo-version.exec = "cargo --version";
     commit.exec = "git-cz";
+    test-nix.exec = "nix-build tests/default.nix";
   };
 
   enterShell = ''
@@ -71,6 +72,15 @@
       commitizen = {
         enable = true;
         stages = ["commit-msg"];
+      };
+      nix-tests = {
+        enable = true;
+        stages = ["pre-commit"];
+        name = "nix-tests";
+        description = "Run Nix tests";
+        entry = "nix-build tests/default.nix";
+        pass_filenames = false;
+        always_run = true;
       };
     };
   };
