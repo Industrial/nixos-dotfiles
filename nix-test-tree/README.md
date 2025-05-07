@@ -2,25 +2,95 @@
 
 A Behaviour Driven Development (BDD) testing framework for Nix and NixOS configurations.
 
-## Overview
+## Current State
 
-Nix Test Tree provides a structured way to write and organize tests for Nix code using BDD principles. It allows for creating hierarchical test structures that can test permutations of code configurations and behaviors.
+### ✅ Implemented
+- Basic test runner with pass/fail reporting
+- Simple test case structure with `it` blocks
+- JSON-based test result serialization
+- Basic shell output formatting
 
-## Core Concepts
+### 🚧 In Progress
+- Test result formatting and display
+- Basic test structure implementation
 
-### Test Structure
+### 📋 Todo
 
-- `describe`: Creates a test branch/group
-- `it`: Defines a test case (leaf node)
-- `before-each`: Setup code that runs before each test
-- `after-each`: Cleanup code that runs after each test
-- `before-all`: Setup code that runs once before all tests in a group
-- `after-all`: Cleanup code that runs once after all tests in a group
+#### Core Framework
+- [ ] Implement `describe` blocks for test grouping
+- [ ] Add `before-each` and `after-each` hooks
+- [ ] Add `before-all` and `after-all` hooks
+- [ ] Support nested test groups
+- [ ] Add test timeout handling
+- [ ] Implement test skipping functionality
+- [ ] Add test focus functionality (run only specific tests)
 
-### Test Permutations
+#### Test Assertions
+- [ ] Add basic assertion library
+  - [ ] Equality assertions
+  - [ ] Type checking assertions
+  - [ ] Error/exception assertions
+  - [ ] Collection assertions (lists, sets)
+- [ ] Add custom assertion messages
+- [ ] Add assertion count tracking
 
-The framework supports testing different permutations of configurations by allowing:
-- Parameterized test cases
-- Configuration matrix testing
-- State management between tests
-- Dependency injection for test fixtures
+#### Test Organization
+- [ ] Support test file discovery
+- [ ] Add test file pattern matching
+- [ ] Implement test suite organization
+- [ ] Add test tagging system
+
+#### Reporting
+- [ ] Add detailed test failure messages
+- [ ] Implement test summary statistics
+- [ ] Add test duration reporting
+- [ ] Support multiple output formats (JSON, TAP, etc.)
+- [ ] Add test coverage reporting
+
+#### Advanced Features
+- [ ] Add parameterized tests
+- [ ] Implement test fixtures
+- [ ] Add test state management
+- [ ] Support async test operations
+- [ ] Add test retry functionality
+- [ ] Implement test isolation
+
+#### Developer Experience
+- [ ] Add watch mode for development
+- [ ] Implement test debugging tools
+- [ ] Add test documentation generation
+- [ ] Create VS Code integration
+- [ ] Add test templates
+
+#### Documentation
+- [ ] Add API documentation
+- [ ] Create usage examples
+- [ ] Add best practices guide
+- [ ] Create migration guide from other testing frameworks
+
+## Next Steps
+
+The immediate next steps to make this framework more useful like Jest/BunJS are:
+
+1. Implement the core test structure:
+   - Add `describe` blocks for test grouping
+   - Implement hooks (`before-each`, `after-each`, etc.)
+   - Add basic assertion library
+
+2. Improve test organization:
+   - Add test file discovery
+   - Implement test suite organization
+   - Add test tagging
+
+3. Enhance reporting:
+   - Add detailed failure messages
+   - Implement test summary statistics
+   - Add test duration reporting
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+[Add License Information]
