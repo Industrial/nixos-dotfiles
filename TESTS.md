@@ -50,10 +50,10 @@ We organize tests co-located with their implementation files using the following
 - [x] `common/settings.nix`
 
 ### Features
-- [ ] `features/ai/n8n/default.nix`
+- [x] `features/ai/n8n/default.nix`
 - [ ] `features/ai/ollama/default.nix`
 - [ ] `features/ci/comin/default.nix`
-- [ ] `features/cli/bat/default.nix`
+- [x] `features/cli/bat/default.nix`
 - [ ] `features/cli/btop/default.nix`
 - [ ] `features/cli/c/default.nix`
 - [ ] `features/cli/cheatsheet/default.nix`
