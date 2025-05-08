@@ -50,39 +50,201 @@ We organize tests co-located with their implementation files using the following
 - [x] `common/settings.nix`
 
 ### Features
-- [ ] `features/cli/*`
-- [ ] `features/window-manager/*`
-- [ ] `features/virtual-machine/*`
-- [ ] `features/programming/*`
-- [ ] `features/security/*`
-- [ ] `features/nix/*`
-- [ ] `features/nixos/*`
-- [ ] `features/office/*`
-- [ ] `features/monitoring/*`
-- [ ] `features/network/*`
-- [ ] `features/media/*`
-- [ ] `features/communication/*`
-- [ ] `features/crypto/*`
-- [ ] `features/games/*`
-- [ ] `features/ai/*`
-- [ ] `features/ci/*`
+- [ ] `features/ai/n8n/default.nix`
+- [ ] `features/ai/ollama/default.nix`
+- [ ] `features/ci/comin/default.nix`
+- [ ] `features/cli/bat/default.nix`
+- [ ] `features/cli/btop/default.nix`
+- [ ] `features/cli/c/default.nix`
+- [ ] `features/cli/cheatsheet/default.nix`
+- [ ] `features/cli/cl/default.nix`
+- [ ] `features/cli/create-ssh-key/default.nix`
+- [ ] `features/cli/direnv/default.nix`
+- [ ] `features/cli/du/default.nix`
+- [ ] `features/cli/dust/default.nix`
+- [ ] `features/cli/eza/default.nix`
+- [ ] `features/cli/fastfetch/default.nix`
+- [ ] `features/cli/fd/default.nix`
+- [ ] `features/cli/fish/default.nix`
+- [ ] `features/cli/fish/havamal.nix`
+- [ ] `features/cli/fzf/default.nix`
+- [ ] `features/cli/g/default.nix`
+- [ ] `features/cli/gpg/default.nix`
+- [ ] `features/cli/jq/default.nix`
+- [ ] `features/cli/killall/default.nix`
+- [ ] `features/cli/lazygit/default.nix`
+- [ ] `features/cli/l/default.nix`
+- [ ] `features/cli/ll/default.nix`
+- [ ] `features/cli/p7zip/default.nix`
+- [ ] `features/cli/p/default.nix`
+- [ ] `features/cli/ripgrep/default.nix`
+- [ ] `features/cli/starship/default.nix`
+- [ ] `features/cli/unrar/default.nix`
+- [ ] `features/cli/unzip/default.nix`
+- [ ] `features/cli/zellij/default.nix`
+- [ ] `features/communication/discord/default.nix`
+- [ ] `features/communication/fractal/default.nix`
+- [ ] `features/communication/teams/default.nix`
+- [ ] `features/communication/telegram/default.nix`
+- [ ] `features/communication/weechat/default.nix`
+- [ ] `features/crypto/monero/default.nix`
+- [ ] `features/games/lutris/default.nix`
+- [ ] `features/games/path-of-building/default.nix`
+- [ ] `features/games/wowup/default.nix`
+- [ ] `features/media/calibre/default.nix`
+- [ ] `features/media/invidious/default.nix`
+- [ ] `features/media/jellyfin/default.nix`
+- [ ] `features/media/lidarr/default.nix`
+- [ ] `features/media/prowlarr/default.nix`
+- [ ] `features/media/radarr/default.nix`
+- [ ] `features/media/readarr/default.nix`
+- [ ] `features/media/sonarr/default.nix`
+- [ ] `features/media/spotify/default.nix`
+- [ ] `features/media/tiny-tiny-rss/default.nix`
+- [ ] `features/media/transmission/default.nix`
+- [ ] `features/media/vlc/default.nix`
+- [ ] `features/media/whisparr/default.nix`
+- [ ] `features/monitoring/grafana/default.nix`
+- [ ] `features/monitoring/homepage-dashboard/default.nix`
+- [ ] `features/monitoring/prometheus/default.nix`
+- [ ] `features/network/chromium/default.nix`
+- [ ] `features/network/firefox/default.nix`
+- [ ] `features/network/i2pd/default.nix`
+- [ ] `features/network/searx/default.nix`
+- [ ] `features/network/ssh/default.nix`
+- [ ] `features/network/syncthing/default.nix`
+- [ ] `features/network/tor-browser/default.nix`
+- [ ] `features/network/tor/default.nix`
+- [ ] `features/nix/default.nix`
+- [ ] `features/nix/nixpkgs/default.nix`
+- [ ] `features/nixos/bluetooth/default.nix`
+- [ ] `features/nixos/boot/default.nix`
+- [ ] `features/nixos/docker/default.nix`
+- [ ] `features/nixos/fonts/default.nix`
+- [ ] `features/nixos/graphics/amd.nix`
+- [ ] `features/nixos/graphics/default.nix`
+- [ ] `features/nixos/networking/default.nix`
+- [ ] `features/nixos/networking/dns.nix`
+- [ ] `features/nixos/networking/firewall.nix`
+- [ ] `features/nixos/security/no-defaults/default.nix`
+- [ ] `features/nixos/security/sudo/default.nix`
+- [ ] `features/nixos/sound/default.nix`
+- [ ] `features/nixos/users/default.nix`
+- [ ] `features/nixos/window-manager/default.nix`
+- [ ] `features/nix/users/trusted-users.nix`
+- [ ] `features/office/obsidian/default.nix`
+- [ ] `features/programming/bun/default.nix`
+- [ ] `features/programming/cursor/default.nix`
+- [ ] `features/programming/devenv/default.nix`
+- [ ] `features/programming/docker-compose/default.nix`
+- [ ] `features/programming/git/default.nix`
+- [ ] `features/programming/gitkraken/default.nix`
+- [ ] `features/programming/glogg/default.nix`
+- [ ] `features/programming/insomnia/default.nix`
+- [ ] `features/programming/meld/default.nix`
+- [ ] `features/programming/neovim/backup-files.nix`
+- [ ] `features/programming/neovim/buffer-search.nix`
+- [ ] `features/programming/neovim/buffers.nix`
+- [ ] `features/programming/neovim/color-scheme.nix`
+- [ ] `features/programming/neovim/commenting.nix`
+- [ ] `features/programming/neovim/copy-paste.nix`
+- [ ] `features/programming/neovim/dashboard.nix`
+- [ ] `features/programming/neovim/debug-adapter-protocol.nix`
+- [ ] `features/programming/neovim/default.nix`
+- [ ] `features/programming/neovim/diagnostic-signs.nix`
+- [ ] `features/programming/neovim/editing.nix`
+- [ ] `features/programming/neovim/file-tabs.nix`
+- [ ] `features/programming/neovim/file-tree-sidebar.nix`
+- [ ] `features/programming/neovim/folds.nix`
+- [ ] `features/programming/neovim/git.nix`
+- [ ] `features/programming/neovim/indentation.nix`
+- [ ] `features/programming/neovim/initialize.nix`
+- [ ] `features/programming/neovim/keybind-menu.nix`
+- [ ] `features/programming/neovim/language-support.nix`
+- [ ] `features/programming/neovim/library.nix`
+- [ ] `features/programming/neovim/line-numbers.nix`
+- [ ] `features/programming/neovim/movement.nix`
+- [ ] `features/programming/neovim/quickfix.nix`
+- [ ] `features/programming/neovim/refactoring.nix`
+- [ ] `features/programming/neovim/saving-files.nix`
+- [ ] `features/programming/neovim/searching.nix`
+- [ ] `features/programming/neovim/splits.nix`
+- [ ] `features/programming/neovim/status-line.nix`
+- [ ] `features/programming/neovim/swap-files.nix`
+- [ ] `features/programming/neovim/tab-line.nix`
+- [ ] `features/programming/neovim/terminal.nix`
+- [ ] `features/programming/neovim/testing.nix`
+- [ ] `features/programming/neovim/undo-files.nix`
+- [ ] `features/programming/neovim/visual-information.nix`
+- [ ] `features/programming/neovim/wildmenu.nix`
+- [ ] `features/programming/node/default.nix`
+- [ ] `features/programming/python/default.nix`
+- [ ] `features/programming/vscode/default.nix`
+- [ ] `features/security/keepassxc/default.nix`
+- [ ] `features/security/tailscale/default.nix`
+- [ ] `features/security/veracrypt/default.nix`
+- [ ] `features/virtual-machine/kubernetes/k3s/default.nix`
+- [ ] `features/virtual-machine/kubernetes/lib/generateHostEntries.nix`
+- [ ] `features/virtual-machine/kubernetes/lib/generateManifest.nix`
+- [ ] `features/virtual-machine/kubernetes/lib/generateManifests.nix`
+- [ ] `features/virtual-machine/kubernetes/master/default.nix`
+- [ ] `features/virtual-machine/kubernetes/node/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/baserow/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/calibre-web/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/dashboard/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/devtron/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/immich/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/jellyfin/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/kube-ops-view/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/openstreetmap/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/pairdrop/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/portainer/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/prowlarr/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/rsshub/default.nix`
+- [ ] `features/virtual-machine/kubernetes/services/skooner/default.nix`
+- [ ] `features/virtual-machine/microvm/base/default.nix`
+- [ ] `features/virtual-machine/microvm/base/gui.nix`
+- [ ] `features/virtual-machine/microvm/database/default.nix`
+- [ ] `features/virtual-machine/microvm/database/host-network.nix`
+- [ ] `features/virtual-machine/microvm/host/default.nix`
+- [ ] `features/virtual-machine/microvm/management/default.nix`
+- [ ] `features/virtual-machine/microvm/management/host-network.nix`
+- [ ] `features/virtual-machine/microvm/ssh/default.nix`
+- [ ] `features/virtual-machine/microvm/target/default.nix`
+- [ ] `features/virtual-machine/microvm/target/host-network.nix`
+- [ ] `features/virtual-machine/microvm/tor/default.nix`
+- [ ] `features/virtual-machine/microvm/tor/host-network.nix`
+- [ ] `features/virtual-machine/microvm/web/default.nix`
+- [ ] `features/virtual-machine/microvm/web/host-network.nix`
+- [ ] `features/virtual-machine/ssh/default.nix`
+- [ ] `features/virtual-machine/virtualbox/default.nix`
+- [ ] `features/window-manager/alacritty/default.nix`
+- [ ] `features/window-manager/dwm/default.nix`
+- [ ] `features/window-manager/dwm/overlays/my-dwm.nix`
+- [ ] `features/window-manager/ghostty/default.nix`
+- [ ] `features/window-manager/gnome/default.nix`
+- [ ] `features/window-manager/river/default.nix`
+- [ ] `features/window-manager/slock/default.nix`
+- [ ] `features/window-manager/stylix/default.nix`
+- [ ] `features/window-manager/stylix/derivations/tinted-theming-schemes.nix`
+- [ ] `features/window-manager/xclip/default.nix`
+- [ ] `features/window-manager/xfce/default.nix`
+- [ ] `features/window-manager/xmonad/default.nix`
+- [ ] `features/window-manager/xsel/default.nix`
 
 ### Hosts
-- [ ] `hosts/mimir/*`
-- [ ] `hosts/vm_target/*`
-- [ ] `hosts/vm_tor/*`
-- [ ] `hosts/vm_web/*`
-- [ ] `hosts/vm_test/*`
-- [ ] `hosts/vm_management/*`
-- [ ] `hosts/vm_database/*`
-- [ ] `hosts/langhus/*`
-- [ ] `hosts/huginn/*`
-- [ ] `hosts/drakkar/*`
-
-### Configuration Files
-- [ ] `.devenv.flake.nix`
-- [ ] `treefmt.toml`
-- [ ] `biome.json`
+- [ ] `hosts/drakkar/flake.nix`
+- [ ] `hosts/huginn/flake.nix`
+- [ ] `hosts/langhus/flake.nix`
+- [ ] `hosts/mimir/disko.nix`
+- [ ] `hosts/mimir/filesystems.nix`
+- [ ] `hosts/mimir/flake.nix`
+- [ ] `hosts/vm_database/flake.nix`
+- [ ] `hosts/vm_management/flake.nix`
+- [ ] `hosts/vm_target/flake.nix`
+- [ ] `hosts/vm_test/flake.nix`
+- [ ] `hosts/vm_tor/flake.nix`
+- [ ] `hosts/vm_web/flake.nix`
 
 ## Test Types
 
@@ -105,59 +267,15 @@ For each module, we should test:
 
 ## Running Tests
 
-Tests can be run in several ways:
+Tests can be run like this:
 
 1. **Unit Tests (Recommended)**
    ```bash
    bin/test
    ```
-   This will run all `.test.nix` files in the repository. Use `bin/test --fail-fast` to stop on first failure.
-
-2. **Integration Tests**
-   ```bash
-   nix-build tests/default.nix
-   ```
-   This verifies the repository structure and configuration.
-
-3. **Using devenv**
-   ```bash
-   devenv test-nix
-   ```
+   This will run all `.test.nix` files in the repository.
 
 Tests are automatically run:
 - Before each commit (pre-commit hook): Integration tests
 - Before each push (pre-push hook): Unit tests
 - In CI/CD pipeline: Both unit and integration tests
-
-## Adding New Tests
-
-When adding new tests:
-
-1. Create a `.test.nix` file next to the module being tested
-2. Use `nixpkgs.lib.runTests` to define test cases
-3. The test will be automatically picked up by `bin/test`
-
-Example test structure:
-```nix
-# module.test.nix
-{ pkgs ? import <nixpkgs> {} }:
-
-pkgs.lib.runTests {
-  testBasicEvaluation = {
-    expr = import ./module.nix { inherit pkgs; };
-    expected = {
-      # expected structure
-    };
-  };
-  
-  testCustomConfig = {
-    expr = import ./module.nix { 
-      inherit pkgs;
-      customOption = "value";
-    };
-    expected = {
-      # expected structure with custom option
-    };
-  };
-}
-``` 

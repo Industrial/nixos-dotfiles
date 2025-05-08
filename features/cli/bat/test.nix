@@ -1,0 +1,21 @@
+{pkgs, ...}: let
+  mockPkgs = {
+    bat = "mock-bat-package";
+  };
+
+  batModule = import ./default.nix {pkgs = mockPkgs;};
+in {
+  # Test that required packages are available
+  testRequiredPackagesAvailable = {
+    expr = builtins.hasAttr "bat" pkgs;
+    expected = true;
+  };
+
+  # Test that the module evaluates without errors
+  testModuleEvaluates = {
+    expr = batModule.environment.systemPackages;
+    expected = [
+      "mock-bat-package"
+    ];
+  };
+}

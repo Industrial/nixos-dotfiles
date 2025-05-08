@@ -3,16 +3,5 @@ echo "> test"
 exec > >(tee ./logs/test) 2>&1
 set -euo pipefail
 
-# Initialize exit code
-exit_code=0
-
-# Find and run all test files
-while IFS= read -r test_file; do
-  echo "> test > $test_file"
-  if ! nix-unit "$test_file"; then
-    exit_code=1
-    echo "> test > $test_file > failed"
-  fi
-done < <(find . -name '*.test.nix')
-
-exit $exit_code
+#nix flake update
+nix flake check
