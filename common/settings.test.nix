@@ -1,5 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
-
+{pkgs ? import <nixpkgs> {}}:
 pkgs.lib.runTests {
   testBasicEvaluation = {
     expr = import ./settings.nix {
@@ -71,4 +70,4 @@ pkgs.lib.runTests {
       };
     };
   };
-} 
+}

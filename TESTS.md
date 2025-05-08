@@ -12,26 +12,27 @@ Currently, we have basic tests in `tests/default.nix` that verify:
 
 ## Test Organization
 
-We recommend organizing tests close to their implementation files using the following structure:
+We organize tests co-located with their implementation files using the following structure:
 
 ```
 .
 ├── common/
 │   ├── settings.nix
-│   └── tests/
-│       └── settings.nix
+│   └── settings.test.nix
 ├── features/
 │   ├── cli/
-│   │   └── tests/
-│   ├── window-manager/
-│   │   └── tests/
-│   └── hidden-service.nix
-│       └── tests/
+│   │   ├── default.nix
+│   │   └── default.test.nix
+│   └── window-manager/
+│       ├── default.nix
+│       └── default.test.nix
 ├── hosts/
 │   ├── mimir/
-│   │   └── tests/
+│   │   ├── default.nix
+│   │   └── default.test.nix
 │   └── vm_target/
-│       └── tests/
+│       ├── default.nix
+│       └── default.test.nix
 └── tests/
     └── default.nix  # Integration tests
 ```
@@ -99,14 +100,15 @@ For each module, we should test:
 
 Tests can be run in several ways:
 
-1. **All Tests**
+1. **All Tests (Recommended)**
    ```bash
-   nix-build tests/default.nix
+   bin/test
    ```
+   This will run all `.test.nix` files in the repository. Use `bin/test --fail-fast` to stop on first failure.
 
 2. **Specific Module Tests**
    ```bash
-   nix-build path/to/module/tests/default.nix
+   nix-build path/to/module.test.nix
    ```
 
 3. **Using devenv**
@@ -123,21 +125,30 @@ Tests are automatically run:
 
 When adding new tests:
 
-1. Create a `tests` directory next to the module being tested
-2. Create a `default.nix` in the tests directory
-3. Use `nixpkgs.lib.runTests` to define test cases
-4. Add the test file to the main `tests/default.nix` for integration testing
+1. Create a `.test.nix` file next to the module being tested
+2. Use `nixpkgs.lib.runTests` to define test cases
+3. Add the test file to the main `tests/default.nix` for integration testing
 
 Example test structure:
 ```nix
-# module/tests/default.nix
+# module.test.nix
 { pkgs ? import <nixpkgs> {} }:
 
 pkgs.lib.runTests {
-  testModuleEvaluation = {
-    expr = import ../default.nix { inherit pkgs; };
+  testBasicEvaluation = {
+    expr = import ./module.nix { inherit pkgs; };
     expected = {
       # expected structure
+    };
+  };
+  
+  testCustomConfig = {
+    expr = import ./module.nix { 
+      inherit pkgs;
+      customOption = "value";
+    };
+    expected = {
+      # expected structure with custom option
     };
   };
 }

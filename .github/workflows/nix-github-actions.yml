@@ -33,5 +33,7 @@ jobs:
         uses: cachix/cachix-action@v14
         with:
           name: devenv
-      - name: Run Nix Tests
+      - name: Run Unit Tests
+        run: bin/test --fail-fast
+      - name: Run Integration Tests
         run: nix-build tests/default.nix

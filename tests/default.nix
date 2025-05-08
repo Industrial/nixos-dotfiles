@@ -23,7 +23,7 @@ pkgs.lib.runTests {
 
   # Test settings module
   testSettings = {
-    expr = import ../common/tests/settings.nix { inherit pkgs; };
+    expr = import ../common/settings.test.nix {inherit pkgs;};
     expected = {
       testBasicEvaluation = true;
       testCustomUsername = true;

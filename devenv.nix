@@ -82,6 +82,15 @@
         pass_filenames = false;
         always_run = true;
       };
+      unit-tests = {
+        enable = true;
+        stages = ["pre-push"];
+        name = "unit-tests";
+        description = "Run unit tests";
+        entry = "bin/test --fail-fast";
+        pass_filenames = false;
+        always_run = true;
+      };
     };
   };
 }
