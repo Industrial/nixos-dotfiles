@@ -20,4 +20,14 @@ pkgs.lib.runTests {
     expr = builtins.pathExists ../hosts;
     expected = true;
   };
+
+  # Test settings module
+  testSettings = {
+    expr = import ../common/tests/settings.nix { inherit pkgs; };
+    expected = {
+      testBasicEvaluation = true;
+      testCustomUsername = true;
+      testCustomVersion = true;
+    };
+  };
 }

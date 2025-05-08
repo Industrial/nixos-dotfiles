@@ -8,6 +8,7 @@ Currently, we have basic tests in `tests/default.nix` that verify:
 - `devenv.nix` evaluates correctly
 - Common modules directory exists
 - Hosts directory exists
+- `common/settings.nix` evaluates correctly with various configurations
 
 ## Test Organization
 
@@ -38,7 +39,7 @@ We recommend organizing tests close to their implementation files using the foll
 ## Files Needing Tests
 
 ### Common Modules
-- [ ] `common/settings.nix`
+- [x] `common/settings.nix`
 
 ### Features
 - [ ] `features/cli/*`

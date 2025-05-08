@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Find all .test.nix files
+test_files=$(find . -name "*.test.nix")
+
+if [ -z "$test_files" ]; then
+    echo -e "${YELLOW}No test files found${NC}"
+    exit 0
+fi
+
+# Counter for failed tests
+failed=0
+
+# Run each test file
+for test_file in $test_files; do
+    echo -e "\n${YELLOW}Running tests in ${test_file}...${NC}"
+    
+    if nix-build "$test_file" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓ All tests passed in ${test_file}${NC}"
+    else
+        echo -e "${RED}✗ Tests failed in ${test_file}${NC}"
+        # Show the actual error
+        nix-build "$test_file"
+        failed=$((failed + 1))
+        # Exit immediately on first failure if --fail-fast is set
+        if [ "${1:-}" = "--fail-fast" ]; then
+            exit 1
+        fi
+    fi
+done
+
+# Exit with appropriate status
+if [ $failed -gt 0 ]; then
+    echo -e "\n${RED}${failed} test file(s) failed${NC}"
+    exit 1
+else
+    echo -e "\n${GREEN}All tests passed!${NC}"
+    exit 0
+fi 
