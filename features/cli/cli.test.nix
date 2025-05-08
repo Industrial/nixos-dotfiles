@@ -1,3 +1,29 @@
 {pkgs, ...}: {
   bat = import ./bat/bat.test.nix {inherit pkgs;};
+  btop = import ./btop/btop.test.nix {inherit pkgs;};
+  c = import ./c/c.test.nix {inherit pkgs;};
+  cheatsheet = import ./cheatsheet/cheatsheet.test.nix {inherit pkgs;};
+  cl = import ./cl/cl.test.nix {inherit pkgs;};
+  create-ssh-key = import ./create-ssh-key/create-ssh-key.test.nix {inherit pkgs;};
+  direnv = import ./direnv/direnv.test.nix {inherit pkgs;};
+  du = import ./du/du.test.nix {inherit pkgs;};
+  dust = import ./dust/dust.test.nix {inherit pkgs;};
+  eza = import ./eza/eza.test.nix {inherit pkgs;};
+  fastfetch = import ./fastfetch/fastfetch.test.nix {inherit pkgs;};
+  fd = import ./fd/fd.test.nix {inherit pkgs;};
+  fish = import ./fish/fish.test.nix {inherit pkgs;};
+  fzf = import ./fzf/fzf.test.nix {inherit pkgs;};
+  g = import ./g/g.test.nix {inherit pkgs;};
+  gpg = import ./gpg/gpg.test.nix {inherit pkgs;};
+  jq = import ./jq/jq.test.nix {inherit pkgs;};
+  l = import ./l/l.test.nix {inherit pkgs;};
+  lazygit = import ./lazygit/lazygit.test.nix {inherit pkgs;};
+  ll = import ./ll/ll.test.nix {inherit pkgs;};
+  p = import ./p/p.test.nix {inherit pkgs;};
+  p7zip = import ./p7zip/p7zip.test.nix {inherit pkgs;};
+  ripgrep = import ./ripgrep/ripgrep.test.nix {inherit pkgs;};
+  starship = import ./starship/starship.test.nix {inherit pkgs;};
+  unrar = import ./unrar/unrar.test.nix {inherit pkgs;};
+  unzip = import ./unzip/unzip.test.nix {inherit pkgs;};
+  zellij = import ./zellij/zellij.test.nix {inherit pkgs;};
 }

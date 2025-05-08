@@ -51,37 +51,37 @@ We organize tests co-located with their implementation files using the following
 
 ### Features
 - [x] `features/ai/n8n/default.nix`
-- [ ] `features/ai/ollama/default.nix`
-- [ ] `features/ci/comin/default.nix`
+- [x] `features/ai/ollama/default.nix`
+- [x] `features/ci/comin/default.nix`
 - [x] `features/cli/bat/default.nix`
-- [ ] `features/cli/btop/default.nix`
-- [ ] `features/cli/c/default.nix`
-- [ ] `features/cli/cheatsheet/default.nix`
-- [ ] `features/cli/cl/default.nix`
-- [ ] `features/cli/create-ssh-key/default.nix`
-- [ ] `features/cli/direnv/default.nix`
-- [ ] `features/cli/du/default.nix`
-- [ ] `features/cli/dust/default.nix`
-- [ ] `features/cli/eza/default.nix`
-- [ ] `features/cli/fastfetch/default.nix`
-- [ ] `features/cli/fd/default.nix`
-- [ ] `features/cli/fish/default.nix`
-- [ ] `features/cli/fish/havamal.nix`
-- [ ] `features/cli/fzf/default.nix`
-- [ ] `features/cli/g/default.nix`
-- [ ] `features/cli/gpg/default.nix`
-- [ ] `features/cli/jq/default.nix`
-- [ ] `features/cli/killall/default.nix`
-- [ ] `features/cli/lazygit/default.nix`
-- [ ] `features/cli/l/default.nix`
-- [ ] `features/cli/ll/default.nix`
-- [ ] `features/cli/p7zip/default.nix`
-- [ ] `features/cli/p/default.nix`
-- [ ] `features/cli/ripgrep/default.nix`
-- [ ] `features/cli/starship/default.nix`
-- [ ] `features/cli/unrar/default.nix`
-- [ ] `features/cli/unzip/default.nix`
-- [ ] `features/cli/zellij/default.nix`
+- [x] `features/cli/btop/default.nix`
+- [x] `features/cli/c/default.nix`
+- [x] `features/cli/cheatsheet/default.nix`
+- [x] `features/cli/cl/default.nix`
+- [x] `features/cli/create-ssh-key/default.nix`
+- [x] `features/cli/direnv/default.nix`
+- [x] `features/cli/du/default.nix`
+- [x] `features/cli/dust/default.nix`
+- [x] `features/cli/eza/default.nix`
+- [x] `features/cli/fastfetch/default.nix`
+- [x] `features/cli/fd/default.nix`
+- [x] `features/cli/fish/default.nix`
+- [x] `features/cli/fish/havamal.nix`
+- [x] `features/cli/fzf/default.nix`
+- [x] `features/cli/g/default.nix`
+- [x] `features/cli/gpg/default.nix`
+- [x] `features/cli/jq/default.nix`
+- [x] `features/cli/killall/default.nix`
+- [x] `features/cli/lazygit/default.nix`
+- [x] `features/cli/l/default.nix`
+- [x] `features/cli/ll/default.nix`
+- [x] `features/cli/p7zip/default.nix`
+- [x] `features/cli/p/default.nix`
+- [x] `features/cli/ripgrep/default.nix`
+- [x] `features/cli/starship/default.nix`
+- [x] `features/cli/unrar/default.nix`
+- [x] `features/cli/unzip/default.nix`
+- [x] `features/cli/zellij/default.nix`
 - [ ] `features/communication/discord/default.nix`
 - [ ] `features/communication/fractal/default.nix`
 - [ ] `features/communication/teams/default.nix`
