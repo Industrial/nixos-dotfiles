@@ -4,11 +4,18 @@ This document outlines the testing strategy for our dotfiles repository and list
 
 ## Current Test Coverage
 
-Currently, we have basic tests in `tests/default.nix` that verify:
-- `devenv.nix` evaluates correctly
-- Common modules directory exists
-- Hosts directory exists
-- `common/settings.nix` evaluates correctly with various configurations
+Currently, we have two types of tests:
+
+1. **Unit Tests** (using `bin/test`):
+   - Individual module tests in `.test.nix` files
+   - Co-located with their implementation
+   - Run with `bin/test` or `bin/test --fail-fast`
+
+2. **Integration Tests** (using `tests/default.nix`):
+   - Repository structure verification
+   - Configuration file existence checks
+   - Directory structure validation
+   - DevEnv evaluation tests
 
 ## Test Organization
 
@@ -100,16 +107,17 @@ For each module, we should test:
 
 Tests can be run in several ways:
 
-1. **All Tests (Recommended)**
+1. **Unit Tests (Recommended)**
    ```bash
    bin/test
    ```
    This will run all `.test.nix` files in the repository. Use `bin/test --fail-fast` to stop on first failure.
 
-2. **Specific Module Tests**
+2. **Integration Tests**
    ```bash
-   nix-build path/to/module.test.nix
+   nix-build tests/default.nix
    ```
+   This verifies the repository structure and configuration.
 
 3. **Using devenv**
    ```bash
@@ -117,9 +125,9 @@ Tests can be run in several ways:
    ```
 
 Tests are automatically run:
-- Before each commit (pre-commit hook)
-- In CI/CD pipeline
-- On pull requests
+- Before each commit (pre-commit hook): Integration tests
+- Before each push (pre-push hook): Unit tests
+- In CI/CD pipeline: Both unit and integration tests
 
 ## Adding New Tests
 
@@ -127,7 +135,7 @@ When adding new tests:
 
 1. Create a `.test.nix` file next to the module being tested
 2. Use `nixpkgs.lib.runTests` to define test cases
-3. Add the test file to the main `tests/default.nix` for integration testing
+3. The test will be automatically picked up by `bin/test`
 
 Example test structure:
 ```nix

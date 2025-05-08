@@ -7,6 +7,11 @@
 
   # https://devenv.sh/packages/
   packages = with pkgs; [
+    # Nix
+    nix-unit
+    namaka
+    nixt
+
     # Rust toolchain
     rustc
     cargo
@@ -49,7 +54,7 @@
     rust-version.exec = "rustc --version";
     cargo-version.exec = "cargo --version";
     commit.exec = "git-cz";
-    test-nix.exec = "nix-build tests/default.nix";
+    test.exec = "bin/test";
   };
 
   enterShell = ''
@@ -77,8 +82,8 @@
         enable = true;
         stages = ["pre-commit"];
         name = "nix-tests";
-        description = "Run Nix tests";
-        entry = "nix-build tests/default.nix";
+        description = "Run Nix unit tests";
+        entry = "bin/test";
         pass_filenames = false;
         always_run = true;
       };
@@ -87,7 +92,7 @@
         stages = ["pre-push"];
         name = "unit-tests";
         description = "Run unit tests";
-        entry = "bin/test --fail-fast";
+        entry = "bin/test";
         pass_filenames = false;
         always_run = true;
       };

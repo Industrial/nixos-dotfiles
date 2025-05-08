@@ -10,6 +10,16 @@
       url = "github:NixOS/nixos-hardware/master";
     };
 
+    # Nix Unit.
+    nix-unit = {
+      url = "github:nix-community/nix-unit";
+      inputs = {
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
+      };
+    };
+
     # Comin: Git Pull Based Deployment System.
     comin = {
       url = "github:nlewo/comin";
@@ -99,11 +109,44 @@
     };
   };
 
-  outputs = inputs @ {self, ...}: {
-    nixosConfigurations = let
-      hostname = "mimir";
-      settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
-    in {
+  outputs = inputs @ {
+    self,
+    nixpkgs,
+    nix-unit,
+    ...
+  }: let
+    hostname = "mimir";
+    settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
+  in {
+    tests = {
+      testsPass = {
+        expr = 3;
+        expected = 4;
+      };
+    };
+
+    checks = {
+      "${settings.system}" = {
+        default =
+          nixpkgs.legacyPackages.${settings.system}.runCommand "tests" {
+            nativeBuildInputs = [
+              nix-unit.packages.${settings.system}.default
+            ];
+          }
+          ''
+            export HOME="$(realpath .)"
+            # The nix derivation must be able to find all used inputs in the
+            # nix-store because it cannot download it during buildTime.
+            nix-unit --eval-store "$HOME" \
+              --extra-experimental-features flakes \
+              --override-input nixpkgs ${nixpkgs} \
+              --flake ${self}#tests
+            touch $out
+          '';
+      };
+    };
+
+    nixosConfigurations = {
       "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
         inherit (settings) system;
         specialArgs = {

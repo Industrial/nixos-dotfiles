@@ -1,7 +1,8 @@
-{pkgs ? import <nixpkgs> {}}:
-pkgs.lib.runTests {
+{pkgs ? import <nixpkgs> {}}: let
+  settings = import ./settings.nix;
+in {
   testBasicEvaluation = {
-    expr = import ./settings.nix {
+    expr = settings {
       inherit (pkgs) system;
       hostname = "test-host";
     };
@@ -24,7 +25,7 @@ pkgs.lib.runTests {
   };
 
   testCustomUsername = {
-    expr = import ./settings.nix {
+    expr = settings {
       inherit (pkgs) system;
       hostname = "test-host";
       username = "custom-user";
@@ -48,7 +49,7 @@ pkgs.lib.runTests {
   };
 
   testCustomVersion = {
-    expr = import ./settings.nix {
+    expr = settings {
       inherit (pkgs) system;
       hostname = "test-host";
       version = "23.11";
