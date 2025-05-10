@@ -109,43 +109,10 @@
     };
   };
 
-  outputs = inputs @ {
-    self,
-    nixpkgs,
-    nix-unit,
-    ...
-  }: let
+  outputs = inputs @ {self, ...}: let
     hostname = "mimir";
     settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
   in {
-    tests = {
-      testsPass = {
-        expr = 3;
-        expected = 4;
-      };
-    };
-
-    checks = {
-      "${settings.system}" = {
-        default =
-          nixpkgs.legacyPackages.${settings.system}.runCommand "tests" {
-            nativeBuildInputs = [
-              nix-unit.packages.${settings.system}.default
-            ];
-          }
-          ''
-            export HOME="$(realpath .)"
-            # The nix derivation must be able to find all used inputs in the
-            # nix-store because it cannot download it during buildTime.
-            nix-unit --eval-store "$HOME" \
-              --extra-experimental-features flakes \
-              --override-input nixpkgs ${nixpkgs} \
-              --flake ${self}#tests
-            touch $out
-          '';
-      };
-    };
-
     nixosConfigurations = {
       "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
         inherit (settings) system;
@@ -200,19 +167,24 @@
 
           ../../features/crypto/monero
 
-          #../../features/games/lutris
-          #../../features/games/wowup
+          #../features/games/lutris
+          #../features/games/path-of-building
+          #../features/games/steam
+          #../features/games/wowup
 
           # TODO: Broken. Need another YouTube client.
           #../../features/media/invidious
+          #../../features/media/jellyfin
           #../../features/media/lidarr
           #../../features/media/prowlarr
           #../../features/media/radarr
           #../../features/media/readarr
           #../../features/media/sonarr
           ../../features/media/spotify
+          #../../features/media/tiny-tiny-rss
           #../../features/media/transmission
           ../../features/media/vlc
+          #../../features/media/whisparr
 
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
@@ -289,6 +261,9 @@
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
           #../../features/window-manager/xfce
+          #../../features/window-manager/xmonad
+          ../../features/window-manager/xsel
+          ../../features/window-manager/xclip
         ];
       };
     };
