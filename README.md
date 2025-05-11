@@ -52,4 +52,3 @@ bin/vm/stop <name>
 bin/vm/delete <name>
 bin/vm/start <name>
 ```
-

@@ -114,7 +114,10 @@
           #../features/ai/ollama
           inputs.comin.nixosModules.comin
           ../features/ci/comin
+
+          ../../features/cli/bandwhich
           ../../features/cli/bat
+          ../../features/cli/broot
           ../../features/cli/btop
           ../../features/cli/c
           ../../features/cli/cheatsheet
@@ -131,6 +134,7 @@
           ../../features/cli/fzf
           ../../features/cli/g
           ../../features/cli/gpg
+          ../../features/cli/gping
           ../../features/cli/jq
           ../../features/cli/killall
           ../../features/cli/l
@@ -143,6 +147,7 @@
           ../../features/cli/unrar
           ../../features/cli/unzip
           ../../features/cli/zellij
+
           ../features/communication/discord
           #../features/communication/fractal
           #../features/communication/weechat
