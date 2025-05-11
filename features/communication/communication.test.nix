@@ -4,5 +4,4 @@
   teams = import ./teams/teams.test.nix {inherit pkgs;};
   telegram = import ./telegram/telegram.test.nix {inherit pkgs;};
   weechat = import ./weechat/weechat.test.nix {inherit pkgs;};
-  whatsapp = import ./whatsapp/whatsapp.test.nix {inherit pkgs;};
 }

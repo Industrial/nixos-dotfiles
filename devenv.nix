@@ -53,6 +53,7 @@
   scripts = {
     rust-version.exec = "rustc --version";
     cargo-version.exec = "cargo --version";
+    format.exec = "treefmt";
     commit.exec = "git-cz";
     test.exec = "bin/test";
   };

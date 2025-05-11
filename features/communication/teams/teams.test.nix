@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockPkgs = {
     stdenv = {
       mkDerivation = attrs: {
@@ -8,7 +8,7 @@
         installPhase = attrs.installPhase;
       };
     };
-    teams = "mock-teams-package";
+    teams-for-linux = "mock-teams-package";
   };
 
   teamsModule = import ./default.nix {pkgs = mockPkgs;};
@@ -21,13 +21,13 @@ in {
 
   # Test that required packages are available
   testRequiredPackagesAvailable = {
-    expr = builtins.hasAttr "teams" mockPkgs;
+    expr = builtins.hasAttr "teams-for-linux" mockPkgs;
     expected = true;
   };
 
   # Test that Teams is in system packages
   testTeamsInSystemPackages = {
-    expr = builtins.elem mockPkgs.teams teamsModule.environment.systemPackages;
+    expr = builtins.elem mockPkgs.teams-for-linux teamsModule.environment.systemPackages;
     expected = true;
   };
-} 
+}

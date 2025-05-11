@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockPkgs = {
     stdenv = {
       mkDerivation = attrs: {
@@ -30,4 +30,4 @@ in {
     expr = builtins.elem mockPkgs.telegram-desktop telegramModule.environment.systemPackages;
     expected = true;
   };
-} 
+}

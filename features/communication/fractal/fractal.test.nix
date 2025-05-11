@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockPkgs = {
     stdenv = {
       mkDerivation = attrs: {
@@ -30,4 +30,4 @@ in {
     expr = builtins.elem mockPkgs.fractal fractalModule.environment.systemPackages;
     expected = true;
   };
-} 
+}

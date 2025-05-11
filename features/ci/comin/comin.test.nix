@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockSettings = {
     hostname = "test-host";
   };

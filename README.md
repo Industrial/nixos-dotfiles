@@ -29,10 +29,9 @@ bin/delete-generations
 ## Development
 
 ```bash
-bin/format
-bin/lint
-bin/check
+format
 bin/test
+commit
 ```
 
 ## Virtual Machines
