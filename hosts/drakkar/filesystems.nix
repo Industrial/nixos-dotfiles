@@ -18,12 +18,4 @@
       };
     };
   };
-
-  fileSystems = {
-    "/data" = {
-      device = "/dev/sda1";
-      fsType = "btrfs";
-      options = ["compress=zstd" "defaults"];
-    };
-  };
-} 
+}
