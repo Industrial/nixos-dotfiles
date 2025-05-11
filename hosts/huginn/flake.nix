@@ -116,34 +116,35 @@
           # ../features/ai/ollama
           inputs.comin.nixosModules.comin
           ../features/ci/comin
-          ../features/cli/bat
-          ../features/cli/btop
-          ../features/cli/c
-          ../features/cli/cheatsheet
-          ../features/cli/cl
-          ../features/cli/create-ssh-key
-          ../features/cli/direnv
-          ../features/cli/du
-          ../features/cli/dust
-          ../features/cli/eza
-          ../features/cli/fastfetch
-          ../features/cli/fd
-          ../features/cli/fish
-          ../features/cli/fzf
-          ../features/cli/g
-          ../features/cli/gpg
-          ../features/cli/jq
-          ../features/cli/killall
-          ../features/cli/l
-          ../features/cli/lazygit
-          ../features/cli/ll
-          ../features/cli/p
-          ../features/cli/p7zip
-          ../features/cli/ripgrep
-          ../features/cli/starship
-          ../features/cli/unrar
-          ../features/cli/unzip
-          ../features/cli/zellij
+          ../../features/cli/bat
+          ../../features/cli/btop
+          ../../features/cli/c
+          ../../features/cli/cheatsheet
+          ../../features/cli/cl
+          ../../features/cli/create-ssh-key
+          ../../features/cli/direnv
+          ../../features/cli/du
+          ../../features/cli/dust
+          ../../features/cli/dysk
+          ../../features/cli/eza
+          ../../features/cli/fastfetch
+          ../../features/cli/fd
+          ../../features/cli/fish
+          ../../features/cli/fzf
+          ../../features/cli/g
+          ../../features/cli/gpg
+          ../../features/cli/jq
+          ../../features/cli/killall
+          ../../features/cli/l
+          ../../features/cli/lazygit
+          ../../features/cli/ll
+          ../../features/cli/p
+          ../../features/cli/p7zip
+          ../../features/cli/ripgrep
+          ../../features/cli/starship
+          ../../features/cli/unrar
+          ../../features/cli/unzip
+          ../../features/cli/zellij
           ../features/communication/discord
           ../features/communication/fractal
           ../features/communication/weechat

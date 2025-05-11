@@ -139,6 +139,7 @@
           ../../features/cli/direnv
           ../../features/cli/du
           ../../features/cli/dust
+          ../../features/cli/dysk
           ../../features/cli/eza
           ../../features/cli/fastfetch
           ../../features/cli/fd
