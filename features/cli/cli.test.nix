@@ -19,6 +19,7 @@
   l = import ./l/l.test.nix {inherit pkgs;};
   lazygit = import ./lazygit/lazygit.test.nix {inherit pkgs;};
   ll = import ./ll/ll.test.nix {inherit pkgs;};
+  lnav = import ./lnav/lnav.test.nix {inherit pkgs;};
   p = import ./p/p.test.nix {inherit pkgs;};
   p7zip = import ./p7zip/p7zip.test.nix {inherit pkgs;};
   ripgrep = import ./ripgrep/ripgrep.test.nix {inherit pkgs;};
