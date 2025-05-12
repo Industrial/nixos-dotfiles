@@ -158,6 +158,7 @@
           ../../features/cli/p
           ../../features/cli/p7zip
           ../../features/cli/ripgrep
+          ../../features/cli/spotify-player
           ../../features/cli/starship
           ../../features/cli/unrar
           ../../features/cli/unzip

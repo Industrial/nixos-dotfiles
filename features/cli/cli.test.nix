@@ -22,6 +22,7 @@
   p = import ./p/p.test.nix {inherit pkgs;};
   p7zip = import ./p7zip/p7zip.test.nix {inherit pkgs;};
   ripgrep = import ./ripgrep/ripgrep.test.nix {inherit pkgs;};
+  spotify-player = import ./spotify-player/spotify-player.test.nix {inherit pkgs;};
   starship = import ./starship/starship.test.nix {inherit pkgs;};
   unrar = import ./unrar/unrar.test.nix {inherit pkgs;};
   unzip = import ./unzip/unzip.test.nix {inherit pkgs;};
