@@ -9,35 +9,104 @@ layout {
     }
   }
 
-  tab name="scratch" {
+  tab name="txt" {
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom"
+      }
+      pane {
+        cwd "/home/tom"
+        command "calcurse"
+      }
+    }
+  }
+
+  tab name="sys" {
+    pane split_direction="vertical" {
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "fastfetch"
+        }
+        pane {
+          cwd "/var/log"
+          command "lnav"
+          args "-e" "\"journalctl -f\""
+        }
+      }
+      pane {
+        cwd "/home/tom"
+        command "btop"
+      }
+    }
+  }
+
+  tab name="net" {
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom"
+        command "gping"
+        args "google.com"
+      }
+      pane {
+        cwd "/home/tom"
+        command "sudo"
+        args "bandwhich"
+      }
+    }
+  }
+
+  tab name="dsk" {
     pane {
       cwd "/home/tom"
+      command "broot"
     }
   }
 
-  tab name="processes" {
-    pane {
-      cwd "/home/tom"
-      command "btop"
+  tab name="mda" {
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom"
+        command "pulsemixer"
+      }
+      pane {
+        cwd "/home/tom"
+        command "spotify-player"
+      }
     }
   }
 
-  tab name="media" {
-    pane {
-      cwd "/home/tom"
-      command "pulsemixer"
+  tab name="cfg" {
+    pane split_direction="vertical" {
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom/.dotfiles"
+        }
+        pane {
+          cwd "/home/tom/.dotfiles"
+          command "lazygit"
+        }
+      }
+      pane {
+        cwd "/home/tom/.dotfiles"
+        command "nvim"
+      }
     }
   }
 
-  tab name="configuration" {
-    pane {
-      cwd "/home/tom/.dotfiles"
-    }
-  }
-
-  tab name="code" {
-    pane {
-      cwd "/home/tom/Code"
+  tab name="vim" {
+    pane split_direction="vertical" {
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom/Code"
+        }
+        pane {
+          cwd "/home/tom/Code"
+        }
+      }
+      pane split_direction="vertical" {
+        cwd "/home/tom/Code"
+      }
     }
   }
 }
