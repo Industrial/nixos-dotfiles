@@ -61,6 +61,9 @@
     statix
     # Nix formatter.
     alejandra
+
+    # Markdown linter
+    vale
   ];
 
   programs = {
