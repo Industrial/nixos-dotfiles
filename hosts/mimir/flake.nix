@@ -227,6 +227,7 @@
           ../../features/office/obsidian
 
           ../../features/programming/bun
+          ../../features/programming/claude-task-master
           ../../features/programming/cursor
           ../../features/programming/devenv
           ../../features/programming/docker-compose
