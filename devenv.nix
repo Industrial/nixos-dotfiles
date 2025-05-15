@@ -67,15 +67,6 @@
 
   git-hooks = {
     hooks = {
-      treefmt = {
-        enable = true;
-        stages = ["pre-commit"];
-        name = "treefmt";
-        description = "Format code with treefmt";
-        entry = "treefmt";
-        pass_filenames = false;
-        always_run = true;
-      };
       commitizen = {
         enable = true;
         stages = ["commit-msg"];
