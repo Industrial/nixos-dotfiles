@@ -82,19 +82,10 @@
       };
       nix-tests = {
         enable = true;
-        stages = ["pre-commit"];
+        stages = ["pre-commit" "pre-push"];
         name = "nix-tests";
         description = "Run Nix unit tests";
-        entry = "bin/test";
-        pass_filenames = false;
-        always_run = true;
-      };
-      unit-tests = {
-        enable = true;
-        stages = ["pre-push"];
-        name = "unit-tests";
-        description = "Run unit tests";
-        entry = "bin/test";
+        entry = "bin/lint && bin/test";
         pass_filenames = false;
         always_run = true;
       };
