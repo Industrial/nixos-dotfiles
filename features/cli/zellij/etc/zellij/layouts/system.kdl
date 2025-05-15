@@ -31,7 +31,7 @@ layout {
         pane {
           cwd "/var/log"
           command "lnav"
-          args "-e" "\"journalctl -f\""
+          args "-e" "\"journalctl" " -f\""
         }
       }
       pane {
@@ -71,7 +71,7 @@ layout {
       }
       pane {
         cwd "/home/tom"
-        command "spotify-player"
+        command "spotify_player"
       }
     }
   }
