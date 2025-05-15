@@ -56,6 +56,7 @@
     format.exec = "treefmt";
     commit.exec = "git-cz";
     test.exec = "bin/test";
+    lint.exec = "bin/lint";
   };
 
   enterShell = ''

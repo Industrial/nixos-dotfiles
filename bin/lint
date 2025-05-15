@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+echo "> lint"
+exec > >(tee ./logs/lint) 2>&1
+set -euo pipefail
+
+treefmt --config-file treefmt.ci.toml
