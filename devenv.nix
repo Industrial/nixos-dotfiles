@@ -80,12 +80,19 @@
         enable = true;
         stages = ["commit-msg"];
       };
-      nix-tests = {
+      lint = {
         enable = true;
-        stages = ["pre-commit" "pre-push"];
+        stages = ["pre-commit"];
+        name = "lint";
+        description = "Lint the code";
+        entry = "bin/lint";
+      };
+      test = {
+        enable = true;
+        stages = ["pre-push"];
         name = "nix-tests";
-        description = "Run Nix unit tests";
-        entry = "bin/lint && bin/test";
+        description = "Run unit tests";
+        entry = "bin/test";
         pass_filenames = false;
         always_run = true;
       };
