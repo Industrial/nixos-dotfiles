@@ -250,10 +250,10 @@
 
           ../../features/window-manager/alacritty
           # TODO: There was an erro building dwm so I'm disabling it for now.
-          #../../features/window-manager/dwm
+          ../../features/window-manager/dwm
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
-          #../../features/window-manager/river
+          ../../features/window-manager/river
           #../../features/window-manager/slock
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
