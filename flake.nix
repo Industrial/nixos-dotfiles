@@ -16,14 +16,7 @@
     pkgs = nixpkgs.legacyPackages.${system};
     featureTests = import ./features/features.test.nix {inherit pkgs;};
   in {
-    tests =
-      {
-        testSomeShit1 = {
-          expr = true;
-          expected = true;
-        };
-      }
-      // featureTests;
+    tests = {} // featureTests;
 
     checks = {
       "${system}" = {
