@@ -29,9 +29,9 @@ layout {
           command "fastfetch"
         }
         pane {
-          cwd "/var/log"
+          cwd "/home/tom"
           command "lnav"
-          args "-e" "\"journalctl" " -f\""
+          args "-e" "journalctl -f"
         }
       }
       pane {
