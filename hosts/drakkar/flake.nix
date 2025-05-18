@@ -180,6 +180,7 @@
           ../../features/media/spotify
           #../../features/media/tiny-tiny-rss
           #../../features/media/transmission
+          ../../features/media/qbittorrent
           ../../features/media/vlc
           #../../features/media/whisparr
 
