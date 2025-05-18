@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > window-manager > dwm > start-dwm-xephyr"
+
+# Find first available display
+DISPLAY_NUM=1
+while [ -f "/tmp/.X${DISPLAY_NUM}-lock" ]; do
+  DISPLAY_NUM=$((DISPLAY_NUM + 1))
+done
+XEPHYR_DISPLAY=":${DISPLAY_NUM}"
+
+echo "features > window-manager > dwm > start-dwm-xephyr > Xephyr display: ${XEPHYR_DISPLAY}"
+
+# Start Xephyr
+Xephyr $XEPHYR_DISPLAY -ac -br -noreset -screen 1280x800 &
+XEPHYR_PID=$!
+
+echo "features > window-manager > dwm > start-dwm-xephyr > Xephyr PID: ${XEPHYR_PID}"
+
+# Ensure Xephyr is killed on script exit
+trap "kill $XEPHYR_PID 2>/dev/null || true" EXIT
+
+echo "features > window-manager > dwm > start-dwm-xephyr > Waiting for Xephyr to start"
+
+# Wait for Xephyr to start
+sleep 1
+
+echo "features > window-manager > dwm > start-dwm-xephyr > Starting DWM"
+
+# Start DWM in Xephyr
+DISPLAY=$XEPHYR_DISPLAY dwm &
+DWM_PID=$!
+
+echo "features > window-manager > dwm > start-dwm-xephyr > DWM PID: ${DWM_PID}"
+
+# Wait for DWM to exit
+wait $DWM_PID 
+
+echo "features > window-manager > dwm > start-dwm-xephyr > DWM exited"

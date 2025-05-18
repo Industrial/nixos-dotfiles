@@ -56,7 +56,7 @@ static const Rule rules[] = {
 /* key definitions */
 #define MODKEY Mod4Mask
 #define TAGKEYS(KEY,TAG) \
-	{ MODKEY,                       KEY,      viewall,        {.ui = 1 << TAG} }, \
+	{ MODKEY,                       KEY,      view,           {.ui = 1 << TAG} }, \
 	{ MODKEY|ShiftMask,             KEY,      toggleview,     {.ui = 1 << TAG} }, \
 	{ MODKEY|ControlMask,           KEY,      tag,            {.ui = 1 << TAG} }, \
 	{ MODKEY|ControlMask|ShiftMask, KEY,      toggletag,      {.ui = 1 << TAG} },
@@ -98,8 +98,8 @@ static const Key keys[] = {
 	// { MODKEY,                       XK_m,      setlayout,      {.v = &layouts[2]} },
 	{ MODKEY,                       XK_Tab,    setlayout,      {0} },
 	{ MODKEY|ControlMask,           XK_Tab,    togglefloating, {0} },
-  // { MODKEY,		                    XK_Tab,  cyclelayout,    {.i = +1 } },
-  // { MODKEY|ControlMask,           XK_Tab,  cyclelayout,    {.i = -1 } },
+        // { MODKEY,		                    XK_Tab,  cyclelayout,    {.i = +1 } },
+        // { MODKEY|ControlMask,           XK_Tab,  cyclelayout,    {.i = -1 } },
 	// { MODKEY,                       XK_0,      view,           {.ui = ~0 } },
 	// { MODKEY|ShiftMask,             XK_0,      tag,            {.ui = ~0 } },
 
