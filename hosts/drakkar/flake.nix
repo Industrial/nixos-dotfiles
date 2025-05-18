@@ -113,6 +113,7 @@
           inputs.disko.nixosModules.disko
           ./disko.nix
           ./filesystems.nix
+          ./hardware.nix
 
           #../../features/ai/n8n
           #../../features/ai/ollama
