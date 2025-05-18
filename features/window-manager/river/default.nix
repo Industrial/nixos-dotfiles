@@ -7,8 +7,8 @@
       xwayland = {
         enable = true;
       };
-      # TODO: What are these?
-      extraPackages = with pkgs; [termite rofi light];
+      # TODO: Why are these here instead of environment.systemPackages?
+      extraPackages = with pkgs; [rofi light];
     };
   };
 
@@ -25,6 +25,12 @@
 
       # Application Launcher
       rofi
+
+      # Tools for nested Wayland/X11 sessions (development/testing)
+      weston
+      cage # Wayland kiosk compositor (preferred for nested Wayland)
+      waypipe # Wayland application forwarding
+      xwayland # X11 compatibility layer for Wayland
     ];
   };
 }
