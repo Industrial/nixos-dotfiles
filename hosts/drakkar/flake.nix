@@ -169,20 +169,20 @@
           #../../features/games/steam
           #../../features/games/wowup
 
-          # TODO: Broken. Need another YouTube client.
-          #../../features/media/invidious
-          #../../features/media/jellyfin
-          #../../features/media/lidarr
-          #../../features/media/prowlarr
-          #../../features/media/radarr
-          #../../features/media/readarr
-          #../../features/media/sonarr
-          ../../features/media/spotify
-          #../../features/media/tiny-tiny-rss
-          #../../features/media/transmission
+          # ../../features/media/calibre
+          # ../../features/media/invidious
+          # ../../features/media/jellyfin
+          # ../../features/media/lidarr
+          # ../../features/media/prowlarr
           ../../features/media/qbittorrent
+          # ../../features/media/radarr
+          # ../../features/media/readarr
+          # ../../features/media/sonarr
+          ../../features/media/spotify
+          ../../features/media/tiny-tiny-rss
+          # ../../features/media/transmission
           ../../features/media/vlc
-          #../../features/media/whisparr
+          # ../../features/media/whisparr
 
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
