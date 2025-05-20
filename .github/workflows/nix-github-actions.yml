@@ -21,6 +21,6 @@ jobs:
       - name: Install > DevEnv
         run: nix profile install nixpkgs#devenv
       - name: DevEnv > Lint
-        run: devenv lint
+        run: bin/lint
       - name: DevEnv > Test
         run: devenv test
