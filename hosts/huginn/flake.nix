@@ -169,7 +169,6 @@
           # ../../features/media/readarr
           # ../../features/media/sonarr
           ../../features/media/spotify
-          ../../features/media/tiny-tiny-rss
           # ../../features/media/transmission
           ../../features/media/vlc
           # ../../features/media/whisparr

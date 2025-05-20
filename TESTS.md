@@ -100,7 +100,6 @@ We organize tests co-located with their implementation files using the following
 - [ ] `features/media/readarr/default.nix`
 - [ ] `features/media/sonarr/default.nix`
 - [ ] `features/media/spotify/default.nix`
-- [ ] `features/media/tiny-tiny-rss/default.nix`
 - [ ] `features/media/transmission/default.nix`
 - [ ] `features/media/vlc/default.nix`
 - [ ] `features/media/whisparr/default.nix`
