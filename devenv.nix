@@ -53,10 +53,19 @@
   scripts = {
     rust-version.exec = "rustc --version";
     cargo-version.exec = "cargo --version";
-    format.exec = "treefmt";
     commit.exec = "git-cz";
-    test.exec = "bin/test";
-    lint.exec = "bin/lint";
+  };
+
+  tasks = {
+    "ci:lint" = {
+      description = "Lint the code";
+      exec = "bin/lint";
+      before = ["ci:test"];
+    };
+    "ci:test" = {
+      description = "Run unit tests";
+      exec = "bin/test";
+    };
   };
 
   enterShell = ''
