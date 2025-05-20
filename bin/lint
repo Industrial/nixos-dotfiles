@@ -3,4 +3,4 @@ echo "> lint"
 exec > >(tee ./logs/lint) 2>&1
 set -euo pipefail
 
-treefmt --config-file treefmt.ci.toml
+devenv shell treefmt --config-file treefmt.ci.toml
