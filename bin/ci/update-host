@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Check if a host was provided
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <host-name>"
+  exit 1
+fi
+
+HOST="$1"
+cd "hosts/$HOST" || exit 1
+
+if [ ! -f "flake.lock" ]; then
+  echo "No flake.lock found for $HOST, skipping"
+  echo "updated=false"
+  exit 0
+fi
+
+# Store the old hash for comparison
+OLD_HASH="$(nix flake metadata --json | jq -r '.locks.nodes.root.locked.narHash')"
+
+# Update the lock file
+nix flake update
+
+# Check if there were actual updates
+NEW_HASH="$(nix flake metadata --json | jq -r '.locks.nodes.root.locked.narHash')"
+
+if [ "$OLD_HASH" != "$NEW_HASH" ]; then
+  echo "updated=true"
+  
+  # Generate update details
+  nix flake metadata --json | jq '.locks.nodes | to_entries[] | select(.key != "root") | {
+    name: .key,
+    old: .value.original.locked.rev[0:7],
+    new: .value.locked.rev[0:7],
+    url: .value.locked.url
+  }' | jq -s '.' > /tmp/updates.json
+  
+  cat /tmp/updates.json | jq -r '.[] | "- **\(.name)**: \(.old) → \(.new)"'
+else
+  echo "updated=false"
+fi 

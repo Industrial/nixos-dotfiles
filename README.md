@@ -14,7 +14,7 @@ git clone git@github.com:Industrial/nixos-dotfiles.git ~/.dotfiles
 ## Update
 
 ```bash
-bin/update/host/<name>
+bin/update/host/<n>
 ```
 
 ## Clean
@@ -34,6 +34,12 @@ bin/test
 commit
 ```
 
+## Automated Flake Updates
+
+The repository includes an automated GitHub Actions workflow that keeps all host flake lock files up-to-date. It runs weekly and creates pull requests with dependency updates. 
+
+See [Flake Update Automation](docs/flake-update-automation.md) for details.
+
 ## Virtual Machines
 
 I have an ongoing project to use
@@ -47,8 +53,8 @@ through this one.
 ### Update VM
 
 ```bash
-bin/vm/update <name>
-bin/vm/stop <name>
-bin/vm/delete <name>
-bin/vm/start <name>
+bin/vm/update <n>
+bin/vm/stop <n>
+bin/vm/delete <n>
+bin/vm/start <n>
 ```
