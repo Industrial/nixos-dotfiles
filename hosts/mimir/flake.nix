@@ -241,7 +241,7 @@
           ../../features/programming/vscode
 
           ../../features/security/keepassxc
-          #../../features/security/tailscale
+          ../../features/security/tailscale
           #../../features/security/veracrypt
           #../../features/security/yubikey-manager
 

@@ -1,29 +1,17 @@
-{
-  settings,
-  pkgs,
-  ...
-}: {
+{settings, ...}: {
   services = {
-    tailscale =
-      if pkgs.stdenv.isLinux
-      then {
-        enable = true;
-        useRoutingFeatures = "client";
-      }
-      else {
-        enable = true;
-      };
+    tailscale = {
+      enable = true;
+      useRoutingFeatures = "client";
+    };
   };
 
-  networking =
-    if pkgs.stdenv.isLinux
-    then {
-      nameservers = ["100.100.100.100"];
-      search = ["${settings.hostname}"];
+  networking = {
+    nameservers = ["100.100.100.100"];
+    search = ["${settings.hostname}"];
 
-      firewall = {
-        trustedInterfaces = ["tailscale0"];
-      };
-    }
-    else {};
+    firewall = {
+      trustedInterfaces = ["tailscale0"];
+    };
+  };
 }
