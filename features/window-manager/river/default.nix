@@ -7,24 +7,21 @@
       xwayland = {
         enable = true;
       };
-      # TODO: Why are these here instead of environment.systemPackages?
-      extraPackages = with pkgs; [rofi light];
+      # extraPackages were moved to systemPackages for consistency
     };
   };
 
   environment = {
     systemPackages = with pkgs; [
       bun
+      rofi # Application launcher (moved from extraPackages)
+      light # Backlight control (moved from extraPackages)
 
       # Top Bar
       waybar
-      # polybarFull
 
       # Notification Daemon
       mako
-
-      # Application Launcher
-      rofi
 
       # Tools for nested Wayland/X11 sessions (development/testing)
       weston
