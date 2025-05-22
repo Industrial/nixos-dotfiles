@@ -162,6 +162,7 @@
           ../../features/communication/telegram
           ../../features/communication/weechat
 
+          ../../features/crypto/bisq
           ../../features/crypto/monero
 
           ../../features/games/lutris
@@ -232,7 +233,7 @@
           ../../features/programming/vscode
 
           ../../features/security/keepassxc
-          ../../features/security/tailscale
+          #../../features/security/tailscale
           #../../features/security/veracrypt
           #../../features/security/yubikey-manager
 

@@ -155,7 +155,10 @@
           ../features/communication/discord
           ../features/communication/fractal
           ../features/communication/weechat
-          ../features/crypto/monero
+
+          ../../features/crypto/bisq
+          ../../features/crypto/monero
+
           #../features/games/lutris
           #../features/games/wowup
 

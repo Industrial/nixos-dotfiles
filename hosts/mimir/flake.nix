@@ -171,6 +171,7 @@
           ../../features/communication/telegram
           ../../features/communication/weechat
 
+          ../../features/crypto/bisq
           ../../features/crypto/monero
 
           #../features/games/lutris
