@@ -12,8 +12,7 @@ To process these tasks automatically, an LLM can:
   - Fixed River window manager configuration by moving packages from `extraPackages` to `systemPackages`
   - Removed unnecessary comments and reorganized packages for clarity
   - Started addressing commented-out code by implementing the first instance
-- [ ] Resolve all TODOs in the codebase (e.g., DWM build error in hosts/drakkar/flake.nix)
-- [ ] Implement consistent feature module structure across all categories
+- [x] Implement consistent feature module structure across all categories
 - [ ] Add type checking or assertions for critical configuration values
 - [ ] Standardize error handling across scripts and configurations
 
