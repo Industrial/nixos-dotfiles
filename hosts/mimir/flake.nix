@@ -212,7 +212,7 @@
 
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
-          #../../features/nixos/docker
+          ../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
           ../../features/nixos/graphics/amd.nix
