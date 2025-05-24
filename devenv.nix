@@ -49,17 +49,10 @@
     };
   };
 
-  # https://devenv.sh/scripts/
-  scripts = {
-    rust-version.exec = "rustc --version";
-    cargo-version.exec = "cargo --version";
-    commit.exec = "git-cz";
-  };
-
   tasks = {
     "chore:lint" = {
       description = "Lint the code";
-      exec = "devenv shell treefmt --config-file treefmt.toml";
+      exec = "treefmt --config-file treefmt.toml";
       before = ["ci:test"];
     };
 
@@ -73,12 +66,6 @@
       exec = "nix flake check";
     };
   };
-
-  enterShell = ''
-    echo "Welcome to the dotfiles development environment!"
-    rust-version
-    cargo-version
-  '';
 
   git-hooks = {
     hooks = {
