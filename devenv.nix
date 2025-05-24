@@ -53,7 +53,7 @@
     "chore:lint" = {
       description = "Lint the code";
       exec = "treefmt --config-file treefmt.toml";
-      before = ["ci:test"];
+      before = [];
     };
 
     "ci:lint" = {
