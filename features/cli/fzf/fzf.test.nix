@@ -3,7 +3,7 @@
     fzf = "mock-fzf-package";
   };
 
-  fzfModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that required packages are available
   testRequiredPackagesAvailable = {
@@ -13,7 +13,7 @@ in {
 
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = fzfModule.environment.systemPackages;
+    expr = module.environment.systemPackages;
     expected = ["mock-fzf-package"];
   };
 }

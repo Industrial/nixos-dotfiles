@@ -3,11 +3,11 @@
     hostname = "test-host";
   };
 
-  cominModule = import ./default.nix {settings = mockSettings;};
+  module = import ./default.nix {settings = mockSettings;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = cominModule.services.comin;
+    expr = module.services.comin;
     expected = {
       enable = true;
       flakeSubdirectory = "hosts/test-host";
@@ -28,19 +28,19 @@ in {
 
   # Test that the flakeSubdirectory is correctly constructed
   testFlakeSubdirectory = {
-    expr = cominModule.services.comin.flakeSubdirectory;
+    expr = module.services.comin.flakeSubdirectory;
     expected = "hosts/test-host";
   };
 
   # Test that the hostname is correctly set
   testHostname = {
-    expr = cominModule.services.comin.hostname;
+    expr = module.services.comin.hostname;
     expected = "test-host";
   };
 
   # Test that the remote configuration is correct
   testRemoteConfig = {
-    expr = cominModule.services.comin.remotes;
+    expr = module.services.comin.remotes;
     expected = [
       {
         name = "origin";

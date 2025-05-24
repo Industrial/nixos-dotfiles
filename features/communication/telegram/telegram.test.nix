@@ -11,11 +11,11 @@
     telegram-desktop = "mock-telegram-package";
   };
 
-  telegramModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length telegramModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
@@ -27,7 +27,7 @@ in {
 
   # Test that Telegram is in system packages
   testTelegramInSystemPackages = {
-    expr = builtins.elem mockPkgs.telegram-desktop telegramModule.environment.systemPackages;
+    expr = builtins.elem mockPkgs.telegram-desktop module.environment.systemPackages;
     expected = true;
   };
 }

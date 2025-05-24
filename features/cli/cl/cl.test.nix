@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockPkgs = {
     rustPlatform = {
       buildRustPackage = attrs: {
@@ -16,43 +16,43 @@
     };
   };
 
-  clModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length clModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
   # Test that the package is created with correct attributes
   testPackageAttributes = {
-    expr = (builtins.head clModule.environment.systemPackages).pname;
+    expr = (builtins.head module.environment.systemPackages).pname;
     expected = "cl";
   };
 
   # Test that the package has the correct version
   testPackageVersion = {
-    expr = (builtins.head clModule.environment.systemPackages).version;
+    expr = (builtins.head module.environment.systemPackages).version;
     expected = "0.1.0";
   };
 
   # Test that the package has the correct source path
   testSourcePath = {
-    expr = (builtins.head clModule.environment.systemPackages).src;
+    expr = (builtins.head module.environment.systemPackages).src;
     expected = ../../../rust/tools/cl;
   };
 
   # Test that the package has the correct cargo lock file
   testCargoLock = {
-    expr = (builtins.head clModule.environment.systemPackages).cargoLock.lockFile;
+    expr = (builtins.head module.environment.systemPackages).cargoLock.lockFile;
     expected = ../../../rust/tools/cl/Cargo.lock;
   };
 
   # Test that the package has the correct meta information
   testMetaInfo = {
     expr = {
-      description = (builtins.head clModule.environment.systemPackages).meta.description;
-      license = (builtins.head clModule.environment.systemPackages).meta.license;
+      description = (builtins.head module.environment.systemPackages).meta.description;
+      license = (builtins.head module.environment.systemPackages).meta.license;
     };
     expected = {
       description = "A simple terminal clear command written in Rust";

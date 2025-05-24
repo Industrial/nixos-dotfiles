@@ -12,7 +12,8 @@
     nix-unit,
     ...
   }: let
-    system = "x86_64-linux";
+    assertions = import ./common/assert.nix {lib = nixpkgs.lib;};
+    system = assertions.assertSupportedSystem "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
     commonTests = import ./common/common.test.nix {inherit pkgs;};
     featureTests = import ./features/features.test.nix {inherit pkgs;};

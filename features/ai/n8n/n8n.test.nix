@@ -5,7 +5,7 @@
     supabase-cli = "mock-supabase-package";
   };
 
-  n8nModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that required packages are available
   testRequiredPackagesAvailable = {
@@ -15,7 +15,7 @@ in {
 
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = n8nModule.environment.systemPackages;
+    expr = module.environment.systemPackages;
     expected = [
       "mock-n8n-package"
       "mock-nodejs-package"
@@ -25,7 +25,7 @@ in {
 
   # Test that n8n service is enabled
   testN8nServiceEnabled = {
-    expr = n8nModule.services.n8n.enable;
+    expr = module.services.n8n.enable;
     expected = true;
   };
 }

@@ -3,7 +3,7 @@
     fd = "mock-fd-package";
   };
 
-  fdModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that required packages are available
   testRequiredPackagesAvailable = {
@@ -13,7 +13,7 @@ in {
 
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = fdModule.environment.systemPackages;
+    expr = module.environment.systemPackages;
     expected = ["mock-fd-package"];
   };
 }

@@ -57,14 +57,20 @@
   };
 
   tasks = {
+    "chore:lint" = {
+      description = "Lint the code";
+      exec = "devenv shell treefmt --config-file treefmt.toml";
+      before = ["ci:test"];
+    };
+
     "ci:lint" = {
       description = "Lint the code";
-      exec = "bin/lint";
+      exec = "devenv shell treefmt --config-file treefmt.ci.toml";
       before = ["ci:test"];
     };
     "ci:test" = {
       description = "Run unit tests";
-      exec = "bin/test";
+      exec = "devenv test";
     };
   };
 
@@ -85,14 +91,15 @@
         stages = ["pre-commit"];
         name = "lint";
         description = "Lint the code";
-        entry = "bin/lint";
+        pass_filenames = true;
+        entry = "treefmt --config-file treefmt.toml";
       };
       test = {
         enable = true;
         stages = ["pre-push"];
         name = "nix-tests";
         description = "Run unit tests";
-        entry = "bin/test";
+        entry = "devenv tasks run ci:test";
         pass_filenames = false;
         always_run = true;
       };

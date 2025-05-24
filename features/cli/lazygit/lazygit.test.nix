@@ -1,15 +1,15 @@
 {pkgs, ...}: let
-  lazygitModule = import ./default.nix {pkgs = pkgs;};
+  module = import ./default.nix {pkgs = pkgs;};
 in {
   # Test that lazygit is enabled
   testLazygitEnabled = {
-    expr = lazygitModule.programs.lazygit.enable;
+    expr = module.programs.lazygit.enable;
     expected = true;
   };
 
   # Test that git log settings are configured correctly
   testGitLogSettings = {
-    expr = lazygitModule.programs.lazygit.settings.git.log.showWholeGraph;
+    expr = module.programs.lazygit.settings.git.log.showWholeGraph;
     expected = true;
   };
 }

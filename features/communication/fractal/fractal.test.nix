@@ -11,11 +11,11 @@
     fractal = "mock-fractal-package";
   };
 
-  fractalModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length fractalModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
@@ -27,7 +27,7 @@ in {
 
   # Test that Fractal is in system packages
   testFractalInSystemPackages = {
-    expr = builtins.elem mockPkgs.fractal fractalModule.environment.systemPackages;
+    expr = builtins.elem mockPkgs.fractal module.environment.systemPackages;
     expected = true;
   };
 }

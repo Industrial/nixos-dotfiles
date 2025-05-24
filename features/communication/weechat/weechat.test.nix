@@ -11,11 +11,11 @@
     weechat = "mock-weechat-package";
   };
 
-  weechatModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length weechatModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
@@ -27,7 +27,7 @@ in {
 
   # Test that WeeChat is in system packages
   testWeeChatInSystemPackages = {
-    expr = builtins.elem mockPkgs.weechat weechatModule.environment.systemPackages;
+    expr = builtins.elem mockPkgs.weechat module.environment.systemPackages;
     expected = true;
   };
 }

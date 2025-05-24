@@ -11,11 +11,11 @@
     teams-for-linux = "mock-teams-package";
   };
 
-  teamsModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length teamsModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
@@ -27,7 +27,7 @@ in {
 
   # Test that Teams is in system packages
   testTeamsInSystemPackages = {
-    expr = builtins.elem mockPkgs.teams-for-linux teamsModule.environment.systemPackages;
+    expr = builtins.elem mockPkgs.teams-for-linux module.environment.systemPackages;
     expected = true;
   };
 }

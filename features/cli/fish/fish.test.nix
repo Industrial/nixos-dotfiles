@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockPkgs = {
     stdenv = {
       mkDerivation = attrs: {
@@ -18,7 +18,7 @@
     username = "testuser";
   };
 
-  fishModule = import ./default.nix {
+  module = import ./default.nix {
     pkgs = mockPkgs;
     settings = mockSettings;
   };
@@ -31,19 +31,19 @@ in {
 
   # Test that fish is enabled
   testFishEnabled = {
-    expr = fishModule.programs.fish.enable;
+    expr = module.programs.fish.enable;
     expected = true;
   };
 
   # Test that fish is in shells
   testFishInShells = {
-    expr = builtins.elem mockPkgs.fish fishModule.environment.shells;
+    expr = builtins.elem mockPkgs.fish module.environment.shells;
     expected = true;
   };
 
   # Test that fish config is created
   testFishConfig = {
-    expr = builtins.hasAttr "fish/config.fish" fishModule.environment.etc;
+    expr = builtins.hasAttr "fish/config.fish" module.environment.etc;
     expected = true;
   };
 
@@ -86,7 +86,7 @@ in {
 
   # Test that user shell is set to fish
   testUserShell = {
-    expr = fishModule.users.users.testuser.shell;
+    expr = module.users.users.testuser.shell;
     expected = mockPkgs.fish;
   };
 }

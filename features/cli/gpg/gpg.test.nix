@@ -4,7 +4,7 @@
     pinentry-all = "mock-pinentry-package";
   };
 
-  gpgModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that required packages are available
   testRequiredPackagesAvailable = {
@@ -14,19 +14,19 @@ in {
 
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = gpgModule.environment.systemPackages;
+    expr = module.environment.systemPackages;
     expected = ["mock-gnupg-package" "mock-pinentry-package"];
   };
 
   # Test that gnupg agent is enabled
   testGnupgAgentEnabled = {
-    expr = gpgModule.programs.gnupg.agent.enable;
+    expr = module.programs.gnupg.agent.enable;
     expected = true;
   };
 
   # Test that browser socket is enabled
   testBrowserSocketEnabled = {
-    expr = gpgModule.programs.gnupg.agent.enableBrowserSocket;
+    expr = module.programs.gnupg.agent.enableBrowserSocket;
     expected = true;
   };
 }

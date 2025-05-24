@@ -4,7 +4,7 @@
     ollama-cuda = "mock-ollama-cuda-package";
   };
 
-  ollamaModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that required packages are available
   testRequiredPackagesAvailable = {
@@ -14,7 +14,7 @@ in {
 
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = ollamaModule.environment.systemPackages;
+    expr = module.environment.systemPackages;
     expected = [
       "mock-ollama-package"
       "mock-ollama-cuda-package"
@@ -24,10 +24,10 @@ in {
   # Test ollama service configuration
   testOllamaServiceConfig = {
     expr = {
-      enable = ollamaModule.services.ollama.enable;
-      host = ollamaModule.services.ollama.host;
-      port = ollamaModule.services.ollama.port;
-      loadModels = ollamaModule.services.ollama.loadModels;
+      enable = module.services.ollama.enable;
+      host = module.services.ollama.host;
+      port = module.services.ollama.port;
+      loadModels = module.services.ollama.loadModels;
     };
     expected = {
       enable = true;
@@ -40,8 +40,8 @@ in {
   # Test nextjs-ollama-llm-ui service configuration
   testNextjsOllamaLlmUiConfig = {
     expr = {
-      enable = ollamaModule.services.nextjs-ollama-llm-ui.enable;
-      port = ollamaModule.services.nextjs-ollama-llm-ui.port;
+      enable = module.services.nextjs-ollama-llm-ui.enable;
+      port = module.services.nextjs-ollama-llm-ui.port;
     };
     expected = {
       enable = true;

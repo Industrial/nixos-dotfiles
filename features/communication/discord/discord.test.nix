@@ -11,11 +11,11 @@
     discord = "mock-discord-package";
   };
 
-  discordModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length discordModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
@@ -27,7 +27,7 @@ in {
 
   # Test that Discord is in system packages
   testDiscordInSystemPackages = {
-    expr = builtins.elem mockPkgs.discord discordModule.environment.systemPackages;
+    expr = builtins.elem mockPkgs.discord module.environment.systemPackages;
     expected = true;
   };
 }

@@ -1,4 +1,4 @@
-{pkgs, ...}: let
+{...}: let
   mockPkgs = {
     stdenv = {
       mkDerivation = attrs: {
@@ -14,26 +14,26 @@
     useremail = "test@example.com";
   };
 
-  createSshKeyModule = import ./default.nix {
+  module = import ./default.nix {
     pkgs = mockPkgs;
     settings = mockSettings;
   };
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length createSshKeyModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
   # Test that the package is created with correct attributes
   testPackageAttributes = {
-    expr = (builtins.head createSshKeyModule.environment.systemPackages).name;
+    expr = (builtins.head module.environment.systemPackages).name;
     expected = "create-ssh-key";
   };
 
   # Test that the package has the correct version
   testPackageVersion = {
-    expr = (builtins.head createSshKeyModule.environment.systemPackages).version;
+    expr = (builtins.head module.environment.systemPackages).version;
     expected = "1.0";
   };
 

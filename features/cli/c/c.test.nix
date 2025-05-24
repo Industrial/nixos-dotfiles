@@ -10,23 +10,23 @@
     };
   };
 
-  cModule = import ./default.nix {pkgs = mockPkgs;};
+  module = import ./default.nix {pkgs = mockPkgs;};
 in {
   # Test that the module evaluates without errors
   testModuleEvaluates = {
-    expr = builtins.length cModule.environment.systemPackages;
+    expr = builtins.length module.environment.systemPackages;
     expected = 1;
   };
 
   # Test that the package is created with correct attributes
   testPackageAttributes = {
-    expr = (builtins.head cModule.environment.systemPackages).name;
+    expr = (builtins.head module.environment.systemPackages).name;
     expected = "c";
   };
 
   # Test that the package has the correct version
   testPackageVersion = {
-    expr = (builtins.head cModule.environment.systemPackages).version;
+    expr = (builtins.head module.environment.systemPackages).version;
     expected = "1.0";
   };
 
