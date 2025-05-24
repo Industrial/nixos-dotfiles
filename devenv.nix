@@ -99,7 +99,7 @@
         stages = ["pre-push"];
         name = "nix-tests";
         description = "Run unit tests";
-        entry = "devenv test";
+        entry = "nix flake check";
         pass_filenames = false;
         always_run = true;
       };
