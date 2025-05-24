@@ -3,16 +3,28 @@
   hostname,
   username ? "tom",
   version ? "24.11",
-}: {
+}: let
+  # Import assertion utilities
+  nixpkgs = import <nixpkgs> {};
+  assertions = import ./assert.nix {lib = nixpkgs.lib;};
+
+  # Apply validations
+  validSystem = assertions.assertSupportedSystem system;
+  validHostname = assertions.assertNonEmptyString hostname;
+  validUsername = assertions.assertNonEmptyString username;
+  validVersion = assertions.assertMatches "[0-9]+\\.[0-9]+" version;
+in {
   inherit system username;
   settings = {
-    inherit system hostname username;
-    stateVersion = version;
+    system = validSystem;
+    hostname = validHostname;
+    username = validUsername;
+    stateVersion = validVersion;
     hostPlatform = {
-      inherit system;
+      system = validSystem;
     };
-    userdir = "/home/${username}";
-    useremail = "${username}@${system}.local";
-    userfullname = username;
+    userdir = "/home/${validUsername}";
+    useremail = "${validUsername}@${validSystem}.local";
+    userfullname = validUsername;
   };
 }

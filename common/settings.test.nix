@@ -1,8 +1,8 @@
 {pkgs ? import <nixpkgs> {}}: let
-  settings = import ./settings.nix;
+  module = import ./settings.nix;
 in {
   testBasicEvaluation = {
-    expr = settings {
+    expr = module {
       inherit (pkgs) system;
       hostname = "test-host";
     };
@@ -25,7 +25,7 @@ in {
   };
 
   testCustomUsername = {
-    expr = settings {
+    expr = module {
       inherit (pkgs) system;
       hostname = "test-host";
       username = "custom-user";
@@ -49,7 +49,7 @@ in {
   };
 
   testCustomVersion = {
-    expr = settings {
+    expr = module {
       inherit (pkgs) system;
       hostname = "test-host";
       version = "23.11";

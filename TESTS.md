@@ -82,8 +82,8 @@ We organize tests co-located with their implementation files using the following
 - [x] `features/cli/unrar/default.nix`
 - [x] `features/cli/unzip/default.nix`
 - [x] `features/cli/zellij/default.nix`
-- [ ] `features/communication/discord/default.nix`
-- [ ] `features/communication/fractal/default.nix`
+- [x] `features/communication/discord/default.nix`
+- [x] `features/communication/fractal/default.nix`
 - [ ] `features/communication/teams/default.nix`
 - [ ] `features/communication/telegram/default.nix`
 - [ ] `features/communication/weechat/default.nix`

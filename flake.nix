@@ -14,9 +14,10 @@
   }: let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
+    commonTests = import ./common/common.test.nix {inherit pkgs;};
     featureTests = import ./features/features.test.nix {inherit pkgs;};
   in {
-    tests = {} // featureTests;
+    tests = {} // commonTests // featureTests;
 
     checks = {
       "${system}" = {

@@ -12,8 +12,14 @@ To process these tasks automatically, an LLM can:
   - Fixed River window manager configuration by moving packages from `extraPackages` to `systemPackages`
   - Removed unnecessary comments and reorganized packages for clarity
   - Started addressing commented-out code by implementing the first instance
+- [ ] Resolve all TODOs in the codebase (e.g., DWM build error in hosts/drakkar/flake.nix)
 - [x] Implement consistent feature module structure across all categories
-- [ ] Add type checking or assertions for critical configuration values
+- [x] Add type checking or assertions for critical configuration values
+  - Added validation for system, hostname, username, and version in common/settings.nix
+  - Added network interface validation in MicroVM configuration with fallback mechanism
+  - Added VM configuration validation that warns about undefined VMs
+  - Added DWM package validation to detect overlay application issues
+  - Implemented non-breaking validations that provide warnings instead of errors for better compatibility
 - [ ] Standardize error handling across scripts and configurations
 
 ## Security
