@@ -70,7 +70,7 @@
     };
     "ci:test" = {
       description = "Run unit tests";
-      exec = "devenv test";
+      exec = "devenv shell nix flake check";
     };
   };
 
