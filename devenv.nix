@@ -95,7 +95,7 @@
         stages = ["pre-push"];
         name = "nix-tests";
         description = "Run unit tests";
-        entry = "devenv exec ci:test";
+        entry = "devenv tasks run ci:test";
         pass_filenames = false;
         always_run = true;
       };
