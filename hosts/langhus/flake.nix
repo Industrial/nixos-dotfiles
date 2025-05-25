@@ -216,7 +216,7 @@
           ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
-          ../../features/programming/vscode
+          # ../../features/programming/vscode
 
           ../features/security/keepassxc
           ../features/security/tailscale
@@ -231,6 +231,7 @@
           ../features/window-manager/alacritty
           # TODO: There was an erro building dwm so I'm disabling it for now.
           #../features/window-manager/dwm
+          #../../features/window-manager/dwm-status
           #../features/window-manager/ghostty
           ../features/window-manager/gnome
           ../features/window-manager/river

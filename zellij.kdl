@@ -1,0 +1,25 @@
+layout {
+  default_tab_template {
+    pane size=1 borderless=true {
+      plugin location="zellij:tab-bar"
+    }
+    children
+    pane size=1 borderless=true {
+      plugin location="zellij:status-bar"
+    }
+  }
+
+  tab name="cmd" {
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom/.dotfiles"
+      }
+    }
+  }
+}
+
+keybinds {
+  normal {
+    unbind "Ctrl q"
+  }
+}

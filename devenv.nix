@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  pkgs,
+  inputs,
+  ...
+}: {
   # https://devenv.sh/basics/
   env = {
     RUST_BACKTRACE = "1";
@@ -63,7 +67,12 @@
     };
     "ci:test" = {
       description = "Run unit tests";
-      exec = "nix flake check";
+      exec = ''
+        nix-unit \
+          --extra-experimental-features "nix-command flakes" \
+          --override-input nixpkgs ${inputs.nixpkgs} \
+          "$PWD/tests.nix"
+      '';
     };
   };
 
@@ -86,7 +95,7 @@
         stages = ["pre-push"];
         name = "nix-tests";
         description = "Run unit tests";
-        entry = "nix flake check";
+        entry = "devenv exec ci:test";
         pass_filenames = false;
         always_run = true;
       };

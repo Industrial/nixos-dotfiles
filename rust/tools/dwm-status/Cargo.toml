@@ -1,12 +1,14 @@
 [package]
-name = "cl"
+name = "dwm-status"
 version = "0.1.0"
 edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
-description = "A simple terminal clear command written in Rust"
+description = "A status bar generator for DWM"
 
 [dependencies]
+xcb = "1.2"
+chrono = "0.4"
 
 [[bin]]
-name = "cl"
+name = "dwm-status"
 path = "src/main.rs"

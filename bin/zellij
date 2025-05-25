@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+echo "> zellij"
+set -euo pipefail
+
+zellij -n zellij.kdl

@@ -5,6 +5,18 @@
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
 
+    # dwm-status tool source
+    dwm-status-src = {
+      url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
+
+    # cl tool source
+    cl-src = {
+      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
+
     # Hardware Support.
     nixos-hardware = {
       url = "github:NixOS/nixos-hardware/master";
@@ -230,7 +242,7 @@
           ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
-          ../../features/programming/vscode
+          # ../../features/programming/vscode
 
           ../../features/security/keepassxc
           #../../features/security/tailscale
@@ -251,6 +263,7 @@
 
           ../../features/window-manager/alacritty
           ../../features/window-manager/dwm
+          ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           ../../features/window-manager/river

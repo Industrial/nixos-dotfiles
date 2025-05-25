@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-echo "> test"
-exec > >(tee ./logs/test) 2>&1
-set -euo pipefail
-
-#nix flake update
-nix flake check
