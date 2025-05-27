@@ -11,10 +11,10 @@
   startDwmXephyrScript = pkgs.writeShellScriptBin "start-dwm-xephyr" ''
     #!${pkgs.bash}/bin/bash
     DISPLAY_NUM=1
-    while [ -f "/tmp/.X\$\{DISPLAY_NUM\}-lock" ]; do
-      DISPLAY_NUM=$((DISPLAY_NUM + 1))
+    while [ -f "/tmp/.X$DISPLAY_NUM-lock" ]; do
+      DISPLAY_NUM=$DISPLAY_NUM + 1
     done
-    XEPHYR_DISPLAY=":\$\{DISPLAY_NUM\}"
+    XEPHYR_DISPLAY=":$DISPLAY_NUM"
     XEPHYR_GEOMETRY="1600x900"
     Xephyr "$XEPHYR_DISPLAY" -screen "$XEPHYR_GEOMETRY" -ac -br -noreset & xephyr_pid=$!
     sleep 1
@@ -47,6 +47,9 @@ in {
 
     # Compositor for X11.
     picom
+
+    # Provides `startx` command
+    xorg.xinit
   ];
 
   services = {
