@@ -1,38 +1,44 @@
 #!/usr/bin/env bash
+echo "> window-manager > river > start-river-nested"
+exec > >(tee ./log/start-river-nested.log) 2>&1
 set -euo pipefail
 
 echo "features > window-manager > river > start-river-nested"
 
-# Create a temporary directory for the nested session
-NESTED_DIR=$(mktemp -d)
-trap "rm -rf $NESTED_DIR" EXIT
+# Check if we're running in a Wayland session
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+  echo "Error: No Wayland compositor detected. Please run this script from within a Wayland session."
+  exit 1
+fi
 
-echo "features > window-manager > river > start-river-nested > Nested runtime dir: ${NESTED_DIR}"
+# Check if XDG_RUNTIME_DIR is set
+if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+  echo "Error: XDG_RUNTIME_DIR is not set"
+  exit 1
+fi
 
-# Find first available display
-DISPLAY_NUM=1
-while [ -f "/tmp/.X${DISPLAY_NUM}-lock" ]; do
-  DISPLAY_NUM=$((DISPLAY_NUM + 1))
-done
-XDISPLAY=":${DISPLAY_NUM}"
+# Create a subdirectory in XDG_RUNTIME_DIR for River
+RIVER_RUNTIME_DIR="${XDG_RUNTIME_DIR}/river-nested"
+mkdir -p "$RIVER_RUNTIME_DIR"
+chmod 700 "$RIVER_RUNTIME_DIR"
 
-echo "features > window-manager > river > start-river-nested > X display: ${XDISPLAY}"
+# Ensure cleanup on exit
+cleanup() {
+  echo "features > window-manager > river > start-river-nested > Cleaning up River runtime directory"
+  rm -rf "$RIVER_RUNTIME_DIR"
+  echo "features > window-manager > river > start-river-nested > River Nested Session End: $(date)"
+}
+trap cleanup EXIT
 
-# Start Xwayland with a proper window size 
-Xwayland $XDISPLAY -ac -geometry 1280x800 -dpi 96 &
-XWAYLAND_PID=$!
+echo "features > window-manager > river > start-river-nested > River runtime dir: ${RIVER_RUNTIME_DIR}"
 
-# Ensure Xwayland is killed on exit
-trap "kill $XWAYLAND_PID 2>/dev/null || true; rm -rf $NESTED_DIR" EXIT
+# Start River with proper Wayland configuration
+echo "features > window-manager > river > start-river-nested > Starting River"
 
-echo "features > window-manager > river > start-river-nested > Xwayland PID: ${XWAYLAND_PID}"
-echo "features > window-manager > river > start-river-nested > Waiting for Xwayland to start"
-sleep 2
-
-echo "features > window-manager > river > start-river-nested > Starting River with Xwayland"
-
-# Start River with Xwayland configured via environment
-DISPLAY=$XDISPLAY XDG_RUNTIME_DIR=$NESTED_DIR river &
+env \
+  RIVER_RUNTIME_DIR=$RIVER_RUNTIME_DIR \
+  WAYLAND_DEBUG=1 \
+  river &
 RIVER_PID=$!
 
 echo "features > window-manager > river > start-river-nested > River PID: ${RIVER_PID}"

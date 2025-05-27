@@ -7,8 +7,6 @@ const cmd = async (command: string) => {
   return process.stdout
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
 // Terminal
 await cmd('riverctl map normal Super Return spawn alacritty')
 
@@ -22,8 +20,8 @@ await cmd('riverctl map normal Super Backspace close')
 await cmd('riverctl map normal Super+Control+Shift Backspace exit')
 
 // Focus Next/Previous Window
-await cmd('riverctl map normal Super J focus-view next')
-await cmd('riverctl map normal Super K focus-view previous')
+await cmd('riverctl map normal Super+J focus-view next')
+await cmd('riverctl map normal Super+K focus-view previous')
 
 // Swap with Next/Previous Window
 await cmd('riverctl map normal Super+Control J swap next')

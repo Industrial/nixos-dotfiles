@@ -1,2 +1,12 @@
 #!/usr/bin/env bash
+echo "> window-manager > river > init"
+exec > >(tee ./log/init.log) 2>&1
+set -euo pipefail
+
+echo "> window-manager > river > init > pwd > $(pwd)"
+
+echo "> window-manager > river > init > cd .config/river"
+cd .config/river
+
+echo "> window-manager > river > init > bun init.ts"
 bun init.ts
