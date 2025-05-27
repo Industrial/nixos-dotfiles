@@ -99,14 +99,6 @@
         {
           Media = [
             {
-              Transmission = {
-                icon = "https://transmissionbt.com/assets/images/Transmission_icon.png";
-                # TODO: Apparently this one doesn't work on the hostname.
-                href = "http://localhost:9091";
-                description = "BitTorrent";
-              };
-            }
-            {
               Lidarr = {
                 icon = "http://${settings.hostname}:8686/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:8686";

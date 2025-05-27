@@ -5,7 +5,6 @@ firefox &
 obsidian &
 spotify &
 discord &
-transmission &
 
 # Notification Daemon
 dunst &

@@ -50,7 +50,6 @@ static const Rule rules[] = {
 	{ "Obsidian",          NULL,       NULL,       0,            0,           -1 },
 	{ "Spotify",           NULL,       NULL,       0,            0,           -1 },
 	{ "Discord",           NULL,       NULL,       0,            0,           -1 },
-	{ "Transmission",      NULL,       NULL,       0,            0,           -1 },
 };
 
 /* key definitions */
