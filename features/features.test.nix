@@ -4,5 +4,6 @@
   cli = import ./cli/cli.test.nix {inherit pkgs;};
   communication = import ./communication/communication.test.nix {inherit pkgs;};
   crypto = import ./crypto/crypto.test.nix {inherit pkgs;};
+  games = import ./games/games.test.nix {inherit pkgs;};
   programming = import ./programming/programming.test.nix {inherit pkgs;};
 }
