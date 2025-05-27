@@ -1,7 +1,9 @@
-use chrono::Local;
+mod metrics;
 use std::thread;
 use std::time::Duration;
 use xcb::{Connection, x};
+
+use crate::metrics::datetime::get_date_time;
 
 fn main() {
     let (conn, screen_num) = Connection::connect(None).unwrap();
@@ -10,10 +12,10 @@ fn main() {
     let root_window = screen.root();
 
     loop {
-        let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-        let status_text = current_time; // Placeholder for more complex status later
+        let datetime_text = get_date_time();
+        let status_text = format!("{}", datetime_text);
 
-        println!("Setting status: {}", status_text); // For debugging
+        println!("Setting status: {}", status_text);
 
         let wm_name_atom_cookie = conn.send_request(&x::InternAtom {
             only_if_exists: false,
@@ -30,8 +32,8 @@ fn main() {
         conn.send_request_checked(&x::ChangeProperty {
             mode: x::PropMode::Replace,
             window: root_window,
-            property: wm_name_atom, // For DWM, this is often WM_NAME. Some WMs might use _NET_WM_NAME
-            r#type: string_atom,    // Property type
+            property: wm_name_atom,
+            r#type: string_atom,
             data: status_text.as_bytes(),
         });
         conn.flush().unwrap();

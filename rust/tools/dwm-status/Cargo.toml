@@ -8,6 +8,11 @@ description = "A status bar generator for DWM"
 [dependencies]
 xcb = "1.2"
 chrono = "0.4"
+sysinfo = { version = "^0.35.1" }
+pulsectl-rs = "0.3.2"
+
+[dev-dependencies]
+proptest = "1.6.0"
 
 [[bin]]
 name = "dwm-status"
