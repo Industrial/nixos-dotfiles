@@ -6,5 +6,6 @@
   crypto = import ./crypto/crypto.test.nix {inherit pkgs;};
   games = import ./games/games.test.nix {inherit pkgs;};
   media = import ./media/media.test.nix {inherit pkgs;};
+  monitoring = import ./monitoring/monitoring.test.nix {inherit pkgs;};
   programming = import ./programming/programming.test.nix {inherit pkgs;};
 }
