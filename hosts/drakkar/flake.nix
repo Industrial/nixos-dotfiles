@@ -5,18 +5,6 @@
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
 
-    # dwm-status tool source
-    dwm-status-src = {
-      url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
-    };
-
-    # cl tool source
-    cl-src = {
-      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
-    };
-
     # Hardware Support.
     nixos-hardware = {
       url = "github:NixOS/nixos-hardware/master";
@@ -52,15 +40,15 @@
       };
     };
 
-    # Nix VS Code Extensions.
-    nix-vscode-extensions = {
-      url = "github:nix-community/nix-vscode-extensions";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
+    # # Nix VS Code Extensions.
+    # nix-vscode-extensions = {
+    #   url = "github:nix-community/nix-vscode-extensions";
+    #   inputs = {
+    #     nixpkgs = {
+    #       follows = "nixpkgs";
+    #     };
+    #   };
+    # };
 
     # Stylix.
     stylix = {
@@ -72,15 +60,15 @@
       };
     };
 
-    # Generate Kubernetes Configurations with Nix.
-    kubenix = {
-      url = "github:hall/kubenix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
+    # # Generate Kubernetes Configurations with Nix.
+    # kubenix = {
+    #   url = "github:hall/kubenix";
+    #   inputs = {
+    #     nixpkgs = {
+    #       follows = "nixpkgs";
+    #     };
+    #   };
+    # };
 
     # MicroVM
     microvm = {
@@ -92,14 +80,6 @@
       };
     };
 
-    # NixOS Anywhere
-    nixos-anywhere = {
-      url = "github:nix-community/nixos-anywhere";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
     # Disko
     disko = {
       url = "github:nix-community/disko";
@@ -108,6 +88,18 @@
           follows = "nixpkgs";
         };
       };
+    };
+
+    # dwm-status tool source
+    dwm-status-src = {
+      url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
+
+    # cl tool source
+    cl-src = {
+      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
     };
   };
 
@@ -130,8 +122,8 @@
           #../../features/ai/n8n
           #../../features/ai/ollama
 
-          inputs.comin.nixosModules.comin
-          ../../features/ci/comin
+          #inputs.comin.nixosModules.comin
+          #../../features/ci/comin
 
           ../../features/cli/bandwhich
           ../../features/cli/bat
@@ -169,16 +161,16 @@
           ../../features/cli/zellij
 
           ../../features/communication/discord
-          ../../features/communication/fractal
-          ../../features/communication/teams
-          ../../features/communication/telegram
-          ../../features/communication/weechat
+          #../../features/communication/fractal
+          #../../features/communication/teams
+          #../../features/communication/telegram
+          #../../features/communication/weechat
 
-          ../../features/crypto/bisq
-          ../../features/crypto/monero
+          ##../../features/crypto/bisq
+          ##../../features/crypto/monero
 
           ../../features/games/lutris
-          ../../features/games/path-of-building
+          #../../features/games/path-of-building
           #../../features/games/steam
           #../../features/games/wowup
 
@@ -200,19 +192,16 @@
           #../../features/monitoring/homepage-dashboard
           #../../features/monitoring/prometheus
 
-          ../../features/network/chromium
+          ##../../features/network/chromium
           ../../features/network/firefox
           #../../features/network/i2pd
           #../../features/network/searx
-          ../../features/network/ssh
-          ../../features/network/syncthing
+          ##../../features/network/ssh
+          ##../../features/network/syncthing
           #../../features/network/tor
           #../../features/network/tor-browser
 
-          ../../features/nix
-          ../../features/nix/nixpkgs
-          ../../features/nix/users/trusted-users.nix
-
+          ../../features/nixos
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
           #../../features/nixos/docker
@@ -220,7 +209,7 @@
           ../../features/nixos/graphics
           ../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
-          ../../features/nixos/networking/dns.nix
+          #../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo
@@ -230,18 +219,18 @@
 
           ../../features/office/obsidian
 
-          ../../features/programming/bun
+          #../../features/programming/bun
           ../../features/programming/cursor
           ../../features/programming/devenv
-          ../../features/programming/docker-compose
+          ##../../features/programming/docker-compose
           ../../features/programming/git
-          ../../features/programming/gitkraken
-          ../../features/programming/glogg
-          ../../features/programming/insomnia
-          ../../features/programming/meld
+          ##../../features/programming/gitkraken
+          ##../../features/programming/glogg
+          ##../../features/programming/insomnia
+          ##../../features/programming/meld
           ../../features/programming/neovim
-          ../../features/programming/node
-          ../../features/programming/python
+          ##../../features/programming/node
+          #../../features/programming/python
           # ../../features/programming/vscode
 
           ../../features/security/keepassxc
@@ -253,10 +242,10 @@
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
           #../../features/virtual-machine/kubernetes/node
-          inputs.microvm.nixosModules.host
-          ../../features/virtual-machine/microvm/host
-          ../../features/virtual-machine/microvm/target/host-network.nix
-          ../../features/virtual-machine/microvm/tor/host-network.nix
+          ##inputs.microvm.nixosModules.host
+          ##../../features/virtual-machine/microvm/host
+          ##../../features/virtual-machine/microvm/target/host-network.nix
+          ##../../features/virtual-machine/microvm/tor/host-network.nix
           #../../features/virtual-machine/microvm/web/host-network.nix
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox
@@ -265,11 +254,11 @@
           ../../features/window-manager/dwm
           ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
-          ../../features/window-manager/gnome
-          ../../features/window-manager/river
+          #../../features/window-manager/gnome
+          #../../features/window-manager/river
           #../../features/window-manager/slock
-          inputs.stylix.nixosModules.stylix
-          ../../features/window-manager/stylix
+          #inputs.stylix.nixosModules.stylix
+          #../../features/window-manager/stylix
           #../../features/window-manager/xfce
           #../../features/window-manager/xmonad
           ../../features/window-manager/xsel

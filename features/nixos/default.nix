@@ -9,4 +9,12 @@
       allow-import-from-derivation = true;
     };
   };
+
+  nixpkgs = {
+    hostPlatform = settings.hostPlatform;
+    config = {
+      allowUnfree = true;
+      allowBroken = false;
+    };
+  };
 }

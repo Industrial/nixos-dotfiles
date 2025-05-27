@@ -130,7 +130,6 @@ We organize tests co-located with their implementation files using the following
 - [ ] `features/nixos/sound/default.nix`
 - [ ] `features/nixos/users/default.nix`
 - [ ] `features/nixos/window-manager/default.nix`
-- [ ] `features/nix/users/trusted-users.nix`
 - [ ] `features/office/obsidian/default.nix`
 - [ ] `features/programming/bun/default.nix`
 - [ ] `features/programming/cursor/default.nix`

@@ -206,18 +206,15 @@
           #../../features/network/tor
           #../../features/network/tor-browser
 
-          ../../features/nix
-          ../../features/nix/nixpkgs
-          ../../features/nix/users/trusted-users.nix
-
+          ../../features/nixos
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
-          ../../features/nixos/docker
+          #../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
           ../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
-          ../../features/nixos/networking/dns.nix
+          #../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo
