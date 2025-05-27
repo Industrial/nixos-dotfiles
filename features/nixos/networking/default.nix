@@ -7,7 +7,7 @@
     hostName = settings.hostname;
     networkmanager = {
       enable = true;
-      dns = lib.mkDefault "none";
+      #dns = lib.mkDefault "none";
     };
   };
 }
