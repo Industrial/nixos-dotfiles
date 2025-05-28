@@ -1,8 +1,4 @@
-{
-  pkgs,
-  inputs,
-  ...
-}: {
+{pkgs, ...}: {
   # https://devenv.sh/basics/
   env = {
     RUST_BACKTRACE = "1";
@@ -81,15 +77,6 @@
         description = "Lint the code";
         pass_filenames = true;
         entry = "treefmt --config-file treefmt.toml";
-      };
-      test = {
-        enable = true;
-        stages = ["pre-push"];
-        name = "nix-tests";
-        description = "Run unit tests";
-        entry = "devenv tasks run ci:test";
-        pass_filenames = false;
-        always_run = true;
       };
     };
   };
