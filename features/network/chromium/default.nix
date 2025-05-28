@@ -1,7 +1,7 @@
 # Browser
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    # ungoogled-chromium
-    google-chrome
+    ungoogled-chromium
+    # google-chrome
   ];
 }

@@ -4,9 +4,7 @@
   username ? "tom",
   version ? "24.11",
 }: let
-  # Import assertion utilities
-  nixpkgs = import <nixpkgs> {};
-  assertions = import ./assert.nix {lib = nixpkgs.lib;};
+  assertions = import ./assert.nix;
 
   # Apply validations
   validSystem = assertions.assertSupportedSystem system;

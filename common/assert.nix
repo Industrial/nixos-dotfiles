@@ -1,5 +1,4 @@
-# Common assertion and type checking utilities for the dotfiles
-{...}: {
+{
   # Check if a system is supported
   assertSupportedSystem = system: let
     supportedSystems = [

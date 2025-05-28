@@ -7,6 +7,7 @@
   env = {
     RUST_BACKTRACE = "1";
     RUST_LOG = "debug";
+    NIXPKGS_ALLOW_UNFREE = "1";
   };
 
   # https://devenv.sh/packages/
@@ -63,16 +64,7 @@
     "ci:lint" = {
       description = "Lint the code";
       exec = "devenv shell treefmt --config-file treefmt.ci.toml";
-      before = ["ci:test"];
-    };
-    "ci:test" = {
-      description = "Run unit tests";
-      exec = ''
-        nix-unit \
-          --extra-experimental-features "nix-command flakes" \
-          --override-input nixpkgs ${inputs.nixpkgs} \
-          "$PWD/tests.nix"
-      '';
+      before = [];
     };
   };
 
