@@ -32,8 +32,6 @@ in {
           set -x XDG_CONFIG_HOME "$HOME/.config"
           set -x XDG_DATA_HOME "$HOME/.local/share"
           set -x XDG_STATE_HOME "$HOME/.local/state"
-          # this is for Cursor IDE
-          set -x NO_NEW_PRIVILEGES 0
 
           # Use vim keybindings.
           fish_vi_key_bindings
