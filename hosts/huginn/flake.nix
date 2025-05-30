@@ -178,14 +178,16 @@
           ../../features/monitoring/grafana
           ../../features/monitoring/homepage-dashboard
           ../../features/monitoring/prometheus
-          ../../features/network/chromium
+
+          #../../features/network/chromium
+          #../../features/network/i2pd
+          #../../features/network/searx
+          #../../features/network/ssh
+          #../../features/network/tor
+          #../../features/network/tor-browser
           ../../features/network/firefox
-          # ../features/network/i2pd
-          ../../features/network/searx
-          ../../features/network/ssh
+          ../../features/network/qute
           ../../features/network/syncthing
-          ../../features/network/tor
-          ../../features/network/tor-browser
 
           ../../features/nixos
           ../../features/nixos/bluetooth
