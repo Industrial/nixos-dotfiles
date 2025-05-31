@@ -44,10 +44,6 @@
   systemd = {
     tmpfiles = {
       rules = [
-        # This creates a directory owned by root and with the group set to data
-        # that is readable and writable by the members of the data group.
-        "d /data 0770 root data - -"
-
         # This creates a directory owned by root and with the group set to games
         # that is readable and writable by the members of the games group.
         "d /games 0770 root games - -"
