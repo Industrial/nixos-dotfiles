@@ -111,6 +111,7 @@
         };
         modules = [
           # inputs.nixos-hardware.starlabs.starlite.i5
+          ./filesystems.nix
 
           # ../features/ai/n8n
           # ../features/ai/ollama
@@ -180,7 +181,6 @@
           ../../features/monitoring/prometheus
 
           #../../features/network/chromium
-          #../../features/network/i2pd
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor
