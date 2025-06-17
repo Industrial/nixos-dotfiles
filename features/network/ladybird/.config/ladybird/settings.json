@@ -1,0 +1,24 @@
+{
+  "browser": {
+    "homepage": "https://duckduckgo.com",
+    "search_engine": "https://duckduckgo.com/?q=",
+    "download_directory": "${HOME}/Downloads",
+    "enable_javascript": true,
+    "enable_webgl": true
+  },
+  "privacy": {
+    "do_not_track": true,
+    "block_third_party_cookies": true,
+    "clear_data_on_exit": false
+  },
+  "appearance": {
+    "theme": "system",
+    "font_family": "JetBrains Mono",
+    "font_size": 12
+  },
+  "developer": {
+    "enable_developer_tools": true,
+    "enable_source_maps": true,
+    "enable_web_inspector": true
+  }
+}

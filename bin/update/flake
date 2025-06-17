@@ -5,6 +5,8 @@ set -e
 
 bin/update/channels
 
-echo "> nix flake update"
+echo "> update > flake > cd hosts/$(hostname)"
 cd "hosts/$(hostname)"
+
+echo "> update > flake > nix --experimental-features \"nix-command flakes\" flake update"
 nix --experimental-features "nix-command flakes" flake update

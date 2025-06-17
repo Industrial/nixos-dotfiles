@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > network > ladybird > clear-cache"
+
+# Clear browser cache and data
+rm -rf "${HOME}/.cache/ladybird"
+rm -rf "${HOME}/.local/share/ladybird"
+
+# Clear configuration if --all flag is provided
+if [ "$1" == "--all" ]; then
+    rm -rf "${HOME}/.config/ladybird"
+    echo "All Ladybird data cleared (including configuration)"
+else
+    echo "Ladybird cache cleared (configuration preserved)"
+fi 

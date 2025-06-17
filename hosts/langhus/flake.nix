@@ -110,8 +110,10 @@
           inherit inputs settings;
         };
         modules = [
-          # ../features/ai/n8n
-          #../features/ai/ollama
+          #../../features/ai/n8n
+          #../../features/ai/ollama
+          ../../features/ai/task-master-ai
+
           inputs.comin.nixosModules.comin
           ../features/ci/comin
 
@@ -178,7 +180,6 @@
           #../features/monitoring/prometheus
 
           #../../features/network/chromium
-          #../../features/network/i2pd
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor

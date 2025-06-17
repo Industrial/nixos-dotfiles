@@ -113,8 +113,10 @@
           # inputs.nixos-hardware.starlabs.starlite.i5
           ./filesystems.nix
 
-          # ../features/ai/n8n
-          # ../features/ai/ollama
+          #../../features/ai/n8n
+          #../../features/ai/ollama
+          ../../features/ai/task-master-ai
+
           inputs.comin.nixosModules.comin
           ../../features/ci/comin
 

@@ -124,8 +124,9 @@
           ./disko.nix
           ./filesystems.nix
 
-          # ../features/ai/n8n
-          #../features/ai/ollama
+          #../../features/ai/n8n
+          #../../features/ai/ollama
+          ../../features/ai/task-master-ai
 
           inputs.comin.nixosModules.comin
           ../../features/ci/comin
@@ -197,7 +198,6 @@
           #../../features/monitoring/prometheus
 
           #../../features/network/chromium
-          #../../features/network/i2pd
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor
@@ -241,7 +241,6 @@
           ../../features/security/keepassxc
           ../../features/security/tailscale
           #../../features/security/veracrypt
-          #../../features/security/yubikey-manager
 
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s

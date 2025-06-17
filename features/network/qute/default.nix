@@ -1,6 +1,6 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
     qutebrowser
-    qutebrowser-qt5
+    #qutebrowser-qt5
   ];
 }

@@ -17,4 +17,10 @@
       allowBroken = false;
     };
   };
+
+  documentation = {
+    nixos = {
+      enable = false;
+    };
+  };
 }

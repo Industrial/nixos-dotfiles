@@ -40,15 +40,15 @@
       };
     };
 
-    # # Nix VS Code Extensions.
-    # nix-vscode-extensions = {
-    #   url = "github:nix-community/nix-vscode-extensions";
-    #   inputs = {
-    #     nixpkgs = {
-    #       follows = "nixpkgs";
-    #     };
-    #   };
-    # };
+    # Nix VS Code Extensions.
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs = {
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
+      };
+    };
 
     # Stylix.
     stylix = {
@@ -103,16 +103,14 @@
     };
   };
 
-  outputs = inputs @ {self, ...}: let
+  outputs = inputs @ {...}: let
     name = "drakkar";
     settings = (import ../../common/settings.nix {hostname = name;}).settings;
   in {
     nixosConfigurations = {
       "${name}" = inputs.nixpkgs.lib.nixosSystem {
         inherit (settings) system;
-        specialArgs = {
-          inherit inputs settings;
-        };
+        specialArgs = {inherit inputs settings;};
         modules = [
           inputs.disko.nixosModules.disko
           ./disko.nix
@@ -121,9 +119,10 @@
 
           #../../features/ai/n8n
           #../../features/ai/ollama
+          ../../features/ai/task-master-ai
 
-          #inputs.comin.nixosModules.comin
-          #../../features/ci/comin
+          inputs.comin.nixosModules.comin
+          ../../features/ci/comin
 
           ../../features/cli/bandwhich
           ../../features/cli/bat
@@ -161,20 +160,20 @@
           ../../features/cli/zellij
 
           ../../features/communication/discord
-          #../../features/communication/fractal
-          #../../features/communication/teams
-          #../../features/communication/telegram
-          #../../features/communication/weechat
+          ../../features/communication/fractal
+          ../../features/communication/teams
+          ../../features/communication/telegram
+          ../../features/communication/weechat
 
-          ##../../features/crypto/bisq
-          ##../../features/crypto/monero
+          ../../features/crypto/bisq
+          ../../features/crypto/monero
 
           ../../features/games/lutris
-          #../../features/games/path-of-building
+          ../../features/games/path-of-building
           #../../features/games/steam
-          #../../features/games/wowup
+          ../../features/games/wowup
 
-          # ../../features/media/calibre
+          ../../features/media/calibre
           # ../../features/media/invidious
           # ../../features/media/jellyfin
           # ../../features/media/lidarr
@@ -191,20 +190,20 @@
           #../../features/monitoring/homepage-dashboard
           #../../features/monitoring/prometheus
 
-          #../../features/network/chromium
-          #../../features/network/i2pd
+          ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor
           #../../features/network/tor-browser
           ../../features/network/firefox
-          ../../features/network/qute
+          #../../features/network/qute
+          #../../features/network/ladybird
           ../../features/network/syncthing
 
           ../../features/nixos
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
-          #../../features/nixos/docker
+          ../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
           ../../features/nixos/graphics/amd.nix
@@ -219,24 +218,23 @@
 
           ../../features/office/obsidian
 
-          #../../features/programming/bun
+          ../../features/programming/bun
           ../../features/programming/cursor
           ../../features/programming/devenv
-          ##../../features/programming/docker-compose
+          ../../features/programming/docker-compose
           ../../features/programming/git
-          ##../../features/programming/gitkraken
-          ##../../features/programming/glogg
-          ##../../features/programming/insomnia
-          ##../../features/programming/meld
+          ../../features/programming/gitkraken
+          ../../features/programming/glogg
+          ../../features/programming/insomnia
+          ../../features/programming/meld
           ../../features/programming/neovim
-          ##../../features/programming/node
-          #../../features/programming/python
+          ../../features/programming/node
+          ../../features/programming/python
           # ../../features/programming/vscode
 
           ../../features/security/keepassxc
-          #../../features/security/tailscale
-          #../../features/security/veracrypt
-          #../../features/security/yubikey-manager
+          ../../features/security/tailscale
+          ../../features/security/veracrypt
 
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
@@ -257,9 +255,9 @@
           #../../features/window-manager/gnome
           #../../features/window-manager/river
           #../../features/window-manager/slock
-          #inputs.stylix.nixosModules.stylix
-          #../../features/window-manager/stylix
-          #../../features/window-manager/xfce
+          inputs.stylix.nixosModules.stylix
+          ../../features/window-manager/stylix
+          ../../features/window-manager/xfce
           #../../features/window-manager/xmonad
           ../../features/window-manager/xsel
           ../../features/window-manager/xclip

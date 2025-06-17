@@ -14,6 +14,7 @@ sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cac
 cd ../..
 bin/update/login-shell "tom"
 
+features/network/ladybird/bin/link-files-nixos
 features/programming/vscode/bin/link-files-nixos
 features/window-manager/dwm/bin/link-files-nixos
 features/window-manager/river/bin/link-files-nixos

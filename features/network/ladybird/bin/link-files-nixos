@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > network > ladybird > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+configSourcePath="${currentDirectoryPath}/features/network/ladybird/.config/ladybird"
+targetDirectoryPath="${HOME}/.config/ladybird"
+
+# Create necessary directories
+mkdir -p "${targetDirectoryPath}"
+
+# Link all configuration files
+for file in "${configSourcePath}"/*; do
+    if [ -f "$file" ]; then
+        filename=$(basename "$file")
+        targetFile="${targetDirectoryPath}/${filename}"
+        ln -sf "$file" "$targetFile"
+        echo "Linked ${filename}"
+    fi
+done
+
+# Create cache and data directories if they don't exist
+mkdir -p "${HOME}/.cache/ladybird"
+mkdir -p "${HOME}/.local/share/ladybird"
+
+# Set appropriate permissions
+chmod 700 "${targetDirectoryPath}"
+chmod 700 "${HOME}/.cache/ladybird"
+chmod 700 "${HOME}/.local/share/ladybird" 

@@ -52,7 +52,6 @@
       xfce.thunar
       xfce.thunar-archive-plugin
       xfce.xfce4-battery-plugin
-      xfce.xfce4-datetime-plugin
       xfce.xfce4-icon-theme
       xfce.xfce4-notifyd
       xfce.xfce4-panel
