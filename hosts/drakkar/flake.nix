@@ -129,6 +129,7 @@
           ../../features/cli/broot
           ../../features/cli/btop
           ../../features/cli/c
+          ../../features/cli/calcurse
           ../../features/cli/cheatsheet
           ../../features/cli/cl
           ../../features/cli/create-ssh-key
@@ -206,7 +207,7 @@
           ../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
-          ../../features/nixos/graphics/amd.nix
+          #../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
           #../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix

@@ -122,6 +122,7 @@
           ../../features/cli/broot
           ../../features/cli/btop
           ../../features/cli/c
+          ../../features/cli/calcurse
           ../../features/cli/cheatsheet
           ../../features/cli/cl
           ../../features/cli/create-ssh-key
