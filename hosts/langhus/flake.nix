@@ -146,6 +146,7 @@
           ../../features/cli/lnav
           ../../features/cli/p
           ../../features/cli/p7zip
+          ../../features/cli/ranger
           ../../features/cli/ripgrep
           ../../features/cli/spotify-player
           ../../features/cli/starship

@@ -153,6 +153,7 @@
           ../../features/cli/lnav
           ../../features/cli/p
           ../../features/cli/p7zip
+          ../../features/cli/ranger
           ../../features/cli/ripgrep
           ../../features/cli/spotify-player
           ../../features/cli/starship
@@ -195,7 +196,7 @@
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor
-          #../../features/network/tor-browser
+          ../../features/network/tor-browser
           ../../features/network/firefox
           #../../features/network/qute
           #../../features/network/ladybird
