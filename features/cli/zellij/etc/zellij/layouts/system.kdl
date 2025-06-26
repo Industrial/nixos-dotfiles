@@ -57,9 +57,15 @@ layout {
   }
 
   tab name="dsk" {
-    pane {
-      cwd "/home/tom"
-      command "broot"
+    pane split_direction="vertical" {
+      pane {
+        cwd "/home/tom"
+        command "broot"
+      }
+      pane {
+        cwd "/home/tom"
+        command "ranger"
+      }
     }
   }
 
