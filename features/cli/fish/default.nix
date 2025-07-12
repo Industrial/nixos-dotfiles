@@ -25,9 +25,10 @@ in {
           source ${havamalPlugin}/share/fish/vendor_conf.d/Hávamál.fish
 
           # Variables
-          # set -x EDITOR "vim"
-          # set -x GIT_EDITOR "vim"
-          # set -x DIFFPROG "vim -d"
+          set -x EDITOR "vnim"
+          set -x GIT_EDITOR "nvim"
+          set -x DIFFPROG "nvim -d"
+          set -x PATH "$PATH:$HOME/.local/bin"
           set -x XDG_CACHE_HOME "$HOME/.cache"
           set -x XDG_CONFIG_HOME "$HOME/.config"
           set -x XDG_DATA_HOME "$HOME/.local/share"
