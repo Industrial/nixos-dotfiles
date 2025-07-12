@@ -5,6 +5,7 @@ set -e
 
 #features/window-manager/gnome/bin/dconf-load
 #features/window-manager/river/bin/link-files-nixos
+features/programming/cursor/bin/link-files-nixos
 
 bin/update/repositories
 bin/update/system

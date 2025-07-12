@@ -4,6 +4,7 @@ exec > >(tee ./logs/update-host-mimir) 2>&1
 set -e
 
 features/window-manager/gnome/bin/dconf-load
+features/programming/cursor/bin/link-files-nixos
 
 bin/update/repositories
 bin/update/system
