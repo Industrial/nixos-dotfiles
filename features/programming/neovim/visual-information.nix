@@ -1,41 +1,12 @@
 {...}: {
   programs = {
     nixvim = {
+      opts = {
+        # Show line numbers.
+        number = true;
+      };
+
       plugins = {
-        nvim-lightbulb = {
-          enable = true;
-
-          settings = {
-            sign = {
-              enabled = true;
-            };
-
-            virtual_text = {
-              enabled = false;
-            };
-
-            float = {
-              enabled = false;
-            };
-
-            status_text = {
-              enabled = true;
-            };
-
-            number = {
-              enabled = false;
-            };
-
-            line = {
-              enabled = false;
-            };
-
-            autocmd = {
-              enabled = true;
-            };
-          };
-        };
-
         # Shows the context you are in on the top of the buffer.
         barbecue = {
           enable = true;

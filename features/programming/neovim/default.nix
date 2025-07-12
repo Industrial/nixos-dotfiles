@@ -15,8 +15,8 @@
     ./copy-paste.nix
     ./dashboard.nix
     ./debug-adapter-protocol.nix
-    ./diagnostic-signs.nix
     ./editing.nix
+    ./environment.nix
     ./file-tabs.nix
     ./file-tree-sidebar.nix
     ./folds.nix
@@ -26,7 +26,6 @@
     ./keybind-menu.nix
     ./language-support.nix
     ./library.nix
-    ./line-numbers.nix
     ./movement.nix
     ./quickfix.nix
     ./refactoring.nix
