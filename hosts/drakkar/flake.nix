@@ -196,7 +196,7 @@
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor
-          ../../features/network/tor-browser
+          #../../features/network/tor-browser
           ../../features/network/firefox
           #../../features/network/qute
           #../../features/network/ladybird
@@ -208,7 +208,7 @@
           ../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
-          #../../features/nixos/graphics/amd.nix
+          ../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
           #../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix
@@ -232,7 +232,7 @@
           ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
-          # ../../features/programming/vscode
+          ../../features/programming/vscode
 
           ../../features/security/keepassxc
           ../../features/security/tailscale
