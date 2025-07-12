@@ -1,0 +1,291 @@
+{
+  "[haskell]": {
+    "editor.defaultFormatter": "haskell.haskell"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "biomejs.biome",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "kamadorueda.alejandra"
+  },
+  "[purescript]": {
+    "editor.defaultFormatter": "nwolverson.ide-purescript"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.detectIndentation": false,
+    "editor.guides.indentation": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4
+  },
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.detectIndentation": false,
+    "editor.guides.indentation": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[moon]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+  },
+
+  "alejandra.program": "alejandra",
+  "biome.enabled": true,
+  "chat.editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "chat.editor.fontSize": 12,
+  "debug.console.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "debug.console.fontSize": 12,
+  "debug.javascript.autoAttachFilter": "disabled",
+  "diffEditor.codeLens": true,
+  "editor.acceptSuggestionOnCommitCharacter": false,
+  "editor.acceptSuggestionOnEnter": "on",
+  "editor.autoClosingBrackets": "always",
+  "editor.autoClosingDelete": "always",
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.autoClosingQuotes": "always",
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "editor.codeLensFontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "editor.codeLensFontSize": 12,
+  "editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "editor.fontLigatures": true,
+  "editor.fontSize": 12,
+  "editor.fontWeight": "500",
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnType": false,
+  "editor.gotoLocation.multipleDeclarations": "gotoAndPeek",
+  "editor.gotoLocation.multipleDefinitions": "gotoAndPeek",
+  "editor.gotoLocation.multipleImplementations": "gotoAndPeek",
+  "editor.gotoLocation.multipleReferences": "gotoAndPeek",
+  "editor.gotoLocation.multipleTypeDefinitions": "gotoAndPeek",
+  "editor.inlayHints.enabled": "off",
+  "editor.inlayHints.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "editor.inlayHints.fontSize": 12,
+  "editor.inlineSuggest.enabled": true,
+  "editor.inlineSuggest.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "editor.inlineSuggest.showToolbar": "always",
+  "editor.inlineSuggest.suppressSuggestions": false,
+  "editor.insertSpaces": true,
+  "editor.largeFileOptimizations": false,
+  "editor.lineHeight": 16,
+  "editor.minimap.enabled": false,
+  "editor.minimap.sectionHeaderFontSize": 12,
+  "editor.quickSuggestions": {
+    "comments": "on",
+    "other": "on",
+    "strings": "on"
+  },
+  "editor.quickSuggestionsDelay": 10,
+  "editor.snippetSuggestions": "bottom",
+  "editor.suggest.filterGraceful": true,
+  "editor.suggest.insertMode": "insert",
+  "editor.suggest.localityBonus": false,
+  "editor.suggest.matchOnWordStartOnly": true,
+  "editor.suggest.preview": true,
+  "editor.suggest.shareSuggestSelections": true,
+  "editor.suggest.showClasses": true,
+  "editor.suggest.showColors": true,
+  "editor.suggest.showConstants": true,
+  "editor.suggest.showConstructors": true,
+  "editor.suggest.showCustomcolors": true,
+  "editor.suggest.showDeprecated": true,
+  "editor.suggest.showEnumMembers": true,
+  "editor.suggest.showEnums": true,
+  "editor.suggest.showEvents": true,
+  "editor.suggest.showFields": true,
+  "editor.suggest.showFiles": true,
+  "editor.suggest.showFolders": true,
+  "editor.suggest.showFunctions": true,
+  "editor.suggest.showIcons": true,
+  "editor.suggest.showInlineDetails": true,
+  "editor.suggest.showInterfaces": true,
+  "editor.suggest.showIssues": true,
+  "editor.suggest.showKeywords": true,
+  "editor.suggest.showMethods": true,
+  "editor.suggest.showModules": true,
+  "editor.suggest.showOperators": true,
+  "editor.suggest.showProperties": true,
+  "editor.suggest.showReferences": true,
+  "editor.suggest.showSnippets": true,
+  "editor.suggest.showStatusBar": true,
+  "editor.suggest.showStructs": true,
+  "editor.suggest.showTypeParameters": true,
+  "editor.suggest.showUnits": true,
+  "editor.suggest.showUsers": true,
+  "editor.suggest.showValues": true,
+  "editor.suggest.showVariables": true,
+  "editor.suggest.showWords": true,
+  "editor.suggest.snippetsPreventQuickSuggestions": true,
+  "editor.suggestFontSize": 12,
+  "editor.suggestOnTriggerCharacters": true,
+  "editor.suggestSelection": "first",
+  "editor.tabSize": 2,
+  "editor.wordBasedSuggestions": "matchingDocuments",
+  "editor.wordWrap": "off",
+  "emmet.includeLanguages": {},
+  "emmet.showAbbreviationSuggestions": false,
+  "emmet.showExpandedAbbreviation": "never",
+  "emmet.showSuggestionsAsSnippets": true,
+  "errorLens.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "errorLens.fontSize": "12",
+  "explorer.confirmDelete": false,
+  "explorer.confirmDragAndDrop": false,
+  "extensions.autoCheckUpdates": false,
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/.hg/store/**": true,
+    "**/.spago/**": true,
+    "**/node_modules/*/**": true
+  },
+  "treefmt.debug": true,
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "gitlens.blame.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "gitlens.blame.fontSize": 12,
+  "gitlens.currentLine.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "gitlens.currentLine.fontSize": 12,
+  "http.proxyStrictSSL": false,
+  "javascript.updateImportsOnFileMove.enabled": "always",
+  "jupyter.askForKernelRestart": false,
+  "jupyter.notebookFileRoot": "${workspaceRoot}",
+  "markdown.preview.fontSize": 12,
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nixd",
+  "notebook.markup.fontSize": 12,
+  "notebook.output.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "notebook.output.fontSize": 12,
+  "python.analysis.autoFormatStrings": true,
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.diagnosticMode": "workspace",
+  "python.analysis.exclude": [
+    "**/.git",
+    "**/.ipynb_checkpoints",
+    "**/.mypy_cache",
+    "**/.pytest_cache",
+    "**/.venv",
+    "**/.vscode",
+    "**/__pycache__",
+    "**/build",
+    "**/data",
+    "**/dist",
+    "**/jupyter_execute",
+    "**/node_modules",
+    "**/venv"
+  ],
+  "python.analysis.fixAll": [
+    "source.unusedImports",
+    "source.convertImportFormat"
+  ],
+  "python.analysis.importFormat": "absolute",
+  "python.analysis.include": [
+    "src/**/*"
+  ],
+  "python.analysis.inlayHints.callArgumentNames": "off",
+  "python.analysis.inlayHints.functionReturnTypes": true,
+  "python.analysis.inlayHints.variableTypes": true,
+  "python.analysis.typeCheckingMode": "standard",
+  "python.experiments.enabled": false,
+  "python.languageServer": "Pylance",
+  "python.terminal.activateEnvironment": false,
+  "references.preferredLocation": "view",
+  "scm.inputFontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "scm.inputFontSize": 12,
+  "security.workspace.trust.untrustedFiles": "open",
+  "terminal.integrated.copyOnSelection": true,
+  "terminal.integrated.enableMultiLinePasteWarning": "never",
+  "terminal.integrated.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "terminal.integrated.fontSize": 12,
+  "terminal.integrated.tabs.enableAnimation": true,
+  "terminal.integrated.tabs.enabled": true,
+  "terminal.integrated.tabs.focusMode": "singleClick",
+  "terminal.integrated.tabs.hideCondition": "never",
+  "terminal.integrated.tabs.location": "left",
+  "terminal.integrated.tabs.showActions": "always",
+  "terminal.integrated.tabs.showActiveTerminal": "always",
+  "terminal.external.linuxExec": "/run/current-system/sw/bin/bash",
+  "terminal.integrated.shellIntegration.enabled": false,
+  "terminal.integrated.profiles.linux": {
+    "fish": {
+      "path": "/run/current-system/sw/bin/fish"
+    },
+    "bash": {
+      "path": "/run/current-system/sw/bin/bash",
+    },
+  },
+  "terminal.integrated.defaultProfile.linux": "fish",
+  "terminal.integrated.automationProfile.linux": {
+    "path": "/run/current-system/sw/bin/fish",
+  },
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.format.enable": false,
+  "typescript.format.insertSpaceAfterTypeAssertion": true,
+  "typescript.inlayHints.enumMemberValues.enabled": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.parameterNames.enabled": "all",
+  "typescript.inlayHints.parameterTypes.enabled": true,
+  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+  "typescript.inlayHints.variableTypes.enabled": true,
+  "typescript.preferGoToSourceDefinition": true,
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.tsserver.maxTsServerMemory": 16384,
+  "typescript.tsserver.web.typeAcquisition.enabled": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "update.mode": "none",
+  "vim.foldfix": true,
+  "vim.hlsearch": true,
+  "vim.normalModeKeyBindingsNonRecursive": [
+    {
+      "before": [
+        "<space>"
+      ],
+      "commands": [
+        "whichkey.show"
+      ]
+    }
+  ],
+  "vim.visualModeKeyBindingsNonRecursive": [
+    {
+      "before": [
+        "<space>"
+      ],
+      "commands": [
+        "whichkey.show"
+      ]
+    }
+  ],
+  "vitest.nodeEnv": null,
+  "workbench.colorTheme": "base16-darkmoss",
+  "workbench.editor.enablePreview": false,
+  "workbench.enableExperiments": true,
+  "workbench.list.openMode": "doubleClick",
+  "cursor.composer.shouldAllowCustomModes": true,
+  "window.confirmSaveUntitledWorkspace": false,
+  "jupyter.interactiveWindow.creationMode": "perFile",
+  "window.commandCenter": true,
+  "update.releaseTrack": "prerelease"
+}

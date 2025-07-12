@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > programming > cursor > clear-cache"
+
+rm -rf "${HOME}/.cursor*"

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > programming > cursor > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+settingsSourceFilePath="${currentDirectoryPath}/features/programming/cursor/.config/Cursor/User/settings.json"
+keybindingsSourceFilePath="${currentDirectoryPath}/features/programming/cursor/.config/Cursor/User/keybindings.json"
+targetDirectoryPath="${HOME}/.config/Cursor/User"
+settingsTargetFilePath="${targetDirectoryPath}/settings.json"
+keybindingsTargetFilePath="${targetDirectoryPath}/keybindings.json"
+
+mkdir -p "${targetDirectoryPath}"
+ln -sf "${settingsSourceFilePath}" "${settingsTargetFilePath}"
+ln -sf "${keybindingsSourceFilePath}" "${keybindingsTargetFilePath}"
