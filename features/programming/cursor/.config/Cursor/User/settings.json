@@ -33,7 +33,6 @@
     "editor.insertSpaces": true,
     "editor.tabSize": 2
   },
-
   "alejandra.program": "alejandra",
   "biome.enabled": true,
   "chat.editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
