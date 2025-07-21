@@ -18,6 +18,27 @@
     wineWowPackages.fonts
     winetricks
 
+    bottles
+    heroic
     lutris
+    protonup-qt
   ];
+
+  programs = {
+    gamemode = {
+      enable = true;
+    };
+
+    steam = {
+      enable = true;
+
+      remotePlay = {
+        openFirewall = true;
+      };
+
+      dedicatedServer = {
+        openFirewall = true;
+      };
+    };
+  };
 }
