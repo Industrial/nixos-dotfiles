@@ -1,7 +1,4 @@
 {
-  "[haskell]": {
-    "editor.defaultFormatter": "haskell.haskell"
-  },
   "[javascript]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
@@ -19,22 +16,12 @@
   "[nix]": {
     "editor.defaultFormatter": "kamadorueda.alejandra"
   },
-  "[purescript]": {
-    "editor.defaultFormatter": "nwolverson.ide-purescript"
-  },
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter",
     "editor.detectIndentation": false,
     "editor.guides.indentation": true,
     "editor.insertSpaces": true,
     "editor.tabSize": 4
-  },
-  "[rust]": {
-    "editor.defaultFormatter": "rust-lang.rust-analyzer",
-    "editor.detectIndentation": false,
-    "editor.guides.indentation": true,
-    "editor.insertSpaces": true,
-    "editor.tabSize": 2
   },
   "[typescript]": {
     "editor.defaultFormatter": "biomejs.biome"
@@ -44,7 +31,7 @@
   },
   "[moon]": {
     "editor.insertSpaces": true,
-    "editor.tabSize": 2,
+    "editor.tabSize": 2
   },
 
   "alejandra.program": "alejandra",
@@ -201,15 +188,12 @@
     "source.convertImportFormat"
   ],
   "python.analysis.importFormat": "absolute",
-  "python.analysis.include": [
-    "src/**/*"
-  ],
+  "python.analysis.include": ["src/**/*"],
   "python.analysis.inlayHints.callArgumentNames": "off",
   "python.analysis.inlayHints.functionReturnTypes": true,
   "python.analysis.inlayHints.variableTypes": true,
   "python.analysis.typeCheckingMode": "standard",
   "python.experiments.enabled": false,
-  "python.languageServer": "Pylance",
   "python.terminal.activateEnvironment": false,
   "references.preferredLocation": "view",
   "scm.inputFontFamily": "'IosevkaTerm Nerd Font Mono'",
@@ -227,18 +211,18 @@
   "terminal.integrated.tabs.showActions": "always",
   "terminal.integrated.tabs.showActiveTerminal": "always",
   "terminal.external.linuxExec": "/run/current-system/sw/bin/bash",
-  "terminal.integrated.shellIntegration.enabled": false,
+  "terminal.integrated.shellIntegration.enabled": true,
   "terminal.integrated.profiles.linux": {
     "fish": {
       "path": "/run/current-system/sw/bin/fish"
     },
     "bash": {
-      "path": "/run/current-system/sw/bin/bash",
-    },
+      "path": "/run/current-system/sw/bin/bash"
+    }
   },
   "terminal.integrated.defaultProfile.linux": "fish",
   "terminal.integrated.automationProfile.linux": {
-    "path": "/run/current-system/sw/bin/fish",
+    "path": "/run/current-system/sw/bin/fish"
   },
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "typescript.format.enable": false,
@@ -260,22 +244,14 @@
   "vim.hlsearch": true,
   "vim.normalModeKeyBindingsNonRecursive": [
     {
-      "before": [
-        "<space>"
-      ],
-      "commands": [
-        "whichkey.show"
-      ]
+      "before": ["<space>"],
+      "commands": ["whichkey.show"]
     }
   ],
   "vim.visualModeKeyBindingsNonRecursive": [
     {
-      "before": [
-        "<space>"
-      ],
-      "commands": [
-        "whichkey.show"
-      ]
+      "before": ["<space>"],
+      "commands": ["whichkey.show"]
     }
   ],
   "vitest.nodeEnv": null,

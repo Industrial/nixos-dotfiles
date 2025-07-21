@@ -3,8 +3,18 @@
   pkgs,
   ...
 }: let
-  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
-  #.forVSCodeVersion "1.98.0";
+  # Override the license of the pylance extension
+  resetLicense = drv:
+    drv.overrideAttrs (prev: {
+      meta =
+        prev.meta
+        // {
+          license = [];
+        };
+    });
+
+  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.99.3";
+
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = pkgs.code-cursor;
     vscodeExtensions = [
@@ -38,18 +48,18 @@
       extensions.vscode-marketplace.dbaeumer.vscode-eslint
       extensions.vscode-marketplace.oven.bun-vscode
       extensions.vscode-marketplace.vitest.explorer
-      # ## Python
-      # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
-      # extensions.vscode-marketplace.ms-python.black-formatter
-      # extensions.vscode-marketplace.ms-python.debugpy
-      # extensions.vscode-marketplace.ms-python.flake8
-      # extensions.vscode-marketplace.ms-python.isort
-      # extensions.vscode-marketplace.ms-python.python
-      # extensions.vscode-marketplace.ms-python.vscode-pylance
-      # extensions.vscode-marketplace.tamasfe.even-better-toml
-      # ## Jupyter
-      # extensions.vscode-marketplace.ms-toolsai.jupyter
-      #extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
+      ## Python
+      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
+      extensions.vscode-marketplace.ms-python.black-formatter
+      extensions.vscode-marketplace.ms-python.debugpy
+      extensions.vscode-marketplace.ms-python.flake8
+      extensions.vscode-marketplace.ms-python.isort
+      extensions.vscode-marketplace.ms-python.python
+      # (resetLicense extensions.vscode-marketplace.ms-python.vscode-pylance)
+      extensions.vscode-marketplace.tamasfe.even-better-toml
+      ## Jupyter
+      extensions.vscode-marketplace.ms-toolsai.jupyter
+      extensions.vscode-marketplace.ms-toolsai.jupyter-renderers
       ## Nix
       extensions.vscode-marketplace.bbenoist.nix
       #extensions.vscode-marketplace.jnoortheen.nix-ide
@@ -86,31 +96,35 @@
       # extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
       # TOML
       extensions.vscode-marketplace.tamasfe.even-better-toml
+      # MoonScript
+      extensions.vscode-marketplace.vgalaktionov.moonscript
     ];
   };
 in {
-  environment.systemPackages = [
-    cursorWithExtensions
+  environment = {
+    systemPackages = with pkgs; [
+      cursorWithExtensions
 
-    # TypeScript
-    pkgs.biome
+      # TypeScript
+      biome
 
-    # Nix
-    pkgs.alejandra
-    pkgs.nixd
+      # Nix
+      alejandra
+      nixd
 
-    # # Haskell
-    # #pkgs.ghc
-    # pkgs.haskell-language-server
-    # pkgs.hlint
+      # # Haskell
+      # #pkgs.ghc
+      # pkgs.haskell-language-server
+      # pkgs.hlint
 
-    # # PureScript
-    # pkgs.nodePackages.purescript-psa
-    # pkgs.nodePackages.purs-tidy
-    # pkgs.nodePackages.purty
+      # # PureScript
+      # pkgs.nodePackages.purescript-psa
+      # pkgs.nodePackages.purs-tidy
+      # pkgs.nodePackages.purty
 
-    # # Rust
-    # pkgs.rustfmt
-    # pkgs.leptosfmt
-  ];
+      # # Rust
+      # pkgs.rustfmt
+      # pkgs.leptosfmt
+    ];
+  };
 }
