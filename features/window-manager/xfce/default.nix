@@ -67,7 +67,7 @@
       xfce.xfce4-volumed-pulse
       xfce.xfce4-whiskermenu-plugin
       xfce.xfconf
-      xfce.xfdashboard
+      # xfce.xfdashboard
       xfce.xfdesktop
       xfce.xfwm4
       xfce.xfwm4-themes
