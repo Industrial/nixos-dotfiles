@@ -190,7 +190,7 @@
 
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
-          #../../features/monitoring/prometheus
+          ../../features/monitoring/prometheus
 
           ../../features/network/chromium
           #../../features/network/searx
@@ -214,6 +214,11 @@
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo
+          ../../features/nixos/boot
+          ../../features/nixos/systemd
+          ../../features/performance/environment
+          ../../features/performance/hardware
+          ../../features/performance/filesystems
           ../../features/nixos/sound
           ../../features/nixos/users
           ../../features/nixos/window-manager
@@ -237,6 +242,10 @@
           ../../features/security/keepassxc
           ../../features/security/tailscale
           ../../features/security/veracrypt
+          ../../features/security/audit
+          ../../features/security/apparmor
+          ../../features/security/kernel
+          ../../features/security/pam
 
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
