@@ -2,6 +2,7 @@
   imports = [
     ../performance/environment
     ../performance/filesystems
+    ../performance/hardware
   ];
 
   system = {
