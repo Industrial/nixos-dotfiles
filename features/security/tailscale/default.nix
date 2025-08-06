@@ -7,9 +7,6 @@
   };
 
   networking = {
-    nameservers = ["100.100.100.100"];
-    search = ["${settings.hostname}"];
-
     firewall = {
       trustedInterfaces = ["tailscale0"];
     };

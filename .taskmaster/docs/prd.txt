@@ -1,0 +1,182 @@
+<context>
+# Overview  
+Volund is a modern, Rust-based tiling window manager named after the legendary smith Völund from Norse mythology. It provides a fast, safe, and efficient way to manage windows on Linux systems using the Wayland protocol. Volund is designed for developers and power users who want a window manager that combines the efficiency of tiling layouts with the safety guarantees of Rust and the modern architecture of Wayland.
+
+The core problem Volund solves is the need for a window manager that is both performant and safe, while providing the flexibility and customization that developers require. Traditional window managers like DWM are powerful but written in C, which can lead to memory safety issues. Volund addresses this by leveraging Rust's ownership system while maintaining the efficiency and functionality that users expect from a tiling window manager.
+
+# Core Features  
+## Native Wayland Compositor
+- **What it does**: Implements a full Wayland compositor using the Smithay library, providing native Wayland protocol support
+- **Why it's important**: Wayland is the future of Linux graphics, offering better security, performance, and modern features compared to X11
+- **How it works**: Uses Smithay's compositor framework to handle Wayland clients, manage surfaces, and coordinate with the display server
+
+## Tiling Layout Engine
+- **What it does**: Provides multiple tiling algorithms including master-stack, monocle, and floating layouts with dynamic switching
+- **Why it's important**: Efficient use of screen real estate and predictable window placement for productivity
+- **How it works**: Layout algorithms calculate window positions and sizes based on available space and user preferences
+
+## Workspace Management System
+- **What it does**: Manages 9 workspaces with tag-based organization and seamless switching
+- **Why it's important**: Allows users to organize applications by task or project, improving workflow efficiency
+- **How it works**: Each workspace maintains its own window stack and layout state, with hotkey-based navigation
+
+## Key Binding System
+- **What it does**: Provides configurable keyboard shortcuts for all window management operations
+- **Why it's important**: Enables efficient, keyboard-driven workflow without requiring mouse interaction
+- **How it works**: Uses Wayland's input handling to capture key events and map them to window manager actions
+
+## XWayland Compatibility Layer
+- **What it does**: Provides seamless support for X11 applications through XWayland integration
+- **Why it's important**: Ensures compatibility with legacy applications while maintaining Wayland's benefits
+- **How it works**: Integrates XWayland server to handle X11 clients within the Wayland environment
+
+# User Experience  
+## User Personas
+- **Developer**: Uses multiple terminals, IDEs, and development tools; needs efficient workspace organization
+- **Power User**: Demands keyboard-driven workflow and extensive customization options
+- **System Administrator**: Requires reliable, stable window management for server administration tasks
+
+## Key User Flows
+1. **Application Launch**: User presses Super+Return to spawn terminal, Super+p for application launcher
+2. **Window Navigation**: User uses Super+j/k to cycle through windows, Super+h/l for monitor switching
+3. **Workspace Management**: User presses Super+1-9 to switch workspaces, Super+Shift+1-9 to move windows
+4. **Layout Switching**: User presses Super+Space to cycle through available layouts
+5. **Window Manipulation**: User uses Super+Tab to toggle floating, mouse drag for window movement
+
+## UI/UX Considerations
+- **Minimal Visual Overhead**: Clean borders and status bar with configurable themes
+- **Immediate Feedback**: Instant response to key presses and window operations
+- **Consistent Behavior**: Predictable window placement and focus management
+- **Accessibility**: Full keyboard navigation and screen reader support
+</context>
+<PRD>
+# Technical Architecture  
+## System Components
+- **Wayland Compositor**: Core compositor using Smithay framework for surface management and client coordination
+- **Event Loop**: Async event processing using Tokio runtime for handling Wayland protocol events
+- **Layout Engine**: Modular layout system supporting multiple tiling algorithms
+- **Input Handler**: Wayland input event processing with configurable key binding system
+- **Window Manager**: Central coordination of window state, focus, and workspace management
+- **Configuration System**: TOML-based configuration with hot-reload capability
+
+## Data Models
+- **Window**: Represents a Wayland surface with position, size, and state information
+- **Workspace**: Container for windows with layout and tag information
+- **Monitor**: Display output with geometry and workspace assignments
+- **Layout**: Algorithm for calculating window positions and sizes
+- **KeyBinding**: Mapping of key combinations to window manager actions
+
+## APIs and Integrations
+- **Wayland Protocol**: Native Wayland client and server protocol implementation
+- **XWayland**: X11 compatibility layer for legacy application support
+- **Status Bar**: IPC-based communication with external status bar applications
+- **Configuration**: File-based configuration with validation and schema support
+- **Logging**: Structured logging with tracing for debugging and monitoring
+
+## Infrastructure Requirements
+- **Development Environment**: NixOS with Devenv.sh for reproducible builds
+- **Testing Environment**: Weston for isolated Wayland compositor testing
+- **CI/CD**: GitHub Actions with NixOS runners for automated testing
+- **Documentation**: Rust docs with examples and integration guides
+
+# Development Roadmap  
+## Phase 1: Core Wayland Compositor (MVP)
+- **Wayland Server Setup**: Basic Wayland compositor using Smithay with surface management
+- **Event Loop Implementation**: Async event processing for Wayland protocol events
+- **Basic Window Management**: Window creation, destruction, and basic positioning
+- **Input Handling**: Keyboard and mouse event processing with basic key binding system
+- **Simple Tiling**: Basic master-stack layout implementation
+- **Window Focus**: Focus management and window switching
+
+## Phase 2: Advanced Window Management
+- **Multiple Layouts**: Implementation of tile, monocle, and floating layouts
+- **Workspace System**: 9-workspace system with tag-based organization
+- **Multi-Monitor Support**: Monitor detection and workspace assignment
+- **Window Resizing**: Dynamic window resizing and layout adjustment
+- **Window Rules**: Configurable window placement and behavior rules
+- **State Persistence**: Window and workspace state persistence across sessions
+
+## Phase 3: Enhanced User Experience
+- **Status Bar Integration**: IPC-based status bar communication and widgets
+- **Application Launcher**: Integrated application launcher with fuzzy search
+- **Notification System**: Wayland notification protocol implementation
+- **Screenshot Support**: Built-in screenshot and screen recording capabilities
+- **Hotkey Daemon**: Global hotkey system for system-wide shortcuts
+- **Configuration UI**: Visual configuration interface for non-technical users
+
+## Phase 4: Developer Experience
+- **Plugin System**: Extensible plugin architecture for custom functionality
+- **Configuration Hot-Reload**: Live configuration updates without restart
+- **Debug Tools**: Comprehensive debugging and profiling tools
+- **Development Integration**: IDE and development tool integration
+- **Custom Widgets**: User-defined status bar widgets and indicators
+- **Performance Monitoring**: Real-time performance metrics and optimization
+
+## Phase 5: Advanced Features
+- **XWayland Integration**: Seamless X11 application support through XWayland
+- **GPU Acceleration**: Vulkan-based rendering and GPU acceleration
+- **Advanced Compositing**: Effects, animations, and visual enhancements
+- **Remote Desktop**: Remote desktop and screen sharing capabilities
+- **Mobile Support**: Touch and gesture support for mobile/tablet devices
+- **Container Integration**: Docker and container environment optimization
+
+# Logical Dependency Chain
+## Foundation Layer (Must be built first)
+1. **Wayland Server Setup**: Core compositor infrastructure using Smithay
+2. **Event Loop**: Basic event processing for Wayland protocol events
+3. **Surface Management**: Window surface creation and destruction
+4. **Input Handling**: Basic keyboard and mouse event processing
+
+## Usable Window Manager (Quick path to visible functionality)
+1. **Basic Tiling**: Simple master-stack layout implementation
+2. **Window Focus**: Focus management and window switching
+3. **Key Binding System**: Configurable keyboard shortcuts
+4. **Window Spawning**: Application launching and window creation
+
+## Enhanced Functionality (Build upon foundation)
+1. **Multiple Layouts**: Expand beyond basic tiling to multiple layout algorithms
+2. **Workspace System**: Add workspace management and organization
+3. **Multi-Monitor**: Support for multiple displays and monitor management
+4. **Window Rules**: Configurable window behavior and placement
+
+## Advanced Features (Polish and optimization)
+1. **Status Bar Integration**: External status bar communication
+2. **Configuration System**: File-based configuration with validation
+3. **Performance Optimization**: Profiling and performance improvements
+4. **XWayland Support**: Legacy application compatibility
+
+# Risks and Mitigations  
+## Technical Challenges
+- **Wayland Complexity**: Wayland protocol is complex and documentation can be sparse
+  - **Mitigation**: Use mature Smithay library and leverage community resources
+- **Performance Optimization**: Achieving sub-16ms event latency for smooth operation
+  - **Mitigation**: Profiling tools and performance benchmarking from the start
+- **XWayland Integration**: Ensuring seamless X11 application compatibility
+  - **Mitigation**: Thorough testing with popular X11 applications and gradual integration
+
+## MVP Scope Management
+- **Feature Creep**: Risk of adding too many features before core functionality is solid
+  - **Mitigation**: Strict adherence to MVP requirements and phased development approach
+- **Complexity Management**: Balancing functionality with maintainability
+  - **Mitigation**: Modular architecture and comprehensive testing
+
+## Resource Constraints
+- **Development Time**: Limited time for development and testing
+  - **Mitigation**: Focus on core functionality first, iterate quickly
+- **Testing Complexity**: Wayland testing requires specialized environment
+  - **Mitigation**: Automated testing with Weston and comprehensive CI/CD
+
+# Appendix  
+## Research Findings
+- **Smithay Library**: Mature Rust library for Wayland compositor development with good documentation
+- **Wayland Protocol**: Modern display protocol offering better security and performance than X11
+- **XWayland**: Well-established compatibility layer for running X11 applications on Wayland
+- **Performance Requirements**: Sub-16ms latency needed for smooth 60fps operation
+
+## Technical Specifications
+- **Language**: Rust 2024 edition with async/await support
+- **Wayland Libraries**: Smithay 0.4+, wayland-client/server 0.32+
+- **Async Runtime**: Tokio 1.36+ for event loop management
+- **Configuration**: TOML format with serde serialization
+- **Logging**: tracing for structured logging and observability
+- **Testing**: Weston for Wayland compositor testing, cargo test for unit tests 

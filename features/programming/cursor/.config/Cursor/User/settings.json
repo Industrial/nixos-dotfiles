@@ -17,7 +17,7 @@
     "editor.defaultFormatter": "kamadorueda.alejandra"
   },
   "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.detectIndentation": false,
     "editor.guides.indentation": true,
     "editor.insertSpaces": true,
@@ -262,5 +262,6 @@
   "window.confirmSaveUntitledWorkspace": false,
   "jupyter.interactiveWindow.creationMode": "perFile",
   "window.commandCenter": true,
-  "update.releaseTrack": "prerelease"
+  "update.releaseTrack": "prerelease",
+  "diffEditor.maxComputationTime": 0
 }

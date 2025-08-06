@@ -106,5 +106,9 @@
     "command": "-deleteLeft",
     "key": "ctrl+backspace",
     "when": "textInputFocus"
+  },
+  {
+    "key": "ctrl+e",
+    "command": "composerMode.background"
   }
 ]

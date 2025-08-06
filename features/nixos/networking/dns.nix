@@ -7,9 +7,14 @@
 #   nix-shell -p dnsutils --run "dig malware.testcategory.com @127.0.0.1"
 # Verify DNSSEC:
 #   nix-shell -p dnsutils --run "dig +dnssec example.com @127.0.0.1"
-{...}: {
+{
+  settings,
+  lib,
+  ...
+}: {
   networking = {
     nameservers = ["127.0.0.1" "::1"];
+    search = ["${settings.hostname}"];
   };
 
   services = {

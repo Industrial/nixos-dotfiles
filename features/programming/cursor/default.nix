@@ -50,12 +50,11 @@
       extensions.vscode-marketplace.vitest.explorer
       ## Python
       extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
-      extensions.vscode-marketplace.ms-python.black-formatter
+      extensions.vscode-marketplace.charliermarsh.ruff
       extensions.vscode-marketplace.ms-python.debugpy
-      extensions.vscode-marketplace.ms-python.flake8
-      extensions.vscode-marketplace.ms-python.isort
       extensions.vscode-marketplace.ms-python.python
       # (resetLicense extensions.vscode-marketplace.ms-python.vscode-pylance)
+      extensions.vscode-marketplace.ms-python.mypy-type-checker
       extensions.vscode-marketplace.tamasfe.even-better-toml
       ## Jupyter
       extensions.vscode-marketplace.ms-toolsai.jupyter

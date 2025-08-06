@@ -1,0 +1,820 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Repository and Development Environment",
+        "description": "Initialize the project repository with Rust 2024 edition and set up the NixOS development environment with Devenv.sh for reproducible builds.",
+        "details": "1. Create a new Git repository for Volund\n2. Initialize Rust project with `cargo init --lib`\n3. Configure Cargo.toml with project metadata and Rust 2024 edition\n4. Set up NixOS development environment with Devenv.sh:\n   - Create devenv.nix with required dependencies (wayland, wlroots, etc.)\n   - Configure development shell with necessary tools\n5. Set up GitHub Actions CI/CD pipeline with NixOS runners\n6. Create initial project structure:\n   ```\n   src/\n     main.rs\n     lib.rs\n     compositor/\n     layout/\n     input/\n     config/\n     wayland/\n     xwayland/\n   ```\n7. Add README.md with project overview and development instructions\n8. Set up logging with tracing crate (tracing 0.1.37+)\n9. Configure .gitignore for Rust projects",
+        "testStrategy": "1. Verify that the project builds successfully with `cargo build`\n2. Ensure the development environment can be reproduced with `devenv up`\n3. Confirm CI pipeline runs successfully on GitHub Actions\n4. Validate project structure follows Rust best practices",
+        "priority": "high",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement Core Wayland Compositor with Smithay",
+        "description": "Set up the basic Wayland compositor using the Smithay framework to handle surface management and client coordination.",
+        "details": "1. Add Smithay dependency (0.4+) to Cargo.toml\n2. Implement basic Wayland compositor structure:\n   ```rust\n   use smithay::wayland::compositor::CompositorState;\n   use smithay::wayland::shell::xdg::XdgShellState;\n   \n   struct VolundState {\n       compositor_state: CompositorState,\n       xdg_shell_state: XdgShellState,\n       // Other state components\n   }\n   ```\n3. Initialize Wayland display and socket:\n   ```rust\n   let display = Display::new().expect(\"Failed to create Wayland display\");\n   let socket = ListeningSocket::bind(\"volund\").expect(\"Failed to bind Wayland socket\");\n   ```\n4. Set up basic surface management:\n   - Surface creation/destruction handlers\n   - Surface commit handlers\n   - Surface damage tracking\n5. Implement basic Wayland protocols:\n   - wl_compositor\n   - wl_shm\n   - xdg_shell\n6. Create a simple rendering loop with wgpu or similar for basic window rendering",
+        "testStrategy": "1. Test with simple Wayland clients like weston-terminal\n2. Verify surface creation and destruction events are handled correctly\n3. Use Wayland protocol debugging tools to validate protocol implementation\n4. Create unit tests for surface management functions",
+        "priority": "high",
+        "dependencies": [1],
+        "status": "in-progress",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Smithay dependencies and basic compositor structure",
+            "description": "Add Smithay dependency to Cargo.toml and implement the basic compositor state structure with necessary components.",
+            "dependencies": [],
+            "details": "1. Add Smithay dependency (0.4+) to Cargo.toml\n2. Create the VolundState struct with CompositorState and XdgShellState\n3. Add other necessary state components like ShmState, DataDeviceState\n4. Implement basic initialization for the compositor state\n5. Set up error handling for state initialization",
+            "status": "in-progress",
+            "testStrategy": "1. Verify project builds successfully with Smithay dependencies\n2. Create unit tests for state initialization\n3. Check that all required state components are properly initialized"
+          },
+          {
+            "id": 2,
+            "title": "Initialize Wayland display and socket",
+            "description": "Set up the Wayland display, create a listening socket, and implement the event loop for client connections.",
+            "dependencies": ["2.1"],
+            "details": "1. Initialize the Wayland display\n2. Create a listening socket with appropriate name and permissions\n3. Implement the event loop for handling client connections\n4. Set up signal handling for graceful shutdown\n5. Implement error handling for display and socket initialization",
+            "status": "pending",
+            "testStrategy": "1. Test socket creation with different names\n2. Verify socket permissions are set correctly\n3. Test connection handling with simple clients\n4. Verify graceful shutdown works when signals are received"
+          },
+          {
+            "id": 3,
+            "title": "Implement basic surface management",
+            "description": "Create handlers for surface lifecycle events including creation, destruction, and commit events.",
+            "dependencies": ["2.1", "2.2"],
+            "details": "1. Implement surface creation handler\n2. Implement surface destruction handler\n3. Create surface commit handler to process surface updates\n4. Implement damage tracking for efficient rendering\n5. Set up buffer management for surface content",
+            "status": "pending",
+            "testStrategy": "1. Test surface creation and destruction with simple clients\n2. Verify damage regions are correctly tracked\n3. Test buffer attachment and release\n4. Create unit tests for surface management functions"
+          },
+          {
+            "id": 4,
+            "title": "Implement core Wayland protocols",
+            "description": "Implement essential Wayland protocols including wl_compositor, wl_shm, and xdg_shell.",
+            "dependencies": ["2.1", "2.2", "2.3"],
+            "details": "1. Implement wl_compositor protocol\n2. Implement wl_shm protocol for shared memory buffers\n3. Implement xdg_shell protocol for window management\n4. Set up protocol error handling\n5. Implement protocol version negotiation",
+            "status": "pending",
+            "testStrategy": "1. Test with Wayland protocol validation tools\n2. Verify protocol implementation with simple clients\n3. Test protocol error handling\n4. Verify version negotiation works correctly with clients"
+          },
+          {
+            "id": 5,
+            "title": "Create basic rendering loop",
+            "description": "Implement a simple rendering loop using wgpu or similar to display client surfaces.",
+            "dependencies": ["2.1", "2.2", "2.3", "2.4"],
+            "details": "1. Set up wgpu or similar rendering backend\n2. Create a rendering loop that processes surface updates\n3. Implement basic compositing of client surfaces\n4. Set up frame timing and vsync\n5. Implement frame callbacks for clients",
+            "status": "pending",
+            "testStrategy": "1. Test rendering with simple clients like weston-terminal\n2. Verify vsync and frame timing\n3. Test frame callbacks are correctly delivered to clients\n4. Measure rendering performance with different client configurations"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement Async Event Loop with Tokio",
+        "description": "Create an asynchronous event processing system using Tokio runtime to handle Wayland protocol events efficiently.",
+        "details": "1. Add Tokio dependency (1.36+) to Cargo.toml\n2. Set up Tokio runtime with multi-threaded scheduler:\n   ```rust\n   let runtime = tokio::runtime::Builder::new_multi_thread()\n       .enable_all()\n       .build()\n       .expect(\"Failed to create Tokio runtime\");\n   ```\n3. Implement event sources:\n   - Wayland client connections\n   - Input device events\n   - Timer events\n   - Signal handling\n4. Create event dispatching system:\n   ```rust\n   async fn dispatch_events(state: &mut VolundState) {\n       loop {\n           tokio::select! {\n               event = wayland_source.next_event() => handle_wayland_event(state, event),\n               event = input_source.next_event() => handle_input_event(state, event),\n               _ = tokio::signal::ctrl_c() => break,\n           }\n       }\n   }\n   ```\n5. Implement efficient event batching for performance optimization\n6. Add proper error handling and recovery mechanisms\n7. Implement graceful shutdown procedure",
+        "testStrategy": "1. Benchmark event processing latency (target: sub-16ms)\n2. Test with high event load to verify stability\n3. Verify proper shutdown sequence\n4. Create unit tests for event dispatching logic\n5. Test error recovery mechanisms",
+        "priority": "high",
+        "dependencies": [2],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Tokio runtime environment",
+            "description": "Configure the project with Tokio dependencies and implement the multi-threaded runtime setup for asynchronous event processing.",
+            "dependencies": [],
+            "details": "Add Tokio 1.36+ to Cargo.toml with appropriate features enabled. Implement the runtime initialization with proper error handling. Create a central state structure that will be shared across the event loop. Configure runtime with optimal thread settings for Wayland event processing.",
+            "status": "pending",
+            "testStrategy": "Verify runtime initialization with unit tests. Measure startup performance. Test runtime shutdown sequence. Ensure proper error propagation from runtime initialization failures."
+          },
+          {
+            "id": 2,
+            "title": "Implement event sources for Wayland protocol",
+            "description": "Create asynchronous event sources for Wayland client connections, input devices, timers, and system signals.",
+            "dependencies": ["3.1"],
+            "details": "Implement Wayland event source with async/await patterns. Create input device event source with proper event buffering. Implement timer event source with configurable intervals. Add signal handling for system events (SIGINT, SIGTERM). Ensure each source implements a common trait for uniform handling.",
+            "status": "pending",
+            "testStrategy": "Test each event source independently with mock events. Verify event source registration and deregistration. Measure event propagation latency. Test concurrent event generation from multiple sources."
+          },
+          {
+            "id": 3,
+            "title": "Create event dispatching system",
+            "description": "Implement the core event dispatching logic using tokio::select! to handle multiple event sources concurrently.",
+            "dependencies": ["3.2"],
+            "details": "Implement the dispatch_events function with tokio::select! for concurrent event handling. Create handler functions for each event type. Implement state management for maintaining compositor state across event cycles. Add cancellation handling for graceful shutdown. Ensure proper error propagation from event handlers.",
+            "status": "pending",
+            "testStrategy": "Test event dispatching with simulated event streams. Verify correct handler invocation for each event type. Test concurrent event handling under load. Measure dispatching performance with benchmarks targeting sub-16ms latency."
+          },
+          {
+            "id": 4,
+            "title": "Implement event batching and optimization",
+            "description": "Create an efficient event batching system to optimize performance and reduce latency in the event processing pipeline.",
+            "dependencies": ["3.3"],
+            "details": "Implement event batching for similar event types to reduce processing overhead. Create priority queue for event processing based on event type importance. Add configurable batching thresholds based on event frequency. Implement frame-rate limiting for rendering events. Add performance metrics collection for optimization feedback.",
+            "status": "pending",
+            "testStrategy": "Benchmark event processing with and without batching. Test with high-frequency event streams to verify stability. Measure latency under various load conditions. Verify batching doesn't introduce noticeable input lag."
+          },
+          {
+            "id": 5,
+            "title": "Implement error handling and graceful shutdown",
+            "description": "Add comprehensive error handling throughout the event loop and implement a proper shutdown sequence for the Tokio runtime.",
+            "dependencies": ["3.3", "3.4"],
+            "details": "Implement error recovery mechanisms for non-fatal errors. Create a graceful shutdown procedure that properly closes all resources. Add logging for error conditions with appropriate context. Implement timeout handling for potentially blocking operations. Create a clean shutdown sequence triggered by SIGINT/SIGTERM.",
+            "status": "pending",
+            "testStrategy": "Test error recovery by injecting faults into event handlers. Verify resources are properly released during shutdown. Test shutdown sequence under various conditions (idle, high load, etc.). Verify no resource leaks occur during normal operation or shutdown."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Develop Basic Window Management System",
+        "description": "Implement the core window management functionality including window creation, destruction, and basic positioning.",
+        "details": "1. Define Window data structure:\n   ```rust\n   struct Window {\n       surface: WlSurface,\n       geometry: Rectangle,\n       state: WindowState,\n       title: Option<String>,\n       app_id: Option<String>,\n   }\n   \n   enum WindowState {\n       Normal,\n       Maximized,\n       Fullscreen,\n       Minimized,\n   }\n   ```\n2. Implement window creation from Wayland surfaces\n3. Create window destruction and cleanup handlers\n4. Implement basic window positioning logic\n5. Add window state tracking (normal, maximized, fullscreen)\n6. Create window list management:\n   ```rust\n   struct WindowManager {\n       windows: HashMap<WindowId, Window>,\n       focused_window: Option<WindowId>,\n   }\n   ```\n7. Implement window property handling (title, app_id, etc.)\n8. Add basic window decoration rendering (if needed)",
+        "testStrategy": "1. Test window creation with various Wayland clients\n2. Verify window state transitions work correctly\n3. Test window destruction and resource cleanup\n4. Create unit tests for window management functions\n5. Verify window properties are correctly tracked",
+        "priority": "high",
+        "dependencies": [2, 3],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Window Data Structure",
+            "description": "Define and implement the Window and WindowState data structures with all necessary fields and methods.",
+            "dependencies": [],
+            "details": "Create the Window struct with fields for surface, geometry, state, title, and app_id. Implement the WindowState enum with Normal, Maximized, Fullscreen, and Minimized variants. Add methods for accessing and modifying window properties. Include proper documentation for all struct fields and methods.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify Window struct initialization, property getters and setters, and state transitions. Test with mock WlSurface objects to ensure proper behavior."
+          },
+          {
+            "id": 2,
+            "title": "Develop Window Creation and Destruction Logic",
+            "description": "Implement functionality to create windows from Wayland surfaces and properly destroy them when needed.",
+            "dependencies": ["4.1"],
+            "details": "Create functions to initialize a Window from a WlSurface. Implement proper resource acquisition during window creation. Develop handlers for window destruction events that properly clean up resources and remove the window from management. Handle edge cases like destroying the focused window.",
+            "status": "pending",
+            "testStrategy": "Test window creation with various Wayland client configurations. Verify resource cleanup on window destruction. Create integration tests with mock Wayland clients to ensure proper lifecycle management."
+          },
+          {
+            "id": 3,
+            "title": "Implement Window Manager Structure",
+            "description": "Create the WindowManager struct to track all windows and maintain focus state.",
+            "dependencies": ["4.1", "4.2"],
+            "details": "Implement the WindowManager struct with a HashMap to store windows and track the currently focused window. Add methods for adding, removing, and finding windows. Implement basic focus management functionality. Create an API for iterating through managed windows.",
+            "status": "pending",
+            "testStrategy": "Test window addition and removal from the WindowManager. Verify focus tracking works correctly. Create unit tests for all WindowManager methods. Test with multiple windows to ensure proper management."
+          },
+          {
+            "id": 4,
+            "title": "Develop Window Positioning System",
+            "description": "Implement basic window positioning logic to place and arrange windows on the screen.",
+            "dependencies": ["4.1", "4.3"],
+            "details": "Create functions to position windows at specific coordinates. Implement logic to handle window movement requests. Add support for basic window arrangements (cascading, tiling). Ensure windows stay within screen boundaries. Handle multi-monitor scenarios if applicable.",
+            "status": "pending",
+            "testStrategy": "Test window positioning with various screen configurations. Verify windows remain within valid screen areas. Create unit tests for positioning algorithms. Test window movement operations."
+          },
+          {
+            "id": 5,
+            "title": "Implement Window State Management",
+            "description": "Add functionality to track and change window states (normal, maximized, fullscreen, minimized).",
+            "dependencies": ["4.1", "4.3", "4.4"],
+            "details": "Implement methods to transition between window states. Create handlers for client-requested state changes. Develop logic for state-specific behaviors (e.g., saving previous geometry when maximizing). Add visual indicators for different window states. Ensure proper Wayland protocol handling for state changes.",
+            "status": "pending",
+            "testStrategy": "Test all state transitions (normal to maximized, maximized to fullscreen, etc.). Verify geometry is properly saved and restored during state changes. Create integration tests with Wayland clients to ensure protocol compliance."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement Input Handling System",
+        "description": "Create a comprehensive input handling system for keyboard and mouse events with a configurable key binding mechanism.",
+        "details": "1. Add input device detection and initialization:\n   ```rust\n   fn initialize_input_devices(seat: &mut SeatState) {\n       // Initialize keyboard, pointer, touch devices\n   }\n   ```\n2. Implement keyboard event handling:\n   - Key press/release events\n   - Modifier tracking (shift, ctrl, alt, super)\n   - Key repeat handling\n3. Create mouse/pointer event handling:\n   - Motion events\n   - Button press/release\n   - Scroll events\n4. Implement key binding system:\n   ```rust\n   struct KeyBinding {\n       modifiers: Modifiers,\n       key: Key,\n       action: Action,\n   }\n   \n   enum Action {\n       SpawnTerminal,\n       CloseWindow,\n       SwitchWorkspace(usize),\n       // Other actions\n   }\n   ```\n5. Add key binding configuration parser\n6. Implement action execution system\n7. Create focus management based on input events",
+        "testStrategy": "1. Test keyboard input with various key combinations\n2. Verify mouse events are correctly processed\n3. Test key binding configuration parsing\n4. Measure input latency (target: <10ms)\n5. Create unit tests for key binding resolution\n6. Test focus management with mouse and keyboard",
+        "priority": "high",
+        "dependencies": [3, 4],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Input Device Detection and Initialization",
+            "description": "Create functions to detect and initialize keyboard, mouse, and touch input devices with proper event handling setup.",
+            "dependencies": [],
+            "details": "Develop the `initialize_input_devices` function that detects available input devices and registers them with the seat. Implement device capability detection to handle different input types. Create separate initialization paths for keyboard, pointer, and touch devices. Include error handling for device initialization failures.",
+            "status": "pending",
+            "testStrategy": "Test device detection with various hardware configurations. Verify all input device types are correctly initialized. Create mock devices for testing initialization failures. Measure initialization time performance."
+          },
+          {
+            "id": 2,
+            "title": "Develop Keyboard Event Handling System",
+            "description": "Implement comprehensive keyboard event handling including key press/release events, modifier tracking, and key repeat functionality.",
+            "dependencies": ["5.1"],
+            "details": "Create event handlers for key press and release events. Implement modifier key state tracking (shift, ctrl, alt, super). Develop key repeat handling with configurable delay and rate. Add support for keyboard layout switching. Implement raw key code to keysym translation.",
+            "status": "pending",
+            "testStrategy": "Test key press/release event capture accuracy. Verify modifier state tracking with various key combinations. Test key repeat functionality with different timing configurations. Ensure keyboard layout changes are properly handled."
+          },
+          {
+            "id": 3,
+            "title": "Create Mouse/Pointer Event Handling System",
+            "description": "Implement mouse event handling for motion, button press/release, and scroll events with proper coordinate translation.",
+            "dependencies": ["5.1"],
+            "details": "Develop handlers for mouse motion events with proper coordinate translation. Implement button press and release event handling. Create scroll event processing for both vertical and horizontal scrolling. Add support for high-resolution scroll events. Implement pointer acceleration and sensitivity configuration.",
+            "status": "pending",
+            "testStrategy": "Test mouse movement tracking accuracy. Verify button press/release events are correctly captured. Test scroll events with various input devices. Measure input latency for mouse events (target: <10ms). Verify coordinate translation works correctly across different monitor configurations."
+          },
+          {
+            "id": 4,
+            "title": "Implement Key Binding System",
+            "description": "Create a flexible key binding system that maps key combinations to actions with support for modifiers and custom configurations.",
+            "dependencies": ["5.2"],
+            "details": "Implement the KeyBinding struct as specified. Develop the Action enum with all required compositor actions. Create a key binding resolution system that matches input events to defined bindings. Implement a binding priority system for handling conflicts. Add support for chord-based key bindings (sequential key combinations).",
+            "status": "pending",
+            "testStrategy": "Test key binding resolution with various modifier combinations. Verify all defined actions are correctly triggered. Test binding priority system with conflicting bindings. Create unit tests for key binding matching algorithms. Measure performance of binding resolution system."
+          },
+          {
+            "id": 5,
+            "title": "Develop Configuration and Action Execution System",
+            "description": "Create a configuration parser for key bindings and implement the action execution system that responds to input events.",
+            "dependencies": ["5.2", "5.3", "5.4"],
+            "details": "Implement a configuration file parser for key bindings. Create the action execution system that triggers the appropriate response to input events. Develop focus management based on input events. Add support for runtime reconfiguration of key bindings. Implement event logging for debugging purposes.",
+            "status": "pending",
+            "testStrategy": "Test configuration file parsing with valid and invalid inputs. Verify action execution correctly responds to input events. Test focus management with mouse and keyboard interactions. Verify runtime reconfiguration works without requiring restart. Create integration tests for the complete input handling pipeline."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement Basic Tiling Layout Engine",
+        "description": "Create the core tiling layout engine with master-stack layout implementation for efficient window organization.",
+        "details": "1. Define Layout trait:\n   ```rust\n   trait Layout {\n       fn arrange(&self, area: Rectangle, windows: &[WindowId]) -> HashMap<WindowId, Rectangle>;\n       fn name(&self) -> &str;\n   }\n   ```\n2. Implement MasterStack layout:\n   ```rust\n   struct MasterStack {\n       master_ratio: f32,\n       master_count: usize,\n   }\n   \n   impl Layout for MasterStack {\n       fn arrange(&self, area: Rectangle, windows: &[WindowId]) -> HashMap<WindowId, Rectangle> {\n           // Calculate master and stack areas based on ratio\n           // Assign windows to positions\n       }\n       \n       fn name(&self) -> &str { \"master-stack\" }\n   }\n   ```\n3. Create layout manager to store and switch between layouts\n4. Implement window resizing within layouts\n5. Add layout persistence across workspace switches\n6. Implement layout-specific operations (increase/decrease master size, etc.)\n7. Create layout application logic to apply layouts when windows change",
+        "testStrategy": "1. Test layout calculations with various window counts\n2. Verify window positions are correctly calculated\n3. Test layout switching\n4. Create visual tests to verify layouts appear correctly\n5. Test window resizing within layouts\n6. Create unit tests for layout algorithms",
+        "priority": "high",
+        "dependencies": [4],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Layout Trait and Basic Structures",
+            "description": "Define the Layout trait and create the basic structures needed for the tiling layout engine.",
+            "dependencies": [],
+            "details": "Create the Layout trait with arrange() and name() methods. Define Rectangle structure for representing window areas. Implement utility functions for calculating window positions and sizes. Set up the foundation for layout implementations.",
+            "status": "pending",
+            "testStrategy": "Create unit tests for Rectangle calculations. Test basic layout trait functionality with mock implementations. Verify correct behavior of utility functions."
+          },
+          {
+            "id": 2,
+            "title": "Implement MasterStack Layout Algorithm",
+            "description": "Create the MasterStack layout implementation that divides the screen into master and stack areas.",
+            "dependencies": ["6.1"],
+            "details": "Implement MasterStack struct with master_ratio and master_count fields. Create the arrange() method to calculate master and stack areas based on the ratio. Implement window assignment logic to position windows in the appropriate areas. Handle edge cases like single window or empty layouts.",
+            "status": "pending",
+            "testStrategy": "Test layout calculations with various window counts. Verify master area sizing based on ratio. Test edge cases (0, 1, many windows). Create visual tests to verify layout appearance."
+          },
+          {
+            "id": 3,
+            "title": "Create Layout Manager",
+            "description": "Develop a layout manager to store, switch between, and persist layouts across workspace switches.",
+            "dependencies": ["6.2"],
+            "details": "Implement LayoutManager struct to store available layouts. Create methods for adding, removing, and switching between layouts. Implement layout persistence mechanism to maintain layout settings across workspace switches. Add serialization/deserialization for layout configurations.",
+            "status": "pending",
+            "testStrategy": "Test layout switching functionality. Verify layout persistence across workspace changes. Test serialization/deserialization of layout configurations. Create integration tests with window management system."
+          },
+          {
+            "id": 4,
+            "title": "Implement Window Resizing Within Layouts",
+            "description": "Add functionality to resize windows within layouts, particularly adjusting the master/stack ratio.",
+            "dependencies": ["6.2", "6.3"],
+            "details": "Implement methods to increase/decrease master area size. Create functions to adjust the number of windows in the master area. Add support for window-specific size adjustments where applicable. Implement constraints to prevent invalid sizing operations.",
+            "status": "pending",
+            "testStrategy": "Test master area resizing operations. Verify constraints prevent invalid sizes. Test with keyboard shortcuts and mouse interactions. Create visual tests to verify resize operations work correctly."
+          },
+          {
+            "id": 5,
+            "title": "Implement Layout Application Logic",
+            "description": "Create the system to apply layouts when windows change, including adding, removing, or focusing windows.",
+            "dependencies": ["6.3", "6.4"],
+            "details": "Implement event handlers for window creation, destruction, and focus changes. Create the apply_layout function to recalculate and apply window positions when needed. Add optimization to minimize unnecessary layout recalculations. Implement layout-specific operations like cycling focus or swapping windows.",
+            "status": "pending",
+            "testStrategy": "Test layout application with window addition/removal. Verify correct behavior when focusing different windows. Test performance with many windows. Create integration tests with the window management system."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Implement Window Focus Management",
+        "description": "Create a comprehensive focus management system to handle window focus, switching, and visual indicators.",
+        "details": "1. Implement focus tracking:\n   ```rust\n   struct FocusManager {\n       focused_window: Option<WindowId>,\n       focus_history: VecDeque<WindowId>,\n   }\n   ```\n2. Create focus switching functions:\n   ```rust\n   impl FocusManager {\n       fn focus_window(&mut self, window_id: WindowId) {\n           // Update focus state\n           // Update Wayland keyboard focus\n           // Update visual indicators\n       }\n       \n       fn focus_next(&mut self) {\n           // Focus next window in stack\n       }\n       \n       fn focus_prev(&mut self) {\n           // Focus previous window in stack\n       }\n   }\n   ```\n3. Implement focus history for alt-tab style switching\n4. Add visual indicators for focused windows (border color, etc.)\n5. Handle focus on window creation/destruction\n6. Implement focus follows mouse option\n7. Create keyboard shortcuts for focus manipulation (Super+j/k)",
+        "testStrategy": "1. Test focus switching with keyboard shortcuts\n2. Verify focus follows mouse behavior\n3. Test focus history with rapid switching\n4. Verify visual indicators update correctly\n5. Test focus behavior on window creation/destruction\n6. Create unit tests for focus management logic",
+        "priority": "high",
+        "dependencies": [5, 6],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Focus Tracking System",
+            "description": "Create the core FocusManager structure and implement basic focus tracking functionality",
+            "dependencies": [],
+            "details": "Implement the FocusManager struct with focused_window and focus_history fields. Create methods for tracking the currently focused window and maintaining a history of focus changes. Ensure the focus state is properly initialized during system startup.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify focus state initialization and basic tracking. Test focus history updates when windows are focused in different sequences."
+          },
+          {
+            "id": 2,
+            "title": "Develop Focus Switching Functions",
+            "description": "Implement methods to change window focus programmatically with proper visual feedback",
+            "dependencies": ["7.1"],
+            "details": "Complete the focus_window, focus_next, and focus_prev methods in the FocusManager implementation. Ensure proper Wayland keyboard focus updates when switching between windows. Implement the focus history mechanism for alt-tab style window switching.",
+            "status": "pending",
+            "testStrategy": "Test focus switching between multiple windows. Verify focus history works correctly when rapidly switching between windows. Test edge cases like focusing when only one window exists."
+          },
+          {
+            "id": 3,
+            "title": "Add Visual Focus Indicators",
+            "description": "Implement visual cues to indicate which window currently has focus",
+            "dependencies": ["7.1", "7.2"],
+            "details": "Create a system to visually distinguish focused windows from unfocused ones. Implement border color changes, opacity adjustments, or other visual indicators. Ensure indicators update immediately when focus changes.",
+            "status": "pending",
+            "testStrategy": "Visually verify focus indicators appear correctly. Test rapid focus switching to ensure indicators update properly. Create automated tests to verify border color changes match focus state."
+          },
+          {
+            "id": 4,
+            "title": "Implement Focus Event Handling",
+            "description": "Handle focus changes during window creation, destruction, and user interactions",
+            "dependencies": ["7.2"],
+            "details": "Create event handlers for window creation and destruction that properly update focus state. Implement logic to determine which window should receive focus when the current focus is lost. Handle click-to-focus and other user-initiated focus events.",
+            "status": "pending",
+            "testStrategy": "Test focus behavior when creating new windows. Verify focus is properly reassigned when the focused window is closed. Test click-to-focus functionality with multiple overlapping windows."
+          },
+          {
+            "id": 5,
+            "title": "Add Focus Configuration Options",
+            "description": "Implement configurable focus behaviors including focus-follows-mouse and keyboard shortcuts",
+            "dependencies": ["7.2", "7.4"],
+            "details": "Create a configurable focus-follows-mouse option that updates focus based on cursor position. Implement keyboard shortcuts (Super+j/k) for focus manipulation. Add configuration options for focus behavior preferences. Ensure all focus methods respect the current configuration.",
+            "status": "pending",
+            "testStrategy": "Test focus-follows-mouse with different mouse movement patterns. Verify keyboard shortcuts correctly change window focus. Test configuration changes at runtime to ensure focus behavior updates accordingly."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Implement Workspace Management System",
+        "description": "Create a 9-workspace system with tag-based organization and seamless switching between workspaces.",
+        "details": "1. Define Workspace structure:\n   ```rust\n   struct Workspace {\n       id: usize,\n       tag: String,\n       windows: Vec<WindowId>,\n       layout: Box<dyn Layout>,\n       focused_window: Option<WindowId>,\n   }\n   ```\n2. Implement workspace manager:\n   ```rust\n   struct WorkspaceManager {\n       workspaces: Vec<Workspace>,\n       current_workspace: usize,\n   }\n   ```\n3. Create workspace switching functions:\n   ```rust\n   impl WorkspaceManager {\n       fn switch_to(&mut self, workspace_id: usize) {\n           // Hide windows from current workspace\n           // Show windows from target workspace\n           // Update current_workspace\n       }\n       \n       fn move_window_to(&mut self, window_id: WindowId, workspace_id: usize) {\n           // Move window between workspaces\n       }\n   }\n   ```\n4. Implement tag-based organization\n5. Add workspace-specific layouts\n6. Create keyboard shortcuts for workspace operations (Super+1-9)\n7. Implement window movement between workspaces (Super+Shift+1-9)\n8. Add workspace persistence across sessions",
+        "testStrategy": "1. Test workspace switching with keyboard shortcuts\n2. Verify window movement between workspaces\n3. Test workspace-specific layouts\n4. Verify workspace state persistence\n5. Create unit tests for workspace management functions\n6. Test with multiple applications across workspaces",
+        "priority": "medium",
+        "dependencies": [6, 7],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Core Workspace Structure",
+            "description": "Define and implement the basic workspace structure and manager with initialization functionality",
+            "dependencies": [],
+            "details": "Implement the Workspace struct with id, tag, windows, layout, and focused_window fields. Create the WorkspaceManager struct with workspaces vector and current_workspace field. Initialize 9 workspaces with default tags (1-9) and empty window lists. Add methods for workspace creation, deletion, and basic management.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify workspace initialization with correct IDs and tags. Test workspace manager initialization with 9 workspaces. Verify basic workspace selection functionality."
+          },
+          {
+            "id": 2,
+            "title": "Implement Workspace Switching Logic",
+            "description": "Create functionality to switch between workspaces and handle window visibility",
+            "dependencies": ["8.1"],
+            "details": "Implement the switch_to() method to hide windows from current workspace and show windows from target workspace. Add logic to update the current_workspace field. Create helper functions to handle window visibility state changes. Implement workspace focus history to allow quick toggling between recent workspaces.",
+            "status": "pending",
+            "testStrategy": "Test workspace switching with multiple windows. Verify window visibility changes correctly. Test edge cases like switching to empty workspaces or the current workspace. Verify focus history works correctly."
+          },
+          {
+            "id": 3,
+            "title": "Implement Window Movement Between Workspaces",
+            "description": "Add functionality to move windows between workspaces while maintaining state",
+            "dependencies": ["8.1", "8.2"],
+            "details": "Implement the move_window_to() method to transfer windows between workspaces. Handle window visibility changes during transfers. Update focused_window in both source and target workspaces. Add support for moving the focused window or specified windows by ID. Implement logic to handle window state preservation during moves.",
+            "status": "pending",
+            "testStrategy": "Test moving windows between workspaces with various scenarios. Verify window state is preserved. Test edge cases like moving the last window from a workspace. Verify focus handling works correctly after window movement."
+          },
+          {
+            "id": 4,
+            "title": "Implement Tag-Based Organization",
+            "description": "Create a tagging system for workspaces with search and filter capabilities",
+            "dependencies": ["8.1"],
+            "details": "Extend the Workspace struct to support custom tags beyond numeric IDs. Implement methods to set, update, and query workspace tags. Create functionality to find workspaces by tag. Add support for multiple tags per workspace. Implement tag-based filtering for workspace operations. Create methods to rename tags and handle tag conflicts.",
+            "status": "pending",
+            "testStrategy": "Test tag assignment and updates. Verify workspace search by tag works correctly. Test with multiple tags per workspace. Verify tag-based filtering functions correctly. Test edge cases like duplicate tags or empty tags."
+          },
+          {
+            "id": 5,
+            "title": "Implement Keyboard Shortcuts and Persistence",
+            "description": "Add keyboard shortcuts for workspace operations and implement workspace state persistence",
+            "dependencies": ["8.2", "8.3", "8.4"],
+            "details": "Implement keyboard shortcuts for workspace switching (Super+1-9). Add shortcuts for moving windows between workspaces (Super+Shift+1-9). Create configuration options for custom shortcuts. Implement workspace state serialization and deserialization. Add functionality to save and restore workspace configuration including tags, layouts, and window assignments across sessions.",
+            "status": "pending",
+            "testStrategy": "Test keyboard shortcuts for workspace switching and window movement. Verify custom shortcut configuration works. Test workspace state persistence by saving and restoring configuration. Verify all workspace properties are correctly preserved across restarts."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Implement Multiple Layout Algorithms",
+        "description": "Expand the layout engine to support multiple tiling algorithms including monocle and floating layouts with dynamic switching.",
+        "details": "1. Implement Monocle layout:\n   ```rust\n   struct Monocle;\n   \n   impl Layout for Monocle {\n       fn arrange(&self, area: Rectangle, windows: &[WindowId]) -> HashMap<WindowId, Rectangle> {\n           // All windows take full area, only focused is visible\n       }\n       \n       fn name(&self) -> &str { \"monocle\" }\n   }\n   ```\n2. Implement Floating layout:\n   ```rust\n   struct Floating {\n       window_positions: HashMap<WindowId, Rectangle>,\n   }\n   \n   impl Layout for Floating {\n       fn arrange(&self, area: Rectangle, windows: &[WindowId]) -> HashMap<WindowId, Rectangle> {\n           // Use stored positions or default centered positions\n       }\n       \n       fn name(&self) -> &str { \"floating\" }\n   }\n   ```\n3. Add layout switching mechanism (Super+Space)\n4. Implement per-window floating toggle (Super+Tab)\n5. Create layout cycling function\n6. Add layout-specific operations for each layout type\n7. Implement layout saving/loading from configuration",
+        "testStrategy": "1. Test each layout algorithm with various window counts\n2. Verify layout switching works correctly\n3. Test per-window floating toggle\n4. Create visual tests for each layout\n5. Verify layout persistence across restarts\n6. Test layout-specific operations",
+        "priority": "medium",
+        "dependencies": [6],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Monocle Layout Algorithm",
+            "description": "Complete the implementation of the Monocle layout where all windows take the full area with only the focused window visible.",
+            "dependencies": [],
+            "details": "Complete the arrange() method for the Monocle layout struct to make all windows take the full area with only the focused window visible. Ensure proper handling of window focus changes and implement any necessary helper functions for window state management.",
+            "status": "pending",
+            "testStrategy": "Test the Monocle layout with various window counts (0, 1, 2+). Verify that all windows occupy the full area and only the focused window is visible. Test focus cycling between windows."
+          },
+          {
+            "id": 2,
+            "title": "Implement Floating Layout Algorithm",
+            "description": "Complete the implementation of the Floating layout that maintains custom positions for windows or uses default centered positions.",
+            "dependencies": [],
+            "details": "Implement the arrange() method for the Floating layout struct to use stored positions from window_positions HashMap or create default centered positions for new windows. Add methods for manual window positioning, resizing, and state persistence.",
+            "status": "pending",
+            "testStrategy": "Test window positioning in floating mode with both stored and default positions. Verify manual window movement and resizing. Test with various window sizes and monitor configurations."
+          },
+          {
+            "id": 3,
+            "title": "Create Layout Switching Mechanism",
+            "description": "Implement a system to switch between different layout algorithms with keyboard shortcuts (Super+Space) and create a layout cycling function.",
+            "dependencies": ["9.1", "9.2"],
+            "details": "Develop a layout manager that stores available layouts and the current active layout. Implement the layout switching mechanism bound to Super+Space and create a layout cycling function that rotates through available layouts. Update window arrangements when layouts change.",
+            "status": "pending",
+            "testStrategy": "Test layout switching with keyboard shortcuts. Verify window rearrangement occurs correctly when switching layouts. Test cycling through all available layouts and back to the original."
+          },
+          {
+            "id": 4,
+            "title": "Implement Per-Window Floating Toggle",
+            "description": "Add functionality to toggle individual windows between tiled and floating states using Super+Tab shortcut.",
+            "dependencies": ["9.2", "9.3"],
+            "details": "Create a system to track floating state per window. Implement the Super+Tab shortcut to toggle the focused window between tiled and floating states. Ensure proper handling of window state when switching layouts and workspaces.",
+            "status": "pending",
+            "testStrategy": "Test toggling windows between tiled and floating states. Verify window state persistence when switching layouts and workspaces. Test with multiple windows in different states."
+          },
+          {
+            "id": 5,
+            "title": "Implement Layout Configuration and Persistence",
+            "description": "Add layout-specific operations for each layout type and implement layout saving/loading from configuration.",
+            "dependencies": ["9.3", "9.4"],
+            "details": "Create layout-specific operations (like adjusting gaps or ratios) for each layout type. Implement a configuration system to save and load layout preferences, including default layouts per workspace and layout-specific settings. Ensure layouts persist across window manager restarts.",
+            "status": "pending",
+            "testStrategy": "Test saving and loading layout configurations. Verify layout-specific operations work correctly. Test persistence of layouts and their settings across restarts of the window manager."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Implement Multi-Monitor Support",
+        "description": "Add support for multiple monitors with workspace assignment and seamless movement between displays.",
+        "details": "1. Define Monitor structure:\n   ```rust\n   struct Monitor {\n       id: usize,\n       geometry: Rectangle,\n       scale_factor: f64,\n       current_workspace: usize,\n       name: String,\n   }\n   ```\n2. Implement monitor detection and initialization:\n   ```rust\n   fn initialize_monitors(backend: &Backend) -> Vec<Monitor> {\n       // Detect connected monitors\n       // Create Monitor structures\n   }\n   ```\n3. Create monitor-workspace assignment system\n4. Implement window movement between monitors (Super+h/l)\n5. Add per-monitor scaling support\n6. Create monitor hotplug detection and handling\n7. Implement per-monitor layouts and workspaces\n8. Add monitor-specific configuration options",
+        "testStrategy": "1. Test with multiple physical monitors\n2. Verify workspace assignment to monitors\n3. Test window movement between monitors\n4. Verify scaling works correctly on HiDPI displays\n5. Test monitor hotplug events\n6. Create unit tests for monitor management functions",
+        "priority": "medium",
+        "dependencies": [8],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Monitor Detection and Initialization",
+            "description": "Complete the monitor detection and initialization function to identify all connected displays and create appropriate Monitor structures.",
+            "dependencies": [],
+            "details": "Complete the initialize_monitors() function to detect all connected monitors using the backend API. Populate the Monitor structure with correct geometry, scale factor, and name information. Ensure proper handling of primary vs. secondary monitors. Add error handling for cases where monitor detection fails.",
+            "status": "pending",
+            "testStrategy": "Test with various monitor configurations (single, dual, triple). Verify correct detection of monitor properties including resolution, scale factor, and position. Create mock backend for unit testing monitor detection logic."
+          },
+          {
+            "id": 2,
+            "title": "Create Monitor-Workspace Assignment System",
+            "description": "Develop a system to assign workspaces to specific monitors and manage the relationship between workspaces and displays.",
+            "dependencies": ["10.1"],
+            "details": "Extend the Workspace structure to include monitor assignment. Create functions to assign workspaces to monitors both programmatically and via user configuration. Implement persistence of workspace-monitor assignments across session restarts. Design a default assignment strategy for initial setup.",
+            "status": "pending",
+            "testStrategy": "Test workspace assignment with multiple monitors. Verify workspaces appear on the correct monitors after assignment. Test persistence of assignments after restart. Create unit tests for assignment logic."
+          },
+          {
+            "id": 3,
+            "title": "Implement Window Movement Between Monitors",
+            "description": "Add functionality to move windows between monitors using keyboard shortcuts (Super+h/l) while maintaining proper sizing and positioning.",
+            "dependencies": ["10.1", "10.2"],
+            "details": "Implement handler functions for Super+h/l shortcuts to move focused window to adjacent monitors. Calculate proper window position and size when moving between monitors with different resolutions or scale factors. Handle edge cases like moving windows between monitors with different orientations. Update window state and trigger re-layout after movement.",
+            "status": "pending",
+            "testStrategy": "Test window movement between monitors with keyboard shortcuts. Verify windows maintain appropriate size relative to monitor dimensions. Test with monitors of different resolutions and scale factors. Verify focus follows the window when moved."
+          },
+          {
+            "id": 4,
+            "title": "Add Per-Monitor Scaling Support",
+            "description": "Implement proper scaling for windows and UI elements based on each monitor's scale factor to ensure correct appearance on HiDPI displays.",
+            "dependencies": ["10.1"],
+            "details": "Use the scale_factor property from Monitor structure to apply appropriate scaling to windows. Implement dynamic rescaling when windows move between monitors with different scale factors. Add configuration options for manual scale factor adjustment. Ensure text, borders, and other UI elements scale correctly.",
+            "status": "pending",
+            "testStrategy": "Test with mixed DPI setups (standard and HiDPI monitors). Verify windows rescale appropriately when moved between monitors. Test with various applications to ensure correct appearance. Create visual regression tests for scaling behavior."
+          },
+          {
+            "id": 5,
+            "title": "Implement Monitor Hotplug Detection and Handling",
+            "description": "Create a system to detect when monitors are connected or disconnected and gracefully handle these events without disrupting the user experience.",
+            "dependencies": ["10.1", "10.2", "10.3", "10.4"],
+            "details": "Set up event listeners for monitor hotplug events from the backend. Implement handler functions to update monitor list when displays are connected or disconnected. Create logic to reassign workspaces when a monitor is removed. Handle window redistribution when display configuration changes. Add user notifications for monitor changes.",
+            "status": "pending",
+            "testStrategy": "Test connecting and disconnecting monitors during runtime. Verify workspaces and windows are properly reassigned when monitors change. Test with various hotplug scenarios (disconnect primary, add new monitor, etc.). Create simulated hotplug events for automated testing."
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Implement Configuration System",
+        "description": "Create a TOML-based configuration system with validation and hot-reload capability.",
+        "details": "1. Add configuration dependencies:\n   ```toml\n   [dependencies]\n   toml = \"0.8.0\"\n   serde = { version = \"1.0\", features = [\"derive\"] }\n   notify = \"6.0.0\"  # For file watching\n   ```\n2. Define configuration structure:\n   ```rust\n   #[derive(Deserialize, Serialize, Debug, Clone)]\n   struct Config {\n       general: GeneralConfig,\n       keybindings: KeybindingsConfig,\n       layouts: LayoutsConfig,\n       appearance: AppearanceConfig,\n   }\n   ```\n3. Implement configuration loading:\n   ```rust\n   fn load_config() -> Result<Config> {\n       let config_path = get_config_path();\n       let config_str = fs::read_to_string(config_path)?;\n       let config: Config = toml::from_str(&config_str)?;\n       Ok(config)\n   }\n   ```\n4. Create default configuration\n5. Implement configuration validation\n6. Add hot-reload capability using file watching\n7. Create configuration application logic to update running system\n8. Implement configuration error reporting",
+        "testStrategy": "1. Test configuration loading from file\n2. Verify validation catches invalid configurations\n3. Test hot-reload functionality\n4. Create unit tests for configuration parsing\n5. Test with various configuration scenarios\n6. Verify error reporting works correctly",
+        "priority": "medium",
+        "dependencies": [5, 6, 7],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Configuration Structures",
+            "description": "Create the TOML-compatible configuration structures with Serde derive macros for all configuration components.",
+            "dependencies": [],
+            "details": "Implement the main Config struct and all sub-structures (GeneralConfig, KeybindingsConfig, LayoutsConfig, AppearanceConfig) with appropriate fields and types. Add Serde derive macros for serialization/deserialization. Include documentation comments for each field. Create default implementation for all configuration structures.",
+            "status": "pending",
+            "testStrategy": "Write unit tests to verify structure serialization/deserialization works correctly. Test that default values are appropriate and complete."
+          },
+          {
+            "id": 2,
+            "title": "Implement Configuration Loading and Saving",
+            "description": "Create functions to load configuration from TOML files and save changes back to disk.",
+            "dependencies": ["11.1"],
+            "details": "Implement get_config_path() to locate user and system config files. Complete load_config() function to read from file and parse TOML. Add save_config() function to write changes back to disk. Handle file I/O errors gracefully with meaningful error messages. Implement configuration merging logic for partial configs.",
+            "status": "pending",
+            "testStrategy": "Test loading from various file locations. Verify error handling for missing or malformed files. Test saving and reloading configurations."
+          },
+          {
+            "id": 3,
+            "title": "Add Configuration Validation",
+            "description": "Implement validation logic to ensure configuration values are within acceptable ranges and semantically correct.",
+            "dependencies": ["11.1", "11.2"],
+            "details": "Create a validate() method for each configuration component. Implement checks for value ranges, required fields, and semantic correctness. Return detailed validation errors with context about the specific issue. Add helper functions to provide suggestions for fixing invalid configurations.",
+            "status": "pending",
+            "testStrategy": "Test validation with both valid and invalid configurations. Verify each validation rule triggers appropriate errors. Test edge cases for all configuration values."
+          },
+          {
+            "id": 4,
+            "title": "Implement Hot-Reload Capability",
+            "description": "Add file watching functionality to detect configuration changes and reload settings without requiring restart.",
+            "dependencies": ["11.2", "11.3"],
+            "details": "Use the notify crate to watch configuration files for changes. Implement a background thread or async task for file watching. Create a callback system to notify components when configuration changes. Add debouncing to prevent multiple reloads for rapid changes. Implement graceful error handling for reload failures.",
+            "status": "pending",
+            "testStrategy": "Test file watching by modifying configuration files while the system is running. Verify configuration changes are applied correctly. Test error recovery when loading invalid configurations during hot-reload."
+          },
+          {
+            "id": 5,
+            "title": "Create Configuration Application System",
+            "description": "Develop a system to apply configuration changes to the running window manager components.",
+            "dependencies": ["11.3", "11.4"],
+            "details": "Create an event system to notify components of configuration changes. Implement apply_config() methods for each component that needs configuration. Add diff detection to only update changed components. Implement rollback capability for failed configuration applications. Create user notification system for configuration change events.",
+            "status": "pending",
+            "testStrategy": "Test applying configuration changes to various components. Verify only changed components are updated. Test rollback functionality when application fails. Verify all components respond correctly to configuration changes."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Implement XWayland Support",
+        "description": "Add XWayland integration to provide seamless support for X11 applications within the Wayland environment.",
+        "details": "1. Add XWayland dependencies to Cargo.toml\n2. Initialize XWayland server:\n   ```rust\n   fn initialize_xwayland(display: &Display) -> XWaylandState {\n       // Set up XWayland server\n       // Configure X11 window management\n   }\n   ```\n3. Implement X11 window detection and wrapping:\n   ```rust\n   fn handle_xwayland_window(state: &mut VolundState, x11_window: X11Window) {\n       // Create Wayland-compatible window wrapper\n       // Apply window management rules\n   }\n   ```\n4. Add X11-specific window property handling\n5. Implement clipboard integration between X11 and Wayland\n6. Create X11 window decoration handling\n7. Add X11 window type detection and special handling\n8. Implement X11 window positioning and sizing",
+        "testStrategy": "1. Test with common X11 applications (Firefox, GIMP, etc.)\n2. Verify window management works correctly for X11 windows\n3. Test clipboard functionality between X11 and Wayland apps\n4. Verify window decorations appear correctly\n5. Test X11 window positioning and sizing\n6. Create integration tests for XWayland functionality",
+        "priority": "medium",
+        "dependencies": [4, 6],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up XWayland dependencies and initialization",
+            "description": "Add XWayland dependencies to Cargo.toml and implement the initialization function for the XWayland server",
+            "dependencies": [],
+            "details": "Add required dependencies like 'smithay-xwayland' to Cargo.toml. Implement the initialize_xwayland function that sets up the XWayland server and configures X11 window management. This should include server socket creation, display setup, and proper error handling.",
+            "status": "pending",
+            "testStrategy": "Verify XWayland server starts correctly with the Wayland compositor. Test initialization with different configuration parameters. Create unit tests for the initialization function."
+          },
+          {
+            "id": 2,
+            "title": "Implement X11 window detection and wrapping",
+            "description": "Create the system to detect X11 windows and wrap them in Wayland-compatible containers",
+            "dependencies": ["12.1"],
+            "details": "Implement the handle_xwayland_window function to detect when X11 applications create windows. Create Wayland-compatible window wrappers that integrate with the existing window management system. Apply appropriate window management rules based on window type and properties.",
+            "status": "pending",
+            "testStrategy": "Test with various X11 applications (Firefox, GIMP, terminal emulators). Verify windows appear correctly in the Wayland environment. Test window focus and stacking behavior."
+          },
+          {
+            "id": 3,
+            "title": "Implement X11 window property handling and type detection",
+            "description": "Add support for X11-specific window properties and implement window type detection for special handling",
+            "dependencies": ["12.2"],
+            "details": "Create handlers for X11-specific window properties like _NET_WM_NAME, _NET_WM_WINDOW_TYPE, etc. Implement window type detection to properly handle different X11 window types (normal, dialog, utility, etc.). Add special handling for window hints and protocols.",
+            "status": "pending",
+            "testStrategy": "Test with applications that use different window types. Verify proper handling of window properties. Create tests for each window type to ensure correct behavior."
+          },
+          {
+            "id": 4,
+            "title": "Implement clipboard integration between X11 and Wayland",
+            "description": "Create a bidirectional clipboard system that works seamlessly between X11 and Wayland applications",
+            "dependencies": ["12.1"],
+            "details": "Implement clipboard data transfer between X11 and Wayland. Handle different data formats and MIME types. Create event handlers for clipboard requests and offers. Ensure text, images, and other common formats work correctly across both systems.",
+            "status": "pending",
+            "testStrategy": "Test copy/paste operations between X11 and Wayland applications. Verify different data types (text, images, rich text) transfer correctly. Test with multiple applications running simultaneously."
+          },
+          {
+            "id": 5,
+            "title": "Implement X11 window decoration and positioning",
+            "description": "Add support for X11 window decorations and implement proper window positioning and sizing",
+            "dependencies": ["12.2", "12.3"],
+            "details": "Create handlers for X11 window decorations that match the Wayland theme. Implement window positioning and sizing that respects X11 window hints and constraints. Add support for fullscreen, maximized, and minimized states for X11 windows.",
+            "status": "pending",
+            "testStrategy": "Test window decoration appearance across different X11 applications. Verify window positioning and sizing works correctly. Test window state changes (maximize, minimize, fullscreen) with X11 applications."
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Implement Status Bar Integration",
+        "description": "Create an IPC-based status bar communication system for external status bar applications.",
+        "details": "1. Define status bar protocol:\n   ```rust\n   enum StatusBarMessage {\n       WorkspaceUpdate { current: usize, occupied: Vec<usize> },\n       WindowUpdate { title: String, app_id: String },\n       LayoutUpdate { name: String },\n       SystemStatus { ... },\n   }\n   ```\n2. Implement IPC mechanism using Unix sockets:\n   ```rust\n   struct StatusBarIPC {\n       socket: UnixStream,\n   }\n   \n   impl StatusBarIPC {\n       fn send_update(&mut self, message: StatusBarMessage) -> Result<()> {\n           // Serialize and send message\n       }\n   }\n   ```\n3. Create status update triggers throughout the window manager\n4. Add configuration options for status bar integration\n5. Implement status bar protocol documentation\n6. Create example status bar client\n7. Add support for external status bar positioning",
+        "testStrategy": "1. Test IPC communication with example client\n2. Verify status updates are sent correctly\n3. Test with popular status bars (waybar, etc.)\n4. Create unit tests for IPC serialization\n5. Verify configuration options work correctly\n6. Test status bar positioning",
+        "priority": "low",
+        "dependencies": [8, 11],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Status Bar Protocol",
+            "description": "Finalize the StatusBarMessage enum with all required message types and implement serialization/deserialization.",
+            "dependencies": [],
+            "details": "Complete the StatusBarMessage enum by adding all necessary fields to SystemStatus and any other required message types. Implement serde serialization and deserialization for the protocol. Ensure the protocol is extensible for future additions.",
+            "status": "pending",
+            "testStrategy": "Create unit tests for serialization/deserialization of each message type. Verify message format compatibility with common status bar applications."
+          },
+          {
+            "id": 2,
+            "title": "Implement Unix Socket IPC Mechanism",
+            "description": "Create a robust IPC system using Unix sockets for bidirectional communication with status bars.",
+            "dependencies": ["13.1"],
+            "details": "Complete the StatusBarIPC implementation with proper error handling, connection management, and message queuing. Add methods for socket initialization, client connection handling, and message reception. Implement a non-blocking communication pattern.",
+            "status": "pending",
+            "testStrategy": "Test socket creation, connection handling, and message transmission. Verify error handling for disconnected clients. Benchmark message throughput under load."
+          },
+          {
+            "id": 3,
+            "title": "Integrate Status Updates Throughout Window Manager",
+            "description": "Add status update triggers at key points in the window manager to send real-time updates to connected status bars.",
+            "dependencies": ["13.2"],
+            "details": "Identify all events requiring status updates (workspace changes, window focus changes, layout switches, etc.). Implement hooks in the window manager code to trigger status updates. Create a central status update manager to handle all outgoing messages.",
+            "status": "pending",
+            "testStrategy": "Verify status updates are sent for all relevant window manager events. Test with multiple simultaneous clients. Ensure updates are sent in the correct order."
+          },
+          {
+            "id": 4,
+            "title": "Implement Configuration System for Status Bar Integration",
+            "description": "Create configuration options for status bar integration including socket path, update frequency, and enabled message types.",
+            "dependencies": ["13.2", "13.3"],
+            "details": "Add status bar configuration section to the window manager config file. Implement options for socket path, automatic reconnection, message filtering, and update throttling. Create a configuration validation system for status bar settings.",
+            "status": "pending",
+            "testStrategy": "Test configuration loading and validation. Verify each configuration option affects the system as expected. Test with invalid configurations to ensure proper error handling."
+          },
+          {
+            "id": 5,
+            "title": "Create Example Status Bar Client and Documentation",
+            "description": "Develop a reference status bar client implementation and comprehensive protocol documentation.",
+            "dependencies": ["13.1", "13.2", "13.4"],
+            "details": "Create a simple but functional status bar client in Rust that demonstrates all protocol features. Write comprehensive documentation for the status bar protocol including message formats, connection handling, and configuration options. Add support for external status bar positioning based on configuration.",
+            "status": "pending",
+            "testStrategy": "Test the example client with the window manager. Verify all message types are properly displayed. Have external developers review the documentation for clarity and completeness."
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Implement Window Rules System",
+        "description": "Create a configurable window rules system for automatic window placement and behavior based on application properties.",
+        "details": "1. Define window rule structure:\n   ```rust\n   struct WindowRule {\n       app_id_pattern: Option<Regex>,\n       title_pattern: Option<Regex>,\n       workspace: Option<usize>,\n       floating: Option<bool>,\n       geometry: Option<Rectangle>,\n       fullscreen: Option<bool>,\n   }\n   ```\n2. Implement rule matching system:\n   ```rust\n   fn apply_rules(window: &mut Window, rules: &[WindowRule]) {\n       for rule in rules {\n           if matches_rule(window, rule) {\n               apply_rule(window, rule);\n           }\n       }\n   }\n   ```\n3. Add rule configuration in TOML format\n4. Create rule application logic for new windows\n5. Implement rule priority system\n6. Add dynamic rule reloading from configuration\n7. Create rule debugging tools",
+        "testStrategy": "1. Test rule matching with various window properties\n2. Verify rule application works correctly\n3. Test rule configuration parsing\n4. Create unit tests for rule matching logic\n5. Test with real applications to verify behavior\n6. Verify rule priority system works correctly",
+        "priority": "low",
+        "dependencies": [4, 11],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Window Rule Structure and Matching Logic",
+            "description": "Define the WindowRule struct and implement the core matching system to determine if a window matches specific criteria.",
+            "dependencies": [],
+            "details": "Create the WindowRule struct with fields for app_id_pattern, title_pattern, workspace, floating, geometry, and fullscreen. Implement the matches_rule function that checks if a window's properties match the patterns defined in a rule. This function should handle regex matching for app_id and title patterns.",
+            "status": "pending",
+            "testStrategy": "Create unit tests with various window properties and rule patterns to verify correct matching behavior. Test edge cases like empty patterns and null values."
+          },
+          {
+            "id": 2,
+            "title": "Develop Rule Application Logic",
+            "description": "Implement the logic to apply matched rules to windows, modifying their properties according to rule specifications.",
+            "dependencies": ["14.1"],
+            "details": "Create the apply_rule function that modifies window properties based on a matched rule. Handle each property type (workspace assignment, floating state, geometry, fullscreen) separately. Ensure properties are only modified if specified in the rule (handle Option types properly).",
+            "status": "pending",
+            "testStrategy": "Test applying rules with different property combinations. Verify that only specified properties are modified and that window state changes correctly after rule application."
+          },
+          {
+            "id": 3,
+            "title": "Create TOML Configuration Parser for Window Rules",
+            "description": "Implement a parser for window rules defined in TOML configuration files, allowing users to easily define and modify rules.",
+            "dependencies": ["14.1"],
+            "details": "Define a TOML schema for window rules. Implement a parser that reads the TOML configuration and converts it to WindowRule structs. Handle validation of rule properties and provide meaningful error messages for invalid configurations. Support regex pattern validation.",
+            "status": "pending",
+            "testStrategy": "Test parsing various valid and invalid TOML configurations. Verify error handling for malformed rules. Test with complex regex patterns and rule combinations."
+          },
+          {
+            "id": 4,
+            "title": "Implement Rule Priority System",
+            "description": "Create a priority system for window rules to handle conflicts when multiple rules match a window.",
+            "dependencies": ["14.1", "14.2"],
+            "details": "Add a priority field to the WindowRule struct. Modify the apply_rules function to sort rules by priority before application. Implement logic to handle property conflicts when multiple rules match (higher priority rules should override lower priority ones for the same property).",
+            "status": "pending",
+            "testStrategy": "Test scenarios with multiple matching rules of different priorities. Verify that higher priority rules correctly override lower priority ones for the same properties. Test edge cases like equal priorities."
+          },
+          {
+            "id": 5,
+            "title": "Add Dynamic Rule Reloading and Debugging Tools",
+            "description": "Implement functionality to reload rules from configuration at runtime and create debugging tools to help users troubleshoot rule matching issues.",
+            "dependencies": ["14.3", "14.4"],
+            "details": "Create a mechanism to watch for changes in the configuration file and reload rules dynamically. Implement a debug mode that logs detailed information about rule matching and application. Create a command-line interface to test rule matching against specific window properties for troubleshooting.",
+            "status": "pending",
+            "testStrategy": "Test rule reloading by modifying configuration files at runtime. Verify that changes are applied correctly. Test the debugging tools with various window scenarios to ensure they provide useful information."
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Implement Performance Optimization and Monitoring",
+        "description": "Add comprehensive performance monitoring, profiling, and optimization to ensure smooth operation with sub-16ms latency.",
+        "details": "1. Implement performance metrics collection:\n   ```rust\n   struct PerformanceMetrics {\n       frame_times: VecDeque<Duration>,\n       event_latencies: VecDeque<Duration>,\n       memory_usage: usize,\n   }\n   ```\n2. Add tracing instrumentation throughout codebase:\n   ```rust\n   #[instrument(skip(state))]\n   fn process_frame(state: &mut VolundState) {\n       // Processing with automatic span creation\n   }\n   ```\n3. Create performance hot path optimization:\n   - Event batching\n   - Render caching\n   - Layout calculation optimization\n4. Implement memory usage monitoring\n5. Add performance reporting to status bar\n6. Create performance debugging tools\n7. Implement adaptive performance scaling based on system load",
+        "testStrategy": "1. Benchmark frame times under various loads\n2. Verify sub-16ms latency target is met\n3. Test memory usage over time for leaks\n4. Create performance regression tests\n5. Verify tracing instrumentation provides useful data\n6. Test performance scaling on different hardware",
+        "priority": "medium",
+        "dependencies": [3, 6, 7],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Performance Metrics Collection System",
+            "description": "Create a comprehensive metrics collection system that tracks frame times, event latencies, and memory usage with minimal overhead.",
+            "dependencies": [],
+            "details": "Implement the PerformanceMetrics struct with appropriate methods for data collection and analysis. Add rolling averages, percentiles, and peak detection. Ensure thread-safe access to metrics from multiple components. Include timestamp correlation between different metric types.",
+            "status": "pending",
+            "testStrategy": "Benchmark the overhead of metrics collection to ensure <1% performance impact. Verify accuracy of collected metrics against external profiling tools. Test thread safety with concurrent access patterns."
+          },
+          {
+            "id": 2,
+            "title": "Add Tracing Instrumentation Throughout Codebase",
+            "description": "Implement comprehensive tracing using the tracing crate to provide detailed performance insights across all major code paths.",
+            "dependencies": ["15.1"],
+            "details": "Add #[instrument] attributes to key functions, focusing on the render pipeline, event handling, and layout calculations. Create custom span events for critical sections. Implement context propagation across async boundaries. Add structured logging with appropriate detail levels.",
+            "status": "pending",
+            "testStrategy": "Verify tracing data can be collected and analyzed without significant performance impact. Test with different backends (console, file, jaeger). Ensure spans correctly nest and provide meaningful timing data."
+          },
+          {
+            "id": 3,
+            "title": "Optimize Performance Hot Paths",
+            "description": "Identify and optimize critical performance paths to ensure consistent sub-16ms frame times even under heavy load.",
+            "dependencies": ["15.1", "15.2"],
+            "details": "Implement event batching to reduce redundant processing. Add render caching for static UI elements. Optimize layout calculations with spatial partitioning. Use SIMD instructions where appropriate for parallel processing. Implement dirty region tracking to minimize redraws.",
+            "status": "pending",
+            "testStrategy": "Benchmark before and after optimizations with various window counts and layouts. Profile CPU and GPU usage to identify bottlenecks. Test on both high-end and low-end hardware to ensure consistent performance."
+          },
+          {
+            "id": 4,
+            "title": "Implement Memory Usage Monitoring and Optimization",
+            "description": "Create a memory tracking system to detect leaks, excessive allocations, and implement memory optimization strategies.",
+            "dependencies": ["15.1"],
+            "details": "Track allocations by component and operation type. Implement custom allocators for frequently allocated objects. Add memory high-water mark detection. Create visualizations of memory usage over time. Implement automatic heap fragmentation analysis.",
+            "status": "pending",
+            "testStrategy": "Run long-duration tests (24+ hours) to detect memory leaks. Verify stable memory usage under various workloads. Test with memory-constrained environments to ensure graceful degradation."
+          },
+          {
+            "id": 5,
+            "title": "Create Performance Debugging Tools and Reporting",
+            "description": "Develop user-facing tools for performance monitoring, debugging, and implement adaptive performance scaling based on system load.",
+            "dependencies": ["15.1", "15.2", "15.3", "15.4"],
+            "details": "Add performance reporting to status bar with configurable metrics display. Create a debug overlay toggled by keyboard shortcut showing detailed metrics. Implement performance recording and playback for regression testing. Add adaptive performance scaling that adjusts quality based on system load and battery status.",
+            "status": "pending",
+            "testStrategy": "Test usability of debugging tools with actual performance issues. Verify adaptive scaling correctly balances performance and quality. Ensure performance reporting is accurate and helpful for diagnosing issues."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-21T21:20:44.203Z",
+      "updated": "2025-07-21T21:48:06.122Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

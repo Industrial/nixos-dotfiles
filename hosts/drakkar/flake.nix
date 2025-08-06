@@ -210,7 +210,7 @@
           ../../features/nixos/graphics
           ../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
-          #../../features/nixos/networking/dns.nix
+          ../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo

@@ -3,6 +3,7 @@ echo "> generations > rollback"
 exec > >(tee ./logs/rollback-nixos) 2>&1
 set -e
 
-PREVIOUS_GENERATION=${1:-"$(bin/generations/list | tail -n 2 | head -n 1 | awk \'{print tolower($0)})"\'}
+# PREVIOUS_GENERATION=${1:-"$(bin/generations/list | tail -n 2 | head -n 1 | awk \'{print tolower($0)})"\'}
+PREVIOUS_GENERATION="$@"
 echo "> switch-to-generation > ${PREVIOUS_GENERATION}"
 sudo "/nix/var/nix/profiles/${PREVIOUS_GENERATION}/bin/switch-to-configuration" switch

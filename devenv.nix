@@ -20,6 +20,10 @@
     clippy
     rust-analyzer
 
+    # System dependencies for Wayland compositor
+    systemd
+    libinput
+
     # Development tools
     direnv
     git
