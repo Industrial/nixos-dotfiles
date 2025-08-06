@@ -1,6 +1,7 @@
 {settings, ...}: {
   imports = [
     ../performance/environment
+    ../performance/filesystems
   ];
 
   system = {
