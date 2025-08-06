@@ -7,6 +7,7 @@
     ../security/audit
     ../security/kernel
     ../security/pam
+    ./systemd
   ];
 
   system = {
