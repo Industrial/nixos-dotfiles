@@ -97,6 +97,18 @@
         };
       };
     };
+
+    # dwm-status tool source
+    dwm-status-src = {
+      url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
+
+    # cl tool source
+    cl-src = {
+      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
   };
 
   outputs = inputs @ {self, ...}: {
@@ -112,6 +124,14 @@
         modules = [
           # inputs.nixos-hardware.starlabs.starlite.i5
           ./filesystems.nix
+
+          ({pkgs, ...}: {
+            environment.systemPackages = with pkgs; [
+              pcsclite
+              opensc
+              ccid
+            ];
+          })
 
           #../../features/ai/n8n
           #../../features/ai/ollama
@@ -167,7 +187,7 @@
           #../../features/games/lutris
           #../../features/games/wowup
 
-          # ../../features/media/calibre
+          ../../features/media/calibre
           # ../../features/media/invidious
           # ../../features/media/jellyfin
           # ../../features/media/lidarr
@@ -180,17 +200,17 @@
           ../../features/media/vlc
           # ../../features/media/whisparr
 
-          ../../features/monitoring/grafana
-          ../../features/monitoring/homepage-dashboard
-          ../../features/monitoring/prometheus
+          # ../../features/monitoring/grafana
+          # ../../features/monitoring/homepage-dashboard
+          # ../../features/monitoring/prometheus
 
-          #../../features/network/chromium
+          ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
           #../../features/network/tor
           #../../features/network/tor-browser
           ../../features/network/firefox
-          ../../features/network/qute
+          #../../features/network/qute
           ../../features/network/syncthing
 
           ../../features/nixos
@@ -229,7 +249,7 @@
           ../../features/security/tailscale
           ../../features/security/veracrypt
           # ../../features/virtual-machine/base
-          ../../features/virtual-machine/kubernetes/k3s
+          #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
           #../../features/virtual-machine/kubernetes/node
           #../../features/virtual-machine/microvm
@@ -239,7 +259,7 @@
           # TODO: There was an erro building dwm so I'm disabling it for now.
           #../../features/window-manager/dwm
           #../../features/window-manager/dwm-status
-          ../../features/window-manager/ghostty
+          #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           #../../features/window-manager/river
           #../../features/window-manager/slock
