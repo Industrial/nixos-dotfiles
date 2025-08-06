@@ -6,6 +6,7 @@
     ../security/apparmor
     ../security/audit
     ../security/kernel
+    ../security/pam
   ];
 
   system = {
