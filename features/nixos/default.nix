@@ -5,6 +5,7 @@
     ../performance/hardware
     ../security/apparmor
     ../security/audit
+    ../security/kernel
   ];
 
   system = {
