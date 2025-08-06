@@ -3,6 +3,7 @@
     ../performance/environment
     ../performance/filesystems
     ../performance/hardware
+    ../security/apparmor
   ];
 
   system = {
