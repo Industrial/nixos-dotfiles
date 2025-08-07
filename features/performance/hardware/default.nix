@@ -13,51 +13,38 @@
     cpu.amd.updateMicrocode = true;
 
     # Configure GPU for performance
-    opengl = {
+    graphics = {
       enable = true;
-      driSupport = true;
-      driSupport32Bit = true;
-    };
-
-    # Configure audio for performance
-    pulseaudio = {
-      enable = true;
-      package = pkgs.pulseaudioFull;
+      # driSupport = true;
+      # driSupport32Bit = true;
     };
   };
 
-  # Configure power management for performance
-  services = {
-    powerManagement = {
-      enable = true;
-      cpuFreqGovernor = "performance";
-      powertop.enable = true;
-    };
+  powerManagement = {
+    enable = true;
+    cpuFreqGovernor = "performance";
+    powertop.enable = true;
   };
 
-  # Configure system packages for performance
-  environment.systemPackages = with pkgs; [
-    # Performance monitoring tools
-    htop
-    iotop
-    iostat
-    sysstat
-    perf-tools
-    powertop
-
-    # Performance optimization tools
-    cpupower
-    turbostat
-    numactl
-
-    # Network performance tools
-    iperf3
-    netperf
-    ethtool
-
-    # Storage performance tools
-    fio
-    iozone3
-    bonnie
-  ];
+  # TODO: Move these into individual features if we really need them.
+  # # Configure system packages for performance
+  # environment.systemPackages = with pkgs; [
+  #   # Performance monitoring tools
+  #   htop
+  #   iotop
+  #   sysstat
+  #   perf-tools
+  #   powertop
+  #   # Performance optimization tools
+  #   turbostat
+  #   numactl
+  #   # Network performance tools
+  #   iperf3
+  #   netperf
+  #   ethtool
+  #   # Storage performance tools
+  #   fio
+  #   iozone3
+  #   bonnie
+  # ];
 }

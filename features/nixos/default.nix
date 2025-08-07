@@ -52,8 +52,8 @@
       # Enable sandbox for security
       sandbox = true;
 
-      # Set max log size
-      max-log-size = 1000000;
+      # # Set max log size
+      # max-log-size = 1000000;
 
       # Enable keep-derivations for better caching
       keep-derivations = true;

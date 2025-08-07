@@ -9,7 +9,7 @@ echo "> update > system > cd hosts/$(hostname)"
 cd "hosts/$(hostname)"
 
 echo "> update > system > sudo nixos-rebuild switch --flake \".#$(hostname)\" --show-trace"
-sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
+nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
 
 cd ../..
 bin/update/login-shell "tom"

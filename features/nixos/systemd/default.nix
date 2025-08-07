@@ -7,57 +7,13 @@
   # Comprehensive systemd configuration with security and performance optimizations
 
   systemd = {
-    # Optimize systemd settings for both security and performance
-    extraConfig = ''
-      DefaultTimeoutStartSec=30s
-      DefaultTimeoutStopSec=30s
-      DefaultRestartSec=100ms
-      DefaultLimitCORE=0
-      DefaultLimitNOFILE=1048576
-      DefaultLimitNPROC=1048576
-    '';
-
-    # Configure services for security and performance
-    services = {
-      # Configure systemd-oomd for memory management
-      "systemd-oomd" = {
-        enable = true;
-      };
-
-      # Configure systemd-resolved for DNS resolution
-      "systemd-resolved" = {
-        enable = true;
-      };
-
-      # Configure systemd-timesyncd for time synchronization
-      "systemd-timesyncd" = {
-        enable = true;
-      };
-    };
-
-    # Configure user services
-    user.services = {
-      # Optimize user services
+    oomd = {
+      enable = true;
     };
   };
 
   # Configure services for performance and security
   services = {
-    # Optimize systemd services
-    systemd-oomd = {
-      enable = true;
-    };
-
-    # Optimize logging
-    journald = {
-      enable = true;
-      extraConfig = ''
-        SystemMaxUse=1G
-        SystemMaxFileSize=100M
-        MaxRetentionSec=1month
-      '';
-    };
-
     # Optimize cron for performance
     cron = {
       enable = true;

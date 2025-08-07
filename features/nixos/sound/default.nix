@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  lib,
+  pkgs,
+  ...
+}: {
   security = {
     rtkit = {
       enable = true;
@@ -7,7 +11,7 @@
 
   services = {
     pulseaudio = {
-      enable = false;
+      enable = lib.mkForce false;
     };
 
     pipewire = {

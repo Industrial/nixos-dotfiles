@@ -9,9 +9,10 @@
   security = {
     # Configure PAM for better authentication
     pam = {
-      enableSSHAgentAuth = true;
+      sshAgentAuth = {
+        enable = true;
+      };
       enableOTPW = false;
-      enablePAM = true;
     };
   };
 }
