@@ -1,15 +1,4 @@
 {settings, ...}: {
-  imports = [
-    ../performance/environment
-    ../performance/filesystems
-    ../performance/hardware
-    ../security/apparmor
-    ../security/audit
-    ../security/kernel
-    ../security/pam
-    ./systemd
-  ];
-
   system = {
     stateVersion = settings.stateVersion;
   };
@@ -48,6 +37,10 @@
 
       # Set build timeout
       build-timeout = 3600;
+
+      # Set build directory outside temporary file system to accomodate big
+      # builds.
+      build-dir = "/var/temproot";
 
       # Enable sandbox for security
       sandbox = true;
