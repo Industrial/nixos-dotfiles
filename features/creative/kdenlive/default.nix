@@ -1,6 +1,6 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    kdenlive
+    kdePackages.kdenlive
     ffmpeg
     mediainfo
     mkvtoolnix
