@@ -12,11 +12,18 @@
       systemd-boot = {
         enable = true;
         configurationLimit = 10;
+        # editor = false; # Disable boot editor for security (commented out)
       };
       efi = {
         canTouchEfiVariables = true;
       };
     };
+
+    # Secure Boot configuration (commented out)
+    # secureBoot = {
+    #   enable = true;
+    #   bootloader = "systemd-boot";
+    # };
 
     # Configure kernel parameters for security and performance
     kernelParams = [
@@ -70,6 +77,16 @@
       # File system performance optimization
       "fs.file-max=2097152"
       "fs.inotify.max_user_watches=524288"
+
+      # Advanced security parameters (commented out)
+      # "lockdown=confidentiality"
+      # "slab_nomerge"
+      # "slab_max_order=0"
+      # "pti=on"
+      # "vsyscall=none"
+      # "debugfs=off"
+      # "oops=panic"
+      # "module.sig_enforce=1"
     ];
 
     # Configure initrd for performance and security
@@ -80,5 +97,29 @@
       # Optimize initrd size
       verbose = false;
     };
+
+    # Disable unnecessary kernel modules (commented out)
+    # blacklistedKernelModules = [
+    #   # Disable potentially dangerous modules
+    #   "dccp"
+    #   "sctp"
+    #   "rds"
+    #   "tipc"
+    #   "n-hdlc"
+    #   "ax25"
+    #   "netrom"
+    #   "x25"
+    #   "rose"
+    #   "decnet"
+    #   "econet"
+    #   "af_802154"
+    #   "ipx"
+    #   "appletalk"
+    #   "psnap"
+    #   "p8023"
+    #   "p8022"
+    #   "can"
+    #   "atm"
+    # ];
   };
 }
