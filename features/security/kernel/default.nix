@@ -16,9 +16,6 @@
     # Configure lock kernel modules
     lockKernelModules = true;
 
-    # # Configure hidepid
-    # hidepid = 2;
-
     # # Configure kernel lockdown
     # kernelLockdown = "integrity";
 
@@ -31,32 +28,28 @@
     # virtualisation = {
     #   protectHostname = true;
     # };
+
+    # Advanced security settings (commented out)
+    # kernelLockdown = "confidentiality";
+    # unprivilegedUsernsClone = false; # Disable for maximum security
   };
 
   # Configure users for security
   users = {
     # Configure default user security
     defaultUserShell = pkgs.bash;
-
-    # # Configure user security settings
-    # users = lib.mkIf (config.security.hidepid == 2) {
-    #   # Hide user processes from other users
-    #   "nobody" = {
-    #     uid = 65534;
-    #     group = "nobody";
-    #     description = "Unprivileged user";
-    #     home = "/var/empty";
-    #     shell = "/run/current-system/sw/bin/nologin";
-    #   };
-    # };
   };
 
-  # # Configure file system security
-  # fileSystems = lib.mkIf (config.security.hidepid == 2) {
-  #   "/proc" = {
-  #     device = "proc";
-  #     fsType = "proc";
-  #     options = ["hidepid=2" "gid=proc"];
+  # Advanced kernel sysctl configuration (commented out)
+  # boot = {
+  #   kernel.sysctl = {
+  #     # Disable kernel debugging
+  #     "kernel.kptr_restrict" = 2;
+  #     "kernel.dmesg_restrict" = 1;
+  #     "kernel.perf_event_paranoid" = 3;
+  #     "kernel.yama.ptrace_scope" = 1;
+  #     "kernel.unprivileged_bpf_disabled" = 1;
+  #     "net.core.bpf_jit_harden" = 2;
   #   };
   # };
 }
