@@ -18,8 +18,8 @@
     wineWowPackages.fonts
     winetricks
 
-    bottles
-    heroic
+    # bottles
+    # heroic
     lutris
     protonup-qt
   ];
