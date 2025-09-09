@@ -119,7 +119,7 @@
 
           #../../features/ai/n8n
           #../../features/ai/ollama
-          ../../features/ai/task-master-ai
+          # ../../features/ai/task-master-ai
 
           # inputs.comin.nixosModules.comin
           # ../../features/ci/comin
@@ -261,8 +261,8 @@
           #../../features/virtual-machine/virtualbox
 
           ../../features/window-manager/alacritty
-          ../../features/window-manager/dwm
-          ../../features/window-manager/dwm-status
+          # ../../features/window-manager/dwm
+          # ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           #../../features/window-manager/river
