@@ -9,7 +9,7 @@
         enable = true;
       };
 
-      core-utilities = {
+      core-apps = {
         enable = true;
       };
 
@@ -17,17 +17,15 @@
         enable = true;
       };
     };
-    xserver = {
-      displayManager = {
-        gdm = {
-          enable = true;
-        };
+    displayManager = {
+      gdm = {
+        enable = true;
       };
+    };
 
-      desktopManager = {
-        gnome = {
-          enable = true;
-        };
+    desktopManager = {
+      gnome = {
+        enable = true;
       };
     };
   };
