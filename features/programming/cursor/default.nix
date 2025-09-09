@@ -3,6 +3,7 @@
   pkgs,
   ...
 }: let
+  # TODO: We need a way to manage the MCP servers. Add the JSON file to the .config/Cursor/mcp.json and link it correctly.
   # Override the license of the pylance extension
   resetLicense = drv:
     drv.overrideAttrs (prev: {
