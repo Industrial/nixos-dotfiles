@@ -37,10 +37,12 @@
   "biome.enabled": true,
   "chat.editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "chat.editor.fontSize": 12,
+  "cursor.composer.shouldAllowCustomModes": true,
   "debug.console.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "debug.console.fontSize": 12,
   "debug.javascript.autoAttachFilter": "disabled",
   "diffEditor.codeLens": true,
+  "diffEditor.maxComputationTime": 0,
   "editor.acceptSuggestionOnCommitCharacter": false,
   "editor.acceptSuggestionOnEnter": "on",
   "editor.autoClosingBrackets": "always",
@@ -146,7 +148,6 @@
     "**/.spago/**": true,
     "**/node_modules/*/**": true
   },
-  "treefmt.debug": true,
   "git.autofetch": true,
   "git.confirmSync": false,
   "git.enableSmartCommit": true,
@@ -157,6 +158,7 @@
   "http.proxyStrictSSL": false,
   "javascript.updateImportsOnFileMove.enabled": "always",
   "jupyter.askForKernelRestart": false,
+  "jupyter.interactiveWindow.creationMode": "perFile",
   "jupyter.notebookFileRoot": "${workspaceRoot}",
   "markdown.preview.fontSize": 12,
   "nix.enableLanguageServer": true,
@@ -165,6 +167,7 @@
   "notebook.output.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "notebook.output.fontSize": 12,
   "python.analysis.autoFormatStrings": true,
+  "treefmt.debug": true,
   "python.analysis.autoImportCompletions": true,
   "python.analysis.diagnosticMode": "workspace",
   "python.analysis.exclude": [
@@ -194,6 +197,7 @@
   "python.analysis.typeCheckingMode": "standard",
   "python.experiments.enabled": false,
   "python.terminal.activateEnvironment": false,
+  "redhat.telemetry.enabled": false,
   "references.preferredLocation": "view",
   "scm.inputFontFamily": "'IosevkaTerm Nerd Font Mono'",
   "scm.inputFontSize": 12,
@@ -253,15 +257,12 @@
       "commands": ["whichkey.show"]
     }
   ],
+  "update.releaseTrack": "prerelease",
   "vitest.nodeEnv": null,
+  "window.commandCenter": true,
+  "window.confirmSaveUntitledWorkspace": false,
   "workbench.colorTheme": "base16-darkmoss",
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
-  "workbench.list.openMode": "doubleClick",
-  "cursor.composer.shouldAllowCustomModes": true,
-  "window.confirmSaveUntitledWorkspace": false,
-  "jupyter.interactiveWindow.creationMode": "perFile",
-  "window.commandCenter": true,
-  "update.releaseTrack": "prerelease",
-  "diffEditor.maxComputationTime": 0
+  "workbench.list.openMode": "doubleClick"
 }

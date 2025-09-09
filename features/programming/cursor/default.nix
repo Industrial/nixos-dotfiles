@@ -52,13 +52,12 @@
       extensions.vscode-marketplace.vitest.explorer
 
       ## Python
-      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
       extensions.vscode-marketplace.charliermarsh.ruff
+      extensions.vscode-marketplace.ms-python.mypy-type-checker
+      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
       extensions.vscode-marketplace.ms-python.debugpy
       extensions.vscode-marketplace.ms-python.python
       # (resetLicense extensions.vscode-marketplace.ms-python.vscode-pylance)
-      extensions.vscode-marketplace.ms-python.mypy-type-checker
-      extensions.vscode-marketplace.tamasfe.even-better-toml
 
       ## Jupyter
       extensions.vscode-marketplace.ms-toolsai.jupyter
@@ -91,23 +90,24 @@
       ## EdgeDB
       extensions.vscode-marketplace.magicstack.edgedb
 
-      ## Haskell
-      extensions.vscode-marketplace.haskell.haskell
-      extensions.vscode-marketplace.hoovercj.haskell-linter
-      extensions.vscode-marketplace.justusadam.language-haskell
-      extensions.vscode-marketplace.phoityne.phoityne-vscode
+      # ## Haskell
+      # extensions.vscode-marketplace.haskell.haskell
+      # extensions.vscode-marketplace.hoovercj.haskell-linter
+      # extensions.vscode-marketplace.justusadam.language-haskell
+      # extensions.vscode-marketplace.phoityne.phoityne-vscode
 
-      # PureScript
-      extensions.vscode-marketplace.mvakula.vscode-purty
-      extensions.vscode-marketplace.nwolverson.ide-purescript
-      extensions.vscode-marketplace.nwolverson.language-purescript
+      # # PureScript
+      # extensions.vscode-marketplace.mvakula.vscode-purty
+      # extensions.vscode-marketplace.nwolverson.ide-purescript
+      # extensions.vscode-marketplace.nwolverson.language-purescript
 
       # Rust
-      extensions.vscode-marketplace.zhangyue.rust-mod-generator
-      extensions.vscode-marketplace.dustypomerleau.rust-syntax
-      extensions.vscode-marketplace.lorenzopirro.rust-flash-snippets
-      extensions.vscode-marketplace.rust-lang.rust-analyzer
+      extensions.vscode-marketplace.rust-lang.rust
+      # extensions.vscode-marketplace.rust-lang.rust-analyzer
       extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
+      # extensions.vscode-marketplace.zhangyue.rust-mod-generator
+      # extensions.vscode-marketplace.dustypomerleau.rust-syntax
+      # extensions.vscode-marketplace.lorenzopirro.rust-flash-snippets
 
       # TOML
       extensions.vscode-marketplace.tamasfe.even-better-toml
@@ -141,6 +141,9 @@ in {
       # # Rust
       # pkgs.rustfmt
       # pkgs.leptosfmt
+
+      # Python
+      uv
     ];
   };
 }
