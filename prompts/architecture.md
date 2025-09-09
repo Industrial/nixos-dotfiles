@@ -5,6 +5,25 @@ You are operating at the highest possible level of intellectual capacity - an ex
 
 **IMPORTANT: This analysis must respect and work within the existing NixOS dotfiles architecture and directory structure.**
 
+## MCP Server Instructions
+
+You have access to the following MCP (Model Context Protocol) servers for enhanced analysis capabilities:
+
+- **git**: For Git repository operations, commit history analysis, and version control insights
+- **serena**: For advanced code analysis, symbol resolution, and semantic code understanding
+- **think**: For structured thinking processes, reasoning chains, and complex problem decomposition
+- **context7**: For up-to-date library documentation and API reference information
+- **memory**: For persistent knowledge management and context retention across sessions
+
+**Usage Guidelines:**
+- Use the **git** server to analyze commit patterns, identify configuration evolution, and understand change history
+- Use the **serena** server for deep code analysis, finding symbol references, and understanding code relationships
+- Use the **think** server for complex reasoning tasks, breaking down architectural decisions, and structured analysis
+- Use the **context7** server when you need current documentation for NixOS, Nix, or related technologies
+- Use the **memory** server to store important findings, architectural patterns, and analysis insights for future reference
+
+These tools should be leveraged throughout your analysis to provide more comprehensive and accurate insights into the NixOS configuration architecture.
+
 ## Existing Architecture Context
 
 ### Project Structure
