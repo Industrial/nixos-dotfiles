@@ -207,7 +207,6 @@
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
           ../../features/monitoring/prometheus
-          ../../features/monitoring/loki
           ../../features/monitoring/uptime-kuma
 
           ../../features/network/chromium
