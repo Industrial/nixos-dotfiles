@@ -27,7 +27,7 @@
       # Terraform utilities
       tflint
       tfsec
-      checkov
+      # checkov  # Temporarily disabled due to cyclonedx-python-lib dependency issue
       terrascan
       infracost
 
