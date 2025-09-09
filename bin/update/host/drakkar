@@ -3,11 +3,11 @@ echo "> update > host > drakkar"
 exec > >(tee ./logs/update-hos-drakkar) 2>&1
 set -e
 
-#features/window-manager/gnome/bin/dconf-load
+features/window-manager/gnome/bin/dconf-load
 #features/window-manager/river/bin/link-files-nixos
 features/programming/cursor/bin/link-files-nixos
 
 bin/update/repositories
 bin/update/system
 
-#features/window-manager/gnome/bin/dconf-dump
+features/window-manager/gnome/bin/dconf-dump
