@@ -112,17 +112,21 @@
         inherit (settings) system;
         specialArgs = {inherit inputs settings;};
         modules = [
+          # System Configuration
           inputs.disko.nixosModules.disko
           ./disko.nix
           ./filesystems.nix
           ./hardware.nix
 
+          # AI Tools
           #../../features/ai/n8n
           #../../features/ai/ollama
 
-          # inputs.comin.nixosModules.comin
-          # ../../features/ci/comin
+          # CI/CD Tools
+          inputs.comin.nixosModules.comin
+          ../../features/ci/comin
 
+          # CLI Tools
           ../../features/cli/bandwhich
           ../../features/cli/bat
           ../../features/cli/broot
@@ -160,18 +164,29 @@
           ../../features/cli/unzip
           ../../features/cli/zellij
 
+          # Creative and Design Tools
+          ../../features/creative/gimp
+          ../../features/creative/inkscape
+          ../../features/creative/blender
+          ../../features/creative/kdenlive
+
           ../../features/communication/discord
           # ../../features/communication/fractal
-          # ../../features/communication/teams
+          ../../features/communication/teams
           # ../../features/communication/telegram
           # ../../features/communication/weechat
 
           # ../../features/crypto/bisq
           # ../../features/crypto/monero
 
+          # Games
           ../../features/games/lutris
           ../../features/games/path-of-building
           ../../features/games/wowup
+
+          # Learning and Documentation
+          ../../features/learning/zotero
+          ../../features/learning/anki
 
           # ../../features/media/calibre
           # ../../features/media/invidious
@@ -186,9 +201,14 @@
           ../../features/media/vlc
           # ../../features/media/whisparr
 
+          # Mobile and IoT Development
+          ../../features/mobile/android-studio
+
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
           ../../features/monitoring/prometheus
+          ../../features/monitoring/loki
+          ../../features/monitoring/uptime-kuma
 
           ../../features/network/chromium
           #../../features/network/searx
@@ -234,13 +254,16 @@
           ../../features/programming/node
           ../../features/programming/python
           ../../features/programming/vscode
+          ../../features/programming/terraform
 
-          ../../features/security/keepassxc
-          ../../features/security/tailscale
-          ../../features/security/veracrypt
+          # Security
           ../../features/security/apparmor
+          ../../features/security/keepassxc
           ../../features/security/kernel
           ../../features/security/pam
+          ../../features/security/tailscale
+          ../../features/security/veracrypt
+          ../../features/security/yubikey
 
           ../../features/storage/qdirstat
 
