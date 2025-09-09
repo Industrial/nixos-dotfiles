@@ -211,8 +211,6 @@
           ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
-          #../../features/network/tor
-          #../../features/network/tor-browser
           ../../features/network/firefox
           #../../features/network/qute
           ../../features/network/syncthing
@@ -270,7 +268,6 @@
           ##inputs.microvm.nixosModules.host
           ##../../features/virtual-machine/microvm/host
           ##../../features/virtual-machine/microvm/target/host-network.nix
-          ##../../features/virtual-machine/microvm/tor/host-network.nix
           #../../features/virtual-machine/microvm/web/host-network.nix
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox

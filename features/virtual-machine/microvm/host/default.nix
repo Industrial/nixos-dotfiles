@@ -29,7 +29,6 @@
   microvm = {
     autostart = [
       "vm_test"
-      "vm_tor"
       "vm_web"
       # "vm_database"
       # "vm_management"

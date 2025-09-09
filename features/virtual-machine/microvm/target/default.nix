@@ -1,10 +1,4 @@
-# A virtual machine running a service that connects to the internet. It is
-# routed through the vm_tor vm proving that it can only connect to the internet
-# through tor.
-# Test DNS: dig @10.0.0.2 example.com
-# Test HTTP: curl -s --socks5-hostname 10.0.0.2:9050 https://check.torproject.org
-# Test Direct Internet Access (should fail): curl https://example.com
-# This should show the Tor circuit information: curl -s --socks5-hostname 10.0.0.2:9050 https://check.torproject.org/torbulkexitlist
+# A virtual machine running a service that connects to the internet.
 {
   settings,
   pkgs,
