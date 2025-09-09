@@ -27,7 +27,6 @@
           };
           chunk_idle_period = "5m";
           chunk_retain_period = "30s";
-          max_transfer_retries = 0;
         };
         schema_config = {
           configs = [
@@ -48,7 +47,6 @@
             active_index_directory = "/var/lib/loki/boltdb-shipper-active";
             cache_location = "/var/lib/loki/boltdb-shipper-cache";
             cache_ttl = "24h";
-            shared_store = "filesystem";
           };
           filesystem = {
             directory = "/var/lib/loki/chunks";
@@ -58,16 +56,13 @@
           reject_old_samples = true;
           reject_old_samples_max_age = "168h";
         };
-        chunk_store_config = {
-          max_look_back_period = "0s";
-        };
+        chunk_store_config = {};
         table_manager = {
           retention_deletes_enabled = false;
           retention_period = "0s";
         };
         compactor = {
           working_directory = "/var/lib/loki/compactor";
-          shared_store = "filesystem";
           compaction_interval = "10m";
           retention_enabled = true;
           retention_delete_delay = "2h";
