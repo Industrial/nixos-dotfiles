@@ -10,6 +10,16 @@
     oomd = {
       enable = true;
     };
+
+    # Security-focused systemd configuration
+    settings = {
+      Manager = {
+        # Security settings
+        DefaultTimeoutStartSec = "30s";
+        DefaultTimeoutStopSec = "30s";
+        DefaultRestartSec = "100ms";
+      };
+    };
   };
 
   # Configure services for performance and security
