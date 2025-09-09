@@ -119,7 +119,6 @@
 
           #../../features/ai/n8n
           #../../features/ai/ollama
-          # ../../features/ai/task-master-ai
 
           # inputs.comin.nixosModules.comin
           # ../../features/ci/comin
