@@ -195,8 +195,8 @@
           #../../features/network/searx
           #../../features/network/ssh
           ../../features/network/firefox
-          ../../features/network/qute
-          ../../features/network/ladybird
+          # ../../features/network/qute
+          # ../../features/network/ladybird
           ../../features/network/syncthing
 
           ../../features/nixos
