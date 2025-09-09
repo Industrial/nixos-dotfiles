@@ -5,6 +5,23 @@ To process these tasks automatically, an LLM can:
 1. Read this file
 2. For each unchecked task (`- [ ]`), attempt to complete it
 3. After completion, mark it as done (`- [x]`)
+
+### Available MCP Servers
+The following MCP (Model Context Protocol) servers are available for enhanced task processing:
+
+- **git**: For Git repository operations, commit history analysis, and version control insights
+- **serena**: For advanced code analysis, symbol resolution, and semantic code understanding
+- **think**: For structured thinking processes, reasoning chains, and complex problem decomposition
+- **context7**: For up-to-date library documentation and API reference information
+- **memory**: For persistent knowledge management and context retention across sessions
+
+**Usage Guidelines:**
+- Use the **git** server to analyze commit patterns, track changes, and understand project evolution
+- Use the **serena** server for deep code analysis, finding symbol references, and understanding code relationships
+- Use the **think** server for complex reasoning tasks, breaking down implementation strategies, and structured analysis
+- Use the **context7** server when you need current documentation for NixOS, Nix, or related technologies
+- Use the **memory** server to store important findings, implementation patterns, and task progress for future reference
+
 4. Commit the changes
 
 ## Code Quality
