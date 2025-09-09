@@ -171,7 +171,6 @@
 
           ../../features/games/lutris
           ../../features/games/path-of-building
-          # #../../features/games/steam
           ../../features/games/wowup
 
           # ../../features/media/calibre
