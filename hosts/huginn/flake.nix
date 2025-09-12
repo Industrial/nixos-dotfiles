@@ -122,7 +122,7 @@
           inherit inputs settings;
         };
         modules = [
-          # inputs.nixos-hardware.starlabs.starlite.i5
+          # System Configuration
           ./filesystems.nix
 
           # TODO: Move this into a feature.
@@ -134,12 +134,15 @@
             ];
           })
 
+          # AI Tools
           #../../features/ai/n8n
           #../../features/ai/ollama
 
+          # CI/CD Tools
           inputs.comin.nixosModules.comin
           ../../features/ci/comin
 
+          # CLI Tools
           ../../features/cli/bandwhich
           ../../features/cli/bat
           ../../features/cli/broot
@@ -177,25 +180,38 @@
           ../../features/cli/unzip
           ../../features/cli/zellij
 
+          # Creative and Design Tools
+          ../../features/creative/gimp
+          ../../features/creative/inkscape
+          ../../features/creative/blender
+          ../../features/creative/kdenlive
+
+          # Communication
           ../../features/communication/discord
           ../../features/communication/fractal
           ../../features/communication/teams
           ../../features/communication/telegram
           ../../features/communication/weechat
 
+          # Crypto
           ../../features/crypto/bisq
           ../../features/crypto/monero
 
+          # Games
           # ../../features/games/lutris
           # ../../features/games/path-of-building
           # ../../features/games/wowup
+
+          # Learning and Documentation
+          ../../features/learning/zotero
+          ../../features/learning/anki
 
           ../../features/media/calibre
           # ../../features/media/invidious
           # ../../features/media/jellyfin
           # ../../features/media/lidarr
           # ../../features/media/prowlarr
-          # ../../features/media/qbittorrent
+          ../../features/media/qbittorrent
           # ../../features/media/radarr
           # ../../features/media/readarr
           # ../../features/media/sonarr
@@ -203,10 +219,16 @@
           ../../features/media/vlc
           # ../../features/media/whisparr
 
+          # Mobile and IoT Development
+          ../../features/mobile/android-studio
+
+          # Monitoring
           # ../../features/monitoring/grafana
           # ../../features/monitoring/homepage-dashboard
           ../../features/monitoring/prometheus
+          ../../features/monitoring/uptime-kuma
 
+          # Net
           ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
@@ -214,6 +236,7 @@
           #../../features/network/qute
           ../../features/network/syncthing
 
+          # NixOS
           ../../features/nixos
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
@@ -235,8 +258,10 @@
           ../../features/nixos/users
           ../../features/nixos/window-manager
 
+          # Office
           ../../features/office/obsidian
 
+          # Programming
           ../../features/programming/bun
           ../../features/programming/cursor
           ../../features/programming/devenv
@@ -250,16 +275,21 @@
           ../../features/programming/node
           ../../features/programming/python
           ../../features/programming/vscode
+          ../../features/programming/terraform
 
-          ../../features/security/keepassxc
-          ../../features/security/tailscale
-          ../../features/security/veracrypt
+          # Security
           ../../features/security/apparmor
+          ../../features/security/keepassxc
           ../../features/security/kernel
           ../../features/security/pam
+          ../../features/security/tailscale
+          ../../features/security/veracrypt
+          ../../features/security/yubikey
 
+          # Disks
           ../../features/storage/qdirstat
 
+          # Virtual Machine
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
@@ -271,6 +301,7 @@
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox
 
+          # Window Manager
           ../../features/window-manager/alacritty
           # ../../features/window-manager/dwm
           # ../../features/window-manager/dwm-status

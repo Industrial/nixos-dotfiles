@@ -170,14 +170,16 @@
           ../../features/creative/blender
           ../../features/creative/kdenlive
 
+          # Communication
           ../../features/communication/discord
-          # ../../features/communication/fractal
+          ../../features/communication/fractal
           ../../features/communication/teams
-          # ../../features/communication/telegram
-          # ../../features/communication/weechat
+          ../../features/communication/telegram
+          ../../features/communication/weechat
 
-          # ../../features/crypto/bisq
-          # ../../features/crypto/monero
+          # Crypto
+          ../../features/crypto/bisq
+          ../../features/crypto/monero
 
           # Games
           ../../features/games/lutris
@@ -188,7 +190,7 @@
           ../../features/learning/zotero
           ../../features/learning/anki
 
-          # ../../features/media/calibre
+          ../../features/media/calibre
           # ../../features/media/invidious
           # ../../features/media/jellyfin
           # ../../features/media/lidarr
@@ -204,11 +206,13 @@
           # Mobile and IoT Development
           ../../features/mobile/android-studio
 
+          # Monitoring
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
           ../../features/monitoring/prometheus
           ../../features/monitoring/uptime-kuma
 
+          # Net
           ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
@@ -217,6 +221,7 @@
           # ../../features/network/ladybird
           ../../features/network/syncthing
 
+          # NixOS
           ../../features/nixos
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
@@ -238,8 +243,10 @@
           ../../features/nixos/users
           ../../features/nixos/window-manager
 
+          # Office
           ../../features/office/obsidian
 
+          # Programming
           ../../features/programming/bun
           ../../features/programming/cursor
           ../../features/programming/devenv
@@ -264,8 +271,10 @@
           ../../features/security/veracrypt
           ../../features/security/yubikey
 
+          # Disks
           ../../features/storage/qdirstat
 
+          # Virtual Machine
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
@@ -277,6 +286,7 @@
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox
 
+          # Window Manager
           ../../features/window-manager/alacritty
           # ../../features/window-manager/dwm
           # ../../features/window-manager/dwm-status
