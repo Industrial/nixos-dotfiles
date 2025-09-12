@@ -48,7 +48,7 @@
             "time"
             "thermal_zone"
             "tcpstat"
-            "udpstat"
+            "udp_queues"
             "uname"
             "vmstat"
             "xfs"
