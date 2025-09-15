@@ -46,6 +46,19 @@
         };
       };
     };
+
+    # Optimize resolved
+    resolved = {
+      enable = true;
+      # extraConfig = ''
+      #   DNS=1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4
+      #   FallbackDNS=1.1.1.1 1.0.0.1
+      #   DNSSEC=yes
+      #   DNSOverTLS=yes
+      #   MulticastDNS=yes
+      #   LLMNR=yes
+      # '';
+    };
   };
 
   systemd = {
