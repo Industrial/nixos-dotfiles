@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-echo "> update > host > langhus"
-exec > >(tee ./logs/update-hos-langhus) 2>&1
-set -e
-
-features/programming/cursor/bin/link-files-nixos
-
-bin/update/repositories
-bin/update/system
