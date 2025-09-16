@@ -1,0 +1,31 @@
+---
+description: MCP server usage guidelines for dotfiles project
+alwaysApply: true
+---
+
+# MCP Server Usage Guidelines
+
+## Required MCP Servers
+Always use the following MCP servers for all operations:
+
+### Context7
+- Use for fetching up-to-date documentation for libraries and packages
+- Essential for Nix package documentation and API references
+- Helps with understanding package configurations and options
+
+### Serena
+- Use for code analysis, symbol finding, and refactoring operations
+- Essential for navigating complex Nix expressions and modules
+- Helps with understanding code structure and dependencies
+
+### Git
+- Use for all version control operations
+- Essential for tracking configuration changes
+- Helps with managing dotfiles history and rollbacks
+
+## Usage Patterns
+- Always check for available MCP servers before starting operations
+- Use Context7 for documentation lookups
+- Use Serena for code analysis and navigation
+- Use Git for version control operations
+- Combine MCP servers for comprehensive analysis
