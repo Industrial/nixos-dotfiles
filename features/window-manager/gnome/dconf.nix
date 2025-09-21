@@ -51,7 +51,7 @@
             pkgs.gnomeExtensions.another-window-session-manager.extensionUuid
           ];
 
-          disabled-extensions = lib.gvariant.mkEmptyArray "as";
+          disabled-extensions = lib.gvariant.mkEmptyArray "s";
 
           favorite-apps = [
             "librewolf.desktop"
@@ -180,73 +180,59 @@
         };
 
         "org/gnome/shell/keybindings" = {
-          focus-active-notification = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-1 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-2 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-3 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-4 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-5 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-6 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-7 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-8 = lib.gvariant.mkEmptyArray "as";
-          open-new-window-application-9 = lib.gvariant.mkEmptyArray "as";
+          focus-active-notification = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-1 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-2 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-3 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-4 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-5 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-6 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-7 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-8 = lib.gvariant.mkEmptyArray "s";
+          open-new-window-application-9 = lib.gvariant.mkEmptyArray "s";
           screenshot = ["<Shift>Print"];
           screenshot-window = ["<Alt>Print"];
-          shift-overview-down = lib.gvariant.mkEmptyArray "as";
-          shift-overview-up = lib.gvariant.mkEmptyArray "as";
-          show-screen-recording-ui = lib.gvariant.mkEmptyArray "as";
+          shift-overview-down = lib.gvariant.mkEmptyArray "s";
+          shift-overview-up = lib.gvariant.mkEmptyArray "s";
+          show-screen-recording-ui = lib.gvariant.mkEmptyArray "s";
           show-screenshot-ui = ["Print"];
-          switch-to-application-1 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-2 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-3 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-4 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-5 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-6 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-7 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-8 = lib.gvariant.mkEmptyArray "as";
-          switch-to-application-9 = lib.gvariant.mkEmptyArray "as";
-          toggle-application-view = lib.gvariant.mkEmptyArray "as";
-          toggle-message-tray = lib.gvariant.mkEmptyArray "as";
-          toggle-overview = lib.gvariant.mkEmptyArray "as";
-          toggle-quick-settings = lib.gvariant.mkEmptyArray "as";
+          switch-to-application-1 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-2 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-3 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-4 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-5 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-6 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-7 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-8 = lib.gvariant.mkEmptyArray "s";
+          switch-to-application-9 = lib.gvariant.mkEmptyArray "s";
+          toggle-application-view = lib.gvariant.mkEmptyArray "s";
+          toggle-message-tray = lib.gvariant.mkEmptyArray "s";
+          toggle-overview = lib.gvariant.mkEmptyArray "s";
+          toggle-quick-settings = lib.gvariant.mkEmptyArray "s";
         };
 
         "org/gnome/desktop/wm/keybindings" = {
-          # Empty array of strings (as) - no keybinding assigned
-          activate-window-menu = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          begin-move = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          begin-resize = lib.gvariant.mkEmptyArray "as";
+          activate-window-menu = lib.gvariant.mkEmptyArray "s";
+          begin-move = lib.gvariant.mkEmptyArray "s";
+          begin-resize = lib.gvariant.mkEmptyArray "s";
           close = ["<Control><Super>c"];
-          # Empty array of strings (as) - no keybinding assigned
-          cycle-group = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          cycle-group-backward = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          cycle-panels = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          cycle-panels-backward = lib.gvariant.mkEmptyArray "as";
+          cycle-group = lib.gvariant.mkEmptyArray "s";
+          cycle-group-backward = lib.gvariant.mkEmptyArray "s";
+          cycle-panels = lib.gvariant.mkEmptyArray "s";
+          cycle-panels-backward = lib.gvariant.mkEmptyArray "s";
           cycle-windows = ["<Super>Tab"];
           cycle-windows-backward = ["<Super><Shift>Tab"];
-          # Empty array of strings (as) - no keybinding assigned
-          maximize = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          # minimize = lib.gvariant.mkEmptyArray "as";
+          maximize = lib.gvariant.mkEmptyArray "s";
           minimize = lib.gvariant.mkEmptyArray "s";
           move-to-center = ["<Super><Control>f"];
           move-to-corner-ne = ["<Super><Control>t"];
           move-to-corner-nw = ["<Super><Control>e"];
           move-to-corner-se = ["<Super><Control>b"];
           move-to-corner-sw = ["<Super><Control>c"];
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-monitor-down = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-monitor-left = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-monitor-right = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-monitor-up = lib.gvariant.mkEmptyArray "as";
+          move-to-monitor-down = lib.gvariant.mkEmptyArray "s";
+          move-to-monitor-left = lib.gvariant.mkEmptyArray "s";
+          move-to-monitor-right = lib.gvariant.mkEmptyArray "s";
+          move-to-monitor-up = lib.gvariant.mkEmptyArray "s";
           move-to-side-e = ["<Super><Control>g"];
           move-to-side-n = ["<Super><Control>r"];
           move-to-side-s = ["<Super><Control>v"];
@@ -262,29 +248,19 @@
           move-to-workspace-8 = ["<Super><Control>8"];
           move-to-workspace-9 = ["<Super><Control>9"];
           move-to-workspace-down = ["<Super><Control>j"];
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-workspace-last = lib.gvariant.mkEmptyArray "as";
+          move-to-workspace-last = lib.gvariant.mkEmptyArray "s";
           move-to-workspace-left = ["<Super><Control>h"];
           move-to-workspace-right = ["<Super><Control>l"];
           move-to-workspace-up = ["<Super><Control>k"];
-          # Empty array of strings (as) - no keybinding assigned
-          panel-run-dialog = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-applications = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-applications-backward = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-group = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-group-backward = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-input-source = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-input-source-backward = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-panels = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-panels-backward = lib.gvariant.mkEmptyArray "as";
+          panel-run-dialog = lib.gvariant.mkEmptyArray "s";
+          switch-applications = lib.gvariant.mkEmptyArray "s";
+          switch-applications-backward = lib.gvariant.mkEmptyArray "s";
+          switch-group = lib.gvariant.mkEmptyArray "s";
+          switch-group-backward = lib.gvariant.mkEmptyArray "s";
+          switch-input-source = lib.gvariant.mkEmptyArray "s";
+          switch-input-source-backward = lib.gvariant.mkEmptyArray "s";
+          switch-panels = lib.gvariant.mkEmptyArray "s";
+          switch-panels-backward = lib.gvariant.mkEmptyArray "s";
           switch-to-workspace-1 = ["<Super>1"];
           switch-to-workspace-10 = ["<Super>0"];
           switch-to-workspace-2 = ["<Super>2"];
@@ -296,52 +272,32 @@
           switch-to-workspace-8 = ["<Super>8"];
           switch-to-workspace-9 = ["<Super>9"];
           switch-to-workspace-down = ["<Super>j"];
-          # Empty array of strings (as) - no keybinding assigned
-          switch-to-workspace-last = lib.gvariant.mkEmptyArray "as";
+          switch-to-workspace-last = lib.gvariant.mkEmptyArray "s";
           switch-to-workspace-left = ["<Super>h"];
           switch-to-workspace-right = ["<Super>l"];
           switch-to-workspace-up = ["<Super>k"];
           toggle-maximized = ["<Control><Super>m"];
-          # Empty array of strings (as) - no keybinding assigned
-          unmaximize = lib.gvariant.mkEmptyArray "as";
+          unmaximize = lib.gvariant.mkEmptyArray "s";
 
           # Additional keybindings to ensure complete source control
-          # Empty array of strings (as) - no keybinding assigned
-          always-on-top = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          lower = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          maximize-horizontally = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          maximize-vertically = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-workspace-11 = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          move-to-workspace-12 = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          panel-main-menu = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          raise = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          raise-or-lower = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          set-spew-mark = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          show-desktop = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-to-workspace-11 = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-to-workspace-12 = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-windows = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          switch-windows-backward = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          toggle-above = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          toggle-fullscreen = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          toggle-on-all-workspaces = lib.gvariant.mkEmptyArray "as";
+          always-on-top = lib.gvariant.mkEmptyArray "s";
+          lower = lib.gvariant.mkEmptyArray "s";
+          maximize-horizontally = lib.gvariant.mkEmptyArray "s";
+          maximize-vertically = lib.gvariant.mkEmptyArray "s";
+          move-to-workspace-11 = lib.gvariant.mkEmptyArray "s";
+          move-to-workspace-12 = lib.gvariant.mkEmptyArray "s";
+          panel-main-menu = lib.gvariant.mkEmptyArray "s";
+          raise = lib.gvariant.mkEmptyArray "s";
+          raise-or-lower = lib.gvariant.mkEmptyArray "s";
+          set-spew-mark = lib.gvariant.mkEmptyArray "s";
+          show-desktop = lib.gvariant.mkEmptyArray "s";
+          switch-to-workspace-11 = lib.gvariant.mkEmptyArray "s";
+          switch-to-workspace-12 = lib.gvariant.mkEmptyArray "s";
+          switch-windows = lib.gvariant.mkEmptyArray "s";
+          switch-windows-backward = lib.gvariant.mkEmptyArray "s";
+          toggle-above = lib.gvariant.mkEmptyArray "s";
+          toggle-fullscreen = lib.gvariant.mkEmptyArray "s";
+          toggle-on-all-workspaces = lib.gvariant.mkEmptyArray "s";
         };
 
         "org/gnome/mutter/keybindings" = {
@@ -349,10 +305,8 @@
           cancel-input-capture = ["<Super><Shift>Escape"];
           rotate-monitor = ["XF86RotateWindows"];
           switch-monitor = ["<Super>p" "XF86Display"];
-          # Empty array of strings (as) - no keybinding assigned
-          toggle-tiled-left = lib.gvariant.mkEmptyArray "as";
-          # Empty array of strings (as) - no keybinding assigned
-          toggle-tiled-right = lib.gvariant.mkEmptyArray "as";
+          toggle-tiled-left = lib.gvariant.mkEmptyArray "s";
+          toggle-tiled-right = lib.gvariant.mkEmptyArray "s";
         };
 
         "org/gnome/desktop/wm/preferences" = {
