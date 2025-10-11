@@ -264,5 +264,15 @@
   "workbench.colorTheme": "base16-darkmoss",
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
-  "workbench.list.openMode": "doubleClick"
+  "workbench.list.openMode": "doubleClick",
+  "[dockercompose]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.autoIndent": "advanced",
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[github-actions-workflow]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "git.openRepositoryInParentFolders": "always"
 }
