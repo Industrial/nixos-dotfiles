@@ -103,9 +103,10 @@
       # extensions.vscode-marketplace.nwolverson.language-purescript
 
       # Rust
-      extensions.vscode-marketplace.rust-lang.rust
-      # extensions.vscode-marketplace.rust-lang.rust-analyzer
+      # extensions.vscode-marketplace.rust-lang.rust
+      extensions.vscode-marketplace.rust-lang.rust-analyzer
       extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
+      extensions.vscode-marketplace.vadimcn.vscode-lldb
       # extensions.vscode-marketplace.zhangyue.rust-mod-generator
       # extensions.vscode-marketplace.dustypomerleau.rust-syntax
       # extensions.vscode-marketplace.lorenzopirro.rust-flash-snippets
@@ -121,6 +122,7 @@ in {
   environment = {
     systemPackages = with pkgs; [
       cursorWithExtensions
+      cursor-cli
 
       # TypeScript
       biome
