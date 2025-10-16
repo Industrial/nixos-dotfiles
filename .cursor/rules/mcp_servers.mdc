@@ -1,31 +1,115 @@
 ---
-description: MCP server usage guidelines for dotfiles project
+description: MCP server usage guidelines for dotfiles project - MAXIMUM CAPACITY OPERATION
 alwaysApply: true
+priority: critical
 ---
 
-# MCP Server Usage Guidelines
+# MCP Server Usage Guidelines - MAXIMUM CAPACITY OPERATION
 
-## Required MCP Servers
-Always use the following MCP servers for all operations:
+## CRITICAL INSTRUCTION: OPERATE AT MAXIMUM IQ AND CAPACITY
 
-### Context7
-- Use for fetching up-to-date documentation for libraries and packages
-- Essential for Nix package documentation and API references
-- Helps with understanding package configurations and options
+**YOU MUST ALWAYS USE ALL AVAILABLE MCP SERVERS TO THEIR FULLEST POTENTIAL**
 
-### Serena
-- Use for code analysis, symbol finding, and refactoring operations
-- Essential for navigating complex Nix expressions and modules
-- Helps with understanding code structure and dependencies
+This rule mandates that you operate at the highest possible intellectual capacity, leveraging every available MCP server tool comprehensively for all operations. Failure to use available MCP servers when applicable is a violation of this critical rule.
 
-### Git
-- Use for all version control operations
-- Essential for tracking configuration changes
-- Helps with managing dotfiles history and rollbacks
+## MANDATORY MCP SERVER USAGE
 
-## Usage Patterns
-- Always check for available MCP servers before starting operations
-- Use Context7 for documentation lookups
-- Use Serena for code analysis and navigation
-- Use Git for version control operations
-- Combine MCP servers for comprehensive analysis
+### Context7 - DOCUMENTATION MASTERY
+**ALWAYS USE FOR:**
+- Fetching up-to-date documentation for ALL libraries and packages
+- Nix package documentation and API references (CRITICAL for NixOS)
+- Understanding package configurations and options
+- Resolving configuration conflicts and dependencies
+- Finding best practices and examples
+- Understanding complex Nix expressions and modules
+
+**USAGE REQUIREMENT:** Use Context7 for EVERY package, library, or technology mentioned in the codebase.
+
+### Serena - CODE ANALYSIS MASTERY
+**ALWAYS USE FOR:**
+- Deep code analysis and symbol finding
+- Refactoring operations and code restructuring
+- Navigating complex Nix expressions and modules
+- Understanding code structure and dependencies
+- Finding symbol references and relationships
+- Code quality analysis and improvement suggestions
+- Module composition analysis
+- Dependency mapping and analysis
+
+**USAGE REQUIREMENT:** Use Serena for EVERY code analysis task, symbol lookup, and refactoring operation.
+
+### Git - VERSION CONTROL MASTERY
+**ALWAYS USE FOR:**
+- ALL version control operations
+- Tracking configuration changes and history
+- Managing dotfiles history and rollbacks
+- Analyzing commit patterns and evolution
+- Understanding configuration changes over time
+- Branch management and merge operations
+- Repository status and diff analysis
+
+**USAGE REQUIREMENT:** Use Git for EVERY version control operation and historical analysis.
+
+## MAXIMUM CAPACITY OPERATION PATTERNS
+
+### 1. COMPREHENSIVE ANALYSIS APPROACH
+- **ALWAYS** combine multiple MCP servers for comprehensive analysis
+- **NEVER** perform single-tool operations when multiple tools are applicable
+- **ALWAYS** cross-reference information between MCP servers
+- **ALWAYS** validate findings across multiple sources
+
+### 2. PROACTIVE TOOL USAGE
+- **ALWAYS** check for available MCP servers before starting ANY operation
+- **ALWAYS** use the most appropriate MCP server for each task
+- **ALWAYS** leverage advanced features of each MCP server
+- **ALWAYS** use MCP servers in parallel when possible
+
+### 3. INTELLECTUAL RIGOR REQUIREMENTS
+- **ALWAYS** operate at maximum intellectual capacity
+- **ALWAYS** provide comprehensive, detailed analysis
+- **ALWAYS** use all available tools to their fullest potential
+- **ALWAYS** cross-validate information across multiple sources
+- **ALWAYS** provide actionable insights and recommendations
+
+## ENFORCEMENT RULES
+
+### CRITICAL VIOLATIONS
+- Using basic tools when MCP servers are available
+- Performing single-tool analysis when multi-tool analysis is possible
+- Not leveraging MCP server advanced features
+- Providing surface-level analysis when deep analysis is possible
+
+### MANDATORY BEHAVIORS
+- **ALWAYS** use Context7 for documentation lookups
+- **ALWAYS** use Serena for code analysis and navigation
+- **ALWAYS** use Git for version control operations
+- **ALWAYS** combine MCP servers for comprehensive analysis
+- **ALWAYS** operate at maximum intellectual capacity
+
+## SUCCESS CRITERIA
+
+### EXCELLENCE STANDARDS
+- Every operation leverages appropriate MCP servers
+- Comprehensive analysis using multiple MCP servers
+- Maximum intellectual capacity demonstrated
+- Actionable insights and recommendations provided
+- Cross-validated information across multiple sources
+
+### QUALITY METRICS
+- MCP server usage rate: 100% when applicable
+- Analysis depth: Maximum possible
+- Intellectual rigor: Highest level
+- Tool utilization: Full potential
+- Information accuracy: Cross-validated
+
+## REMINDER: MAXIMUM CAPACITY OPERATION
+
+**YOU ARE OPERATING AT MAXIMUM INTELLECTUAL CAPACITY**
+
+- Use every available MCP server to its fullest potential
+- Provide comprehensive, detailed analysis
+- Cross-reference information across multiple sources
+- Deliver actionable insights and recommendations
+- Operate with the highest possible IQ and attention to detail
+
+**FAILURE TO USE AVAILABLE MCP SERVERS IS A CRITICAL VIOLATION OF THIS RULE**
