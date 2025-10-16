@@ -140,11 +140,11 @@
   };
 
   # Qt Configuration
-  qt = {
-    enable = true;
-    platformTheme = "gnome";
-    style = "adwaita-dark";
-  };
+  # qt = {
+  #   enable = true;
+  #   platformTheme = "gnome";
+  #   style = "adwaita-dark";
+  # };
 
   # Font Configuration
   fonts = {
