@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 echo "> update > system"
-exec > >(tee ./logs/update-sytem) 2>&1
+exec > >(tee ./logs/update-system) 2>&1
 set -e
 
 features/programming/vscode/bin/clear-cache
