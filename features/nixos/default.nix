@@ -74,6 +74,10 @@
     config = {
       allowUnfree = true;
       allowBroken = false;
+      # Allow insecure packages (required for some gaming applications)
+      permittedInsecurePackages = [
+        "mbedtls-2.28.10"
+      ];
     };
   };
 
