@@ -173,6 +173,7 @@
           # Communication
           ../../features/communication/discord
           ../../features/communication/fractal
+          ../../features/communication/signal
           ../../features/communication/teams
           ../../features/communication/telegram
           ../../features/communication/weechat
@@ -182,7 +183,7 @@
           ../../features/crypto/monero
 
           # Games
-          ../../features/games/lutris
+          # ../../features/games/lutris  # Temporarily disabled due to psycopg build issues
           ../../features/games/path-of-building
           ../../features/games/wowup
 

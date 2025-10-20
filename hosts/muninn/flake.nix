@@ -173,6 +173,7 @@
           # Communication
           ../../features/communication/discord
           ../../features/communication/fractal
+          ../../features/communication/signal
           ../../features/communication/teams
           ../../features/communication/telegram
           ../../features/communication/weechat
