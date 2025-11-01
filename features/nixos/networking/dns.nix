@@ -16,9 +16,6 @@
   networking = {
     # nameservers = ["127.0.0.1" "::1"];
     # search = ["${settings.hostname}"];
-    hosts = {
-      "127.0.0.1" = ["dev.company.local"];
-    };
   };
 
   # services = {
