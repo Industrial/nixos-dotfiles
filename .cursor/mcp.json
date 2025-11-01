@@ -29,6 +29,13 @@
       "command": "bunx",
       "args": ["@modelcontextprotocol/server-memory"],
       "env": {}
+    },
+    "chrome-devtools": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "npx -y chrome-devtools-mcp@latest --isolated --executablePath /run/current-system/sw/bin/chromium"
+      ]
     }
   }
 }
