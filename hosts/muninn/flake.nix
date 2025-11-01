@@ -104,7 +104,7 @@
   };
 
   outputs = inputs @ {...}: let
-    name = "drakkar";
+    name = "muninn";
     settings = (import ../../common/settings.nix {hostname = name;}).settings;
   in {
     nixosConfigurations = {
@@ -237,6 +237,7 @@
           ../../features/nixos/security/sudo
           ../../features/nixos/boot
           ../../features/nixos/systemd
+          ../../features/nixos/auto-update
           ../../features/performance/environment
           ../../features/performance/hardware
           ../../features/performance/filesystems

@@ -252,6 +252,7 @@
           ../../features/nixos/security/sudo
           ../../features/nixos/boot
           ../../features/nixos/systemd
+          ../../features/nixos/auto-update
           ../../features/performance/environment
           ../../features/performance/hardware
           ../../features/performance/filesystems

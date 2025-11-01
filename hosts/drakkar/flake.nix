@@ -183,7 +183,7 @@
           ../../features/crypto/monero
 
           # Games
-          # ../../features/games/lutris  # Temporarily disabled due to psycopg build issues
+          # ../../features/games/lutris
           ../../features/games/path-of-building
           ../../features/games/wowup
 
@@ -237,6 +237,7 @@
           ../../features/nixos/security/sudo
           ../../features/nixos/boot
           ../../features/nixos/systemd
+          ../../features/nixos/auto-update
           ../../features/performance/environment
           ../../features/performance/hardware
           ../../features/performance/filesystems

@@ -218,6 +218,7 @@
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo
+          ../../features/nixos/auto-update
           ../../features/nixos/sound
           ../../features/nixos/users
           ../../features/nixos/window-manager
