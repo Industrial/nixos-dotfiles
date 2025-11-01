@@ -99,7 +99,7 @@
       fira-code
       material-design-icons
       font-awesome
-      noto-fonts-emoji
+      noto-fonts-color-emoji
 
       # Visual Enhancements
       gnomeExtensions.blur-my-shell
@@ -154,7 +154,7 @@
       fira-code
       material-design-icons
       font-awesome
-      noto-fonts-emoji
+      noto-fonts-color-emoji
     ];
     fontconfig = {
       enable = true;
