@@ -12,62 +12,66 @@
   lib,
   ...
 }: {
+  # Add local DNS entries
   networking = {
-    nameservers = ["127.0.0.1" "::1"];
-    search = ["${settings.hostname}"];
-  };
-
-  services = {
-    dnscrypt-proxy2 = {
-      enable = true;
-      settings = {
-        ipv6_servers = true;
-        block_ipv6 = false;
-        require_dnssec = true;
-
-        # Use Quad9 servers
-        server_names = [
-          "quad9-dnscrypt-ip4-filter-pri"
-          "quad9-dnscrypt-ip4-filter-alt"
-        ];
-
-        sources = {
-          # Use Quad9's resolver list
-          quad9-resolvers = {
-            urls = [
-              "https://quad9.net/dnscrypt/quad9-resolvers.md"
-              "https://raw.githubusercontent.com/Quad9DNS/dnscrypt-settings/main/dnscrypt/quad9-resolvers.md"
-            ];
-            cache_file = "/var/lib/dnscrypt-proxy/quad9-resolvers.md";
-            minisign_key = "RWQBphd2+f6eiAqBsvDZEBXBGHQBJfeG6G+wJPPKxCZMoEQYpmoysKUN";
-            refresh_delay = 72;
-            prefix = "quad9-";
-          };
-        };
-      };
-    };
-
-    # Optimize resolved
-    resolved = {
-      enable = true;
-      # extraConfig = ''
-      #   DNS=1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4
-      #   FallbackDNS=1.1.1.1 1.0.0.1
-      #   DNSSEC=yes
-      #   DNSOverTLS=yes
-      #   MulticastDNS=yes
-      #   LLMNR=yes
-      # '';
+    # nameservers = ["127.0.0.1" "::1"];
+    # search = ["${settings.hostname}"];
+    hosts = {
+      "127.0.0.1" = ["dev.company.local"];
     };
   };
 
-  systemd = {
-    services = {
-      dnscrypt-proxy2 = {
-        serviceConfig = {
-          StateDirectory = "dnscrypt-proxy";
-        };
-      };
-    };
-  };
+  # services = {
+  #   dnscrypt-proxy2 = {
+  #     enable = true;
+  #     settings = {
+  #       ipv6_servers = true;
+  #       block_ipv6 = false;
+  #       require_dnssec = true;
+
+  #       # Use Quad9 servers
+  #       server_names = [
+  #         "quad9-dnscrypt-ip4-filter-pri"
+  #         "quad9-dnscrypt-ip4-filter-alt"
+  #       ];
+
+  #       sources = {
+  #         # Use Quad9's resolver list
+  #         quad9-resolvers = {
+  #           urls = [
+  #             "https://quad9.net/dnscrypt/quad9-resolvers.md"
+  #             "https://raw.githubusercontent.com/Quad9DNS/dnscrypt-settings/main/dnscrypt/quad9-resolvers.md"
+  #           ];
+  #           cache_file = "/var/lib/dnscrypt-proxy/quad9-resolvers.md";
+  #           minisign_key = "RWQBphd2+f6eiAqBsvDZEBXBGHQBJfeG6G+wJPPKxCZMoEQYpmoysKUN";
+  #           refresh_delay = 72;
+  #           prefix = "quad9-";
+  #         };
+  #       };
+  #     };
+  #   };
+
+  #   # Optimize resolved
+  #   resolved = {
+  #     enable = true;
+  #     # extraConfig = ''
+  #     #   DNS=1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4
+  #     #   FallbackDNS=1.1.1.1 1.0.0.1
+  #     #   DNSSEC=yes
+  #     #   DNSOverTLS=yes
+  #     #   MulticastDNS=yes
+  #     #   LLMNR=yes
+  #     # '';
+  #   };
+  # };
+
+  # systemd = {
+  #   services = {
+  #     dnscrypt-proxy2 = {
+  #       serviceConfig = {
+  #         StateDirectory = "dnscrypt-proxy";
+  #       };
+  #     };
+  #   };
+  # };
 }
