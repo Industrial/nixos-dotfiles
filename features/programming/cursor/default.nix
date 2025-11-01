@@ -122,6 +122,7 @@ in {
   environment = {
     systemPackages = with pkgs; [
       cursorWithExtensions
+      # cursor-cli
 
       # TypeScript
       biome
