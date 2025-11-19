@@ -22,6 +22,9 @@ in {
         # Use vim keybindings.
         fish_vi_key_bindings
 
+        # FZF keybindings (Ctrl-R for history search, Ctrl-T for file search, Alt-C for directory change)
+        fzf --fish | source
+
         # Remove default aliases.
         functions -e l
         functions -e ll
