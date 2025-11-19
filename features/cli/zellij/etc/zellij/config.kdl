@@ -15,6 +15,11 @@ ui {
   hide_session_name false
   };
 };
+plugins {
+  welcome-screen location="zellij:session-manager" {
+    welcome_screen false
+  }
+}
 keybinds clear-defaults=true {
   normal {
     // uncomment this and adjust key if using copy_on_select=false
