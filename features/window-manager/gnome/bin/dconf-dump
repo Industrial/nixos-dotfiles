@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-echo "> features > window-manager > gnome > dconf > dump"
-exec > >(tee ./logs/dconf-dump) 2>&1
-set -e
-
-echo "> dconf dump / > features/window-manager/gnome/dconf/dump.conf"
-dconf dump / > features/window-manager/gnome/dconf/dump.conf
