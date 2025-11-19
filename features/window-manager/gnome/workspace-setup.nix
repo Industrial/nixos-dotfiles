@@ -40,22 +40,22 @@
         # Applications will be moved based on the application-list configuration in dconf.nix
 
         # Launch Librewolf on workspace 1 (index 0) - will be moved by extension
-        ${pkgs.librewolf}/bin/librewolf &
+        librewolf &
 
         # Launch VS Code/Cursor on workspace 2 (index 1) - will be moved by extension
-        ${pkgs.cursor}/bin/cursor &
+        cursor &
 
         # Launch Obsidian on workspace 4 (index 3) - will be moved by extension
-        ${pkgs.obsidian}/bin/obsidian &
+        obsidian &
 
         # Launch Spotify on workspace 6 (index 5) - will be moved by extension
-        ${pkgs.spotify}/bin/spotify &
+        spotify &
 
         # Launch Discord on workspace 8 (index 7) - will be moved by extension
-        ${pkgs.discord}/bin/discord &
+        discord &
 
         # Launch Discord on workspace 8 (index 7) - will be moved by extension
-        ${pkgs.signal-desktop}/bin/signal-desktop &
+        signal-desktop &
       '';
     };
 
