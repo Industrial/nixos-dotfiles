@@ -1,6 +1,7 @@
 {
   settings,
   pkgs,
+  lib,
   ...
 }: let
   havamalPlugin = pkgs.callPackage ./havamal.nix {inherit settings pkgs;};
@@ -15,7 +16,7 @@ in {
       fish
     ];
     etc = {
-      "fish/config.fish" = {
+      "fish/config.fish" = lib.mkForce {
         text = ''
           # Disable greeting
           function fish_greeting
