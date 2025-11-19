@@ -149,14 +149,17 @@
           ../../features/cli/g
           ../../features/cli/gpg
           ../../features/cli/gping
+          ../../features/cli/gix
           ../../features/cli/jq
           ../../features/cli/killall
           ../../features/cli/l
           ../../features/cli/lazygit
           ../../features/cli/ll
           ../../features/cli/lnav
+          ../../features/cli/nix-tree
           ../../features/cli/p
           ../../features/cli/p7zip
+          ../../features/cli/procs
           ../../features/cli/ranger
           ../../features/cli/ripgrep
           ../../features/cli/spotify-player
