@@ -49,6 +49,9 @@
             pkgs.gnomeExtensions.media-controls.extensionUuid
             pkgs.gnomeExtensions.notification-banner-reloaded.extensionUuid
             pkgs.gnomeExtensions.another-window-session-manager.extensionUuid
+
+            # Workspace Management
+            pkgs.gnomeExtensions.auto-move-windows.extensionUuid
           ];
 
           disabled-extensions = lib.gvariant.mkEmptyArray "s";
@@ -313,6 +316,8 @@
           action-middle-click-titlebar = "lower";
           button-layout = "icon,appmenu:minimize,maximize,close";
           num-workspaces = lib.gvariant.mkInt32 10;
+          # Workspace names (1-based): ["www", "dev", "cmd", "git", "doc", "mda", "gtd", "net", "oth", "rnd"]
+          # Workspace indices for auto-move-windows (0-based): 0=www, 1=dev, 2=cmd, 3=git, 4=doc, 5=mda, 6=gtd, 7=net, 8=oth, 9=rnd
           workspace-names = ["www" "dev" "cmd" "git" "doc" "mda" "gtd" "net" "oth" "rnd"];
         };
 
@@ -356,6 +361,24 @@
 
         "org/gnome/settings-daemon/plugins/power" = {
           sleep-inactive-ac-type = "nothing";
+        };
+
+        # Auto Move Windows Extension Configuration
+        # Maps applications to workspaces (0-based index for extension)
+        # Workspace mapping: 0=www, 1=dev, 2=cmd, 3=git, 4=doc, 5=mda, 6=gtd, 7=net, 8=oth, 9=rnd
+        # Note: Workspace names are 1-based in GNOME UI, but extension uses 0-based indices
+        "org/gnome/shell/extensions/auto-move-windows" = {
+          # Application list format: ['desktop-file', workspace-index]
+          # Applications will automatically move to assigned workspaces on launch
+          # Desktop files must match exactly (check /usr/share/applications/ or ~/.local/share/applications/)
+          application-list = [
+            "['librewolf.desktop', 0]" # Librewolf → workspace 1 (www) - index 0
+            "['cursor.desktop', 1]" # Cursor → workspace 2 (dev) - index 1
+            "['obsidian.desktop', 3]" # Obsidian → workspace 4 (git) - index 3
+            "['spotify.desktop', 5]" # Spotify → workspace 6 (mda) - index 5
+            "['discord.desktop', 7]" # Discord → workspace 8 (oth) - index 7
+            "['discord.desktop', 7]" # Discord → workspace 8 (oth) - index 7
+          ];
         };
       };
     }

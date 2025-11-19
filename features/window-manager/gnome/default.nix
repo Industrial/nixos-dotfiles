@@ -5,9 +5,10 @@
   config,
   ...
 }: {
-  # Import dconf configuration
+  # Import dconf configuration and workspace setup
   imports = [
     ./dconf.nix
+    ./workspace-setup.nix
   ];
 
   # Core GNOME Services
@@ -126,6 +127,10 @@
       gnomeExtensions.media-controls
       gnomeExtensions.notification-banner-reloaded
       gnomeExtensions.another-window-session-manager
+
+      # Workspace Management
+      gnomeExtensions.auto-move-windows
+      wmctrl
     ];
 
     # Performance optimizations
