@@ -120,7 +120,8 @@
 
           # AI Tools
           #../../features/ai/n8n
-          #../../features/ai/ollama
+          # ../../features/ai/ollama
+          # ../../features/ai/opencode
 
           # CI/CD Tools
           inputs.comin.nixosModules.comin
@@ -165,31 +166,31 @@
           ../../features/cli/zellij
 
           # Creative and Design Tools
-          ../../features/creative/gimp
-          ../../features/creative/inkscape
-          ../../features/creative/blender
-          ../../features/creative/kdenlive
+          # ../../features/creative/gimp
+          # ../../features/creative/inkscape
+          # ../../features/creative/blender
+          # ../../features/creative/kdenlive
 
           # Communication
           ../../features/communication/discord
-          ../../features/communication/fractal
+          # ../../features/communication/fractal
           ../../features/communication/signal-desktop
-          ../../features/communication/teams
-          ../../features/communication/telegram
-          ../../features/communication/weechat
+          # ../../features/communication/teams
+          # ../../features/communication/telegram
+          # ../../features/communication/weechat
 
           # Crypto
-          ../../features/crypto/bisq
-          ../../features/crypto/monero
+          # ../../features/crypto/bisq
+          # ../../features/crypto/monero
 
           # Games
           # ../../features/games/lutris
-          ../../features/games/path-of-building
-          ../../features/games/wowup
+          # ../../features/games/path-of-building
+          # ../../features/games/wowup
 
           # Learning and Documentation
-          ../../features/learning/zotero
-          ../../features/learning/anki
+          # ../../features/learning/zotero
+          # ../../features/learning/anki
 
           ../../features/media/calibre
           # ../../features/media/invidious
@@ -205,7 +206,7 @@
           # ../../features/media/whisparr
 
           # Mobile and IoT Development
-          ../../features/mobile/android-studio
+          # ../../features/mobile/android-studio
 
           # Monitoring
           #../../features/monitoring/grafana
@@ -237,7 +238,8 @@
           ../../features/nixos/security/sudo
           ../../features/nixos/boot
           ../../features/nixos/systemd
-          ../../features/nixos/auto-update
+          # TODO: Somehow my system started freezing. This might be the cause.
+          # ../../features/nixos/auto-update
           ../../features/performance/environment
           ../../features/performance/hardware
           ../../features/performance/filesystems
@@ -255,9 +257,9 @@
           ../../features/programming/docker-compose
           ../../features/programming/git
           ../../features/programming/gitkraken
-          ../../features/programming/glogg
-          ../../features/programming/insomnia
-          ../../features/programming/meld
+          # ../../features/programming/glogg
+          # ../../features/programming/insomnia
+          # ../../features/programming/meld
           # ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
