@@ -50,6 +50,26 @@ in {
 
     # Provides `startx` command
     xorg.xinit
+
+    # # Xephyr - Nested X server for testing window managers
+    # xorg.xephyr
+
+    # Desktop Integration - CLI Tools (for Zellij system management)
+    # Network management
+    networkmanager # Provides nmcli and nmtui (interactive TUI)
+
+    # Bluetooth management - bluetuith (Rust TUI) added via bluetuith feature
+    # (bluetoothctl comes with bluez via bluetooth feature as fallback)
+
+    # Audio management (wpctl comes with wireplumber via pipewire)
+
+    # System utilities (already in base system)
+    # - systemctl (systemd)
+    # - lsblk, watch (util-linux, procps)
+
+    # Desktop Integration - Background Services
+    polkit_gnome # Polkit authentication agent
+    gnome.gnome-keyring # Password storage for browsers
   ];
 
   services = {

@@ -1,9 +1,19 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 echo "features > window-manager > dwm > link-files-nixos"
 
 currentDirectoryPath=$(pwd)
 
+# Link .xinitrc for startx
 ln -sf "${currentDirectoryPath}/features/window-manager/dwm/conf/.xinitrc" "${HOME}/.xinitrc"
+
+# Create .dwm directory if it doesn't exist
+mkdir -p "${HOME}/.dwm"
+
+# Link DWM autostart scripts (used by DWM autostart patch)
+ln -sf "${currentDirectoryPath}/features/window-manager/dwm/conf/dwm/autostart.sh" "${HOME}/.dwm/autostart.sh"
+ln -sf "${currentDirectoryPath}/features/window-manager/dwm/conf/dwm/autostart_blocking.sh" "${HOME}/.dwm/autostart_blocking.sh"
+
+# Link dwm directory (for other config files if needed)
 ln -sf "${currentDirectoryPath}/features/window-manager/dwm/conf/dwm" "${HOME}/dwm"

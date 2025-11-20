@@ -43,21 +43,33 @@ layout {
 
   tab name="net" {
     pane split_direction="vertical" {
-      pane {
-        cwd "/home/tom"
-        command "gping"
-        args "google.com"
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "gping"
+          args "google.com"
+        }
+        pane {
+          cwd "/home/tom"
+          command "sudo"
+          args "bandwhich"
+        }
       }
-      pane {
-        cwd "/home/tom"
-        command "sudo"
-        args "bandwhich"
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "nmtui"
+        }
+        pane {
+          cwd "/home/tom"
+          command "bluetuith"
+        }
       }
     }
   }
 
   tab name="dsk" {
-    pane split_direction="vertical" {
+    pane split_direction="horizontal" {
       pane {
         cwd "/home/tom"
         command "broot"
@@ -71,13 +83,20 @@ layout {
 
   tab name="mda" {
     pane split_direction="vertical" {
-      pane {
-        cwd "/home/tom"
-        command "pulsemixer"
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "pulsemixer"
+        }
+        pane {
+          cwd "/home/tom"
+          command "spotify_player"
+        }
       }
       pane {
         cwd "/home/tom"
-        command "spotify_player"
+        command "watch"
+        args "-n" "2" "wpctl" "status"
       }
     }
   }

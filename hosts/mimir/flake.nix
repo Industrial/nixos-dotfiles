@@ -132,6 +132,7 @@
 
           ../../features/cli/bandwhich
           ../../features/cli/bat
+          ../../features/cli/bluetuith
           ../../features/cli/broot
           ../../features/cli/btop
           ../../features/cli/c
@@ -258,8 +259,8 @@
           #../../features/virtual-machine/virtualbox
 
           ../../features/window-manager/alacritty
-          #../../features/window-manager/dwm
-          #../../features/window-manager/dwm-status
+          ../../features/window-manager/dwm
+          ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           #../../features/window-manager/river

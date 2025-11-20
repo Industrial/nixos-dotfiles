@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 echo "features > window-manager > dwm > start-dwm-xephyr"
 

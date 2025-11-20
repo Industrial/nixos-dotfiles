@@ -88,9 +88,11 @@
         local cmpNvimLSP = require('cmp_nvim_lsp')
         local copilot = require('copilot')
         local copilotCMP = require('copilot_cmp')
-        local lspconfig = require('lspconfig')
         local lspkind = require('lspkind')
         local whichKey = require('which-key')
+
+        -- Use vim.lsp.config if available (Neovim 0.11+), otherwise fall back to require('lspconfig')
+        local lspconfig = vim.lsp.config or require('lspconfig')
 
         cmp.setup({
           priority_weight = 2,
