@@ -261,7 +261,7 @@
           ../../features/programming/glogg
           ../../features/programming/insomnia
           ../../features/programming/meld
-          # ../../features/programming/neovim
+          ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
           # ../../features/programming/vscode
