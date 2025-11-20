@@ -298,7 +298,6 @@
           ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
-          #../../features/window-manager/river
           #../../features/window-manager/slock
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix

@@ -94,6 +94,17 @@
         -- Use vim.lsp.config if available (Neovim 0.11+), otherwise fall back to require('lspconfig')
         local lspconfig = vim.lsp.config or require('lspconfig')
 
+        -- Helper function to safely setup LSP servers
+        local function setup_lsp_server(server_name, config)
+          if vim.lsp.config then
+            -- Neovim 0.11+ API
+            vim.lsp.config[server_name](config)
+          elseif lspconfig[server_name] then
+            -- Legacy lspconfig API
+            lspconfig[server_name].setup(config)
+          end
+        end
+
         cmp.setup({
           priority_weight = 2,
           sorting = {
@@ -188,13 +199,13 @@
         })
 
         -- Bash
-        lspconfig.bashls.setup({
+        setup_lsp_server('bashls', {
           capabilities = capabilities,
           flags = flags
         })
 
         -- CSS
-        lspconfig.cssls.setup({
+        setup_lsp_server('cssls', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -214,7 +225,7 @@
             }
           }
         })
-        lspconfig.cssmodules_ls.setup({
+        setup_lsp_server('cssmodules_ls', {
           capabilities = capabilities,
           flags = flags,
           filetypes = {
@@ -223,7 +234,7 @@
         })
 
         -- Docker
-        lspconfig.dockerls.setup({
+        setup_lsp_server('dockerls', {
           capabilities = capabilities,
           cmd = {
             "docker-langserver",
@@ -233,7 +244,7 @@
         })
 
         -- Dot
-        lspconfig.dotls.setup({
+        setup_lsp_server('dotls', {
           capabilities = capabilities,
           cmd = {
             "dot-language-server",
@@ -243,7 +254,7 @@
         })
 
         -- ESLint
-        lspconfig.eslint.setup({
+        setup_lsp_server('eslint', {
           capabilities = capabilities,
           flags = flags,
           on_attach = function(client, bufnr)
@@ -255,7 +266,7 @@
         })
 
         -- GraphQL
-        lspconfig.graphql.setup({
+        setup_lsp_server('graphql', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -267,7 +278,7 @@
         })
 
         -- HTML
-        lspconfig.html.setup({
+        setup_lsp_server('html', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -277,13 +288,13 @@
         })
 
         -- JSON
-        lspconfig.jsonls.setup({
+        setup_lsp_server('jsonls', {
           capabilities = capabilities,
           flags = flags
         })
 
         -- Lua
-        lspconfig.lua_ls.setup({
+        setup_lsp_server('lua_ls', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -311,13 +322,13 @@
         })
 
         -- Nix
-        lspconfig.nixd.setup({
+        setup_lsp_server('nixd', {
           capabilities = capabilities,
           flags = flags
         })
 
         -- Python
-        lspconfig.pylsp.setup({
+        setup_lsp_server('pylsp', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -409,7 +420,7 @@
             }
           }
         })
-        lspconfig.pyright.setup({
+        setup_lsp_server('pyright', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -430,13 +441,13 @@
         })
 
         -- TypeScript
-        lspconfig.ts_ls.setup({
+        setup_lsp_server('ts_ls', {
           capabilities = capabilities,
           flags = flags
         })
 
         -- Vim Language Server
-        lspconfig.vimls.setup({
+        setup_lsp_server('vimls', {
           capabilities = capabilities,
           flags = flags,
           cmd = {
@@ -472,7 +483,7 @@
         })
 
         -- YAML
-        lspconfig.yamlls.setup({
+        setup_lsp_server('yamlls', {
           capabilities = capabilities,
           flags = flags,
           cmd = {

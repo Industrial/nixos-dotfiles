@@ -90,11 +90,11 @@
       };
     };
 
-    # dwm-status tool source
-    dwm-status-src = {
-      url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
-    };
+    # # dwm-status tool source
+    # dwm-status-src = {
+    #   url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
+    #   flake = false; # Treat as a source tree, not a flake
+    # };
 
     # cl tool source
     cl-src = {
@@ -121,7 +121,7 @@
           # AI Tools
           #../../features/ai/n8n
           # ../../features/ai/ollama
-          # ../../features/ai/opencode
+          ../../features/ai/opencode
 
           # CI/CD Tools
           inputs.comin.nixosModules.comin
@@ -296,18 +296,17 @@
 
           # Window Manager
           ../../features/window-manager/alacritty
-          ../../features/window-manager/dwm
-          ../../features/window-manager/dwm-status
+          # ../../features/window-manager/dwm
+          # ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
-          #../../features/window-manager/river
+          ../../features/window-manager/hyprland
           #../../features/window-manager/slock
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
-          # ../../features/window-manager/xfce
-          #../../features/window-manager/xmonad
-          ../../features/window-manager/xsel
           ../../features/window-manager/xclip
+          # ../../features/window-manager/xfce
+          ../../features/window-manager/xsel
         ];
       };
     };

@@ -23,7 +23,9 @@
       touchpad {
         natural_scroll = no
       }
-      sensitivity = 0 # -1.0 - 1.0, 0 means no modification.
+
+      # -1.0 - 1.0, 0 means no modification.
+      sensitivity = 0
     }
 
     # General Configuration
@@ -46,10 +48,11 @@
         size = 3
         passes = 1
       }
-      drop_shadow = yes
-      shadow_range = 4
-      shadow_render_power = 3
-      col.shadow = rgba(1a1a1aee)
+      # TODO: this broke.
+      # drop_shadow = yes
+      # shadow_range = 4
+      # shadow_render_power = 3
+      # col.shadow = rgba(1a1a1aee)
     }
 
     # Animations
@@ -70,106 +73,163 @@
       preserve_split = yes
     }
 
-    # Gestures
-    gestures {
-      workspace_swipe = off
-    }
+    # TODO: this broke.
+    # # Gestures
+    # gestures {
+    #   workspace_swipe = off
+    # }
 
-    # Window Rules
-    windowrule = float, ^(pavucontrol)$
-    windowrule = float, ^(blueman-manager)$
-    windowrule = float, ^(nm-connection-editor)$
-    windowrule = float, ^(org.gnome.Settings)$
+    # TODO: this broke.
+    # # Window Rules
+    # windowrule = float, ^(pavucontrol)$
+    # windowrule = float, ^(blueman-manager)$
+    # windowrule = float, ^(nm-connection-editor)$
+    # windowrule = float, ^(org.gnome.Settings)$
 
-    # Application Keybinds
-    bind = SUPER, Return, exec, ${pkgs.alacritty}/bin/alacritty
-    bind = SUPER, Q, killactive,
-    bind = SUPER, M, exit,
-    bind = SUPER, E, exec, ${pkgs.nautilus}/bin/nautilus
-    bind = SUPER, V, togglefloating,
-    bind = SUPER, R, exec, ${pkgs.wofi}/bin/wofi --show drun
-    bind = SUPER, P, exec, ${pkgs.wofi}/bin/wofi --show powermenu
-    bind = SUPER, L, exec, ${pkgs.hyprlock}/bin/hyprlock
-
-    # Move focus with mainMod + arrow keys
-    bind = SUPER, left, movefocus, l
-    bind = SUPER, right, movefocus, r
-    bind = SUPER, up, movefocus, u
-    bind = SUPER, down, movefocus, d
-
-    # Switch workspaces with mainMod + [0-9]
-    bind = SUPER, 1, workspace, 1
-    bind = SUPER, 2, workspace, 2
-    bind = SUPER, 3, workspace, 3
-    bind = SUPER, 4, workspace, 4
-    bind = SUPER, 5, workspace, 5
-    bind = SUPER, 6, workspace, 6
-    bind = SUPER, 7, workspace, 7
-    bind = SUPER, 8, workspace, 8
-    bind = SUPER, 9, workspace, 9
-    bind = SUPER, 0, workspace, 10
-
-    # Move active window to a workspace with mainMod + SHIFT + [0-9]
-    bind = SUPER SHIFT, 1, movetoworkspace, 1
-    bind = SUPER SHIFT, 2, movetoworkspace, 2
-    bind = SUPER SHIFT, 3, movetoworkspace, 3
-    bind = SUPER SHIFT, 4, movetoworkspace, 4
-    bind = SUPER SHIFT, 5, movetoworkspace, 5
-    bind = SUPER SHIFT, 6, movetoworkspace, 6
-    bind = SUPER SHIFT, 7, movetoworkspace, 7
-    bind = SUPER SHIFT, 8, movetoworkspace, 8
-    bind = SUPER SHIFT, 9, movetoworkspace, 9
-    bind = SUPER SHIFT, 0, movetoworkspace, 10
-
-    # Scroll through existing workspaces with mainMod + scroll
-    bind = SUPER, mouse_down, workspace, e+1
-    bind = SUPER, mouse_up, workspace, e-1
-
-    # Move/resize windows with mainMod + LMB/RMB and dragging
-    bindm = SUPER, mouse:272, movewindow
-    bindm = SUPER, mouse:273, resizewindow
-
-    # Desktop Integration - Launch GUI tools
-    bind = SUPER SHIFT, N, exec, ${pkgs.networkmanager_dmenu}/bin/networkmanager_dmenu
-    bind = SUPER SHIFT, B, exec, ${pkgs.blueman}/bin/blueman-manager
-    bind = SUPER SHIFT, A, exec, ${pkgs.pavucontrol}/bin/pavucontrol
-    bind = SUPER SHIFT, S, exec, ${pkgs.gnome.gnome-settings-daemon}/bin/gnome-control-center
+    # Keybinds
+      # Session
+        # Reload Hyprland configuration
+        bind = SUPER CTRL SHIFT, R, exec, ${pkgs.hyprland}/bin/hyprctl reload
+        # Quit Hyprland
+        bind = SUPER CTRL SHIFT, Q, exec, ${pkgs.hyprland}/bin/hyprctl exit
+        # Lock screen
+        bind = SUPER CTRL SHIFT, L, exec, ${pkgs.hyprlock}/bin/hyprlock
+      # Window
+        # Kill active window
+        bind = SUPER CTRL, Q, killactive,
+        # Toggle floating
+        bind = SUPER CTRL, Space, togglefloating,
+      # Application
+        # Open terminal
+        bind = SUPER, Return, exec, ${pkgs.alacritty}/bin/alacritty
+        # Open application
+        bind = SUPER, P, exec, ${pkgs.wofi}/bin/wofi
+      # Focus
+        # Move focus left
+        bind = SUPER, h, movefocus, l
+        # Move focus right
+        bind = SUPER, l, movefocus, r
+        # Move focus up
+        bind = SUPER, k, movefocus, u
+        # Move focus down
+        bind = SUPER, j, movefocus, d
+      # Workspaces
+        # Switch
+          # Switch to workspace 1
+          bind = SUPER, 1, workspace, 1
+          # Switch to workspace 2
+          bind = SUPER, 2, workspace, 2
+          # Switch to workspace 3
+          bind = SUPER, 3, workspace, 3
+          # Switch to workspace 4
+          bind = SUPER, 4, workspace, 4
+          # Switch to workspace 5
+          bind = SUPER, 5, workspace, 5
+          # Switch to workspace 6
+          bind = SUPER, 6, workspace, 6
+          # Switch to workspace 7
+          bind = SUPER, 7, workspace, 7
+          # Switch to workspace 8
+          bind = SUPER, 8, workspace, 8
+          # Switch to workspace 9
+          bind = SUPER, 9, workspace, 9
+          # Switch to workspace 10
+          bind = SUPER, 0, workspace, 10
+        # Move
+          # Move to workspace 1
+          bind = SUPER CTRL, 1, movetoworkspace, 1
+          # Move to workspace 2
+          bind = SUPER CTRL, 2, movetoworkspace, 2
+          # Move to workspace 3
+          bind = SUPER CTRL, 3, movetoworkspace, 3
+          # Move to workspace 4
+          bind = SUPER CTRL, 4, movetoworkspace, 4
+          # Move to workspace 5
+          bind = SUPER CTRL, 5, movetoworkspace, 5
+          # Move to workspace 6
+          bind = SUPER CTRL, 6, movetoworkspace, 6
+          # Move to workspace 7
+          bind = SUPER CTRL, 7, movetoworkspace, 7
+          # Move to workspace 8
+          bind = SUPER CTRL, 8, movetoworkspace, 8
+          # Move to workspace 9
+          bind = SUPER CTRL, 9, movetoworkspace, 9
+          # Move to workspace 10
+          bind = SUPER CTRL, 0, movetoworkspace, 10
 
     # Audio
-    bind = , XF86AudioRaiseVolume, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
-    bind = , XF86AudioLowerVolume, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
-    bind = , XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+      # Raise volume
+      bind = , XF86AudioRaiseVolume, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
+      # Lower volume
+      bind = , XF86AudioLowerVolume, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+      # Mute
+      bind = , XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
 
     # Brightness
-    bind = , XF86MonBrightnessUp, exec, ${pkgs.brightnessctl}/bin/brightnessctl set +10%
-    bind = , XF86MonBrightnessDown, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 10%-
+      # Increase brightness
+      bind = , XF86MonBrightnessUp, exec, ${pkgs.brightnessctl}/bin/brightnessctl set +10%
+      # Decrease brightness
+      bind = , XF86MonBrightnessDown, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 10%-
+
+    # # Scroll through existing workspaces with mainMod + scroll
+    # bind = SUPER, mouse_down, workspace, e+1
+    # bind = SUPER, mouse_up, workspace, e-1
+
+    # # Move/resize windows with mainMod + LMB/RMB and dragging
+    # bindm = SUPER, mouse:272, movewindow
+    # bindm = SUPER, mouse:273, resizewindow
+
+    # # Desktop Integration - Launch GUI tools
+    # bind = SUPER SHIFT, N, exec, ${pkgs.networkmanager_dmenu}/bin/networkmanager_dmenu
+    # bind = SUPER SHIFT, B, exec, ${pkgs.blueman}/bin/blueman-manager
+    # bind = SUPER SHIFT, A, exec, ${pkgs.pavucontrol}/bin/pavucontrol
+    # bind = SUPER SHIFT, S, exec, ${pkgs.gnome-settings-daemon}/bin/gnome-control-center
 
     # XWayland
     xwayland {
       force_zero_scaling = true
     }
 
-    # Autostart desktop integration tools
-    exec-once = ${pkgs.waybar}/bin/waybar
-    exec-once = ${pkgs.mako}/bin/mako
-    exec-once = ${pkgs.polkit_gnome}/lib/polkit-gnome/polkit-gnome-authentication-agent-1
-    exec-once = ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator
-    exec-once = ${pkgs.blueman}/bin/blueman-applet
-    exec-once = ${pkgs.gnome.gnome-keyring}/bin/gnome-keyring-daemon --start --components=ssh
+    # # Autostart desktop integration tools
+    # exec-once = ${pkgs.waybar}/bin/waybar
+    # exec-once = ${pkgs.mako}/bin/mako
+    # exec-once = ${pkgs.polkit_gnome}/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+    # exec-once = ${pkgs.networkmanagerapplet}/bin/nm-applet --indicator
+    # exec-once = ${pkgs.blueman}/bin/blueman-applet
+    # exec-once = ${pkgs.gnome-keyring}/bin/gnome-keyring-daemon --start --components=ssh
   '';
 in {
-  # Enable Hyprland
-  programs.hyprland = {
-    enable = true;
-    xwayland.enable = true;
-    nvidiaPatches = false; # Set to true if using NVIDIA
+  programs = {
+    hyprland = {
+      enable = true;
+      xwayland = {
+        enable = true;
+      };
+    };
   };
 
-  # Use GDM as display manager (same as GNOME)
-  services.displayManager.gdm.enable = true;
+  services = {
+    xserver = {
+      displayManager = {
+        gdm = {
+          enable = true;
+        };
+      };
+    };
 
-  # Environment variables
+    gnome = {
+      gnome-keyring.enable = true;
+    };
+  };
+
   environment = {
+    etc = {
+      "xdg/hypr/hyprland.conf" = {
+        source = hyprlandConfig;
+        mode = "0644";
+      };
+    };
+
     sessionVariables = {
       NIXOS_OZONE_WL = "1";
       QT_QPA_PLATFORM = "wayland";
@@ -180,18 +240,27 @@ in {
     systemPackages = with pkgs; [
       # Hyprland ecosystem
       hyprland
+      # Lock screen
       hyprlock
+      # Idle screen
       hypridle
+      # Status bar
       waybar
+      # Application launcher
       wofi
+      # Notification daemon
       mako
 
-      # Desktop Integration Tools
-      networkmanagerapplet # WiFi/Network GUI (system tray)
-      networkmanager_dmenu # NetworkManager dmenu launcher
-      blueman # Bluetooth manager GUI
-      pavucontrol # Audio control GUI
-      gnome.gnome-control-center # Settings (optional)
+      # WiFi/Network GUI (system tray)
+      networkmanagerapplet
+      # NetworkManager dmenu launcher
+      networkmanager_dmenu
+      # Bluetooth manager GUI
+      blueman
+      # Audio control GUI
+      pavucontrol
+      # Settings (optional)
+      gnome-control-center
 
       # Polkit for authentication dialogs
       polkit_gnome
@@ -207,47 +276,34 @@ in {
       alacritty
 
       # GNOME Keyring for password management
-      gnome.gnome-keyring
+      gnome-keyring
     ];
   };
 
-  # XDG Portal for application integration
-  xdg.portal = {
-    enable = true;
-    wlr.enable = true;
-    extraPortals = [
-      pkgs.xdg-desktop-portal-gtk
-    ];
+  xdg = {
+    portal = {
+      enable = true;
+      wlr.enable = true;
+      extraPortals = [
+        pkgs.xdg-desktop-portal-gtk
+      ];
+    };
   };
 
-  # Polkit configuration
-  security.polkit.enable = true;
-
-  # GNOME Keyring for password storage (works with browsers, etc.)
-  services.gnome.gnome-keyring.enable = true;
-
-  # Audio system (WirePlumber/PipeWire)
-  hardware.pulseaudio.enable = false; # Disable if using PipeWire
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-    wireplumber.enable = true;
+  security = {
+    polkit = {
+      enable = true;
+    };
   };
 
-  # Copy Hyprland config using environment.etc (accessible to user)
-  environment.etc."xdg/hypr/hyprland.conf" = {
-    source = hyprlandConfig;
-    mode = "0644";
+  system = {
+    activationScripts = {
+      hyprland-config = lib.stringAfter ["etc"] ''
+        mkdir -p /home/${settings.username}/.config/hypr
+        if [ ! -f /home/${settings.username}/.config/hypr/hyprland.conf ]; then
+          ln -sfn /etc/xdg/hypr/hyprland.conf /home/${settings.username}/.config/hypr/hyprland.conf
+        fi
+      '';
+    };
   };
-
-  # Link config to user's home directory via activation script
-  # Users can override by creating ~/.config/hypr/hyprland.conf
-  system.activationScripts.hyprland-config = lib.stringAfter ["etc"] ''
-    mkdir -p /home/${settings.username}/.config/hypr
-    if [ ! -f /home/${settings.username}/.config/hypr/hyprland.conf ]; then
-      ln -sfn /etc/xdg/hypr/hyprland.conf /home/${settings.username}/.config/hypr/hyprland.conf
-    fi
-  '';
 }
