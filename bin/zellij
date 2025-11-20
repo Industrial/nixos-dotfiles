@@ -2,4 +2,9 @@
 echo "> zellij"
 set -euo pipefail
 
-zellij -n zellij.kdl
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+zellij \
+  --config "$PROJECT_ROOT/zellij.kdl" \
+  --layout "$PROJECT_ROOT/zellij-layout.kdl"
