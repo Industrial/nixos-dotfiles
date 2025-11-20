@@ -33,6 +33,8 @@
     treefmt
     commitizen
     nodejs
+    slumber
+    lazysql
 
     # treefmt
     alejandra
