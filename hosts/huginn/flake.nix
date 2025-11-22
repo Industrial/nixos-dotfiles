@@ -98,12 +98,6 @@
       };
     };
 
-    # dwm-status tool source
-    dwm-status-src = {
-      url = "path:../../rust/tools/dwm-status"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
-    };
-
     # cl tool source
     cl-src = {
       url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
@@ -256,7 +250,6 @@
           ../../features/nixos/security/sudo
           ../../features/nixos/boot
           ../../features/nixos/systemd
-          ../../features/nixos/auto-update
           ../../features/performance/environment
           ../../features/performance/hardware
           ../../features/performance/filesystems
@@ -265,6 +258,7 @@
           ../../features/nixos/window-manager
 
           # Office
+          ../../features/office/notion
           ../../features/office/obsidian
 
           # Programming
@@ -309,8 +303,6 @@
 
           # Window Manager
           ../../features/window-manager/alacritty
-          ../../features/window-manager/dwm
-          ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           #../../features/window-manager/slock

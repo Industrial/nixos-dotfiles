@@ -222,11 +222,11 @@
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo
-          ../../features/nixos/auto-update
           ../../features/nixos/sound
           ../../features/nixos/users
           ../../features/nixos/window-manager
 
+          ../../features/office/notion
           ../../features/office/obsidian
 
           ../../features/programming/bun
@@ -259,8 +259,6 @@
           #../../features/virtual-machine/virtualbox
 
           ../../features/window-manager/alacritty
-          ../../features/window-manager/dwm
-          ../../features/window-manager/dwm-status
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           #../../features/window-manager/slock
