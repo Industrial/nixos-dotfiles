@@ -96,11 +96,8 @@
 
         -- Helper function to safely setup LSP servers
         local function setup_lsp_server(server_name, config)
-          if vim.lsp.config then
-            -- Neovim 0.11+ API
-            vim.lsp.config[server_name](config)
-          elseif lspconfig[server_name] then
-            -- Legacy lspconfig API
+          -- For now, always use legacy lspconfig API since vim.lsp.config API is different
+          if lspconfig[server_name] then
             lspconfig[server_name].setup(config)
           end
         end
