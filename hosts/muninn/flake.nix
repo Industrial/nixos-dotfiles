@@ -126,6 +126,7 @@
           ../../features/cli/bluetuith
           ../../features/cli/broot
           ../../features/cli/btop
+          ../../features/cli/nvtop
           ../../features/cli/c
           ../../features/cli/calcurse
           ../../features/cli/cheatsheet
