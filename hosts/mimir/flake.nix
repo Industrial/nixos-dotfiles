@@ -259,6 +259,7 @@
           #../../features/virtual-machine/virtualbox
 
           ../../features/window-manager/alacritty
+          ../../features/window-manager/kitty
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
           #../../features/window-manager/slock
