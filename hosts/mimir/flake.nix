@@ -227,7 +227,6 @@
           ../../features/nixos/users
           ../../features/nixos/window-manager
 
-          ../../features/office/notion
           ../../features/office/obsidian
 
           ../../features/programming/bun

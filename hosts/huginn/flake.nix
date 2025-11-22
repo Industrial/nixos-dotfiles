@@ -259,7 +259,6 @@
           ../../features/nixos/window-manager
 
           # Office
-          ../../features/office/notion
           ../../features/office/obsidian
 
           # Programming
