@@ -9,13 +9,20 @@ layout {
     }
   }
 
-  tab name="scratch" {
-    pane {
-      cwd "/home/tom/.dotfiles"
-    }
-  }
+   tab name="scratch" {
+     pane {
+       cwd "/home/tom/.dotfiles"
+     }
+   }
 
-  tab name="http" {
+   tab name="opencode" {
+     pane {
+       cwd "/home/tom/.dotfiles"
+       command "opencode"
+     }
+   }
+
+   tab name="http" {
     pane {
       cwd "/home/tom/.dotfiles"
       command "slumber"
