@@ -91,12 +91,11 @@
         local lspkind = require('lspkind')
         local whichKey = require('which-key')
 
-        -- Use vim.lsp.config if available (Neovim 0.11+), otherwise fall back to require('lspconfig')
-        local lspconfig = vim.lsp.config or require('lspconfig')
+        -- Always use the traditional lspconfig for now, even in Neovim 0.11+
+        local lspconfig = require('lspconfig')
 
         -- Helper function to safely setup LSP servers
         local function setup_lsp_server(server_name, config)
-          -- For now, always use legacy lspconfig API since vim.lsp.config API is different
           if lspconfig[server_name] then
             lspconfig[server_name].setup(config)
           end
