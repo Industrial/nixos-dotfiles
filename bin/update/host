@@ -3,7 +3,4 @@ echo "> update > host"
 exec > >(tee ./logs/update-host) 2>&1
 set -e
 
-features/programming/cursor/bin/link-files-nixos
-
-bin/update/repositories
 bin/update/system
