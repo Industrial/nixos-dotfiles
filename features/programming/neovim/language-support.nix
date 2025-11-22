@@ -91,12 +91,18 @@
         local lspkind = require('lspkind')
         local whichKey = require('which-key')
 
-        -- Always use the traditional lspconfig for now, even in Neovim 0.11+
-        local lspconfig = require('lspconfig')
+        -- Try to load lspconfig, fallback to vim.lsp.config if available
+        local lspconfig = nil
+        local ok, lspconfig_module = pcall(require, 'lspconfig')
+        if ok then
+          lspconfig = lspconfig_module
+        elseif vim.lsp.config then
+          lspconfig = vim.lsp.config
+        end
 
         -- Helper function to safely setup LSP servers
         local function setup_lsp_server(server_name, config)
-          if lspconfig[server_name] then
+          if lspconfig and lspconfig[server_name] and lspconfig[server_name].setup then
             lspconfig[server_name].setup(config)
           end
         end
