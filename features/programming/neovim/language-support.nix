@@ -102,9 +102,10 @@
 
         -- Helper function to safely setup LSP servers
         local function setup_lsp_server(server_name, config)
-          if lspconfig and lspconfig[server_name] and lspconfig[server_name].setup then
-            lspconfig[server_name].setup(config)
-          end
+          -- Temporarily disable LSP setup to test if this resolves startup errors
+          -- if lspconfig and lspconfig[server_name] and lspconfig[server_name].setup then
+          --   lspconfig[server_name].setup(config)
+          -- end
         end
 
         cmp.setup({
