@@ -1,5 +1,6 @@
 auto_layouts true
-copy_command "xclip -selection clipboard"
+copy_command "wl-copy --trim-newline"
+copy_on_select true
 default_layout "system"
 default_mode "normal"
 default_shell "fish"
@@ -22,8 +23,8 @@ plugins {
 }
 keybinds clear-defaults=true {
   normal {
-    // uncomment this and adjust key if using copy_on_select=false
-    // bind "Alt c" { Copy; }
+    // // Manual copy keybind (Alt+y for yank/copy)
+    // bind "Alt y" { Copy; }
   }
   resize {
     bind "Alt n" { SwitchToMode "normal"; }

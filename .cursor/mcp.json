@@ -5,29 +5,9 @@
       "args": ["mcp-server-git"],
       "env": {}
     },
-    "serena": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "git+https://github.com/oraios/serena",
-        "serena",
-        "start-mcp-server"
-      ],
-      "env": {}
-    },
-    "think": {
-      "command": "bunx",
-      "args": ["@modelcontextprotocol/server-sequential-thinking"],
-      "env": {}
-    },
     "context7": {
       "command": "bunx",
       "args": ["-y", "@upstash/context7-mcp@latest"],
-      "env": {}
-    },
-    "memory": {
-      "command": "bunx",
-      "args": ["@modelcontextprotocol/server-memory"],
       "env": {}
     },
     "chrome-devtools": {

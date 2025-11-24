@@ -5,7 +5,10 @@
   ...
 }: {
   environment = {
-    systemPackages = with pkgs; [zellij];
+    systemPackages = with pkgs; [
+      zellij
+      wl-clipboard # Wayland clipboard support for zellij
+    ];
     etc = {
       "zellij/config.kdl" = {
         source = ./etc/zellij/config.kdl;
