@@ -14,6 +14,16 @@
         };
     });
 
+  # Override license for unfree extensions to allow evaluation
+  allowUnfreeExtension = drv:
+    drv.overrideAttrs (prev: {
+      meta =
+        (prev.meta or {})
+        // {
+          license = [];
+        };
+    });
+
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.99.3";
 
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
@@ -79,7 +89,7 @@
       extensions.vscode-marketplace.mikestead.dotenv
 
       ## Git
-      extensions.vscode-marketplace.mhutchie.git-graph
+      (allowUnfreeExtension extensions.vscode-marketplace.mhutchie.git-graph)
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
 
       ## PlantUML

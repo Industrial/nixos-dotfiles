@@ -1,4 +1,8 @@
-{settings, ...}: {
+{
+  lib,
+  settings,
+  ...
+}: {
   system = {
     stateVersion = settings.stateVersion;
   };
