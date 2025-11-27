@@ -160,6 +160,7 @@
           ../../features/cli/lazygit
           ../../features/cli/ll
           ../../features/cli/lnav
+          ../../features/cli/lsusb
           ../../features/cli/nix-tree
           ../../features/cli/p
           ../../features/cli/p7zip
