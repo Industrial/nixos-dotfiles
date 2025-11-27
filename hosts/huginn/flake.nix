@@ -275,7 +275,6 @@
           ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
-          ../../features/programming/vscode
           ../../features/programming/terraform
 
           # Security

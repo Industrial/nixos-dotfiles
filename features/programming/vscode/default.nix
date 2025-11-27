@@ -58,14 +58,14 @@
       extensions.vscode-marketplace.bbenoist.nix
       #extensions.vscode-marketplace.jnoortheen.nix-ide
       extensions.vscode-marketplace.kamadorueda.alejandra
-      # ## YAML
-      # extensions.vscode-marketplace.redhat.vscode-yaml
-      # ## Docker
-      # extensions.vscode-marketplace.ms-azuretools.vscode-docker
+      ## YAML
+      extensions.vscode-marketplace.redhat.vscode-yaml
+      ## Docker
+      extensions.vscode-marketplace.ms-azuretools.vscode-docker
       ## Dotenv
       extensions.vscode-marketplace.mikestead.dotenv
       ## Git
-      extensions.vscode-marketplace.donjayamanne.githistory
+      extensions.vscode-marketplace.mhutchie.git-graph
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
       # ## PlantUML
       # extensions.vscode-marketplace.jebbs.plantuml

@@ -39,14 +39,19 @@
     "when": "editorTextFocus && !filesExplorerFocus && !chatFocus && !inputFocus"
   },
   {
+    "command": "workbench.action.focusSideBar",
+    "key": "ctrl+l",
+    "when": "editorTextFocus && !sideBarFocus"
+  },
+  {
     "command": "workbench.action.chat.focus",
     "key": "ctrl+l",
-    "when": "editorTextFocus && !chatFocus && !inputFocus"
+    "when": "editorTextFocus && sideBarFocus && !chatFocus"
   },
   {
     "command": "workbench.action.focusActiveEditorGroup",
     "key": "ctrl+l",
-    "when": "filesExplorerFocus || chatFocus || inputFocus"
+    "when": "filesExplorerFocus || (sideBarFocus && chatFocus) || inputFocus"
   },
   {
     "command": "workbench.action.terminal.focus",

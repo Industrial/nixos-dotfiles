@@ -3,8 +3,6 @@ echo "> update > system"
 exec > >(tee ./logs/update-system) 2>&1
 set -e
 
-features/programming/vscode/bin/clear-cache
-
 echo "> update > system > cd hosts/$(hostname)"
 cd "hosts/$(hostname)"
 
@@ -15,5 +13,4 @@ cd ../..
 bin/update/login-shell "tom"
 
 features/network/ladybird/bin/link-files-nixos
-features/programming/vscode/bin/link-files-nixos
 features/programming/cursor/bin/link-files-nixos
