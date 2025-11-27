@@ -29,20 +29,34 @@
     "when": "editorTextFocus"
   },
   {
-    "command": "workbench.action.navigateLeft",
-    "key": "ctrl+h"
+    "command": "workbench.files.action.focusFilesExplorer",
+    "key": "ctrl+h",
+    "when": "editorTextFocus && !filesExplorerFocus && !chatFocus"
   },
   {
-    "command": "workbench.action.navigateDown",
-    "key": "ctrl+j"
+    "command": "workbench.action.chat.focus",
+    "key": "ctrl+h",
+    "when": "editorTextFocus && !filesExplorerFocus && !chatFocus && !inputFocus"
   },
   {
-    "command": "workbench.action.navigateUp",
-    "key": "ctrl+k"
+    "command": "workbench.action.chat.focus",
+    "key": "ctrl+l",
+    "when": "editorTextFocus && !chatFocus && !inputFocus"
   },
   {
-    "command": "workbench.action.navigateRight",
-    "key": "ctrl+l"
+    "command": "workbench.action.focusActiveEditorGroup",
+    "key": "ctrl+l",
+    "when": "filesExplorerFocus || chatFocus || inputFocus"
+  },
+  {
+    "command": "workbench.action.terminal.focus",
+    "key": "ctrl+j",
+    "when": "editorTextFocus && !terminalFocus"
+  },
+  {
+    "command": "workbench.action.focusActiveEditorGroup",
+    "key": "ctrl+k",
+    "when": "terminalFocus || panelFocus"
   },
   {
     "command": "selectNextSuggestion",
