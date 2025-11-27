@@ -247,6 +247,9 @@
           ../../features/security/tailscale
           #../../features/security/veracrypt
 
+          # Hardware
+          ../../features/hardware/zsa-voyager
+
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master

@@ -286,6 +286,9 @@
           ../../features/security/veracrypt
           ../../features/security/yubikey
 
+          # Hardware
+          ../../features/hardware/zsa-voyager
+
           # Disks
           ../../features/storage/qdirstat
 
