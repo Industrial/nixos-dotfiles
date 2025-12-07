@@ -1,4 +1,3 @@
-# TODO: Copilot Chat: https://github.com/nix-community/nixvim/issues/1425
 {
   pkgs,
   inputs,

@@ -52,26 +52,31 @@
         # Lanauge Server Protocol
         lsp = {
           enable = true;
+
+          servers = {
+            rust_analyzer = {
+              enable = true;
+              installCargo = true;
+              installRustc = true;
+              installRustfmt = true;
+            };
+          };
         };
 
         # Completion Framework.
         cmp = {
           enable = true;
-        };
-        cmp-nvim-lsp = {
-          enable = true;
-        };
-        cmp-buffer = {
-          enable = true;
-        };
-        cmp-path = {
-          enable = true;
-        };
-        cmp-cmdline = {
-          enable = true;
-        };
-        copilot-cmp = {
-          enable = true;
+          settings = {
+            autoEnableSources = true;
+            sources = [
+              {name = "nvim_lsp";}
+              {name = "cmp-clippy";}
+              {name = "async_path";}
+              {name = "treesitter";}
+              {name = "buffer";}
+              {name = "cmdline";}
+            ];
+          };
         };
       };
 
@@ -86,8 +91,6 @@
       extraConfigLua = ''
         local cmp = require('cmp')
         local cmpNvimLSP = require('cmp_nvim_lsp')
-        local copilot = require('copilot')
-        local copilotCMP = require('copilot_cmp')
         local lspkind = require('lspkind')
         local whichKey = require('which-key')
 
@@ -127,9 +130,7 @@
             format = lspkind.cmp_format({
               mode = "symbol",
               max_widt = 50,
-              symbol_map = {
-                Copilot = "",
-              },
+              symbol_map = {},
             }),
           },
           window = {
@@ -141,55 +142,6 @@
             ['<cr>'] = cmp.mapping.confirm({ select = true }),
             ['<tab>'] = cmp.mapping.confirm({ select = true }),
           }),
-          sources = cmp.config.sources({
-            {
-              name = 'copilot',
-              group_index = 2,
-            },
-            {
-              name = 'nvim_lsp',
-              group_index = 2,
-            },
-            {
-              name = 'path',
-              group_index = 2,
-            },
-            {
-              name = 'buffer',
-              group_index = 2,
-            },
-            -- { name = 'vsnip' }, -- For vsnip users.
-          })
-        })
-
-        cmp.setup.filetype("gitcommit", {
-          sources = cmp.config.sources({
-            {
-              name = "buffer"
-            }
-          })
-        })
-        cmp.setup.cmdline({
-          "/",
-          "?"
-        }, {
-          mapping = cmp.mapping.preset.cmdline(),
-          sources = {
-            {
-              name = "buffer"
-            }
-          }
-        })
-        cmp.setup.cmdline(":", {
-          mapping = cmp.mapping.preset.cmdline(),
-          sources = cmp.config.sources({
-            {
-              name = "path"
-            },
-            {
-              name = "cmdline"
-            }
-          })
         })
 
         local capabilities = cmpNvimLSP.default_capabilities()
@@ -201,11 +153,11 @@
           silent = true
         })
 
-        -- Bash
-        setup_lsp_server('bashls', {
-          capabilities = capabilities,
-          flags = flags
-        })
+        -- -- Bash
+        -- setup_lsp_server('bashls', {
+        --   capabilities = capabilities,
+        --   flags = flags
+        -- })
 
         -- CSS
         setup_lsp_server('cssls', {
@@ -443,11 +395,11 @@
           }
         })
 
-        -- TypeScript
-        setup_lsp_server('ts_ls', {
-          capabilities = capabilities,
-          flags = flags
-        })
+        -- -- TypeScript
+        -- setup_lsp_server('ts_ls', {
+        --   capabilities = capabilities,
+        --   flags = flags
+        -- })
 
         -- Vim Language Server
         setup_lsp_server('vimls', {
@@ -485,26 +437,26 @@
           }
         })
 
-        -- YAML
-        setup_lsp_server('yamlls', {
-          capabilities = capabilities,
-          flags = flags,
-          cmd = {
-            "yaml-language-server",
-            "--stdio"
-          },
-          filetypes = {
-            "yaml"
-          },
-          init_options = {
-            validate = true,
-            hover = true,
-            completion = true,
-            format = {
-              enable = true
-            }
-          }
-        })
+        -- -- YAML
+        -- setup_lsp_server('yamlls', {
+        --   capabilities = capabilities,
+        --   flags = flags,
+        --   cmd = {
+        --     "yaml-language-server",
+        --     "--stdio"
+        --   },
+        --   filetypes = {
+        --     "yaml"
+        --   },
+        --   init_options = {
+        --     validate = true,
+        --     hover = true,
+        --     completion = true,
+        --     format = {
+        --       enable = true
+        --     }
+        --   }
+        -- })
 
         whichKey.add({
           { "<leader>l", group = "LSP" },
@@ -518,32 +470,9 @@
           { "<leader>lr", vim.lsp.buf.references, desc = "References" },
         })
 
-        local capabilities = cmpNvimLSP.default_capabilities()
-        -- lspconfig['SOMETHING'].setup({
-        --   capabilities = capabilities,
-        -- })
-
         lspkind.init({
           mode = 'symbol_text',
         })
-
-        copilot.setup({
-          panel = {
-            enabled = false,
-            auto_refresh = true,
-          },
-          suggestion = {
-            enabled = false,
-            auto_trigger = true,
-          }
-        })
-        cmp.event:on('menu_opened', function()
-          vim.b.copilot_suggestion_hidden = true
-        end)
-        cmp.event:on('menu_closed', function()
-          vim.b.copilot_suggestion_hidden = false
-        end)
-        copilotCMP.setup()
       '';
     };
   };
