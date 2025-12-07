@@ -1,5 +1,12 @@
 # Hyprland - Dynamic Tiling Wayland Compositor with Desktop Integration
 # Integrates with NetworkManager, Bluetooth, and other GNOME services
+# TODO: Integrate these plugins/functionalities:
+# - https://github.com/raybbian/hyprtasking
+# - https://github.com/hyprwm/hyprpaper
+# - https://github.com/hyprwm/hyprcursor
+# - https://github.com/hyprwm/hyprsunset
+# - https://quickshell.org
+# - https://aylur.github.io/ags
 {
   pkgs,
   lib,
