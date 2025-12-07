@@ -2,19 +2,49 @@
   "mcpServers": {
     "git": {
       "command": "uvx",
-      "args": ["mcp-server-git"],
-      "env": {}
+      "args": ["mcp-server-git", "--repository", "/data/Code/streamweave"]
+    },
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server"
+      ]
+    },
+    "think": {
+      "command": "uvx",
+      "args": ["mcp-think-tool"]
     },
     "context7": {
-      "command": "bunx",
-      "args": ["-y", "@upstash/context7-mcp@latest"],
-      "env": {}
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "task-master-ai": {
+      "command": "npx",
+      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
+      "env": {
+        "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY_HERE",
+        "PERPLEXITY_API_KEY": "PERPLEXITY_API_KEY_HERE",
+        "OPENAI_API_KEY": "OPENAI_API_KEY_HERE",
+        "GOOGLE_API_KEY": "GOOGLE_API_KEY_HERE",
+        "XAI_API_KEY": "XAI_API_KEY_HERE",
+        "OPENROUTER_API_KEY": "OPENROUTER_API_KEY_HERE",
+        "MISTRAL_API_KEY": "MISTRAL_API_KEY_HERE",
+        "AZURE_OPENAI_API_KEY": "AZURE_OPENAI_API_KEY_HERE",
+        "OLLAMA_API_KEY": "OLLAMA_API_KEY_HERE"
+      }
     },
     "chrome-devtools": {
       "command": "bash",
       "args": [
         "-c",
-        "npx -y chrome-devtools-mcp@latest --isolated --executablePath /run/current-system/sw/bin/chromium"
+        "npx -y chrome-devtools-mcp@latest --executablePath /run/current-system/sw/bin/chromium --isolated"
       ]
     }
   }
