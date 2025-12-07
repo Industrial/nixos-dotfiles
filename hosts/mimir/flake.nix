@@ -10,16 +10,6 @@
       url = "github:NixOS/nixos-hardware/master";
     };
 
-    # Nix Unit.
-    nix-unit = {
-      url = "github:nix-community/nix-unit";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Comin: Git Pull Based Deployment System.
     comin = {
       url = "github:nlewo/comin";
@@ -90,14 +80,6 @@
       };
     };
 
-    # NixOS Anywhere
-    nixos-anywhere = {
-      url = "github:nix-community/nixos-anywhere";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
     # Disko
     disko = {
       url = "github:nix-community/disko";
@@ -107,9 +89,15 @@
         };
       };
     };
+
+    # cl tool source
+    cl-src = {
+      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
   };
 
-  outputs = inputs @ {self, ...}: let
+  outputs = inputs @ {...}: let
     hostname = "mimir";
     settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
   in {
@@ -120,16 +108,22 @@
           inherit inputs settings;
         };
         modules = [
+          # System Configuration
           inputs.disko.nixosModules.disko
           ./disko.nix
           ./filesystems.nix
+          ./hardware.nix
 
-          #../../features/ai/n8n
-          #../../features/ai/ollama
+          # AI Tools
+          # ../../features/ai/n8n
+          # ../../features/ai/ollama
+          # ../../features/ai/opencode
 
+          # CI/CD Tools
           inputs.comin.nixosModules.comin
           ../../features/ci/comin
 
+          # CLI Tools
           ../../features/cli/bandwhich
           ../../features/cli/bat
           ../../features/cli/bluetuith
@@ -173,22 +167,34 @@
           ../../features/cli/unzip
           ../../features/cli/zellij
 
+          # Creative and Design Tools
+          # ../../features/creative/gimp
+          # ../../features/creative/inkscape
+          # ../../features/creative/blender
+          # ../../features/creative/kdenlive
+
           # Communication
-          ../../features/communication/discord
-          ../../features/communication/fractal
-          ../../features/communication/signal-desktop
-          ../../features/communication/teams
-          ../../features/communication/telegram
-          ../../features/communication/weechat
+          # ../../features/communication/discord
+          # ../../features/communication/fractal
+          # ../../features/communication/signal-desktop
+          # ../../features/communication/teams
+          # ../../features/communication/telegram
+          # ../../features/communication/weechat
 
-          ../../features/crypto/bisq
-          ../../features/crypto/monero
+          # Crypto
+          # ../../features/crypto/bisq
+          # ../../features/crypto/monero
 
-          #../features/games/lutris
-          #../features/games/path-of-building
-          #../features/games/wowup
+          # Games
+          # ../../features/games/lutris
+          # ../../features/games/path-of-building
+          # ../../features/games/wowup
 
-          # ../../features/media/calibre
+          # Learning and Documentation
+          # ../../features/learning/zotero
+          # ../../features/learning/anki
+
+          ../../features/media/calibre
           # ../../features/media/invidious
           # ../../features/media/jellyfin
           # ../../features/media/lidarr
@@ -197,39 +203,54 @@
           # ../../features/media/radarr
           # ../../features/media/readarr
           # ../../features/media/sonarr
-          # ../../features/media/spotify
+          ../../features/media/spotify
           ../../features/media/vlc
           # ../../features/media/whisparr
 
+          # Mobile and IoT Development
+          # ../../features/mobile/android-studio
+
+          # Monitoring
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
-          #../../features/monitoring/prometheus
+          # ../../features/monitoring/prometheus
+          # ../../features/monitoring/uptime-kuma
 
-          #../../features/network/chromium
+          # Net
+          ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
           ../../features/network/firefox
-          ../../features/network/qute
-          ../../features/network/syncthing
+          # ../../features/network/qute
+          # ../../features/network/ladybird
+          # ../../features/network/syncthing
 
+          # NixOS
           ../../features/nixos
           ../../features/nixos/bluetooth
           ../../features/nixos/boot
-          #../../features/nixos/docker
+          ../../features/nixos/docker
           ../../features/nixos/fonts
           ../../features/nixos/graphics
           ../../features/nixos/graphics/amd.nix
           ../../features/nixos/networking
-          #../../features/nixos/networking/dns.nix
+          ../../features/nixos/networking/dns.nix
           ../../features/nixos/networking/firewall.nix
           ../../features/nixos/security/no-defaults
           ../../features/nixos/security/sudo
+          ../../features/nixos/boot
+          ../../features/nixos/systemd
+          ../../features/performance/environment
+          ../../features/performance/hardware
+          ../../features/performance/filesystems
           ../../features/nixos/sound
           ../../features/nixos/users
           ../../features/nixos/window-manager
 
-          ../../features/office/obsidian
+          # Office
+          # ../../features/office/obsidian
 
+          # Programming
           ../../features/programming/bun
           ../../features/programming/cursor
           ../../features/programming/devenv
@@ -243,36 +264,47 @@
           ../../features/programming/node
           ../../features/programming/python
           # ../../features/programming/vscode
+          # ../../features/programming/terraform
 
+          # Security
+          ../../features/security/apparmor
           ../../features/security/keepassxc
+          # ../../features/security/kernel
+          ../../features/security/pam
           ../../features/security/tailscale
-          #../../features/security/veracrypt
+          ../../features/security/veracrypt
+          ../../features/security/yubikey
 
           # Hardware
           ../../features/hardware/zsa-voyager
 
+          # Disks
+          ../../features/storage/qdirstat
+
+          # Virtual Machine
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
           #../../features/virtual-machine/kubernetes/node
-          inputs.microvm.nixosModules.host
-          ../../features/virtual-machine/microvm/host
-          ../../features/virtual-machine/microvm/target/host-network.nix
+          ##inputs.microvm.nixosModules.host
+          ##../../features/virtual-machine/microvm/host
+          ##../../features/virtual-machine/microvm/target/host-network.nix
           #../../features/virtual-machine/microvm/web/host-network.nix
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox
 
+          # Window Manager
           ../../features/window-manager/alacritty
           ../../features/window-manager/kitty
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
+          ../../features/window-manager/hyprland
           #../../features/window-manager/slock
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
-          #../../features/window-manager/xfce
-          #../../features/window-manager/xmonad
-          ../../features/window-manager/xsel
           ../../features/window-manager/xclip
+          # ../../features/window-manager/xfce
+          ../../features/window-manager/xsel
         ];
       };
     };

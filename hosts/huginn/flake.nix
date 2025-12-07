@@ -80,14 +80,6 @@
       };
     };
 
-    # NixOS Anywhere
-    nixos-anywhere = {
-      url = "github:nix-community/nixos-anywhere";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
     # Disko
     disko = {
       url = "github:nix-community/disko";
@@ -105,11 +97,11 @@
     };
   };
 
-  outputs = inputs @ {self, ...}: {
-    nixosConfigurations = let
-      hostname = "huginn";
-      settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
-    in {
+  outputs = inputs @ {...}: let
+    hostname = "huginn";
+    settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
+  in {
+    nixosConfigurations = {
       "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
         inherit (settings) system;
         specialArgs = {
@@ -117,20 +109,15 @@
         };
         modules = [
           # System Configuration
+          # inputs.disko.nixosModules.disko
+          # ./disko.nix
           ./filesystems.nix
-
-          # TODO: Move this into a feature.
-          ({pkgs, ...}: {
-            environment.systemPackages = with pkgs; [
-              pcsclite
-              opensc
-              ccid
-            ];
-          })
+          ./hardware.nix
 
           # AI Tools
-          #../../features/ai/n8n
-          #../../features/ai/ollama
+          # ../../features/ai/n8n
+          # ../../features/ai/ollama
+          # ../../features/ai/opencode
 
           # CI/CD Tools
           inputs.comin.nixosModules.comin
@@ -181,10 +168,10 @@
           ../../features/cli/zellij
 
           # Creative and Design Tools
-          ../../features/creative/gimp
-          ../../features/creative/inkscape
-          ../../features/creative/blender
-          ../../features/creative/kdenlive
+          # ../../features/creative/gimp
+          # ../../features/creative/inkscape
+          # ../../features/creative/blender
+          # ../../features/creative/kdenlive
 
           # Communication
           ../../features/communication/discord
@@ -199,9 +186,9 @@
           ../../features/crypto/monero
 
           # Games
-          # ../../features/games/lutris
-          # ../../features/games/path-of-building
-          # ../../features/games/wowup
+          ../../features/games/lutris
+          ../../features/games/path-of-building
+          ../../features/games/wowup
 
           # Learning and Documentation
           ../../features/learning/zotero
@@ -221,21 +208,22 @@
           # ../../features/media/whisparr
 
           # Mobile and IoT Development
-          ../../features/mobile/android-studio
+          # ../../features/mobile/android-studio
 
           # Monitoring
-          # ../../features/monitoring/grafana
-          # ../../features/monitoring/homepage-dashboard
-          ../../features/monitoring/prometheus
-          ../../features/monitoring/uptime-kuma
+          #../../features/monitoring/grafana
+          #../../features/monitoring/homepage-dashboard
+          # ../../features/monitoring/prometheus
+          # ../../features/monitoring/uptime-kuma
 
           # Net
           ../../features/network/chromium
           #../../features/network/searx
           #../../features/network/ssh
           ../../features/network/firefox
-          #../../features/network/qute
-          ../../features/network/syncthing
+          # ../../features/network/qute
+          # ../../features/network/ladybird
+          # ../../features/network/syncthing
 
           # NixOS
           ../../features/nixos
@@ -260,7 +248,7 @@
           ../../features/nixos/window-manager
 
           # Office
-          ../../features/office/obsidian
+          # ../../features/office/obsidian
 
           # Programming
           ../../features/programming/bun
@@ -275,12 +263,13 @@
           ../../features/programming/neovim
           ../../features/programming/node
           ../../features/programming/python
-          ../../features/programming/terraform
+          # ../../features/programming/vscode
+          # ../../features/programming/terraform
 
           # Security
           ../../features/security/apparmor
           ../../features/security/keepassxc
-          ../../features/security/kernel
+          # ../../features/security/kernel
           ../../features/security/pam
           ../../features/security/tailscale
           ../../features/security/veracrypt
@@ -309,13 +298,13 @@
           ../../features/window-manager/kitty
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
+          ../../features/window-manager/hyprland
           #../../features/window-manager/slock
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
-          # ../../features/window-manager/xfce
-          #../../features/window-manager/xmonad
-          ../../features/window-manager/xsel
           ../../features/window-manager/xclip
+          # ../../features/window-manager/xfce
+          ../../features/window-manager/xsel
         ];
       };
     };

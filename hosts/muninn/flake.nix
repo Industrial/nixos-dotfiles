@@ -98,13 +98,15 @@
   };
 
   outputs = inputs @ {...}: let
-    name = "muninn";
-    settings = (import ../../common/settings.nix {hostname = name;}).settings;
+    hostname = "muninn";
+    settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
   in {
     nixosConfigurations = {
-      "${name}" = inputs.nixpkgs.lib.nixosSystem {
+      "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
         inherit (settings) system;
-        specialArgs = {inherit inputs settings;};
+        specialArgs = {
+          inherit inputs settings;
+        };
         modules = [
           # System Configuration
           inputs.disko.nixosModules.disko
@@ -113,8 +115,9 @@
           ./hardware.nix
 
           # AI Tools
-          #../../features/ai/n8n
-          #../../features/ai/ollama
+          # ../../features/ai/n8n
+          # ../../features/ai/ollama
+          # ../../features/ai/opencode
 
           # CI/CD Tools
           inputs.comin.nixosModules.comin
@@ -165,10 +168,10 @@
           ../../features/cli/zellij
 
           # Creative and Design Tools
-          ../../features/creative/gimp
-          ../../features/creative/inkscape
-          ../../features/creative/blender
-          ../../features/creative/kdenlive
+          # ../../features/creative/gimp
+          # ../../features/creative/inkscape
+          # ../../features/creative/blender
+          # ../../features/creative/kdenlive
 
           # Communication
           ../../features/communication/discord
@@ -205,7 +208,7 @@
           # ../../features/media/whisparr
 
           # Mobile and IoT Development
-          ../../features/mobile/android-studio
+          # ../../features/mobile/android-studio
 
           # Monitoring
           #../../features/monitoring/grafana
@@ -220,7 +223,7 @@
           ../../features/network/firefox
           # ../../features/network/qute
           # ../../features/network/ladybird
-          ../../features/network/syncthing
+          # ../../features/network/syncthing
 
           # NixOS
           ../../features/nixos
@@ -245,7 +248,7 @@
           ../../features/nixos/window-manager
 
           # Office
-          ../../features/office/obsidian
+          # ../../features/office/obsidian
 
           # Programming
           ../../features/programming/bun
@@ -266,7 +269,7 @@
           # Security
           ../../features/security/apparmor
           ../../features/security/keepassxc
-          ../../features/security/kernel
+          # ../../features/security/kernel
           ../../features/security/pam
           ../../features/security/tailscale
           ../../features/security/veracrypt
@@ -295,13 +298,13 @@
           ../../features/window-manager/kitty
           #../../features/window-manager/ghostty
           ../../features/window-manager/gnome
+          ../../features/window-manager/hyprland
           #../../features/window-manager/slock
           inputs.stylix.nixosModules.stylix
           ../../features/window-manager/stylix
-          # ../../features/window-manager/xfce
-          #../../features/window-manager/xmonad
-          ../../features/window-manager/xsel
           ../../features/window-manager/xclip
+          # ../../features/window-manager/xfce
+          ../../features/window-manager/xsel
         ];
       };
     };
