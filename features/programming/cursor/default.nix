@@ -40,32 +40,32 @@
       extensions.vscode-marketplace.vspacecode.whichkey
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
-      # Testing
+      # # Testing
       # This adapter converter is needed for other language test adapter
       # extensions like Test Explorer UI
-      extensions.vscode-marketplace.ms-vscode.test-adapter-converter
-      extensions.vscode-marketplace.hbenl.vscode-test-explorer
+      # extensions.vscode-marketplace.ms-vscode.test-adapter-converter
+      # extensions.vscode-marketplace.hbenl.vscode-test-explorer
 
-      # File Types
-      ## GraphQL
-      extensions.vscode-marketplace.graphql.vscode-graphql-syntax
-      extensions.vscode-marketplace.graphql.vscode-graphql
+      # # File Types
+      # ## GraphQL
+      # extensions.vscode-marketplace.graphql.vscode-graphql-syntax
+      # extensions.vscode-marketplace.graphql.vscode-graphql
 
-      ## Markdown
-      extensions.vscode-marketplace.yzhang.markdown-all-in-one
-      extensions.vscode-marketplace.geeklearningio.graphviz-markdown-preview
+      # ## Markdown
+      # extensions.vscode-marketplace.yzhang.markdown-all-in-one
+      # extensions.vscode-marketplace.geeklearningio.graphviz-markdown-preview
 
       ## JavaScript / TypeScript
-      extensions.vscode-marketplace.firsttris.vscode-jest-runner
+      # extensions.vscode-marketplace.firsttris.vscode-jest-runner
       extensions.vscode-marketplace.biomejs.biome
-      extensions.vscode-marketplace.dbaeumer.vscode-eslint
+      # extensions.vscode-marketplace.dbaeumer.vscode-eslint
       extensions.vscode-marketplace.oven.bun-vscode
-      extensions.vscode-marketplace.vitest.explorer
+      # extensions.vscode-marketplace.vitest.explorer
 
       ## Python
       extensions.vscode-marketplace.charliermarsh.ruff
       extensions.vscode-marketplace.ms-python.mypy-type-checker
-      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
+      # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
       extensions.vscode-marketplace.ms-python.debugpy
       extensions.vscode-marketplace.ms-python.python
       # (resetLicense extensions.vscode-marketplace.ms-python.vscode-pylance)
@@ -91,15 +91,16 @@
       ## Git
       (allowUnfreeExtension extensions.vscode-marketplace.mhutchie.git-graph)
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
+      # extensions.vscode-marketplace.github.vscode-github-actions
 
-      ## PlantUML
-      extensions.vscode-marketplace.jebbs.plantuml
+      # ## PlantUML
+      # extensions.vscode-marketplace.jebbs.plantuml
 
-      ## AutoHotkey
-      extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
+      # ## AutoHotkey
+      # extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
 
-      ## EdgeDB
-      extensions.vscode-marketplace.magicstack.edgedb
+      # ## EdgeDB
+      # extensions.vscode-marketplace.magicstack.edgedb
 
       # ## Haskell
       # extensions.vscode-marketplace.haskell.haskell
@@ -124,8 +125,8 @@
       # TOML
       extensions.vscode-marketplace.tamasfe.even-better-toml
 
-      # MoonScript
-      extensions.vscode-marketplace.vgalaktionov.moonscript
+      # # MoonScript
+      # extensions.vscode-marketplace.vgalaktionov.moonscript
     ];
   };
 in {
