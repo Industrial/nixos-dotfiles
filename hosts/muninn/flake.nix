@@ -243,6 +243,7 @@
           ../../features/performance/environment
           ../../features/performance/hardware
           ../../features/performance/filesystems
+          ../../features/performance/memory
           ../../features/nixos/sound
           ../../features/nixos/users
           ../../features/nixos/window-manager
