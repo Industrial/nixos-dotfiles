@@ -274,5 +274,10 @@
   "[github-actions-workflow]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
   },
-  "git.openRepositoryInParentFolders": "always"
+  "git.openRepositoryInParentFolders": "always",
+  "yaml.schemas": {
+    "file:///nix/store/vw7702fxddfxfbhcic0a92q2zwxqgn7c-vscode-extensions/share/vscode/extensions/continue.continue/config-yaml-schema.json": [
+      ".continue/**/*.yaml"
+    ]
+  }
 }
