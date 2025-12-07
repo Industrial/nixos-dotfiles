@@ -51,6 +51,7 @@
       '';
     };
   };
+
   environment = {
     etc = {
       "xdg/hypr/hyprland.conf" = {
