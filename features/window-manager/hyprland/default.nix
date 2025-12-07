@@ -2,11 +2,6 @@
 # Integrates with NetworkManager, Bluetooth, and other GNOME services
 # TODO: Integrate these plugins/functionalities:
 # - https://github.com/raybbian/hyprtasking
-# - https://github.com/hyprwm/hyprpaper
-# - https://github.com/hyprwm/hyprcursor
-# - https://github.com/hyprwm/hyprsunset
-# - https://quickshell.org
-# - https://aylur.github.io/ags
 {
   pkgs,
   lib,
@@ -44,16 +39,17 @@
           ln -sfn /etc/xdg/hypr/hyprland.conf /home/${settings.username}/.config/hypr/hyprland.conf
         fi
 
-        mkdir -p /home/${settings.username}/.config/hyprpanel
-        chown -R ${settings.username}:users /home/${settings.username}/.config/hyprpanel
-        if [ ! -f /home/${settings.username}/.config/hyprpanel/config.json ]; then
-          ln -sfn /etc/xdg/hyprpanel/config.json /home/${settings.username}/.config/hyprpanel/config.json
-          chown ${settings.username}:users /home/${settings.username}/.config/hyprpanel/config.json
-        fi
-
         mkdir -p /home/${settings.username}/.config/hypr
         if [ ! -f /home/${settings.username}/.config/hypr/hypridle.conf ]; then
           ln -sfn /etc/xdg/hypr/hypridle.conf /home/${settings.username}/.config/hypr/hypridle.conf
+        fi
+
+        if [ ! -f /home/${settings.username}/.config/hypr/hyprpaper.conf ]; then
+          ln -sfn /etc/xdg/hypr/hyprpaper.conf /home/${settings.username}/.config/hypr/hyprpaper.conf
+        fi
+
+        if [ ! -f /home/${settings.username}/.config/hypr/hyprsunset.conf ]; then
+          ln -sfn /etc/xdg/hypr/hyprsunset.conf /home/${settings.username}/.config/hypr/hyprsunset.conf
         fi
       '';
     };
@@ -65,12 +61,20 @@
         source = ./hyprland.conf;
         mode = "0644";
       };
-      "xdg/hyprpanel/config.json" = {
-        source = ./hyprpanel.json;
-        mode = "0644";
-      };
       "xdg/hypr/hypridle.conf" = {
         source = ./hypridle.conf;
+        mode = "0644";
+      };
+      "xdg/hypr/hyprpaper.conf" = {
+        source = ./hyprpaper.conf;
+        mode = "0644";
+      };
+      "xdg/hypr/hyprsunset.conf" = {
+        source = ./hyprsunset.conf;
+        mode = "0644";
+      };
+      "xdg/ashell/config.toml" = {
+        source = ./ashell.toml;
         mode = "0644";
       };
     };
@@ -89,8 +93,14 @@
       hyprlock
       # Idle screen
       hypridle
-      # HyprPanel
-      hyprpanel
+      # Wallpaper manager
+      hyprpaper
+      # Cursor theme manager
+      hyprcursor
+      # Blue-light filter / Night light
+      hyprsunset
+      # Bar
+      ashell
       # Application launcher
       wofi
       # Notification daemon
@@ -113,6 +123,7 @@
       # System utilities
       brightnessctl # Screen brightness control
       wireplumber # Audio system (usually handled by systemd)
+      playerctl # Media player control
 
       # File manager
       nautilus
