@@ -2,7 +2,7 @@
 # Prevents system freezes from memory exhaustion by:
 # - Enabling systemd-oomd for proactive memory management
 # - Configuring kernel OOM killer for faster, predictable behavior
-# - Setting memory overcommit policies to prevent allocation beyond available memory
+# - Setting memory overcommit to allow normal operation
 {...}: {
   systemd = {
     oomd = {
@@ -16,6 +16,15 @@
 
       # Enable user services for proactive memory management
       enableUserServices = true;
+
+      # Configure memory pressure thresholds (only kill at 90%+ memory usage)
+      # Default is too aggressive (~60-70%), so we raise it to 90%
+      # This prevents killing processes during normal operation
+      extraConfig = ''
+        [OOM]
+        DefaultMemoryPressureDurationSec=10s
+        DefaultMemoryPressureLimit=90%
+      '';
     };
   };
 
@@ -25,11 +34,9 @@
         # Kill the allocating task instead of searching for best candidate
         "vm.oom_kill_allocating_task" = 1;
 
-        # Don't overcommit memory (safer, prevents allocation beyond available)
-        "vm.overcommit_memory" = 2;
-
-        # Only allow 50% overcommit when overcommit is enabled
-        "vm.overcommit_ratio" = 50;
+        # Allow overcommit (default behavior) - this is necessary for normal operation
+        # Setting to 2 (no overcommit) causes legitimate processes to fail
+        "vm.overcommit_memory" = 0;
 
         # Don't panic on OOM, just kill processes
         "vm.panic_on_oom" = 0;
