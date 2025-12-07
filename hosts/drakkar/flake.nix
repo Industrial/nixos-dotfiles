@@ -271,7 +271,7 @@
           ../../features/security/keepassxc
           # ../../features/security/kernel
           ../../features/security/pam
-          ../../features/security/tailscale
+          # ../../features/security/tailscale
           ../../features/security/veracrypt
           ../../features/security/yubikey
 
