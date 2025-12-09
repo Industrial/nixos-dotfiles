@@ -14,17 +14,18 @@
       # Enable user slices for proactive memory management
       enableUserSlices = true;
 
-      # Enable user services for proactive memory management
-      enableUserServices = true;
+      # Note: enableUserServices was renamed to enableUserSlices in newer NixOS
+      # Both are enabled via enableUserSlices above
 
       # Configure memory pressure thresholds (only kill at 90%+ memory usage)
       # Default is too aggressive (~60-70%), so we raise it to 90%
       # This prevents killing processes during normal operation
-      extraConfig = ''
-        [OOM]
-        DefaultMemoryPressureDurationSec=10s
-        DefaultMemoryPressureLimit=90%
-      '';
+      settings = {
+        OOM = {
+          DefaultMemoryPressureDurationSec = "2s";
+          DefaultMemoryPressureLimit = "90%";
+        };
+      };
     };
   };
 
