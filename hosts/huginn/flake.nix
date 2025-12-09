@@ -108,181 +108,75 @@
           inherit inputs settings;
         };
         modules = [
-          # System Configuration
+          # System Configuration (host-specific)
+          # Note: Disko is commented out for this host
           # inputs.disko.nixosModules.disko
           # ./disko.nix
           ./filesystems.nix
           ./hardware.nix
 
-          # AI Tools
+          # Profiles
+          ../../profiles/base.nix
+          ../../profiles/development.nix
+          ../../profiles/desktop.nix
+          ../../profiles/gaming.nix
+          ../../profiles/communication.nix
+          ../../profiles/crypto.nix
+          ../../profiles/learning.nix
+
+          # Host-specific additions
+          ../../features/nixos/graphics/amd.nix
+          ../../features/hardware/zsa-voyager
+
+          # AI Tools (commented for future use)
           # ../../features/ai/n8n
           # ../../features/ai/ollama
           # ../../features/ai/opencode
 
-          # CI/CD Tools
-          inputs.comin.nixosModules.comin
-          ../../features/ci/comin
-
-          # CLI Tools
-          ../../features/cli/bandwhich
-          ../../features/cli/bat
-          ../../features/cli/bluetuith
-          ../../features/cli/broot
-          ../../features/cli/btop
-          ../../features/cli/nvtop
-          ../../features/cli/c
-          ../../features/cli/calcurse
-          ../../features/cli/cheatsheet
-          ../../features/cli/cl
-          ../../features/cli/create-ssh-key
-          ../../features/cli/direnv
-          ../../features/cli/du
-          ../../features/cli/dust
-          ../../features/cli/dysk
-          ../../features/cli/eza
-          ../../features/cli/fastfetch
-          ../../features/cli/fd
-          ../../features/cli/fish
-          ../../features/cli/fzf
-          ../../features/cli/g
-          ../../features/cli/gpg
-          ../../features/cli/gping
-          ../../features/cli/gix
-          ../../features/cli/jq
-          ../../features/cli/killall
-          ../../features/cli/l
-          ../../features/cli/lazygit
-          ../../features/cli/ll
-          ../../features/cli/lnav
-          ../../features/cli/lsusb
-          ../../features/cli/nix-tree
-          ../../features/cli/p
-          ../../features/cli/p7zip
-          ../../features/cli/procs
-          ../../features/cli/ranger
-          ../../features/cli/ripgrep
-          ../../features/cli/spotify-player
-          ../../features/cli/starship
-          ../../features/cli/unrar
-          ../../features/cli/unzip
-          ../../features/cli/zellij
-
-          # Creative and Design Tools
+          # Creative and Design Tools (commented - not used on this host)
           # ../../features/creative/gimp
           # ../../features/creative/inkscape
           # ../../features/creative/blender
           # ../../features/creative/kdenlive
 
-          # Communication
-          ../../features/communication/discord
-          ../../features/communication/fractal
-          ../../features/communication/signal-desktop
-          ../../features/communication/teams
-          ../../features/communication/telegram
-          ../../features/communication/weechat
-
-          # Crypto
-          ../../features/crypto/bisq
-          ../../features/crypto/monero
-
-          # Games
-          ../../features/games/lutris
-          ../../features/games/path-of-building
-          ../../features/games/wowup
-
-          # Learning and Documentation
-          ../../features/learning/zotero
-          ../../features/learning/anki
-
-          ../../features/media/calibre
+          # Media (commented for future use)
           # ../../features/media/invidious
           # ../../features/media/jellyfin
           # ../../features/media/lidarr
           # ../../features/media/prowlarr
-          ../../features/media/qbittorrent
           # ../../features/media/radarr
           # ../../features/media/readarr
           # ../../features/media/sonarr
-          ../../features/media/spotify
-          ../../features/media/vlc
           # ../../features/media/whisparr
 
-          # Mobile and IoT Development
+          # Mobile and IoT Development (commented for future use)
           # ../../features/mobile/android-studio
 
-          # Monitoring
+          # Monitoring (commented for future use)
           #../../features/monitoring/grafana
           #../../features/monitoring/homepage-dashboard
           # ../../features/monitoring/prometheus
           # ../../features/monitoring/uptime-kuma
 
-          # Net
-          ../../features/network/chromium
+          # Network (commented for future use)
           #../../features/network/searx
           #../../features/network/ssh
-          ../../features/network/firefox
           # ../../features/network/qute
           # ../../features/network/ladybird
           # ../../features/network/syncthing
 
-          # NixOS
-          ../../features/nixos
-          ../../features/nixos/bluetooth
-          ../../features/nixos/boot
-          ../../features/nixos/docker
-          ../../features/nixos/fonts
-          ../../features/nixos/graphics
-          ../../features/nixos/graphics/amd.nix
-          ../../features/nixos/networking
-          ../../features/nixos/networking/dns.nix
-          ../../features/nixos/networking/firewall.nix
-          ../../features/nixos/security/no-defaults
-          ../../features/nixos/security/sudo
-          ../../features/nixos/boot
-          ../../features/nixos/systemd
-          ../../features/performance/environment
-          ../../features/performance/hardware
-          ../../features/performance/filesystems
-          ../../features/performance/memory
-          ../../features/nixos/sound
-          ../../features/nixos/users
-          ../../features/nixos/window-manager
-
-          # Office
+          # Office (commented for future use)
           # ../../features/office/obsidian
 
-          # Programming
-          ../../features/programming/bun
-          ../../features/programming/cursor
-          ../../features/programming/devenv
-          ../../features/programming/docker-compose
-          ../../features/programming/git
-          ../../features/programming/gitkraken
-          ../../features/programming/glogg
-          ../../features/programming/insomnia
-          ../../features/programming/meld
-          ../../features/programming/neovim
-          ../../features/programming/node
-          ../../features/programming/python
+          # Programming (commented for future use)
           # ../../features/programming/vscode
           # ../../features/programming/terraform
 
-          # Security
-          ../../features/security/apparmor
-          ../../features/security/keepassxc
+          # Security (commented for future use)
           # ../../features/security/kernel
-          ../../features/security/pam
           # ../../features/security/tailscale
-          ../../features/security/veracrypt
-          ../../features/security/yubikey
 
-          # Hardware
-          ../../features/hardware/zsa-voyager
-
-          # Disks
-          ../../features/storage/qdirstat
-
-          # Virtual Machine
+          # Virtual Machine (commented for future use)
           #../../features/virtual-machine/base
           #../../features/virtual-machine/kubernetes/k3s
           #../../features/virtual-machine/kubernetes/master
@@ -294,18 +188,10 @@
           #../../features/virtual-machine/ssh
           #../../features/virtual-machine/virtualbox
 
-          # Window Manager
-          ../../features/window-manager/alacritty
-          ../../features/window-manager/kitty
+          # Window Manager (commented for future use)
           #../../features/window-manager/ghostty
-          ../../features/window-manager/gnome
-          ../../features/window-manager/hyprland
           #../../features/window-manager/slock
-          inputs.stylix.nixosModules.stylix
-          ../../features/window-manager/stylix
-          ../../features/window-manager/xclip
           # ../../features/window-manager/xfce
-          ../../features/window-manager/xsel
         ];
       };
     };
