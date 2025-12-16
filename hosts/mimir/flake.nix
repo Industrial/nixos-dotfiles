@@ -116,8 +116,9 @@
 
           # Profiles (minimal setup: base + development + desktop only)
           ../../profiles/base.nix
-          ../../profiles/development.nix
+          ../../profiles/communication.nix
           ../../profiles/desktop.nix
+          ../../profiles/development.nix
 
           # Host-specific additions
           ../../features/nixos/graphics/amd.nix
