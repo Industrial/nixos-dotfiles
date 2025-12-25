@@ -11,8 +11,8 @@
   imports = [
     ./base.nix
 
-    # Learning and Documentation
-    ../features/learning/zotero
     ../features/learning/anki
+    ../features/learning/foliate
+    ../features/learning/zotero
   ];
 }

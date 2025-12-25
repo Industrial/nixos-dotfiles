@@ -5,7 +5,9 @@
   lib,
   config,
   ...
-}: {
+}: let
+  wallpaper = "file:///home/tom/.local/share/backgrounds/2024-08-18-19-15-47-wallhaven-p9oe19.jpg";
+in {
   # Advanced GNOME Configuration via dconf
   programs.dconf.profiles.user.databases = [
     {
@@ -137,8 +139,8 @@
         "org/gnome/desktop/background" = {
           color-shading-type = "solid";
           picture-options = "zoom";
-          picture-uri = "file:///home/tom/.local/share/backgrounds/2024-08-18-19-15-47-wallhaven-m9yymk.jpg";
-          picture-uri-dark = "file:///home/tom/.local/share/backgrounds/2024-08-18-19-15-47-wallhaven-m9yymk.jpg";
+          picture-uri = wallpaper;
+          picture-uri-dark = wallpaper;
           primary-color = "#2E3440";
           secondary-color = "#3B4252";
         };
@@ -171,7 +173,7 @@
           color-shading-type = "solid";
           lock-enabled = true;
           picture-options = "zoom";
-          picture-uri = "file:///home/tom/.local/share/backgrounds/2024-08-18-19-15-47-wallhaven-m9yymk.jpg";
+          picture-uri = wallpaper;
           primary-color = "#2E3440";
           secondary-color = "#3B4252";
         };

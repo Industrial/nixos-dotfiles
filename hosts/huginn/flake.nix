@@ -119,14 +119,14 @@
           ../../profiles/base.nix
           ../../profiles/development.nix
           ../../profiles/desktop.nix
-          ../../profiles/gaming.nix
+          #../../profiles/gaming.nix
           ../../profiles/communication.nix
-          ../../profiles/crypto.nix
+          # ../../profiles/crypto.nix
           ../../profiles/learning.nix
 
-          # Host-specific additions
-          ../../features/nixos/graphics/amd.nix
-          ../../features/hardware/zsa-voyager
+          # # Host-specific additions
+          # ../../features/nixos/graphics/amd.nix
+          # ../../features/hardware/zsa-voyager
 
           # AI Tools (commented for future use)
           # ../../features/ai/n8n
