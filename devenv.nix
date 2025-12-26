@@ -33,6 +33,7 @@
     treefmt
     commitizen
     nodejs
+    nodePackages.npm
     slumber
     lazysql
 
@@ -54,19 +55,14 @@
       channel = "stable";
       components = ["rustfmt" "clippy" "rust-analyzer"];
     };
-  };
 
-  tasks = {
-    "chore:lint" = {
-      description = "Lint the code";
-      exec = "treefmt --config-file treefmt.toml";
-      before = [];
-    };
-
-    "ci:lint" = {
-      description = "Lint the code";
-      exec = "devenv shell treefmt --config-file treefmt.ci.toml";
-      before = [];
+    javascript = {
+      enable = true;
+      package = pkgs.nodejs;
+      bun = {
+        enable = true;
+        package = pkgs.bun;
+      };
     };
   };
 
