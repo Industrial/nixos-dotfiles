@@ -9,7 +9,9 @@ runs:
   steps:
     - name: Nix Flake Check
       shell: bash
-      run: nix flake check hosts/${{ inputs.host }}
+      working-directory: hosts/${{ inputs.host }}
+      run: nix flake check
     - name: Nix Build Dry Run
       shell: bash
-      run: nix build --dry-run hosts/${{ inputs.host }}#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel
+      working-directory: hosts/${{ inputs.host }}
+      run: nix build --dry-run .#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel
