@@ -3,9 +3,6 @@ description: 'Run treefmt format check'
 runs:
   using: 'composite'
   steps:
-    - name: Install devenv
-      shell: bash
-      run: nix profile install nixpkgs#devenv
     - name: Run lint
       shell: bash
       run: ./bin/ci/lint
