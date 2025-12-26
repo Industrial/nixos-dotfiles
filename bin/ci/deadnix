@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run deadnix to find unused Nix code in devenv shell
+# Check all host configurations for dead code
+devenv shell -- deadnix --fail hosts/*/
+

@@ -47,6 +47,7 @@
     yamlfmt
     taplo
     rustfmt
+    vulnix
   ];
 
   # https://devenv.sh/languages/

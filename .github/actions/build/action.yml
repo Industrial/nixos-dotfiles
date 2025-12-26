@@ -1,0 +1,13 @@
+name: 'Build'
+description: 'Build NixOS configuration for a host'
+inputs:
+  host:
+    description: 'Host name to build'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Build NixOS Configuration
+      shell: bash
+      working-directory: hosts/${{ inputs.host }}
+      run: nix build .#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel

@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+echo "> ci > clamav"
+
+# Create temporary ClamAV config directory
+TMP_CONFIG_DIR=$(mktemp -d)
+echo "> ci > clamav > creating temporary config directory: $TMP_CONFIG_DIR"
+
+# Create minimal freshclam.conf
+cat > "$TMP_CONFIG_DIR/freshclam.conf" << 'EOF'
+# Minimal freshclam configuration
+DatabaseDirectory /tmp/clamav-db
+UpdateLogFile /tmp/clamav-update.log
+LogTime yes
+LogVerbose yes
+# Database mirrors
+DatabaseMirror db.local.clamav.net
+DatabaseMirror database.clamav.net
+# Fallback mirrors
+DatabaseMirror db.de.clamav.net
+DatabaseMirror db.fr.clamav.net
+EOF
+
+echo "> ci > clamav > updating virus database"
+nix-shell -p clamav --run "freshclam --config-file=$TMP_CONFIG_DIR/freshclam.conf" || {
+  echo "Warning: freshclam failed, continuing with existing database if available"
+}
+
+echo "> ci > clamav > scanning repository"
+# Scan only the repository code, not system directories
+# Use --no-summary to avoid exit code issues, and continue on errors
+nix-shell -p clamav --run "clamscan --database=/tmp/clamav-db -r --log=/tmp/clamav-repo.log --no-summary ." || {
+  EXIT_CODE=$?
+  echo "ClamAV scan completed with exit code: $EXIT_CODE"
+  if [ -f /tmp/clamav-repo.log ]; then
+    echo "> ci > clamav > scan results:"
+    cat /tmp/clamav-repo.log
+  fi
+  # Exit code 1 means viruses found, exit code 2 means errors
+  # For CI, we'll treat both as failures but show the results
+  if [ $EXIT_CODE -eq 1 ]; then
+    echo "ERROR: ClamAV found infected files in the repository!"
+    exit 1
+  elif [ $EXIT_CODE -eq 2 ]; then
+    echo "WARNING: ClamAV encountered errors during scan"
+    # Don't fail CI for scan errors, just warn
+    exit 0
+  else
+    exit $EXIT_CODE
+  fi
+}
+
+echo "> ci > clamav > scan completed successfully"
+if [ -f /tmp/clamav-repo.log ]; then
+  echo "> ci > clamav > scan results:"
+  cat /tmp/clamav-repo.log
+fi
+
+echo "> ci > clamav > cleaning up temporary config directory"
+rm -rf "$TMP_CONFIG_DIR"

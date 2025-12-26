@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-echo "> security > vulnix"
-exec > >(tee ./logs/security-vulnix) 2>&1
+echo "> ci > vulnix"
 
-echo "> security > vulnix > vulnix --system"
+echo "> ci > vulnix > vulnix --system"
 # Use the vulnix feature from the dotfiles
 # This will use the proper Python environment with all dependencies
 nix-shell -E '
@@ -31,7 +30,7 @@ let
 in
 pkgs.mkShell {
   buildInputs = [ pkgs.vulnix vulnixEnv ];
-  shellHook = "export PYTHONPATH=${pkgs.vulnix}/lib/python3.13/site-packages:\$PYTHONPATH";
+  shellHook = "export PYTHONPATH=${pkgs.python3.sitePackages}:\$PYTHONPATH";
 }
 ' --run "python -c \"
 from vulnix.main import main
