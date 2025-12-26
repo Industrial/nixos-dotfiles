@@ -27,6 +27,7 @@
     # Development tools
     direnv
     git
+    gh
     jq
     nixpkgs-fmt
     pre-commit

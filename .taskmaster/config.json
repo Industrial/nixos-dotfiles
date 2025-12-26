@@ -31,7 +31,8 @@
     "responseLanguage": "English",
     "enableCodebaseAnalysis": true,
     "enableProxy": false,
-    "anonymousTelemetry": true
+    "anonymousTelemetry": true,
+    "userId": "1234567890"
   },
   "claudeCode": {},
   "codexCli": {},

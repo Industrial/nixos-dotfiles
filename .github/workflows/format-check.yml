@@ -1,0 +1,19 @@
+name: Format Check
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Install devenv
+        run: nix profile install github:cachix/devenv
+      - name: Run treefmt
+        run: devenv shell -- treefmt --config-file treefmt.ci.toml

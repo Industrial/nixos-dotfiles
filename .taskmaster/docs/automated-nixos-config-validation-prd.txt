@@ -1,0 +1,206 @@
+<context>
+# Overview
+Implement automated NixOS configuration validation using treefmt in GitHub Actions. This will ensure all configuration files are properly formatted before PRs can be merged, maintaining code quality and consistency across all hosts (drakkar, huginn, mimir, muninn, and all VM hosts). The solution will prevent improperly formatted code from being merged into the main branch, reducing manual review burden and ensuring consistent code style across the entire NixOS dotfiles repository.
+
+# Core Features
+1. **Automated Format Checking**
+   - Run treefmt validation on every pull request
+   - Use devenv to provide all required formatters (treefmt, alejandra, deadnix, actionlint, beautysh, biome, yamlfmt, taplo, rustfmt)
+   - Execute treefmt with `treefmt.ci.toml` configuration file
+   - Fail the CI check if any formatting issues are detected
+   - Validate all files in the repository (not just changed files)
+
+2. **GitHub Actions Integration**
+   - Create `.github/workflows/format-check.yml` workflow
+   - Trigger on `pull_request` events targeting the `main` branch
+   - Install Nix using `cachix/install-nix-action@v31`
+   - Install devenv via `nix profile install github:cachix/devenv`
+   - Run treefmt using `devenv shell -- treefmt --config-file treefmt.ci.toml`
+   - The workflow should be named "Format Check" for branch protection integration
+
+3. **Branch Protection**
+   - Configure `main` branch protection rules using GitHub CLI (`gh`)
+   - Require the "Format Check" workflow to pass before merging
+   - Prevent direct pushes to main (require PRs)
+   - Enable strict status checks (all must pass)
+   - Enforce protection for admins
+
+4. **Error Reporting**
+   - Workflow fails with clear error output from treefmt
+   - No additional annotations or PR comments needed
+   - Simple pass/fail status check
+
+# User Experience
+- **Developer Workflow**: Developers create PRs as normal. If formatting is incorrect, the PR shows a failed check. Developer fixes formatting locally and pushes again.
+- **Maintainer Workflow**: No manual formatting checks needed. All PRs must pass formatting before merge.
+- **CI/CD Integration**: Seamless integration with existing GitHub Actions workflows. No interference with other automation.
+</context>
+<PRD>
+# Technical Architecture
+
+## Components
+
+1. **GitHub Actions Workflow** (`.github/workflows/format-check.yml`)
+   - Single job named `format-check`
+   - Runs on `ubuntu-latest` runner
+   - Steps:
+     - Checkout repository code
+     - Install Nix using `cachix/install-nix-action@v31` with `nixpkgs=channel:nixos-unstable`
+     - Install devenv: `nix profile install github:cachix/devenv`
+     - Run treefmt: `devenv shell -- treefmt --config-file treefmt.ci.toml`
+   - Workflow name: "Format Check"
+
+2. **Treefmt Configuration** (already exists: `treefmt.ci.toml`)
+   - Configured with `fail-on-change = true` for CI mode
+   - Uses `walk = "git"` to only format tracked files
+   - Includes formatters: deadnix, alejandra, actionlint, beautysh, biome, yamlfmt, taplo, rustfmt
+   - All formatters are available in `devenv.nix` packages
+
+3. **Devenv Environment** (already exists: `devenv.nix`)
+   - Provides all required formatters as packages
+   - No modifications needed
+
+4. **Branch Protection** (configured via GitHub CLI)
+   - Use `gh api` command to set branch protection rules
+   - Repository owner/name determined at runtime
+   - Commands to execute:
+     ```bash
+     gh api repos/:owner/:repo/branches/main/protection \
+       --method PUT \
+       -f required_status_checks='{"strict":true,"contexts":["Format Check"]}' \
+       -f enforce_admins=true \
+       -f required_pull_request_reviews=null \
+       -f restrictions=null
+     ```
+
+## Data Flow
+
+1. Developer creates/updates PR
+2. GitHub Actions triggers "Format Check" workflow
+3. Workflow installs Nix and devenv
+4. Workflow runs treefmt with CI config
+5. Treefmt checks all files against formatting rules
+6. If formatting issues found: workflow fails, PR merge blocked
+7. If no issues: workflow passes, PR can be merged
+
+# Development Roadmap
+
+## Phase 1: GitHub Actions Workflow Setup
+- Create `.github/workflows/format-check.yml` file
+- Configure workflow to trigger on pull requests
+- Set up Nix installation step
+- Set up devenv installation step
+- Configure treefmt execution step
+- Test workflow locally or on test branch
+
+## Phase 2: Branch Protection Configuration
+- Authenticate GitHub CLI (`gh auth`)
+- Determine repository owner/name
+- Execute `gh api` command to set branch protection rules
+- Verify branch protection is active
+- Test that direct pushes to main are blocked
+
+## Phase 3: Verification and Testing
+- Create test PR with intentionally bad formatting
+- Verify workflow fails as expected
+- Fix formatting issues
+- Verify workflow passes
+- Verify PR merge is blocked until workflow passes
+- Test with properly formatted PR to ensure it passes
+
+# Logical Dependency Chain
+
+1. **Foundation**: GitHub Actions workflow must be created first
+   - This is the core functionality
+   - Must work before branch protection is meaningful
+
+2. **Integration**: Branch protection setup
+   - Depends on workflow existing and working
+   - Requires workflow to have run at least once to appear in status checks
+
+3. **Validation**: Testing and verification
+   - Can only be done after both workflow and branch protection are set up
+   - Ensures the complete system works end-to-end
+
+# Risks and Mitigations
+
+## Technical Challenges
+
+1. **Devenv Installation Time**
+   - Risk: Installing devenv in CI may add significant time to workflow runs
+   - Mitigation: Acceptable for now. Future enhancement: add caching for devenv/nix store
+
+2. **Formatter Availability**
+   - Risk: Formatters might not be available in devenv environment
+   - Mitigation: Already verified - all formatters are in `devenv.nix` packages list
+
+3. **GitHub CLI Authentication**
+   - Risk: `gh` CLI might not be authenticated when running branch protection commands
+   - Mitigation: Ensure `gh auth login` is run before executing protection commands
+
+4. **Repository Permissions**
+   - Risk: User might not have permissions to set branch protection rules
+   - Mitigation: Verify repository admin access before attempting configuration
+
+## MVP Scope
+
+The MVP focuses on:
+- Basic format checking workflow
+- Branch protection requiring the workflow
+- Simple pass/fail status
+
+Future enhancements (out of scope for MVP):
+- Nix evaluation checks (`nix flake check`)
+- Dry-run builds for all hosts
+- Caching for devenv/nix store
+- Matrix strategy to validate each host separately
+- PR comments with formatting suggestions
+
+# Appendix
+
+## Existing Configuration Files
+
+- `treefmt.ci.toml`: Already configured with `fail-on-change = true` and all formatters
+- `devenv.nix`: Already includes all required formatter packages
+- No modifications needed to existing configuration
+
+## GitHub Actions Workflow Example
+
+```yaml
+name: Format Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      
+      - name: Install devenv
+        run: nix profile install github:cachix/devenv
+      
+      - name: Run treefmt
+        run: devenv shell -- treefmt --config-file treefmt.ci.toml
+```
+
+## Branch Protection Command
+
+```bash
+gh api repos/:owner/:repo/branches/main/protection \
+  --method PUT \
+  -f required_status_checks='{"strict":true,"contexts":["Format Check"]}' \
+  -f enforce_admins=true \
+  -f required_pull_request_reviews=null \
+  -f restrictions=null
+```
+
+Note: Replace `:owner/:repo` with actual repository owner and name at runtime.
+</PRD>
+
