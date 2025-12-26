@@ -26,6 +26,6 @@ jobs:
       - name: Setup Nix and Cachix
         uses: ./.github/actions/setup-nix.yml
       - name: Check
-        uses: ./.github/actions/check.yml
+        uses: ./.github/actions/check
         with:
           host: ${{ matrix.host }}
