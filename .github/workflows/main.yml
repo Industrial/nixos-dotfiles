@@ -13,6 +13,26 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Format Check
         uses: ./.github/actions/format
+  security:
+    runs-on: ubuntu-latest
+    needs: format
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      - name: Security Scan
+        uses: ./.github/actions/vulnix
+  deadnix:
+    runs-on: ubuntu-latest
+    needs: format
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      - name: Dead Code Detection
+        uses: ./.github/actions/deadnix
   check:
     runs-on: ubuntu-latest
     needs: format
@@ -27,5 +47,21 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Check
         uses: ./.github/actions/check
+        with:
+          host: ${{ matrix.host }}
+  build:
+    runs-on: ubuntu-latest
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [drakkar, huginn, mimir]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      - name: Build
+        uses: ./.github/actions/build
         with:
           host: ${{ matrix.host }}

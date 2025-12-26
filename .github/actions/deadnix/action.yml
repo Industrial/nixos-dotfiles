@@ -1,0 +1,9 @@
+name: 'Dead Code Detection'
+description: 'Run deadnix to detect unused Nix code'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run dead code detection
+      shell: bash
+      run: ./bin/ci/deadnix
+

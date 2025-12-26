@@ -1,0 +1,9 @@
+name: 'Security Scan'
+description: 'Run vulnix security scan on host configurations'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run security scan
+      shell: bash
+      run: ./bin/ci/vulnix
+

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run vulnix security scan in devenv shell
+# Scan all host configurations for vulnerabilities
+devenv shell -- vulnix --system x86_64-linux hosts/*/
+
