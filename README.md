@@ -1,9 +1,22 @@
 # NixOS Dotfiles
 
+[![CI - PR](https://github.com/Industrial/nixos-dotfiles/actions/workflows/pr.yml/badge.svg)](https://github.com/Industrial/nixos-dotfiles/actions/workflows/pr.yml)
+[![CI - Main](https://github.com/Industrial/nixos-dotfiles/actions/workflows/main.yml/badge.svg)](https://github.com/Industrial/nixos-dotfiles/actions/workflows/main.yml)
+
 My NixOS configuration. I have separated out all software into features and
 avoided [HomeManager](https://github.com/nix-community/home-manager) to make it
 more portable. The caveat is that you have to configure everything manually but
 hey it's nix so that's pretty easy!
+
+## Hosts
+
+This repository manages the following NixOS hosts:
+
+- **drakkar** - Desktop workstation
+- **huginn** - Tablet ([StarLite 5](https://us.starlabs.systems/products/starlite))
+- **mimir** - Server
+
+Each host has its own flake configuration in the `hosts/` directory.
 
 ## Installation
 
@@ -11,50 +24,115 @@ hey it's nix so that's pretty easy!
 git clone git@github.com:Industrial/nixos-dotfiles.git ~/.dotfiles
 ```
 
+For detailed installation instructions for specific hosts, see the `hosts/<hostname>/INSTALL.md` file (if available).
+
 ## Update
 
+Update the current host system:
+
 ```bash
-bin/update/host/<n>
+bin/update/host
 ```
 
-## Clean
+This will:
+- Update the system using `nixos-rebuild switch`
+- Update the login shell
+- Link necessary files for certain features
 
-If you hit the limit of derivations or you are just very happy with what you've
-got:
+Other update commands:
+
+- `bin/update/system` - Update system only
+- `bin/update/flake` - Update flake lock files
+- `bin/update/channels` - Update NixOS channels
+- `bin/update/nix-env` - Update nix-env packages
+- `bin/update/repositories` - Update git repositories
+- `bin/update/login-shell` - Update login shell only
+
+## System Management
+
+### Generations
+
+List, rollback, or delete system generations:
 
 ```bash
-bin/delete-generations
+bin/generations/list      # List all system generations
+bin/generations/rollback  # Rollback to previous generation
+bin/generations/delete    # Delete old generations (keeps last 2)
+```
+
+### Cleanup
+
+Collect garbage to free up disk space:
+
+```bash
+bin/delete/collectgarbage
 ```
 
 ## Development
 
-```bash
-format
-bin/test
-commit
-```
+This repository uses [devenv.sh](https://devenv.sh/) for development environment management. Devenv provides a consistent development environment with all necessary tools and dependencies configured through Nix.
 
-## Automated Flake Updates
+### Getting Started
 
-The repository includes an automated GitHub Actions workflow that keeps all host flake lock files up-to-date. It runs weekly and creates pull requests with dependency updates. 
-
-See [Flake Update Automation](docs/flake-update-automation.md) for details.
-
-## Virtual Machines
-
-I have an ongoing project to use
-[MicroVM](https://astro.github.io/microvm.nix/intro.html) to run containerized
-services in virtual machines (rather then say, docker containers or bare metal)
-in order to provide a secure environment for the processes to run and to expose
-them to the internet. The plan is to create a setup that works a bit like
-QubesOS and have one VM run Tor and to run all network traffic of other VM's
-through this one.
-
-### Update VM
+Enter the devenv shell:
 
 ```bash
-bin/vm/update <n>
-bin/vm/stop <n>
-bin/vm/delete <n>
-bin/vm/start <n>
+devenv shell
 ```
+
+This will activate the development environment with all necessary tools and dependencies.
+
+The devenv environment includes:
+- Nix development tools (nix-unit, namaka, nixt)
+- Rust toolchain (rustc, cargo, rustfmt, clippy, rust-analyzer)
+- Formatting tools (treefmt, alejandra, deadnix, biome, etc.)
+- Security scanning tools (clamav, lynis, vulnix)
+- And more...
+
+For more information about devenv, see the [devenv.sh documentation](https://devenv.sh/).
+
+### Development Workflow
+
+1. Make your changes
+2. Format code (if needed):
+   ```bash
+   treefmt
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m "your message"
+   ```
+
+The CI pipeline will automatically check formatting, run security scans, and validate configurations for all hosts.
+
+## Project Structure
+
+```
+.
+├── bin/              # Utility scripts
+├── common/           # Common NixOS configuration
+├── config/           # Configuration files
+├── features/         # Feature modules (organized by category)
+├── hosts/            # Host-specific configurations
+│   ├── drakkar/      # Desktop workstation
+│   ├── huginn/       # Server
+│   └── mimir/        # Server
+├── profiles/         # User profiles
+└── devenv.nix        # Development environment configuration
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Ensure all CI checks pass
+5. Commit your changes (`git commit -m 'Add some amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+## License
+
+This project is released into the public domain. See [LICENSE](LICENSE) for details.
