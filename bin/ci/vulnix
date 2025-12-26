@@ -30,7 +30,7 @@ let
 in
 pkgs.mkShell {
   buildInputs = [ pkgs.vulnix vulnixEnv ];
-  shellHook = "export PYTHONPATH=${pkgs.vulnix}/lib/python3.13/site-packages:\$PYTHONPATH";
+  shellHook = "export PYTHONPATH=${pkgs.python3.sitePackages}:\$PYTHONPATH";
 }
 ' --run "python -c \"
 from vulnix.main import main
