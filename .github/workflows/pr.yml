@@ -13,7 +13,7 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Format Check
         uses: ./.github/actions/format
-  security:
+  vulnix:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -22,8 +22,22 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Vulnix Scan
         uses: ./.github/actions/vulnix
+  clamav:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
       - name: ClamAV Scan
         uses: ./.github/actions/clamav
+  lynis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
       - name: Lynis Scan
         uses: ./.github/actions/lynis
   deadnix:
