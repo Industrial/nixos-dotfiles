@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Run treefmt in devenv shell with CI configuration
+devenv shell -- treefmt \
+  --config-file treefmt.ci.toml
+
