@@ -1,0 +1,8 @@
+name: 'ClamAV Scan'
+description: 'Run ClamAV antivirus scan'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run ClamAV scan
+      shell: bash
+      run: ./bin/ci/clamav

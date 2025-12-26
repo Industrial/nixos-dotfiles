@@ -1,0 +1,8 @@
+name: 'Lynis Scan'
+description: 'Run Lynis security audit'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Lynis scan
+      shell: bash
+      run: ./bin/ci/lynix

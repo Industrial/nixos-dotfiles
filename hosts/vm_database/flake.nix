@@ -16,7 +16,7 @@
     };
   };
 
-  outputs = inputs @ {self, ...}: {
+  outputs = inputs @ {...}: {
     nixosConfigurations = let
       hostname = "vm_database";
       settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
