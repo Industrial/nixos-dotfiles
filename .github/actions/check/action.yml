@@ -1,0 +1,17 @@
+name: 'Check'
+description: 'Run nix flake check and build dry-run for a host'
+inputs:
+  host:
+    description: 'Host name to check'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Nix Flake Check
+      shell: bash
+      working-directory: hosts/${{ inputs.host }}
+      run: nix flake check
+    - name: Nix Build Dry Run
+      shell: bash
+      working-directory: hosts/${{ inputs.host }}
+      run: nix build --dry-run .#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel

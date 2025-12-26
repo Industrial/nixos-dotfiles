@@ -1,0 +1,8 @@
+name: 'Format Check'
+description: 'Run treefmt format check'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run lint
+      shell: bash
+      run: ./bin/ci/lint
