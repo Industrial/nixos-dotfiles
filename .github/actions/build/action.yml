@@ -11,4 +11,3 @@ runs:
       shell: bash
       working-directory: hosts/${{ inputs.host }}
       run: nix build .#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel
-

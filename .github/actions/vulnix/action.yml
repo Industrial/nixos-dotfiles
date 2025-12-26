@@ -6,4 +6,3 @@ runs:
     - name: Run security scan
       shell: bash
       run: ./bin/ci/vulnix
-
