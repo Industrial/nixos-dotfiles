@@ -1,0 +1,17 @@
+---
+description: Use Serena MCP Server for all coding tasks
+globs: "**/*"
+alwaysApply: true
+priority: critical
+---
+
+**MANDATORY:** Use Serena MCP Server tools for ALL coding operations
+
+**Use Serena for:**
+- Code analysis and symbol finding
+- Refactoring and code restructuring
+- Understanding code structure and dependencies
+- Finding symbol references
+- Code navigation
+
+**Prefer Serena tools over basic file operations when available.**
