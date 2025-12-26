@@ -1,0 +1,44 @@
+---
+description: Run all command line commands in a devenv shell to ensure proper environment and dependencies.
+globs: "**/*"
+alwaysApply: true
+---
+
+- **Always use devenv shell for commands**
+  - All terminal commands executed by Cursor should be run within a `devenv shell` environment
+  - This ensures all development tools, dependencies, and environment variables from [devenv.nix](mdc:devenv.nix) are available
+  - The devenv environment includes: Nix tools, Rust toolchain, formatting tools, security scanners, and more
+
+- **Command Execution Pattern**
+  - Wrap commands with `devenv shell -- <command>` or use `devenv shell` interactively
+  - For single commands: `devenv shell -- <your-command>`
+  - For multiple commands: `devenv shell` then run commands in that shell
+  - For scripts: `devenv shell -- bash -c "<script-content>"`
+
+- **Examples**
+
+  ✅ DO: Run commands in devenv shell
+  ```bash
+  devenv shell -- treefmt
+  devenv shell -- nix flake check
+  devenv shell -- cargo build
+  devenv shell -- git commit -m "message"
+  ```
+
+  ❌ DON'T: Run commands directly without devenv
+  ```bash
+  treefmt  # Missing devenv environment
+  nix flake check  # May not have all tools
+  cargo build  # Rust toolchain may not be available
+  ```
+
+- **When to Use**
+  - All development commands (formatting, building, testing)
+  - All git operations that might use hooks (commit, etc.)
+  - All Nix-related commands
+  - All Rust/Cargo commands
+  - Any command that needs tools from the devenv environment
+
+- **Exception**
+  - Commands that explicitly need to run outside devenv (rare)
+  - System-level operations that don't require development tools
