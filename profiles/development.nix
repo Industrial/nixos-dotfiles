@@ -12,6 +12,9 @@
     ./base.nix
 
     # Programming Tools
+    # ../features/programming/neovim
+    # ../features/programming/terraform
+    # ../features/programming/vscode
     ../features/programming/bun
     ../features/programming/cursor
     ../features/programming/devenv
@@ -21,10 +24,7 @@
     ../features/programming/glogg
     ../features/programming/insomnia
     ../features/programming/meld
-    ../features/programming/neovim
     ../features/programming/node
     ../features/programming/python
-    # ../features/programming/vscode
-    # ../features/programming/terraform
   ];
 }
