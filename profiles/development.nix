@@ -25,6 +25,7 @@
     ../features/programming/insomnia
     ../features/programming/meld
     ../features/programming/node
+    ../features/programming/pgadmin
     ../features/programming/python
   ];
 }
