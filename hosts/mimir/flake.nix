@@ -115,6 +115,8 @@
           ./hardware.nix
 
           ../../features/ai/opencode
+          ../../features/ai/claude-code
+          ../../features/ai/gemini-cli
 
           # Profiles (minimal setup: base + development + desktop only)
           ../../profiles/base.nix
