@@ -279,5 +279,7 @@
     "file:///nix/store/vw7702fxddfxfbhcic0a92q2zwxqgn7c-vscode-extensions/share/vscode/extensions/continue.continue/config-yaml-schema.json": [
       ".continue/**/*.yaml"
     ]
-  }
+  },
+  "explorer.autoReveal": true,
+  "lldb-dap.executable-path": "/nix/store/q3p69a1jdli1rszys53krr43gl1q9fcj-lldb-21.1.2/bin/lldb"
 }

@@ -24,7 +24,10 @@
         };
     });
 
-  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.99.3";
+  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.105.1";
+  # Use an older VSCode version for vscode-lldb to get compatible version (1.11.8)
+  # Version 1.11.8 of vscode-lldb requires an older VSCode version filter
+  extensionsForLldb = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.75.0";
 
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = pkgs.code-cursor;
@@ -36,6 +39,7 @@
       extensions.vscode-marketplace.vscodevim.vim
 
       # Visual Feedback
+      extensions.vscode-marketplace.randomfractalsinc.vscode-data-preview
       extensions.vscode-marketplace.usernamehw.errorlens
       extensions.vscode-marketplace.vspacecode.whichkey
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
@@ -133,7 +137,7 @@ in {
   environment = {
     systemPackages = with pkgs; [
       cursorWithExtensions
-      # cursor-cli
+      cursor-cli
 
       # TypeScript
       biome
