@@ -8,7 +8,11 @@
     systemPackages = with pkgs; [
       ollama
       ollama-cuda
+      aider-chat
     ];
+    sessionVariables = {
+      OLLAMA_API_BASE = "http://localhost:11434";
+    };
   };
   services = {
     ollama = {
@@ -18,9 +22,8 @@
       # acceleration = "rocm";
       loadModels = [
         "llama3.3:70b"
-        "deepseek-r1:70b"
         "qwen-2.5:70b"
-        "qwen-coder:30b"
+        "qwen2.5-coder:0.5b"
       ];
     };
     nextjs-ollama-llm-ui = {
