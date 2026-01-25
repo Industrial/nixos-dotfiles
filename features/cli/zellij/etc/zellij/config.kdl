@@ -20,6 +20,15 @@ plugins {
   welcome-screen location="zellij:session-manager" {
     welcome_screen false
   }
+  zjstatus-hints location="file:~/.config/zellij/plugins/zjstatus-hints.wasm" {
+    max_length 0
+    overflow_str "..."
+    pipe_name "zjstatus_hints"
+    hide_in_base_mode false
+  }
+}
+load_plugins {
+  zjstatus-hints
 }
 keybinds clear-defaults=true {
   normal {

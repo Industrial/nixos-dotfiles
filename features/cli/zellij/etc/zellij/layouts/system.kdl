@@ -4,8 +4,15 @@ layout {
       plugin location="zellij:tab-bar"
     }
     children
+    // pane size=1 borderless=true {
+    //   plugin location="zellij:status-bar"
+    // }
     pane size=1 borderless=true {
-      plugin location="zellij:status-bar"
+      plugin location="file:~/.config/zellij/plugins/zjstatus-hints.wasm" {
+        format_left "{mode} {tabs}"
+        format_right "{pipe_zjstatus_hints}{datetime} " 
+        pipe_zjstatus_hints_format "{output}"
+      }
     }
   }
 
