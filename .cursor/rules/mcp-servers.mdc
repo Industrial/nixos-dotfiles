@@ -1,0 +1,148 @@
+---
+description: "MCP server usage guidelines and tool selection rules for Serena, Context7, MCP Debugger, and Drift."
+alwaysApply: true
+---
+
+# MCP Server Rules
+
+## Overview
+
+This project uses multiple MCP servers, each optimized for specific tasks:
+- **Serena**: Semantic code analysis and editing
+- **Context7**: External library documentation
+- **MCP Debugger**: Interactive debugging
+- **Drift**: Automated codebase pattern detection and analysis
+
+See `.cursor/rules/drift.mdc` for detailed Drift usage guidelines.
+
+## Agent Rules
+
+### Coding Agent Rules - Serena MCP Server
+
+**Serena provides semantic code analysis and editing capabilities. Use these tools for all code operations:**
+
+#### Code Analysis & Navigation
+- **`find_symbol`**: ALWAYS use to locate functions, classes, methods by name path pattern. PREFER over manual searches.
+- **`get_symbols_overview`**: ALWAYS use to understand file structure before reading entire files. Shows classes, functions, and their relationships.
+- **`find_referencing_symbols`**: ALWAYS use to find all references to a symbol. Essential for understanding dependencies and impact of changes.
+- **`list_dir`**: ALWAYS use for directory structure navigation. PREFER over manual directory exploration.
+- **`find_file`**: Use to locate files by name pattern when you know the filename.
+- **`search_for_pattern`**: Use for flexible pattern searches across the codebase when symbol-based search isn't sufficient.
+
+#### File Operations
+- **`read_file`**: Use to read file contents when you need full file access (PREFER `get_symbols_overview` for structure understanding first).
+- **`create_text_file`**: Use for creating new files with content.
+- **`replace_content`**: Use for file-based edits when replacing content across files or large sections.
+
+#### Symbol-Based Editing
+- **`replace_symbol_body`**: ALWAYS use for replacing entire function/class bodies. Most precise way to edit code.
+- **`insert_after_symbol`**: ALWAYS use to insert code after a specific symbol (function, class, etc.).
+- **`insert_before_symbol`**: ALWAYS use to insert code before a specific symbol.
+- **`rename_symbol`**: ALWAYS use for renaming symbols across the entire codebase. Automatically updates all references.
+
+#### Memory & Context Management
+- **`write_memory`**: Use to save project information for future sessions.
+- **`read_memory`**: Use to retrieve previously saved project context.
+- **`list_memories`**: Use to see available saved memories.
+- **`delete_memory`**: Use to remove outdated memories.
+- **`edit_memory`**: Use to update existing memory content.
+
+#### Project Management
+- **`execute_shell_command`**: Use for running shell commands when needed (wrap with `devenv shell --` for this project).
+- **`get_current_config`**: Use to check current project configuration and active modes.
+- **`switch_modes`**: Use to activate desired modes (editing, planning, interactive, etc.).
+
+#### Thinking & Quality Control
+- **`think_about_collected_information`**: ALWAYS use after completing a sequence of searches/reads to synthesize findings.
+- **`think_about_task_adherence`**: ALWAYS use before making code changes to ensure you're on track.
+- **`think_about_whether_you_are_done`**: Use when you believe a task is complete to verify completeness.
+
+**Usage Pattern**: Before reading entire files, use `get_symbols_overview` or `find_symbol` to understand structure first. For edits, PREFER symbol-based tools over file-based tools.
+
+### Library Documentation Agent Rules - Context7 MCP Server
+
+**Context7 provides up-to-date documentation for libraries. Use these tools for all external library work:**
+
+- **`resolve-library-id`**: ALWAYS use FIRST when you need documentation. Resolves package names to Context7 library IDs.
+- **`query-docs`**: ALWAYS use AFTER resolving library ID to get documentation. Provides up-to-date API references and examples.
+
+**Usage Pattern**: 
+1. Use `resolve-library-id` to find the library ID
+2. Use `query-docs` with the library ID to fetch documentation
+3. NEVER guess API usage - ALWAYS query Context7 first
+
+### Debugging Agent Rules - MCP Debugger MCP Server
+
+**MCP Debugger provides interactive debugging capabilities. Use these tools for debugging JavaScript and Python:**
+
+#### Session Management
+- **`create_debug_session`**: ALWAYS use FIRST to create a debugging session for JavaScript or Python code.
+- **`list_debug_sessions`**: Use to see all active debugging sessions.
+- **`close_debug_session`**: Use to close a debugging session when done.
+- **`list_supported_languages`**: Use to check which languages are supported for debugging.
+
+#### Debugging Setup
+- **`set_breakpoint`**: ALWAYS use to set breakpoints BEFORE starting debugging. Set on executable lines (assignments, function calls, conditionals, returns).
+- **`start_debugging`**: ALWAYS use to launch debugging with proper script path and configuration.
+
+#### Execution Control
+- **`step_over`**: Use to execute current line and move to next line (step over function calls).
+- **`step_into`**: Use to step into function calls to debug function internals.
+- **`step_out`**: Use to step out of current function to caller.
+- **`continue_execution`**: Use to continue execution until next breakpoint or end.
+- **`pause_execution`**: Use to pause execution (Note: May not be fully implemented).
+
+#### State Inspection
+- **`get_local_variables`**: ALWAYS use to see local variables in current stack frame (most convenient).
+- **`get_variables`**: Use to get variables for a specific scope (uses variablesReference from stack frame).
+- **`get_stack_trace`**: ALWAYS use to see the call stack and current execution position.
+- **`get_scopes`**: Use to get all scopes (local, closure, global) for a stack frame.
+
+#### Advanced Debugging
+- **`evaluate_expression`**: ALWAYS use to test hypotheses, inspect values, or modify program state during debugging.
+- **`get_source_context`**: Use to view source code around a specific line with context lines.
+
+**Usage Pattern**: 
+1. `create_debug_session` with language
+2. `set_breakpoint` on executable lines
+3. `start_debugging` with script path
+4. Use `step_over/into/out` and `continue_execution` to navigate
+5. Use `get_local_variables`, `get_stack_trace`, `evaluate_expression` to inspect state
+6. `close_debug_session` when done
+
+### Codebase Analysis Agent Rules - Drift MCP Server
+
+**Drift provides automated codebase pattern detection and analysis. Use these tools for automated analysis:**
+
+#### Pattern Discovery
+- **`drift_patterns_list`**: ALWAYS use to discover code patterns in the codebase. Shows learned conventions.
+- **`drift_pattern_get`**: Use to get detailed information about a specific pattern.
+- **`drift_context`**: Use for high-level codebase understanding ("how do I add X?").
+
+#### Impact & Reachability Analysis
+- **`drift_impact_analysis`**: ALWAYS use before refactoring to see what breaks if you change code.
+- **`drift_reachability`**: Use to understand what data a function can access.
+- **`drift_reachability --inverse`**: Use to find who can access sensitive data (security analysis).
+
+#### Architecture Analysis
+- **`drift_coupling`**: ALWAYS use to check for dependency cycles before refactoring.
+- **`drift_test_topology`**: Use to find which tests should be run for changed code.
+
+#### Security Analysis
+- **`drift_boundaries`**: Use for security boundary overview and sensitive data access tracking.
+- **`drift_security_summary`**: Use for security patterns overview.
+
+#### Status & Discovery
+- **`drift_status`**: Use to check Drift's understanding of the codebase.
+- **`drift_capabilities`**: Use to see what Drift can analyze.
+
+**Usage Pattern**: 
+1. Start with `drift_status` for quick health check (discovery layer)
+2. Use `drift_patterns_list` to discover patterns (exploration layer)
+3. Use `drift_impact_analysis` before changes (detail layer)
+4. Use `drift_coupling` for architecture analysis (analysis layer)
+5. Combine with Serena for detailed symbol-level analysis
+
+**Token Efficiency**: Use lower layers (discovery/surgical) for quick checks, escalate to higher layers only when needed.
+
+See `.cursor/rules/drift.mdc` for comprehensive Drift usage guidelines.
