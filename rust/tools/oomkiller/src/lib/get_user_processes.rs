@@ -3,12 +3,17 @@ use sysinfo::System;
 
 /// Lists all processes owned by the current user.
 ///
+/// Uses a System object that should already have been refreshed with refresh_all().
+/// This avoids creating a new System object and re-scanning processes.
+///
+/// # Arguments
+/// * `system` - A System object that has already been refreshed with refresh_all()
+///
 /// Returns a vector of `ProcessInfo` containing PID and RSS memory usage.
 /// Returns `Err` if process information cannot be read or current user ID cannot be determined.
-pub fn get_user_processes() -> Result<Vec<ProcessInfo>, String> {
+pub fn get_user_processes(system: &System) -> Result<Vec<ProcessInfo>, String> {
     let current_uid = get_current_uid()?;
-    let mut system = System::new_all();
-    system.refresh_all();
+    // Note: system should already be refreshed by caller to avoid redundant scanning
 
     let mut processes = Vec::new();
 
@@ -52,14 +57,18 @@ mod tests {
     #[test]
     fn test_get_user_processes_returns_result() {
         // Test that get_user_processes returns a Result
-        let result = get_user_processes();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = get_user_processes(&system);
         assert!(result.is_ok() || result.is_err());
     }
 
     #[test]
     fn test_get_user_processes_returns_vector_when_ok() {
         // Test that when Ok, get_user_processes returns a vector
-        let result = get_user_processes();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = get_user_processes(&system);
         if let Ok(processes) = result {
             // Should be a vector (can be empty or have processes)
             assert!(processes.len() >= 0);
@@ -76,7 +85,9 @@ mod tests {
         // Test that get_user_processes returns processes
         // The actual UID filtering is tested in check_process_owned_by_user tests
         // This test verifies the function works and returns valid ProcessInfo structs
-        let result = get_user_processes();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = get_user_processes(&system);
         if let Ok(processes) = result {
             // Verify all returned processes have valid data
             for process in processes {

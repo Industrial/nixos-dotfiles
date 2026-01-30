@@ -12,6 +12,6 @@ pub use daemon_iteration::daemon_iteration;
 pub use find_highest_memory_process::find_highest_memory_process;
 pub use get_current_uid::get_current_uid;
 pub use get_user_processes::get_user_processes;
-pub use is_memory_threshold_exceeded::is_memory_threshold_exceeded;
+pub use is_memory_threshold_exceeded::{MEMORY_THRESHOLD_PERCENT, is_memory_threshold_exceeded};
 pub use kill_process::kill_process;
 pub use types::ProcessInfo;

@@ -1,12 +1,33 @@
 {
   pkgs,
-  inputs, # Expect 'inputs' from specialArgs
+  inputs,
+  settings,
+  lib,
   ...
 }: let
-  # inputs.oomkiller-src is a store path to the tool's source directory
-  # callPackage will look for default.nix within this store path
   oomkillerPkg = pkgs.callPackage inputs.oomkiller-src {};
 in {
-  # The oomkiller feature adds the tool to systemPackages.
-  environment.systemPackages = [oomkillerPkg];
+  environment = {
+    systemPackages = with pkgs; [
+      oomkillerPkg
+    ];
+  };
+
+  systemd = {
+    services = {
+      oomkiller = {
+        description = "OOM Killer Daemon - Monitors system memory and kills highest memory-consuming process when threshold exceeded";
+        wantedBy = ["multi-user.target"];
+        after = ["basic.target"];
+
+        serviceConfig = {
+          Type = "simple";
+          User = "${settings.username}";
+          ExecStart = "${oomkillerPkg}/bin/oomkiller";
+          Restart = "always";
+          RestartSec = "5s";
+        };
+      };
+    };
+  };
 }

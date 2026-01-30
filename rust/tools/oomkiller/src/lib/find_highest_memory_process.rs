@@ -1,11 +1,17 @@
 use crate::{get_user_processes, types::ProcessInfo};
+use sysinfo::System;
 
 /// Finds the process with the highest RSS memory usage from user-owned processes.
 ///
+/// Uses a System object that should already have been refreshed with refresh_all().
+///
+/// # Arguments
+/// * `system` - A System object that has already been refreshed with refresh_all()
+///
 /// Returns `Some(ProcessInfo)` if a process is found, `None` if no processes are available.
 /// Returns `Err` if process listing fails.
-pub fn find_highest_memory_process() -> Result<Option<ProcessInfo>, String> {
-    let processes = get_user_processes()?;
+pub fn find_highest_memory_process(system: &System) -> Result<Option<ProcessInfo>, String> {
+    let processes = get_user_processes(system)?;
 
     if processes.is_empty() {
         return Ok(None);
@@ -24,14 +30,18 @@ mod tests {
     #[test]
     fn test_find_highest_memory_process_returns_result() {
         // Test that find_highest_memory_process returns a Result
-        let result = find_highest_memory_process();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = find_highest_memory_process(&system);
         assert!(result.is_ok() || result.is_err());
     }
 
     #[test]
     fn test_find_highest_memory_process_returns_option_when_ok() {
         // Test that when Ok, it returns an Option
-        let result = find_highest_memory_process();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = find_highest_memory_process(&system);
         if let Ok(option) = result {
             // Should be Some(ProcessInfo) or None
             match option {
@@ -51,7 +61,9 @@ mod tests {
         // Test that it correctly finds a process (if any exist)
         // We can't easily verify it's the maximum without calling get_user_processes twice,
         // which might return different results. So we just verify the function works.
-        let result = find_highest_memory_process();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = find_highest_memory_process(&system);
         assert!(result.is_ok());
 
         if let Ok(Some(process)) = result {
@@ -66,7 +78,9 @@ mod tests {
     fn test_find_highest_memory_process_handles_empty_list() {
         // Test that it returns None when no processes are available
         // This is hard to test directly, but we can verify the function handles it
-        let result = find_highest_memory_process();
+        let mut system = System::new_all();
+        system.refresh_all();
+        let result = find_highest_memory_process(&system);
         assert!(result.is_ok());
         // If no user processes exist, should return None
         // Otherwise, should return Some(ProcessInfo)
