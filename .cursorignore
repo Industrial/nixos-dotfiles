@@ -1,0 +1,108 @@
+# Build artifacts and generated files
+**/target/
+**/result
+**/.devenv*
+**/.direnv/
+**/dist/
+**/build/
+**/out/
+**/.cargo/
+
+# Lock files (large, auto-generated, rarely searched)
+**/Cargo.lock
+**/devenv.lock
+**/bun.lock
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+**/*.lock
+
+# Log files
+**/*.log
+**/logs/
+**/log/
+
+# Nix store paths and build artifacts
+/nix/
+**/result-*
+**/.nix-*
+
+# Temporary files
+**/.tmp/
+**/tmp/
+**/*.swp
+**/*.swo
+**/*~
+**/.DS_Store
+**/Thumbs.db
+
+# IDE and editor files
+**/.idea/
+**/.vscode/
+**/.cursor/
+**/*.code-workspace
+**/.aider*
+
+# Dependencies
+**/node_modules/
+**/.cargo/registry/
+**/.cargo/git/
+
+# Keys and secrets
+**/keys/
+**/.env
+**/.env.local
+**/.env.*.local
+
+# Beads (issue tracker) - already in .gitignore but good to be explicit
+**/.beads/
+
+# Large binary files
+**/*.qcow2
+**/*.iso
+**/*.img
+**/*.bin
+
+# Rust build artifacts (comprehensive)
+**/target/**/*.rlib
+**/target/**/*.rmeta
+**/target/**/deps/
+**/target/**/build/
+**/target/**/incremental/
+**/target/**/*.d
+
+# Nix evaluation cache
+**/.nix-eval-cache/
+
+# Pre-commit hooks (generated)
+**/.pre-commit-config.yaml
+
+# Documentation build outputs
+**/book/
+**/_book/
+**/site/
+
+# Test coverage
+**/coverage/
+**/.coverage/
+**/tarpaulin-report.html
+**/lcov.info
+
+# Profiling data
+**/*.profdata
+**/*.profraw
+
+# macOS
+**/.DS_Store
+**/.AppleDouble
+**/.LSOverride
+
+# Windows
+**/Thumbs.db
+**/ehthumbs.db
+**/Desktop.ini
+
+# Linux
+**/.directory
+**/.Trash-*
+
