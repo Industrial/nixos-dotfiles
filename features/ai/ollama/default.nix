@@ -22,7 +22,7 @@
       # acceleration = "rocm";
       loadModels = [
         "llama3.3:70b"
-        "qwen-2.5:70b"
+        "qwen2.5:72b"
         "qwen2.5-coder:0.5b"
       ];
     };
