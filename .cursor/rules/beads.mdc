@@ -1,0 +1,39 @@
+---
+description: "Guidelines for using the bd (beads) issue tracker for all task and todo management."
+alwaysApply: true
+---
+
+# Issue Tracking with bd (beads)
+
+**IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
+
+## Why bd?
+
+- Dependency-aware: Track blockers and relationships between issues
+- Git-friendly: Auto-syncs to JSONL for version control
+- Agent-optimized: JSON output, ready work detection, discovered-from links
+- Prevents duplicate tracking systems and confusion
+
+## Usage with AI Agents
+
+- **Exclusivity**: AI agents **MUST** use `bd` commands for all task creation, updates, and completion. Existing task/todo tools (e.g., `todo_write`) are **PROHIBITED** for managing project tasks.
+- **Workflow**: Agents should follow the standard `bd` workflow:
+  1. Check for ready work: `bd ready --json`
+  2. Claim your task: `bd update <id> --status in_progress --json`
+  3. Work on it: Implement, test, document
+  4. Discover new work? Create linked issue: `bd create "Found bug" -p 1 --deps discovered-from:<parent-id> --json`
+  5. Complete: `bd close <id> --reason "Done" --json`
+  6. Commit together: Always commit the `.beads/issues.jsonl` file together with the code changes.
+
+## Important Rules for AI Agents
+
+- ✅ Use bd for ALL task tracking.
+- ✅ Always use `--json` flag for programmatic bd commands.
+- ✅ Link discovered work with `discovered-from` dependencies.
+- ✅ Check `bd ready` before asking "what should I work on?".
+- ❌ Do NOT create markdown TODO lists.
+- ❌ Do NOT use the `todo_write` tool or any other non-`bd` task management tool.
+- ❌ Do NOT use external issue trackers.
+- ❌ Do NOT duplicate tracking systems.
+
+For more details, see `AGENTS.md` and `README.md`.

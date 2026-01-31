@@ -1,51 +1,44 @@
 {
   "mcpServers": {
-    "git": {
-      "command": "uvx",
-      "args": ["mcp-server-git", "--repository", "/data/Code/streamweave"]
-    },
     "serena": {
       "command": "uvx",
       "args": [
         "--from",
         "git+https://github.com/oraios/serena",
         "serena",
-        "start-mcp-server"
-      ]
-    },
-    "think": {
-      "command": "uvx",
-      "args": ["mcp-think-tool"]
+        "start-mcp-server",
+        "--context",
+        "ide"
+      ],
+      "disabled": false
     },
     "context7": {
       "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp@latest"]
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "disabled": false
     },
-    "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    "ferroscope": {
+      "command": "ferroscope",
+      "args": [],
+      "env": {},
+      "description": "Rust debugging via LLDB/GDB"
     },
-    "task-master-ai": {
-      "command": "npx",
-      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
-      "env": {
-        "ANTHROPIC_API_KEY": "ANTHROPIC_API_KEY_HERE",
-        "PERPLEXITY_API_KEY": "PERPLEXITY_API_KEY_HERE",
-        "OPENAI_API_KEY": "OPENAI_API_KEY_HERE",
-        "GOOGLE_API_KEY": "GOOGLE_API_KEY_HERE",
-        "XAI_API_KEY": "XAI_API_KEY_HERE",
-        "OPENROUTER_API_KEY": "OPENROUTER_API_KEY_HERE",
-        "MISTRAL_API_KEY": "MISTRAL_API_KEY_HERE",
-        "AZURE_OPENAI_API_KEY": "AZURE_OPENAI_API_KEY_HERE",
-        "OLLAMA_API_KEY": "OLLAMA_API_KEY_HERE"
-      }
-    },
-    "chrome-devtools": {
-      "command": "bash",
+    "mcp-debugger": {
+      "command": "node",
       "args": [
-        "-c",
-        "npx -y chrome-devtools-mcp@latest --executablePath /run/current-system/sw/bin/chromium --isolated"
-      ]
+        "node_modules/.bin/mcp-debugger",
+        "stdio",
+        "--log-level",
+        "debug",
+        "--log-file",
+        "./tmp/debug-mcp-server.log"
+      ],
+      "disabled": false,
+      "autoApprove": ["create_debug_session", "set_breakpoint", "get_variables"]
+    },
+    "drift": {
+      "command": "bunx",
+      "args": ["-y", "driftdetect-mcp@0.9.23"]
     }
   }
 }

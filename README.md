@@ -44,7 +44,7 @@ Other update commands:
 - `bin/update/system` - Update system only
 - `bin/update/flake` - Update flake lock files
 - `bin/update/channels` - Update NixOS channels
-- `bin/update/nix-env` - Update nix-env packages
+- `bin/update/profiles` - Update profiles
 - `bin/update/repositories` - Update git repositories
 - `bin/update/login-shell` - Update login shell only
 

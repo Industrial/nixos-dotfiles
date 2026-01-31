@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > ai > opencode > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+configSourceFilePath="${currentDirectoryPath}/features/ai/opencode/.config/opencode/config.json"
+targetDirectoryPath="${HOME}/.config/opencode"
+configTargetFilePath="${targetDirectoryPath}/config.json"
+
+mkdir -p "${targetDirectoryPath}"
+ln -sf "${configSourceFilePath}" "${configTargetFilePath}"

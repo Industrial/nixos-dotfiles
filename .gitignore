@@ -1,3 +1,18 @@
+*.log
+*.njsproj
+*.ntvs*
+*.sln
+*.suo
+*.sw?
+.DS_Store
+.aider*
+.beads/
+.devenv*
+.direnv/
+.env
+.idea/
+.pre-commit-config.yaml
+.vscode
 /**/*.qcow2
 /.direnv/
 /.pre-commit-config.yaml
@@ -5,40 +20,10 @@
 /keys/
 /logs/
 /result
-
-# Devenv
-.devenv*
+dev-debug.log
 devenv.local.nix
-
-# direnv
-.direnv
-
-# pre-commit
-.pre-commit-config.yaml
-
-# Logs
 logs
-*.log
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-dev-debug.log
-# Dependency directories
-node_modules/
-# Environment variables
-.env
-# Editor directories and files
-.idea
-.vscode
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-# OS specific
-.DS_Store
-
-# Task files
-# tasks.json
-# tasks/ 
-.aider*

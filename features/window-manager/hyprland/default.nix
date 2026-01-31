@@ -18,11 +18,9 @@
   };
 
   services = {
-    xserver = {
-      displayManager = {
-        gdm = {
-          enable = true;
-        };
+    displayManager = {
+      gdm = {
+        enable = true;
       };
     };
 

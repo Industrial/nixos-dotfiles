@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-echo "> update > nix-env"
-exec > >(tee ./logs/update-nix-env) 2>&1
-set -e
-
-echo "> nix-env -u --always"
-nix-env -u --always

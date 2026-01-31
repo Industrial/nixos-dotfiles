@@ -14,3 +14,4 @@ bin/update/login-shell "tom"
 
 features/network/ladybird/bin/link-files-nixos
 features/programming/cursor/bin/link-files-nixos
+features/ai/opencode/bin/link-files-nixos

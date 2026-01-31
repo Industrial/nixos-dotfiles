@@ -1,0 +1,183 @@
+---
+description: "Drift MCP server usage guidelines for automated codebase pattern detection and analysis."
+alwaysApply: true
+---
+
+# Drift MCP Server Rules
+
+**Drift provides automated codebase pattern detection and analysis through 45+ MCP tools. It complements Serena, Context7, and MCP Debugger by adding automated analysis capabilities.**
+
+## Overview
+
+Drift learns patterns from your actual codebase, provides call graph analysis, impact analysis, and test topology - capabilities that enhance but don't replace manual analysis.
+
+## Architecture Layers
+
+Drift uses a **7-layer architecture** designed for efficient token usage:
+
+1. **ORCHESTRATION** (`drift_context`) - "Tell me what you want, I'll give you everything"
+   - Token budget: 1000-2000
+   - Use for: High-level codebase understanding, implementation planning
+
+2. **DISCOVERY** (`drift_status`, `drift_capabilities`) - "Quick health check"
+   - Token budget: 200-500
+   - Use for: Quick status checks, capability discovery
+
+3. **SURGICAL** (`drift_signature`, `drift_callers`, `drift_type`) - "I need exactly this one thing"
+   - Token budget: 200-500
+   - Use for: Specific symbol/type information
+
+4. **EXPLORATION** (`drift_patterns_list`, `drift_security_summary`) - "Let me browse and filter"
+   - Token budget: 500-1000
+   - Use for: Pattern discovery, security overview
+
+5. **DETAIL** (`drift_pattern_get`, `drift_impact_analysis`) - "Deep dive into this specific thing"
+   - Token budget: 500-1500
+   - Use for: Detailed pattern analysis, impact assessment
+
+6. **ANALYSIS** (`drift_coupling`, `drift_test_topology`) - "Run complex analysis"
+   - Token budget: 1000-2000
+   - Use for: Dependency analysis, test selection
+
+7. **GENERATION** (`drift_validate_change`, `drift_suggest_changes`) - "Help me write code"
+   - Token budget: 500-1500
+   - Use for: Code suggestions, change validation
+
+## Tool Selection Guidelines
+
+### When to Use Drift vs Other MCP Servers
+
+| Task | Use Drift When | Use Serena When | Use Context7 When |
+|------|----------------|----------------|------------------|
+| Pattern discovery | Finding code patterns in codebase | Finding exact symbols | N/A |
+| Impact analysis | Automated "what breaks if I change this?" | Detailed symbol references | N/A |
+| Architecture | Coupling/cycles analysis | File structure, symbol relationships | N/A |
+| Security | Boundary analysis, sensitive data access | Code review details | N/A |
+| Testing | Test selection (which tests to run) | Test file structure | N/A |
+| Code navigation | Pattern-based search | Exact symbol search | N/A |
+| Documentation | N/A | N/A | External library docs |
+
+### Common Workflows
+
+#### Before Code Review
+1. Use `drift_impact_analysis` to see what breaks if changed files are modified
+2. Use `drift_reachability` to understand data flow
+3. Use Serena `find_referencing_symbols` for detailed references
+
+#### Before Refactoring
+1. Use `drift_coupling` to check for dependency cycles
+2. Use `drift_impact_analysis` to assess blast radius
+3. Use `drift_test_topology` to find relevant tests
+
+#### Security Review
+1. Use `drift_boundaries` for security boundary overview
+2. Use `drift_reachability --inverse` to find who can access sensitive data
+3. Use `drift_security_summary` for security patterns
+
+#### Implementation Planning
+1. Use `drift_context` for high-level codebase understanding
+2. Use `drift_patterns_list` to discover existing patterns
+3. Use `drift_pattern_get` to understand specific patterns
+
+## Key Tools Reference
+
+### Orchestration Layer
+- **`drift_context`**: Get comprehensive context about a topic. Use when you need "everything about X".
+  - Example: "How do I add a new endpoint?" → Returns patterns, examples, files to modify
+
+### Discovery Layer
+- **`drift_status`**: Quick health check of Drift's understanding of the codebase
+- **`drift_capabilities`**: See what Drift can analyze
+
+### Surgical Layer
+- **`drift_signature`**: Get function/method signature
+- **`drift_callers`**: Find all callers of a function
+- **`drift_type`**: Get type information
+
+### Exploration Layer
+- **`drift_patterns_list`**: Browse discovered patterns
+- **`drift_security_summary`**: Security patterns overview
+
+### Detail Layer
+- **`drift_pattern_get`**: Get detailed pattern information
+- **`drift_impact_analysis`**: What breaks if I change this?
+- **`drift_reachability`**: What data can this function access?
+
+### Analysis Layer
+- **`drift_coupling`**: Dependency cycles and hotspots
+- **`drift_test_topology`**: Which tests should I run?
+- **`drift_error_handling`**: What errors aren't handled?
+
+### Generation Layer
+- **`drift_validate_change`**: Validate proposed changes
+- **`drift_suggest_changes`**: Get code suggestions
+
+## Token Budget Management
+
+**Strategy**: Start with lower layers (discovery/surgical) for quick checks, escalate to higher layers only when needed.
+
+- **Quick checks**: Use Discovery/Surgical layers (200-500 tokens)
+- **Deep analysis**: Use Analysis layer (1000-2000 tokens)
+- **Comprehensive understanding**: Use Orchestration layer (1000-2000 tokens)
+
+## Integration with Existing Workflows
+
+### Code Review Workflow
+1. Run `drift_impact_analysis` on changed files
+2. Run `drift_reachability` to understand data flow
+3. Use Serena for detailed symbol analysis
+4. Use security-reviewer agent for security deep dive
+
+### Refactoring Workflow
+1. Run `drift_coupling` to check for cycles
+2. Run `drift_impact_analysis` to assess impact
+3. Run `drift_test_topology` to find relevant tests
+4. Use Serena for detailed symbol references
+
+### Security Review Workflow
+1. Run `drift_boundaries` for overview
+2. Run `drift_reachability --inverse` for sensitive data access
+3. Use security-reviewer agent for detailed analysis
+
+## Pattern Approval
+
+Before using discovered patterns in analysis:
+1. Review patterns with `drift_patterns_list`
+2. Examine pattern details with `drift_pattern_get`
+3. Approve patterns that match project conventions
+4. Reject patterns that don't align with project standards
+
+## Rust-Specific Considerations
+
+Drift supports Rust with:
+- Tree-sitter parsing
+- Call graph analysis
+- Data access tracking
+- Framework support (Actix, Axum, Diesel)
+
+When working with Rust code:
+- Use `drift_context` for understanding Rust-specific patterns
+- Use `drift_patterns_list` to discover Rust idioms
+- Use `drift_impact_analysis` for Rust-specific impact (lifetimes, ownership)
+
+## Best Practices
+
+1. **Start small**: Use discovery layer first, escalate as needed
+2. **Combine tools**: Use Drift for automated analysis, Serena for detailed navigation
+3. **Verify patterns**: Review and approve patterns before using them
+4. **Token efficiency**: Use appropriate layer for the task
+5. **Complement, don't replace**: Drift enhances manual analysis, doesn't replace it
+
+## Error Handling
+
+If Drift tools fail:
+1. Check `drift_status` for health
+2. Verify codebase has been scanned (`drift scan` if CLI available)
+3. Fall back to Serena for symbol-based analysis
+4. Use manual analysis if needed
+
+## See Also
+
+- `.cursor/rules/mcp-servers.mdc` - Overall MCP server guidelines
+- `.cursor/PLAN-drift-integration.md` - Integration plan and details
+- [Drift GitHub](https://github.com/dadbodgeoff/drift) - Official documentation
