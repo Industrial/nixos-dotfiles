@@ -25,9 +25,9 @@
     });
 
   extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.105.1";
-  # Use an older VSCode version for vscode-lldb to get compatible version (1.11.8)
-  # Version 1.11.8 of vscode-lldb requires an older VSCode version filter
-  extensionsForLldb = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.75.0";
+  # # Use an older VSCode version for vscode-lldb to get compatible version (1.11.8)
+  # # Version 1.11.8 of vscode-lldb requires an older VSCode version filter
+  # extensionsForLldb = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.75.0";
 
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = pkgs.code-cursor;
@@ -40,38 +40,30 @@
 
       # Visual Feedback
       extensions.vscode-marketplace.randomfractalsinc.vscode-data-preview
-      extensions.vscode-marketplace.usernamehw.errorlens
+      # TODO: Not available?
+      # extensions.vscode-marketplace.usernamehw.errorlens
       extensions.vscode-marketplace.vspacecode.whichkey
       extensions.vscode-marketplace.yoavbls.pretty-ts-errors
 
-      # # Testing
+      # Testing
       # This adapter converter is needed for other language test adapter
       # extensions like Test Explorer UI
-      # extensions.vscode-marketplace.ms-vscode.test-adapter-converter
-      # extensions.vscode-marketplace.hbenl.vscode-test-explorer
+      extensions.vscode-marketplace.ms-vscode.test-adapter-converter
+      extensions.vscode-marketplace.hbenl.vscode-test-explorer
 
-      # # File Types
-      # ## GraphQL
-      # extensions.vscode-marketplace.graphql.vscode-graphql-syntax
-      # extensions.vscode-marketplace.graphql.vscode-graphql
-
-      # ## Markdown
-      # extensions.vscode-marketplace.yzhang.markdown-all-in-one
-      # extensions.vscode-marketplace.geeklearningio.graphviz-markdown-preview
-
+      # File Types
       ## JavaScript / TypeScript
-      # extensions.vscode-marketplace.firsttris.vscode-jest-runner
       extensions.vscode-marketplace.biomejs.biome
-      # extensions.vscode-marketplace.dbaeumer.vscode-eslint
       extensions.vscode-marketplace.oven.bun-vscode
       # extensions.vscode-marketplace.vitest.explorer
 
       ## Python
       extensions.vscode-marketplace.charliermarsh.ruff
       extensions.vscode-marketplace.ms-python.mypy-type-checker
-      # extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
+      extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
       extensions.vscode-marketplace.ms-python.debugpy
       extensions.vscode-marketplace.ms-python.python
+      # TODO: What was wrong with this?
       # (resetLicense extensions.vscode-marketplace.ms-python.vscode-pylance)
 
       ## Jupyter
@@ -80,6 +72,7 @@
 
       ## Nix
       extensions.vscode-marketplace.bbenoist.nix
+      # TODO: What was wrong with this?
       #extensions.vscode-marketplace.jnoortheen.nix-ide
       extensions.vscode-marketplace.kamadorueda.alejandra
 
@@ -95,42 +88,18 @@
       ## Git
       (allowUnfreeExtension extensions.vscode-marketplace.mhutchie.git-graph)
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
+      # TODO: What was wrong with this?
       # extensions.vscode-marketplace.github.vscode-github-actions
-
-      # ## PlantUML
-      # extensions.vscode-marketplace.jebbs.plantuml
-
-      # ## AutoHotkey
-      # extensions.vscode-marketplace.thqby.vscode-autohotkey2-lsp
-
-      # ## EdgeDB
-      # extensions.vscode-marketplace.magicstack.edgedb
-
-      # ## Haskell
-      # extensions.vscode-marketplace.haskell.haskell
-      # extensions.vscode-marketplace.hoovercj.haskell-linter
-      # extensions.vscode-marketplace.justusadam.language-haskell
-      # extensions.vscode-marketplace.phoityne.phoityne-vscode
-
-      # # PureScript
-      # extensions.vscode-marketplace.mvakula.vscode-purty
-      # extensions.vscode-marketplace.nwolverson.ide-purescript
-      # extensions.vscode-marketplace.nwolverson.language-purescript
 
       # Rust
       # extensions.vscode-marketplace.rust-lang.rust
       extensions.vscode-marketplace.rust-lang.rust-analyzer
       extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
+      # TODO: Marked as broken.
       # extensions.vscode-marketplace.vadimcn.vscode-lldb  # Marked as broken in nixpkgs
-      # extensions.vscode-marketplace.zhangyue.rust-mod-generator
-      # extensions.vscode-marketplace.dustypomerleau.rust-syntax
-      # extensions.vscode-marketplace.lorenzopirro.rust-flash-snippets
 
       # TOML
       extensions.vscode-marketplace.tamasfe.even-better-toml
-
-      # # MoonScript
-      # extensions.vscode-marketplace.vgalaktionov.moonscript
     ];
   };
 in {
@@ -146,19 +115,8 @@ in {
       alejandra
       nixd
 
-      # # Haskell
-      # #pkgs.ghc
-      # pkgs.haskell-language-server
-      # pkgs.hlint
-
-      # # PureScript
-      # pkgs.nodePackages.purescript-psa
-      # pkgs.nodePackages.purs-tidy
-      # pkgs.nodePackages.purty
-
-      # # Rust
-      # pkgs.rustfmt
-      # pkgs.leptosfmt
+      # Rust
+      rustfmt
 
       # Python
       uv

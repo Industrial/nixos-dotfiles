@@ -162,7 +162,25 @@
   "jupyter.notebookFileRoot": "${workspaceRoot}",
   "markdown.preview.fontSize": 12,
   "nix.enableLanguageServer": true,
-  "nix.serverPath": "nixd",
+  "nix.serverPath": "/run/current-system/sw/bin/nixd",
+  "nix.serverSettings": {
+    "nixd": {
+      "formatting": {
+        "command": ["alejandra"]
+      },
+      "options": {
+        "nixos": {
+          "expr": "(builtins.getFlake \"${workspaceFolder}\").nixosConfigurations.<name>.options"
+        },
+        "home-manager": {
+          "expr": "(builtins.getFlake \"${workspaceFolder}\").homeConfigurations.<name>.options"
+        },
+        "nix-darwin": {
+          "expr": "(builtins.getFlake \"${workspaceFolder}\").darwinConfigurations.<name>.options"
+        }
+      }
+    }
+  },
   "notebook.markup.fontSize": 12,
   "notebook.output.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "notebook.output.fontSize": 12,
@@ -280,6 +298,5 @@
   },
   "explorer.autoReveal": true,
   "lldb-dap.executable-path": "/nix/store/q3p69a1jdli1rszys53krr43gl1q9fcj-lldb-21.1.2/bin/lldb",
-  "workbench.colorTheme": "base16-gruvbox-dark-hard",
-  "workbench.statusBar.visible": false
+  "workbench.colorTheme": "base16-gruvbox-dark-hard"
 }
