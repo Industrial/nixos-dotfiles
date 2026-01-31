@@ -21,9 +21,8 @@
       port = 11434;
       # acceleration = "rocm";
       loadModels = [
-        "llama3.3:70b"
-        "qwen2.5:72b"
-        "qwen2.5-coder:0.5b"
+        "qwen3:14b"
+        "glm-4.7-flash"
       ];
     };
     nextjs-ollama-llm-ui = {

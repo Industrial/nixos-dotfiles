@@ -11,17 +11,13 @@
   # These models match the ones loaded in the ollama service
   litellmConfig = pkgs.writeText "litellm-config.yaml" ''
     model_list:
-      - model_name: ollama/llama3.3:70b
+      - model_name: ollama/qwen3:14b
         litellm_params:
-          model: ollama/llama3.3:70b
+          model: ollama/qwen3:14b
           api_base: http://localhost:11434
-      - model_name: ollama/qwen2.5:72b
+      - model_name: ollama/glm-4.7-flash
         litellm_params:
-          model: ollama/qwen2.5:72b
-          api_base: http://localhost:11434
-      - model_name: ollama/qwen2.5-coder:0.5b
-        litellm_params:
-          model: ollama/qwen2.5-coder:0.5b
+          model: ollama/glm-4.7-flash
           api_base: http://localhost:11434
   '';
 
