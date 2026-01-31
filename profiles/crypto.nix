@@ -9,9 +9,6 @@
   ...
 }: {
   imports = [
-    ./base.nix
-
-    # Crypto
     ../features/crypto/bisq
     ../features/crypto/monero
   ];

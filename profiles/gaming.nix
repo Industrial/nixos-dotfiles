@@ -9,9 +9,6 @@
   ...
 }: {
   imports = [
-    ./base.nix
-
-    # Games
     ../features/games/lutris
     ../features/games/path-of-building
     ../features/games/wowup

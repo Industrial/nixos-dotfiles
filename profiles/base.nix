@@ -46,6 +46,8 @@
     ../features/cli/ll
     ../features/cli/lnav
     ../features/cli/lsusb
+    ../features/cli/lsof
+    ../features/cli/nettools
     ../features/cli/nix-tree
     ../features/cli/p
     ../features/cli/p7zip

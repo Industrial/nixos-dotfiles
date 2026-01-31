@@ -9,8 +9,6 @@
   ...
 }: {
   imports = [
-    ./base.nix
-
     ../features/learning/anki
     ../features/learning/foliate
     ../features/learning/zotero

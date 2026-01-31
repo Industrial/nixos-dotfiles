@@ -9,9 +9,6 @@
   ...
 }: {
   imports = [
-    ./base.nix
-
-    # Window Manager
     # ../features/window-manager/xfce
     #../features/window-manager/ghostty
     #../features/window-manager/slock
