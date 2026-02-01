@@ -57,6 +57,7 @@ use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
 use rowan::ast::AstNode;
 use serde::Serialize;
+use serde_json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -600,7 +601,8 @@ pub struct Evaluator {
     /// Search paths for resolving <nixpkgs> style imports
     search_paths: HashMap<String, PathBuf>,
     /// Current file path (for resolving relative imports)
-    current_file: Option<PathBuf>,
+    /// Uses interior mutability to allow setting during import evaluation
+    current_file: Rc<RefCell<Option<PathBuf>>>,
 }
 
 impl Evaluator {
@@ -619,13 +621,105 @@ impl Evaluator {
             scope: HashMap::new(),
             import_cache: Rc::new(RefCell::new(HashMap::new())),
             search_paths: HashMap::new(),
-            current_file: None,
+            current_file: Rc::new(RefCell::new(None)),
         };
 
         // Register basic builtin functions
         evaluator.register_basic_builtins();
 
+        // Parse NIX_PATH environment variable to configure search paths
+        evaluator.parse_nix_path();
+
         evaluator
+    }
+
+    /// Resolve a flake reference to a file system path
+    ///
+    /// Attempts to resolve flake references like "nixpkgs" to actual file system paths
+    /// using nix commands. Returns the resolved path or an error.
+    fn resolve_flake_path(flake_ref: &str) -> std::io::Result<PathBuf> {
+        use std::process::Command;
+        
+        // Try using nix flake metadata first (for flakes)
+        if let Ok(output) = Command::new("nix")
+            .args(&["flake", "metadata", "--json", "--flake", flake_ref])
+            .output()
+        {
+            if output.status.success() {
+                // Parse JSON output to get path
+                if let Ok(json) = std::str::from_utf8(&output.stdout) {
+                    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json) {
+                        if let Some(path_str) = parsed.get("path").and_then(|p| p.as_str()) {
+                            return Ok(PathBuf::from(path_str));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Fallback: try nix-instantiate for traditional NIX_PATH resolution
+        if let Ok(output) = Command::new("nix-instantiate")
+            .args(&["--eval", "-E", &format!("<{}>", flake_ref)])
+            .output()
+        {
+            if output.status.success() {
+                let path_str = std::str::from_utf8(&output.stdout)
+                    .unwrap_or("")
+                    .trim()
+                    .trim_matches('"');
+                if !path_str.is_empty() && path_str.starts_with('/') {
+                    return Ok(PathBuf::from(path_str));
+                }
+            }
+        }
+        
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("could not resolve flake reference: {}", flake_ref),
+        ))
+    }
+
+    /// Parse NIX_PATH environment variable and configure search paths
+    ///
+    /// NIX_PATH format: "name1=path1:name2=path2:..."
+    /// Example: "nixpkgs=/path/to/nixpkgs:other=/path/to/other"
+    /// Also supports flake: protocol: "nixpkgs=flake:nixpkgs"
+    fn parse_nix_path(&mut self) {
+        if let Ok(nix_path) = std::env::var("NIX_PATH") {
+            for entry in nix_path.split(':') {
+                // Skip empty entries
+                if entry.is_empty() {
+                    continue;
+                }
+                
+                // Split on '=' to get name and path
+                if let Some((name, path_str)) = entry.split_once('=') {
+                    // Handle flake: protocol references
+                    if path_str.starts_with("flake:") {
+                        // Try to resolve flake reference using nix command
+                        // Format: flake:name or flake:name#output
+                        let flake_ref = if let Some(flake_name) = path_str.strip_prefix("flake:") {
+                            flake_name.split('#').next().unwrap_or(flake_name)
+                        } else {
+                            continue;
+                        };
+                        
+                        // Try to resolve using nix flake metadata or nix-instantiate
+                        if let Ok(resolved_path) = Self::resolve_flake_path(flake_ref) {
+                            self.search_paths.insert(name.to_string(), resolved_path);
+                        } else {
+                            // If resolution fails, skip this entry
+                            // TODO: Log warning or provide better error handling
+                            continue;
+                        }
+                    } else {
+                        // Regular path
+                        let path = PathBuf::from(path_str);
+                        self.search_paths.insert(name.to_string(), path);
+                    }
+                }
+            }
+        }
     }
 
     /// Register basic builtin functions
@@ -731,6 +825,29 @@ impl Evaluator {
     /// A mutable reference to the current `VariableScope`
     pub fn scope_mut(&mut self) -> &mut VariableScope {
         &mut self.scope
+    }
+
+    /// Add a search path for resolving `<name>` style imports
+    ///
+    /// Search paths allow using syntax like `<nixpkgs>` to reference paths
+    /// without specifying the full path. This is commonly used for nixpkgs.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The search path name (e.g., "nixpkgs")
+    /// * `path` - The actual path to resolve to
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use nix_eval::Evaluator;
+    /// use std::path::PathBuf;
+    ///
+    /// let mut evaluator = Evaluator::new();
+    /// evaluator.add_search_path("nixpkgs", PathBuf::from("/path/to/nixpkgs"));
+    /// ```
+    pub fn add_search_path(&mut self, name: impl Into<String>, path: PathBuf) {
+        self.search_paths.insert(name.into(), path);
     }
 
     /// Evaluate a Nix expression string to a [`NixValue`]
@@ -1693,8 +1810,9 @@ impl Evaluator {
             PathBuf::from(path_str)
         } else {
             // Relative path - resolve relative to current file
-            if let Some(current_file) = &self.current_file {
-                current_file
+            let current_file = self.current_file.borrow();
+            if let Some(ref current_file_path) = *current_file {
+                current_file_path
                     .parent()
                     .ok_or_else(|| Error::UnsupportedExpression {
                         reason: "cannot resolve relative path: current file has no parent"
@@ -2321,9 +2439,23 @@ impl Evaluator {
 
         let expr = root.expr().ok_or(Error::NoExpression)?;
 
+        // Set current_file for relative imports within this file
+        let old_current_file = {
+            let mut current_file = self.current_file.borrow_mut();
+            let old = current_file.clone();
+            *current_file = Some(normalized_path.clone());
+            old
+        };
+
         // Evaluate the expression
         // Note: Imported files should have their own scope, but for now we'll use the current scope
         let result = self.evaluate_expr_with_scope(&expr, &self.scope)?;
+
+        // Restore previous current_file
+        {
+            let mut current_file = self.current_file.borrow_mut();
+            *current_file = old_current_file;
+        }
 
         // Cache the result
         {

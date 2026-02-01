@@ -44,8 +44,15 @@ fn get_nixpkgs_path() -> Option<String> {
 }
 
 /// Helper to evaluate with nix-eval and capture errors
+/// Automatically configures nixpkgs search path if available
 fn eval_with_nix_eval(expr: &str) -> Result<NixValue, String> {
-    let evaluator = Evaluator::new();
+    let mut evaluator = Evaluator::new();
+    
+    // Try to configure nixpkgs search path if available
+    if let Some(nixpkgs_path) = get_nixpkgs_path() {
+        evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path));
+    }
+    
     evaluator.evaluate(expr).map_err(|e| format!("{:?}", e))
 }
 
@@ -722,9 +729,30 @@ mod full_evaluation {
         println!("  Testing Full Nixpkgs Evaluation");
         println!("═══════════════════════════════════════════════════════════\n");
 
-        // Step 1: Import nixpkgs
+        // Step 1: Configure evaluator with nixpkgs search path
+        let mut evaluator = Evaluator::new();
+        
+        // Try to get nixpkgs path and configure search path
+        if let Some(path) = get_nixpkgs_path() {
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(path));
+        } else {
+            // Try alternative: use NIX_PATH environment variable
+            if let Ok(nix_path) = std::env::var("NIX_PATH") {
+                // NIX_PATH format: "nixpkgs=/path/to/nixpkgs:other=/path"
+                for entry in nix_path.split(':') {
+                    if let Some((name, path)) = entry.split_once('=') {
+                        if name == "nixpkgs" {
+                            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(path));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Step 2: Import nixpkgs
         let expr = "import <nixpkgs> {}";
-        let result = eval_with_nix_eval(expr);
+        let result = evaluator.evaluate(expr).map_err(|e| format!("{:?}", e));
         
         let pkgs = match result {
             Ok(NixValue::AttributeSet(attrs)) => attrs,
@@ -745,7 +773,7 @@ mod full_evaluation {
         println!("✓ Successfully imported nixpkgs");
         println!("  Found {} top-level attributes", pkgs.len());
 
-        // Step 2: Try to evaluate all packages
+        // Step 3: Try to evaluate all packages
         // We'll iterate through packages and try to evaluate them
         // This will fail on the first package that requires unsupported features
         let mut evaluated_count = 0;
@@ -759,7 +787,7 @@ mod full_evaluation {
             
             // Try to force evaluation of this package
             // This will trigger evaluation of the package's derivation
-            match value.clone().force(&Evaluator::new()) {
+            match value.clone().force(&evaluator) {
                 Ok(_) => {
                     evaluated_count += 1;
                     if evaluated_count % 100 == 0 {
@@ -813,8 +841,28 @@ mod full_evaluation {
     #[test]
     fn test_evaluate_nixpkgs_lib() {
 
+        // Configure evaluator with nixpkgs search path
+        let mut evaluator = Evaluator::new();
+        
+        // Try to get nixpkgs path and configure search path
+        if let Some(path) = get_nixpkgs_path() {
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(path));
+        } else {
+            // Try alternative: use NIX_PATH environment variable
+            if let Ok(nix_path) = std::env::var("NIX_PATH") {
+                for entry in nix_path.split(':') {
+                    if let Some((name, path)) = entry.split_once('=') {
+                        if name == "nixpkgs" {
+                            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(path));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
         let expr = "(import <nixpkgs> {}).lib";
-        let result = eval_with_nix_eval(expr);
+        let result = evaluator.evaluate(expr).map_err(|e| format!("{:?}", e));
         
         match result {
             Ok(NixValue::AttributeSet(lib_attrs)) => {
@@ -825,7 +873,7 @@ mod full_evaluation {
                 let key_functions = ["length", "mapAttrs", "foldl'", "attrNames", "concatStringsSep"];
                 for func_name in &key_functions {
                     if let Some(func_value) = lib_attrs.get(*func_name) {
-                        match func_value.clone().force(&Evaluator::new()) {
+                        match func_value.clone().force(&evaluator) {
                             Ok(_) => {
                                 println!("  ✓ {}: evaluated successfully", func_name);
                             }
