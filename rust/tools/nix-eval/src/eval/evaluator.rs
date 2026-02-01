@@ -95,6 +95,10 @@ impl Evaluator {
         self.register_builtin(Box::new(MulBuiltin));
         self.register_builtin(Box::new(DivBuiltin));
         self.register_builtin(Box::new(CompareVersionsBuiltin));
+        self.register_builtin(Box::new(CeilBuiltin));
+        self.register_builtin(Box::new(FloorBuiltin));
+        self.register_builtin(Box::new(ParseDrvNameBuiltin));
+        self.register_builtin(Box::new(FoldlStrictBuiltin));
         self.register_builtin(Box::new(ElemAtBuiltin));
         self.register_builtin(Box::new(SubstringBuiltin));
         self.register_builtin(Box::new(ReplaceStringsBuiltin));
@@ -116,6 +120,8 @@ impl Evaluator {
         self.register_builtin(Box::new(crate::builtins::BitXorBuiltin));
         self.register_builtin(Box::new(crate::builtins::ConcatMapBuiltin));
         self.register_builtin(Box::new(crate::builtins::NixVersionBuiltin));
+        self.register_builtin(Box::new(crate::builtins::ToJSONBuiltin));
+        self.register_builtin(Box::new(crate::builtins::ListToAttrsBuiltin));
     }
 
     /// Get a builtin function by name
@@ -621,6 +627,7 @@ impl Evaluator {
             Expr::Assert(assert) => self.evaluate_assert(assert, scope),
             Expr::Path(path_expr) => self.evaluate_path(path_expr, scope),
             Expr::Select(select) => self.evaluate_select(select, scope),
+            Expr::HasAttr(has_attr) => self.evaluate_has_attr(has_attr, scope),
             Expr::BinOp(binop) => self.evaluate_binop(binop, scope),
             Expr::Paren(paren) => self.evaluate_paren(paren, scope),
             Expr::UnaryOp(unary_op) => self.evaluate_unary_op(unary_op, scope),

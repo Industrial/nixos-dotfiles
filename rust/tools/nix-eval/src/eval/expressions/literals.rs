@@ -5,6 +5,7 @@ use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
 use crate::value::NixValue;
 use rnix::ast::{Literal, Str, InterpolPart};
+use rowan::ast::AstNode;
 
 impl Evaluator {
     pub(crate) fn evaluate_literal(&self, literal: &Literal) -> Result<NixValue> {
@@ -52,6 +53,11 @@ impl Evaluator {
     }
 
     pub(crate) fn evaluate_string(&self, str_expr: &Str, scope: &VariableScope) -> Result<NixValue> {
+        // Check if this is an indented string (multiline string using '')
+        // In rnix, indented strings are represented differently - check the syntax
+        let syntax_text = str_expr.syntax().text().to_string();
+        let is_indented = syntax_text.trim_start().starts_with("''");
+        
         let mut result = String::new();
 
         // Iterate over the parts of the string
@@ -62,17 +68,39 @@ impl Evaluator {
                 InterpolPart::Literal(literal) => {
                     // This is a literal string part
                     let part_text = literal.to_string();
-                    // Unescape the string
-                    // Handle backslash-newline line continuation first (backslash followed by actual newline)
-                    let mut unescaped = part_text.replace("\\\n", "\n");
-                    // Handle other escape sequences
-                    unescaped = unescaped
-                        .replace("\\n", "\n")
-                        .replace("\\t", "\t")
-                        .replace("\\\"", "\"")
-                        .replace("\\\\", "\\")
-                        .replace("\\${", "${"); // Unescape ${ in strings
-                    result.push_str(&unescaped);
+                    
+                    if is_indented {
+                        // For indented strings, handle special escaping
+                        // '' becomes ', ''${ becomes ${, ''\n becomes \n, etc.
+                        let mut unescaped = part_text
+                            .replace("''", "'")  // '' becomes '
+                            .replace("''${", "${")  // ''${ becomes ${
+                            .replace("''\\n", "\\n")  // ''\n becomes \n
+                            .replace("''\\r", "\\r")  // ''\r becomes \r
+                            .replace("''\\t", "\\t");  // ''\t becomes \t
+                        
+                        // Now handle regular escape sequences
+                        unescaped = unescaped
+                            .replace("\\n", "\n")
+                            .replace("\\r", "\r")
+                            .replace("\\t", "\t")
+                            .replace("\\\"", "\"")
+                            .replace("\\\\", "\\");
+                        
+                        result.push_str(&unescaped);
+                    } else {
+                        // Regular string - unescape normally
+                        // Handle backslash-newline line continuation first (backslash followed by actual newline)
+                        let mut unescaped = part_text.replace("\\\n", "\n");
+                        // Handle other escape sequences
+                        unescaped = unescaped
+                            .replace("\\n", "\n")
+                            .replace("\\t", "\t")
+                            .replace("\\\"", "\"")
+                            .replace("\\\\", "\\")
+                            .replace("\\${", "${"); // Unescape ${ in strings
+                        result.push_str(&unescaped);
+                    }
                 }
                 InterpolPart::Interpolation(interp) => {
                     // This is an interpolated expression - get the expression
@@ -110,6 +138,40 @@ impl Evaluator {
             }
         }
 
+        // For indented strings, strip common indentation from all lines
+        if is_indented {
+            // Split into lines and find minimum indentation
+            let lines: Vec<&str> = result.lines().collect();
+            if !lines.is_empty() {
+                // Find minimum indentation (excluding empty lines)
+                let mut min_indent = usize::MAX;
+                for line in &lines {
+                    if !line.trim().is_empty() {
+                        let indent = line.len() - line.trim_start().len();
+                        min_indent = min_indent.min(indent);
+                    }
+                }
+                
+                // Strip the minimum indentation from each line
+                let mut stripped_lines = Vec::new();
+                for line in &lines {
+                    if line.trim().is_empty() {
+                        stripped_lines.push("");
+                    } else {
+                        let indent = line.len() - line.trim_start().len();
+                        if indent >= min_indent {
+                            stripped_lines.push(&line[min_indent..]);
+                        } else {
+                            stripped_lines.push(line);
+                        }
+                    }
+                }
+                
+                // Join lines with \n
+                result = stripped_lines.join("\n");
+            }
+        }
+        
         Ok(NixValue::String(result))
     }
 

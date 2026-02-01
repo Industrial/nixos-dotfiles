@@ -18,65 +18,97 @@ impl Evaluator {
             reason: "binary operation missing right operand".to_string(),
         })?;
 
-        // Evaluate both operands
-        let lhs_raw = self.evaluate_expr_with_scope(&lhs_expr, scope)?;
-        let rhs_raw = self.evaluate_expr_with_scope(&rhs_expr, scope)?;
-        
-        // Force thunks before arithmetic operations
-        let lhs = lhs_raw.clone().force(self)?;
-        let rhs = rhs_raw.clone().force(self)?;
-
-        // Get the operator
+        // Get the operator first to check if we need special handling
         let op = binop
             .operator()
             .ok_or_else(|| Error::UnsupportedExpression {
                 reason: "binary operation missing operator".to_string(),
             })?;
 
-        // Handle arithmetic operators based on BinOpKind
-        // Note: In Nix, `//` is used for both integer division and attribute set updates.
-        // We'll handle it as integer division here for arithmetic operations.
-        // Attribute set updates will be handled separately when we implement that feature.
-        match op {
-            BinOpKind::Add => self.evaluate_add(&lhs, &rhs),
-            BinOpKind::Sub => self.evaluate_subtract(&lhs, &rhs),
-            BinOpKind::Mul => self.evaluate_multiply(&lhs, &rhs),
-            BinOpKind::Div => self.evaluate_divide(&lhs, &rhs),
-            BinOpKind::Update => {
-                // `//` operator: Check if operands are integers (integer division) or attribute sets (update)
-                match (&lhs, &rhs) {
-                    (NixValue::Integer(_), NixValue::Integer(_)) => {
-                        self.evaluate_integer_divide(&lhs, &rhs)
+        // Handle `or` operator specially: if left side fails, return right side
+        if op == BinOpKind::Or {
+            // Try to evaluate left side (including forcing)
+            let lhs_result = (|| -> Result<NixValue> {
+                let lhs_raw = self.evaluate_expr_with_scope(&lhs_expr, scope)?;
+                let lhs = lhs_raw.clone().force(self)?;
+                Ok(lhs)
+            })();
+            
+            match lhs_result {
+                Ok(lhs) => {
+                    // Left side succeeded - check if it's falsy
+                    let lhs_falsy = matches!(lhs, NixValue::Boolean(false) | NixValue::Null);
+                    if lhs_falsy {
+                        // Evaluate and return right side
+                        let rhs_raw = self.evaluate_expr_with_scope(&rhs_expr, scope)?;
+                        let rhs = rhs_raw.clone().force(self)?;
+                        Ok(rhs)
+                    } else {
+                        // Short-circuit: return left side
+                        Ok(lhs)
                     }
-                    (NixValue::AttributeSet(lhs_attrs), NixValue::AttributeSet(rhs_attrs)) => {
-                        // Attribute set update: merge rhs into lhs, with rhs values taking precedence
-                        let mut result = lhs_attrs.clone();
-                        // Add/override attributes from rhs
-                        for (key, value) in rhs_attrs {
-                            result.insert(key.clone(), value.clone());
-                        }
-                        Ok(NixValue::AttributeSet(result))
-                    }
-                    _ => Err(Error::UnsupportedExpression {
-                        reason: format!("cannot apply // operator to {} and {}", lhs, rhs),
-                    }),
+                }
+                Err(_) => {
+                    // Left side failed (either evaluation or forcing) - return right side
+                    let rhs_raw = self.evaluate_expr_with_scope(&rhs_expr, scope)?;
+                    let rhs = rhs_raw.clone().force(self)?;
+                    Ok(rhs)
                 }
             }
-            // Comparison operators
-            BinOpKind::Equal => self.evaluate_equal(&lhs, &rhs),
-            BinOpKind::NotEqual => self.evaluate_not_equal(&lhs, &rhs),
-            BinOpKind::Less => self.evaluate_less(&lhs, &rhs),
-            BinOpKind::More => self.evaluate_greater(&lhs, &rhs),
-            BinOpKind::LessOrEq => self.evaluate_less_or_equal(&lhs, &rhs),
-            BinOpKind::MoreOrEq => self.evaluate_greater_or_equal(&lhs, &rhs),
-            // Logical operators
-            BinOpKind::And => self.evaluate_and(&lhs, &rhs),
-            BinOpKind::Or => self.evaluate_or(&lhs, &rhs),
-            // List concatenation operator
-            BinOpKind::Concat => self.evaluate_concat(&lhs, &rhs),
-            _ => Err(Error::UnsupportedExpression {
-                reason: format!("unsupported binary operator: {:?}", op),
-            }),
+        } else {
+            // For all other operators, evaluate both operands first
+            let lhs_raw = self.evaluate_expr_with_scope(&lhs_expr, scope)?;
+            let rhs_raw = self.evaluate_expr_with_scope(&rhs_expr, scope)?;
+            
+            // Force thunks before arithmetic operations
+            let lhs = lhs_raw.clone().force(self)?;
+            let rhs = rhs_raw.clone().force(self)?;
+
+            // Handle arithmetic operators based on BinOpKind
+            // Note: In Nix, `//` is used for both integer division and attribute set updates.
+            // We'll handle it as integer division here for arithmetic operations.
+            // Attribute set updates will be handled separately when we implement that feature.
+            match op {
+                BinOpKind::Add => self.evaluate_add(&lhs, &rhs),
+                BinOpKind::Sub => self.evaluate_subtract(&lhs, &rhs),
+                BinOpKind::Mul => self.evaluate_multiply(&lhs, &rhs),
+                BinOpKind::Div => self.evaluate_divide(&lhs, &rhs),
+                BinOpKind::Update => {
+                    // `//` operator: Check if operands are integers (integer division) or attribute sets (update)
+                    match (&lhs, &rhs) {
+                        (NixValue::Integer(_), NixValue::Integer(_)) => {
+                            self.evaluate_integer_divide(&lhs, &rhs)
+                        }
+                        (NixValue::AttributeSet(lhs_attrs), NixValue::AttributeSet(rhs_attrs)) => {
+                            // Attribute set update: merge rhs into lhs, with rhs values taking precedence
+                            let mut result = lhs_attrs.clone();
+                            // Add/override attributes from rhs
+                            for (key, value) in rhs_attrs {
+                                result.insert(key.clone(), value.clone());
+                            }
+                            Ok(NixValue::AttributeSet(result))
+                        }
+                        _ => Err(Error::UnsupportedExpression {
+                            reason: format!("cannot apply // operator to {} and {}", lhs, rhs),
+                        }),
+                    }
+                }
+                // Comparison operators
+                BinOpKind::Equal => self.evaluate_equal(&lhs, &rhs),
+                BinOpKind::NotEqual => self.evaluate_not_equal(&lhs, &rhs),
+                BinOpKind::Less => self.evaluate_less(&lhs, &rhs),
+                BinOpKind::More => self.evaluate_greater(&lhs, &rhs),
+                BinOpKind::LessOrEq => self.evaluate_less_or_equal(&lhs, &rhs),
+                BinOpKind::MoreOrEq => self.evaluate_greater_or_equal(&lhs, &rhs),
+                // Logical operators
+                BinOpKind::And => self.evaluate_and(&lhs, &rhs),
+                BinOpKind::Or => self.evaluate_or(&lhs, &rhs),
+                // List concatenation operator
+                BinOpKind::Concat => self.evaluate_concat(&lhs, &rhs),
+                _ => Err(Error::UnsupportedExpression {
+                    reason: format!("unsupported binary operator: {:?}", op),
+                }),
+            }
         }
     }
 
@@ -195,6 +227,90 @@ impl Evaluator {
             (NixValue::String(lhs_str), NixValue::Path(rhs_path)) => {
                 let rhs_str = rhs_path.to_string_lossy();
                 Ok(NixValue::String(format!("{}{}", lhs_str, rhs_str)))
+            }
+            // Attribute set with __toString + String: coerce attribute set to string
+            (NixValue::AttributeSet(lhs_attrs), NixValue::String(rhs_str)) => {
+                // Check for __toString attribute
+                if let Some(toString_value) = lhs_attrs.get("__toString") {
+                    let toString_func = toString_value.clone().force(self)?;
+                    match toString_func {
+                        NixValue::Function(func) => {
+                            // Call __toString with the attribute set (without __toString)
+                            let mut attrs_for_call = lhs_attrs.clone();
+                            attrs_for_call.remove("__toString");
+                            let attrs_value = NixValue::AttributeSet(attrs_for_call);
+                            let coerced_str = func.apply(self, attrs_value)?;
+                            match coerced_str {
+                                NixValue::String(s) => Ok(NixValue::String(format!("{}{}", s, rhs_str))),
+                                _ => Err(Error::UnsupportedExpression {
+                                    reason: format!("__toString must return a string, got {}", coerced_str),
+                                }),
+                            }
+                        }
+                        _ => Err(Error::UnsupportedExpression {
+                            reason: format!("__toString must be a function, got {}", toString_func),
+                        }),
+                    }
+                } else if let Some(out_path_value) = lhs_attrs.get("outPath") {
+                    // Check for outPath attribute (for derivations)
+                    let out_path_str = out_path_value.clone().force(self)?;
+                    match out_path_str {
+                        NixValue::String(s) => Ok(NixValue::String(format!("{}{}", s, rhs_str))),
+                        NixValue::Path(p) => {
+                            let p_str = p.to_string_lossy();
+                            Ok(NixValue::String(format!("{}{}", p_str, rhs_str)))
+                        }
+                        _ => Err(Error::UnsupportedExpression {
+                            reason: format!("outPath must be a string or path, got {}", out_path_str),
+                        }),
+                    }
+                } else {
+                    Err(Error::UnsupportedExpression {
+                        reason: format!("cannot add {} and {}", lhs_forced, rhs_forced),
+                    })
+                }
+            }
+            // String + Attribute set with __toString: coerce attribute set to string
+            (NixValue::String(lhs_str), NixValue::AttributeSet(rhs_attrs)) => {
+                // Check for __toString attribute
+                if let Some(toString_value) = rhs_attrs.get("__toString") {
+                    let toString_func = toString_value.clone().force(self)?;
+                    match toString_func {
+                        NixValue::Function(func) => {
+                            // Call __toString with the attribute set (without __toString)
+                            let mut attrs_for_call = rhs_attrs.clone();
+                            attrs_for_call.remove("__toString");
+                            let attrs_value = NixValue::AttributeSet(attrs_for_call);
+                            let coerced_str = func.apply(self, attrs_value)?;
+                            match coerced_str {
+                                NixValue::String(s) => Ok(NixValue::String(format!("{}{}", lhs_str, s))),
+                                _ => Err(Error::UnsupportedExpression {
+                                    reason: format!("__toString must return a string, got {}", coerced_str),
+                                }),
+                            }
+                        }
+                        _ => Err(Error::UnsupportedExpression {
+                            reason: format!("__toString must be a function, got {}", toString_func),
+                        }),
+                    }
+                } else if let Some(out_path_value) = rhs_attrs.get("outPath") {
+                    // Check for outPath attribute (for derivations)
+                    let out_path_str = out_path_value.clone().force(self)?;
+                    match out_path_str {
+                        NixValue::String(s) => Ok(NixValue::String(format!("{}{}", lhs_str, s))),
+                        NixValue::Path(p) => {
+                            let p_str = p.to_string_lossy();
+                            Ok(NixValue::String(format!("{}{}", lhs_str, p_str)))
+                        }
+                        _ => Err(Error::UnsupportedExpression {
+                            reason: format!("outPath must be a string or path, got {}", out_path_str),
+                        }),
+                    }
+                } else {
+                    Err(Error::UnsupportedExpression {
+                        reason: format!("cannot add {} and {}", lhs_forced, rhs_forced),
+                    })
+                }
             }
             // Path + Path: concatenate two paths
             // In Nix, path + path appends the components of the second path to the first
@@ -382,15 +498,37 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_less(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        let result = match (lhs, rhs) {
+        // Deep force both sides to ensure all nested thunks are evaluated
+        let lhs_deep = lhs.clone().deep_force(self)?;
+        let rhs_deep = rhs.clone().deep_force(self)?;
+        
+        let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a < b,
             (NixValue::Float(a), NixValue::Float(b)) => a < b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) < *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a < (*b as f64),
             (NixValue::String(a), NixValue::String(b)) => a < b,
+            (NixValue::List(a), NixValue::List(b)) => {
+                // Compare lists lexicographically
+                for (a_elem, b_elem) in a.iter().zip(b.iter()) {
+                    let a_val = a_elem.clone().deep_force(self)?;
+                    let b_val = b_elem.clone().deep_force(self)?;
+                    let cmp = self.evaluate_less(&a_val, &b_val)?;
+                    if let NixValue::Boolean(true) = cmp {
+                        return Ok(NixValue::Boolean(true));
+                    }
+                    let eq = self.evaluate_equal(&a_val, &b_val)?;
+                    if let NixValue::Boolean(false) = eq {
+                        // Not equal, and not less, so greater
+                        return Ok(NixValue::Boolean(false));
+                    }
+                }
+                // All elements equal so far - compare lengths
+                a.len() < b.len()
+            }
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("cannot compare {} and {} with <", lhs, rhs),
+                    reason: format!("cannot compare {} and {} with <", lhs_deep, rhs_deep),
                 });
             }
         };
@@ -402,15 +540,37 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_greater(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        let result = match (lhs, rhs) {
+        // Deep force both sides to ensure all nested thunks are evaluated
+        let lhs_deep = lhs.clone().deep_force(self)?;
+        let rhs_deep = rhs.clone().deep_force(self)?;
+        
+        let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a > b,
             (NixValue::Float(a), NixValue::Float(b)) => a > b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) > *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a > (*b as f64),
             (NixValue::String(a), NixValue::String(b)) => a > b,
+            (NixValue::List(a), NixValue::List(b)) => {
+                // Compare lists lexicographically
+                for (a_elem, b_elem) in a.iter().zip(b.iter()) {
+                    let a_val = a_elem.clone().deep_force(self)?;
+                    let b_val = b_elem.clone().deep_force(self)?;
+                    let cmp = self.evaluate_greater(&a_val, &b_val)?;
+                    if let NixValue::Boolean(true) = cmp {
+                        return Ok(NixValue::Boolean(true));
+                    }
+                    let eq = self.evaluate_equal(&a_val, &b_val)?;
+                    if let NixValue::Boolean(false) = eq {
+                        // Not equal, and not greater, so less
+                        return Ok(NixValue::Boolean(false));
+                    }
+                }
+                // All elements equal so far - compare lengths
+                a.len() > b.len()
+            }
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("cannot compare {} and {} with >", lhs, rhs),
+                    reason: format!("cannot compare {} and {} with >", lhs_deep, rhs_deep),
                 });
             }
         };
@@ -422,15 +582,37 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_less_or_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        let result = match (lhs, rhs) {
+        // Deep force both sides to ensure all nested thunks are evaluated
+        let lhs_deep = lhs.clone().deep_force(self)?;
+        let rhs_deep = rhs.clone().deep_force(self)?;
+        
+        let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a <= b,
             (NixValue::Float(a), NixValue::Float(b)) => a <= b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) <= *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a <= (*b as f64),
             (NixValue::String(a), NixValue::String(b)) => a <= b,
+            (NixValue::List(a), NixValue::List(b)) => {
+                // Compare lists lexicographically
+                for (a_elem, b_elem) in a.iter().zip(b.iter()) {
+                    let a_val = a_elem.clone().deep_force(self)?;
+                    let b_val = b_elem.clone().deep_force(self)?;
+                    let cmp = self.evaluate_less(&a_val, &b_val)?;
+                    if let NixValue::Boolean(true) = cmp {
+                        return Ok(NixValue::Boolean(true));
+                    }
+                    let eq = self.evaluate_equal(&a_val, &b_val)?;
+                    if let NixValue::Boolean(false) = eq {
+                        // Not equal, and not less, so greater
+                        return Ok(NixValue::Boolean(false));
+                    }
+                }
+                // All elements equal so far - compare lengths
+                a.len() <= b.len()
+            }
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("cannot compare {} and {} with <=", lhs, rhs),
+                    reason: format!("cannot compare {} and {} with <=", lhs_deep, rhs_deep),
                 });
             }
         };
@@ -442,15 +624,37 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_greater_or_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        let result = match (lhs, rhs) {
+        // Deep force both sides to ensure all nested thunks are evaluated
+        let lhs_deep = lhs.clone().deep_force(self)?;
+        let rhs_deep = rhs.clone().deep_force(self)?;
+        
+        let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a >= b,
             (NixValue::Float(a), NixValue::Float(b)) => a >= b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) >= *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a >= (*b as f64),
             (NixValue::String(a), NixValue::String(b)) => a >= b,
+            (NixValue::List(a), NixValue::List(b)) => {
+                // Compare lists lexicographically
+                for (a_elem, b_elem) in a.iter().zip(b.iter()) {
+                    let a_val = a_elem.clone().deep_force(self)?;
+                    let b_val = b_elem.clone().deep_force(self)?;
+                    let cmp = self.evaluate_greater(&a_val, &b_val)?;
+                    if let NixValue::Boolean(true) = cmp {
+                        return Ok(NixValue::Boolean(true));
+                    }
+                    let eq = self.evaluate_equal(&a_val, &b_val)?;
+                    if let NixValue::Boolean(false) = eq {
+                        // Not equal, and not greater, so less
+                        return Ok(NixValue::Boolean(false));
+                    }
+                }
+                // All elements equal so far - compare lengths
+                a.len() >= b.len()
+            }
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("cannot compare {} and {} with >=", lhs, rhs),
+                    reason: format!("cannot compare {} and {} with >=", lhs_deep, rhs_deep),
                 });
             }
         };

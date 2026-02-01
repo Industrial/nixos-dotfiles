@@ -219,29 +219,42 @@ impl Evaluator {
                 } else {
                     // Nested case: foo.bar = value
                     // Build nested structure from the inside out
+                    // For "a.b = 15", attr_names = ["a", "b"]
+                    // We want to create { a = { b = 15 } }
+                    // So we start with the value (15), then wrap it with "b", then wrap that with "a"
                     let mut nested_value = value;
                     
-                    // Start from the last key and work backwards
-                    for key in attr_names.iter().rev().skip(1) {
+                    // Start from the last key and work backwards (skip the first key, we'll handle it separately)
+                    // For ["a", "b"], we want to iterate over ["b"] (the last one)
+                    // Then wrap it with "a" (the first one)
+                    for key in attr_names.iter().rev().take(attr_names.len() - 1) {
                         let mut inner_map = HashMap::new();
                         inner_map.insert(key.clone(), nested_value);
                         nested_value = NixValue::AttributeSet(inner_map);
                     }
                     
-                    // Now merge into the top-level attrs
+                    // Now merge into the top-level attrs using the first key
                     let first_key = &attr_names[0];
                     if let Some(existing) = attrs.get_mut(first_key) {
                         // Merge with existing nested structure
-                        if let NixValue::AttributeSet(existing_map) = existing {
-                            if let NixValue::AttributeSet(new_map) = &nested_value {
-                                // Merge the new map into the existing map
-                                for (k, v) in new_map {
-                                    existing_map.insert(k.clone(), v.clone());
+                        let existing_forced = existing.clone().force(self)?;
+                        match existing_forced {
+                            NixValue::AttributeSet(mut existing_map) => {
+                                if let NixValue::AttributeSet(new_map) = nested_value {
+                                    // Merge the new map into the existing map
+                                    for (k, v) in new_map {
+                                        existing_map.insert(k.clone(), v.clone());
+                                    }
+                                    *existing = NixValue::AttributeSet(existing_map);
+                                } else {
+                                    // Overwrite if not an attribute set
+                                    *existing = nested_value;
                                 }
                             }
-                        } else {
-                            // Overwrite if not an attribute set
-                            *existing = nested_value;
+                            _ => {
+                                // Overwrite if not an attribute set
+                                *existing = nested_value;
+                            }
                         }
                     } else {
                         // Insert new nested structure

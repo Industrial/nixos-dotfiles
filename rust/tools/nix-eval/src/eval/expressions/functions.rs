@@ -194,6 +194,143 @@ impl Evaluator {
                 }
             }
 
+            // Handle listToAttrs builtin specially - needs evaluator context for lazy evaluation
+            if builtin_name == "listToAttrs" {
+                let arg_expr = apply
+                    .argument()
+                    .ok_or_else(|| Error::UnsupportedExpression {
+                        reason: "listToAttrs missing argument".to_string(),
+                    })?;
+                let list_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                
+                // Force the list to get the actual list
+                let list_forced = list_value.clone().force(self)?;
+                let list = match list_forced {
+                    NixValue::List(l) => l,
+                    _ => {
+                        return Err(Error::UnsupportedExpression {
+                            reason: format!("listToAttrs expects a list, got {}", list_forced),
+                        });
+                    }
+                };
+                
+                let mut attrs = HashMap::new();
+                
+                // Process each element in the list
+                for elem in list {
+                    // Force the element to get the attribute set (but don't force nested values)
+                    let elem_forced = elem.clone().force(self)?;
+                    
+                    // Each element should be an attribute set with "name" and "value" keys
+                    let elem_attrs = match elem_forced {
+                        NixValue::AttributeSet(a) => a,
+                        _ => {
+                            return Err(Error::UnsupportedExpression {
+                                reason: format!("listToAttrs: list element must be an attribute set, got {}", elem_forced),
+                            });
+                        }
+                    };
+                    
+                    // Get the "name" attribute - force it to get the string
+                    let name_value = elem_attrs.get("name")
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: format!("listToAttrs: element must have a 'name' attribute"),
+                        })?;
+                    let name_forced = name_value.clone().force(self)?;
+                    let name = match name_forced {
+                        NixValue::String(s) => s,
+                        _ => {
+                            return Err(Error::UnsupportedExpression {
+                                reason: format!("listToAttrs: element must have a 'name' string attribute, got {}", name_forced),
+                            });
+                        }
+                    };
+                    
+                    // Get the "value" attribute - DON'T force it! Just clone it (preserves thunks)
+                    let value = elem_attrs.get("value")
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: format!("listToAttrs: element must have a 'value' attribute"),
+                        })?
+                        .clone();
+                    
+                    // Insert into result (first occurrence wins if duplicate names)
+                    attrs.entry(name).or_insert(value);
+                }
+                
+                return Ok(NixValue::AttributeSet(attrs));
+            }
+
+            // Handle toJSON builtin specially to support __toString in attribute sets
+            if builtin_name == "toJSON" {
+                let arg_expr = apply
+                    .argument()
+                    .ok_or_else(|| Error::UnsupportedExpression {
+                        reason: "toJSON missing argument".to_string(),
+                    })?;
+                let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+
+                // Check if the argument is an attribute set with __toString
+                if let NixValue::AttributeSet(ref attrs) = arg_value {
+                    if let Some(toString_value) = attrs.get("__toString") {
+                        // Clone the attribute set and remove __toString for the function call
+                        let mut attrs_for_call = attrs.clone();
+                        attrs_for_call.remove("__toString");
+
+                        // Force the __toString value if it's a thunk
+                        let toString_func = toString_value.clone().force(self)?;
+
+                        // The __toString should be a function
+                        match toString_func {
+                            NixValue::Function(func) => {
+                                // Call __toString with the attribute set as the argument
+                                let attrs_value = NixValue::AttributeSet(attrs_for_call);
+                                let result = func.apply(self, attrs_value)?;
+
+                                // The result should be a string - JSON-encode it (add quotes and escape)
+                                match result {
+                                    NixValue::String(s) => {
+                                        // JSON-encode the string: escape quotes and backslashes, wrap in quotes
+                                        let escaped: String = s
+                                            .chars()
+                                            .map(|c| match c {
+                                                '"' => "\\\"".to_string(),
+                                                '\\' => "\\\\".to_string(),
+                                                '\n' => "\\n".to_string(),
+                                                '\r' => "\\r".to_string(),
+                                                '\t' => "\\t".to_string(),
+                                                _ => c.to_string(),
+                                            })
+                                            .collect();
+                                        return Ok(NixValue::String(format!("\"{}\"", escaped)));
+                                    }
+                                    _ => {
+                                        return Err(Error::UnsupportedExpression {
+                                            reason: format!(
+                                                "__toString must return a string, got: {:?}",
+                                                result
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!(
+                                        "__toString must be a function, got: {:?}",
+                                        toString_func
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                }
+                // No __toString found, fall through to normal toJSON builtin
+                // For now, return an error since we don't have full JSON serialization yet
+                return Err(Error::UnsupportedExpression {
+                    reason: "toJSON: full JSON serialization not yet implemented (only __toString attribute sets supported)".to_string(),
+                });
+            }
+
             if let Some(builtin) = self.builtins.get(&builtin_name) {
                 // This is a builtin function call
                 // Get the argument expression
@@ -255,7 +392,238 @@ impl Evaluator {
                                             return Ok(NixValue::AttributeSet(result));
                                         }
                                     }
-                                } else                                 if attr.to_string() == "attrNames" {
+                                } else if attr.to_string() == "toJSON" {
+                                    // This is builtins.toJSON value - handle __toString specially
+                                    let arg_expr = apply.argument()
+                                        .ok_or_else(|| Error::UnsupportedExpression {
+                                            reason: "toJSON: missing argument".to_string(),
+                                        })?;
+                                    
+                                    let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                    
+                                    // Check if the argument is an attribute set with __toString
+                                    if let NixValue::AttributeSet(ref attrs) = arg_value {
+                                        if let Some(toString_value) = attrs.get("__toString") {
+                                            // Clone the attribute set and remove __toString for the function call
+                                            let mut attrs_for_call = attrs.clone();
+                                            attrs_for_call.remove("__toString");
+                                            
+                                            // Force the __toString value if it's a thunk
+                                            let toString_func = toString_value.clone().force(self)?;
+                                            
+                                            // The __toString should be a function
+                                            match toString_func {
+                                                NixValue::Function(func) => {
+                                                    // Call __toString with the attribute set as the argument
+                                                    let attrs_value = NixValue::AttributeSet(attrs_for_call);
+                                                    let result = func.apply(self, attrs_value)?;
+                                                    
+                                                    // The result should be a string - JSON-encode it (add quotes and escape)
+                                                    match result {
+                                                        NixValue::String(s) => {
+                                                            // JSON-encode the string: escape quotes and backslashes, wrap in quotes
+                                                            let escaped: String = s
+                                                                .chars()
+                                                                .map(|c| match c {
+                                                                    '"' => "\\\"".to_string(),
+                                                                    '\\' => "\\\\".to_string(),
+                                                                    '\n' => "\\n".to_string(),
+                                                                    '\r' => "\\r".to_string(),
+                                                                    '\t' => "\\t".to_string(),
+                                                                    _ => c.to_string(),
+                                                                })
+                                                                .collect();
+                                                            return Ok(NixValue::String(format!("\"{}\"", escaped)));
+                                                        }
+                                                        _ => {
+                                                            return Err(Error::UnsupportedExpression {
+                                                                reason: format!(
+                                                                    "__toString must return a string, got: {:?}",
+                                                                    result
+                                                                ),
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!(
+                                                            "__toString must be a function, got: {:?}",
+                                                            toString_func
+                                                        ),
+                                                    });
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // No __toString found, fall through to normal toJSON builtin
+                                    if let Some(builtin) = self.builtins.get("toJSON") {
+                                        let arg_forced = arg_value.clone().force(self)?;
+                                        return builtin.call(&[arg_forced]);
+                                    }
+                                } else if attr.to_string() == "listToAttrs" {
+                                    // This is builtins.listToAttrs list - handle specially to force thunks in list elements
+                                    // but preserve thunks in values (lazy evaluation)
+                                    let arg_expr = apply.argument()
+                                        .ok_or_else(|| Error::UnsupportedExpression {
+                                            reason: "listToAttrs: missing argument".to_string(),
+                                        })?;
+                                    
+                                    let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                    let arg_forced = arg_value.clone().force(self)?;
+                                    
+                                    let list = match arg_forced {
+                                        NixValue::List(l) => l,
+                                        _ => {
+                                            return Err(Error::UnsupportedExpression {
+                                                reason: format!("listToAttrs expects a list, got {}", arg_forced),
+                                            });
+                                        }
+                                    };
+                                    
+                                    let mut result = HashMap::new();
+                                    for item in list {
+                                        // Force thunks in list elements to get the attribute set
+                                        let item_forced = item.clone().force(self)?;
+                                        match item_forced {
+                                            NixValue::AttributeSet(attrs) => {
+                                                // Extract name and value attributes
+                                                let name = attrs.get("name")
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "listToAttrs: attribute set missing 'name' attribute".to_string(),
+                                                    })?;
+                                                let value = attrs.get("value")
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "listToAttrs: attribute set missing 'value' attribute".to_string(),
+                                                    })?;
+                                                
+                                                // Force the name to get the string value (name must be evaluated)
+                                                let name_forced = name.clone().force(self)?;
+                                                let name_str = match name_forced {
+                                                    NixValue::String(s) => s,
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("listToAttrs: 'name' must be a string, got {}", name_forced),
+                                                        });
+                                                    }
+                                                };
+                                                
+                                                // Insert into result (later entries override earlier ones with the same name)
+                                                // Keep value as-is (may be a thunk for lazy evaluation)
+                                                result.insert(name_str, value.clone());
+                                            }
+                                            _ => {
+                                                return Err(Error::UnsupportedExpression {
+                                                    reason: format!("listToAttrs: list elements must be attribute sets, got {}", item_forced),
+                                                });
+                                            }
+                                        }
+                                    }
+                                    
+                                    return Ok(NixValue::AttributeSet(result));
+                                } else if attr.to_string() == "elem" {
+                                    // This is builtins.elem x xs - check if x is in list xs
+                                    let arg_expr = apply.argument()
+                                        .ok_or_else(|| Error::UnsupportedExpression {
+                                            reason: "elem: missing argument".to_string(),
+                                        })?;
+                                    
+                                    let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                    
+                                    // elem is curried: builtins.elem x xs
+                                    // Check if func_expr is itself an Apply with builtins.elem x
+                                    if let Expr::Apply(inner_apply) = &func_expr {
+                                        if let Some(inner_func_expr) = inner_apply.lambda() {
+                                            if let Expr::Select(select) = inner_func_expr {
+                                                if let Some(base_expr) = select.expr() {
+                                                    if let Expr::Ident(ident) = base_expr {
+                                                        if ident.to_string() == "builtins" {
+                                                            if let Some(attrpath) = select.attrpath() {
+                                                                if let Some(inner_attr) = attrpath.attrs().next() {
+                                                                    if inner_attr.to_string() == "elem" {
+                                                                        // This is builtins.elem x xs
+                                                                        let x_expr = inner_apply.argument()
+                                                                            .ok_or_else(|| Error::UnsupportedExpression {
+                                                                                reason: "elem: missing first argument".to_string(),
+                                                                            })?;
+                                                                        let xs_expr = apply.argument()
+                                                                            .ok_or_else(|| Error::UnsupportedExpression {
+                                                                                reason: "elem: missing second argument".to_string(),
+                                                                            })?;
+                                                                        
+                                                                        let x_value = self.evaluate_expr_with_scope_impl(&x_expr, scope)?;
+                                                                        let xs_value = self.evaluate_expr_with_scope_impl(&xs_expr, scope)?;
+                                                                        
+                                                                        // Force the list to check elements
+                                                                        let xs_forced = xs_value.clone().force(self)?;
+                                                                        let list = match xs_forced {
+                                                                            NixValue::List(l) => l,
+                                                                            _ => {
+                                                                                return Err(Error::UnsupportedExpression {
+                                                                                    reason: format!("elem: second argument must be a list, got {}", xs_forced),
+                                                                                });
+                                                                            }
+                                                                        };
+                                                                        
+                                                                        // Check if x is in the list (force thunks in list elements for comparison)
+                                                                        for item in list {
+                                                                            let item_forced = item.clone().force(self)?;
+                                                                            // Compare using equality
+                                                                            let eq_result = self.evaluate_equal(&x_value, &item_forced)?;
+                                                                            if let NixValue::Boolean(true) = eq_result {
+                                                                                return Ok(NixValue::Boolean(true));
+                                                                            }
+                                                                        }
+                                                                        
+                                                                        return Ok(NixValue::Boolean(false));
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // If not curried, return error (elem requires two arguments)
+                                    return Err(Error::UnsupportedExpression {
+                                        reason: "elem: requires two arguments (elem x xs)".to_string(),
+                                    });
+                                } else if attr.to_string() == "dirOf" {
+                                    // This is builtins.dirOf path - extract directory from path
+                                    let arg_expr = apply.argument()
+                                        .ok_or_else(|| Error::UnsupportedExpression {
+                                            reason: "dirOf: missing argument".to_string(),
+                                        })?;
+                                    
+                                    let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                    let arg_forced = arg_value.clone().force(self)?;
+                                    
+                                    let path_str = match arg_forced {
+                                        NixValue::String(s) => s,
+                                        NixValue::Path(p) => p.to_string_lossy().to_string(),
+                                        _ => {
+                                            return Err(Error::UnsupportedExpression {
+                                                reason: format!("dirOf: argument must be a string or path, got {}", arg_forced),
+                                            });
+                                        }
+                                    };
+                                    
+                                    // Extract directory from path
+                                    let dir = if path_str.is_empty() {
+                                        ".".to_string()
+                                    } else if let Some(last_slash) = path_str.rfind('/') {
+                                        if last_slash == 0 {
+                                            "/".to_string()
+                                        } else {
+                                            path_str[..last_slash].to_string()
+                                        }
+                                    } else {
+                                        ".".to_string()
+                                    };
+                                    
+                                    return Ok(NixValue::String(dir));
+                                } else if attr.to_string() == "attrNames" {
                                     // This is builtins.attrNames set
                                     let arg_expr = apply.argument()
                                         .ok_or_else(|| Error::UnsupportedExpression {
@@ -322,6 +690,7 @@ impl Evaluator {
         // Check if this is a nested Apply for genList: builtins.genList f n
         // The parser gives us: Apply(Apply(builtins.genList, f), n)
         // So we check if func_expr is itself an Apply with builtins.genList
+        // Also check for foldl' which has three arguments: Apply(Apply(Apply(builtins.foldl', f), init), list)
         if let Expr::Apply(inner_apply) = &func_expr {
             if let Some(inner_func_expr) = inner_apply.lambda() {
                 if let Expr::Select(select) = inner_func_expr {
@@ -331,7 +700,293 @@ impl Evaluator {
                             if ident.to_string() == "builtins" {
                                 if let Some(attrpath) = select.attrpath() {
                                     if let Some(attr) = attrpath.attrs().next() {
-                                        if attr.to_string() == "genList" {
+                                        // Check for foldl' first (three arguments: Apply(Apply(Apply(builtins.foldl', f), init), list))
+                                        // We're at: Apply(Apply(builtins.foldl', f), init)
+                                        // So func_expr is Apply(Apply(builtins.foldl', f), init)
+                                        // inner_apply is Apply(builtins.foldl', f)
+                                        // We need to check if apply is itself an Apply to get the list
+                                        if attr.to_string() == "foldl'" {
+                                            // Structure: apply = Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                            // func_expr = apply.lambda() = Apply(Apply(builtins.foldl', f), init)
+                                            // inner_apply = Apply(Apply(builtins.foldl', f), init) (same as func_expr)
+                                            // inner_apply.lambda() = Apply(builtins.foldl', f)
+                                            // So:
+                                            //   f_expr = inner_apply.lambda().argument() = f
+                                            //   init_expr = inner_apply.argument() = init
+                                            //   list_expr = apply.argument() = list
+                                            
+                                            let inner_inner_func_expr = inner_apply.lambda()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "foldl': missing inner function".to_string(),
+                                                })?;
+                                            let f_expr = if let Expr::Apply(inner_inner_apply) = inner_inner_func_expr {
+                                                inner_inner_apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "foldl': missing first argument".to_string(),
+                                                    })?
+                                            } else {
+                                                return Err(Error::UnsupportedExpression {
+                                                    reason: "foldl': expected Apply expression for function".to_string(),
+                                                });
+                                            };
+                                            let init_expr = inner_apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "foldl': missing second argument".to_string(),
+                                                })?;
+                                            let list_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "foldl': missing third argument".to_string(),
+                                                })?;
+                                            
+                                            let f_value = self.evaluate_expr_with_scope_impl(&f_expr, scope)?;
+                                            let init_value = self.evaluate_expr_with_scope_impl(&init_expr, scope)?;
+                                            let list_value = self.evaluate_expr_with_scope_impl(&list_expr, scope)?;
+                                            
+                                            // Get the list
+                                            let list_forced = list_value.clone().force(self)?;
+                                            let list = match list_forced {
+                                                NixValue::List(l) => l,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("foldl': third argument must be a list, got {}", list_forced),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Handle builtin functions specially
+                                            if let NixValue::String(s) = &f_value {
+                                                if s.starts_with("__builtin_func:") {
+                                                    let builtin_name = &s[15..]; // Skip "__builtin_func:"
+                                                    if let Some(builtin) = self.builtins.get(builtin_name) {
+                                                        // Strict left fold with builtin: foldl' builtin init [x1, x2, ..., xn]
+                                                        // For builtins, we call them directly: builtin(acc, x)
+                                                        let mut accumulator = init_value;
+                                                        for element in list {
+                                                            // Force element before applying builtin (strict evaluation)
+                                                            let element_forced = element.clone().force(self)?;
+                                                            // Call builtin with accumulator and element
+                                                            accumulator = builtin.call(&[accumulator, element_forced])?;
+                                                        }
+                                                        return Ok(accumulator);
+                                                    } else {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("foldl': unknown builtin function: {}", builtin_name),
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // Handle regular functions
+                                            let func = match f_value {
+                                                NixValue::Function(f) => f,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("foldl': first argument must be a function, got {}", f_value),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Strict left fold: foldl' f init [x1, x2, ..., xn] = f (... (f (f init x1) x2) ...) xn
+                                            // f is curried: f acc x = (f acc) x
+                                            let mut accumulator = init_value;
+                                            for element in list {
+                                                // Force element before applying function (strict evaluation)
+                                                let element_forced = element.clone().force(self)?;
+                                                // Apply f to accumulator: f acc (returns a function)
+                                                let f_acc = func.apply(self, accumulator)?;
+                                                // Apply (f acc) to element: (f acc) x
+                                                accumulator = match f_acc {
+                                                    NixValue::Function(f_acc_func) => f_acc_func.apply(self, element_forced)?,
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("foldl': function must return a function when partially applied, got {}", f_acc),
+                                                        });
+                                                    }
+                                                };
+                                            }
+                                            
+                                            return Ok(accumulator);
+                                        } else if attr.to_string() == "deepSeq" {
+                                            // Check if this is foldl' f init list (three arguments)
+                                            // The parser gives us: Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                            // We're at: Apply(Apply(builtins.foldl', f), init)
+                                            // So func_expr is Apply(Apply(builtins.foldl', f), init)
+                                            // inner_apply is Apply(builtins.foldl', f)
+                                            // We need to check if apply (the outer Apply) is itself an Apply to get the list
+                                            // Actually, apply is Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                            // So apply.argument() is list
+                                            // And func_expr is Apply(Apply(builtins.foldl', f), init)
+                                            // So inner_apply is Apply(builtins.foldl', f), and inner_apply.argument() is f
+                                            // And apply is Apply(inner_apply, init), so... wait, that's not right either
+                                            
+                                            // Let me think: apply = Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                            // func_expr = apply.lambda() = Apply(Apply(builtins.foldl', f), init)
+                                            // So if func_expr is Apply, then:
+                                            //   mid_apply = Apply(Apply(builtins.foldl', f), init) (same as func_expr)
+                                            //   inner_apply = Apply(builtins.foldl', f)
+                                            // So:
+                                            //   f_expr = inner_apply.argument() = f
+                                            //   init_expr = mid_apply.argument() = init
+                                            //   list_expr = apply.argument() = list
+                                            
+                                            // Check if func_expr is itself an Apply (meaning we have Apply(Apply(builtins.foldl', f), init))
+                                            if let Expr::Apply(mid_apply) = &func_expr {
+                                                // mid_apply is Apply(Apply(builtins.foldl', f), init)
+                                                // Check if mid_apply.lambda() is Apply(builtins.foldl', f)
+                                                if let Some(mid_func_expr) = mid_apply.lambda() {
+                                                    if let Expr::Apply(inner_inner_apply) = mid_func_expr {
+                                                        if let Some(inner_inner_func_expr) = inner_inner_apply.lambda() {
+                                                            if let Expr::Select(inner_inner_select) = inner_inner_func_expr {
+                                                                if let Some(inner_inner_base_expr) = inner_inner_select.expr() {
+                                                                    if let Expr::Ident(inner_inner_ident) = inner_inner_base_expr {
+                                                                        if inner_inner_ident.to_string() == "builtins" {
+                                                                            if let Some(inner_inner_attrpath) = inner_inner_select.attrpath() {
+                                                                                if let Some(inner_inner_attr) = inner_inner_attrpath.attrs().next() {
+                                                                                    if inner_inner_attr.to_string() == "foldl'" {
+                                                                                        // This is builtins.foldl' f init list
+                                                                                        // inner_inner_apply is Apply(builtins.foldl', f)
+                                                                                        // mid_apply is Apply(inner_inner_apply, init)
+                                                                                        // apply is Apply(mid_apply, list)
+                                                                                        let f_expr = inner_inner_apply.argument()
+                                                                                            .ok_or_else(|| Error::UnsupportedExpression {
+                                                                                                reason: "foldl': missing first argument".to_string(),
+                                                                                            })?;
+                                                                                        let init_expr = mid_apply.argument()
+                                                                                            .ok_or_else(|| Error::UnsupportedExpression {
+                                                                                                reason: "foldl': missing second argument".to_string(),
+                                                                                            })?;
+                                                                                        let list_expr = apply.argument()
+                                                                                            .ok_or_else(|| Error::UnsupportedExpression {
+                                                                                                reason: "foldl': missing third argument".to_string(),
+                                                                                            })?;
+                                                                                
+                                                                                        let f_value = self.evaluate_expr_with_scope_impl(&f_expr, scope)?;
+                                                                                        let init_value = self.evaluate_expr_with_scope_impl(&init_expr, scope)?;
+                                                                                        let list_value = self.evaluate_expr_with_scope_impl(&list_expr, scope)?;
+                                                                                        
+                                                                                        // Get the list
+                                                                                        let list_forced = list_value.clone().force(self)?;
+                                                                                        let list = match list_forced {
+                                                                                            NixValue::List(l) => l,
+                                                                                            _ => {
+                                                                                                return Err(Error::UnsupportedExpression {
+                                                                                                    reason: format!("foldl': third argument must be a list, got {}", list_forced),
+                                                                                                });
+                                                                                            }
+                                                                                        };
+                                                                                        
+                                                                                        // Handle builtin functions specially
+                                                                                        if let NixValue::String(s) = &f_value {
+                                                                                            if s.starts_with("__builtin_func:") {
+                                                                                                let builtin_name = &s[15..]; // Skip "__builtin_func:"
+                                                                                                if let Some(builtin) = self.builtins.get(builtin_name) {
+                                                                                                    // Strict left fold with builtin: foldl' builtin init [x1, x2, ..., xn]
+                                                                                                    // For builtins, we call them directly: builtin(acc, x)
+                                                                                                    let mut accumulator = init_value;
+                                                                                                    for element in list {
+                                                                                                        // Force element before applying builtin (strict evaluation)
+                                                                                                        let element_forced = element.clone().force(self)?;
+                                                                                                        // Call builtin with accumulator and element
+                                                                                                        accumulator = builtin.call(&[accumulator, element_forced])?;
+                                                                                                    }
+                                                                                                    return Ok(accumulator);
+                                                                                                } else {
+                                                                                                    return Err(Error::UnsupportedExpression {
+                                                                                                        reason: format!("foldl': unknown builtin function: {}", builtin_name),
+                                                                                                    });
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                        
+                                                                                        // Handle regular functions
+                                                                                        let func = match f_value {
+                                                                                            NixValue::Function(f) => f,
+                                                                                            _ => {
+                                                                                                return Err(Error::UnsupportedExpression {
+                                                                                                    reason: format!("foldl': first argument must be a function, got {}", f_value),
+                                                                                                });
+                                                                                            }
+                                                                                        };
+                                                                                        
+                                                                                        // Strict left fold: foldl' f init [x1, x2, ..., xn] = f (... (f (f init x1) x2) ...) xn
+                                                                                        // f is curried: f acc x = (f acc) x
+                                                                                        let mut accumulator = init_value;
+                                                                                        for element in list {
+                                                                                            // Force element before applying function (strict evaluation)
+                                                                                            let element_forced = element.clone().force(self)?;
+                                                                                            // Apply f to accumulator: f acc (returns a function)
+                                                                                            let f_acc = func.apply(self, accumulator)?;
+                                                                                            // Apply (f acc) to element: (f acc) x
+                                                                                            accumulator = match f_acc {
+                                                                                                NixValue::Function(f_acc_func) => f_acc_func.apply(self, element_forced)?,
+                                                                                                _ => {
+                                                                                                    return Err(Error::UnsupportedExpression {
+                                                                                                        reason: format!("foldl': function must return a function when partially applied, got {}", f_acc),
+                                                                                                    });
+                                                                                                }
+                                                                                            };
+                                                                                        }
+                                                                                        
+                                                                                        return Ok(accumulator);
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else if attr.to_string() == "deepSeq" {
+                                            // This is builtins.deepSeq a b - force a deeply, return b
+                                            let a_expr = inner_apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "deepSeq: missing first argument".to_string(),
+                                                })?;
+                                            let b_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "deepSeq: missing second argument".to_string(),
+                                                })?;
+                                            
+                                            let a_value = self.evaluate_expr_with_scope_impl(&a_expr, scope)?;
+                                            let b_value = self.evaluate_expr_with_scope_impl(&b_expr, scope)?;
+                                            
+                                            // Deep force a (evaluate all thunks recursively)
+                                            let _ = a_value.clone().deep_force(self)?;
+                                            
+                                            // Return b
+                                            return Ok(b_value);
+                                        } else if attr.to_string() == "foldl'" {
+                                            // This is builtins.foldl' f init list - strict left fold
+                                            // The parser gives us: Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                            // We're currently at: Apply(builtins.foldl', f)
+                                            // So func_expr is builtins.foldl', and inner_apply.argument() is f
+                                            // We need to check if func_expr (which is the result of applying foldl' to f) is itself applied
+                                            // Actually, let's check if func_expr matches inner_apply
+                                            // If func_expr == inner_apply, then apply is Apply(inner_apply, init)
+                                            // And we need to check if there's another level
+                                            
+                                            // Check if func_expr is itself an Apply (meaning we have Apply(Apply(builtins.foldl', f), init))
+                                            if let Expr::Apply(mid_apply) = &func_expr {
+                                                // Check if mid_apply matches inner_apply (they should be the same Apply node)
+                                                // If so, then apply is Apply(mid_apply, init), and we need the third argument
+                                                let init_expr = apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "foldl': missing second argument".to_string(),
+                                                    })?;
+                                                
+                                                // Now check if the result is applied again to get the list
+                                                // This would be in a nested Apply, but we're already handling that at a different level
+                                                // For now, let's assume we need to handle this at the outer level
+                                                // Actually, the structure is: Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                                // So we need to check one more level up
+                                                return Err(Error::UnsupportedExpression {
+                                                    reason: "foldl': requires three arguments (foldl' f init list) - needs nested Apply handling".to_string(),
+                                                });
+                                            }
+                                        } else if attr.to_string() == "genList" {
                                             // This is builtins.genList f n - extract both arguments
                                             let first_arg_expr = inner_apply.argument()
                                                 .ok_or_else(|| Error::UnsupportedExpression {

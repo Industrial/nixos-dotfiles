@@ -166,7 +166,7 @@ impl Function {
         file_id: Option<FileId>,
     ) -> Self {
         let parameter = format!("__curried_{}_arg{}", builtin_name, args.len() + 1);
-        let body_text = format!("__curried_builtin_call:{}", builtin_name);
+        let _body_text = format!("__curried_builtin_call:{}", builtin_name);
         
         let mut closure = VariableScope::new();
         closure.insert(format!("__builtin_{}", builtin_name), NixValue::String(format!("__builtin_func:{}", builtin_name)));

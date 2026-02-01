@@ -1372,6 +1372,119 @@ impl Builtin for AddBuiltin {
     }
 }
 
+/// Ceil builtin - rounds a number up to the nearest integer
+pub struct CeilBuiltin;
+
+impl Builtin for CeilBuiltin {
+    fn name(&self) -> &str {
+        "ceil"
+    }
+    
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if args.len() != 1 {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("ceil takes 1 argument, got {}", args.len()),
+            });
+        }
+        
+        match &args[0] {
+            NixValue::Integer(i) => Ok(NixValue::Integer(*i)),
+            NixValue::Float(f) => Ok(NixValue::Integer(f.ceil() as i64)),
+            _ => Err(Error::UnsupportedExpression {
+                reason: format!("ceil expects a number, got {}", args[0]),
+            }),
+        }
+    }
+}
+
+/// Floor builtin - rounds a number down to the nearest integer
+pub struct FloorBuiltin;
+
+impl Builtin for FloorBuiltin {
+    fn name(&self) -> &str {
+        "floor"
+    }
+
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if args.len() != 1 {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("floor takes 1 argument, got {}", args.len()),
+            });
+        }
+
+        match &args[0] {
+            NixValue::Integer(i) => Ok(NixValue::Integer(*i)),
+            NixValue::Float(f) => Ok(NixValue::Integer(f.floor() as i64)),
+            _ => Err(Error::UnsupportedExpression {
+                reason: format!("floor expects a number, got {}", args[0]),
+            }),
+        }
+    }
+}
+
+/// ParseDrvName builtin - parses a derivation name string into name and version
+///
+/// `builtins.parseDrvName "name-version"` returns `{name = "name"; version = "version";}`
+/// The first dash followed by a non-alphabetic character separates name from version.
+pub struct ParseDrvNameBuiltin;
+
+impl Builtin for ParseDrvNameBuiltin {
+    fn name(&self) -> &str {
+        "parseDrvName"
+    }
+
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if args.len() != 1 {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("parseDrvName takes 1 argument, got {}", args.len()),
+            });
+        }
+
+        let s = match &args[0] {
+            NixValue::String(s) => s,
+            _ => {
+                return Err(Error::UnsupportedExpression {
+                    reason: format!("parseDrvName expects a string, got {}", args[0]),
+                });
+            }
+        };
+
+        // Find the first dash followed by a non-alphabetic character
+        // This separates the name from the version
+        let mut name_end = None;
+        for (i, ch) in s.char_indices() {
+            if ch == '-' {
+                // Check if the next character (if any) is non-alphabetic
+                let next_ch = s[i+ch.len_utf8()..].chars().next();
+                if let Some(next) = next_ch {
+                    if !next.is_alphabetic() {
+                        name_end = Some(i);
+                        break;
+                    }
+                } else {
+                    // Dash at the end - this separates name from version
+                    name_end = Some(i);
+                    break;
+                }
+            }
+        }
+
+        let (name, version) = if let Some(end) = name_end {
+            let name_part = &s[..end];
+            let version_part = &s[end + 1..];
+            (name_part.to_string(), version_part.to_string())
+        } else {
+            // No separator found - entire string is the name, version is empty
+            (s.clone(), "".to_string())
+        };
+
+        let mut result = HashMap::new();
+        result.insert("name".to_string(), NixValue::String(name));
+        result.insert("version".to_string(), NixValue::String(version));
+        Ok(NixValue::AttributeSet(result))
+    }
+}
+
 /// Mul builtin - multiplies two numbers
 pub struct MulBuiltin;
 
@@ -2040,10 +2153,21 @@ impl Builtin for ListToAttrsBuiltin {
         let mut attrs = HashMap::new();
         
         // Process each element in the list
+        // Note: We need to force elements to get attribute sets, but NOT force the "value" attributes
+        // This requires evaluator context, so listToAttrs should be handled specially in evaluate_apply
+        // For now, we'll handle it here but this might need to be moved to evaluate_apply
         for elem in list {
             // Each element should be an attribute set with "name" and "value" keys
+            // Don't force the element here - it will be forced when accessed
             let elem_attrs = match elem {
                 NixValue::AttributeSet(a) => a,
+                NixValue::Thunk(_) => {
+                    // Element is a thunk - we can't force it here without evaluator context
+                    // This will be handled specially in evaluate_apply
+                    return Err(Error::UnsupportedExpression {
+                        reason: "listToAttrs: requires evaluator context for lazy evaluation".to_string(),
+                    });
+                }
                 _ => {
                     return Err(Error::UnsupportedExpression {
                         reason: format!("listToAttrs: list element must be an attribute set, got {}", elem),
@@ -2051,25 +2175,30 @@ impl Builtin for ListToAttrsBuiltin {
                 }
             };
             
-            // Get the "name" attribute
-            let name = match elem_attrs.get("name") {
-                Some(NixValue::String(s)) => s.clone(),
+            // Get the "name" attribute - this needs to be forced to get the string
+            // But we can't force it here without evaluator context
+            let name_value = elem_attrs.get("name")
+                .ok_or_else(|| Error::UnsupportedExpression {
+                    reason: format!("listToAttrs: element must have a 'name' attribute"),
+                })?;
+            
+            // Try to get the name without forcing (if it's already a string)
+            let name = match name_value {
+                NixValue::String(s) => s.clone(),
                 _ => {
+                    // Name is a thunk - we can't force it here
                     return Err(Error::UnsupportedExpression {
-                        reason: format!("listToAttrs: element must have a 'name' string attribute, got {:?}", elem_attrs.get("name")),
+                        reason: "listToAttrs: requires evaluator context to force 'name' attribute".to_string(),
                     });
                 }
             };
             
-            // Get the "value" attribute
-            let value = match elem_attrs.get("value") {
-                Some(v) => v.clone(),
-                None => {
-                    return Err(Error::UnsupportedExpression {
-                        reason: format!("listToAttrs: element must have a 'value' attribute"),
-                    });
-                }
-            };
+            // Get the "value" attribute - DON'T force it! Just clone it (preserves thunks)
+            let value = elem_attrs.get("value")
+                .ok_or_else(|| Error::UnsupportedExpression {
+                    reason: format!("listToAttrs: element must have a 'value' attribute"),
+                })?
+                .clone();
             
             // Insert into result (first occurrence wins if duplicate names)
             attrs.entry(name).or_insert(value);
@@ -2639,3 +2768,5 @@ impl Builtin for NixVersionBuiltin {
         Ok(NixValue::String("2.18".to_string()))
     }
 }
+
+
