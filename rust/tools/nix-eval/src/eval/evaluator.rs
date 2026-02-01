@@ -115,6 +115,7 @@ impl Evaluator {
         self.register_builtin(Box::new(crate::builtins::BitAndBuiltin));
         self.register_builtin(Box::new(crate::builtins::BitXorBuiltin));
         self.register_builtin(Box::new(crate::builtins::ConcatMapBuiltin));
+        self.register_builtin(Box::new(crate::builtins::NixVersionBuiltin));
     }
 
     /// Get a builtin function by name
@@ -695,7 +696,14 @@ impl crate::value::NixValue {
     ///
     /// The fully evaluated value or an error
     pub fn deep_force(self, evaluator: &crate::eval::Evaluator) -> Result<NixValue> {
-        match self.force(evaluator)? {
+        // Keep forcing until we get a non-thunk value
+        let mut value = self.force(evaluator)?;
+        while let NixValue::Thunk(thunk) = &value {
+            value = thunk.force(evaluator)?;
+        }
+        
+        // Now recursively force nested structures
+        match value {
             NixValue::List(list) => {
                 let mut forced_list = Vec::new();
                 for item in list {

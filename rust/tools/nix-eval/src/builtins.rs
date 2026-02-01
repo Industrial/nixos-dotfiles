@@ -2619,3 +2619,23 @@ impl Builtin for SplitVersionBuiltin {
         Ok(NixValue::List(result))
     }
 }
+
+/// NixVersion builtin - returns the Nix version string
+pub struct NixVersionBuiltin;
+
+impl Builtin for NixVersionBuiltin {
+    fn name(&self) -> &str {
+        "nixVersion"
+    }
+    
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if !args.is_empty() {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("nixVersion takes 0 arguments, got {}", args.len()),
+            });
+        }
+        // Return a version string compatible with nixpkgs checks
+        // Using "2.18" as a safe default that works with most checks
+        Ok(NixValue::String("2.18".to_string()))
+    }
+}
