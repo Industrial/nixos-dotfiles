@@ -313,11 +313,11 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        // Force thunks before comparison
-        let lhs_forced = lhs.clone().force(self)?;
-        let rhs_forced = rhs.clone().force(self)?;
+        // Deep force both sides to ensure all nested thunks are evaluated
+        let lhs_deep = lhs.clone().deep_force(self)?;
+        let rhs_deep = rhs.clone().deep_force(self)?;
         
-        let result = match (&lhs_forced, &rhs_forced) {
+        let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a == b,
             (NixValue::Float(a), NixValue::Float(b)) => a == b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) == *b,
@@ -340,17 +340,23 @@ impl Evaluator {
                 }
             },
             (NixValue::AttributeSet(a), NixValue::AttributeSet(b)) => {
-                // Compare attribute sets by forcing thunks in values
+                // Compare attribute sets - they're already deeply forced at the top level
+                // But we need to recursively compare nested attribute sets
                 if a.len() != b.len() {
                     false
                 } else {
-                    // Check that all keys in a exist in b with equal values
                     a.iter().all(|(key, a_val)| {
                         if let Some(b_val) = b.get(key) {
-                            // Force thunks before comparing
-                            match (a_val.clone().force(self), b_val.clone().force(self)) {
-                                (Ok(a_forced), Ok(b_forced)) => a_forced == b_forced,
-                                _ => false,
+                            // Recursively compare values, handling nested attribute sets
+                            match (a_val, b_val) {
+                                (NixValue::AttributeSet(_), NixValue::AttributeSet(_)) => {
+                                    // Recursively compare nested attribute sets
+                                    match self.evaluate_equal(a_val, b_val) {
+                                        Ok(NixValue::Boolean(true)) => true,
+                                        _ => false,
+                                    }
+                                }
+                                _ => a_val == b_val,
                             }
                         } else {
                             false

@@ -216,11 +216,22 @@ impl Evaluator {
                                     // Try to evaluate the expression, catching any errors
                                     match self.evaluate_expr_with_scope_impl(&arg_expr, scope) {
                                         Ok(value) => {
-                                            // Evaluation succeeded
-                                            let mut result = std::collections::HashMap::new();
-                                            result.insert("success".to_string(), NixValue::Boolean(true));
-                                            result.insert("value".to_string(), value);
-                                            return Ok(NixValue::AttributeSet(result));
+                                            // If the value is a thunk, force it and catch any errors
+                                            match value.clone().force(self) {
+                                                Ok(forced_value) => {
+                                                    // Evaluation succeeded
+                                                    let mut result = std::collections::HashMap::new();
+                                                    result.insert("success".to_string(), NixValue::Boolean(true));
+                                                    result.insert("value".to_string(), forced_value);
+                                                    return Ok(NixValue::AttributeSet(result));
+                                                }
+                                                Err(_) => {
+                                                    // Forcing the thunk failed - return success=false
+                                                    let mut result = std::collections::HashMap::new();
+                                                    result.insert("success".to_string(), NixValue::Boolean(false));
+                                                    return Ok(NixValue::AttributeSet(result));
+                                                }
+                                            }
                                         }
                                         Err(_) => {
                                             // Evaluation failed - return success=false
@@ -680,6 +691,106 @@ impl Evaluator {
                                             }
                                             
                                             return Ok(NixValue::List(result));
+                                        } else if attr.to_string() == "concatLists" {
+                                            // This is builtins.concatLists list
+                                            let arg_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "concatLists: missing argument".to_string(),
+                                                })?;
+                                            
+                                            let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                            let arg_forced = arg_value.clone().force(self)?;
+                                            
+                                            // Get the list
+                                            let list = match arg_forced {
+                                                NixValue::List(l) => l,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("concatLists expects a list, got {}", arg_forced),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Check that each element is a list and concatenate
+                                            // We force thunks to check they're lists, but don't force thunks inside the lists
+                                            let mut result = Vec::new();
+                                            for item in list {
+                                                // Force the item to check it's a list, but preserve thunks inside
+                                                let item_forced = item.clone().force(self)?;
+                                                match item_forced {
+                                                    NixValue::List(l) => {
+                                                        // Extend with the list elements (which may contain thunks)
+                                                        // Don't force thunks inside the lists - preserve lazy evaluation
+                                                        result.extend(l);
+                                                    }
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("concatLists: all elements must be lists, got {}", item_forced),
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            
+                                            return Ok(NixValue::List(result));
+                                        } else if attr.to_string() == "elemAt" {
+                                            // This is builtins.elemAt list index
+                                            let arg_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "elemAt: missing argument".to_string(),
+                                                })?;
+                                            
+                                            // Check if this is a nested apply: elemAt list index
+                                            if let Expr::Apply(inner_apply) = &func_expr {
+                                                let list_expr = inner_apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "elemAt: missing list argument".to_string(),
+                                                    })?;
+                                                let index_expr = arg_expr;
+                                                
+                                                let list_value = self.evaluate_expr_with_scope_impl(&list_expr, scope)?;
+                                                let list_forced = list_value.clone().force(self)?;
+                                                
+                                                let index_value = self.evaluate_expr_with_scope_impl(&index_expr, scope)?;
+                                                let index_forced = index_value.clone().force(self)?;
+                                                
+                                                // Get the list
+                                                let list = match list_forced {
+                                                    NixValue::List(l) => l,
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("elemAt: first argument must be a list, got {}", list_forced),
+                                                        });
+                                                    }
+                                                };
+                                                
+                                                // Get the index
+                                                let index = match index_forced {
+                                                    NixValue::Integer(i) => {
+                                                        if i < 0 {
+                                                            return Err(Error::UnsupportedExpression {
+                                                                reason: format!("elemAt: index must be non-negative, got {}", i),
+                                                            });
+                                                        }
+                                                        i as usize
+                                                    }
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("elemAt: second argument must be an integer, got {}", index_forced),
+                                                        });
+                                                    }
+                                                };
+                                                
+                                                if index >= list.len() {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("elemAt: index {} out of bounds for list of length {}", index, list.len()),
+                                                    });
+                                                }
+                                                
+                                                // Force the thunk at the index before returning
+                                                let element = list[index].clone();
+                                                let element_forced = element.force(self)?;
+                                                return Ok(element_forced);
+                                            }
                                         }
                                     }
                                 }

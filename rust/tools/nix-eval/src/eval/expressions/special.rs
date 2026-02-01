@@ -39,12 +39,22 @@ impl Evaluator {
                 })?;
 
             // Get the first identifier from the attrpath as the variable name
+            // Handle both identifiers and string literals (e.g., "foo bar")
             let var_name = attrpath
                 .attrs()
                 .next()
-                .map(|attr| attr.to_string())
+                .map(|attr| {
+                    let attr_str = attr.to_string();
+                    // Check if it's a string literal (starts and ends with quotes)
+                    if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
+                        // Strip quotes for string literal attribute names
+                        attr_str[1..attr_str.len()-1].to_string()
+                    } else {
+                        attr_str
+                    }
+                })
                 .ok_or_else(|| Error::UnsupportedExpression {
-                    reason: "let binding variable name must be an identifier".to_string(),
+                    reason: "let binding variable name must be an identifier or string".to_string(),
                 })?;
 
             // Get the value expression
@@ -143,12 +153,22 @@ impl Evaluator {
                 })?;
 
             // Get the first identifier from the attrpath as the variable name
+            // Handle both identifiers and string literals (e.g., "foo bar")
             let var_name = attrpath
                 .attrs()
                 .next()
-                .map(|attr| attr.to_string())
+                .map(|attr| {
+                    let attr_str = attr.to_string();
+                    // Check if it's a string literal (starts and ends with quotes)
+                    if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
+                        // Strip quotes for string literal attribute names
+                        attr_str[1..attr_str.len()-1].to_string()
+                    } else {
+                        attr_str
+                    }
+                })
                 .ok_or_else(|| Error::UnsupportedExpression {
-                    reason: "let binding variable name must be an identifier".to_string(),
+                    reason: "let binding variable name must be an identifier or string".to_string(),
                 })?;
 
             // Get the value expression

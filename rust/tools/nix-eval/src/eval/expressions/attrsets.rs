@@ -71,36 +71,44 @@ impl Evaluator {
                 
                 // Get the attributes to inherit
                 for attr in inherit_node.attrs() {
-                    // Get the attribute name (can be identifier or string expression)
+                    // Get the attribute name (can be identifier or string literal)
+                    // For string literals like "foo bar", we need to extract the string value
                     let key = if let Some(ident) = rnix::ast::Ident::cast(attr.syntax().clone()) {
                         ident.to_string()
-                    } else if let Some(string) = rnix::ast::Str::cast(attr.syntax().clone()) {
-                        // String expression - evaluate it to get the string value
-                        let str_value = self.evaluate_string(&string, scope)?;
-                        match str_value {
-                            NixValue::String(s) => s,
-                            _ => {
-                                return Err(Error::UnsupportedExpression {
-                                    reason: "inherit: string expression must evaluate to a string".to_string(),
-                                });
-                            }
-                        }
                     } else {
-                        // Try to evaluate as an expression (for dynamic attribute names)
-                        // First check if it's an expression
-                        if let Some(expr) = rnix::ast::Expr::cast(attr.syntax().clone()) {
-                            let expr_value = self.evaluate_expr_with_scope(&expr, scope)?;
-                            match expr_value {
+                        // Try to get the text representation and handle string literals
+                        let attr_text = attr.syntax().text().to_string();
+                        // Check if it's a string literal (starts and ends with quotes)
+                        if attr_text.starts_with('"') && attr_text.ends_with('"') && attr_text.len() >= 2 {
+                            // String literal - strip quotes
+                            attr_text[1..attr_text.len()-1].to_string()
+                        } else if let Some(string) = rnix::ast::Str::cast(attr.syntax().clone()) {
+                            // String expression - evaluate it to get the string value
+                            let str_value = self.evaluate_string(&string, scope)?;
+                            match str_value {
                                 NixValue::String(s) => s,
                                 _ => {
                                     return Err(Error::UnsupportedExpression {
-                                        reason: "inherit: expression must evaluate to a string".to_string(),
+                                        reason: "inherit: string expression must evaluate to a string".to_string(),
                                     });
                                 }
                             }
                         } else {
-                            // Fallback: try to get text representation
-                            attr.syntax().text().to_string().trim_matches('"').to_string()
+                            // Try to evaluate as an expression (for dynamic attribute names)
+                            if let Some(expr) = rnix::ast::Expr::cast(attr.syntax().clone()) {
+                                let expr_value = self.evaluate_expr_with_scope(&expr, scope)?;
+                                match expr_value {
+                                    NixValue::String(s) => s,
+                                    _ => {
+                                        return Err(Error::UnsupportedExpression {
+                                            reason: "inherit: expression must evaluate to a string".to_string(),
+                                        });
+                                    }
+                                }
+                            } else {
+                                // Fallback: use text representation, trimming quotes if present
+                                attr_text.trim_matches('"').to_string()
+                            }
                         }
                     };
                     
@@ -132,19 +140,42 @@ impl Evaluator {
                         })?;
 
                 // Collect all attributes in the path
-                let attr_names: Vec<String> = attrpath
-                    .attrs()
-                    .map(|attr| {
-                        // For string attributes, attr.to_string() includes quotes, so strip them
-                        let attr_str = attr.to_string();
-                        // Check if it starts and ends with quotes
-                        if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
-                            attr_str[1..attr_str.len()-1].to_string()
-                        } else {
-                            attr_str
+                // Attribute names can be identifiers, string literals, or string expressions (with interpolation)
+                let mut attr_names = Vec::new();
+                for attr in attrpath.attrs() {
+                    // Check if it's a string expression (with interpolation like "${expr}")
+                    if let Some(str_node) = rnix::ast::Str::cast(attr.syntax().clone()) {
+                        // Evaluate the string expression to get the key name
+                        // This handles dynamic keys like "${builtins.throw "a"}"
+                        match self.evaluate_string(&str_node, scope) {
+                            Ok(NixValue::String(s)) => {
+                                attr_names.push(s);
+                            }
+                            Ok(_) => {
+                                // If evaluation succeeds but doesn't return a string, use text representation
+                                let attr_str = attr.to_string().trim_matches('"').to_string();
+                                attr_names.push(attr_str);
+                            }
+                            Err(e) => {
+                                // If evaluation fails, propagate the error
+                                // This allows tryEval to catch errors from attribute keys
+                                return Err(e);
+                            }
                         }
-                    })
-                    .collect();
+                    } else if let Some(ident) = rnix::ast::Ident::cast(attr.syntax().clone()) {
+                        // Simple identifier
+                        attr_names.push(ident.to_string());
+                    } else {
+                        // Fallback: try to get text representation
+                        let attr_str = attr.to_string();
+                        // Check if it's a string literal (starts and ends with quotes)
+                        if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
+                            attr_names.push(attr_str[1..attr_str.len()-1].to_string());
+                        } else {
+                            attr_names.push(attr_str);
+                        }
+                    }
+                }
 
                 if attr_names.is_empty() {
                     return Err(Error::UnsupportedExpression {

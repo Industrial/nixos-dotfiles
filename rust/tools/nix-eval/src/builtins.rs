@@ -1076,9 +1076,25 @@ impl Builtin for BaseNameOfBuiltin {
             });
         }
         
+        // Convert to string representation, handling Path values specially
         let path_str = match &args[0] {
             NixValue::String(s) => s.clone(),
-            NixValue::Path(p) => p.display().to_string(),
+            NixValue::Path(p) => {
+                // For Path values, check if it's the root directory or ends with a component that is "."
+                let path_display = p.display().to_string();
+                // Check if path is root directory "/" or "."
+                if p == std::path::Path::new("/") || p == std::path::Path::new(".") {
+                    return Ok(NixValue::String("".to_string()));
+                }
+                // Check if the last component is "." (like "./.")
+                if let Some(last_component) = p.components().last() {
+                    if let std::path::Component::CurDir = last_component {
+                        // If the path ends with ".", baseNameOf returns ""
+                        return Ok(NixValue::String("".to_string()));
+                    }
+                }
+                path_display
+            }
             NixValue::StorePath(p) => p.clone(),
             _ => {
                 return Err(Error::UnsupportedExpression {
@@ -1092,17 +1108,23 @@ impl Builtin for BaseNameOfBuiltin {
             return Ok(NixValue::String("".to_string()));
         }
         
-        // Remove trailing slashes (but preserve a single leading slash for absolute paths)
-        let mut cleaned = path_str.trim_end_matches('/').to_string();
+        // If the path ends with '/', it represents a directory and baseNameOf returns ""
+        // Check this BEFORE removing trailing slashes
+        if path_str.ends_with('/') {
+            return Ok(NixValue::String("".to_string()));
+        }
+        
+        // Remove trailing slashes for normalization
+        let cleaned = path_str.trim_end_matches('/').to_string();
         
         // Handle root path or paths that become empty after removing trailing slashes
         if cleaned == "/" || cleaned.is_empty() {
             return Ok(NixValue::String("".to_string()));
         }
         
-        // Handle current directory
+        // Handle current directory - baseNameOf of "." is ""
         if cleaned == "." {
-            return Ok(NixValue::String(".".to_string()));
+            return Ok(NixValue::String("".to_string()));
         }
         
         // Extract the last component
