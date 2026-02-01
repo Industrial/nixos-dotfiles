@@ -12,8 +12,14 @@ impl Evaluator {
 
         // Remove quotes from string literals
         if text.starts_with('"') && text.ends_with('"') {
-            // Basic string unescaping (simplified - doesn't handle all escape sequences)
-            let unescaped = text[1..text.len() - 1]
+            // Basic string unescaping
+            // Handle backslash-newline line continuation first (backslash followed by actual newline)
+            // Then handle other escape sequences
+            let mut unescaped = text[1..text.len() - 1].to_string();
+            // Replace backslash followed by newline with just newline (line continuation)
+            unescaped = unescaped.replace("\\\n", "\n");
+            // Handle other escape sequences
+            unescaped = unescaped
                 .replace("\\n", "\n")
                 .replace("\\t", "\t")
                 .replace("\\\"", "\"")
@@ -57,7 +63,10 @@ impl Evaluator {
                     // This is a literal string part
                     let part_text = literal.to_string();
                     // Unescape the string
-                    let unescaped = part_text
+                    // Handle backslash-newline line continuation first (backslash followed by actual newline)
+                    let mut unescaped = part_text.replace("\\\n", "\n");
+                    // Handle other escape sequences
+                    unescaped = unescaped
                         .replace("\\n", "\n")
                         .replace("\\t", "\t")
                         .replace("\\\"", "\"")

@@ -8,7 +8,21 @@ use std::sync::Arc;
 impl fmt::Display for NixValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            NixValue::String(s) => write!(f, "\"{}\"", s),
+            NixValue::String(s) => {
+                // Escape special characters in strings for display
+                let escaped: String = s
+                    .chars()
+                    .map(|c| match c {
+                        '\n' => "\\n".to_string(),
+                        '\t' => "\\t".to_string(),
+                        '\r' => "\\r".to_string(),
+                        '"' => "\\\"".to_string(),
+                        '\\' => "\\\\".to_string(),
+                        _ => c.to_string(),
+                    })
+                    .collect();
+                write!(f, "\"{}\"", escaped)
+            },
             NixValue::Integer(i) => write!(f, "{}", i),
             NixValue::Float(fl) => {
                 // Nix displays floats with a maximum of 5 significant digits

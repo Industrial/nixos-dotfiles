@@ -486,7 +486,10 @@ impl Evaluator {
         })?;
 
         // Evaluate the base expression
-        let base_value = self.evaluate_expr_with_scope(&expr, scope)?;
+        let base_value_raw = self.evaluate_expr_with_scope(&expr, scope)?;
+        
+        // Force thunks before checking if it's an attribute set
+        let base_value = base_value_raw.force(self)?;
 
         // Get the attribute path
         let attrpath = select
