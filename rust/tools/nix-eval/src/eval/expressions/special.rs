@@ -27,9 +27,13 @@ impl Evaluator {
         // Track variable names for legacy let expressions
         let mut var_names = Vec::new();
 
-        // First pass: Create thunks for all bindings (to handle forward references)
+        // First pass: Collect all bindings and handle nested attribute paths
         // In Nix, let bindings can reference each other, so we need to create thunks
         // that will be evaluated lazily when accessed.
+        // We also need to handle nested paths like `set.a.b = value`
+        use std::collections::HashMap;
+        let mut nested_bindings: HashMap<String, Vec<(Vec<String>, rnix::ast::Expr)>> = HashMap::new();
+        
         for binding in bindings {
             // Get the attribute path (the variable name)
             let attrpath = binding
@@ -38,41 +42,105 @@ impl Evaluator {
                     reason: "let binding missing attrpath".to_string(),
                 })?;
 
-            // Get the first identifier from the attrpath as the variable name
-            // Handle both identifiers and string literals (e.g., "foo bar")
-            let var_name = attrpath
-                .attrs()
-                .next()
-                .map(|attr| {
-                    let attr_str = attr.to_string();
-                    // Check if it's a string literal (starts and ends with quotes)
-                    if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
-                        // Strip quotes for string literal attribute names
-                        attr_str[1..attr_str.len()-1].to_string()
-                    } else {
-                        attr_str
-                    }
-                })
-                .ok_or_else(|| Error::UnsupportedExpression {
+            // Collect all attribute names from the path
+            let mut attr_names = Vec::new();
+            for attr in attrpath.attrs() {
+                let attr_str = attr.to_string();
+                // Check if it's a string literal (starts and ends with quotes)
+                if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
+                    // Strip quotes for string literal attribute names
+                    attr_names.push(attr_str[1..attr_str.len()-1].to_string());
+                } else {
+                    attr_names.push(attr_str);
+                }
+            }
+
+            if attr_names.is_empty() {
+                return Err(Error::UnsupportedExpression {
                     reason: "let binding variable name must be an identifier or string".to_string(),
-                })?;
+                });
+            }
 
             // Get the value expression
             let value_expr = binding
                 .value()
                 .ok_or_else(|| Error::UnsupportedExpression {
-                    reason: format!("let binding '{}' missing value", var_name),
+                    reason: format!("let binding missing value"),
                 })?;
 
-            // Create a thunk for this binding
-            // The thunk's closure includes the new_scope (which will have all bindings)
-            // This allows forward references: bindings can reference each other
-            let file_id = self.current_file_id();
-            let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
-
-            // Add the thunk to the scope (wrapped in NixValue::Thunk)
-            new_scope.insert(var_name.clone(), NixValue::Thunk(Arc::new(thunk)));
-            var_names.push(var_name);
+            let var_name = attr_names[0].clone();
+            
+            if attr_names.len() == 1 {
+                // Simple binding: var = value
+                // Create a thunk for this binding
+                let file_id = self.current_file_id();
+                let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
+                new_scope.insert(var_name.clone(), NixValue::Thunk(Arc::new(thunk)));
+                var_names.push(var_name);
+            } else {
+                // Nested binding: var.a.b = value
+                // Store it for later processing
+                nested_bindings.entry(var_name.clone())
+                    .or_insert_with(Vec::new)
+                    .push((attr_names, value_expr));
+                if !var_names.contains(&var_name) {
+                    var_names.push(var_name);
+                }
+            }
+        }
+        
+        // Second pass: Handle nested bindings by creating attribute sets
+        for (var_name, paths_and_values) in nested_bindings {
+            // Build the nested attribute set structure
+            // Start with an empty attribute set that will be merged into
+            let mut attrs = HashMap::new();
+            
+            for (attr_names, value_expr) in paths_and_values {
+                // Create a thunk for the value
+                let file_id = self.current_file_id();
+                let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
+                let mut nested_value = NixValue::Thunk(Arc::new(thunk));
+                
+                // Build nested structure from inside out
+                // For "set.a.b = value", attr_names = ["set", "a", "b"]
+                // We want to build { a = { b = value } }
+                // So we iterate over ["a", "b"] in reverse: ["b", "a"]
+                let nested_path = &attr_names[1..];
+                for key in nested_path.iter().rev() {
+                    let mut inner_map = HashMap::new();
+                    inner_map.insert(key.clone(), nested_value);
+                    nested_value = NixValue::AttributeSet(inner_map);
+                }
+                
+                // nested_value now contains the full structure, e.g., { a = { b = value } }
+                // Merge it into attrs (which will become the value of var_name)
+                if let NixValue::AttributeSet(new_map) = nested_value {
+                    // Deep merge: merge each key recursively
+                    for (k, v) in new_map {
+                        if let Some(existing) = attrs.get_mut(&k) {
+                            // Merge recursively if both are attribute sets
+                            if let NixValue::AttributeSet(existing_map) = existing {
+                                if let NixValue::AttributeSet(new_inner_map) = &v {
+                                    for (inner_k, inner_v) in new_inner_map {
+                                        existing_map.insert(inner_k.clone(), inner_v.clone());
+                                    }
+                                } else {
+                                    // Overwrite if types don't match
+                                    *existing = v.clone();
+                                }
+                            } else {
+                                // Overwrite if existing is not an attribute set
+                                *existing = v.clone();
+                            }
+                        } else {
+                            attrs.insert(k, v);
+                        }
+                    }
+                }
+            }
+            
+            // Store the attribute set in the scope
+            new_scope.insert(var_name, NixValue::AttributeSet(attrs));
         }
 
         // Check if this is a legacy let expression (no "in" clause)
@@ -236,15 +304,18 @@ impl Evaluator {
 
         // Evaluate the attribute set expression
         let attrset_value = self.evaluate_expr_with_scope(&attrset_expr, scope)?;
+        
+        // Force thunks before checking if it's an attribute set
+        let attrset_forced = attrset_value.force(self)?;
 
         // Extract the attribute set
-        let attrs = match attrset_value {
+        let attrs = match attrset_forced {
             NixValue::AttributeSet(attrs) => attrs,
             _ => {
                 return Err(Error::UnsupportedExpression {
                     reason: format!(
                         "with expression namespace must be an attribute set, got: {:?}",
-                        attrset_value
+                        attrset_forced
                     ),
                 });
             }

@@ -23,16 +23,10 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
         "test files always end in .nix"
     );
 
-    let code = fs::read_to_string(&code_path).unwrap_or_else(|e| {
-        panic!(
-            "should be able to read test code from {}: {}",
-            code_path.display(),
-            e
-        )
-    });
-
     let evaluator = Evaluator::new();
-    let result = evaluator.evaluate(&code);
+    
+    // Use evaluate_from_file to set up file context for relative imports
+    let result = evaluator.evaluate_from_file(&code_path);
 
     let failed = result.is_err();
 

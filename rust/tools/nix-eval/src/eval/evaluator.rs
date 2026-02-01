@@ -445,6 +445,73 @@ impl Evaluator {
         self.evaluate_expr(&expr)
     }
 
+    /// Evaluate a Nix expression from a file
+    ///
+    /// This method sets up the file context so that relative imports can be resolved.
+    /// It reads the file, parses it, and evaluates it with the proper file context.
+    ///
+    /// # Arguments
+    ///
+    /// * `file_path` - Path to the Nix file to evaluate
+    ///
+    /// # Returns
+    ///
+    /// * `Ok(NixValue)` - The evaluated value
+    /// * `Err(Error)` - An error if reading, parsing, or evaluation fails
+    pub fn evaluate_from_file(&self, file_path: &PathBuf) -> Result<NixValue> {
+        // Read the file
+        let code = std::fs::read_to_string(file_path).map_err(|e| {
+            Error::UnsupportedExpression {
+                reason: format!("cannot read file '{}': {}", file_path.display(), e),
+            }
+        })?;
+
+        // Get canonical path
+        let canonical_path = file_path.canonicalize().unwrap_or_else(|_| file_path.clone());
+
+        // Add file to source map and get file ID
+        let file_id = {
+            let mut source_map = self.source_map.borrow_mut();
+            let file_name = canonical_path.to_string_lossy().to_string();
+            let file_id = source_map.add(file_name, code.clone());
+            // Store the mapping from file_id to path
+            {
+                let mut file_id_to_path = self.file_id_to_path.borrow_mut();
+                file_id_to_path.insert(file_id, canonical_path.clone());
+            }
+            file_id
+        };
+
+        // Parse the code
+        let tokens = tokenize(&code);
+        let (green_node, errors) = parse(tokens.into_iter());
+
+        // Check for parse errors
+        if !errors.is_empty() {
+            let error_msgs: Vec<String> = errors.iter().map(|e| format!("{:?}", e)).collect();
+            return Err(Error::ParseError {
+                reason: error_msgs.join(", "),
+            });
+        }
+
+        // Convert to syntax node and then to AST root
+        let syntax_node = SyntaxNode::new_root(green_node);
+        let root = Root::cast(syntax_node).ok_or(Error::AstConversionError)?;
+
+        let expr = root.expr().ok_or(Error::NoExpression)?;
+
+        // Push context for this file
+        self.push_context(Some(file_id), self.scope.clone());
+
+        // Evaluate the expression
+        let result = self.evaluate_expr(&expr);
+
+        // Pop context (restore previous context)
+        self.pop_context();
+
+        result
+    }
+
     /// Evaluate a parsed Nix expression AST node with a specific scope
     ///
     /// This method evaluates an expression using the provided scope instead of

@@ -67,8 +67,8 @@ impl Evaluator {
             BinOpKind::NotEqual => self.evaluate_not_equal(&lhs, &rhs),
             BinOpKind::Less => self.evaluate_less(&lhs, &rhs),
             BinOpKind::More => self.evaluate_greater(&lhs, &rhs),
-            // Note: <= and >= operators may be represented differently in rnix
-            // For now, we handle ==, !=, <, >. <= and >= can be added when we determine the correct variant names.
+            BinOpKind::LessOrEq => self.evaluate_less_or_equal(&lhs, &rhs),
+            BinOpKind::MoreOrEq => self.evaluate_greater_or_equal(&lhs, &rhs),
             // Logical operators
             BinOpKind::And => self.evaluate_and(&lhs, &rhs),
             BinOpKind::Or => self.evaluate_or(&lhs, &rhs),
@@ -348,15 +348,10 @@ impl Evaluator {
                     a.iter().all(|(key, a_val)| {
                         if let Some(b_val) = b.get(key) {
                             // Recursively compare values, handling nested attribute sets
-                            match (a_val, b_val) {
-                                (NixValue::AttributeSet(_), NixValue::AttributeSet(_)) => {
-                                    // Recursively compare nested attribute sets
-                                    match self.evaluate_equal(a_val, b_val) {
-                                        Ok(NixValue::Boolean(true)) => true,
-                                        _ => false,
-                                    }
-                                }
-                                _ => a_val == b_val,
+                            // evaluate_equal will handle deep forcing, so we can call it directly
+                            match self.evaluate_equal(a_val, b_val) {
+                                Ok(NixValue::Boolean(true)) => true,
+                                _ => false,
                             }
                         } else {
                             false
@@ -392,6 +387,7 @@ impl Evaluator {
             (NixValue::Float(a), NixValue::Float(b)) => a < b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) < *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a < (*b as f64),
+            (NixValue::String(a), NixValue::String(b)) => a < b,
             _ => {
                 return Err(Error::UnsupportedExpression {
                     reason: format!("cannot compare {} and {} with <", lhs, rhs),
@@ -411,6 +407,7 @@ impl Evaluator {
             (NixValue::Float(a), NixValue::Float(b)) => a > b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) > *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a > (*b as f64),
+            (NixValue::String(a), NixValue::String(b)) => a > b,
             _ => {
                 return Err(Error::UnsupportedExpression {
                     reason: format!("cannot compare {} and {} with >", lhs, rhs),
@@ -430,6 +427,7 @@ impl Evaluator {
             (NixValue::Float(a), NixValue::Float(b)) => a <= b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) <= *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a <= (*b as f64),
+            (NixValue::String(a), NixValue::String(b)) => a <= b,
             _ => {
                 return Err(Error::UnsupportedExpression {
                     reason: format!("cannot compare {} and {} with <=", lhs, rhs),
@@ -449,6 +447,7 @@ impl Evaluator {
             (NixValue::Float(a), NixValue::Float(b)) => a >= b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) >= *b,
             (NixValue::Float(a), NixValue::Integer(b)) => *a >= (*b as f64),
+            (NixValue::String(a), NixValue::String(b)) => a >= b,
             _ => {
                 return Err(Error::UnsupportedExpression {
                     reason: format!("cannot compare {} and {} with >=", lhs, rhs),

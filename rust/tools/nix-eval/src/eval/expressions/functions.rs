@@ -9,6 +9,7 @@ use rowan::ast::AstNode;
 use std::path::Path;
 use std::sync::Arc;
 use crate::function;
+use std::collections::HashMap;
 
 impl Evaluator {
         pub(crate) fn evaluate_lambda(
@@ -97,6 +98,19 @@ impl Evaluator {
                             });
                         }
                     }
+                }
+            }
+
+            // Handle concatStringsSep sep list directly (when accessed via with builtins)
+            if builtin_name == "concatStringsSep" {
+                // Check if this is a nested apply: concatStringsSep sep list
+                // The parser gives us: Apply(concatStringsSep, sep) and then Apply(Apply(concatStringsSep, sep), list)
+                if let Expr::Apply(inner_apply) = &func_expr {
+                    // This is already handled in the nested Apply section below
+                } else {
+                    // Single argument - this is partial application, but concatStringsSep needs 2 args
+                    // So we need to handle this in the nested Apply section
+                    // For now, let it fall through to the nested Apply handling
                 }
             }
 
@@ -732,6 +746,57 @@ impl Evaluator {
                                             }
                                             
                                             return Ok(NixValue::List(result));
+                                        } else if attr.to_string() == "concatStringsSep" {
+                                            // This is builtins.concatStringsSep sep list - extract both arguments
+                                            let first_arg_expr = inner_apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "concatStringsSep: missing first argument".to_string(),
+                                                })?;
+                                            let second_arg_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "concatStringsSep: missing second argument".to_string(),
+                                                })?;
+                                            
+                                            let separator_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                                            let list_value = self.evaluate_expr_with_scope_impl(&second_arg_expr, scope)?;
+                                            
+                                            // Get the separator string
+                                            let separator = match separator_value {
+                                                NixValue::String(s) => s,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("concatStringsSep: first argument must be a string, got {}", separator_value),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Get the list
+                                            let list = match list_value {
+                                                NixValue::List(l) => l,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("concatStringsSep: second argument must be a list, got {}", list_value),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Convert list elements to strings and join with separator
+                                            let mut str_values = Vec::new();
+                                            for element in list {
+                                                // Force thunks before converting to string
+                                                let element_forced = element.clone().force(self)?;
+                                                match element_forced {
+                                                    NixValue::String(s) => str_values.push(s),
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("concatStringsSep: all elements must be strings, got {}", element_forced),
+                                                        });
+                                                    }
+                                                }
+                                            }
+                                            
+                                            let joined = str_values.join(&separator);
+                                            return Ok(NixValue::String(joined));
                                         } else if attr.to_string() == "elemAt" {
                                             // This is builtins.elemAt list index
                                             let arg_expr = apply.argument()
@@ -791,6 +856,201 @@ impl Evaluator {
                                                 let element_forced = element.force(self)?;
                                                 return Ok(element_forced);
                                             }
+                                        } else if attr.to_string() == "head" {
+                                            // This is builtins.head list
+                                            let arg_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "head: missing argument".to_string(),
+                                                })?;
+                                            
+                                            let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                            let arg_forced = arg_value.clone().force(self)?;
+                                            
+                                            // Get the list
+                                            let list = match arg_forced {
+                                                NixValue::List(l) => l,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("head expects a list, got {}", arg_forced),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            if list.is_empty() {
+                                                return Err(Error::UnsupportedExpression {
+                                                    reason: "head: list is empty".to_string(),
+                                                });
+                                            }
+                                            
+                                            // Force the first element before returning
+                                            let first_element = list[0].clone();
+                                            let first_forced = first_element.force(self)?;
+                                            return Ok(first_forced);
+                                        } else if attr.to_string() == "getAttr" {
+                                            // This is builtins.getAttr name set [default]
+                                            // Check if this is a nested apply: getAttr name set [default]
+                                            if let Expr::Apply(inner_apply) = &func_expr {
+                                                let name_expr = inner_apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "getAttr: missing name argument".to_string(),
+                                                    })?;
+                                                let set_expr = apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "getAttr: missing set argument".to_string(),
+                                                    })?;
+                                                
+                                                let name_value = self.evaluate_expr_with_scope_impl(&name_expr, scope)?;
+                                                let name_forced = name_value.clone().force(self)?;
+                                                
+                                                let set_value = self.evaluate_expr_with_scope_impl(&set_expr, scope)?;
+                                                let set_forced = set_value.clone().force(self)?;
+                                                
+                                                // Get the attribute name
+                                                let attr_name = match name_forced {
+                                                    NixValue::String(s) => s,
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("getAttr: first argument must be a string, got {}", name_forced),
+                                                        });
+                                                    }
+                                                };
+                                                
+                                                // Get the attribute set
+                                                let attrs = match set_forced {
+                                                    NixValue::AttributeSet(a) => a,
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("getAttr: second argument must be an attribute set, got {}", set_forced),
+                                                        });
+                                                    }
+                                                };
+                                                
+                                                // Get the attribute value and force it
+                                                if let Some(value) = attrs.get(&attr_name) {
+                                                    let value_forced = value.clone().force(self)?;
+                                                    return Ok(value_forced);
+                                                } else {
+                                                    // Check if there's a default value (third argument)
+                                                    // This would be: getAttr name set default
+                                                    // But we need to check if there's another Apply level
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("getAttr: attribute '{}' not found", attr_name),
+                                                    });
+                                                }
+                                            }
+                                        } else if attr.to_string() == "functionArgs" {
+                                            // This is builtins.functionArgs function
+                                            let arg_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "functionArgs: missing argument".to_string(),
+                                                })?;
+                                            
+                                            // Evaluate the argument - but don't force it if it's a thunk
+                                            // We need to check if it's a function without forcing thunks that throw
+                                            let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                                            
+                                            // Check if it's a function - if not, this will throw an error
+                                            // which tryEval should catch
+                                            match arg_value {
+                                                NixValue::Function(_) => {
+                                                    // For now, return empty attribute set
+                                                    // In a full implementation, we'd extract parameter names
+                                                    // from the function's parameter pattern
+                                                    return Ok(NixValue::AttributeSet(HashMap::new()));
+                                                }
+                                                NixValue::Thunk(_) => {
+                                                    // If it's a thunk, we need to force it to check if it's a function
+                                                    // But this might throw, which tryEval should catch
+                                                    let forced = arg_value.force(self)?;
+                                                    match forced {
+                                                        NixValue::Function(_) => {
+                                                            return Ok(NixValue::AttributeSet(HashMap::new()));
+                                                        }
+                                                        _ => {
+                                                            return Err(Error::UnsupportedExpression {
+                                                                reason: format!("functionArgs: argument must be a function, got {}", forced),
+                                                            });
+                                                        }
+                                                    }
+                                                }
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("functionArgs: argument must be a function, got {}", arg_value),
+                                                    });
+                                                }
+                                            }
+                                        } else if attr.to_string() == "genList" {
+                                            // This is builtins.genList f n
+                                            // Check if this is a nested apply: genList f n
+                                            if let Expr::Apply(inner_apply) = &func_expr {
+                                                let func_expr_arg = inner_apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "genList: missing function argument".to_string(),
+                                                    })?;
+                                                let length_expr = apply.argument()
+                                                    .ok_or_else(|| Error::UnsupportedExpression {
+                                                        reason: "genList: missing length argument".to_string(),
+                                                    })?;
+                                                
+                                                // Evaluate function and length, but don't force thunks yet
+                                                // The function might be a thunk that references variables not yet in scope
+                                                let func_value = self.evaluate_expr_with_scope_impl(&func_expr_arg, scope)?;
+                                                
+                                                let length_value = self.evaluate_expr_with_scope_impl(&length_expr, scope)?;
+                                                let length_forced = length_value.clone().force(self)?;
+                                                
+                                                // Get the length
+                                                let length = match length_forced {
+                                                    NixValue::Integer(n) => {
+                                                        if n < 0 {
+                                                            return Err(Error::UnsupportedExpression {
+                                                                reason: format!("genList: length must be non-negative, got {}", n),
+                                                            });
+                                                        }
+                                                        n as usize
+                                                    }
+                                                    _ => {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("genList: second argument must be an integer, got {}", length_forced),
+                                                        });
+                                                    }
+                                                };
+                                                
+                                                // Create thunks for each list element
+                                                // Each thunk will call the function when forced, allowing lazy evaluation
+                                                let mut result = Vec::new();
+                                                let file_id = self.current_file_id();
+                                                
+                                                // Store the function value and scope for thunk creation
+                                                // We'll create thunks that evaluate func(i) when forced
+                                                for i in 0..length {
+                                                    let index = i as i64;
+                                                    let func_value_clone = func_value.clone();
+                                                    let scope_clone = scope.clone();
+                                                    
+                                                    // Create a thunk that will evaluate func(i) when forced
+                                                    // Parse a synthetic expression: func index
+                                                    // Actually, we can't easily create a thunk from a function call
+                                                    // Instead, we need to call the function, but wrap the result in a thunk if needed
+                                                    // For now, let's try calling the function and see if it works
+                                                    // If func_value is a thunk, force it to get the function
+                                                    let func_forced = func_value_clone.clone().force(self)?;
+                                                    let func = match func_forced {
+                                                        NixValue::Function(f) => f,
+                                                        _ => {
+                                                            return Err(Error::UnsupportedExpression {
+                                                                reason: format!("genList: first argument must be a function, got {}", func_forced),
+                                                            });
+                                                        }
+                                                    };
+                                                    
+                                                    let index_value = NixValue::Integer(index);
+                                                    let element = func.apply(self, index_value)?;
+                                                    result.push(element);
+                                                }
+                                                
+                                                return Ok(NixValue::List(result));
+                                            }
                                         }
                                     }
                                 }
@@ -849,6 +1109,155 @@ impl Evaluator {
                             result.push(mapped_value);
                         }
                         return Ok(NixValue::List(result));
+                    } else if builtin_name == "concatStringsSep" {
+                        // This is concatStringsSep sep list - extract both arguments
+                        let first_arg_expr = inner_apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "concatStringsSep: missing first argument".to_string(),
+                            })?;
+                        let second_arg_expr = apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "concatStringsSep: missing second argument".to_string(),
+                            })?;
+                        
+                        let separator_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                        let list_value = self.evaluate_expr_with_scope_impl(&second_arg_expr, scope)?;
+                        
+                        // Get the separator string
+                        let separator = match separator_value {
+                            NixValue::String(s) => s,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("concatStringsSep: first argument must be a string, got {}", separator_value),
+                                });
+                            }
+                        };
+                        
+                        // Get the list
+                        let list = match list_value {
+                            NixValue::List(l) => l,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("concatStringsSep: second argument must be a list, got {}", list_value),
+                                });
+                            }
+                        };
+                        
+                        // Convert list elements to strings and join with separator
+                        let mut str_values = Vec::new();
+                        for element in list {
+                            // Force thunks before converting to string
+                            let element_forced = element.clone().force(self)?;
+                            match element_forced {
+                                NixValue::String(s) => str_values.push(s),
+                                _ => {
+                                    return Err(Error::UnsupportedExpression {
+                                        reason: format!("concatStringsSep: all elements must be strings, got {}", element_forced),
+                                    });
+                                }
+                            }
+                        }
+                        
+                        let joined = str_values.join(&separator);
+                        return Ok(NixValue::String(joined));
+                    } else if builtin_name == "all" {
+                        // This is all f list - extract both arguments
+                        let first_arg_expr = inner_apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "all: missing first argument".to_string(),
+                            })?;
+                        let second_arg_expr = apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "all: missing second argument".to_string(),
+                            })?;
+                        
+                        let func_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                        let list_value = self.evaluate_expr_with_scope_impl(&second_arg_expr, scope)?;
+                        
+                        let list = match list_value {
+                            NixValue::List(l) => l,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("all: second argument must be a list, got {}", list_value),
+                                });
+                            }
+                        };
+                        
+                        let func = match func_value.clone().force(self)? {
+                            NixValue::Function(f) => f,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("all: first argument must be a function, got {}", func_value),
+                                });
+                            }
+                        };
+                        
+                        // Check if all elements satisfy the predicate (short-circuit on false)
+                        for element in list {
+                            let element_forced = element.clone().force(self)?;
+                            let predicate_result = func.apply(self, element_forced)?;
+                            
+                            let is_truthy = match predicate_result {
+                                NixValue::Boolean(false) => false,
+                                NixValue::Null => false,
+                                _ => true,
+                            };
+                            
+                            if !is_truthy {
+                                return Ok(NixValue::Boolean(false));
+                            }
+                        }
+                        
+                        return Ok(NixValue::Boolean(true));
+                    } else if builtin_name == "any" {
+                        // This is any f list - extract both arguments
+                        let first_arg_expr = inner_apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "any: missing first argument".to_string(),
+                            })?;
+                        let second_arg_expr = apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "any: missing second argument".to_string(),
+                            })?;
+                        
+                        let func_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                        let list_value = self.evaluate_expr_with_scope_impl(&second_arg_expr, scope)?;
+                        
+                        let list = match list_value {
+                            NixValue::List(l) => l,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("any: second argument must be a list, got {}", list_value),
+                                });
+                            }
+                        };
+                        
+                        let func = match func_value.clone().force(self)? {
+                            NixValue::Function(f) => f,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("any: first argument must be a function, got {}", func_value),
+                                });
+                            }
+                        };
+                        
+                        // Check if any element satisfies the predicate (short-circuit on true)
+                        for element in list {
+                            let element_forced = element.clone().force(self)?;
+                            let predicate_result = func.apply(self, element_forced)?;
+                            
+                            let is_truthy = match predicate_result {
+                                NixValue::Boolean(false) => false,
+                                NixValue::Null => false,
+                                _ => true,
+                            };
+                            
+                            if is_truthy {
+                                return Ok(NixValue::Boolean(true));
+                            }
+                        }
+                        
+                        return Ok(NixValue::Boolean(false));
                     }
                 }
             }
