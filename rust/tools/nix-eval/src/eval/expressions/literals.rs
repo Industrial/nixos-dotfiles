@@ -68,11 +68,12 @@ impl Evaluator {
                 InterpolPart::Interpolation(interp) => {
                     // This is an interpolated expression - get the expression
                     if let Some(expr) = interp.expr() {
-                        // Evaluate the interpolated expression
+                        // Evaluate the interpolated expression and force thunks
                         let value = self.evaluate_expr_with_scope(&expr, scope)?;
+                        let value_forced = value.force(self)?;
 
                         // Convert the value to a string
-                        let value_str = match value {
+                        let value_str = match value_forced {
                             NixValue::String(s) => s,
                             NixValue::Integer(i) => i.to_string(),
                             NixValue::Float(f) => f.to_string(),
@@ -86,7 +87,7 @@ impl Evaluator {
                             | NixValue::Thunk(_)
                             | NixValue::Function(_) => {
                                 // For complex types, use their Display implementation
-                                format!("{}", value)
+                                format!("{}", value_forced)
                             }
                         };
 

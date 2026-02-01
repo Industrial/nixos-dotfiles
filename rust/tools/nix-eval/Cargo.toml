@@ -26,6 +26,7 @@ hex = "0.4"
 base32 = "0.4"
 codespan = "0.11"
 codespan-reporting = "0.13"
+regex = "1.10"
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }

@@ -511,6 +511,7 @@ dependencies = [
  "hex",
  "md5",
  "proptest",
+ "regex",
  "rnix",
  "rowan",
  "serde",

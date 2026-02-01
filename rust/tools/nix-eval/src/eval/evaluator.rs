@@ -78,17 +78,38 @@ impl Evaluator {
         self.register_builtin(Box::new(LengthBuiltin));
         self.register_builtin(Box::new(HeadBuiltin));
         self.register_builtin(Box::new(TailBuiltin));
+        self.register_builtin(Box::new(ElemAtBuiltin));
         self.register_builtin(Box::new(AttrNamesBuiltin));
+        self.register_builtin(Box::new(AttrValuesBuiltin));
+        self.register_builtin(Box::new(CatAttrsBuiltin));
         self.register_builtin(Box::new(HasAttrBuiltin));
         self.register_builtin(Box::new(GetAttrBuiltin));
         self.register_builtin(Box::new(ConcatListsBuiltin));
         self.register_builtin(Box::new(ConcatStringsSepBuiltin));
         self.register_builtin(Box::new(AbortBuiltin));
         self.register_builtin(Box::new(TraceBuiltin));
+        self.register_builtin(Box::new(StringLengthBuiltin));
+        self.register_builtin(Box::new(AddBuiltin));
+        self.register_builtin(Box::new(SubBuiltin));
+        self.register_builtin(Box::new(SubstringBuiltin));
+        self.register_builtin(Box::new(ReplaceStringsBuiltin));
+        self.register_builtin(Box::new(SplitBuiltin));
+        self.register_builtin(Box::new(SplitVersionBuiltin));
         self.register_builtin(Box::new(crate::builtins::DerivationBuiltin));
         self.register_builtin(Box::new(crate::builtins::StorePathBuiltin));
         self.register_builtin(Box::new(crate::builtins::PathBuiltin));
         self.register_builtin(Box::new(crate::builtins::GenListBuiltin));
+        self.register_builtin(Box::new(crate::builtins::AllBuiltin));
+        self.register_builtin(Box::new(crate::builtins::AnyBuiltin));
+        self.register_builtin(Box::new(crate::builtins::FilterBuiltin));
+        self.register_builtin(Box::new(crate::builtins::BaseNameOfBuiltin));
+        self.register_builtin(Box::new(crate::builtins::TryEvalBuiltin));
+        self.register_builtin(Box::new(crate::builtins::ThrowBuiltin));
+        self.register_builtin(Box::new(crate::builtins::MapBuiltin));
+        self.register_builtin(Box::new(crate::builtins::BitOrBuiltin));
+        self.register_builtin(Box::new(crate::builtins::BitAndBuiltin));
+        self.register_builtin(Box::new(crate::builtins::BitXorBuiltin));
+        self.register_builtin(Box::new(crate::builtins::ConcatMapBuiltin));
     }
 
     /// Get a builtin function by name
@@ -481,6 +502,9 @@ impl Evaluator {
                             // Store a marker that we can detect in evaluate_select
                             builtins_attrs.insert(name.clone(), NixValue::String(format!("__builtin:{}", name)));
                         }
+                        // Add builtins.builtins pointing to itself (recursive reference)
+                        // We'll use a special marker that evaluate_select will recognize
+                        builtins_attrs.insert("builtins".to_string(), NixValue::String("__builtins_self__".to_string()));
                         Ok(NixValue::AttributeSet(builtins_attrs))
                     }
                     _ => {
@@ -509,8 +533,10 @@ impl Evaluator {
             Expr::Lambda(lambda) => self.evaluate_lambda(lambda, scope),
             Expr::Apply(apply) => self.evaluate_apply(apply, scope),
             Expr::LetIn(let_in) => self.evaluate_let_in(let_in, scope),
+            Expr::LegacyLet(legacy_let) => self.evaluate_legacy_let(legacy_let, scope),
             Expr::With(with) => self.evaluate_with(with, scope),
             Expr::IfElse(if_else) => self.evaluate_if_else(if_else, scope),
+            Expr::Assert(assert) => self.evaluate_assert(assert, scope),
             Expr::Path(path_expr) => self.evaluate_path(path_expr, scope),
             Expr::Select(select) => self.evaluate_select(select, scope),
             Expr::BinOp(binop) => self.evaluate_binop(binop, scope),

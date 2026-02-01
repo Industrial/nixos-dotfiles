@@ -29,44 +29,167 @@ impl Evaluator {
         let mut attrs = HashMap::new();
 
         for entry in set.entries() {
-            // Entry is an AttrpathValue - cast from the entry's syntax node
             let entry_syntax = entry.syntax();
-            let attrpath_value = AttrpathValue::cast(entry_syntax.clone()).ok_or_else(|| {
-                Error::UnsupportedExpression {
-                    reason: "cannot cast entry to AttrpathValue".to_string(),
+            
+            // Check if this is an inherit statement
+            if let Some(inherit_node) = Inherit::cast(entry_syntax.clone()) {
+                // Handle inherit statement: inherit attr1 attr2 ...;
+                // or inherit (expr) attr1 attr2 ...;
+                
+                // Get the inherit from expression (if any)
+                let inherit_from = inherit_node.from();
+                
+                // Determine the scope to inherit from
+                let inherit_scope = if let Some(inherit_from_node) = inherit_from {
+                    // Get the expression from the InheritFrom node
+                    if let Some(from_expr) = inherit_from_node.expr() {
+                        // Evaluate the from expression to get an attribute set
+                        let from_value = self.evaluate_expr_with_scope(&from_expr, scope)?;
+                        match from_value {
+                            NixValue::AttributeSet(from_attrs) => {
+                                // Create a scope from the attribute set
+                                let mut inherit_scope = VariableScope::new();
+                                for (key, value) in from_attrs {
+                                    inherit_scope.insert(key, value);
+                                }
+                                inherit_scope
+                            }
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: "inherit from expression must be an attribute set".to_string(),
+                                });
+                            }
+                        }
+                    } else {
+                        // No expression in InheritFrom - inherit from current scope
+                        scope.clone()
+                    }
+                } else {
+                    // Inherit from the current scope
+                    scope.clone()
+                };
+                
+                // Get the attributes to inherit
+                for attr in inherit_node.attrs() {
+                    // Get the attribute name (can be identifier or string expression)
+                    let key = if let Some(ident) = rnix::ast::Ident::cast(attr.syntax().clone()) {
+                        ident.to_string()
+                    } else if let Some(string) = rnix::ast::Str::cast(attr.syntax().clone()) {
+                        // String expression - evaluate it to get the string value
+                        let str_value = self.evaluate_string(&string, scope)?;
+                        match str_value {
+                            NixValue::String(s) => s,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: "inherit: string expression must evaluate to a string".to_string(),
+                                });
+                            }
+                        }
+                    } else {
+                        // Try to evaluate as an expression (for dynamic attribute names)
+                        // First check if it's an expression
+                        if let Some(expr) = rnix::ast::Expr::cast(attr.syntax().clone()) {
+                            let expr_value = self.evaluate_expr_with_scope(&expr, scope)?;
+                            match expr_value {
+                                NixValue::String(s) => s,
+                                _ => {
+                                    return Err(Error::UnsupportedExpression {
+                                        reason: "inherit: expression must evaluate to a string".to_string(),
+                                    });
+                                }
+                            }
+                        } else {
+                            // Fallback: try to get text representation
+                            attr.syntax().text().to_string().trim_matches('"').to_string()
+                        }
+                    };
+                    
+                    // Look up the value in the inherit scope
+                    if let Some(value) = inherit_scope.get(&key) {
+                        attrs.insert(key, value.clone());
+                    } else {
+                        return Err(Error::UnsupportedExpression {
+                            reason: format!("inherit: attribute '{}' not found in scope", key),
+                        });
+                    }
                 }
-            })?;
+            } else if let Some(attrpath_value) = AttrpathValue::cast(entry_syntax.clone()) {
+                // Regular attribute assignment: key = value;
+                // Handle nested attribute paths like foo.bar = "baz"
+                
+                let attrpath =
+                    attrpath_value
+                        .attrpath()
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: "attribute entry missing attrpath".to_string(),
+                        })?;
 
-            // Get the first identifier from the attrpath as the key
-            let attrpath =
-                attrpath_value
-                    .attrpath()
-                    .ok_or_else(|| Error::UnsupportedExpression {
-                        reason: "attribute entry missing attrpath".to_string(),
-                    })?;
+                let value_expr =
+                    attrpath_value
+                        .value()
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: "attribute entry missing value".to_string(),
+                        })?;
 
-            // Get the key from the first attribute in the attrpath
-            let key = attrpath
-                .attrs()
-                .next()
-                .map(|attr| attr.to_string())
-                .ok_or_else(|| Error::UnsupportedExpression {
-                    reason: "attribute key must be an identifier".to_string(),
-                })?;
+                // Collect all attributes in the path
+                let attr_names: Vec<String> = attrpath
+                    .attrs()
+                    .map(|attr| attr.to_string())
+                    .collect();
 
-            let value_expr =
-                attrpath_value
-                    .value()
-                    .ok_or_else(|| Error::UnsupportedExpression {
-                        reason: "attribute entry missing value".to_string(),
-                    })?;
+                if attr_names.is_empty() {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "attribute key must be an identifier".to_string(),
+                    });
+                }
 
-            // Create a thunk for lazy evaluation of attribute values
-            // This is the key to lazy evaluation: attribute values are not evaluated
-            // until they are actually accessed.
-            let file_id = self.current_file_id();
-            let thunk = thunk::Thunk::new(&value_expr, self.scope.clone(), file_id);
-            attrs.insert(key, NixValue::Thunk(Arc::new(thunk)));
+                // Create a thunk for lazy evaluation of attribute values
+                let file_id = self.current_file_id();
+                let thunk = thunk::Thunk::new(&value_expr, scope.clone(), file_id);
+                let value = NixValue::Thunk(Arc::new(thunk));
+
+                // Handle nested attribute paths: foo.bar.baz = value
+                // Create nested attribute sets as needed
+                if attr_names.len() == 1 {
+                    // Simple case: foo = value
+                    attrs.insert(attr_names[0].clone(), value);
+                } else {
+                    // Nested case: foo.bar = value
+                    // Build nested structure from the inside out
+                    let mut nested_value = value;
+                    
+                    // Start from the last key and work backwards
+                    for key in attr_names.iter().rev().skip(1) {
+                        let mut inner_map = HashMap::new();
+                        inner_map.insert(key.clone(), nested_value);
+                        nested_value = NixValue::AttributeSet(inner_map);
+                    }
+                    
+                    // Now merge into the top-level attrs
+                    let first_key = &attr_names[0];
+                    if let Some(existing) = attrs.get_mut(first_key) {
+                        // Merge with existing nested structure
+                        if let NixValue::AttributeSet(existing_map) = existing {
+                            if let NixValue::AttributeSet(new_map) = &nested_value {
+                                // Merge the new map into the existing map
+                                for (k, v) in new_map {
+                                    existing_map.insert(k.clone(), v.clone());
+                                }
+                            }
+                        } else {
+                            // Overwrite if not an attribute set
+                            *existing = nested_value;
+                        }
+                    } else {
+                        // Insert new nested structure
+                        attrs.insert(first_key.clone(), nested_value);
+                    }
+                }
+            } else {
+                return Err(Error::UnsupportedExpression {
+                    reason: format!("unsupported attribute set entry: {:?}", entry_syntax.kind()),
+                });
+            }
         }
 
         Ok(NixValue::AttributeSet(attrs))
@@ -88,42 +211,104 @@ impl Evaluator {
         fn evaluate_recursive_attr_set(&self, set: &rnix::ast::AttrSet, scope: &VariableScope) -> Result<NixValue> {
         // First pass: Collect all attribute names and expressions
         let mut attr_entries = Vec::new();
+        let mut inherit_attrs = HashMap::new();
 
         for entry in set.entries() {
-            // Entry is an AttrpathValue - cast from the entry's syntax node
             let entry_syntax = entry.syntax();
-            let attrpath_value = AttrpathValue::cast(entry_syntax.clone()).ok_or_else(|| {
-                Error::UnsupportedExpression {
-                    reason: "cannot cast entry to AttrpathValue".to_string(),
+            
+            // Check if this is an inherit statement
+            if let Some(inherit_node) = Inherit::cast(entry_syntax.clone()) {
+                // Handle inherit in recursive sets
+                let inherit_from = inherit_node.from();
+                let inherit_scope = if let Some(inherit_from_node) = inherit_from {
+                    if let Some(from_expr) = inherit_from_node.expr() {
+                        let from_value = self.evaluate_expr_with_scope(&from_expr, scope)?;
+                        match from_value {
+                            NixValue::AttributeSet(from_attrs) => {
+                                let mut inherit_scope = VariableScope::new();
+                                for (key, value) in from_attrs {
+                                    inherit_scope.insert(key, value);
+                                }
+                                inherit_scope
+                            }
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: "inherit from expression must be an attribute set".to_string(),
+                                });
+                            }
+                        }
+                    } else {
+                        scope.clone()
+                    }
+                } else {
+                    scope.clone()
+                };
+                
+                // Collect inherited attributes
+                for attr in inherit_node.attrs() {
+                    let key = if let Some(ident) = rnix::ast::Ident::cast(attr.syntax().clone()) {
+                        ident.to_string()
+                    } else if let Some(string) = rnix::ast::Str::cast(attr.syntax().clone()) {
+                        let str_value = self.evaluate_string(&string, scope)?;
+                        match str_value {
+                            NixValue::String(s) => s,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: "inherit: string expression must evaluate to a string".to_string(),
+                                });
+                            }
+                        }
+                    } else {
+                        if let Some(expr) = rnix::ast::Expr::cast(attr.syntax().clone()) {
+                            let expr_value = self.evaluate_expr_with_scope(&expr, scope)?;
+                            match expr_value {
+                                NixValue::String(s) => s,
+                                _ => {
+                                    return Err(Error::UnsupportedExpression {
+                                        reason: "inherit: expression must evaluate to a string".to_string(),
+                                    });
+                                }
+                            }
+                        } else {
+                            attr.syntax().text().to_string().trim_matches('"').to_string()
+                        }
+                    };
+                    
+                    if let Some(value) = inherit_scope.get(&key) {
+                        inherit_attrs.insert(key.clone(), value.clone());
+                    } else {
+                        return Err(Error::UnsupportedExpression {
+                            reason: format!("inherit: attribute '{}' not found in scope", key),
+                        });
+                    }
                 }
-            })?;
+            } else if let Some(attrpath_value) = AttrpathValue::cast(entry_syntax.clone()) {
+                // Regular attribute assignment
+                let attrpath =
+                    attrpath_value
+                        .attrpath()
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: "attribute entry missing attrpath".to_string(),
+                        })?;
 
-            // Get the first identifier from the attrpath as the key
-            let attrpath =
-                attrpath_value
-                    .attrpath()
+                let key = attrpath
+                    .attrs()
+                    .next()
+                    .map(|attr| attr.to_string())
                     .ok_or_else(|| Error::UnsupportedExpression {
-                        reason: "attribute entry missing attrpath".to_string(),
+                        reason: "attribute key must be an identifier".to_string(),
                     })?;
 
-            // Get the key from the first attribute in the attrpath
-            let key = attrpath
-                .attrs()
-                .next()
-                .map(|attr| attr.to_string())
-                .ok_or_else(|| Error::UnsupportedExpression {
-                    reason: "attribute key must be an identifier".to_string(),
-                })?;
+                let value_expr =
+                    attrpath_value
+                        .value()
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: "attribute entry missing value".to_string(),
+                        })?;
 
-            let value_expr =
-                attrpath_value
-                    .value()
-                    .ok_or_else(|| Error::UnsupportedExpression {
-                        reason: "attribute entry missing value".to_string(),
-                    })?;
-
-            // Store the entry for later evaluation
-            attr_entries.push((key, value_expr));
+                // Store the entry for later evaluation
+                attr_entries.push((key, value_expr));
+            }
         }
 
         // For recursive sets, all attributes must be in scope when evaluating any attribute.
@@ -146,12 +331,18 @@ impl Evaluator {
         let mut rec_scope = self.scope.clone();
         let mut attrs = HashMap::new();
 
+        // Add inherited attributes to the recursive scope first
+        for (key, value) in &inherit_attrs {
+            rec_scope.insert(key.clone(), value.clone());
+            attrs.insert(key.clone(), value.clone());
+        }
+        
         // Create thunks sequentially, where each thunk's closure includes previous thunks
         // This supports forward references: `rec { y = 1; x = y; }` works
         // But backward references like `rec { x = y; y = 1; }` won't work with this approach
         let file_id = self.current_file_id();
         for (key, value_expr) in &attr_entries {
-            // Create thunk with current scope (includes outer scope + previous attributes)
+            // Create thunk with current scope (includes outer scope + previous attributes + inherited)
             let thunk = thunk::Thunk::new(value_expr, rec_scope.clone(), file_id);
             let thunk_arc = Arc::new(thunk);
 

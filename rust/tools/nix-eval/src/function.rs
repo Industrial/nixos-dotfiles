@@ -11,6 +11,7 @@ use rnix::ast::{Expr, Root};
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
 use rowan::ast::AstNode;
+use std::sync::Arc;
 
 /// A Nix function (closure)
 ///
@@ -43,18 +44,18 @@ pub struct Function {
     ///
     /// Similar to thunks, we store the expression as text for now.
     /// In a full implementation, we'd want to store the actual AST node.
-    body_text: String,
+    pub(crate) body_text: String,
     /// The lexical closure (variable scope) captured at function definition time
     ///
     /// This allows the function to access variables from its surrounding scope
     /// even when called in a different context (lexical scoping).
-    closure: VariableScope,
+    pub(crate) closure: VariableScope,
     /// The file_id context at function definition time (for resolving relative imports)
     ///
     /// This is critical for lazy evaluation: when a function is called and creates thunks,
     /// those thunks need to know what file the function was defined in so that relative
     /// imports work correctly.
-    file_id: Option<FileId>,
+    pub(crate) file_id: Option<FileId>,
 }
 
 impl Function {
@@ -81,6 +82,21 @@ impl Function {
         // but that requires handling lifetimes carefully
         let body_text = body_expr.syntax().text().to_string();
 
+        Self {
+            parameter,
+            body_text,
+            closure,
+            file_id,
+        }
+    }
+    
+    /// Create a curried builtin function (internal constructor)
+    pub(crate) fn new_curried_builtin_internal(
+        parameter: String,
+        body_text: String,
+        closure: VariableScope,
+        file_id: Option<FileId>,
+    ) -> Self {
         Self {
             parameter,
             body_text,
@@ -140,6 +156,38 @@ impl Function {
         }
     }
     
+    /// Create a curried builtin function with multiple arguments already applied
+    ///
+    /// This creates a function that captures multiple arguments and waits for more.
+    pub fn new_curried_builtin_multi(
+        builtin_name: String,
+        _builtin: Box<dyn crate::Builtin>,
+        args: Vec<NixValue>,
+        file_id: Option<FileId>,
+    ) -> Self {
+        let parameter = format!("__curried_{}_arg{}", builtin_name, args.len() + 1);
+        let body_text = format!("__curried_builtin_call:{}", builtin_name);
+        
+        let mut closure = VariableScope::new();
+        closure.insert(format!("__builtin_{}", builtin_name), NixValue::String(format!("__builtin_func:{}", builtin_name)));
+        for (i, arg) in args.iter().enumerate() {
+            closure.insert(format!("__curried_arg{}", i + 1), arg.clone());
+        }
+        closure.insert("__curried_arg_count".to_string(), NixValue::Integer(args.len() as i64));
+
+        // Create a dummy Expr for the body (we won't actually use it for curried builtins)
+        // We'll use an empty expression since the body_text is just a marker
+        use rnix::parser::parse;
+        use rnix::tokenizer::tokenize;
+        let tokens = tokenize("null");
+        let (green_node, _) = parse(tokens.into_iter());
+        let syntax_node = SyntaxNode::new_root(green_node);
+        let root = Root::cast(syntax_node).unwrap();
+        let dummy_expr = root.expr().unwrap();
+        
+        Self::new(parameter, &dummy_expr, closure, file_id)
+    }
+
     /// Create a curried foldl' function (2 args applied, needs list)
     ///
     /// This creates a function that captures op and nul, and when called with a list,
@@ -291,7 +339,69 @@ impl Function {
         
         // Check if this is a curried builtin function
         if self.body_text.starts_with("__curried_builtin_call:") {
-            // "__curried_builtin_call:" is 23 characters
+            let builtin_name = &self.body_text[23..]; // Skip "__curried_builtin_call:"
+            
+            // Get the builtin and collected arguments from closure
+            if let Some(builtin_marker) = self.closure.get(&format!("__builtin_{}", builtin_name)) {
+                if let NixValue::String(ref marker) = builtin_marker {
+                    if marker.starts_with("__builtin_func:") {
+                        if let Some(builtin) = evaluator.get_builtin(builtin_name) {
+                            // Collect all arguments from closure
+                            let mut args = Vec::new();
+                            
+                            // Check if we have __curried_first_arg (old style) or __curried_arg1, __curried_arg2, etc. (new style)
+                            if let Some(first_arg) = self.closure.get("__curried_first_arg") {
+                                // Old style: single argument - force thunks before collecting
+                                let first_arg_forced = first_arg.clone().force(evaluator)?;
+                                args.push(first_arg_forced);
+                                let arg_forced = argument.clone().force(evaluator)?;
+                                args.push(arg_forced);
+                            } else {
+                                // New style: multiple arguments - force thunks before collecting
+                                let arg_count = self.closure.get("__curried_arg_count")
+                                    .and_then(|v| match v {
+                                        NixValue::Integer(n) => Some(*n as usize),
+                                        _ => None,
+                                    })
+                                    .unwrap_or(0);
+                                
+                                for i in 1..=arg_count {
+                                    if let Some(arg) = self.closure.get(&format!("__curried_arg{}", i)) {
+                                        let arg_forced = arg.clone().force(evaluator)?;
+                                        args.push(arg_forced);
+                                    }
+                                }
+                                let arg_forced = argument.clone().force(evaluator)?;
+                                args.push(arg_forced);
+                            }
+                            
+                            // Try calling the builtin with all collected arguments
+                            match builtin.call(&args) {
+                                Ok(result) => return Ok(result),
+                                Err(Error::UnsupportedExpression { reason }) if reason.contains("takes") && reason.contains("arguments") => {
+                                    // Still needs more arguments - create another curried function
+                                    let file_id = evaluator.current_file_id();
+                                    let mut closure = VariableScope::new();
+                                    closure.insert(format!("__builtin_{}", builtin_name), NixValue::String(format!("__builtin_func:{}", builtin_name)));
+                                    for (i, arg) in args.iter().enumerate() {
+                                        closure.insert(format!("__curried_arg{}", i + 1), arg.clone());
+                                    }
+                                    closure.insert("__curried_arg_count".to_string(), NixValue::Integer(args.len() as i64));
+                                    
+                                    let next_curried = Function::new_curried_builtin_internal(
+                                        format!("__curried_{}_arg{}", builtin_name, args.len() + 1),
+                                        format!("__curried_builtin_call:{}", builtin_name),
+                                        closure,
+                                        file_id,
+                                    );
+                                    return Ok(NixValue::Function(Arc::new(next_curried)));
+                                }
+                                Err(e) => return Err(e),
+                            }
+                        }
+                    }
+                }
+            }
             let builtin_name = &self.body_text[23..]; // Skip "__curried_builtin_call:"
             if let Some(first_arg) = self.closure.get("__curried_first_arg") {
                 // This is a curried builtin - call it with both arguments

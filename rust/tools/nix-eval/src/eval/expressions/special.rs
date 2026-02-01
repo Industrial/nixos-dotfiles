@@ -5,7 +5,8 @@ use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
 use crate::value::NixValue;
 use crate::thunk;
-use rnix::ast::{LetIn, With, IfElse, Assert, Paren, Select, HasAttr, Expr, HasEntry};
+use rnix::ast::{LetIn, LegacyLet, With, IfElse, Assert, Paren, Select, HasAttr, Expr, HasEntry, Attr};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -22,6 +23,9 @@ impl Evaluator {
         // Create a new scope that starts with the current scope
         // Bindings will be added to this scope as we evaluate them
         let mut new_scope = scope.clone();
+        
+        // Track variable names for legacy let expressions
+        let mut var_names = Vec::new();
 
         // First pass: Create thunks for all bindings (to handle forward references)
         // In Nix, let bindings can reference each other, so we need to create thunks
@@ -57,17 +61,135 @@ impl Evaluator {
             let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
 
             // Add the thunk to the scope (wrapped in NixValue::Thunk)
-            new_scope.insert(var_name, NixValue::Thunk(Arc::new(thunk)));
+            new_scope.insert(var_name.clone(), NixValue::Thunk(Arc::new(thunk)));
+            var_names.push(var_name);
         }
 
-        // Get the body expression (the "in" part)
-        let body_expr = let_in.body().ok_or_else(|| Error::UnsupportedExpression {
-            reason: "let-in missing body expression".to_string(),
-        })?;
+        // Check if this is a legacy let expression (no "in" clause)
+        // Legacy let expressions return the attribute set itself, with a special "body" attribute
+        if let_in.body().is_none() {
+            // Legacy let: build an attribute set from the bindings and return the "body" attribute
+            use std::collections::HashMap;
+            let mut attrs = HashMap::new();
+            
+            // Build attribute set from the scope (all bindings are already in new_scope)
+            for var_name in var_names {
+                if let Some(value) = new_scope.get(&var_name) {
+                    attrs.insert(var_name, value.clone());
+                }
+            }
 
-        // Evaluate the body expression in the new scope
-        // When bindings are accessed, their thunks will be forced and evaluated
-        self.evaluate_expr_with_scope(&body_expr, &new_scope)
+            // Extract the "body" attribute from the attribute set
+            if let Some(body_value) = attrs.remove("body") {
+                // Force the body thunk and return it
+                // The body thunk can access other bindings through its closure (new_scope)
+                body_value.force(self)
+            } else {
+                Err(Error::UnsupportedExpression {
+                    reason: "legacy let expression must have a 'body' attribute".to_string(),
+                })
+            }
+        } else {
+            // Modern let: evaluate the body expression in the new scope
+            let body_expr = let_in.body().ok_or_else(|| Error::UnsupportedExpression {
+                reason: "let-in missing body expression".to_string(),
+            })?;
+
+            // Evaluate the body expression in the new scope
+            // When bindings are accessed, their thunks will be forced and evaluated
+            self.evaluate_expr_with_scope(&body_expr, &new_scope)
+        }
+    }
+
+    /// Evaluate a legacy let expression
+    ///
+    /// Legacy let expressions like `let { x = 1; body = x; }` don't have an "in" clause.
+    /// Instead, they return the attribute set itself, with a special "body" attribute
+    /// that contains the result value.
+    ///
+    /// # Arguments
+    ///
+    /// * `legacy_let` - The legacy let AST node
+    /// * `scope` - The current variable scope
+    ///
+    /// # Returns
+    ///
+    /// The evaluated "body" attribute value
+    pub(crate) fn evaluate_legacy_let(
+        &self,
+        legacy_let: &rnix::ast::LegacyLet,
+        scope: &VariableScope,
+    ) -> Result<NixValue> {
+        // Get the bindings (the "let" part)
+        // attrpath_values() returns an iterator over the bindings
+        let bindings = legacy_let.attrpath_values();
+
+        // Create a new scope that starts with the current scope
+        // Bindings will be added to this scope as we evaluate them
+        let mut new_scope = scope.clone();
+        
+        // Track variable names for building the attribute set
+        let mut var_names = Vec::new();
+
+        // First pass: Create thunks for all bindings (to handle forward references)
+        // In Nix, let bindings can reference each other, so we need to create thunks
+        // that will be evaluated lazily when accessed.
+        for binding in bindings {
+            // Get the attribute path (the variable name)
+            let attrpath = binding
+                .attrpath()
+                .ok_or_else(|| Error::UnsupportedExpression {
+                    reason: "let binding missing attrpath".to_string(),
+                })?;
+
+            // Get the first identifier from the attrpath as the variable name
+            let var_name = attrpath
+                .attrs()
+                .next()
+                .map(|attr| attr.to_string())
+                .ok_or_else(|| Error::UnsupportedExpression {
+                    reason: "let binding variable name must be an identifier".to_string(),
+                })?;
+
+            // Get the value expression
+            let value_expr = binding
+                .value()
+                .ok_or_else(|| Error::UnsupportedExpression {
+                    reason: format!("let binding '{}' missing value", var_name),
+                })?;
+
+            // Create a thunk for this binding
+            // The thunk's closure includes the new_scope (which will have all bindings)
+            // This allows forward references: bindings can reference each other
+            let file_id = self.current_file_id();
+            let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
+
+            // Add the thunk to the scope (wrapped in NixValue::Thunk)
+            new_scope.insert(var_name.clone(), NixValue::Thunk(Arc::new(thunk)));
+            var_names.push(var_name);
+        }
+
+        // Legacy let: build an attribute set from the bindings and return the "body" attribute
+        use std::collections::HashMap;
+        let mut attrs = HashMap::new();
+        
+        // Build attribute set from the scope (all bindings are already in new_scope)
+        for var_name in var_names {
+            if let Some(value) = new_scope.get(&var_name) {
+                attrs.insert(var_name, value.clone());
+            }
+        }
+
+        // Extract the "body" attribute from the attribute set
+        if let Some(body_value) = attrs.remove("body") {
+            // Force the body thunk and return it
+            // The body thunk can access other bindings through its closure (new_scope)
+            body_value.force(self)
+        } else {
+            Err(Error::UnsupportedExpression {
+                reason: "legacy let expression must have a 'body' attribute".to_string(),
+            })
+        }
     }
 
     /// Evaluate a with expression
@@ -130,6 +252,57 @@ impl Evaluator {
 
         // Evaluate the body expression in the merged scope
         self.evaluate_expr_with_scope(&body_expr, &new_scope)
+    }
+
+    /// Evaluate an assert expression
+    ///
+    /// An assert expression like `assert condition; body` evaluates the condition
+    /// and if it's truthy, evaluates and returns the body. If the condition is falsy,
+    /// it throws an error.
+    ///
+    /// # Arguments
+    ///
+    /// * `assert` - The assert AST node
+    /// * `scope` - The current variable scope
+    ///
+    /// # Returns
+    ///
+    /// The evaluated body value if condition is truthy, or an error if falsy
+    pub(crate) fn evaluate_assert(
+        &self,
+        assert: &rnix::ast::Assert,
+        scope: &VariableScope,
+    ) -> Result<NixValue> {
+        // Get the condition expression
+        let condition_expr = assert.condition().ok_or_else(|| Error::UnsupportedExpression {
+            reason: "assert expression missing condition".to_string(),
+        })?;
+
+        // Evaluate and force the condition (thunks must be forced)
+        let condition_value = self.evaluate_expr_with_scope(&condition_expr, scope)?;
+        let condition_forced = condition_value.force(self)?;
+
+        // Check if condition is truthy
+        // In Nix, only `false` and `null` are falsy
+        let is_truthy = match condition_forced {
+            NixValue::Boolean(false) => false,
+            NixValue::Null => false,
+            _ => true,
+        };
+
+        if !is_truthy {
+            return Err(Error::UnsupportedExpression {
+                reason: "assertion failed".to_string(),
+            });
+        }
+
+        // Get the body expression
+        let body_expr = assert.body().ok_or_else(|| Error::UnsupportedExpression {
+            reason: "assert expression missing body".to_string(),
+        })?;
+
+        // Evaluate and return the body
+        self.evaluate_expr_with_scope(&body_expr, scope)
     }
 
     /// Evaluate an if-else expression
@@ -232,13 +405,48 @@ impl Evaluator {
             })?;
 
         // Get the first attribute name
-        let attr_name = attrpath
+        // Handle both identifiers and string literals
+        let attr_node = attrpath
             .attrs()
             .next()
-            .map(|attr| attr.to_string())
             .ok_or_else(|| Error::UnsupportedExpression {
                 reason: "select attrpath must have at least one attribute".to_string(),
             })?;
+        
+        // Get the syntax node from the attribute using rowan's AstNode trait
+        use rowan::ast::AstNode;
+        let attr_syntax = attr_node.syntax();
+        
+        let attr_name = if let Some(ident) = rnix::ast::Ident::cast(attr_syntax.clone()) {
+            // Regular identifier
+            ident.to_string()
+        } else if let Some(str_node) = rnix::ast::Str::cast(attr_syntax.clone()) {
+            // String literal - evaluate it to get the key
+            let str_value = self.evaluate_string(&str_node, scope)?;
+            match str_value {
+                NixValue::String(s) => s,
+                _ => {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "attribute name must be a string".to_string(),
+                    });
+                }
+            }
+        } else if let Some(expr) = rnix::ast::Expr::cast(attr_syntax.clone()) {
+            // Dynamic attribute name - evaluate it
+            let expr_value = self.evaluate_expr_with_scope(&expr, scope)?;
+            let forced_value = expr_value.force(self)?;
+            match forced_value {
+                NixValue::String(s) => s,
+                _ => {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "attribute name must evaluate to a string".to_string(),
+                    });
+                }
+            }
+        } else {
+            // Fallback: try to get text representation
+            attr_syntax.text().to_string().trim_matches('"').to_string()
+        };
 
         // Access the attribute from the attribute set
         match base_value {
@@ -253,6 +461,16 @@ impl Evaluator {
                                 // Return a marker that evaluate_apply will recognize
                                 return Ok(NixValue::String(format!("__builtin_func:{}", builtin_name)));
                             }
+                        } else if s == "__builtins_self__" {
+                            // builtins.builtins should return the builtins attribute set itself
+                            // Reconstruct the builtins attribute set
+                            let mut builtins_attrs = HashMap::new();
+                            for (name, _builtin) in &self.builtins {
+                                builtins_attrs.insert(name.clone(), NixValue::String(format!("__builtin:{}", name)));
+                            }
+                            // Add builtins.builtins pointing to itself (recursive)
+                            builtins_attrs.insert("builtins".to_string(), NixValue::String("__builtins_self__".to_string()));
+                            return Ok(NixValue::AttributeSet(builtins_attrs));
                         }
                     }
                     // Force thunks when accessing attributes

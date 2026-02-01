@@ -48,11 +48,14 @@ impl Evaluator {
                     (NixValue::Integer(_), NixValue::Integer(_)) => {
                         self.evaluate_integer_divide(&lhs, &rhs)
                     }
-                    (NixValue::AttributeSet(_), NixValue::AttributeSet(_)) => {
-                        // Attribute set update - will be implemented later
-                        Err(Error::UnsupportedExpression {
-                            reason: "attribute set update (//) not yet implemented".to_string(),
-                        })
+                    (NixValue::AttributeSet(lhs_attrs), NixValue::AttributeSet(rhs_attrs)) => {
+                        // Attribute set update: merge rhs into lhs, with rhs values taking precedence
+                        let mut result = lhs_attrs.clone();
+                        // Add/override attributes from rhs
+                        for (key, value) in rhs_attrs {
+                            result.insert(key.clone(), value.clone());
+                        }
+                        Ok(NixValue::AttributeSet(result))
                     }
                     _ => Err(Error::UnsupportedExpression {
                         reason: format!("cannot apply // operator to {} and {}", lhs, rhs),
@@ -127,7 +130,11 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_add(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        match (lhs, rhs) {
+        // Force thunks before addition
+        let lhs_forced = lhs.clone().force(self)?;
+        let rhs_forced = rhs.clone().force(self)?;
+        
+        match (&lhs_forced, &rhs_forced) {
             (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a + b)),
             (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a + b)),
             (NixValue::Integer(a), NixValue::Float(b)) => Ok(NixValue::Float(*a as f64 + b)),
@@ -139,6 +146,56 @@ impl Evaluator {
                 let mut result = a.clone();
                 result.extend(b.clone());
                 Ok(NixValue::List(result))
+            }
+            // Path + String: concatenate path with string
+            // In Nix, path + string concatenates the string as a path component
+            // Special case: if string is "/", it's treated as empty (no-op)
+            (NixValue::Path(lhs_path), NixValue::String(rhs_str)) => {
+                use std::path::PathBuf;
+                if rhs_str == "/" {
+                    // Special case: /bin + "/" = /bin
+                    Ok(NixValue::Path(lhs_path.clone()))
+                } else if rhs_str.starts_with('/') {
+                    // If string starts with "/", treat it as a path component
+                    // e.g., /bin + "/bar" = /bin/bar
+                    let mut result = lhs_path.clone();
+                    let component = &rhs_str[1..]; // Remove leading "/"
+                    if !component.is_empty() {
+                        result.push(component);
+                    }
+                    Ok(NixValue::Path(result))
+                } else {
+                    // Direct string concatenation: /bin + "bar" = /binbar
+                    // Convert path to string, append, then convert back
+                    let lhs_str = lhs_path.to_string_lossy();
+                    let combined = format!("{}{}", lhs_str, rhs_str);
+                    Ok(NixValue::Path(PathBuf::from(combined)))
+                }
+            }
+            // String + Path: convert string to path and concatenate
+            (NixValue::String(lhs_str), NixValue::Path(rhs_path)) => {
+                use std::path::PathBuf;
+                let mut result = PathBuf::from(lhs_str);
+                // Append rhs_path components to the string path
+                for component in rhs_path.components() {
+                    result.push(component);
+                }
+                Ok(NixValue::Path(result))
+            }
+            // Path + Path: concatenate two paths
+            (NixValue::Path(lhs_path), NixValue::Path(rhs_path)) => {
+                use std::path::PathBuf;
+                let mut result = lhs_path.clone();
+                // If rhs is absolute, use it as base, otherwise append
+                if rhs_path.is_absolute() {
+                    result = rhs_path.clone();
+                } else {
+                    // Append rhs_path components to lhs_path
+                    for component in rhs_path.components() {
+                        result.push(component);
+                    }
+                }
+                Ok(NixValue::Path(result))
             }
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("cannot add {} and {}", lhs, rhs),
@@ -232,7 +289,11 @@ impl Evaluator {
 
 
         pub(crate) fn evaluate_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
-        let result = match (lhs, rhs) {
+        // Force thunks before comparison
+        let lhs_forced = lhs.clone().force(self)?;
+        let rhs_forced = rhs.clone().force(self)?;
+        
+        let result = match (&lhs_forced, &rhs_forced) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a == b,
             (NixValue::Float(a), NixValue::Float(b)) => a == b,
             (NixValue::Integer(a), NixValue::Float(b)) => (*a as f64) == *b,
@@ -240,8 +301,39 @@ impl Evaluator {
             (NixValue::String(a), NixValue::String(b)) => a == b,
             (NixValue::Boolean(a), NixValue::Boolean(b)) => a == b,
             (NixValue::Null, NixValue::Null) => true,
-            (NixValue::List(a), NixValue::List(b)) => a == b,
-            (NixValue::AttributeSet(a), NixValue::AttributeSet(b)) => a == b,
+            (NixValue::List(a), NixValue::List(b)) => {
+                // Compare lists element by element, forcing thunks
+                if a.len() != b.len() {
+                    false
+                } else {
+                    a.iter().zip(b.iter()).all(|(a_elem, b_elem)| {
+                        // Force thunks in list elements before comparison
+                        match (a_elem.clone().force(self), b_elem.clone().force(self)) {
+                            (Ok(a_val), Ok(b_val)) => a_val == b_val,
+                            _ => false,
+                        }
+                    })
+                }
+            },
+            (NixValue::AttributeSet(a), NixValue::AttributeSet(b)) => {
+                // Compare attribute sets by forcing thunks in values
+                if a.len() != b.len() {
+                    false
+                } else {
+                    // Check that all keys in a exist in b with equal values
+                    a.iter().all(|(key, a_val)| {
+                        if let Some(b_val) = b.get(key) {
+                            // Force thunks before comparing
+                            match (a_val.clone().force(self), b_val.clone().force(self)) {
+                                (Ok(a_forced), Ok(b_forced)) => a_forced == b_forced,
+                                _ => false,
+                            }
+                        } else {
+                            false
+                        }
+                    })
+                }
+            },
             (NixValue::Path(a), NixValue::Path(b)) => a == b,
             _ => false, // Different types are never equal
         };
