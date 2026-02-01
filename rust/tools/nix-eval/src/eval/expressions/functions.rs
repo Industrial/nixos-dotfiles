@@ -1323,7 +1323,11 @@ impl Evaluator {
         let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
 
         // Force thunks before applying - functions stored as thunks need to be forced
-        let func_value_forced = func_value.clone().force(self)?;
+        // Keep forcing until we get a non-thunk value (handle thunk-thunk cases)
+        let mut func_value_forced = func_value.clone().force(self)?;
+        while let NixValue::Thunk(thunk) = &func_value_forced {
+            func_value_forced = thunk.force(self)?;
+        }
 
         // Apply the function to the argument
         // Note: The result of apply() may be another function, enabling currying.
@@ -1368,7 +1372,7 @@ impl Evaluator {
                 }
             }
             _ => Err(Error::UnsupportedExpression {
-                reason: format!("cannot apply non-function value: {:?}", func_value),
+                reason: format!("cannot apply non-function value: {:?}", func_value_forced),
             }),
         }
     }

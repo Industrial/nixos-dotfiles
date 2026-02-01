@@ -192,7 +192,30 @@ impl Evaluator {
                 // Create nested attribute sets as needed
                 if attr_names.len() == 1 {
                     // Simple case: foo = value
-                    attrs.insert(attr_names[0].clone(), value);
+                    // If the key already exists and both are attribute sets, merge them
+                    let key = &attr_names[0];
+                    if let Some(existing) = attrs.get_mut(key) {
+                        // Force both values to check if they're attribute sets
+                        // In Nix, attribute set merging happens eagerly
+                        let existing_forced = existing.clone().force(self)?;
+                        let new_forced = value.clone().force(self)?;
+                        match (existing_forced, new_forced) {
+                            (NixValue::AttributeSet(mut existing_map), NixValue::AttributeSet(new_map)) => {
+                                // Merge the new map into the existing map
+                                for (k, v) in new_map {
+                                    existing_map.insert(k.clone(), v.clone());
+                                }
+                                // Update the existing value with the merged map
+                                *existing = NixValue::AttributeSet(existing_map);
+                            }
+                            _ => {
+                                // Overwrite if not both attribute sets
+                                *existing = value;
+                            }
+                        }
+                    } else {
+                        attrs.insert(key.clone(), value);
+                    }
                 } else {
                     // Nested case: foo.bar = value
                     // Build nested structure from the inside out
