@@ -2370,8 +2370,11 @@ mod tests {
         let result = evaluator.evaluate("{ foo = 1; bar = 2; }").unwrap();
         match result {
             NixValue::AttributeSet(attrs) => {
-                assert_eq!(attrs.get("foo"), Some(&NixValue::Integer(1)));
-                assert_eq!(attrs.get("bar"), Some(&NixValue::Integer(2)));
+                // Attribute values are thunks, need to force them
+                let foo_value = attrs.get("foo").unwrap().clone().force(&evaluator).unwrap();
+                let bar_value = attrs.get("bar").unwrap().clone().force(&evaluator).unwrap();
+                assert_eq!(foo_value, NixValue::Integer(1));
+                assert_eq!(bar_value, NixValue::Integer(2));
             }
             _ => panic!("Expected AttributeSet"),
         }
@@ -2385,11 +2388,21 @@ mod tests {
             .unwrap();
         match result {
             NixValue::AttributeSet(attrs) => {
-                assert_eq!(
-                    attrs.get("name"),
-                    Some(&NixValue::String("test".to_string()))
-                );
-                assert_eq!(attrs.get("value"), Some(&NixValue::Integer(42)));
+                // Attribute values are thunks, need to force them
+                let name_value = attrs
+                    .get("name")
+                    .unwrap()
+                    .clone()
+                    .force(&evaluator)
+                    .unwrap();
+                let value_value = attrs
+                    .get("value")
+                    .unwrap()
+                    .clone()
+                    .force(&evaluator)
+                    .unwrap();
+                assert_eq!(name_value, NixValue::String("test".to_string()));
+                assert_eq!(value_value, NixValue::Integer(42));
             }
             _ => panic!("Expected AttributeSet"),
         }

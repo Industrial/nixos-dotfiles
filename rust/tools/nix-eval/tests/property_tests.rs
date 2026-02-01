@@ -7,7 +7,8 @@ use nix_eval::{Evaluator, NixValue};
 use proptest::prelude::*;
 
 fn arb_integer() -> impl Strategy<Value = i64> {
-    any::<i64>()
+    // Only non-negative integers until unary operator support is added
+    0i64..i64::MAX
 }
 
 fn arb_string() -> impl Strategy<Value = String> {
@@ -59,7 +60,7 @@ proptest! {
     }
 
     #[test]
-    fn test_list_length_preserved(items in prop::collection::vec(any::<i64>(), 0..100)) {
+    fn test_list_length_preserved(items in prop::collection::vec(0i64..i64::MAX, 0..100)) {
         let evaluator = Evaluator::new();
         let expr = format!("[{}]", items.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(" "));
         let result = evaluator.evaluate(&expr).unwrap();

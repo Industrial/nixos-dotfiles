@@ -111,8 +111,11 @@ fn test_evaluate_simple_attribute_set() {
     match result {
         NixValue::AttributeSet(attrs) => {
             assert_eq!(attrs.len(), 2);
-            assert_eq!(attrs.get("foo"), Some(&NixValue::Integer(1)));
-            assert_eq!(attrs.get("bar"), Some(&NixValue::Integer(2)));
+            // Attribute values are thunks, need to force them
+            let foo_value = attrs.get("foo").unwrap().clone().force(&evaluator).unwrap();
+            let bar_value = attrs.get("bar").unwrap().clone().force(&evaluator).unwrap();
+            assert_eq!(foo_value, NixValue::Integer(1));
+            assert_eq!(bar_value, NixValue::Integer(2));
         }
         _ => panic!("Expected AttributeSet"),
     }
@@ -127,12 +130,28 @@ fn test_evaluate_attribute_set_with_mixed_values() {
     match result {
         NixValue::AttributeSet(attrs) => {
             assert_eq!(attrs.len(), 3);
-            assert_eq!(
-                attrs.get("name"),
-                Some(&NixValue::String("test".to_string()))
-            );
-            assert_eq!(attrs.get("value"), Some(&NixValue::Integer(42)));
-            assert_eq!(attrs.get("enabled"), Some(&NixValue::Boolean(true)));
+            // Attribute values are thunks, need to force them
+            let name_value = attrs
+                .get("name")
+                .unwrap()
+                .clone()
+                .force(&evaluator)
+                .unwrap();
+            let value_value = attrs
+                .get("value")
+                .unwrap()
+                .clone()
+                .force(&evaluator)
+                .unwrap();
+            let enabled_value = attrs
+                .get("enabled")
+                .unwrap()
+                .clone()
+                .force(&evaluator)
+                .unwrap();
+            assert_eq!(name_value, NixValue::String("test".to_string()));
+            assert_eq!(value_value, NixValue::Integer(42));
+            assert_eq!(enabled_value, NixValue::Boolean(true));
         }
         _ => panic!("Expected AttributeSet"),
     }
@@ -145,9 +164,23 @@ fn test_evaluate_nested_attribute_set() {
     match result {
         NixValue::AttributeSet(outer) => {
             assert_eq!(outer.len(), 1);
-            match outer.get("outer") {
-                Some(NixValue::AttributeSet(inner)) => {
-                    assert_eq!(inner.get("inner"), Some(&NixValue::Integer(42)));
+            // Attribute values are thunks, need to force them
+            let outer_value = outer
+                .get("outer")
+                .unwrap()
+                .clone()
+                .force(&evaluator)
+                .unwrap();
+            match outer_value {
+                NixValue::AttributeSet(inner) => {
+                    // Inner attribute set values are also thunks
+                    let inner_value = inner
+                        .get("inner")
+                        .unwrap()
+                        .clone()
+                        .force(&evaluator)
+                        .unwrap();
+                    assert_eq!(inner_value, NixValue::Integer(42));
                 }
                 _ => panic!("Expected nested AttributeSet"),
             }
@@ -161,12 +194,21 @@ fn test_evaluate_attribute_set_with_list() {
     let evaluator = Evaluator::new();
     let result = evaluator.evaluate("{ items = [1 2 3]; }").unwrap();
     match result {
-        NixValue::AttributeSet(attrs) => match attrs.get("items") {
-            Some(NixValue::List(items)) => {
-                assert_eq!(items.len(), 3);
+        NixValue::AttributeSet(attrs) => {
+            // Attribute values are thunks, need to force them
+            let items_value = attrs
+                .get("items")
+                .unwrap()
+                .clone()
+                .force(&evaluator)
+                .unwrap();
+            match items_value {
+                NixValue::List(items) => {
+                    assert_eq!(items.len(), 3);
+                }
+                _ => panic!("Expected List in AttributeSet"),
             }
-            _ => panic!("Expected List in AttributeSet"),
-        },
+        }
         _ => panic!("Expected AttributeSet"),
     }
 }
