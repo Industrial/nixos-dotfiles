@@ -694,6 +694,167 @@ mod flake_outputs {
     }
 }
 
+mod full_evaluation {
+    use super::*;
+
+    /// Test: Evaluate ALL of nixpkgs
+    /// 
+    /// This test attempts to evaluate the entire nixpkgs repository by:
+    /// 1. Importing nixpkgs
+    /// 2. Iterating through all top-level packages
+    /// 3. Evaluating each package to ensure the evaluator can handle the full complexity
+    /// 
+    /// This is the ultimate test - it will fail until nix-eval can fully evaluate nixpkgs.
+    /// 
+    /// Requires: Full nixpkgs evaluation support including:
+    /// - Complete import system
+    /// - All builtin functions
+    /// - All Nix language features
+    /// - Proper lazy evaluation
+    /// - Error handling for edge cases
+    /// 
+    /// NOTE: This test will FAIL until nix-eval can fully evaluate nixpkgs.
+    /// It does NOT skip - it always attempts evaluation to track progress.
+    #[test]
+    fn test_evaluate_all_nixpkgs() {
+
+        println!("\n═══════════════════════════════════════════════════════════");
+        println!("  Testing Full Nixpkgs Evaluation");
+        println!("═══════════════════════════════════════════════════════════\n");
+
+        // Step 1: Import nixpkgs
+        let expr = "import <nixpkgs> {}";
+        let result = eval_with_nix_eval(expr);
+        
+        let pkgs = match result {
+            Ok(NixValue::AttributeSet(attrs)) => attrs,
+            Ok(other) => {
+                let msg = format!("❌ Failed to import nixpkgs: expected AttributeSet, got {:?}", other);
+                eprintln!("{}", msg);
+                record_missing_feature("nixpkgs import");
+                panic!("{}", msg);
+            }
+            Err(e) => {
+                let msg = format!("❌ Failed to import nixpkgs: {}\n   Missing: import builtin, <nixpkgs> search path", e);
+                eprintln!("{}", msg);
+                record_missing_feature("nixpkgs import");
+                panic!("{}", msg);
+            }
+        };
+
+        println!("✓ Successfully imported nixpkgs");
+        println!("  Found {} top-level attributes", pkgs.len());
+
+        // Step 2: Try to evaluate all packages
+        // We'll iterate through packages and try to evaluate them
+        // This will fail on the first package that requires unsupported features
+        let mut evaluated_count = 0;
+        let mut failed_packages = Vec::new();
+        let mut total_packages = 0;
+
+        // Get package names (we'll try to access lib.attrNames if available)
+        // For now, we'll iterate through what we have
+        for (name, value) in &pkgs {
+            total_packages += 1;
+            
+            // Try to force evaluation of this package
+            // This will trigger evaluation of the package's derivation
+            match value.clone().force(&Evaluator::new()) {
+                Ok(_) => {
+                    evaluated_count += 1;
+                    if evaluated_count % 100 == 0 {
+                        println!("  Progress: {}/{} packages evaluated", evaluated_count, total_packages);
+                    }
+                }
+                Err(e) => {
+                    failed_packages.push((name.clone(), format!("{:?}", e)));
+                    // Don't fail immediately - collect failures to report at the end
+                    if failed_packages.len() <= 10 {
+                        eprintln!("  ⚠️  Failed to evaluate package '{}': {:?}", name, e);
+                    }
+                }
+            }
+        }
+
+        println!("\n═══════════════════════════════════════════════════════════");
+        println!("  Evaluation Summary");
+        println!("═══════════════════════════════════════════════════════════");
+        println!("Total packages: {}", total_packages);
+        println!("Successfully evaluated: {}", evaluated_count);
+        println!("Failed: {}", failed_packages.len());
+        
+        if !failed_packages.is_empty() {
+            println!("\nFirst {} failed packages:", failed_packages.len().min(10));
+            for (name, error) in failed_packages.iter().take(10) {
+                println!("  - {}: {}", name, error);
+            }
+            
+            let msg = format!(
+                "❌ Full nixpkgs evaluation incomplete: {}/{} packages failed\n   Missing: Full nixpkgs evaluation support",
+                failed_packages.len(),
+                total_packages
+            );
+            eprintln!("\n{}", msg);
+            record_missing_feature("Full nixpkgs evaluation support");
+            panic!("{}", msg);
+        } else {
+            println!("\n✅ Successfully evaluated ALL of nixpkgs!");
+        }
+        println!("═══════════════════════════════════════════════════════════\n");
+    }
+
+    /// Test: Evaluate nixpkgs.lib (all library functions)
+    /// 
+    /// This tests evaluation of the entire lib attribute set, which contains
+    /// all library functions used throughout nixpkgs.
+    /// 
+    /// NOTE: This test will FAIL until nix-eval can fully evaluate nixpkgs.lib.
+    /// It does NOT skip - it always attempts evaluation to track progress.
+    #[test]
+    fn test_evaluate_nixpkgs_lib() {
+
+        let expr = "(import <nixpkgs> {}).lib";
+        let result = eval_with_nix_eval(expr);
+        
+        match result {
+            Ok(NixValue::AttributeSet(lib_attrs)) => {
+                println!("✓ Successfully evaluated nixpkgs.lib");
+                println!("  Found {} library functions", lib_attrs.len());
+                
+                // Try to evaluate a few key library functions
+                let key_functions = ["length", "mapAttrs", "foldl'", "attrNames", "concatStringsSep"];
+                for func_name in &key_functions {
+                    if let Some(func_value) = lib_attrs.get(*func_name) {
+                        match func_value.clone().force(&Evaluator::new()) {
+                            Ok(_) => {
+                                println!("  ✓ {}: evaluated successfully", func_name);
+                            }
+                            Err(e) => {
+                                let msg = format!("❌ Failed to evaluate lib.{}: {:?}", func_name, e);
+                                eprintln!("{}", msg);
+                                record_missing_feature(&format!("lib.{} evaluation", func_name));
+                                panic!("{}", msg);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(other) => {
+                let msg = format!("❌ Expected AttributeSet for lib, got: {:?}", other);
+                eprintln!("{}", msg);
+                record_missing_feature("nixpkgs.lib access");
+                panic!("{}", msg);
+            }
+            Err(e) => {
+                let msg = format!("❌ Failed to evaluate nixpkgs.lib: {}\n   Missing: lib access or evaluation", e);
+                eprintln!("{}", msg);
+                record_missing_feature("nixpkgs.lib evaluation");
+                panic!("{}", msg);
+            }
+        }
+    }
+}
+
 /// Test suite runner that provides a summary
 /// This test should run last to collect all missing features
 #[test]
@@ -720,6 +881,7 @@ fn test_nixpkgs_evaluation_summary() {
     println!("  cargo nextest run --test nixpkgs builtin_functions");
     println!("  cargo nextest run --test nixpkgs nixos_configurations");
     println!("  cargo nextest run --test nixpkgs flake_outputs");
+    println!("  cargo nextest run --test nixpkgs full_evaluation");
     println!();
     println!("═══════════════════════════════════════════════════════════\n");
 }
