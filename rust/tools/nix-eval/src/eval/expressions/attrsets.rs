@@ -134,7 +134,16 @@ impl Evaluator {
                 // Collect all attributes in the path
                 let attr_names: Vec<String> = attrpath
                     .attrs()
-                    .map(|attr| attr.to_string())
+                    .map(|attr| {
+                        // For string attributes, attr.to_string() includes quotes, so strip them
+                        let attr_str = attr.to_string();
+                        // Check if it starts and ends with quotes
+                        if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
+                            attr_str[1..attr_str.len()-1].to_string()
+                        } else {
+                            attr_str
+                        }
+                    })
                     .collect();
 
                 if attr_names.is_empty() {

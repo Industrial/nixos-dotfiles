@@ -1385,6 +1385,65 @@ impl Builtin for MulBuiltin {
     }
 }
 
+/// Div builtin - integer division (truncates towards zero)
+///
+/// `builtins.div a b` performs integer division, truncating towards zero.
+pub struct DivBuiltin;
+
+impl Builtin for DivBuiltin {
+    fn name(&self) -> &str {
+        "div"
+    }
+    
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if args.len() != 2 {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("div takes 2 arguments, got {}", args.len()),
+            });
+        }
+        
+        match (&args[0], &args[1]) {
+            (NixValue::Integer(a), NixValue::Integer(b)) => {
+                if *b == 0 {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "division by zero".to_string(),
+                    });
+                }
+                // Integer division truncates towards zero
+                Ok(NixValue::Integer(a / b))
+            }
+            (NixValue::Float(a), NixValue::Float(b)) => {
+                if *b == 0.0 {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "division by zero".to_string(),
+                    });
+                }
+                // Float division returns float
+                Ok(NixValue::Float(a / b))
+            }
+            (NixValue::Integer(a), NixValue::Float(b)) => {
+                if *b == 0.0 {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "division by zero".to_string(),
+                    });
+                }
+                Ok(NixValue::Float(*a as f64 / b))
+            }
+            (NixValue::Float(a), NixValue::Integer(b)) => {
+                if *b == 0 {
+                    return Err(Error::UnsupportedExpression {
+                        reason: "division by zero".to_string(),
+                    });
+                }
+                Ok(NixValue::Float(a / *b as f64))
+            }
+            _ => Err(Error::UnsupportedExpression {
+                reason: format!("div expects two numbers, got {} and {}", args[0], args[1]),
+            }),
+        }
+    }
+}
+
 /// Sub builtin - subtracts two numbers
 pub struct SubBuiltin;
 
@@ -1415,62 +1474,6 @@ impl Builtin for SubBuiltin {
             }
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("sub expects two numbers, got {} and {}", args[0], args[1]),
-            }),
-        }
-    }
-}
-
-/// Div builtin - divides two numbers
-pub struct DivBuiltin;
-
-impl Builtin for DivBuiltin {
-    fn name(&self) -> &str {
-        "div"
-    }
-    
-    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
-        if args.len() != 2 {
-            return Err(Error::UnsupportedExpression {
-                reason: format!("div takes 2 arguments, got {}", args.len()),
-            });
-        }
-        
-        match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                if *b == 0 {
-                    return Err(Error::UnsupportedExpression {
-                        reason: "division by zero".to_string(),
-                    });
-                }
-                // Integer division in Nix truncates towards zero
-                Ok(NixValue::Integer(a / b))
-            }
-            (NixValue::Float(a), NixValue::Float(b)) => {
-                if *b == 0.0 {
-                    return Err(Error::UnsupportedExpression {
-                        reason: "division by zero".to_string(),
-                    });
-                }
-                Ok(NixValue::Float(a / b))
-            }
-            (NixValue::Integer(a), NixValue::Float(b)) => {
-                if *b == 0.0 {
-                    return Err(Error::UnsupportedExpression {
-                        reason: "division by zero".to_string(),
-                    });
-                }
-                Ok(NixValue::Float(*a as f64 / b))
-            }
-            (NixValue::Float(a), NixValue::Integer(b)) => {
-                if *b == 0 {
-                    return Err(Error::UnsupportedExpression {
-                        reason: "division by zero".to_string(),
-                    });
-                }
-                Ok(NixValue::Float(a / *b as f64))
-            }
-            _ => Err(Error::UnsupportedExpression {
-                reason: format!("div expects two numbers, got {} and {}", args[0], args[1]),
             }),
         }
     }
@@ -2408,6 +2411,141 @@ impl Builtin for SplitBuiltin {
         }
         
         Ok(NixValue::List(result))
+    }
+}
+
+/// CompareVersions builtin - compares two version strings
+///
+/// `builtins.compareVersions a b` returns:
+/// - -1 if a < b
+/// - 0 if a == b
+/// - 1 if a > b
+pub struct CompareVersionsBuiltin;
+
+impl Builtin for CompareVersionsBuiltin {
+    fn name(&self) -> &str {
+        "compareVersions"
+    }
+    
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if args.len() != 2 {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("compareVersions takes 2 arguments, got {}", args.len()),
+            });
+        }
+        
+        let a = match &args[0] {
+            NixValue::String(s) => s,
+            _ => {
+                return Err(Error::UnsupportedExpression {
+                    reason: format!("compareVersions: first argument must be a string, got {}", args[0]),
+                });
+            }
+        };
+        
+        let b = match &args[1] {
+            NixValue::String(s) => s,
+            _ => {
+                return Err(Error::UnsupportedExpression {
+                    reason: format!("compareVersions: second argument must be a string, got {}", args[1]),
+                });
+            }
+        };
+        
+        // Nix version comparison algorithm:
+        // 1. Split versions into components (numbers and strings)
+        // 2. Compare components lexicographically
+        // 3. Numbers are compared numerically, strings lexicographically
+        // 4. Empty components are treated as 0
+        // 5. "pre" suffix is special - versions with "pre" are less than versions without
+        
+        fn split_version(s: &str) -> Vec<String> {
+            let mut components = Vec::new();
+            let mut current = String::new();
+            let mut in_number = false;
+            
+            for ch in s.chars() {
+                if ch.is_ascii_digit() {
+                    if !in_number && !current.is_empty() {
+                        components.push(current.clone());
+                        current.clear();
+                    }
+                    in_number = true;
+                    current.push(ch);
+                } else if ch == '.' || ch == '-' {
+                    if !current.is_empty() {
+                        components.push(current.clone());
+                        current.clear();
+                    }
+                    in_number = false;
+                } else {
+                    if in_number && !current.is_empty() {
+                        components.push(current.clone());
+                        current.clear();
+                    }
+                    in_number = false;
+                    current.push(ch);
+                }
+            }
+            if !current.is_empty() {
+                components.push(current);
+            }
+            components
+        }
+        
+        let a_parts = split_version(a);
+        let b_parts = split_version(b);
+        
+        // Compare components
+        let max_len = a_parts.len().max(b_parts.len());
+        for i in 0..max_len {
+            let a_part = a_parts.get(i).map(|s| s.as_str()).unwrap_or("");
+            let b_part = b_parts.get(i).map(|s| s.as_str()).unwrap_or("");
+            
+            // Check for "pre" suffix
+            let a_has_pre = a_part.contains("pre");
+            let b_has_pre = b_part.contains("pre");
+            
+            if a_has_pre && !b_has_pre {
+                return Ok(NixValue::Integer(-1));
+            }
+            if !a_has_pre && b_has_pre {
+                return Ok(NixValue::Integer(1));
+            }
+            
+            // Try to parse as numbers
+            let a_num = a_part.parse::<i64>().ok();
+            let b_num = b_part.parse::<i64>().ok();
+            
+            match (a_num, b_num) {
+                (Some(a_n), Some(b_n)) => {
+                    if a_n < b_n {
+                        return Ok(NixValue::Integer(-1));
+                    } else if a_n > b_n {
+                        return Ok(NixValue::Integer(1));
+                    }
+                }
+                (Some(_), None) | (None, Some(_)) => {
+                    // One is a number, one is a string - compare as strings
+                    if a_part < b_part {
+                        return Ok(NixValue::Integer(-1));
+                    } else if a_part > b_part {
+                        return Ok(NixValue::Integer(1));
+                    }
+                }
+                (None, None) => {
+                    // Both are strings - compare lexicographically
+                    if a_part < b_part {
+                        return Ok(NixValue::Integer(-1));
+                    } else if a_part > b_part {
+                        return Ok(NixValue::Integer(1));
+                    }
+                }
+            }
+        }
+        
+        // All components equal
+        Ok(NixValue::Integer(0))
     }
 }
 

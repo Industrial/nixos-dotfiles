@@ -172,27 +172,51 @@ impl Evaluator {
                     Ok(NixValue::Path(PathBuf::from(combined)))
                 }
             }
-            // String + Path: convert string to path and concatenate
-            (NixValue::String(lhs_str), NixValue::Path(rhs_path)) => {
-                use std::path::PathBuf;
-                let mut result = PathBuf::from(lhs_str);
-                // Append rhs_path components to the string path
-                for component in rhs_path.components() {
-                    result.push(component);
-                }
-                Ok(NixValue::Path(result))
-            }
             // Path + Path: concatenate two paths
+            // In Nix, path + path concatenates the second path as components of the first
+            // e.g., /bin + /bin = /bin/bin
             (NixValue::Path(lhs_path), NixValue::Path(rhs_path)) => {
                 use std::path::PathBuf;
                 let mut result = lhs_path.clone();
-                // If rhs is absolute, use it as base, otherwise append
-                if rhs_path.is_absolute() {
-                    result = rhs_path.clone();
-                } else {
-                    // Append rhs_path components to lhs_path
-                    for component in rhs_path.components() {
-                        result.push(component);
+                // Append all components from rhs_path to lhs_path
+                for component in rhs_path.components() {
+                    if let std::path::Component::Normal(comp) = component {
+                        result.push(comp);
+                    } else if let std::path::Component::RootDir = component {
+                        // Root dir in rhs is ignored when appending
+                        continue;
+                    } else {
+                        result.push(component.as_os_str());
+                    }
+                }
+                Ok(NixValue::Path(result))
+            }
+            // String + Path: convert path to string and concatenate
+            (NixValue::String(lhs_str), NixValue::Path(rhs_path)) => {
+                let rhs_str = rhs_path.to_string_lossy();
+                Ok(NixValue::String(format!("{}{}", lhs_str, rhs_str)))
+            }
+            // Path + Path: concatenate two paths
+            // In Nix, path + path appends the components of the second path to the first
+            // e.g., /bin + /bin = /bin/bin (not /bin)
+            (NixValue::Path(lhs_path), NixValue::Path(rhs_path)) => {
+                use std::path::PathBuf;
+                let mut result = lhs_path.clone();
+                // Append all components from rhs_path to lhs_path
+                // Skip the root component if present
+                for component in rhs_path.components() {
+                    match component {
+                        std::path::Component::RootDir => {
+                            // Skip root dir - we want to append components, not replace
+                            continue;
+                        }
+                        std::path::Component::Normal(comp) => {
+                            result.push(comp);
+                        }
+                        _ => {
+                            // Handle other component types
+                            result.push(component.as_os_str());
+                        }
                     }
                 }
                 Ok(NixValue::Path(result))

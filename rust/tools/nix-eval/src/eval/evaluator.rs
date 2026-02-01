@@ -73,6 +73,7 @@ impl Evaluator {
         self.register_builtin(Box::new(IsPathBuiltin));
         self.register_builtin(Box::new(IsListBuiltin));
         self.register_builtin(Box::new(IsAttrsBuiltin));
+        self.register_builtin(Box::new(IsFunctionBuiltin));
         self.register_builtin(Box::new(TypeOfBuiltin));
         self.register_builtin(Box::new(ToStringBuiltin));
         self.register_builtin(Box::new(LengthBuiltin));
@@ -91,6 +92,10 @@ impl Evaluator {
         self.register_builtin(Box::new(StringLengthBuiltin));
         self.register_builtin(Box::new(AddBuiltin));
         self.register_builtin(Box::new(SubBuiltin));
+        self.register_builtin(Box::new(MulBuiltin));
+        self.register_builtin(Box::new(DivBuiltin));
+        self.register_builtin(Box::new(CompareVersionsBuiltin));
+        self.register_builtin(Box::new(ElemAtBuiltin));
         self.register_builtin(Box::new(SubstringBuiltin));
         self.register_builtin(Box::new(ReplaceStringsBuiltin));
         self.register_builtin(Box::new(SplitBuiltin));
@@ -513,8 +518,17 @@ impl Evaluator {
                             return Ok(value.clone());
                         }
                         // Check if it's a builtin function
+                        // For builtins that need special handling (map, all, any, etc.), we return
+                        // a marker string so evaluate_apply can handle them specially
                         if self.builtins.contains_key(&text) {
-                            // Builtins are functions, not values - they need to be called
+                            // Builtins that need evaluator context return a marker
+                            if text == "map" || text == "all" || text == "any" || 
+                               text == "filter" || text == "concatMap" || text == "catAttrs" ||
+                               text == "attrValues" || text == "tryEval" {
+                                // Return a marker so evaluate_apply can handle it
+                                return Ok(NixValue::String(format!("__direct_builtin:{}", text)));
+                            }
+                            // Other builtins are functions, not values - they need to be called
                             return Err(Error::UnsupportedExpression {
                                 reason: format!(
                                     "builtin '{}' cannot be used as a value, it must be called",
@@ -529,7 +543,7 @@ impl Evaluator {
                 }
             }
             Expr::AttrSet(set) => self.evaluate_attr_set(set, scope),
-            Expr::List(list) => self.evaluate_list(list),
+            Expr::List(list) => self.evaluate_list(list, scope),
             Expr::Lambda(lambda) => self.evaluate_lambda(lambda, scope),
             Expr::Apply(apply) => self.evaluate_apply(apply, scope),
             Expr::LetIn(let_in) => self.evaluate_let_in(let_in, scope),

@@ -63,8 +63,42 @@ impl Evaluator {
 
         // Check if the function is a builtin (identifier that's a builtin)
         // This handles cases like `toString 42` where `toString` is a builtin
+        // Also handles direct builtin calls like `map f list` (not just `builtins.map f list`)
         if let Expr::Ident(ident) = &func_expr {
             let builtin_name = ident.to_string();
+
+            // Handle builtins that need special evaluation context when called directly
+            // These are normally accessed via builtins.map, but can also be called directly as map
+            if builtin_name == "map" {
+                // Handle map f list directly
+                let first_arg_expr = apply.argument()
+                    .ok_or_else(|| Error::UnsupportedExpression {
+                        reason: "map: missing first argument".to_string(),
+                    })?;
+                
+                // Check if this is a nested apply: map f list
+                // The parser gives us: Apply(map, f) and then Apply(Apply(map, f), list)
+                // So we need to check if the next argument exists
+                if let Expr::Apply(inner_apply) = &func_expr {
+                    // This is already handled in the nested Apply section below
+                } else {
+                    // Single argument - this is partial application, create a curried function
+                    let func_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                    // Force thunks
+                    let func_forced = func_value.clone().force(self)?;
+                    match func_forced {
+                        NixValue::Function(_) => {
+                            // Return a curried function that will apply map when called with list
+                            // For now, we'll handle this in the nested Apply section
+                        }
+                        _ => {
+                            return Err(Error::UnsupportedExpression {
+                                reason: format!("map: first argument must be a function, got {}", func_forced),
+                            });
+                        }
+                    }
+                }
+            }
 
             // Handle import builtin specially since it needs evaluator context
             if builtin_name == "import" {
@@ -465,6 +499,8 @@ impl Evaluator {
                                             };
                                             
                                             // Filter the list by calling the predicate for each element
+                                            // Note: We force the element before calling the predicate, but we need to
+                                            // keep the original element (which may be a thunk) for the result
                                             let mut result = Vec::new();
                                             for element in list {
                                                 // Force thunks before calling the predicate
@@ -519,11 +555,13 @@ impl Evaluator {
                                             };
                                             
                                             // Apply function to each element
+                                            // Note: We pass the element (which may be a thunk) directly to the function
+                                            // The function can then force it if needed (e.g., for tryEval to catch errors)
                                             let mut result = Vec::new();
                                             for element in list {
-                                                // Force thunks before calling the function
-                                                let element_forced = element.clone().force(self)?;
-                                                let mapped_value = func.apply(self, element_forced)?;
+                                                // Don't force thunks here - let the function decide when to force
+                                                // This allows tryEval to catch errors from thunks
+                                                let mapped_value = func.apply(self, element.clone())?;
                                                 result.push(mapped_value);
                                             }
                                             
@@ -563,11 +601,13 @@ impl Evaluator {
                                             };
                                             
                                             // Apply function to each element and concatenate results
+                                            // Note: We pass the element (which may be a thunk) directly to the function
+                                            // The function can then force it if needed (e.g., for tryEval to catch errors)
                                             let mut result = Vec::new();
                                             for element in list {
-                                                // Force thunks before calling the function
-                                                let element_forced = element.clone().force(self)?;
-                                                let mapped_value = func.apply(self, element_forced)?;
+                                                // Don't force thunks here - let the function decide when to force
+                                                // This allows tryEval to catch errors from thunks
+                                                let mapped_value = func.apply(self, element.clone())?;
                                                 
                                                 // The result should be a list - concatenate it
                                                 match mapped_value {
@@ -650,6 +690,59 @@ impl Evaluator {
             }
         }
 
+        // Handle direct builtin identifiers (like `map` instead of `builtins.map`)
+        // Check if func_expr is an Apply with a direct builtin identifier
+        // For `map f list`, parser gives us: Apply(Apply(map, f), list)
+        // So func_expr is Apply(map, f), and we need to check if the lambda is `map`
+        if let Expr::Apply(inner_apply) = &func_expr {
+            if let Some(inner_func_expr) = inner_apply.lambda() {
+                if let Expr::Ident(ident) = inner_func_expr {
+                    let builtin_name = ident.to_string();
+                    if builtin_name == "map" {
+                        // This is map f list - extract both arguments
+                        let first_arg_expr = inner_apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "map: missing first argument".to_string(),
+                            })?;
+                        let second_arg_expr = apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "map: missing second argument".to_string(),
+                            })?;
+                        
+                        let func_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                        let list_value = self.evaluate_expr_with_scope_impl(&second_arg_expr, scope)?;
+                        
+                        let list = match list_value {
+                            NixValue::List(l) => l,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("map: second argument must be a list, got {}", list_value),
+                                });
+                            }
+                        };
+                        
+                        let func = match func_value.clone().force(self)? {
+                            NixValue::Function(f) => f,
+                            _ => {
+                                return Err(Error::UnsupportedExpression {
+                                    reason: format!("map: first argument must be a function, got {}", func_value),
+                                });
+                            }
+                        };
+                        
+                        let mut result = Vec::new();
+                        for element in list {
+                            // Don't force thunks here - let the function decide when to force
+                            // This allows tryEval to catch errors from thunks
+                            let mapped_value = func.apply(self, element.clone())?;
+                            result.push(mapped_value);
+                        }
+                        return Ok(NixValue::List(result));
+                    }
+                }
+            }
+        }
+        
         // Evaluate the function expression to get the function value
         let func_value_raw = self.evaluate_expr_with_scope_impl(&func_expr, scope)?;
         
@@ -709,10 +802,13 @@ impl Evaluator {
         // Evaluate the argument expression
         let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
 
+        // Force thunks before applying - functions stored as thunks need to be forced
+        let func_value_forced = func_value.clone().force(self)?;
+
         // Apply the function to the argument
         // Note: The result of apply() may be another function, enabling currying.
         // Chained applications like `f 1 2` are handled by the parser as nested Apply nodes.
-        match func_value {
+        match func_value_forced {
             NixValue::Function(func) => func.apply(self, arg_value),
             NixValue::AttributeSet(mut attrs) => {
                 // Check for __functor attribute (makes attribute sets callable)
