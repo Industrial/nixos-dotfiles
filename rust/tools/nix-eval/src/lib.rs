@@ -51,7 +51,7 @@ mod thunk;
 
 use rnix::SyntaxNode;
 use rnix::ast::{
-    AttrpathValue, BinOp, BinOpKind, Expr, HasEntry, InterpolPart, Literal, Root, Str,
+    AttrpathValue, BinOp, BinOpKind, Expr, HasEntry, InterpolPart, Literal, Paren, Root, Str, UnaryOp, UnaryOpKind,
 };
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
@@ -655,6 +655,7 @@ impl Evaluator {
         self.register_builtin(Box::new(builtins::DerivationBuiltin));
         self.register_builtin(Box::new(builtins::StorePathBuiltin));
         self.register_builtin(Box::new(builtins::PathBuiltin));
+        self.register_builtin(Box::new(builtins::GenListBuiltin));
     }
 
     /// Register a builtin function with the evaluator
@@ -841,6 +842,17 @@ impl Evaluator {
                     "true" => Ok(NixValue::Boolean(true)),
                     "false" => Ok(NixValue::Boolean(false)),
                     "null" => Ok(NixValue::Null),
+                    "builtins" => {
+                        // Return an attribute set containing all builtin functions
+                        // Each builtin is accessible via builtins.<name>
+                        // We'll handle this specially in evaluate_select and evaluate_apply
+                        let mut builtins_attrs = HashMap::new();
+                        for (name, _builtin) in &self.builtins {
+                            // Store a marker that we can detect in evaluate_select
+                            builtins_attrs.insert(name.clone(), NixValue::String(format!("__builtin:{}", name)));
+                        }
+                        Ok(NixValue::AttributeSet(builtins_attrs))
+                    }
                     _ => {
                         // Check if it's a variable in scope
                         if let Some(value) = scope.get(&text) {
@@ -872,6 +884,8 @@ impl Evaluator {
             Expr::Path(path_expr) => self.evaluate_path(path_expr, scope),
             Expr::Select(select) => self.evaluate_select(select, scope),
             Expr::BinOp(binop) => self.evaluate_binop(binop, scope),
+            Expr::Paren(paren) => self.evaluate_paren(paren, scope),
+            Expr::UnaryOp(unary_op) => self.evaluate_unary_op(unary_op, scope),
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("{:?}", expr),
             }),
@@ -1297,8 +1311,104 @@ impl Evaluator {
             }
         }
 
+        // Check if this is a nested Apply for genList: builtins.genList f n
+        // The parser gives us: Apply(Apply(builtins.genList, f), n)
+        // So we check if func_expr is itself an Apply with builtins.genList
+        if let Expr::Apply(inner_apply) = &func_expr {
+            if let Some(inner_func_expr) = inner_apply.lambda() {
+                if let Expr::Select(select) = inner_func_expr {
+                    // Check if it's builtins.genList
+                    if let Some(base_expr) = select.expr() {
+                        if let Expr::Ident(ident) = base_expr {
+                            if ident.to_string() == "builtins" {
+                                if let Some(attrpath) = select.attrpath() {
+                                    if let Some(attr) = attrpath.attrs().next() {
+                                        if attr.to_string() == "genList" {
+                                            // This is builtins.genList f n - extract both arguments
+                                            let first_arg_expr = inner_apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "genList: missing first argument".to_string(),
+                                                })?;
+                                            let second_arg_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "genList: missing second argument".to_string(),
+                                                })?;
+                                            
+                                            let func_value = self.evaluate_expr_with_scope_impl(&first_arg_expr, scope)?;
+                                            let length_value = self.evaluate_expr_with_scope_impl(&second_arg_expr, scope)?;
+                                            
+                                            // Get the length
+                                            let length = match length_value {
+                                                NixValue::Integer(n) => {
+                                                    if n < 0 {
+                                                        return Err(Error::UnsupportedExpression {
+                                                            reason: format!("genList: length must be non-negative, got {}", n),
+                                                        });
+                                                    }
+                                                    n as usize
+                                                }
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("genList: second argument must be an integer, got {}", length_value),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Get the function
+                                            let func = match func_value {
+                                                NixValue::Function(f) => f,
+                                                _ => {
+                                                    return Err(Error::UnsupportedExpression {
+                                                        reason: format!("genList: first argument must be a function, got {}", func_value),
+                                                    });
+                                                }
+                                            };
+                                            
+                                            // Generate the list by calling the function for each index
+                                            let mut result = Vec::new();
+                                            for i in 0..length {
+                                                let index_value = NixValue::Integer(i as i64);
+                                                let element = func.apply(self, index_value)?;
+                                                result.push(element);
+                                            }
+                                            
+                                            return Ok(NixValue::List(result));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Evaluate the function expression to get the function value
-        let func_value = self.evaluate_expr_with_scope_impl(&func_expr, scope)?;
+        let func_value_raw = self.evaluate_expr_with_scope_impl(&func_expr, scope)?;
+        
+        // Check if this is a builtin function marker (from builtins.<name>)
+        let func_value = if let NixValue::String(ref s) = func_value_raw {
+            if s.starts_with("__builtin_func:") {
+                let builtin_name = &s[15..]; // Skip "__builtin_func:"
+                if let Some(builtin) = self.builtins.get(builtin_name) {
+                    // Get the argument expression
+                    let arg_expr = apply
+                        .argument()
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: "function application missing argument".to_string(),
+                        })?;
+                    
+                    // Evaluate the argument
+                    let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                    
+                    // Call the builtin with the argument
+                    return builtin.call(&[arg_value]);
+                }
+            }
+            func_value_raw
+        } else {
+            func_value_raw
+        };
 
         // Get the argument expression (right-hand side)
         let arg_expr = apply
@@ -1711,6 +1821,17 @@ impl Evaluator {
         match base_value {
             NixValue::AttributeSet(mut attrs) => {
                 if let Some(value) = attrs.remove(&attr_name) {
+                    // Check if this is a builtin marker (from builtins.<name> access)
+                    if let NixValue::String(ref s) = value {
+                        if s.starts_with("__builtin:") {
+                            let builtin_name = &s[10..]; // Skip "__builtin:"
+                            // Verify the builtin exists
+                            if self.builtins.contains_key(builtin_name) {
+                                // Return a marker that evaluate_apply will recognize
+                                return Ok(NixValue::String(format!("__builtin_func:{}", builtin_name)));
+                            }
+                        }
+                    }
                     // Force thunks when accessing attributes
                     value.force(self)
                 } else {
@@ -1752,8 +1873,12 @@ impl Evaluator {
         })?;
 
         // Evaluate both operands
-        let lhs = self.evaluate_expr_with_scope_impl(&lhs_expr, scope)?;
-        let rhs = self.evaluate_expr_with_scope_impl(&rhs_expr, scope)?;
+        let lhs_raw = self.evaluate_expr_with_scope_impl(&lhs_expr, scope)?;
+        let rhs_raw = self.evaluate_expr_with_scope_impl(&rhs_expr, scope)?;
+        
+        // Force thunks before arithmetic operations
+        let lhs = lhs_raw.clone().force(self)?;
+        let rhs = rhs_raw.clone().force(self)?;
 
         // Get the operator
         let op = binop
@@ -1798,6 +1923,8 @@ impl Evaluator {
             // Logical operators
             BinOpKind::And => self.evaluate_and(&lhs, &rhs),
             BinOpKind::Or => self.evaluate_or(&lhs, &rhs),
+            // List concatenation operator
+            BinOpKind::Concat => self.evaluate_concat(&lhs, &rhs),
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("unsupported binary operator: {:?}", op),
             }),
@@ -1906,6 +2033,61 @@ impl Evaluator {
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("cannot divide {} by {}", lhs, rhs),
             }),
+        }
+    }
+
+    /// Evaluate a parenthesized expression
+    ///
+    /// Parentheses in Nix just group expressions - `(expr)` evaluates to the same value as `expr`.
+    fn evaluate_paren(&self, paren: &Paren, scope: &VariableScope) -> Result<NixValue> {
+        // Get the inner expression
+        let inner_expr = paren.expr().ok_or_else(|| Error::UnsupportedExpression {
+            reason: "parenthesized expression missing inner expression".to_string(),
+        })?;
+        
+        // Evaluate the inner expression
+        self.evaluate_expr_with_scope_impl(&inner_expr, scope)
+    }
+
+    /// Evaluate a unary operation expression
+    ///
+    /// In Nix, unary operators include:
+    /// - Unary minus: `-42` → `-42`
+    /// - Unary plus: `+42` → `42` (rarely used)
+    fn evaluate_unary_op(&self, unary_op: &UnaryOp, scope: &VariableScope) -> Result<NixValue> {
+        // Get the operator text from the syntax node
+        // The operator token is part of the syntax tree
+        let op_text = unary_op.syntax().text().to_string();
+        
+        // Get the operand expression
+        let operand_expr = unary_op.expr().ok_or_else(|| Error::UnsupportedExpression {
+            reason: "unary operation missing operand".to_string(),
+        })?;
+        
+        // Evaluate the operand
+        let operand_value = self.evaluate_expr_with_scope_impl(&operand_expr, scope)?;
+        
+        // Force thunks before applying unary operators
+        let operand = operand_value.clone().force(self)?;
+        
+        // Apply the unary operator based on the text
+        // The operator text will be "-" for unary minus
+        if op_text.starts_with('-') {
+            // Unary minus: negate the value
+            match operand {
+                NixValue::Integer(n) => Ok(NixValue::Integer(-n)),
+                NixValue::Float(f) => Ok(NixValue::Float(-f)),
+                _ => Err(Error::UnsupportedExpression {
+                    reason: format!("cannot apply unary minus to {}", operand),
+                }),
+            }
+        } else if op_text.starts_with('+') {
+            // Unary plus: no-op (just return the value)
+            Ok(operand)
+        } else {
+            Err(Error::UnsupportedExpression {
+                reason: format!("unsupported unary operator: {}", op_text),
+            })
         }
     }
 
@@ -2064,6 +2246,22 @@ impl Evaluator {
         } else {
             // Short-circuit: return lhs without evaluating rhs
             Ok(lhs.clone())
+        }
+    }
+
+    /// Evaluate list concatenation operation (`++`)
+    ///
+    /// In Nix, `++` concatenates two lists: `[1 2] ++ [3 4]` → `[1 2 3 4]`
+    fn evaluate_concat(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+        match (lhs, rhs) {
+            (NixValue::List(a), NixValue::List(b)) => {
+                let mut result = a.clone();
+                result.extend(b.clone());
+                Ok(NixValue::List(result))
+            }
+            _ => Err(Error::UnsupportedExpression {
+                reason: format!("cannot concatenate {} and {} with ++", lhs, rhs),
+            }),
         }
     }
 

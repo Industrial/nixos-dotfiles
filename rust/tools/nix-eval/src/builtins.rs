@@ -814,3 +814,55 @@ impl Builtin for PathBuiltin {
         }
     }
 }
+
+/// GenList builtin - generates a list by calling a function for each index
+///
+/// `builtins.genList f n` generates a list of length n by calling f for each index from 0 to n-1.
+/// This is a placeholder implementation - full implementation requires evaluator context to call Nix functions.
+pub struct GenListBuiltin;
+
+impl Builtin for GenListBuiltin {
+    fn name(&self) -> &str {
+        "genList"
+    }
+    
+    fn call(&self, args: &[NixValue]) -> Result<NixValue> {
+        if args.len() != 2 {
+            return Err(Error::UnsupportedExpression {
+                reason: format!("genList takes 2 arguments, got {}", args.len()),
+            });
+        }
+        
+        // Get the length
+        let length = match &args[1] {
+            NixValue::Integer(n) => {
+                if *n < 0 {
+                    return Err(Error::UnsupportedExpression {
+                        reason: format!("genList: length must be non-negative, got {}", n),
+                    });
+                }
+                *n as usize
+            }
+            _ => {
+                return Err(Error::UnsupportedExpression {
+                    reason: format!("genList: second argument must be an integer, got {}", args[1]),
+                });
+            }
+        };
+        
+        // Get the function
+        // Note: This is a placeholder - full implementation would need evaluator context
+        // to call the Nix function for each index
+        match &args[0] {
+            NixValue::Function(_) => {
+                // For now, return an error indicating this needs evaluator context
+                Err(Error::UnsupportedExpression {
+                    reason: "genList requires evaluator context to call Nix functions".to_string(),
+                })
+            }
+            _ => Err(Error::UnsupportedExpression {
+                reason: format!("genList: first argument must be a function, got {}", args[0]),
+            }),
+        }
+    }
+}
