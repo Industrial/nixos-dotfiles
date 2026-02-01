@@ -1,4 +1,4 @@
 [
-  (builtins.head [ "foo" ])
-  (builtins.head [ 1 2 3 ])
+  (builtins.head ["foo"])
+  (builtins.head [1 2 3])
 ]

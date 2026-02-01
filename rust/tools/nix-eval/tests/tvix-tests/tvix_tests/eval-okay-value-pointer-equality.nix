@@ -2,19 +2,17 @@
 let
   # Some incomparable values
   f = MC: "Boing";
-  t = [ (throw "is a little blue man") ];
-  a = { "with" = abort "headphones and a big smile."; };
+  t = [(throw "is a little blue man")];
+  a = {"with" = abort "headphones and a big smile.";};
 
   # Aliases
   f' = f;
   t' = t;
   a' = a;
 
-  peq1 = a: b: [ a ] == [ b ];
-  peq2 = a: b: { x = a; } == { x = b; };
-in
-
-[
+  peq1 = a: b: [a] == [b];
+  peq2 = a: b: {x = a;} == {x = b;};
+in [
   # pointer equality of functions
   (peq1 f f)
   (peq2 f f)
@@ -25,7 +23,7 @@ in
   (f == f)
   (f == f')
   # works with !=
-  ([ f ] != [ f' ])
+  ([f] != [f'])
 
   # thunks that fail to evaluated wrapped in sets/lists
   (peq1 t t)
@@ -38,7 +36,7 @@ in
   (peq2 a' a)
 
   # function equality with builtins.elem
-  (builtins.elem f [ 21 f 42 ])
+  (builtins.elem f [21 f 42])
 
   # pointer inequality
   (peq1 f (x: x))

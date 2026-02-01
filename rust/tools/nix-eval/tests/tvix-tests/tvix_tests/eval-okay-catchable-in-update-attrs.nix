@@ -1,1 +1,1 @@
-(builtins.tryEval (throw "bob" // { })).success
+(builtins.tryEval (throw "bob" // {})).success

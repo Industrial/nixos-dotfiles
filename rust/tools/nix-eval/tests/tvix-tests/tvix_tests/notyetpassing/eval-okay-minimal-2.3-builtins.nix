@@ -6,7 +6,6 @@
 #
 # Tvix also may choose never to implement some builtins if they are only useful
 # for flakes or perform well enough via the shims nixpkgs usually provides.
-
 let
   # C++ Nix 2.3 builtins except valueSize which is removed in later versions
   minimalBuiltins = [
@@ -118,5 +117,4 @@ let
 
   intersectLists = as: bs: builtins.filter (a: builtins.elem a bs) as;
 in
-
-intersectLists minimalBuiltins (builtins.attrNames builtins)
+  intersectLists minimalBuiltins (builtins.attrNames builtins)

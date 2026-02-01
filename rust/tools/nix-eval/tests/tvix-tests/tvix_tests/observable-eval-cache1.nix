@@ -1,1 +1,1 @@
-let id = x: x; in { inherit id; }
+let id = x: x; in {inherit id;}

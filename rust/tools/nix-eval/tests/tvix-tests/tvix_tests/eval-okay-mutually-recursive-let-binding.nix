@@ -10,5 +10,4 @@ let
     c = a.c or 3;
   };
 in
-
-a // b
+  a // b

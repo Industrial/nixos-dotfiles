@@ -1,13 +1,14 @@
-let a = 1;
+let
+  a = 1;
 in
-(rec {
-  inherit a;
+  (rec {
+    inherit a;
 
-  b = {
-    c = a + 20;
-  };
+    b = {
+      c = a + 20;
+    };
 
-  inherit (b) c;
+    inherit (b) c;
 
-  d = c * 2;
-}).d
+    d = c * 2;
+  }).d

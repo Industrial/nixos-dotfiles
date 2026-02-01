@@ -1,1 +1,1 @@
-(builtins.tryEval (({ foo ? throw "up" }: foo -> true) { })).success
+(builtins.tryEval (({foo ? throw "up"}: foo -> true) {})).success

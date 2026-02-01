@@ -1,1 +1,1 @@
-{ "inherit" = true; }
+{"inherit" = true;}

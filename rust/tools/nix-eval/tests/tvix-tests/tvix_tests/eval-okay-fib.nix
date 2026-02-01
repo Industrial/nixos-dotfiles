@@ -6,4 +6,4 @@ let
 
   fib = n: fib' n 1 1;
 in
-fib 10
+  fib 10

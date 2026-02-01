@@ -1,1 +1,1 @@
-{ "rec" = true; }
+{"rec" = true;}

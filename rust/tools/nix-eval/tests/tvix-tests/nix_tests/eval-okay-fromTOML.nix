@@ -1,5 +1,4 @@
 [
-
   (builtins.fromTOML ''
     # This is a TOML document.
 
@@ -204,5 +203,4 @@
     c = [ [ { d = true } ] ]
     e = [[123]]
   '')
-
 ]

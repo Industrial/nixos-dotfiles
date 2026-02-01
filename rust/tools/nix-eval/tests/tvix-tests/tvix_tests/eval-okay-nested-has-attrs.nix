@@ -8,9 +8,7 @@ let
   };
 
   tes = "random value";
-in
-
-[
+in [
   (set ? a)
   (set ? a.b)
   (set ? a.b.c)

@@ -6,15 +6,12 @@
 let
   thunk = x: x;
   bomb = thunk true;
-  f =
-    { finalise ? later == null
-    , later ? null
-    }:
-    [ finalise later ];
+  f = {
+    finalise ? later == null,
+    later ? null,
+  }: [finalise later];
 in
-
-# Note that the crash did not occur if the offending expression was the rhs
+  # Note that the crash did not occur if the offending expression was the rhs
   # argument to `builtins.seq`, hence we need to put the assert in between.
-assert builtins.seq bomb true;
-
-f { finalise = bomb; }
+  assert builtins.seq bomb true;
+    f {finalise = bomb;}

@@ -1,1 +1,5 @@
-{ a = 15; b = "string"; c = null; }
+{
+  a = 15;
+  b = "string";
+  c = null;
+}

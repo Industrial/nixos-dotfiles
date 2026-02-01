@@ -1,1 +1,9 @@
-({x, y, z}: x + y + z) {x = "foo"; z = "bar";}
+({
+  x,
+  y,
+  z,
+}:
+x + y + z) {
+  x = "foo";
+  z = "bar";
+}

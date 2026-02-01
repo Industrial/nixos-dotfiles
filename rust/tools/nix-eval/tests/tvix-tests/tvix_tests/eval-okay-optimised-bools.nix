@@ -1,8 +1,7 @@
 let
   makeTrue = _: true;
   makeFalse = _: false;
-in
-[
+in [
   # useless `false`
   (false || makeTrue null) # true
   (makeTrue null || false) # true

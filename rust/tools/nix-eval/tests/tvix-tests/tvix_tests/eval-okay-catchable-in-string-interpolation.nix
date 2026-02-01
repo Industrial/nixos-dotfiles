@@ -1,1 +1,1 @@
-(builtins.tryEval ("${toString 3}  ${throw "bob"}")).success
+(builtins.tryEval "${toString 3}  ${throw "bob"}").success

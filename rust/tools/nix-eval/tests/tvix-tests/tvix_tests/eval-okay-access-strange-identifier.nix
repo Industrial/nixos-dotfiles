@@ -3,7 +3,7 @@ let
   # way.
   "foo bar" = 42;
 in
-({
-  # but we *can* inherit it back out
-  inherit "foo bar";
-})."foo bar"
+  ({
+    # but we *can* inherit it back out
+    inherit "foo bar";
+  })."foo bar"

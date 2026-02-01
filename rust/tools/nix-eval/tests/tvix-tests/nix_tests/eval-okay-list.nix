@@ -1,6 +1,5 @@
 with import ./lib.nix;
-
-let {
+  let {
 
   body = concat ["foo" "bar" "bla" "test"];
     

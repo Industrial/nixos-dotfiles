@@ -23,14 +23,19 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
         "test files always end in .nix"
     );
 
-    let code = fs::read_to_string(&code_path)
-        .unwrap_or_else(|e| panic!("should be able to read test code from {}: {}", code_path.display(), e));
+    let code = fs::read_to_string(&code_path).unwrap_or_else(|e| {
+        panic!(
+            "should be able to read test code from {}: {}",
+            code_path.display(),
+            e
+        )
+    });
 
     let evaluator = Evaluator::new();
     let result = evaluator.evaluate(&code);
 
     let failed = result.is_err();
-    
+
     if expect_success && failed {
         panic!(
             "{}: evaluation of eval-okay test should succeed, but failed with {:?}",
@@ -52,13 +57,14 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
 
     // For success cases, check the result
     let value = result.expect("evaluation should succeed");
-    let result_str = value.to_string();
+    // Force all thunks recursively before converting to string for comparison
+    let forced_value = value.deep_force(&evaluator).expect("should be able to force all thunks");
+    let result_str = forced_value.to_string();
 
     // Check for .exp file
     let exp_path = code_path.with_extension("exp");
     if exp_path.exists() {
-        let exp_str = fs::read_to_string(&exp_path)
-            .expect("unable to read .exp file");
+        let exp_str = fs::read_to_string(&exp_path).expect("unable to read .exp file");
 
         if expect_success {
             assert_eq!(
@@ -92,14 +98,14 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
 fn discover_test_files(pattern: &str) -> Vec<PathBuf> {
     let test_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/tvix-tests");
     let mut files = Vec::new();
-    
+
     // Simple pattern matching: supports * wildcard
     let (prefix, suffix) = if let Some(star_pos) = pattern.find('*') {
         (&pattern[..star_pos], &pattern[star_pos + 1..])
     } else {
         (pattern, "")
     };
-    
+
     fn walk_dir(dir: &Path, prefix: &str, suffix: &str, files: &mut Vec<PathBuf>) {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
@@ -115,18 +121,14 @@ fn discover_test_files(pattern: &str) -> Vec<PathBuf> {
             }
         }
     }
-    
+
     walk_dir(&test_dir, prefix, suffix, &mut files);
     files.sort();
     files
 }
-
-
 
 // Generate individual test functions for each file
 // We'll use a different approach - generate tests at compile time using include!
 
 // For now, let's use a runtime approach that generates individual test cases
 // We'll create a test that discovers files and creates sub-tests
-
-

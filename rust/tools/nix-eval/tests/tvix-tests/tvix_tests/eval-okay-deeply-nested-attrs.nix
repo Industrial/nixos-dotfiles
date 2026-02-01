@@ -1,1 +1,1 @@
-{ a.b.c.d.e.f.g = "deep!"; }
+{a.b.c.d.e.f.g = "deep!";}

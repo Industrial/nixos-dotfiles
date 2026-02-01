@@ -1,1 +1,3 @@
-if true then abort "this should fail" else 1
+if true
+then abort "this should fail"
+else 1

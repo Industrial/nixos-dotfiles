@@ -1,1 +1,5 @@
-{ name = "foo"; value = "bar"; } // { other = 42; }
+{
+  name = "foo";
+  value = "bar";
+}
+// {other = 42;}

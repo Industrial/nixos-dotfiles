@@ -5,12 +5,12 @@
 //! where expressions are only evaluated when their values are needed.
 
 use crate::{Error, Evaluator, NixValue, Result, VariableScope};
+use codespan::FileId;
 use rnix::SyntaxNode;
 use rnix::ast::{Expr, Root};
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
 use rowan::ast::AstNode;
-use codespan::FileId;
 use std::sync::{Arc, Mutex};
 
 /// Represents the state of a thunk during evaluation
@@ -214,6 +214,8 @@ impl Thunk {
                 evaluator.push_context(self.file_id, self.closure.clone());
 
                 // Evaluate the expression using the thunk's closure as the scope
+                // Note: For let bindings, if a variable is not found or is Null in the closure,
+                // the identifier lookup in evaluate_expr_with_scope_impl will check the context stack
                 let result = evaluator.evaluate_expr_with_scope(&expr, &self.closure);
 
                 // Pop context (restore previous context)
@@ -244,14 +246,13 @@ impl Thunk {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::NixValue;
     use std::collections::HashMap;
 
     #[test]
     fn test_thunk_creation() {
         // This test is a placeholder - we'll need actual Expr nodes from rnix
         // For now, we'll test the structure
-        let scope: VariableScope = HashMap::new();
+        let _scope: VariableScope = HashMap::new();
         // In a real test, we'd parse an expression and create a thunk
         // let expr = parse("42").unwrap();
         // let thunk = Thunk::new(&expr, scope);
@@ -260,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_thunk_state() {
-        let scope: VariableScope = HashMap::new();
+        let _scope: VariableScope = HashMap::new();
         // Placeholder test - will be expanded when we have actual Expr nodes
     }
 }

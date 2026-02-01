@@ -1,4 +1,4 @@
 {
   services.ssh.port = 23;
-  services.ssh = { enable = true; };
+  services.ssh = {enable = true;};
 }

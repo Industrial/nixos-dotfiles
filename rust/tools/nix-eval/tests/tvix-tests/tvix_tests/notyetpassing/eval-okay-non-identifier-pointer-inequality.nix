@@ -8,21 +8,19 @@
 # the latter, not the former, the values are no longer equal
 # by pointer.
 let
-  foo = { bar = x: x; };
+  foo = {bar = x: x;};
 
   id = x: x;
-in
+in [
+  ({inherit (foo) bar;} == {inherit (foo) bar;})
+  ([foo.bar] == [foo.bar])
 
-[
-  ({ inherit (foo) bar; } == { inherit (foo) bar; })
-  ([ foo.bar ] == [ foo.bar ])
+  ([builtins.add] == [builtins.add])
+  ({inherit (builtins) import;} == {inherit (builtins) import;})
 
-  ([ builtins.add ] == [ builtins.add ])
-  ({ inherit (builtins) import; } == { inherit (builtins) import; })
+  ([(id id)] == [(id id)])
+  ([id] == [id])
 
-  ([ (id id) ] == [ (id id) ])
-  ([ id ] == [ id ])
-
-  (with foo; [ bar ] == [ bar ])
-  (with builtins; [ add ] == [ add ])
+  (with foo; [bar] == [bar])
+  (with builtins; [add] == [add])
 ]

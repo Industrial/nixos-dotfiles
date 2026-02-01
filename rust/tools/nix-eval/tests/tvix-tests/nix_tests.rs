@@ -128,7 +128,7 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
 #[cfg(feature = "impure")]
 #[rstest]
 fn identity(#[files("src/tests/tvix_tests/identity-*.nix")] code_path: PathBuf) {
-    use crate::{vm::EvalMode, EvalIO};
+    use crate::{EvalIO, vm::EvalMode};
 
     let code = std::fs::read_to_string(code_path).expect("should be able to read test code");
 

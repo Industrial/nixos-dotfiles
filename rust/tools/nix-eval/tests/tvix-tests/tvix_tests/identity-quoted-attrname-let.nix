@@ -1,1 +1,1 @@
-{ "let" = true; }
+{"let" = true;}

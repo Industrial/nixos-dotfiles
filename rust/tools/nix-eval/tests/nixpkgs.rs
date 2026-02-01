@@ -33,7 +33,7 @@ fn get_nixpkgs_path() -> Option<String> {
         .args(&["eval", "--raw", "--expr", "<nixpkgs>"])
         .output()
         .ok()?;
-    
+
     if output.status.success() {
         str::from_utf8(&output.stdout)
             .ok()
@@ -47,12 +47,12 @@ fn get_nixpkgs_path() -> Option<String> {
 /// Automatically configures nixpkgs search path if available
 fn eval_with_nix_eval(expr: &str) -> Result<NixValue, String> {
     let mut evaluator = Evaluator::new();
-    
+
     // Try to configure nixpkgs search path if available
     if let Some(nixpkgs_path) = get_nixpkgs_path() {
         evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path));
     }
-    
+
     evaluator.evaluate(expr).map_err(|e| format!("{:?}", e))
 }
 
@@ -105,7 +105,7 @@ mod basic_imports {
         // Test that we can resolve <nixpkgs> to a path
         let expr = "<nixpkgs>";
         let result = evaluator.evaluate(expr).map_err(|e| format!("{:?}", e));
-        
+
         match result {
             Ok(NixValue::Path(_)) | Ok(NixValue::StorePath(_)) => {
                 // Success!
@@ -114,7 +114,10 @@ mod basic_imports {
                 panic!("Expected Path or StorePath, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ Failed to resolve <nixpkgs>: {}\n   Missing: Search path resolution", e);
+                let msg = format!(
+                    "❌ Failed to resolve <nixpkgs>: {}\n   Missing: Search path resolution",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("Search path resolution");
                 panic!("{}", msg);
@@ -129,11 +132,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import default.nix directly
             let expr = format!("import {}/default.nix", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) | Ok(NixValue::Function(_)) => {
                     // Success!
@@ -142,9 +145,14 @@ mod basic_imports {
                     eprintln!("⚠️  Got unexpected type: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to import nixpkgs/default.nix: {}\n   Missing: import builtin, file reading, or directory import handling", e);
+                    let msg = format!(
+                        "❌ Failed to import nixpkgs/default.nix: {}\n   Missing: import builtin, file reading, or directory import handling",
+                        e
+                    );
                     eprintln!("{}", msg);
-                    record_missing_feature("import builtin, file reading, or directory import handling");
+                    record_missing_feature(
+                        "import builtin, file reading, or directory import handling",
+                    );
                     panic!("{}", msg);
                 }
             }
@@ -160,11 +168,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import lib/minfeatures.nix directly
             let expr = format!("import {}/lib/minfeatures.nix", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) => {
                     // Success!
@@ -173,7 +181,10 @@ mod basic_imports {
                     eprintln!("⚠️  Got unexpected type: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to import lib/minfeatures.nix: {}\n   Missing: import builtin, file reading, or relative imports", e);
+                    let msg = format!(
+                        "❌ Failed to import lib/minfeatures.nix: {}\n   Missing: import builtin, file reading, or relative imports",
+                        e
+                    );
                     eprintln!("{}", msg);
                     record_missing_feature("import builtin, file reading, or relative imports");
                     panic!("{}", msg);
@@ -191,11 +202,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import pkgs/top-level/impure.nix directly
             let expr = format!("import {}/pkgs/top-level/impure.nix", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::Function(_)) => {
                     // Success! impure.nix should return a function
@@ -204,7 +215,10 @@ mod basic_imports {
                     eprintln!("⚠️  Expected Function, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to import pkgs/top-level/impure.nix: {}\n   Missing: import builtin, file reading, or function evaluation", e);
+                    let msg = format!(
+                        "❌ Failed to import pkgs/top-level/impure.nix: {}\n   Missing: import builtin, file reading, or function evaluation",
+                        e
+                    );
                     eprintln!("{}", msg);
                     record_missing_feature("import builtin, file reading, or function evaluation");
                     panic!("{}", msg);
@@ -222,11 +236,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import pkgs/top-level/impure-overlays.nix directly
             let expr = format!("import {}/pkgs/top-level/impure-overlays.nix", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::List(_)) => {
                     // Success! Should return a list of overlays
@@ -235,7 +249,10 @@ mod basic_imports {
                     eprintln!("⚠️  Expected List, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to import pkgs/top-level/impure-overlays.nix: {}\n   Missing: import builtin, file reading, or list evaluation", e);
+                    let msg = format!(
+                        "❌ Failed to import pkgs/top-level/impure-overlays.nix: {}\n   Missing: import builtin, file reading, or list evaluation",
+                        e
+                    );
                     eprintln!("{}", msg);
                     record_missing_feature("import builtin, file reading, or list evaluation");
                     panic!("{}", msg);
@@ -253,27 +270,27 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Test importing a bare identifier - this should resolve relative to current file
             // First, let's set up a test file that imports "flake"
             let test_dir = std::env::temp_dir().join("nix-eval-test-import");
             std::fs::create_dir_all(&test_dir).unwrap();
-            
+
             // Create a flake directory with default.nix
             let flake_dir = test_dir.join("flake");
             std::fs::create_dir_all(&flake_dir).unwrap();
             std::fs::write(flake_dir.join("default.nix"), "{ x = 1; }").unwrap();
-            
+
             // Create a test.nix that imports flake (bare identifier, no ./)
             let test_file = test_dir.join("test.nix");
             std::fs::write(&test_file, "import flake").unwrap();
-            
+
             // Set current_file context and try to import
             // Actually, we need to test this through the evaluator's import mechanism
             // Let's test importing the test file which has "import flake"
             let expr = format!("import {}", test_file.display());
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) => {
                     // Success! Bare identifier import works
@@ -282,13 +299,16 @@ mod basic_imports {
                     eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to import bare identifier: {}\n   Missing: Bare identifier import handling (import flake should resolve relative to current file)", e);
+                    let msg = format!(
+                        "❌ Failed to import bare identifier: {}\n   Missing: Bare identifier import handling (import flake should resolve relative to current file)",
+                        e
+                    );
                     eprintln!("{}", msg);
                     record_missing_feature("Bare identifier import handling");
                     panic!("{}", msg);
                 }
             }
-            
+
             // Cleanup
             let _ = std::fs::remove_dir_all(&test_dir);
         } else {
@@ -303,7 +323,7 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Test importing a directory - nixpkgs has a flake.nix file, so flake/ might be a directory
             // Actually, let's test with a known directory structure
             // Check if lib/ is a directory and has default.nix
@@ -312,7 +332,7 @@ mod basic_imports {
                 // Try importing the lib directory (should resolve to lib/default.nix)
                 let expr = format!("import {}/lib", nixpkgs_path);
                 let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-                
+
                 match result {
                     Ok(NixValue::AttributeSet(_)) => {
                         // Success! Directory import works
@@ -321,7 +341,10 @@ mod basic_imports {
                         eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
                     }
                     Err(e) => {
-                        let msg = format!("❌ Failed to import directory: {}\n   Missing: Directory import handling (import ./dir should resolve to import ./dir/default.nix)", e);
+                        let msg = format!(
+                            "❌ Failed to import directory: {}\n   Missing: Directory import handling (import ./dir should resolve to import ./dir/default.nix)",
+                            e
+                        );
                         eprintln!("{}", msg);
                         record_missing_feature("Directory import handling");
                         panic!("{}", msg);
@@ -346,7 +369,7 @@ mod basic_imports {
 
         let expr = "import <nixpkgs> {}";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::AttributeSet(_)) => {
                 // Success! Basic import works
@@ -356,7 +379,10 @@ mod basic_imports {
             }
             Err(e) => {
                 // Expected to fail - document what's missing
-                let msg = format!("❌ Basic nixpkgs import failed: {}\n   Missing: import builtin, <nixpkgs> search path resolution", e);
+                let msg = format!(
+                    "❌ Basic nixpkgs import failed: {}\n   Missing: import builtin, <nixpkgs> search path resolution",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("import builtin, <nixpkgs> search path resolution");
                 // Fail the test to make it visible
@@ -372,7 +398,7 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let expr = format!("import {} {{}}", nixpkgs_path);
             let result = eval_with_nix_eval(&expr);
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) => {
                     // Success!
@@ -381,7 +407,10 @@ mod basic_imports {
                     panic!("Expected AttributeSet, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Nixpkgs import with path failed: {}\n   Missing: import builtin, file reading", e);
+                    let msg = format!(
+                        "❌ Nixpkgs import with path failed: {}\n   Missing: import builtin, file reading",
+                        e
+                    );
                     eprintln!("{}", msg);
                     record_missing_feature("import builtin, file reading");
                     panic!("{}", msg);
@@ -399,11 +428,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import impure.nix (returns a function) and call it with {}
             let expr = format!("(import {}/pkgs/top-level/impure.nix) {{}}", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) | Ok(NixValue::Function(_)) => {
                     // Success! Function call works
@@ -412,9 +441,14 @@ mod basic_imports {
                     eprintln!("⚠️  Got unexpected type: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to call impure.nix function: {}\n   Missing: Function application, attribute set handling, or nested imports", e);
+                    let msg = format!(
+                        "❌ Failed to call impure.nix function: {}\n   Missing: Function application, attribute set handling, or nested imports",
+                        e
+                    );
                     eprintln!("{}", msg);
-                    record_missing_feature("Function application, attribute set handling, or nested imports");
+                    record_missing_feature(
+                        "Function application, attribute set handling, or nested imports",
+                    );
                     panic!("{}", msg);
                 }
             }
@@ -430,11 +464,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import pkgs/top-level/default.nix directly
             let expr = format!("import {}/pkgs/top-level/default.nix", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::Function(_)) => {
                     // Success! Should return a function
@@ -443,9 +477,14 @@ mod basic_imports {
                     eprintln!("⚠️  Expected Function, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to import pkgs/top-level/default.nix: {}\n   Missing: import builtin, file reading, or nested directory imports", e);
+                    let msg = format!(
+                        "❌ Failed to import pkgs/top-level/default.nix: {}\n   Missing: import builtin, file reading, or nested directory imports",
+                        e
+                    );
                     eprintln!("{}", msg);
-                    record_missing_feature("import builtin, file reading, or nested directory imports");
+                    record_missing_feature(
+                        "import builtin, file reading, or nested directory imports",
+                    );
                     panic!("{}", msg);
                 }
             }
@@ -461,7 +500,7 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import pkgs/top-level/default.nix and call it with minimal args
             // Based on impure.nix, it needs: config, overlays, localSystem
             let expr = format!(
@@ -469,7 +508,7 @@ mod basic_imports {
                 nixpkgs_path
             );
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) => {
                     // Success! This should return the package set
@@ -478,9 +517,14 @@ mod basic_imports {
                     eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to call pkgs/top-level/default.nix: {}\n   Missing: Function application, nested attribute sets, or complex evaluation", e);
+                    let msg = format!(
+                        "❌ Failed to call pkgs/top-level/default.nix: {}\n   Missing: Function application, nested attribute sets, or complex evaluation",
+                        e
+                    );
                     eprintln!("{}", msg);
-                    record_missing_feature("Function application, nested attribute sets, or complex evaluation");
+                    record_missing_feature(
+                        "Function application, nested attribute sets, or complex evaluation",
+                    );
                     panic!("{}", msg);
                 }
             }
@@ -496,9 +540,9 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             println!("\nTracing nixpkgs import chain...");
-            
+
             // Step 1: Import default.nix
             println!("Step 1: Importing default.nix...");
             let expr1 = format!("import {}/default.nix", nixpkgs_path);
@@ -509,7 +553,7 @@ mod basic_imports {
                     panic!("❌ Failed at step 1 (default.nix): {}", e);
                 }
             }
-            
+
             // Step 2: Import pkgs/top-level/impure.nix
             println!("Step 2: Importing pkgs/top-level/impure.nix...");
             let expr2 = format!("import {}/pkgs/top-level/impure.nix", nixpkgs_path);
@@ -520,7 +564,7 @@ mod basic_imports {
                     panic!("❌ Failed at step 2 (impure.nix): {}", e);
                 }
             }
-            
+
             // Step 3: Call impure.nix with {}
             println!("Step 3: Calling impure.nix function with {{}}...");
             let expr3 = format!("(import {}/pkgs/top-level/impure.nix) {{}}", nixpkgs_path);
@@ -531,7 +575,7 @@ mod basic_imports {
                     panic!("❌ Failed at step 3 (calling impure.nix): {}", e);
                 }
             }
-            
+
             // Step 4: Import pkgs/top-level/default.nix
             println!("Step 4: Importing pkgs/top-level/default.nix...");
             let expr4 = format!("import {}/pkgs/top-level/default.nix", nixpkgs_path);
@@ -542,7 +586,7 @@ mod basic_imports {
                     panic!("❌ Failed at step 4 (pkgs/top-level/default.nix): {}", e);
                 }
             }
-            
+
             println!("✓ All import chain steps completed successfully!");
         } else {
             eprintln!("Skipping: Could not determine nixpkgs path");
@@ -556,19 +600,24 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // Import nixpkgs and try to access a simple package
             let expr = "(import <nixpkgs> {}).hello";
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(_) => {
                     println!("✓ Successfully accessed hello package");
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to access hello package: {}\n   This is where lazy evaluation triggers nested imports", e);
+                    let msg = format!(
+                        "❌ Failed to access hello package: {}\n   This is where lazy evaluation triggers nested imports",
+                        e
+                    );
                     eprintln!("{}", msg);
-                    record_missing_feature("Lazy evaluation or nested imports during package access");
+                    record_missing_feature(
+                        "Lazy evaluation or nested imports during package access",
+                    );
                     panic!("{}", msg);
                 }
             }
@@ -584,11 +633,11 @@ mod basic_imports {
         if let Some(nixpkgs_path) = get_nixpkgs_path() {
             let mut evaluator = Evaluator::new();
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
-            
+
             // This is exactly what "import <nixpkgs> {}" does
             let expr = format!("(import {}/default.nix) {{}}", nixpkgs_path);
             let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-            
+
             match result {
                 Ok(NixValue::AttributeSet(_)) => {
                     println!("✓ Successfully called default.nix with {{}}");
@@ -597,7 +646,10 @@ mod basic_imports {
                     eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
                 }
                 Err(e) => {
-                    let msg = format!("❌ Failed to call default.nix with {{}}: {}\n   This is the exact failure point - somewhere in this call chain, there's an import of 'flake'", e);
+                    let msg = format!(
+                        "❌ Failed to call default.nix with {{}}: {}\n   This is the exact failure point - somewhere in this call chain, there's an import of 'flake'",
+                        e
+                    );
                     eprintln!("{}", msg);
                     record_missing_feature("Calling default.nix with empty attribute set");
                     panic!("{}", msg);
@@ -614,26 +666,26 @@ mod basic_imports {
     fn test_import_path_variable() {
         use std::fs;
         use std::path::PathBuf;
-        
+
         // Create a temporary directory structure
         let temp_dir = std::env::temp_dir().join("nix-eval-test-import-path");
         let _ = fs::remove_dir_all(&temp_dir); // Clean up if exists
         fs::create_dir_all(&temp_dir).unwrap();
-        
+
         // Create test-flake directory with default.nix
         let flake_dir = temp_dir.join("test-flake");
         fs::create_dir_all(&flake_dir).unwrap();
         fs::write(flake_dir.join("default.nix"), "{ x = 1; }").unwrap();
-        
+
         // Create test.nix that imports the flake variable
         let test_file = temp_dir.join("test.nix");
         fs::write(&test_file, "let flake = ./test-flake; in import flake").unwrap();
-        
+
         // Test with our evaluator
         let mut evaluator = Evaluator::new();
         let expr = format!("import {}", test_file.display());
         let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
-        
+
         match result {
             Ok(NixValue::AttributeSet(attrs)) => {
                 // Check that x = 1
@@ -655,13 +707,16 @@ mod basic_imports {
                 panic!("{}", msg);
             }
             Err(e) => {
-                let msg = format!("❌ Failed to import path variable: {}\n   Missing: Path variable resolution in import", e);
+                let msg = format!(
+                    "❌ Failed to import path variable: {}\n   Missing: Path variable resolution in import",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("Path variable resolution in import");
                 panic!("{}", msg);
             }
         }
-        
+
         // Cleanup
         let _ = fs::remove_dir_all(&temp_dir);
     }
@@ -681,7 +736,7 @@ mod simple_package_access {
 
         let expr = "(import <nixpkgs> {}).hello";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::AttributeSet(_)) | Ok(NixValue::Derivation(_)) => {
                 // Success! Can access packages
@@ -707,13 +762,16 @@ mod simple_package_access {
 
         let expr = "(import <nixpkgs> {}).python3Packages.numpy";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(_) => {
                 // Success!
             }
             Err(e) => {
-                let msg = format!("❌ Nested package access failed: {}\n   Missing: nested attribute access (a.b.c)", e);
+                let msg = format!(
+                    "❌ Nested package access failed: {}\n   Missing: nested attribute access (a.b.c)",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("nested attribute access (a.b.c)");
                 panic!("{}", msg);
@@ -732,7 +790,7 @@ mod simple_package_access {
 
         let expr = "(import <nixpkgs> {}).hello.name";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::String(_)) => {
                 // Success!
@@ -741,7 +799,10 @@ mod simple_package_access {
                 eprintln!("⚠️  Expected String, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ Package name access failed: {}\n   Missing: attribute access, derivation attribute access", e);
+                let msg = format!(
+                    "❌ Package name access failed: {}\n   Missing: attribute access, derivation attribute access",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("attribute access, derivation attribute access");
                 panic!("{}", msg);
@@ -764,7 +825,7 @@ mod library_functions {
 
         let expr = "(import <nixpkgs> {}).lib.length [1 2 3]";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Integer(3)) => {
                 // Success!
@@ -773,7 +834,10 @@ mod library_functions {
                 eprintln!("⚠️  Expected Integer(3), got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ lib.length failed: {}\n   Missing: lib access, function application, or length builtin", e);
+                let msg = format!(
+                    "❌ lib.length failed: {}\n   Missing: lib access, function application, or length builtin",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("lib access, function application, or length builtin");
                 panic!("{}", msg);
@@ -792,7 +856,7 @@ mod library_functions {
 
         let expr = "(import <nixpkgs> {}).lib.mapAttrs (name: value: name) { a = 1; b = 2; }";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::AttributeSet(_)) => {
                 // Success!
@@ -818,7 +882,7 @@ mod library_functions {
 
         let expr = "(import <nixpkgs> {}).lib.foldl' (x: y: x + y) 0 [1 2 3]";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Integer(6)) => {
                 // Success!
@@ -827,7 +891,10 @@ mod library_functions {
                 eprintln!("⚠️  Expected Integer(6), got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ lib.foldl' failed: {}\n   Missing: lib.foldl' function, higher-order functions", e);
+                let msg = format!(
+                    "❌ lib.foldl' failed: {}\n   Missing: lib.foldl' function, higher-order functions",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("lib.foldl' function, higher-order functions");
                 panic!("{}", msg);
@@ -846,7 +913,7 @@ mod library_functions {
 
         let expr = "(import <nixpkgs> {}).lib.attrNames { a = 1; b = 2; }";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::List(_)) => {
                 // Success!
@@ -855,7 +922,10 @@ mod library_functions {
                 eprintln!("⚠️  Expected List, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ lib.attrNames failed: {}\n   Missing: lib.attrNames or attrNames builtin", e);
+                let msg = format!(
+                    "❌ lib.attrNames failed: {}\n   Missing: lib.attrNames or attrNames builtin",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("lib.attrNames or attrNames builtin");
                 panic!("{}", msg);
@@ -883,7 +953,7 @@ mod complex_expressions {
         "#;
 
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Function(_)) => {
                 // Success! Can parse package definition
@@ -893,7 +963,9 @@ mod complex_expressions {
             }
             Err(e) => {
                 eprintln!("❌ Simple package definition failed: {}", e);
-                eprintln!("   Missing: function definitions, attribute sets, or string interpolation");
+                eprintln!(
+                    "   Missing: function definitions, attribute sets, or string interpolation"
+                );
             }
         }
     }
@@ -909,7 +981,7 @@ mod complex_expressions {
 
         let expr = "with (import <nixpkgs> {}); [ hello git ]";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::List(_)) => {
                 // Success!
@@ -918,7 +990,10 @@ mod complex_expressions {
                 eprintln!("⚠️  Expected List, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ with expression failed: {}\n   Missing: with expression support", e);
+                let msg = format!(
+                    "❌ with expression failed: {}\n   Missing: with expression support",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("with expression support");
                 panic!("{}", msg);
@@ -932,7 +1007,7 @@ mod complex_expressions {
     fn test_let_expression() {
         let expr = "let x = 1; y = 2; in x + y";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Integer(3)) => {
                 // Success!
@@ -941,7 +1016,10 @@ mod complex_expressions {
                 eprintln!("⚠️  Expected Integer(3), got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ let expression failed: {}\n   Missing: let expression support or addition operator", e);
+                let msg = format!(
+                    "❌ let expression failed: {}\n   Missing: let expression support or addition operator",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("let expression support or addition operator");
                 panic!("{}", msg);
@@ -955,7 +1033,7 @@ mod complex_expressions {
     fn test_if_expression() {
         let expr = "if true then 1 else 2";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Integer(1)) => {
                 // Success!
@@ -980,7 +1058,7 @@ mod operators {
     fn test_unary_minus() {
         let expr = "-42";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Integer(-42)) => {
                 // Success!
@@ -989,7 +1067,10 @@ mod operators {
                 eprintln!("⚠️  Expected Integer(-42), got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ Unary minus failed: {}\n   Missing: Unary operator support (UnaryOp)", e);
+                let msg = format!(
+                    "❌ Unary minus failed: {}\n   Missing: Unary operator support (UnaryOp)",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("Unary operator support (UnaryOp)");
                 panic!("{}", msg);
@@ -1003,7 +1084,7 @@ mod operators {
     fn test_string_concat() {
         let expr = r#""hello" + " " + "world""#;
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::String(s)) if s == "hello world" => {
                 // Success!
@@ -1027,7 +1108,7 @@ mod operators {
     fn test_list_concat() {
         let expr = "[1 2] ++ [3 4]";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::List(l)) if l.len() == 4 => {
                 // Success!
@@ -1039,7 +1120,10 @@ mod operators {
                 eprintln!("⚠️  Expected List, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ List concatenation failed: {}\n   Missing: List concatenation (++) operator", e);
+                let msg = format!(
+                    "❌ List concatenation failed: {}\n   Missing: List concatenation (++) operator",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("List concatenation (++) operator");
                 panic!("{}", msg);
@@ -1058,10 +1142,10 @@ mod builtin_functions {
         // Create a temporary file
         let test_file = std::env::temp_dir().join("nix-eval-test.txt");
         std::fs::write(&test_file, "hello world").unwrap();
-        
+
         let expr = format!("builtins.readFile {}", test_file.display());
         let result = eval_with_nix_eval(&expr);
-        
+
         match result {
             Ok(NixValue::String(s)) if s == "hello world" => {
                 // Success!
@@ -1077,7 +1161,7 @@ mod builtin_functions {
                 eprintln!("   Missing: readFile builtin or file I/O");
             }
         }
-        
+
         // Cleanup
         let _ = std::fs::remove_file(&test_file);
     }
@@ -1088,7 +1172,7 @@ mod builtin_functions {
     fn test_builtins_mapattrs() {
         let expr = "builtins.mapAttrs (name: value: name) { a = 1; b = 2; }";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::AttributeSet(_)) => {
                 // Success!
@@ -1109,7 +1193,7 @@ mod builtin_functions {
     fn test_builtins_foldl() {
         let expr = "builtins.foldl' (x: y: x + y) 0 [1 2 3]";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Integer(6)) => {
                 // Success!
@@ -1130,7 +1214,7 @@ mod builtin_functions {
     fn test_builtins_genlist() {
         let expr = "builtins.genList (x: x * 2) 5";
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::List(l)) if l.len() == 5 => {
                 // Success!
@@ -1142,7 +1226,10 @@ mod builtin_functions {
                 eprintln!("⚠️  Expected List, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ builtins.genList failed: {}\n   Missing: genList builtin or function application", e);
+                let msg = format!(
+                    "❌ builtins.genList failed: {}\n   Missing: genList builtin or function application",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("genList builtin or function application");
                 panic!("{}", msg);
@@ -1171,7 +1258,7 @@ mod nixos_configurations {
         "#;
 
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::Function(_)) => {
                 // Success! Can parse NixOS config
@@ -1180,7 +1267,10 @@ mod nixos_configurations {
                 eprintln!("⚠️  Expected Function, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ Simple NixOS config failed: {}\n   Missing: Function definitions, nested attribute sets", e);
+                let msg = format!(
+                    "❌ Simple NixOS config failed: {}\n   Missing: Function definitions, nested attribute sets",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("Function definitions, nested attribute sets");
                 panic!("{}", msg);
@@ -1204,7 +1294,7 @@ mod flake_outputs {
         "#;
 
         let result = eval_with_nix_eval(expr);
-        
+
         match result {
             Ok(NixValue::AttributeSet(_)) => {
                 // Success!
@@ -1213,7 +1303,10 @@ mod flake_outputs {
                 eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
             }
             Err(e) => {
-                let msg = format!("❌ Flake outputs structure failed: {}\n   Missing: Nested attribute sets, import, or package access", e);
+                let msg = format!(
+                    "❌ Flake outputs structure failed: {}\n   Missing: Nested attribute sets, import, or package access",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("Nested attribute sets, import, or package access");
                 panic!("{}", msg);
@@ -1226,33 +1319,32 @@ mod full_evaluation {
     use super::*;
 
     /// Test: Evaluate ALL of nixpkgs
-    /// 
+    ///
     /// This test attempts to evaluate the entire nixpkgs repository by:
     /// 1. Importing nixpkgs
     /// 2. Iterating through all top-level packages
     /// 3. Evaluating each package to ensure the evaluator can handle the full complexity
-    /// 
+    ///
     /// This is the ultimate test - it will fail until nix-eval can fully evaluate nixpkgs.
-    /// 
+    ///
     /// Requires: Full nixpkgs evaluation support including:
     /// - Complete import system
     /// - All builtin functions
     /// - All Nix language features
     /// - Proper lazy evaluation
     /// - Error handling for edge cases
-    /// 
+    ///
     /// NOTE: This test will FAIL until nix-eval can fully evaluate nixpkgs.
     /// It does NOT skip - it always attempts evaluation to track progress.
     #[test]
     fn test_evaluate_all_nixpkgs() {
-
         println!("\n═══════════════════════════════════════════════════════════");
         println!("  Testing Full Nixpkgs Evaluation");
         println!("═══════════════════════════════════════════════════════════\n");
 
         // Step 1: Configure evaluator with nixpkgs search path
         let mut evaluator = Evaluator::new();
-        
+
         // Try to get nixpkgs path and configure search path
         if let Some(path) = get_nixpkgs_path() {
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(path));
@@ -1274,17 +1366,23 @@ mod full_evaluation {
         // Step 2: Import nixpkgs
         let expr = "import <nixpkgs> {}";
         let result = evaluator.evaluate(expr).map_err(|e| format!("{:?}", e));
-        
+
         let pkgs = match result {
             Ok(NixValue::AttributeSet(attrs)) => attrs,
             Ok(other) => {
-                let msg = format!("❌ Failed to import nixpkgs: expected AttributeSet, got {:?}", other);
+                let msg = format!(
+                    "❌ Failed to import nixpkgs: expected AttributeSet, got {:?}",
+                    other
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("nixpkgs import");
                 panic!("{}", msg);
             }
             Err(e) => {
-                let msg = format!("❌ Failed to import nixpkgs: {}\n   Missing: import builtin, <nixpkgs> search path", e);
+                let msg = format!(
+                    "❌ Failed to import nixpkgs: {}\n   Missing: import builtin, <nixpkgs> search path",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("nixpkgs import");
                 panic!("{}", msg);
@@ -1305,14 +1403,17 @@ mod full_evaluation {
         // For now, we'll iterate through what we have
         for (name, value) in &pkgs {
             total_packages += 1;
-            
+
             // Try to force evaluation of this package
             // This will trigger evaluation of the package's derivation
             match value.clone().force(&evaluator) {
                 Ok(_) => {
                     evaluated_count += 1;
                     if evaluated_count % 100 == 0 {
-                        println!("  Progress: {}/{} packages evaluated", evaluated_count, total_packages);
+                        println!(
+                            "  Progress: {}/{} packages evaluated",
+                            evaluated_count, total_packages
+                        );
                     }
                 }
                 Err(e) => {
@@ -1331,13 +1432,13 @@ mod full_evaluation {
         println!("Total packages: {}", total_packages);
         println!("Successfully evaluated: {}", evaluated_count);
         println!("Failed: {}", failed_packages.len());
-        
+
         if !failed_packages.is_empty() {
             println!("\nFirst {} failed packages:", failed_packages.len().min(10));
             for (name, error) in failed_packages.iter().take(10) {
                 println!("  - {}: {}", name, error);
             }
-            
+
             let msg = format!(
                 "❌ Full nixpkgs evaluation incomplete: {}/{} packages failed\n   Missing: Full nixpkgs evaluation support",
                 failed_packages.len(),
@@ -1353,18 +1454,17 @@ mod full_evaluation {
     }
 
     /// Test: Evaluate nixpkgs.lib (all library functions)
-    /// 
+    ///
     /// This tests evaluation of the entire lib attribute set, which contains
     /// all library functions used throughout nixpkgs.
-    /// 
+    ///
     /// NOTE: This test will FAIL until nix-eval can fully evaluate nixpkgs.lib.
     /// It does NOT skip - it always attempts evaluation to track progress.
     #[test]
     fn test_evaluate_nixpkgs_lib() {
-
         // Configure evaluator with nixpkgs search path
         let mut evaluator = Evaluator::new();
-        
+
         // Try to get nixpkgs path and configure search path
         if let Some(path) = get_nixpkgs_path() {
             evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(path));
@@ -1384,14 +1484,20 @@ mod full_evaluation {
 
         let expr = "(import <nixpkgs> {}).lib";
         let result = evaluator.evaluate(expr).map_err(|e| format!("{:?}", e));
-        
+
         match result {
             Ok(NixValue::AttributeSet(lib_attrs)) => {
                 println!("✓ Successfully evaluated nixpkgs.lib");
                 println!("  Found {} library functions", lib_attrs.len());
-                
+
                 // Try to evaluate a few key library functions
-                let key_functions = ["length", "mapAttrs", "foldl'", "attrNames", "concatStringsSep"];
+                let key_functions = [
+                    "length",
+                    "mapAttrs",
+                    "foldl'",
+                    "attrNames",
+                    "concatStringsSep",
+                ];
                 for func_name in &key_functions {
                     if let Some(func_value) = lib_attrs.get(*func_name) {
                         match func_value.clone().force(&evaluator) {
@@ -1399,7 +1505,8 @@ mod full_evaluation {
                                 println!("  ✓ {}: evaluated successfully", func_name);
                             }
                             Err(e) => {
-                                let msg = format!("❌ Failed to evaluate lib.{}: {:?}", func_name, e);
+                                let msg =
+                                    format!("❌ Failed to evaluate lib.{}: {:?}", func_name, e);
                                 eprintln!("{}", msg);
                                 record_missing_feature(&format!("lib.{} evaluation", func_name));
                                 panic!("{}", msg);
@@ -1415,7 +1522,10 @@ mod full_evaluation {
                 panic!("{}", msg);
             }
             Err(e) => {
-                let msg = format!("❌ Failed to evaluate nixpkgs.lib: {}\n   Missing: lib access or evaluation", e);
+                let msg = format!(
+                    "❌ Failed to evaluate nixpkgs.lib: {}\n   Missing: lib access or evaluation",
+                    e
+                );
                 eprintln!("{}", msg);
                 record_missing_feature("nixpkgs.lib evaluation");
                 panic!("{}", msg);
@@ -1430,7 +1540,7 @@ mod full_evaluation {
 fn test_nixpkgs_evaluation_summary() {
     // Clear any previous runs
     clear_missing_features();
-    
+
     println!("\n═══════════════════════════════════════════════════════════");
     println!("  Nixpkgs Evaluation Test Suite");
     println!("═══════════════════════════════════════════════════════════");

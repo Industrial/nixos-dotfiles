@@ -1,8 +1,8 @@
 let
-  lst = builtins.foldl'
-    (acc: x: acc ++ [ x ])
-    [ ]
-    [ 42 (throw "this shouldn't be evaluated") ];
+  lst =
+    builtins.foldl'
+    (acc: x: acc ++ [x])
+    []
+    [42 (throw "this shouldn't be evaluated")];
 in
-
-builtins.head lst
+  builtins.head lst

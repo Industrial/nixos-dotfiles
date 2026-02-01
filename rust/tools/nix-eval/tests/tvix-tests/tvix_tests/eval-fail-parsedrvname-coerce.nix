@@ -1,1 +1,1 @@
-builtins.parseDrvName { outPath = "lol"; }
+builtins.parseDrvName {outPath = "lol";}

@@ -1,13 +1,13 @@
 [
   # This is independent of builtins
-  (builtins.length [ (builtins.throw "Ferge") (builtins.throw "Wehsal") ])
+  (builtins.length [(builtins.throw "Ferge") (builtins.throw "Wehsal")])
   (builtins.attrNames {
     Hans = throw "Castorp";
     Joachim = throw "Ziemßen";
     James = "Tienappel";
   })
 
-  (builtins.length (builtins.map builtins.throw [ "Settembrini" "Naphta" ]))
+  (builtins.length (builtins.map builtins.throw ["Settembrini" "Naphta"]))
 
   (builtins.attrNames (builtins.mapAttrs builtins.throw {
     Clawdia = "Chauchat";
@@ -20,12 +20,25 @@
   # These are hard to get wrong since the outer layer needs to be forced anyways
   (builtins.length (builtins.genericClosure {
     startSet = [
-      { key = 1; initial = true; }
+      {
+        key = 1;
+        initial = true;
+      }
     ];
-    operator = { key, initial, ... }:
+    operator = {
+      key,
+      initial,
+      ...
+    }:
       if initial
-      then [{ key = key - 1; initial = false; value = throw "lol"; }]
-      else [ ];
+      then [
+        {
+          key = key - 1;
+          initial = false;
+          value = throw "lol";
+        }
+      ]
+      else [];
   }))
-  (builtins.length (builtins.concatMap (m: [ m (builtins.throw m) ]) [ "Marusja" ]))
+  (builtins.length (builtins.concatMap (m: [m (builtins.throw m)]) ["Marusja"]))
 ]

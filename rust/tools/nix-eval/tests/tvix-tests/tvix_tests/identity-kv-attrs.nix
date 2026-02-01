@@ -1,1 +1,4 @@
-{ name = "foo"; value = 12; }
+{
+  name = "foo";
+  value = 12;
+}

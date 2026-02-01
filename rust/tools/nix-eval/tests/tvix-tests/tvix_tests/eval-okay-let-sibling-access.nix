@@ -3,4 +3,4 @@ let
   b = 2;
   c = a + b;
 in
-c
+  c

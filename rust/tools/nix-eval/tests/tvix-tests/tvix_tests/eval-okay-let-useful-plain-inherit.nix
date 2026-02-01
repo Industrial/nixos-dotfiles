@@ -1,9 +1,4 @@
-with { a = 1; };
-
-let
+with {a = 1;}; let
   inherit a;
 in
-
-with { a = 2; };
-
-a
+  with {a = 2;}; a

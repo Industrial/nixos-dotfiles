@@ -1,1 +1,1 @@
-[ (builtins.floor 3.4) ]
+[(builtins.floor 3.4)]

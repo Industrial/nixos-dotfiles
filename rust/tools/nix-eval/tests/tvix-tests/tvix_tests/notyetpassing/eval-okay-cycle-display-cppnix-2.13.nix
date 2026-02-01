@@ -21,14 +21,19 @@ let
     tail1 = multiTail;
     tail2 = multiTail;
   };
-in
-
-[
+in [
   linkedList
   list
   set
 
   # In C++ Nix 2.3 these would be displayed differently
   multiTail
-  (let multiTail = { val = 21; tail1 = multiTail; tail2 = multiTail; }; in multiTail)
+  (let
+    multiTail = {
+      val = 21;
+      tail1 = multiTail;
+      tail2 = multiTail;
+    };
+  in
+    multiTail)
 ]

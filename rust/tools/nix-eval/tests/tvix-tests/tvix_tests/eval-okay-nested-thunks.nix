@@ -5,4 +5,4 @@ let
   b = c;
   c = 42;
 in
-a
+  a

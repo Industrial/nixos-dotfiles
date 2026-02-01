@@ -29,14 +29,13 @@ let
     foo.bar = "bar";
     b = 1;
   };
-
-in
-[
+in [
   (
     {
       foo = "foo";
       bar = 10;
-    } == {
+    }
+    == {
       bar = 10;
       foo = "foo";
     }

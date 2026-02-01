@@ -1,14 +1,8 @@
-with builtins;
-
-let
-
+with builtins; let
   matches = pat: s: match pat s != null;
 
   splitFN = match "((.*)/)?([^/]*)\\.(nix|cc)";
-
-in
-
-[
+in [
   (matches "foobar" "foobar")
   (matches "fo*" "f")
   (matches "fo+" "f")

@@ -3,7 +3,7 @@ let
     name = "fail";
     builder = "/bin/false";
     system = "x86_64-linux";
-    outputs = [ "out" "foo" ];
+    outputs = ["out" "foo"];
   };
 
   path = "${./eval-okay-context-introspection.nix}";
@@ -13,7 +13,7 @@ let
       path = true;
     };
     "${builtins.unsafeDiscardStringContext drv.drvPath}" = {
-      outputs = [ "foo" "out" ];
+      outputs = ["foo" "out"];
       allOutputs = true;
     };
   };
@@ -21,16 +21,17 @@ let
   combo-path = "${path}${drv.outPath}${drv.foo.outPath}${drv.drvPath}";
   legit-context = builtins.getContext combo-path;
 
-  reconstructed-path = builtins.appendContext
+  reconstructed-path =
+    builtins.appendContext
     (builtins.unsafeDiscardStringContext combo-path)
     desired-context;
 
   # Eta rule for strings with context.
   etaRule = str:
-    str == builtins.appendContext
-      (builtins.unsafeDiscardStringContext str)
-      (builtins.getContext str);
-
+    str
+    == builtins.appendContext
+    (builtins.unsafeDiscardStringContext str)
+    (builtins.getContext str);
 in [
   (legit-context == desired-context)
   (reconstructed-path == combo-path)

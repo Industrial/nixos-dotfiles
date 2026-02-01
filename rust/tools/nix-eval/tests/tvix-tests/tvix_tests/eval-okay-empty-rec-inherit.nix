@@ -1,1 +1,1 @@
-rec { inherit; }
+rec {inherit;}

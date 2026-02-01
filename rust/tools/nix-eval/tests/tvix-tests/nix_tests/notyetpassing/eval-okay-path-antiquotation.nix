@@ -1,7 +1,6 @@
 let
   foo = "foo";
-in
-{
+in {
   simple = ./${foo};
   surrounded = ./a-${foo}-b;
   absolute = /${foo};

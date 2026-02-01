@@ -1,1 +1,1 @@
-(builtins.tryEval (builtins.filter (_: throw "fred") [ 3 ])).success
+(builtins.tryEval (builtins.filter (_: throw "fred") [3])).success

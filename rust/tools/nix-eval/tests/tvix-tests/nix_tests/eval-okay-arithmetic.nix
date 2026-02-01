@@ -1,6 +1,5 @@
 with import ./lib.nix;
-
-let {
+  let {
 
   /* Supposedly tail recursive version:
 
@@ -11,12 +10,16 @@ let {
   range = range_ [];
   */
 
-  x = 12;
+  x =
+    12;
 
-  err = abort "urgh";
+  err =
+    abort "urgh";
 
-  body = sum
-    [ (sum (range 1 50))
+  body =
+    sum
+    [
+      (sum (range 1 50))
       (123 + 456)
       (0 + -10 + -(-11) + -x)
       (10 - 7 - -2)
@@ -27,33 +30,105 @@ let {
       (3 + 4 * const 5 0 - 6 / id 2)
 
       (builtins.bitAnd 12 10) # 0b1100 & 0b1010 =  8
-      (builtins.bitOr  12 10) # 0b1100 | 0b1010 = 14
+      (builtins.bitOr 12 10) # 0b1100 | 0b1010 = 14
       (builtins.bitXor 12 10) # 0b1100 ^ 0b1010 =  6
 
-      (if 3 < 7 then 1 else err)
-      (if 7 < 3 then err else 1)
-      (if 3 < 3 then err else 1)
+      (
+        if 3 < 7
+        then 1
+        else err
+      )
+      (
+        if 7 < 3
+        then err
+        else 1
+      )
+      (
+        if 3 < 3
+        then err
+        else 1
+      )
 
-      (if 3 <= 7 then 1 else err)
-      (if 7 <= 3 then err else 1)
-      (if 3 <= 3 then 1 else err)
+      (
+        if 3 <= 7
+        then 1
+        else err
+      )
+      (
+        if 7 <= 3
+        then err
+        else 1
+      )
+      (
+        if 3 <= 3
+        then 1
+        else err
+      )
 
-      (if 3 > 7 then err else 1)
-      (if 7 > 3 then 1 else err)
-      (if 3 > 3 then err else 1)
+      (
+        if 3 > 7
+        then err
+        else 1
+      )
+      (
+        if 7 > 3
+        then 1
+        else err
+      )
+      (
+        if 3 > 3
+        then err
+        else 1
+      )
 
-      (if 3 >= 7 then err else 1)
-      (if 7 >= 3 then 1 else err)
-      (if 3 >= 3 then 1 else err)
+      (
+        if 3 >= 7
+        then err
+        else 1
+      )
+      (
+        if 7 >= 3
+        then 1
+        else err
+      )
+      (
+        if 3 >= 3
+        then 1
+        else err
+      )
 
-      (if 2 > 1 == 1 < 2 then 1 else err)
-      (if 1 + 2 * 3 >= 7 then 1 else err)
-      (if 1 + 2 * 3 < 7 then err else 1)
+      (
+        if 2 > 1 == 1 < 2
+        then 1
+        else err
+      )
+      (
+        if 1 + 2 * 3 >= 7
+        then 1
+        else err
+      )
+      (
+        if 1 + 2 * 3 < 7
+        then err
+        else 1
+      )
 
       # Not integer, but so what.
-      (if "aa" < "ab" then 1 else err)
-      (if "aa" < "aa" then err else 1)
-      (if "foo" < "foobar" then 1 else err)
+      (
+        if "aa" < "ab"
+        then 1
+        else err
+      )
+      (
+        if "aa" < "aa"
+        then err
+        else 1
+      )
+      (
+        if "foo" < "foobar"
+        then 1
+        else err
+      )
     ];
 
 }

@@ -2,5 +2,4 @@
 let
   f = owo: "thia";
 in
-
-[ f 42 ] > [ f 21 ]
+  [f 42] > [f 21]

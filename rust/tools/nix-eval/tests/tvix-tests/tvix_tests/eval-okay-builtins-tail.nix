@@ -1,4 +1,4 @@
 [
-  (builtins.tail [ "foo" ])
-  (builtins.tail [ 1 2 3 ])
+  (builtins.tail ["foo"])
+  (builtins.tail [1 2 3])
 ]

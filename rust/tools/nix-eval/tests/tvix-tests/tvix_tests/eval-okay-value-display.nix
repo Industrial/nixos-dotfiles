@@ -8,9 +8,9 @@
   42.0
   "foo\t\nbar"
   /home/arthur
-  [ 1 2 3 ]
+  [1 2 3]
   (x: x)
   builtins.add
   (builtins.substring 0 1)
-  { hello = "world"; }
+  {hello = "world";}
 ]

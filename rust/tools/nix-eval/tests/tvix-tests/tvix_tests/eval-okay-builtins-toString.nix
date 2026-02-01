@@ -6,10 +6,10 @@ let
 
   toStringExamples = [
     null
-    [ null false ]
-    [ null /deep/thought ]
-    [ [ null 2 ] null 3 ]
-    [ false "flat" ]
+    [null false]
+    [null /deep/thought]
+    [[null 2] null 3]
+    [false "flat"]
     1
     4.2
     null
@@ -18,11 +18,10 @@ let
     "foo"
     /etc
     toStringableSet
-    { __toString = _: toStringableSet; }
-    { __toString = _: true; }
-    { outPath = "out"; }
-    { outPath = { outPath = { __toString = _: 2; }; }; }
+    {__toString = _: toStringableSet;}
+    {__toString = _: true;}
+    {outPath = "out";}
+    {outPath = {outPath = {__toString = _: 2;};};}
   ];
 in
-
-(builtins.map toString toStringExamples) ++ [ (toString toStringExamples) ]
+  (builtins.map toString toStringExamples) ++ [(toString toStringExamples)]

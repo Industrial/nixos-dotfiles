@@ -1,4 +1,3 @@
 let
   a = 1;
-in
-{ inherit a; }
+in {inherit a;}

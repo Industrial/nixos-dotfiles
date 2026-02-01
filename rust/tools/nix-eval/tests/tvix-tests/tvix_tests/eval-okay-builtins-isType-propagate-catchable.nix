@@ -11,4 +11,4 @@ let
     builtins.isString
   ];
 in
-map (fn: (builtins.tryEval (fn (builtins.throw "is type"))).success) isTypeFns
+  map (fn: (builtins.tryEval (fn (builtins.throw "is type"))).success) isTypeFns

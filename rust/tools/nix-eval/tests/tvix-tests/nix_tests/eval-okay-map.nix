@@ -1,3 +1,2 @@
 with import ./lib.nix;
-
-concat (map (x: x + "bar") [ "foo" "bla" "xyzzy" ])
+  concat (map (x: x + "bar") ["foo" "bla" "xyzzy"])
