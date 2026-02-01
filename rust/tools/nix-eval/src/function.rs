@@ -10,6 +10,7 @@ use rnix::ast::{Expr, Root};
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
 use rowan::ast::AstNode;
+use codespan::FileId;
 
 /// A Nix function (closure)
 ///
@@ -17,6 +18,7 @@ use rowan::ast::AstNode;
 /// - Capture their lexical environment (scope) at definition time
 /// - Have a parameter name (or pattern) that will be bound when applied
 /// - Have a body expression that will be evaluated when the function is called
+/// - Capture the file_id context at definition time (for relative imports)
 ///
 /// # Example
 ///
@@ -47,6 +49,12 @@ pub struct Function {
     /// This allows the function to access variables from its surrounding scope
     /// even when called in a different context (lexical scoping).
     closure: VariableScope,
+    /// The file_id context at function definition time (for resolving relative imports)
+    ///
+    /// This is critical for lazy evaluation: when a function is called and creates thunks,
+    /// those thunks need to know what file the function was defined in so that relative
+    /// imports work correctly.
+    file_id: Option<FileId>,
 }
 
 impl Function {
@@ -57,11 +65,12 @@ impl Function {
     /// * `parameter` - The parameter name (or pattern) for this function
     /// * `body_expr` - The body expression (from rnix AST)
     /// * `closure` - The lexical closure (variable scope) at function definition time
+    /// * `file_id` - The file ID at function definition time (for relative imports)
     ///
     /// # Returns
     ///
     /// A new function closure
-    pub fn new(parameter: String, body_expr: &Expr, closure: VariableScope) -> Self {
+    pub fn new(parameter: String, body_expr: &Expr, closure: VariableScope, file_id: Option<FileId>) -> Self {
         // Store the body expression as text representation for now
         // In a full implementation, we'd want to store the actual AST node
         // but that requires handling lifetimes carefully
@@ -71,6 +80,7 @@ impl Function {
             parameter,
             body_text,
             closure,
+            file_id,
         }
     }
 
@@ -144,8 +154,18 @@ impl Function {
 
         let body_expr = root.expr().ok_or(Error::NoExpression)?;
 
+        // Restore the file_id context when calling the function
+        // This is critical for relative imports within function bodies to work correctly
+        // Push context with the function's file_id
+        evaluator.push_context(self.file_id, scope.clone());
+
         // Evaluate the body expression using the merged scope
-        evaluator.evaluate_expr_with_scope(&body_expr, &scope)
+        let result = evaluator.evaluate_expr_with_scope(&body_expr, &scope);
+
+        // Pop context (restore previous context)
+        evaluator.pop_context();
+
+        result
     }
 }
 

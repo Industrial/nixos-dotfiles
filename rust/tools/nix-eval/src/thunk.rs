@@ -10,6 +10,7 @@ use rnix::ast::{Expr, Root};
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
 use rowan::ast::AstNode;
+use codespan::FileId;
 use std::sync::{Arc, Mutex};
 
 /// Represents the state of a thunk during evaluation
@@ -28,6 +29,7 @@ enum ThunkState {
 /// Thunks are the foundation of lazy evaluation. They store:
 /// - The expression to evaluate (from the rnix AST)
 /// - The lexical closure (variable scope) at the time of thunk creation
+/// - The file_id context at thunk creation time (for relative imports)
 /// - The evaluation state (suspended, evaluating, or evaluated with cached result)
 ///
 /// # Example
@@ -48,6 +50,10 @@ pub struct Thunk {
     expression_text: String,
     /// The lexical closure (variable scope) at thunk creation time
     closure: VariableScope,
+    /// The file_id context at thunk creation time (for resolving relative imports)
+    /// This is critical for lazy evaluation: when a thunk is forced, it needs to know
+    /// what file it was created in so that relative imports work correctly.
+    file_id: Option<FileId>,
     /// The current state of the thunk
     state: Arc<Mutex<ThunkState>>,
     /// Cached result after evaluation (None if not yet evaluated)
@@ -61,11 +67,12 @@ impl Thunk {
     ///
     /// * `expr` - The expression to evaluate (from rnix AST)
     /// * `closure` - The lexical closure (variable scope) at thunk creation
+    /// * `file_id` - The file ID at thunk creation (for relative imports)
     ///
     /// # Returns
     ///
     /// A new thunk in the Suspended state
-    pub fn new(expr: &Expr, closure: VariableScope) -> Self {
+    pub fn new(expr: &Expr, closure: VariableScope, file_id: Option<FileId>) -> Self {
         // Store the expression as text representation for now
         // In a full implementation, we'd want to store the actual AST node
         // but that requires handling lifetimes carefully
@@ -74,6 +81,7 @@ impl Thunk {
         Self {
             expression_text,
             closure,
+            file_id,
             state: Arc::new(Mutex::new(ThunkState::Suspended)),
             cached_value: Arc::new(Mutex::new(None)),
         }
@@ -200,8 +208,16 @@ impl Thunk {
                     Error::NoExpression
                 })?;
 
+                // Restore the file_id context when forcing the thunk
+                // This is critical for relative imports within thunks to work correctly
+                // Push context with the thunk's file_id and closure
+                evaluator.push_context(self.file_id, self.closure.clone());
+
                 // Evaluate the expression using the thunk's closure as the scope
                 let result = evaluator.evaluate_expr_with_scope(&expr, &self.closure);
+
+                // Pop context (restore previous context)
+                evaluator.pop_context();
 
                 // Update state and cache result (memoization)
                 // Once evaluated, the result is cached so subsequent calls to force()

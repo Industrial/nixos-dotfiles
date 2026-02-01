@@ -88,6 +88,253 @@ fn clear_missing_features() {
 mod basic_imports {
     use super::*;
 
+    /// Test: Resolve <nixpkgs> search path
+    /// Requires: Search path resolution
+    #[test]
+    fn test_resolve_nixpkgs_search_path() {
+        if !nixpkgs_available() {
+            eprintln!("Skipping: nixpkgs not available");
+            return;
+        }
+
+        let mut evaluator = Evaluator::new();
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path));
+        }
+
+        // Test that we can resolve <nixpkgs> to a path
+        let expr = "<nixpkgs>";
+        let result = evaluator.evaluate(expr).map_err(|e| format!("{:?}", e));
+        
+        match result {
+            Ok(NixValue::Path(_)) | Ok(NixValue::StorePath(_)) => {
+                // Success!
+            }
+            Ok(other) => {
+                panic!("Expected Path or StorePath, got: {:?}", other);
+            }
+            Err(e) => {
+                let msg = format!("❌ Failed to resolve <nixpkgs>: {}\n   Missing: Search path resolution", e);
+                eprintln!("{}", msg);
+                record_missing_feature("Search path resolution");
+                panic!("{}", msg);
+            }
+        }
+    }
+
+    /// Test: Import nixpkgs default.nix directly
+    /// Requires: `import` builtin, file reading, directory import handling
+    #[test]
+    fn test_import_nixpkgs_default_nix() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import default.nix directly
+            let expr = format!("import {}/default.nix", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::AttributeSet(_)) | Ok(NixValue::Function(_)) => {
+                    // Success!
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Got unexpected type: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to import nixpkgs/default.nix: {}\n   Missing: import builtin, file reading, or directory import handling", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("import builtin, file reading, or directory import handling");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import nixpkgs lib/minfeatures.nix
+    /// This is imported early in default.nix, so testing it separately helps isolate issues
+    #[test]
+    fn test_import_nixpkgs_lib_minfeatures() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import lib/minfeatures.nix directly
+            let expr = format!("import {}/lib/minfeatures.nix", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::AttributeSet(_)) => {
+                    // Success!
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Got unexpected type: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to import lib/minfeatures.nix: {}\n   Missing: import builtin, file reading, or relative imports", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("import builtin, file reading, or relative imports");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import nixpkgs pkgs/top-level/impure.nix
+    /// This is what default.nix imports, so testing it separately helps isolate issues
+    #[test]
+    fn test_import_nixpkgs_impure_nix() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import pkgs/top-level/impure.nix directly
+            let expr = format!("import {}/pkgs/top-level/impure.nix", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::Function(_)) => {
+                    // Success! impure.nix should return a function
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Expected Function, got: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to import pkgs/top-level/impure.nix: {}\n   Missing: import builtin, file reading, or function evaluation", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("import builtin, file reading, or function evaluation");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import nixpkgs pkgs/top-level/impure-overlays.nix
+    /// This is imported by impure.nix
+    #[test]
+    fn test_import_nixpkgs_impure_overlays() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import pkgs/top-level/impure-overlays.nix directly
+            let expr = format!("import {}/pkgs/top-level/impure-overlays.nix", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::List(_)) => {
+                    // Success! Should return a list of overlays
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Expected List, got: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to import pkgs/top-level/impure-overlays.nix: {}\n   Missing: import builtin, file reading, or list evaluation", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("import builtin, file reading, or list evaluation");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import bare identifier (e.g., import flake without ./)
+    /// This tests what happens when we try to import a bare identifier
+    #[test]
+    fn test_import_bare_identifier() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Test importing a bare identifier - this should resolve relative to current file
+            // First, let's set up a test file that imports "flake"
+            let test_dir = std::env::temp_dir().join("nix-eval-test-import");
+            std::fs::create_dir_all(&test_dir).unwrap();
+            
+            // Create a flake directory with default.nix
+            let flake_dir = test_dir.join("flake");
+            std::fs::create_dir_all(&flake_dir).unwrap();
+            std::fs::write(flake_dir.join("default.nix"), "{ x = 1; }").unwrap();
+            
+            // Create a test.nix that imports flake (bare identifier, no ./)
+            let test_file = test_dir.join("test.nix");
+            std::fs::write(&test_file, "import flake").unwrap();
+            
+            // Set current_file context and try to import
+            // Actually, we need to test this through the evaluator's import mechanism
+            // Let's test importing the test file which has "import flake"
+            let expr = format!("import {}", test_file.display());
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::AttributeSet(_)) => {
+                    // Success! Bare identifier import works
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to import bare identifier: {}\n   Missing: Bare identifier import handling (import flake should resolve relative to current file)", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("Bare identifier import handling");
+                    panic!("{}", msg);
+                }
+            }
+            
+            // Cleanup
+            let _ = std::fs::remove_dir_all(&test_dir);
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import directory (e.g., import ./flake when flake is a directory)
+    /// This tests the directory import feature we just implemented
+    #[test]
+    fn test_import_directory() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Test importing a directory - nixpkgs has a flake.nix file, so flake/ might be a directory
+            // Actually, let's test with a known directory structure
+            // Check if lib/ is a directory and has default.nix
+            let lib_path = format!("{}/lib", nixpkgs_path);
+            if std::path::Path::new(&lib_path).is_dir() {
+                // Try importing the lib directory (should resolve to lib/default.nix)
+                let expr = format!("import {}/lib", nixpkgs_path);
+                let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+                
+                match result {
+                    Ok(NixValue::AttributeSet(_)) => {
+                        // Success! Directory import works
+                    }
+                    Ok(other) => {
+                        eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
+                    }
+                    Err(e) => {
+                        let msg = format!("❌ Failed to import directory: {}\n   Missing: Directory import handling (import ./dir should resolve to import ./dir/default.nix)", e);
+                        eprintln!("{}", msg);
+                        record_missing_feature("Directory import handling");
+                        panic!("{}", msg);
+                    }
+                }
+            } else {
+                eprintln!("Skipping: lib/ is not a directory or doesn't exist");
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
     /// Test: Basic nixpkgs import
     /// Requires: `import` builtin, path resolution, `<nixpkgs>` search path
     #[test]
@@ -143,6 +390,280 @@ mod basic_imports {
         } else {
             eprintln!("Skipping: Could not determine nixpkgs path");
         }
+    }
+
+    /// Test: Call impure.nix function with empty attribute set
+    /// This tests what happens when we actually call the function returned by impure.nix
+    #[test]
+    fn test_call_impure_nix_function() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import impure.nix (returns a function) and call it with {}
+            let expr = format!("(import {}/pkgs/top-level/impure.nix) {{}}", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::AttributeSet(_)) | Ok(NixValue::Function(_)) => {
+                    // Success! Function call works
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Got unexpected type: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to call impure.nix function: {}\n   Missing: Function application, attribute set handling, or nested imports", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("Function application, attribute set handling, or nested imports");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import pkgs/top-level/default.nix (what impure.nix imports)
+    /// This is the actual package collection
+    #[test]
+    fn test_import_pkgs_top_level_default_nix() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import pkgs/top-level/default.nix directly
+            let expr = format!("import {}/pkgs/top-level/default.nix", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::Function(_)) => {
+                    // Success! Should return a function
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Expected Function, got: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to import pkgs/top-level/default.nix: {}\n   Missing: import builtin, file reading, or nested directory imports", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("import builtin, file reading, or nested directory imports");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import pkgs/top-level/default.nix with arguments
+    /// This tests calling the function with the arguments that impure.nix would pass
+    #[test]
+    fn test_call_pkgs_top_level_default_nix() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import pkgs/top-level/default.nix and call it with minimal args
+            // Based on impure.nix, it needs: config, overlays, localSystem
+            let expr = format!(
+                "(import {}/pkgs/top-level/default.nix) {{ config = {{}}; overlays = []; localSystem = {{ system = \"x86_64-linux\"; }}; }}",
+                nixpkgs_path
+            );
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::AttributeSet(_)) => {
+                    // Success! This should return the package set
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to call pkgs/top-level/default.nix: {}\n   Missing: Function application, nested attribute sets, or complex evaluation", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("Function application, nested attribute sets, or complex evaluation");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Trace the import chain that nixpkgs uses
+    /// This helps identify exactly where in the chain the failure occurs
+    #[test]
+    fn test_trace_nixpkgs_import_chain() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            println!("\nTracing nixpkgs import chain...");
+            
+            // Step 1: Import default.nix
+            println!("Step 1: Importing default.nix...");
+            let expr1 = format!("import {}/default.nix", nixpkgs_path);
+            let result1 = evaluator.evaluate(&expr1).map_err(|e| format!("{:?}", e));
+            match result1 {
+                Ok(_) => println!("  ✓ default.nix imported successfully"),
+                Err(e) => {
+                    panic!("❌ Failed at step 1 (default.nix): {}", e);
+                }
+            }
+            
+            // Step 2: Import pkgs/top-level/impure.nix
+            println!("Step 2: Importing pkgs/top-level/impure.nix...");
+            let expr2 = format!("import {}/pkgs/top-level/impure.nix", nixpkgs_path);
+            let result2 = evaluator.evaluate(&expr2).map_err(|e| format!("{:?}", e));
+            match result2 {
+                Ok(_) => println!("  ✓ impure.nix imported successfully"),
+                Err(e) => {
+                    panic!("❌ Failed at step 2 (impure.nix): {}", e);
+                }
+            }
+            
+            // Step 3: Call impure.nix with {}
+            println!("Step 3: Calling impure.nix function with {{}}...");
+            let expr3 = format!("(import {}/pkgs/top-level/impure.nix) {{}}", nixpkgs_path);
+            let result3 = evaluator.evaluate(&expr3).map_err(|e| format!("{:?}", e));
+            match result3 {
+                Ok(_) => println!("  ✓ impure.nix called successfully"),
+                Err(e) => {
+                    panic!("❌ Failed at step 3 (calling impure.nix): {}", e);
+                }
+            }
+            
+            // Step 4: Import pkgs/top-level/default.nix
+            println!("Step 4: Importing pkgs/top-level/default.nix...");
+            let expr4 = format!("import {}/pkgs/top-level/default.nix", nixpkgs_path);
+            let result4 = evaluator.evaluate(&expr4).map_err(|e| format!("{:?}", e));
+            match result4 {
+                Ok(_) => println!("  ✓ pkgs/top-level/default.nix imported successfully"),
+                Err(e) => {
+                    panic!("❌ Failed at step 4 (pkgs/top-level/default.nix): {}", e);
+                }
+            }
+            
+            println!("✓ All import chain steps completed successfully!");
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Access a single package attribute to trigger lazy evaluation
+    /// This tests what happens when we actually try to evaluate a package
+    #[test]
+    fn test_access_single_package_trigger_evaluation() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // Import nixpkgs and try to access a simple package
+            let expr = "(import <nixpkgs> {}).hello";
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(_) => {
+                    println!("✓ Successfully accessed hello package");
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to access hello package: {}\n   This is where lazy evaluation triggers nested imports", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("Lazy evaluation or nested imports during package access");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Call default.nix with {} (what import <nixpkgs> {} does)
+    /// This is the exact expression that fails in the full evaluation test
+    #[test]
+    fn test_call_default_nix_with_empty_set() {
+        if let Some(nixpkgs_path) = get_nixpkgs_path() {
+            let mut evaluator = Evaluator::new();
+            evaluator.add_search_path("nixpkgs", std::path::PathBuf::from(nixpkgs_path.clone()));
+            
+            // This is exactly what "import <nixpkgs> {}" does
+            let expr = format!("(import {}/default.nix) {{}}", nixpkgs_path);
+            let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+            
+            match result {
+                Ok(NixValue::AttributeSet(_)) => {
+                    println!("✓ Successfully called default.nix with {{}}");
+                }
+                Ok(other) => {
+                    eprintln!("⚠️  Expected AttributeSet, got: {:?}", other);
+                }
+                Err(e) => {
+                    let msg = format!("❌ Failed to call default.nix with {{}}: {}\n   This is the exact failure point - somewhere in this call chain, there's an import of 'flake'", e);
+                    eprintln!("{}", msg);
+                    record_missing_feature("Calling default.nix with empty attribute set");
+                    panic!("{}", msg);
+                }
+            }
+        } else {
+            eprintln!("Skipping: Could not determine nixpkgs path");
+        }
+    }
+
+    /// Test: Import a path variable (like `let flake = ./test-flake; in import flake`)
+    /// This tests that we can import a path value stored in a variable
+    #[test]
+    fn test_import_path_variable() {
+        use std::fs;
+        use std::path::PathBuf;
+        
+        // Create a temporary directory structure
+        let temp_dir = std::env::temp_dir().join("nix-eval-test-import-path");
+        let _ = fs::remove_dir_all(&temp_dir); // Clean up if exists
+        fs::create_dir_all(&temp_dir).unwrap();
+        
+        // Create test-flake directory with default.nix
+        let flake_dir = temp_dir.join("test-flake");
+        fs::create_dir_all(&flake_dir).unwrap();
+        fs::write(flake_dir.join("default.nix"), "{ x = 1; }").unwrap();
+        
+        // Create test.nix that imports the flake variable
+        let test_file = temp_dir.join("test.nix");
+        fs::write(&test_file, "let flake = ./test-flake; in import flake").unwrap();
+        
+        // Test with our evaluator
+        let mut evaluator = Evaluator::new();
+        let expr = format!("import {}", test_file.display());
+        let result = evaluator.evaluate(&expr).map_err(|e| format!("{:?}", e));
+        
+        match result {
+            Ok(NixValue::AttributeSet(attrs)) => {
+                // Check that x = 1
+                if let Some(x_value) = attrs.get("x") {
+                    let x = x_value.clone().force(&evaluator).unwrap();
+                    if let NixValue::Integer(1) = x {
+                        println!("✓ Successfully imported path variable");
+                    } else {
+                        panic!("Expected x = 1, got: {:?}", x);
+                    }
+                } else {
+                    panic!("Expected attribute 'x' in result");
+                }
+            }
+            Ok(other) => {
+                let msg = format!("❌ Expected AttributeSet, got: {:?}", other);
+                eprintln!("{}", msg);
+                record_missing_feature("Import path variable");
+                panic!("{}", msg);
+            }
+            Err(e) => {
+                let msg = format!("❌ Failed to import path variable: {}\n   Missing: Path variable resolution in import", e);
+                eprintln!("{}", msg);
+                record_missing_feature("Path variable resolution in import");
+                panic!("{}", msg);
+            }
+        }
+        
+        // Cleanup
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
 

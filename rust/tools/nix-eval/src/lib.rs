@@ -65,6 +65,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::sync::Arc;
 use thiserror::Error;
+use codespan::{Files, FileId};
 
 /// Error type for Nix evaluation
 ///
@@ -559,6 +560,18 @@ pub trait Builtin: Send + Sync {
 /// with inner scopes shadowing outer scopes.
 pub type VariableScope = HashMap<String, NixValue>;
 
+/// Evaluation context for tracking file and scope information
+///
+/// This struct stores the context needed for evaluation, including
+/// the file ID (for source tracking) and the variable scope.
+#[derive(Debug, Clone)]
+struct EvaluationContext {
+    /// File ID in the source map (None for expressions without a file)
+    file_id: Option<FileId>,
+    /// Variable scope for this context
+    scope: VariableScope,
+}
+
 // Re-export thunk types for public API
 pub use thunk::Thunk;
 // Re-export function types for public API
@@ -600,9 +613,16 @@ pub struct Evaluator {
     import_cache: Rc<RefCell<HashMap<PathBuf, NixValue>>>,
     /// Search paths for resolving <nixpkgs> style imports
     search_paths: HashMap<String, PathBuf>,
-    /// Current file path (for resolving relative imports)
-    /// Uses interior mutability to allow setting during import evaluation
-    current_file: Rc<RefCell<Option<PathBuf>>>,
+    /// Source file map for tracking file contents and locations
+    /// Uses interior mutability to allow updating during immutable evaluation
+    source_map: Rc<RefCell<Files<String>>>,
+    /// Mapping from FileId to file path for quick lookup
+    /// Uses interior mutability to allow updating during immutable evaluation
+    file_id_to_path: Rc<RefCell<HashMap<FileId, PathBuf>>>,
+    /// Context stack for tracking evaluation context (file, scope)
+    /// The top of the stack represents the current evaluation context
+    /// Uses interior mutability to allow updating during immutable evaluation
+    context_stack: Rc<RefCell<Vec<EvaluationContext>>>,
 }
 
 impl Evaluator {
@@ -621,7 +641,9 @@ impl Evaluator {
             scope: HashMap::new(),
             import_cache: Rc::new(RefCell::new(HashMap::new())),
             search_paths: HashMap::new(),
-            current_file: Rc::new(RefCell::new(None)),
+            source_map: Rc::new(RefCell::new(Files::new())),
+            file_id_to_path: Rc::new(RefCell::new(HashMap::new())),
+            context_stack: Rc::new(RefCell::new(Vec::new())),
         };
 
         // Register basic builtin functions
@@ -631,6 +653,33 @@ impl Evaluator {
         evaluator.parse_nix_path();
 
         evaluator
+    }
+
+    /// Get the current file path from the context stack
+    fn current_file_path(&self) -> Option<PathBuf> {
+        let context_stack = self.context_stack.borrow();
+        let file_id_to_path = self.file_id_to_path.borrow();
+        context_stack
+            .last()
+            .and_then(|ctx| ctx.file_id)
+            .and_then(|file_id| file_id_to_path.get(&file_id).cloned())
+    }
+
+    /// Get the current file ID from the context stack
+    fn current_file_id(&self) -> Option<FileId> {
+        self.context_stack.borrow().last().and_then(|ctx| ctx.file_id)
+    }
+
+    /// Push a new evaluation context onto the stack
+    fn push_context(&self, file_id: Option<FileId>, scope: VariableScope) {
+        self.context_stack
+            .borrow_mut()
+            .push(EvaluationContext { file_id, scope });
+    }
+
+    /// Pop the current evaluation context from the stack
+    fn pop_context(&self) -> Option<EvaluationContext> {
+        self.context_stack.borrow_mut().pop()
     }
 
     /// Resolve a flake reference to a file system path
@@ -1179,7 +1228,8 @@ impl Evaluator {
             // Create a thunk for lazy evaluation of attribute values
             // This is the key to lazy evaluation: attribute values are not evaluated
             // until they are actually accessed.
-            let thunk = thunk::Thunk::new(&value_expr, self.scope.clone());
+            let file_id = self.current_file_id();
+            let thunk = thunk::Thunk::new(&value_expr, self.scope.clone(), file_id);
             attrs.insert(key, NixValue::Thunk(Arc::new(thunk)));
         }
 
@@ -1262,9 +1312,10 @@ impl Evaluator {
         // Create thunks sequentially, where each thunk's closure includes previous thunks
         // This supports forward references: `rec { y = 1; x = y; }` works
         // But backward references like `rec { x = y; y = 1; }` won't work with this approach
+        let file_id = self.current_file_id();
         for (key, value_expr) in &attr_entries {
             // Create thunk with current scope (includes outer scope + previous attributes)
-            let thunk = thunk::Thunk::new(value_expr, rec_scope.clone());
+            let thunk = thunk::Thunk::new(value_expr, rec_scope.clone(), file_id);
             let thunk_arc = Arc::new(thunk);
 
             // Add to both attribute set and scope for next iteration
@@ -1306,7 +1357,8 @@ impl Evaluator {
         })?;
 
         // Create a function closure with the current scope
-        let func = function::Function::new(param_name, &body_expr, scope.clone());
+        let file_id = self.current_file_id();
+        let func = function::Function::new(param_name, &body_expr, scope.clone(), file_id);
         Ok(NixValue::Function(Arc::new(func)))
     }
 
@@ -1339,7 +1391,9 @@ impl Evaluator {
                     .ok_or_else(|| Error::UnsupportedExpression {
                         reason: "import missing argument".to_string(),
                     })?;
-                let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                let arg_value_raw = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                // Force thunks before importing - path variables might be thunks
+                let arg_value = arg_value_raw.clone().force(self)?;
                 match arg_value {
                     NixValue::Path(path) => return self.import_file(&path),
                     NixValue::StorePath(path_str) => {
@@ -1642,7 +1696,8 @@ impl Evaluator {
             // Create a thunk for this binding
             // The thunk's closure includes the new_scope (which will have all bindings)
             // This allows forward references: bindings can reference each other
-            let thunk = thunk::Thunk::new(&value_expr, new_scope.clone());
+            let file_id = self.current_file_id();
+            let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
 
             // Add the thunk to the scope (wrapped in NixValue::Thunk)
             new_scope.insert(var_name, NixValue::Thunk(Arc::new(thunk)));
@@ -1810,8 +1865,7 @@ impl Evaluator {
             PathBuf::from(path_str)
         } else {
             // Relative path - resolve relative to current file
-            let current_file = self.current_file.borrow();
-            if let Some(ref current_file_path) = *current_file {
+            if let Some(current_file_path) = self.current_file_path() {
                 current_file_path
                     .parent()
                     .ok_or_else(|| Error::UnsupportedExpression {
@@ -2387,18 +2441,78 @@ impl Evaluator {
     ///
     /// This method loads a .nix file, parses it, and evaluates it.
     /// Results are cached to avoid re-evaluating the same file multiple times.
+    ///
+    /// In Nix, importing a directory automatically looks for `default.nix` in that directory.
+    /// For example, `import ./flake` is equivalent to `import ./flake/default.nix` when `flake` is a directory.
     fn import_file(&self, file_path: &Path) -> Result<NixValue> {
-        // Normalize the path (resolve any .. components)
-        let normalized_path =
-            file_path
-                .canonicalize()
-                .map_err(|e| Error::UnsupportedExpression {
-                    reason: format!(
-                        "cannot resolve import path '{}': {}",
-                        file_path.display(),
-                        e
-                    ),
-                })?;
+        // Resolve the path to import
+        // First, try to resolve relative paths based on current_file context
+        let resolved_path = if file_path.is_absolute() {
+            file_path.to_path_buf()
+        } else {
+            // Relative path - resolve relative to current file
+            if let Some(current_file_path) = self.current_file_path() {
+                current_file_path
+                    .parent()
+                    .ok_or_else(|| Error::UnsupportedExpression {
+                        reason: "cannot resolve relative path: current file has no parent"
+                            .to_string(),
+                    })?
+                    .join(file_path)
+            } else {
+                // No current file, use as-is (will be relative to CWD)
+                file_path.to_path_buf()
+            }
+        };
+
+        // Check if the path is a directory, and if so, append /default.nix
+        // This matches the official Nix behavior where `import ./dir` becomes `import ./dir/default.nix`
+        // Try to canonicalize the path as-is first
+        let normalized_path = match resolved_path.canonicalize() {
+            Ok(path) => {
+                // Path exists - check if it's a directory
+                if path.is_dir() {
+                    // It's a directory, append /default.nix
+                    path.join("default.nix")
+                        .canonicalize()
+                        .map_err(|e| Error::UnsupportedExpression {
+                            reason: format!(
+                                "cannot resolve import path '{}': directory exists but default.nix not found: {}",
+                                file_path.display(),
+                                e
+                            ),
+                        })?
+                } else {
+                    // It's a file, use it as-is
+                    path
+                }
+            }
+            Err(e) => {
+                // Path doesn't exist as-is, try with /default.nix appended (might be a directory)
+                let dir_with_default = resolved_path.join("default.nix");
+                match dir_with_default.canonicalize() {
+                    Ok(path) => path,
+                    Err(_) => {
+                        // Neither the path nor path/default.nix exists
+                        // Provide better error message with context
+                        let current_file_info = if let Some(current_file_path) = self.current_file_path() {
+                            format!(" (current file: {})", current_file_path.display())
+                        } else {
+                            " (no current file context)".to_string()
+                        };
+                        return Err(Error::UnsupportedExpression {
+                            reason: format!(
+                                "cannot resolve import path '{}': {} (resolved to: {}){}",
+                                file_path.display(),
+                                e,
+                                resolved_path.display(),
+                                current_file_info
+                            ),
+                        });
+                    }
+                }
+            }
+        };
 
         // Check cache first
         {
@@ -2419,7 +2533,7 @@ impl Evaluator {
             }
         })?;
 
-        // Parse and evaluate the file
+        // Parse and evaluate the file (use reference for parsing, then move to source map)
         let tokens = tokenize(&file_contents);
         let (green_node, errors) = parse(tokens.into_iter());
 
@@ -2439,23 +2553,31 @@ impl Evaluator {
 
         let expr = root.expr().ok_or(Error::NoExpression)?;
 
-        // Set current_file for relative imports within this file
-        let old_current_file = {
-            let mut current_file = self.current_file.borrow_mut();
-            let old = current_file.clone();
-            *current_file = Some(normalized_path.clone());
-            old
+        // Add file to source map and get file ID (move file_contents here)
+        let file_id = {
+            let mut source_map = self.source_map.borrow_mut();
+            let file_name = normalized_path.to_string_lossy().to_string();
+            let file_id = source_map.add(file_name, file_contents);
+            // Store the mapping from file_id to path
+            {
+                let mut file_id_to_path = self.file_id_to_path.borrow_mut();
+                file_id_to_path.insert(file_id, normalized_path.clone());
+            }
+            file_id
         };
+
+        // Push context for this file
+        self.push_context(Some(file_id), self.scope.clone());
 
         // Evaluate the expression
         // Note: Imported files should have their own scope, but for now we'll use the current scope
-        let result = self.evaluate_expr_with_scope(&expr, &self.scope)?;
+        let result = self.evaluate_expr_with_scope(&expr, &self.scope);
 
-        // Restore previous current_file
-        {
-            let mut current_file = self.current_file.borrow_mut();
-            *current_file = old_current_file;
-        }
+        // Pop context (restore previous context)
+        self.pop_context();
+
+        // Unwrap result after popping context
+        let result = result?;
 
         // Cache the result
         {
