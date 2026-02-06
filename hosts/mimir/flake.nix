@@ -126,7 +126,7 @@
           ../../profiles/communication.nix
           ../../profiles/desktop.nix
           ../../profiles/development.nix
-          # ../../profiles/gaming.nix
+          ../../profiles/gaming.nix
 
           # Host-specific additions
           ../../features/nixos/graphics/amd.nix

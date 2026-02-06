@@ -32,6 +32,13 @@
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = pkgs.code-cursor;
     vscodeExtensions = [
+      pkgs.vscode-extensions.ms-vscode-remote.remote-ssh
+
+      # extensions.vscode-marketplace.anysphere.remote-ssh
+
+      # AI
+      extensions.vscode-marketplace.thundercompute.thunder-compute
+
       # Themes
       extensions.vscode-marketplace.tintedtheming.base16-tinted-themes
 

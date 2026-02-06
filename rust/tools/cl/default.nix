@@ -9,11 +9,11 @@
     defaultCrateOverrides = pkgs.defaultCrateOverrides;
   };
 in
-  cargoNix.workspaceMembers.cl.build {
+  cargoNix.workspaceMembers.cl.build.overrideAttrs (oldAttrs: {
     meta = with lib; {
       description = "A simple terminal clear command written in Rust";
       homepage = "";
       license = licenses.mit;
       maintainers = [];
     };
-  }
+  })

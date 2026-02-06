@@ -122,6 +122,7 @@ impl Evaluator {
         self.register_builtin(Box::new(crate::builtins::NixVersionBuiltin));
         self.register_builtin(Box::new(crate::builtins::ToJSONBuiltin));
         self.register_builtin(Box::new(crate::builtins::ListToAttrsBuiltin));
+        self.register_builtin(Box::new(crate::builtins::SeqBuiltin));
     }
 
     /// Get a builtin function by name
@@ -567,7 +568,16 @@ impl Evaluator {
             Expr::Str(str_expr) => self.evaluate_string(str_expr, scope),
             Expr::Ident(ident) => {
                 // Handle identifiers (true, false, null, variables, builtins)
+                // IMPORTANT: Check scope first! Variables in scope (including shadowed builtins)
+                // take precedence over builtin values.
                 let text = ident.to_string();
+                
+                // Check if it's a variable in scope first (scope takes precedence)
+                if let Some(value) = scope.get(&text) {
+                    return Ok(value.clone());
+                }
+                
+                // If not in scope, check for builtin values
                 match text.as_str() {
                     "true" => Ok(NixValue::Boolean(true)),
                     "false" => Ok(NixValue::Boolean(false)),
@@ -587,10 +597,6 @@ impl Evaluator {
                         Ok(NixValue::AttributeSet(builtins_attrs))
                     }
                     _ => {
-                        // Check if it's a variable in scope
-                        if let Some(value) = scope.get(&text) {
-                            return Ok(value.clone());
-                        }
                         // Check if it's a builtin function
                         // For builtins that need special handling (map, all, any, etc.), we return
                         // a marker string so evaluate_apply can handle them specially

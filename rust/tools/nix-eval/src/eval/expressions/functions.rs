@@ -114,6 +114,23 @@ impl Evaluator {
                 }
             }
 
+            // Handle foldl' directly (when accessed via with builtins)
+            // foldl' takes 3 arguments: f init list
+            // But can be partially applied with 2 arguments: f init (returns a function that takes list)
+            if builtin_name == "foldl'" {
+                // Check if this is a nested apply: foldl' f init list
+                // The parser gives us: Apply(foldl', f), Apply(Apply(foldl', f), init), Apply(Apply(Apply(foldl', f), init), list)
+                // We need to handle all these cases
+                if let Expr::Apply(inner_apply) = &func_expr {
+                    // This is already handled in the nested Apply section below
+                    // But we need to make sure it's handled there
+                } else {
+                    // Single argument - this is partial application with 1 arg
+                    // But foldl' needs at least 2 args, so this should fall through
+                    // Actually, let it fall through to check if it's in the nested Apply section
+                }
+            }
+
             // Handle import builtin specially since it needs evaluator context
             if builtin_name == "import" {
                 let arg_expr = apply
@@ -331,25 +348,80 @@ impl Evaluator {
                 });
             }
 
+            // Handle foldl' specially when called directly (not via builtins.foldl')
+            // foldl' requires evaluator context, so it can't be called via builtin.call()
+            if builtin_name == "foldl'" {
+                // Check if this is a nested apply: foldl' f init list
+                // The parser gives us: Apply(foldl', f), Apply(Apply(foldl', f), init), Apply(Apply(Apply(foldl', f), init), list)
+                // We need to handle this in the nested Apply section
+                // For now, let it fall through to the nested Apply handling below
+            }
+
             if let Some(builtin) = self.builtins.get(&builtin_name) {
-                // This is a builtin function call
-                // Get the argument expression
-                let arg_expr = apply
-                    .argument()
-                    .ok_or_else(|| Error::UnsupportedExpression {
-                        reason: "function application missing argument".to_string(),
-                    })?;
+                // Skip foldl' here since it needs special handling
+                if builtin_name == "foldl'" {
+                    // This will be handled in the nested Apply section below
+                } else {
+                    // This is a builtin function call
+                    // Get the argument expression
+                    let arg_expr = apply
+                        .argument()
+                        .ok_or_else(|| Error::UnsupportedExpression {
+                            reason: "function application missing argument".to_string(),
+                        })?;
 
-                // Evaluate the argument
-                let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
+                    // Evaluate the argument
+                    let arg_value = self.evaluate_expr_with_scope_impl(&arg_expr, scope)?;
 
-                // Call the builtin with the argument
-                // Note: Builtins take a slice of arguments, so we wrap in a slice
-                return builtin.call(&[arg_value]);
+                    // Call the builtin with the argument
+                    // Note: Builtins take a slice of arguments, so we wrap in a slice
+                    return builtin.call(&[arg_value]);
+                }
             }
         }
 
         // Check if this is a builtin that needs special handling (builtins.attrValues, builtins.tryEval, builtins.genList, etc.)
+        // Handle builtins.seq first (before Select check) since it might be nested
+        // Structure: Apply(Apply(builtins.seq, a), b)
+        // When evaluating outer Apply: func_expr = Apply(builtins.seq, a)
+        if let Expr::Apply(inner_apply) = &func_expr {
+            if let Some(inner_func_expr) = inner_apply.lambda() {
+                if let Expr::Select(select) = inner_func_expr {
+                    if let Some(base_expr) = select.expr() {
+                        if let Expr::Ident(ident) = base_expr {
+                            if ident.to_string() == "builtins" {
+                                if let Some(attrpath) = select.attrpath() {
+                                    if let Some(attr) = attrpath.attrs().next() {
+                                        if attr.to_string() == "seq" {
+                                            // This is builtins.seq a b
+                                            let a_expr = inner_apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "seq: missing first argument".to_string(),
+                                                })?;
+                                            let b_expr = apply.argument()
+                                                .ok_or_else(|| Error::UnsupportedExpression {
+                                                    reason: "seq: missing second argument".to_string(),
+                                                })?;
+                                            
+                                            // Evaluate both arguments
+                                            let a_value = self.evaluate_expr_with_scope_impl(&a_expr, scope)?;
+                                            let b_value = self.evaluate_expr_with_scope_impl(&b_expr, scope)?;
+                                            
+                                            // Force the first argument (evaluate any thunks)
+                                            let _a_forced = a_value.clone().force(self)?;
+                                            
+                                            // Return the second argument
+                                            return Ok(b_value);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
         // Handle builtins.tryEval specially to catch errors
         if let Expr::Select(select) = &func_expr {
             if let Some(base_expr) = select.expr() {
@@ -691,122 +763,327 @@ impl Evaluator {
         // The parser gives us: Apply(Apply(builtins.genList, f), n)
         // So we check if func_expr is itself an Apply with builtins.genList
         // Also check for foldl' which has three arguments: Apply(Apply(Apply(builtins.foldl', f), init), list)
+        // Also check for direct foldl' calls: Apply(Apply(foldl', f), init) or Apply(Apply(Apply(foldl', f), init), list)
         if let Expr::Apply(inner_apply) = &func_expr {
             if let Some(inner_func_expr) = inner_apply.lambda() {
-                if let Expr::Select(select) = inner_func_expr {
-                    // Check if it's builtins.genList
+                // Check for direct foldl' calls (not via builtins.foldl')
+                if let Expr::Ident(ref ident) = inner_func_expr {
+                    if ident.to_string() == "foldl'" {
+                        // Structure for 3 args: apply = Apply(Apply(Apply(foldl', f), init), list)
+                        // Structure for 2 args: apply = Apply(Apply(foldl', f), init)
+                        // func_expr = apply.lambda() = Apply(Apply(foldl', f), init)
+                        // inner_apply = Apply(Apply(foldl', f), init) (same as func_expr)
+                        // inner_apply.lambda() = Apply(foldl', f)
+                        // So:
+                        //   f_expr = inner_apply.lambda().argument() = f
+                        //   init_expr = inner_apply.argument() = init
+                        //   list_expr = apply.argument() = list (if it exists)
+                        
+                        // For direct foldl' calls: inner_apply = Apply(foldl', f)
+                        // So inner_apply.lambda() = foldl' (Ident), and inner_apply.argument() = f
+                        let f_expr = inner_apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "foldl': missing first argument".to_string(),
+                            })?;
+                        let init_expr = inner_apply.argument()
+                            .ok_or_else(|| Error::UnsupportedExpression {
+                                reason: "foldl': missing second argument".to_string(),
+                            })?;
+                        
+                        let f_value = self.evaluate_expr_with_scope_impl(&f_expr, scope)?;
+                        let init_value = self.evaluate_expr_with_scope_impl(&init_expr, scope)?;
+                        
+                        // Check if we have a third argument (the list)
+                        // For direct foldl' calls: apply = Apply(Apply(foldl', f), init)
+                        // So apply.argument() = init (the second argument)
+                        // We need to check if there's another Apply wrapping this to get the list
+                        // Actually, if apply.argument() exists and is a list, it's the third argument
+                        // If apply.argument() exists but is not a list, it's the second argument (2-arg case)
+                        if let Some(third_arg_expr) = apply.argument() {
+                            let third_arg_value = self.evaluate_expr_with_scope_impl(&third_arg_expr, scope)?;
+                            let third_arg_forced = third_arg_value.clone().force(self)?;
+                            
+                            // Check if it's a list (third argument) or something else (second argument)
+                            if let NixValue::List(list) = third_arg_forced {
+                                // Three arguments: foldl' f init list - execute the fold
+                                // Handle builtin functions specially
+                                if let NixValue::String(s) = &f_value {
+                                    if s.starts_with("__builtin_func:") {
+                                        let builtin_name = &s[15..]; // Skip "__builtin_func:"
+                                        if let Some(builtin) = self.builtins.get(builtin_name) {
+                                            // Strict left fold with builtin: foldl' builtin init [x1, x2, ..., xn]
+                                            // For builtins, we call them directly: builtin(acc, x)
+                                            let mut accumulator = init_value;
+                                            for element in list {
+                                                // Force element before applying builtin (strict evaluation)
+                                                let element_forced = element.clone().force(self)?;
+                                                // Call builtin with accumulator and element
+                                                accumulator = builtin.call(&[accumulator, element_forced])?;
+                                            }
+                                            return Ok(accumulator);
+                                        } else {
+                                            return Err(Error::UnsupportedExpression {
+                                                reason: format!("foldl': unknown builtin function: {}", builtin_name),
+                                            });
+                                        }
+                                    }
+                                }
+                                
+                                // Handle regular functions
+                                let func = match f_value {
+                                    NixValue::Function(f) => f,
+                                    _ => {
+                                        return Err(Error::UnsupportedExpression {
+                                            reason: format!("foldl': first argument must be a function, got {}", f_value),
+                                        });
+                                    }
+                                };
+                                
+                                // Strict left fold: foldl' f init [x1, x2, ..., xn] = f (... (f (f init x1) x2) ...) xn
+                                // f is curried: f acc x = (f acc) x
+                                let mut accumulator = init_value;
+                                for element in list {
+                                    // Force element before applying function (strict evaluation)
+                                    let element_forced = element.clone().force(self)?;
+                                    // Apply f to accumulator: f acc (returns a function)
+                                    let f_acc = func.apply(self, accumulator)?;
+                                    // Apply (f acc) to element: (f acc) x
+                                    accumulator = match f_acc {
+                                        NixValue::Function(f_acc_func) => f_acc_func.apply(self, element_forced)?,
+                                        _ => {
+                                            return Err(Error::UnsupportedExpression {
+                                                reason: format!("foldl': function must return a function when partially applied, got {}", f_acc),
+                                            });
+                                        }
+                                    };
+                                }
+                                
+                                return Ok(accumulator);
+                            } else {
+                                // The third argument is not a list, so this is actually the 2-argument case
+                                // apply.argument() is the second argument (init), not the third
+                                // Two arguments: foldl' f init - return a curried function that takes a list
+                                use crate::function::Function;
+                                use std::sync::Arc;
+                                
+                                // Create a function that takes a list argument
+                                // This function will apply foldl' f init to the list
+                                let curried_func = Function::new_curried_foldl(
+                                    f_value,
+                                    init_value,
+                                    self.current_file_id(),
+                                );
+                                
+                                return Ok(NixValue::Function(Arc::new(curried_func)));
+                            }
+                        } else {
+                            // No third argument - this shouldn't happen for foldl' with 2 args
+                            // But handle it as 2-arg case anyway
+                            use crate::function::Function;
+                            use std::sync::Arc;
+                            
+                            let curried_func = Function::new_curried_foldl(
+                                f_value,
+                                init_value,
+                                self.current_file_id(),
+                            );
+                            
+                            return Ok(NixValue::Function(Arc::new(curried_func)));
+                        }
+                    }
+                }
+                
+                // Check if inner_func_expr is a Select (builtins.elem) or an Apply containing builtins.foldl'
+                // For builtins.elem x xs: func_expr = Apply(builtins.elem, x), inner_func_expr = builtins.elem (Select)
+                if let Expr::Select(ref select) = inner_func_expr {
                     if let Some(base_expr) = select.expr() {
                         if let Expr::Ident(ident) = base_expr {
                             if ident.to_string() == "builtins" {
                                 if let Some(attrpath) = select.attrpath() {
                                     if let Some(attr) = attrpath.attrs().next() {
-                                        // Check for foldl' first (three arguments: Apply(Apply(Apply(builtins.foldl', f), init), list))
-                                        // We're at: Apply(Apply(builtins.foldl', f), init)
-                                        // So func_expr is Apply(Apply(builtins.foldl', f), init)
-                                        // inner_apply is Apply(builtins.foldl', f)
-                                        // We need to check if apply is itself an Apply to get the list
-                                        if attr.to_string() == "foldl'" {
-                                            // Structure: apply = Apply(Apply(Apply(builtins.foldl', f), init), list)
-                                            // func_expr = apply.lambda() = Apply(Apply(builtins.foldl', f), init)
-                                            // inner_apply = Apply(Apply(builtins.foldl', f), init) (same as func_expr)
-                                            // inner_apply.lambda() = Apply(builtins.foldl', f)
+                                        if attr.to_string() == "elem" {
+                                            // This is builtins.elem x xs
+                                            // Structure: Apply(Apply(builtins.elem, x), xs)
+                                            // func_expr = Apply(builtins.elem, x)
+                                            // inner_apply = Apply(builtins.elem, x) (same as func_expr)
+                                            // inner_func_expr = inner_apply.lambda() = builtins.elem (Select)
                                             // So:
-                                            //   f_expr = inner_apply.lambda().argument() = f
-                                            //   init_expr = inner_apply.argument() = init
-                                            //   list_expr = apply.argument() = list
-                                            
-                                            let inner_inner_func_expr = inner_apply.lambda()
+                                            //   x_expr = inner_apply.argument() = x
+                                            //   xs_expr = apply.argument() = xs
+                                            let x_expr = inner_apply.argument()
                                                 .ok_or_else(|| Error::UnsupportedExpression {
-                                                    reason: "foldl': missing inner function".to_string(),
+                                                    reason: "elem: missing first argument".to_string(),
                                                 })?;
-                                            let f_expr = if let Expr::Apply(inner_inner_apply) = inner_inner_func_expr {
-                                                inner_inner_apply.argument()
-                                                    .ok_or_else(|| Error::UnsupportedExpression {
-                                                        reason: "foldl': missing first argument".to_string(),
-                                                    })?
-                                            } else {
-                                                return Err(Error::UnsupportedExpression {
-                                                    reason: "foldl': expected Apply expression for function".to_string(),
-                                                });
-                                            };
-                                            let init_expr = inner_apply.argument()
+                                            let xs_expr = apply.argument()
                                                 .ok_or_else(|| Error::UnsupportedExpression {
-                                                    reason: "foldl': missing second argument".to_string(),
-                                                })?;
-                                            let list_expr = apply.argument()
-                                                .ok_or_else(|| Error::UnsupportedExpression {
-                                                    reason: "foldl': missing third argument".to_string(),
+                                                    reason: "elem: missing second argument".to_string(),
                                                 })?;
                                             
-                                            let f_value = self.evaluate_expr_with_scope_impl(&f_expr, scope)?;
-                                            let init_value = self.evaluate_expr_with_scope_impl(&init_expr, scope)?;
-                                            let list_value = self.evaluate_expr_with_scope_impl(&list_expr, scope)?;
+                                            let x_value = self.evaluate_expr_with_scope_impl(&x_expr, scope)?;
+                                            let xs_value = self.evaluate_expr_with_scope_impl(&xs_expr, scope)?;
                                             
-                                            // Get the list
-                                            let list_forced = list_value.clone().force(self)?;
-                                            let list = match list_forced {
+                                            // Force the list to check elements
+                                            let xs_forced = xs_value.clone().force(self)?;
+                                            let list = match xs_forced {
                                                 NixValue::List(l) => l,
                                                 _ => {
                                                     return Err(Error::UnsupportedExpression {
-                                                        reason: format!("foldl': third argument must be a list, got {}", list_forced),
+                                                        reason: format!("elem: second argument must be a list, got {}", xs_forced),
                                                     });
                                                 }
                                             };
                                             
-                                            // Handle builtin functions specially
-                                            if let NixValue::String(s) = &f_value {
-                                                if s.starts_with("__builtin_func:") {
-                                                    let builtin_name = &s[15..]; // Skip "__builtin_func:"
-                                                    if let Some(builtin) = self.builtins.get(builtin_name) {
-                                                        // Strict left fold with builtin: foldl' builtin init [x1, x2, ..., xn]
-                                                        // For builtins, we call them directly: builtin(acc, x)
+                                            // Check if x is in the list (force thunks in list elements for comparison)
+                                            for item in list {
+                                                let item_forced = item.clone().force(self)?;
+                                                // Compare using equality
+                                                let eq_result = self.evaluate_equal(&x_value, &item_forced)?;
+                                                if let NixValue::Boolean(true) = eq_result {
+                                                    return Ok(NixValue::Boolean(true));
+                                                }
+                                            }
+                                            
+                                            return Ok(NixValue::Boolean(false));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Check if inner_func_expr is an Apply containing builtins.foldl'
+                if let Expr::Apply(ref inner_inner_apply) = inner_func_expr {
+                    if let Some(inner_inner_func_expr) = inner_inner_apply.lambda() {
+                        if let Expr::Select(select) = inner_inner_func_expr {
+                            if let Some(base_expr) = select.expr() {
+                                if let Expr::Ident(ident) = base_expr {
+                                    if ident.to_string() == "builtins" {
+                                        if let Some(attrpath) = select.attrpath() {
+                                            if let Some(attr) = attrpath.attrs().next() {
+                                                if attr.to_string() == "foldl'" {
+                                                    // This is builtins.foldl' f init list
+                                                    // Structure: Apply(Apply(Apply(builtins.foldl', f), init), list)
+                                                    // inner_apply = Apply(Apply(builtins.foldl', f), init)
+                                                    // inner_inner_apply = Apply(builtins.foldl', f)
+                                                    // So:
+                                                    //   f_expr = inner_inner_apply.argument() = f
+                                                    //   init_expr = inner_apply.argument() = init
+                                                    //   list_expr = apply.argument() = list
+                                                    let f_expr = inner_inner_apply.argument()
+                                                        .ok_or_else(|| Error::UnsupportedExpression {
+                                                            reason: "foldl': missing first argument".to_string(),
+                                                        })?;
+                                                    let init_expr = inner_apply.argument()
+                                                        .ok_or_else(|| Error::UnsupportedExpression {
+                                                            reason: "foldl': missing second argument".to_string(),
+                                                        })?;
+                                                    
+                                                    let f_value = self.evaluate_expr_with_scope_impl(&f_expr, scope)?;
+                                                    let init_value = self.evaluate_expr_with_scope_impl(&init_expr, scope)?;
+                                                    
+                                                    // Check if we have a third argument (the list)
+                                                    if let Some(list_expr) = apply.argument() {
+                                                        // Three arguments: foldl' f init list - execute the fold
+                                                        let list_value = self.evaluate_expr_with_scope_impl(&list_expr, scope)?;
+                                                        
+                                                        // Get the list
+                                                        let list_forced = list_value.clone().force(self)?;
+                                                        let list = match list_forced {
+                                                            NixValue::List(l) => l,
+                                                            _ => {
+                                                                return Err(Error::UnsupportedExpression {
+                                                                    reason: format!("foldl': third argument must be a list, got {}", list_forced),
+                                                                });
+                                                            }
+                                                        };
+                                                        
+                                                        // Handle builtin functions specially
+                                                        if let NixValue::String(s) = &f_value {
+                                                            if s.starts_with("__builtin_func:") {
+                                                                let builtin_name = &s[15..]; // Skip "__builtin_func:"
+                                                                if let Some(builtin) = self.builtins.get(builtin_name) {
+                                                                    // Strict left fold with builtin: foldl' builtin init [x1, x2, ..., xn]
+                                                                    // For builtins, we call them directly: builtin(acc, x)
+                                                                    let mut accumulator = init_value;
+                                                                    for element in list {
+                                                                        // Force element before applying builtin (strict evaluation)
+                                                                        let element_forced = element.clone().force(self)?;
+                                                                        // Call builtin with accumulator and element
+                                                                        accumulator = builtin.call(&[accumulator, element_forced])?;
+                                                                    }
+                                                                    return Ok(accumulator);
+                                                                } else {
+                                                                    return Err(Error::UnsupportedExpression {
+                                                                        reason: format!("foldl': unknown builtin function: {}", builtin_name),
+                                                                    });
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                        // Handle regular functions
+                                                        let func = match f_value {
+                                                            NixValue::Function(f) => f,
+                                                            _ => {
+                                                                return Err(Error::UnsupportedExpression {
+                                                                    reason: format!("foldl': first argument must be a function, got {}", f_value),
+                                                                });
+                                                            }
+                                                        };
+                                                        
+                                                        // Strict left fold: foldl' f init [x1, x2, ..., xn] = f (... (f (f init x1) x2) ...) xn
+                                                        // f is curried: f acc x = (f acc) x
                                                         let mut accumulator = init_value;
                                                         for element in list {
-                                                            // Force element before applying builtin (strict evaluation)
+                                                            // Force element before applying function (strict evaluation)
                                                             let element_forced = element.clone().force(self)?;
-                                                            // Call builtin with accumulator and element
-                                                            accumulator = builtin.call(&[accumulator, element_forced])?;
+                                                            // Apply f to accumulator: f acc (returns a function)
+                                                            let f_acc = func.apply(self, accumulator)?;
+                                                            // Apply (f acc) to element: (f acc) x
+                                                            accumulator = match f_acc {
+                                                                NixValue::Function(f_acc_func) => f_acc_func.apply(self, element_forced)?,
+                                                                _ => {
+                                                                    return Err(Error::UnsupportedExpression {
+                                                                        reason: format!("foldl': function must return a function when partially applied, got {}", f_acc),
+                                                                    });
+                                                                }
+                                                            };
                                                         }
+                                                        
                                                         return Ok(accumulator);
                                                     } else {
-                                                        return Err(Error::UnsupportedExpression {
-                                                            reason: format!("foldl': unknown builtin function: {}", builtin_name),
-                                                        });
+                                                        // Two arguments: foldl' f init - return a curried function that takes a list
+                                                        use crate::function::Function;
+                                                        use std::sync::Arc;
+                                                        
+                                                        // Create a function that takes a list argument
+                                                        // This function will apply foldl' f init to the list
+                                                        let curried_func = Function::new_curried_foldl(
+                                                            f_value,
+                                                            init_value,
+                                                            self.current_file_id(),
+                                                        );
+                                                        
+                                                        return Ok(NixValue::Function(Arc::new(curried_func)));
                                                     }
                                                 }
                                             }
-                                            
-                                            // Handle regular functions
-                                            let func = match f_value {
-                                                NixValue::Function(f) => f,
-                                                _ => {
-                                                    return Err(Error::UnsupportedExpression {
-                                                        reason: format!("foldl': first argument must be a function, got {}", f_value),
-                                                    });
-                                                }
-                                            };
-                                            
-                                            // Strict left fold: foldl' f init [x1, x2, ..., xn] = f (... (f (f init x1) x2) ...) xn
-                                            // f is curried: f acc x = (f acc) x
-                                            let mut accumulator = init_value;
-                                            for element in list {
-                                                // Force element before applying function (strict evaluation)
-                                                let element_forced = element.clone().force(self)?;
-                                                // Apply f to accumulator: f acc (returns a function)
-                                                let f_acc = func.apply(self, accumulator)?;
-                                                // Apply (f acc) to element: (f acc) x
-                                                accumulator = match f_acc {
-                                                    NixValue::Function(f_acc_func) => f_acc_func.apply(self, element_forced)?,
-                                                    _ => {
-                                                        return Err(Error::UnsupportedExpression {
-                                                            reason: format!("foldl': function must return a function when partially applied, got {}", f_acc),
-                                                        });
-                                                    }
-                                                };
-                                            }
-                                            
-                                            return Ok(accumulator);
-                                        } else if attr.to_string() == "deepSeq" {
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if let Expr::Select(select) = inner_func_expr {
+                    // Check if it's builtins.genList or other builtins
+                    if let Some(base_expr) = select.expr() {
+                        if let Expr::Ident(ident) = base_expr {
+                            if ident.to_string() == "builtins" {
+                                if let Some(attrpath) = select.attrpath() {
+                                    if let Some(attr) = attrpath.attrs().next() {
+                                        if attr.to_string() == "deepSeq" {
                                             // Check if this is foldl' f init list (three arguments)
                                             // The parser gives us: Apply(Apply(Apply(builtins.foldl', f), init), list)
                                             // We're at: Apply(Apply(builtins.foldl', f), init)

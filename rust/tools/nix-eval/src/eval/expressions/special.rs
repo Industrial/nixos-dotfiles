@@ -141,6 +141,8 @@ impl Evaluator {
         use std::collections::HashMap;
         let mut nested_bindings: HashMap<String, Vec<(Vec<String>, rnix::ast::Expr)>> = HashMap::new();
         
+        // First, collect all bindings and their expressions
+        let mut binding_exprs: Vec<(String, rnix::ast::Expr)> = Vec::new();
         let bindings = let_in.attrpath_values();
         for binding in bindings {
             // Get the attribute path (the variable name)
@@ -180,10 +182,8 @@ impl Evaluator {
             
             if attr_names.len() == 1 {
                 // Simple binding: var = value
-                // Create a thunk for this binding
-                let file_id = self.current_file_id();
-                let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
-                new_scope.insert(var_name.clone(), NixValue::Thunk(Arc::new(thunk)));
+                // Store for later processing after all bindings are collected
+                binding_exprs.push((var_name.clone(), value_expr));
                 var_names.push(var_name);
             } else {
                 // Nested binding: var.a.b = value
@@ -195,6 +195,54 @@ impl Evaluator {
                     var_names.push(var_name);
                 }
             }
+        }
+        
+        // Create thunks for all simple bindings
+        // For recursive bindings to work, we need each thunk's closure to include itself.
+        // Since thunks capture their closure at creation time, and VariableScope is cloned,
+        // we need to use a shared mutable scope (Rc<RefCell<>>) for let bindings.
+        // However, that requires changing the thunk structure, which is a bigger change.
+        //
+        // For now, let's use a workaround: create thunks in two passes:
+        // 1. First pass: Insert all bindings as placeholders (using the actual expression as a thunk)
+        // 2. Second pass: Create real thunks with scope that includes all placeholders
+        // 3. Replace placeholders with real thunks
+        //
+        // The issue: when a thunk is forced, it uses its own closure, not the updated scope.
+        // So even if we replace the placeholder, the thunk's closure still has the placeholder.
+        //
+        // The real solution: Modify thunk to use Rc<RefCell<VariableScope>> for let bindings,
+        // or modify identifier lookup to check a "let scope" that's shared.
+        //
+        // For now, let's try creating thunks with a scope that includes forward references.
+        // We'll create a special "recursive scope" that can look up bindings dynamically.
+        use std::rc::Rc;
+        use std::cell::RefCell;
+        
+        // Create a shared mutable scope for let bindings
+        let shared_scope: Rc<RefCell<VariableScope>> = Rc::new(RefCell::new(new_scope.clone()));
+        let file_id = self.current_file_id();
+        
+        // First pass: Create all thunks with the shared scope
+        // Each thunk will reference the shared scope, so when bindings are added,
+        // all thunks will see them
+        let mut thunk_values: Vec<(String, NixValue)> = Vec::new();
+        for (var_name, value_expr) in binding_exprs {
+            // Create thunk with shared scope (will be updated as we add bindings)
+            // But Thunk::new takes VariableScope, not Rc<RefCell<>>, so we need to
+            // clone the current state of the shared scope
+            let current_scope = shared_scope.borrow().clone();
+            let thunk = thunk::Thunk::new(&value_expr, current_scope, file_id);
+            let thunk_value = NixValue::Thunk(Arc::new(thunk));
+            
+            // Insert into shared scope
+            shared_scope.borrow_mut().insert(var_name.clone(), thunk_value.clone());
+            thunk_values.push((var_name, thunk_value));
+        }
+        
+        // Update new_scope with all bindings from shared scope
+        for (var_name, thunk_value) in thunk_values {
+            new_scope.insert(var_name, thunk_value);
         }
         
         // Second pass: Handle nested bindings by creating attribute sets
