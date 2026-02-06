@@ -62,6 +62,12 @@ priority = 0
 [formatter.nix]
 command = "alejandra"
 includes = ["*.nix"]
+# Exclude intentionally malformed test files (parse-fail/eval-fail tests)
+excludes = [
+  "**/parse-fail-*.nix",
+  "**/eval-fail-*.nix",
+  "**/parse-okay-crlf.nix", # Contains intentional CRLF line endings
+]
 priority = 1
 
 [formatter.github-actions]

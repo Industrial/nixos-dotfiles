@@ -1,0 +1,17 @@
+[package]
+name = "oomkiller"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "A daemon that monitors system memory and kills the highest memory-consuming process when memory usage exceeds 90%"
+
+[dependencies]
+sysinfo = "0.31"
+
+[lib]
+name = "oomkiller"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "oomkiller"
+path = "src/main.rs"

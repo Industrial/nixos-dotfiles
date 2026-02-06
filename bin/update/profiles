@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+echo "> update > profiles"
+exec > >(tee ./logs/update-profiles) 2>&1
+set -e
+
+echo "> nix profile upgrade --all"
+nix profile upgrade --all

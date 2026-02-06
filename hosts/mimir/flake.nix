@@ -95,6 +95,12 @@
       url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
       flake = false; # Treat as a source tree, not a flake
     };
+
+    # oomkiller tool source
+    oomkiller-src = {
+      url = "path:../../rust/tools/oomkiller"; # Path relative to this flake.nix
+      flake = false; # Treat as a source tree, not a flake
+    };
   };
 
   outputs = inputs @ {...}: let
@@ -114,9 +120,8 @@
           ./filesystems.nix
           ./hardware.nix
 
-          ../../features/ai/opencode
-
           # Profiles (minimal setup: base + development + desktop only)
+          ../../profiles/ai.nix
           ../../profiles/base.nix
           ../../profiles/communication.nix
           ../../profiles/desktop.nix

@@ -1,4 +1,8 @@
-{pkgs, ...}: {
+{
+  inputs,
+  pkgs,
+  ...
+}: {
   # https://devenv.sh/basics/
   env = {
     RUST_BACKTRACE = "1";
@@ -8,6 +12,9 @@
 
   # https://devenv.sh/packages/
   packages = with pkgs; [
+    # AI
+    inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.beads
+
     # Nix
     nix-unit
     namaka
