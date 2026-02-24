@@ -60,8 +60,8 @@
   "editor.fontLigatures": true,
   "editor.fontSize": 12,
   "editor.fontWeight": "500",
-  "editor.formatOnPaste": true,
-  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.formatOnSave": false,
   "editor.formatOnType": false,
   "editor.gotoLocation.multipleDeclarations": "gotoAndPeek",
   "editor.gotoLocation.multipleDefinitions": "gotoAndPeek",
@@ -274,7 +274,6 @@
       "commands": ["whichkey.show"]
     }
   ],
-  "update.releaseTrack": "prerelease",
   "vitest.nodeEnv": null,
   "window.commandCenter": true,
   "window.confirmSaveUntitledWorkspace": false,
@@ -299,10 +298,10 @@
   "explorer.autoReveal": true,
   "lldb-dap.executable-path": "/nix/store/q3p69a1jdli1rszys53krr43gl1q9fcj-lldb-21.1.2/bin/lldb",
   "workbench.colorTheme": "base16-gruvbox-dark-hard",
-  "workbench.statusBar.visible": false,
   "remote.SSH.remotePlatform": {
     "tnr-0": "linux"
   },
+  "cursor.composer.queueMessageDefaultBehavior": "queue",
   "files.autoSave": "afterDelay",
-  "cursor.composer.queueMessageDefaultBehavior": "queue"
+  "update.mode": "none"
 }
