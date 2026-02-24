@@ -33,7 +33,6 @@
     vscode = pkgs.code-cursor;
     vscodeExtensions = [
       pkgs.vscode-extensions.ms-vscode-remote.remote-ssh
-
       # extensions.vscode-marketplace.anysphere.remote-ssh
 
       # AI
@@ -98,6 +97,9 @@
       # TODO: What was wrong with this?
       # extensions.vscode-marketplace.github.vscode-github-actions
 
+      # Beads
+      extensions.vscode-marketplace.planet57.vscode-beads
+
       # Rust
       # extensions.vscode-marketplace.rust-lang.rust
       extensions.vscode-marketplace.rust-lang.rust-analyzer
@@ -107,6 +109,19 @@
 
       # TOML
       extensions.vscode-marketplace.tamasfe.even-better-toml
+
+      # Astro
+      extensions.vscode-marketplace.astro-build.astro-vscode
+
+      # GraphViz
+      # pkgs.vscode-extensions.joaompinto.vscode-graphviz
+      extensions.vscode-marketplace.efanzh.graphviz-preview
+
+      # Terraform
+      extensions.vscode-marketplace.hashicorp.terraform
+
+      # Mermaid
+      extensions.vscode-marketplace.mermaidchart.vscode-mermaid-chart
     ];
   };
 in {
