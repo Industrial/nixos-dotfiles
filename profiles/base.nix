@@ -47,6 +47,7 @@
     ../features/cli/lnav
     ../features/cli/lsusb
     ../features/cli/lsof
+    ../features/cli/ngrok
     ../features/cli/nettools
     ../features/cli/nix-tree
     ../features/cli/p
