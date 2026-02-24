@@ -6,10 +6,10 @@
 
 use crate::{Error, Evaluator, NixValue, Result, VariableScope};
 use codespan::FileId;
-use rnix::SyntaxNode;
 use rnix::ast::{Expr, Root};
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
+use rnix::SyntaxNode;
 use rowan::ast::AstNode;
 use std::sync::{Arc, Mutex};
 

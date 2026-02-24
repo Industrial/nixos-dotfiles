@@ -1,8 +1,8 @@
 //! Attribute set expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::thunk;
 use crate::value::NixValue;
 use rnix::ast::{AttrpathValue, HasEntry, Inherit, InheritFrom};

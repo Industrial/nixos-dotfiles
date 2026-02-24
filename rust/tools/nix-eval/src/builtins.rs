@@ -534,8 +534,8 @@ impl Builtin for AttrValuesBuiltin {
                 // Get keys, sort them, then collect values in sorted key order
                 let mut keys: Vec<String> = attrs.keys().cloned().collect();
                 keys.sort(); // Nix returns attribute values in sorted key order
-                // Note: attrValues requires evaluator context to force thunks
-                // This is handled specially in evaluate_apply
+                             // Note: attrValues requires evaluator context to force thunks
+                             // This is handled specially in evaluate_apply
                 let values: Vec<NixValue> =
                     keys.iter().map(|k| attrs.get(k).unwrap().clone()).collect();
                 Ok(NixValue::List(values))
