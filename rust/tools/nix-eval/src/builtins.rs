@@ -6,10 +6,10 @@
 use crate::builtin::Builtin;
 use crate::error::{Error, Result};
 use crate::value::NixValue;
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::path::PathBuf;
 use regex::Regex;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Import builtin function
 ///
@@ -188,10 +188,7 @@ impl Builtin for IsFunctionBuiltin {
                 reason: format!("isFunction takes 1 argument, got {}", args.len()),
             });
         }
-        Ok(NixValue::Boolean(matches!(
-            args[0],
-            NixValue::Function(_)
-        )))
+        Ok(NixValue::Boolean(matches!(args[0], NixValue::Function(_))))
     }
 }
 
@@ -220,7 +217,7 @@ impl Builtin for StringLengthBuiltin {
 }
 
 /// Seq builtin - forces evaluation of first argument, returns second argument
-/// 
+///
 /// `builtins.seq a b` evaluates `a` (forcing any thunks) and then returns `b`.
 /// This is used for strict evaluation in otherwise lazy contexts.
 pub struct SeqBuiltin;
@@ -244,7 +241,7 @@ impl Builtin for SeqBuiltin {
 }
 
 /// Elem builtin - checks if an element is in a list
-/// 
+///
 /// `builtins.elem x xs` returns true if `x` is an element of list `xs`.
 /// Note: This requires evaluator context to force thunks in the list.
 pub struct ElemBuiltin;
@@ -262,7 +259,7 @@ impl Builtin for ElemBuiltin {
 }
 
 /// IntersectAttrs builtin - returns the intersection of two attribute sets
-/// 
+///
 /// `builtins.intersectAttrs e1 e2` returns an attribute set containing only the attributes
 /// that are present in both `e1` and `e2`, with values from `e2`.
 pub struct IntersectAttrsBuiltin;
@@ -288,14 +285,17 @@ impl Builtin for IntersectAttrsBuiltin {
                 Ok(NixValue::AttributeSet(result))
             }
             _ => Err(Error::UnsupportedExpression {
-                reason: format!("intersectAttrs: both arguments must be attribute sets, got {} and {}", args[0], args[1]),
+                reason: format!(
+                    "intersectAttrs: both arguments must be attribute sets, got {} and {}",
+                    args[0], args[1]
+                ),
             }),
         }
     }
 }
 
 /// ElemAt builtin - gets an element from a list by index
-/// 
+///
 /// `builtins.elemAt xs n` returns the element at index `n` (0-based) in list `xs`.
 /// Note: The argument order in Nix is `elemAt list index`, not `elemAt index list`.
 pub struct ElemAtBuiltin;
@@ -324,13 +324,20 @@ impl Builtin for ElemAtBuiltin {
                     }
                     _ => {
                         return Err(Error::UnsupportedExpression {
-                            reason: format!("elemAt: second argument must be an integer, got {}", args[1]),
+                            reason: format!(
+                                "elemAt: second argument must be an integer, got {}",
+                                args[1]
+                            ),
                         });
                     }
                 };
                 if index >= list.len() {
                     return Err(Error::UnsupportedExpression {
-                        reason: format!("elemAt: index {} out of bounds for list of length {}", index, list.len()),
+                        reason: format!(
+                            "elemAt: index {} out of bounds for list of length {}",
+                            index,
+                            list.len()
+                        ),
                     });
                 }
                 Ok(list[index].clone())
@@ -527,11 +534,10 @@ impl Builtin for AttrValuesBuiltin {
                 // Get keys, sort them, then collect values in sorted key order
                 let mut keys: Vec<String> = attrs.keys().cloned().collect();
                 keys.sort(); // Nix returns attribute values in sorted key order
-                // Note: attrValues requires evaluator context to force thunks
-                // This is handled specially in evaluate_apply
-                let values: Vec<NixValue> = keys.iter()
-                    .map(|k| attrs.get(k).unwrap().clone())
-                    .collect();
+                             // Note: attrValues requires evaluator context to force thunks
+                             // This is handled specially in evaluate_apply
+                let values: Vec<NixValue> =
+                    keys.iter().map(|k| attrs.get(k).unwrap().clone()).collect();
                 Ok(NixValue::List(values))
             }
             _ => Err(Error::UnsupportedExpression {
@@ -553,7 +559,7 @@ impl Builtin for CatAttrsBuiltin {
                 reason: format!("catAttrs takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         let attr_name = match &args[0] {
             NixValue::String(s) => s.clone(),
             _ => {
@@ -562,7 +568,7 @@ impl Builtin for CatAttrsBuiltin {
                 });
             }
         };
-        
+
         let list = match &args[1] {
             NixValue::List(l) => l,
             _ => {
@@ -571,7 +577,7 @@ impl Builtin for CatAttrsBuiltin {
                 });
             }
         };
-        
+
         // Collect the attribute from each attribute set in the list
         // Note: catAttrs requires evaluator context to force thunks, so it's handled specially
         // This implementation is a fallback and should not be called directly
@@ -1068,14 +1074,14 @@ impl Builtin for BaseNameOfBuiltin {
     fn name(&self) -> &str {
         "baseNameOf"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("baseNameOf takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         // Convert to string representation, handling Path values specially
         let path_str = match &args[0] {
             NixValue::String(s) => s.clone(),
@@ -1102,35 +1108,35 @@ impl Builtin for BaseNameOfBuiltin {
                 });
             }
         };
-        
+
         // Handle empty string
         if path_str.is_empty() {
             return Ok(NixValue::String("".to_string()));
         }
-        
+
         // If the path ends with '/', it represents a directory and baseNameOf returns ""
         // Check this BEFORE removing trailing slashes
         if path_str.ends_with('/') {
             return Ok(NixValue::String("".to_string()));
         }
-        
+
         // Remove trailing slashes for normalization
         let cleaned = path_str.trim_end_matches('/').to_string();
-        
+
         // Handle root path or paths that become empty after removing trailing slashes
         if cleaned == "/" || cleaned.is_empty() {
             return Ok(NixValue::String("".to_string()));
         }
-        
+
         // Handle current directory - baseNameOf of "." is ""
         if cleaned == "." {
             return Ok(NixValue::String("".to_string()));
         }
-        
+
         // Extract the last component
         // Split by '/' and take the last non-empty part
         let parts: Vec<&str> = cleaned.split('/').filter(|s| !s.is_empty()).collect();
-        
+
         if parts.is_empty() {
             // This happens for paths like "///" which become empty after splitting
             Ok(NixValue::String("".to_string()))
@@ -1149,22 +1155,20 @@ impl Builtin for ThrowBuiltin {
     fn name(&self) -> &str {
         "throw"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("throw takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         let message = match &args[0] {
             NixValue::String(s) => s.clone(),
             _ => format!("{}", args[0]),
         };
-        
-        Err(Error::UnsupportedExpression {
-            reason: message,
-        })
+
+        Err(Error::UnsupportedExpression { reason: message })
     }
 }
 
@@ -1181,7 +1185,7 @@ impl Builtin for TryEvalBuiltin {
     fn name(&self) -> &str {
         "tryEval"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - tryEval is handled specially in evaluate_apply
         // to receive the unevaluated expression AST
@@ -1227,7 +1231,8 @@ impl Builtin for ConcatMapBuiltin {
         // This should never be called directly - concatMap is handled specially in evaluate_apply
         // to call Nix functions for each element
         Err(Error::UnsupportedExpression {
-            reason: "concatMap requires evaluator context and must be handled specially".to_string(),
+            reason: "concatMap requires evaluator context and must be handled specially"
+                .to_string(),
         })
     }
 }
@@ -1241,20 +1246,21 @@ impl Builtin for BitOrBuiltin {
     fn name(&self) -> &str {
         "bitOr"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("bitOr takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Integer(a | b))
-            }
+            (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a | b)),
             _ => Err(Error::UnsupportedExpression {
-                reason: format!("bitOr expects two integers, got {} and {}", args[0], args[1]),
+                reason: format!(
+                    "bitOr expects two integers, got {} and {}",
+                    args[0], args[1]
+                ),
             }),
         }
     }
@@ -1269,20 +1275,21 @@ impl Builtin for BitAndBuiltin {
     fn name(&self) -> &str {
         "bitAnd"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("bitAnd takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Integer(a & b))
-            }
+            (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a & b)),
             _ => Err(Error::UnsupportedExpression {
-                reason: format!("bitAnd expects two integers, got {} and {}", args[0], args[1]),
+                reason: format!(
+                    "bitAnd expects two integers, got {} and {}",
+                    args[0], args[1]
+                ),
             }),
         }
     }
@@ -1297,20 +1304,21 @@ impl Builtin for BitXorBuiltin {
     fn name(&self) -> &str {
         "bitXor"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("bitXor takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Integer(a ^ b))
-            }
+            (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a ^ b)),
             _ => Err(Error::UnsupportedExpression {
-                reason: format!("bitXor expects two integers, got {} and {}", args[0], args[1]),
+                reason: format!(
+                    "bitXor expects two integers, got {} and {}",
+                    args[0], args[1]
+                ),
             }),
         }
     }
@@ -1327,7 +1335,7 @@ impl Builtin for FoldlStrictBuiltin {
     fn name(&self) -> &str {
         "foldl'"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - foldl' is handled specially in evaluate_apply
         // to call Nix functions for each element
@@ -1344,27 +1352,19 @@ impl Builtin for AddBuiltin {
     fn name(&self) -> &str {
         "add"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("add takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Integer(a + b))
-            }
-            (NixValue::Float(a), NixValue::Float(b)) => {
-                Ok(NixValue::Float(a + b))
-            }
-            (NixValue::Integer(a), NixValue::Float(b)) => {
-                Ok(NixValue::Float(*a as f64 + b))
-            }
-            (NixValue::Float(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Float(a + *b as f64))
-            }
+            (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a + b)),
+            (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a + b)),
+            (NixValue::Integer(a), NixValue::Float(b)) => Ok(NixValue::Float(*a as f64 + b)),
+            (NixValue::Float(a), NixValue::Integer(b)) => Ok(NixValue::Float(a + *b as f64)),
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("add expects two numbers, got {} and {}", args[0], args[1]),
             }),
@@ -1379,14 +1379,14 @@ impl Builtin for CeilBuiltin {
     fn name(&self) -> &str {
         "ceil"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("ceil takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         match &args[0] {
             NixValue::Integer(i) => Ok(NixValue::Integer(*i)),
             NixValue::Float(f) => Ok(NixValue::Integer(f.ceil() as i64)),
@@ -1455,7 +1455,7 @@ impl Builtin for ParseDrvNameBuiltin {
         for (i, ch) in s.char_indices() {
             if ch == '-' {
                 // Check if the next character (if any) is non-alphabetic
-                let next_ch = s[i+ch.len_utf8()..].chars().next();
+                let next_ch = s[i + ch.len_utf8()..].chars().next();
                 if let Some(next) = next_ch {
                     if !next.is_alphabetic() {
                         name_end = Some(i);
@@ -1492,27 +1492,19 @@ impl Builtin for MulBuiltin {
     fn name(&self) -> &str {
         "mul"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("mul takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Integer(a * b))
-            }
-            (NixValue::Float(a), NixValue::Float(b)) => {
-                Ok(NixValue::Float(a * b))
-            }
-            (NixValue::Integer(a), NixValue::Float(b)) => {
-                Ok(NixValue::Float(*a as f64 * b))
-            }
-            (NixValue::Float(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Float(a * *b as f64))
-            }
+            (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a * b)),
+            (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a * b)),
+            (NixValue::Integer(a), NixValue::Float(b)) => Ok(NixValue::Float(*a as f64 * b)),
+            (NixValue::Float(a), NixValue::Integer(b)) => Ok(NixValue::Float(a * *b as f64)),
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("mul expects two numbers, got {} and {}", args[0], args[1]),
             }),
@@ -1529,14 +1521,14 @@ impl Builtin for DivBuiltin {
     fn name(&self) -> &str {
         "div"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("div takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
             (NixValue::Integer(a), NixValue::Integer(b)) => {
                 if *b == 0 {
@@ -1586,27 +1578,19 @@ impl Builtin for SubBuiltin {
     fn name(&self) -> &str {
         "sub"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("sub takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         match (&args[0], &args[1]) {
-            (NixValue::Integer(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Integer(a - b))
-            }
-            (NixValue::Float(a), NixValue::Float(b)) => {
-                Ok(NixValue::Float(a - b))
-            }
-            (NixValue::Integer(a), NixValue::Float(b)) => {
-                Ok(NixValue::Float(*a as f64 - b))
-            }
-            (NixValue::Float(a), NixValue::Integer(b)) => {
-                Ok(NixValue::Float(a - *b as f64))
-            }
+            (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a - b)),
+            (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a - b)),
+            (NixValue::Integer(a), NixValue::Float(b)) => Ok(NixValue::Float(*a as f64 - b)),
+            (NixValue::Float(a), NixValue::Integer(b)) => Ok(NixValue::Float(a - *b as f64)),
             _ => Err(Error::UnsupportedExpression {
                 reason: format!("sub expects two numbers, got {} and {}", args[0], args[1]),
             }),
@@ -1621,14 +1605,14 @@ impl Builtin for ToJSONBuiltin {
     fn name(&self) -> &str {
         "toJSON"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("toJSON takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         // Convert NixValue to JSON string
         let json_str = match &args[0] {
             NixValue::Null => "null".to_string(),
@@ -1638,52 +1622,79 @@ impl Builtin for ToJSONBuiltin {
             NixValue::Float(f) => f.to_string(),
             NixValue::String(s) => {
                 // Escape JSON string
-                format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t"))
+                format!(
+                    "\"{}\"",
+                    s.replace('\\', "\\\\")
+                        .replace('"', "\\\"")
+                        .replace('\n', "\\n")
+                        .replace('\r', "\\r")
+                        .replace('\t', "\\t")
+                )
             }
             NixValue::List(l) => {
-                let items: Vec<String> = l.iter().map(|v| {
-                    // Recursively convert each item
-                    match v {
-                        NixValue::Null => "null".to_string(),
-                        NixValue::Boolean(true) => "true".to_string(),
-                        NixValue::Boolean(false) => "false".to_string(),
-                        NixValue::Integer(i) => i.to_string(),
-                        NixValue::Float(f) => f.to_string(),
-                        NixValue::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t")),
-                        NixValue::List(_) => {
-                            // For nested lists, we'd need recursive conversion
-                            // For now, return a placeholder
-                            "[]".to_string()
+                let items: Vec<String> = l
+                    .iter()
+                    .map(|v| {
+                        // Recursively convert each item
+                        match v {
+                            NixValue::Null => "null".to_string(),
+                            NixValue::Boolean(true) => "true".to_string(),
+                            NixValue::Boolean(false) => "false".to_string(),
+                            NixValue::Integer(i) => i.to_string(),
+                            NixValue::Float(f) => f.to_string(),
+                            NixValue::String(s) => format!(
+                                "\"{}\"",
+                                s.replace('\\', "\\\\")
+                                    .replace('"', "\\\"")
+                                    .replace('\n', "\\n")
+                                    .replace('\r', "\\r")
+                                    .replace('\t', "\\t")
+                            ),
+                            NixValue::List(_) => {
+                                // For nested lists, we'd need recursive conversion
+                                // For now, return a placeholder
+                                "[]".to_string()
+                            }
+                            NixValue::AttributeSet(_) => {
+                                // For attribute sets, we'd need recursive conversion
+                                // For now, return a placeholder
+                                "{}".to_string()
+                            }
+                            _ => format!("\"{}\"", v),
                         }
-                        NixValue::AttributeSet(_) => {
-                            // For attribute sets, we'd need recursive conversion
-                            // For now, return a placeholder
-                            "{}".to_string()
-                        }
-                        _ => format!("\"{}\"", v),
-                    }
-                }).collect();
+                    })
+                    .collect();
                 format!("[{}]", items.join(","))
             }
             NixValue::AttributeSet(attrs) => {
-                let pairs: Vec<String> = attrs.iter().map(|(k, v)| {
-                    let key = format!("\"{}\"", k.replace('\\', "\\\\").replace('"', "\\\""));
-                    let val = match v {
-                        NixValue::Null => "null".to_string(),
-                        NixValue::Boolean(true) => "true".to_string(),
-                        NixValue::Boolean(false) => "false".to_string(),
-                        NixValue::Integer(i) => i.to_string(),
-                        NixValue::Float(f) => f.to_string(),
-                        NixValue::String(s) => format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t")),
-                        _ => format!("\"{}\"", v),
-                    };
-                    format!("{}:{}", key, val)
-                }).collect();
+                let pairs: Vec<String> = attrs
+                    .iter()
+                    .map(|(k, v)| {
+                        let key = format!("\"{}\"", k.replace('\\', "\\\\").replace('"', "\\\""));
+                        let val = match v {
+                            NixValue::Null => "null".to_string(),
+                            NixValue::Boolean(true) => "true".to_string(),
+                            NixValue::Boolean(false) => "false".to_string(),
+                            NixValue::Integer(i) => i.to_string(),
+                            NixValue::Float(f) => f.to_string(),
+                            NixValue::String(s) => format!(
+                                "\"{}\"",
+                                s.replace('\\', "\\\\")
+                                    .replace('"', "\\\"")
+                                    .replace('\n', "\\n")
+                                    .replace('\r', "\\r")
+                                    .replace('\t', "\\t")
+                            ),
+                            _ => format!("\"{}\"", v),
+                        };
+                        format!("{}:{}", key, val)
+                    })
+                    .collect();
                 format!("{{{}}}", pairs.join(","))
             }
             _ => format!("\"{}\"", args[0]),
         };
-        
+
         Ok(NixValue::String(json_str))
     }
 }
@@ -1698,7 +1709,7 @@ impl Builtin for FilterBuiltin {
     fn name(&self) -> &str {
         "filter"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - filter is handled specially in evaluate_apply
         // to call Nix functions for each element
@@ -1718,7 +1729,7 @@ impl Builtin for AllBuiltin {
     fn name(&self) -> &str {
         "all"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - all is handled specially in evaluate_apply
         // to call Nix functions for each element
@@ -1738,7 +1749,7 @@ impl Builtin for AnyBuiltin {
     fn name(&self) -> &str {
         "any"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - any is handled specially in evaluate_apply
         // to call Nix functions for each element
@@ -1759,7 +1770,7 @@ impl Builtin for SortBuiltin {
     fn name(&self) -> &str {
         "sort"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - sort is handled specially in evaluate_apply
         // to call Nix functions for comparison
@@ -1776,14 +1787,14 @@ impl Builtin for FromJSONBuiltin {
     fn name(&self) -> &str {
         "fromJSON"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("fromJSON takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         let json_str = match &args[0] {
             NixValue::String(s) => s,
             _ => {
@@ -1792,11 +1803,11 @@ impl Builtin for FromJSONBuiltin {
                 });
             }
         };
-        
+
         // Simple JSON parsing (basic implementation)
         // For a full implementation, we'd want a proper JSON parser
         let trimmed = json_str.trim();
-        
+
         if trimmed == "null" {
             return Ok(NixValue::Null);
         }
@@ -1806,29 +1817,34 @@ impl Builtin for FromJSONBuiltin {
         if trimmed == "false" {
             return Ok(NixValue::Boolean(false));
         }
-        
+
         // Try to parse as integer
         if let Ok(i) = trimmed.parse::<i64>() {
             return Ok(NixValue::Integer(i));
         }
-        
+
         // Try to parse as float
         if let Ok(f) = trimmed.parse::<f64>() {
             return Ok(NixValue::Float(f));
         }
-        
+
         // Try to parse as string (remove quotes)
         if trimmed.starts_with('"') && trimmed.ends_with('"') {
-            let unquoted = &trimmed[1..trimmed.len()-1];
+            let unquoted = &trimmed[1..trimmed.len() - 1];
             // Unescape JSON string
-            let unescaped = unquoted.replace("\\\"", "\"").replace("\\\\", "\\").replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t");
+            let unescaped = unquoted
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
+                .replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t");
             return Ok(NixValue::String(unescaped));
         }
-        
+
         // Try to parse as list
         if trimmed.starts_with('[') && trimmed.ends_with(']') {
             // Simple list parsing - split by comma and parse each element
-            let content = &trimmed[1..trimmed.len()-1].trim();
+            let content = &trimmed[1..trimmed.len() - 1].trim();
             if content.is_empty() {
                 return Ok(NixValue::List(Vec::new()));
             }
@@ -1837,7 +1853,7 @@ impl Builtin for FromJSONBuiltin {
                 reason: "fromJSON: complex JSON parsing not yet implemented".to_string(),
             });
         }
-        
+
         // Try to parse as object
         if trimmed.starts_with('{') && trimmed.ends_with('}') {
             // Simple object parsing
@@ -1845,7 +1861,7 @@ impl Builtin for FromJSONBuiltin {
                 reason: "fromJSON: object parsing not yet implemented".to_string(),
             });
         }
-        
+
         Err(Error::UnsupportedExpression {
             reason: format!("fromJSON: cannot parse JSON: {}", json_str),
         })
@@ -1917,12 +1933,13 @@ impl Builtin for PathExistsBuiltin {
     fn name(&self) -> &str {
         "pathExists"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - pathExists is handled specially in evaluate_apply
         // to resolve paths relative to the current file
         Err(Error::UnsupportedExpression {
-            reason: "pathExists requires evaluator context and must be handled specially".to_string(),
+            reason: "pathExists requires evaluator context and must be handled specially"
+                .to_string(),
         })
     }
 }
@@ -1934,7 +1951,7 @@ impl Builtin for ReadFileBuiltin {
     fn name(&self) -> &str {
         "readFile"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - readFile is handled specially in evaluate_apply
         // to resolve paths relative to the current file
@@ -1951,32 +1968,38 @@ impl Builtin for RemoveAttrsBuiltin {
     fn name(&self) -> &str {
         "removeAttrs"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("removeAttrs takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         let attrs = match &args[0] {
             NixValue::AttributeSet(a) => a,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("removeAttrs: first argument must be an attribute set, got {}", args[0]),
+                    reason: format!(
+                        "removeAttrs: first argument must be an attribute set, got {}",
+                        args[0]
+                    ),
                 });
             }
         };
-        
+
         let keys_to_remove = match &args[1] {
             NixValue::List(l) => l,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("removeAttrs: second argument must be a list, got {}", args[1]),
+                    reason: format!(
+                        "removeAttrs: second argument must be a list, got {}",
+                        args[1]
+                    ),
                 });
             }
         };
-        
+
         // Collect keys to remove as strings
         let mut keys_set = std::collections::HashSet::new();
         for key_value in keys_to_remove {
@@ -1984,13 +2007,16 @@ impl Builtin for RemoveAttrsBuiltin {
                 NixValue::String(s) => s.clone(),
                 _ => {
                     return Err(Error::UnsupportedExpression {
-                        reason: format!("removeAttrs: list must contain strings, got {}", key_value),
+                        reason: format!(
+                            "removeAttrs: list must contain strings, got {}",
+                            key_value
+                        ),
                     });
                 }
             };
             keys_set.insert(key);
         }
-        
+
         // Create new attribute set without the removed keys
         let mut new_attrs = HashMap::new();
         for (key, value) in attrs {
@@ -1998,7 +2024,7 @@ impl Builtin for RemoveAttrsBuiltin {
                 new_attrs.insert(key.clone(), value.clone());
             }
         }
-        
+
         Ok(NixValue::AttributeSet(new_attrs))
     }
 }
@@ -2010,14 +2036,14 @@ impl Builtin for ToPathBuiltin {
     fn name(&self) -> &str {
         "toPath"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("toPath takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         match &args[0] {
             NixValue::String(path_str) => {
                 // Convert string to a Path value
@@ -2046,7 +2072,7 @@ impl Builtin for MapAttrsBuiltin {
     fn name(&self) -> &str {
         "mapAttrs"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - mapAttrs is handled specially in evaluate_apply
         // to call Nix functions for each attribute
@@ -2063,7 +2089,7 @@ impl Builtin for ReadDirBuiltin {
     fn name(&self) -> &str {
         "readDir"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - readDir is handled specially in evaluate_apply
         // to resolve paths relative to the current file
@@ -2080,12 +2106,13 @@ impl Builtin for ReadFileTypeBuiltin {
     fn name(&self) -> &str {
         "readFileType"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - readFileType is handled specially in evaluate_apply
         // to resolve paths relative to the current file
         Err(Error::UnsupportedExpression {
-            reason: "readFileType requires evaluator context and must be handled specially".to_string(),
+            reason: "readFileType requires evaluator context and must be handled specially"
+                .to_string(),
         })
     }
 }
@@ -2097,17 +2124,17 @@ impl Builtin for LessThanBuiltin {
     fn name(&self) -> &str {
         "lessThan"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("lessThan takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         let a = &args[0];
         let b = &args[1];
-        
+
         // Compare based on type
         let result = match (a, b) {
             (NixValue::Integer(x), NixValue::Integer(y)) => x < y,
@@ -2121,7 +2148,7 @@ impl Builtin for LessThanBuiltin {
                 });
             }
         };
-        
+
         Ok(NixValue::Boolean(result))
     }
 }
@@ -2133,14 +2160,14 @@ impl Builtin for ListToAttrsBuiltin {
     fn name(&self) -> &str {
         "listToAttrs"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("listToAttrs takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         let list = match &args[0] {
             NixValue::List(l) => l,
             _ => {
@@ -2149,9 +2176,9 @@ impl Builtin for ListToAttrsBuiltin {
                 });
             }
         };
-        
+
         let mut attrs = HashMap::new();
-        
+
         // Process each element in the list
         // Note: We need to force elements to get attribute sets, but NOT force the "value" attributes
         // This requires evaluator context, so listToAttrs should be handled specially in evaluate_apply
@@ -2165,45 +2192,53 @@ impl Builtin for ListToAttrsBuiltin {
                     // Element is a thunk - we can't force it here without evaluator context
                     // This will be handled specially in evaluate_apply
                     return Err(Error::UnsupportedExpression {
-                        reason: "listToAttrs: requires evaluator context for lazy evaluation".to_string(),
+                        reason: "listToAttrs: requires evaluator context for lazy evaluation"
+                            .to_string(),
                     });
                 }
                 _ => {
                     return Err(Error::UnsupportedExpression {
-                        reason: format!("listToAttrs: list element must be an attribute set, got {}", elem),
+                        reason: format!(
+                            "listToAttrs: list element must be an attribute set, got {}",
+                            elem
+                        ),
                     });
                 }
             };
-            
+
             // Get the "name" attribute - this needs to be forced to get the string
             // But we can't force it here without evaluator context
-            let name_value = elem_attrs.get("name")
-                .ok_or_else(|| Error::UnsupportedExpression {
-                    reason: format!("listToAttrs: element must have a 'name' attribute"),
-                })?;
-            
+            let name_value =
+                elem_attrs
+                    .get("name")
+                    .ok_or_else(|| Error::UnsupportedExpression {
+                        reason: format!("listToAttrs: element must have a 'name' attribute"),
+                    })?;
+
             // Try to get the name without forcing (if it's already a string)
             let name = match name_value {
                 NixValue::String(s) => s.clone(),
                 _ => {
                     // Name is a thunk - we can't force it here
                     return Err(Error::UnsupportedExpression {
-                        reason: "listToAttrs: requires evaluator context to force 'name' attribute".to_string(),
+                        reason: "listToAttrs: requires evaluator context to force 'name' attribute"
+                            .to_string(),
                     });
                 }
             };
-            
+
             // Get the "value" attribute - DON'T force it! Just clone it (preserves thunks)
-            let value = elem_attrs.get("value")
+            let value = elem_attrs
+                .get("value")
                 .ok_or_else(|| Error::UnsupportedExpression {
                     reason: format!("listToAttrs: element must have a 'value' attribute"),
                 })?
                 .clone();
-            
+
             // Insert into result (first occurrence wins if duplicate names)
             attrs.entry(name).or_insert(value);
         }
-        
+
         Ok(NixValue::AttributeSet(attrs))
     }
 }
@@ -2215,12 +2250,13 @@ impl Builtin for PartitionBuiltin {
     fn name(&self) -> &str {
         "partition"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - partition is handled specially in evaluate_apply
         // to call the predicate function for each element
         Err(Error::UnsupportedExpression {
-            reason: "partition requires evaluator context and must be handled specially".to_string(),
+            reason: "partition requires evaluator context and must be handled specially"
+                .to_string(),
         })
     }
 }
@@ -2232,32 +2268,38 @@ impl Builtin for HashStringBuiltin {
     fn name(&self) -> &str {
         "hashString"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("hashString takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         let algorithm = match &args[0] {
             NixValue::String(s) => s.as_str(),
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("hashString: first argument must be a string, got {}", args[0]),
+                    reason: format!(
+                        "hashString: first argument must be a string, got {}",
+                        args[0]
+                    ),
                 });
             }
         };
-        
+
         let input = match &args[1] {
             NixValue::String(s) => s.as_str(),
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("hashString: second argument must be a string, got {}", args[1]),
+                    reason: format!(
+                        "hashString: second argument must be a string, got {}",
+                        args[1]
+                    ),
                 });
             }
         };
-        
+
         // Compute hash based on algorithm
         let hash_hex = match algorithm {
             "md5" => {
@@ -2265,7 +2307,7 @@ impl Builtin for HashStringBuiltin {
                 hex::encode(digest.as_slice())
             }
             "sha1" => {
-                use sha1::{Sha1, Digest};
+                use sha1::{Digest, Sha1};
                 let mut hasher = Sha1::new();
                 hasher.update(input.as_bytes());
                 let hash_bytes = hasher.finalize();
@@ -2287,11 +2329,14 @@ impl Builtin for HashStringBuiltin {
             }
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("hashString: unsupported algorithm '{}', supported: md5, sha1, sha256, sha512", algorithm),
+                    reason: format!(
+                        "hashString: unsupported algorithm '{}', supported: md5, sha1, sha256, sha512",
+                        algorithm
+                    ),
                 });
             }
         };
-        
+
         Ok(NixValue::String(hash_hex))
     }
 }
@@ -2303,7 +2348,7 @@ impl Builtin for GroupByBuiltin {
     fn name(&self) -> &str {
         "groupBy"
     }
-    
+
     fn call(&self, _args: &[NixValue]) -> Result<NixValue> {
         // This should never be called directly - groupBy is handled specially in evaluate_apply
         // to call the key function for each element
@@ -2320,14 +2365,14 @@ impl Builtin for HasContextBuiltin {
     fn name(&self) -> &str {
         "hasContext"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("hasContext takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         // Check if the value has context (store path references)
         // For now, we'll check if it's a StorePath or contains StorePath references
         // In a full implementation, we'd need to track context through string interpolation
@@ -2339,7 +2384,7 @@ impl Builtin for HasContextBuiltin {
             }
             _ => false,
         };
-        
+
         Ok(NixValue::Boolean(has_context))
     }
 }
@@ -2351,57 +2396,66 @@ impl Builtin for SubstringBuiltin {
     fn name(&self) -> &str {
         "substring"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 3 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("substring takes 3 arguments, got {}", args.len()),
             });
         }
-        
+
         let start = match &args[0] {
             NixValue::Integer(i) => *i,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("substring: first argument must be an integer, got {}", args[0]),
+                    reason: format!(
+                        "substring: first argument must be an integer, got {}",
+                        args[0]
+                    ),
                 });
             }
         };
-        
+
         let len = match &args[1] {
             NixValue::Integer(i) => *i,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("substring: second argument must be an integer, got {}", args[1]),
+                    reason: format!(
+                        "substring: second argument must be an integer, got {}",
+                        args[1]
+                    ),
                 });
             }
         };
-        
+
         let s = match &args[2] {
             NixValue::String(s) => s,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("substring: third argument must be a string, got {}", args[2]),
+                    reason: format!(
+                        "substring: third argument must be a string, got {}",
+                        args[2]
+                    ),
                 });
             }
         };
-        
+
         // Handle negative length (Nix allows this)
         let actual_len = if len < 0 {
             s.len().saturating_sub(start.max(0) as usize)
         } else {
             len.max(0) as usize
         };
-        
+
         let start_idx = start.max(0) as usize;
-        
+
         // If start is beyond the string length, return empty string
         if start_idx >= s.len() {
             return Ok(NixValue::String(String::new()));
         }
-        
+
         let end_idx = (start_idx + actual_len).min(s.len());
-        
+
         Ok(NixValue::String(s[start_idx..end_idx].to_string()))
     }
 }
@@ -2413,62 +2467,78 @@ impl Builtin for ReplaceStringsBuiltin {
     fn name(&self) -> &str {
         "replaceStrings"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 3 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("replaceStrings takes 3 arguments, got {}", args.len()),
             });
         }
-        
+
         let from_list = match &args[0] {
             NixValue::List(l) => l,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("replaceStrings: first argument must be a list, got {}", args[0]),
+                    reason: format!(
+                        "replaceStrings: first argument must be a list, got {}",
+                        args[0]
+                    ),
                 });
             }
         };
-        
+
         let to_list = match &args[1] {
             NixValue::List(l) => l,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("replaceStrings: second argument must be a list, got {}", args[1]),
+                    reason: format!(
+                        "replaceStrings: second argument must be a list, got {}",
+                        args[1]
+                    ),
                 });
             }
         };
-        
+
         if from_list.len() != to_list.len() {
             return Err(Error::UnsupportedExpression {
-                reason: format!("replaceStrings: from and to lists must have the same length, got {} and {}", from_list.len(), to_list.len()),
+                reason: format!(
+                    "replaceStrings: from and to lists must have the same length, got {} and {}",
+                    from_list.len(),
+                    to_list.len()
+                ),
             });
         }
-        
+
         let mut s = match &args[2] {
             NixValue::String(s) => s.clone(),
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("replaceStrings: third argument must be a string, got {}", args[2]),
+                    reason: format!(
+                        "replaceStrings: third argument must be a string, got {}",
+                        args[2]
+                    ),
                 });
             }
         };
-        
+
         // Apply replacements sequentially
         // Nix's replaceStrings processes replacements in order, applying each pattern globally
         // Empty strings are handled specially: they insert replacements at boundaries
         let mut result = s.clone();
-        
+
         for (from, to) in from_list.iter().zip(to_list.iter()) {
             let from_str = match from {
                 NixValue::String(s) => s,
                 _ => {
                     return Err(Error::UnsupportedExpression {
-                        reason: format!("replaceStrings: from list must contain strings, got {}", from),
+                        reason: format!(
+                            "replaceStrings: from list must contain strings, got {}",
+                            from
+                        ),
                     });
                 }
             };
-            
+
             let to_str = match to {
                 NixValue::String(s) => s,
                 _ => {
@@ -2477,7 +2547,7 @@ impl Builtin for ReplaceStringsBuiltin {
                     });
                 }
             };
-            
+
             if from_str.is_empty() {
                 // Empty string: insert replacement at start and end
                 result = format!("{}{}{}", to_str, result, to_str);
@@ -2486,7 +2556,7 @@ impl Builtin for ReplaceStringsBuiltin {
                 result = result.replace(from_str, to_str);
             }
         }
-        
+
         Ok(NixValue::String(result))
     }
 }
@@ -2498,23 +2568,26 @@ impl Builtin for SplitBuiltin {
     fn name(&self) -> &str {
         "split"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("split takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         let regex_str = match &args[0] {
             NixValue::String(s) => s,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("split: first argument must be a string (regex), got {}", args[0]),
+                    reason: format!(
+                        "split: first argument must be a string (regex), got {}",
+                        args[0]
+                    ),
                 });
             }
         };
-        
+
         let s = match &args[1] {
             NixValue::String(s) => s,
             _ => {
@@ -2523,7 +2596,7 @@ impl Builtin for SplitBuiltin {
                 });
             }
         };
-        
+
         // Use regex crate for splitting
         // Note: Nix uses POSIX extended regex, but we'll use Rust's regex crate
         // Nix's split returns a list where even indices are non-matches and odd indices are matches
@@ -2535,12 +2608,12 @@ impl Builtin for SplitBuiltin {
                 });
             }
         };
-        
+
         // Split the string and collect matches
         // Nix's split returns a list where even indices are non-matches and odd indices are matches
         let mut result = Vec::new();
         let mut last_end = 0;
-        
+
         for mat in re.find_iter(s) {
             // Add the part before the match
             if mat.start() > last_end {
@@ -2550,17 +2623,17 @@ impl Builtin for SplitBuiltin {
             result.push(NixValue::String(mat.as_str().to_string()));
             last_end = mat.end();
         }
-        
+
         // Add the remaining part after the last match
         if last_end < s.len() {
             result.push(NixValue::String(s[last_end..].to_string()));
         }
-        
+
         // If no matches, return the whole string
         if result.is_empty() {
             result.push(NixValue::String(s.clone()));
         }
-        
+
         Ok(NixValue::List(result))
     }
 }
@@ -2577,44 +2650,50 @@ impl Builtin for CompareVersionsBuiltin {
     fn name(&self) -> &str {
         "compareVersions"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 2 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("compareVersions takes 2 arguments, got {}", args.len()),
             });
         }
-        
+
         let a = match &args[0] {
             NixValue::String(s) => s,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("compareVersions: first argument must be a string, got {}", args[0]),
+                    reason: format!(
+                        "compareVersions: first argument must be a string, got {}",
+                        args[0]
+                    ),
                 });
             }
         };
-        
+
         let b = match &args[1] {
             NixValue::String(s) => s,
             _ => {
                 return Err(Error::UnsupportedExpression {
-                    reason: format!("compareVersions: second argument must be a string, got {}", args[1]),
+                    reason: format!(
+                        "compareVersions: second argument must be a string, got {}",
+                        args[1]
+                    ),
                 });
             }
         };
-        
+
         // Nix version comparison algorithm:
         // 1. Split versions into components (numbers and strings)
         // 2. Compare components lexicographically
         // 3. Numbers are compared numerically, strings lexicographically
         // 4. Empty components are treated as 0
         // 5. "pre" suffix is special - versions with "pre" are less than versions without
-        
+
         fn split_version(s: &str) -> Vec<String> {
             let mut components = Vec::new();
             let mut current = String::new();
             let mut in_number = false;
-            
+
             for ch in s.chars() {
                 if ch.is_ascii_digit() {
                     if !in_number && !current.is_empty() {
@@ -2643,31 +2722,31 @@ impl Builtin for CompareVersionsBuiltin {
             }
             components
         }
-        
+
         let a_parts = split_version(a);
         let b_parts = split_version(b);
-        
+
         // Compare components
         let max_len = a_parts.len().max(b_parts.len());
         for i in 0..max_len {
             let a_part = a_parts.get(i).map(|s| s.as_str()).unwrap_or("");
             let b_part = b_parts.get(i).map(|s| s.as_str()).unwrap_or("");
-            
+
             // Check for "pre" suffix
             let a_has_pre = a_part.contains("pre");
             let b_has_pre = b_part.contains("pre");
-            
+
             if a_has_pre && !b_has_pre {
                 return Ok(NixValue::Integer(-1));
             }
             if !a_has_pre && b_has_pre {
                 return Ok(NixValue::Integer(1));
             }
-            
+
             // Try to parse as numbers
             let a_num = a_part.parse::<i64>().ok();
             let b_num = b_part.parse::<i64>().ok();
-            
+
             match (a_num, b_num) {
                 (Some(a_n), Some(b_n)) => {
                     if a_n < b_n {
@@ -2694,7 +2773,7 @@ impl Builtin for CompareVersionsBuiltin {
                 }
             }
         }
-        
+
         // All components equal
         Ok(NixValue::Integer(0))
     }
@@ -2707,14 +2786,14 @@ impl Builtin for SplitVersionBuiltin {
     fn name(&self) -> &str {
         "splitVersion"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if args.len() != 1 {
             return Err(Error::UnsupportedExpression {
                 reason: format!("splitVersion takes 1 argument, got {}", args.len()),
             });
         }
-        
+
         let version = match &args[0] {
             NixValue::String(s) => s,
             _ => {
@@ -2723,12 +2802,12 @@ impl Builtin for SplitVersionBuiltin {
                 });
             }
         };
-        
+
         // Split version string into components
         // Nix splits on non-alphanumeric characters, keeping separators as separate elements
         let mut result = Vec::new();
         let mut current = String::new();
-        
+
         for ch in version.chars() {
             if ch.is_alphanumeric() {
                 current.push(ch);
@@ -2740,11 +2819,11 @@ impl Builtin for SplitVersionBuiltin {
                 result.push(NixValue::String(ch.to_string()));
             }
         }
-        
+
         if !current.is_empty() {
             result.push(NixValue::String(current));
         }
-        
+
         Ok(NixValue::List(result))
     }
 }
@@ -2756,7 +2835,7 @@ impl Builtin for NixVersionBuiltin {
     fn name(&self) -> &str {
         "nixVersion"
     }
-    
+
     fn call(&self, args: &[NixValue]) -> Result<NixValue> {
         if !args.is_empty() {
             return Err(Error::UnsupportedExpression {
@@ -2768,5 +2847,3 @@ impl Builtin for NixVersionBuiltin {
         Ok(NixValue::String("2.18".to_string()))
     }
 }
-
-

@@ -1,10 +1,10 @@
 //! Literal expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::value::NixValue;
-use rnix::ast::{Literal, Str, InterpolPart};
+use rnix::ast::{InterpolPart, Literal, Str};
 use rowan::ast::AstNode;
 
 impl Evaluator {
@@ -52,12 +52,16 @@ impl Evaluator {
         Err(Error::UnsupportedLiteral { literal: text })
     }
 
-    pub(crate) fn evaluate_string(&self, str_expr: &Str, scope: &VariableScope) -> Result<NixValue> {
+    pub(crate) fn evaluate_string(
+        &self,
+        str_expr: &Str,
+        scope: &VariableScope,
+    ) -> Result<NixValue> {
         // Check if this is an indented string (multiline string using '')
         // In rnix, indented strings are represented differently - check the syntax
         let syntax_text = str_expr.syntax().text().to_string();
         let is_indented = syntax_text.trim_start().starts_with("''");
-        
+
         let mut result = String::new();
 
         // Iterate over the parts of the string
@@ -68,17 +72,17 @@ impl Evaluator {
                 InterpolPart::Literal(literal) => {
                     // This is a literal string part
                     let part_text = literal.to_string();
-                    
+
                     if is_indented {
                         // For indented strings, handle special escaping
                         // '' becomes ', ''${ becomes ${, ''\n becomes \n, etc.
                         let mut unescaped = part_text
-                            .replace("''", "'")  // '' becomes '
-                            .replace("''${", "${")  // ''${ becomes ${
-                            .replace("''\\n", "\\n")  // ''\n becomes \n
-                            .replace("''\\r", "\\r")  // ''\r becomes \r
-                            .replace("''\\t", "\\t");  // ''\t becomes \t
-                        
+                            .replace("''", "'") // '' becomes '
+                            .replace("''${", "${") // ''${ becomes ${
+                            .replace("''\\n", "\\n") // ''\n becomes \n
+                            .replace("''\\r", "\\r") // ''\r becomes \r
+                            .replace("''\\t", "\\t"); // ''\t becomes \t
+
                         // Now handle regular escape sequences
                         unescaped = unescaped
                             .replace("\\n", "\n")
@@ -86,7 +90,7 @@ impl Evaluator {
                             .replace("\\t", "\t")
                             .replace("\\\"", "\"")
                             .replace("\\\\", "\\");
-                        
+
                         result.push_str(&unescaped);
                     } else {
                         // Regular string - unescape normally
@@ -151,7 +155,7 @@ impl Evaluator {
                         min_indent = min_indent.min(indent);
                     }
                 }
-                
+
                 // Strip the minimum indentation from each line
                 let mut stripped_lines = Vec::new();
                 for line in &lines {
@@ -166,15 +170,12 @@ impl Evaluator {
                         }
                     }
                 }
-                
+
                 // Join lines with \n
                 result = stripped_lines.join("\n");
             }
         }
-        
+
         Ok(NixValue::String(result))
     }
-
-
-
 }

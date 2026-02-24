@@ -1,14 +1,14 @@
 //! Operator expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::value::NixValue;
 use rnix::ast::{BinOp, BinOpKind, UnaryOp, UnaryOpKind};
 use rowan::ast::AstNode;
 
 impl Evaluator {
-        pub(crate) fn evaluate_binop(&self, binop: &BinOp, scope: &VariableScope) -> Result<NixValue> {
+    pub(crate) fn evaluate_binop(&self, binop: &BinOp, scope: &VariableScope) -> Result<NixValue> {
         // Get the left and right operands
         let lhs_expr = binop.lhs().ok_or_else(|| Error::UnsupportedExpression {
             reason: "binary operation missing left operand".to_string(),
@@ -33,7 +33,7 @@ impl Evaluator {
                 let lhs = lhs_raw.clone().force(self)?;
                 Ok(lhs)
             })();
-            
+
             match lhs_result {
                 Ok(lhs) => {
                     // Left side succeeded - check if it's falsy
@@ -59,7 +59,7 @@ impl Evaluator {
             // For all other operators, evaluate both operands first
             let lhs_raw = self.evaluate_expr_with_scope(&lhs_expr, scope)?;
             let rhs_raw = self.evaluate_expr_with_scope(&rhs_expr, scope)?;
-            
+
             // Force thunks before arithmetic operations
             let lhs = lhs_raw.clone().force(self)?;
             let rhs = rhs_raw.clone().force(self)?;
@@ -119,23 +119,28 @@ impl Evaluator {
     /// - Float addition: `1.5 + 2.5` → `4.0`
     /// - String concatenation: `"hello" + "world"` → `"helloworld"`
 
-
-        pub(crate) fn evaluate_unary_op(&self, unary_op: &UnaryOp, scope: &VariableScope) -> Result<NixValue> {
+    pub(crate) fn evaluate_unary_op(
+        &self,
+        unary_op: &UnaryOp,
+        scope: &VariableScope,
+    ) -> Result<NixValue> {
         // Get the operator text from the syntax node
         // The operator token is part of the syntax tree
         let op_text = unary_op.syntax().text().to_string();
-        
+
         // Get the operand expression
-        let operand_expr = unary_op.expr().ok_or_else(|| Error::UnsupportedExpression {
-            reason: "unary operation missing operand".to_string(),
-        })?;
-        
+        let operand_expr = unary_op
+            .expr()
+            .ok_or_else(|| Error::UnsupportedExpression {
+                reason: "unary operation missing operand".to_string(),
+            })?;
+
         // Evaluate the operand
         let operand_value = self.evaluate_expr_with_scope(&operand_expr, scope)?;
-        
+
         // Force thunks before applying unary operators
         let operand = operand_value.clone().force(self)?;
-        
+
         // Apply the unary operator based on the text
         // The operator text will be "-" for unary minus
         if op_text.starts_with('-') {
@@ -160,12 +165,11 @@ impl Evaluator {
     /// Evaluate integer division operation
     ///
 
-
-        pub(crate) fn evaluate_add(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_add(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         // Force thunks before addition
         let lhs_forced = lhs.clone().force(self)?;
         let rhs_forced = rhs.clone().force(self)?;
-        
+
         match (&lhs_forced, &rhs_forced) {
             (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a + b)),
             (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a + b)),
@@ -241,9 +245,14 @@ impl Evaluator {
                             let attrs_value = NixValue::AttributeSet(attrs_for_call);
                             let coerced_str = func.apply(self, attrs_value)?;
                             match coerced_str {
-                                NixValue::String(s) => Ok(NixValue::String(format!("{}{}", s, rhs_str))),
+                                NixValue::String(s) => {
+                                    Ok(NixValue::String(format!("{}{}", s, rhs_str)))
+                                }
                                 _ => Err(Error::UnsupportedExpression {
-                                    reason: format!("__toString must return a string, got {}", coerced_str),
+                                    reason: format!(
+                                        "__toString must return a string, got {}",
+                                        coerced_str
+                                    ),
                                 }),
                             }
                         }
@@ -261,7 +270,10 @@ impl Evaluator {
                             Ok(NixValue::String(format!("{}{}", p_str, rhs_str)))
                         }
                         _ => Err(Error::UnsupportedExpression {
-                            reason: format!("outPath must be a string or path, got {}", out_path_str),
+                            reason: format!(
+                                "outPath must be a string or path, got {}",
+                                out_path_str
+                            ),
                         }),
                     }
                 } else {
@@ -283,9 +295,14 @@ impl Evaluator {
                             let attrs_value = NixValue::AttributeSet(attrs_for_call);
                             let coerced_str = func.apply(self, attrs_value)?;
                             match coerced_str {
-                                NixValue::String(s) => Ok(NixValue::String(format!("{}{}", lhs_str, s))),
+                                NixValue::String(s) => {
+                                    Ok(NixValue::String(format!("{}{}", lhs_str, s)))
+                                }
                                 _ => Err(Error::UnsupportedExpression {
-                                    reason: format!("__toString must return a string, got {}", coerced_str),
+                                    reason: format!(
+                                        "__toString must return a string, got {}",
+                                        coerced_str
+                                    ),
                                 }),
                             }
                         }
@@ -303,7 +320,10 @@ impl Evaluator {
                             Ok(NixValue::String(format!("{}{}", lhs_str, p_str)))
                         }
                         _ => Err(Error::UnsupportedExpression {
-                            reason: format!("outPath must be a string or path, got {}", out_path_str),
+                            reason: format!(
+                                "outPath must be a string or path, got {}",
+                                out_path_str
+                            ),
                         }),
                     }
                 } else {
@@ -348,8 +368,7 @@ impl Evaluator {
     /// In Nix, `-` is used for:
     /// - Integer subtraction: `5 - 2` → `3`
 
-
-        pub(crate) fn evaluate_subtract(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_subtract(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         match (lhs, rhs) {
             (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a - b)),
             (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a - b)),
@@ -366,8 +385,7 @@ impl Evaluator {
     /// In Nix, `*` is used for:
     /// - Integer multiplication: `2 * 3` → `6`
 
-
-        pub(crate) fn evaluate_multiply(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_multiply(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         match (lhs, rhs) {
             (NixValue::Integer(a), NixValue::Integer(b)) => Ok(NixValue::Integer(a * b)),
             (NixValue::Float(a), NixValue::Float(b)) => Ok(NixValue::Float(a * b)),
@@ -383,8 +401,7 @@ impl Evaluator {
     ///
     /// In Nix, `/` is used for:
 
-
-        pub(crate) fn evaluate_divide(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_divide(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         match (lhs, rhs) {
             (NixValue::Integer(a), NixValue::Integer(b)) => {
                 if *b == 0 {
@@ -427,12 +444,11 @@ impl Evaluator {
     /// Evaluate a parenthesized expression
     ///
 
-
-        pub(crate) fn evaluate_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         // Deep force both sides to ensure all nested thunks are evaluated
         let lhs_deep = lhs.clone().deep_force(self)?;
         let rhs_deep = rhs.clone().deep_force(self)?;
-        
+
         let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a == b,
             (NixValue::Float(a), NixValue::Float(b)) => a == b,
@@ -454,7 +470,7 @@ impl Evaluator {
                         }
                     })
                 }
-            },
+            }
             (NixValue::AttributeSet(a), NixValue::AttributeSet(b)) => {
                 // Compare attribute sets - they're already deeply forced at the top level
                 // But we need to recursively compare nested attribute sets
@@ -474,7 +490,7 @@ impl Evaluator {
                         }
                     })
                 }
-            },
+            }
             (NixValue::Path(a), NixValue::Path(b)) => a == b,
             _ => false, // Different types are never equal
         };
@@ -484,8 +500,7 @@ impl Evaluator {
     /// Evaluate inequality comparison (`!=`)
     ///
 
-
-        pub(crate) fn evaluate_not_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_not_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         let equal = self.evaluate_equal(lhs, rhs)?;
         match equal {
             NixValue::Boolean(b) => Ok(NixValue::Boolean(!b)),
@@ -496,12 +511,11 @@ impl Evaluator {
     /// Evaluate less-than comparison (`<`)
     ///
 
-
-        pub(crate) fn evaluate_less(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_less(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         // Deep force both sides to ensure all nested thunks are evaluated
         let lhs_deep = lhs.clone().deep_force(self)?;
         let rhs_deep = rhs.clone().deep_force(self)?;
-        
+
         let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a < b,
             (NixValue::Float(a), NixValue::Float(b)) => a < b,
@@ -538,12 +552,11 @@ impl Evaluator {
     /// Evaluate less-than-or-equal comparison (`<=`)
     ///
 
-
-        pub(crate) fn evaluate_greater(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_greater(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         // Deep force both sides to ensure all nested thunks are evaluated
         let lhs_deep = lhs.clone().deep_force(self)?;
         let rhs_deep = rhs.clone().deep_force(self)?;
-        
+
         let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a > b,
             (NixValue::Float(a), NixValue::Float(b)) => a > b,
@@ -580,12 +593,15 @@ impl Evaluator {
     /// Evaluate greater-than-or-equal comparison (`>=`)
     ///
 
-
-        pub(crate) fn evaluate_less_or_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_less_or_equal(
+        &self,
+        lhs: &NixValue,
+        rhs: &NixValue,
+    ) -> Result<NixValue> {
         // Deep force both sides to ensure all nested thunks are evaluated
         let lhs_deep = lhs.clone().deep_force(self)?;
         let rhs_deep = rhs.clone().deep_force(self)?;
-        
+
         let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a <= b,
             (NixValue::Float(a), NixValue::Float(b)) => a <= b,
@@ -622,12 +638,15 @@ impl Evaluator {
     /// Evaluate greater-than comparison (`>`)
     ///
 
-
-        pub(crate) fn evaluate_greater_or_equal(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_greater_or_equal(
+        &self,
+        lhs: &NixValue,
+        rhs: &NixValue,
+    ) -> Result<NixValue> {
         // Deep force both sides to ensure all nested thunks are evaluated
         let lhs_deep = lhs.clone().deep_force(self)?;
         let rhs_deep = rhs.clone().deep_force(self)?;
-        
+
         let result = match (&lhs_deep, &rhs_deep) {
             (NixValue::Integer(a), NixValue::Integer(b)) => a >= b,
             (NixValue::Float(a), NixValue::Float(b)) => a >= b,
@@ -666,8 +685,7 @@ impl Evaluator {
     /// In Nix, `&&` performs short-circuit evaluation:
     /// - If the left operand is falsy (false or null), return it without evaluating the right operand
 
-
-        pub(crate) fn evaluate_and(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_and(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         // Check if lhs is falsy (false or null)
         let lhs_falsy = matches!(lhs, NixValue::Boolean(false) | NixValue::Null);
 
@@ -685,8 +703,7 @@ impl Evaluator {
     /// In Nix, `||` performs short-circuit evaluation:
     /// - If the left operand is truthy (not false and not null), return it without evaluating the right operand
 
-
-        pub(crate) fn evaluate_or(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_or(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         // Check if lhs is falsy (false or null)
         let lhs_falsy = matches!(lhs, NixValue::Boolean(false) | NixValue::Null);
 
@@ -702,8 +719,7 @@ impl Evaluator {
     /// Evaluate list concatenation operation (`++`)
     ///
 
-
-        pub(crate) fn evaluate_concat(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_concat(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
         match (lhs, rhs) {
             (NixValue::List(a), NixValue::List(b)) => {
                 let mut result = a.clone();
@@ -723,8 +739,11 @@ impl Evaluator {
     ///
     /// In Nix, importing a directory automatically looks for `default.nix` in that directory.
 
-
-        pub(crate) fn evaluate_integer_divide(&self, lhs: &NixValue, rhs: &NixValue) -> Result<NixValue> {
+    pub(crate) fn evaluate_integer_divide(
+        &self,
+        lhs: &NixValue,
+        rhs: &NixValue,
+    ) -> Result<NixValue> {
         match (lhs, rhs) {
             (NixValue::Integer(a), NixValue::Integer(b)) => {
                 if *b == 0 {
@@ -739,5 +758,4 @@ impl Evaluator {
             }),
         }
     }
-
 }

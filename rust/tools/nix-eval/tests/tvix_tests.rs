@@ -24,7 +24,7 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
     );
 
     let evaluator = Evaluator::new();
-    
+
     // Use evaluate_from_file to set up file context for relative imports
     let result = evaluator.evaluate_from_file(&code_path);
 
@@ -52,7 +52,9 @@ fn eval_test(code_path: PathBuf, expect_success: bool) {
     // For success cases, check the result
     let value = result.expect("evaluation should succeed");
     // Force all thunks recursively before converting to string for comparison
-    let forced_value = value.deep_force(&evaluator).expect("should be able to force all thunks");
+    let forced_value = value
+        .deep_force(&evaluator)
+        .expect("should be able to force all thunks");
     let result_str = forced_value.to_string();
 
     // Check for .exp file

@@ -1,15 +1,19 @@
 //! List expression evaluation
 
 use crate::error::Result;
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
-use crate::value::NixValue;
+use crate::eval::Evaluator;
 use crate::thunk;
+use crate::value::NixValue;
 use rnix::ast::List;
 use std::sync::Arc;
 
 impl Evaluator {
-        pub(crate) fn evaluate_list(&self, list: &rnix::ast::List, scope: &VariableScope) -> Result<NixValue> {
+    pub(crate) fn evaluate_list(
+        &self,
+        list: &rnix::ast::List,
+        scope: &VariableScope,
+    ) -> Result<NixValue> {
         let mut values = Vec::new();
 
         // In Nix, list elements are lazy (thunks) - they're only evaluated when accessed
@@ -22,7 +26,4 @@ impl Evaluator {
 
         Ok(NixValue::List(values))
     }
-
-
-
 }

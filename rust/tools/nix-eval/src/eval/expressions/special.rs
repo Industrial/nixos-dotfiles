@@ -1,18 +1,21 @@
 //! Special form expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
-use crate::value::NixValue;
+use crate::eval::Evaluator;
 use crate::thunk;
-use rnix::ast::{LetIn, LegacyLet, With, IfElse, Assert, Paren, Select, HasAttr, Expr, HasEntry, Attr, Inherit, AttrpathValue};
+use crate::value::NixValue;
+use rnix::ast::{
+    Assert, Attr, AttrpathValue, Expr, HasAttr, HasEntry, IfElse, Inherit, LegacyLet, LetIn, Paren,
+    Select, With,
+};
 use rowan::ast::AstNode;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 impl Evaluator {
-        pub(crate) fn evaluate_let_in(
+    pub(crate) fn evaluate_let_in(
         &self,
         let_in: &rnix::ast::LetIn,
         scope: &VariableScope,
@@ -22,11 +25,11 @@ impl Evaluator {
         // But inherit statements are also part of the let bindings
         // We need to check the syntax tree for Inherit nodes
         let syntax = let_in.syntax();
-        
+
         // Create a new scope that starts with the current scope
         // Bindings will be added to this scope as we evaluate them
         let mut new_scope = scope.clone();
-        
+
         // Track variable names for legacy let expressions
         let mut var_names = Vec::new();
 
@@ -50,88 +53,93 @@ impl Evaluator {
                 }
             }
         }
-        
+
         // Process all found inherit statements
         for inherit_node in found_inherits {
-                // Handle inherit statement: inherit attr1 attr2 ...;
-                // or inherit (expr) attr1 attr2 ...;
-                
-                // Get the inherit from expression (if any)
-                let inherit_from = inherit_node.from();
-                
-                // Determine the scope to inherit from
-                let inherit_scope = if let Some(inherit_from_node) = inherit_from {
-                    // Get the expression from the InheritFrom node
-                    if let Some(from_expr) = inherit_from_node.expr() {
-                        // Evaluate the from expression to get an attribute set
-                        let from_value = self.evaluate_expr_with_scope(&from_expr, &new_scope)?;
-                        match from_value {
-                            NixValue::AttributeSet(from_attrs) => {
-                                // Create a scope from the attribute set
-                                let mut inherit_scope = VariableScope::new();
-                                for (key, value) in from_attrs {
-                                    inherit_scope.insert(key, value);
-                                }
-                                inherit_scope
+            // Handle inherit statement: inherit attr1 attr2 ...;
+            // or inherit (expr) attr1 attr2 ...;
+
+            // Get the inherit from expression (if any)
+            let inherit_from = inherit_node.from();
+
+            // Determine the scope to inherit from
+            let inherit_scope = if let Some(inherit_from_node) = inherit_from {
+                // Get the expression from the InheritFrom node
+                if let Some(from_expr) = inherit_from_node.expr() {
+                    // Evaluate the from expression to get an attribute set
+                    let from_value = self.evaluate_expr_with_scope(&from_expr, &new_scope)?;
+                    match from_value {
+                        NixValue::AttributeSet(from_attrs) => {
+                            // Create a scope from the attribute set
+                            let mut inherit_scope = VariableScope::new();
+                            for (key, value) in from_attrs {
+                                inherit_scope.insert(key, value);
                             }
+                            inherit_scope
+                        }
+                        _ => {
+                            return Err(Error::UnsupportedExpression {
+                                reason: "inherit from expression must be an attribute set"
+                                    .to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    // No expression in InheritFrom - inherit from current scope (the scope passed in, not new_scope!)
+                    scope.clone()
+                }
+            } else {
+                // Inherit from the current scope (the scope passed in, not new_scope!)
+                scope.clone()
+            };
+
+            // Get the attributes to inherit
+            for attr in inherit_node.attrs() {
+                // Get the attribute name (can be identifier or string literal)
+                let key = if let Some(ident) = rnix::ast::Ident::cast(attr.syntax().clone()) {
+                    ident.to_string()
+                } else {
+                    // Try to get the text representation and handle string literals
+                    let attr_text = attr.syntax().text().to_string();
+                    // Check if it's a string literal (starts and ends with quotes)
+                    if attr_text.starts_with('"')
+                        && attr_text.ends_with('"')
+                        && attr_text.len() >= 2
+                    {
+                        // String literal - strip quotes
+                        attr_text[1..attr_text.len() - 1].to_string()
+                    } else if let Some(string) = rnix::ast::Str::cast(attr.syntax().clone()) {
+                        // String expression - evaluate it to get the string value
+                        let str_value = self.evaluate_string(&string, &new_scope)?;
+                        match str_value {
+                            NixValue::String(s) => s,
                             _ => {
                                 return Err(Error::UnsupportedExpression {
-                                    reason: "inherit from expression must be an attribute set".to_string(),
+                                    reason: "inherit: string expression must evaluate to a string"
+                                        .to_string(),
                                 });
                             }
                         }
                     } else {
-                        // No expression in InheritFrom - inherit from current scope (the scope passed in, not new_scope!)
-                        scope.clone()
+                        // Fallback: use text representation, trimming quotes if present
+                        attr_text.trim_matches('"').to_string()
+                    }
+                };
+
+                // Look up the value in the inherit scope
+                if let Some(value) = inherit_scope.get(&key) {
+                    // Create a thunk for the inherited value (lazy evaluation)
+                    // The value might already be a thunk, so we can just clone it
+                    new_scope.insert(key.clone(), value.clone());
+                    if !var_names.contains(&key) {
+                        var_names.push(key);
                     }
                 } else {
-                    // Inherit from the current scope (the scope passed in, not new_scope!)
-                    scope.clone()
-                };
-                
-                // Get the attributes to inherit
-                for attr in inherit_node.attrs() {
-                    // Get the attribute name (can be identifier or string literal)
-                    let key = if let Some(ident) = rnix::ast::Ident::cast(attr.syntax().clone()) {
-                        ident.to_string()
-                    } else {
-                        // Try to get the text representation and handle string literals
-                        let attr_text = attr.syntax().text().to_string();
-                        // Check if it's a string literal (starts and ends with quotes)
-                        if attr_text.starts_with('"') && attr_text.ends_with('"') && attr_text.len() >= 2 {
-                            // String literal - strip quotes
-                            attr_text[1..attr_text.len()-1].to_string()
-                        } else if let Some(string) = rnix::ast::Str::cast(attr.syntax().clone()) {
-                            // String expression - evaluate it to get the string value
-                            let str_value = self.evaluate_string(&string, &new_scope)?;
-                            match str_value {
-                                NixValue::String(s) => s,
-                                _ => {
-                                    return Err(Error::UnsupportedExpression {
-                                        reason: "inherit: string expression must evaluate to a string".to_string(),
-                                    });
-                                }
-                            }
-                        } else {
-                            // Fallback: use text representation, trimming quotes if present
-                            attr_text.trim_matches('"').to_string()
-                        }
-                    };
-                    
-                    // Look up the value in the inherit scope
-                    if let Some(value) = inherit_scope.get(&key) {
-                        // Create a thunk for the inherited value (lazy evaluation)
-                        // The value might already be a thunk, so we can just clone it
-                        new_scope.insert(key.clone(), value.clone());
-                        if !var_names.contains(&key) {
-                            var_names.push(key);
-                        }
-                    } else {
-                        return Err(Error::UnsupportedExpression {
-                            reason: format!("inherit: attribute '{}' not found in scope", key),
-                        });
-                    }
+                    return Err(Error::UnsupportedExpression {
+                        reason: format!("inherit: attribute '{}' not found in scope", key),
+                    });
                 }
+            }
         }
 
         // Second pass: Collect all bindings and handle nested attribute paths
@@ -139,8 +147,9 @@ impl Evaluator {
         // that will be evaluated lazily when accessed.
         // We also need to handle nested paths like `set.a.b = value`
         use std::collections::HashMap;
-        let mut nested_bindings: HashMap<String, Vec<(Vec<String>, rnix::ast::Expr)>> = HashMap::new();
-        
+        let mut nested_bindings: HashMap<String, Vec<(Vec<String>, rnix::ast::Expr)>> =
+            HashMap::new();
+
         // First, collect all bindings and their expressions
         let mut binding_exprs: Vec<(String, rnix::ast::Expr)> = Vec::new();
         let bindings = let_in.attrpath_values();
@@ -159,7 +168,7 @@ impl Evaluator {
                 // Check if it's a string literal (starts and ends with quotes)
                 if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
                     // Strip quotes for string literal attribute names
-                    attr_names.push(attr_str[1..attr_str.len()-1].to_string());
+                    attr_names.push(attr_str[1..attr_str.len() - 1].to_string());
                 } else {
                     attr_names.push(attr_str);
                 }
@@ -179,7 +188,7 @@ impl Evaluator {
                 })?;
 
             let var_name = attr_names[0].clone();
-            
+
             if attr_names.len() == 1 {
                 // Simple binding: var = value
                 // Store for later processing after all bindings are collected
@@ -188,7 +197,8 @@ impl Evaluator {
             } else {
                 // Nested binding: var.a.b = value
                 // Store it for later processing
-                nested_bindings.entry(var_name.clone())
+                nested_bindings
+                    .entry(var_name.clone())
                     .or_insert_with(Vec::new)
                     .push((attr_names, value_expr));
                 if !var_names.contains(&var_name) {
@@ -196,7 +206,7 @@ impl Evaluator {
                 }
             }
         }
-        
+
         // Create thunks for all simple bindings
         // For recursive bindings to work, we need each thunk's closure to include itself.
         // Since thunks capture their closure at creation time, and VariableScope is cloned,
@@ -216,13 +226,13 @@ impl Evaluator {
         //
         // For now, let's try creating thunks with a scope that includes forward references.
         // We'll create a special "recursive scope" that can look up bindings dynamically.
-        use std::rc::Rc;
         use std::cell::RefCell;
-        
+        use std::rc::Rc;
+
         // Create a shared mutable scope for let bindings
         let shared_scope: Rc<RefCell<VariableScope>> = Rc::new(RefCell::new(new_scope.clone()));
         let file_id = self.current_file_id();
-        
+
         // First pass: Create all thunks with the shared scope
         // Each thunk will reference the shared scope, so when bindings are added,
         // all thunks will see them
@@ -234,29 +244,31 @@ impl Evaluator {
             let current_scope = shared_scope.borrow().clone();
             let thunk = thunk::Thunk::new(&value_expr, current_scope, file_id);
             let thunk_value = NixValue::Thunk(Arc::new(thunk));
-            
+
             // Insert into shared scope
-            shared_scope.borrow_mut().insert(var_name.clone(), thunk_value.clone());
+            shared_scope
+                .borrow_mut()
+                .insert(var_name.clone(), thunk_value.clone());
             thunk_values.push((var_name, thunk_value));
         }
-        
+
         // Update new_scope with all bindings from shared scope
         for (var_name, thunk_value) in thunk_values {
             new_scope.insert(var_name, thunk_value);
         }
-        
+
         // Second pass: Handle nested bindings by creating attribute sets
         for (var_name, paths_and_values) in nested_bindings {
             // Build the nested attribute set structure
             // Start with an empty attribute set that will be merged into
             let mut attrs = HashMap::new();
-            
+
             for (attr_names, value_expr) in paths_and_values {
                 // Create a thunk for the value
                 let file_id = self.current_file_id();
                 let thunk = thunk::Thunk::new(&value_expr, new_scope.clone(), file_id);
                 let mut nested_value = NixValue::Thunk(Arc::new(thunk));
-                
+
                 // Build nested structure from inside out
                 // For "set.a.b = value", attr_names = ["set", "a", "b"]
                 // We want to build { a = { b = value } }
@@ -267,7 +279,7 @@ impl Evaluator {
                     inner_map.insert(key.clone(), nested_value);
                     nested_value = NixValue::AttributeSet(inner_map);
                 }
-                
+
                 // nested_value now contains the full structure, e.g., { a = { b = value } }
                 // Merge it into attrs (which will become the value of var_name)
                 if let NixValue::AttributeSet(new_map) = nested_value {
@@ -294,7 +306,7 @@ impl Evaluator {
                     }
                 }
             }
-            
+
             // Store the attribute set in the scope
             new_scope.insert(var_name, NixValue::AttributeSet(attrs));
         }
@@ -305,7 +317,7 @@ impl Evaluator {
             // Legacy let: build an attribute set from the bindings and return the "body" attribute
             use std::collections::HashMap;
             let mut attrs = HashMap::new();
-            
+
             // Build attribute set from the scope (all bindings are already in new_scope)
             for var_name in var_names {
                 if let Some(value) = new_scope.get(&var_name) {
@@ -361,7 +373,7 @@ impl Evaluator {
         // Create a new scope that starts with the current scope
         // Bindings will be added to this scope as we evaluate them
         let mut new_scope = scope.clone();
-        
+
         // Track variable names for building the attribute set
         let mut var_names = Vec::new();
 
@@ -386,7 +398,7 @@ impl Evaluator {
                     // Check if it's a string literal (starts and ends with quotes)
                     if attr_str.starts_with('"') && attr_str.ends_with('"') && attr_str.len() >= 2 {
                         // Strip quotes for string literal attribute names
-                        attr_str[1..attr_str.len()-1].to_string()
+                        attr_str[1..attr_str.len() - 1].to_string()
                     } else {
                         attr_str
                     }
@@ -416,7 +428,7 @@ impl Evaluator {
         // Legacy let: build an attribute set from the bindings and return the "body" attribute
         use std::collections::HashMap;
         let mut attrs = HashMap::new();
-        
+
         // Build attribute set from the scope (all bindings are already in new_scope)
         for var_name in var_names {
             if let Some(value) = new_scope.get(&var_name) {
@@ -449,8 +461,11 @@ impl Evaluator {
     /// # Returns
     ///
 
-
-        pub(crate) fn evaluate_with(&self, with: &rnix::ast::With, scope: &VariableScope) -> Result<NixValue> {
+    pub(crate) fn evaluate_with(
+        &self,
+        with: &rnix::ast::With,
+        scope: &VariableScope,
+    ) -> Result<NixValue> {
         // Get the attribute set expression (the "with" part)
         let attrset_expr = with
             .namespace()
@@ -460,7 +475,7 @@ impl Evaluator {
 
         // Evaluate the attribute set expression
         let attrset_value = self.evaluate_expr_with_scope(&attrset_expr, scope)?;
-        
+
         // Force thunks before checking if it's an attribute set
         let attrset_forced = attrset_value.force(self)?;
 
@@ -521,9 +536,11 @@ impl Evaluator {
         scope: &VariableScope,
     ) -> Result<NixValue> {
         // Get the condition expression
-        let condition_expr = assert.condition().ok_or_else(|| Error::UnsupportedExpression {
-            reason: "assert expression missing condition".to_string(),
-        })?;
+        let condition_expr = assert
+            .condition()
+            .ok_or_else(|| Error::UnsupportedExpression {
+                reason: "assert expression missing condition".to_string(),
+            })?;
 
         // Evaluate and force the condition (thunks must be forced)
         let condition_value = self.evaluate_expr_with_scope(&condition_expr, scope)?;
@@ -566,8 +583,7 @@ impl Evaluator {
     /// # Returns
     ///
 
-
-        pub(crate) fn evaluate_path(
+    pub(crate) fn evaluate_path(
         &self,
         path_expr: &rnix::ast::Path,
         scope: &VariableScope,
@@ -630,8 +646,7 @@ impl Evaluator {
     /// - `<hash>` is a base32-encoded hash (typically 32 characters, but can vary)
     /// - `<name>` is the rest of the path component (can contain any characters except `/`)
 
-
-        pub(crate) fn evaluate_select(
+    pub(crate) fn evaluate_select(
         &self,
         select: &rnix::ast::Select,
         scope: &VariableScope,
@@ -643,7 +658,7 @@ impl Evaluator {
 
         // Evaluate the base expression
         let base_value_raw = self.evaluate_expr_with_scope(&expr, scope)?;
-        
+
         // Force thunks before checking if it's an attribute set
         let base_value = base_value_raw.force(self)?;
 
@@ -660,7 +675,7 @@ impl Evaluator {
             // Get the syntax node from the attribute using rowan's AstNode trait
             use rowan::ast::AstNode;
             let attr_syntax = attr_node.syntax();
-            
+
             let attr_name = if let Some(ident) = rnix::ast::Ident::cast(attr_syntax.clone()) {
                 // Regular identifier
                 ident.to_string()
@@ -706,7 +721,7 @@ impl Evaluator {
         for (idx, attr_name) in attr_names.iter().enumerate() {
             // Force thunks before checking if it's an attribute set
             let forced_value = current_value.force(self)?;
-            
+
             match forced_value {
                 NixValue::AttributeSet(mut attrs) => {
                     if let Some(value) = attrs.remove(attr_name) {
@@ -716,20 +731,29 @@ impl Evaluator {
                             if let NixValue::String(ref s) = value {
                                 if s.starts_with("__builtin:") {
                                     let builtin_name = &s[10..]; // Skip "__builtin:"
-                                    // Verify the builtin exists
+                                                                 // Verify the builtin exists
                                     if self.builtins.contains_key(builtin_name) {
                                         // Return a marker that evaluate_apply will recognize
-                                        return Ok(NixValue::String(format!("__builtin_func:{}", builtin_name)));
+                                        return Ok(NixValue::String(format!(
+                                            "__builtin_func:{}",
+                                            builtin_name
+                                        )));
                                     }
                                 } else if s == "__builtins_self__" {
                                     // builtins.builtins should return the builtins attribute set itself
                                     // Reconstruct the builtins attribute set
                                     let mut builtins_attrs = HashMap::new();
                                     for (name, _builtin) in &self.builtins {
-                                        builtins_attrs.insert(name.clone(), NixValue::String(format!("__builtin:{}", name)));
+                                        builtins_attrs.insert(
+                                            name.clone(),
+                                            NixValue::String(format!("__builtin:{}", name)),
+                                        );
                                     }
                                     // Add builtins.builtins pointing to itself (recursive)
-                                    builtins_attrs.insert("builtins".to_string(), NixValue::String("__builtins_self__".to_string()));
+                                    builtins_attrs.insert(
+                                        "builtins".to_string(),
+                                        NixValue::String("__builtins_self__".to_string()),
+                                    );
                                     return Ok(NixValue::AttributeSet(builtins_attrs));
                                 }
                             }
@@ -752,7 +776,7 @@ impl Evaluator {
                 }
             }
         }
-        
+
         // Force the final value before returning
         current_value.force(self)
     }
@@ -777,13 +801,15 @@ impl Evaluator {
         scope: &VariableScope,
     ) -> Result<NixValue> {
         // Get the expression being checked
-        let expr = has_attr.expr().ok_or_else(|| Error::UnsupportedExpression {
-            reason: "hasAttr expression missing base expression".to_string(),
-        })?;
+        let expr = has_attr
+            .expr()
+            .ok_or_else(|| Error::UnsupportedExpression {
+                reason: "hasAttr expression missing base expression".to_string(),
+            })?;
 
         // Evaluate the base expression
         let base_value_raw = self.evaluate_expr_with_scope(&expr, scope)?;
-        
+
         // Force thunks before checking if it's an attribute set
         let base_value = base_value_raw.force(self)?;
 
@@ -800,7 +826,7 @@ impl Evaluator {
             // Get the syntax node from the attribute using rowan's AstNode trait
             use rowan::ast::AstNode;
             let attr_syntax = attr_node.syntax();
-            
+
             let attr_name = if let Some(ident) = rnix::ast::Ident::cast(attr_syntax.clone()) {
                 // Regular identifier
                 ident.to_string()
@@ -845,7 +871,7 @@ impl Evaluator {
         for (idx, attr_name) in attr_names.iter().enumerate() {
             // Force thunks before checking if it's an attribute set
             let forced_value = current_value.force(self)?;
-            
+
             match forced_value {
                 NixValue::AttributeSet(attrs) => {
                     if let Some(value) = attrs.get(attr_name) {
@@ -866,7 +892,7 @@ impl Evaluator {
                 }
             }
         }
-        
+
         // Should never reach here, but return true if we do
         Ok(NixValue::Boolean(true))
     }
@@ -884,8 +910,7 @@ impl Evaluator {
     /// # Returns
     ///
 
-
-        pub(crate) fn evaluate_if_else(
+    pub(crate) fn evaluate_if_else(
         &self,
         if_else: &rnix::ast::IfElse,
         scope: &VariableScope,
@@ -935,15 +960,13 @@ impl Evaluator {
     ///
     /// Path literals evaluate to `NixValue::Path` values. To import a file,
 
-
-        pub(crate) fn evaluate_paren(&self, paren: &Paren, scope: &VariableScope) -> Result<NixValue> {
+    pub(crate) fn evaluate_paren(&self, paren: &Paren, scope: &VariableScope) -> Result<NixValue> {
         // Get the inner expression
         let inner_expr = paren.expr().ok_or_else(|| Error::UnsupportedExpression {
             reason: "parenthesized expression missing inner expression".to_string(),
         })?;
-        
+
         // Evaluate the inner expression
         self.evaluate_expr_with_scope(&inner_expr, scope)
     }
-
 }
