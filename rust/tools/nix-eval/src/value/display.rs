@@ -22,7 +22,7 @@ impl fmt::Display for NixValue {
                     })
                     .collect();
                 write!(f, "\"{}\"", escaped)
-            },
+            }
             NixValue::Integer(i) => write!(f, "{}", i),
             NixValue::Float(fl) => {
                 // Nix displays floats with a maximum of 5 significant digits

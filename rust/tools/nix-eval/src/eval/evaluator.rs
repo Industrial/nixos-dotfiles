@@ -4,7 +4,7 @@ use crate::builtin::Builtin;
 use crate::error::{Error, Result};
 use crate::eval::context::{EvaluationContext, VariableScope};
 use crate::value::NixValue;
-use codespan::{Files, FileId};
+use codespan::{FileId, Files};
 use rnix::SyntaxNode;
 use rnix::ast::{Expr, Root};
 use rnix::parser::parse;
@@ -37,10 +37,8 @@ pub struct Evaluator {
     context_stack: Rc<RefCell<Vec<EvaluationContext>>>,
 }
 
-
-
 impl Evaluator {
-        pub fn new() -> Self {
+    pub fn new() -> Self {
         let mut evaluator = Self {
             builtins: HashMap::new(),
             scope: HashMap::new(),
@@ -60,9 +58,7 @@ impl Evaluator {
         evaluator
     }
 
-
-
-        fn register_basic_builtins(&mut self) {
+    fn register_basic_builtins(&mut self) {
         use crate::builtins::*;
 
         self.register_builtin(Box::new(IsNullBuiltin));
@@ -185,8 +181,7 @@ impl Evaluator {
     /// let mut evaluator = Evaluator::new();
     /// evaluator.register_builtin(Box::new(AddBuiltin));
 
-
-        pub fn register_builtin(&mut self, builtin: Box<dyn Builtin>) {
+    pub fn register_builtin(&mut self, builtin: Box<dyn Builtin>) {
         self.builtins.insert(builtin.name().to_string(), builtin);
     }
 
@@ -211,15 +206,14 @@ impl Evaluator {
     /// scope.insert("y".to_string(), NixValue::String("hello".to_string()));
     /// evaluator.set_scope(scope);
 
-
-        fn parse_nix_path(&mut self) {
+    fn parse_nix_path(&mut self) {
         if let Ok(nix_path) = std::env::var("NIX_PATH") {
             for entry in nix_path.split(':') {
                 // Skip empty entries
                 if entry.is_empty() {
                     continue;
                 }
-                
+
                 // Split on '=' to get name and path
                 if let Some((name, path_str)) = entry.split_once('=') {
                     // Handle flake: protocol references
@@ -231,7 +225,7 @@ impl Evaluator {
                         } else {
                             continue;
                         };
-                        
+
                         // Try to resolve using nix flake metadata or nix-instantiate
                         if let Ok(resolved_path) = Self::resolve_flake_path(flake_ref) {
                             self.search_paths.insert(name.to_string(), resolved_path);
@@ -250,11 +244,9 @@ impl Evaluator {
         }
     }
 
-
-
-        fn resolve_flake_path(flake_ref: &str) -> std::io::Result<PathBuf> {
+    fn resolve_flake_path(flake_ref: &str) -> std::io::Result<PathBuf> {
         use std::process::Command;
-        
+
         // Try using nix flake metadata first (for flakes)
         if let Ok(output) = Command::new("nix")
             .args(&["flake", "metadata", "--json", "--flake", flake_ref])
@@ -271,7 +263,7 @@ impl Evaluator {
                 }
             }
         }
-        
+
         // Fallback: try nix-instantiate for traditional NIX_PATH resolution
         if let Ok(output) = Command::new("nix-instantiate")
             .args(&["--eval", "-E", &format!("<{}>", flake_ref)])
@@ -287,7 +279,7 @@ impl Evaluator {
                 }
             }
         }
-        
+
         Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             format!("could not resolve flake reference: {}", flake_ref),
@@ -299,8 +291,7 @@ impl Evaluator {
     /// NIX_PATH format: "name1=path1:name2=path2:..."
     /// Example: "nixpkgs=/path/to/nixpkgs:other=/path/to/other"
 
-
-        pub(crate) fn current_file_path(&self) -> Option<PathBuf> {
+    pub(crate) fn current_file_path(&self) -> Option<PathBuf> {
         let context_stack = self.context_stack.borrow();
         let file_id_to_path = self.file_id_to_path.borrow();
         context_stack
@@ -309,23 +300,20 @@ impl Evaluator {
             .and_then(|file_id| file_id_to_path.get(&file_id).cloned())
     }
 
-
-
-        pub(crate) fn current_file_id(&self) -> Option<FileId> {
-        self.context_stack.borrow().last().and_then(|ctx| ctx.file_id)
+    pub(crate) fn current_file_id(&self) -> Option<FileId> {
+        self.context_stack
+            .borrow()
+            .last()
+            .and_then(|ctx| ctx.file_id)
     }
 
-
-
-        pub(crate) fn push_context(&self, file_id: Option<FileId>, scope: VariableScope) {
+    pub(crate) fn push_context(&self, file_id: Option<FileId>, scope: VariableScope) {
         self.context_stack
             .borrow_mut()
             .push(EvaluationContext { file_id, scope });
     }
 
-
-
-        pub(crate) fn pop_context(&self) -> Option<EvaluationContext> {
+    pub(crate) fn pop_context(&self) -> Option<EvaluationContext> {
         self.context_stack.borrow_mut().pop()
     }
 
@@ -333,8 +321,7 @@ impl Evaluator {
     ///
     /// Attempts to resolve flake references like "nixpkgs" to actual file system paths
 
-
-        pub fn set_scope(&mut self, scope: VariableScope) {
+    pub fn set_scope(&mut self, scope: VariableScope) {
         self.scope = scope;
     }
 
@@ -343,8 +330,7 @@ impl Evaluator {
     /// # Returns
     ///
 
-
-        pub fn scope(&self) -> &VariableScope {
+    pub fn scope(&self) -> &VariableScope {
         &self.scope
     }
 
@@ -355,8 +341,7 @@ impl Evaluator {
     /// # Returns
     ///
 
-
-        pub fn scope_mut(&mut self) -> &mut VariableScope {
+    pub fn scope_mut(&mut self) -> &mut VariableScope {
         &mut self.scope
     }
 
@@ -379,8 +364,7 @@ impl Evaluator {
     /// let mut evaluator = Evaluator::new();
     /// evaluator.add_search_path("nixpkgs", PathBuf::from("/path/to/nixpkgs"));
 
-
-        pub fn add_search_path(&mut self, name: impl Into<String>, path: PathBuf) {
+    pub fn add_search_path(&mut self, name: impl Into<String>, path: PathBuf) {
         self.search_paths.insert(name.into(), path);
     }
 
@@ -468,14 +452,15 @@ impl Evaluator {
     /// * `Err(Error)` - An error if reading, parsing, or evaluation fails
     pub fn evaluate_from_file(&self, file_path: &PathBuf) -> Result<NixValue> {
         // Read the file
-        let code = std::fs::read_to_string(file_path).map_err(|e| {
-            Error::UnsupportedExpression {
+        let code =
+            std::fs::read_to_string(file_path).map_err(|e| Error::UnsupportedExpression {
                 reason: format!("cannot read file '{}': {}", file_path.display(), e),
-            }
-        })?;
+            })?;
 
         // Get canonical path
-        let canonical_path = file_path.canonicalize().unwrap_or_else(|_| file_path.clone());
+        let canonical_path = file_path
+            .canonicalize()
+            .unwrap_or_else(|_| file_path.clone());
 
         // Add file to source map and get file ID
         let file_id = {
@@ -534,7 +519,6 @@ impl Evaluator {
     /// # Returns
     ///
 
-
     pub(crate) fn evaluate_expr(&self, expr: &Expr) -> Result<NixValue> {
         self.evaluate_expr_with_scope_impl(expr, &self.scope)
     }
@@ -571,12 +555,12 @@ impl Evaluator {
                 // IMPORTANT: Check scope first! Variables in scope (including shadowed builtins)
                 // take precedence over builtin values.
                 let text = ident.to_string();
-                
+
                 // Check if it's a variable in scope first (scope takes precedence)
                 if let Some(value) = scope.get(&text) {
                     return Ok(value.clone());
                 }
-                
+
                 // If not in scope, check for builtin values
                 match text.as_str() {
                     "true" => Ok(NixValue::Boolean(true)),
@@ -589,11 +573,17 @@ impl Evaluator {
                         let mut builtins_attrs = HashMap::new();
                         for (name, _builtin) in &self.builtins {
                             // Store a marker that we can detect in evaluate_select
-                            builtins_attrs.insert(name.clone(), NixValue::String(format!("__builtin:{}", name)));
+                            builtins_attrs.insert(
+                                name.clone(),
+                                NixValue::String(format!("__builtin:{}", name)),
+                            );
                         }
                         // Add builtins.builtins pointing to itself (recursive reference)
                         // We'll use a special marker that evaluate_select will recognize
-                        builtins_attrs.insert("builtins".to_string(), NixValue::String("__builtins_self__".to_string()));
+                        builtins_attrs.insert(
+                            "builtins".to_string(),
+                            NixValue::String("__builtins_self__".to_string()),
+                        );
                         Ok(NixValue::AttributeSet(builtins_attrs))
                     }
                     _ => {
@@ -602,9 +592,15 @@ impl Evaluator {
                         // a marker string so evaluate_apply can handle them specially
                         if self.builtins.contains_key(&text) {
                             // Builtins that need evaluator context return a marker
-                            if text == "map" || text == "all" || text == "any" || 
-                               text == "filter" || text == "concatMap" || text == "catAttrs" ||
-                               text == "attrValues" || text == "tryEval" {
+                            if text == "map"
+                                || text == "all"
+                                || text == "any"
+                                || text == "filter"
+                                || text == "concatMap"
+                                || text == "catAttrs"
+                                || text == "attrValues"
+                                || text == "tryEval"
+                            {
                                 // Return a marker so evaluate_apply can handle it
                                 return Ok(NixValue::String(format!("__direct_builtin:{}", text)));
                             }
@@ -680,7 +676,11 @@ impl crate::value::NixValue {
     /// # Returns
     ///
     /// The evaluated value if found, or None if the key doesn't exist
-    pub fn get_attr(self, key: &str, evaluator: &crate::eval::Evaluator) -> Result<Option<NixValue>> {
+    pub fn get_attr(
+        self,
+        key: &str,
+        evaluator: &crate::eval::Evaluator,
+    ) -> Result<Option<NixValue>> {
         match self {
             NixValue::AttributeSet(mut attrs) => {
                 if let Some(value) = attrs.remove(key) {
@@ -714,7 +714,7 @@ impl crate::value::NixValue {
         while let NixValue::Thunk(thunk) = &value {
             value = thunk.force(evaluator)?;
         }
-        
+
         // Now recursively force nested structures
         match value {
             NixValue::List(list) => {

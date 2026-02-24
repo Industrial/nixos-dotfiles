@@ -3,16 +3,16 @@
 use crate::error::{Error, Result};
 use crate::eval::Evaluator;
 use crate::value::NixValue;
-use std::path::{Path, PathBuf};
+use codespan::FileId;
 use rnix::SyntaxNode;
 use rnix::ast::Root;
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
 use rowan::ast::AstNode;
-use codespan::FileId;
+use std::path::{Path, PathBuf};
 
 impl Evaluator {
-        pub(crate) fn import_file(&self, file_path: &Path) -> Result<NixValue> {
+    pub(crate) fn import_file(&self, file_path: &Path) -> Result<NixValue> {
         // Resolve the path to import
         // First, try to resolve relative paths based on current_file context
         let resolved_path = if file_path.is_absolute() {
@@ -63,11 +63,12 @@ impl Evaluator {
                     Err(_) => {
                         // Neither the path nor path/default.nix exists
                         // Provide better error message with context
-                        let current_file_info = if let Some(current_file_path) = self.current_file_path() {
-                            format!(" (current file: {})", current_file_path.display())
-                        } else {
-                            " (no current file context)".to_string()
-                        };
+                        let current_file_info =
+                            if let Some(current_file_path) = self.current_file_path() {
+                                format!(" (current file: {})", current_file_path.display())
+                            } else {
+                                " (no current file context)".to_string()
+                            };
                         return Err(Error::UnsupportedExpression {
                             reason: format!(
                                 "cannot resolve import path '{}': {} (resolved to: {}){}",

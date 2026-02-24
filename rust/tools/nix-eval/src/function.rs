@@ -89,7 +89,7 @@ impl Function {
             file_id,
         }
     }
-    
+
     /// Create a curried builtin function (internal constructor)
     pub(crate) fn new_curried_builtin_internal(
         parameter: String,
@@ -142,10 +142,13 @@ impl Function {
         // We'll use a special parameter name to indicate this is a curried builtin
         let parameter = format!("__curried_{}_arg2", builtin_name);
         let body_text = format!("__curried_builtin_call:{}", builtin_name);
-        
+
         // Store the builtin and first arg in the closure
         let mut closure = VariableScope::new();
-        closure.insert(format!("__builtin_{}", builtin_name), NixValue::String(format!("__builtin_func:{}", builtin_name)));
+        closure.insert(
+            format!("__builtin_{}", builtin_name),
+            NixValue::String(format!("__builtin_func:{}", builtin_name)),
+        );
         closure.insert("__curried_first_arg".to_string(), first_arg);
 
         Self {
@@ -155,7 +158,7 @@ impl Function {
             file_id,
         }
     }
-    
+
     /// Create a curried builtin function with multiple arguments already applied
     ///
     /// This creates a function that captures multiple arguments and waits for more.
@@ -167,13 +170,19 @@ impl Function {
     ) -> Self {
         let parameter = format!("__curried_{}_arg{}", builtin_name, args.len() + 1);
         let _body_text = format!("__curried_builtin_call:{}", builtin_name);
-        
+
         let mut closure = VariableScope::new();
-        closure.insert(format!("__builtin_{}", builtin_name), NixValue::String(format!("__builtin_func:{}", builtin_name)));
+        closure.insert(
+            format!("__builtin_{}", builtin_name),
+            NixValue::String(format!("__builtin_func:{}", builtin_name)),
+        );
         for (i, arg) in args.iter().enumerate() {
             closure.insert(format!("__curried_arg{}", i + 1), arg.clone());
         }
-        closure.insert("__curried_arg_count".to_string(), NixValue::Integer(args.len() as i64));
+        closure.insert(
+            "__curried_arg_count".to_string(),
+            NixValue::Integer(args.len() as i64),
+        );
 
         // Create a dummy Expr for the body (we won't actually use it for curried builtins)
         // We'll use an empty expression since the body_text is just a marker
@@ -184,7 +193,7 @@ impl Function {
         let syntax_node = SyntaxNode::new_root(green_node);
         let root = Root::cast(syntax_node).unwrap();
         let dummy_expr = root.expr().unwrap();
-        
+
         Self::new(parameter, &dummy_expr, closure, file_id)
     }
 
@@ -202,16 +211,12 @@ impl Function {
     /// # Returns
     ///
     /// A new function that, when called with a list, will call foldl' with (op, nul, list)
-    pub fn new_curried_foldl(
-        op: NixValue,
-        nul: NixValue,
-        file_id: Option<FileId>,
-    ) -> Self {
+    pub fn new_curried_foldl(op: NixValue, nul: NixValue, file_id: Option<FileId>) -> Self {
         // Create a function that captures op and nul
         // When applied with a list, it will call foldl' with (op, nul, list)
         let parameter = "__foldl_list_arg".to_string();
         let body_text = "__curried_foldl_call".to_string();
-        
+
         // Store op and nul in the closure
         let mut closure = VariableScope::new();
         closure.insert("__foldl_op".to_string(), op);
@@ -277,11 +282,14 @@ impl Function {
                     NixValue::List(l) => l,
                     _ => {
                         return Err(Error::UnsupportedExpression {
-                            reason: format!("foldl': third argument must be a list, got {}", list_value),
+                            reason: format!(
+                                "foldl': third argument must be a list, got {}",
+                                list_value
+                            ),
                         });
                     }
                 };
-                
+
                 // Get the operator function or builtin name
                 let op_value = op.clone().force(evaluator)?;
                 let (op_func_opt, builtin_name_opt) = match op_value {
@@ -292,17 +300,23 @@ impl Function {
                             (None, Some(builtin_name.to_string()))
                         } else {
                             return Err(Error::UnsupportedExpression {
-                                reason: format!("foldl': unknown builtin function: {}", builtin_name),
+                                reason: format!(
+                                    "foldl': unknown builtin function: {}",
+                                    builtin_name
+                                ),
                             });
                         }
                     }
                     _ => {
                         return Err(Error::UnsupportedExpression {
-                            reason: format!("foldl': first argument must be a function, got {}", op_value),
+                            reason: format!(
+                                "foldl': first argument must be a function, got {}",
+                                op_value
+                            ),
                         });
                     }
                 };
-                
+
                 // Fold left: start with nul, apply op to accumulator and each element
                 let mut accumulator = nul.clone();
                 for element in list {
@@ -323,24 +337,29 @@ impl Function {
                         let element_forced = element.clone().force(evaluator)?;
                         let partial = op_func.apply(evaluator, accumulator_forced)?;
                         accumulator = match partial {
-                            NixValue::Function(next_func) => next_func.apply(evaluator, element_forced)?,
+                            NixValue::Function(next_func) => {
+                                next_func.apply(evaluator, element_forced)?
+                            }
                             _ => {
                                 return Err(Error::UnsupportedExpression {
-                                    reason: format!("foldl': operator function must be curried (take 2 args), got {}", partial),
+                                    reason: format!(
+                                        "foldl': operator function must be curried (take 2 args), got {}",
+                                        partial
+                                    ),
                                 });
                             }
                         };
                     }
                 }
-                
+
                 return Ok(accumulator);
             }
         }
-        
+
         // Check if this is a curried builtin function
         if self.body_text.starts_with("__curried_builtin_call:") {
             let builtin_name = &self.body_text[23..]; // Skip "__curried_builtin_call:"
-            
+
             // Get the builtin and collected arguments from closure
             if let Some(builtin_marker) = self.closure.get(&format!("__builtin_{}", builtin_name)) {
                 if let NixValue::String(ref marker) = builtin_marker {
@@ -348,7 +367,7 @@ impl Function {
                         if let Some(builtin) = evaluator.get_builtin(builtin_name) {
                             // Collect all arguments from closure
                             let mut args = Vec::new();
-                            
+
                             // Check if we have __curried_first_arg (old style) or __curried_arg1, __curried_arg2, etc. (new style)
                             if let Some(first_arg) = self.closure.get("__curried_first_arg") {
                                 // Old style: single argument - force thunks before collecting
@@ -358,15 +377,19 @@ impl Function {
                                 args.push(arg_forced);
                             } else {
                                 // New style: multiple arguments - force thunks before collecting
-                                let arg_count = self.closure.get("__curried_arg_count")
+                                let arg_count = self
+                                    .closure
+                                    .get("__curried_arg_count")
                                     .and_then(|v| match v {
                                         NixValue::Integer(n) => Some(*n as usize),
                                         _ => None,
                                     })
                                     .unwrap_or(0);
-                                
+
                                 for i in 1..=arg_count {
-                                    if let Some(arg) = self.closure.get(&format!("__curried_arg{}", i)) {
+                                    if let Some(arg) =
+                                        self.closure.get(&format!("__curried_arg{}", i))
+                                    {
                                         let arg_forced = arg.clone().force(evaluator)?;
                                         args.push(arg_forced);
                                     }
@@ -374,20 +397,32 @@ impl Function {
                                 let arg_forced = argument.clone().force(evaluator)?;
                                 args.push(arg_forced);
                             }
-                            
+
                             // Try calling the builtin with all collected arguments
                             match builtin.call(&args) {
                                 Ok(result) => return Ok(result),
-                                Err(Error::UnsupportedExpression { reason }) if reason.contains("takes") && reason.contains("arguments") => {
+                                Err(Error::UnsupportedExpression { reason })
+                                    if reason.contains("takes") && reason.contains("arguments") =>
+                                {
                                     // Still needs more arguments - create another curried function
                                     let file_id = evaluator.current_file_id();
                                     let mut closure = VariableScope::new();
-                                    closure.insert(format!("__builtin_{}", builtin_name), NixValue::String(format!("__builtin_func:{}", builtin_name)));
+                                    closure.insert(
+                                        format!("__builtin_{}", builtin_name),
+                                        NixValue::String(format!(
+                                            "__builtin_func:{}",
+                                            builtin_name
+                                        )),
+                                    );
                                     for (i, arg) in args.iter().enumerate() {
-                                        closure.insert(format!("__curried_arg{}", i + 1), arg.clone());
+                                        closure
+                                            .insert(format!("__curried_arg{}", i + 1), arg.clone());
                                     }
-                                    closure.insert("__curried_arg_count".to_string(), NixValue::Integer(args.len() as i64));
-                                    
+                                    closure.insert(
+                                        "__curried_arg_count".to_string(),
+                                        NixValue::Integer(args.len() as i64),
+                                    );
+
                                     let next_curried = Function::new_curried_builtin_internal(
                                         format!("__curried_{}_arg{}", builtin_name, args.len() + 1),
                                         format!("__curried_builtin_call:{}", builtin_name),
@@ -408,7 +443,7 @@ impl Function {
                 // Force both arguments before calling the builtin
                 let first_arg_forced = first_arg.clone().force(evaluator)?;
                 let argument_forced = argument.clone().force(evaluator)?;
-                
+
                 // Get the builtin from the evaluator
                 if let Some(builtin) = evaluator.get_builtin(builtin_name) {
                     // get_builtin returns &dyn Builtin, but call takes &[NixValue]

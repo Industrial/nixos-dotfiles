@@ -1,7 +1,7 @@
 //! NixValue enum and basic operations
 
-use crate::thunk;
 use crate::function;
+use crate::thunk;
 use crate::value::Derivation;
 use serde::Serialize;
 use std::collections::HashMap;
