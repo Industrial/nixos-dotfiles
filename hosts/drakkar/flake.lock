@@ -431,6 +431,18 @@
         "type": "github"
       }
     },
+    "oomkiller-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/oomkiller",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/oomkiller",
+        "type": "path"
+      },
+      "parent": []
+    },
     "root": {
       "inputs": {
         "cl-src": "cl-src",
@@ -443,6 +455,7 @@
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs",
         "nixvim": "nixvim",
+        "oomkiller-src": "oomkiller-src",
         "stylix": "stylix"
       }
     },

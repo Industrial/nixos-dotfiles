@@ -59,7 +59,6 @@
       xfce.xfce4-power-manager
       xfce.xfce4-pulseaudio-plugin
       xfce.xfce4-screensaver
-      xfce4-screenshooter
       xfce.xfce4-session
       xfce.xfce4-settings
       xfce.xfce4-taskmanager

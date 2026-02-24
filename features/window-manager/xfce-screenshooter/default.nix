@@ -4,6 +4,6 @@
   ...
 }: {
   environment.systemPackages = with pkgs; [
-    xfce4-screenshooter
+    xfce.xfce4-screenshooter
   ];
 }
