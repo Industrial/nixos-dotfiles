@@ -41,7 +41,7 @@
     treefmt
     commitizen
     nodejs
-    npm
+    # npm is included with nodejs
     slumber
     lazysql
 
