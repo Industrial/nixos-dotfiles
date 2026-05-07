@@ -41,7 +41,7 @@
     treefmt
     commitizen
     nodejs
-    nodePackages.npm
+    npm
     slumber
     lazysql
 
