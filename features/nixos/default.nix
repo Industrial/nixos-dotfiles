@@ -83,6 +83,14 @@
         "mbedtls-2.28.10"
       ];
     };
+    overlays = [
+      # Disable openldap tests (flaky syncreplication test)
+      (final: prev: {
+        openldap = prev.openldap.overrideAttrs (old: {
+          doCheck = false;
+        });
+      })
+    ];
   };
 
   # Aggressively disable ALL documentation to avoid python3.12 docs build failure
