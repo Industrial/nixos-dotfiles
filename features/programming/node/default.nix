@@ -4,6 +4,6 @@
   environment.systemPackages = with pkgs; [
     nodejs_20
     # npm is included with nodejs
-    pnpm  # Available at top level in newer nixpkgs
+    pnpm # Available at top level in newer nixpkgs
   ];
 }
