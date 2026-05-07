@@ -99,6 +99,5 @@ priority = 6
 
 [formatter.rust]
 command = "rustfmt"
-options = ["--edition", "2024"]
 includes = ["*.rs"]
 priority = 7
