@@ -1,8 +1,8 @@
 //! Operator expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::value::NixValue;
 use rnix::ast::{BinOp, BinOpKind, UnaryOp, UnaryOpKind};
 use rowan::ast::AstNode;

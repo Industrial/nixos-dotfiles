@@ -1,8 +1,8 @@
 //! Literal expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::value::NixValue;
 use rnix::ast::{InterpolPart, Literal, Str};
 use rowan::ast::AstNode;

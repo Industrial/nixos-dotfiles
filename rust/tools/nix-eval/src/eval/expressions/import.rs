@@ -4,10 +4,10 @@ use crate::error::{Error, Result};
 use crate::eval::Evaluator;
 use crate::value::NixValue;
 use codespan::FileId;
-use rnix::SyntaxNode;
 use rnix::ast::Root;
 use rnix::parser::parse;
 use rnix::tokenizer::tokenize;
+use rnix::SyntaxNode;
 use rowan::ast::AstNode;
 use std::path::{Path, PathBuf};
 
