@@ -77,7 +77,7 @@
     hostPlatform = settings.hostPlatform;
     config = {
       allowUnfree = true;
-      allowBroken = true;  # Temporarily allow broken to skip python docs
+      allowBroken = true; # Temporarily allow broken to skip python docs
       # Allow insecure packages (required for some gaming applications)
       permittedInsecurePackages = [
         "mbedtls-2.28.10"
