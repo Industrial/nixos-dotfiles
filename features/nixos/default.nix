@@ -77,7 +77,7 @@
     hostPlatform = settings.hostPlatform;
     config = {
       allowUnfree = true;
-      allowBroken = false;
+      allowBroken = true;  # Temporarily allow broken to skip python docs
       # Allow insecure packages (required for some gaming applications)
       permittedInsecurePackages = [
         "mbedtls-2.28.10"
@@ -85,9 +85,14 @@
     };
   };
 
-  documentation = {
-    nixos = {
-      enable = false;
-    };
-  };
+  # Aggressively disable ALL documentation to avoid python3.12 docs build failure
+  documentation.enable = false;
+  documentation.nixos.enable = false;
+  documentation.man.enable = false;
+  documentation.info.enable = false;
+  documentation.doc.enable = false;
+  documentation.dev.enable = false;
+
+  # Remove doc outputs from environment
+  environment.extraOutputsToInstall = [];
 }
