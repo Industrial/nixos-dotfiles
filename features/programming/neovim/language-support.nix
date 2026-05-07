@@ -500,31 +500,31 @@
     nixd
 
     # Bash Language Server
-    nodePackages.bash-language-server
+    bash-language-server
 
     # Docker Language Server
-    nodePackages.dockerfile-language-server-nodejs
+    dockerfile-language-server-nodejs
 
     # TypeScript / JavaScript formatter
-    nodePackages.eslint
+    eslint_d
 
     # Rust based formatter
     dprint
 
     # GraphQL Language Server
-    nodePackages.graphql-language-service-cli
+    graphql-language-service-cli
 
     # TypeScript
-    nodePackages.typescript
+    typescript
 
     # TypeScript Language Server
-    nodePackages.typescript-language-server
+    typescript-language-server
 
     # Vim Language Server
-    nodePackages.vim-language-server
+    vim-language-server
 
     # VSCode standard language servers
-    nodePackages.vscode-langservers-extracted
+    vscode-langservers-extracted
 
     # Python tooling
     python311Packages.autopep8
