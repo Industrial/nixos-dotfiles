@@ -1,8 +1,8 @@
 //! List expression evaluation
 
 use crate::error::Result;
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::thunk;
 use crate::value::NixValue;
 use rnix::ast::List;

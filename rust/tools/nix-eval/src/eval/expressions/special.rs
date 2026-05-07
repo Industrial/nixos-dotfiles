@@ -1,8 +1,8 @@
 //! Special form expression evaluation
 
 use crate::error::{Error, Result};
-use crate::eval::Evaluator;
 use crate::eval::context::VariableScope;
+use crate::eval::Evaluator;
 use crate::thunk;
 use crate::value::NixValue;
 use rnix::ast::{
@@ -731,7 +731,7 @@ impl Evaluator {
                             if let NixValue::String(ref s) = value {
                                 if s.starts_with("__builtin:") {
                                     let builtin_name = &s[10..]; // Skip "__builtin:"
-                                    // Verify the builtin exists
+                                                                 // Verify the builtin exists
                                     if self.builtins.contains_key(builtin_name) {
                                         // Return a marker that evaluate_apply will recognize
                                         return Ok(NixValue::String(format!(
