@@ -484,8 +484,7 @@
     # Lua formatter
     stylua
 
-    # nodePackages.cssmodules-language-server
-    # nodePackages.dot-language-server
+    # cssmodules-language-server, dot-language-server moved to top-level (no longer in nodePackages)
 
     # Fix common misspellings in source code.
     codespell
