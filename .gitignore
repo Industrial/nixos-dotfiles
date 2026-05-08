@@ -4,6 +4,7 @@
 *.sln
 *.suo
 *.sw?
+*/target/
 .DS_Store
 .aider*
 .beads/
