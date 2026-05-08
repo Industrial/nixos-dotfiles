@@ -74,7 +74,7 @@ fn triplet_other(bits: u32, sticky: bool) -> String {
 }
 
 #[cfg(unix)]
-fn file_type_char(meta: &Metadata, ft: &std::fs::FileType) -> char {
+fn file_type_char(_meta: &Metadata, ft: &std::fs::FileType) -> char {
     if ft.is_fifo() {
         'p'
     } else if ft.is_char_device() {
@@ -98,12 +98,21 @@ pub fn mode_string(_meta: &Metadata) -> String {
 }
 
 /// Human-readable size column: device major,minor or byte length (symlink: link text length).
+/// Glibc `gnu_dev_major` / `gnu_dev_minor` for 64-bit `dev_t` (see `bits/sysmacros.h`).
+#[cfg(all(unix, target_os = "linux"))]
+fn gnu_dev_major_minor(dev: u64) -> (u32, u32) {
+    let major = ((dev & 0x0000_0000_000f_ff00u64) >> 8) as u32
+        | ((dev & 0xffff_f000_0000_0000u64) >> 32) as u32;
+    let minor = ((dev & 0x0000_0000_0000_00ffu64) >> 0) as u32
+        | ((dev & 0x0000_0fff_ff0_0000u64) >> 12) as u32;
+    (major, minor)
+}
+
 #[cfg(all(unix, target_os = "linux"))]
 pub fn size_or_device(meta: &Metadata) -> String {
     let ft = meta.file_type();
     if ft.is_block_device() || ft.is_char_device() {
-        let dev = meta.rdev() as libc::dev_t;
-        let (major, minor) = unsafe { (libc::gnu_dev_major(dev), libc::gnu_dev_minor(dev)) };
+        let (major, minor) = gnu_dev_major_minor(meta.rdev());
         format!("{major}, {minor}")
     } else {
         format!("{}", meta.len())
