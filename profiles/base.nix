@@ -60,6 +60,7 @@
     ../features/cli/starship
     ../features/cli/unrar
     ../features/cli/unzip
+    ../features/cli/wc
     ../features/cli/zellij
 
     # Core NixOS Configuration
