@@ -68,6 +68,18 @@
         "type": "github"
       }
     },
+    "cat-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/cat",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/cat",
+        "type": "path"
+      },
+      "parent": []
+    },
     "cl-src": {
       "flake": false,
       "locked": {
@@ -286,6 +298,18 @@
         "type": "gitlab"
       }
     },
+    "head-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/head",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/head",
+        "type": "path"
+      },
+      "parent": []
+    },
     "kubenix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -308,6 +332,18 @@
         "repo": "kubenix",
         "type": "github"
       }
+    },
+    "ls-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/ls",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/ls",
+        "type": "path"
+      },
+      "parent": []
     },
     "microvm": {
       "inputs": {
@@ -443,20 +479,36 @@
     },
     "root": {
       "inputs": {
+        "cat-src": "cat-src",
         "cl-src": "cl-src",
         "comin": "comin",
         "cursor": "cursor",
         "disko": "disko",
+        "head-src": "head-src",
         "kubenix": "kubenix",
+        "ls-src": "ls-src",
         "microvm": "microvm",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
+        "sort-src": "sort-src",
         "stylix": "stylix",
         "wc-src": "wc-src"
       }
+    },
+    "sort-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/sort",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/sort",
+        "type": "path"
+      },
+      "parent": []
     },
     "spectrum": {
       "flake": false,
