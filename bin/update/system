@@ -6,8 +6,22 @@ set -e
 echo "> update > system > cd hosts/$(hostname)"
 cd "hosts/$(hostname)"
 
-echo "> update > system > sudo nixos-rebuild switch --flake \".#$(hostname)\" --show-trace"
-sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
+# Live `switch` is blocked when critical stack changes (e.g. dbus -> dbus-broker);
+# `boot` registers the new generation and refreshes the bootloader without activating.
+# If the default profile already matches what we booted, `switch` is safe and immediate.
+booted="$(readlink -f /run/booted-system)"
+profile="$(readlink -f /nix/var/nix/profiles/system)"
+if [ "$booted" = "$profile" ]; then
+  echo "> update > system > profile matches booted system; sudo nixos-rebuild switch --flake \".#$(hostname)\""
+  sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
+else
+  echo "> update > system > booted != default profile (reboot pending or prior failed switch)"
+  echo "> update > system >   booted:  $booted"
+  echo "> update > system >   profile: $profile"
+  echo "> update > system > sudo nixos-rebuild boot --flake \".#$(hostname)\""
+  sudo nixos-rebuild boot --flake ".#$(hostname)" --show-trace --option eval-cache false
+  echo "> update > system > Reboot to activate this generation; systemd-boot default should point at it."
+fi
 
 cd ../..
 bin/update/login-shell "tom"
