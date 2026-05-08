@@ -1,0 +1,14 @@
+#!@shell@
+set -euo pipefail
+export _JAVA_AWT_WM_NONREPARENTING="${_JAVA_AWT_WM_NONREPARENTING:-1}"
+steamrun="@steamrun@"
+gwroot="@gwroot@"
+LOG="${IBGW_LOG:-$HOME/.cache/ib-gateway-launch.log}"
+mkdir -p "$(dirname "$LOG")"
+if [ -t 1 ]; then
+  exec > >(tee -a "$LOG") 2>&1
+else
+  exec >>"$LOG" 2>&1
+fi
+echo "=== ib-gateway $(date -Is) pid=$$ DISPLAY=${DISPLAY:-} WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} ==="
+exec "$steamrun" "$gwroot/ibgateway" "$@"
