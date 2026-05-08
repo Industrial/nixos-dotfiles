@@ -1,9 +1,9 @@
-//! `wc` binary — thin CLI over [`wc::wc_effect`] and [`id_effect::run_blocking`].
+//! `sort` binary.
 
 use std::process;
 
 use id_effect::run_blocking;
-use wc::{ParsedCli, VERSION, parse_args, wc_effect};
+use sort::{ParsedCli, VERSION, parse_args, sort_effect};
 
 fn main() {
     let parsed = match parse_args() {
@@ -16,18 +16,18 @@ fn main() {
 
     match parsed {
         ParsedCli::Help => {
-            print!("{}", wc::usage());
+            print!("{}", sort::usage());
             process::exit(0);
         }
         ParsedCli::Version => {
-            println!("wc (dotfiles-wc) {VERSION}");
+            println!("sort (dotfiles-sort) {VERSION}");
             process::exit(0);
         }
         ParsedCli::Run { settings, inputs } => {
-            let code = match run_blocking(wc_effect(settings, inputs), ()) {
+            let code = match run_blocking(sort_effect(settings, inputs), ()) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("wc: {e}");
+                    eprintln!("sort: {e}");
                     1
                 }
             };

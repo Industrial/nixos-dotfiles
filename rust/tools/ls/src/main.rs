@@ -1,9 +1,9 @@
-//! `wc` binary — thin CLI over [`wc::wc_effect`] and [`id_effect::run_blocking`].
+//! `ls` binary.
 
 use std::process;
 
 use id_effect::run_blocking;
-use wc::{ParsedCli, VERSION, parse_args, wc_effect};
+use ls::{ParsedCli, VERSION, ls_effect, parse_args};
 
 fn main() {
     let parsed = match parse_args() {
@@ -16,18 +16,18 @@ fn main() {
 
     match parsed {
         ParsedCli::Help => {
-            print!("{}", wc::usage());
+            print!("{}", ls::usage());
             process::exit(0);
         }
         ParsedCli::Version => {
-            println!("wc (dotfiles-wc) {VERSION}");
+            println!("ls (dotfiles-ls) {VERSION}");
             process::exit(0);
         }
-        ParsedCli::Run { settings, inputs } => {
-            let code = match run_blocking(wc_effect(settings, inputs), ()) {
+        ParsedCli::Run { settings, paths } => {
+            let code = match run_blocking(ls_effect(settings, paths), ()) {
                 Ok(c) => c,
                 Err(e) => {
-                    eprintln!("wc: {e}");
+                    eprintln!("ls: {e}");
                     1
                 }
             };

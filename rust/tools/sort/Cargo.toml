@@ -1,19 +1,18 @@
 [package]
-name = "wc"
+name = "sort"
 version = "0.1.0"
 edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
-description = "Word, line, character, and byte count (compatible with GNU wc)"
+description = "Sort lines (POSIX/GNU subset) using id_effect"
 license = "MIT"
 
 [dependencies]
 id_effect = "0.2"
-unicode-width = "0.2"
 
 [lib]
-name = "wc"
+name = "sort"
 path = "src/lib.rs"
 
 [[bin]]
-name = "wc"
+name = "sort"
 path = "src/main.rs"

@@ -1,19 +1,18 @@
 [package]
-name = "wc"
+name = "ls"
 version = "0.1.0"
 edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
-description = "Word, line, character, and byte count (compatible with GNU wc)"
+description = "List directory contents (POSIX-oriented subset) using id_effect"
 license = "MIT"
 
 [dependencies]
 id_effect = "0.2"
-unicode-width = "0.2"
 
 [lib]
-name = "wc"
+name = "ls"
 path = "src/lib.rs"
 
 [[bin]]
-name = "wc"
+name = "ls"
 path = "src/main.rs"

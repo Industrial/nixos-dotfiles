@@ -60,6 +60,10 @@
     ../features/cli/starship
     ../features/cli/unrar
     ../features/cli/unzip
+    ../features/cli/cat
+    ../features/cli/head
+    ../features/cli/ls
+    ../features/cli/sort
     ../features/cli/wc
     ../features/cli/zellij
 

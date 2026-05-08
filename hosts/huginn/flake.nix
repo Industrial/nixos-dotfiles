@@ -107,6 +107,26 @@
       url = "path:../../rust/tools/wc";
       flake = false;
     };
+
+    cat-src = {
+      url = "path:../../rust/tools/cat";
+      flake = false;
+    };
+
+    sort-src = {
+      url = "path:../../rust/tools/sort";
+      flake = false;
+    };
+
+    ls-src = {
+      url = "path:../../rust/tools/ls";
+      flake = false;
+    };
+
+    head-src = {
+      url = "path:../../rust/tools/head";
+      flake = false;
+    };
   };
 
   outputs = inputs @ {...}: let
