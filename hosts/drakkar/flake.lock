@@ -454,7 +454,8 @@
         "nixpkgs": "nixpkgs",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
-        "stylix": "stylix"
+        "stylix": "stylix",
+        "wc-src": "wc-src"
       }
     },
     "spectrum": {
@@ -667,6 +668,18 @@
         "repo": "treefmt-nix",
         "type": "github"
       }
+    },
+    "wc-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/wc",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/wc",
+        "type": "path"
+      },
+      "parent": []
     }
   },
   "root": "root",

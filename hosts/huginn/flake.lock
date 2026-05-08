@@ -429,6 +429,18 @@
         "type": "github"
       }
     },
+    "oomkiller-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/oomkiller",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/oomkiller",
+        "type": "path"
+      },
+      "parent": []
+    },
     "root": {
       "inputs": {
         "cl-src": "cl-src",
@@ -441,7 +453,9 @@
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs",
         "nixvim": "nixvim",
-        "stylix": "stylix"
+        "oomkiller-src": "oomkiller-src",
+        "stylix": "stylix",
+        "wc-src": "wc-src"
       }
     },
     "spectrum": {
@@ -654,6 +668,18 @@
         "repo": "treefmt-nix",
         "type": "github"
       }
+    },
+    "wc-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/wc",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/wc",
+        "type": "path"
+      },
+      "parent": []
     }
   },
   "root": "root",

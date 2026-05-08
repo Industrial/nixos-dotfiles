@@ -101,6 +101,12 @@
       url = "path:../../rust/tools/oomkiller"; # Path relative to this flake.nix
       flake = false; # Treat as a source tree, not a flake
     };
+
+    # wc tool source (Rust, GNU-compatible)
+    wc-src = {
+      url = "path:../../rust/tools/wc";
+      flake = false;
+    };
   };
 
   outputs = inputs @ {...}: let
