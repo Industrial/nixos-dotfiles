@@ -16,7 +16,8 @@
 # CDN uses /latest/ (no per-version URL). When the vendor updates the image,
 # fixed-output hashes below will fail to match: run the prefetch command in the
 # error, update `version` (match https://github.com/Mintplex-Labs/anything-llm/releases),
-# and paste the new hashes.
+# and paste the new hashes. aarch64 still uses lib.fakeHash until prefetched on
+# that platform.
 #
 # Known NixOS caveats (upstream / Prisma): see Mintplex-Labs/anything-llm#4533.
 # `gzip` is included in the FHS env so bundled tooling can run `gunzip`.
@@ -41,7 +42,10 @@
   appimage = pkgs.fetchurl {
     url = appimageUrl;
     name = "AnythingLLMDesktop.AppImage";
-    hash = lib.fakeHash;
+    hash =
+      if system == "aarch64-linux"
+      then lib.fakeHash
+      else "sha256-AUQlGyLOKvU15MCjlZj8cP0IjX6CdJDCMYf5fSZH+bk=";
   };
 
   anythingllm-desktop = pkgs.appimageTools.wrapType2 {
