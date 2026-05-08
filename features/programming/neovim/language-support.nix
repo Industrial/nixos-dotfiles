@@ -505,7 +505,7 @@
     dockerfile-language-server-nodejs
 
     # TypeScript / JavaScript formatter
-    eslint_d
+    eslint
 
     # Rust based formatter
     dprint

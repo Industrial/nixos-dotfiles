@@ -125,5 +125,10 @@
     "command": "-deleteLeft",
     "key": "ctrl+backspace",
     "when": "textInputFocus"
+  },
+  {
+    "key": "ctrl+alt+s",
+    "command": "workbench.action.toggleUnifiedSidebarFromKeyboard",
+    "when": "!isAuxiliaryWindowFocusedContext"
   }
 ]
