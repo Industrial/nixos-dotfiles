@@ -68,6 +68,18 @@
         "type": "github"
       }
     },
+    "cat-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/cat",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/cat",
+        "type": "path"
+      },
+      "parent": []
+    },
     "cl-src": {
       "flake": false,
       "locked": {
@@ -98,28 +110,6 @@
       "original": {
         "owner": "nlewo",
         "repo": "comin",
-        "type": "github"
-      }
-    },
-    "cursor": {
-      "inputs": {
-        "flake-utils": "flake-utils",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1769780362,
-        "narHash": "sha256-LWQ/iJxIE8OeNiMTJLOKWBMZPbAbMeKeGAH4Yf6UM5w=",
-        "owner": "omarcresp",
-        "repo": "cursor-flake",
-        "rev": "ac538dde6f4af05ed29db42c1ef007e25fa99f61",
-        "type": "github"
-      },
-      "original": {
-        "owner": "omarcresp",
-        "ref": "main",
-        "repo": "cursor-flake",
         "type": "github"
       }
     },
@@ -233,24 +223,6 @@
         "type": "github"
       }
     },
-    "flake-utils": {
-      "inputs": {
-        "systems": "systems"
-      },
-      "locked": {
-        "lastModified": 1731533236,
-        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
-        "type": "github"
-      }
-    },
     "fromYaml": {
       "flake": false,
       "locked": {
@@ -286,13 +258,25 @@
         "type": "gitlab"
       }
     },
+    "head-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/head",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/head",
+        "type": "path"
+      },
+      "parent": []
+    },
     "kubenix": {
       "inputs": {
         "flake-compat": "flake-compat_2",
         "nixpkgs": [
           "nixpkgs"
         ],
-        "systems": "systems_2",
+        "systems": "systems",
         "treefmt": "treefmt"
       },
       "locked": {
@@ -308,6 +292,18 @@
         "repo": "kubenix",
         "type": "github"
       }
+    },
+    "ls-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/ls",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/ls",
+        "type": "path"
+      },
+      "parent": []
     },
     "microvm": {
       "inputs": {
@@ -388,7 +384,7 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "systems": "systems_3"
+        "systems": "systems_2"
       },
       "locked": {
         "lastModified": 1769644746,
@@ -441,21 +437,50 @@
       },
       "parent": []
     },
+    "rev-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/rev",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/rev",
+        "type": "path"
+      },
+      "parent": []
+    },
     "root": {
       "inputs": {
+        "cat-src": "cat-src",
         "cl-src": "cl-src",
         "comin": "comin",
-        "cursor": "cursor",
         "disko": "disko",
+        "head-src": "head-src",
         "kubenix": "kubenix",
+        "ls-src": "ls-src",
         "microvm": "microvm",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
-        "stylix": "stylix"
+        "rev-src": "rev-src",
+        "sort-src": "sort-src",
+        "stylix": "stylix",
+        "wc-src": "wc-src"
       }
+    },
+    "sort-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/sort",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/sort",
+        "type": "path"
+      },
+      "parent": []
     },
     "spectrum": {
       "flake": false,
@@ -486,7 +511,7 @@
           "nixpkgs"
         ],
         "nur": "nur",
-        "systems": "systems_4",
+        "systems": "systems_3",
         "tinted-foot": "tinted-foot",
         "tinted-kitty": "tinted-kitty",
         "tinted-schemes": "tinted-schemes",
@@ -517,9 +542,8 @@
         "type": "github"
       },
       "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
+        "id": "systems",
+        "type": "indirect"
       }
     },
     "systems_2": {
@@ -532,26 +556,12 @@
         "type": "github"
       },
       "original": {
-        "id": "systems",
-        "type": "indirect"
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
       }
     },
     "systems_3": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
-    "systems_4": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
@@ -667,6 +677,18 @@
         "repo": "treefmt-nix",
         "type": "github"
       }
+    },
+    "wc-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/wc",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/wc",
+        "type": "path"
+      },
+      "parent": []
     }
   },
   "root": "root",

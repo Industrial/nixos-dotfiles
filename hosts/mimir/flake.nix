@@ -30,16 +30,6 @@
       };
     };
 
-    # Cursor IDE
-    cursor = {
-      url = "github:omarcresp/cursor-flake/main";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Nix VS Code Extensions.
     nix-vscode-extensions = {
       url = "github:nix-community/nix-vscode-extensions";
