@@ -104,6 +104,7 @@ pub fn parse_args() -> Result<ParsedCli, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ParsedCli;
     use rstest::rstest;
     use std::ffi::OsStr;
 
