@@ -126,10 +126,10 @@
           ../../profiles/development.nix
           ../../profiles/desktop.nix
           ../../profiles/gaming.nix
-          # ../../profiles/creative.nix
+          ../../profiles/creative.nix
           ../../profiles/communication.nix
-          # ../../profiles/crypto.nix
-          # ../../profiles/learning.nix
+          ../../profiles/crypto.nix
+          ../../profiles/learning.nix
 
           # Host-specific additions
           ../../features/nixos/graphics/amd.nix
