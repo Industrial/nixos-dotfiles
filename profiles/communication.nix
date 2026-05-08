@@ -13,7 +13,7 @@
     # ../features/communication/fractal
     ../features/communication/signal-desktop
     # ../features/communication/teams
-    # ../features/communication/telegram
+    ../features/communication/telegram
     # ../features/communication/weechat
   ];
 }
