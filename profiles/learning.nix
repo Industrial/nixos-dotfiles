@@ -12,5 +12,6 @@
     ../features/learning/anki
     ../features/learning/foliate
     ../features/learning/zotero
+    ../features/office/obsidian
   ];
 }
