@@ -10,12 +10,13 @@ use std::os::unix::fs::{FileTypeExt, MetadataExt};
 #[cfg(unix)]
 pub fn mode_string(meta: &Metadata) -> String {
     let mode = meta.mode();
+    let perm = mode & 0o7777;
     let ft = meta.file_type();
     let mut s = String::with_capacity(10);
     s.push(file_type_char(meta, &ft));
-    let owner = (mode >> 6) & 7;
-    let group = (mode >> 3) & 7;
-    let other = mode & 7;
+    let owner = (perm >> 6) & 7;
+    let group = (perm >> 3) & 7;
+    let other = perm & 7;
     let setuid = mode & 0o4000 != 0;
     let setgid = mode & 0o2000 != 0;
     let sticky = mode & 0o1000 != 0;
@@ -31,11 +32,7 @@ fn triplet(bits: u32, set_id: bool) -> String {
     let w = bits & 2 != 0;
     let x = bits & 1 != 0;
     let exec_ch = if set_id {
-        if x {
-            's'
-        } else {
-            'S'
-        }
+        if x { 's' } else { 'S' }
     } else if x {
         'x'
     } else {
@@ -55,11 +52,7 @@ fn triplet_other(bits: u32, sticky: bool) -> String {
     let w = bits & 2 != 0;
     let x = bits & 1 != 0;
     let exec_ch = if sticky {
-        if x {
-            't'
-        } else {
-            'T'
-        }
+        if x { 't' } else { 'T' }
     } else if x {
         'x'
     } else {
@@ -101,10 +94,11 @@ pub fn mode_string(_meta: &Metadata) -> String {
 /// Glibc `gnu_dev_major` / `gnu_dev_minor` for 64-bit `dev_t` (see `bits/sysmacros.h`).
 #[cfg(all(unix, target_os = "linux"))]
 fn gnu_dev_major_minor(dev: u64) -> (u32, u32) {
-    let major = ((dev & 0x0000_0000_000f_ff00u64) >> 8) as u32
-        | ((dev & 0xffff_f000_0000_0000u64) >> 32) as u32;
-    let minor = ((dev & 0x0000_0000_0000_00ffu64) >> 0) as u32
-        | ((dev & 0x0000_0fff_ff0_0000u64) >> 12) as u32;
+    const MA_LOW: u64 = 0xfff00;
+    const MA_HIGH: u64 = 0xffff_f000_0000_0000;
+    const MI_MID: u64 = 0xffffff00000;
+    let major = ((dev & MA_LOW) >> 8) as u32 | ((dev & MA_HIGH) >> 32) as u32;
+    let minor = ((dev & 0xff) as u32) | (((dev & MI_MID) >> 12) as u32);
     (major, minor)
 }
 
@@ -219,6 +213,17 @@ mod tests {
     use super::*;
 
     #[cfg(unix)]
+    #[cfg(all(target_os = "linux", test))]
+    mod gnu_dev_major_minor {
+        use super::super::gnu_dev_major_minor;
+
+        #[test]
+        fn decodes_classic_dev_encoding() {
+            let (maj, min) = gnu_dev_major_minor(0x103);
+            assert_eq!((maj, min), (1, 3));
+        }
+    }
+
     mod mode_string {
         use super::*;
         use std::fs;
@@ -245,7 +250,7 @@ mod tests {
             fs::set_permissions(&p, perms).unwrap();
             let meta = fs::symlink_metadata(&p).unwrap();
             let m = mode_string(&meta);
-            assert_eq!(&m[3..6], "rws");
+            assert_eq!(&m[1..4], "rws");
         }
 
         #[test]
@@ -258,7 +263,7 @@ mod tests {
             fs::set_permissions(&p, perms).unwrap();
             let meta = fs::symlink_metadata(&p).unwrap();
             let m = mode_string(&meta);
-            assert_eq!(&m[3..6], "rwS");
+            assert_eq!(&m[1..4], "rwS");
         }
 
         #[test]

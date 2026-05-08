@@ -9,9 +9,9 @@
     defaultCrateOverrides = pkgs.defaultCrateOverrides;
   };
 in
-  cargoNix.workspaceMembers.ls.build.overrideAttrs (oldAttrs: {
+  cargoNix.workspaceMembers.ls.build.overrideAttrs (_oldAttrs: {
     meta = with lib; {
-      description = "List directory contents (dotfiles Rust ls)";
+      description = "List directory contents (GNU parity goal; dotfiles Rust ls)";
       license = licenses.mit;
     };
   })

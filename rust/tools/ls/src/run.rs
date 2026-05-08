@@ -53,10 +53,7 @@ fn write_long<W: Write>(
     let size_col = size_or_device(meta);
     let mtime = format_mtime(meta, now);
     let name = long_name(path, meta);
-    writeln!(
-        out,
-        "{mode} {nl} {user} {group} {size_col} {mtime} {name}"
-    )?;
+    writeln!(out, "{mode} {nl} {user} {group} {size_col} {mtime} {name}")?;
     Ok(())
 }
 
@@ -169,14 +166,18 @@ mod tests {
                 };
                 let mut stdout = Cursor::new(Vec::new());
                 let mut stderr = Cursor::new(Vec::new());
-                let code = run_ls_with_io(&settings, &[dir.to_path_buf()], &mut stdout, &mut stderr);
+                let code =
+                    run_ls_with_io(&settings, &[dir.to_path_buf()], &mut stdout, &mut stderr);
                 assert_eq!(code, 0);
                 let s = String::from_utf8(stdout.into_inner()).unwrap();
                 assert!(
                     s.contains("link -> target"),
                     "expected arrow in long output, got:\n{s}"
                 );
-                assert!(s.lines().any(|l| l.starts_with('l') && l.contains("link ->")));
+                assert!(
+                    s.lines()
+                        .any(|l| l.starts_with('l') && l.contains("link ->"))
+                );
             }
         }
 

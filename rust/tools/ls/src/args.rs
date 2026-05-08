@@ -127,10 +127,7 @@ mod tests {
 
             #[test]
             fn returns_help_when_dash_dash_help() {
-                assert!(matches!(
-                    parse(["--help"]).expect("parse"),
-                    ParsedCli::Help
-                ));
+                assert!(matches!(parse(["--help"]).expect("parse"), ParsedCli::Help));
             }
 
             #[test]
@@ -147,7 +144,8 @@ mod tests {
 
             #[test]
             fn uses_dot_when_no_paths() {
-                let ParsedCli::Run { paths, .. } = parse([]).expect("parse") else {
+                let ParsedCli::Run { paths, .. } = parse::<[&str; 0], &str>([]).expect("parse")
+                else {
                     panic!("expected Run");
                 };
                 assert_eq!(paths, vec![PathBuf::from(".")]);

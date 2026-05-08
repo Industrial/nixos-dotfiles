@@ -397,7 +397,6 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "id_effect",
- "libc",
  "rstest",
  "tempfile",
  "uzers",
