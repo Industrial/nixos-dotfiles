@@ -8,6 +8,7 @@
   ...
 }: {
   imports = [
+    ../features/ai/anythingllm-desktop
     ../features/ai/claude-code
     ../features/ai/gemini-cli
     ../features/ai/litellm
