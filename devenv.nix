@@ -12,6 +12,7 @@
     (hiPrio (pkgs.callPackage ./rust/tools/sort {}))
     (hiPrio (pkgs.callPackage ./rust/tools/ls {}))
     (hiPrio (pkgs.callPackage ./rust/tools/head {}))
+    (hiPrio (pkgs.callPackage ./rust/tools/rev {}))
   ];
   dotfilesCoreutilsBin = pkgs.lib.makeBinPath dotfilesCoreutils;
 in {

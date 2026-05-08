@@ -127,6 +127,11 @@
       url = "path:../../rust/tools/head";
       flake = false;
     };
+
+    rev-src = {
+      url = "path:../../rust/tools/rev";
+      flake = false;
+    };
   };
 
   outputs = inputs @ {...}: let

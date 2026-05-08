@@ -65,6 +65,7 @@
     ../features/cli/ls
     ../features/cli/sort
     ../features/cli/wc
+    ../features/cli/rev
     ../features/cli/zellij
 
     # Core NixOS Configuration
