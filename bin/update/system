@@ -21,6 +21,7 @@ else
   echo "> update > system > sudo nixos-rebuild boot --flake \".#$(hostname)\""
   sudo nixos-rebuild boot --flake ".#$(hostname)" --show-trace --option eval-cache false
   echo "> update > system > Reboot to activate this generation; systemd-boot default should point at it."
+  echo "> update > system > Until reboot, PATH still uses /run/current-system (old gen). New binaries: /nix/var/nix/profiles/system/sw/bin/… — or run: sudo nixos-rebuild switch --flake \".#$(hostname)\""
 fi
 
 cd ../..
