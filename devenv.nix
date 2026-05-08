@@ -41,7 +41,7 @@
     treefmt
     commitizen
     nodejs
-    nodePackages.npm
+    # npm is included with nodejs
     slumber
     lazysql
 
@@ -75,20 +75,21 @@
     };
   };
 
-  git-hooks = {
-    hooks = {
-      commitizen = {
-        enable = true;
-        stages = ["commit-msg"];
-      };
-      lint = {
-        enable = true;
-        stages = ["pre-commit"];
-        name = "lint";
-        description = "Lint the code";
-        pass_filenames = true;
-        entry = "treefmt --config-file treefmt.toml";
-      };
-    };
-  };
+  # git-hooks configuration disabled - pre-commit hooks work via .pre-commit-config.yaml
+  # git-hooks = {
+  #   hooks = {
+  #     commitizen = {
+  #       enable = true;
+  #       stages = ["commit-msg"];
+  #     };
+  #     lint = {
+  #       enable = true;
+  #       stages = ["pre-commit"];
+  #       name = "lint";
+  #       description = "Lint the code";
+  #       pass_filenames = true;
+  #       entry = "treefmt --config-file treefmt.toml";
+  #     };
+  #   };
+  # };
 }

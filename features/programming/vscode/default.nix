@@ -109,9 +109,7 @@ in {
     # pkgs.hlint
 
     # # PureScript
-    # pkgs.nodePackages.purescript-psa
-    # pkgs.nodePackages.purs-tidy
-    # pkgs.nodePackages.purty
+    # purescript-psa, purs-tidy, purty moved to top-level (no longer in nodePackages)
 
     # # Rust
     # pkgs.rustfmt

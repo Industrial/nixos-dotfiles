@@ -9,9 +9,9 @@
   ...
 }: {
   imports = [
-    # CI/CD Tools (Comin disabled)
-    # inputs.comin.nixosModules.comin
-    # ../features/ci/comin
+    # CI/CD Tools
+    inputs.comin.nixosModules.comin
+    ../features/ci/comin
 
     # CLI Tools
     ../features/cli/bandwhich
@@ -35,6 +35,7 @@
     ../features/cli/fd
     ../features/cli/fish
     ../features/cli/fzf
+    ../features/cli/nushell
     ../features/cli/g
     ../features/cli/gpg
     ../features/cli/gping

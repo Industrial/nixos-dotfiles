@@ -97,8 +97,8 @@ options = ["format"]
 includes = ["*.toml"]
 priority = 6
 
-[formatter.rust]
-command = "rustfmt"
-options = ["--edition", "2024"]
-includes = ["*.rs"]
-priority = 7
+# Rust formatting is handled by cargo fmt in the nix-eval workflow
+# [formatter.rust]
+# command = "rustfmt"
+# includes = ["*.rs"]
+# priority = 7
