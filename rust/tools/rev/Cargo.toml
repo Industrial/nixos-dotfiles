@@ -1,0 +1,22 @@
+[package]
+name = "rev"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Reverse lines byte-wise (POSIX/coreutils-oriented) using id_effect"
+license = "MIT"
+
+[dependencies]
+id_effect = "0.2"
+
+[dev-dependencies]
+rstest = "0.26"
+tempfile = "3"
+
+[lib]
+name = "rev"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rev"
+path = "src/main.rs"
