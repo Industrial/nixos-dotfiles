@@ -302,6 +302,6 @@
     "tnr-0": "linux"
   },
   "cursor.composer.queueMessageDefaultBehavior": "queue",
-  "files.autoSave": "afterDelay",
-  "update.mode": "none"
+  "update.mode": "none",
+  "files.autoSave": "afterDelay"
 }
