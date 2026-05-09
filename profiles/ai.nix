@@ -14,7 +14,7 @@
     # ../features/ai/litellm
     ../features/ai/lmstudio
     # ../features/ai/n8n
-    ../features/ai/ollama
+    # ../features/ai/ollama
     ../features/ai/opencode
   ];
 }
