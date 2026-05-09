@@ -2,7 +2,7 @@
 //!
 //! Run benchmarks with: `cargo bench`
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use nix_eval::Evaluator;
 
 fn bench_evaluate_integer(c: &mut Criterion) {
