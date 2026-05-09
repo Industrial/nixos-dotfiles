@@ -91,6 +91,9 @@
       ## Dotenv
       extensions.vscode-marketplace.mikestead.dotenv
 
+      ## Nushell
+      extensions.vscode-marketplace.thenuprojectcontributors.vscode-nushell-lang
+
       ## Git
       (allowUnfreeExtension extensions.vscode-marketplace.mhutchie.git-graph)
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack

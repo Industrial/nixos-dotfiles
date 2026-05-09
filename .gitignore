@@ -13,7 +13,6 @@
 .env
 .idea/
 .pre-commit-config.yaml
-.vscode
 /**/*.qcow2
 /.direnv/
 /.pre-commit-config.yaml
@@ -21,10 +20,13 @@
 /keys/
 /logs/
 /result
+# Per-host flake `nix build` / `nixos-rebuild build` symlink outputs
+hosts/**/result
 dev-debug.log
 devenv.local.nix
 logs
 node_modules/
 npm-debug.log*
+target/
 yarn-debug.log*
 yarn-error.log*
