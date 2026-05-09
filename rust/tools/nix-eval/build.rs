@@ -178,13 +178,14 @@ fn path_to_test_name(path: &Path, prefix: &str) -> String {
     let relative = path.strip_prefix(&test_dir).unwrap_or(path);
 
     // Convert to a valid Rust identifier
-    let name = relative
+    let name: String = relative
         .to_string_lossy()
-        .replace('/', "_")
-        .replace('-', "_")
-        .replace('.', "_")
-        .replace(' ', "_")
-        .replace('\\', "_");
+        .chars()
+        .map(|c| match c {
+            '/' | '-' | '.' | ' ' | '\\' => '_',
+            c => c,
+        })
+        .collect();
 
     format!("{}_{}", prefix, name)
 }
