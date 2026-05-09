@@ -55,12 +55,13 @@
   '';
 
   # Single-file store path merged into the FHS rootfs (not extraBwrapArgs).
-  prismaOsReleasePkg = pkgs.runCommand "anythingllm-desktop-prisma-os-etc" {
-    meta.priority = -100;
-  } ''
-    mkdir -p $out/etc
-    install -m444 ${prismaOsRelease} $out/etc/os-release
-  '';
+  prismaOsReleasePkg =
+    pkgs.runCommand "anythingllm-desktop-prisma-os-etc" {
+      meta.priority = -100;
+    } ''
+      mkdir -p $out/etc
+      install -m444 ${prismaOsRelease} $out/etc/os-release
+    '';
 
   appimageUrl =
     if system == "aarch64-linux"
@@ -82,10 +83,11 @@
     pname = "anythingllm-desktop";
     inherit version;
     src = appimage;
-    extraPkgs = pkgs: with pkgs; [
-      gzip
-      prismaOsReleasePkg
-    ];
+    extraPkgs = pkgs:
+      with pkgs; [
+        gzip
+        prismaOsReleasePkg
+      ];
     meta = {
       description = "AnythingLLM Desktop — local LLM workspace (official AppImage)";
       homepage = "https://anythingllm.com/desktop";
