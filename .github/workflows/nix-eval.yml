@@ -52,7 +52,7 @@ jobs:
         # They intentionally surface evaluator gaps (builtins, inherit quirks, thunk forcing).
         # Keep CI focused on fmt/clippy/build plus smaller crates/tests until parity improves.
         run: >-
-          cargo test --all-features --verbose --
+          cargo test --all-features --verbose --lib --tests --bins --benches --
           --skip eval_okay_tvix_tests
           --skip nix_eval_okay_nix_tests
       - name: Build
