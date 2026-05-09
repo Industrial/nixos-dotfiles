@@ -6,23 +6,19 @@ set -e
 echo "> update > system > cd hosts/$(hostname)"
 cd "hosts/$(hostname)"
 
-# Live `switch` is blocked when critical stack changes (e.g. dbus -> dbus-broker);
-# `boot` registers the new generation and refreshes the bootloader without activating.
-# If the default profile already matches what we booted, `switch` is safe and immediate.
+# Always `switch` so the new generation is activated immediately (PATH, services, new
+# packages). Some upgrades still need a reboot for the kernel or firmware path to match
+# `/run/booted-system`; if `switch` is blocked (switch inhibitors / known breaking changes),
+# run `sudo nixos-rebuild boot --flake ".#$(hostname)"` manually and reboot.
 booted="$(readlink -f /run/booted-system)"
 profile="$(readlink -f /nix/var/nix/profiles/system)"
-if [ "$booted" = "$profile" ]; then
-  echo "> update > system > profile matches booted system; sudo nixos-rebuild switch --flake \".#$(hostname)\""
-  sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
-else
-  echo "> update > system > booted != default profile (reboot pending or prior failed switch)"
+if [ "$booted" != "$profile" ]; then
+  echo "> update > system > booted != default profile (will activate profile with switch)"
   echo "> update > system >   booted:  $booted"
   echo "> update > system >   profile: $profile"
-  echo "> update > system > sudo nixos-rebuild boot --flake \".#$(hostname)\""
-  sudo nixos-rebuild boot --flake ".#$(hostname)" --show-trace --option eval-cache false
-  echo "> update > system > Reboot to activate this generation; systemd-boot default should point at it."
-  echo "> update > system > Until reboot, PATH still uses /run/current-system (old gen). New binaries: /nix/var/nix/profiles/system/sw/bin/… — or run: sudo nixos-rebuild switch --flake \".#$(hostname)\""
 fi
+echo "> update > system > sudo nixos-rebuild switch --flake \".#$(hostname)\""
+sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
 
 cd ../..
 bin/update/login-shell "tom"
