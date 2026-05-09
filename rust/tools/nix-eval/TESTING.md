@@ -33,6 +33,10 @@ cargo test --test integration_tests
 cargo test --test property_tests
 ```
 
+## CI checks
+
+GitHub Actions runs `cargo fmt --check`, `cargo clippy`, and `cargo test` for this crate (see `.github/workflows/nix-eval.yml`).
+
 ## Test Structure
 
 ```
