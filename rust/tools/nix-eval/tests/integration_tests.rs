@@ -44,6 +44,7 @@ fn test_evaluate_null() {
 }
 
 #[test]
+#[allow(clippy::approx_constant)] // Literal matches evaluated expression, not std's PI approximation.
 fn test_evaluate_float() {
     let evaluator = Evaluator::new();
     let result = evaluator.evaluate("3.14").unwrap();
