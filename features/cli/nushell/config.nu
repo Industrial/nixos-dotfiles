@@ -5,11 +5,11 @@
 # Core Configuration
 # ============================================================================
 
-# Vi mode (Note: less mature than Fish's vi mode)
-$env.config.edit_mode = "vi"
-
-# Remove default greeting (like Fish's empty fish_greeting)
-$env.config.show_banner = false
+# Vi mode and banner settings
+$env.config = ($env.config | merge {
+    edit_mode: vi
+    show_banner: false
+})
 
 # ============================================================================
 # Custom Commands (equivalent to Fish aliases/functions)
@@ -17,18 +17,12 @@ $env.config.show_banner = false
 
 # l - detailed eza listing (matches Fish version)
 def l [...args] {
-    eza --colour=always --icons --long --group --header
-        --time-style long-iso --git --classify
-        --group-directories-first --sort Extension --all
-        ...$args
+    eza --colour=always --icons --long --group --header --time-style=long-iso --git --classify --group-directories-first --sort=Extension --all ...$args
 }
 
 # ll - alternative eza listing
 def ll [...args] {
-    eza --colour=always --icons --long --group --header
-        --time-style long-iso --git --classify
-        --group-directories-first --sort Name --all
-        ...$args
+    eza --colour=always --icons --long --group --header --time-style=long-iso --git --classify --group-directories-first --sort=Name --all ...$args
 }
 
 # g - git shorthand
@@ -59,7 +53,8 @@ def p [] {
 # Note: FZF integration requires manual setup in Nushell
 # These keybindings provide equivalent functionality to Fish's fzf integration
 
-$env.config.keybindings = [
+$env.config = ($env.config | merge {
+    keybindings: [
     # Ctrl-R: FZF history search (matches Fish)
     {
         name: fzf_history
@@ -113,75 +108,76 @@ $env.config.keybindings = [
         mode: [emacs, vi_insert]
         event: { send: down }
     }
-]
+    ]
+})
 
 # ============================================================================
 # Starship Prompt Integration
 # ============================================================================
 
-# Initialize Starship prompt
-# This uses the same starship.toml as Fish for consistency
-mkdir ($nu.data-dir | path join "vendor/autoload")
-starship init nu | save --force ($nu.data-dir | path join "vendor/autoload/starship.nu")
-
-# Source Starship
-source ($nu.data-dir | path join "vendor/autoload/starship.nu")
+# Starship uses same starship.toml as Fish for consistency
+# Simply set the prompt - starship handles the rest via STARSHIP_SESSION_KEY
+$env.STARSHIP_SHELL = "nu"
+$env.PROMPT_COMMAND = { || starship prompt --cmd-duration $env.CMD_DURATION_MS --status $env.LAST_EXIT_CODE }
+$env.PROMPT_COMMAND_RIGHT = { || starship prompt --right --cmd-duration $env.CMD_DURATION_MS --status $env.LAST_EXIT_CODE }
+$env.PROMPT_INDICATOR = { || "" }
+$env.PROMPT_INDICATOR_VI_INSERT = { || ": " }
+$env.PROMPT_INDICATOR_VI_NORMAL = { || "> " }
+$env.PROMPT_MULTILINE_INDICATOR = { || "::: " }
 
 # ============================================================================
 # Completions & Suggestions
 # ============================================================================
 
 # Enable completions
-$env.config.completions = {
-    case_sensitive: false
-    quick: true
-    partial: true
-    algorithm: "prefix"
-}
+$env.config = ($env.config | merge {
+    completions: {
+        case_sensitive: false
+        quick: true
+        partial: true
+        algorithm: "prefix"
+    }
+})
 
 # ============================================================================
 # Color & Display Configuration
 # ============================================================================
 
 # Use colors (similar to Fish theme)
-$env.config.color_config = {
-    shape_string: green
-    shape_flag: blue
-    shape_int: purple
-    shape_float: purple
-    shape_range: yellow
-    shape_internalcall: cyan
-    shape_external: cyan
-    shape_externalarg: green
-    shape_literal: blue
-    shape_operator: yellow
-    shape_signature: green_bold
-    shape_garbage: { fg: white bg: red attr: b}
-}
+$env.config = ($env.config | merge {
+    color_config: {
+        shape_string: green
+        shape_flag: blue
+        shape_int: purple
+        shape_float: purple
+        shape_range: yellow
+        shape_internalcall: cyan
+        shape_external: cyan
+        shape_externalarg: green
+        shape_literal: blue
+        shape_operator: yellow
+        shape_signature: green_bold
+        shape_garbage: { fg: white bg: red attr: b}
+    }
+})
 
 # ============================================================================
 # Additional Configuration
 # ============================================================================
 
-# Table display settings
-$env.config.table = {
-    mode: rounded
-    index_mode: auto
-    show_empty: true
-}
-
-# History configuration
-$env.config.history = {
-    max_size: 100000
-    sync_on_enter: true
-    file_format: "sqlite"
-}
-
-# File size format (human-readable)
-$env.config.filesize = {
-    metric: false
-    format: "auto"
-}
+# Table display and history settings
+$env.config = ($env.config | merge {
+    table: {
+        mode: rounded
+        index_mode: auto
+        show_empty: true
+    }
+    history: {
+        max_size: 100000
+        sync_on_enter: true
+        file_format: "sqlite"
+    }
+})
 
 # ============================================================================
 # Notes for Fish Users

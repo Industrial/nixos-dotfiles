@@ -16,6 +16,11 @@
   "[nix]": {
     "editor.defaultFormatter": "kamadorueda.alejandra"
   },
+  "[nu]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.wordWrap": "off"
+  },
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.detectIndentation": false,
@@ -239,6 +244,10 @@
     },
     "bash": {
       "path": "/run/current-system/sw/bin/bash"
+    },
+    "nu": {
+      "path": "/run/current-system/sw/bin/nu",
+      "args": []
     }
   },
   "terminal.integrated.defaultProfile.linux": "fish",
