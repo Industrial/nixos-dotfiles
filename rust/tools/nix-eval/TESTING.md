@@ -35,7 +35,7 @@ cargo test --test property_tests
 
 ## CI checks
 
-GitHub Actions runs `cargo fmt --check`, `cargo clippy`, and `cargo test` for this crate (see `.github/workflows/nix-eval.yml`).
+GitHub Actions runs `cargo fmt --check`, `cargo clippy`, and `cargo test --all-targets` for this crate (see `.github/workflows/nix-eval.yml`). CI sets `NIX_EVAL_CI_LIGHT=1`, which makes the generated Tvix/Nix corpus harness in `tests/tvix_tests.rs` return early; unset it locally when you want those comparisons to execute.
 
 ## Test Structure
 
