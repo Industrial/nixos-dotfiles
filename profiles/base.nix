@@ -100,6 +100,9 @@
     # Storage
     ../features/storage/qdirstat
 
+    # VPN
+    ../features/network/mullvad
+
     # Network Browsers
     ../features/network/chromium
     ../features/network/firefox
