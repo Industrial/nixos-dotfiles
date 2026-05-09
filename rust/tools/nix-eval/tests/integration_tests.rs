@@ -57,7 +57,11 @@ fn test_evaluate_float() {
 #[test]
 fn test_evaluate_simple_list() {
     let evaluator = Evaluator::new();
-    let result = evaluator.evaluate("[1 2 3]").unwrap();
+    let result = evaluator
+        .evaluate("[1 2 3]")
+        .unwrap()
+        .deep_force(&evaluator)
+        .unwrap();
     match result {
         NixValue::List(items) => {
             assert_eq!(items.len(), 3);
@@ -72,7 +76,11 @@ fn test_evaluate_simple_list() {
 #[test]
 fn test_evaluate_mixed_list() {
     let evaluator = Evaluator::new();
-    let result = evaluator.evaluate(r#"["hello" 42 true null]"#).unwrap();
+    let result = evaluator
+        .evaluate(r#"["hello" 42 true null]"#)
+        .unwrap()
+        .deep_force(&evaluator)
+        .unwrap();
     match result {
         NixValue::List(items) => {
             assert_eq!(items.len(), 4);
@@ -88,7 +96,11 @@ fn test_evaluate_mixed_list() {
 #[test]
 fn test_evaluate_nested_list() {
     let evaluator = Evaluator::new();
-    let result = evaluator.evaluate("[[1 2] [3 4]]").unwrap();
+    let result = evaluator
+        .evaluate("[[1 2] [3 4]]")
+        .unwrap()
+        .deep_force(&evaluator)
+        .unwrap();
     match result {
         NixValue::List(outer) => {
             assert_eq!(outer.len(), 2);
@@ -266,7 +278,11 @@ fn test_display_formatting() {
     let value = evaluator.evaluate("true").unwrap();
     assert_eq!(format!("{}", value), "true");
 
-    let value = evaluator.evaluate("[1 2 3]").unwrap();
+    let value = evaluator
+        .evaluate("[1 2 3]")
+        .unwrap()
+        .deep_force(&evaluator)
+        .unwrap();
     let formatted = format!("{}", value);
     assert!(formatted.contains("1"));
     assert!(formatted.contains("2"));
@@ -288,7 +304,11 @@ fn test_json_serialization() {
     assert!(json.contains("string"));
     assert!(json.contains("hello"));
 
-    let value = evaluator.evaluate("[1 2 3]").unwrap();
+    let value = evaluator
+        .evaluate("[1 2 3]")
+        .unwrap()
+        .deep_force(&evaluator)
+        .unwrap();
     let json = serde_json::to_string(&value).unwrap();
     assert!(json.contains("list"));
 }
