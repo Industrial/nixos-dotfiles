@@ -425,7 +425,11 @@ mod edge_cases {
     fn test_single_element_structures() {
         let evaluator = Evaluator::new();
 
-        let list = evaluator.evaluate("[42]").unwrap();
+        let list = evaluator
+            .evaluate("[42]")
+            .unwrap()
+            .deep_force(&evaluator)
+            .unwrap();
         match list {
             NixValue::List(items) => {
                 assert_eq!(items.len(), 1);
