@@ -11,6 +11,8 @@
   imports = [
     ../features/learning/anki
     ../features/learning/foliate
+    ../features/learning/tolaria
     ../features/learning/zotero
+    ../features/office/obsidian
   ];
 }

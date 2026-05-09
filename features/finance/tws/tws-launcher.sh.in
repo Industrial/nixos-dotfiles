@@ -1,0 +1,16 @@
+#!@shell@
+set -euo pipefail
+# Helps Java AWT/Swing dialogs on many Linux setups (incl. GNOME on Wayland).
+# Does not always silence IB’s own INFO logs about dialog parents; those are often benign.
+export _JAVA_AWT_WM_NONREPARENTING="${_JAVA_AWT_WM_NONREPARENTING:-1}"
+steamrun="@steamrun@"
+twroot="@twroot@"
+LOG="${TWS_LOG:-$HOME/.cache/ib-tws-launch.log}"
+mkdir -p "$(dirname "$LOG")"
+if [ -t 1 ]; then
+  exec > >(tee -a "$LOG") 2>&1
+else
+  exec >>"$LOG" 2>&1
+fi
+echo "=== ib-tws $(date -Is) pid=$$ DISPLAY=${DISPLAY:-} WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} ==="
+exec "$steamrun" "$twroot/tws" "$@"

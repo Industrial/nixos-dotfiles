@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run deadnix to find unused Nix code in devenv shell
-# Check all host configurations for dead code
-devenv shell -- deadnix --fail hosts/*/
+# Run deadnix on host flakes. Use nix-shell instead of `devenv shell` so CI does
+# not evaluate the full devenv profile (that eval has failed on runners when a
+# transitive dependency referenced an invalid substitute path).
+nix-shell -p deadnix --run 'deadnix --fail hosts/*/'
 

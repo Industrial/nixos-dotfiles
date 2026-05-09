@@ -60,6 +60,12 @@
     ../features/cli/starship
     ../features/cli/unrar
     ../features/cli/unzip
+    ../features/cli/cat
+    ../features/cli/head
+    ../features/cli/ls
+    ../features/cli/sort
+    ../features/cli/wc
+    ../features/cli/rev
     ../features/cli/zellij
 
     # Core NixOS Configuration
@@ -93,6 +99,9 @@
 
     # Storage
     ../features/storage/qdirstat
+
+    # VPN
+    ../features/network/mullvad
 
     # Network Browsers
     ../features/network/chromium

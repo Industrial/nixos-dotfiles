@@ -97,7 +97,7 @@ options = ["format"]
 includes = ["*.toml"]
 priority = 6
 
-# Rust formatting is handled by cargo fmt in the nix-eval workflow
+# Rust formatting (optional): enable a rustfmt formatter here if you want treefmt to touch *.rs.
 # [formatter.rust]
 # command = "rustfmt"
 # includes = ["*.rs"]

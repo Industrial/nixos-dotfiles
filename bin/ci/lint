@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run treefmt in devenv shell with CI configuration
-devenv shell -- treefmt \
-  --config-file treefmt.ci.toml
+# Run treefmt with the formatters declared in treefmt.ci.toml. Use nix-shell
+# rather than `devenv shell` so CI avoids evaluating the full devenv profile
+# (same substitute-path failures as bin/ci/deadnix had on GitHub runners).
+nix-shell -p treefmt deadnix alejandra actionlint beautysh biome yamlfmt taplo --run \
+  'treefmt --config-file treefmt.ci.toml'
 

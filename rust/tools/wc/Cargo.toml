@@ -1,0 +1,19 @@
+[package]
+name = "wc"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Word, line, character, and byte count (compatible with GNU wc)"
+license = "MIT"
+
+[dependencies]
+id_effect = "0.2"
+unicode-width = "0.2"
+
+[lib]
+name = "wc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "wc"
+path = "src/main.rs"

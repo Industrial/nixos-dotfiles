@@ -1,0 +1,18 @@
+[package]
+name = "head"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Output first part of files (POSIX-oriented subset) using id_effect"
+license = "MIT"
+
+[dependencies]
+id_effect = "0.2"
+
+[lib]
+name = "head"
+path = "src/lib.rs"
+
+[[bin]]
+name = "head"
+path = "src/main.rs"

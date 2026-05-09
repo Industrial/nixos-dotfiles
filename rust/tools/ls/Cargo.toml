@@ -1,0 +1,26 @@
+[package]
+name = "ls"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "List directory contents (GNU coreutils parity goal) using id_effect"
+license = "MIT"
+
+[dependencies]
+chrono = "0.4"
+id_effect = "0.2"
+
+[target.'cfg(unix)'.dependencies]
+uzers = "0.12"
+
+[dev-dependencies]
+rstest = "0.24"
+tempfile = "3"
+
+[lib]
+name = "ls"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ls"
+path = "src/main.rs"

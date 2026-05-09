@@ -1,0 +1,18 @@
+[package]
+name = "cat"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Concatenate files (POSIX/GNU subset) using id_effect"
+license = "MIT"
+
+[dependencies]
+id_effect = "0.2"
+
+[lib]
+name = "cat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cat"
+path = "src/main.rs"

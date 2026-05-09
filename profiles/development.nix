@@ -9,6 +9,8 @@
   ...
 }: {
   imports = [
+    ../features/finance/tws
+    ../features/finance/ib-gateway
     # ../features/programming/meld
     # ../features/programming/neovim
     # ../features/programming/terraform
@@ -25,5 +27,6 @@
     ../features/programming/node
     ../features/programming/pgadmin
     ../features/programming/python
+    ../features/programming/zig
   ];
 }

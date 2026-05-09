@@ -11,5 +11,6 @@
   imports = [
     ../features/crypto/bisq
     ../features/crypto/monero
+    ../features/crypto/solana
   ];
 }

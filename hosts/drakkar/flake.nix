@@ -30,16 +30,6 @@
       };
     };
 
-    # Cursor IDE
-    cursor = {
-      url = "github:omarcresp/cursor-flake/main";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Nix VS Code Extensions.
     nix-vscode-extensions = {
       url = "github:nix-community/nix-vscode-extensions";
@@ -101,6 +91,37 @@
       url = "path:../../rust/tools/oomkiller"; # Path relative to this flake.nix
       flake = false; # Treat as a source tree, not a flake
     };
+
+    # wc tool source (Rust, GNU-compatible)
+    wc-src = {
+      url = "path:../../rust/tools/wc";
+      flake = false;
+    };
+
+    cat-src = {
+      url = "path:../../rust/tools/cat";
+      flake = false;
+    };
+
+    sort-src = {
+      url = "path:../../rust/tools/sort";
+      flake = false;
+    };
+
+    ls-src = {
+      url = "path:../../rust/tools/ls";
+      flake = false;
+    };
+
+    head-src = {
+      url = "path:../../rust/tools/head";
+      flake = false;
+    };
+
+    rev-src = {
+      url = "path:../../rust/tools/rev";
+      flake = false;
+    };
   };
 
   outputs = inputs @ {...}: let
@@ -126,10 +147,10 @@
           ../../profiles/development.nix
           ../../profiles/desktop.nix
           ../../profiles/gaming.nix
-          # ../../profiles/creative.nix
+          ../../profiles/creative.nix
           ../../profiles/communication.nix
-          # ../../profiles/crypto.nix
-          # ../../profiles/learning.nix
+          ../../profiles/crypto.nix
+          ../../profiles/learning.nix
 
           # Host-specific additions
           ../../features/nixos/graphics/amd.nix
