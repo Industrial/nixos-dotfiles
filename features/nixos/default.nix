@@ -13,9 +13,6 @@
       max-jobs = "auto";
       cores = 0;
 
-      # Trusted users for binary cache
-      trusted-users = ["root" "@wheel"];
-
       # Binary cache substituters for faster builds
       substituters = [
         "https://cache.nixos.org"
