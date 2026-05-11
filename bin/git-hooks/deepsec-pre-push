@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Git pre-push: run deepsec process on commits being pushed. Exits non-zero
+# when deepsec reports findings (or when the AI stage fails, e.g. missing keys).
+#
+# Environment:
+#   DEEPSEC_PRE_PUSH_SKIP=1  — skip this hook entirely
+#   DEEPSEC_PRE_PUSH_AGENT   — codex or claude (default: claude; matches .deepsec flake)
+#   DEEPSEC_PRE_PUSH_LIMIT=n — forward --limit to deepsec (optional)
+
+if [[ "${DEEPSEC_PRE_PUSH_SKIP:-}" == "1" ]]; then
+  echo "deepsec pre-push: skipped (DEEPSEC_PRE_PUSH_SKIP=1)" >&2
+  exit 0
+fi
+
+toplevel=$(git rev-parse --show-toplevel)
+deepsec_dir="$toplevel/.deepsec"
+
+if [[ ! -f "$deepsec_dir/deepsec.config.ts" ]]; then
+  exit 0
+fi
+
+if ! command -v nix >/dev/null 2>&1; then
+  echo "deepsec pre-push: nix not on PATH (needed for nix develop .deepsec)" >&2
+  exit 1
+fi
+
+agent="${DEEPSEC_PRE_PUSH_AGENT:-claude}"
+
+resolve_base_for_new_branch() {
+  local local_sha=$1
+  local remote_branch mb
+  for remote_branch in "refs/remotes/origin/main" "refs/remotes/origin/master"; do
+    if git -C "$toplevel" rev-parse -q --verify "$remote_branch" >/dev/null 2>&1; then
+      mb=$(git -C "$toplevel" merge-base "$remote_branch" "$local_sha" 2>/dev/null || true)
+      if [[ -n "$mb" ]]; then
+        printf "%s" "$mb"
+        return 0
+      fi
+    fi
+  done
+  candidate=$(git -C "$toplevel" rev-list --max-parents=0 "$local_sha" 2>/dev/null | tail -n 1)
+  printf "%s" "${candidate:-}"
+}
+
+run_deepsec_for_range() {
+  local range=$1
+  export DEEPSEC_DIR="$deepsec_dir"
+  export DEEPSEC_PRE_PUSH_AGENT_INNER="$agent"
+  export DEEPSEC_PRE_PUSH_RANGE="$range"
+  nix develop "$deepsec_dir" --accept-flake-config -c bash -c '
+    set -euo pipefail
+    cd "$DEEPSEC_DIR"
+    if [[ ! -d node_modules/deepsec ]]; then
+      pnpm install --frozen-lockfile
+    fi
+    cmd=(pnpm exec deepsec process --project-id dotfiles --agent "$DEEPSEC_PRE_PUSH_AGENT_INNER" --diff "$DEEPSEC_PRE_PUSH_RANGE")
+    if [[ -n "${DEEPSEC_PRE_PUSH_LIMIT:-}" ]]; then
+      cmd+=(--limit "$DEEPSEC_PRE_PUSH_LIMIT")
+    fi
+    exec "${cmd[@]}"
+  '
+}
+
+failed=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [[ -z "${local_sha:-}" ]] && continue
+  if [[ "$local_sha" == "0000000000000000000000000000000000000000" ]]; then
+    continue
+  fi
+
+  if [[ "$remote_sha" == "$local_sha" ]]; then
+    continue
+  fi
+
+  if [[ "$remote_sha" == "0000000000000000000000000000000000000000" ]]; then
+    old_ref=$(resolve_base_for_new_branch "$local_sha")
+    if [[ -z "$old_ref" ]]; then
+      echo "deepsec pre-push: could not determine merge base for new branch $local_ref" >&2
+      failed=1
+      continue
+    fi
+  else
+    old_ref=$remote_sha
+  fi
+
+  if git -C "$toplevel" diff --quiet "$old_ref" "$local_sha" 2>/dev/null; then
+    continue
+  fi
+
+  range="${old_ref}..${local_sha}"
+  if ! run_deepsec_for_range "$range"; then
+    echo "deepsec pre-push: blocked — deepsec process failed or reported findings for $local_ref ($range)" >&2
+    failed=1
+  fi
+done
+
+exit "$failed"
