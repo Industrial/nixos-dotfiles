@@ -12,6 +12,13 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
+## Git pre-push (deepsec)
+
+With the dev shell active, devenv installs a **pre-push** hook that runs `bin/git-hooks/deepsec-pre-push`. It invokes `deepsec process` (via `nix develop .deepsec`) on the commit range being pushed and **rejects the push** if deepsec exits non-zero (reported findings or AI stage failure).
+
+- **Skip when needed:** `DEEPSEC_PRE_PUSH_SKIP=1 git push …`
+- **Agent:** defaults to `claude` (matches `.deepsec`); override with `DEEPSEC_PRE_PUSH_AGENT=codex` if you use Codex credentials instead.
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
