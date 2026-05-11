@@ -7,11 +7,19 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Nix Flake Check
+    - name: Nix Flake Check and build dry-run
       shell: bash
-      working-directory: hosts/${{ inputs.host }}
-      run: nix flake check
-    - name: Nix Build Dry Run
-      shell: bash
-      working-directory: hosts/${{ inputs.host }}
-      run: nix build --dry-run .#nixosConfigurations.${{ inputs.host }}.config.system.build.toplevel
+      env:
+        HOST: ${{ inputs.host }}
+      run: |
+        set -euo pipefail
+        case "$HOST" in
+          drakkar|huginn|mimir) ;;
+          *)
+            echo "Invalid host: $HOST" >&2
+            exit 1
+            ;;
+        esac
+        cd "hosts/$HOST"
+        nix flake check
+        nix build --dry-run ".#nixosConfigurations.$HOST.config.system.build.toplevel"

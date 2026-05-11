@@ -4,11 +4,11 @@ runs:
   using: 'composite'
   steps:
     - name: Install Nix
-      uses: cachix/install-nix-action@v31
+      uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Install Cachix
-      uses: cachix/cachix-action@v14
+      uses: cachix/cachix-action@18cf96c7c98e048e10a83abd92116114cd8504be # v14
       with:
         name: devenv
     - name: Install devenv

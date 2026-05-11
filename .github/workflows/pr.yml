@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Setup Nix and Cachix
         uses: ./.github/actions/setup-nix
       - name: Format Check
@@ -17,7 +17,7 @@ jobs:
   #   runs-on: ubuntu-latest
   #   steps:
   #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
   #     - name: Setup Nix and Cachix
   #       uses: ./.github/actions/setup-nix
   #     - name: Vulnix Scan
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Setup Nix and Cachix
         uses: ./.github/actions/setup-nix
       - name: ClamAV Scan
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Setup Nix and Cachix
         uses: ./.github/actions/setup-nix
       - name: Lynis Scan
@@ -44,7 +44,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Setup Nix and Cachix
         uses: ./.github/actions/setup-nix
       - name: Dead Code Detection
@@ -57,7 +57,7 @@ jobs:
         host: [drakkar, huginn, mimir]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Setup Nix and Cachix
         uses: ./.github/actions/setup-nix
       - name: Check
@@ -73,7 +73,7 @@ jobs:
   #       host: [drakkar, huginn, mimir]
   #   steps:
   #     - name: Checkout repository
-  #       uses: actions/checkout@v4
+  #       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
   #     - name: Setup Nix and Cachix
   #       uses: ./.github/actions/setup-nix
   #     - name: Build
