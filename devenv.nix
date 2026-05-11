@@ -94,21 +94,45 @@ in {
     };
   };
 
-  # git-hooks configuration disabled - pre-commit hooks work via .pre-commit-config.yaml
-  # git-hooks = {
-  #   hooks = {
-  #     commitizen = {
-  #       enable = true;
-  #       stages = ["commit-msg"];
-  #     };
-  #     lint = {
-  #       enable = true;
-  #       stages = ["pre-commit"];
-  #       name = "lint";
-  #       description = "Lint the code";
-  #       pass_filenames = true;
-  #       entry = "treefmt --config-file treefmt.toml";
-  #     };
-  #   };
-  # };
+  scripts = {
+    prek-install = {
+      exec = ''
+        ${pkgs.prek}/bin/prek install -q --overwrite -c "$DEVENV_ROOT/.pre-commit-config.yaml"
+        # `core.hooksPath` (e.g. beads → `.beads/hooks`) is where prek installs. If that
+        # directory previously held a PyPI `pre-commit` shim, prek renames it to `*.legacy`
+        # and still runs it first; that legacy binary prints "migration mode" and exits
+        # non-zero, blocking commits even when commitizen passes. Drop stale legacy shims.
+        if cd "$DEVENV_ROOT" && git rev-parse --git-dir >/dev/null 2>&1; then
+          HOOKS_DIR=$(git rev-parse --git-path hooks 2>/dev/null) || true
+          if [ -n "$HOOKS_DIR" ] && [ -d "$HOOKS_DIR" ]; then
+            rm -f "$HOOKS_DIR"/*.legacy
+          fi
+        fi
+      '';
+    };
+  };
+
+  tasks = {
+    "devenv:git-hooks:install" = pkgs.lib.mkForce {
+      after = ["devenv:files"];
+      before = ["devenv:enterShell"];
+      exec = ''
+        prek-install
+      '';
+    };
+  };
+
+  git-hooks = {
+    hooks = {
+      deepsec = {
+        enable = true;
+        stages = ["pre-push"];
+        name = "deepsec";
+        description = "Run deepsec process on outgoing commits; blocks push on findings";
+        pass_filenames = false;
+        always_run = true;
+        entry = "devenv shell -- bin/git-hooks/deepsec-pre-push";
+      };
+    };
+  };
 }
