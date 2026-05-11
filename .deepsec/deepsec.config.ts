@@ -1,8 +1,8 @@
-import { defineConfig } from "deepsec/config";
+import { defineConfig } from 'deepsec/config'
 
 export default defineConfig({
   projects: [
-    { id: "dotfiles", root: ".." },
+    { id: 'dotfiles', root: '..' },
     // <deepsec:projects-insert-above>
   ],
-});
+})

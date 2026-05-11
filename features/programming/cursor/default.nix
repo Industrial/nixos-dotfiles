@@ -4,16 +4,6 @@
   ...
 }: let
   # TODO: We need a way to manage the MCP servers. Add the JSON file to the .config/Cursor/mcp.json and link it correctly.
-  # Override the license of the pylance extension
-  resetLicense = drv:
-    drv.overrideAttrs (prev: {
-      meta =
-        prev.meta
-        // {
-          license = [];
-        };
-    });
-
   # Override license for unfree extensions to allow evaluation
   allowUnfreeExtension = drv:
     drv.overrideAttrs (prev: {
@@ -65,12 +55,10 @@
 
       ## Python
       extensions.vscode-marketplace.charliermarsh.ruff
-      extensions.vscode-marketplace.ms-python.mypy-type-checker
+      extensions.vscode-marketplace.astral-sh.ty
       extensions.vscode-marketplace.littlefoxteam.vscode-python-test-adapter
       extensions.vscode-marketplace.ms-python.debugpy
       extensions.vscode-marketplace.ms-python.python
-      # TODO: What was wrong with this?
-      # (resetLicense extensions.vscode-marketplace.ms-python.vscode-pylance)
 
       ## Jupyter
       extensions.vscode-marketplace.ms-toolsai.jupyter
@@ -144,6 +132,7 @@ in {
       rustfmt
 
       # Python
+      ty
       uv
     ];
   };

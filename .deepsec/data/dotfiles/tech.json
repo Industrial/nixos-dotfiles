@@ -1,13 +1,6 @@
 {
-  "tags": [
-    "bun",
-    "github-actions",
-    "node"
-  ],
-  "sentinels": [
-    "bun.lock",
-    "package.json"
-  ],
+  "tags": ["bun", "github-actions", "node"],
+  "sentinels": ["bun.lock", "package.json"],
   "detectedAt": "2026-05-09T12:50:22.727Z",
   "rootPath": "/home/tom/.dotfiles"
 }

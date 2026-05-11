@@ -38,10 +38,20 @@
     "editor.insertSpaces": true,
     "editor.tabSize": 2
   },
+  "[dockercompose]": {
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.autoIndent": "advanced",
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[github-actions-workflow]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
   "alejandra.program": "alejandra",
   "biome.enabled": true,
   "chat.editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "chat.editor.fontSize": 12,
+  "cursor.composer.queueMessageDefaultBehavior": "queue",
   "cursor.composer.shouldAllowCustomModes": true,
   "debug.console.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "debug.console.fontSize": 12,
@@ -52,7 +62,6 @@
   "editor.acceptSuggestionOnEnter": "on",
   "editor.autoClosingBrackets": "always",
   "editor.autoClosingDelete": "always",
-  "editor.defaultFormatter": "biomejs.biome",
   "editor.autoClosingQuotes": "always",
   "editor.codeActionsOnSave": {
     "source.fixAll": "never",
@@ -61,6 +70,7 @@
   },
   "editor.codeLensFontFamily": "'IosevkaTerm Nerd Font Mono'",
   "editor.codeLensFontSize": 12,
+  "editor.defaultFormatter": "biomejs.biome",
   "editor.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "editor.fontLigatures": true,
   "editor.fontSize": 12,
@@ -143,6 +153,7 @@
   "emmet.showSuggestionsAsSnippets": true,
   "errorLens.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "errorLens.fontSize": "12",
+  "explorer.autoReveal": true,
   "explorer.confirmDelete": false,
   "explorer.confirmDragAndDrop": false,
   "extensions.autoCheckUpdates": false,
@@ -156,6 +167,7 @@
   "git.autofetch": true,
   "git.confirmSync": false,
   "git.enableSmartCommit": true,
+  "git.openRepositoryInParentFolders": "always",
   "gitlens.blame.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "gitlens.blame.fontSize": 12,
   "gitlens.currentLine.fontFamily": "'IosevkaTerm Nerd Font Mono'",
@@ -165,14 +177,14 @@
   "jupyter.askForKernelRestart": false,
   "jupyter.interactiveWindow.creationMode": "perFile",
   "jupyter.notebookFileRoot": "${workspaceRoot}",
+  "lldb-dap.executable-path": "/nix/store/q3p69a1jdli1rszys53krr43gl1q9fcj-lldb-21.1.2/bin/lldb",
+  "lldb.library": "/run/current-system/sw/lib/liblldb.so",
   "markdown.preview.fontSize": 12,
   "nix.enableLanguageServer": true,
   "nix.serverPath": "/run/current-system/sw/bin/nixd",
   "nix.serverSettings": {
     "nixd": {
-      "formatting": {
-        "command": ["alejandra"]
-      },
+      "formatting": { "command": ["alejandra"] },
       "options": {
         "nixos": {
           "expr": "(builtins.getFlake \"${workspaceFolder}\").nixosConfigurations.<name>.options"
@@ -189,123 +201,12 @@
   "notebook.markup.fontSize": 12,
   "notebook.output.fontFamily": "'IosevkaTerm Nerd Font Mono'",
   "notebook.output.fontSize": 12,
-  "python.analysis.autoFormatStrings": true,
-  "treefmt.debug": true,
-  "python.analysis.autoImportCompletions": true,
-  "python.analysis.diagnosticMode": "workspace",
-  "python.analysis.exclude": [
-    "**/.git",
-    "**/.ipynb_checkpoints",
-    "**/.mypy_cache",
-    "**/.pytest_cache",
-    "**/.venv",
-    "**/.vscode",
-    "**/__pycache__",
-    "**/build",
-    "**/data",
-    "**/dist",
-    "**/jupyter_execute",
-    "**/node_modules",
-    "**/venv"
-  ],
-  "python.analysis.fixAll": [
-    "source.unusedImports",
-    "source.convertImportFormat"
-  ],
-  "python.analysis.importFormat": "absolute",
-  "python.analysis.include": ["src/**/*"],
-  "python.analysis.inlayHints.callArgumentNames": "off",
-  "python.analysis.inlayHints.functionReturnTypes": true,
-  "python.analysis.inlayHints.variableTypes": true,
-  "python.analysis.typeCheckingMode": "standard",
   "python.experiments.enabled": false,
+  "python.languageServer": "None",
   "python.terminal.activateEnvironment": false,
   "redhat.telemetry.enabled": false,
   "references.preferredLocation": "view",
-  "scm.inputFontFamily": "'IosevkaTerm Nerd Font Mono'",
-  "scm.inputFontSize": 12,
-  "security.workspace.trust.untrustedFiles": "open",
-  "terminal.integrated.copyOnSelection": true,
-  "terminal.integrated.enableMultiLinePasteWarning": "never",
-  "terminal.integrated.fontFamily": "'IosevkaTerm Nerd Font Mono'",
-  "terminal.integrated.fontSize": 12,
-  "terminal.integrated.tabs.enableAnimation": true,
-  "terminal.integrated.tabs.enabled": true,
-  "terminal.integrated.tabs.focusMode": "singleClick",
-  "terminal.integrated.tabs.hideCondition": "never",
-  "terminal.integrated.tabs.location": "left",
-  "terminal.integrated.tabs.showActions": "always",
-  "terminal.integrated.tabs.showActiveTerminal": "always",
-  "terminal.external.linuxExec": "/run/current-system/sw/bin/bash",
-  "terminal.integrated.shellIntegration.enabled": true,
-  "terminal.integrated.profiles.linux": {
-    "fish": {
-      "path": "/run/current-system/sw/bin/fish"
-    },
-    "bash": {
-      "path": "/run/current-system/sw/bin/bash"
-    },
-    "nu": {
-      "path": "/run/current-system/sw/bin/nu",
-      "args": []
-    }
-  },
-  "terminal.integrated.defaultProfile.linux": "fish",
-  "terminal.integrated.automationProfile.linux": {
-    "path": "/run/current-system/sw/bin/fish"
-  },
-  "typescript.enablePromptUseWorkspaceTsdk": true,
-  "typescript.format.enable": false,
-  "typescript.format.insertSpaceAfterTypeAssertion": true,
-  "typescript.inlayHints.enumMemberValues.enabled": true,
-  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
-  "typescript.inlayHints.parameterNames.enabled": "all",
-  "typescript.inlayHints.parameterTypes.enabled": true,
-  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
-  "typescript.inlayHints.variableTypes.enabled": true,
-  "typescript.preferGoToSourceDefinition": true,
-  "typescript.preferences.preferTypeOnlyAutoImports": true,
-  "typescript.suggest.completeFunctionCalls": true,
-  "typescript.tsserver.maxTsServerMemory": 16384,
-  "typescript.tsserver.web.typeAcquisition.enabled": true,
-  "typescript.updateImportsOnFileMove.enabled": "always",
-  "vim.foldfix": true,
-  "vim.hlsearch": true,
-  "vim.normalModeKeyBindingsNonRecursive": [
-    {
-      "before": ["<space>"],
-      "commands": ["whichkey.show"]
-    }
-  ],
-  "vim.visualModeKeyBindingsNonRecursive": [
-    {
-      "before": ["<space>"],
-      "commands": ["whichkey.show"]
-    }
-  ],
-  "window.commandCenter": true,
-  "window.confirmSaveUntitledWorkspace": false,
-  "workbench.editor.enablePreview": false,
-  "workbench.enableExperiments": true,
-  "workbench.list.openMode": "doubleClick",
-  "[dockercompose]": {
-    "editor.insertSpaces": true,
-    "editor.tabSize": 2,
-    "editor.autoIndent": "advanced",
-    "editor.defaultFormatter": "redhat.vscode-yaml"
-  },
-  "[github-actions-workflow]": {
-    "editor.defaultFormatter": "redhat.vscode-yaml"
-  },
-  "git.openRepositoryInParentFolders": "always",
-  "explorer.autoReveal": true,
-  "lldb-dap.executable-path": "/nix/store/q3p69a1jdli1rszys53krr43gl1q9fcj-lldb-21.1.2/bin/lldb",
-  "lldb.library": "/run/current-system/sw/lib/liblldb.so",
-  "remote.SSH.remotePlatform": {
-    "tnr-0": "linux"
-  },
-  "cursor.composer.queueMessageDefaultBehavior": "queue",
-  "update.mode": "none",
+  "remote.SSH.remotePlatform": { "tnr-0": "linux" },
   "rust-analyzer.assist.emitMustUse": true,
   "rust-analyzer.assist.preferSelf": true,
   "rust-analyzer.cachePriming.enable": true,
@@ -327,5 +228,61 @@
   "rust-analyzer.semanticHighlighting.operator.specialization.enable": true,
   "rust-analyzer.semanticHighlighting.punctuation.enable": true,
   "rust-analyzer.semanticHighlighting.punctuation.separate.macro.bang": true,
-  "rust-analyzer.semanticHighlighting.punctuation.specialization.enable": true
+  "rust-analyzer.semanticHighlighting.punctuation.specialization.enable": true,
+  "scm.inputFontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "scm.inputFontSize": 12,
+  "security.workspace.trust.untrustedFiles": "open",
+  "terminal.external.linuxExec": "/run/current-system/sw/bin/bash",
+  "terminal.integrated.automationProfile.linux": {
+    "path": "/run/current-system/sw/bin/fish"
+  },
+  "terminal.integrated.copyOnSelection": true,
+  "terminal.integrated.defaultProfile.linux": "fish",
+  "terminal.integrated.enableMultiLinePasteWarning": "never",
+  "terminal.integrated.fontFamily": "'IosevkaTerm Nerd Font Mono'",
+  "terminal.integrated.fontSize": 12,
+  "terminal.integrated.profiles.linux": {
+    "fish": { "path": "/run/current-system/sw/bin/fish" },
+    "bash": { "path": "/run/current-system/sw/bin/bash" },
+    "nu": { "path": "/run/current-system/sw/bin/nu", "args": [] }
+  },
+  "terminal.integrated.shellIntegration.enabled": true,
+  "terminal.integrated.tabs.enableAnimation": true,
+  "terminal.integrated.tabs.enabled": true,
+  "terminal.integrated.tabs.focusMode": "singleClick",
+  "terminal.integrated.tabs.hideCondition": "never",
+  "terminal.integrated.tabs.location": "left",
+  "terminal.integrated.tabs.showActions": "always",
+  "terminal.integrated.tabs.showActiveTerminal": "always",
+  "treefmt.debug": true,
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.format.enable": false,
+  "typescript.format.insertSpaceAfterTypeAssertion": true,
+  "typescript.inlayHints.enumMemberValues.enabled": true,
+  "typescript.inlayHints.functionLikeReturnTypes.enabled": true,
+  "typescript.inlayHints.parameterNames.enabled": "all",
+  "typescript.inlayHints.parameterTypes.enabled": true,
+  "typescript.inlayHints.propertyDeclarationTypes.enabled": true,
+  "typescript.inlayHints.variableTypes.enabled": true,
+  "typescript.preferGoToSourceDefinition": true,
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "typescript.suggest.completeFunctionCalls": true,
+  "typescript.tsserver.maxTsServerMemory": 16384,
+  "typescript.tsserver.web.typeAcquisition.enabled": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "update.mode": "none",
+  "vim.foldfix": true,
+  "vim.hlsearch": true,
+  "vim.normalModeKeyBindingsNonRecursive": [
+    { "before": ["<space>"], "commands": ["whichkey.show"] }
+  ],
+  "vim.visualModeKeyBindingsNonRecursive": [
+    { "before": ["<space>"], "commands": ["whichkey.show"] }
+  ],
+  "window.commandCenter": true,
+  "window.confirmSaveUntitledWorkspace": false,
+  "workbench.colorTheme": "base16-gruvbox-dark-hard",
+  "workbench.editor.enablePreview": false,
+  "workbench.enableExperiments": true,
+  "workbench.list.openMode": "doubleClick"
 }
