@@ -30,7 +30,7 @@ agent="${DEEPSEC_PRE_PUSH_AGENT:-claude}"
 
 resolve_base_for_new_branch() {
   local local_sha=$1
-  local remote_branch candidate mb
+  local remote_branch mb
   for remote_branch in "refs/remotes/origin/main" "refs/remotes/origin/master"; do
     if git -C "$toplevel" rev-parse -q --verify "$remote_branch" >/dev/null 2>&1; then
       mb=$(git -C "$toplevel" merge-base "$remote_branch" "$local_sha" 2>/dev/null || true)
