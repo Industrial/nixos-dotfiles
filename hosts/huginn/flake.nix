@@ -5,6 +5,13 @@
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
 
+    # Hyprland 0.55+ (Lua configs); nixpkgs-unstable may lag behind.
+    # Do not pin hyprland.inputs.nixpkgs here: Hyprland may require a newer nixpkgs
+    # (e.g. lua5_5) than this flake's nixpkgs provides.
+    hyprland = {
+      url = "github:hyprwm/hyprland";
+    };
+
     # Hardware Support.
     nixos-hardware = {
       url = "github:NixOS/nixos-hardware/master";
