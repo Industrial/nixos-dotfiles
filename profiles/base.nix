@@ -110,7 +110,7 @@
     # Media (common to all hosts)
     ../features/media/calibre
     ../features/media/qbittorrent
-    ../features/media/spotify
+    #../features/media/spotify
     ../features/media/vlc
   ];
 }
