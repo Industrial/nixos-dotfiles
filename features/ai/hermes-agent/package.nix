@@ -27,8 +27,8 @@ python3Packages.buildPythonApplication rec {
   pyproject = true;
   build-system = with python3Packages; [setuptools];
 
-  # Core dependencies only ([project].dependencies — no optional extras).
-  # Optional groups (messaging, web, anthropic, …) belong in separate passthru / future outputs.
+  # Core [project].dependencies plus anthropic (optional extra upstream; required for provider=anthropic).
+  # Other lazy backends stay in pythonRemoveDeps until we add explicit outputs or deps for them.
   dependencies =
     (with python3Packages; [
       openai
@@ -49,6 +49,7 @@ python3Packages.buildPythonApplication rec {
       pyjwt
       cryptography
       psutil
+      anthropic
     ])
     ++ lib.optionals (python3Packages.python.stdenv.hostPlatform.isWindows) [python3Packages.tzdata];
 
@@ -72,12 +73,12 @@ python3Packages.buildPythonApplication rec {
     "pyjwt"
     "cryptography"
     "psutil"
+    "anthropic"
   ];
 
   # Upstream loads these via tools/lazy_deps.py; they are not true core imports but
   # still appear as Requires-Dist on the built wheel, which breaks pythonRuntimeDepsCheck.
   pythonRemoveDeps = [
-    "anthropic"
     "exa-py"
     "parallel-web"
     "fal-client"
