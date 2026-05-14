@@ -45,6 +45,7 @@ python3Packages.buildPythonPackage rec {
     pydantic
     pygls
     pystray
+    pywebview
     python-dotenv
     python-multipart
     pyyaml
@@ -69,7 +70,6 @@ python3Packages.buildPythonPackage rec {
     "dotenv"
     "pyright"
     "fortls"
-    "pywebview"
   ];
 
   doCheck = false;
