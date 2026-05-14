@@ -1,16 +1,35 @@
 # Hyprland - Dynamic Tiling Wayland Compositor with Desktop Integration
 # Integrates with NetworkManager, Bluetooth, and other GNOME services
+# Lua config (hyprland.lua) requires Hyprland 0.55+; pin via flake input `hyprland`
+# (nixpkgs-unstable may still ship an older release).
+# See https://hypr.land/news/26_lua/ and https://wiki.hypr.land/Nix/Hyprland-on-NixOS/
 # TODO: Integrate these plugins/functionalities:
 # - https://github.com/raybbian/hyprtasking
 {
   pkgs,
   lib,
   settings,
+  inputs,
   ...
-}: {
+}:
+let
+  system = pkgs.stdenv.hostPlatform.system;
+  hyprPkgs = inputs.hyprland.packages.${system};
+  hyprlandPkg = hyprPkgs.hyprland;
+  hyprlandPortal = hyprPkgs.xdg-desktop-portal-hyprland;
+  # Live config under the git checkout (edit + `hyprctl reload` / restart Hyprland — no rebuild).
+  dotfilesHyprDir = "${settings.userdir}/.dotfiles/features/window-manager/hyprland";
+in
+assert lib.assertMsg (inputs ? hyprland) ''
+  features/window-manager/hyprland: add a `hyprland` flake input, for example:
+    hyprland.url = "github:hyprwm/hyprland";
+  (Avoid `hyprland.inputs.nixpkgs.follows` unless your nixpkgs has all deps, e.g. lua5_5.)
+''; {
   programs = {
     hyprland = {
       enable = true;
+      package = hyprlandPkg;
+      portalPackage = hyprlandPortal;
       xwayland = {
         enable = true;
       };
@@ -33,11 +52,18 @@
     activationScripts = {
       hyprland-config = lib.stringAfter ["etc"] ''
         mkdir -p /home/${settings.username}/.config/hypr
-        if [ ! -f /home/${settings.username}/.config/hypr/hyprland.conf ]; then
-          ln -sfn /etc/xdg/hypr/hyprland.conf /home/${settings.username}/.config/hypr/hyprland.conf
+        # Prefer the mutable checkout so edits apply after reload/restart without nixos-rebuild.
+        if [ -f "${dotfilesHyprDir}/hyprland.lua" ]; then
+          ln -sfn "${dotfilesHyprDir}/hyprland.lua" /home/${settings.username}/.config/hypr/hyprland.lua
+        else
+          ln -sfn /etc/xdg/hypr/hyprland.lua /home/${settings.username}/.config/hypr/hyprland.lua
+        fi
+        if [ -f "${dotfilesHyprDir}/hyprland.conf.hyprlang" ]; then
+          ln -sfn "${dotfilesHyprDir}/hyprland.conf.hyprlang" /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
+        else
+          ln -sfn /etc/xdg/hypr/hyprland.conf.hyprlang /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
         fi
 
-        mkdir -p /home/${settings.username}/.config/hypr
         if [ ! -f /home/${settings.username}/.config/hypr/hypridle.conf ]; then
           ln -sfn /etc/xdg/hypr/hypridle.conf /home/${settings.username}/.config/hypr/hypridle.conf
         fi
@@ -55,8 +81,12 @@
 
   environment = {
     etc = {
-      "xdg/hypr/hyprland.conf" = {
-        source = ./hyprland.conf;
+      "xdg/hypr/hyprland.lua" = {
+        source = ./hyprland.lua;
+        mode = "0644";
+      };
+      "xdg/hypr/hyprland.conf.hyprlang" = {
+        source = ./hyprland.conf.hyprlang;
         mode = "0644";
       };
       "xdg/hypr/hypridle.conf" = {
@@ -85,8 +115,8 @@
     };
 
     systemPackages = with pkgs; [
-      # Hyprland ecosystem
-      hyprland
+      # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
+      hyprlandPkg
       # Lock screen
       hyprlock
       # Idle screen
