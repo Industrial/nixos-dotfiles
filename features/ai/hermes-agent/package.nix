@@ -27,6 +27,10 @@ python3Packages.buildPythonApplication rec {
   pyproject = true;
   build-system = with python3Packages; [setuptools];
 
+  # mcp is an optional extra ("extra == mcp") so buildPythonApplication's dep resolution skips
+  # it. Inject it explicitly via propagatedBuildInputs so it lands in the runtime closure.
+  propagatedBuildInputs = with python3Packages; [mcp];
+
   # Core [project].dependencies plus anthropic (optional extra upstream; required for provider=anthropic).
   # Other lazy backends stay in pythonRemoveDeps until we add explicit outputs or deps for them.
   dependencies =
@@ -50,6 +54,7 @@ python3Packages.buildPythonApplication rec {
       cryptography
       psutil
       anthropic
+      mcp
     ])
     ++ lib.optionals (python3Packages.python.stdenv.hostPlatform.isWindows) [python3Packages.tzdata];
 
@@ -74,6 +79,7 @@ python3Packages.buildPythonApplication rec {
     "cryptography"
     "psutil"
     "anthropic"
+    "mcp"
   ];
 
   # Upstream loads these via tools/lazy_deps.py; they are not true core imports but
