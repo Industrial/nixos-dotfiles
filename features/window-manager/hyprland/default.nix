@@ -75,6 +75,8 @@ assert lib.assertMsg (inputs ? hyprland) ''
         if [ ! -f /home/${settings.username}/.config/hypr/hyprsunset.conf ]; then
           ln -sfn /etc/xdg/hypr/hyprsunset.conf /home/${settings.username}/.config/hypr/hyprsunset.conf
         fi
+
+        ln -sfn "${dotfilesHyprDir}/xdph.conf" /home/${settings.username}/.config/hypr/xdph.conf
       '';
     };
   };
@@ -103,6 +105,10 @@ assert lib.assertMsg (inputs ? hyprland) ''
       };
       "xdg/ashell/config.toml" = {
         source = ./ashell.toml;
+        mode = "0644";
+      };
+      "xdg/hypr/xdph.conf" = {
+        source = ./xdph.conf;
         mode = "0644";
       };
     };
