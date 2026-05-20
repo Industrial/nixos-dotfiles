@@ -146,6 +146,7 @@ hl.bind("SUPER + CTRL + SHIFT + Q", hl.dsp.exit())
 hl.bind("SUPER + CTRL + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
 
 -- Window
+hl.bind("SUPER + CTRL + C", hl.dsp.window.close())
 hl.bind("SUPER + CTRL + Q", hl.dsp.window.kill())
 hl.bind("SUPER + CTRL + Space", hl.dsp.window.float({ action = "toggle" }))
 
