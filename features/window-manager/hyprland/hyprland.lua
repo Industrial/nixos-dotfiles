@@ -7,11 +7,15 @@
 -----------------
 
 -- 8K resolution: 7680x2160@59.99Hz
+-- bitdepth 8: required for PipeWire screen share (Signal, WebRTC, etc.).
+-- bitdepth,10 breaks or greys out capture on xdg-desktop-portal-hyprland.
+-- https://wiki.hypr.land/Configuring/Monitors/#10-bit-support
 hl.monitor({
   output = "DP-1",
   mode = "7680x2160@59.99",
   position = "auto",
   scale = 1,
+  bitdepth = 8,
 })
 
 --------------------
