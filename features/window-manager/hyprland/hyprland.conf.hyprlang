@@ -1,6 +1,7 @@
 # Monitor Configuration
 # 8K resolution: 7680x2160@59.99Hz
-monitor=DP-1,7680x2160@59.99,auto,1
+# bitdepth,8 — do not use bitdepth,10; breaks PipeWire screen share (grey/black).
+monitor=DP-1,7680x2160@59.99,auto,1,bitdepth,8
 
 # Input Configuration
 input {
