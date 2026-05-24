@@ -27,9 +27,6 @@ in {
   packages =
     dotfilesCoreutils
     ++ (with pkgs; [
-      # AI
-      inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.beads
-
       # Nix
       nix-unit
       namaka

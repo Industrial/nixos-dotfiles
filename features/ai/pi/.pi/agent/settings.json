@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.75.5",
   "defaultProvider": "openrouter",
-  "defaultModel": "openrouter/free",
+  "defaultModel": "openrouter/auto",
   "defaultThinkingLevel": "medium",
   "packages": [
     "npm:pi-subagents",
