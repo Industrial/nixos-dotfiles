@@ -2,5 +2,11 @@
   "lastChangelogVersion": "0.75.5",
   "defaultProvider": "openrouter",
   "defaultModel": "openrouter/free",
-  "defaultThinkingLevel": "medium"
+  "defaultThinkingLevel": "medium",
+  "packages": [
+    "npm:pi-subagents",
+    "npm:pi-web-access",
+    "npm:pi-mcp-adapter",
+    "npm:pi-lean-ctx"
+  ]
 }

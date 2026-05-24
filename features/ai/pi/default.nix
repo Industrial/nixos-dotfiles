@@ -3,9 +3,15 @@
 #
 # Provides `pi` on PATH as a NixOS system package.
 {pkgs, ...}: {
-  environment.systemPackages = [
-    (pkgs.callPackage ./package.nix {
-      nodejs = pkgs.nodejs_22;
-    })
-  ];
+  environment = {
+    variables = {
+      LEAN_CTX_PI_MODE = "replace";
+    };
+
+    systemPackages = [
+      (pkgs.callPackage ./package.nix {
+        nodejs = pkgs.nodejs_22;
+      })
+    ];
+  };
 }

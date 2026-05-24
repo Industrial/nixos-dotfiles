@@ -1,0 +1,89 @@
+{
+  "mcpServers": {
+    "chromedevtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "directTools": true
+    },
+    "mcp-debugger": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@debugmcp/mcp-debugger",
+        "stdio",
+        "--log-level",
+        "debug",
+        "--log-file",
+        "./tmp/debug-mcp-server.log"
+      ],
+      "disabled": false,
+      "autoApprove": [
+        "create_debug_session",
+        "set_breakpoint",
+        "get_variables"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "disabled": false
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "disabled": false
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github@latest"
+      ],
+      "disabled": false
+    },
+    "temporal": {
+      "command": "uvx",
+      "args": [
+        "temporal-mcp-server",
+        "--host",
+        "127.0.0.1:7233",
+        "--namespace",
+        "default",
+        "--tls-enabled",
+        "false"
+      ],
+      "disabled": false,
+      "description": "Temporal workflows/schedules via MCP (temporal-mcp-server; see https://github.com/GethosTheWalrus/temporal-mcp)"
+    },
+    "lean-ctx": {
+      "command": "lean-ctx",
+      "args": [],
+      "disabled": false,
+      "description": "lean-ctx MCP (context compression; https://github.com/yvgude/lean-ctx)"
+    },
+    "serena": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--with", "\"serana-agent>=0.1.4\"", "start-mcp-server"],
+      "disabled": false,
+      "description": "Serena MCP (@oraios/serena); stdio via uv + devenv"
+    },
+    "roam-code": {
+      "type": "stdio",
+      "command": "roam",
+      "args": ["mcp"],
+      "disabled": false,
+      "description": "roam-code MCP via devenv (`roam mcp` + fastmcp)"
+    }
+  },
+  "imports": []
+}
