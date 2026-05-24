@@ -17,5 +17,6 @@
     # ../features/ai/n8n
     # ../features/ai/ollama
     ../features/ai/opencode
+    ../features/ai/pi
   ];
 }

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > ai > pi > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+sourceDirectoryPath="${currentDirectoryPath}/features/ai/pi/.pi"
+targetDirectoryPath="${HOME}/.pi"
+
+rm -rf "${targetDirectoryPath}"
+ln -sf "${sourceDirectoryPath}" "${targetDirectoryPath}"
