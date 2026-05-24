@@ -12,6 +12,7 @@
       (pkgs.callPackage ./package.nix {
         nodejs = pkgs.nodejs_22;
       })
+      (pkgs.callPackage ./plugins/pi-mcp-beads/default.nix {})
     ];
   };
 }

@@ -2,10 +2,7 @@
   "mcpServers": {
     "chromedevtools": {
       "command": "npx",
-      "args": [
-        "-y",
-        "chrome-devtools-mcp@latest"
-      ],
+      "args": ["-y", "chrome-devtools-mcp@latest"],
       "directTools": true
     },
     "mcp-debugger": {
@@ -19,32 +16,19 @@
         "--log-file",
         "./tmp/debug-mcp-server.log"
       ],
-      "autoApprove": [
-        "create_debug_session",
-        "set_breakpoint",
-        "get_variables"
-      ]
+      "autoApprove": ["create_debug_session", "set_breakpoint", "get_variables"]
     },
     "context7": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@upstash/context7-mcp@latest"
-      ]
+      "args": ["-y", "@upstash/context7-mcp@latest"]
     },
     "playwright": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest"
-      ]
+      "args": ["-y", "@playwright/mcp@latest"]
     },
     "github": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github@latest"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-github@latest"]
     },
     "temporal": {
       "command": "uvx",
@@ -75,6 +59,25 @@
       "command": "roam",
       "args": ["mcp"],
       "description": "roam-code MCP via devenv (`roam mcp` + fastmcp)"
+    },
+    "beads": {
+      "type": "stdio",
+      "command": "/home/tom/.dotfiles/features/ai/pi/bin/pi-mcp-beads",
+      "args": [],
+      "lifecycle": "lazy",
+      "description": "Beads (bd) issue tracking — 110 tools via pi-mcp-beads",
+      "directTools": [
+        "bd_ready",
+        "bd_show",
+        "bd_create",
+        "bd_close",
+        "bd_update",
+        "bd_list",
+        "bd_sync",
+        "bd_prime",
+        "bd_blocked",
+        "bd_dep_add"
+      ]
     }
   },
   "imports": []

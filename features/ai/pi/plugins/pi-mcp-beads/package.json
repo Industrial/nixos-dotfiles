@@ -1,0 +1,27 @@
+{
+  "name": "pi-mcp-beads",
+  "version": "0.1.0",
+  "description": "An MCP server encapsulating Beads commands.",
+  "type": "module",
+  "main": "src/index.ts",
+  "bin": {
+    "pi-mcp-beads": "src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun run --watch src/index.ts",
+    "test": "bun test",
+    "lint": "oxlint",
+    "typecheck": "tsgo -b --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.10",
+    "@types/bun": "latest",
+    "@types/node": "^25.0.7",
+    "@typescript/native-preview": "^7.0.0-dev.20260128.1",
+    "oxlint": "^1.66.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
+}

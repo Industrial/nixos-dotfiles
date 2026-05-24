@@ -11,8 +11,7 @@
   settings,
   inputs,
   ...
-}:
-let
+}: let
   system = pkgs.stdenv.hostPlatform.system;
   hyprPkgs = inputs.hyprland.packages.${system};
   hyprlandPkg = hyprPkgs.hyprland;
@@ -20,169 +19,169 @@ let
   # Live config under the git checkout (edit + `hyprctl reload` / restart Hyprland — no rebuild).
   dotfilesHyprDir = "${settings.userdir}/.dotfiles/features/window-manager/hyprland";
 in
-assert lib.assertMsg (inputs ? hyprland) ''
-  features/window-manager/hyprland: add a `hyprland` flake input, for example:
-    hyprland.url = "github:hyprwm/hyprland";
-  (Avoid `hyprland.inputs.nixpkgs.follows` unless your nixpkgs has all deps, e.g. lua5_5.)
-''; {
-  programs = {
-    hyprland = {
-      enable = true;
-      package = hyprlandPkg;
-      portalPackage = hyprlandPortal;
-      xwayland = {
+  assert lib.assertMsg (inputs ? hyprland) ''
+    features/window-manager/hyprland: add a `hyprland` flake input, for example:
+      hyprland.url = "github:hyprwm/hyprland";
+    (Avoid `hyprland.inputs.nixpkgs.follows` unless your nixpkgs has all deps, e.g. lua5_5.)
+  ''; {
+    programs = {
+      hyprland = {
         enable = true;
-      };
-    };
-  };
-
-  services = {
-    displayManager = {
-      gdm = {
-        enable = true;
+        package = hyprlandPkg;
+        portalPackage = hyprlandPortal;
+        xwayland = {
+          enable = true;
+        };
       };
     };
 
-    gnome = {
-      gnome-keyring.enable = true;
-    };
-  };
-
-  system = {
-    activationScripts = {
-      hyprland-config = lib.stringAfter ["etc"] ''
-        mkdir -p /home/${settings.username}/.config/hypr
-        # Prefer the mutable checkout so edits apply after reload/restart without nixos-rebuild.
-        if [ -f "${dotfilesHyprDir}/hyprland.lua" ]; then
-          ln -sfn "${dotfilesHyprDir}/hyprland.lua" /home/${settings.username}/.config/hypr/hyprland.lua
-        else
-          ln -sfn /etc/xdg/hypr/hyprland.lua /home/${settings.username}/.config/hypr/hyprland.lua
-        fi
-        if [ -f "${dotfilesHyprDir}/hyprland.conf.hyprlang" ]; then
-          ln -sfn "${dotfilesHyprDir}/hyprland.conf.hyprlang" /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
-        else
-          ln -sfn /etc/xdg/hypr/hyprland.conf.hyprlang /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
-        fi
-
-        if [ ! -f /home/${settings.username}/.config/hypr/hypridle.conf ]; then
-          ln -sfn /etc/xdg/hypr/hypridle.conf /home/${settings.username}/.config/hypr/hypridle.conf
-        fi
-
-        if [ ! -f /home/${settings.username}/.config/hypr/hyprpaper.conf ]; then
-          ln -sfn /etc/xdg/hypr/hyprpaper.conf /home/${settings.username}/.config/hypr/hyprpaper.conf
-        fi
-
-        if [ ! -f /home/${settings.username}/.config/hypr/hyprsunset.conf ]; then
-          ln -sfn /etc/xdg/hypr/hyprsunset.conf /home/${settings.username}/.config/hypr/hyprsunset.conf
-        fi
-
-        ln -sfn "${dotfilesHyprDir}/xdph.conf" /home/${settings.username}/.config/hypr/xdph.conf
-      '';
-    };
-  };
-
-  environment = {
-    etc = {
-      "xdg/hypr/hyprland.lua" = {
-        source = ./hyprland.lua;
-        mode = "0644";
+    services = {
+      displayManager = {
+        gdm = {
+          enable = true;
+        };
       };
-      "xdg/hypr/hyprland.conf.hyprlang" = {
-        source = ./hyprland.conf.hyprlang;
-        mode = "0644";
-      };
-      "xdg/hypr/hypridle.conf" = {
-        source = ./hypridle.conf;
-        mode = "0644";
-      };
-      "xdg/hypr/hyprpaper.conf" = {
-        source = ./hyprpaper.conf;
-        mode = "0644";
-      };
-      "xdg/hypr/hyprsunset.conf" = {
-        source = ./hyprsunset.conf;
-        mode = "0644";
-      };
-      "xdg/ashell/config.toml" = {
-        source = ./ashell.toml;
-        mode = "0644";
-      };
-      "xdg/hypr/xdph.conf" = {
-        source = ./xdph.conf;
-        mode = "0644";
+
+      gnome = {
+        gnome-keyring.enable = true;
       };
     };
 
-    sessionVariables = {
-      NIXOS_OZONE_WL = "1";
-      QT_QPA_PLATFORM = "wayland";
-      GDK_BACKEND = "wayland";
-      WLR_NO_HARDWARE_CURSORS = "1";
+    system = {
+      activationScripts = {
+        hyprland-config = lib.stringAfter ["etc"] ''
+          mkdir -p /home/${settings.username}/.config/hypr
+          # Prefer the mutable checkout so edits apply after reload/restart without nixos-rebuild.
+          if [ -f "${dotfilesHyprDir}/hyprland.lua" ]; then
+            ln -sfn "${dotfilesHyprDir}/hyprland.lua" /home/${settings.username}/.config/hypr/hyprland.lua
+          else
+            ln -sfn /etc/xdg/hypr/hyprland.lua /home/${settings.username}/.config/hypr/hyprland.lua
+          fi
+          if [ -f "${dotfilesHyprDir}/hyprland.conf.hyprlang" ]; then
+            ln -sfn "${dotfilesHyprDir}/hyprland.conf.hyprlang" /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
+          else
+            ln -sfn /etc/xdg/hypr/hyprland.conf.hyprlang /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
+          fi
+
+          if [ ! -f /home/${settings.username}/.config/hypr/hypridle.conf ]; then
+            ln -sfn /etc/xdg/hypr/hypridle.conf /home/${settings.username}/.config/hypr/hypridle.conf
+          fi
+
+          if [ ! -f /home/${settings.username}/.config/hypr/hyprpaper.conf ]; then
+            ln -sfn /etc/xdg/hypr/hyprpaper.conf /home/${settings.username}/.config/hypr/hyprpaper.conf
+          fi
+
+          if [ ! -f /home/${settings.username}/.config/hypr/hyprsunset.conf ]; then
+            ln -sfn /etc/xdg/hypr/hyprsunset.conf /home/${settings.username}/.config/hypr/hyprsunset.conf
+          fi
+
+          ln -sfn "${dotfilesHyprDir}/xdph.conf" /home/${settings.username}/.config/hypr/xdph.conf
+        '';
+      };
     };
 
-    systemPackages = with pkgs; [
-      # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
-      hyprlandPkg
-      # Lock screen
-      hyprlock
-      # Idle screen
-      hypridle
-      # Wallpaper manager
-      hyprpaper
-      # Cursor theme manager
-      hyprcursor
-      # Blue-light filter / Night light
-      hyprsunset
-      # Bar
-      ashell
-      # Application launcher
-      wofi
-      # Notification daemon
-      mako
+    environment = {
+      etc = {
+        "xdg/hypr/hyprland.lua" = {
+          source = ./hyprland.lua;
+          mode = "0644";
+        };
+        "xdg/hypr/hyprland.conf.hyprlang" = {
+          source = ./hyprland.conf.hyprlang;
+          mode = "0644";
+        };
+        "xdg/hypr/hypridle.conf" = {
+          source = ./hypridle.conf;
+          mode = "0644";
+        };
+        "xdg/hypr/hyprpaper.conf" = {
+          source = ./hyprpaper.conf;
+          mode = "0644";
+        };
+        "xdg/hypr/hyprsunset.conf" = {
+          source = ./hyprsunset.conf;
+          mode = "0644";
+        };
+        "xdg/ashell/config.toml" = {
+          source = ./ashell.toml;
+          mode = "0644";
+        };
+        "xdg/hypr/xdph.conf" = {
+          source = ./xdph.conf;
+          mode = "0644";
+        };
+      };
 
-      # WiFi/Network GUI (system tray)
-      networkmanagerapplet
-      # NetworkManager dmenu launcher
-      networkmanager_dmenu
-      # Bluetooth manager GUI
-      blueman
-      # Audio control GUI
-      pavucontrol
-      # Settings (optional)
-      gnome-control-center
+      sessionVariables = {
+        NIXOS_OZONE_WL = "1";
+        QT_QPA_PLATFORM = "wayland";
+        GDK_BACKEND = "wayland";
+        WLR_NO_HARDWARE_CURSORS = "1";
+      };
 
-      # Polkit for authentication dialogs
-      polkit_gnome
+      systemPackages = with pkgs; [
+        # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
+        hyprlandPkg
+        # Lock screen
+        hyprlock
+        # Idle screen
+        hypridle
+        # Wallpaper manager
+        hyprpaper
+        # Cursor theme manager
+        hyprcursor
+        # Blue-light filter / Night light
+        hyprsunset
+        # Bar
+        ashell
+        # Application launcher
+        wofi
+        # Notification daemon
+        mako
 
-      # System utilities
-      brightnessctl # Screen brightness control
-      wireplumber # Audio system (usually handled by systemd)
-      playerctl # Media player control
+        # WiFi/Network GUI (system tray)
+        networkmanagerapplet
+        # NetworkManager dmenu launcher
+        networkmanager_dmenu
+        # Bluetooth manager GUI
+        blueman
+        # Audio control GUI
+        pavucontrol
+        # Settings (optional)
+        gnome-control-center
 
-      # File manager
-      nautilus
+        # Polkit for authentication dialogs
+        polkit_gnome
 
-      # Terminal
-      alacritty
+        # System utilities
+        brightnessctl # Screen brightness control
+        wireplumber # Audio system (usually handled by systemd)
+        playerctl # Media player control
 
-      # GNOME Keyring for password management
-      gnome-keyring
-    ];
-  };
+        # File manager
+        nautilus
 
-  xdg = {
-    portal = {
-      enable = true;
-      wlr.enable = true;
-      extraPortals = [
-        pkgs.xdg-desktop-portal-gtk
+        # Terminal
+        alacritty
+
+        # GNOME Keyring for password management
+        gnome-keyring
       ];
     };
-  };
 
-  security = {
-    polkit = {
-      enable = true;
+    xdg = {
+      portal = {
+        enable = true;
+        wlr.enable = true;
+        extraPortals = [
+          pkgs.xdg-desktop-portal-gtk
+        ];
+      };
     };
-  };
-}
+
+    security = {
+      polkit = {
+        enable = true;
+      };
+    };
+  }
