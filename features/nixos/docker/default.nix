@@ -10,13 +10,7 @@
         setSocketVariable = true;
         # Optionally customize rootless Docker daemon settings
         daemon.settings = {
-          # Mullvad VPN's DNS leak protection silently drops port-53 traffic from
-          # the docker bridge to any resolver other than its own (10.64.0.1), so
-          # public DNS (1.1.1.1 / 8.8.8.8) times out from inside containers and
-          # `apt-get update` fails to resolve deb.debian.org. Using Mullvad's DNS
-          # works while the VPN is up (Lockdown Mode kills container egress when
-          # it's down anyway, so no point in a public-DNS fallback).
-          dns = ["10.64.0.1"];
+          dns = ["1.1.1.1" "8.8.8.8"];
           registry-mirrors = ["https://mirror.gcr.io"];
         };
       };

@@ -101,7 +101,7 @@
     ../features/storage/qdirstat
 
     # VPN
-    ../features/network/mullvad
+    #../features/network/mullvad
 
     # Network Browsers
     ../features/network/chromium
