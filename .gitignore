@@ -16,14 +16,14 @@
 /**/*.qcow2
 /.direnv/
 /.pre-commit-config.yaml
+/.roam/
 /.tmp
 /keys/
 /logs/
 /result
-# Per-host flake `nix build` / `nixos-rebuild build` symlink outputs
-hosts/**/result
 dev-debug.log
 devenv.local.nix
+hosts/**/result
 logs
 node_modules/
 npm-debug.log*
