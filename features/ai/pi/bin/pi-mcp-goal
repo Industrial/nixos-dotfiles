@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+plugin_root="${PI_MCP_GOAL_PLUGIN_ROOT:-$HOME/.dotfiles/features/ai/pi/plugins/goal}"
+
+if [ ! -f "$plugin_root/package.json" ]; then
+  echo "pi-mcp-goal: plugin not found at $plugin_root" >&2
+  exit 1
+fi
+
+if [ ! -d "$plugin_root/node_modules" ]; then
+  echo "pi-mcp-goal: run 'bun install' in $plugin_root" >&2
+  exit 1
+fi
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "pi-mcp-goal: bun is not on PATH" >&2
+  exit 1
+fi
+
+cd "$plugin_root"
+exec bun run src/mcp/index.ts

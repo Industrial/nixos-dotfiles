@@ -22,9 +22,10 @@
     "oxlint": "^1.66.0"
   },
   "dependencies": {
-    "effect": "^3.21.2",
     "@effect/schema": "^0.75.5",
     "@effect/sql": "^0.51.1",
-    "@effect/sql-sqlite-bun": "^0.52.0"
+    "@effect/sql-sqlite-bun": "^0.52.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "effect": "^3.21.2"
   }
 }

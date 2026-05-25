@@ -70,6 +70,14 @@
       "lifecycle": "lazy",
       "description": "Beads (bd) issue tracking — 85 tools via pi-mcp-beads (targets bd 1.0.x)",
       "directTools": true
+    },
+    "goal": {
+      "type": "stdio",
+      "command": "/home/tom/.dotfiles/features/ai/pi/bin/pi-mcp-goal",
+      "args": [],
+      "lifecycle": "lazy",
+      "description": "Goal management plugin for persistent, long-running goals with automated continuation loops",
+      "directTools": true
     }
   },
   "imports": []
