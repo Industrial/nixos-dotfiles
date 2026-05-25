@@ -9,3 +9,4 @@ export * from "./CancelGoalCommand.js";
 export * from "./ProposeGoalDraftCommand.js";
 export * from "./UpdateGoalCommand.js";
 export * from "./UpdateGoalEvaluationCommand.js";
+export * from "./ExecuteGoalCommand.js";
