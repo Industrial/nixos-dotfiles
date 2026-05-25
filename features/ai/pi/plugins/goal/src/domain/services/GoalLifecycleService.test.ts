@@ -4,7 +4,7 @@
  * Tests the domain service using Mock repositories - no database required!
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { GoalLifecycleService } from "./GoalLifecycleService.js";
 import { GoalLifecycleTestLayer } from "../../testing/TestLayers.js";
 

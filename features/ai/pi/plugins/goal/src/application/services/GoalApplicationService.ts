@@ -8,6 +8,7 @@ import { Context, Effect } from "effect";
 import { Goal } from "../../domain/models/Goal.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
+import { EventStore } from "../../domain/repositories/EventStore.js";
 import {
   CreateGoalCommand,
   PauseGoalCommand,
@@ -28,10 +29,18 @@ export class GoalApplicationService extends Context.Tag("GoalApplicationService"
   GoalApplicationService,
   {
     // Commands
-    readonly createGoal: (command: CreateGoalCommand) => Effect.Effect<Goal, Error, GoalLifecycleService>;
-    readonly pauseGoal: (command: PauseGoalCommand) => Effect.Effect<Goal, Error, GoalLifecycleService>;
-    readonly resumeGoal: (command: ResumeGoalCommand) => Effect.Effect<Goal, Error, GoalLifecycleService>;
-    readonly completeGoal: (command: CompleteGoalCommand) => Effect.Effect<Goal, Error, GoalLifecycleService>;
+    readonly createGoal: (
+      command: CreateGoalCommand
+    ) => Effect.Effect<Goal, Error, GoalLifecycleService | EventStore>;
+    readonly pauseGoal: (
+      command: PauseGoalCommand
+    ) => Effect.Effect<Goal, Error, GoalLifecycleService | EventStore>;
+    readonly resumeGoal: (
+      command: ResumeGoalCommand
+    ) => Effect.Effect<Goal, Error, GoalLifecycleService | EventStore>;
+    readonly completeGoal: (
+      command: CompleteGoalCommand
+    ) => Effect.Effect<Goal, Error, GoalLifecycleService | EventStore>;
 
     // Queries
     readonly getGoal: (query: GetGoalQuery) => Effect.Effect<Goal, Error, GoalRepository>;

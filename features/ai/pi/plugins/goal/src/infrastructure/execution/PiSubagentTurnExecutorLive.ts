@@ -76,7 +76,7 @@ async function runSubagentBridge(input: {
   };
 
   const proc = Bun.spawn(["bun", bridgeScript], {
-    stdin: JSON.stringify(payload),
+    stdin: Buffer.from(JSON.stringify(payload)),
     stdout: "pipe",
     stderr: "pipe",
     cwd: input.cwd,

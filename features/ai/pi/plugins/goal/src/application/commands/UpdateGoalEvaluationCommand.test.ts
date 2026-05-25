@@ -5,7 +5,7 @@
  * Tracks progress, blockers, next steps, and notes.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { UpdateGoalEvaluationCommand, updateGoalEvaluationHandler } from "./UpdateGoalEvaluationCommand.js";
 import { CreateGoalCommand, createGoalHandler } from "./CreateGoalCommand.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";

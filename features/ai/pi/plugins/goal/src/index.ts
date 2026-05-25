@@ -37,14 +37,6 @@ import {
   GoalApplicationServiceLive,
 } from "./application/GoalApplicationService.js";
 
-const DomainServicesMocksLayer = Layer.mergeAll(
-  GoalLifecycleServiceLive,
-  JudgeServiceMock,
-  PromptGeneratorServiceMock,
-  ToolExecutionServiceMock,
-  AgentTurnExecutorLive
-);
-
 const InfrastructureMocksLayer = Layer.mergeAll(
   GoalRepositoryMock,
   GoalIterationRepositoryMock,

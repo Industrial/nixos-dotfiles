@@ -41,7 +41,7 @@ describe("JudgeServiceLive", () => {
             ],
           }),
           { status: 200 }
-        )) as typeof fetch;
+        )) as unknown as typeof fetch;
 
       const goal = new Goal({
         id: "goal-judge-live",

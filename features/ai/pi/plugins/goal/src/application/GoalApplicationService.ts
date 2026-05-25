@@ -30,6 +30,9 @@ import { GoalExecutionRepository } from "../domain/repositories/GoalExecutionRep
 import { GoalIterationRepository } from "../domain/repositories/GoalIterationRepository.js";
 import { GoalLifecycleService } from "../domain/services/GoalLifecycleService.js";
 import { JudgeService } from "../domain/services/JudgeService.js";
+import { AgentExecutionPort } from "../domain/ports/AgentExecutionPort.js";
+import { EventStore } from "../domain/repositories/EventStore.js";
+import { PromptGeneratorService } from "../domain/services/PromptGeneratorService.js";
 
 /**
  * Main application service interface
@@ -44,35 +47,35 @@ export interface GoalApplicationService {
   createGoal(params: {
     objective: string;
     context?: string;
-  }): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService>;
+  }): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore>;
 
   /**
    * Pause an active goal
    */
   pauseGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService>;
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore>;
 
   /**
    * Resume a paused goal
    */
   resumeGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService>;
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore>;
 
   /**
    * Mark a goal as complete
    */
   completeGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService>;
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore>;
 
   /**
    * Cancel a goal
    */
   cancelGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService>;
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore>;
 
   /**
    * Execute a goal in continuation loop
@@ -80,7 +83,18 @@ export interface GoalApplicationService {
   executeGoal(
     goalId: string,
     options?: { maxTurns?: number }
-  ): Effect.Effect<ExecutionResult, Error, GoalRepository | JudgeService>;
+  ): Effect.Effect<
+    ExecutionResult,
+    Error,
+    | GoalRepository
+    | JudgeService
+    | GoalLifecycleService
+    | GoalIterationRepository
+    | AgentExecutionPort
+    | GoalExecutionRepository
+    | EventStore
+    | PromptGeneratorService
+  >;
 
   /**
    * Get the currently active goal
@@ -100,10 +114,23 @@ export interface GoalApplicationService {
     offset?: number;
   }): Effect.Effect<readonly Goal[], Error, GoalRepository>;
 
-  getExecutionStatus(
-    goalId: string
-  ): Effect.Effect<
-    unknown,
+  getExecutionStatus(goalId: string): Effect.Effect<
+    {
+      goal: { id: string; objective: string; status: string };
+      execution: {
+        cumulativeTurn: number;
+        status: string;
+        updatedAt: number;
+        lastJudge: unknown;
+      } | null;
+      latestIteration: {
+        id: string;
+        iterationNumber: number;
+        completedAt: number | undefined;
+        outcome: unknown;
+      } | null;
+      iterationCount: number;
+    },
     Error,
     GoalRepository | GoalExecutionRepository | GoalIterationRepository
   >;
@@ -116,38 +143,49 @@ class GoalApplicationServiceImpl implements GoalApplicationService {
   createGoal(params: {
     objective: string;
     context?: string;
-  }): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService> {
+  }): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore> {
     return createGoalHandler(new CreateGoalCommand(params));
   }
 
   pauseGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService> {
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore> {
     return pauseGoalHandler(new PauseGoalCommand({ goalId }));
   }
 
   resumeGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService> {
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore> {
     return resumeGoalHandler(new ResumeGoalCommand({ goalId }));
   }
 
   completeGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService> {
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore> {
     return completeGoalHandler(new CompleteGoalCommand({ goalId }));
   }
 
   cancelGoal(
     goalId: string
-  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService> {
+  ): Effect.Effect<Goal, Error, GoalRepository | GoalLifecycleService | EventStore> {
     return cancelGoalHandler(new CancelGoalCommand({ goalId }));
   }
 
   executeGoal(
     goalId: string,
     options?: { maxTurns?: number }
-  ): Effect.Effect<ExecutionResult, Error, GoalRepository | JudgeService> {
+  ): Effect.Effect<
+    ExecutionResult,
+    Error,
+    | GoalRepository
+    | JudgeService
+    | GoalLifecycleService
+    | GoalIterationRepository
+    | AgentExecutionPort
+    | GoalExecutionRepository
+    | EventStore
+    | PromptGeneratorService
+  > {
     return executeGoalHandler(
       new ExecuteGoalCommand({
         goalId,

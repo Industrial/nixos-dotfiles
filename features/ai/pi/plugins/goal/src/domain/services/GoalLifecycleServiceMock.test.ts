@@ -4,9 +4,12 @@
  * Tests the mock implementation of the lifecycle service.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import { GoalLifecycleService } from "./GoalLifecycleService.js";
 import { GoalLifecycleServiceMock } from "./GoalLifecycleServiceMock.js";
+import { EventStoreMock } from "../../infrastructure/persistence/EventStoreMock.js";
+
+const TestLayer = Layer.mergeAll(GoalLifecycleServiceMock, EventStoreMock);
 
 describe("GoalLifecycleServiceMock", () => {
   describe("createGoal", () => {
@@ -18,7 +21,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const goal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(goal.objective).toBe("Test goal");
@@ -32,7 +35,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const goal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(goal.objective).toBe("Test goal");
@@ -51,7 +54,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         await expect(
-          Effect.runPromise(program.pipe(Effect.provide(GoalLifecycleServiceMock)))
+          Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
         ).rejects.toThrow(/Active goal already exists/);
       });
     });
@@ -68,7 +71,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const goal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(goal.objective).toBe("Second goal");
@@ -88,7 +91,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const pausedGoal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(pausedGoal.status).toBe("paused");
@@ -103,7 +106,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         await expect(
-          Effect.runPromise(program.pipe(Effect.provide(GoalLifecycleServiceMock)))
+          Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
         ).rejects.toThrow(/Goal not found/);
       });
     });
@@ -122,7 +125,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const resumedGoal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(resumedGoal.status).toBe("active");
@@ -143,7 +146,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         await expect(
-          Effect.runPromise(program.pipe(Effect.provide(GoalLifecycleServiceMock)))
+          Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
         ).rejects.toThrow(/Another goal is already active/);
       });
     });
@@ -156,7 +159,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         await expect(
-          Effect.runPromise(program.pipe(Effect.provide(GoalLifecycleServiceMock)))
+          Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
         ).rejects.toThrow(/Goal not found/);
       });
     });
@@ -173,7 +176,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const completedGoal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(completedGoal.status).toBe("completed");
@@ -189,7 +192,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         await expect(
-          Effect.runPromise(program.pipe(Effect.provide(GoalLifecycleServiceMock)))
+          Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
         ).rejects.toThrow(/Goal not found/);
       });
     });
@@ -206,7 +209,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const cancelledGoal = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(cancelledGoal.status).toBe("cancelled");
@@ -222,7 +225,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         await expect(
-          Effect.runPromise(program.pipe(Effect.provide(GoalLifecycleServiceMock)))
+          Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
         ).rejects.toThrow(/Goal not found/);
       });
     });
@@ -237,7 +240,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const canActivate = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(canActivate).toBe(true);
@@ -255,7 +258,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const canActivate = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(canActivate).toBe(false);
@@ -274,7 +277,7 @@ describe("GoalLifecycleServiceMock", () => {
         });
 
         const canActivate = await Effect.runPromise(
-          program.pipe(Effect.provide(GoalLifecycleServiceMock))
+          program.pipe(Effect.provide(TestLayer))
         );
 
         expect(canActivate).toBe(true);
@@ -295,7 +298,7 @@ describe("GoalLifecycleServiceMock", () => {
       });
 
       const { created, paused, resumed } = await Effect.runPromise(
-        program.pipe(Effect.provide(GoalLifecycleServiceMock))
+        program.pipe(Effect.provide(TestLayer))
       );
 
       expect(created.status).toBe("active");
@@ -320,7 +323,7 @@ describe("GoalLifecycleServiceMock", () => {
       });
 
       const { goal1, goal2, goal3 } = await Effect.runPromise(
-        program.pipe(Effect.provide(GoalLifecycleServiceMock))
+        program.pipe(Effect.provide(TestLayer))
       );
 
       expect(goal1.id).not.toBe(goal2.id);

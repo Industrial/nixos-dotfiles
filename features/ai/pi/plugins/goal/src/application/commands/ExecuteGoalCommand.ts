@@ -30,6 +30,7 @@ import {
 } from "../../domain/repositories/GoalExecutionRepository.js";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
 import { EventStore } from "../../domain/repositories/EventStore.js";
+import { PromptGeneratorService } from "../../domain/services/PromptGeneratorService.js";
 import { createIteration } from "../../domain/models/GoalIteration.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";
 import { JudgeService } from "../../domain/services/JudgeService.js";
@@ -88,6 +89,7 @@ export const executeGoalHandler = (
   | AgentExecutionPort
   | GoalExecutionRepository
   | EventStore
+  | PromptGeneratorService
 > =>
   Effect.gen(function* () {
     const repo = yield* GoalRepository;

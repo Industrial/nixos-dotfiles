@@ -5,7 +5,7 @@
  * Cancelling moves a goal to terminal "cancelled" status.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { CancelGoalCommand, cancelGoalHandler } from "./CancelGoalCommand.js";
 import { CreateGoalCommand, createGoalHandler } from "./CreateGoalCommand.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";

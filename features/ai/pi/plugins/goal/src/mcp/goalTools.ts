@@ -208,7 +208,7 @@ export const goalTools: GoalTool[] = [
           return yield* service.getExecutionStatus(args.goalId as string);
         })
       );
-      return { success: true, ...status };
+      return { success: true, data: status };
     },
   },
 

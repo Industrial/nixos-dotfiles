@@ -6,6 +6,7 @@
  */
 import { Context, Effect } from "effect";
 import { Goal } from "../models/Goal.js";
+import { EventStore } from "../repositories/EventStore.js";
 
 /**
  * Goal Lifecycle Service
@@ -21,27 +22,27 @@ export class GoalLifecycleService extends Context.Tag("GoalLifecycleService")<
     readonly createGoal: (
       objective: string,
       context?: string
-    ) => Effect.Effect<Goal, Error, never>;
+    ) => Effect.Effect<Goal, Error, EventStore>;
 
     /**
      * Pause an active goal
      */
-    readonly pauseGoal: (goalId: string) => Effect.Effect<Goal, Error, never>;
+    readonly pauseGoal: (goalId: string) => Effect.Effect<Goal, Error, EventStore>;
 
     /**
      * Resume a paused goal
      */
-    readonly resumeGoal: (goalId: string) => Effect.Effect<Goal, Error, never>;
+    readonly resumeGoal: (goalId: string) => Effect.Effect<Goal, Error, EventStore>;
 
     /**
      * Complete a goal
      */
-    readonly completeGoal: (goalId: string) => Effect.Effect<Goal, Error, never>;
+    readonly completeGoal: (goalId: string) => Effect.Effect<Goal, Error, EventStore>;
 
     /**
      * Cancel a goal
      */
-    readonly cancelGoal: (goalId: string) => Effect.Effect<Goal, Error, never>;
+    readonly cancelGoal: (goalId: string) => Effect.Effect<Goal, Error, EventStore>;
 
     /**
      * Check if a new goal can be activated

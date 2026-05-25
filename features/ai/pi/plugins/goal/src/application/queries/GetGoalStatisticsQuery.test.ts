@@ -4,7 +4,7 @@
  * Tests for retrieving aggregate statistics about goals.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { GetGoalStatisticsQuery, getGoalStatisticsHandler } from "./GetGoalStatisticsQuery.js";
 import { CreateGoalCommand, createGoalHandler } from "../commands/CreateGoalCommand.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";

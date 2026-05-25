@@ -23,12 +23,37 @@ export const GoalApplicationServiceMock = Layer.effect(
   GoalApplicationService,
   Effect.gen(function* () {
     const store = yield* Ref.make<Map<string, Goal>>(new Map());
+    const clock = yield* Ref.make(Date.now());
+
+    const bumpTime = () =>
+      Ref.modify(clock, (t) => {
+        const next = Math.max(t + 1, Date.now());
+        return [next, next] as const;
+      });
+
+    const stampUpdatedAt = (goal: Goal) =>
+      Effect.gen(function* () {
+        const ts = yield* bumpTime();
+        return new Goal({ ...goal, updatedAt: ts });
+      });
+
+    const stampCompleted = (goal: Goal) =>
+      Effect.gen(function* () {
+        const ts = yield* bumpTime();
+        return new Goal({ ...goal, updatedAt: ts, completedAt: ts });
+      });
 
     const createGoal = (command: CreateGoalCommand) =>
       Effect.gen(function* () {
         const goal = makeGoal(command.objective, command.context);
-        yield* Ref.update(store, (map) => new Map(map).set(goal.id, goal));
-        return goal;
+        const ts = yield* bumpTime();
+        const stamped = new Goal({
+          ...goal,
+          createdAt: ts,
+          updatedAt: ts,
+        });
+        yield* Ref.update(store, (map) => new Map(map).set(stamped.id, stamped));
+        return stamped;
       });
 
     const pauseGoal = (command: PauseGoalCommand) =>
@@ -40,7 +65,7 @@ export const GoalApplicationServiceMock = Layer.effect(
           return yield* Effect.fail(new Error(`Goal not found: ${command.goalId}`));
         }
 
-        const pausedGoal = yield* goal.pause();
+        const pausedGoal = yield* stampUpdatedAt(yield* goal.pause());
         yield* Ref.update(store, (m) => new Map(m).set(goal.id, pausedGoal));
         return pausedGoal;
       });
@@ -54,7 +79,7 @@ export const GoalApplicationServiceMock = Layer.effect(
           return yield* Effect.fail(new Error(`Goal not found: ${command.goalId}`));
         }
 
-        const resumedGoal = yield* goal.resume();
+        const resumedGoal = yield* stampUpdatedAt(yield* goal.resume());
         yield* Ref.update(store, (m) => new Map(m).set(goal.id, resumedGoal));
         return resumedGoal;
       });
@@ -68,7 +93,7 @@ export const GoalApplicationServiceMock = Layer.effect(
           return yield* Effect.fail(new Error(`Goal not found: ${command.goalId}`));
         }
 
-        const completedGoal = yield* goal.complete();
+        const completedGoal = yield* stampCompleted(yield* goal.complete());
         yield* Ref.update(store, (m) => new Map(m).set(goal.id, completedGoal));
         return completedGoal;
       });
