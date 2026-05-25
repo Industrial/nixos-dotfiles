@@ -305,15 +305,15 @@ describe("CompleteGoalCommand", () => {
     describe("State transition sequences", () => {
       it("When completing after pause/resume cycle, Then completion succeeds", async () => {
         const program = Effect.gen(function* () {
-          const _service = yield* GoalLifecycleService;
-          
+          const service = yield* GoalLifecycleService;
+
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
           // Pause and resume
-          yield* _service.pauseGoal(goal.id);
-          yield* _service.resumeGoal(goal.id);
+          yield* service.pauseGoal(goal.id);
+          yield* service.resumeGoal(goal.id);
 
           // Then complete
           return yield* completeGoalHandler(
@@ -328,17 +328,17 @@ describe("CompleteGoalCommand", () => {
 
       it("When completing after multiple pause/resume cycles, Then completion succeeds", async () => {
         const program = Effect.gen(function* () {
-          const _service = yield* GoalLifecycleService;
-          
+          const service = yield* GoalLifecycleService;
+
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
           // Multiple cycles
-          yield* _service.pauseGoal(goal.id);
-          yield* _service.resumeGoal(goal.id);
-          yield* _service.pauseGoal(goal.id);
-          yield* _service.resumeGoal(goal.id);
+          yield* service.pauseGoal(goal.id);
+          yield* service.resumeGoal(goal.id);
+          yield* service.pauseGoal(goal.id);
+          yield* service.resumeGoal(goal.id);
 
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })

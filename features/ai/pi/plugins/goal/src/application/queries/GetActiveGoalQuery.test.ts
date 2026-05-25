@@ -50,7 +50,7 @@ describe("GetActiveGoalQuery", () => {
     describe("Given one active goal exists", () => {
       it("When executing query, Then returns the active goal", async () => {
         const program = Effect.gen(function* () {
-          const _goal = yield* createGoalHandler(
+          const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -152,7 +152,7 @@ describe("GetActiveGoalQuery", () => {
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.pauseGoal(goal.id);
+          yield* service.pauseGoal(_goal.id);
 
           return yield* getActiveGoalHandler();
         });
@@ -170,7 +170,7 @@ describe("GetActiveGoalQuery", () => {
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.pauseGoal(goal.id);
+          yield* service.pauseGoal(_goal.id);
 
           const result1 = yield* getActiveGoalHandler();
           const result2 = yield* getActiveGoalHandler();
@@ -192,7 +192,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const _goal = yield* createGoalHandler(
+          const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -221,10 +221,10 @@ describe("GetActiveGoalQuery", () => {
           );
 
           // Multiple cycles
-          yield* service.pauseGoal(goal.id);
-          yield* service.resumeGoal(goal.id);
-          yield* service.pauseGoal(goal.id);
-          yield* service.resumeGoal(goal.id);
+          yield* service.pauseGoal(_goal.id);
+          yield* service.resumeGoal(_goal.id);
+          yield* service.pauseGoal(_goal.id);
+          yield* service.resumeGoal(_goal.id);
 
           return yield* getActiveGoalHandler();
         });
@@ -244,7 +244,7 @@ describe("GetActiveGoalQuery", () => {
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.completeGoal(goal.id);
+          yield* service.completeGoal(_goal.id);
 
           return yield* getActiveGoalHandler();
         });
@@ -262,7 +262,7 @@ describe("GetActiveGoalQuery", () => {
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.completeGoal(goal.id);
+          yield* service.completeGoal(_goal.id);
 
           const result1 = yield* getActiveGoalHandler();
           const result2 = yield* getActiveGoalHandler();
@@ -288,7 +288,7 @@ describe("GetActiveGoalQuery", () => {
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.cancelGoal(goal.id);
+          yield* service.cancelGoal(_goal.id);
 
           return yield* getActiveGoalHandler();
         });

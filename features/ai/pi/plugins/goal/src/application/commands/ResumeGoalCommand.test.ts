@@ -84,7 +84,7 @@ describe("ResumeGoalCommand", () => {
             new CreateGoalCommand({ objective: "Test goal" })
           );
           const _pausedGoal = yield* service.pauseGoal(goal.id);
-          const pausedUpdatedAt = pausedGoal.updatedAt;
+          const pausedUpdatedAt = _pausedGoal.updatedAt;
 
           yield* Effect.sleep("1 millis");
 
