@@ -304,13 +304,13 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const _goal1 = yield* createGoalHandler(
+          const goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "First goal" })
           );
 
           yield* service.completeGoal(goal1.id);
 
-          const _goal2 = yield* createGoalHandler(
+          const goal2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Second goal" })
           );
 
@@ -333,13 +333,13 @@ describe("GetActiveGoalQuery", () => {
           const service = yield* GoalLifecycleService;
 
           // Create and complete first goal
-          const _goal1 = yield* createGoalHandler(
+          const goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "First" })
           );
           yield* service.completeGoal(goal1.id);
 
           // Create and cancel second goal
-          const _goal2 = yield* createGoalHandler(
+          const goal2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Second" })
           );
           yield* service.cancelGoal(goal2.id);
@@ -354,7 +354,7 @@ describe("GetActiveGoalQuery", () => {
           return { goal1, goal2, goal3, activeGoal };
         });
 
-        const { goal1, goal2, goal3, activeGoal } = await Effect.runPromise(
+        const { goal1: _goal1, goal2: _goal2, goal3, activeGoal } = await Effect.runPromise(
           program.pipe(Effect.provide(TestLayer))
         );
 

@@ -1,11 +1,12 @@
 /**
  * Event Store - SQLite Live Implementation
- * 
+ *
  * Stores events in SQLite as the source of truth.
  */
 import { Effect, Layer } from "effect";
 import { SqlClient } from "@effect/sql";
 import { GoalEvent } from "../../domain/events/index.js";
+import { EventStore } from "../../domain/repositories/EventStore.js";
 
 /**
  * SQLite-based Event Store implementation

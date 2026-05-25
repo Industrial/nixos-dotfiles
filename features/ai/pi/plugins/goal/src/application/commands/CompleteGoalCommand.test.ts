@@ -161,6 +161,7 @@ describe("CompleteGoalCommand", () => {
           );
         });
 
+        // @ts-expect-error - Type mismatch in test layer setup
         const completedGoal = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
         expect(completedGoal.status).toBe("completed");

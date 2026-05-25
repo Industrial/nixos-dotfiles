@@ -311,7 +311,7 @@ describe("GoalLifecycleServiceMock", () => {
         const goal1 = yield* service.createGoal("First");
         yield* service.completeGoal(goal1.id);
 
-        const _goal2 = yield* service.createGoal("Second");
+        const goal2 = yield* service.createGoal("Second");
         yield* service.pauseGoal(goal2.id);
 
         const goal3 = yield* service.createGoal("Third");

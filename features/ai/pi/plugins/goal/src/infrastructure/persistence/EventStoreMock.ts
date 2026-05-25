@@ -3,6 +3,7 @@
  */
 import { Effect, Layer, Ref } from "effect";
 import { GoalEvent } from "../../domain/events/index.js";
+import { EventStore } from "../../domain/repositories/EventStore.js";
 
 /**
  * In-memory Event Store for testing
