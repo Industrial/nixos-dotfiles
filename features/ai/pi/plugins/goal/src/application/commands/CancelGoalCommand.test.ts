@@ -318,7 +318,8 @@ describe("CancelGoalCommand", () => {
         );
 
         expect(cancelled.completedAt!).toBeGreaterThanOrEqual(before);
-        expect(cancelled.completedAt!).toBeLessThanOrEqual(after);
+        // +1: domain uses monotonic bump when wall clock has ms resolution
+        expect(cancelled.completedAt!).toBeLessThanOrEqual(after + 1);
       });
     });
   });

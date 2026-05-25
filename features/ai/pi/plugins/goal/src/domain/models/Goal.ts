@@ -29,6 +29,11 @@ export class GoalEvaluation extends S.Class<GoalEvaluation>("GoalEvaluation")({
  * 
  * Main domain entity representing a goal with its full lifecycle and business rules.
  */
+/** Strictly advance updatedAt (avoids same-ms flakes in fast test runs). */
+export function bumpUpdatedAt(previous: number): number {
+  return Math.max(Date.now(), previous + 1);
+}
+
 export class Goal extends S.Class<Goal>("Goal")({
   id: S.String,
   objective: S.String,
@@ -80,7 +85,7 @@ export class Goal extends S.Class<Goal>("Goal")({
       new Goal({
         ...this,
         status: "paused",
-        updatedAt: Date.now(),
+        updatedAt: bumpUpdatedAt(this.updatedAt),
       })
     );
   }
@@ -98,7 +103,7 @@ export class Goal extends S.Class<Goal>("Goal")({
       new Goal({
         ...this,
         status: "active",
-        updatedAt: Date.now(),
+        updatedAt: bumpUpdatedAt(this.updatedAt),
       })
     );
   }
@@ -112,12 +117,13 @@ export class Goal extends S.Class<Goal>("Goal")({
         new Error(`Goal already in terminal state: ${this.status}`)
       );
     }
+    const ts = bumpUpdatedAt(this.updatedAt);
     return Effect.succeed(
       new Goal({
         ...this,
         status: "completed",
-        updatedAt: Date.now(),
-        completedAt: Date.now(),
+        updatedAt: ts,
+        completedAt: ts,
       })
     );
   }
@@ -131,12 +137,13 @@ export class Goal extends S.Class<Goal>("Goal")({
         new Error(`Goal already in terminal state: ${this.status}`)
       );
     }
+    const ts = bumpUpdatedAt(this.updatedAt);
     return Effect.succeed(
       new Goal({
         ...this,
         status: "cancelled",
-        updatedAt: Date.now(),
-        completedAt: Date.now(),
+        updatedAt: ts,
+        completedAt: ts,
       })
     );
   }
@@ -148,7 +155,7 @@ export class Goal extends S.Class<Goal>("Goal")({
     return new Goal({
       ...this,
       evaluationData: evaluation,
-      updatedAt: Date.now(),
+      updatedAt: bumpUpdatedAt(this.updatedAt),
     });
   }
 }

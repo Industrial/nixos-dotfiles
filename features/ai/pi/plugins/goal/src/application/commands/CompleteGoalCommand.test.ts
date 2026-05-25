@@ -370,7 +370,7 @@ describe("CompleteGoalCommand", () => {
         );
 
         expect(completedGoal.completedAt!).toBeGreaterThanOrEqual(beforeComplete);
-        expect(completedGoal.completedAt!).toBeLessThanOrEqual(afterComplete);
+        expect(completedGoal.completedAt!).toBeLessThanOrEqual(afterComplete + 1);
       });
 
       it("When completing goals in sequence, Then each has later or equal completedAt", async () => {
