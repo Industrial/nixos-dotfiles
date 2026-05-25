@@ -13,10 +13,26 @@ export const BD_TOOL_SPECS: BdToolSpec[] = [
     // --- Working with issues ---
     {
         name: "bd_close",
-        description: "Close one or more issues.",
+        description:
+            "Close one or more issues. Epics require all direct children closed first, or pass force: true. Optional reason.",
         subcommand: "close",
         outputKey: "result",
-        params: [issueIds()],
+        params: [
+            issueIds(),
+            {
+                name: "reason",
+                type: "string",
+                description: "Reason for closing.",
+                shortFlag: "r",
+                quote: true,
+            },
+            {
+                name: "force",
+                type: "boolean",
+                description: "Force close (epics with open children, blocked issues, unsatisfied gates).",
+                shortFlag: "f",
+            },
+        ],
     },
     {
         name: "bd_comment",
@@ -222,10 +238,38 @@ export const BD_TOOL_SPECS: BdToolSpec[] = [
     },
     {
         name: "bd_delete",
-        description: "Delete one or more issues.",
+        description:
+            "Delete one or more issues. Without force, shows a preview only (bd 1.0+ safety). Pass force: true to actually delete.",
         subcommand: "delete",
         outputKey: "result",
-        params: [issueIds()],
+        params: [
+            issueIds(),
+            {
+                name: "force",
+                type: "boolean",
+                description: "Actually delete (required; without this, bd shows preview only).",
+                shortFlag: "f",
+            },
+            {
+                name: "dryRun",
+                type: "boolean",
+                description: "Preview what would be deleted without making changes.",
+                flag: "dry-run",
+            },
+            {
+                name: "cascade",
+                type: "boolean",
+                description: "Recursively delete all dependent issues.",
+                flag: "cascade",
+            },
+            {
+                name: "fromFile",
+                type: "string",
+                description: "Read issue IDs from file (one per line).",
+                flag: "from-file",
+                quote: true,
+            },
+        ],
     },
     {
         name: "bd_edit",
@@ -1448,6 +1492,11 @@ export const BD_TOOL_TEST_CASES: ToolTestCase[] = [
         command: "close dotfiles-1 dotfiles-2",
     },
     {
+        tool: "bd_close",
+        args: { issueIds: ["dotfiles-9jh"], force: true, reason: "All work complete" },
+        command: 'close dotfiles-9jh -r "All work complete" -f',
+    },
+    {
         tool: "bd_comment",
         args: { issueId: "dotfiles-1", text: "Looks good" },
         command: 'comment dotfiles-1 "Looks good"',
@@ -1477,6 +1526,11 @@ export const BD_TOOL_TEST_CASES: ToolTestCase[] = [
         tool: "bd_delete",
         args: { issueIds: ["dotfiles-1"] },
         command: "delete dotfiles-1",
+    },
+    {
+        tool: "bd_delete",
+        args: { issueIds: ["dotfiles-1", "dotfiles-2"], force: true },
+        command: "delete dotfiles-1 dotfiles-2 -f",
     },
     {
         tool: "bd_edit",
