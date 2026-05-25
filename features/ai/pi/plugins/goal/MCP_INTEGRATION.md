@@ -19,7 +19,7 @@ The plugin is registered in `~/.pi/agent/mcp.json` as:
 
 ## Available Tools
 
-The plugin exposes 8 MCP tools to Pi Agent:
+The plugin exposes 11 MCP tools to Pi Agent:
 
 1. **goal_create** - Create a new goal
    - Parameters: `objective` (string, required), `context` (string, optional)
@@ -29,9 +29,10 @@ The plugin exposes 8 MCP tools to Pi Agent:
    - Parameters: None
    - Returns: Active goal or null
 
-3. **goal_execute** - Execute goal with judge evaluation
-   - Parameters: `goalId` (string, required), `maxTurns` (number, optional, default: 50)
-   - Returns: Execution result with turns, completion status, judge evaluation
+3. **goal_execute** - Run up to `maxTurns` plugin turns (default **1**, max **1000** per call, **1000 lifetime** per goal across all agents)
+   - Parameters: `goalId` (required), `maxTurns` (optional)
+   - Returns: `success`, `goalAchieved`, `phaseComplete`, `turnLimitReached`, `stoppedReason`, `turnsThisCall`, `cumulativeTurn`, `nextPrompt`, `judge`
+   - **Not** 1000 agent steps in one call — invoke repeatedly until `goalAchieved: true`
 
 4. **goal_pause** - Pause an active goal
    - Parameters: `goalId` (string, required)
@@ -49,7 +50,10 @@ The plugin exposes 8 MCP tools to Pi Agent:
    - Parameters: `goalId` (string, required)
    - Returns: Updated goal with cancelled status
 
-8. **goal_statistics** - Get goal statistics
+8. **goal_get** - Get goal by ID
+9. **goal_list** - List goals (optional status filter)
+10. **goal_execution_status** - Checkpoint + latest iteration
+11. **goal_statistics** - Get goal statistics
    - Parameters: None
    - Returns: Statistics object with counts and metrics
 
@@ -115,13 +119,26 @@ Domain services & repositories (Effect.ts layers)
 
 1. **Restart Pi Agent** to load the new plugin
 2. **Test tools** in Pi Agent to verify integration
-3. **Replace mock services** with Pi implementations:
-   - JudgeServiceLive (Pi model system)
-   - PromptGeneratorServiceLive (full templates)
-   - ToolExecutionServiceLive (Pi tool bridge)
-4. **Add SQLite persistence** (replace in-memory mocks)
-5. **Implement streaming** for execution updates
-6. **Add retry logic** for transient failures
+3. **Execution via pi-subagents** (implemented): each `goal_execute` turn spawns `pi-goal-subagent-run` → `runSync()` with agent `worker` (override: `PI_GOAL_SUBAGENT_AGENT`). Requires `npm:pi-subagents` in `settings.json`. Disable: `PI_GOAL_SUBAGENT_DISABLE=1`.
+4. **JudgeServiceLive** (implemented): OpenRouter `openrouter/free` via `OPENROUTER_API_KEY` (override model: `PI_JUDGE_MODEL`).
+5. **Event store** (implemented): lifecycle + turn events in SQLite `events` table via `EventStoreLive`.
+6. **PromptGeneratorServiceLive** (remaining mock)
+7. ~~**Add SQLite persistence**~~ Done — goals persist at `~/.pi/state/goal/goals.db`
+6. **Implement streaming** for execution updates
+7. **Add retry logic** for transient failures
+
+### Environment (goal_execute + subagents)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PI_GOAL_SUBAGENT_AGENT` | `worker` | pi-subagents agent name |
+| `PI_GOAL_SUBAGENT_CWD` | `BEADS_MCP_CWD` or `~/.dotfiles` | Working directory for subagent |
+| `PI_SUBAGENTS_ROOT` | `~/.dotfiles/features/ai/pi/.pi/agent/npm/node_modules/pi-subagents` | Package path |
+| `PI_CODING_AGENT_DIR` | `~/.dotfiles/features/ai/pi/.pi/agent` | Pi agent dir (agent discovery) |
+| `PI_GOAL_SUBAGENT_DISABLE` | unset | Set `1` to use prompt-only delegation (no spawn) |
+| `OPENROUTER_API_KEY` | — | Required for JudgeServiceLive |
+| `PI_JUDGE_MODEL` | `openrouter/free` | Judge LLM (matches Pi settings.json) |
+| `GOAL_SMOKE_TEST` | unset | Set `1` with API key to run `src/goal.smoke.test.ts` |
 
 ## Troubleshooting
 
@@ -164,7 +181,7 @@ Domain services & repositories (Effect.ts layers)
 - Errors propagated as MCP errors
 
 **Testing:**
-- 748 tests covering all functionality
+- 756 tests covering all functionality
 - BDD/TDD approach throughout
 - Full domain, application, and infrastructure coverage
 - No MCP-specific tests (integration point only)

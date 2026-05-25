@@ -18,8 +18,16 @@ import { completeGoalHandler, CompleteGoalCommand } from "./commands/CompleteGoa
 import { cancelGoalHandler, CancelGoalCommand } from "./commands/CancelGoalCommand.js";
 import { executeGoalHandler, ExecuteGoalCommand } from "./commands/ExecuteGoalCommand.js";
 import { getActiveGoalHandler } from "./queries/GetActiveGoalQuery.js";
+import { getGoalHandler, GetGoalQuery } from "./queries/GetGoalQuery.js";
+import { listGoalsHandler, ListGoalsQuery } from "./queries/ListGoalsQuery.js";
+import {
+  getGoalExecutionStatusHandler,
+  GetGoalExecutionStatusQuery,
+} from "./queries/GetGoalExecutionStatusQuery.js";
 import { getGoalStatisticsHandler } from "./queries/GetGoalStatisticsQuery.js";
 import { GoalRepository } from "../domain/repositories/GoalRepository.js";
+import { GoalExecutionRepository } from "../domain/repositories/GoalExecutionRepository.js";
+import { GoalIterationRepository } from "../domain/repositories/GoalIterationRepository.js";
 import { GoalLifecycleService } from "../domain/services/GoalLifecycleService.js";
 import { JudgeService } from "../domain/services/JudgeService.js";
 
@@ -83,6 +91,22 @@ export interface GoalApplicationService {
    * Get goal statistics
    */
   getGoalStatistics(): Effect.Effect<GoalStatistics, Error, GoalRepository>;
+
+  getGoal(goalId: string): Effect.Effect<Goal, Error, GoalRepository>;
+
+  listGoals(params?: {
+    status?: Goal["status"];
+    limit?: number;
+    offset?: number;
+  }): Effect.Effect<readonly Goal[], Error, GoalRepository>;
+
+  getExecutionStatus(
+    goalId: string
+  ): Effect.Effect<
+    unknown,
+    Error,
+    GoalRepository | GoalExecutionRepository | GoalIterationRepository
+  >;
 }
 
 /**
@@ -140,6 +164,30 @@ class GoalApplicationServiceImpl implements GoalApplicationService {
 
   getGoalStatistics(): Effect.Effect<GoalStatistics, Error, GoalRepository> {
     return getGoalStatisticsHandler(new GetGoalStatisticsQuery());
+  }
+
+  getGoal(goalId: string): Effect.Effect<Goal, Error, GoalRepository> {
+    return getGoalHandler(new GetGoalQuery({ goalId }));
+  }
+
+  listGoals(params?: {
+    status?: Goal["status"];
+    limit?: number;
+    offset?: number;
+  }): Effect.Effect<readonly Goal[], Error, GoalRepository> {
+    return listGoalsHandler(
+      new ListGoalsQuery({
+        status: params?.status,
+        limit: params?.limit,
+        offset: params?.offset,
+      })
+    );
+  }
+
+  getExecutionStatus(goalId: string) {
+    return getGoalExecutionStatusHandler(
+      new GetGoalExecutionStatusQuery({ goalId })
+    );
   }
 }
 

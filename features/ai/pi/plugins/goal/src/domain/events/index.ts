@@ -8,6 +8,7 @@ export * from "./GoalResumed.js";
 export * from "./GoalCompleted.js";
 export * from "./GoalCancelled.js";
 export * from "./GoalEvaluationUpdated.js";
+export * from "./GoalTurnExecuted.js";
 
 // Re-export union type
 import type { GoalCreated } from "./GoalCreated.js";
@@ -16,6 +17,7 @@ import type { GoalResumed } from "./GoalResumed.js";
 import type { GoalCompleted } from "./GoalCompleted.js";
 import type { GoalCancelled } from "./GoalCancelled.js";
 import type { GoalEvaluationUpdated } from "./GoalEvaluationUpdated.js";
+import type { GoalTurnExecuted } from "./GoalTurnExecuted.js";
 
 /**
  * Union type of all Goal events
@@ -26,4 +28,5 @@ export type GoalEvent =
   | GoalResumed
   | GoalCompleted
   | GoalCancelled
-  | GoalEvaluationUpdated;
+  | GoalEvaluationUpdated
+  | GoalTurnExecuted;

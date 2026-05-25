@@ -9,13 +9,10 @@ import { Effect, Layer } from "effect";
 import { UpdateGoalEvaluationCommand, updateGoalEvaluationHandler } from "./UpdateGoalEvaluationCommand.js";
 import { CreateGoalCommand, createGoalHandler } from "./CreateGoalCommand.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";
-import { GoalLifecycleServiceLive } from "../../domain/services/GoalLifecycleServiceLive.js";
-import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
+import { GoalLifecycleTestLayer } from "../../testing/TestLayers.js";
 
 describe("UpdateGoalEvaluationCommand", () => {
-  const TestLayer = GoalLifecycleServiceLive.pipe(
-    Layer.provide(GoalRepositoryMock)
-  ).pipe(Layer.merge(GoalRepositoryMock));
+  const TestLayer = GoalLifecycleTestLayer;
 
   describe("Schema Validation", () => {
     describe("Given valid command input", () => {

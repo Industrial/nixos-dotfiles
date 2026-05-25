@@ -3,8 +3,43 @@
  */
 import { Effect, Layer } from "effect";
 import { SqlClient } from "@effect/sql";
-import { GoalIteration } from "../../domain/models/GoalIteration.js";
+import {
+  GoalIteration,
+  IterationOutcome,
+} from "../../domain/models/GoalIteration.js";
+import { GoalEvaluation } from "../../domain/models/Goal.js";
 import { GoalIterationRepository } from "../../domain/repositories/GoalIterationRepository.js";
+
+function rowToIteration(row: {
+  id: string;
+  goal_id: string;
+  iteration_number: number;
+  started_at: number;
+  completed_at: number | null;
+  outcome: string | null;
+  evaluation_data: string | null;
+}): GoalIteration {
+  const parsedOutcome = row.outcome
+    ? (JSON.parse(row.outcome) as {
+        success: boolean;
+        message: string;
+        actionsCompleted: string[];
+        nextActions: string[];
+      })
+    : undefined;
+
+  return new GoalIteration({
+    id: row.id,
+    goalId: row.goal_id,
+    iterationNumber: row.iteration_number,
+    startedAt: row.started_at,
+    completedAt: row.completed_at ?? undefined,
+    outcome: parsedOutcome ? new IterationOutcome(parsedOutcome) : undefined,
+    evaluationData: row.evaluation_data
+      ? new GoalEvaluation(JSON.parse(row.evaluation_data))
+      : undefined,
+  });
+}
 
 /**
  * SQLite-based implementation of GoalIterationRepository
@@ -57,18 +92,7 @@ export const GoalIterationRepositoryLive = Layer.effect(
 
         if (result.length === 0) return null;
 
-        const row = result[0];
-        return new GoalIteration({
-          id: row.id,
-          goalId: row.goal_id,
-          iterationNumber: row.iteration_number,
-          startedAt: row.started_at,
-          completedAt: row.completed_at ?? undefined,
-          outcome: row.outcome ? JSON.parse(row.outcome) : undefined,
-          evaluationData: row.evaluation_data 
-            ? JSON.parse(row.evaluation_data) 
-            : undefined,
-        });
+        return rowToIteration(result[0]);
       });
 
     const findByGoalId = (goalId: string) =>
@@ -87,20 +111,7 @@ export const GoalIterationRepositoryLive = Layer.effect(
           ORDER BY iteration_number DESC
         `;
 
-        return results.map(
-          (row) =>
-            new GoalIteration({
-              id: row.id,
-              goalId: row.goal_id,
-              iterationNumber: row.iteration_number,
-              startedAt: row.started_at,
-              completedAt: row.completed_at ?? undefined,
-              outcome: row.outcome ? JSON.parse(row.outcome) : undefined,
-              evaluationData: row.evaluation_data 
-                ? JSON.parse(row.evaluation_data) 
-                : undefined,
-            })
-        );
+        return results.map((row) => rowToIteration(row));
       });
 
     const findLatest = (goalId: string) =>

@@ -8,13 +8,10 @@ import { Effect, Layer } from "effect";
 import { CompleteGoalCommand, completeGoalHandler } from "./CompleteGoalCommand.js";
 import { CreateGoalCommand, createGoalHandler } from "./CreateGoalCommand.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";
-import { GoalLifecycleServiceLive } from "../../domain/services/GoalLifecycleServiceLive.js";
-import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
+import { GoalLifecycleTestLayer } from "../../testing/TestLayers.js";
 
 describe("CompleteGoalCommand", () => {
-  const TestLayer = GoalLifecycleServiceLive.pipe(
-    Layer.provide(GoalRepositoryMock)
-  );
+  const TestLayer = GoalLifecycleTestLayer;
 
   describe("Schema Validation", () => {
     describe("Given valid command input", () => {

@@ -11,13 +11,23 @@
 import { Effect, Layer } from "effect";
 
 // Infrastructure
+import { DatabaseLayer } from "./infrastructure/database/DatabaseLayer.js";
 import { GoalRepositoryMock } from "./infrastructure/persistence/GoalRepositoryMock.js";
+import { GoalRepositoryLive } from "./infrastructure/persistence/GoalRepositoryLive.js";
 import { GoalIterationRepositoryMock } from "./infrastructure/persistence/GoalIterationRepositoryMock.js";
+import { GoalIterationRepositoryLive } from "./infrastructure/persistence/GoalIterationRepositoryLive.js";
+import { GoalExecutionRepositoryMock } from "./infrastructure/persistence/GoalExecutionRepositoryMock.js";
+import { GoalExecutionRepositoryLive } from "./infrastructure/persistence/GoalExecutionRepositoryLive.js";
 import { EventStoreMock } from "./infrastructure/persistence/EventStoreMock.js";
+import { AgentTurnExecutorLive } from "./infrastructure/execution/AgentTurnExecutorLive.js";
+import { PiSubagentTurnExecutorLive } from "./infrastructure/execution/PiSubagentTurnExecutorLive.js";
+import { isSubagentExecutionDisabled } from "./infrastructure/execution/piSubagentsConfig.js";
 
 // Domain Services
 import { GoalLifecycleServiceLive } from "./domain/services/GoalLifecycleServiceLive.js";
 import { JudgeServiceMock } from "./domain/services/JudgeServiceMock.js";
+import { JudgeServiceLive } from "./domain/services/JudgeServiceLive.js";
+import { EventStoreLive } from "./infrastructure/persistence/EventStoreLive.js";
 import { PromptGeneratorServiceMock } from "./domain/services/PromptGeneratorServiceMock.js";
 import { ToolExecutionServiceMock } from "./domain/services/ToolExecutionServiceMock.js";
 
@@ -27,31 +37,68 @@ import {
   GoalApplicationServiceLive,
 } from "./application/GoalApplicationService.js";
 
-/**
- * Complete application layer with all dependencies
- *
- * Layer composition:
- * - Infrastructure: Mock repositories (in-memory for development)
- * - Domain Services: Lifecycle, Judge, Prompt Generator, Tool Execution
- * - Application: GoalApplicationService facade
- */
-const DomainServicesLayer = Layer.mergeAll(
-  GoalLifecycleServiceLive.pipe(Layer.provide(GoalRepositoryMock)),
+const DomainServicesMocksLayer = Layer.mergeAll(
+  GoalLifecycleServiceLive,
   JudgeServiceMock,
+  PromptGeneratorServiceMock,
+  ToolExecutionServiceMock,
+  AgentTurnExecutorLive
+);
+
+const InfrastructureMocksLayer = Layer.mergeAll(
+  GoalRepositoryMock,
+  GoalIterationRepositoryMock,
+  GoalExecutionRepositoryMock,
+  EventStoreMock
+);
+
+const CoreServicesMockLayer = Layer.mergeAll(
+  GoalApplicationServiceLive,
+  GoalLifecycleServiceLive,
+  JudgeServiceMock,
+  PromptGeneratorServiceMock,
+  ToolExecutionServiceMock
+).pipe(Layer.provideMerge(AgentTurnExecutorLive));
+
+/**
+ * In-memory layer for local demo and tests that inject their own layers.
+ */
+export const AppLayerMock = CoreServicesMockLayer.pipe(
+  Layer.provideMerge(InfrastructureMocksLayer)
+);
+
+/** @deprecated Use AppLayerMock or AppLayerLive explicitly. */
+export const AppLayer = AppLayerMock;
+
+const InfrastructureLiveLayer = Layer.mergeAll(
+  GoalRepositoryLive,
+  GoalIterationRepositoryLive,
+  GoalExecutionRepositoryLive,
+  EventStoreLive
+);
+
+const CoreServicesLiveBaseLayer = Layer.mergeAll(
+  GoalApplicationServiceLive,
+  GoalLifecycleServiceLive,
+  JudgeServiceLive,
   PromptGeneratorServiceMock,
   ToolExecutionServiceMock
 );
 
-const InfrastructureLayer = Layer.mergeAll(
-  GoalRepositoryMock,
-  GoalIterationRepositoryMock,
-  EventStoreMock
-);
-
-export const AppLayer = Layer.mergeAll(
-  GoalApplicationServiceLive,
-  DomainServicesLayer,
-  InfrastructureLayer
+/**
+ * Production layer: SQLite at ~/.pi/state/goal/goals.db (or PI_GOAL_DB_PATH).
+ * Turns use pi-subagents (settings.json: npm:pi-subagents) unless PI_GOAL_SUBAGENT_DISABLE=1.
+ */
+export const AppLayerLive = CoreServicesLiveBaseLayer.pipe(
+  Layer.provideMerge(
+    Layer.suspend(() =>
+      isSubagentExecutionDisabled()
+        ? AgentTurnExecutorLive
+        : PiSubagentTurnExecutorLive
+    )
+  ),
+  Layer.provideMerge(InfrastructureLiveLayer),
+  Layer.provide(DatabaseLayer)
 );
 
 /**

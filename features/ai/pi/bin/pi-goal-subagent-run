@@ -1,0 +1,140 @@
+#!/usr/bin/env bun
+/**
+ * Bridge: run one pi-subagents sync turn for the goal plugin MCP server.
+ *
+ * stdin: JSON { task, cwd, agent, runId, goalId, turn }
+ * stdout: JSON { text, exitCode, error?, finalOutput?, toolCalls?, artifactOutputPath? }
+ */
+import { mkdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
+interface BridgeInput {
+  task: string;
+  cwd: string;
+  agent: string;
+  runId: string;
+  goalId: string;
+  turn: number;
+  piSubagentsRoot: string;
+  piAgentDir: string;
+  artifactsDir: string;
+}
+
+interface BridgeOutput {
+  text: string;
+  exitCode: number;
+  error?: string;
+  finalOutput?: string;
+  toolCalls?: number;
+  artifactOutputPath?: string;
+  delegated: boolean;
+}
+
+function readStdin(): string {
+  return readFileSync(0, "utf8");
+}
+
+async function main(): Promise<void> {
+  const input = JSON.parse(readStdin()) as BridgeInput;
+
+  process.env.PI_CODING_AGENT_DIR = input.piAgentDir;
+
+  const subagentsRoot = input.piSubagentsRoot;
+  const agentsMod = await import(
+    pathToFileURL(join(subagentsRoot, "src/agents/agents.ts")).href
+  );
+  const executionMod = await import(
+    pathToFileURL(join(subagentsRoot, "src/runs/foreground/execution.ts")).href
+  );
+  const typesMod = await import(
+    pathToFileURL(join(subagentsRoot, "src/shared/types.ts")).href
+  );
+
+  const { discoverAgents } = agentsMod as {
+    discoverAgents: (
+      cwd: string,
+      scope: "both"
+    ) => { agents: Array<{ name: string }> };
+  };
+  const { runSync } = executionMod as {
+    runSync: (
+      runtimeCwd: string,
+      agents: unknown[],
+      agentName: string,
+      task: string,
+      options: Record<string, unknown>
+    ) => Promise<{
+      exitCode: number;
+      error?: string;
+      finalOutput?: string;
+      messages?: unknown[];
+      toolCalls?: unknown[];
+      artifactPaths?: { outputPath: string };
+    }>;
+  };
+  const { DEFAULT_ARTIFACT_CONFIG } = typesMod as {
+    DEFAULT_ARTIFACT_CONFIG: Record<string, unknown>;
+  };
+
+  mkdirSync(input.artifactsDir, { recursive: true });
+
+  const { agents } = discoverAgents(input.cwd, "both");
+  const agentExists = agents.some((a) => a.name === input.agent);
+  if (!agentExists) {
+    const out: BridgeOutput = {
+      text: "",
+      exitCode: 1,
+      error: `Unknown pi-subagents agent: ${input.agent}. Available: ${agents.map((a) => a.name).join(", ")}`,
+      delegated: false,
+    };
+    process.stdout.write(JSON.stringify(out));
+    process.exit(1);
+  }
+
+  const result = await runSync(input.cwd, agents, input.agent, input.task, {
+    cwd: input.cwd,
+    runId: input.runId,
+    artifactsDir: input.artifactsDir,
+    artifactConfig: DEFAULT_ARTIFACT_CONFIG,
+    index: input.turn,
+  });
+
+  let text =
+    result.finalOutput?.trim() ??
+    (result.artifactPaths?.outputPath
+      ? readFileSync(result.artifactPaths.outputPath, "utf8").trim()
+      : "");
+
+  if (!text && result.error) {
+    text = result.error;
+  }
+  if (!text && result.exitCode !== 0) {
+    text = `Subagent exited with code ${result.exitCode}`;
+  }
+
+  const out: BridgeOutput = {
+    text: text || "(subagent produced no text output)",
+    exitCode: result.exitCode,
+    error: result.error,
+    finalOutput: result.finalOutput,
+    toolCalls: result.toolCalls?.length ?? 0,
+    artifactOutputPath: result.artifactPaths?.outputPath,
+    delegated: result.exitCode === 0,
+  };
+
+  process.stdout.write(JSON.stringify(out));
+  process.exit(result.exitCode === 0 ? 0 : 1);
+}
+
+main().catch((err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  const out: BridgeOutput = {
+    text: "",
+    exitCode: 1,
+    error: message,
+    delegated: false,
+  };
+  process.stdout.write(JSON.stringify(out));
+  process.exit(1);
+});

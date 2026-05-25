@@ -1,24 +1,20 @@
 /**
- * JudgeServiceLive - Production Implementation
- *
- * Real implementation of JudgeService using Pi's local model system.
- * Integrates with Pi Agent's model interface for LLM evaluation.
+ * JudgeServiceLive - Production Implementation (OpenRouter / openrouter/free)
  */
 import { Effect, Layer } from "effect";
 import { JudgeService } from "./JudgeService.js";
 import { Goal } from "../models/Goal.js";
 import { JudgeResult, JudgeStatus } from "../models/JudgeResult.js";
+import {
+  openRouterChatCompletion,
+  resolveJudgeModel,
+  resolveOpenRouterApiKey,
+} from "../../infrastructure/llm/openRouterClient.js";
 
 /**
  * Judge prompt template
- *
- * Structured prompt for LLM-as-Judge evaluation following best practices:
- * - Clear role definition
- * - Explicit evaluation criteria
- * - Structured output format
- * - Confidence scoring
  */
-function createJudgePrompt(goal: Goal, context: string, turn: number): string {
+export function createJudgePrompt(goal: Goal, context: string, turn: number): string {
   return `You are an objective judge evaluating goal progress. Your role is to assess whether a goal has been achieved, is in progress, is blocked, or has failed.
 
 GOAL OBJECTIVE:
@@ -49,38 +45,40 @@ Be objective and precise. Base your judgment only on the evidence provided.`;
 /**
  * Parse judge response from LLM
  */
-function _parseJudgeResponse(
+export function parseJudgeResponse(
   response: string,
   goalId: string,
   turn: number
 ): JudgeResult {
   try {
-    // Extract JSON from response (may have markdown code blocks)
     const jsonMatch = response.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("No JSON found in judge response");
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    const parsed = JSON.parse(jsonMatch[0]) as {
+      status?: string;
+      confidence?: number;
+      reasoning?: string;
+      recommendations?: string[];
+    };
 
-    // Validate required fields
     if (!parsed.status || typeof parsed.confidence !== "number") {
       throw new Error("Invalid judge response format");
     }
 
-    // Ensure status is valid
     const validStatuses = [
       JudgeStatus.COMPLETE,
       JudgeStatus.IN_PROGRESS,
       JudgeStatus.BLOCKED,
       JudgeStatus.FAILED,
     ];
-    if (!validStatuses.includes(parsed.status)) {
+    if (!validStatuses.includes(parsed.status as JudgeStatus)) {
       throw new Error(`Invalid status: ${parsed.status}`);
     }
 
     return new JudgeResult({
-      status: parsed.status,
+      status: parsed.status as JudgeStatus,
       confidence: Math.max(0, Math.min(1, parsed.confidence)),
       reasoning: parsed.reasoning || "No reasoning provided",
       recommendations: Array.isArray(parsed.recommendations)
@@ -91,7 +89,6 @@ function _parseJudgeResponse(
       timestamp: Date.now(),
     });
   } catch (error) {
-    // Fallback to conservative assessment on parse error
     return new JudgeResult({
       status: JudgeStatus.IN_PROGRESS,
       confidence: 0.5,
@@ -104,17 +101,6 @@ function _parseJudgeResponse(
   }
 }
 
-/**
- * Production judge service implementation
- *
- * TODO: Integrate with Pi Agent's model system
- * - Access Pi's model registry (~/.pi/agent/models.json)
- * - Use Pi's ModelService for vendor-agnostic LLM calls
- * - Support Ollama, vLLM, llama.cpp backends
- * - Add retry logic with exponential backoff
- * - Add timeout handling
- * - Add streaming support for large contexts
- */
 class JudgeServiceLiveImpl implements JudgeService {
   evaluateGoalProgress(
     goal: Goal,
@@ -122,44 +108,33 @@ class JudgeServiceLiveImpl implements JudgeService {
     turn: number
   ): Effect.Effect<JudgeResult, Error> {
     return Effect.gen(function* () {
-      const _prompt = createJudgePrompt(goal, context, turn);
+      const apiKey = resolveOpenRouterApiKey();
+      if (!apiKey) {
+        return yield* Effect.fail(
+          new Error(
+            "OPENROUTER_API_KEY is required for JudgeServiceLive (set in environment)"
+          )
+        );
+      }
 
-      // TODO: Replace with Pi ModelService integration
-      // const modelService = yield* ModelService;
-      // const response = yield* modelService.generate({
-      //   model: "judge-model", // Configurable judge model name
-      //   prompt,
-      //   temperature: 0.3, // Low temperature for consistent evaluation
-      //   maxTokens: 500,
-      // });
+      const prompt = createJudgePrompt(goal, context, turn);
+      const model = resolveJudgeModel();
 
-      // Placeholder: For now, return a basic result
-      // This will be replaced with actual Pi model integration
-      yield* Effect.logWarning(
-        "JudgeServiceLive: Pi model integration not yet implemented, using placeholder"
-      );
-
-      // Placeholder implementation
-      return new JudgeResult({
-        status: JudgeStatus.IN_PROGRESS,
-        confidence: 0.7,
-        reasoning:
-          "Placeholder: Judge model integration with Pi Agent pending",
-        recommendations: ["Integrate with Pi ModelService", "Configure judge model"],
-        goalId: goal.id,
-        turn,
-        timestamp: Date.now(),
+      const response = yield* Effect.tryPromise({
+        try: () =>
+          openRouterChatCompletion({
+            apiKey,
+            model,
+            prompt,
+          }),
+        catch: (e) => (e instanceof Error ? e : new Error(String(e))),
       });
 
-      // When Pi integration is ready, uncomment:
-      // return parseJudgeResponse(response, goal.id, turn);
+      return parseJudgeResponse(response, goal.id, turn);
     });
   }
 }
 
-/**
- * JudgeServiceLive Layer
- */
 export const JudgeServiceLive = Layer.succeed(
   JudgeService,
   new JudgeServiceLiveImpl()

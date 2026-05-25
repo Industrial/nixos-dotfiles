@@ -5,6 +5,12 @@ import { Effect, Layer } from "effect";
 import { createGoal as makeGoal } from "../models/Goal.js";
 import { GoalRepository } from "../repositories/GoalRepository.js";
 import { GoalLifecycleService } from "./GoalLifecycleService.js";
+import { appendGoalEvent } from "./goalEventAppend.js";
+import { GoalCreated, GoalCreatedPayload } from "../events/GoalCreated.js";
+import { GoalPaused } from "../events/GoalPaused.js";
+import { GoalResumed } from "../events/GoalResumed.js";
+import { GoalCompleted } from "../events/GoalCompleted.js";
+import { GoalCancelled } from "../events/GoalCancelled.js";
 
 /**
  * Live implementation of GoalLifecycleService
@@ -16,7 +22,6 @@ export const GoalLifecycleServiceLive = Layer.effect(
 
     const createGoal = (objective: string, context?: string) =>
       Effect.gen(function* () {
-        // Business rule: Only one active goal at a time
         const activeGoal = yield* goalRepo.findActive();
         if (activeGoal) {
           return yield* Effect.fail(
@@ -27,7 +32,20 @@ export const GoalLifecycleServiceLive = Layer.effect(
         }
 
         const goal = makeGoal(objective, context);
-        return yield* goalRepo.save(goal);
+        const saved = yield* goalRepo.save(goal);
+
+        yield* appendGoalEvent(saved.id, (version) =>
+          GoalCreated.create(
+            saved.id,
+            version,
+            new GoalCreatedPayload({
+              objective: saved.objective,
+              context: saved.context,
+            })
+          )
+        );
+
+        return saved;
       });
 
     const pauseGoal = (goalId: string) =>
@@ -38,12 +56,17 @@ export const GoalLifecycleServiceLive = Layer.effect(
         }
 
         const pausedGoal = yield* goal.pause();
-        return yield* goalRepo.update(pausedGoal);
+        const updated = yield* goalRepo.update(pausedGoal);
+
+        yield* appendGoalEvent(goalId, (version) =>
+          GoalPaused.create(goalId, version)
+        );
+
+        return updated;
       });
 
     const resumeGoal = (goalId: string) =>
       Effect.gen(function* () {
-        // Business rule: Only one active goal at a time
         const activeGoal = yield* goalRepo.findActive();
         if (activeGoal && activeGoal.id !== goalId) {
           return yield* Effect.fail(
@@ -59,7 +82,13 @@ export const GoalLifecycleServiceLive = Layer.effect(
         }
 
         const resumedGoal = yield* goal.resume();
-        return yield* goalRepo.update(resumedGoal);
+        const updated = yield* goalRepo.update(resumedGoal);
+
+        yield* appendGoalEvent(goalId, (version) =>
+          GoalResumed.create(goalId, version)
+        );
+
+        return updated;
       });
 
     const completeGoal = (goalId: string) =>
@@ -70,7 +99,13 @@ export const GoalLifecycleServiceLive = Layer.effect(
         }
 
         const completedGoal = yield* goal.complete();
-        return yield* goalRepo.update(completedGoal);
+        const updated = yield* goalRepo.update(completedGoal);
+
+        yield* appendGoalEvent(goalId, (version) =>
+          GoalCompleted.create(goalId, version)
+        );
+
+        return updated;
       });
 
     const cancelGoal = (goalId: string) =>
@@ -81,7 +116,13 @@ export const GoalLifecycleServiceLive = Layer.effect(
         }
 
         const cancelledGoal = yield* goal.cancel();
-        return yield* goalRepo.update(cancelledGoal);
+        const updated = yield* goalRepo.update(cancelledGoal);
+
+        yield* appendGoalEvent(goalId, (version) =>
+          GoalCancelled.create(goalId, version)
+        );
+
+        return updated;
       });
 
     const canActivateGoal = () =>

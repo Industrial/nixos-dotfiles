@@ -6,14 +6,11 @@
 import { describe, it, expect } from "bun:test";
 import { Effect, Layer } from "effect";
 import { GoalLifecycleService } from "./GoalLifecycleService.js";
-import { GoalLifecycleServiceLive } from "./GoalLifecycleServiceLive.js";
-import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
+import { GoalLifecycleTestLayer } from "../../testing/TestLayers.js";
 
 describe("GoalLifecycleService", () => {
   // Test layer using mock repository - no database!
-  const TestLayer = GoalLifecycleServiceLive.pipe(
-    Layer.provide(GoalRepositoryMock)
-  );
+  const TestLayer = GoalLifecycleTestLayer;
 
   describe("createGoal", () => {
     it("should create a new goal when none is active", async () => {

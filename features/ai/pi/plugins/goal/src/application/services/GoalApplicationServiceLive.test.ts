@@ -7,8 +7,7 @@ import { describe, it, expect } from "bun:test";
 import { Effect, Layer } from "effect";
 import { GoalApplicationService } from "./GoalApplicationService.js";
 import { GoalApplicationServiceLive } from "./GoalApplicationServiceLive.js";
-import { GoalLifecycleServiceLive } from "../../domain/services/GoalLifecycleServiceLive.js";
-import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
+import { GoalLifecycleTestLayer } from "../../testing/TestLayers.js";
 import {
   CreateGoalCommand,
   PauseGoalCommand,
@@ -22,14 +21,11 @@ describe("GoalApplicationServiceLive", () => {
   // 1. GoalRepositoryMock - base dependency
   // 2. GoalLifecycleServiceLive - requires GoalRepository
   // 3. GoalApplicationServiceLive - handlers need both GoalLifecycleService and GoalRepository
-  const lifecycleLayer = GoalLifecycleServiceLive.pipe(
-    Layer.provide(GoalRepositoryMock)
-  );
+  const lifecycleLayer = GoalLifecycleTestLayer;
 
   const TestLayer = Layer.mergeAll(
     GoalApplicationServiceLive,
-    lifecycleLayer,
-    GoalRepositoryMock
+    lifecycleLayer
   );
 
   describe("Service delegation", () => {

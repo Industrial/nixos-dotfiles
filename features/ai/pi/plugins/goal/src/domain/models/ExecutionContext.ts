@@ -2,15 +2,12 @@
  * ExecutionContext - Domain Model
  *
  * Tracks goal execution state, turns, errors, and limits.
- * Prevents infinite loops and provides error tracking.
  */
 import { Schema as S } from "@effect/schema";
+import type { StoppedReason } from "../execution/StoppedReason.js";
 import { JudgeResult } from "./JudgeResult.js";
 import { ToolResult } from "./ToolResult.js";
 
-/**
- * Execution error record
- */
 export class ExecutionError extends S.Class<ExecutionError>("ExecutionError")({
   message: S.String,
   timestamp: S.Number,
@@ -18,43 +15,82 @@ export class ExecutionError extends S.Class<ExecutionError>("ExecutionError")({
   stack: S.optional(S.String),
 }) {}
 
-/**
- * ExecutionContext - Aggregate Root
- *
- * Immutable context for tracking goal execution progress.
- */
 export class ExecutionContext extends S.Class<ExecutionContext>("ExecutionContext")({
   id: S.String,
   goalId: S.String,
+  /** Cumulative turn counter across all goal_execute calls */
   currentTurn: S.Number,
+  /** Turns allowed in this MCP call only */
   maxTurns: S.Number,
+  /** Turn counter at start of this call */
+  turnsAtStart: S.Number,
   errors: S.Array(ExecutionError),
   judgeEvaluations: S.Array(JudgeResult),
   toolResults: S.Array(ToolResult),
+  /** @deprecated Use phaseComplete — kept for backward compatibility */
   isComplete: S.Boolean,
+  phaseComplete: S.Boolean,
+  goalAchieved: S.Boolean,
+  turnLimitReached: S.Boolean,
+  stoppedReason: S.optional(S.String),
+  nextPrompt: S.optional(S.String),
   createdAt: S.Number,
   completedAt: S.optional(S.Number),
 }) {
-  /**
-   * Increment the turn counter
-   */
-  incrementTurn(): ExecutionContext {
+  private clone(
+    patch: Partial<{
+      currentTurn: number;
+      errors: readonly ExecutionError[];
+      judgeEvaluations: readonly JudgeResult[];
+      toolResults: readonly ToolResult[];
+      isComplete: boolean;
+      phaseComplete: boolean;
+      goalAchieved: boolean;
+      turnLimitReached: boolean;
+      stoppedReason: string | undefined;
+      nextPrompt: string | undefined;
+      completedAt: number | undefined;
+    }>
+  ): ExecutionContext {
     return new ExecutionContext({
-      ...this,
-      currentTurn: this.currentTurn + 1,
+      id: this.id,
+      goalId: this.goalId,
+      currentTurn: patch.currentTurn ?? this.currentTurn,
+      maxTurns: this.maxTurns,
+      turnsAtStart: this.turnsAtStart,
+      errors: patch.errors ?? this.errors,
+      judgeEvaluations: patch.judgeEvaluations ?? this.judgeEvaluations,
+      toolResults: patch.toolResults ?? this.toolResults,
+      isComplete: patch.isComplete ?? this.isComplete,
+      phaseComplete: patch.phaseComplete ?? this.phaseComplete,
+      goalAchieved: patch.goalAchieved ?? this.goalAchieved,
+      turnLimitReached: patch.turnLimitReached ?? this.turnLimitReached,
+      stoppedReason:
+        patch.stoppedReason !== undefined
+          ? patch.stoppedReason
+          : this.stoppedReason,
+      nextPrompt:
+        patch.nextPrompt !== undefined ? patch.nextPrompt : this.nextPrompt,
+      createdAt: this.createdAt,
+      completedAt:
+        patch.completedAt !== undefined
+          ? patch.completedAt
+          : this.completedAt,
     });
   }
 
-  /**
-   * Check if turn limit has been reached
-   */
-  hasReachedLimit(): boolean {
-    return this.currentTurn >= this.maxTurns;
+  incrementTurn(): ExecutionContext {
+    return this.clone({ currentTurn: this.currentTurn + 1 });
   }
 
-  /**
-   * Record an error that occurred during execution
-   */
+  turnsThisCall(): number {
+    return this.currentTurn - this.turnsAtStart;
+  }
+
+  hasReachedLimit(): boolean {
+    return this.turnsThisCall() >= this.maxTurns;
+  }
+
   recordError(error: Error): ExecutionContext {
     const executionError = new ExecutionError({
       message: error.message,
@@ -63,93 +99,80 @@ export class ExecutionContext extends S.Class<ExecutionContext>("ExecutionContex
       stack: error.stack,
     });
 
-    return new ExecutionContext({
-      ...this,
-      errors: [...this.errors, executionError],
-    });
+    return this.clone({ errors: [...this.errors, executionError] });
   }
 
-  /**
-   * Record a judge evaluation
-   */
   recordJudgeEvaluation(evaluation: JudgeResult): ExecutionContext {
-    return new ExecutionContext({
-      ...this,
+    return this.clone({
       judgeEvaluations: [...this.judgeEvaluations, evaluation],
     });
   }
 
-  /**
-   * Get the most recent judge evaluation
-   */
   getLatestJudgeEvaluation(): JudgeResult | undefined {
     return this.judgeEvaluations[this.judgeEvaluations.length - 1];
   }
 
-  /**
-   * Record a tool execution result
-   */
   recordToolResult(result: ToolResult): ExecutionContext {
-    return new ExecutionContext({
-      ...this,
-      toolResults: [...this.toolResults, result],
-    });
+    return this.clone({ toolResults: [...this.toolResults, result] });
   }
 
-  /**
-   * Get tool results for current turn
-   */
   getToolResultsForTurn(_turn: number): readonly ToolResult[] {
-    // Tool results don't have turn numbers in the current schema
-    // For now, return all tool results
-    // TODO: Add turn tracking to ToolResult for proper filtering
     return this.toolResults;
   }
 
-  /**
-   * Mark execution as complete
-   */
-  markComplete(): ExecutionContext {
-    return new ExecutionContext({
-      ...this,
+  finishPhase(params: {
+    stoppedReason: StoppedReason;
+    goalAchieved: boolean;
+    nextPrompt?: string;
+  }): ExecutionContext {
+    return this.clone({
       isComplete: true,
+      phaseComplete: true,
+      goalAchieved: params.goalAchieved,
+      turnLimitReached: params.stoppedReason === "turn_limit",
+      stoppedReason: params.stoppedReason,
+      nextPrompt: params.nextPrompt,
       completedAt: Date.now(),
     });
   }
 
-  /**
-   * Check if execution can continue
-   */
-  canContinue(): boolean {
-    return !this.isComplete && !this.hasReachedLimit();
+  /** @deprecated Use finishPhase */
+  markComplete(): ExecutionContext {
+    return this.finishPhase({
+      stoppedReason: "none",
+      goalAchieved: false,
+    });
   }
 
-  /**
-   * Get progress percentage (0.0 to 1.0)
-   */
+  canContinue(): boolean {
+    return !this.phaseComplete && !this.hasReachedLimit();
+  }
+
   getTurnProgress(): number {
     if (this.maxTurns === 0) return 1.0;
-    return Math.min(this.currentTurn / this.maxTurns, 1.0);
+    return Math.min(this.turnsThisCall() / this.maxTurns, 1.0);
   }
 }
 
-/**
- * Factory function to create a new execution context
- */
 export const createExecutionContext = (
   goalId: string,
-  maxTurns: number = 50
+  maxTurnsPerCall: number = 50,
+  cumulativeTurnAtStart: number = 0
 ): ExecutionContext => {
   const now = Date.now();
   return new ExecutionContext({
     id: `exec-${now}-${Math.random().toString(36).substring(2, 9)}`,
     goalId,
-    currentTurn: 0,
-    maxTurns,
+    currentTurn: cumulativeTurnAtStart,
+    maxTurns: maxTurnsPerCall,
+    turnsAtStart: cumulativeTurnAtStart,
     errors: [],
     judgeEvaluations: [],
     toolResults: [],
     isComplete: false,
+    phaseComplete: false,
+    goalAchieved: false,
+    turnLimitReached: false,
     createdAt: now,
   });
 };

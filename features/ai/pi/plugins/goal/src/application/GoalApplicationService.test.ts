@@ -4,28 +4,12 @@
  * Tests for the main application facade that coordinates all goal operations.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
-import {
-  GoalApplicationService,
-  GoalApplicationServiceLive,
-} from "./GoalApplicationService.js";
-import { GoalLifecycleServiceLive } from "../domain/services/GoalLifecycleServiceLive.js";
-import { JudgeServiceMock } from "../domain/services/JudgeServiceMock.js";
-import { PromptGeneratorServiceMock } from "../domain/services/PromptGeneratorServiceMock.js";
-import { ToolExecutionServiceMock } from "../domain/services/ToolExecutionServiceMock.js";
-import { GoalRepositoryMock } from "../infrastructure/persistence/GoalRepositoryMock.js";
+import { Effect } from "effect";
+import { GoalApplicationService } from "./GoalApplicationService.js";
+import { AppLayerMock } from "../index.js";
 
 describe("GoalApplicationService", () => {
-  // Simplified: Just use the domain layers directly
-  // Application service doesn't need DI since it calls handlers directly
-  const TestLayer = Layer.mergeAll(
-    GoalRepositoryMock,
-    GoalLifecycleServiceLive.pipe(Layer.provide(GoalRepositoryMock)),
-    JudgeServiceMock,
-    PromptGeneratorServiceMock,
-    ToolExecutionServiceMock,
-    GoalApplicationServiceLive
-  );
+  const TestLayer = AppLayerMock;
 
   describe("createGoal", () => {
     it("When creating goal with objective, Then returns goal", async () => {
@@ -167,7 +151,10 @@ describe("GoalApplicationService", () => {
         program.pipe(Effect.provide(TestLayer))
       );
 
-      expect(result.success).toBe(true);
+      expect(result.turnsThisCall).toBe(2);
+      expect(result.phaseComplete).toBe(true);
+      expect(result.goalAchieved).toBe(false);
+      expect(result.success).toBe(false);
       expect(result.context).toBeDefined();
     });
   });

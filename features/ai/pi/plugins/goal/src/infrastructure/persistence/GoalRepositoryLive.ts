@@ -171,6 +171,11 @@ export const GoalRepositoryLive = Layer.effect(
           ? JSON.stringify(goal.evaluationData) 
           : null;
 
+        const existing = yield* findById(goal.id);
+        if (!existing) {
+          return yield* Effect.fail(new Error(`Goal not found: ${goal.id}`));
+        }
+
         yield* sql`
           UPDATE goals SET
             objective = ${goal.objective},
@@ -181,11 +186,6 @@ export const GoalRepositoryLive = Layer.effect(
             evaluation_data = ${evaluationJson}
           WHERE id = ${goal.id}
         `;
-
-        const exists = yield* findById(goal.id);
-        if (!exists) {
-          return yield* Effect.fail(new Error(`Goal not found: ${goal.id}`));
-        }
 
         return goal;
       });
