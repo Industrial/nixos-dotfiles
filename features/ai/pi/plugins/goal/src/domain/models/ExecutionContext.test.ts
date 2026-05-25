@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from "bun:test";
 import { createExecutionContext } from "./ExecutionContext.js";
+import { JudgeResult, JudgeStatus } from "./JudgeResult.js";
 
 describe("ExecutionContext", () => {
   describe("createExecutionContext factory", () => {
@@ -235,6 +236,131 @@ describe("ExecutionContext", () => {
       }
 
       expect(ctx.errors).toHaveLength(100);
+    });
+  });
+
+  describe("recordJudgeEvaluation", () => {
+    it("should add judge evaluation to array", () => {
+      const ctx = createExecutionContext("goal-123");
+      const evaluation = new JudgeResult({
+        status: JudgeStatus.IN_PROGRESS,
+        confidence: 0.8,
+        reasoning: "Making progress",
+        recommendations: ["Continue"],
+        goalId: "goal-123",
+        turn: 1,
+        timestamp: Date.now(),
+      });
+
+      const updated = ctx.recordJudgeEvaluation(evaluation);
+
+      expect(updated.judgeEvaluations).toHaveLength(1);
+      expect(updated.judgeEvaluations[0]).toBe(evaluation);
+    });
+
+    it("should preserve existing evaluations", () => {
+      const ctx = createExecutionContext("goal-123");
+      const eval1 = new JudgeResult({
+        status: JudgeStatus.IN_PROGRESS,
+        confidence: 0.7,
+        reasoning: "First evaluation",
+        recommendations: [],
+        goalId: "goal-123",
+        turn: 1,
+        timestamp: Date.now(),
+      });
+      const eval2 = new JudgeResult({
+        status: JudgeStatus.COMPLETE,
+        confidence: 0.9,
+        reasoning: "Second evaluation",
+        recommendations: [],
+        goalId: "goal-123",
+        turn: 2,
+        timestamp: Date.now(),
+      });
+
+      const updated1 = ctx.recordJudgeEvaluation(eval1);
+      const updated2 = updated1.recordJudgeEvaluation(eval2);
+
+      expect(updated2.judgeEvaluations).toHaveLength(2);
+      expect(updated2.judgeEvaluations[0]).toBe(eval1);
+      expect(updated2.judgeEvaluations[1]).toBe(eval2);
+    });
+
+    it("should track evaluation progression", () => {
+      let ctx = createExecutionContext("goal-123");
+
+      for (let i = 1; i <= 5; i++) {
+        const judgeEval = new JudgeResult({
+          status: JudgeStatus.IN_PROGRESS,
+          confidence: 0.6 + i * 0.05,
+          reasoning: `Turn ${i} evaluation`,
+          recommendations: [],
+          goalId: "goal-123",
+          turn: i,
+          timestamp: Date.now(),
+        });
+        ctx = ctx.recordJudgeEvaluation(judgeEval);
+      }
+
+      expect(ctx.judgeEvaluations).toHaveLength(5);
+      expect(ctx.judgeEvaluations[4].turn).toBe(5);
+    });
+  });
+
+  describe("getLatestJudgeEvaluation", () => {
+    it("should return undefined when no evaluations", () => {
+      const ctx = createExecutionContext("goal-123");
+
+      expect(ctx.getLatestJudgeEvaluation()).toBeUndefined();
+    });
+
+    it("should return most recent evaluation", () => {
+      const ctx = createExecutionContext("goal-123");
+      const eval1 = new JudgeResult({
+        status: JudgeStatus.IN_PROGRESS,
+        confidence: 0.7,
+        reasoning: "First",
+        recommendations: [],
+        goalId: "goal-123",
+        turn: 1,
+        timestamp: Date.now(),
+      });
+      const eval2 = new JudgeResult({
+        status: JudgeStatus.COMPLETE,
+        confidence: 0.95,
+        reasoning: "Second",
+        recommendations: [],
+        goalId: "goal-123",
+        turn: 2,
+        timestamp: Date.now(),
+      });
+
+      const updated = ctx
+        .recordJudgeEvaluation(eval1)
+        .recordJudgeEvaluation(eval2);
+
+      const latest = updated.getLatestJudgeEvaluation();
+      expect(latest).toBe(eval2);
+      expect(latest?.turn).toBe(2);
+    });
+
+    it("should return only evaluation when one exists", () => {
+      const ctx = createExecutionContext("goal-123");
+      const judgeEval = new JudgeResult({
+        status: JudgeStatus.BLOCKED,
+        confidence: 0.8,
+        reasoning: "Only one",
+        recommendations: [],
+        goalId: "goal-123",
+        turn: 1,
+        timestamp: Date.now(),
+      });
+
+      const updated = ctx.recordJudgeEvaluation(judgeEval);
+      const latest = updated.getLatestJudgeEvaluation();
+
+      expect(latest).toBe(judgeEval);
     });
   });
 });

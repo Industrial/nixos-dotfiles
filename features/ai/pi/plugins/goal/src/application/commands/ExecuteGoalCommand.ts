@@ -6,6 +6,7 @@
 import { Schema as S } from "@effect/schema";
 import { Effect } from "effect";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
+import { JudgeService } from "../../domain/services/JudgeService.js";
 import { createExecutionContext, ExecutionContext } from "../../domain/models/ExecutionContext.js";
 
 /**
@@ -28,15 +29,15 @@ export class ExecuteGoalCommand extends S.Class<ExecuteGoalCommand>("ExecuteGoal
 /**
  * ExecuteGoalCommand Handler
  *
- * Note: This is a basic implementation that creates an execution context
- * and runs a simple loop. The actual goal execution logic (judge evaluation,
- * prompting, etc.) will be implemented in subsequent tasks.
+ * Executes a goal in a continuation loop with judge evaluation.
+ * Integrates LLM-as-Judge pattern for objective progress assessment.
  */
 export const executeGoalHandler = (
   command: ExecuteGoalCommand
-): Effect.Effect<ExecutionResult, Error, GoalRepository> =>
+): Effect.Effect<ExecutionResult, Error, GoalRepository | JudgeService> =>
   Effect.gen(function* () {
     const repo = yield* GoalRepository;
+    const judge = yield* JudgeService;
 
     // Verify goal exists and is not in terminal state
     const goal = yield* repo.findById(command.goalId);
@@ -56,23 +57,46 @@ export const executeGoalHandler = (
     const maxTurns = command.maxTurns ?? 50;
     let context = createExecutionContext(command.goalId, maxTurns);
 
-    // Basic execution loop
-    // Note: Actual execution logic (judge model, prompting) will be added in future tasks
+    // Execution loop with judge evaluation
     while (context.canContinue()) {
       context = context.incrementTurn();
 
-      // Placeholder: In a real implementation, this would:
       // 1. Generate prompt for current turn
-      // 2. Execute LLM call
-      // 3. Evaluate result with judge model
-      // 4. Update goal state
-      // 5. Check completion criteria
+      // TODO: Implement PromptGeneratorService (task dotfiles-csa.3.2)
+      const turnContext = `Turn ${context.currentTurn}: Placeholder execution context`;
 
-      // For now, continue looping until turn limit is reached
-      // The loop will exit when hasReachedLimit() becomes true
+      // 2. Execute LLM call
+      // TODO: Implement goal execution logic (task dotfiles-csa.3.2)
+      // For now, skip to judge evaluation
+
+      // 3. Evaluate progress with judge model
+      const judgeResult = yield* judge.evaluateGoalProgress(
+        goal,
+        turnContext,
+        context.currentTurn
+      );
+
+      // 4. Record judge evaluation
+      context = context.recordJudgeEvaluation(judgeResult);
+
+      // 5. Check completion criteria from judge
+      if (judgeResult.isTerminal()) {
+        // Judge determined goal is complete or failed
+        context = context.markComplete();
+        break;
+      }
+
+      // 6. Check if judge says we should not continue (blocked)
+      if (!judgeResult.shouldContinue()) {
+        // Goal is blocked or in terminal state
+        context = context.markComplete();
+        break;
+      }
+
+      // Continue to next turn if judge says IN_PROGRESS and turn limit not reached
     }
 
-    // Mark as complete when loop exits
+    // Mark as complete if loop exited due to turn limit
     if (!context.isComplete) {
       context = context.markComplete();
     }

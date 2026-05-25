@@ -5,6 +5,7 @@
  * Prevents infinite loops and provides error tracking.
  */
 import { Schema as S } from "@effect/schema";
+import { JudgeResult } from "./JudgeResult.js";
 
 /**
  * Execution error record
@@ -27,6 +28,7 @@ export class ExecutionContext extends S.Class<ExecutionContext>("ExecutionContex
   currentTurn: S.Number,
   maxTurns: S.Number,
   errors: S.Array(ExecutionError),
+  judgeEvaluations: S.Array(JudgeResult),
   isComplete: S.Boolean,
   createdAt: S.Number,
   completedAt: S.optional(S.Number),
@@ -63,6 +65,23 @@ export class ExecutionContext extends S.Class<ExecutionContext>("ExecutionContex
       ...this,
       errors: [...this.errors, executionError],
     });
+  }
+
+  /**
+   * Record a judge evaluation
+   */
+  recordJudgeEvaluation(evaluation: JudgeResult): ExecutionContext {
+    return new ExecutionContext({
+      ...this,
+      judgeEvaluations: [...this.judgeEvaluations, evaluation],
+    });
+  }
+
+  /**
+   * Get the most recent judge evaluation
+   */
+  getLatestJudgeEvaluation(): JudgeResult | undefined {
+    return this.judgeEvaluations[this.judgeEvaluations.length - 1];
   }
 
   /**
@@ -106,6 +125,7 @@ export const createExecutionContext = (
     currentTurn: 0,
     maxTurns,
     errors: [],
+    judgeEvaluations: [],
     isComplete: false,
     createdAt: now,
   });

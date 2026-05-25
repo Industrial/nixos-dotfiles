@@ -9,12 +9,15 @@ import { ExecuteGoalCommand, executeGoalHandler } from "./ExecuteGoalCommand.js"
 import { CreateGoalCommand, createGoalHandler } from "./CreateGoalCommand.js";
 import { GoalLifecycleService } from "../../domain/services/GoalLifecycleService.js";
 import { GoalLifecycleServiceLive } from "../../domain/services/GoalLifecycleServiceLive.js";
+import { JudgeServiceMock } from "../../domain/services/JudgeServiceMock.js";
 import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
 
 describe("ExecuteGoalCommand", () => {
   const TestLayer = GoalLifecycleServiceLive.pipe(
     Layer.provide(GoalRepositoryMock)
-  ).pipe(Layer.merge(GoalRepositoryMock));
+  )
+    .pipe(Layer.merge(GoalRepositoryMock))
+    .pipe(Layer.merge(JudgeServiceMock));
 
   describe("Schema Validation", () => {
     describe("Given valid command input", () => {
@@ -274,6 +277,75 @@ describe("ExecuteGoalCommand", () => {
         );
 
         expect(executionResult.goalId).toBe(goalId);
+      });
+    });
+
+    describe("Judge integration", () => {
+      it("When executing goal, Then judge evaluations are recorded", async () => {
+        const program = Effect.gen(function* () {
+          const goal = yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Test goal" })
+          );
+
+          return yield* executeGoalHandler(
+            new ExecuteGoalCommand({
+              goalId: goal.id,
+              maxTurns: 3,
+            })
+          );
+        });
+
+        const result = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
+
+        expect(result.context.judgeEvaluations).toBeDefined();
+        expect(result.context.judgeEvaluations.length).toBeGreaterThan(0);
+      });
+
+      it("When executing goal, Then each turn has judge evaluation", async () => {
+        const program = Effect.gen(function* () {
+          const goal = yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Test goal" })
+          );
+
+          return yield* executeGoalHandler(
+            new ExecuteGoalCommand({
+              goalId: goal.id,
+              maxTurns: 5,
+            })
+          );
+        });
+
+        const result = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
+
+        // Should have judge evaluations for each turn
+        expect(result.context.judgeEvaluations.length).toBeGreaterThan(0);
+
+        // Each evaluation should have proper turn number
+        result.context.judgeEvaluations.forEach((evaluation) => {
+          expect(evaluation.turn).toBeGreaterThan(0);
+          expect(evaluation.goalId).toBe(result.goalId);
+        });
+      });
+
+      it("When executing goal, Then latest evaluation is accessible", async () => {
+        const program = Effect.gen(function* () {
+          const goal = yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Test goal" })
+          );
+
+          return yield* executeGoalHandler(
+            new ExecuteGoalCommand({
+              goalId: goal.id,
+              maxTurns: 2,
+            })
+          );
+        });
+
+        const result = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
+
+        const latest = result.context.getLatestJudgeEvaluation();
+        expect(latest).toBeDefined();
+        expect(latest?.goalId).toBe(result.goalId);
       });
     });
   });
