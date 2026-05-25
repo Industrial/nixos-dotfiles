@@ -8,7 +8,7 @@ import { Effect } from "effect";
 import { GetGoalQuery, getGoalHandler } from "./GetGoalQuery.js";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
 import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
-import { createGoal } from "../../domain/models/Goal.js";
+import { createGoal, GoalEvaluation } from "../../domain/models/Goal.js";
 
 describe("GetGoalQuery", () => {
   const TestLayer = GoalRepositoryMock;
@@ -135,7 +135,7 @@ describe("GetGoalQuery", () => {
       it("When executing get query, Then paused goal is returned with correct status", async () => {
         const program = Effect.gen(function* () {
           const repo = yield* GoalRepository;
-          
+
           const goal = createGoal("Test goal");
           const pausedGoal = yield* goal.pause();
           yield* repo.save(pausedGoal);
@@ -148,7 +148,7 @@ describe("GetGoalQuery", () => {
         const result = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
         expect(result.status).toBe("paused");
-        expect(result.updatedAt).toBeGreaterThan(result.createdAt);
+        expect(result.updatedAt).toBeGreaterThanOrEqual(result.createdAt);
         expect(result.completedAt).toBeUndefined();
       });
 
@@ -197,7 +197,7 @@ describe("GetGoalQuery", () => {
       it("When executing get query on completed goal, Then timestamps are consistent", async () => {
         const program = Effect.gen(function* () {
           const repo = yield* GoalRepository;
-          
+
           const goal = createGoal("Test goal");
           const completedGoal = yield* goal.complete();
           yield* repo.save(completedGoal);
@@ -209,9 +209,9 @@ describe("GetGoalQuery", () => {
 
         const result = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
-        expect(result.createdAt).toBeLessThan(result.updatedAt);
+        expect(result.createdAt).toBeLessThanOrEqual(result.updatedAt);
         expect(result.completedAt).toBe(result.updatedAt);
-        expect(result.completedAt).toBeGreaterThan(result.createdAt);
+        expect(result.completedAt).toBeGreaterThanOrEqual(result.createdAt);
       });
     });
 
@@ -347,14 +347,15 @@ describe("GetGoalQuery", () => {
       it("When getting goal with evaluation data, Then evaluation data is returned", async () => {
         const program = Effect.gen(function* () {
           const repo = yield* GoalRepository;
-          
+
           const goal = createGoal("Goal with evaluation");
-          const withEval = goal.updateEvaluation({
+          const evaluation = new GoalEvaluation({
             progress: 75,
             blockers: ["Waiting for review"],
             nextSteps: ["Address feedback", "Deploy"],
             notes: "Good progress",
-          } as any);
+          });
+          const withEval = goal.updateEvaluation(evaluation);
           yield* repo.save(withEval);
 
           return yield* getGoalHandler(

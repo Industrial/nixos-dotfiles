@@ -397,7 +397,7 @@ describe("ResumeGoalCommand", () => {
       it("When multiple resume commands execute sequentially on paused goal, Then only first succeeds", async () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
-          
+
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
@@ -408,8 +408,10 @@ describe("ResumeGoalCommand", () => {
           );
 
           // This should fail since goal is now active
-          const attemptSecondResume = resumeGoalHandler(
-            new ResumeGoalCommand({ goalId: goal.id })
+          const attemptSecondResume = yield* Effect.either(
+            resumeGoalHandler(
+              new ResumeGoalCommand({ goalId: goal.id })
+            )
           );
 
           return { resumed, attemptSecondResume };
@@ -420,10 +422,10 @@ describe("ResumeGoalCommand", () => {
         );
 
         expect(resumed.status).toBe("active");
-        
-        await expect(
-          Effect.runPromise(attemptSecondResume.pipe(Effect.provide(TestLayer)))
-        ).rejects.toThrow(/Cannot resume goal in status: active/);
+        expect(attemptSecondResume._tag).toBe("Left");
+        if (attemptSecondResume._tag === "Left") {
+          expect(attemptSecondResume.left.message).toMatch(/Cannot resume goal in status: active/);
+        }
       });
     });
 

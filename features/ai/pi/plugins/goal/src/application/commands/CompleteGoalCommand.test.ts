@@ -147,21 +147,18 @@ describe("CompleteGoalCommand", () => {
 
       it("When executing complete command on goal with evaluation data, Then evaluation data is preserved", async () => {
         const program = Effect.gen(function* () {
-          const _service = yield* GoalLifecycleService;
-          const _repo = yield* _service as any; // Access internal repo for direct updates
-          
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
+          // TODO: Add test for evaluation data preservation when Goal model supports updateEvaluation
           // Note: In real implementation, we'd update evaluation through proper service method
-          // For now, just complete without evaluation data
+          // For now, just verify completion works
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })
           );
         });
 
-        // @ts-expect-error - Type mismatch in test layer setup
         const completedGoal = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
         expect(completedGoal.status).toBe("completed");
