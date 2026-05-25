@@ -64,20 +64,12 @@
       "type": "stdio",
       "command": "/home/tom/.dotfiles/features/ai/pi/bin/pi-mcp-beads",
       "args": [],
+      "env": {
+        "BEADS_MCP_CWD": "/home/tom/.dotfiles"
+      },
       "lifecycle": "lazy",
-      "description": "Beads (bd) issue tracking — 110 tools via pi-mcp-beads",
-      "directTools": [
-        "bd_ready",
-        "bd_show",
-        "bd_create",
-        "bd_close",
-        "bd_update",
-        "bd_list",
-        "bd_sync",
-        "bd_prime",
-        "bd_blocked",
-        "bd_dep_add"
-      ]
+      "description": "Beads (bd) issue tracking — 85 tools via pi-mcp-beads (targets bd 1.0.x)",
+      "directTools": true
     }
   },
   "imports": []

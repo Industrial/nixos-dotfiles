@@ -6,6 +6,6 @@ describe("createBeadsMcpServer", () => {
     it("registers all beads tools for MCP list_tools", () => {
         const server = createBeadsMcpServer();
         expect(server).toBeDefined();
-        expect(EXPECTED_TOOL_NAMES.length).toBe(110);
+        expect(EXPECTED_TOOL_NAMES.length).toBe(85);
     });
 });

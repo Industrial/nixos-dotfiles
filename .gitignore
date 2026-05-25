@@ -7,7 +7,6 @@
 */target/
 .DS_Store
 .aider*
-.beads/
 .devenv*
 .direnv/
 .env
@@ -30,3 +29,8 @@ npm-debug.log*
 target/
 yarn-debug.log*
 yarn-error.log*
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
