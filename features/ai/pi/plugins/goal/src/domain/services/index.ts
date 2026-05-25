@@ -7,3 +7,5 @@ export * from "./GoalLifecycleServiceMock.js";
 export * from "./JudgeService.js";
 export * from "./JudgeServiceLive.js";
 export * from "./JudgeServiceMock.js";
+export * from "./PromptGeneratorService.js";
+export * from "./PromptGeneratorServiceMock.js";
