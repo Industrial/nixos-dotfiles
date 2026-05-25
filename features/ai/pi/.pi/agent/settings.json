@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.75.5",
   "defaultProvider": "openrouter",
-  "defaultModel": "anthropic/claude-sonnet-4.5",
+  "defaultModel": "openrouter/free",
   "defaultThinkingLevel": "medium",
   "packages": [
     "npm:pi-subagents",
