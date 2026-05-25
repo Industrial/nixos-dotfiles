@@ -76,3 +76,5 @@
 {"id":"int-4c3b8e44","kind":"field_change","created_at":"2026-05-25T12:23:25.439269541Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.3.1","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-76c9e54c","kind":"field_change","created_at":"2026-05-25T12:27:12.385541118Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.3.2","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-9710e568","kind":"field_change","created_at":"2026-05-25T15:14:37.923301874Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.4","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-b38973c6","kind":"field_change","created_at":"2026-05-25T15:18:33.337697259Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.6","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-edfc56a6","kind":"field_change","created_at":"2026-05-25T15:18:49.958177162Z","actor":"Tom Wieland","issue_id":"dotfiles-csa","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}

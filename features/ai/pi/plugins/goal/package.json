@@ -4,6 +4,9 @@
   "description": "A Pi plugin for managing persistent, long-running goals with automated continuation loops.",
   "type": "module",
   "main": "src/index.ts",
+  "bin": {
+    "pi-plugin-goal": "src/index.ts"
+  },
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
