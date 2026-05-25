@@ -14,7 +14,42 @@ import * as os from "node:os";
  */
 export const initializeSchema = (sql: SqlClient.SqlClient) =>
   Effect.gen(function* () {
-    // Create goals table
+    // ===== EVENT SOURCING =====
+    // Events table - source of truth for all state changes
+    yield* sql`
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id TEXT NOT NULL UNIQUE,
+        event_type TEXT NOT NULL,
+        aggregate_id TEXT NOT NULL,
+        aggregate_type TEXT NOT NULL,
+        version INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL,
+        payload TEXT NOT NULL,
+        UNIQUE(aggregate_id, version)
+      )
+    `;
+
+    // Index for retrieving events by aggregate
+    yield* sql`
+      CREATE INDEX IF NOT EXISTS idx_events_aggregate
+      ON events(aggregate_id, version ASC)
+    `;
+
+    // Index for event type queries
+    yield* sql`
+      CREATE INDEX IF NOT EXISTS idx_events_type
+      ON events(event_type, timestamp DESC)
+    `;
+
+    // Index for aggregate type queries
+    yield* sql`
+      CREATE INDEX IF NOT EXISTS idx_events_aggregate_type
+      ON events(aggregate_type, aggregate_id)
+    `;
+
+    // ===== READ MODELS (CQRS) =====
+    // Goals read model - optimized for queries
     yield* sql`
       CREATE TABLE IF NOT EXISTS goals (
         id TEXT PRIMARY KEY,
@@ -24,7 +59,8 @@ export const initializeSchema = (sql: SqlClient.SqlClient) =>
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         completed_at INTEGER,
-        evaluation_data TEXT
+        evaluation_data TEXT,
+        version INTEGER NOT NULL DEFAULT 0
       )
     `;
 
