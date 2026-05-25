@@ -3,3 +3,4 @@
  */
 export * from "./GoalLifecycleService.js";
 export * from "./GoalLifecycleServiceLive.js";
+export * from "./GoalLifecycleServiceMock.js";

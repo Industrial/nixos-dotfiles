@@ -1,27 +1,20 @@
 /**
- * Goal Application Service
+ * Goal Application Service - Interface
  * 
  * Orchestrates application-level operations using commands and queries.
  * This is the main entry point for the application layer.
  */
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect } from "effect";
 import { Goal } from "../../domain/models/Goal.js";
 import {
   CreateGoalCommand,
-  createGoalHandler,
   PauseGoalCommand,
-  pauseGoalHandler,
   ResumeGoalCommand,
-  resumeGoalHandler,
   CompleteGoalCommand,
-  completeGoalHandler,
 } from "../commands/index.js";
 import {
   GetGoalQuery,
-  getGoalHandler,
   ListGoalsQuery,
-  listGoalsHandler,
-  getActiveGoalHandler,
 } from "../queries/index.js";
 
 /**
@@ -45,21 +38,4 @@ export class GoalApplicationService extends Context.Tag("GoalApplicationService"
   }
 >() {}
 
-/**
- * Live implementation of GoalApplicationService
- * 
- * Note: Handler functions need access to services from context,
- * so we return them as-is. They'll pull services when executed.
- */
-export const GoalApplicationServiceLive = Layer.succeed(
-  GoalApplicationService,
-  GoalApplicationService.of({
-    createGoal: createGoalHandler,
-    pauseGoal: pauseGoalHandler,
-    resumeGoal: resumeGoalHandler,
-    completeGoal: completeGoalHandler,
-    getGoal: getGoalHandler,
-    listGoals: listGoalsHandler,
-    getActiveGoal: getActiveGoalHandler,
-  })
-);
+
