@@ -6,6 +6,7 @@
  */
 import { Schema as S } from "@effect/schema";
 import { JudgeResult } from "./JudgeResult.js";
+import { ToolResult } from "./ToolResult.js";
 
 /**
  * Execution error record
@@ -29,6 +30,7 @@ export class ExecutionContext extends S.Class<ExecutionContext>("ExecutionContex
   maxTurns: S.Number,
   errors: S.Array(ExecutionError),
   judgeEvaluations: S.Array(JudgeResult),
+  toolResults: S.Array(ToolResult),
   isComplete: S.Boolean,
   createdAt: S.Number,
   completedAt: S.optional(S.Number),
@@ -85,6 +87,26 @@ export class ExecutionContext extends S.Class<ExecutionContext>("ExecutionContex
   }
 
   /**
+   * Record a tool execution result
+   */
+  recordToolResult(result: ToolResult): ExecutionContext {
+    return new ExecutionContext({
+      ...this,
+      toolResults: [...this.toolResults, result],
+    });
+  }
+
+  /**
+   * Get tool results for current turn
+   */
+  getToolResultsForTurn(_turn: number): readonly ToolResult[] {
+    // Tool results don't have turn numbers in the current schema
+    // For now, return all tool results
+    // TODO: Add turn tracking to ToolResult for proper filtering
+    return this.toolResults;
+  }
+
+  /**
    * Mark execution as complete
    */
   markComplete(): ExecutionContext {
@@ -126,6 +148,7 @@ export const createExecutionContext = (
     maxTurns,
     errors: [],
     judgeEvaluations: [],
+    toolResults: [],
     isComplete: false,
     createdAt: now,
   });
