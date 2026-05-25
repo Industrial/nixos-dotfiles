@@ -137,7 +137,7 @@ describe("GoalLifecycleServiceMock", () => {
           const goal1 = yield* service.createGoal("First goal");
           yield* service.pauseGoal(goal1.id);
 
-          const goal2 = yield* service.createGoal("Second goal");
+          const _goal2 = yield* service.createGoal("Second goal");
 
           return yield* service.resumeGoal(goal1.id);
         });
@@ -311,7 +311,7 @@ describe("GoalLifecycleServiceMock", () => {
         const goal1 = yield* service.createGoal("First");
         yield* service.completeGoal(goal1.id);
 
-        const goal2 = yield* service.createGoal("Second");
+        const _goal2 = yield* service.createGoal("Second");
         yield* service.pauseGoal(goal2.id);
 
         const goal3 = yield* service.createGoal("Third");

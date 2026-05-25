@@ -4,7 +4,7 @@
  * Tests the mock repository implementation itself.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
 import { GoalRepositoryMock } from "./GoalRepositoryMock.js";
 import { createGoal } from "../../domain/models/Goal.js";

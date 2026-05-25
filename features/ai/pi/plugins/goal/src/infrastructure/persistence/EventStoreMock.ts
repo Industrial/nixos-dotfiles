@@ -2,7 +2,6 @@
  * Event Store - In-Memory Mock Implementation
  */
 import { Effect, Layer, Ref } from "effect";
-import { EventStore, EventStream } from "../../domain/repositories/EventStore.js";
 import { GoalEvent } from "../../domain/events/index.js";
 
 /**

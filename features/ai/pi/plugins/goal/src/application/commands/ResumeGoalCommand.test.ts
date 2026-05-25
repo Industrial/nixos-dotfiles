@@ -83,7 +83,7 @@ describe("ResumeGoalCommand", () => {
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
-          const pausedGoal = yield* service.pauseGoal(goal.id);
+          const _pausedGoal = yield* service.pauseGoal(goal.id);
           const pausedUpdatedAt = pausedGoal.updatedAt;
 
           yield* Effect.sleep("1 millis");
@@ -141,7 +141,7 @@ describe("ResumeGoalCommand", () => {
           );
           
           // Pause goal
-          const pausedGoal = yield* service.pauseGoal(goal.id);
+          const _pausedGoal = yield* service.pauseGoal(goal.id);
           
           // Resume goal
           return yield* resumeGoalHandler(

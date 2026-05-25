@@ -4,7 +4,7 @@
  * Comprehensive input/output mutation tests using Given/When/Then pattern.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { GetGoalQuery, getGoalHandler } from "./GetGoalQuery.js";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
 import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";

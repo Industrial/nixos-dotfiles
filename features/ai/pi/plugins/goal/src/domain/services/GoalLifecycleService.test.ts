@@ -3,7 +3,7 @@
  * 
  * Tests the domain service using Mock repositories - no database required!
  */
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect } from "bun:test";
 import { Effect, Layer } from "effect";
 import { GoalLifecycleService } from "./GoalLifecycleService.js";
 import { GoalLifecycleServiceLive } from "./GoalLifecycleServiceLive.js";

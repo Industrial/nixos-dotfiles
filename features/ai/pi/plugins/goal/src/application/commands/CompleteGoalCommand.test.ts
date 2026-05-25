@@ -147,8 +147,8 @@ describe("CompleteGoalCommand", () => {
 
       it("When executing complete command on goal with evaluation data, Then evaluation data is preserved", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
-          const repo = yield* service as any; // Access internal repo for direct updates
+          const _service = yield* GoalLifecycleService;
+          const _repo = yield* _service as any; // Access internal repo for direct updates
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
@@ -170,13 +170,13 @@ describe("CompleteGoalCommand", () => {
     describe("Given a paused goal exists", () => {
       it("When executing complete command, Then goal is completed successfully", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.pauseGoal(goal.id);
+          yield* _service.pauseGoal(goal.id);
 
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })
@@ -191,13 +191,13 @@ describe("CompleteGoalCommand", () => {
 
       it("When executing complete command on paused goal, Then completedAt timestamp is set", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.pauseGoal(goal.id);
+          yield* _service.pauseGoal(goal.id);
 
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })
@@ -235,13 +235,13 @@ describe("CompleteGoalCommand", () => {
 
       it("When executing complete command twice, Then second attempt fails", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.completeGoal(goal.id);
+          yield* _service.completeGoal(goal.id);
 
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })
@@ -257,13 +257,13 @@ describe("CompleteGoalCommand", () => {
     describe("Given a cancelled goal exists", () => {
       it("When executing complete command, Then command fails with terminal state error", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
-          yield* service.cancelGoal(goal.id);
+          yield* _service.cancelGoal(goal.id);
 
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })
@@ -305,15 +305,15 @@ describe("CompleteGoalCommand", () => {
     describe("State transition sequences", () => {
       it("When completing after pause/resume cycle, Then completion succeeds", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
           // Pause and resume
-          yield* service.pauseGoal(goal.id);
-          yield* service.resumeGoal(goal.id);
+          yield* _service.pauseGoal(goal.id);
+          yield* _service.resumeGoal(goal.id);
 
           // Then complete
           return yield* completeGoalHandler(
@@ -328,17 +328,17 @@ describe("CompleteGoalCommand", () => {
 
       it("When completing after multiple pause/resume cycles, Then completion succeeds", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
           // Multiple cycles
-          yield* service.pauseGoal(goal.id);
-          yield* service.resumeGoal(goal.id);
-          yield* service.pauseGoal(goal.id);
-          yield* service.resumeGoal(goal.id);
+          yield* _service.pauseGoal(goal.id);
+          yield* _service.resumeGoal(goal.id);
+          yield* _service.pauseGoal(goal.id);
+          yield* _service.resumeGoal(goal.id);
 
           return yield* completeGoalHandler(
             new CompleteGoalCommand({ goalId: goal.id })
@@ -380,7 +380,7 @@ describe("CompleteGoalCommand", () => {
 
       it("When completing goals in sequence, Then each has later or equal completedAt", async () => {
         const program = Effect.gen(function* () {
-          const service = yield* GoalLifecycleService;
+          const _service = yield* GoalLifecycleService;
           
           const goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "First" })

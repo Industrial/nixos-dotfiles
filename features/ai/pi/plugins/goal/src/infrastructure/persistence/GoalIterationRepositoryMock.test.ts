@@ -4,7 +4,7 @@
  * Comprehensive tests for the mock repository implementation.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { GoalIterationRepository } from "../../domain/repositories/GoalIterationRepository.js";
 import { GoalIterationRepositoryMock } from "./GoalIterationRepositoryMock.js";
 import { createIteration, IterationOutcome } from "../../domain/models/GoalIteration.js";

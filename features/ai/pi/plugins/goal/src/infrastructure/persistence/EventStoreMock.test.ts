@@ -5,7 +5,7 @@
  * Tests event sourcing patterns: append-only, versioning, concurrency control.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { EventStore } from "../../domain/repositories/EventStore.js";
 import { EventStoreMock } from "./EventStoreMock.js";
 import {
@@ -14,7 +14,6 @@ import {
   GoalPaused,
   GoalResumed,
   GoalCompleted,
-  GoalCancelled,
 } from "../../domain/events/index.js";
 
 describe("EventStoreMock", () => {
@@ -277,8 +276,9 @@ describe("EventStoreMock", () => {
 
         const events = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
-        expect(events[0].payload.objective).toBe("Build a rocket");
-        expect(events[0].payload.context).toBe("For Mars mission");
+        const firstPayload = events[0].payload as any;
+        expect(firstPayload.objective).toBe("Build a rocket");
+        expect(firstPayload.context).toBe("For Mars mission");
       });
     });
 
@@ -587,8 +587,9 @@ describe("EventStoreMock", () => {
 
       const events = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
-      expect(events[0].payload.objective).toContain("🚀");
-      expect(events[0].payload.context).toContain("\n");
+      const firstPayload = events[0].payload as any;
+      expect(firstPayload.objective).toContain("🚀");
+      expect(firstPayload.context).toContain("\n");
     });
 
     it("When storing events with metadata, Then all metadata is preserved", async () => {

@@ -50,7 +50,7 @@ describe("GetActiveGoalQuery", () => {
     describe("Given one active goal exists", () => {
       it("When executing query, Then returns the active goal", async () => {
         const program = Effect.gen(function* () {
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -148,7 +148,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -166,7 +166,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -192,7 +192,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -216,7 +216,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -240,7 +240,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -258,7 +258,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -284,7 +284,7 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 
@@ -304,13 +304,13 @@ describe("GetActiveGoalQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          const goal1 = yield* createGoalHandler(
+          const _goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "First goal" })
           );
 
           yield* service.completeGoal(goal1.id);
 
-          const goal2 = yield* createGoalHandler(
+          const _goal2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Second goal" })
           );
 
@@ -333,13 +333,13 @@ describe("GetActiveGoalQuery", () => {
           const service = yield* GoalLifecycleService;
 
           // Create and complete first goal
-          const goal1 = yield* createGoalHandler(
+          const _goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "First" })
           );
           yield* service.completeGoal(goal1.id);
 
           // Create and cancel second goal
-          const goal2 = yield* createGoalHandler(
+          const _goal2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Second" })
           );
           yield* service.cancelGoal(goal2.id);
@@ -454,7 +454,7 @@ describe("GetActiveGoalQuery", () => {
 
       it("When goal has evaluation data, Then query returns goal with evaluation", async () => {
         const program = Effect.gen(function* () {
-          const goal = yield* createGoalHandler(
+          const _goal = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Test goal" })
           );
 

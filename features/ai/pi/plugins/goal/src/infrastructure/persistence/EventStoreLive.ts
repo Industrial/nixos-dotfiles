@@ -5,7 +5,6 @@
  */
 import { Effect, Layer } from "effect";
 import { SqlClient } from "@effect/sql";
-import { EventStore, EventStream } from "../../domain/repositories/EventStore.js";
 import { GoalEvent } from "../../domain/events/index.js";
 
 /**
