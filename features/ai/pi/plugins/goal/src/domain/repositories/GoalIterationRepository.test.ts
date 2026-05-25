@@ -14,7 +14,7 @@ describe("GoalIterationRepository", () => {
     });
 
     it("When checking interface name, Then name matches", () => {
-      expect(GoalIterationRepository.name).toBe("Tag");
+      expect(GoalIterationRepository.name).toBe("GoalIterationRepository");
     });
 
     it("When checking interface key, Then key is defined", () => {

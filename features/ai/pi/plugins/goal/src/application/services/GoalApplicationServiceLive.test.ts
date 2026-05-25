@@ -18,11 +18,19 @@ import {
 import { GetGoalQuery, ListGoalsQuery } from "../queries/index.js";
 
 describe("GoalApplicationServiceLive", () => {
-  const TestLayer = GoalApplicationServiceLive.pipe(
-    Layer.provide(
-      GoalLifecycleServiceLive.pipe(Layer.provide(GoalRepositoryMock))
-    )
-  ).pipe(Layer.merge(GoalRepositoryMock));
+  // Build complete dependency tree:
+  // 1. GoalRepositoryMock - base dependency
+  // 2. GoalLifecycleServiceLive - requires GoalRepository
+  // 3. GoalApplicationServiceLive - handlers need both GoalLifecycleService and GoalRepository
+  const lifecycleLayer = GoalLifecycleServiceLive.pipe(
+    Layer.provide(GoalRepositoryMock)
+  );
+
+  const TestLayer = Layer.mergeAll(
+    GoalApplicationServiceLive,
+    lifecycleLayer,
+    GoalRepositoryMock
+  );
 
   describe("Service delegation", () => {
     describe("Given live service is provided", () => {
@@ -35,7 +43,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const goal = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -57,7 +64,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const pausedGoal = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -80,7 +86,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const resumedGoal = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -101,7 +106,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const completedGoal = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -123,7 +127,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const goal = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -134,8 +137,13 @@ describe("GoalApplicationServiceLive", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalApplicationService;
 
-          yield* service.createGoal(
+          const goal1 = yield* service.createGoal(
             new CreateGoalCommand({ objective: "Goal 1" })
+          );
+
+          // Complete first goal so we can create second
+          yield* service.completeGoal(
+            new CompleteGoalCommand({ goalId: goal1.id })
           );
 
           yield* service.createGoal(
@@ -146,7 +154,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const goals = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -167,7 +174,6 @@ describe("GoalApplicationServiceLive", () => {
         });
 
         const { created, active } = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
           program.pipe(Effect.provide(TestLayer))
         );
 
@@ -187,24 +193,24 @@ describe("GoalApplicationServiceLive", () => {
         );
 
         // Should fail: cannot create second active goal
-        const attemptSecond = service.createGoal(
-          new CreateGoalCommand({ objective: "Second" })
+        const attemptSecond = yield* Effect.either(
+          service.createGoal(
+            new CreateGoalCommand({ objective: "Second" })
+          )
         );
 
         return { goal1, attemptSecond };
       });
 
       const { goal1, attemptSecond } = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
         program.pipe(Effect.provide(TestLayer))
       );
 
       expect(goal1).toBeDefined();
-
-      await expect(
-        // @ts-expect-error - Type mismatch in test layer setup
-        Effect.runPromise(attemptSecond.pipe(Effect.provide(TestLayer)))
-      ).rejects.toThrow(/Active goal already exists/);
+      expect(attemptSecond._tag).toBe("Left");
+      if (attemptSecond._tag === "Left") {
+        expect(attemptSecond.left.message).toMatch(/Active goal already exists/);
+      }
     });
 
     it("When querying after state changes, Then reflects current state", async () => {
@@ -229,7 +235,6 @@ describe("GoalApplicationServiceLive", () => {
       });
 
       const { active1, active2, active3, goalId } = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
         program.pipe(Effect.provide(TestLayer))
       );
 
@@ -262,7 +267,6 @@ describe("GoalApplicationServiceLive", () => {
       });
 
       await expect(
-        // @ts-expect-error - Type mismatch in test layer setup
         Effect.runPromise(program.pipe(Effect.provide(TestLayer)))
       ).rejects.toThrow(/Goal not found/);
     });
@@ -289,7 +293,6 @@ describe("GoalApplicationServiceLive", () => {
       });
 
       const { created, listed, fetched } = await Effect.runPromise(
-        // @ts-expect-error - Type mismatch in test layer setup
         program.pipe(Effect.provide(TestLayer))
       );
 

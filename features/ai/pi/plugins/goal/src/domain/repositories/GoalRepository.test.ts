@@ -14,7 +14,7 @@ describe("GoalRepository", () => {
     });
 
     it("When checking interface name, Then name matches", () => {
-      expect(GoalRepository.name).toBe("Tag");
+      expect(GoalRepository.name).toBe("GoalRepository");
     });
 
     it("When checking interface structure, Then key property exists", () => {

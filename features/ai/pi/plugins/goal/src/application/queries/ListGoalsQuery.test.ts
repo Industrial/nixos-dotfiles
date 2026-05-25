@@ -227,22 +227,22 @@ describe("ListGoalsQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          // Create active goal
-          yield* createGoalHandler(
+          // Create and pause first goal
+          const goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Goal 1" })
           );
+          yield* service.pauseGoal(goal1.id);
 
-          // Create and pause second goal
+          // Create and complete second goal
           const goal2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Goal 2" })
           );
-          yield* service.pauseGoal(goal2.id);
+          yield* service.completeGoal(goal2.id);
 
-          // Create and complete third goal
-          const goal3 = yield* createGoalHandler(
+          // Create active third goal
+          yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Goal 3" })
           );
-          yield* service.completeGoal(goal3.id);
 
           return yield* listGoalsHandler(new ListGoalsQuery({}));
         });
@@ -256,17 +256,21 @@ describe("ListGoalsQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          yield* createGoalHandler(
-            new CreateGoalCommand({ objective: "Active 1" })
+          // Create and complete first goal
+          const goal1 = yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Completed" })
           );
+          yield* service.completeGoal(goal1.id);
 
+          // Create and pause second goal
           const paused = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Paused" })
           );
           yield* service.pauseGoal(paused.id);
 
+          // Create active goal
           yield* createGoalHandler(
-            new CreateGoalCommand({ objective: "Active 2" })
+            new CreateGoalCommand({ objective: "Active" })
           );
 
           return yield* listGoalsHandler(
@@ -276,7 +280,7 @@ describe("ListGoalsQuery", () => {
 
         const goals = await Effect.runPromise(program.pipe(Effect.provide(TestLayer)));
 
-        expect(goals.length).toBe(2);
+        expect(goals.length).toBe(1);
         expect(goals.every(g => g.status === "active")).toBe(true);
       });
 
@@ -284,19 +288,22 @@ describe("ListGoalsQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          yield* createGoalHandler(
-            new CreateGoalCommand({ objective: "Active" })
-          );
-
+          // Create and pause first goal
           const paused1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Paused 1" })
           );
           yield* service.pauseGoal(paused1.id);
 
+          // Create and pause second goal
           const paused2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Paused 2" })
           );
           yield* service.pauseGoal(paused2.id);
+
+          // Create active goal
+          yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Active" })
+          );
 
           return yield* listGoalsHandler(
             new ListGoalsQuery({ status: "paused" })
@@ -313,19 +320,22 @@ describe("ListGoalsQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
+          // Create and complete first goal
           const completed1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Completed 1" })
           );
           yield* service.completeGoal(completed1.id);
 
-          yield* createGoalHandler(
-            new CreateGoalCommand({ objective: "Active" })
-          );
-
+          // Create and complete second goal
           const completed2 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Completed 2" })
           );
           yield* service.completeGoal(completed2.id);
+
+          // Create active goal
+          yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Active" })
+          );
 
           return yield* listGoalsHandler(
             new ListGoalsQuery({ status: "completed" })
@@ -505,17 +515,22 @@ describe("ListGoalsQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          // Create 3 active goals
-          for (let i = 1; i <= 3; i++) {
-            yield* createGoalHandler(
-              new CreateGoalCommand({ objective: `Active ${i}` })
-            );
-          }
+          // Create and pause first goal
+          const goal1 = yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Paused 1" })
+          );
+          yield* service.pauseGoal(goal1.id);
 
-          // Pause the first two
-          const allGoals = yield* listGoalsHandler(new ListGoalsQuery({}));
-          yield* service.pauseGoal(allGoals[0].id);
-          yield* service.pauseGoal(allGoals[1].id);
+          // Create and pause second goal
+          const goal2 = yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Paused 2" })
+          );
+          yield* service.pauseGoal(goal2.id);
+
+          // Create active goal
+          yield* createGoalHandler(
+            new CreateGoalCommand({ objective: "Active" })
+          );
 
           return yield* listGoalsHandler(
             new ListGoalsQuery({ status: "paused", limit: 1 })
@@ -629,14 +644,16 @@ describe("ListGoalsQuery", () => {
         const program = Effect.gen(function* () {
           const service = yield* GoalLifecycleService;
 
-          yield* createGoalHandler(
+          // Create and pause first goal
+          const goal1 = yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Goal 1" })
           );
+          yield* service.pauseGoal(goal1.id);
 
-          const paused = yield* createGoalHandler(
+          // Create active goal
+          yield* createGoalHandler(
             new CreateGoalCommand({ objective: "Goal 2" })
           );
-          yield* service.pauseGoal(paused.id);
 
           const snapshot1 = yield* listGoalsHandler(new ListGoalsQuery({}));
 

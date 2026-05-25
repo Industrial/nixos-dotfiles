@@ -14,7 +14,7 @@ describe("EventStore", () => {
     });
 
     it("When checking interface name, Then name matches", () => {
-      expect(EventStore.name).toBe("Tag");
+      expect(EventStore.name).toBe("EventStore");
     });
 
     it("When checking interface key, Then key is defined", () => {

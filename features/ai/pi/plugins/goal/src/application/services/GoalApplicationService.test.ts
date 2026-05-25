@@ -14,7 +14,7 @@ describe("GoalApplicationService", () => {
     });
 
     it("When checking interface name, Then name matches", () => {
-      expect(GoalApplicationService.name).toBe("Tag");
+      expect(GoalApplicationService.name).toBe("GoalApplicationService");
     });
 
     it("When checking interface key, Then key is defined", () => {

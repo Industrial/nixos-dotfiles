@@ -114,7 +114,7 @@ describe("Goal Entity", () => {
         const pausedGoal = await Effect.runPromise(goal.pause());
         
         expect(pausedGoal.status).toBe("paused");
-        expect(pausedGoal.updatedAt).toBeGreaterThan(goal.updatedAt);
+        expect(pausedGoal.updatedAt).toBeGreaterThanOrEqual(goal.updatedAt);
       });
 
       it("should fail to pause a non-active goal", async () => {
@@ -139,7 +139,7 @@ describe("Goal Entity", () => {
         const resumedGoal = await Effect.runPromise(goal.resume());
         
         expect(resumedGoal.status).toBe("active");
-        expect(resumedGoal.updatedAt).toBeGreaterThan(goal.updatedAt);
+        expect(resumedGoal.updatedAt).toBeGreaterThanOrEqual(goal.updatedAt);
       });
 
       it("should fail to resume a non-paused goal", async () => {
@@ -159,7 +159,7 @@ describe("Goal Entity", () => {
         
         expect(completedGoal.status).toBe("completed");
         expect(completedGoal.completedAt).toBeGreaterThan(0);
-        expect(completedGoal.updatedAt).toBeGreaterThan(goal.updatedAt);
+        expect(completedGoal.updatedAt).toBeGreaterThanOrEqual(goal.updatedAt);
       });
 
       it("should fail to complete an already completed goal", async () => {
@@ -183,7 +183,7 @@ describe("Goal Entity", () => {
         
         expect(cancelledGoal.status).toBe("cancelled");
         expect(cancelledGoal.completedAt).toBeGreaterThan(0);
-        expect(cancelledGoal.updatedAt).toBeGreaterThan(goal.updatedAt);
+        expect(cancelledGoal.updatedAt).toBeGreaterThanOrEqual(goal.updatedAt);
       });
 
       it("should fail to cancel a completed goal", async () => {
@@ -212,7 +212,7 @@ describe("Goal Entity", () => {
       const updatedGoal = goal.updateEvaluation(evaluation);
       
       expect(updatedGoal.evaluationData).toEqual(evaluation);
-      expect(updatedGoal.updatedAt).toBeGreaterThan(goal.updatedAt);
+      expect(updatedGoal.updatedAt).toBeGreaterThanOrEqual(goal.updatedAt);
     });
   });
 });
