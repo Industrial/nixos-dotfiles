@@ -2,7 +2,7 @@
  * Goal Lifecycle Service - Live Implementation
  */
 import { Effect, Layer } from "effect";
-import { Goal, createGoal as makeGoal } from "../models/Goal.js";
+import { createGoal as makeGoal } from "../models/Goal.js";
 import { GoalRepository } from "../repositories/GoalRepository.js";
 import { GoalLifecycleService } from "./GoalLifecycleService.js";
 

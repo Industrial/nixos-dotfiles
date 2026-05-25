@@ -3,7 +3,7 @@
  */
 import { Effect } from "effect";
 import { Schema as S } from "@effect/schema";
-import { Goal, GoalStatus } from "../../domain/models/Goal.js";
+import { GoalStatus } from "../../domain/models/Goal.js";
 import { GoalRepository, GoalFilters } from "../../domain/repositories/GoalRepository.js";
 
 /**

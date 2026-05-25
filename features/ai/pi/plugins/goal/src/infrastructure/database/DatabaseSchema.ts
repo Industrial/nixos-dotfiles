@@ -3,7 +3,7 @@
  * 
  * Handles database initialization and migrations.
  */
-import { Effect, Layer, Config } from "effect";
+import { Effect, Layer } from "effect";
 import { SqlClient } from "@effect/sql";
 import { SqliteClient } from "@effect/sql-sqlite-bun";
 import * as path from "node:path";
@@ -90,8 +90,6 @@ export const SqliteLive = Layer.unwrapEffect(
     
     return SqliteClient.layer({
       filename: dbPath,
-      transformResultNames: Config.succeed,
-      transformQueryNames: Config.succeed,
     });
   })
 );

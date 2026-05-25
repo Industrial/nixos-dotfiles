@@ -6,7 +6,6 @@
  */
 import { Context, Effect } from "effect";
 import { Goal } from "../models/Goal.js";
-import { GoalRepository } from "../repositories/GoalRepository.js";
 
 /**
  * Goal Lifecycle Service

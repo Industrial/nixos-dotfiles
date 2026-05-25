@@ -5,7 +5,6 @@
  */
 import { Effect } from "effect";
 import { Schema as S } from "@effect/schema";
-import { Goal } from "../../domain/models/Goal.js";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
 
 /**

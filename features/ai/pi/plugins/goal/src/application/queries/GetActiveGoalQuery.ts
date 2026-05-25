@@ -2,7 +2,6 @@
  * Get Active Goal Query - Application Layer
  */
 import { Effect } from "effect";
-import { Goal } from "../../domain/models/Goal.js";
 import { GoalRepository } from "../../domain/repositories/GoalRepository.js";
 
 /**

@@ -7,7 +7,6 @@
  * - Infrastructure: Repository implementations, database
  */
 import { Effect, Layer } from "effect";
-import { SqlClient } from "@effect/sql";
 
 // Infrastructure
 import { DatabaseLayer } from "./infrastructure/database/index.js";
@@ -29,14 +28,16 @@ import {
   ResumeGoalCommand,
   CompleteGoalCommand,
 } from "./application/commands/index.js";
-import {
-  GetGoalQuery,
-  ListGoalsQuery,
-} from "./application/queries/index.js";
+import { ListGoalsQuery } from "./application/queries/index.js";
 
 /**
  * Main application layer combining all dependencies
  * Uses live SQLite implementations
+ * 
+ * Layer composition provides all services needed:
+ * - Infrastructure: Database + Repositories
+ * - Domain: GoalLifecycleService
+ * - Application: GoalApplicationService
  */
 const RepositoryLayer = Layer.merge(
   GoalRepositoryLive,
@@ -47,8 +48,11 @@ const DomainLayer = GoalLifecycleServiceLive.pipe(
   Layer.provide(RepositoryLayer)
 );
 
-export const AppLayer = GoalApplicationServiceLive.pipe(
-  Layer.provide(DomainLayer)
+// Merge all layers so all services are available
+export const AppLayer = Layer.mergeAll(
+  GoalApplicationServiceLive,
+  DomainLayer,
+  RepositoryLayer
 );
 
 /**
@@ -125,16 +129,10 @@ const exampleProgram = Effect.gen(function* () {
 });
 
 /**
- * Main entry point
- */
-const main = Effect.gen(function* () {
-  yield* exampleProgram;
-});
-
-/**
  * Run with full application layer
+ * The exampleProgram has requirements that are satisfied by AppLayer
  */
-const runnable = main.pipe(Effect.provide(AppLayer));
+const runnable = exampleProgram.pipe(Effect.provide(AppLayer));
 
 // Execute
 Effect.runPromise(runnable)
