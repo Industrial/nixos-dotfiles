@@ -66,3 +66,4 @@
 {"id":"int-0dd43912","kind":"field_change","created_at":"2026-05-25T09:42:40.71681382Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.5","extra":{"field":"status","new_value":"open","old_value":"in_progress"}}
 {"id":"int-b4fcc3ff","kind":"field_change","created_at":"2026-05-25T09:42:41.036909807Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.6","extra":{"field":"status","new_value":"open","old_value":"in_progress"}}
 {"id":"int-f27f049c","kind":"field_change","created_at":"2026-05-25T09:42:41.34543004Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.7","extra":{"field":"status","new_value":"open","old_value":"in_progress"}}
+{"id":"int-b03b25cb","kind":"field_change","created_at":"2026-05-25T10:04:08.532480486Z","actor":"Tom Wieland","issue_id":"dotfiles-csa.1","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
