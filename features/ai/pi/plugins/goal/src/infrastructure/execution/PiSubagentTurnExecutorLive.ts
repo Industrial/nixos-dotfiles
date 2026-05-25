@@ -116,10 +116,8 @@ async function runSubagentBridge(input: {
 
 export const PiSubagentTurnExecutorLive = Layer.effect(
   AgentExecutionPort,
-  Effect.gen(function* () {
-    const prompts = yield* PromptGeneratorService;
-
-    const runTurn: AgentExecutionPort["runTurn"] = (input) =>
+  Effect.succeed({
+    runTurn: (input) =>
       Effect.gen(function* () {
         if (isSubagentExecutionDisabled()) {
           return yield* Effect.fail(
@@ -127,6 +125,7 @@ export const PiSubagentTurnExecutorLive = Layer.effect(
           );
         }
 
+        const prompts = yield* PromptGeneratorService;
         const prompt =
           input.turn <= 1
             ? yield* prompts.generateInitialPrompt(input.goal)
@@ -181,8 +180,6 @@ export const PiSubagentTurnExecutorLive = Layer.effect(
           nextPrompt: prompt,
           delegated: bridge.delegated && bridge.exitCode === 0,
         });
-      });
-
-    return { runTurn };
+      }),
   })
 );
