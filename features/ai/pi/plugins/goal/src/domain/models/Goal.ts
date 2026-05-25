@@ -10,7 +10,7 @@ import { Effect } from "effect";
 /**
  * Goal status enumeration
  */
-export const GoalStatus = S.Literal("active", "paused", "completed", "cancelled");
+export const GoalStatus = S.Literal("active", "paused", "completed", "cancelled", "draft");
 export type GoalStatus = S.Schema.Type<typeof GoalStatus>;
 
 /**
@@ -163,6 +163,22 @@ export const createGoal = (objective: string, context?: string): Goal => {
     objective,
     context,
     status: "active",
+    createdAt: now,
+    updatedAt: now,
+  });
+};
+
+/**
+ * Factory function to create a new goal draft
+ * Drafts can exist alongside active goals and don't enforce the "one active goal" rule
+ */
+export const createGoalDraft = (objective: string, context?: string): Goal => {
+  const now = Date.now();
+  return new Goal({
+    id: `goal-${now}-${Math.random().toString(36).substring(2, 9)}`,
+    objective,
+    context,
+    status: "draft",
     createdAt: now,
     updatedAt: now,
   });

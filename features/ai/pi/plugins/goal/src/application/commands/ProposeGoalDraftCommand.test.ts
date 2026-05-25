@@ -5,15 +5,12 @@
  * Goal drafts allow users to review and refine goals before committing.
  */
 import { describe, it, expect } from "bun:test";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { ProposeGoalDraftCommand, proposeGoalDraftHandler } from "./ProposeGoalDraftCommand.js";
-import { GoalLifecycleServiceLive } from "../../domain/services/GoalLifecycleServiceLive.js";
 import { GoalRepositoryMock } from "../../infrastructure/persistence/GoalRepositoryMock.js";
 
 describe("ProposeGoalDraftCommand", () => {
-  const TestLayer = GoalLifecycleServiceLive.pipe(
-    Layer.provide(GoalRepositoryMock)
-  );
+  const TestLayer = GoalRepositoryMock;
 
   describe("Schema Validation", () => {
     describe("Given valid command input", () => {
@@ -90,8 +87,7 @@ describe("ProposeGoalDraftCommand", () => {
 
         expect(draft.objective).toBe("Test goal");
         expect(draft.context).toBe("Test context");
-        // TODO: Implement draft status when Goal model supports it
-        // expect(draft.status).toBe("draft");
+        expect(draft.status).toBe("draft");
       });
 
       it("When proposing draft with rationale, Then rationale is included", async () => {
@@ -113,8 +109,7 @@ describe("ProposeGoalDraftCommand", () => {
         expect(draft.objective).toBe("Test goal");
       });
 
-      // TODO: Enable when Goal model supports draft status separate from active goals
-      it.skip("When proposing draft, Then draft gets unique ID", async () => {
+      it("When proposing draft, Then draft gets unique ID", async () => {
         const program = Effect.gen(function* () {
           const draft1 = yield* proposeGoalDraftHandler(
             new ProposeGoalDraftCommand({ objective: "First" })
@@ -155,8 +150,7 @@ describe("ProposeGoalDraftCommand", () => {
     });
 
     describe("Given multiple drafts", () => {
-      // TODO: Enable when Goal model supports draft status separate from active goals
-      it.skip("When proposing multiple drafts, Then all can exist simultaneously", async () => {
+      it("When proposing multiple drafts, Then all can exist simultaneously", async () => {
         const program = Effect.gen(function* () {
           const draft1 = yield* proposeGoalDraftHandler(
             new ProposeGoalDraftCommand({ objective: "Draft 1" })

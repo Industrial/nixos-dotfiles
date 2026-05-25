@@ -11,7 +11,7 @@ import { Goal } from "../models/Goal.js";
  * Goal query filters value object
  */
 export interface GoalFilters {
-  readonly status?: "active" | "paused" | "completed" | "cancelled";
+  readonly status?: "active" | "paused" | "completed" | "cancelled" | "draft";
   readonly limit?: number;
   readonly offset?: number;
 }
