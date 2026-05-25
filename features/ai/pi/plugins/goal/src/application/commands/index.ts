@@ -7,3 +7,5 @@ export * from "./ResumeGoalCommand.js";
 export * from "./CompleteGoalCommand.js";
 export * from "./CancelGoalCommand.js";
 export * from "./ProposeGoalDraftCommand.js";
+export * from "./UpdateGoalCommand.js";
+export * from "./UpdateGoalEvaluationCommand.js";
