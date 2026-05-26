@@ -5,3 +5,5 @@ Hermes Agent tooling: There is NO web_search tool. For web/API research use curl
 SearXNG instance: localhost:4001, NixOS-managed via services.searx. Config at features/network/searx/default.nix in dotfiles. Two independent 403 causes: (1) bot detection limiter blocks non-browser requests -- fix with server.limiter=false; (2) search.formats default is ["html"] only, so ?format=json gets 403 -- fix with search.formats=[html,json,csv,rss]. Both fixes required for mcp-searxng MCP client to work.
 §
 Hermes skills.sh integration: `hermes skills` CLI supports search, browse, install, inspect, audit, update, uninstall, config, tap (source management). 9 registries (skills.sh, ClawHub, LobeHub, GitHub, Anthropic, OpenAI, HuggingFace, gstack, browse.sh), 2,550 total skills, refreshed 2x daily. Skill creation via skill_manage tool. Skills are class-level umbrellas with support files in references/, templates/, scripts/.
+§
+Hermes plugins live under features/ai/hermes-agent/plugins/<name>/, NOT as sibling features under features/ai/<name>/. This was corrected mid-session.
