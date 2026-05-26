@@ -7,6 +7,10 @@
           port = 4001;
           bind_address = "0.0.0.0";
           secret_key = "keyboardcat";
+          limiter = false;
+        };
+        search = {
+          formats = ["html" "json" "csv" "rss"];
         };
       };
     };

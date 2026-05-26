@@ -432,6 +432,14 @@ mcp_servers:
     args:
     - start-mcp-server
     enabled: true
+  searxng:
+    command: npx
+    args:
+    - -y
+    - mcp-searxng
+    env:
+      SEARXNG_URL: "http://0.0.0.0:4001"
+    enabled: true
 
 # ── Fallback Model ────────────────────────────────────────────────────
 # Automatic provider failover when primary is unavailable.

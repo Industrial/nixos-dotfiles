@@ -106,6 +106,7 @@
     # Network Browsers
     ../features/network/chromium
     ../features/network/firefox
+    ../features/network/searx
 
     # Media (common to all hosts)
     ../features/media/calibre

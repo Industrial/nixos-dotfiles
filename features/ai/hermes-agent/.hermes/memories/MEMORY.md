@@ -1,3 +1,5 @@
 Dotfiles repo: /home/tom/.dotfiles (not /root/.dotfiles). Branch feat/lean-ctx-mcp-hermes-support. AI features live under features/ai/; each tool has package.nix + default.nix. hermes-agent/default.nix imports lean-ctx, roam-code, serena, context7. PR required (main is protected).
 §
 Hermes Agent tooling: There is NO web_search tool. For web/API research use curl via execute_code (e.g., GitHub API: api.github.com/search/repositories?q=...&sort=stars&order=desc). Use browser_navigate for page scraping. GitHub API rate-limits quickly (unauthenticated ~10 req/min); batch queries and add small delays between calls.
+§
+SearXNG (localhost:4001): Self-hosted via NixOS services.searx. Bot detection limiter blocks API/non-browser requests with 403 Fix: services.searx.settings.server.limiter = false in NixOS config. The MCP server (mcp_searxng_*) uses this instance. If MCP tools fail with 403, the limiter is the cause, not missing auth. Workaround: use execute_code + curl with Accept: text/html,application/json and User-Agent: Mozilla/5.0 headers.

@@ -12,7 +12,9 @@ description: How to research topics on the internet using Hermes Agent's availab
 | GitHub API queries | `execute_code` + `curl` | Best for structured data (repos, stars, etc.) |
 | Web page scraping | `browser_navigate` | For pages that need JS rendering |
 | DuckDuckGo HTML | `execute_code` + `curl` to `html.duckduckgo.com` | Returns plain HTML, regex-parseable |
+| SearxNG (self-hosted metasearch) | `execute_code` + `curl` to localhost:8080 | When searx service is enabled via features.ai.searxng |
 | Context7 (library docs) | `mcp_context7_*` | Official docs for programming libraries |
+| Roam code analysis | `mcp_roam_code_*` | Codebase intelligence for indexed repos |
 | Roam code analysis | `mcp_roam_code_*` | Codebase intelligence for indexed repos |
 
 ## GitHub API Search Recipe

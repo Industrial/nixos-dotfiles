@@ -2,12 +2,14 @@
 .hermes/**/*/*.tar.gz
 .hermes/**/*/*.tgz
 .hermes/.hermes_history
+.hermes/.skills_prompt_snapshot.json
 .hermes/.update_check
 .hermes/auth.json
 .hermes/auth.lock
 .hermes/bin/
 .hermes/cache/
 .hermes/models_dev_cache.json
+.hermes/ollama_cloud_models_cache.json
 .hermes/pastes/
 .hermes/processes.json
 .hermes/sessions/
