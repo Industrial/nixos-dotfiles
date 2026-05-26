@@ -47,6 +47,19 @@ titles = re.findall(r'<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.
 snippets = re.findall(r'<a rel="noopener" class="result__snippet"[^>]*>(.*?)</a>', result.stdout)
 ```
 
+## Research Order: CLI-First Heuristic
+
+When the topic involves a **CLI tool or binary** (suspected or confirmed), run the tool directly FIRST before searching other skill/registry systems:
+
+1. `which <tool>` or `command -V <tool>` — check if it's on PATH and what kind of binary
+2. `<tool> --help` — inspect the actual CLI surface
+3. If it's a wrapper/alias, trace the real binary with `ls -la $(which <tool>)`
+4. Only then fall back to: hermes skills search, web search, GitHub API, Context7, etc.
+
+**Why**: The hermes skills registry indexes skill metadata — it won't tell you if `maestro` on PATH is actually a Bun binary under a misnamed symlink (NixOS package collision). The CLI itself reveals the ground truth.
+
+**Applies to**: any named binary the user asks about. This is distinct from library research where "Context7 first" is the right order.
+
 ## Output Format (CLI)
 
 The user is on a terminal. Use plain text, not markdown:

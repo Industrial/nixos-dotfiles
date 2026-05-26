@@ -126,7 +126,7 @@ def my_tool(params: dict, **kwargs) -> str:
 #   return json.dumps({"success": False, "error": str(e)})
 ```
 
-## package.nix
+## package.nix (Python plugin)
 
 ```nix
 { lib, python3Packages }:
@@ -165,11 +165,13 @@ environment.systemPackages = [
 ### package.nix — accept and propagate extraPlugins
 
 Add to the function arguments:
+
 ```nix
 extraPlugins ? [],
 ```
 
 Wire into propagatedBuildInputs:
+
 ```nix
 propagatedBuildInputs = with python3Packages; [mcp]
   ++ extraPlugins;
@@ -199,5 +201,9 @@ Tom's preferred sequence:
   fetchFromGitHub needed for local plugins.
 - extraPlugins propagation is what makes importlib.metadata discovery work —
   without it the entry point is not on PYTHONPATH at runtime.
+- Prebuilt release binaries (e.g. from GitHub releases) are often dynamically
+  linked and fail on NixOS with "Could not start dynamically linked executable".
+  Always add `autoPatchelfHook` to buildInputs when packaging a fetchurl'd binary.
+  See references/prebuilt-binary-packaging.md for the exact pattern.
 
-See also: references/hermes-plugin-api.md
+See also: references/hermes-plugin-api.md, references/prebuilt-binary-packaging.md

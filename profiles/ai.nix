@@ -19,5 +19,6 @@
     ../features/ai/lmstudio
     ../features/ai/opencode
     ../features/ai/pi
+    ../features/ai/maestro
   ];
 }
