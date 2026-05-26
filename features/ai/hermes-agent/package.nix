@@ -11,6 +11,10 @@
   lib,
   python3Packages,
   fetchFromGitHub,
+  # List of extra Python packages (plugins) to inject as propagatedBuildInputs.
+  # Each must declare a [project.entry-points."hermes_agent.plugins"] entry point
+  # so Hermes discovers it via importlib.metadata at session start.
+  extraPlugins ? [],
 }:
 python3Packages.buildPythonApplication rec {
   pname = "hermes-agent";
@@ -30,7 +34,8 @@ python3Packages.buildPythonApplication rec {
 
   # mcp is an optional extra ("extra == mcp") so buildPythonApplication's dep resolution skips
   # it. Inject it explicitly via propagatedBuildInputs so it lands in the runtime closure.
-  propagatedBuildInputs = with python3Packages; [mcp];
+  propagatedBuildInputs = with python3Packages; [mcp]
+    ++ extraPlugins;
 
   # Core [project].dependencies plus anthropic (optional extra upstream; required for provider=anthropic).
   # Other lazy backends stay in pythonRemoveDeps until we add explicit outputs or deps for them.

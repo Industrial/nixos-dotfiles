@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "id-hermes-superpowers"
+version = "0.1.0"
+description = "Superpowers agentic development workflows for Hermes Agent"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# Runtime dependencies — extend as tool handlers require them.
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/obra/superpowers"
+
+# This is what Hermes discovers via importlib.metadata at session start.
+# The key ("id-hermes-superpowers") is the plugin name; the value is the
+# Python package that contains register().
+[project.entry-points."hermes_agent.plugins"]
+id-hermes-superpowers = "id_hermes_superpowers"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["id_hermes_superpowers*"]

@@ -15,6 +15,7 @@
 .hermes/sessions/
 .hermes/skills/.curator_backups/
 .hermes/skills/.curator_state
+.hermes/skills/.hub/index-cache/
 .hermes/skills/.usage.json
 .hermes/skills/usage.json
 .hermes/skills/usage.json.lock

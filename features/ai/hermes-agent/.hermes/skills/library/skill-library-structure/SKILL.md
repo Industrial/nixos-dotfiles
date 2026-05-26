@@ -25,7 +25,9 @@ Each skill directory **MUST** contain the following items:
 - `templates/` – copy‑and‑modify starter files (configs, scaffolds)
 - `scripts/` – deterministic scripts the skill can invoke (verification scripts, fixtures)
 
-The top‑level `features/ai/hermes-agent/plugins/` tree is the single source of truth for all skills.
+The `~/.hermes/skills/` tree (symlinked from `features/ai/hermes-agent/.hermes/skills/`) is the source of truth for Hermes SKILL.md files.
+
+NOTE: `features/ai/hermes-agent/plugins/` is where Nix-built Python plugin *packages* live (each with a `package.nix`, `pyproject.toml`, and `register(ctx)` entry point). These are distinct from SKILL.md skill files. See the `hermes-plugin-authoring` skill for the plugin package pattern.
 
 ## Skill Naming
 

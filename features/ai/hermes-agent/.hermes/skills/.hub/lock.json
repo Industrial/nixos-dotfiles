@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "installed": {
+    "react": {
+      "source": "skills.sh",
+      "identifier": "skills-sh/vercel-labs/json-render/react",
+      "trust_level": "community",
+      "scan_verdict": "safe",
+      "content_hash": "sha256:f71bcff6320e8294",
+      "install_path": "react",
+      "files": [
+        "SKILL.md"
+      ],
+      "metadata": {},
+      "installed_at": "2026-05-26T18:25:36.090846+00:00",
+      "updated_at": "2026-05-26T18:25:36.090850+00:00"
+    }
+  }
+}

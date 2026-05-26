@@ -1,0 +1,24 @@
+# id-hermes-superpowers — Superpowers skill pack plugin for Hermes Agent
+# https://github.com/obra/superpowers
+#
+# Adapts the Superpowers agentic skills framework (brainstorming, planning,
+# code review, debugging, TDD, etc.) as first-class Hermes tools.
+#
+# Tools and hooks are stubs — to be implemented as the workflows are defined.
+
+name: id-hermes-superpowers
+version: 0.1.0
+description: >
+  Superpowers agentic development workflows for Hermes Agent.
+  Provides brainstorming, plan writing, plan execution, code review,
+  systematic debugging, TDD, and subagent-driven development as native tools.
+author: ""
+homepage: https://github.com/obra/superpowers
+
+# Tools registered via ctx.register_tool() in __init__.py
+# Populated as workflows are implemented.
+provides_tools: []
+
+# Lifecycle hooks registered via ctx.register_hook() in __init__.py
+# Populated as workflows are implemented.
+provides_hooks: []
