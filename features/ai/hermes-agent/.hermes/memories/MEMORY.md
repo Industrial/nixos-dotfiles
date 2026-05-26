@@ -1,1 +1,3 @@
 Dotfiles repo: /home/tom/.dotfiles (not /root/.dotfiles). Branch feat/lean-ctx-mcp-hermes-support. AI features live under features/ai/; each tool has package.nix + default.nix. hermes-agent/default.nix imports lean-ctx, roam-code, serena, context7. PR required (main is protected).
+§
+Hermes Agent tooling: There is NO web_search tool. For web/API research use curl via execute_code (e.g., GitHub API: api.github.com/search/repositories?q=...&sort=stars&order=desc). Use browser_navigate for page scraping. GitHub API rate-limits quickly (unauthenticated ~10 req/min); batch queries and add small delays between calls.
