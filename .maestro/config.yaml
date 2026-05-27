@@ -1,0 +1,26 @@
+# Maestro configuration for NixOS dotfiles repo
+# See https://github.com/ReinaMacCredy/maestro
+
+project:
+  name: nixos-dotfiles
+  description: NixOS system configuration with AI/agent toolchain
+  repo: https://github.com/Industrial/nixos-dotfiles
+
+# Quality gates — tasks must satisfy these before moving to ready/shipped
+quality_gates:
+  nix:
+    - "nix flake check --no-build (per host)"
+    - "treefmt --check"
+    - "deadnix --fail"
+  rust:
+    - "cargo clippy --workspace --all-targets --all-features -- -D warnings"
+    - "cargo test --workspace"
+    - "cargo fmt --all -- --check"
+  security:
+    - "bin/ci/lynis (or equivalently: nix-shell -p lynis --run 'lynis audit system')"
+    - "bin/ci/vulnix"
+
+# Risk thresholds for auto-routing verdicts
+policy:
+  block_threshold: 85       # pr_risk score at or above → BLOCK verdict
+  autopilot_max_risk: 30    # score below this → can ship without human review

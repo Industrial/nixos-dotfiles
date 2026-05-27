@@ -1,0 +1,1 @@
+{"task_id":"tsk-mpnt22r1-a6hcr2","kind":"transition","timestamp":"2026-05-27T08:31:36.302Z","payload":{"evidence_id":"evd-mpnt22r2-c87o2b","from_state":null,"to_state":"draft","trigger_verb":"task:from-spec"}}
