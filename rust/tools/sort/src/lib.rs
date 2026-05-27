@@ -74,103 +74,89 @@ fn parse_key_field(s: &str) -> Result<usize, String> {
     Ok(n)
 }
 
-pub fn parse_args() -> Result<ParsedCli, String> {
-    let mut it = env::args_os().skip(1).peekable();
-    let mut settings = Settings::default();
-    let mut files: Vec<OsString> = Vec::new();
-
-    while let Some(arg) = it.next() {
-        let s = arg.to_string_lossy();
-        if s == "--" {
-            files.extend(it);
-            break;
-        }
-        if s.starts_with("--") {
-            match s.as_ref() {
-                "--help" => return Ok(ParsedCli::Help),
-                "--version" => return Ok(ParsedCli::Version),
-                "--ignore-case" => settings.ignore_case = true,
-                "--numeric-sort" => settings.numeric = true,
-                "--reverse" => settings.reverse = true,
-                "--unique" => settings.unique = true,
-                "--field-separator" => {
-                    let v = it.next().ok_or_else(|| {
-                        "sort: option requires an argument --field-separator".to_string()
-                    })?;
-                    let vs = v.to_string_lossy();
-                    let mut itc = vs.chars();
-                    let c = itc
-                        .next()
-                        .ok_or_else(|| "sort: empty separator".to_string())?;
-                    if itc.next().is_some() {
-                        return Err("sort: separator must be a single character".into());
-                    }
-                    settings.delimiter = Some(c);
-                }
-                long if long.starts_with("--field-separator=") => {
-                    let rest = &long["--field-separator=".len()..];
-                    let mut itc = rest.chars();
-                    let c = itc
-                        .next()
-                        .ok_or_else(|| "sort: empty separator".to_string())?;
-                    if itc.next().is_some() {
-                        return Err("sort: separator must be a single character".into());
-                    }
-                    settings.delimiter = Some(c);
-                }
-                long if long.starts_with("--key=") => {
-                    let v = &long["--key=".len()..];
-                    settings.key_field = Some(parse_key_field(v)?);
-                }
-                "--key" => {
-                    let v = it
-                        .next()
-                        .ok_or_else(|| "sort: option requires an argument --key".to_string())?;
-                    settings.key_field = Some(parse_key_field(&v.to_string_lossy())?);
-                }
-                _ => return Err(format!("sort: unrecognized option {s:?}")),
-            }
-            continue;
-        }
-        if s.starts_with('-') && s != "-" {
-            let mut chars = s.chars().skip(1);
-            while let Some(ch) = chars.next() {
-                match ch {
-                    'f' => settings.ignore_case = true,
-                    'n' => settings.numeric = true,
-                    'r' => settings.reverse = true,
-                    'u' => settings.unique = true,
-                    't' => {
-                        let sep = chars.next().ok_or_else(|| {
-                            "sort: option requires an argument for -t".to_string()
-                        })?;
-                        settings.delimiter = Some(sep);
-                        break;
-                    }
-                    'k' => {
-                        let rest: String = chars.collect();
-                        let v = if rest.is_empty() {
-                            it.next()
-                                .ok_or_else(|| {
-                                    "sort: option requires an argument for -k".to_string()
-                                })?
-                                .to_string_lossy()
-                                .into_owned()
-                        } else {
-                            rest
-                        };
-                        settings.key_field = Some(parse_key_field(&v)?);
-                        break;
-                    }
-                    _ => return Err(format!("sort: invalid option -- {ch}")),
-                }
-            }
-            continue;
-        }
-        files.push(arg);
+fn parse_separator_value(raw: &str) -> Result<char, String> {
+    let mut itc = raw.chars();
+    let c = itc
+        .next()
+        .ok_or_else(|| "sort: empty separator".to_string())?;
+    if itc.next().is_some() {
+        return Err("sort: separator must be a single character".into());
     }
+    Ok(c)
+}
 
-    let inputs: Vec<Input> = if files.is_empty() {
+fn parse_separator_arg(raw: &str, settings: &mut Settings) -> Result<(), String> {
+    let c = parse_separator_value(raw)?;
+    settings.delimiter = Some(c);
+    Ok(())
+}
+
+fn parse_key_arg(raw: &str, settings: &mut Settings) -> Result<(), String> {
+    settings.key_field = Some(parse_key_field(raw)?);
+    Ok(())
+}
+
+fn apply_long_flag(arg: &str, it: &mut impl Iterator<Item = OsString>, settings: &mut Settings) -> Result<Option<ParsedCli>, String> {
+    match arg {
+        "--help" => return Ok(Some(ParsedCli::Help)),
+        "--version" => return Ok(Some(ParsedCli::Version)),
+        "--ignore-case" => settings.ignore_case = true,
+        "--numeric-sort" => settings.numeric = true,
+        "--reverse" => settings.reverse = true,
+        "--unique" => settings.unique = true,
+        "--field-separator" => {
+            let v = it.next()
+                .ok_or_else(|| "sort: option requires an argument --field-separator".to_string())?;
+            parse_separator_arg(&v.to_string_lossy(), settings)?;
+        }
+        "--key" => {
+            let v = it.next()
+                .ok_or_else(|| "sort: option requires an argument --key".to_string())?;
+            parse_key_arg(&v.to_string_lossy(), settings)?;
+        }
+        long if long.starts_with("--field-separator=") => {
+            let rest = &long["--field-separator=".len()..];
+            parse_separator_arg(rest, settings)?;
+        }
+        long if long.starts_with("--key=") => {
+            let rest = &long["--key=".len()..];
+            parse_key_arg(rest, settings)?;
+        }
+        _ => return Err(format!("sort: unrecognized option {arg:?}")),
+    }
+    Ok(None)
+}
+
+fn apply_short_flag(ch: char, chars: &mut impl Iterator<Item = char>, it: &mut impl Iterator<Item = OsString>, settings: &mut Settings) -> Result<Option<ParsedCli>, String> {
+    match ch {
+        'f' => settings.ignore_case = true,
+        'n' => settings.numeric = true,
+        'r' => settings.reverse = true,
+        'u' => settings.unique = true,
+        't' => {
+            let sep = chars.next()
+                .ok_or_else(|| "sort: option requires an argument for -t".to_string())?;
+            settings.delimiter = Some(sep);
+        }
+        'k' => {
+            let rest: String = chars.collect();
+            let v = if rest.is_empty() {
+                it.next()
+                    .ok_or_else(|| "sort: option requires an argument for -k".to_string())?
+                    .to_string_lossy()
+                    .into_owned()
+            } else {
+                rest
+            };
+            parse_key_arg(&v, settings)?;
+        }
+        _ => return Err(format!("sort: invalid option -- {ch}")),
+    }
+    Ok(None)
+}
+
+fn build_inputs(files: Vec<OsString>) -> Vec<Input> {
+    if files.is_empty() {
         vec![Input::Stdin]
     } else {
         files
@@ -183,8 +169,39 @@ pub fn parse_args() -> Result<ParsedCli, String> {
                 }
             })
             .collect()
-    };
+    }
+}
 
+pub fn parse_args() -> Result<ParsedCli, String> {
+    let mut it = env::args_os().skip(1).peekable();
+    let mut settings = Settings::default();
+    let mut files: Vec<OsString> = Vec::new();
+
+    while let Some(arg) = it.next() {
+        let s = arg.to_string_lossy();
+        if s == "--" {
+            files.extend(it);
+            break;
+        }
+        if s.starts_with("--") {
+            if let Some(result) = apply_long_flag(&s, &mut it, &mut settings)? {
+                return Ok(result);
+            }
+            continue;
+        }
+        if s.starts_with('-') && s != "-" {
+            let mut chars = s.chars().skip(1);
+            while let Some(ch) = chars.next() {
+                if let Some(result) = apply_short_flag(ch, &mut chars, &mut it, &mut settings)? {
+                    return Ok(result);
+                }
+            }
+            continue;
+        }
+        files.push(arg);
+    }
+
+    let inputs = build_inputs(files);
     Ok(ParsedCli::Run { settings, inputs })
 }
 

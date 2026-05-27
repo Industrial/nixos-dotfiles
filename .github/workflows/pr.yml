@@ -49,6 +49,30 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Dead Code Detection
         uses: ./.github/actions/deadnix
+  cargo-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-nix
+      - name: Clippy
+        run: nix develop --command bash -c "cd rust && cargo clippy --workspace --all-targets -- -D warnings"
+  cargo-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-nix
+      - name: Test
+        run: nix develop --command bash -c "cd rust && cargo test --workspace"
+  cargo-nix-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: ./.github/actions/setup-nix
+      - name: Check Cargo.nix drift
+        run: |
+          nix develop --command bash -c "cd rust && cargo generate-lockfile"
+          # Check if any Cargo.nix files would change
+          git diff --exit-code rust/tools/*/Cargo.nix || (echo 'Cargo.nix is out of date. Run cargo regenerate-lockfile and commit.' && exit 1)
   check:
     runs-on: ubuntu-latest
     strategy:

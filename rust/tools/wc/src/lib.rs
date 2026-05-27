@@ -373,17 +373,26 @@ fn field_width(
 ) -> usize {
     let ncols = settings.number_enabled();
 
-    if stdin_implicit_only && ncols == 1 {
-        return max_digit_all_cells(counts, sum, settings);
-    }
-    if stdin_implicit_only && ncols > 1 {
-        return cmp::max(MIN_WIDTH, max_digit_all_cells(counts, sum, settings));
+    if stdin_implicit_only {
+        return field_width_stdin_only(counts, sum, settings, ncols);
     }
 
     if ncols == 1 && inputs.len() == 1 {
         return max_digit_all_cells(counts, sum, settings);
     }
 
+    field_width_from_metadata(inputs, counts, sum, settings)
+}
+
+fn field_width_stdin_only(counts: &[WordCount], sum: &WordCount, settings: &Settings, ncols: u32) -> usize {
+    if ncols == 1 {
+        max_digit_all_cells(counts, sum, settings)
+    } else {
+        cmp::max(MIN_WIDTH, max_digit_all_cells(counts, sum, settings))
+    }
+}
+
+fn field_width_from_metadata(inputs: &[Input], counts: &[WordCount], sum: &WordCount, settings: &Settings) -> usize {
     let mut min_w = 1usize;
     let mut size_sum: u64 = 0;
 
@@ -451,6 +460,77 @@ GNU-compatible options:\n\
       --version          output version information and exit\n"
 }
 
+fn apply_long_flag(arg: &str, settings: &mut Settings) -> Result<Option<ParsedCli>, String> {
+    match arg {
+        "--help" => return Ok(Some(ParsedCli::Help)),
+        "--version" => return Ok(Some(ParsedCli::Version)),
+        "--bytes" => settings.show_bytes = true,
+        "--chars" => settings.show_chars = true,
+        "--lines" => settings.show_lines = true,
+        "--words" => settings.show_words = true,
+        "--max-line-length" => settings.show_max_line_length = true,
+        "--debug" => settings.debug = true,
+        long if long.starts_with("--files0-from=") => {
+            let v = &long["--files0-from=".len()..];
+            settings.files0_from = Some(OsString::from(v));
+        }
+        long if long.starts_with("--total=") => {
+            let v = &long["--total=".len()..];
+            settings.total_when = TotalWhen::parse(v)
+                .ok_or_else(|| format!("wc: invalid --total argument {v:?}"))?;
+        }
+        _ => return Err(format!("wc: unrecognized option {arg:?}")),
+    }
+    Ok(None)
+}
+
+fn apply_short_flag(ch: char, settings: &mut Settings) -> Result<(), String> {
+    match ch {
+        'c' => settings.show_bytes = true,
+        'm' => settings.show_chars = true,
+        'l' => settings.show_lines = true,
+        'w' => settings.show_words = true,
+        'L' => settings.show_max_line_length = true,
+        _ => return Err(format!("wc: invalid option -- {ch}")),
+    }
+    Ok(())
+}
+
+fn resolve_inputs(settings: &Settings, files: Vec<Input>) -> Result<Vec<Input>, String> {
+    if settings.files0_from.is_some() && !files.is_empty() {
+        return Err(
+            "wc: extra operand when using --files0-from\nTry 'wc --help' for more information."
+                .into(),
+        );
+    }
+
+    if let Some(ref f0) = settings.files0_from {
+        let paths = if f0 == "-" {
+            let stdin = io::stdin();
+            let mut locked = stdin.lock();
+            let mut buf = Vec::new();
+            locked.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+            parse_files0_buffer(&buf).map_err(|e| e.to_string())?
+        } else {
+            read_files0_list(Path::new(f0)).map_err(|e| e.to_string())?
+        };
+        Ok(paths
+            .into_iter()
+            .map(|p| {
+                if p.as_os_str() == "-" {
+                    Input::Stdin(StdinKind::Explicit)
+                } else {
+                    Input::Path(p)
+                }
+            })
+            .collect())
+    } else if files.is_empty() {
+        Ok(vec![Input::Stdin(StdinKind::Implicit)])
+    } else {
+        Ok(files)
+    }
+}
+
 /// Parse argv. Returns [`ParsedCli::Help`] / [`ParsedCli::Version`] or a [`ParsedCli::Run`].
 pub fn parse_args() -> Result<ParsedCli, String> {
     let mut args = env::args_os().peekable();
@@ -483,43 +563,15 @@ pub fn parse_args() -> Result<ParsedCli, String> {
         }
 
         if s.starts_with("--") {
-            match s.as_ref() {
-                "--help" => {
-                    return Ok(ParsedCli::Help);
-                }
-                "--version" => {
-                    return Ok(ParsedCli::Version);
-                }
-                "--bytes" => settings.show_bytes = true,
-                "--chars" => settings.show_chars = true,
-                "--lines" => settings.show_lines = true,
-                "--words" => settings.show_words = true,
-                "--max-line-length" => settings.show_max_line_length = true,
-                "--debug" => settings.debug = true,
-                long if long.starts_with("--files0-from=") => {
-                    let v = &long["--files0-from=".len()..];
-                    settings.files0_from = Some(OsString::from(v));
-                }
-                long if long.starts_with("--total=") => {
-                    let v = &long["--total=".len()..];
-                    settings.total_when = TotalWhen::parse(v)
-                        .ok_or_else(|| format!("wc: invalid --total argument {v:?}"))?;
-                }
-                _ => return Err(format!("wc: unrecognized option {s:?}")),
+            if let Some(result) = apply_long_flag(&s, &mut settings)? {
+                return Ok(result);
             }
             continue;
         }
 
         if s.starts_with('-') && s != "-" {
             for ch in s.chars().skip(1) {
-                match ch {
-                    'c' => settings.show_bytes = true,
-                    'm' => settings.show_chars = true,
-                    'l' => settings.show_lines = true,
-                    'w' => settings.show_words = true,
-                    'L' => settings.show_max_line_length = true,
-                    _ => return Err(format!("wc: invalid option -- {ch}")),
-                }
+                apply_short_flag(ch, &mut settings)?;
             }
             continue;
         }
@@ -527,41 +579,8 @@ pub fn parse_args() -> Result<ParsedCli, String> {
         files.push(Input::Path(PathBuf::from(arg)));
     }
 
-    if settings.files0_from.is_some() && !files.is_empty() {
-        return Err(
-            "wc: extra operand when using --files0-from\nTry 'wc --help' for more information."
-                .into(),
-        );
-    }
-
     let settings = settings.finalize();
-
-    let inputs = if let Some(ref f0) = settings.files0_from {
-        let paths = if f0 == "-" {
-            let stdin = io::stdin();
-            let mut locked = stdin.lock();
-            let mut buf = Vec::new();
-            locked.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-            parse_files0_buffer(&buf).map_err(|e| e.to_string())?
-        } else {
-            read_files0_list(Path::new(f0)).map_err(|e| e.to_string())?
-        };
-        paths
-            .into_iter()
-            .map(|p| {
-                if p.as_os_str() == "-" {
-                    Input::Stdin(StdinKind::Explicit)
-                } else {
-                    Input::Path(p)
-                }
-            })
-            .collect()
-    } else if files.is_empty() {
-        vec![Input::Stdin(StdinKind::Implicit)]
-    } else {
-        files
-    };
-
+    let inputs = resolve_inputs(&settings, files)?;
     Ok(ParsedCli::Run { settings, inputs })
 }
 

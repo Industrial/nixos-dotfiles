@@ -70,100 +70,76 @@ fn parse_num(s: &str) -> Result<usize, String> {
     s.parse().map_err(|_| format!("head: invalid number {s:?}"))
 }
 
-pub fn parse_args() -> Result<ParsedCli, String> {
-    let mut it = env::args_os().skip(1).peekable();
-    let mut settings = Settings::default();
-    let mut files: Vec<OsString> = Vec::new();
-
-    while let Some(arg) = it.next() {
-        let s = arg.to_string_lossy();
-        if s == "--" {
-            files.extend(it);
-            break;
+fn apply_long_flag(arg: &str, it: &mut impl Iterator<Item = OsString>, settings: &mut Settings) -> Result<Option<ParsedCli>, String> {
+    match arg {
+        "--help" => return Ok(Some(ParsedCli::Help)),
+        "--version" => return Ok(Some(ParsedCli::Version)),
+        "--quiet" | "--silent" => settings.quiet = true,
+        "--verbose" => settings.verbose = true,
+        "--bytes" => {
+            let v = it.next()
+                .ok_or_else(|| "head: option requires an argument --bytes".to_string())?;
+            settings.bytes = Some(parse_num(&v.to_string_lossy())?);
+            settings.lines = None;
         }
-        if s.starts_with("--") {
-            match s.as_ref() {
-                "--help" => return Ok(ParsedCli::Help),
-                "--version" => return Ok(ParsedCli::Version),
-                "--quiet" | "--silent" => {
-                    settings.quiet = true;
-                }
-                "--verbose" => settings.verbose = true,
-                long if long.starts_with("--bytes=") => {
-                    let v = &long["--bytes=".len()..];
-                    settings.bytes = Some(parse_num(v)?);
-                    settings.lines = None;
-                }
-                long if long.starts_with("--lines=") => {
-                    let v = &long["--lines=".len()..];
-                    settings.lines = Some(parse_num(v)?);
-                    settings.bytes = None;
-                }
-                "--bytes" => {
-                    let v = it
-                        .next()
-                        .ok_or_else(|| "head: option requires an argument --bytes".to_string())?;
-                    settings.bytes = Some(parse_num(&v.to_string_lossy())?);
-                    settings.lines = None;
-                }
-                "--lines" => {
-                    let v = it
-                        .next()
-                        .ok_or_else(|| "head: option requires an argument --lines".to_string())?;
-                    settings.lines = Some(parse_num(&v.to_string_lossy())?);
-                    settings.bytes = None;
-                }
-                _ => return Err(format!("head: unrecognized option {s:?}")),
-            }
-            continue;
+        "--lines" => {
+            let v = it.next()
+                .ok_or_else(|| "head: option requires an argument --lines".to_string())?;
+            settings.lines = Some(parse_num(&v.to_string_lossy())?);
+            settings.bytes = None;
         }
-        if s.starts_with('-') && s != "-" {
-            let mut chars = s.chars().skip(1);
-            while let Some(ch) = chars.next() {
-                match ch {
-                    'c' => {
-                        let rest: String = chars.collect();
-                        let v = if rest.is_empty() {
-                            it.next()
-                                .ok_or_else(|| {
-                                    "head: option requires an argument for -c".to_string()
-                                })?
-                                .to_string_lossy()
-                                .into_owned()
-                        } else {
-                            rest
-                        };
-                        settings.bytes = Some(parse_num(&v)?);
-                        settings.lines = None;
-                        break;
-                    }
-                    'n' => {
-                        let rest: String = chars.collect();
-                        let v = if rest.is_empty() {
-                            it.next()
-                                .ok_or_else(|| {
-                                    "head: option requires an argument for -n".to_string()
-                                })?
-                                .to_string_lossy()
-                                .into_owned()
-                        } else {
-                            rest
-                        };
-                        settings.lines = Some(parse_num(&v)?);
-                        settings.bytes = None;
-                        break;
-                    }
-                    'q' => settings.quiet = true,
-                    'v' => settings.verbose = true,
-                    _ => return Err(format!("head: invalid option -- {ch}")),
-                }
-            }
-            continue;
+        long if long.starts_with("--bytes=") => {
+            let v = &long["--bytes=".len()..];
+            settings.bytes = Some(parse_num(v)?);
+            settings.lines = None;
         }
-        files.push(arg);
+        long if long.starts_with("--lines=") => {
+            let v = &long["--lines=".len()..];
+            settings.lines = Some(parse_num(v)?);
+            settings.bytes = None;
+        }
+        _ => return Err(format!("head: unrecognized option {arg:?}")),
     }
+    Ok(None)
+}
 
-    let inputs: Vec<Input> = if files.is_empty() {
+fn apply_short_flag(ch: char, chars: &mut impl Iterator<Item = char>, it: &mut impl Iterator<Item = OsString>, settings: &mut Settings) -> Result<Option<ParsedCli>, String> {
+    match ch {
+        'c' => {
+            let rest: String = chars.collect();
+            let v = if rest.is_empty() {
+                it.next()
+                    .ok_or_else(|| "head: option requires an argument for -c".to_string())?
+                    .to_string_lossy()
+                    .into_owned()
+            } else {
+                rest
+            };
+            settings.bytes = Some(parse_num(&v)?);
+            settings.lines = None;
+        }
+        'n' => {
+            let rest: String = chars.collect();
+            let v = if rest.is_empty() {
+                it.next()
+                    .ok_or_else(|| "head: option requires an argument for -n".to_string())?
+                    .to_string_lossy()
+                    .into_owned()
+            } else {
+                rest
+            };
+            settings.lines = Some(parse_num(&v)?);
+            settings.bytes = None;
+        }
+        'q' => settings.quiet = true,
+        'v' => settings.verbose = true,
+        _ => return Err(format!("head: invalid option -- {ch}")),
+    }
+    Ok(None)
+}
+
+fn build_inputs(files: Vec<OsString>) -> Vec<Input> {
+    if files.is_empty() {
         vec![Input::Stdin]
     } else {
         files
@@ -176,8 +152,39 @@ pub fn parse_args() -> Result<ParsedCli, String> {
                 }
             })
             .collect()
-    };
+    }
+}
 
+pub fn parse_args() -> Result<ParsedCli, String> {
+    let mut it = env::args_os().skip(1).peekable();
+    let mut settings = Settings::default();
+    let mut files: Vec<OsString> = Vec::new();
+
+    while let Some(arg) = it.next() {
+        let s = arg.to_string_lossy();
+        if s == "--" {
+            files.extend(it);
+            break;
+        }
+        if s.starts_with("--") {
+            if let Some(result) = apply_long_flag(&s, &mut it, &mut settings)? {
+                return Ok(result);
+            }
+            continue;
+        }
+        if s.starts_with('-') && s != "-" {
+            let mut chars = s.chars().skip(1);
+            while let Some(ch) = chars.next() {
+                if let Some(result) = apply_short_flag(ch, &mut chars, &mut it, &mut settings)? {
+                    return Ok(result);
+                }
+            }
+            continue;
+        }
+        files.push(arg);
+    }
+
+    let inputs = build_inputs(files);
     Ok(ParsedCli::Run { settings, inputs })
 }
 
