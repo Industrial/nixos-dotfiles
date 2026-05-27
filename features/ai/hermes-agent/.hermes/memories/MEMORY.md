@@ -4,6 +4,10 @@ Hermes Agent tooling: There is NO web_search tool. For web/API research use curl
 §
 SearXNG instance: localhost:4001, NixOS-managed via services.searx. Config at features/network/searx/default.nix in dotfiles. Two independent 403 causes: (1) bot detection limiter blocks non-browser requests -- fix with server.limiter=false; (2) search.formats default is ["html"] only, so ?format=json gets 403 -- fix with search.formats=[html,json,csv,rss]. Both fixes required for mcp-searxng MCP client to work.
 §
-Hermes skills.sh integration: `hermes skills` CLI supports search, browse, install, inspect, audit, update, uninstall, config, tap (source management). 9 registries (skills.sh, ClawHub, LobeHub, GitHub, Anthropic, OpenAI, HuggingFace, gstack, browse.sh), 2,550 total skills, refreshed 2x daily. Skill creation via skill_manage tool. Skills are class-level umbrellas with support files in references/, templates/, scripts/.
+Hermes: plugins live under features/ai/hermes-agent/plugins/<name>/ (not features/ai/<name>/). `hermes skills` CLI manages skills from 9 registries (2,550 total). Skills use class-level names with references/, templates/, scripts/ support dirs.
 §
-Hermes plugins live under features/ai/hermes-agent/plugins/<name>/, NOT as sibling features under features/ai/<name>/. This was corrected mid-session.
+Hermes: plugins live under features/ai/hermes-agent/plugins/<name>/ (not features/ai/<name>/). `hermes skills` CLI manages skills from 9 registries (2,550 total). Skills use class-level names with references/, templates/, scripts/ support dirs.
+§
+treefmt format:check: first run reformats in-place AND fails (fail-on-change=true + biome --write). Second run passes. Use `ci:format` (no fail-on-change) to format, then `format:check` to verify.
+§
+patch corruption: after a successful `patch` that removes lines, the file shifts. A second `patch` using pre-edit context can corrupt the file (e.g. duplicate function declarations). Recovery: `write_file` the entire corrected content. Prevention: `read_file` after each patch to get the new state before planning the next one.

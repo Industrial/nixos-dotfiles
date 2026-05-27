@@ -123,6 +123,11 @@ Fix: `sudo rm /nix/store/<hash>-<name>.drv` using the path from the error output
 
 maestro v0.106.1+ ships `maestro mcp serve` which starts the stdio MCP server.
 
+For mission creation, task decompose, and evidence recording patterns via MCP
+tools, see `maestro-mcp-patterns` — it covers pitfalls only visible when using
+`mcp_maestro_*` tools (not the CLI): the spec frontmatter requirement, the
+bare+decompose path, directory prerequisites, and contract gotchas.
+
 **Prerequisite**: `maestro --version` must NOT show `bun`. If it shows `bun`, rebuild with the interpreter-only packaging pattern (see [Diagnosing a Broken Binary](#diagnosing-a-broken-binary-on-nixos)).
 
 **Registration** (`~/.hermes/config.yaml`):

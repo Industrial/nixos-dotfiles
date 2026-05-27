@@ -1,3 +1,4 @@
+*.db
 *.log
 *.njsproj
 *.ntvs*
@@ -7,13 +8,16 @@
 */target/
 .DS_Store
 .aider*
+.beads-credential-key
 .devenv*
 .direnv/
+.dolt/
 .env
 .idea/
 .pre-commit-config.yaml
 /**/*.qcow2
 /.direnv/
+/.maestro/
 /.pre-commit-config.yaml
 /.roam/
 /.tmp
@@ -29,8 +33,3 @@ npm-debug.log*
 target/
 yarn-debug.log*
 yarn-error.log*
-
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
-.beads-credential-key
