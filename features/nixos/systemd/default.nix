@@ -31,6 +31,7 @@
         # Optimize system performance
         "0 2 * * * root /run/current-system/sw/bin/nix-collect-garbage -d"
         "0 3 * * * root /run/current-system/sw/bin/nix-store --optimise"
+        "30 3 * * 0 root /run/current-system/sw/bin/journalctl --vacuum-size=800M"
       ];
     };
 

@@ -272,6 +272,11 @@ Tom's preferred sequence:
   __init__.py or Hermes may warn about undeclared registrations.
 - src = ./. in package.nix works because the plugin is in-tree. No
   fetchFromGitHub needed for local plugins.
+- If __init__.py imports from hermes internals (e.g. `from providers import
+  register_provider`), set `pythonImportsCheck = []` in package.nix. The
+  hermes-agent site-packages are not in the Nix build sandbox, so the check
+  always fails with ModuleNotFoundError at build time even though the import
+  works fine at runtime.
 - extraPlugins propagation is what makes importlib.metadata discovery work —
   without it the entry point is not on PYTHONPATH at runtime.
 - Prebuilt release binaries (e.g. from GitHub releases) are often dynamically
