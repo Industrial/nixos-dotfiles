@@ -14,10 +14,10 @@
         };
     });
 
-  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.105.1";
+  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.stdenv.hostPlatform.system}.forVSCodeVersion "1.105.1";
   # # Use an older VSCode version for vscode-lldb to get compatible version (1.11.8)
   # # Version 1.11.8 of vscode-lldb requires an older VSCode version filter
-  # extensionsForLldb = inputs.nix-vscode-extensions.extensions.${pkgs.system}.forVSCodeVersion "1.75.0";
+  # extensionsForLldb = inputs.nix-vscode-extensions.extensions.${pkgs.stdenv.hostPlatform.system}.forVSCodeVersion "1.75.0";
 
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = pkgs.code-cursor;
