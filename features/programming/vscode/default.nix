@@ -3,7 +3,7 @@
   pkgs,
   ...
 }: let
-  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.system};
+  extensions = inputs.nix-vscode-extensions.extensions.${pkgs.stdenv.hostPlatform.system};
   #.forVSCodeVersion "1.98.0";
   vscodeWithExtensions = pkgs.vscode-with-extensions.override {
     vscodeExtensions = [
