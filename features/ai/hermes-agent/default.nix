@@ -9,6 +9,7 @@
 #
 # Plugins (hermes_agent.plugins entry-point packages):
 #   id-hermes-superpowers (./plugins/id-hermes-superpowers) — Superpowers agentic workflows
+#   cursor-acp            (./plugins/cursor-acp)            — Cursor CLI ACP model provider
 {pkgs, ...}: {
   imports = [
     ../lean-ctx
@@ -23,6 +24,7 @@
       # via importlib.metadata (hermes_agent.plugins entry point) at session start.
       extraPlugins = [
         (pkgs.callPackage ./plugins/id-hermes-superpowers/package.nix {})
+        (pkgs.callPackage ./plugins/cursor-acp/package.nix {})
       ];
     })
   ];
