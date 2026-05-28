@@ -1,6 +1,6 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    # (wineWowPackages.waylandFull.override {
+    # (wineWow64Packages.waylandFull.override {
     #   wineRelease = "staging";
     #   gettextSupport = true;
     #   fontconfigSupport = true;
@@ -15,7 +15,7 @@
     #   mingwSupport = true;
     #   pulseaudioSupport = true;
     # })
-    wineWowPackages.fonts
+    wineWow64Packages.fonts
     winetricks
 
     # bottles
