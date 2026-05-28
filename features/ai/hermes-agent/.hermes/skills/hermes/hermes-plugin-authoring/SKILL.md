@@ -11,6 +11,63 @@ tags: [hermes, nix, plugin, python]
 
 # Hermes Plugin Authoring
 
+## Two plugin kinds: tools-plugin vs model-provider plugin
+
+These share the same discovery mechanism (hermes_agent.plugins entry point,
+pyproject.toml, package.nix, plugin.yaml) but differ in what their __init__.py
+does and what files they contain.
+
+### Tools / hooks plugin (the common case)
+
+__init__.py implements register(ctx) and calls ctx.register_tool() /
+ctx.register_hook(). Has schemas.py + tools.py siblings.
+
+### Model-provider plugin
+
+__init__.py imports from providers and calls register_provider() at module
+level. No schemas.py or tools.py — just __init__.py. The register(ctx)
+function is still required (entry-point contract) but its body is minimal:
+
+```python
+from providers import register_provider
+from providers.base import ProviderProfile
+
+class MyProfile(ProviderProfile):
+    def fetch_models(self, api_key=None, timeout=8.0) -> list[str] | None:
+        return None   # subprocess / external process handles this
+
+my_profile = MyProfile(
+    name="my-provider",
+    aliases=("my", "my-provider-alias"),
+    api_mode="chat_completions",
+    env_vars=(),
+    base_url="acp://my-provider",   # sentinel scheme for ACP subprocess providers
+    auth_type="external_process",   # skips all credential checks
+)
+
+register_provider(my_profile)   # called at import time
+
+def register(ctx) -> None:
+    pass   # provider already registered above; ctx not needed
+```
+
+### ACP subprocess providers specifically
+
+ACP providers (like copilot-acp and cursor-acp) use:
+- base_url="acp://<name>"    — sentinel; Hermes skips HTTP stack
+- auth_type="external_process" — skips credential checks; auth via local CLI
+- env_vars=()                — no API key env var; do NOT add one
+- fetch_models() returns None — ACP subprocess handles model listing
+
+The base_url sentinel + auth_type together are what routes to the ACP layer.
+Do not attempt HTTP requests to an acp:// URL.
+
+If run_agent.py has a generalised acp:// dispatch table
+(ACP_SUBPROCESS_COMMANDS), registering the profile is sufficient.
+If it is still Copilot-specific, a table entry must be added for the new
+base_url. See references/acp-provider-pattern.md for the table shape,
+shortcut table, auth bypass, and a list of known ACP providers.
+
 ## Where plugins live
 
 Plugins are Python packages under:
@@ -187,6 +244,22 @@ Tom's preferred sequence:
    mcp_context7_query_docs) for the upstream project.
 2. Discuss findings before writing any code.
 3. When "implement" is said — write ALL files in one complete pass.
+
+## Git staging pitfalls
+
+- Before committing, ALWAYS run `git diff --cached --name-status | cat` to
+  see what is actually staged. Prior sessions may have left staged deletions
+  or modifications that will be silently swept into your commit.
+
+- The `patch` tool stages each individual change as it goes. If you make
+  multiple patch calls on the same file, the index may hold an intermediate
+  state. After the final patch call on a file, run `git add <file>` to stage
+  the full working tree version before committing.
+
+- If staged state is wrong (e.g. missing a line you just added), run:
+    git add <path>   # re-stages from working tree
+  This is always safe — it just replaces what is staged with the current
+  disk contents.
 
 ## Pitfalls
 
