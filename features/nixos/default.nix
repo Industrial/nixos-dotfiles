@@ -90,6 +90,11 @@
     ];
   };
 
-  # Remove doc outputs from environment
-  environment.extraOutputsToInstall = [];
+  # Disable package doc outputs globally to avoid pulling fragile doc builds
+  # (e.g. python docs via sphinx/docutils) into system-path.
+  documentation = {
+    doc = {
+      enable = false;
+    };
+  };
 }
