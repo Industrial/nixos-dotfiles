@@ -9,6 +9,7 @@
   ...
 }: {
   imports = [
+    ../features/games/exiled-exchange-2
     ../features/games/lutris
     ../features/games/path-of-building
     ../features/games/wowup
