@@ -13,10 +13,16 @@
 
     # dbus-broker reload (Type=notify-reload) exceeds DefaultTimeoutStartSec on
     # large desktop configs and fails switch-to-configuration with exit 4.
-    # Restart on config change instead of reload.
+    # Do not restart on switch — it cascades into display-manager and kills the
+    # active graphical session.
     services.dbus-broker = {
       reloadIfChanged = lib.mkForce false;
+      restartIfChanged = lib.mkForce false;
       serviceConfig.TimeoutStartSec = lib.mkForce "5min";
+    };
+
+    services.display-manager = {
+      restartIfChanged = lib.mkForce false;
     };
 
     user.services.dbus-broker = {
