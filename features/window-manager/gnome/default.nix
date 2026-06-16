@@ -38,7 +38,6 @@
     displayManager = {
       gdm = {
         enable = true;
-        wayland = true;
       };
     };
 
@@ -115,7 +114,6 @@
 
       # Media & Entertainment
       gnomeExtensions.sound-output-device-chooser
-      gnomeExtensions.spotify-tray
 
       # Advanced Features
       gnomeExtensions.night-theme-switcher

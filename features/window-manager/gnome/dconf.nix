@@ -39,7 +39,6 @@ in {
 
             # Media & Entertainment
             pkgs.gnomeExtensions.sound-output-device-chooser.extensionUuid
-            pkgs.gnomeExtensions.spotify-tray.extensionUuid
 
             # Advanced Features
             pkgs.gnomeExtensions.night-theme-switcher.extensionUuid
