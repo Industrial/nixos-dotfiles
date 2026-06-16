@@ -44,6 +44,23 @@
     "editor.autoIndent": "advanced",
     "editor.defaultFormatter": "redhat.vscode-yaml"
   },
+  "[elixir]": {
+    "editor.defaultFormatter": "JakeBecker.elixir-ls",
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "editor.trimAutoWhitespace": false,
+    "editor.wordBasedSuggestions": "off",
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true
+  },
+  "[eex]": {
+    "editor.defaultFormatter": "JakeBecker.elixir-ls",
+    "editor.formatOnType": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
   "[github-actions-workflow]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
   },
@@ -58,6 +75,7 @@
   "debug.javascript.autoAttachFilter": "disabled",
   "diffEditor.codeLens": true,
   "diffEditor.maxComputationTime": 0,
+  "elixirLS.languageServerOverridePath": "/run/current-system/sw/share/elixir-ls",
   "editor.acceptSuggestionOnCommitCharacter": false,
   "editor.acceptSuggestionOnEnter": "on",
   "editor.autoClosingBrackets": "always",
@@ -284,5 +302,6 @@
   "workbench.colorTheme": "base16-gruvbox-dark-hard",
   "workbench.editor.enablePreview": false,
   "workbench.enableExperiments": true,
-  "workbench.list.openMode": "doubleClick"
+  "workbench.list.openMode": "doubleClick",
+  "files.autoSave": "afterDelay"
 }

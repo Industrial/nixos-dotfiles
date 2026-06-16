@@ -1,8 +1,24 @@
 {
   inputs,
   pkgs,
+  settings,
   ...
 }: let
+  cursorAgentExe = pkgs.lib.getExe pkgs.cursor-cli;
+
+  # Cursor's shell wrapper hardcodes ~/.local/bin/cursor-agent and auto-installs
+  # upstream FHS binaries that fail on NixOS (stub-ld). Install an immutable
+  # delegate script at the path Cursor expects so updates cannot replace it.
+  cursorAgentLocalWrapper = pkgs.writeShellScript "cursor-agent-local-wrapper" ''
+    case "''${1-}" in
+      update)
+        echo "cursor-agent is managed by NixOS (pkgs.cursor-cli); run nixos-rebuild switch" >&2
+        exit 0
+        ;;
+    esac
+    exec ${cursorAgentExe} "$@"
+  '';
+
   # TODO: We need a way to manage the MCP servers. Add the JSON file to the .config/Cursor/mcp.json and link it correctly.
   # Override license for unfree extensions to allow evaluation
   allowUnfreeExtension = drv:
@@ -18,6 +34,15 @@
   # # Use an older VSCode version for vscode-lldb to get compatible version (1.11.8)
   # # Version 1.11.8 of vscode-lldb requires an older VSCode version filter
   # extensionsForLldb = inputs.nix-vscode-extensions.extensions.${pkgs.stdenv.hostPlatform.system}.forVSCodeVersion "1.75.0";
+
+  # Expose ElixirLS launcher scripts where the VS Code extension expects them.
+  elixirLsRelease = pkgs.runCommand "elixir-ls-release" {} ''
+    mkdir -p $out/bin $out/share/elixir-ls
+    ln -s ${pkgs.elixir-ls}/bin/* $out/bin/
+    for script in ${pkgs.elixir-ls}/scripts/*; do
+      ln -s "$script" $out/share/elixir-ls/$(basename "$script")
+    done
+  '';
 
   cursorWithExtensions = pkgs.vscode-with-extensions.override {
     vscode = pkgs.code-cursor;
@@ -82,6 +107,10 @@
       ## Nushell
       extensions.vscode-marketplace.thenuprojectcontributors.vscode-nushell-lang
 
+      ## Elixir
+      pkgs.vscode-extensions.elixir-lsp.vscode-elixir-ls
+      pkgs.vscode-extensions.phoenixframework.phoenix
+
       ## Git
       (allowUnfreeExtension extensions.vscode-marketplace.mhutchie.git-graph)
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
@@ -134,6 +163,31 @@ in {
       # Python
       ty
       uv
+
+      # Elixir
+      elixir
+      elixirLsRelease
     ];
+  };
+
+  system.activationScripts.cursorAgentLocalWrapper = {
+    text = ''
+      local_bin="${settings.userdir}/.local/bin"
+      share_agent="${settings.userdir}/.local/share/cursor-agent"
+
+      mkdir -p "$local_bin"
+
+      for name in cursor-agent agent; do
+        target="$local_bin/$name"
+        chattr -i "$target" 2>/dev/null || true
+        rm -f "$target"
+        cp ${cursorAgentLocalWrapper} "$target"
+        chmod 755 "$target"
+        chown ${settings.username}: "$target"
+        chattr +i "$target" 2>/dev/null || true
+      done
+
+      rm -rf "$share_agent"
+    '';
   };
 }
