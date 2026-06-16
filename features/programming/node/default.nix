@@ -1,8 +1,8 @@
 # Node.js development environment
-# Note: npm is included with nodejs_20 by default
+# Note: npm is included with nodejs by default
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    nodejs_20
+    nodejs
     pnpm
   ];
 }
