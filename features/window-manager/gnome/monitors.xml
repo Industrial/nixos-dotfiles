@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- GNOME Mutter display layout — keep in sync with hyprland DP-1 mode (7680x2160@~60). -->
+<monitors version="2">
+  <configuration>
+    <layoutmode>logical</layoutmode>
+    <logicalmonitor>
+      <x>0</x>
+      <y>0</y>
+      <scale>1</scale>
+      <primary>yes</primary>
+      <monitor>
+        <monitorspec>
+          <connector>DP-1</connector>
+          <vendor>SAM</vendor>
+          <product>Odyssey G95NC</product>
+          <serial>HNTWB00104</serial>
+        </monitorspec>
+        <mode>
+          <width>7680</width>
+          <height>2160</height>
+          <rate>59.987</rate>
+        </mode>
+      </monitor>
+    </logicalmonitor>
+  </configuration>
+</monitors>

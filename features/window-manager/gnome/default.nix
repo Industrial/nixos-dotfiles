@@ -3,6 +3,7 @@
   pkgs,
   lib,
   config,
+  settings,
   ...
 }: {
   # Import dconf configuration and workspace setup
@@ -180,4 +181,10 @@
       ];
     };
   };
+
+  # Match Hyprland monitor mode on DP-1 (Mutter reads ~/.config/monitors.xml).
+  system.activationScripts.gnome-monitors = lib.stringAfter ["etc"] ''
+    mkdir -p /home/${settings.username}/.config
+    ln -sfn ${./monitors.xml} /home/${settings.username}/.config/monitors.xml
+  '';
 }
