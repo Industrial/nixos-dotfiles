@@ -1,19 +1,22 @@
 model:
-  default: openrouter/free
-  provider: openrouter
-  base_url: https://openrouter.ai/api/v1
+  default: gemma-4-26b-a4b-it-qat
+  provider: lmstudio
+  base_url: http://localhost:11434/v1
   api_mode: chat_completions
+  api_key: ''
 providers: {}
 fallback_providers: []
 credential_pool_strategies: {}
-toolsets:
-  - hermes-cli
+toolsets: []
+platform_toolsets:
+  cli:
+  - no_mcp
 agent:
   max_turns: 100
   gateway_timeout: 1800
   restart_drain_timeout: 180
   api_max_retries: 3
-  service_tier: ""
+  service_tier: ''
   tool_use_enforcement: auto
   gateway_timeout_warning: 900
   clarify_timeout: 600
@@ -46,9 +49,9 @@ terminal:
   docker_run_as_host_user: false
   persistent_shell: true
 web:
-  backend: ""
-  search_backend: ""
-  extract_backend: ""
+  backend: ''
+  search_backend: ''
+  extract_backend: ''
 browser:
   inactivity_timeout: 120
   command_timeout: 30
@@ -56,13 +59,13 @@ browser:
   allow_private_urls: false
   engine: auto
   auto_local_for_private_urls: true
-  cdp_url: ""
+  cdp_url: ''
   dialog_policy: must_respond
   dialog_timeout_s: 300
   camofox:
     managed_persistence: false
-    user_id: ""
-    session_key: ""
+    user_id: ''
+    session_key: ''
     adopt_existing_tab: false
 checkpoints:
   enabled: false
@@ -103,87 +106,87 @@ openrouter:
   response_cache_ttl: 300
   min_coding_score: 0.65
 bedrock:
-  region: ""
+  region: ''
   discovery:
     enabled: true
     provider_filter: []
     refresh_interval: 3600
   guardrail:
-    guardrail_identifier: ""
-    guardrail_version: ""
+    guardrail_identifier: ''
+    guardrail_version: ''
     stream_processing_mode: async
     trace: disabled
 auxiliary:
   vision:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 120
     extra_body: {}
     download_timeout: 30
   web_extract:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 360
     extra_body: {}
   compression:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 120
     extra_body: {}
   session_search:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 30
     extra_body: {}
     max_concurrency: 3
   skills_hub:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 30
     extra_body: {}
   approval:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 30
     extra_body: {}
   mcp:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 30
     extra_body: {}
   title_generation:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 30
     extra_body: {}
   triage_specifier:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 120
     extra_body: {}
   curator:
     provider: auto
-    model: ""
-    base_url: ""
-    api_key: ""
+    model: ''
+    base_url: ''
+    api_key: ''
     timeout: 600
     extra_body: {}
 display:
@@ -217,9 +220,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-      - model
-      - context_pct
-      - cwd
+    - model
+    - context_pct
+    - cwd
   copy_shortcut: auto
 dashboard:
   theme: default
@@ -245,8 +248,8 @@ tts:
     model: voxtral-mini-tts-2603
     voice_id: c69964a6-ab8b-4f8a-9465-ec0925096ec8
   neutts:
-    ref_audio: ""
-    ref_text: ""
+    ref_audio: ''
+    ref_text: ''
     model: neuphonic/neutts-air-q4-gguf
     device: cpu
   piper:
@@ -256,7 +259,7 @@ stt:
   provider: local
   local:
     model: base
-    language: ""
+    language: ''
   openai:
     model: whisper-1
   mistral:
@@ -269,7 +272,7 @@ voice:
   silence_threshold: 200
   silence_duration: 3
 human_delay:
-  mode: off
+  mode: false
   min_ms: 800
   max_ms: 2500
 context:
@@ -279,27 +282,27 @@ memory:
   user_profile_enabled: true
   memory_char_limit: 2200
   user_char_limit: 1375
-  provider: ""
+  provider: ''
 delegation:
-  model: ""
-  provider: ""
-  base_url: ""
-  api_key: ""
-  api_mode: ""
+  model: ''
+  provider: ''
+  base_url: ''
+  api_key: ''
+  api_mode: ''
   inherit_mcp_toolsets: true
   max_iterations: 50
   child_timeout_seconds: 600
-  reasoning_effort: ""
+  reasoning_effort: ''
   max_concurrent_children: 3
   max_spawn_depth: 1
   orchestrator_enabled: true
   subagent_auto_approve: false
-prefill_messages_file: ""
+prefill_messages_file: ''
 goals:
   max_turns: 20
 skills:
   external_dirs:
-    - /home/tom/.agents/skills
+  - /home/tom/.agents/skills
   template_vars: true
   inline_shell: false
   inline_shell_timeout: 10
@@ -314,38 +317,38 @@ curator:
     enabled: true
     keep: 5
 honcho: {}
-timezone: ""
+timezone: ''
 slack:
   require_mention: true
-  free_response_channels: ""
-  allowed_channels: ""
+  free_response_channels: ''
+  allowed_channels: ''
   channel_prompts: {}
 discord:
   require_mention: true
-  free_response_channels: ""
-  allowed_channels: ""
+  free_response_channels: ''
+  allowed_channels: ''
   auto_thread: true
   thread_require_mention: false
   history_backfill: true
   history_backfill_limit: 50
   reactions: true
   channel_prompts: {}
-  dm_role_auth_guild: ""
-  server_actions: ""
+  dm_role_auth_guild: ''
+  server_actions: ''
 whatsapp: {}
 telegram:
   reactions: false
   channel_prompts: {}
-  allowed_chats: ""
+  allowed_chats: ''
 mattermost:
   require_mention: true
-  free_response_channels: ""
-  allowed_channels: ""
+  free_response_channels: ''
+  allowed_channels: ''
   channel_prompts: {}
 matrix:
   require_mention: true
-  free_response_rooms: ""
-  allowed_rooms: ""
+  free_response_rooms: ''
+  allowed_rooms: ''
 approvals:
   mode: manual
   timeout: 60
@@ -353,7 +356,7 @@ approvals:
   mcp_reload_confirm: true
   destructive_slash_confirm: true
 command_allowlist:
-  - script execution via -e/-c flag
+- script execution via -e/-c flag
 quick_commands: {}
 hooks: {}
 hooks_auto_accept: false
@@ -422,7 +425,7 @@ mcp_servers:
   roam-code:
     command: roam
     args:
-      - mcp
+    - mcp
     enabled: true
   context7:
     command: context7-mcp
@@ -431,19 +434,19 @@ mcp_servers:
   serena:
     command: serena
     args:
-      - start-mcp-server
+    - start-mcp-server
     enabled: true
   searxng:
     command: npx
     args:
-      - -y
-      - mcp-searxng
+    - -y
+    - mcp-searxng
     env:
       SEARXNG_URL: http://0.0.0.0:4001
     enabled: true
   maestro:
     command: maestro
     args:
-      - mcp
-      - serve
+    - mcp
+    - serve
     enabled: true
