@@ -5,7 +5,7 @@ description: Guidance for configuring Hermes Agent to use LM Studio's built‑in
 ---
 
 ## Overview
-LM Studio runs a local OpenAI‑compatible server (default `http://localhost:11434/v1`) when a model is loaded. Hermes Agent can consume this API directly – no intermediate wrapper scripts are required.
+LM Studio runs a local OpenAI‑compatible server (default `http://localhost:1234/v1`; this install uses `11434`) when a model is loaded. Hermes Agent can consume this API directly – no intermediate wrapper scripts are required.
 
 ## Configuration Steps
 ```bash
@@ -18,10 +18,11 @@ hermes config set model.api_mode chat_completions
 # LM Studio does not require an API key; leave it empty.
 hermes config set model.api_key ""
 # 3. Select the model (must match GET /v1/models exactly).
-hermes config set model.default "gemma-4-26b-a4b-it-qat"
-# 4. If the model's LM Studio prompt template lacks tool support, disable
-#    Hermes tools for CLI chat (otherwise LM Studio returns jinja errors).
-hermes config set platform_toolsets.cli '["no_mcp"]'
+hermes config set model.default "qwen3.6-35b-a3b"
+hermes config set model.context_length 65536
+# 4. Tool-capable models (Qwen 3.6, Qwen3-Coder, etc.) use default hermes-cli toolsets.
+#    Only disable tools for models with broken LM Studio jinja templates (e.g. Gemma 4 QAT):
+# hermes config set platform_toolsets.cli '["no_mcp"]'
 ```
 
 ## Verification
@@ -29,16 +30,16 @@ hermes config set platform_toolsets.cli '["no_mcp"]'
 # Quick sanity check: verify LM Studio API is accessible first
 curl http://localhost:11434/v1/models
 hermes chat -q "What is the capital of France?"
+hermes chat -q "List the files in the current directory using your tools."
 ```
-You should receive a response from the Gemma model.
+You should receive a response from the Qwen model; the second prompt should invoke terminal tools.
 
 ## Pitfalls & Tips
-- **Port conflicts** – LM Studio defaults to `11434`. If you change the port, update `base_url` accordingly.
-- **Model name mismatch** – use the exact name shown by `curl http://localhost:11434/v1/models` (e.g. `gemma-4-26b-a4b-it-qat`, not `14b`).
+- **Port conflicts** – LM Studio defaults to `1234`. This install uses `11434`; update `base_url` to match your server.
+- **Model name mismatch** – use the exact name shown by `curl http://localhost:11434/v1/models` (e.g. `qwen3.6-35b-a3b`).
 - **Authentication** – LM Studio does not enforce an API key, but Hermes expects a key field; set it to an empty string.
-- **Tool-calling / jinja template errors** – many local Gemma builds in LM Studio fail when Hermes sends tool schemas (`Cannot call something that is not a function: got UndefinedValue`). Workarounds:
-  - Chat-only: `platform_toolsets.cli: [no_mcp]` (disables Hermes + MCP tools for CLI).
-  - Full agent: load an `lmstudio-community` build with a fixed prompt template, or override the template in LM Studio (**My Models → model settings → Prompt Template**), then restore `platform_toolsets.cli` to `["hermes-cli"]` (or run `hermes tools` to re-enable).
+- **Context length** – set at least `65536` for Hermes agent use; increase in LM Studio if VRAM allows.
+- **Tool-calling / jinja template errors** – Qwen 3.6 and Qwen3-Coder work out of the box. Gemma 4 builds may fail with `UndefinedValue`; use `platform_toolsets.cli: [no_mcp]` for chat-only or fix the LM Studio prompt template.
 
 ## References
 | Topic | Link |
