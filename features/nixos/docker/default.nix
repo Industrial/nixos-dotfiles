@@ -1,4 +1,8 @@
-{settings, ...}: {
+{
+  settings,
+  pkgs,
+  ...
+}: {
   virtualisation = {
     docker = {
       enable = true;
@@ -8,6 +12,12 @@
       rootless = {
         enable = true;
         setSocketVariable = true;
+
+        extraPackages = with pkgs; [
+          docker-buildx # buildkit builder management
+          docker-compose # compose v2 plugin (if you use `docker compose`, not standalone binary)
+        ];
+
         # Optionally customize rootless Docker daemon settings
         daemon.settings = {
           dns = ["1.1.1.1" "8.8.8.8"];
