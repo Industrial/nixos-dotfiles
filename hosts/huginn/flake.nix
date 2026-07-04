@@ -57,26 +57,6 @@
       };
     };
 
-    # Generate Kubernetes Configurations with Nix.
-    kubenix = {
-      url = "github:hall/kubenix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
-    # MicroVM
-    microvm = {
-      url = "github:astro/microvm.nix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Disko
     disko = {
       url = "github:nix-community/disko";
@@ -209,18 +189,6 @@
           # Security (commented for future use)
           # ../../features/security/kernel
           # ../../features/security/tailscale
-
-          # Virtual Machine (commented for future use)
-          #../../features/virtual-machine/base
-          #../../features/virtual-machine/kubernetes/k3s
-          #../../features/virtual-machine/kubernetes/master
-          #../../features/virtual-machine/kubernetes/node
-          ##inputs.microvm.nixosModules.host
-          ##../../features/virtual-machine/microvm/host
-          ##../../features/virtual-machine/microvm/target/host-network.nix
-          #../../features/virtual-machine/microvm/web/host-network.nix
-          #../../features/virtual-machine/ssh
-          #../../features/virtual-machine/virtualbox
 
           # Window Manager (commented for future use)
           #../../features/window-manager/ghostty

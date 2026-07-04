@@ -55,26 +55,6 @@
       };
     };
 
-    # Generate Kubernetes Configurations with Nix.
-    kubenix = {
-      url = "github:hall/kubenix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
-    # MicroVM
-    microvm = {
-      url = "github:astro/microvm.nix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Disko
     disko = {
       url = "github:nix-community/disko";
