@@ -466,7 +466,15 @@ async fn example_db_integration_requires_postgres() {
 
 ## Running Tests
 
-**Quick Rust checks:** `moon run :format` and `moon run :check`, or `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features -- -D warnings`. This does not replace **`moon run :coverage`** or the full pre-push pipeline — see root **`README.md`** Development section.
+**Quick Rust checks:** `moon run dotfiles:format`, or from `rust/`:
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+CI runs the same clippy and test commands (see `.github/workflows/main.yml`).
 
 ```bash
 # Run all tests
@@ -510,12 +518,10 @@ Meeting the **95%** llvm-cov gates is done by **adding and maintaining real test
 
 **Do not change this document’s targets or the tooling setup to make the numbers “match.”** The percentages in the table above and the **`moon run :coverage`** / **`cargo llvm-cov nextest`** wiring (workspace scope, nextest filters, fail-under values, absence of excludes) are fixed requirements: improve code and tests until the gates pass—do not edit `TESTING.md`, `moon.yml`, or crate test tasks to relax, reword, or bypass them.
 
-The workspace root **`moon run :coverage`** task runs **`cargo llvm-cov nextest`** on the **entire** workspace with **`--fail-under-lines` / `--fail-under-regions` / `--fail-under-functions` all at 95** and **no** filename excludes.
-
-For a local HTML report without failing on thresholds:
+Coverage targets (95% line/branch/function) are defined in this document; enforce locally when `cargo-llvm-cov` is available:
 
 ```bash
-devenv shell -- cargo llvm-cov nextest --html --fail-under-lines 0
+cd rust && cargo llvm-cov nextest --html --fail-under-lines 0
 ```
 
 ---

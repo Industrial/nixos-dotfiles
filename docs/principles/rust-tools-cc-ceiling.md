@@ -12,19 +12,18 @@ that each have a single, stated responsibility.
 
 ## Rationale
 
-The tools in `rust/tools/` are POSIX utility reimplementations. Their logic is
-well-specified by POSIX standards; any CC > 10 is a sign the implementation has
-drifted toward ad-hoc special-casing rather than structured argument dispatch.
-High CC makes the tools harder to test to the 95% branch-coverage target in
-TESTING.md.
+The `rust/tools/` workspace currently contains `oomkiller`, a memory-pressure
+daemon. Its control flow (process enumeration, threshold checks, signal delivery)
+should stay linear and testable. CC > 10 indicates ad-hoc branching that makes
+the 95% coverage target in `rust/tools/TESTING.md` harder to sustain.
 
 ## Acceptance test
 
-`roam complexity-report --threshold 10` returns no symbols from `rust/tools/`.
+`roam complexity --threshold 10` returns no symbols from `rust/tools/`.
 
 ## Remediation pattern
 
-1. Extract each `match`/`if`-arm that handles a distinct flag into a
-   `fn apply_<flag>_option(args: &mut Args, value: …) -> Result<()>` function.
-2. The top-level `parse_args` becomes a flat dispatcher that calls helpers —
+1. Extract each distinct branch (threshold check, process selection, kill path)
+   into a focused helper with a descriptive name.
+2. Keep top-level orchestration (`daemon_iteration`, `main`) as flat dispatch —
    nesting depth must not exceed 3.
