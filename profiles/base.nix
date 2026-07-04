@@ -23,7 +23,6 @@
     ../features/cli/c
     ../features/cli/calcurse
     ../features/cli/cheatsheet
-    ../features/cli/cl
     ../features/cli/create-ssh-key
     ../features/cli/oomkiller
     ../features/cli/direnv
@@ -60,12 +59,6 @@
     ../features/cli/starship
     ../features/cli/unrar
     ../features/cli/unzip
-    ../features/cli/cat
-    ../features/cli/head
-    ../features/cli/ls
-    ../features/cli/sort
-    ../features/cli/wc
-    ../features/cli/rev
     ../features/cli/zellij
 
     # Core NixOS Configuration

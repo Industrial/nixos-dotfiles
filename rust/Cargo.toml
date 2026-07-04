@@ -1,2 +1,2 @@
 [workspace]
-members = ["tools/cat","tools/cl","tools/head","tools/ls","tools/oomkiller","tools/rev","tools/sort","tools/wc"]
+members = ["tools/oomkiller"]

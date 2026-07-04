@@ -101,30 +101,6 @@
         "type": "github"
       }
     },
-    "cat-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/cat",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/cat",
-        "type": "path"
-      },
-      "parent": []
-    },
-    "cl-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/cl",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/cl",
-        "type": "path"
-      },
-      "parent": []
-    },
     "comin": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -311,18 +287,6 @@
         "rev": "ef02db02bf0ff342734d525b5767814770d85b49",
         "type": "github"
       }
-    },
-    "head-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/head",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/head",
-        "type": "path"
-      },
-      "parent": []
     },
     "hyprcursor": {
       "inputs": {
@@ -643,18 +607,6 @@
         "type": "github"
       }
     },
-    "ls-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/ls",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/ls",
-        "type": "path"
-      },
-      "parent": []
-    },
     "nix-vscode-extensions": {
       "inputs": {
         "nixpkgs": [
@@ -837,49 +789,18 @@
         "type": "github"
       }
     },
-    "rev-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/rev",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/rev",
-        "type": "path"
-      },
-      "parent": []
-    },
     "root": {
       "inputs": {
-        "cat-src": "cat-src",
-        "cl-src": "cl-src",
         "comin": "comin",
         "disko": "disko",
-        "head-src": "head-src",
         "hyprland": "hyprland",
-        "ls-src": "ls-src",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-hardware": "nixos-hardware",
         "nixpkgs": "nixpkgs_4",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
-        "rev-src": "rev-src",
-        "sort-src": "sort-src",
-        "stylix": "stylix",
-        "wc-src": "wc-src"
+        "stylix": "stylix"
       }
-    },
-    "sort-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/sort",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/sort",
-        "type": "path"
-      },
-      "parent": []
     },
     "stylix": {
       "inputs": {
@@ -1041,18 +962,6 @@
         "repo": "treefmt-nix",
         "type": "github"
       }
-    },
-    "wc-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/wc",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/wc",
-        "type": "path"
-      },
-      "parent": []
     },
     "xdph": {
       "inputs": {

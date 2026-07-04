@@ -1,5 +1,5 @@
 [workspace]
-members = ["common/*", "tools/*"]
+members = ["tools/oomkiller"]
 resolver = "2"
 
 [workspace.package]

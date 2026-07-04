@@ -101,30 +101,6 @@
         "type": "github"
       }
     },
-    "cat-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/cat",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/cat",
-        "type": "path"
-      },
-      "parent": []
-    },
-    "cl-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/cl",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/cl",
-        "type": "path"
-      },
-      "parent": []
-    },
     "comin": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -210,22 +186,6 @@
       },
       "original": {
         "owner": "NixOS",
-        "repo": "flake-compat",
-        "type": "github"
-      }
-    },
-    "flake-compat_3": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1747046372,
-        "narHash": "sha256-CIVLLkVgvHYbgI2UpXvIIBJ12HWgX+fjA8Xf8PUmqCY=",
-        "owner": "edolstra",
-        "repo": "flake-compat",
-        "rev": "9100a0f413b0c601e0533d1d94ffd501ce2e7885",
-        "type": "github"
-      },
-      "original": {
-        "owner": "edolstra",
         "repo": "flake-compat",
         "type": "github"
       }
@@ -329,18 +289,6 @@
         "type": "gitlab"
       }
     },
-    "head-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/head",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/head",
-        "type": "path"
-      },
-      "parent": []
-    },
     "hyprcursor": {
       "inputs": {
         "hyprlang": [
@@ -410,9 +358,7 @@
         "hyprutils": "hyprutils",
         "hyprwayland-scanner": "hyprwayland-scanner",
         "hyprwire": "hyprwire",
-        "nixpkgs": [
-          "nixpkgs"
-        ],
+        "nixpkgs": "nixpkgs",
         "pre-commit-hooks": "pre-commit-hooks",
         "systems": "systems",
         "xdph": "xdph"
@@ -662,62 +608,6 @@
         "type": "github"
       }
     },
-    "kubenix": {
-      "inputs": {
-        "flake-compat": "flake-compat_3",
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "systems": "systems_2",
-        "treefmt": "treefmt"
-      },
-      "locked": {
-        "lastModified": 1767672498,
-        "narHash": "sha256-gqqeFdVR08X6Hr7V5TSk79YqDrFHoCJYV0BtuN/djzg=",
-        "owner": "hall",
-        "repo": "kubenix",
-        "rev": "acf25de47ae1befc76094c8c7369ff3ad6ec3ad1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "hall",
-        "repo": "kubenix",
-        "type": "github"
-      }
-    },
-    "ls-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/ls",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/ls",
-        "type": "path"
-      },
-      "parent": []
-    },
-    "microvm": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "spectrum": "spectrum"
-      },
-      "locked": {
-        "lastModified": 1769624238,
-        "narHash": "sha256-qeXiVWfblS5w/gxwklncxfXPrdpyPJ3OGvgXKekXzaM=",
-        "owner": "astro",
-        "repo": "microvm.nix",
-        "rev": "43406f57d740f96428a8df14d2fba80f437ca79a",
-        "type": "github"
-      },
-      "original": {
-        "owner": "astro",
-        "repo": "microvm.nix",
-        "type": "github"
-      }
-    },
     "nix-vscode-extensions": {
       "inputs": {
         "nixpkgs": [
@@ -756,6 +646,22 @@
     },
     "nixpkgs": {
       "locked": {
+        "lastModified": 1782959384,
+        "narHash": "sha256-xnJJk+ct+D2+wdRxj1wk36w5zV9RVESwRqcklPdt3fM=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "65179426c83bb3f6bc14898b42ea1c6f01d374b0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_2": {
+      "locked": {
         "lastModified": 1769740369,
         "narHash": "sha256-xKPyJoMoXfXpDM5DFDZDsi9PHArf2k5BJjvReYXoFpM=",
         "owner": "nixos",
@@ -776,7 +682,7 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "systems": "systems_3"
+        "systems": "systems_2"
       },
       "locked": {
         "lastModified": 1769644746,
@@ -852,66 +758,17 @@
         "type": "github"
       }
     },
-    "rev-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/rev",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/rev",
-        "type": "path"
-      },
-      "parent": []
-    },
     "root": {
       "inputs": {
-        "cat-src": "cat-src",
-        "cl-src": "cl-src",
         "comin": "comin",
         "disko": "disko",
-        "head-src": "head-src",
         "hyprland": "hyprland",
-        "kubenix": "kubenix",
-        "ls-src": "ls-src",
-        "microvm": "microvm",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-hardware": "nixos-hardware",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": "nixpkgs_2",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
-        "rev-src": "rev-src",
-        "sort-src": "sort-src",
-        "stylix": "stylix",
-        "wc-src": "wc-src"
-      }
-    },
-    "sort-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/sort",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/sort",
-        "type": "path"
-      },
-      "parent": []
-    },
-    "spectrum": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1759482047,
-        "narHash": "sha256-H1wiXRQHxxPyMMlP39ce3ROKCwI5/tUn36P8x6dFiiQ=",
-        "ref": "refs/heads/main",
-        "rev": "c5d5786d3dc938af0b279c542d1e43bce381b4b9",
-        "revCount": 996,
-        "type": "git",
-        "url": "https://spectrum-os.org/git/spectrum"
-      },
-      "original": {
-        "type": "git",
-        "url": "https://spectrum-os.org/git/spectrum"
+        "stylix": "stylix"
       }
     },
     "stylix": {
@@ -927,7 +784,7 @@
           "nixpkgs"
         ],
         "nur": "nur",
-        "systems": "systems_4",
+        "systems": "systems_3",
         "tinted-foot": "tinted-foot",
         "tinted-kitty": "tinted-kitty",
         "tinted-schemes": "tinted-schemes",
@@ -973,26 +830,12 @@
         "type": "github"
       },
       "original": {
-        "id": "systems",
-        "type": "indirect"
+        "owner": "nix-systems",
+        "repo": "default",
+        "type": "github"
       }
     },
     "systems_3": {
-      "locked": {
-        "lastModified": 1681028828,
-        "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
-        "owner": "nix-systems",
-        "repo": "default",
-        "rev": "da67096a3b9bf56a91d16901293e51ba5b49a27e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-systems",
-        "repo": "default",
-        "type": "github"
-      }
-    },
-    "systems_4": {
       "locked": {
         "lastModified": 1681028828,
         "narHash": "sha256-Vy1rq5AaRuLzOxct8nz4T6wlgyUR7zLU309k9mBC768=",
@@ -1087,39 +930,6 @@
         "repo": "base16-zed",
         "type": "github"
       }
-    },
-    "treefmt": {
-      "inputs": {
-        "nixpkgs": [
-          "kubenix",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1750931469,
-        "narHash": "sha256-0IEdQB1nS+uViQw4k3VGUXntjkDp7aAlqcxdewb/hAc=",
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "rev": "ac8e6f32e11e9c7f153823abc3ab007f2a65d3e1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "type": "github"
-      }
-    },
-    "wc-src": {
-      "flake": false,
-      "locked": {
-        "path": "../../rust/tools/wc",
-        "type": "path"
-      },
-      "original": {
-        "path": "../../rust/tools/wc",
-        "type": "path"
-      },
-      "parent": []
     },
     "xdph": {
       "inputs": {

@@ -65,47 +65,10 @@
       };
     };
 
-    # cl tool source
-    cl-src = {
-      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
-    };
-
     # oomkiller tool source
     oomkiller-src = {
       url = "path:../../rust/tools/oomkiller"; # Path relative to this flake.nix
       flake = false; # Treat as a source tree, not a flake
-    };
-
-    # wc tool source (Rust, GNU-compatible)
-    wc-src = {
-      url = "path:../../rust/tools/wc";
-      flake = false;
-    };
-
-    cat-src = {
-      url = "path:../../rust/tools/cat";
-      flake = false;
-    };
-
-    sort-src = {
-      url = "path:../../rust/tools/sort";
-      flake = false;
-    };
-
-    ls-src = {
-      url = "path:../../rust/tools/ls";
-      flake = false;
-    };
-
-    head-src = {
-      url = "path:../../rust/tools/head";
-      flake = false;
-    };
-
-    rev-src = {
-      url = "path:../../rust/tools/rev";
-      flake = false;
     };
   };
 

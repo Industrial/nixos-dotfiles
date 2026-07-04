@@ -3,21 +3,9 @@
   pkgs,
   ...
 }: let
-  inherit (pkgs.lib) hiPrio;
-
   system = pkgs.stdenv.hostPlatform.system;
 
-  dotfilesCoreutils = [
-    (hiPrio (pkgs.callPackage ./rust/tools/wc {}))
-    (hiPrio (pkgs.callPackage ./rust/tools/cat {}))
-    (hiPrio (pkgs.callPackage ./rust/tools/sort {}))
-    (hiPrio (pkgs.callPackage ./rust/tools/ls {}))
-    (hiPrio (pkgs.callPackage ./rust/tools/head {}))
-    (hiPrio (pkgs.callPackage ./rust/tools/rev {}))
-  ];
-  dotfilesCoreutilsBin = pkgs.lib.makeBinPath dotfilesCoreutils;
-
-  moon = pkgs.stdenv.mkDerivation {
+  moon = pkgs.stdenv.mkDerivation rec {
     pname = "moon-cli";
     version = "2.3.3";
     src = pkgs.fetchurl {
@@ -81,9 +69,7 @@ in {
     NIXPKGS_ALLOW_UNFREE = "1";
   };
 
-  packages =
-    dotfilesCoreutils
-    ++ (with pkgs; [
+  packages = with pkgs; [
       inputs.definitively.packages.${system}.definitively
 
       nix-unit
@@ -126,10 +112,10 @@ in {
       bun
       zlib
       pkgs.stdenv.cc.cc.lib
-    ]);
+    ];
 
   enterShell = ''
-    export PATH="${dotfilesCoreutilsBin}:''${DEVENV_ROOT}/.devenv/state/venv/bin:''${PATH}"
+    export PATH="''${DEVENV_ROOT}/.devenv/state/venv/bin:''${PATH}"
   '';
 
   languages = {
