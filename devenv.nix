@@ -84,7 +84,6 @@ in {
   packages =
     dotfilesCoreutils
     ++ (with pkgs; [
-      inputs.nixpkgs-unstable.legacyPackages.${system}.beads
       inputs.definitively.packages.${system}.definitively
 
       nix-unit

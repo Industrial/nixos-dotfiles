@@ -114,13 +114,6 @@
       ## Git
       (allowUnfreeExtension extensions.vscode-marketplace.mhutchie.git-graph)
       extensions.vscode-marketplace.sugatoray.vscode-git-extension-pack
-      # TODO: What was wrong with this?
-      # extensions.vscode-marketplace.github.vscode-github-actions
-
-      # Beads
-      extensions.vscode-marketplace.planet57.vscode-beads
-
-      # Rust
       # extensions.vscode-marketplace.rust-lang.rust
       extensions.vscode-marketplace.rust-lang.rust-analyzer
       extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
