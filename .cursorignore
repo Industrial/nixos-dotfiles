@@ -39,7 +39,6 @@
 # IDE and editor files
 **/.idea/
 **/.vscode/
-**/.cursor/
 **/*.code-workspace
 **/.aider*
 

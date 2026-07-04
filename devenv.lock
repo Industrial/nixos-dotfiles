@@ -1,5 +1,29 @@
 {
   "nodes": {
+    "definitively": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "nixpkgs-unstable": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780653512,
+        "narHash": "sha256-pHCO0hWSAaFLGErM8E0PkIRq///Cx/sSm/CE2JbF5bQ=",
+        "owner": "Industrial",
+        "repo": "definitively",
+        "rev": "c7b575b9e3526b5595a5561a19482d35cd0a8a2c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Industrial",
+        "ref": "definitively-v0.4.1",
+        "repo": "definitively",
+        "type": "github"
+      }
+    },
     "devenv": {
       "locked": {
         "dir": "src/modules",
@@ -151,6 +175,7 @@
     },
     "root": {
       "inputs": {
+        "definitively": "definitively",
         "devenv": "devenv",
         "fenix": "fenix",
         "git-hooks": "git-hooks",

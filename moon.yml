@@ -1,0 +1,6 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+id: 'dotfiles'
+language: 'bash'
+tasks:
+  format:
+    command: 'treefmt'

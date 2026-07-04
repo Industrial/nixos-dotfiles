@@ -4,6 +4,16 @@ This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get sta
 
 ## Quick Reference
 
+## Cursor config (submodule)
+
+`.cursor/` is the [Industrial/cursor-setup](https://github.com/Industrial/cursor-setup) submodule. After clone:
+
+```bash
+git submodule update --init --recursive .cursor
+devenv shell   # installs lean-ctx, roam, definitively, Serena uv venv, moon
+```
+
+
 ```bash
 bd ready              # Find available work
 bd show <id>          # View issue details

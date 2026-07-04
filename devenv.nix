@@ -3,9 +3,10 @@
   pkgs,
   ...
 }: let
-  # Dotfiles Rust coreutils for devenv. `languages.rust` pulls in a stdenv whose PATH lists
-  # pkgs.coreutils before `packages`, so we also prepend these in `enterShell` (see below).
   inherit (pkgs.lib) hiPrio;
+
+  system = pkgs.stdenv.hostPlatform.system;
+
   dotfilesCoreutils = [
     (hiPrio (pkgs.callPackage ./rust/tools/wc {}))
     (hiPrio (pkgs.callPackage ./rust/tools/cat {}))
@@ -15,35 +16,90 @@
     (hiPrio (pkgs.callPackage ./rust/tools/rev {}))
   ];
   dotfilesCoreutilsBin = pkgs.lib.makeBinPath dotfilesCoreutils;
+
+  moon = pkgs.stdenv.mkDerivation {
+    pname = "moon-cli";
+    version = "2.3.3";
+    src = pkgs.fetchurl {
+      url = "https://github.com/moonrepo/moon/releases/download/v2.3.3/moon_cli-x86_64-unknown-linux-gnu.tar.xz";
+      sha256 = "19y47x4dh2dkvzx0nfzjcw97qvwiidkh0dimza6da4ivjdywfa66";
+    };
+    nativeBuildInputs = [pkgs.autoPatchelfHook];
+    buildInputs = [pkgs.stdenv.cc.cc.lib];
+    installPhase = ''
+      runHook preInstall
+      mkdir -p $out/bin
+      install -m755 moon $out/bin/moon
+      runHook postInstall
+    '';
+    meta = {
+      description = "Moon CLI (moonrepo)";
+      homepage = "https://moonrepo.dev";
+      license = pkgs.lib.licenses.mit;
+      platforms = pkgs.lib.platforms.linux;
+    };
+  };
+
+  roam-code-src = pkgs.fetchFromGitHub {
+    owner = "Cranot";
+    repo = "roam-code";
+    rev = "9023ed76922d61ae4514d15e9d81b86ddfaf1569";
+    hash = "sha256-hE1gihZlJUQ8e8dOOpsxQM3b2KgvPAsU4wsJclmkptc=";
+  };
+  roam-code = pkgs.python3Packages.buildPythonApplication rec {
+    pname = "roam-code";
+    version = "11.2.0";
+    src = roam-code-src;
+    format = "pyproject";
+    nativeBuildInputs = with pkgs.python3Packages; [setuptools wheel];
+    propagatedBuildInputs = with pkgs.python3Packages; [
+      click
+      tree-sitter
+      tree-sitter-language-pack
+      networkx
+      fastmcp
+    ];
+    doCheck = false;
+  };
+
+  lean-ctx = pkgs.rustPlatform.buildRustPackage rec {
+    pname = "lean-ctx";
+    version = "3.1.5";
+    src = pkgs.fetchCrate {
+      inherit pname version;
+      hash = "sha256-WrLKCd6YzN5fxmBlyv9XSvAKXEtMbhuskyeDeLNFG2w=";
+    };
+    cargoHash = "sha256-n/xrYp8OLkmjbm3hjS9Mzx18VHs8Oh4Op767NM6rmI0=";
+    doCheck = false;
+  };
 in {
-  # https://devenv.sh/basics/
+  dotenv.enable = true;
+
   env = {
     RUST_BACKTRACE = "1";
     RUST_LOG = "debug";
     NIXPKGS_ALLOW_UNFREE = "1";
   };
 
-  # https://devenv.sh/packages/
   packages =
     dotfilesCoreutils
     ++ (with pkgs; [
-      # Nix
+      inputs.nixpkgs-unstable.legacyPackages.${system}.beads
+      inputs.definitively.packages.${system}.definitively
+
       nix-unit
       namaka
       nixt
 
-      # Rust toolchain
       rustc
       cargo
       rustfmt
       clippy
       rust-analyzer
 
-      # System dependencies for Wayland compositor
       systemd
       libinput
 
-      # Development tools
       direnv
       git
       gh
@@ -52,11 +108,9 @@ in {
       pre-commit
       treefmt
       commitizen
-      nodejs
       slumber
       lazysql
 
-      # treefmt
       alejandra
       actionlint
       deadnix
@@ -64,16 +118,21 @@ in {
       biome
       yamlfmt
       taplo
-      rustfmt
       vulnix
+
+      roam-code
+      lean-ctx
+      moon
+      uv
+      bun
+      zlib
+      pkgs.stdenv.cc.cc.lib
     ]);
 
-  # Prepend so `which cat` / `which wc` resolve to rust_* (Rust stdenv puts coreutils earlier in PATH).
   enterShell = ''
-    export PATH="${dotfilesCoreutilsBin}:$PATH"
+    export PATH="${dotfilesCoreutilsBin}:''${DEVENV_ROOT}/.devenv/state/venv/bin:''${PATH}"
   '';
 
-  # https://devenv.sh/languages/
   languages = {
     rust = {
       enable = true;
@@ -83,10 +142,21 @@ in {
 
     javascript = {
       enable = true;
-      package = pkgs.nodejs;
-      bun = {
+      bun.enable = true;
+    };
+
+    python = {
+      enable = true;
+      uv = {
         enable = true;
-        package = pkgs.bun;
+        sync = {
+          enable = true;
+          arguments = [
+            "--no-install-project"
+            "--group"
+            "serena"
+          ];
+        };
       };
     };
   };
@@ -95,16 +165,24 @@ in {
     prek-install = {
       exec = ''
         ${pkgs.prek}/bin/prek install -q --overwrite -c "$DEVENV_ROOT/.pre-commit-config.yaml"
-        # `core.hooksPath` (e.g. beads → `.beads/hooks`) is where prek installs. If that
-        # directory previously held a PyPI `pre-commit` shim, prek renames it to `*.legacy`
-        # and still runs it first; that legacy binary prints "migration mode" and exits
-        # non-zero, blocking commits even when commitizen passes. Drop stale legacy shims.
         if cd "$DEVENV_ROOT" && git rev-parse --git-dir >/dev/null 2>&1; then
           HOOKS_DIR=$(git rev-parse --git-path hooks 2>/dev/null) || true
           if [ -n "$HOOKS_DIR" ] && [ -d "$HOOKS_DIR" ]; then
             rm -f "$HOOKS_DIR"/*.legacy
           fi
         fi
+      '';
+    };
+
+    moon-sync = {
+      exec = ''
+        moon sync
+      '';
+    };
+
+    format = {
+      exec = ''
+        treefmt
       '';
     };
   };
