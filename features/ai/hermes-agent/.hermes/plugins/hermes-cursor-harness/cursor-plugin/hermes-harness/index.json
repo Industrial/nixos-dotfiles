@@ -1,0 +1,16 @@
+{
+  "name": "hermes-harness",
+  "displayName": "Hermes Harness",
+  "version": "0.1.0",
+  "description": "Cursor-side companion skeleton for the Hermes Cursor Harness.",
+  "rules": ["rules/hermes-harness.mdc"],
+  "skills": ["skills/hermes-context.md"],
+  "mcps": {
+    "hermes-cursor-harness": {
+      "command": "hermes-cursor-harness-mcp",
+      "args": [],
+      "env": {}
+    }
+  },
+  "hooks": {}
+}

@@ -1,0 +1,30 @@
+{
+  "transport": "auto",
+  "sdk_runtime": "local",
+  "sdk_package": "@cursor/sdk@latest",
+  "sdk_auto_install": true,
+  "sdk_setting_sources": ["project", "user", "team", "plugins"],
+  "sdk_sandbox_enabled": true,
+  "sdk_cloud_repository": "",
+  "sdk_cloud_ref": "",
+  "sdk_auto_create_pr": false,
+  "projects": {
+    "my-app": "/absolute/path/to/my-app"
+  },
+  "default_permission_policy": "plan",
+  "trusted_readonly_mcp_tools": [
+    "hermes_cursor_status",
+    "hermes_cursor_latest",
+    "hermes_cursor_events",
+    "hermes_cursor_project_context"
+  ],
+  "background_api_base_url": "https://api.cursor.com",
+  "allow_background_agents": true,
+  "security_profile": "",
+  "security_profiles": {},
+  "approval_bridge_command": ["hermes-cursor-harness", "approval-bridge"],
+  "approval_bridge_timeout_sec": 120,
+  "default_timeout_sec": 900,
+  "no_output_timeout_sec": 120,
+  "mcp_servers": []
+}

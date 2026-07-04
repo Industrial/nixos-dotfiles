@@ -1,0 +1,17 @@
+include README.md
+include CHANGELOG.md
+include LICENSE
+include plugin.yaml
+include install.sh
+include pyproject.toml
+recursive-include skills *.md
+recursive-include docs *.md
+recursive-include scripts *.sh
+recursive-include examples *.json *.md *.py
+recursive-include cursor-plugin *.json *.md *.mdc
+recursive-include dashboard *.json *.py *.js
+recursive-include integrations *.md *.json
+recursive-include hermes_cursor_harness *.mjs
+recursive-include hermes_cursor_harness/skills *.md
+recursive-include tests/fakes *.py
+recursive-include .github/workflows *.yml

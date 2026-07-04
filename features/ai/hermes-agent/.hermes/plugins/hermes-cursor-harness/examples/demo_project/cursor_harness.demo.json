@@ -1,0 +1,8 @@
+{
+  "transport": "auto",
+  "projects": {
+    "demo-project": "/absolute/path/to/hermes-cursor-harness/examples/demo_project"
+  },
+  "default_permission_policy": "plan",
+  "security_profile": "trusted-local"
+}

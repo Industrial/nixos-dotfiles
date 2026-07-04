@@ -1,0 +1,65 @@
+{
+  "success": true,
+  "summary": {
+    "total": 1,
+    "pending": 1,
+    "resolved": 0,
+    "by_kind": {
+      "task_update": 1
+    },
+    "by_priority": {
+      "high": 1
+    }
+  },
+  "items": [
+    {
+      "proposal": {
+        "id": "hcp_demo1234567890",
+        "status": "pending",
+        "kind": "task_update",
+        "title": "Track Cursor follow-up",
+        "body": "Cursor found a useful follow-up while inspecting the repo.",
+        "priority": "high",
+        "source": "cursor_mcp",
+        "harness_session_id": "hch_demo",
+        "cursor_session_id": "cur_demo",
+        "project": "/absolute/path/to/repo",
+        "payload": {
+          "suggested_owner": "hermes"
+        },
+        "created_at_ms": 1777580000000,
+        "updated_at_ms": 1777580000000,
+        "resolution": {}
+      },
+      "session": {
+        "harness_session_id": "hch_demo",
+        "project_path": "/absolute/path/to/repo",
+        "transport": "sdk",
+        "mode": "plan",
+        "permission_policy": "plan",
+        "cursor_session_id": "cur_demo",
+        "name": "Demo review"
+      },
+      "linked_events": [
+        {
+          "type": "cursor_companion_proposal",
+          "source": "cursor_mcp",
+          "proposal_id": "hcp_demo1234567890",
+          "text": "Cursor filed a reviewable proposal."
+        }
+      ],
+      "actions": [
+        "get",
+        "accept",
+        "reject",
+        "done",
+        "archive",
+        "cancel"
+      ]
+    }
+  ],
+  "next_actions": [
+    "Review pending proposals with action=get or the proposal inbox.",
+    "Resolve each pending proposal with accept, reject, done, archive, or cancel."
+  ]
+}

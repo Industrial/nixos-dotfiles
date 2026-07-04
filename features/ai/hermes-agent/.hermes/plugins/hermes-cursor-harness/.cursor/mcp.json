@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "hermes-cursor-harness": {
+      "args": [],
+      "command": "hermes-cursor-harness-mcp",
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+      - name: Compile
+        run: python -m py_compile hermes_cursor_harness/*.py tests/fakes/*.py
+      - name: Test
+        run: python -m pytest -q
+      - name: Validate config and quick smoke with fake Cursor commands
+        env:
+          HERMES_CURSOR_HARNESS_ACP_COMMAND: python tests/fakes/fake_cursor_acp.py
+          HERMES_CURSOR_HARNESS_STREAM_COMMAND: python tests/fakes/fake_cursor_stream.py
+        run: |
+          python -m hermes_cursor_harness.cli config validate --no-sdk-status
+          python -m hermes_cursor_harness.cli smoke --level quick --json
+
+  package:
+    name: Build package
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install build tools
+        run: python -m pip install -e ".[dev,release]"
+      - name: Release gate
+        run: scripts/release_check.sh

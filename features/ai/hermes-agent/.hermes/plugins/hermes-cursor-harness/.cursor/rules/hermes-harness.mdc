@@ -1,0 +1,27 @@
+---
+description: Coordinate Cursor work with Hermes when Hermes Cursor Harness is available.
+alwaysApply: false
+---
+
+When a task is being driven by Hermes, preserve Hermes as the outer runtime:
+session state, approval policy, high-level intent, memory context, and final
+transcript belong to Hermes. Use Cursor for repo-local coding work, tool calls,
+analysis, edits, and shell execution.
+
+If the Hermes Cursor Harness MCP server is available, use its read-only tools
+to inspect Hermes session status, project context, and recent harness events
+before making broad repo changes. These tools are context lookups, not approval
+to edit files.
+
+When useful, use the writeback tools to keep Hermes informed: append progress
+with `hermes_cursor_append_event`, or create a reviewable handoff with
+`hermes_cursor_propose`. These are not authority tools; Hermes must still
+accept, reject, or complete proposals before they become task state, memory,
+policy, or tool actions.
+
+If `hermes_cursor_sdk_status` is available, it can confirm whether Hermes is
+driving you through the official Cursor SDK bridge.
+
+When Hermes supplied a permission mode, keep your work inside that mode. In
+plan or ask mode, do not edit files. In edit mode, make focused repo changes
+and report the exact files touched.

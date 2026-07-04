@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hermes-cursor-harness"
+version = "0.1.1"
+description = "Hermes-native Cursor SDK harness plugin"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Hermes Cursor Harness contributors"}]
+dependencies = ["certifi>=2024.2.2"]
+keywords = ["hermes", "cursor", "cursor-sdk", "cursor-agent", "acp", "mcp", "coding-agent"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+release = ["build>=1", "twine>=5"]
+
+[project.urls]
+Homepage = "https://github.com/Cosmic-Construct/hermes-cursor-harness"
+Issues = "https://github.com/Cosmic-Construct/hermes-cursor-harness/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["hermes_cursor_harness*"]
+
+[tool.setuptools.package-data]
+hermes_cursor_harness = ["py.typed", "sdk_bridge.mjs", "skills/*.md"]
+
+[project.scripts]
+hermes-cursor-harness = "hermes_cursor_harness.cli:main"
+hermes-cursor-harness-mcp = "hermes_cursor_harness.mcp_server:main"
+
+[project.entry-points."hermes_agent.plugins"]
+hermes-cursor-harness = "hermes_cursor_harness.plugin"
