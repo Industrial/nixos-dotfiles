@@ -53,9 +53,6 @@
 **/.env.local
 **/.env.*.local
 
-# Beads (issue tracker) - already in .gitignore but good to be explicit
-**/.beads/
-
 # Large binary files
 **/*.qcow2
 **/*.iso

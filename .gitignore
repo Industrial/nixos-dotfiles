@@ -8,10 +8,8 @@
 */target/
 .DS_Store
 .aider*
-.beads-credential-key
 .devenv*
 .direnv/
-.dolt/
 .env
 .idea/
 .pre-commit-config.yaml

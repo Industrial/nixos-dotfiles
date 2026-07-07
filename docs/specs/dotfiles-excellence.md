@@ -14,7 +14,7 @@ configuration system. Health is tracked with roam-code; target is sustained
 ## Current State (2026-07-04)
 
 After removing experimental Rust coreutils (cat, cl, head, ls, rev, sort, wc),
-pi, beads, and VM host setups:
+pi and VM host setups:
 
 - **Health score: 100/100** — 0 critical issues, quality gate passes
 - **498 indexed files, 289 symbols** — 0 dependency cycles
