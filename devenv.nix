@@ -70,49 +70,49 @@ in {
   };
 
   packages = with pkgs; [
-      inputs.definitively.packages.${system}.definitively
+    inputs.definitively.packages.${system}.definitively
 
-      nix-unit
-      namaka
-      nixt
+    nix-unit
+    namaka
+    nixt
 
-      rustc
-      cargo
-      rustfmt
-      clippy
-      rust-analyzer
+    rustc
+    cargo
+    rustfmt
+    clippy
+    rust-analyzer
 
-      systemd
-      libinput
+    systemd
+    libinput
 
-      direnv
-      git
-      gh
-      jq
-      nixpkgs-fmt
-      pre-commit
-      treefmt
-      commitizen
-      slumber
-      lazysql
+    direnv
+    git
+    gh
+    jq
+    nixpkgs-fmt
+    pre-commit
+    treefmt
+    commitizen
+    slumber
+    lazysql
 
-      alejandra
-      actionlint
-      deadnix
-      beautysh
-      biome
-      yamlfmt
-      taplo
-      vulnix
+    alejandra
+    actionlint
+    deadnix
+    beautysh
+    biome
+    yamlfmt
+    taplo
+    vulnix
 
-      roam-code
-      lean-ctx
-      moon
-      uv
-      bun
-      zlib
-      pkgs.stdenv.cc.cc.lib
-    ];
+    roam-code
+    lean-ctx
+    moon
+    uv
+    bun
+    zlib
+    pkgs.stdenv.cc.cc.lib
+  ];
 
   enterShell = ''
     export PATH="''${DEVENV_ROOT}/.devenv/state/venv/bin:''${PATH}"

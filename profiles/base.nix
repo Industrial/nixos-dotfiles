@@ -63,6 +63,7 @@
 
     # Core NixOS Configuration
     ../features/nixos
+    ../features/nixos/auto-update
     ../features/nixos/bluetooth
     ../features/nixos/boot
     ../features/nixos/docker

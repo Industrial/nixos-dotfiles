@@ -18,15 +18,15 @@
 }:
 python3Packages.buildPythonApplication rec {
   pname = "hermes-agent";
-  version = "0.14.0";
-  revision = "v2026.5.16";
+  version = "0.18.0";
+  revision = "v2026.7.1";
 
-  # Release "Hermes Agent v0.14.0 (2026.5.16)" — tag is calendar-style, not v0.14.0.
+  # Release "Hermes Agent v0.18.0 (2026.7.1)" — tag is calendar-style, not v0.18.0.
   src = fetchFromGitHub {
     owner = "NousResearch";
     repo = "hermes-agent";
     rev = revision;
-    hash = "sha256-d9qhrTy45Q5UsmjapqMHOVi9e+gR9zE8Nq9Z0wObLmc=";
+    hash = "sha256-Wt72AQtA6Eizi7Ubj23JBhwZ7GKYcjY4mcV6upqHOaU=";
   };
 
   pyproject = true;
