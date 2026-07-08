@@ -101,7 +101,6 @@
     ../features/network/chromium
     ../features/network/firefox
     ../features/network/searx
-    ../features/network/tor-browser
 
     # Media (common to all hosts)
     ../features/media/calibre
