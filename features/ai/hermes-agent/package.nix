@@ -34,7 +34,8 @@ python3Packages.buildPythonApplication rec {
 
   # mcp is an optional extra ("extra == mcp") so buildPythonApplication's dep resolution skips
   # it. Inject it explicitly via propagatedBuildInputs so it lands in the runtime closure.
-  propagatedBuildInputs = with python3Packages; [mcp]
+  propagatedBuildInputs = with python3Packages;
+    [mcp]
     ++ extraPlugins;
 
   # Core [project].dependencies plus anthropic (optional extra upstream; required for provider=anthropic).
@@ -42,6 +43,7 @@ python3Packages.buildPythonApplication rec {
   dependencies =
     (with python3Packages; [
       openai
+      certifi
       python-dotenv
       fire
       httpx
@@ -56,9 +58,19 @@ python3Packages.buildPythonApplication rec {
       pydantic
       prompt-toolkit
       croniter
+      packaging
+      markdown
       pyjwt
+      urllib3
       cryptography
       psutil
+      websockets
+      pathspec
+      fastapi
+      uvicorn
+      python-multipart
+      ptyprocess
+      pillow
       anthropic
       mcp
     ])
@@ -69,6 +81,7 @@ python3Packages.buildPythonApplication rec {
   # Upstream pins == in pyproject; nixpkgs may carry slightly different versions.
   pythonRelaxDeps = [
     "openai"
+    "certifi"
     "python-dotenv"
     "fire"
     "httpx"
@@ -81,9 +94,19 @@ python3Packages.buildPythonApplication rec {
     "pydantic"
     "prompt-toolkit"
     "croniter"
+    "packaging"
+    "markdown"
     "pyjwt"
+    "urllib3"
     "cryptography"
     "psutil"
+    "websockets"
+    "pathspec"
+    "fastapi"
+    "uvicorn"
+    "python-multipart"
+    "ptyprocess"
+    "pillow"
     "anthropic"
     "mcp"
   ];
