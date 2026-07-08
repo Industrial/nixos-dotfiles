@@ -1,6 +1,9 @@
 # PLUGIN_NAME — Nix package
 # See hermes-agent/package.nix for the extraPlugins wiring.
-{ lib, python3Packages }:
+{
+  lib,
+  python3Packages,
+}:
 python3Packages.buildPythonPackage {
   pname = "PLUGIN_NAME";
   version = "0.1.0";

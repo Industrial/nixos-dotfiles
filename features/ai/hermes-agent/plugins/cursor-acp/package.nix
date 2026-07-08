@@ -20,7 +20,7 @@ python3Packages.buildPythonPackage {
   # No additional deps needed.
   dependencies = [];
 
-  pythonImportsCheck = [];  # providers module is a hermes-agent internal — only resolvable at runtime
+  pythonImportsCheck = []; # providers module is a hermes-agent internal — only resolvable at runtime
   doCheck = false;
 
   meta = {
