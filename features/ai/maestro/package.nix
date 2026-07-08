@@ -35,7 +35,7 @@ stdenv.mkDerivation rec {
   # stdenv fixup shrinks/strips ELF metadata and breaks Bun standalone layouts.
   dontShrinkRpath = true;
   dontStrip = true;
-  nativeBuildInputs = [ patchelf ];
+  nativeBuildInputs = [patchelf];
 
   # Bun-compiled release binaries embed a virtual filesystem; autoPatchelfHook
   # rewrites RPATH/libs and leaves a runnable `bun` on PATH instead of maestro.
