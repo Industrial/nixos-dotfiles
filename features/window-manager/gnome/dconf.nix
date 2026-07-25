@@ -37,9 +37,6 @@ in {
             pkgs.gnomeExtensions.gsconnect.extensionUuid
             pkgs.gnomeExtensions.quick-settings-tweaker.extensionUuid
 
-            # Media & Entertainment
-            pkgs.gnomeExtensions.sound-output-device-chooser.extensionUuid
-
             # Advanced Features
             pkgs.gnomeExtensions.night-theme-switcher.extensionUuid
 

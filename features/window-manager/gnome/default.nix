@@ -113,9 +113,6 @@
       gnomeExtensions.gsconnect
       gnomeExtensions.quick-settings-tweaker
 
-      # Media & Entertainment
-      gnomeExtensions.sound-output-device-chooser
-
       # Advanced Features
       gnomeExtensions.night-theme-switcher
 
