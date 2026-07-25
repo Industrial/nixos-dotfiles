@@ -28,6 +28,16 @@ rustPlatform.buildRustPackage rec {
 
   cargoHash = "sha256-2qiUkmt2+hWwzY6GdFl9jU5GfW2cGJ0UsbuitBcc7xg=";
 
+  # Upstream release profile uses opt-level=z. Combined with rten-gemm 0.24's
+  # AVX512 VNNI paths, LLVM fails: "Cannot select: intrinsic %llvm.x86.avx512.vpdpbusd.512"
+  # (seen on Zen4 / Ryzen 7950X). Prefer speed over size for the Nix build.
+  # Also pin a non-AVX512 baseline so impure shells exporting
+  # RUSTFLAGS=-C target-cpu=native cannot reintroduce the failure.
+  env = {
+    CARGO_PROFILE_RELEASE_OPT_LEVEL = "3";
+    RUSTFLAGS = "-C target-cpu=x86-64-v3";
+  };
+
   # Upstream tests assume a full dev shell (Python, sandbox tooling); skip in Nix sandbox.
   doCheck = false;
 
