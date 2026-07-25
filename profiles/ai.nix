@@ -11,7 +11,7 @@
     # ../features/ai/litellm
     # ../features/ai/n8n
     # ../features/ai/ollama
-    ../features/ai/anythingllm-desktop
+    # ../features/ai/anythingllm-desktop
     ../features/ai/claude-code
     ../features/ai/gemini-cli
     ../features/ai/hermes-agent
