@@ -27,6 +27,7 @@
 
     user.services.dbus-broker = {
       reloadIfChanged = lib.mkForce false;
+      restartIfChanged = lib.mkForce false;
       serviceConfig.TimeoutStartSec = lib.mkForce "5min";
     };
 
