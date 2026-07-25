@@ -16,6 +16,7 @@
     ../features/ai/gemini-cli
     ../features/ai/hermes-agent
     ../features/ai/lmstudio
+    ../features/ai/omniroute
     ../features/ai/opencode
     ../features/ai/maestro
   ];

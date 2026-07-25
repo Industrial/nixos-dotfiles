@@ -1,13 +1,14 @@
 model:
-  default: qwen3.6-35b-a3b
-  provider: lmstudio
-  base_url: http://localhost:11434/v1
+  default: auto/coding:free
+  provider: openrouter
+  base_url: http://127.0.0.1:20128/v1
   api_mode: chat_completions
   api_key: ''
-  context_length: 65536
+  context_length: 131072
 providers: {}
 fallback_providers: []
-credential_pool_strategies: {}
+credential_pool_strategies:
+  openrouter: fill_first
 toolsets: []
 agent:
   max_turns: 100
@@ -218,9 +219,9 @@ display:
   runtime_footer:
     enabled: false
     fields:
-      - model
-      - context_pct
-      - cwd
+    - model
+    - context_pct
+    - cwd
   copy_shortcut: auto
 dashboard:
   theme: default
@@ -300,7 +301,7 @@ goals:
   max_turns: 20
 skills:
   external_dirs:
-    - /home/tom/.agents/skills
+  - /home/tom/.agents/skills
   template_vars: true
   inline_shell: false
   inline_shell_timeout: 10
@@ -354,8 +355,8 @@ approvals:
   mcp_reload_confirm: true
   destructive_slash_confirm: true
 command_allowlist:
-  - shell command via -c/-lc flag
-  - script execution via -e/-c flag
+- shell command via -c/-lc flag
+- script execution via -e/-c flag
 quick_commands: {}
 hooks: {}
 hooks_auto_accept: false
@@ -424,7 +425,7 @@ mcp_servers:
   roam-code:
     command: roam
     args:
-      - mcp
+    - mcp
     enabled: true
   context7:
     command: context7-mcp
@@ -433,21 +434,21 @@ mcp_servers:
   serena:
     command: serena
     args:
-      - start-mcp-server
+    - start-mcp-server
     enabled: true
   searxng:
     command: npx
     args:
-      - -y
-      - mcp-searxng
+    - -y
+    - mcp-searxng
     env:
       SEARXNG_URL: http://0.0.0.0:4001
     enabled: true
   maestro:
     command: maestro
     args:
-      - mcp
-      - serve
+    - mcp
+    - serve
     enabled: true
 
 # ── Fallback Model ────────────────────────────────────────────────────
