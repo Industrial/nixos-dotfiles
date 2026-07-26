@@ -2,17 +2,8 @@
   "version": 1,
   "providers": {},
   "active_provider": null,
-  "credential_pool": {
-    "openrouter": [
-      {
-        "id": "omniroute",
-        "label": "OmniRoute gateway",
-        "auth_type": "api_key",
-        "priority": 0,
-        "source": "env:OMNIROUTE_API_KEY",
-        "access_token": "",
-        "base_url": "http://127.0.0.1:20128/v1"
-      }
-    ]
-  }
+  "suppressed_sources": {
+    "openrouter": ["env:OPENROUTER_API_KEY"]
+  },
+  "credential_pool": {}
 }

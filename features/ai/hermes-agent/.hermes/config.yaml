@@ -1,11 +1,16 @@
 model:
   default: auto/coding:free
-  provider: openrouter
+  provider: omniroute
   base_url: http://127.0.0.1:20128/v1
   api_mode: chat_completions
   api_key: ''
   context_length: 131072
 providers: {}
+# OpenAI-compatible local gateway (see features/ai/omniroute/README.md)
+custom_providers:
+  - name: omniroute
+    base_url: http://127.0.0.1:20128/v1
+    key_env: OMNIROUTE_API_KEY
 fallback_providers: []
 credential_pool_strategies:
   openrouter: fill_first
