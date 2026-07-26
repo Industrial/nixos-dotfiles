@@ -8,7 +8,7 @@ Local AI gateway with free-tier routing and an OpenAI-compatible API.
 ## First-time setup
 
 1. Rebuild NixOS on a host with the AI profile (`mimir`, `drakkar`).
-2. Enable and start the user service:
+2. Enable and start the user service (defined in `features/ai/omniroute/default.nix`):
 
    ```bash
    systemctl --user enable --now omniroute.service
@@ -21,8 +21,11 @@ Local AI gateway with free-tier routing and an OpenAI-compatible API.
 
 ## Hermes
 
-Hermes is preconfigured to use OmniRoute:
+Hermes is preconfigured to use OmniRoute via a **custom provider** (not `openrouter` — that provider ignores `model.base_url` and always hits openrouter.ai):
 
-- `model.default`: `auto/coding:free`
+- `model.provider`: `omniroute`
 - `model.base_url`: `http://127.0.0.1:20128/v1`
-- `model.provider`: `openrouter` (OpenAI-compatible shim)
+- `custom_providers[].key_env`: `OMNIROUTE_API_KEY`
+- `model.default`: `auto/coding:free`
+
+Set `OMNIROUTE_API_KEY` in `~/.hermes/.env`. Suppress `env:OPENROUTER_API_KEY` in `auth.json` if you also have `OPENROUTER_API_KEY` in `.env`, or Hermes will re-seed a direct OpenRouter credential and bypass OmniRoute.

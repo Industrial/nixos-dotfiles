@@ -3,5 +3,7 @@ echo "> generations > delete"
 exec > >(tee ./logs/delete-generations) 2>&1
 set -e
 
+source "$(dirname "$0")/../lib/root-cmd.sh"
+
 echo "> nix-env -p /nix/var/nix/profiles/system --delete-generations +2"
-sudo nix-env -p /nix/var/nix/profiles/system --delete-generations +2
+root_cmd nix-env -p /nix/var/nix/profiles/system --delete-generations +2

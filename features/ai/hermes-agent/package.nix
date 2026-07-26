@@ -32,6 +32,13 @@ python3Packages.buildPythonApplication rec {
   pyproject = true;
   build-system = with python3Packages; [setuptools];
 
+  # nixpkgs-unstable ships setuptools 83; upstream caps <83 in [build-system].requires.
+  postPatch = ''
+    substituteInPlace pyproject.toml --replace-fail \
+      "setuptools>=77.0,<83" \
+      "setuptools>=77.0"
+  '';
+
   # mcp is an optional extra ("extra == mcp") so buildPythonApplication's dep resolution skips
   # it. Inject it explicitly via propagatedBuildInputs so it lands in the runtime closure.
   propagatedBuildInputs = with python3Packages;

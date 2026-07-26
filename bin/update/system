@@ -3,8 +3,13 @@ echo "> update > system"
 exec > >(tee ./logs/update-system) 2>&1
 set -e
 
-echo "> update > system > cd hosts/$(hostname)"
-cd "hosts/$(hostname)"
+source "$(dirname "$0")/../lib/root-cmd.sh"
+
+dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
+host_dir="$dotfiles_root/hosts/$(hostname)"
+
+echo "> update > system > cd $host_dir"
+cd "$host_dir"
 
 # Always `switch` so the new generation is activated immediately (PATH, services, new
 # packages). Some upgrades still need a reboot for the kernel or firmware path to match
@@ -17,10 +22,10 @@ if [ "$booted" != "$profile" ]; then
   echo "> update > system >   booted:  $booted"
   echo "> update > system >   profile: $profile"
 fi
-echo "> update > system > sudo nixos-rebuild switch --flake \".#$(hostname)\""
-sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
+echo "> update > system > nixos-rebuild switch --flake \".#$(hostname)\""
+root_cmd sh -c "cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --option eval-cache false"
 
-cd ../..
+cd "$dotfiles_root"
 bin/update/login-shell "tom"
 
 features/network/ladybird/bin/link-files-nixos

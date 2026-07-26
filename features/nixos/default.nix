@@ -87,6 +87,20 @@
           doCheck = false;
         });
       })
+      # pipx 1.14.0 check phase fails on pytest parametrize in test_inject.py
+      (final: prev: let
+        disablePipxCheck = pkg:
+          pkg.overridePythonAttrs (old: {
+            doCheck = false;
+          });
+      in {
+        pipx = disablePipxCheck prev.pipx;
+        python314Packages = prev.python314Packages.override {
+          overrides = self: super: {
+            pipx = disablePipxCheck super.pipx;
+          };
+        };
+      })
     ];
   };
 

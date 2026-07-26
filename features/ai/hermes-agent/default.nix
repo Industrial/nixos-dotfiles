@@ -15,6 +15,7 @@
     ../roam-code
     ../serena
     ../context7
+    ../omniroute
   ];
 
   environment.systemPackages = [

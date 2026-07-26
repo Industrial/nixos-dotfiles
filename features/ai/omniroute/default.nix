@@ -5,94 +5,39 @@
 # Dashboard: http://127.0.0.1:20128
 #
 # First-time setup (after enabling this module):
-#   1. Open the dashboard and set an admin password
-#   2. Connect free providers (OpenCode Zen, Pollinations, Groq, Gemini, NVIDIA NIM, …)
-#   3. Create an endpoint API key for Hermes
-#   4. Set OMNIROUTE_API_KEY in ~/.hermes/.env (see auth.json.example)
+#   1. systemctl --user enable --now omniroute.service
+#   2. Open the dashboard and set an admin password
+#   3. Connect free providers (OpenCode Zen, Pollinations, Groq, Gemini, NVIDIA NIM, …)
+#   4. Create an endpoint API key for Hermes
+#   5. Set OMNIROUTE_API_KEY in ~/.hermes/.env (see auth.json.example)
 {
   config,
   lib,
   pkgs,
   ...
 }: let
-  cfg = config.services.omniroute;
   omniroute = pkgs.callPackage ./package.nix {};
 in {
-  options = {
-    services = {
-      omniroute = {
-        enable = lib.mkEnableOption "OmniRoute local AI gateway";
+  environment.systemPackages = [
+    omniroute
+  ];
 
-        port = lib.mkOption {
-          type = lib.types.port;
-          default = 20128;
-          description = "HTTP port for the OmniRoute API and dashboard.";
-        };
+  systemd.user.services.omniroute = {
+    description = "OmniRoute AI gateway";
+    documentation = ["https://github.com/diegosouzapw/OmniRoute"];
+    after = ["network.target"];
+    wantedBy = ["default.target"];
 
-        dataDir = lib.mkOption {
-          type = lib.types.str;
-          default = "%h/.config/omniroute";
-          description = "Directory for OmniRoute state (expanded per user in the user service).";
-        };
-
-        openFirewall = lib.mkOption {
-          type = lib.types.bool;
-          default = false;
-          description = "Whether to open the OmniRoute port on the firewall (usually keep false; localhost only).";
-        };
-
-        extraArgs = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          default = [];
-          description = "Extra arguments passed to the OmniRoute server process.";
-        };
-      };
-    };
-  };
-
-  config = lib.mkIf cfg.enable {
-    environment = {
-      systemPackages = [omniroute];
-    };
-
-    networking = {
-      firewall = {
-        allowedTCPPorts = lib.mkIf cfg.openFirewall [cfg.port];
-      };
-    };
-
-    systemd = {
-      user = {
-        services = {
-          omniroute = {
-            description = "OmniRoute AI gateway";
-            wantedBy = ["default.target"];
-            after = ["network.target"];
-
-            serviceConfig = {
-              ExecStart = lib.escapeShellArgs (
-                [
-                  (lib.getExe omniroute)
-                ]
-                ++ cfg.extraArgs
-              );
-              Restart = "on-failure";
-              RestartSec = "5s";
-              Environment = [
-                "PORT=${toString cfg.port}"
-                "DATA_DIR=${cfg.dataDir}"
-                "APP_LOG_TO_FILE=false"
-              ];
-            };
-          };
-        };
-      };
-    };
-  };
-
-  services = {
-    omniroute = {
-      enable = true;
+    serviceConfig = {
+      ExecStart = lib.getExe omniroute;
+      Restart = "on-failure";
+      RestartSec = "5s";
+      # Journald only — file logging can grow unbounded when SQLite is unavailable.
+      Environment = [
+        "APP_LOG_TO_FILE=false"
+        "PORT=20128"
+        "NODE_OPTIONS=--max-old-space-size=4096"
+      ];
     };
   };
 }
