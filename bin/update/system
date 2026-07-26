@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-echo "> update > system"
-exec > >(tee ./logs/update-system) 2>&1
 set -e
+
+dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
+log_file="$dotfiles_root/logs/update-system"
+mkdir -p "$(dirname "$log_file")"
+
+echo "> update > system"
+if command -v stdbuf >/dev/null 2>&1; then
+  exec > >(stdbuf -oL tee "$log_file") 2>&1
+else
+  exec > >(tee "$log_file") 2>&1
+fi
 
 source "$(dirname "$0")/../lib/root-cmd.sh"
 
-dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
 host_dir="$dotfiles_root/hosts/$(hostname)"
 
 echo "> update > system > cd $host_dir"
@@ -23,7 +31,13 @@ if [ "$booted" != "$profile" ]; then
   echo "> update > system >   profile: $profile"
 fi
 echo "> update > system > nixos-rebuild switch --flake \".#$(hostname)\""
-root_cmd sh -c "cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --option eval-cache false"
+rebuild="cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --option eval-cache false"
+if command -v script >/dev/null 2>&1; then
+  # exec>tee makes stdout a pipe; script allocates a pty so nixos-rebuild shows live progress.
+  root_cmd script -qefc "$rebuild" /dev/null
+else
+  root_cmd sh -c "$rebuild"
+fi
 
 cd "$dotfiles_root"
 bin/update/login-shell "tom"
