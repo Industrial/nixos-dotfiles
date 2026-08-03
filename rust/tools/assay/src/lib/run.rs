@@ -7,14 +7,22 @@ use serde::Serialize;
 
 use crate::assay_suite::load_assay_suite;
 use crate::caps::{AssayEnv, SnapshotStoreKey};
-use crate::claims::{Claim, interpret_claim};
+use crate::claims::Claim;
 use crate::compat::load_compat_suite;
 use crate::discover::{SuiteFile, SuiteKind, discover_suites, suite_kind};
 use crate::outcome::AssayOutcome;
+use crate::timeout::interpret_claim_with_retry;
 use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome};
 
 #[derive(Debug, Clone, Default)]
-pub struct RunOptions { pub update_snapshots: bool, pub json_output: bool }
+pub struct RunOptions {
+    pub update_snapshots: bool,
+    pub json_output: bool,
+    /// Per-case timeout in milliseconds (`None` = no limit).
+    pub case_timeout_ms: Option<u64>,
+    /// Retry flaky nix eval via `retry_with_clock` (default off).
+    pub retry_flaky_eval: bool,
+}
 
 #[derive(Debug, Clone)]
 pub struct SuiteReport { pub outcomes: Vec<(String, Exit<CaseVerdict, InfraError>)> }
@@ -29,10 +37,11 @@ pub fn run_suite(path: &Path, opts: &RunOptions) -> Effect<SuiteReport, InfraErr
 
 fn run_suite_on_env(path: &Path, opts: &RunOptions, env: &mut AssayEnv) -> Result<SuiteReport, InfraError> {
     if opts.update_snapshots {
-        let mut updated = env.get::<Cap<SnapshotStoreKey>>().clone();
-        updated.update_snapshots = true;
+        let updated = env.get::<Cap<SnapshotStoreKey>>().clone().with_update(true);
         env.insert::<Cap<SnapshotStoreKey>>(updated);
     }
+    let retry = opts.retry_flaky_eval;
+    let _timeout_ms = opts.case_timeout_ms;
     let kind = suite_kind(path).unwrap_or(SuiteKind::CompatJson);
     let cases = match kind {
         SuiteKind::CompatJson | SuiteKind::CompatNix => load_compat_cases(path)?,
@@ -41,7 +50,8 @@ fn run_suite_on_env(path: &Path, opts: &RunOptions, env: &mut AssayEnv) -> Resul
     let env_clone = env.clone();
     let mut outcomes = Vec::with_capacity(cases.len());
     for (name, claim) in cases {
-        outcomes.push((name, run_test(interpret_claim(claim), env_clone.clone())));
+        let case_effect = interpret_claim_with_retry(claim, retry);
+        outcomes.push((name, run_test(case_effect, env_clone.clone())));
     }
     Ok(SuiteReport { outcomes })
 }

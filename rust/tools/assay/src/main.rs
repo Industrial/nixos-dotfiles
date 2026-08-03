@@ -32,6 +32,10 @@ enum Commands {
         format: Option<String>,
         #[arg(long)]
         update_snapshots: bool,
+        #[arg(long, value_name = "MS")]
+        case_timeout_ms: Option<u64>,
+        #[arg(long)]
+        retry_flaky_eval: bool,
     },
     Discover { path: PathBuf },
     Laws {
@@ -55,7 +59,16 @@ fn main() -> ExitCode {
             json,
             format,
             update_snapshots,
-        } => cmd_run(&path, json, format.as_deref(), update_snapshots),
+            case_timeout_ms,
+            retry_flaky_eval,
+        } => cmd_run(
+            &path,
+            json,
+            format.as_deref(),
+            update_snapshots,
+            case_timeout_ms,
+            retry_flaky_eval,
+        ),
         Commands::Discover { path } => cmd_discover(&path),
         Commands::Laws { seed, json } => cmd_laws(seed, json),
     }
@@ -66,6 +79,8 @@ fn cmd_run(
     json: bool,
     format: Option<&str>,
     update_snapshots: bool,
+    case_timeout_ms: Option<u64>,
+    retry_flaky_eval: bool,
 ) -> ExitCode {
     let report_format = match resolve_format(json, format) {
         Ok(f) => f,
@@ -78,6 +93,8 @@ fn cmd_run(
     let opts = RunOptions {
         update_snapshots,
         json_output: report_format == ReportFormat::Json,
+        case_timeout_ms,
+        retry_flaky_eval,
     };
 
     let effect = if path.is_dir() {

@@ -15,7 +15,16 @@ pub struct SnapshotStore {
 
 impl SnapshotStore {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into(), update_snapshots: false }
+        Self {
+            root: root.into(),
+            update_snapshots: false,
+        }
+    }
+
+    /// Return a copy with [`SnapshotStore::update_snapshots`] set (for `--update-snapshots`).
+    pub fn with_update(mut self, update: bool) -> Self {
+        self.update_snapshots = update;
+        self
     }
 
     pub fn read(&self, name: &str) -> anyhow::Result<Option<Value>> {
@@ -38,6 +47,7 @@ impl SnapshotStore {
     }
 
     pub fn assert_match(&self, name: &str, observed: &Value, update: bool) -> AssayOutcome {
+        let update = update || self.update_snapshots;
         let path = self.golden_path(name);
         if update {
             return match self.write(name, observed) {
@@ -179,5 +189,43 @@ mod tests {
         let value = json!({"fresh": true});
         assert_eq!(store.assert_match("new", &value, true), AssayOutcome::Pass);
         assert_eq!(store.read("new").unwrap(), Some(value));
+    }
+
+    #[test]
+    fn with_update_flag_drives_assert_match() {
+        let temp = TempStore::new();
+        let store = temp.store.clone().with_update(true);
+        let value = json!({"flag": true});
+        assert_eq!(store.assert_match("flagged", &value, false), AssayOutcome::Pass);
+        assert_eq!(store.read("flagged").unwrap(), Some(value));
+    }
+}
+
+#[cfg(test)]
+mod golden_contract {
+    use id_effect::testing::snapshot::{
+        assert_golden_effect, GoldenBuilder, SnapshotAssertion,
+    };
+    use id_effect::{Effect, succeed};
+
+    #[test]
+    fn golden_builder_assert_observed_passes_on_match() {
+        GoldenBuilder::new("assay_store_roundtrip", r#"{"ok":true}"#)
+            .assert_observed(r#"{"ok":true}"#);
+    }
+
+    fn snapshot_store_contract_effect() -> Effect<SnapshotAssertion, (), ()> {
+        succeed(SnapshotAssertion {
+            name: "assay_snapshot_store_contract",
+            observed: r#"{"via":"store"}"#.into(),
+            expected: r#"{"via":"store"}"#,
+        })
+    }
+
+    #[test]
+    fn assert_golden_effect_runs_store_contract() {
+        let snap = assert_golden_effect(snapshot_store_contract_effect(), ());
+        assert_eq!(snap.name, "assay_snapshot_store_contract");
+        assert!(snap.matches());
     }
 }

@@ -17,6 +17,7 @@ pub mod report;
 pub mod run;
 pub mod schema;
 pub mod snapshot;
+pub mod timeout;
 pub mod verdict;
 
 pub use claims::{Claim, build_module_eval_expr, interpret_claim};
