@@ -3,10 +3,17 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use anyhow::Context;
 use clap::{Parser, Subcommand};
-use assay::{discover_suites, report_outcomes_stdout, run_suite, AssayOutcome, ReportFormat, RunOptions};
-use assay::run::summarize;
+use id_effect::{Cause, Exit, run_with};
+use id_effect::failure::pretty_cause;
+use id_effect_cli::{cause_max_exit_byte, exit_code_for_cause};
+use serde::Serialize;
+
+use assay::caps::live_providers;
+use assay::discover::discover_suites;
+use assay::run::{RunOptions, run_discovered, run_suite, summarize};
+use assay::verdict::{CaseVerdict, InfraError, exit_to_outcome};
+use assay::{report_outcomes_stdout, AssayOutcome, ReportFormat, SuiteReport};
 
 #[derive(Parser)]
 #[command(name = "assay", about = "Nix unit testing: discover and run assay suites")]
@@ -17,21 +24,16 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run a suite file or discover and run all suites under a directory.
     Run {
         path: PathBuf,
-        /// Emit JSON report (alias for `--format json`).
         #[arg(long)]
         json: bool,
-        /// Report format: human, json, or tap.
         #[arg(long, value_name = "FORMAT")]
         format: Option<String>,
         #[arg(long)]
         update_snapshots: bool,
     },
-    /// List suite files under a directory tree.
     Discover { path: PathBuf },
-    /// Run built-in algebraic law checks.
     Laws {
         #[arg(long, default_value_t = 0)]
         seed: u64,
@@ -40,19 +42,14 @@ enum Commands {
     },
 }
 
-fn main() -> ExitCode {
-    match run() {
-        Ok(code) => code,
-        Err(err) => {
-            eprintln!("assay: {err:#}");
-            ExitCode::from(1)
-        }
-    }
+#[derive(Serialize)]
+struct JsonOutcome {
+    name: String,
+    outcome: AssayOutcome,
 }
 
-fn run() -> anyhow::Result<ExitCode> {
-    let cli = Cli::parse();
-    match cli.command {
+fn main() -> ExitCode {
+    match Cli::parse().command {
         Commands::Run {
             path,
             json,
@@ -69,64 +66,85 @@ fn cmd_run(
     json: bool,
     format: Option<&str>,
     update_snapshots: bool,
-) -> anyhow::Result<ExitCode> {
-    let report_format = resolve_format(json, format)?;
+) -> ExitCode {
+    let report_format = match resolve_format(json, format) {
+        Ok(f) => f,
+        Err(err) => {
+            eprintln!("assay: {err}");
+            return ExitCode::from(1);
+        }
+    };
+
     let opts = RunOptions {
         update_snapshots,
         json_output: report_format == ReportFormat::Json,
     };
 
-    let outcomes = if path.is_dir() {
-        run_discovered(path, &opts)?
+    let effect = if path.is_dir() {
+        run_discovered(path, &opts)
     } else {
         run_suite(path, &opts)
     };
 
-    let summary = summarize(&outcomes);
-    report_outcomes_stdout(&outcomes, report_format, &summary)
-        .with_context(|| "report outcomes")?;
-
-    Ok(if summary.failed == 0 && summary.errored == 0 {
-        ExitCode::from(0)
-    } else {
-        ExitCode::from(1)
-    })
+    match run_with(live_providers(), effect) {
+        Ok(report) => {
+            let outcomes = legacy_outcomes(&report);
+            let summary = summarize(&report);
+            if let Err(err) = report_outcomes_stdout(&outcomes, report_format, &summary) {
+                eprintln!("assay: {err}");
+                return ExitCode::from(1);
+            }
+            exit_code_for_suite(&report)
+        }
+        Err(infra) => {
+            let cause = Cause::Fail(infra);
+            eprintln!("{}", pretty_cause(&cause));
+            exit_code_for_cause(cause)
+        }
+    }
 }
 
-fn resolve_format(json: bool, format: Option<&str>) -> anyhow::Result<ReportFormat> {
+fn legacy_outcomes(report: &SuiteReport) -> Vec<(String, AssayOutcome)> {
+    report
+        .outcomes
+        .iter()
+        .map(|(name, exit)| (name.clone(), exit_to_outcome(exit.clone())))
+        .collect()
+}
+
+fn resolve_format(json: bool, format: Option<&str>) -> Result<ReportFormat, String> {
     match (json, format) {
         (true, Some(f)) => {
             let parsed = ReportFormat::parse(f)
-                .ok_or_else(|| anyhow::anyhow!("unknown report format: {f}"))?;
+                .ok_or_else(|| format!("unknown report format: {f}"))?;
             if parsed != ReportFormat::Json {
-                anyhow::bail!("--json conflicts with --format {f}");
+                return Err(format!("--json conflicts with --format {f}"));
             }
             Ok(parsed)
         }
         (true, None) => Ok(ReportFormat::Json),
         (false, Some(f)) => ReportFormat::parse(f)
-            .ok_or_else(|| anyhow::anyhow!("unknown report format: {f} (expected human, json, or tap)")),
+            .ok_or_else(|| format!("unknown report format: {f} (expected human, json, or tap)")),
         (false, None) => Ok(ReportFormat::Human),
     }
 }
 
-fn run_discovered(
-    root: &PathBuf,
-    opts: &RunOptions,
-) -> anyhow::Result<Vec<(String, AssayOutcome)>> {
-    let suites = discover_suites(root).with_context(|| format!("discover {}", root.display()))?;
-    let mut outcomes = Vec::new();
-    for suite in suites {
-        let prefix = suite.path.display().to_string();
-        for (name, outcome) in run_suite(&suite.path, opts) {
-            outcomes.push((format!("{prefix}::{name}"), outcome));
+fn cmd_discover(path: &PathBuf) -> ExitCode {
+    match discover_suites(path) {
+        Ok(suites) => {
+            for suite in suites {
+                println!("{} ({:?})", suite.path.display(), suite.kind);
+            }
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("assay: discover {}: {err:#}", path.display());
+            ExitCode::from(1)
         }
     }
-    Ok(outcomes)
 }
 
-
-fn cmd_laws(seed: u64, json: bool) -> anyhow::Result<ExitCode> {
+fn cmd_laws(seed: u64, json: bool) -> ExitCode {
     let laws = assay::run_builtin_laws(seed);
     let failed = laws.iter().any(|(_, o)| *o != AssayOutcome::Pass);
     if json {
@@ -137,21 +155,40 @@ fn cmd_laws(seed: u64, json: bool) -> anyhow::Result<ExitCode> {
                 outcome,
             })
             .collect();
-        println!("{}", serde_json::to_string_pretty(&rows)?);
+        match serde_json::to_string_pretty(&rows) {
+            Ok(s) => println!("{s}"),
+            Err(err) => {
+                eprintln!("assay: {err}");
+                return ExitCode::from(1);
+            }
+        }
     } else {
         for (name, outcome) in laws {
             let mark = if outcome == AssayOutcome::Pass { "PASS" } else { "FAIL" };
             println!("{mark} {name}");
         }
     }
-    Ok(if failed { ExitCode::from(1) } else { ExitCode::from(0) })
-}
-
-fn cmd_discover(path: &PathBuf) -> anyhow::Result<ExitCode> {
-    let suites = discover_suites(path).with_context(|| format!("discover {}", path.display()))?;
-    for suite in suites {
-        println!("{} ({:?})", suite.path.display(), suite.kind);
+    if failed {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
     }
-    Ok(ExitCode::from(0))
 }
 
+fn exit_code_for_suite(report: &SuiteReport) -> ExitCode {
+    let worst = report
+        .outcomes
+        .iter()
+        .map(|(_, exit)| exit_code_byte(exit))
+        .max()
+        .unwrap_or(0);
+    ExitCode::from(worst)
+}
+
+fn exit_code_byte(exit: &Exit<CaseVerdict, InfraError>) -> u8 {
+    match exit {
+        Exit::Failure(cause) => cause_max_exit_byte(cause),
+        Exit::Success(CaseVerdict::Pass) => 0,
+        Exit::Success(_) => 1,
+    }
+}

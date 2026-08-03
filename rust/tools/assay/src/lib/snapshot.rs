@@ -10,11 +10,12 @@ use crate::outcome::AssayOutcome;
 #[derive(Debug, Clone)]
 pub struct SnapshotStore {
     pub root: PathBuf,
+    pub update_snapshots: bool,
 }
 
 impl SnapshotStore {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self { root: root.into(), update_snapshots: false }
     }
 
     pub fn read(&self, name: &str) -> anyhow::Result<Option<Value>> {
