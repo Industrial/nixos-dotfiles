@@ -14,6 +14,8 @@ Assay keeps **authoring in Nix** and moves **evaluation, isolation, and diffing*
 
 Full design lock: [history/20260803-232133-nix-assay-testing.md](../../../history/20260803-232133-nix-assay-testing.md).
 
+Reimplementation plan: [history/20260804-002152-assay-id-effect-reimplementation.md](../../../history/20260804-002152-assay-id-effect-reimplementation.md).
+
 Nix DSL reference: [common/assay/README.md](../../../common/assay/README.md).
 
 ## Architecture
@@ -30,6 +32,59 @@ Nix suites (common/assay)  →  assay run  →  Rust runner (id_effect)
 | Runner | `rust/tools/assay/` | Discover suites, eval in isolation, normalize, report |
 | Goldens | `testdata/goldens/` | Snapshot storage |
 | Compat | `fixtures/compat/` | runTests / nix-unit shaped fixtures |
+
+## id_effect runner
+
+**Doctrine:** library code returns `Effect`; capabilities are the only I/O; cases run as fibers; soft assertion results are `CaseVerdict` in `Exit::Success`; infra is `Fail(InfraError)`; panics/leaks are `Die`. The CLI is a thin `run_with` edge.
+
+Skill router (start here): [.cursor/skills/rust/id_effect/SKILL.md](../../../.cursor/skills/rust/id_effect/SKILL.md).
+
+### Core signatures
+
+Target (wave 2+ — capability-injected interpreter and orchestrator):
+
+```rust
+use id_effect::Effect;
+
+// Claim interpreter — uses ~NixEvaluator / ~SnapshotStore inside effect!
+fn interpret_claim(claim: &Claim) -> Effect<CaseVerdict, InfraError, AssayEnv>;
+
+// Suite orchestrator — discover, run cases, aggregate report
+fn run_suite(path: &Path, opts: &RunOptions) -> Effect<SuiteReport, InfraError, AssayEnv>;
+```
+
+Current v0 sync API (migration shim; `eval` passed explicitly until wave 2 lands):
+
+```rust
+pub fn interpret_claim(claim: &Claim, eval: &dyn EvalBackend) -> AssayOutcome;
+pub fn run_suite(path: &Path, opts: &RunOptions) -> Vec<(String, AssayOutcome)>;
+```
+
+`normalize` / `diff` stay pure value morphisms — no `Effect` wrapper (decision D6).
+
+### Capability providers
+
+Injected via `Caps` / `AssayEnv = caps!(…)` — never globals.
+
+| Capability | Marker (`caps.rs`) | Role | Live provider (v1) |
+|------------|-------------------|------|---------------------|
+| Nix evaluator | `NixEvaluator` | `eval_json` for claim expressions | `ProcessNixEval` (`nix eval` subprocess — see [SPIKE.md](SPIKE.md)) |
+| Snapshot store | `SnapshotStore` | Golden read/write under `testdata/goldens/` | Filesystem-backed store |
+| Clock | `TestClock` | Timeouts, fiber races, deterministic tests | `LiveClock` at CLI edge; `TestClock` in unit tests |
+
+Optional: `FakeStore` (sandbox / IFD module tests) and `NixWorkerPool` (bounded concurrency) are planned behind separate capability keys.
+
+Unit tests use `mock_capability!` + `build_env` + `run_test` — see the id_effect testing chapter below.
+
+### id_effect book anchors
+
+Local book checkout (adjust if your `id_effect` path differs):
+
+| Topic | Chapter | Path |
+|-------|---------|------|
+| `Exit` / verdict vs `Cause` | ch08 — Exit | `/data/Code/rust/id_effect/crates/id_effect/book/src/part3/ch08-02-exit.md` |
+| Fibers, spawn, collect-all | ch09 — Concurrency | `/data/Code/rust/id_effect/crates/id_effect/book/src/part3/ch09-00-concurrency.md` |
+| `run_test`, mocks, TestClock | ch15 — Testing | `/data/Code/rust/id_effect/crates/id_effect/book/src/part4/ch15-00-testing.md` |
 
 ## CLI
 
@@ -82,7 +137,9 @@ Rust testing conventions for this workspace: [../TESTING.md](../TESTING.md).
 
 ## Status
 
-Runner and claim interpreter are under active development. The Nix DSL in `common/assay/` is stable as **data**; CLI behavior may evolve until wave-1 leaves ship.
+Wave 0 (`id_effect` deps) shipped. Waves 1–5 (caps, Effect interpreter, fibers, snapshots, schema/optics) are in flight. The Nix DSL in `common/assay/` is stable as **data**; runner APIs may evolve until wave 6 regression gate is green.
+
+Evaluator backend: process-isolated `nix eval` is the v1 Live provider; the Nix C API remains **optional** (see [SPIKE.md](SPIKE.md)).
 
 ## Related tools in devenv
 

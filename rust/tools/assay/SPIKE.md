@@ -15,9 +15,13 @@ Process boundaries give throw/recursion isolation without linking the Nix C API 
 
 | Backend | Isolation | v0 status |
 |---------|-----------|-----------|
-| `ProcessNixEval` (`nix eval` subprocess) | Strong (new process per call) | **Implemented** — spike / H1 fallback |
-| Nix C API (`libnixexpr`) | In-process, resettable state | Planned — target if H1 passes |
+| `ProcessNixEval` (`nix eval` subprocess) | Strong (new process per call) | **Implemented** — default Live provider (locked D4) |
+| Nix C API (`libnixexpr`) | In-process, resettable state | **Optional** — alternate provider if H1 passes; not required for v1 ship |
 | tvix | Alternate evaluator | Future capability |
+
+> **Note:** The Nix C API is an optimization path, not a mission blocker. Assay ships with
+> process-isolated `nix eval` as the Live `NixEvaluator` provider; a C API backend can be
+> added later behind the same `EvalBackend` / capability trait without changing claim semantics.
 
 ## Running timings
 
