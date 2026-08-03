@@ -25,3 +25,24 @@ pub use eval::{EvalBackend, EvalResult, ProcessNixEval};
 pub use normalize::normalize_value;
 pub use outcome::{AssayOutcome, run_case};
 pub use run::{RunOptions, run_suite};
+
+/// Wave-0 compile gate: id_effect is linked. Full Effectify lands in later waves.
+#[cfg(test)]
+mod id_effect_dep_smoke {
+    use id_effect::Exit;
+
+    #[test]
+    fn id_effect_exit_is_linked() {
+        let exit: Exit<(), ()> = Exit::succeed(());
+        assert!(matches!(exit, Exit::Success(())));
+    }
+
+    #[cfg(feature = "cli-exit")]
+    #[test]
+    fn id_effect_cli_exit_code_linked() {
+        use id_effect_cli::exit_code_for_exit;
+        use std::process::ExitCode;
+        let code = exit_code_for_exit(Exit::<(), ()>::succeed(()));
+        assert_eq!(code, ExitCode::SUCCESS);
+    }
+}
