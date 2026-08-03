@@ -93,10 +93,23 @@ devenv shell -- assay run <path>          # file or directory of suites
 devenv shell -- assay run common/assay/tests
 ```
 
-Options (runner; see `assay run --help` when implemented):
+Options (see `assay run --help`):
 
+- `--format human|json|tap` — report format (default: human)
+- `--json` — alias for `--format json` (backward compatible)
 - `--update-snapshots` — refresh golden files
-- JSON / TAP output for CI
+
+### Report formats
+
+| Format | Use case |
+|--------|----------|
+| `human` | Local dev (PASS/FAIL lines + summary) |
+| `json` | CI artifact / machine parsing |
+| `tap` | Test Anything Protocol consumers |
+
+Reporting uses `id_effect::Stream::from_iterable` over collected outcomes.
+**v1 backpressure:** outcomes are buffered entirely before formatted output is
+emitted (no live per-case streaming yet).
 
 ## Writing tests
 

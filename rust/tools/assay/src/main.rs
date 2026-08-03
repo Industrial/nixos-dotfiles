@@ -5,10 +5,8 @@ use std::process::ExitCode;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use serde::Serialize;
-
-use assay::{discover_suites, run_suite, AssayOutcome, RunOptions};
-use assay::run::{summarize, RunSummary};
+use assay::{discover_suites, report_outcomes_stdout, run_suite, AssayOutcome, ReportFormat, RunOptions};
+use assay::run::summarize;
 
 #[derive(Parser)]
 #[command(name = "assay", about = "Nix unit testing: discover and run assay suites")]
@@ -22,8 +20,12 @@ enum Commands {
     /// Run a suite file or discover and run all suites under a directory.
     Run {
         path: PathBuf,
+        /// Emit JSON report (alias for `--format json`).
         #[arg(long)]
         json: bool,
+        /// Report format: human, json, or tap.
+        #[arg(long, value_name = "FORMAT")]
+        format: Option<String>,
         #[arg(long)]
         update_snapshots: bool,
     },
@@ -36,12 +38,6 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-}
-
-#[derive(Serialize)]
-struct JsonOutcome {
-    name: String,
-    outcome: AssayOutcome,
 }
 
 fn main() -> ExitCode {
@@ -60,17 +56,24 @@ fn run() -> anyhow::Result<ExitCode> {
         Commands::Run {
             path,
             json,
+            format,
             update_snapshots,
-        } => cmd_run(&path, json, update_snapshots),
+        } => cmd_run(&path, json, format.as_deref(), update_snapshots),
         Commands::Discover { path } => cmd_discover(&path),
         Commands::Laws { seed, json } => cmd_laws(seed, json),
     }
 }
 
-fn cmd_run(path: &PathBuf, json: bool, update_snapshots: bool) -> anyhow::Result<ExitCode> {
+fn cmd_run(
+    path: &PathBuf,
+    json: bool,
+    format: Option<&str>,
+    update_snapshots: bool,
+) -> anyhow::Result<ExitCode> {
+    let report_format = resolve_format(json, format)?;
     let opts = RunOptions {
         update_snapshots,
-        json_output: json,
+        json_output: report_format == ReportFormat::Json,
     };
 
     let outcomes = if path.is_dir() {
@@ -80,17 +83,31 @@ fn cmd_run(path: &PathBuf, json: bool, update_snapshots: bool) -> anyhow::Result
     };
 
     let summary = summarize(&outcomes);
-    if json {
-        print_json(&outcomes)?;
-    } else {
-        print_human(&outcomes, &summary);
-    }
+    report_outcomes_stdout(&outcomes, report_format, &summary)
+        .with_context(|| "report outcomes")?;
 
     Ok(if summary.failed == 0 && summary.errored == 0 {
         ExitCode::from(0)
     } else {
         ExitCode::from(1)
     })
+}
+
+fn resolve_format(json: bool, format: Option<&str>) -> anyhow::Result<ReportFormat> {
+    match (json, format) {
+        (true, Some(f)) => {
+            let parsed = ReportFormat::parse(f)
+                .ok_or_else(|| anyhow::anyhow!("unknown report format: {f}"))?;
+            if parsed != ReportFormat::Json {
+                anyhow::bail!("--json conflicts with --format {f}");
+            }
+            Ok(parsed)
+        }
+        (true, None) => Ok(ReportFormat::Json),
+        (false, Some(f)) => ReportFormat::parse(f)
+            .ok_or_else(|| anyhow::anyhow!("unknown report format: {f} (expected human, json, or tap)")),
+        (false, None) => Ok(ReportFormat::Human),
+    }
 }
 
 fn run_discovered(
@@ -138,41 +155,3 @@ fn cmd_discover(path: &PathBuf) -> anyhow::Result<ExitCode> {
     Ok(ExitCode::from(0))
 }
 
-fn print_human(outcomes: &[(String, AssayOutcome)], summary: &RunSummary) {
-    for (name, outcome) in outcomes {
-        let mark = match outcome {
-            AssayOutcome::Pass => "PASS",
-            AssayOutcome::EvalError { .. }
-            | AssayOutcome::Recursion
-            | AssayOutcome::Timeout
-            | AssayOutcome::ResourceLeak => "ERR",
-            _ => "FAIL",
-        };
-        println!("{mark} {name}");
-        if let AssayOutcome::Fail { diff, .. } = outcome {
-            println!("  {diff}");
-        }
-        if let AssayOutcome::EvalError { message, .. } = outcome {
-            println!("  {message}");
-        }
-    }
-    println!(
-        "\n{passed}/{total} passed, {failed} failed, {errored} errored",
-        passed = summary.passed,
-        total = summary.total,
-        failed = summary.failed,
-        errored = summary.errored,
-    );
-}
-
-fn print_json(outcomes: &[(String, AssayOutcome)]) -> anyhow::Result<()> {
-    let rows: Vec<JsonOutcome> = outcomes
-        .iter()
-        .map(|(name, outcome)| JsonOutcome {
-            name: name.clone(),
-            outcome: outcome.clone(),
-        })
-        .collect();
-    println!("{}", serde_json::to_string_pretty(&rows)?);
-    Ok(())
-}
