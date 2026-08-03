@@ -9,6 +9,7 @@ use crate::diff::structural_diff;
 use crate::eval::{EvalBackend, EvalResult};
 use crate::force::check_forces;
 use crate::normalize::normalize_value;
+use crate::optics_json::{value_contains_subset, value_has_attrs};
 use crate::outcome::AssayOutcome;
 
 /// A single test claim authored in Nix and interpreted by the runner.
@@ -245,22 +246,6 @@ fn throw_message(out: &AssayOutcome) -> String {
         AssayOutcome::EvalError { message, .. } => message.clone(),
         AssayOutcome::Recursion => "infinite recursion".into(),
         _ => String::new(),
-    }
-}
-
-fn value_contains_subset(actual: &Value, expected: &Value) -> bool {
-    match (actual, expected) {
-        (Value::Object(a), Value::Object(e)) => e
-            .iter()
-            .all(|(k, v)| a.get(k).is_some_and(|av| value_contains_subset(av, v))),
-        _ => actual == expected,
-    }
-}
-
-fn value_has_attrs(value: &Value, attrs: &[String]) -> bool {
-    match value {
-        Value::Object(map) => attrs.iter().all(|k| map.contains_key(k)),
-        _ => false,
     }
 }
 

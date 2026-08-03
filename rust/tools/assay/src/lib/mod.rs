@@ -10,6 +10,7 @@ pub mod eval;
 pub mod force;
 pub mod laws;
 pub mod normalize;
+pub mod optics_json;
 pub mod outcome;
 pub mod prop;
 pub mod run;

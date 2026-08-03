@@ -21,7 +21,7 @@ id_effect_process = { path = "/data/Code/rust/id_effect/crates/id_effect_process
 id_effect_optics = { path = "/data/Code/rust/id_effect/crates/id_effect_optics", optional = true }
 
 [features]
-default = ["cli-exit"]
+default = ["cli-exit", "optics"]
 cli-exit = ["dep:id_effect_cli"]
 process-pool = ["dep:id_effect_process"]
 optics = ["dep:id_effect_optics"]
