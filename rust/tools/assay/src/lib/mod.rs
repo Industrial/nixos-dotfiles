@@ -22,7 +22,7 @@ pub use discover::{SuiteFile, discover_suites};
 pub use caps::{
     Caps, FakeStore, NixEvaluator, SnapshotStore as CapsSnapshotStore, TestClock, require_store,
 };
-pub use eval::{EvalBackend, EvalResult, ProcessNixEval};
+pub use eval::{EvalBackend, EvalResult, NixEval, ProcessNixEval};
 pub use normalize::normalize_value;
 pub use outcome::{AssayOutcome, run_case};
 pub use verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};

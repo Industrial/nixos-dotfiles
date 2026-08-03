@@ -1,6 +1,9 @@
 //! Isolated Nix evaluation backends.
+//!
+//! **Invariant:** `Command::new("nix")` may only appear in this module (Live provider).
 
 use std::io;
+use std::path::Path;
 use std::process::Command;
 
 use serde_json::Value;
@@ -15,25 +18,39 @@ pub enum EvalResult {
 }
 
 /// Capability for evaluating Nix expressions in isolation.
-pub trait EvalBackend {
+pub trait NixEval: Send + Sync {
     fn eval_json(&self, expr: &str) -> EvalResult;
 }
 
-/// v0 backend: spawn a fresh `nix eval` process per expression.
+/// Back-compat alias during id_effect migration.
+pub use NixEval as EvalBackend;
+
+/// v0 Live backend: spawn a fresh `nix eval` process per expression.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct ProcessNixEval;
 
-impl EvalBackend for ProcessNixEval {
+impl NixEval for ProcessNixEval {
     fn eval_json(&self, expr: &str) -> EvalResult {
-        match run_nix_eval(expr) {
+        match eval_expr_json(expr) {
             Ok(value) => EvalResult::Ok(value),
             Err(outcome) => EvalResult::Err(outcome),
         }
     }
 }
 
-fn run_nix_eval(expr: &str) -> Result<Value, AssayOutcome> {
+/// Evaluate a Nix expression string to JSON.
+pub(crate) fn eval_expr_json(expr: &str) -> Result<Value, AssayOutcome> {
     let output = spawn_nix_eval(expr)?;
+    if output.status.success() {
+        return parse_stdout_json(&output.stdout);
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    Err(classify_stderr(&stderr))
+}
+
+/// Evaluate a Nix file to JSON (suite load path).
+pub fn nix_eval_file(path: &Path) -> Result<Value, AssayOutcome> {
+    let output = spawn_nix_eval_file(path)?;
     if output.status.success() {
         return parse_stdout_json(&output.stdout);
     }
@@ -48,6 +65,15 @@ fn spawn_nix_eval(expr: &str) -> Result<std::process::Output, AssayOutcome> {
         .map_err(nix_spawn_error)
 }
 
+fn spawn_nix_eval_file(path: &Path) -> Result<std::process::Output, AssayOutcome> {
+    Command::new("nix")
+        .args(["eval", "--impure", "--file"])
+        .arg(path)
+        .arg("--json")
+        .output()
+        .map_err(|err| nix_spawn_error_for_path(err, path))
+}
+
 fn nix_spawn_error(err: io::Error) -> AssayOutcome {
     if err.kind() == io::ErrorKind::NotFound {
         return AssayOutcome::EvalError {
@@ -59,6 +85,21 @@ fn nix_spawn_error(err: io::Error) -> AssayOutcome {
     AssayOutcome::EvalError {
         kind: "io".to_string(),
         message: err.to_string(),
+        span: None,
+    }
+}
+
+fn nix_spawn_error_for_path(err: io::Error, path: &Path) -> AssayOutcome {
+    if err.kind() == io::ErrorKind::NotFound {
+        return AssayOutcome::EvalError {
+            kind: "nix_missing".to_string(),
+            message: "nix executable not found in PATH".to_string(),
+            span: None,
+        };
+    }
+    AssayOutcome::EvalError {
+        kind: "io".to_string(),
+        message: format!("run nix eval on {}: {err}", path.display()),
         span: None,
     }
 }

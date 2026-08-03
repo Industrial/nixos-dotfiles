@@ -1,7 +1,6 @@
 //! nix-unit / `lib.runTests` compatibility: load `{ name = { expr; expected; }; }` suites.
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{Context, bail};
 use serde_json::Value;
@@ -95,17 +94,12 @@ fn load_nix_compat_suite(path: &Path) -> anyhow::Result<CompatSuite> {
 }
 
 fn try_nix_eval(path: &Path) -> anyhow::Result<CompatSuite> {
-    let output = Command::new("nix")
-        .args(["eval", "--impure", "--file"])
-        .arg(path)
-        .arg("--json")
-        .output()
-        .with_context(|| format!("run nix eval on {}", path.display()))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("nix eval failed: {stderr}");
-    }
-    let v: Value = serde_json::from_slice(&output.stdout)?;
+    let v = crate::eval::nix_eval_file(path).map_err(|outcome| match outcome {
+        crate::outcome::AssayOutcome::EvalError { message, .. } => {
+            anyhow::anyhow!("nix eval failed: {message}")
+        }
+        other => anyhow::anyhow!("nix eval failed: {other:?}"),
+    })?;
     parse_compat_json(&v)
 }
 

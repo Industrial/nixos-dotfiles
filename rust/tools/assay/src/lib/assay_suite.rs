@@ -1,7 +1,6 @@
 //! Load Assay-native suites: `{ name, cases = { case = { claim, ... }; }; }`.
 
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::{Context, bail};
 use serde_json::Value;
@@ -39,17 +38,12 @@ pub fn load_assay_suite(path: &Path) -> anyhow::Result<Vec<(String, Claim)>> {
 }
 
 fn nix_eval_file(path: &Path) -> anyhow::Result<Value> {
-    let output = Command::new("nix")
-        .args(["eval", "--impure", "--file"])
-        .arg(path)
-        .arg("--json")
-        .output()
-        .with_context(|| format!("nix eval {}", path.display()))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("nix eval failed: {stderr}");
-    }
-    Ok(serde_json::from_slice(&output.stdout)?)
+    crate::eval::nix_eval_file(path).map_err(|outcome| match outcome {
+        crate::outcome::AssayOutcome::EvalError { message, .. } => {
+            anyhow::anyhow!("nix eval failed: {message}")
+        }
+        other => anyhow::anyhow!("nix eval failed: {other:?}"),
+    })
 }
 
 fn claim_from_json(v: &Value) -> anyhow::Result<Claim> {
