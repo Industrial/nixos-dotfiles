@@ -14,6 +14,7 @@ pub mod outcome;
 pub mod prop;
 pub mod run;
 pub mod snapshot;
+pub mod verdict;
 
 pub use claims::{Claim, interpret_claim};
 pub use compat::{CompatCase, CompatSuite, load_compat_suite};
@@ -24,6 +25,7 @@ pub use caps::{
 pub use eval::{EvalBackend, EvalResult, ProcessNixEval};
 pub use normalize::normalize_value;
 pub use outcome::{AssayOutcome, run_case};
+pub use verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};
 pub use run::{RunOptions, run_suite};
 
 /// Wave-0 compile gate: id_effect is linked. Full Effectify lands in later waves.
