@@ -13,6 +13,7 @@ pub mod normalize;
 pub mod optics_json;
 pub mod outcome;
 pub mod prop;
+pub mod pool;
 pub mod report;
 pub mod run;
 pub mod schema;
@@ -24,8 +25,10 @@ pub use compat::{CompatCase, CompatSuite, load_compat_suite};
 pub use discover::{SuiteFile, discover_suites};
 pub use caps::{
     AssayEnv, ClockKey, FakeStore, FsSnapshotStoreLive, LiveClockLive, MockNixEval,
-    NixEvaluatorKey, ProcessNixEvalLive, SnapshotStoreKey, live_providers, require_store,
+NixEvaluatorKey, NixWorkerPoolKey, ProcessNixEvalLive,
+    SemaphoreWorkerPoolLive, SnapshotStoreKey, live_providers, require_store,
 };
+pub use pool::{MockWorkerPool, NixWorkerPool, PoolStats, SemaphoreWorkerPool};
 pub use eval::{EvalBackend, EvalResult, NixEval, ProcessNixEval};
 pub use normalize::normalize_value;
 pub use outcome::{AssayOutcome, run_case};

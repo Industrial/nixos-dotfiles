@@ -11,6 +11,7 @@ use serde_json::Value;
 
 use crate::eval::{EvalBackend, EvalResult, ProcessNixEval};
 use crate::outcome::AssayOutcome;
+use crate::pool::{MockWorkerPool, NixWorkerPool, SemaphoreWorkerPool};
 use crate::snapshot::SnapshotStore;
 
 /// Nix evaluation backend injected at the runner edge.
@@ -22,8 +23,11 @@ pub type SnapshotStoreKey = SnapshotStore;
 /// Injectable clock for deterministic time-dependent claims.
 pub type ClockKey = Arc<dyn Clock + Send + Sync>;
 
+/// Bounded concurrent Nix worker slots.
+pub type NixWorkerPoolKey = Arc<dyn NixWorkerPool + Send + Sync>;
+
 /// Required capabilities for an Assay run or unit-test harness.
-pub type AssayEnv = caps!(NixEvaluatorKey, SnapshotStoreKey, ClockKey);
+pub type AssayEnv = caps!(NixEvaluatorKey, SnapshotStoreKey, ClockKey, NixWorkerPoolKey);
 
 // --- Live providers ---
 
@@ -58,6 +62,17 @@ pub struct LiveClockLive;
 impl LiveClockLive {
     fn new() -> ClockKey {
         Arc::new(LiveClock::new(ThreadSleepRuntime::default()))
+    }
+}
+
+/// Semaphore-backed worker pool (default max = CPU count).
+#[derive(::id_effect::ProviderSpecDerive)]
+#[provides(NixWorkerPoolKey)]
+pub struct SemaphoreWorkerPoolLive;
+
+impl SemaphoreWorkerPoolLive {
+    fn new() -> NixWorkerPoolKey {
+        Arc::new(SemaphoreWorkerPool::default_live())
     }
 }
 
@@ -125,6 +140,13 @@ mock_capability!(
     }
 );
 
+mock_capability!(
+    MockWorkerPoolLive,
+    NixWorkerPoolKey,
+    "pool/mock",
+    || Arc::new(MockWorkerPool::new(8)) as NixWorkerPoolKey
+);
+
 /// Marker for an in-memory / fake nix store used in sandboxed module tests.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub struct FakeStore;
@@ -145,20 +167,22 @@ pub fn require_store(store: Option<&FakeStore>) -> Result<&FakeStore, AssayOutco
 }
 
 /// Default live provider list for `run_with` at the application edge.
-pub fn live_providers() -> [id_effect::ProviderBox; 3] {
+pub fn live_providers() -> [id_effect::ProviderBox; 4] {
     [
         provide!(ProcessNixEvalLive),
         provide!(FsSnapshotStoreLive),
         provide!(LiveClockLive),
+        provide!(SemaphoreWorkerPoolLive),
     ]
 }
 
 #[cfg(test)]
-pub fn mock_providers() -> [id_effect::ProviderBox; 3] {
+pub fn mock_providers() -> [id_effect::ProviderBox; 4] {
     [
         provide!(MockNixEvalLive),
         provide!(MockSnapshotStoreLive),
         provide!(AssayTestClockLive),
+        provide!(MockWorkerPoolLive),
     ]
 }
 
@@ -173,6 +197,7 @@ mod tests {
         assert!(env.has::<Cap<NixEvaluatorKey>>());
         assert!(env.has::<Cap<SnapshotStoreKey>>());
         assert!(env.has::<Cap<ClockKey>>());
+        assert!(env.has::<Cap<NixWorkerPoolKey>>());
     }
 
     #[test]
@@ -181,19 +206,21 @@ mod tests {
         assert!(env.has::<Cap<NixEvaluatorKey>>());
         assert!(env.has::<Cap<SnapshotStoreKey>>());
         assert!(env.has::<Cap<ClockKey>>());
+        assert!(env.has::<Cap<NixWorkerPoolKey>>());
     }
 
     #[test]
     fn run_test_reads_all_caps() {
         let env = AssayEnv::from_env(build_env(mock_providers()).expect("env"));
-        let effect: Effect<(bool, bool, bool), (), AssayEnv> = Effect::new(|env| {
+        let effect: Effect<(bool, bool, bool, bool), (), AssayEnv> = Effect::new(|env| {
             let _nix = Needs::<NixEvaluatorKey>::need(env);
             let _snap = Needs::<SnapshotStoreKey>::need(env);
             let _clock = Needs::<ClockKey>::need(env);
-            Ok((true, true, true))
+            let _pool = Needs::<NixWorkerPoolKey>::need(env);
+            Ok((true, true, true, true))
         });
         let exit = run_test(effect, env);
-        assert_eq!(exit, Exit::Success((true, true, true)));
+        assert_eq!(exit, Exit::Success((true, true, true, true)));
     }
 
     #[test]

@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use id_effect::{Cause, Effect, Exit};
 
-use crate::caps::{AssayEnv, NixEvaluatorKey, SnapshotStoreKey};
+use crate::caps::{AssayEnv, NixEvaluatorKey, NixWorkerPoolKey, SnapshotStoreKey};
 use crate::diff::structural_diff;
 use crate::eval::{EvalBackend, EvalResult};
 use crate::force::check_forces;
@@ -62,6 +62,8 @@ pub enum Claim {
 /// Interpret `claim` using capabilities from [`AssayEnv`].
 pub fn interpret_claim(claim: Claim) -> Effect<CaseVerdict, InfraError, AssayEnv> {
     Effect::new(move |env| {
+        let pool = id_effect::Needs::<NixWorkerPoolKey>::need(env);
+        let _slot = pool.acquire()?;
         let eval = id_effect::Needs::<NixEvaluatorKey>::need(env);
         let store = id_effect::Needs::<SnapshotStoreKey>::need(env);
         interpret_claim_with(eval.as_ref(), store, &claim)
