@@ -65,3 +65,18 @@ portable fallback for environments without `libnixexpr` dev headers.
 2. Spike Nix C API evaluator behind the same `EvalBackend` trait.
 3. Wire `interpret_claim` / runner to call `eval_json` and map `EvalResult` into the claim
    algebra.
+
+## Worker pool vs plain fibers (wave 3)
+
+Assay bounds concurrent `nix eval` subprocesses via `NixWorkerPoolKey` (default: CPU count)
+using an in-process semaphore in `SemaphoreWorkerPool`. Each `interpret_claim` acquires a slot
+before calling `NixEvaluatorKey`.
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Semaphore pool (shipped)** | Simple, no extra deps, works with `ProcessNixEval` | Slots are in-process only; no isolated worker OS processes |
+| **Fiber + `run_fork` per case** | Parallel case scheduling, collect-all joins | Does not cap nix fan-out by itself |
+| **`id_effect_process` mailbox** *(optional `process-pool` feature)* | True process workers, `Addr::call(timeout)` | Heavier; needs `id_effect_process` wiring |
+
+For v1 we combine **fibers for case parallelism** with **semaphore for nix concurrency**.
+Upgrade to `id_effect_process` when subprocess isolation must live in long-lived worker VMs.
