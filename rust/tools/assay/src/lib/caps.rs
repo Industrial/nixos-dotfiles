@@ -1,111 +1,216 @@
-//! Capability markers for dependency injection at the Assay runner edge.
-//!
-//! Evaluators, snapshot stores, fake stores, and clocks are injected — never globals.
+//! Capability keys and providers for Assay DI 3.0 (`#[capability]`, `ProviderSpec`, `provide!`).
 
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
+use id_effect::runtime::ThreadSleepRuntime;
+use id_effect::{Clock, LiveClock, TestClock, caps, mock_capability, provide};
+use serde_json::Value;
+
+use crate::eval::{EvalBackend, EvalResult, ProcessNixEval};
 use crate::outcome::AssayOutcome;
+use crate::snapshot::SnapshotStore;
 
-/// Marker for the real Nix evaluator capability (`NixEvaluator` in the runner graph).
-#[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
-pub struct NixEvaluator;
+/// Nix evaluation backend injected at the runner edge.
+pub type NixEvaluatorKey = Arc<dyn EvalBackend + Send + Sync>;
 
-/// Golden-file store rooted at `root` (typically `testdata/goldens/`).
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct SnapshotStore {
-    pub root: PathBuf,
+/// Golden-file snapshot store capability.
+pub type SnapshotStoreKey = SnapshotStore;
+
+/// Injectable clock for deterministic time-dependent claims.
+pub type ClockKey = Arc<dyn Clock + Send + Sync>;
+
+/// Required capabilities for an Assay run or unit-test harness.
+pub type AssayEnv = caps!(NixEvaluatorKey, SnapshotStoreKey, ClockKey);
+
+// --- Live providers ---
+
+/// Live Nix evaluator: wraps [`ProcessNixEval`] as `Arc<dyn EvalBackend>`.
+#[derive(::id_effect::ProviderSpecDerive)]
+#[provides(NixEvaluatorKey)]
+pub struct ProcessNixEvalLive;
+
+impl ProcessNixEvalLive {
+    fn new() -> NixEvaluatorKey {
+        Arc::new(ProcessNixEval)
+    }
 }
 
-/// Marker for an in-memory / fake nix store used in unit tests.
-///
-/// IFD (import-from-derivation) requires a `FakeStore` with [`FakeStore::allow_ifd`] true;
-/// the default denies IFD until sandbox wiring is implemented.
+/// Filesystem-backed snapshot store rooted at `testdata/goldens/`.
+#[derive(::id_effect::ProviderSpecDerive)]
+#[provides(SnapshotStoreKey)]
+pub struct FsSnapshotStoreLive;
+
+impl FsSnapshotStoreLive {
+    fn new() -> SnapshotStoreKey {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/goldens");
+        SnapshotStore::new(root)
+    }
+}
+
+/// Production clock backed by [`ThreadSleepRuntime`].
+#[derive(::id_effect::ProviderSpecDerive)]
+#[provides(ClockKey)]
+pub struct LiveClockLive;
+
+impl LiveClockLive {
+    fn new() -> ClockKey {
+        Arc::new(LiveClock::new(ThreadSleepRuntime::default()))
+    }
+}
+
+/// Deterministic test clock for unit tests.
+#[derive(::id_effect::ProviderSpecDerive)]
+#[provides(ClockKey)]
+pub struct AssayTestClockLive;
+
+impl AssayTestClockLive {
+    fn new() -> ClockKey {
+        Arc::new(TestClock::new(Instant::now()))
+    }
+}
+
+// --- Mock providers ---
+
+/// In-memory Nix evaluator for claim unit tests.
+#[derive(Default)]
+pub struct MockNixEval {
+    values: Mutex<HashMap<String, EvalResult>>,
+}
+
+impl MockNixEval {
+    pub fn set(&self, expr: &str, result: EvalResult) {
+        self.values
+            .lock()
+            .unwrap()
+            .insert(expr.into(), result);
+    }
+}
+
+impl EvalBackend for MockNixEval {
+    fn eval_json(&self, expr: &str) -> EvalResult {
+        self.values
+            .lock()
+            .unwrap()
+            .get(expr)
+            .cloned()
+            .unwrap_or(EvalResult::Ok(Value::Null))
+    }
+}
+
+mock_capability!(
+    MockNixEvalLive,
+    NixEvaluatorKey,
+    "nix/mock",
+    || Arc::new(MockNixEval::default()) as NixEvaluatorKey
+);
+
+mock_capability!(
+    MockSnapshotStoreLive,
+    SnapshotStoreKey,
+    "snapshot/mock-temp",
+    || {
+        let dir = std::env::temp_dir().join(format!(
+            "assay-mock-snap-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).expect("tempdir");
+        SnapshotStore::new(dir)
+    }
+);
+
+/// Marker for an in-memory / fake nix store used in sandboxed module tests.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq)]
 pub struct FakeStore;
 
 impl FakeStore {
-    /// Whether this fake store permits import-from-derivation during module evaluation.
-    ///
-    /// The default `FakeStore` always returns `false`. Future sandboxed module tests must
-    /// construct a `FakeStore` with IFD enabled (not yet implemented).
     pub fn allow_ifd(&self) -> bool {
         false
     }
 }
 
-/// Injectable clock for deterministic time-dependent claims.
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct TestClock {
-    pub millis: u64,
-}
-
-/// Injected capabilities for an Assay run or unit-test harness.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct Caps {
-    pub evaluator: NixEvaluator,
-    pub snapshots: SnapshotStore,
-    pub store: Option<FakeStore>,
-    pub clock: TestClock,
-}
-
-impl Caps {
-    /// Build a minimal capability set for unit tests (no fake store, clock at 0).
-    pub fn unit_test(goldens: impl Into<PathBuf>) -> Self {
-        Self {
-            evaluator: NixEvaluator,
-            snapshots: SnapshotStore::new(goldens),
-            store: None,
-            clock: TestClock::new(0),
-        }
-    }
-}
-
 /// Require a [`FakeStore`] for sandboxed / IFD module evaluation.
-pub fn require_store(caps: &Caps) -> Result<&FakeStore, AssayOutcome> {
-    caps.store.as_ref().ok_or(AssayOutcome::EvalError {
+pub fn require_store(store: Option<&FakeStore>) -> Result<&FakeStore, AssayOutcome> {
+    store.ok_or(AssayOutcome::EvalError {
         kind: "sandbox".into(),
         message: "IFD denied: provide FakeStore capability".into(),
         span: None,
     })
 }
 
-impl SnapshotStore {
-    pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
-    }
-
-    /// Path to the golden JSON for `name` (`<root>/<name>.json`).
-    pub fn path_for(&self, name: &str) -> PathBuf {
-        self.root.join(format!("{name}.json"))
-    }
+/// Default live provider list for `run_with` at the application edge.
+pub fn live_providers() -> [id_effect::ProviderBox; 3] {
+    [
+        provide!(ProcessNixEvalLive),
+        provide!(FsSnapshotStoreLive),
+        provide!(LiveClockLive),
+    ]
 }
 
-impl TestClock {
-    pub fn new(millis: u64) -> Self {
-        Self { millis }
-    }
+#[cfg(test)]
+pub fn mock_providers() -> [id_effect::ProviderBox; 3] {
+    [
+        provide!(MockNixEvalLive),
+        provide!(MockSnapshotStoreLive),
+        provide!(AssayTestClockLive),
+    ]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use id_effect::{Cap, Effect, Exit, FromEnv, Needs, build_env, run_test};
 
     #[test]
-    fn snapshot_store_path_for_appends_json_extension() {
-        let store = SnapshotStore::new("/tmp/goldens");
+    fn build_env_materializes_all_live_capabilities() {
+        let env = build_env(live_providers()).expect("env");
+        assert!(env.has::<Cap<NixEvaluatorKey>>());
+        assert!(env.has::<Cap<SnapshotStoreKey>>());
+        assert!(env.has::<Cap<ClockKey>>());
+    }
+
+    #[test]
+    fn build_env_materializes_all_mock_capabilities() {
+        let env = build_env(mock_providers()).expect("env");
+        assert!(env.has::<Cap<NixEvaluatorKey>>());
+        assert!(env.has::<Cap<SnapshotStoreKey>>());
+        assert!(env.has::<Cap<ClockKey>>());
+    }
+
+    #[test]
+    fn run_test_reads_all_caps() {
+        let env = AssayEnv::from_env(build_env(mock_providers()).expect("env"));
+        let effect: Effect<(bool, bool, bool), (), AssayEnv> = Effect::new(|env| {
+            let _nix = Needs::<NixEvaluatorKey>::need(env);
+            let _snap = Needs::<SnapshotStoreKey>::need(env);
+            let _clock = Needs::<ClockKey>::need(env);
+            Ok((true, true, true))
+        });
+        let exit = run_test(effect, env);
+        assert_eq!(exit, Exit::Success((true, true, true)));
+    }
+
+    #[test]
+    fn mock_nix_eval_returns_configured_values() {
+        let mock = Arc::new(MockNixEval::default());
+        mock.set("x", EvalResult::Ok(serde_json::json!(42)));
         assert_eq!(
-            store.path_for("my_case"),
-            PathBuf::from("/tmp/goldens/my_case.json")
+            mock.eval_json("x"),
+            EvalResult::Ok(serde_json::json!(42))
         );
     }
 
     #[test]
-    fn snapshot_store_path_for_nested_name() {
-        let store = SnapshotStore::new("testdata/goldens");
-        assert_eq!(
-            store.path_for("suite/case"),
-            PathBuf::from("testdata/goldens/suite/case.json")
-        );
+    fn fs_snapshot_store_live_roots_at_goldens() {
+        let env = build_env([provide!(FsSnapshotStoreLive)]).expect("env");
+        let store = env.get::<Cap<SnapshotStoreKey>>();
+        assert!(store.root.ends_with("testdata/goldens"));
     }
 
     #[test]
@@ -114,21 +219,9 @@ mod tests {
     }
 
     #[test]
-    fn unit_test_caps_has_no_store_and_zero_clock() {
-        let caps = Caps::unit_test("/tmp/goldens");
-        assert!(caps.store.is_none());
-        assert_eq!(caps.clock.millis, 0);
-        assert_eq!(
-            caps.snapshots.path_for("case"),
-            PathBuf::from("/tmp/goldens/case.json")
-        );
-    }
-
-    #[test]
     fn require_store_err_when_missing() {
-        let caps = Caps::unit_test("/tmp/goldens");
         assert_eq!(
-            require_store(&caps),
+            require_store(None),
             Err(AssayOutcome::EvalError {
                 kind: "sandbox".into(),
                 message: "IFD denied: provide FakeStore capability".into(),
@@ -139,12 +232,7 @@ mod tests {
 
     #[test]
     fn require_store_ok_when_present() {
-        let caps = Caps {
-            evaluator: NixEvaluator,
-            snapshots: SnapshotStore::new("/tmp/goldens"),
-            store: Some(FakeStore),
-            clock: TestClock::new(0),
-        };
-        assert!(require_store(&caps).is_ok());
+        let store = FakeStore;
+        assert!(require_store(Some(&store)).is_ok());
     }
 }

@@ -20,7 +20,8 @@ pub use claims::{Claim, interpret_claim};
 pub use compat::{CompatCase, CompatSuite, load_compat_suite};
 pub use discover::{SuiteFile, discover_suites};
 pub use caps::{
-    Caps, FakeStore, NixEvaluator, SnapshotStore as CapsSnapshotStore, TestClock, require_store,
+    AssayEnv, ClockKey, FakeStore, FsSnapshotStoreLive, LiveClockLive, MockNixEval,
+    NixEvaluatorKey, ProcessNixEvalLive, SnapshotStoreKey, live_providers, require_store,
 };
 pub use eval::{EvalBackend, EvalResult, NixEval, ProcessNixEval};
 pub use normalize::normalize_value;
