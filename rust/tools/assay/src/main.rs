@@ -29,6 +29,13 @@ enum Commands {
     },
     /// List suite files under a directory tree.
     Discover { path: PathBuf },
+    /// Run built-in algebraic law checks.
+    Laws {
+        #[arg(long, default_value_t = 0)]
+        seed: u64,
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Serialize)]
@@ -56,6 +63,7 @@ fn run() -> anyhow::Result<ExitCode> {
             update_snapshots,
         } => cmd_run(&path, json, update_snapshots),
         Commands::Discover { path } => cmd_discover(&path),
+        Commands::Laws { seed, json } => cmd_laws(seed, json),
     }
 }
 
@@ -98,6 +106,28 @@ fn run_discovered(
         }
     }
     Ok(outcomes)
+}
+
+
+fn cmd_laws(seed: u64, json: bool) -> anyhow::Result<ExitCode> {
+    let laws = assay::run_builtin_laws(seed);
+    let failed = laws.iter().any(|(_, o)| *o != AssayOutcome::Pass);
+    if json {
+        let rows: Vec<JsonOutcome> = laws
+            .into_iter()
+            .map(|(name, outcome)| JsonOutcome {
+                name: name.to_string(),
+                outcome,
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+    } else {
+        for (name, outcome) in laws {
+            let mark = if outcome == AssayOutcome::Pass { "PASS" } else { "FAIL" };
+            println!("{mark} {name}");
+        }
+    }
+    Ok(if failed { ExitCode::from(1) } else { ExitCode::from(0) })
 }
 
 fn cmd_discover(path: &PathBuf) -> anyhow::Result<ExitCode> {

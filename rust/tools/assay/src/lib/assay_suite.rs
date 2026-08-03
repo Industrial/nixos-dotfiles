@@ -6,7 +6,7 @@ use anyhow::{Context, bail};
 use serde_json::Value;
 
 use crate::claims::Claim;
-use crate::compat::field_to_nix;
+use crate::schema::decode_suite_cases;
 
 /// Parse an Assay suite JSON value into named claims.
 pub fn parse_assay_suite(v: &Value) -> anyhow::Result<Vec<(String, Claim)>> {
@@ -16,11 +16,8 @@ pub fn parse_assay_suite(v: &Value) -> anyhow::Result<Vec<(String, Claim)>> {
         .and_then(|c| c.as_object())
         .context("assay suite missing cases object")?;
 
-    let mut out = Vec::with_capacity(cases.len());
-    for (name, case_val) in cases {
-        out.push((name.clone(), claim_from_json(case_val)?));
-    }
-    Ok(out)
+    decode_suite_cases(&Value::Object(cases.clone()))
+        .map_err(|e| anyhow::anyhow!("{e:?}"))
 }
 
 /// Load suite from `.assay.nix` via `nix eval --json`, or from `.json`.
@@ -46,61 +43,6 @@ fn nix_eval_file(path: &Path) -> anyhow::Result<Value> {
     })
 }
 
-fn claim_from_json(v: &Value) -> anyhow::Result<Claim> {
-    let obj = v.as_object().context("claim must be an object")?;
-    let claim = obj
-        .get("claim")
-        .and_then(|c| c.as_str())
-        .unwrap_or("eq");
-
-    match claim {
-        "eq" => {
-            let left = obj.get("expr").context("eq missing expr")?;
-            let right = obj.get("expected").context("eq missing expected")?;
-            Ok(Claim::Eq {
-                left_expr: field_to_nix(left)?,
-                right_expr: field_to_nix(right)?,
-            })
-        }
-        "throws" => {
-            let expr = obj.get("expr").context("throws missing expr")?;
-            let pattern = match obj.get("pattern") {
-                None | Some(Value::Null) => None,
-                Some(p) => Some(field_to_nix(p)?.trim_matches('"').to_string()),
-            };
-            Ok(Claim::Throws {
-                expr: field_to_nix(expr)?,
-                pattern,
-            })
-        }
-        "subset" => {
-            let expr = obj.get("expr").context("subset missing expr")?;
-            let expected = obj
-                .get("expected")
-                .cloned()
-                .context("subset missing expected")?;
-            Ok(Claim::Subset {
-                expr: field_to_nix(expr)?,
-                expected_subset: expected,
-            })
-        }
-        "hasAttrs" => {
-            let expr = obj.get("expr").context("hasAttrs missing expr")?;
-            let attrs = obj
-                .get("attrs")
-                .and_then(|a| a.as_array())
-                .context("hasAttrs missing attrs array")?
-                .iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect();
-            Ok(Claim::HasAttrs {
-                expr: field_to_nix(expr)?,
-                attrs,
-            })
-        }
-        other => bail!("unsupported claim type: {other}"),
-    }
-}
 
 #[cfg(test)]
 mod tests {

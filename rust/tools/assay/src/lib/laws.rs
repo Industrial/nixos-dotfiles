@@ -7,6 +7,28 @@ use crate::prop::{Gen, prop_assert};
 
 const LAW_TRIALS: u32 = 128;
 
+/// Built-in law names exposed to suite `law` claims and the CLI.
+pub const BUILTIN_LAW_NAMES: &[&str] = &[
+    "merge_identity",
+    "merge_associativity",
+    "merge_idempotent",
+];
+
+/// Run a single built-in law by name.
+pub fn run_law_by_name(name: &str, seed: u64) -> AssayOutcome {
+    match name {
+        "merge_identity" => law_merge_identity(seed),
+        "merge_associativity" => law_merge_associativity(seed),
+        "merge_idempotent" => law_merge_idempotent(seed),
+        other => AssayOutcome::EvalError {
+            kind: "law".into(),
+            message: format!("unknown law: {other}"),
+            span: None,
+        },
+    }
+}
+
+
 /// `a ∪ {} == a` and `{} ∪ a == a` for object maps.
 pub fn law_merge_identity(seed: u64) -> AssayOutcome {
     prop_assert(seed, LAW_TRIALS, |rng| {
@@ -117,6 +139,20 @@ mod tests {
     }
 
     #[test]
+
+    #[test]
+    fn run_law_by_name_dispatches_merge_idempotent() {
+        assert_eq!(run_law_by_name("merge_idempotent", 3), AssayOutcome::Pass);
+    }
+
+    #[test]
+    fn unknown_law_is_eval_error() {
+        assert!(matches!(
+            run_law_by_name("no_such_law", 0),
+            AssayOutcome::EvalError { .. }
+        ));
+    }
+
     fn merge_last_wins_on_key_collision() {
         let mut left = Map::new();
         left.insert("x".into(), Value::Number(1.into()));
@@ -126,3 +162,17 @@ mod tests {
         assert_eq!(merged.get("x"), Some(&Value::Number(2.into())));
     }
 }
+
+#[cfg(feature = "proptest")]
+mod proptest_laws {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn merge_idempotent_holds_for_any_seed(seed in 0u64..512) {
+            prop_assert_eq!(law_merge_idempotent(seed), AssayOutcome::Pass);
+        }
+    }
+}
+

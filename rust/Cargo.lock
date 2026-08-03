@@ -70,6 +70,7 @@ dependencies = [
  "id_effect_optics",
  "id_effect_proc_macro",
  "id_effect_process",
+ "proptest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

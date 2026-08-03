@@ -7,6 +7,23 @@ use crate::outcome::AssayOutcome;
 const MAX_STRING_LEN: usize = 16;
 const MAX_COLLECTION_LEN: usize = 4;
 
+/// Built-in property names for suite `prop` claims.
+pub const BUILTIN_PROP_NAMES: &[&str] = &["always_pass", "merge_idempotent"];
+
+/// Run a built-in property by name.
+pub fn run_prop_by_name(name: &str, seed: u64, trials: u32) -> AssayOutcome {
+    match name {
+        "always_pass" => prop_assert(seed, trials, |_| Ok(())),
+        "merge_idempotent" => crate::laws::law_merge_idempotent(seed),
+        other => AssayOutcome::EvalError {
+            kind: "prop".into(),
+            message: format!("unknown property: {other}"),
+            span: None,
+        },
+    }
+}
+
+
 /// Seeded pseudo-random generator with a stable value sequence per seed.
 #[derive(Debug, Clone)]
 pub struct Gen {
@@ -180,6 +197,12 @@ mod tests {
     }
 
     #[test]
+
+    #[test]
+    fn run_prop_by_name_always_pass() {
+        assert_eq!(run_prop_by_name("always_pass", 1, 10), AssayOutcome::Pass);
+    }
+
     fn counterexample_is_shrunk() {
         let failing = Value::Array(vec![
             Value::Number(10.into()),

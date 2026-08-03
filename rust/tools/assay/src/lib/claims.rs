@@ -13,7 +13,7 @@ use crate::optics_json::{value_contains_subset, value_has_attrs};
 use crate::outcome::AssayOutcome;
 
 /// A single test claim authored in Nix and interpreted by the runner.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Claim {
     Eq {
         left_expr: String,
@@ -44,6 +44,17 @@ pub enum Claim {
         args_expr: String,
         expect: Value,
     },
+    /// Run a built-in algebraic law by name.
+    Law {
+        name: String,
+        seed: u64,
+    },
+    /// Run a built-in property check by name.
+    Prop {
+        name: String,
+        seed: u64,
+        trials: Option<u32>,
+    },
 }
 
 /// Interpret `claim` against `eval`, returning Pass or a structured failure outcome.
@@ -66,6 +77,10 @@ pub fn interpret_claim(claim: &Claim, eval: &dyn EvalBackend) -> AssayOutcome {
             args_expr,
             expect,
         } => interpret_module(imports_expr, args_expr, expect, eval),
+        Claim::Law { name, seed } => crate::laws::run_law_by_name(name, *seed),
+        Claim::Prop { name, seed, trials } => {
+            crate::prop::run_prop_by_name(name, *seed, trials.unwrap_or(128))
+        }
     }
 }
 
