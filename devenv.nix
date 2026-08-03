@@ -50,6 +50,9 @@
     doCheck = false;
   };
 
+  # Local Rust tools (callPackage from repo root).
+  assay = pkgs.callPackage ./rust/tools/assay {};
+
   lean-ctx = pkgs.rustPlatform.buildRustPackage rec {
     pname = "lean-ctx";
     version = "3.1.5";
@@ -73,6 +76,7 @@ in {
     inputs.definitively.packages.${system}.definitively
 
     nix-unit
+    assay
     namaka
     nixt
 
@@ -108,15 +112,10 @@ in {
     roam-code
     lean-ctx
     moon
-    uv
     bun
     zlib
     pkgs.stdenv.cc.cc.lib
   ];
-
-  enterShell = ''
-    export PATH="''${DEVENV_ROOT}/.devenv/state/venv/bin:''${PATH}"
-  '';
 
   languages = {
     rust = {
@@ -128,21 +127,6 @@ in {
     javascript = {
       enable = true;
       bun.enable = true;
-    };
-
-    python = {
-      enable = true;
-      uv = {
-        enable = true;
-        sync = {
-          enable = true;
-          arguments = [
-            "--no-install-project"
-            "--group"
-            "serena"
-          ];
-        };
-      };
     };
   };
 

@@ -540,3 +540,7 @@ Before submitting code, verify:
 - [ ] rstest used for parameterized cases
 - [ ] Async tests use `#[tokio::test]`
 - [ ] Integration tests marked `#[ignore]`
+
+## Assay
+
+[Assay](assay/README.md) is the Nix unit-testing runner in this workspace (`rust/tools/assay`). It interprets claim algebra (eq, throws, subset, module eval, snapshots, and more) via isolated `nix eval` backends. See the Assay README for suite layout, CLI usage, and dogfood examples under `common/assay/`.

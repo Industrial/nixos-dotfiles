@@ -1,0 +1,49 @@
+# Maestro configuration for the dotfiles repo
+# This file is seeded as part of WS-1b
+# Settings are minimal; add your own rules/projects as needed.
+
+project:
+  name: nixos-dotfiles
+  description: NixOS system configuration with AI/agent toolchain
+  repo: https://github.com/Industrial/nixos-dotfiles
+
+# Quality gates — tasks must satisfy these before moving to ready/shipped
+quality_gates:
+  nix:
+    - "nix flake check --no-build (per host)"
+    - "treefmt --check"
+    - "deadnix --fail"
+  rust:
+    - "cargo clippy --workspace --all-targets --all-features -- -D warnings"
+    - "cargo test --workspace"
+    - "cd rust && cargo test -p assay"
+    - "cargo fmt --all -- --check"
+  security:
+    - "bin/ci/lynis (or equivalently: nix-shell -p lynis --run 'lynis audit system')"
+    - "bin/ci/vulnix"
+
+# Default execution directories for tasks
+workdir: "/home/tom/.dotfiles"
+
+# Toolchains used by tasks
+enabled_toolsets:
+  - web
+  - terminal
+  - cronjob
+  - skills
+
+# Notification settings
+notifications:
+  slack:
+    channel: "#dotfiles-ops"
+    token: "${SLACK_TOKEN}"
+
+# Safety / policy enforcement
+policy:
+  enforce: true
+  warnings_as_errors: true
+
+# Logging
+log:
+  level: info
+  file: "/home/tom/.dotfiles/.maestro/logs/latest.log"

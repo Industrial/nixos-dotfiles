@@ -25,6 +25,7 @@
     ../features/cli/cheatsheet
     ../features/cli/create-ssh-key
     ../features/cli/oomkiller
+    ../features/cli/assay
     ../features/cli/direnv
     ../features/cli/du
     ../features/cli/dust

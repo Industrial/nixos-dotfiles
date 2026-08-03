@@ -1,6 +1,6 @@
 [workspace]
-members = ["tools/oomkiller"]
-resolver = "2"
+members = ["tools/oomkiller", "tools/assay"]
+resolver = "3"
 
 [workspace.package]
 version = "0.1.0"
