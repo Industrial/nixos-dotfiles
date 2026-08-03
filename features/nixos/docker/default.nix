@@ -49,6 +49,13 @@
         };
       };
     };
+
+    # Rootless dockerd (Go TLS) does not pick up system CAs without this;
+    # otherwise pulls fail with: x509: certificate signed by unknown authority
+    user.services.docker.serviceConfig.Environment = [
+      "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      "NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+    ];
   };
 
   boot = {
