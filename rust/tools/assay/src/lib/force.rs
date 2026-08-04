@@ -23,12 +23,8 @@ pub fn force_support() -> ForceSupport {
 ///
 /// Returns [`AssayOutcome::Pass`] only when the backend supports force probes and the
 /// observed set matches. Today always fails with an explicit UNSUPPORTED message.
-pub fn check_forces(
-    _expr: &str,
-    paths: &[String],
-    _eval: &dyn EvalBackend,
-) -> AssayOutcome {
-    match force_support() {
+fn check_forces_with_support(support: ForceSupport, paths: &[String]) -> AssayOutcome {
+    match support {
         ForceSupport::Unsupported(reason) => AssayOutcome::Fail {
             claim: "forces".into(),
             left: None,
@@ -47,6 +43,14 @@ pub fn check_forces(
     }
 }
 
+pub fn check_forces(
+    _expr: &str,
+    paths: &[String],
+    _eval: &dyn EvalBackend,
+) -> AssayOutcome {
+    check_forces_with_support(force_support(), paths)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -62,23 +66,42 @@ mod tests {
     }
 
     #[test]
+    fn check_forces_public_entry_uses_unsupported_backend() {
+        let eval = NoopEval;
+        let out = check_forces("x", &["p".into()], &eval);
+        match out {
+            AssayOutcome::Fail { .. } => {}
+            other => panic!("expected Fail, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn force_support_is_unsupported() {
-        assert!(matches!(force_support(), ForceSupport::Unsupported(_)));
+        match force_support() {
+            ForceSupport::Unsupported(_) => {}
+            ForceSupport::Supported => panic!("expected unsupported"),
+        }
     }
 
     #[test]
     fn check_forces_fails_not_pass() {
         let eval = NoopEval;
         let out = check_forces("x", &["a".into()], &eval);
-        assert!(
-            matches!(out, AssayOutcome::Fail { .. }),
-            "expected Fail, got {out:?}"
-        );
-        if let AssayOutcome::Fail { diff, .. } = out {
-            assert!(
+        match out {
+            AssayOutcome::Fail { diff, .. } => assert!(
                 diff.contains("UNSUPPORTED"),
                 "diff must explain unsupported: {diff}"
-            );
+            ),
+            other => panic!("expected Fail, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_forces_supported_backend_branch() {
+        let out = check_forces_with_support(ForceSupport::Supported, &["a".into()]);
+        match out {
+            AssayOutcome::Fail { diff, .. } => assert!(diff.contains("force probe not wired")),
+            other => panic!("expected Fail, got {other:?}"),
         }
     }
 }

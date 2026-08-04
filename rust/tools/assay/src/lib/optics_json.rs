@@ -83,6 +83,25 @@ mod traversal_impl {
                 value_has_attrs(&value, &attrs)
             );
         }
+
+        #[test]
+        fn object_keys_traversal_leaves_scalar_unchanged() {
+            let scalar = serde_json::json!(5);
+            let out = object_keys_traversal().over(scalar.clone(), |_| unreachable!());
+            assert_eq!(out, scalar);
+        }
+
+        #[test]
+        fn object_keys_traversal_rewrites_object_keys() {
+            let value = serde_json::json!({"a": 1});
+            let out = object_keys_traversal().over(value, |k| format!("{k}_x"));
+            assert_eq!(out, serde_json::json!({"a_x": 1}));
+        }
+
+        #[test]
+        fn value_has_attrs_via_traversal_empty_attrs_on_scalar() {
+            assert!(value_has_attrs_via_traversal(&serde_json::json!(null), &[]));
+        }
     }
 }
 
@@ -137,5 +156,20 @@ mod tests {
         assert!(value_has_attrs(&value, &["a".into(), "b".into()]));
         assert!(!value_has_attrs(&value, &["z".into()]));
         assert!(!value_has_attrs(&serde_json::json!(1), &["a".into()]));
+    }
+
+    #[test]
+    fn subset_fails_on_missing_key() {
+        assert!(!value_contains_subset(
+            &serde_json::json!({"a": 1}),
+            &serde_json::json!({"b": 1})
+        ));
+    }
+
+    #[test]
+    fn fold_object_keys_noop_on_scalar() {
+        let mut keys = Vec::new();
+        fold_object_keys(&serde_json::json!(null), |k| keys.push(k.to_string()));
+        assert!(keys.is_empty());
     }
 }

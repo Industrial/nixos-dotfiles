@@ -1,14 +1,10 @@
 # Colocated suite: systemPackages from stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
-      pkgs = { fd = "fd"; };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages)
-'';
+  pkgs = { fd = "fd"; };
+  mod = import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "fd" {
-    systemPackages = assay.eq packages ''[ "fd" ]'';
+    systemPackages = assay.eq mod.environment.systemPackages [ "fd" ];
   }

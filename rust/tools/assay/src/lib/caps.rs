@@ -5,8 +5,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use id_effect::runtime::ThreadSleepRuntime;
-use id_effect::{Clock, LiveClock, TestClock, caps, mock_capability, provide};
+use id_effect::{Clock, Never, TestClock, caps, mock_capability, provide, Effect};
+use std::time::Duration;
 use serde_json::Value;
 
 use crate::eval::{EvalBackend, EvalResult, ProcessNixEval};
@@ -54,14 +54,39 @@ impl FsSnapshotStoreLive {
     }
 }
 
-/// Production clock backed by [`ThreadSleepRuntime`].
+/// Wall-clock [`Clock`] without ComputeFabric/Sysinfo telemetry startup cost.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct StdClock;
+
+impl Clock for StdClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn sleep(&self, duration: Duration) -> Effect<(), Never, ()> {
+        Effect::new(move |_env| {
+            std::thread::sleep(duration);
+            Ok::<(), Never>(())
+        })
+    }
+
+    fn sleep_until(&self, deadline: Instant) -> Effect<(), Never, ()> {
+        let now = Instant::now();
+        if deadline <= now {
+            return Effect::new(|_| Ok::<(), Never>(()));
+        }
+        self.sleep(deadline.duration_since(now))
+    }
+}
+
+/// Production clock: [`StdClock`] (no ThreadSleepRuntime fabric install).
 #[derive(::id_effect::ProviderSpecDerive)]
 #[provides(ClockKey)]
 pub struct LiveClockLive;
 
 impl LiveClockLive {
     fn new() -> ClockKey {
-        Arc::new(LiveClock::new(ThreadSleepRuntime::default()))
+        Arc::new(StdClock)
     }
 }
 
@@ -303,5 +328,102 @@ mod tests {
     fn require_store_ok_when_present() {
         let store = FakeStore;
         assert!(require_store(Some(&store)).is_ok());
+    }
+
+    #[test]
+    fn mock_nix_eval_batched_eq_pair() {
+        let mock = Arc::new(MockNixEval::default());
+        mock.set("1", EvalResult::Ok(serde_json::json!(1)));
+        mock.set("2", EvalResult::Ok(serde_json::json!(2)));
+        let batched = "[ (1) (2) ]";
+        assert_eq!(
+            mock.eval_json(batched),
+            EvalResult::Ok(serde_json::json!([1, 2]))
+        );
+        assert_eq!(mock.eval_json("missing"), EvalResult::Ok(serde_json::json!(null)));
+    }
+
+    #[test]
+    fn mock_nix_eval_batched_eq_propagates_error() {
+        let mock = Arc::new(MockNixEval::default());
+        mock.set(
+            "bad",
+            EvalResult::Err(AssayOutcome::EvalError {
+                kind: "throw".into(),
+                message: "boom".into(),
+                span: None,
+            }),
+        );
+        let batched = "[ (bad) (1) ]";
+        assert!(matches!(mock.eval_json(batched), EvalResult::Err(_)));
+    }
+
+    #[test]
+    fn std_clock_sleep_until_past_is_noop() {
+        let clock = StdClock;
+        let past = Instant::now() - Duration::from_secs(1);
+        let exit = id_effect::run_test(clock.sleep_until(past), ());
+        assert!(matches!(exit, Exit::Success(())));
+    }
+
+    #[test]
+    fn std_clock_sleep_runs() {
+        let clock = StdClock;
+        let exit = id_effect::run_test(clock.sleep(Duration::from_millis(1)), ());
+        assert!(matches!(exit, Exit::Success(())));
+    }
+
+    #[test]
+    fn std_clock_sleep_until_future_waits() {
+        let clock = StdClock;
+        let future = Instant::now() + Duration::from_millis(1);
+        let exit = id_effect::run_test(clock.sleep_until(future), ());
+        assert!(matches!(exit, Exit::Success(())));
+    }
+
+    #[test]
+    fn split_eq_pair_requires_wrapped_operands() {
+        assert!(split_eq_pair("[ 1 ) ( 2 ]").is_none());
+        assert!(unwrap_parens("(no-close").is_none());
+    }
+
+    #[test]
+    fn split_eq_pair_parsing_edge_cases() {
+        assert_eq!(split_eq_pair("[ (1) (2) ]"), Some(("1", "2")));
+        assert!(split_eq_pair("not").is_none());
+        assert!(split_eq_pair("[ (only) ]").is_none());
+        assert!(split_eq_pair("[ 1 2 ]").is_none());
+    }
+
+    #[test]
+    fn split_top_level_pair_respects_nesting() {
+        assert_eq!(
+            split_top_level_pair("(a (b c)) (d)"),
+            Some(("(a (b c))", "(d)"))
+        );
+        assert!(split_top_level_pair("single").is_none());
+    }
+
+    #[test]
+    fn mock_nix_eval_batched_right_side_error() {
+        let mock = Arc::new(MockNixEval::default());
+        mock.set("1", EvalResult::Ok(serde_json::json!(1)));
+        mock.set(
+            "bad",
+            EvalResult::Err(AssayOutcome::EvalError {
+                kind: "throw".into(),
+                message: "boom".into(),
+                span: None,
+            }),
+        );
+        assert!(matches!(mock.eval_json("[ (1) (bad) ]"), EvalResult::Err(_)));
+    }
+
+    #[test]
+    fn split_top_level_pair_bracket_and_brace_depth() {
+        assert_eq!(split_top_level_pair("[a] {b}"), Some(("[a]", "{b}")));
+        assert!(split_top_level_pair("   ").is_none());
+        assert!(split_top_level_pair("foo ").is_none());
+        assert!(split_top_level_pair(" foo").is_none());
     }
 }

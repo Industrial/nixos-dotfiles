@@ -1,14 +1,10 @@
 # Colocated suite: systemPackages from stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
-      pkgs = { "gemini-cli" = "gemini-cli"; };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages)
-'';
+  pkgs = { "gemini-cli" = "gemini-cli"; };
+  mod = import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "gemini-cli" {
-    systemPackages = assay.eq packages ''[ "gemini-cli" ]'';
+    systemPackages = assay.eq mod.environment.systemPackages [ "gemini-cli" ];
   }

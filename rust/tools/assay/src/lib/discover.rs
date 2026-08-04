@@ -123,6 +123,8 @@ mod tests {
         assert_eq!(suite_kind(suite_json), Some(SuiteKind::CompatJson));
         assert_eq!(suite_kind(assay), Some(SuiteKind::AssayNix));
         assert_eq!(suite_kind(compat_nix), Some(SuiteKind::CompatNix));
+        assert_eq!(suite_kind(Path::new("x.assay.json")), Some(SuiteKind::AssayNix));
+        assert_eq!(suite_kind(Path::new("fixtures/compat/foo.txt")), None);
         assert_eq!(suite_kind(Path::new("other/foo.json")), None);
     }
 
@@ -157,14 +159,57 @@ mod tests {
         let root = std::env::temp_dir().join(format!("assay_discover_{}", std::process::id()));
         fs::remove_dir_all(&root).ok();
         write_file(&root.join("fixtures/compat/one.json"), "{}");
+        write_file(&root.join("fixtures/compat/two.nix"), "{}");
         write_file(&root.join("deep/suite.json"), "{}");
         write_file(&root.join("cases/demo.assay.nix"), "#");
+        write_file(&root.join("junk/readme.txt"), "skip");
 
         let found = discover_suites(&root).expect("discover");
-        assert_eq!(found.len(), 3);
+        assert_eq!(found.len(), 4);
         assert!(found.iter().any(|s| s.kind == SuiteKind::CompatJson));
+        assert!(found.iter().any(|s| s.kind == SuiteKind::CompatNix));
         assert!(found.iter().any(|s| s.kind == SuiteKind::AssayNix));
 
         fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn write_file_without_parent_component() {
+        let filename = format!("assay_discover_bare_{}.txt", std::process::id());
+        let path = Path::new(&filename);
+        write_file(path, "x");
+        assert!(path.exists());
+        fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn discover_non_suite_file_returns_empty() {
+        let path = std::env::temp_dir().join(format!("assay_notsuite_{}.txt", std::process::id()));
+        fs::write(&path, "x").unwrap();
+        let found = discover_suites(&path).expect("discover");
+        assert!(found.is_empty());
+        fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn discover_single_compat_json_file() {
+        let dir = std::env::temp_dir().join(format!("assay_single_json_{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("suite.json");
+        fs::write(&path, "{}").unwrap();
+        let found = discover_suites(&path).expect("discover");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].kind, SuiteKind::CompatJson);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn discover_single_assay_nix_file() {
+        let path = std::env::temp_dir().join(format!("assay_single_{}.assay.nix", std::process::id()));
+        fs::write(&path, "#").unwrap();
+        let found = discover_suites(&path).expect("discover");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].kind, SuiteKind::AssayNix);
+        fs::remove_file(&path).ok();
     }
 }

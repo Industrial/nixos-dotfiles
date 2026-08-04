@@ -1,13 +1,11 @@
 # Colocated suite: xserver enabled with xterm session.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  mod = ''
-    (let
+  mod = let
       pkgs = { xterm = { outPath = "/xterm"; }; };
-    in import ${modFile} { inherit pkgs; })
-  '';
+    in import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "window-manager" {
-    xserver = assay.eq "${mod}.services.xserver.enable" "true";
+    xserver = assay.eq mod.services.xserver.enable true;
   }

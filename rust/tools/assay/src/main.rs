@@ -36,6 +36,9 @@ enum Commands {
         case_timeout_ms: Option<u64>,
         #[arg(long)]
         retry_flaky_eval: bool,
+        /// Disable tryEval mega-batch (one nix process per claim).
+        #[arg(long)]
+        no_batch: bool,
     },
     Discover { path: PathBuf },
     Laws {
@@ -61,6 +64,7 @@ fn main() -> ExitCode {
             update_snapshots,
             case_timeout_ms,
             retry_flaky_eval,
+            no_batch,
         } => cmd_run(
             &path,
             json,
@@ -68,6 +72,7 @@ fn main() -> ExitCode {
             update_snapshots,
             case_timeout_ms,
             retry_flaky_eval,
+            !no_batch,
         ),
         Commands::Discover { path } => cmd_discover(&path),
         Commands::Laws { seed, json } => cmd_laws(seed, json),
@@ -81,6 +86,7 @@ fn cmd_run(
     update_snapshots: bool,
     case_timeout_ms: Option<u64>,
     retry_flaky_eval: bool,
+    batch_eval: bool,
 ) -> ExitCode {
     let report_format = match resolve_format(json, format) {
         Ok(f) => f,
@@ -95,6 +101,7 @@ fn cmd_run(
         json_output: report_format == ReportFormat::Json,
         case_timeout_ms,
         retry_flaky_eval,
+        batch_eval,
     };
 
     let effect = if path.is_dir() {
@@ -103,8 +110,16 @@ fn cmd_run(
         run_suite(path, &opts)
     };
 
-    match run_with(live_providers(), effect) {
+    let providers = live_providers();
+    let t_run = std::time::Instant::now();
+    match run_with(providers, effect) {
         Ok(report) => {
+            if std::env::var_os("ASSAY_TRACE").is_some() {
+                eprintln!(
+                    "assay_trace: run_with {:.1}ms",
+                    t_run.elapsed().as_secs_f64() * 1000.0
+                );
+            }
             let outcomes = legacy_outcomes(&report);
             let summary = summarize(&report);
             if let Err(err) = report_outcomes_stdout(&outcomes, report_format, &summary) {

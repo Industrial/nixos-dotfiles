@@ -521,7 +521,9 @@ Meeting the **95%** llvm-cov gates is done by **adding and maintaining real test
 Coverage targets (95% line/branch/function) are defined in this document; enforce locally when `cargo-llvm-cov` is available:
 
 ```bash
-cd rust && cargo llvm-cov nextest --html --fail-under-lines 0
+# Prefer the devenv script (fenix nightly + --branch + 95% line/region gates):
+devenv shell -- assay-coverage
+# or: moon run :coverage
 ```
 
 ---

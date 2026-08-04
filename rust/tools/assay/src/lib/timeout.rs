@@ -115,4 +115,65 @@ mod tests {
         clock.advance(Duration::from_millis(10));
         assert!(clock.pending_sleeps().is_empty());
     }
+
+    #[test]
+    fn interpret_claim_with_retry_enabled_eventually_passes() {
+        use crate::outcome::AssayOutcome;
+
+        let attempts = Arc::new(AtomicUsize::new(0));
+        struct FlakyEval {
+            attempts: Arc<AtomicUsize>,
+        }
+        impl EvalBackend for FlakyEval {
+            fn eval_json(&self, _expr: &str) -> EvalResult {
+                let n = self.attempts.fetch_add(1, Ordering::SeqCst);
+                if n == 0 {
+                    EvalResult::Err(AssayOutcome::EvalError {
+                        kind: "io".into(),
+                        message: "flaky".into(),
+                        span: None,
+                    })
+                } else {
+                    EvalResult::Ok(serde_json::json!([1, 1]))
+                }
+            }
+        }
+        let mut built = build_env(mock_providers()).expect("env");
+        built.insert::<Cap<NixEvaluatorKey>>(Arc::new(FlakyEval {
+            attempts: Arc::clone(&attempts),
+        }));
+        let env = AssayEnv::from_env(built);
+        let claim = Claim::Eq {
+            left_expr: "x".into(),
+            right_expr: "x".into(),
+        };
+        let exit = run_test(interpret_claim_with_retry(claim, true), env);
+        assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
+        assert!(attempts.load(Ordering::SeqCst) >= 2);
+    }
+
+    #[test]
+    fn interpret_claim_with_retry_exhausts_budget() {
+        use crate::outcome::AssayOutcome;
+
+        struct AlwaysIoFail;
+        impl EvalBackend for AlwaysIoFail {
+            fn eval_json(&self, _expr: &str) -> EvalResult {
+                EvalResult::Err(AssayOutcome::EvalError {
+                    kind: "io".into(),
+                    message: "persistent".into(),
+                    span: None,
+                })
+            }
+        }
+        let mut built = build_env(mock_providers()).expect("env");
+        built.insert::<Cap<NixEvaluatorKey>>(Arc::new(AlwaysIoFail));
+        let env = AssayEnv::from_env(built);
+        let claim = Claim::Eq {
+            left_expr: "a".into(),
+            right_expr: "b".into(),
+        };
+        let exit = run_test(interpret_claim_with_retry(claim, true), env);
+        assert!(matches!(exit, Exit::Failure(_)));
+    }
 }

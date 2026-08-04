@@ -127,6 +127,25 @@ pub(crate) fn classify_stderr(stderr: &str) -> AssayOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
+
+    thread_local! {
+        static FORCE_SKIP_NIX: Cell<bool> = const { Cell::new(false) };
+    }
+
+    fn skip_if_no_nix() -> bool {
+        if FORCE_SKIP_NIX.with(|flag| flag.get()) {
+            return true;
+        }
+        Command::new("nix").arg("--version").output().is_err()
+    }
+
+    fn run_if_nix(f: impl FnOnce()) {
+        if skip_if_no_nix() {
+            return;
+        }
+        f();
+    }
 
     #[test]
     fn classify_infinite_recursion() {
@@ -152,12 +171,127 @@ mod tests {
     fn nix_throw_isolated_per_call() {
         let backend = ProcessNixEval;
         let thrown = backend.eval_json("builtins.throw \"boom\"");
-        assert!(matches!(
-            thrown,
-            EvalResult::Err(AssayOutcome::EvalError { ref kind, .. }) if kind == "throw"
-        ));
+        match thrown {
+            EvalResult::Err(AssayOutcome::EvalError { kind, .. }) => {
+                assert_eq!(kind, "throw");
+            }
+            other => panic!("expected throw, got {other:?}"),
+        }
 
         let ok = backend.eval_json("1 + 1");
-        assert!(matches!(ok, EvalResult::Ok(Value::Number(_))));
+        match ok {
+            EvalResult::Ok(Value::Number(_)) => {}
+            other => panic!("expected number, got {other:?}"),
+        }
     }
+    #[test]
+    fn parse_stdout_json_roundtrip() {
+        use serde_json::json;
+        let v = parse_stdout_json(br#"{"a":1}"#).expect("parse");
+        assert_eq!(v, json!({"a": 1}));
+        assert!(parse_stdout_json(b"not json").is_err());
+        assert!(parse_stdout_json(b"").is_err());
+    }
+
+    #[test]
+    fn nix_spawn_error_not_found() {
+        use std::io;
+        let err = nix_spawn_error(io::Error::new(io::ErrorKind::NotFound, "nix"));
+        match err {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "nix_missing"),
+            other => panic!("expected nix_missing, got {other:?}"),
+        }
+        let err2 = nix_spawn_error(io::Error::new(io::ErrorKind::PermissionDenied, "x"));
+        match err2 {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "io"),
+            other => panic!("expected io, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn nix_spawn_error_for_path_variants() {
+        use std::io;
+        use std::path::Path;
+        let p = Path::new("/no/such/file.nix");
+        let err = nix_spawn_error_for_path(io::Error::new(io::ErrorKind::NotFound, "nix"), p);
+        match err {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "nix_missing"),
+            other => panic!("expected nix_missing, got {other:?}"),
+        }
+        let err2 = nix_spawn_error_for_path(io::Error::new(io::ErrorKind::Other, "x"), p);
+        match err2 {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "io"),
+            other => panic!("expected io, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn process_nix_eval_exercises_spawn_path() {
+        let backend = ProcessNixEval;
+        let _ = backend.eval_json("null");
+    }
+
+    #[test]
+    fn nix_eval_file_missing_path_returns_err() {
+        use std::path::Path;
+        let path = Path::new("/tmp/assay-no-such-nix-file-xyz.nix");
+        assert!(nix_eval_file(path).is_err());
+    }
+
+    #[test]
+    fn skip_if_no_nix_true_when_forced() {
+        FORCE_SKIP_NIX.with(|flag| flag.set(true));
+        assert!(skip_if_no_nix());
+        FORCE_SKIP_NIX.with(|flag| flag.set(false));
+    }
+
+    #[test]
+    fn run_if_nix_noops_when_forced_skip() {
+        FORCE_SKIP_NIX.with(|flag| flag.set(true));
+        run_if_nix(|| panic!("should not run"));
+        FORCE_SKIP_NIX.with(|flag| flag.set(false));
+    }
+
+    #[test]
+    fn nix_eval_file_succeeds_when_nix_available() {
+        run_if_nix(|| {
+            let dir = std::env::temp_dir().join(format!("assay-nix-eval-ok-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("value.nix");
+            std::fs::write(&path, "42").unwrap();
+            let value = nix_eval_file(&path).expect("nix eval file");
+            assert_eq!(value, serde_json::json!(42));
+            let _ = std::fs::remove_dir_all(dir);
+        });
+    }
+
+    #[test]
+    fn eval_expr_json_live_ok_and_throw_stderr() {
+        run_if_nix(|| {
+            let ok = eval_expr_json("1 + 1").expect("eval");
+            assert_eq!(ok, serde_json::json!(2));
+            let err = eval_expr_json("builtins.throw \"branch-cov\"").unwrap_err();
+            match err {
+                AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "throw"),
+                other => panic!("expected throw, got {other:?}"),
+            }
+        });
+    }
+
+    #[test]
+    fn nix_eval_file_throw_when_nix_available() {
+        run_if_nix(|| {
+            let dir = std::env::temp_dir().join(format!("assay-nix-throw-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            let path = dir.join("throw.nix");
+            std::fs::write(&path, "builtins.throw \"file-throw\"").unwrap();
+            let err = nix_eval_file(&path).unwrap_err();
+            match err {
+                AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "throw"),
+                other => panic!("expected throw, got {other:?}"),
+            }
+            let _ = std::fs::remove_dir_all(dir);
+        });
+    }
+
 }

@@ -1,14 +1,10 @@
 # Colocated suite: systemPackages from stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
-      pkgs = { networkmanager = "networkmanager"; };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages)
-'';
+  pkgs = { networkmanager = "networkmanager"; };
+  mod = import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "nmtui" {
-    systemPackages = assay.eq packages ''[ "networkmanager" ]'';
+    systemPackages = assay.eq mod.environment.systemPackages [ "networkmanager" ];
   }

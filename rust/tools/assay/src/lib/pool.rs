@@ -223,4 +223,17 @@ mod tests {
         let pool = SemaphoreWorkerPool::new(0);
         assert_eq!(pool.max_concurrency(), 1);
     }
+
+    #[test]
+    fn semaphore_pool_waits_for_slot_release() {
+        let pool = Arc::new(SemaphoreWorkerPool::new(1));
+        let guard = pool.acquire().unwrap();
+        let pool2 = Arc::clone(&pool);
+        let handle = std::thread::spawn(move || {
+            let _second = pool2.acquire().unwrap();
+        });
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        drop(guard);
+        handle.join().unwrap();
+    }
 }

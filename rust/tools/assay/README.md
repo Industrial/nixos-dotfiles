@@ -18,6 +18,8 @@ Reimplementation plan: [history/20260804-002152-assay-id-effect-reimplementation
 
 Nix DSL reference: [common/assay/README.md](../../../common/assay/README.md).
 
+Competitive comparison (measured): [COMPARISON.md](COMPARISON.md).
+
 ## Architecture
 
 ```text

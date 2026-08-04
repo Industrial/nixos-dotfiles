@@ -1,14 +1,12 @@
 # Colocated suite: lidarr systemd unit description.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  mod = ''
-    (let
+  mod = let
       pkgs = { lidarr = "lidarr"; };
-    in import ${modFile} { inherit pkgs; })
-  '';
+    in import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "lidarr" {
-    description = assay.eq "${mod}.systemd.services.lidarr.description" ''"Lidarr Daemon"'';
-    systemUser = assay.eq "${mod}.users.users.lidarr.isSystemUser" "true";
+    description = assay.eq mod.systemd.services.lidarr.description "Lidarr Daemon";
+    systemUser = assay.eq mod.users.users.lidarr.isSystemUser true;
   }

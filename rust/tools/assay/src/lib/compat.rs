@@ -108,12 +108,39 @@ fn nix_string_literal(s: &str) -> String {
     format!("\"{escaped}\"")
 }
 
+fn is_valid_nix_ident(s: &str) -> bool {
+    if s.is_empty() {
+        return false;
+    }
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '\'')
+}
+
+fn nix_attr_name(s: &str) -> String {
+    if is_valid_nix_ident(s) {
+        s.to_string()
+    } else {
+        nix_string_literal(s)
+    }
+}
+
 /// Convert a JSON field to a Nix expression string (strings pass through as source).
+///
+/// Used for nix-unit compat suites where `expr` / `expected` strings are Nix source.
 pub fn field_to_nix(v: &Value) -> anyhow::Result<String> {
     match v {
         Value::String(s) => Ok(s.clone()),
         other => Ok(value_to_nix_expr(other)),
     }
+}
+
+/// Serialize a `nix eval --json` value as a Nix expression (including strings).
+pub fn json_value_to_nix(v: &Value) -> String {
+    value_to_nix_expr(v)
 }
 
 fn value_to_nix_expr(v: &Value) -> String {
@@ -127,11 +154,14 @@ fn value_to_nix_expr(v: &Value) -> String {
             format!("[{}]", inner.join(" "))
         }
         Value::Object(map) => {
+            if map.is_empty() {
+                return "{}".into();
+            }
             let inner: Vec<_> = map
                 .iter()
-                .map(|(k, v)| format!("{k} = {}", value_to_nix_expr(v)))
+                .map(|(k, v)| format!("{} = {}", nix_attr_name(k), value_to_nix_expr(v)))
                 .collect();
-            format!("{{ {} }}", inner.join("; "))
+            format!("{{ {}; }}", inner.join("; "))
         }
     }
 }
@@ -186,4 +216,106 @@ mod tests {
         let suite = load_compat_suite(&path).expect("load suite.json");
         assert!(suite.cases.len() >= 5);
     }
+    #[test]
+    fn json_value_to_nix_covers_types() {
+        assert_eq!(json_value_to_nix(&json!(null)), "null");
+        assert_eq!(json_value_to_nix(&json!(true)), "true");
+        assert_eq!(json_value_to_nix(&json!(1)), "1");
+        assert_eq!(json_value_to_nix(&json!("hi")), "\"hi\"");
+        assert_eq!(json_value_to_nix(&json!([])), "[]");
+        assert_eq!(json_value_to_nix(&json!({})), "{}");
+    }
+
+    #[test]
+    fn load_compat_unsupported_extension() {
+        let path = std::env::temp_dir().join("assay-bad.ext");
+        std::fs::write(&path, "{}").unwrap();
+        assert!(load_compat_suite(&path).is_err());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn parse_compat_json_rejects_non_object() {
+        assert!(parse_compat_json(&json!([])).is_err());
+    }
+
+    #[test]
+    fn parse_compat_json_rejects_bad_case_shape() {
+        assert!(parse_compat_json(&json!({"x": "not-object"})).is_err());
+        assert!(parse_compat_json(&json!({"x": {"expected": "1"}})).is_err());
+        assert!(parse_compat_json(&json!({"x": {"expr": "1"}})).is_err());
+    }
+
+    #[test]
+    fn is_valid_nix_ident_and_attr_name() {
+        assert!(!is_valid_nix_ident(""));
+        assert!(!is_valid_nix_ident("1bad"));
+        assert!(is_valid_nix_ident("foo-bar"));
+        assert!(is_valid_nix_ident("_x"));
+        assert!(!is_valid_nix_ident("has space"));
+        assert!(!is_valid_nix_ident("good@bad"));
+        assert!(!is_valid_nix_ident("ab.c"));
+        assert_eq!(nix_attr_name("valid"), "valid");
+        assert_eq!(nix_attr_name("bad key"), "\"bad key\"");
+    }
+
+    #[test]
+    fn json_value_to_nix_nested_and_escaped() {
+        let nested = json!({"a": 1, "bad key": [true, "x\"y"]});
+        let rendered = json_value_to_nix(&nested);
+        assert!(rendered.contains("a = 1"));
+        assert!(rendered.contains("\"bad key\""));
+        assert!(rendered.contains("true"));
+        assert!(rendered.contains("x\\\"y"));
+        assert!(nix_string_literal("a\"b").contains("\\\""));
+    }
+
+    #[test]
+    fn field_to_nix_accepts_json_literals() {
+        assert_eq!(field_to_nix(&json!("expr")).unwrap(), "expr");
+        assert_eq!(field_to_nix(&json!(42)).unwrap(), "42");
+    }
+
+    #[test]
+    fn load_nix_compat_suite_propagates_error_without_sidecar() {
+        let dir = std::env::temp_dir().join(format!(
+            "assay-compat-no-sidecar-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let nix_path = dir.join("suite.nix");
+        std::fs::write(&nix_path, "invalid nix {{{").unwrap();
+        assert!(load_compat_suite(&nix_path).is_err());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn load_nix_compat_suite_uses_sidecar_json() {
+        let dir = std::env::temp_dir().join(format!(
+            "assay-compat-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let nix_path = dir.join("suite.nix");
+        let json_path = dir.join("suite.json");
+        std::fs::write(&nix_path, "invalid nix {{{").unwrap();
+        std::fs::write(
+            &json_path,
+            r#"{"sidecar": {"expr": "1", "expected": "1"}}"#,
+        )
+        .unwrap();
+        let suite = load_compat_suite(&nix_path).expect("sidecar fallback");
+        assert_eq!(suite.cases.len(), 1);
+        assert_eq!(suite.cases[0].name, "sidecar");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
 }

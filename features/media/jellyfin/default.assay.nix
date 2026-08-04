@@ -1,9 +1,7 @@
 # Colocated suite: module top-level shape with stubbed args.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  expr = ''
-    (import ${modFile} {
+  mod = import ./default.nix {
       settings = { hostname = "testhost"; username = "alice"; useremail = "a@b.c"; };
       pkgs = {
         callPackage = path: args: "pkg";
@@ -17,9 +15,9 @@ let
       };
       lib = (import <nixpkgs> {}).lib;
       config = { };
-    })
-  '';
+    };
+
 in
   assay.suite "jellyfin" {
-    shape = assay.hasAttrs expr [ "services" "systemd" "users" ];
+    shape = assay.hasAttrs mod [ "services" "systemd" "users" ];
   }

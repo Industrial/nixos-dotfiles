@@ -58,6 +58,14 @@
     cargo = pkgs-unstable.cargo;
   };
 
+  # Nightly toolchain for cargo-llvm-cov --branch (stable rejects -Z coverage-options=branch).
+  rust-nightly = inputs.fenix.packages.${system}.complete.withComponents [
+    "rustc"
+    "cargo"
+    "rust-std"
+    "llvm-tools-preview"
+  ];
+
   lean-ctx = pkgs.rustPlatform.buildRustPackage rec {
     pname = "lean-ctx";
     version = "3.1.5";
@@ -75,6 +83,8 @@ in {
     RUST_BACKTRACE = "1";
     RUST_LOG = "debug";
     NIXPKGS_ALLOW_UNFREE = "1";
+    LLVM_COV = "${pkgs.llvmPackages.llvm}/bin/llvm-cov";
+    LLVM_PROFDATA = "${pkgs.llvmPackages.llvm}/bin/llvm-profdata";
   };
 
   packages = with pkgs; [
@@ -90,6 +100,10 @@ in {
     rustfmt
     clippy
     rust-analyzer
+    cargo-llvm-cov
+    cargo-nextest
+    # llvm-cov/profdata for cargo-llvm-cov (rustup llvm-tools-preview not in nix rustc)
+    llvmPackages.llvm
 
     systemd
     libinput
@@ -159,6 +173,18 @@ in {
         treefmt
       '';
     };
+
+    assay-coverage = {
+      exec = ''
+        set -euo pipefail
+        export PATH="${rust-nightly}/bin:$PATH"
+        unset RUSTC_WRAPPER || true
+        cd "$DEVENV_ROOT/rust"
+        cargo llvm-cov nextest -p assay --lib --branch \
+          --fail-under-lines 95 --fail-under-regions 95 \
+          --no-cfg-coverage
+      '';
+    };
   };
 
   tasks = {
@@ -190,6 +216,15 @@ in {
         pass_filenames = false;
         always_run = true;
         entry = "devenv shell -- assay run .";
+      };
+      moon-coverage = {
+        enable = true;
+        stages = ["pre-commit" "pre-push"];
+        name = "moon coverage (assay)";
+        description = "Run assay-coverage (≥95% lines/branches via llvm-cov)";
+        pass_filenames = false;
+        always_run = true;
+        entry = "devenv shell -- assay-coverage";
       };
     };
   };

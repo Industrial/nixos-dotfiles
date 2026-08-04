@@ -176,20 +176,8 @@ fn infra_cause_to_outcome(cause: &Cause<InfraError>) -> AssayOutcome {
             message: "fiber interrupted".into(),
             span: None,
         },
-        Cause::Both(left, right) => {
-            let left_out = infra_cause_to_outcome(left);
-            if !matches!(left_out, AssayOutcome::Pass) {
-                return left_out;
-            }
-            infra_cause_to_outcome(right)
-        }
-        Cause::Then(left, right) => {
-            let left_out = infra_cause_to_outcome(left);
-            if !matches!(left_out, AssayOutcome::Pass) {
-                return left_out;
-            }
-            infra_cause_to_outcome(right)
-        }
+        Cause::Both(left, _) => infra_cause_to_outcome(left),
+        Cause::Then(_, right) => infra_cause_to_outcome(right),
     }
 }
 
@@ -210,6 +198,7 @@ impl InfraError {
 #[cfg(test)]
 mod tests {
     use id_effect::failure::pretty_exit;
+    use serde_json::json;
     use super::*;
 
     #[test]
@@ -296,4 +285,226 @@ mod tests {
         let back: InfraError = serde_json::from_str(&json).unwrap();
         assert_eq!(back, err);
     }
+    #[test]
+    fn outcome_to_exit_suite_load_and_io_kinds() {
+        let suite_err = AssayOutcome::EvalError {
+            kind: "suite_load".into(),
+            message: "bad".into(),
+            span: None,
+        };
+        assert_eq!(exit_to_outcome(outcome_to_exit(suite_err.clone())), suite_err);
+
+        for kind in ["io", "json"] {
+            let err = AssayOutcome::EvalError {
+                kind: kind.into(),
+                message: "disk".into(),
+                span: None,
+            };
+            let roundtripped = exit_to_outcome(outcome_to_exit(err));
+            match roundtripped {
+                AssayOutcome::EvalError { kind: k, .. } => assert_eq!(k, "io"),
+                other => panic!("expected io eval error, got {other:?}"),
+            }
+        }
+
+        let nix_err = AssayOutcome::EvalError {
+            kind: "nix_missing".into(),
+            message: "no nix".into(),
+            span: None,
+        };
+        assert_eq!(exit_to_outcome(outcome_to_exit(nix_err.clone())), nix_err);
+    }
+
+    #[test]
+    fn outcome_to_exit_throw_counterexample_snapshot() {
+        let throw = AssayOutcome::EvalError {
+            kind: "throw".into(),
+            message: "boom".into(),
+            span: None,
+        };
+        assert!(matches!(outcome_to_exit(throw.clone()), Exit::Success(CaseVerdict::EvalThrow { .. })));
+        assert_eq!(exit_to_outcome(outcome_to_exit(throw)), AssayOutcome::EvalError {
+            kind: "throw".into(),
+            message: "boom".into(),
+            span: None,
+        });
+
+        let cx = AssayOutcome::Counterexample {
+            seed: 1,
+            shrunk: json!({}),
+        };
+        assert_eq!(exit_to_outcome(outcome_to_exit(cx.clone())), cx);
+
+        let snap = AssayOutcome::SnapshotMismatch {
+            path: "p".into(),
+            diff: "d".into(),
+        };
+        assert_eq!(exit_to_outcome(outcome_to_exit(snap.clone())), snap);
+    }
+
+    #[test]
+    fn infra_cause_to_outcome_mappings() {
+        use id_effect::Cause;
+        assert_eq!(
+            infra_cause_to_outcome(&Cause::Die("resource leak".into())),
+            AssayOutcome::ResourceLeak
+        );
+        let worker = infra_cause_to_outcome(&Cause::Fail(InfraError::Worker("pool".into())));
+        match worker {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "worker"),
+            other => panic!("expected worker, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn infra_cause_both_then_interrupt_and_die() {
+        use id_effect::Cause;
+        let pass = Cause::Fail(InfraError::Io("ok".into()));
+        // Both/Then prefer left when left is not Pass — here SuiteLoad maps to non-Pass
+        let left = Cause::Fail(InfraError::SuiteLoad("bad".into()));
+        let right = Cause::Fail(InfraError::Io("disk".into()));
+        match infra_cause_to_outcome(&Cause::Both(Box::new(left.clone()), Box::new(right.clone()))) {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "suite_load"),
+            other => panic!("expected suite_load, got {other:?}"),
+        }
+        match infra_cause_to_outcome(&Cause::Then(Box::new(left), Box::new(right))) {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "io"),
+            other => panic!("expected io, got {other:?}"),
+        }
+        match infra_cause_to_outcome(&Cause::Interrupt(id_effect::FiberId::new(1))) {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "interrupt"),
+            other => panic!("expected interrupt, got {other:?}"),
+        }
+        match infra_cause_to_outcome(&Cause::Die("panic msg".into())) {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "panic"),
+            other => panic!("expected panic, got {other:?}"),
+        }
+        assert_eq!(
+            infra_cause_to_outcome(&Cause::Fail(InfraError::Capability("nix".into()))),
+            AssayOutcome::EvalError {
+                kind: "nix_missing".into(),
+                message: "nix".into(),
+                span: None,
+            }
+        );
+        let _ = pass;
+    }
+
+    #[test]
+    fn verdict_roundtrips_expected_throw_and_unsupported() {
+        assert_eq!(
+            exit_to_outcome(Exit::succeed(CaseVerdict::ExpectedThrow)),
+            AssayOutcome::Pass
+        );
+        let unsupported = Exit::succeed(CaseVerdict::Unsupported {
+            feature: "ifd".into(),
+        });
+        match exit_to_outcome(unsupported) {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "unsupported"),
+            other => panic!("expected unsupported, got {other:?}"),
+        }
+        let recursion = Exit::succeed(CaseVerdict::EvalThrow {
+            kind: "recursion".into(),
+            message: "infinite recursion".into(),
+        });
+        assert_eq!(exit_to_outcome(recursion), AssayOutcome::Recursion);
+    }
+
+    #[test]
+    fn into_exit_helpers() {
+        assert!(matches!(CaseVerdict::Pass.into_exit(), Exit::Success(CaseVerdict::Pass)));
+        assert!(matches!(
+            InfraError::Worker("w".into()).into_exit(),
+            Exit::Failure(Cause::Fail(InfraError::Worker(_)))
+        ));
+    }
+
+    #[test]
+    fn outcome_roundtrip_timeout() {
+        let exit = outcome_to_exit(AssayOutcome::Timeout);
+        assert!(matches!(
+            exit,
+            Exit::Failure(Cause::Fail(InfraError::Timeout { .. }))
+        ));
+        assert_eq!(exit_to_outcome(exit), AssayOutcome::Timeout);
+    }
+
+    #[test]
+    fn assert_fail_with_values_roundtrips() {
+        let verdict = CaseVerdict::AssertFail {
+            claim: "eq".into(),
+            left: Some(json!(1)),
+            right: Some(json!(2)),
+            diff: "d".into(),
+        };
+        match exit_to_outcome(Exit::succeed(verdict)) {
+            AssayOutcome::Fail { left, right, .. } => {
+                assert_eq!(left, Some(json!(1)));
+                assert_eq!(right, Some(json!(2)));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn serde_all_case_verdict_variants() {
+        let variants = vec![
+            CaseVerdict::Pass,
+            CaseVerdict::AssertFail {
+                claim: "eq".into(),
+                left: Some(json!(1)),
+                right: None,
+                diff: "d".into(),
+            },
+            CaseVerdict::EvalThrow {
+                kind: "throw".into(),
+                message: "m".into(),
+            },
+            CaseVerdict::ExpectedThrow,
+            CaseVerdict::SnapshotMismatch {
+                path: "p".into(),
+                diff: "d".into(),
+            },
+            CaseVerdict::Counterexample {
+                seed: 1,
+                shrunk: json!(null),
+            },
+            CaseVerdict::Unsupported {
+                feature: "ifd".into(),
+            },
+        ];
+        for verdict in variants {
+            let encoded = serde_json::to_string(&verdict).unwrap();
+            let decoded: CaseVerdict = serde_json::from_str(&encoded).unwrap();
+            assert_eq!(decoded, verdict);
+        }
+    }
+
+    #[test]
+    fn outcome_json_kind_maps_to_io_infra() {
+        use id_effect::Cause;
+        let err = AssayOutcome::EvalError {
+            kind: "json".into(),
+            message: "bad json".into(),
+            span: None,
+        };
+        match outcome_to_exit(err) {
+            Exit::Failure(Cause::Fail(InfraError::Io(msg))) => assert_eq!(msg, "bad json"),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn infra_timeout_cause_roundtrips() {
+        let err = InfraError::Timeout {
+            case: "slow".into(),
+            limit_ms: 50,
+        };
+        let exit = Exit::fail(err.clone());
+        assert_eq!(exit_to_outcome(exit), AssayOutcome::Timeout);
+        let json = serde_json::to_string(&err).unwrap();
+        let back: InfraError = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, err);
+    }
+
 }

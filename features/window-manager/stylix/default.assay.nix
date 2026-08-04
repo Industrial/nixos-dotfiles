@@ -1,9 +1,7 @@
 # Colocated suite: stylix autoEnable.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  mod = ''
-    (import ${modFile} {
+  mod = import ./default.nix {
       pkgs = {
         callPackage = path: args: "theme";
         noto-fonts-color-emoji = "emoji";
@@ -16,9 +14,9 @@ let
         in {}
       );
       lib = (import <nixpkgs> {}).lib;
-    })
-  '';
+    };
+
 in
   assay.suite "stylix" {
-    autoEnable = assay.eq "${mod}.stylix.autoEnable" "true";
+    autoEnable = assay.eq mod.stylix.autoEnable true;
   }

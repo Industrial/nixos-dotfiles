@@ -23,3 +23,17 @@ tasks:
     options:
       # Whole-repo discovery; do not treat as always-cacheable across env changes.
       cache: true
+  coverage:
+    description: 'Assay crate llvm-cov (≥95% lines/regions; nightly --branch)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'assay-coverage'
+    inputs:
+      - 'rust/tools/assay/src/**/*'
+      - 'rust/tools/assay/Cargo.toml'
+      - 'rust/Cargo.toml'
+      - 'rust/Cargo.lock'
+    options:
+      cache: true

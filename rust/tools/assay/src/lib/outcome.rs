@@ -78,4 +78,31 @@ mod tests {
             }
         );
     }
+
+    #[test]
+    fn run_case_string_panic_payload() {
+        let outcome = run_case(|| panic!("{}", "string panic"));
+        match outcome {
+            AssayOutcome::EvalError { kind, message, .. } => {
+                assert_eq!(kind, "panic");
+                assert_eq!(message, "string panic");
+            }
+            other => panic!("expected panic eval error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn run_case_unknown_panic_payload() {
+        let outcome = run_case(|| {
+            std::panic::panic_any(42i32);
+        });
+        assert_eq!(
+            outcome,
+            AssayOutcome::EvalError {
+                kind: "panic".to_string(),
+                message: "unknown panic".to_string(),
+                span: None,
+            }
+        );
+    }
 }

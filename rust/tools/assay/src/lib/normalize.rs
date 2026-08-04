@@ -180,6 +180,15 @@ mod tests {
     }
 
     #[test]
+    fn size_budget_returns_marker() {
+        let huge = json!("x".repeat(MAX_SIZE + 1));
+        let normalized = normalize_value(&huge);
+        let serialized = serde_json::to_string(&normalized).expect("serialize");
+        assert!(serialized.contains("budget_exceeded"));
+        assert!(serialized.contains("size"));
+    }
+
+    #[test]
     fn recurses_through_arrays_and_objects() {
         let input = json!({
             "items": [
@@ -198,5 +207,16 @@ mod tests {
                 "meta": { "count": 2 },
             })
         );
+    }
+
+    #[test]
+    fn derivation_projection_skips_non_string_metadata() {
+        let drv = json!({
+            "type": "derivation",
+            "outPath": 123,
+            "name": false,
+            "drvPath": "/nix/store/x.drv"
+        });
+        assert_eq!(normalize_value(&drv), json!({"type": "derivation"}));
     }
 }

@@ -51,42 +51,67 @@ fn decode_claim_unknown(value: &Unknown) -> Result<Claim, ParseError> {
 
     let tag = require_str(obj, "claim")?;
     match tag.as_str() {
-        "eq" => Ok(Claim::Eq {
-            left_expr: nix_field(obj, "expr")?,
-            right_expr: nix_field(obj, "expected")?,
-        }),
+        "eq" => {
+            if obj.contains_key("actual") {
+                Ok(Claim::EqValues {
+                    left: json_field(obj, "actual")?,
+                    right: json_field(obj, "expected")?,
+                })
+            } else {
+                Ok(Claim::Eq {
+                    left_expr: source_field(obj, "expr")?,
+                    right_expr: source_field(obj, "expected")?,
+                })
+            }
+        }
         "throws" => {
             let pattern = match obj.get("pattern") {
                 None | Some(Unknown::Null) => None,
-                Some(other) => Some(nix_field_from_unknown(other, "pattern")?),
+                Some(other) => Some(source_field_from_unknown(other, "pattern")?),
             };
             Ok(Claim::Throws {
-                expr: nix_field(obj, "expr")?,
+                expr: source_field(obj, "expr")?,
                 pattern,
             })
         }
-        "subset" => Ok(Claim::Subset {
-            expr: nix_field(obj, "expr")?,
-            expected_subset: json_field(obj, "expected")?,
-        }),
+        "subset" => {
+            if obj.contains_key("actual") {
+                Ok(Claim::SubsetValues {
+                    actual: json_field(obj, "actual")?,
+                    expected_subset: json_field(obj, "expected")?,
+                })
+            } else {
+                Ok(Claim::Subset {
+                    expr: source_field(obj, "expr")?,
+                    expected_subset: json_field(obj, "expected")?,
+                })
+            }
+        }
         "hasAttrs" => {
             let attrs = string_array_field(obj, "attrs")?;
-            Ok(Claim::HasAttrs {
-                expr: nix_field(obj, "expr")?,
-                attrs,
-            })
+            if obj.contains_key("actual") {
+                Ok(Claim::HasAttrsValues {
+                    actual: json_field(obj, "actual")?,
+                    attrs,
+                })
+            } else {
+                Ok(Claim::HasAttrs {
+                    expr: source_field(obj, "expr")?,
+                    attrs,
+                })
+            }
         }
         "snapshot" => Ok(Claim::Snapshot {
             name: require_str(obj, "name")?,
-            expr: nix_field(obj, "expr")?,
+            expr: source_field(obj, "expr")?,
         }),
         "forces" => Ok(Claim::Forces {
-            expr: nix_field(obj, "expr")?,
+            expr: source_field(obj, "expr")?,
             paths: string_array_field(obj, "paths")?,
         }),
         "module" => Ok(Claim::Module {
-            imports_expr: nix_field(obj, "imports")?,
-            args_expr: nix_field(obj, "args")?,
+            imports_expr: source_field(obj, "imports")?,
+            args_expr: source_field(obj, "args")?,
             expect: json_field(obj, "expect")?,
         }),
         "law" => Ok(Claim::Law {
@@ -116,6 +141,11 @@ fn encode_claim_unknown(claim: Claim) -> Unknown {
             insert_nix_field(&mut obj, "expr", &left_expr);
             insert_nix_field(&mut obj, "expected", &right_expr);
         }
+        Claim::EqValues { left, right } => {
+            obj.insert("claim".into(), Unknown::String("eq".into()));
+            obj.insert("actual".into(), unknown_from_serde_json(left));
+            obj.insert("expected".into(), unknown_from_serde_json(right));
+        }
         Claim::Throws { expr, pattern } => {
             obj.insert("claim".into(), Unknown::String("throws".into()));
             insert_nix_field(&mut obj, "expr", &expr);
@@ -134,9 +164,28 @@ fn encode_claim_unknown(claim: Claim) -> Unknown {
                 unknown_from_serde_json(expected_subset),
             );
         }
+        Claim::SubsetValues {
+            actual,
+            expected_subset,
+        } => {
+            obj.insert("claim".into(), Unknown::String("subset".into()));
+            obj.insert("actual".into(), unknown_from_serde_json(actual));
+            obj.insert(
+                "expected".into(),
+                unknown_from_serde_json(expected_subset),
+            );
+        }
         Claim::HasAttrs { expr, attrs } => {
             obj.insert("claim".into(), Unknown::String("hasAttrs".into()));
             insert_nix_field(&mut obj, "expr", &expr);
+            obj.insert(
+                "attrs".into(),
+                Unknown::Array(attrs.into_iter().map(Unknown::String).collect()),
+            );
+        }
+        Claim::HasAttrsValues { actual, attrs } => {
+            obj.insert("claim".into(), Unknown::String("hasAttrs".into()));
+            obj.insert("actual".into(), unknown_from_serde_json(actual));
             obj.insert(
                 "attrs".into(),
                 Unknown::Array(attrs.into_iter().map(Unknown::String).collect()),
@@ -196,14 +245,14 @@ fn require_str(obj: &BTreeMap<String, Unknown>, key: &str) -> Result<String, Par
     }
 }
 
-fn nix_field(obj: &BTreeMap<String, Unknown>, key: &str) -> Result<String, ParseError> {
+fn source_field(obj: &BTreeMap<String, Unknown>, key: &str) -> Result<String, ParseError> {
     let value = obj
         .get(key)
         .ok_or_else(|| ParseError::new(key, format!("missing field {key}")))?;
-    nix_field_from_unknown(value, key)
+    source_field_from_unknown(value, key)
 }
 
-fn nix_field_from_unknown(value: &Unknown, key: &str) -> Result<String, ParseError> {
+fn source_field_from_unknown(value: &Unknown, key: &str) -> Result<String, ParseError> {
     let json = unknown_to_json(value);
     field_to_nix(&json).map_err(|err| ParseError::new(key, err.to_string()))
 }
@@ -310,6 +359,14 @@ mod tests {
     }
 
     #[test]
+    fn eq_values_claim_round_trips() {
+        round_trip(Claim::EqValues {
+            left: json!(2),
+            right: json!(2),
+        });
+    }
+
+    #[test]
     fn throws_claim_round_trips_with_pattern() {
         round_trip(Claim::Throws {
             expr: "builtins.throw \"x\"".into(),
@@ -336,6 +393,11 @@ mod tests {
             seed: 7,
             trials: Some(64),
         });
+        round_trip(Claim::Prop {
+            name: "always_pass".into(),
+            seed: 8,
+            trials: None,
+        });
     }
 
     #[test]
@@ -351,4 +413,166 @@ mod tests {
         assert!(matches!(cases[0].1, Claim::Eq { .. }));
         assert!(matches!(cases[1].1, Claim::Law { .. }));
     }
+    #[test]
+    fn subset_values_claim_round_trips() {
+        round_trip(Claim::SubsetValues {
+            actual: json!({"a": 1}),
+            expected_subset: json!({"a": 1}),
+        });
+    }
+
+    #[test]
+    fn hasattrs_values_claim_round_trips() {
+        round_trip(Claim::HasAttrsValues {
+            actual: json!({"a": 1}),
+            attrs: vec!["a".into()],
+        });
+    }
+
+    #[test]
+    fn decode_claim_json_rejects_unknown() {
+        assert!(decode_claim_json(&json!({"claim": "nope"})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "eq"})).is_err());
+    }
+
+    #[test]
+    fn value_mode_eq_uses_actual_key() {
+        let encoded = encode_claim_json(&Claim::EqValues {
+            left: json!(1),
+            right: json!(2),
+        });
+        assert!(encoded.get("actual").is_some());
+        let decoded = decode_claim_json(&encoded).expect("decode");
+        assert!(matches!(decoded, Claim::EqValues { .. }));
+    }
+
+    #[test]
+    fn throws_without_pattern_round_trips() {
+        round_trip(Claim::Throws {
+            expr: "builtins.throw \"x\"".into(),
+            pattern: None,
+        });
+    }
+
+    #[test]
+    fn snapshot_forces_module_round_trip() {
+        round_trip(Claim::Snapshot {
+            name: "snap".into(),
+            expr: "1".into(),
+        });
+        round_trip(Claim::Forces {
+            expr: "x".into(),
+            paths: vec!["p".into()],
+        });
+        round_trip(Claim::Module {
+            imports_expr: "[]".into(),
+            args_expr: "{}".into(),
+            expect: json!({"ok": true}),
+        });
+    }
+
+    #[test]
+    fn hasattrs_expr_mode_round_trips() {
+        round_trip(Claim::HasAttrs {
+            expr: "{ a = 1; }".into(),
+            attrs: vec!["a".into()],
+        });
+    }
+
+    #[test]
+    fn decode_suite_cases_rejects_non_object() {
+        assert!(decode_suite_cases(&json!([])).is_err());
+    }
+
+    #[test]
+    fn decode_field_helper_errors() {
+        use id_effect::schema::unknown_from_serde_json;
+        let bad = unknown_from_serde_json(json!({"claim": 1}));
+        assert!(decode_claim_json(&json!({"claim": 1})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "eq"})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "law", "name": "x"})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": -1})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": 1, "trials": 9999999999i64})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": 1, "trials": "lots"})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "hasAttrs", "expr": "x", "attrs": [1]})).is_err());
+        assert!(decode_claim_json(&json!({"claim": "subset", "actual": {}})).is_err());
+        let _ = bad;
+    }
+
+    #[test]
+    fn claim_schema_has_schema_trait() {
+        let _ = Claim::schema();
+    }
+
+    #[test]
+    fn unknown_to_json_f64_nan_becomes_null() {
+        use id_effect::schema::Unknown;
+        let nan = Unknown::F64(f64::NAN);
+        assert_eq!(unknown_to_json(&nan), Value::Null);
+    }
+
+    #[test]
+    fn unknown_to_json_covers_all_variants() {
+        use id_effect::schema::Unknown;
+        assert_eq!(unknown_to_json(&Unknown::Bool(true)), Value::Bool(true));
+        assert_eq!(unknown_to_json(&Unknown::I64(3)), Value::Number(3.into()));
+        assert_eq!(
+            unknown_to_json(&Unknown::F64(1.5)),
+            Value::Number(serde_json::Number::from_f64(1.5).unwrap())
+        );
+        assert_eq!(
+            unknown_to_json(&Unknown::Array(vec![Unknown::Null])),
+            json!([null])
+        );
+        assert_eq!(
+            unknown_to_json(&Unknown::Object(BTreeMap::from([(
+                "k".into(),
+                Unknown::String("v".into()),
+            )]))),
+            json!({"k": "v"})
+        );
+    }
+
+    #[test]
+    fn law_seed_max_encodes_as_i64_max() {
+        let encoded = encode_claim_json(&Claim::Law {
+            name: "merge_identity".into(),
+            seed: u64::MAX,
+        });
+        assert_eq!(encoded["seed"], json!(i64::MAX));
+    }
+
+    #[test]
+    fn prop_optional_trials_null_and_valid() {
+        let without = decode_claim_json(&json!({
+            "claim": "prop",
+            "name": "gen_int",
+            "seed": 1
+        }))
+        .expect("decode");
+        assert!(matches!(without, Claim::Prop { trials: None, .. }));
+        let encoded = encode_claim_json(&without);
+        assert!(encoded.get("trials").is_none());
+
+        let with_valid = decode_claim_json(&json!({
+            "claim": "prop",
+            "name": "gen_int",
+            "seed": 1,
+            "trials": 42
+        }))
+        .expect("decode");
+        assert!(matches!(with_valid, Claim::Prop { trials: Some(42), .. }));
+    }
+
+    #[test]
+    fn throws_null_pattern_decodes_as_none() {
+        let decoded = decode_claim_json(&json!({
+            "claim": "throws",
+            "expr": "builtins.throw \"x\"",
+            "pattern": null
+        }))
+        .expect("decode");
+        assert!(matches!(decoded, Claim::Throws { pattern: None, .. }));
+    }
+
 }

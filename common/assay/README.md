@@ -35,14 +35,27 @@ assay.suite "arithmetic" {
 
 | Constructor | Fields | Meaning |
 |-------------|--------|---------|
-| `assay.eq expr expected` | `claim = "eq"` | Normalized structural equality |
-| `assay.throws expr pattern` | `claim = "throws"` | Eval fails; message matches regex `pattern` |
-| `assay.subset expr expected` | `claim = "subset"` | `expected` is a sub-attrset of `expr` |
-| `assay.hasAttrs expr attrs` | `claim = "hasAttrs"` | `expr` has every key in `attrs` |
+| `assay.eq actual expected` | `claim = "eq"`, `actual`, `expected` | Real Nix values; suite eval computes both; runner compares JSON (no re-eval) |
+| `assay.throws expr pattern` | `claim = "throws"`, `expr` (Nix **source string**) | Eval fails; optional message substring `pattern` |
+| `assay.subset actual expected` | `claim = "subset"`, `actual`, `expected` | `expected` is a sub-attrset of `actual` |
+| `assay.hasAttrs actual attrs` | `claim = "hasAttrs"`, `actual`, `attrs` | `actual` has every key in `attrs` |
 | `assay.snapshot name expr` | `claim = "snapshot"` | Golden compare via runner store |
 | `assay.module args` | `claim = "module"` | `lib.evalModules` + config predicates |
 | `assay.drv args` | `claim = "drv"` | Derivation projection before compare |
 | `assay.forces expr paths` | `claim = "forces"` | Only listed attrpaths may be forced |
+
+Prefer first-class values for `eq` / `subset` / `hasAttrs` (no quoted Nix blobs):
+
+```nix
+let
+  assay = import ./../../../common/assay/default.nix;
+  pkgs = { callPackage = path: args: "local-pkg"; };
+  mod = import ./default.nix { inherit pkgs; };
+in
+  assay.suite "context7" {
+    systemPackages = assay.eq mod.environment.systemPackages [ "local-pkg" ];
+  }
+```
 
 `module` and `drv` merge `args` into the claim; typical keys:
 
@@ -130,3 +143,16 @@ devenv shell -- nix eval --file common/assay/tests/dogfood.nix
 ```
 
 These check that the DSL and suites are valid Nix data, not that claims pass.
+
+### Value-mode claims (first-class Nix values)
+
+For `eq`, `subset`, and `hasAttrs`, suites may pass **already-evaluated JSON values** instead of Nix expression strings:
+
+- `eq`: use `actual` (or `left`/`right` value fields per schema) — not `expr`/`expected` strings
+- `subset`: `actual` + `expected` subset object
+- `hasAttrs`: `actual` + `attrs` list
+
+If the JSON object has an `actual` key, the runner uses value-mode variants (`EqValues`, `SubsetValues`, `HasAttrsValues`). Otherwise legacy expr strings are used.
+
+`throws` claims always keep Nix expression strings (and optional `pattern`).
+

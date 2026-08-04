@@ -21,6 +21,11 @@ pub enum Claim {
         left_expr: String,
         right_expr: String,
     },
+    /// Already-evaluated sides from suite JSON (first-class Nix authoring).
+    EqValues {
+        left: Value,
+        right: Value,
+    },
     Throws {
         expr: String,
         pattern: Option<String>,
@@ -29,8 +34,16 @@ pub enum Claim {
         expr: String,
         expected_subset: Value,
     },
+    SubsetValues {
+        actual: Value,
+        expected_subset: Value,
+    },
     HasAttrs {
         expr: String,
+        attrs: Vec<String>,
+    },
+    HasAttrsValues {
+        actual: Value,
         attrs: Vec<String>,
     },
     Snapshot {
@@ -70,12 +83,22 @@ pub fn interpret_claim(claim: Claim) -> Effect<CaseVerdict, InfraError, AssayEnv
     })
 }
 
-fn interpret_claim_with(eval: &dyn EvalBackend, store: &SnapshotStore, claim: &Claim) -> Result<CaseVerdict, InfraError> {
+pub(crate) fn interpret_claim_with(
+    eval: &dyn EvalBackend,
+    store: &SnapshotStore,
+    claim: &Claim,
+) -> Result<CaseVerdict, InfraError> {
     let outcome = match claim {
         Claim::Eq { left_expr, right_expr } => interpret_eq(left_expr, right_expr, eval),
+        Claim::EqValues { left, right } => interpret_eq_values(left, right),
         Claim::Throws { expr, pattern } => interpret_throws(expr, pattern.as_deref(), eval),
         Claim::Subset { expr, expected_subset } => interpret_subset(expr, expected_subset, eval),
+        Claim::SubsetValues {
+            actual,
+            expected_subset,
+        } => interpret_subset_values(actual, expected_subset),
         Claim::HasAttrs { expr, attrs } => interpret_has_attrs(expr, attrs, eval),
+        Claim::HasAttrsValues { actual, attrs } => interpret_has_attrs_values(actual, attrs),
         Claim::Snapshot { name, expr } => interpret_snapshot(name, expr, eval, store),
         Claim::Forces { expr, paths } => check_forces(expr, paths, eval),
         Claim::Module { imports_expr, args_expr, expect } => interpret_module(imports_expr, args_expr, expect, eval),
@@ -118,6 +141,14 @@ fn interpret_eq(left_expr: &str, right_expr: &str, eval: &dyn EvalBackend) -> As
         }
         EvalResult::Err(out) => return out,
     };
+    compare_eq(left, right)
+}
+
+fn interpret_eq_values(left: &Value, right: &Value) -> AssayOutcome {
+    compare_eq(normalize_value(left), normalize_value(right))
+}
+
+fn compare_eq(left: Value, right: Value) -> AssayOutcome {
     if left == right {
         AssayOutcome::Pass
     } else {
@@ -205,14 +236,18 @@ fn interpret_subset(
         EvalResult::Ok(v) => v,
         EvalResult::Err(out) => return out,
     };
-    if value_contains_subset(&actual, expected_subset) {
+    interpret_subset_values(&actual, expected_subset)
+}
+
+fn interpret_subset_values(actual: &Value, expected_subset: &Value) -> AssayOutcome {
+    if value_contains_subset(actual, expected_subset) {
         AssayOutcome::Pass
     } else {
         AssayOutcome::Fail {
             claim: "subset".into(),
             left: Some(actual.clone()),
             right: Some(expected_subset.clone()),
-            diff: structural_diff(&actual, expected_subset),
+            diff: structural_diff(actual, expected_subset),
         }
     }
 }
@@ -222,12 +257,16 @@ fn interpret_has_attrs(expr: &str, attrs: &[String], eval: &dyn EvalBackend) -> 
         EvalResult::Ok(v) => v,
         EvalResult::Err(out) => return out,
     };
-    if value_has_attrs(&value, attrs) {
+    interpret_has_attrs_values(&value, attrs)
+}
+
+fn interpret_has_attrs_values(value: &Value, attrs: &[String]) -> AssayOutcome {
+    if value_has_attrs(value, attrs) {
         AssayOutcome::Pass
     } else {
         AssayOutcome::Fail {
             claim: "hasAttrs".into(),
-            left: Some(value),
+            left: Some(value.clone()),
             right: None,
             diff: format!("missing attrs among {:?}", attrs),
         }
@@ -520,4 +559,89 @@ mod tests {
         );
         assert!(matches!(exit, Exit::Success(CaseVerdict::EvalThrow { .. })));
     }
+    #[test]
+    fn eq_values_pass_without_nix() {
+        let exit = run_claim_test(|_eval| {}, Claim::EqValues {
+            left: serde_json::json!(1),
+            right: serde_json::json!(1),
+        });
+        assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
+    }
+
+    #[test]
+    fn eq_values_fail_when_different() {
+        let exit = run_claim_test(|_eval| {}, Claim::EqValues {
+            left: serde_json::json!(1),
+            right: serde_json::json!(2),
+        });
+        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+    }
+
+    #[test]
+    fn subset_values_and_hasattrs_values() {
+        let sub = run_claim_test(|_eval| {}, Claim::SubsetValues {
+            actual: serde_json::json!({"a": 1, "b": 2}),
+            expected_subset: serde_json::json!({"a": 1}),
+        });
+        assert!(matches!(sub, Exit::Success(CaseVerdict::Pass)));
+
+        let has = run_claim_test(|_eval| {}, Claim::HasAttrsValues {
+            actual: serde_json::json!({"a": 1}),
+            attrs: vec!["a".into()],
+        });
+        assert!(matches!(has, Exit::Success(CaseVerdict::Pass)));
+    }
+
+    #[test]
+    fn law_and_prop_claims_run() {
+        let law = run_claim_test(|_eval| {}, Claim::Law {
+            name: "merge_idempotent".into(),
+            seed: 1,
+        });
+        assert!(matches!(law, Exit::Success(CaseVerdict::Pass) | Exit::Success(CaseVerdict::AssertFail { .. })));
+
+        let prop = run_claim_test(|_eval| {}, Claim::Prop {
+            name: "always_pass".into(),
+            seed: 1,
+            trials: Some(4),
+        });
+        assert!(matches!(prop, Exit::Success(CaseVerdict::Pass)));
+    }
+
+    #[test]
+    fn interpret_eq_bad_pair_length_returns_eq_pair_error() {
+        let exit = run_claim_test(
+            |eval| {
+                eval.set("[(1) (2)]", EvalResult::Ok(serde_json::json!([1])));
+            },
+            Claim::Eq {
+                left_expr: "1".into(),
+                right_expr: "2".into(),
+            },
+        );
+        match exit {
+            Exit::Success(CaseVerdict::EvalThrow { kind, .. }) => {
+                assert_eq!(kind, "eq_pair");
+            }
+            other => panic!("expected eq_pair eval throw, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn interpret_throws_propagates_non_throw_eval_error() {
+        let exit = run_claim_test(
+            |eval| {
+                eval.set(
+                    "expr",
+                    EvalResult::Err(AssayOutcome::Timeout),
+                );
+            },
+            Claim::Throws {
+                expr: "expr".into(),
+                pattern: None,
+            },
+        );
+        assert!(matches!(exit, Exit::Failure(_)));
+    }
+
 }

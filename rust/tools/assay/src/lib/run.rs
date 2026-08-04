@@ -9,6 +9,8 @@ use id_effect::{Cap, Cause, Effect, Exit, Needs};
 use serde::Serialize;
 
 use crate::assay_suite::load_assay_suite;
+use crate::batch::{partition_cases, run_batch};
+use crate::caps::NixEvaluatorKey;
 use crate::caps::{AssayEnv, NixWorkerPoolKey, SnapshotStoreKey};
 use crate::claims::Claim;
 use crate::timeout::interpret_claim_with_retry;
@@ -17,7 +19,7 @@ use crate::discover::{discover_suites, suite_kind, SuiteKind};
 use crate::outcome::AssayOutcome;
 use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RunOptions {
     pub update_snapshots: bool,
     pub json_output: bool,
@@ -25,6 +27,20 @@ pub struct RunOptions {
     pub case_timeout_ms: Option<u64>,
     /// Retry flaky nix eval via `retry_with_clock` (default off).
     pub retry_flaky_eval: bool,
+    /// Collapse batchable claims into one `nix eval` via `tryEval` (default on).
+    pub batch_eval: bool,
+}
+
+impl Default for RunOptions {
+    fn default() -> Self {
+        Self {
+            update_snapshots: false,
+            json_output: false,
+            case_timeout_ms: None,
+            retry_flaky_eval: false,
+            batch_eval: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -72,44 +88,87 @@ fn run_suite_on_env(
     env: &mut AssayEnv,
 ) -> Result<SuiteReport, InfraError> {
     apply_snapshot_update(env, opts.update_snapshots);
-    let retry = opts.retry_flaky_eval;
+    let t0 = std::time::Instant::now();
     let cases = load_suite_cases(path, env)?;
+    if std::env::var_os("ASSAY_TRACE").is_some() {
+        eprintln!(
+            "assay_trace: load_suite {:.1}ms ({} cases)",
+            t0.elapsed().as_secs_f64() * 1000.0,
+            cases.len()
+        );
+    }
+    let t1 = std::time::Instant::now();
+    let report = run_cases_on_env(cases, opts, env)?;
+    if std::env::var_os("ASSAY_TRACE").is_some() {
+        eprintln!(
+            "assay_trace: run_cases {:.1}ms",
+            t1.elapsed().as_secs_f64() * 1000.0
+        );
+    }
+    Ok(report)
+}
 
-    let rt = ThreadSleepRuntime::default();
+fn run_cases_on_env(
+    cases: Vec<(String, Claim)>,
+    opts: &RunOptions,
+    env: &mut AssayEnv,
+) -> Result<SuiteReport, InfraError> {
+    let retry = opts.retry_flaky_eval;
     let timeout_ms = opts.case_timeout_ms;
 
-    struct PendingCase {
-        name: String,
-        case: FiberHandle<CaseVerdict, InfraError>,
-        timeout: Option<FiberHandle<CaseVerdict, InfraError>>,
+    let (batchable, isolated) = if opts.batch_eval {
+        partition_cases(cases)
+    } else {
+        (Vec::new(), cases)
+    };
+
+    let mut outcomes = Vec::new();
+
+    if !batchable.is_empty() {
+        let pool = Needs::<NixWorkerPoolKey>::need(env);
+        let _slot = pool.acquire()?;
+        let eval = Needs::<NixEvaluatorKey>::need(env);
+        let store = Needs::<SnapshotStoreKey>::need(env);
+        outcomes.extend(run_batch(&batchable, eval.as_ref(), store)?);
     }
 
-    let mut pending = Vec::with_capacity(cases.len());
-    for (name, claim) in cases {
-        let env_clone = env.clone();
-        let case_name = name.clone();
-        let case_handle = run_fork(&rt, move || (interpret_claim_with_retry(claim, retry), env_clone));
-        let timeout_handle =
-            timeout_ms.map(|limit_ms| spawn_timeout_fiber(&rt, case_name, limit_ms));
-        pending.push(PendingCase {
-            name,
-            case: case_handle,
-            timeout: timeout_handle,
-        });
-    }
+    if !isolated.is_empty() {
+        // Fabric construct is cheap after ComputeSupervisor lazy telemetry init.
+        let rt = ThreadSleepRuntime::default();
 
-    let mut outcomes = Vec::with_capacity(pending.len());
-    for p in pending {
-        let exit = match p.timeout {
-            Some(timeout) => race_case_or_timeout(p.case, timeout),
-            None => {
-                let exit = run_blocking(p.case.await_exit(), ())
-                    .expect("await_exit is infallible");
-                let _ = p.case.interrupt();
-                exit
-            }
-        };
-        outcomes.push((p.name, exit));
+        struct PendingCase {
+            name: String,
+            case: FiberHandle<CaseVerdict, InfraError>,
+            timeout: Option<FiberHandle<CaseVerdict, InfraError>>,
+        }
+
+        let mut pending = Vec::with_capacity(isolated.len());
+        for (name, claim) in isolated {
+            let env_clone = env.clone();
+            let case_name = name.clone();
+            let case_handle =
+                run_fork(&rt, move || (interpret_claim_with_retry(claim, retry), env_clone));
+            let timeout_handle =
+                timeout_ms.map(|limit_ms| spawn_timeout_fiber(&rt, case_name, limit_ms));
+            pending.push(PendingCase {
+                name,
+                case: case_handle,
+                timeout: timeout_handle,
+            });
+        }
+
+        for p in pending {
+            let exit = match p.timeout {
+                Some(timeout) => race_case_or_timeout(p.case, timeout),
+                None => {
+                    let exit = run_blocking(p.case.await_exit(), ())
+                        .expect("await_exit is infallible");
+                    let _ = p.case.interrupt();
+                    exit
+                }
+            };
+            outcomes.push((p.name, exit));
+        }
     }
 
     outcomes.sort_by(|a, b| a.0.cmp(&b.0));
@@ -181,7 +240,6 @@ pub fn run_discovered(root: &Path, opts: &RunOptions) -> Effect<SuiteReport, Inf
     let opts = opts.clone();
     Effect::new(move |env| {
         apply_snapshot_update(env, opts.update_snapshots);
-        // Snapshot update already applied; don't re-mutate per suite clone.
         let suite_opts = RunOptions {
             update_snapshots: false,
             ..opts.clone()
@@ -189,20 +247,20 @@ pub fn run_discovered(root: &Path, opts: &RunOptions) -> Effect<SuiteReport, Inf
 
         let suites = discover_suites(&root).map_err(|e| InfraError::Io(e.to_string()))?;
         let rt = ThreadSleepRuntime::default();
-        let mut handles = Vec::with_capacity(suites.len());
+
+        // Phase 1: load every suite in parallel (pool-gated inside load_suite_cases).
+        let mut load_handles = Vec::with_capacity(suites.len());
         for suite in suites {
             let env_clone = env.clone();
-            let opts = suite_opts.clone();
             let path = suite.path;
-            handles.push(run_fork(&rt, move || {
+            load_handles.push(run_fork(&rt, move || {
                 (
                     Effect::new(move |env| {
                         let prefix = path.display().to_string();
-                        let report = run_suite_on_env(&path, &opts, env)?;
-                        Ok(report
-                            .outcomes
+                        let cases = load_suite_cases(&path, env)?;
+                        Ok(cases
                             .into_iter()
-                            .map(|(name, exit)| (format!("{prefix}::{name}"), exit))
+                            .map(|(name, claim)| (format!("{prefix}::{name}"), claim))
                             .collect::<Vec<_>>())
                     }),
                     env_clone,
@@ -210,17 +268,18 @@ pub fn run_discovered(root: &Path, opts: &RunOptions) -> Effect<SuiteReport, Inf
             }));
         }
 
-        let mut all = Vec::new();
-        for handle in handles {
+        let mut all_cases = Vec::new();
+        for handle in load_handles {
             let exit = run_blocking(handle.await_exit(), ()).expect("await_exit is infallible");
             let _ = handle.interrupt();
             match exit {
-                Exit::Success(outcomes) => all.extend(outcomes),
+                Exit::Success(cases) => all_cases.extend(cases),
                 Exit::Failure(cause) => return Err(suite_fiber_infra(cause)),
             }
         }
-        all.sort_by(|a, b| a.0.cmp(&b.0));
-        Ok(SuiteReport { outcomes: all })
+
+        // Phase 2: one mega-batch for all batchable claims + isolated fibers.
+        run_cases_on_env(all_cases, &suite_opts, env)
     })
 }
 
@@ -457,7 +516,13 @@ mod tests {
         let env = AssayEnv::from_env(built);
 
         let report = run_blocking(
-            run_discovered(&root, &RunOptions::default()),
+            run_discovered(
+                &root,
+                &RunOptions {
+                    batch_eval: false,
+                    ..RunOptions::default()
+                },
+            ),
             env,
         )
         .expect("discovered");
@@ -470,5 +535,110 @@ mod tests {
             "expected concurrent suite/case pool use, max_in_flight={}",
             pool.max_in_flight()
         );
+    }
+
+    #[test]
+    fn suite_fiber_infra_maps_all_cause_variants() {
+        use id_effect::Cause;
+        assert!(matches!(
+            suite_fiber_infra(Cause::Fail(InfraError::Io("x".into()))),
+            InfraError::Io(_)
+        ));
+        assert!(matches!(
+            suite_fiber_infra(Cause::Die("d".into())),
+            InfraError::Worker(_)
+        ));
+        assert!(matches!(
+            suite_fiber_infra(Cause::Interrupt(id_effect::FiberId::new(9))),
+            InfraError::Worker(_)
+        ));
+        let left = Cause::Fail(InfraError::SuiteLoad("a".into()));
+        let right = Cause::Fail(InfraError::Io("b".into()));
+        assert!(matches!(
+            suite_fiber_infra(Cause::Both(Box::new(left.clone()), Box::new(right.clone()))),
+            InfraError::SuiteLoad(_)
+        ));
+        assert!(matches!(
+            suite_fiber_infra(Cause::Then(Box::new(left), Box::new(right))),
+            InfraError::Io(_)
+        ));
+    }
+
+    #[test]
+    fn race_case_or_timeout_case_wins() {
+        let env = mock_env_with_eval(Arc::new(MockNixEval::default()));
+        let claim = Claim::Eq {
+            left_expr: "1".into(),
+            right_expr: "1".into(),
+        };
+        let rt = ThreadSleepRuntime::default();
+        let case = run_fork(&rt, {
+            let env = env.clone();
+            move || (interpret_claim(claim), env)
+        });
+        let timeout = spawn_timeout_fiber(&rt, "fast".into(), 5_000);
+        let exit = race_case_or_timeout(case, timeout);
+        assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
+    }
+
+    #[test]
+    fn run_cases_on_env_batch_eval_path() {
+        let mock = Arc::new(MockNixEval::default());
+        mock.set("1", EvalResult::Ok(json!(1)));
+        let pool = Arc::new(MockWorkerPool::new(2));
+        let mut built = build_env(mock_providers()).expect("env");
+        built.insert::<Cap<NixEvaluatorKey>>(mock);
+        built.insert::<Cap<crate::caps::NixWorkerPoolKey>>(pool.clone() as _);
+        let mut env = AssayEnv::from_env(built);
+        let cases = vec![(
+            "eq".into(),
+            Claim::Eq {
+                left_expr: "1".into(),
+                right_expr: "1".into(),
+            },
+        )];
+        unsafe {
+            std::env::set_var("ASSAY_TRACE", "1");
+        }
+        let report = run_cases_on_env(
+            cases,
+            &RunOptions {
+                batch_eval: true,
+                ..RunOptions::default()
+            },
+            &mut env,
+        )
+        .expect("batch path");
+        unsafe {
+            std::env::remove_var("ASSAY_TRACE");
+        }
+        assert_eq!(report.outcomes.len(), 1);
+    }
+
+    #[test]
+    fn run_suite_on_env_trace_path() {
+        use std::fs;
+
+        let dir = std::env::temp_dir().join(format!("assay_suite_trace_{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("suite.json");
+        fs::write(&path, r#"{"eq": {"expr": "1", "expected": "1"}}"#).unwrap();
+
+        let mock = Arc::new(MockNixEval::default());
+        mock.set("1", EvalResult::Ok(json!(1)));
+        let pool = Arc::new(MockWorkerPool::new(2));
+        let mut built = build_env(mock_providers()).expect("env");
+        built.insert::<Cap<NixEvaluatorKey>>(mock);
+        built.insert::<Cap<crate::caps::NixWorkerPoolKey>>(pool);
+        let mut env = AssayEnv::from_env(built);
+        unsafe {
+            std::env::set_var("ASSAY_TRACE", "1");
+        }
+        let report = run_suite_on_env(&path, &RunOptions::default(), &mut env).expect("suite");
+        unsafe {
+            std::env::remove_var("ASSAY_TRACE");
+        }
+        let _ = fs::remove_dir_all(dir);
+        assert_eq!(report.outcomes.len(), 1);
     }
 }

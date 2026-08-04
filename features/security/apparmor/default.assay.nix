@@ -1,15 +1,13 @@
 # Colocated suite: apparmor enable.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  mod = ''
-    (import ${modFile} {
+  mod = import ./default.nix {
       config = { };
       lib = (import <nixpkgs> {}).lib;
       pkgs = { };
-    })
-  '';
+    };
+
 in
   assay.suite "apparmor" {
-    enabled = assay.eq "${mod}.security.apparmor.enable" "true";
+    enabled = assay.eq mod.security.apparmor.enable true;
   }

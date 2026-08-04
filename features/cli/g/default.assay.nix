@@ -1,22 +1,20 @@
 # Colocated suite: wrapper derivation name is installed.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
+  mod = let
       pkgs = {
         stdenv = { mkDerivation = args: args.name; };
         eza = "eza";
         settings = {};
       };
       settings = { useremail = "a@b.c"; hostname = "h"; username = "u"; };
-      mod = import ${modFile} { inherit pkgs; } // { };
+      mod = import ./default.nix { inherit pkgs; } // { };
       # some wrappers also take settings
-      mod2 = builtins.tryEval (import ${modFile} { inherit pkgs settings; });
-      mod' = if mod2.success then mod2.value else (import ${modFile} { inherit pkgs; });
-    in mod'.environment.systemPackages)
-'';
+      mod2 = builtins.tryEval (import ./default.nix { inherit pkgs settings; });
+      mod' = if mod2.success then mod2.value else (import ./default.nix { inherit pkgs; });
+    in mod'.environment.systemPackages;
+
 in
   assay.suite "g" {
-    systemPackages = assay.eq packages ''[ "g" ]'';
+    systemPackages = assay.eq mod [ "g" ];
   }

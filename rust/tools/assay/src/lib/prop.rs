@@ -151,9 +151,7 @@ fn shrink_once(value: &Value) -> Value {
         Value::Object(map) if map.len() > 1 => {
             let key = map.keys().next().expect("non-empty map").clone();
             let mut shrunk = Map::new();
-            if let Some(value) = map.get(&key) {
-                shrunk.insert(key, value.clone());
-            }
+            shrunk.insert(key.clone(), map[&key].clone());
             Value::Object(shrunk)
         }
         Value::String(text) if !text.is_empty() => Value::String(text[..text.len() / 2].into()),
@@ -168,6 +166,7 @@ fn shrink_once(value: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
 
     #[test]
     fn same_seed_produces_same_sequence() {
@@ -197,12 +196,17 @@ mod tests {
     }
 
     #[test]
+    fn run_prop_by_name_unknown_returns_eval_error() {
+        let outcome = run_prop_by_name("__no_such_prop__", 1, 1);
+        assert!(matches!(outcome, AssayOutcome::EvalError { .. }));
+    }
 
     #[test]
     fn run_prop_by_name_always_pass() {
         assert_eq!(run_prop_by_name("always_pass", 1, 10), AssayOutcome::Pass);
     }
 
+    #[test]
     fn counterexample_is_shrunk() {
         let failing = Value::Array(vec![
             Value::Number(10.into()),
@@ -214,6 +218,61 @@ mod tests {
                 assert_ne!(shrunk, failing);
             }
             other => panic!("expected counterexample, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn shrink_once_covers_object_number_string() {
+        let obj = Value::Object(serde_json::Map::from_iter([
+            ("a".into(), Value::Number(1.into())),
+            ("b".into(), Value::Number(2.into())),
+        ]));
+        let shrunk = shrink_once(&obj);
+        assert!(matches!(shrunk, Value::Object(_)));
+        let num = Value::Number(10.into());
+        assert!(matches!(shrink_once(&num), Value::Number(_)));
+        let s = Value::String("hello".into());
+        assert!(matches!(shrink_once(&s), Value::String(_)));
+    }
+
+    #[test]
+    fn shrink_once_single_element_array_and_fallback() {
+        let one = Value::Array(vec![Value::Number(9.into())]);
+        assert_eq!(shrink_once(&one), Value::Number(9.into()));
+        let empty = Value::Array(vec![]);
+        assert_eq!(shrink_once(&empty), empty);
+        assert_eq!(shrink_once(&Value::Bool(true)), Value::Bool(true));
+        assert_eq!(shrink_once(&Value::Null), Value::Null);
+    }
+
+    #[test]
+    fn shrink_once_integer_number() {
+        let shrunk = shrink_once(&Value::Number(10.into()));
+        assert_eq!(shrunk, Value::Number(5.into()));
+    }
+
+    #[test]
+    fn gen_u32_and_string_zero_max() {
+        let mut g = Gen::new(1);
+        assert_eq!(g.gen_u32(1), 0);
+        assert_eq!(g.gen_string(0), "");
+    }
+
+    #[test]
+    fn gen_seed_zero_matches_seed_one() {
+        let mut z = Gen::new(0);
+        let mut o = Gen::new(1);
+        assert_eq!(z.gen_bool(), o.gen_bool());
+    }
+
+    #[test]
+    fn gen_json_depth_zero_uses_leaf() {
+        let mut g = Gen::new(99);
+        for _ in 0..8 {
+            match g.gen_json(0) {
+                Value::Array(_) | Value::Object(_) => panic!("depth 0 must be leaf"),
+                _ => {}
+            }
         }
     }
 }

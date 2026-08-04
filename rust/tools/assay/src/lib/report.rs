@@ -280,6 +280,43 @@ mod tests {
         );
         assert!(not_ok.starts_with("not ok 2 - bad"));
         assert!(not_ok.contains("boom"));
+        let quiet = format_tap_line(
+            3,
+            "quiet",
+            &AssayOutcome::EvalError {
+                kind: "io".into(),
+                message: String::new(),
+                span: None,
+            },
+        );
+        assert_eq!(quiet, "not ok 3 - quiet");
+    }
+
+    #[test]
+    fn tap_line_other_outcome_variants() {
+        assert!(format_tap_line(1, "r", &AssayOutcome::Recursion).contains("infinite recursion"));
+        assert!(format_tap_line(1, "t", &AssayOutcome::Timeout).contains("timeout"));
+        assert!(
+            format_tap_line(1, "l", &AssayOutcome::ResourceLeak).contains("resource leak")
+        );
+        assert!(format_tap_line(
+            1,
+            "c",
+            &AssayOutcome::Counterexample {
+                seed: 1,
+                shrunk: serde_json::json!(null),
+            }
+        )
+        .contains("counterexample"));
+        assert!(format_tap_line(
+            1,
+            "s",
+            &AssayOutcome::SnapshotMismatch {
+                path: "golden.json".into(),
+                diff: "mismatch".into(),
+            }
+        )
+        .contains("mismatch"));
     }
 
     #[test]

@@ -1,14 +1,10 @@
 # Colocated suite: systemPackages from stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
-      pkgs = { qdirstat = "qdirstat"; };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages)
-'';
+  pkgs = { qdirstat = "qdirstat"; };
+  mod = import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "qdirstat" {
-    systemPackages = assay.eq packages ''[ "qdirstat" ]'';
+    systemPackages = assay.eq mod.environment.systemPackages [ "qdirstat" ];
   }

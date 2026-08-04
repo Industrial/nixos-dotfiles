@@ -1,14 +1,9 @@
 # Colocated suite: programs.gamemode.enable.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  enable = ''
-(    let
-      pkgs = { };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.programs.gamemode.enable)
-'';
+  pkgs = { };
+  mod = import ./default.nix { inherit pkgs; };
 in
   assay.suite "lutris" {
-    enabled = assay.eq enable "true";
+    enabled = assay.eq mod.programs.gamemode.enable true;
   }

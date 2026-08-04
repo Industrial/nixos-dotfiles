@@ -1,14 +1,16 @@
 # Colocated suite: systemPackages from stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
-      pkgs = { "v4l-utils" = "v4l-utils"; };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages)
-'';
+  pkgs = {
+    "v4l-utils" = "v4l-utils";
+    obs-studio-plugins = {
+      obs-backgroundremoval = "obs-backgroundremoval";
+      "obs-pipewire-audio-capture" = "obs-pipewire-audio-capture";
+    };
+  };
+  mod = import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "obs-studio" {
-    systemPackages = assay.eq packages ''[ "v4l-utils" ]'';
+    systemPackages = assay.eq mod.environment.systemPackages [ "v4l-utils" ];
   }

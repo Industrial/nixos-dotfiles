@@ -1,6 +1,7 @@
 //! Assay — Nix unit testing framework (claim algebra + isolated eval runner).
 
 pub mod assay_suite;
+pub mod batch;
 pub mod caps;
 pub mod claims;
 pub mod compat;
@@ -41,6 +42,12 @@ pub use laws::{run_builtin_laws, run_law_by_name};
 pub use id_effect::Exit;
 
 /// Wave-0 compile gate: id_effect is linked.
+#[cfg(test)]
+mod coverage_tests;
+
+#[cfg(test)]
+mod branch_coverage_tests;
+
 #[cfg(test)]
 mod id_effect_dep_smoke {
     use id_effect::Exit;

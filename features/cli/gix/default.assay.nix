@@ -1,14 +1,10 @@
 # Colocated suite: systemPackages from stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  modFile = toString ./default.nix;
-  packages = ''
-(    let
-      pkgs = { gitoxide = "gitoxide"; };
-      mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages)
-'';
+  pkgs = { gitoxide = "gitoxide"; };
+  mod = import ./default.nix { inherit pkgs; };
+
 in
   assay.suite "gix" {
-    systemPackages = assay.eq packages ''[ "gitoxide" ]'';
+    systemPackages = assay.eq mod.environment.systemPackages [ "gitoxide" ];
   }

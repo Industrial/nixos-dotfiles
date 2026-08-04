@@ -1,11 +1,12 @@
 # Assay — Nix claim algebra (authoring DSL).
-# Claims are plain attrsets; the Rust runner evaluates them in isolation.
+# eq/subset/hasAttrs take real Nix values (suite eval computes them; runner compares JSON).
+# throws/forces/module keep expr strings (must re-eval to observe failure / IFD).
 {
   suite = name: cases: {inherit name cases;};
 
-  eq = expr: expected: {
+  eq = actual: expected: {
     claim = "eq";
-    inherit expr expected;
+    inherit actual expected;
   };
 
   throws = expr: pattern: {
@@ -13,14 +14,14 @@
     inherit expr pattern;
   };
 
-  subset = expr: expected: {
+  subset = actual: expected: {
     claim = "subset";
-    inherit expr expected;
+    inherit actual expected;
   };
 
-  hasAttrs = expr: attrs: {
+  hasAttrs = actual: attrs: {
     claim = "hasAttrs";
-    inherit expr attrs;
+    inherit actual attrs;
   };
 
   snapshot = name: expr: {

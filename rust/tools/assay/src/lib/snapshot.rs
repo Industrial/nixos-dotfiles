@@ -154,6 +154,15 @@ mod tests {
     }
 
     #[test]
+    fn write_nested_golden_creates_parent_dirs() {
+        let temp = TempStore::new();
+        let store = &temp.store;
+        let value = json!({"nested": true});
+        store.write("nested/deep/golden", &value).unwrap();
+        assert_eq!(store.read("nested/deep/golden").unwrap(), Some(value));
+    }
+
+    #[test]
     fn assert_match_passes_when_equal() {
         let temp = TempStore::new();
         let store = &temp.store;
@@ -189,6 +198,38 @@ mod tests {
         let value = json!({"fresh": true});
         assert_eq!(store.assert_match("new", &value, true), AssayOutcome::Pass);
         assert_eq!(store.read("new").unwrap(), Some(value));
+    }
+
+    #[test]
+    fn snapshot_diff_uses_debug_when_values_equal() {
+        let v = json!({"k": 1});
+        let diff = snapshot_diff(&v, &v);
+        assert!(diff.contains("expected:"));
+        assert!(diff.contains("observed:"));
+    }
+
+    #[test]
+    fn assert_match_corrupt_golden_returns_io_error() {
+        let temp = TempStore::new();
+        let store = &temp.store;
+        store.write("corrupt", &json!(1)).unwrap();
+        let path = temp.store.root.join("corrupt.json");
+        std::fs::write(&path, "not-json").unwrap();
+        match store.assert_match("corrupt", &json!(2), false) {
+            AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "io"),
+            other => panic!("expected io error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn write_without_parent_directory() {
+        let name = format!("assay_snap_bare_{}", std::process::id());
+        let store = SnapshotStore::new("");
+        let path = PathBuf::from(format!("{name}.json"));
+        let _ = std::fs::remove_file(&path);
+        store.write(&name, &json!(1)).unwrap();
+        assert!(path.exists());
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

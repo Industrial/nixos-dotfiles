@@ -63,4 +63,42 @@ mod tests {
         assert!(matches!(cases[0].1, Claim::Eq { .. }) || matches!(cases[1].1, Claim::Eq { .. }));
         assert!(cases.iter().any(|(_, c)| matches!(c, Claim::Throws { .. })));
     }
+    #[test]
+    fn load_assay_suite_json_roundtrip() {
+        let dir = std::env::temp_dir().join("assay-suite-json");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("suite.json");
+        std::fs::write(
+            &path,
+            r#"{"name":"t","cases":{"one":{"claim":"eq","expr":"1","expected":"1"}}}"#,
+        )
+        .unwrap();
+        let cases = load_assay_suite(&path).expect("load");
+        assert_eq!(cases.len(), 1);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn load_assay_suite_unsupported_extension() {
+        let path = std::env::temp_dir().join("assay-suite.bad");
+        std::fs::write(&path, "{}").unwrap();
+        assert!(load_assay_suite(&path).is_err());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn parse_assay_suite_invalid_case() {
+        let v = serde_json::json!({
+            "name": "t",
+            "cases": { "bad": { "claim": "nope" } }
+        });
+        assert!(parse_assay_suite(&v).is_err());
+    }
+
+    #[test]
+    fn load_assay_suite_missing_file_errors() {
+        let path = std::env::temp_dir().join(format!("assay-missing-{}.json", std::process::id()));
+        assert!(load_assay_suite(&path).is_err());
+    }
+
 }
