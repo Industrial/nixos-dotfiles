@@ -86,10 +86,7 @@
       tela-icon-theme
       nordzy-icon-theme
       candy-icons
-      nordic
-      dracula-theme
       catppuccin-gtk
-      gruvbox-gtk-theme
       bibata-cursors
       nordzy-cursor-theme
       catppuccin-cursors

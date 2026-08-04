@@ -99,7 +99,7 @@ in {
           gtk-im-preedit-style = "callback";
           gtk-im-status-style = "callback";
           gtk-key-theme = "";
-          gtk-theme = "Nordic";
+          gtk-theme = "Catppuccin-Mocha-Standard-Blue-Dark";
           icon-theme = "Papirus-Dark";
           locate-pointer = false;
           menubar-accel = "F10";
