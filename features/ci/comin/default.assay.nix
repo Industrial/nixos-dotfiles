@@ -2,9 +2,11 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = import ./default.nix {
-      settings = { hostname = "testhost"; username = "alice"; };
+    settings = {
+      hostname = "testhost";
+      username = "alice";
     };
-
+  };
 in
   assay.suite "comin" {
     enabled = assay.eq mod.services.comin.enable true;
