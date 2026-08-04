@@ -11,6 +11,8 @@ pub mod run;
 
 #[cfg(test)]
 mod oracle;
+#[cfg(test)]
+mod tools_compat;
 
 pub use algo::HashAlgo;
 pub use encode::Encoding;

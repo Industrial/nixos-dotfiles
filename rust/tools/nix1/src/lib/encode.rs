@@ -22,6 +22,11 @@ pub fn nix_base32_len(byte_len: usize) -> usize {
     (byte_len * 8 - 1) / 5 + 1
 }
 
+/// Characters accepted by Nix's base-32 alphabet (`NIX_BASE32_ALPHABET`).
+pub fn is_nix_base32_char(c: char) -> bool {
+    NIX_BASE32_ALPHABET.contains(c)
+}
+
 /// Nix `printHash32` (src/libutil/hash.cc).
 pub fn nix_base32_encode_full(data: &[u8]) -> String {
     let alphabet = NIX_BASE32_ALPHABET.as_bytes();

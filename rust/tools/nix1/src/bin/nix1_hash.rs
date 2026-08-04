@@ -127,22 +127,24 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<Vec<String>, HashError> {
-    let algo = match cli.hash_type.as_deref() {
-        None => HashAlgo::Md5,
-        Some(s) => HashAlgo::parse(s).map_err(HashError::msg)?,
+    let type_hint = match cli.hash_type.as_deref() {
+        None => None,
+        Some(s) => Some(HashAlgo::parse(s).map_err(HashError::msg)?),
     };
 
     if let Some(to) = convert_target(&cli)? {
         if cli.args.is_empty() {
             return Err(HashError::msg("no hashes specified"));
         }
-        return run_convert(&cli.args, algo, to);
+        return run_convert(&cli.args, type_hint, to);
     }
 
     if cli.args.is_empty() {
         return Err(HashError::msg("no paths specified"));
     }
 
+    // Path hashing: stock defaults to md5 when --type is omitted.
+    let algo = type_hint.unwrap_or(HashAlgo::Md5);
     let encoding = encoding_from_flags(&cli)?;
     let paths: Vec<PathBuf> = cli.args.iter().map(PathBuf::from).collect();
     run_hash_paths(&paths, algo, cli.flat, cli.truncate, encoding)

@@ -15,7 +15,10 @@ fn stock_nix_hash(args: &[&str]) -> Option<String> {
 }
 
 fn temp_hello() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("nix1-oracle-{}", std::process::id()));
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let n = SEQ.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("nix1-oracle-{}-{n}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("f");
@@ -86,7 +89,7 @@ fn oracle_to_sri_matches_stock_when_present() {
         eprintln!("nix-hash not available; skipping");
         return;
     };
-    let got = run_convert(&[hex.clone()], HashAlgo::Sha256, Encoding::Sri).unwrap();
+    let got = run_convert(&[hex.clone()], Some(HashAlgo::Sha256), Encoding::Sri).unwrap();
     assert_eq!(got.join("\n"), want);
 }
 

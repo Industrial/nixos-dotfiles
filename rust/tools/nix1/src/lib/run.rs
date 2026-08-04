@@ -26,13 +26,12 @@ pub fn run_hash_paths(
 
 pub fn run_convert(
     hashes: &[String],
-    algo: HashAlgo,
+    type_hint: Option<HashAlgo>,
     to: Encoding,
 ) -> Result<Vec<String>, HashError> {
-    let from_base32 = matches!(to, Encoding::Base16);
     let mut lines = Vec::with_capacity(hashes.len());
     for h in hashes {
-        lines.push(convert_hash(h, algo, to, from_base32)?);
+        lines.push(convert_hash(h, type_hint, to)?);
     }
     Ok(lines)
 }
