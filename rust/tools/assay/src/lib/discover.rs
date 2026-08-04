@@ -123,7 +123,10 @@ mod tests {
         assert_eq!(suite_kind(suite_json), Some(SuiteKind::CompatJson));
         assert_eq!(suite_kind(assay), Some(SuiteKind::AssayNix));
         assert_eq!(suite_kind(compat_nix), Some(SuiteKind::CompatNix));
-        assert_eq!(suite_kind(Path::new("x.assay.json")), Some(SuiteKind::AssayNix));
+        assert_eq!(
+            suite_kind(Path::new("x.assay.json")),
+            Some(SuiteKind::AssayNix)
+        );
         assert_eq!(suite_kind(Path::new("fixtures/compat/foo.txt")), None);
         assert_eq!(suite_kind(Path::new("other/foo.json")), None);
     }
@@ -205,7 +208,8 @@ mod tests {
 
     #[test]
     fn discover_single_assay_nix_file() {
-        let path = std::env::temp_dir().join(format!("assay_single_{}.assay.nix", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("assay_single_{}.assay.nix", std::process::id()));
         fs::write(&path, "#").unwrap();
         let found = discover_suites(&path).expect("discover");
         assert_eq!(found.len(), 1);

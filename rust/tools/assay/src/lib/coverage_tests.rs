@@ -3,27 +3,23 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use id_effect::{build_env, Cap, Exit, FromEnv};
 use id_effect::Clock;
-use serde_json::{json, Value};
+use id_effect::{Cap, Exit, FromEnv, build_env};
+use serde_json::{Value, json};
 
-use crate::batch::{
-    is_batchable, partition_cases, run_batch, BATCH_MARKER, FORCE_BATCH_JSON_EVAL,
-};
-use crate::caps::{mock_providers, AssayEnv, MockNixEval, NixEvaluatorKey, StdClock};
+use crate::batch::{BATCH_MARKER, FORCE_BATCH_JSON_EVAL, is_batchable, partition_cases, run_batch};
+use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, StdClock, mock_providers};
 use crate::claims::Claim;
 use crate::eval::{EvalBackend, EvalResult};
-use crate::optics_json::{fold_object_keys, value_contains_subset};
 use crate::outcome::AssayOutcome;
 use crate::pool::{NixWorkerPool, SemaphoreWorkerPool};
-use crate::prop::{run_prop_by_name, Gen, BUILTIN_PROP_NAMES};
-use crate::report::{
-    collect_formatted_lines, format_line, report_outcomes_stdout, ReportFormat,
-};
-use crate::run::{summarize, summarize_exits, RunSummary, SuiteReport};
+use crate::prop::{BUILTIN_PROP_NAMES, Gen, run_prop_by_name};
+use crate::report::{ReportFormat, collect_formatted_lines, format_line, report_outcomes_stdout};
+use crate::run::{RunSummary, SuiteReport, summarize, summarize_exits};
 use crate::schema::{decode_claim_json, encode_claim_json};
 use crate::snapshot::SnapshotStore;
-use crate::verdict::{exit_to_outcome, outcome_to_exit, CaseVerdict, InfraError};
+use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};
+use nixq::{fold_object_keys, value_contains_subset};
 
 struct BatchJsonEval {
     inner: MockNixEval,
@@ -165,7 +161,10 @@ fn run_batch_mock_covers_eq_subset_hasattrs_snapshot() {
     let outs = run_batch(&cases, eval.as_ref(), &store).expect("batch");
     assert_eq!(outs.len(), 5);
     assert!(matches!(outs[0].1, Exit::Success(CaseVerdict::Pass)));
-    assert!(matches!(outs[1].1, Exit::Success(CaseVerdict::AssertFail { .. })));
+    assert!(matches!(
+        outs[1].1,
+        Exit::Success(CaseVerdict::AssertFail { .. })
+    ));
     assert!(matches!(outs[2].1, Exit::Success(CaseVerdict::Pass)));
     assert!(matches!(outs[3].1, Exit::Success(CaseVerdict::Pass)));
     assert!(matches!(
@@ -173,8 +172,6 @@ fn run_batch_mock_covers_eq_subset_hasattrs_snapshot() {
         Exit::Success(CaseVerdict::SnapshotMismatch { .. })
     ));
 }
-
-
 
 #[test]
 fn partition_puts_value_mode_claims_in_isolated() {
@@ -263,10 +260,7 @@ fn report_outcomes_stdout_smoke() {
 #[test]
 fn summarize_exits_counts_pass_fail_error() {
     let outcomes = vec![
-        (
-            "p".into(),
-            Exit::Success(CaseVerdict::Pass),
-        ),
+        ("p".into(), Exit::Success(CaseVerdict::Pass)),
         (
             "f".into(),
             Exit::Success(CaseVerdict::AssertFail {
@@ -346,10 +340,7 @@ fn mock_nix_eval_batched_nested_and_invalid() {
     mock.set("other", EvalResult::Ok(json!(2)));
     // nested parens in left side
     let nested = "[ (inner) (other) ]";
-    assert_eq!(
-        mock.eval_json(nested),
-        EvalResult::Ok(json!([1, 2]))
-    );
+    assert_eq!(mock.eval_json(nested), EvalResult::Ok(json!([1, 2])));
     // not a batched pair → null
     assert_eq!(mock.eval_json("not-batch"), EvalResult::Ok(json!(null)));
     // malformed batch
@@ -363,7 +354,10 @@ fn mock_nix_eval_batched_nested_and_invalid() {
             span: None,
         }),
     );
-    assert!(matches!(mock.eval_json("[ (bad) (other) ]"), EvalResult::Err(_)));
+    assert!(matches!(
+        mock.eval_json("[ (bad) (other) ]"),
+        EvalResult::Err(_)
+    ));
 }
 
 #[test]
@@ -383,12 +377,18 @@ fn outcome_to_exit_unknown_eval_kind() {
         message: "msg".into(),
         span: None,
     };
-    assert!(matches!(outcome_to_exit(err.clone()), Exit::Success(CaseVerdict::EvalThrow { .. })));
-    assert_eq!(exit_to_outcome(outcome_to_exit(err)), AssayOutcome::EvalError {
-        kind: "custom".into(),
-        message: "msg".into(),
-        span: None,
-    });
+    assert!(matches!(
+        outcome_to_exit(err.clone()),
+        Exit::Success(CaseVerdict::EvalThrow { .. })
+    ));
+    assert_eq!(
+        exit_to_outcome(outcome_to_exit(err)),
+        AssayOutcome::EvalError {
+            kind: "custom".into(),
+            message: "msg".into(),
+            span: None,
+        }
+    );
 }
 
 #[test]
@@ -399,8 +399,14 @@ fn outcome_to_exit_panic_and_timeout_paths() {
         span: None,
     };
     assert!(matches!(outcome_to_exit(panic), Exit::Failure(_)));
-    assert!(matches!(outcome_to_exit(AssayOutcome::Timeout), Exit::Failure(_)));
-    assert!(matches!(outcome_to_exit(AssayOutcome::ResourceLeak), Exit::Failure(_)));
+    assert!(matches!(
+        outcome_to_exit(AssayOutcome::Timeout),
+        Exit::Failure(_)
+    ));
+    assert!(matches!(
+        outcome_to_exit(AssayOutcome::ResourceLeak),
+        Exit::Failure(_)
+    ));
 }
 
 #[test]

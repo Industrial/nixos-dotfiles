@@ -3,23 +3,25 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use id_effect::{build_env, Cap, Exit, FromEnv};
-use serde_json::{json, Value};
+use id_effect::{Cap, Exit, FromEnv, build_env};
+use serde_json::{Value, json};
 
 use crate::assay_suite::parse_assay_suite;
-use crate::caps::{mock_providers, MockNixEval, NixEvaluatorKey, NixWorkerPoolKey, AssayEnv};
+use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, NixWorkerPoolKey, mock_providers};
 use crate::claims::Claim;
-use crate::diff::structural_diff;
-use crate::discover::{discover_suites, suite_kind, SuiteKind};
-use crate::eval::{classify_stderr, EvalBackend, EvalResult, NixEval, ProcessNixEval};
+use crate::discover::{SuiteKind, discover_suites, suite_kind};
+use crate::eval::{EvalBackend, EvalResult, NixEval, ProcessNixEval, classify_stderr};
 use crate::laws::{law_merge_associativity, run_law_by_name};
-use crate::optics_json::{fold_object_keys, value_has_attrs_via_traversal};
 use crate::outcome::AssayOutcome;
 use crate::pool::MockWorkerPool;
 use crate::prop::{Gen, run_prop_by_name};
-use crate::run::{run_suite_blocking, summarize, summarize_exits, RunOptions};
+use crate::run::{RunOptions, run_suite_blocking, summarize, summarize_exits};
 use crate::schema::{decode_claim_json, encode_claim_json};
-use crate::verdict::{exit_to_outcome, outcome_to_exit, CaseVerdict, InfraError};
+use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};
+use nixq::{
+    fold_object_keys, normalize_value, object_keys_traversal, structural_diff,
+    value_has_attrs_via_traversal,
+};
 
 #[test]
 fn verdict_unknown_eval_kind_maps_to_eval_throw() {
@@ -32,11 +34,14 @@ fn verdict_unknown_eval_kind_maps_to_eval_throw() {
         outcome_to_exit(err.clone()),
         Exit::Success(CaseVerdict::EvalThrow { .. })
     ));
-    assert_eq!(exit_to_outcome(outcome_to_exit(err)), AssayOutcome::EvalError {
-        kind: "custom_kind".into(),
-        message: "weird".into(),
-        span: None,
-    });
+    assert_eq!(
+        exit_to_outcome(outcome_to_exit(err)),
+        AssayOutcome::EvalError {
+            kind: "custom_kind".into(),
+            message: "weird".into(),
+            span: None,
+        }
+    );
 }
 
 #[test]
@@ -51,13 +56,19 @@ fn mock_nix_eval_batched_left_side_error() {
         }),
     );
     mock.set("1", EvalResult::Ok(json!(1)));
-    assert!(matches!(mock.eval_json("[ (bad) (1) ]"), EvalResult::Err(_)));
+    assert!(matches!(
+        mock.eval_json("[ (bad) (1) ]"),
+        EvalResult::Err(_)
+    ));
 }
 
 #[test]
 fn laws_associativity_exercises_object_wrap_branch() {
     assert_eq!(law_merge_associativity(42), AssayOutcome::Pass);
-    assert_eq!(run_law_by_name("merge_associativity", 99), AssayOutcome::Pass);
+    assert_eq!(
+        run_law_by_name("merge_associativity", 99),
+        AssayOutcome::Pass
+    );
 }
 
 #[test]
@@ -75,7 +86,7 @@ fn prop_gen_and_shrink_branches() {
     assert_eq!(rng.gen_u32(1), 0);
     assert_eq!(rng.gen_string(0), "");
 
-let mut kinds = std::collections::HashSet::new();
+    let mut kinds = std::collections::HashSet::new();
     for seed in 0..64u64 {
         let mut g = Gen::new(seed);
         for _ in 0..12 {
@@ -102,7 +113,10 @@ let mut kinds = std::collections::HashSet::new();
         }
     }
     assert!(kinds.len() >= 4);
-    assert_eq!(run_prop_by_name("merge_idempotent", 3, 4), AssayOutcome::Pass);
+    assert_eq!(
+        run_prop_by_name("merge_idempotent", 3, 4),
+        AssayOutcome::Pass
+    );
 }
 
 #[test]
@@ -165,11 +179,7 @@ fn run_suite_blocking_update_snapshots_and_summarize() {
     let dir = std::env::temp_dir().join(format!("assay_run_blk_{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("suite.json");
-    std::fs::write(
-        &path,
-        r#"{"ok":{"expr":"1","expected":"1"}}"#,
-    )
-    .unwrap();
+    std::fs::write(&path, r#"{"ok":{"expr":"1","expected":"1"}}"#).unwrap();
     let mut built = build_env(mock_providers()).expect("env");
     built.insert::<Cap<NixEvaluatorKey>>(Arc::new(MockNixEval::default()) as _);
     built.insert::<Cap<NixWorkerPoolKey>>(Arc::new(MockWorkerPool::new(2)) as _);
@@ -256,7 +266,7 @@ fn eval_live_when_nix_available() {
 #[cfg(feature = "optics")]
 #[test]
 fn optics_traversal_scalar_is_noop() {
-    use crate::optics_json::object_keys_traversal;
+    use nixq::object_keys_traversal;
     let scalar = json!(42);
     let keys = object_keys_traversal().to_vec(&scalar);
     assert!(keys.is_empty());
@@ -272,7 +282,7 @@ fn decode_claim_rejects_non_object_root() {
 
 #[test]
 fn normalize_derivation_type_field() {
-    use crate::normalize::normalize_value;
+    use nixq::normalize_value;
     let drv = json!({
         "type": "derivation",
         "outPath": "/nix/store/x",
@@ -287,7 +297,7 @@ fn normalize_derivation_type_field() {
 
 #[test]
 fn verdict_outcome_to_exit_fail_and_infra_variants() {
-    use crate::verdict::{exit_to_outcome, outcome_to_exit, CaseVerdict, InfraError};
+    use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};
     use id_effect::Exit;
     let fail = outcome_to_exit(AssayOutcome::Fail {
         claim: "eq".into(),
@@ -295,7 +305,10 @@ fn verdict_outcome_to_exit_fail_and_infra_variants() {
         right: None,
         diff: "d".into(),
     });
-    assert!(matches!(fail, Exit::Success(CaseVerdict::AssertFail { .. })));
+    assert!(matches!(
+        fail,
+        Exit::Success(CaseVerdict::AssertFail { .. })
+    ));
     for kind in ["io", "json"] {
         let infra = outcome_to_exit(AssayOutcome::EvalError {
             kind: kind.into(),
@@ -321,8 +334,8 @@ fn verdict_outcome_to_exit_fail_and_infra_variants() {
 
 #[test]
 fn schema_decode_expr_mode_and_throws_pattern() {
-    use crate::schema::{decode_claim_json, encode_claim_json};
     use crate::claims::Claim;
+    use crate::schema::{decode_claim_json, encode_claim_json};
     let eq = decode_claim_json(&json!({
         "claim": "eq",
         "expr": "1",
@@ -336,7 +349,13 @@ fn schema_decode_expr_mode_and_throws_pattern() {
         "pattern": "x"
     }))
     .unwrap();
-    assert!(matches!(throws, Claim::Throws { pattern: Some(_), .. }));
+    assert!(matches!(
+        throws,
+        Claim::Throws {
+            pattern: Some(_),
+            ..
+        }
+    ));
     let prop = decode_claim_json(&json!({
         "claim": "prop",
         "name": "gen_int",
@@ -344,7 +363,13 @@ fn schema_decode_expr_mode_and_throws_pattern() {
         "trials": 3
     }))
     .unwrap();
-    assert!(matches!(prop, Claim::Prop { trials: Some(3), .. }));
+    assert!(matches!(
+        prop,
+        Claim::Prop {
+            trials: Some(3),
+            ..
+        }
+    ));
     let encoded = encode_claim_json(&prop);
     assert_eq!(encoded["trials"], json!(3));
 }
@@ -352,10 +377,12 @@ fn schema_decode_expr_mode_and_throws_pattern() {
 #[test]
 fn schema_decode_suite_cases_prefixes_errors() {
     use crate::schema::decode_suite_cases;
-    assert!(decode_suite_cases(&json!({
-        "bad": { "claim": "nope" }
-    }))
-    .is_err());
+    assert!(
+        decode_suite_cases(&json!({
+            "bad": { "claim": "nope" }
+        }))
+        .is_err()
+    );
 }
 
 #[test]

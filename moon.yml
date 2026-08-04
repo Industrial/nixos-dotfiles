@@ -20,6 +20,8 @@ tasks:
       - 'common/**/*.nix'
       - 'rust/tools/assay/src/**/*'
       - 'rust/tools/assay/Cargo.toml'
+      - 'rust/tools/nixq/src/**/*'
+      - 'rust/tools/nixq/Cargo.toml'
     options:
       # Whole-repo discovery; do not treat as always-cacheable across env changes.
       cache: true
@@ -33,6 +35,40 @@ tasks:
     inputs:
       - 'rust/tools/assay/src/**/*'
       - 'rust/tools/assay/Cargo.toml'
+      - 'rust/tools/nixq/src/**/*'
+      - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/Cargo.toml'
+      - 'rust/Cargo.lock'
+    options:
+      cache: true
+  nixq-test:
+    description: 'nixq unit tests'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nixq'
+    inputs:
+      - 'rust/tools/nixq/src/**/*'
+      - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true
+  nixq-coverage:
+    description: 'nixq crate llvm-cov (≥95% lines/regions; nightly --branch)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'nixq-coverage'
+    inputs:
+      - 'rust/tools/nixq/src/**/*'
+      - 'rust/tools/nixq/Cargo.toml'
       - 'rust/Cargo.toml'
       - 'rust/Cargo.lock'
     options:

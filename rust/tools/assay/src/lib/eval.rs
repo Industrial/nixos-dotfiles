@@ -255,7 +255,8 @@ mod tests {
     #[test]
     fn nix_eval_file_succeeds_when_nix_available() {
         run_if_nix(|| {
-            let dir = std::env::temp_dir().join(format!("assay-nix-eval-ok-{}", std::process::id()));
+            let dir =
+                std::env::temp_dir().join(format!("assay-nix-eval-ok-{}", std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             let path = dir.join("value.nix");
             std::fs::write(&path, "42").unwrap();
@@ -293,5 +294,4 @@ mod tests {
             let _ = std::fs::remove_dir_all(dir);
         });
     }
-
 }

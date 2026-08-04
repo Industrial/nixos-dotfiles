@@ -29,10 +29,7 @@ fn check_forces_with_support(support: ForceSupport, paths: &[String]) -> AssayOu
             claim: "forces".into(),
             left: None,
             right: None,
-            diff: format!(
-                "UNSUPPORTED: {reason}; cannot verify force set {:?}",
-                paths
-            ),
+            diff: format!("UNSUPPORTED: {reason}; cannot verify force set {:?}", paths),
         },
         ForceSupport::Supported => AssayOutcome::Fail {
             claim: "forces".into(),
@@ -43,11 +40,7 @@ fn check_forces_with_support(support: ForceSupport, paths: &[String]) -> AssayOu
     }
 }
 
-pub fn check_forces(
-    _expr: &str,
-    paths: &[String],
-    _eval: &dyn EvalBackend,
-) -> AssayOutcome {
+pub fn check_forces(_expr: &str, paths: &[String], _eval: &dyn EvalBackend) -> AssayOutcome {
     check_forces_with_support(force_support(), paths)
 }
 

@@ -83,7 +83,7 @@ impl SnapshotStore {
 }
 
 fn snapshot_diff(expected: &Value, observed: &Value) -> String {
-    let diff = crate::diff::structural_diff(expected, observed);
+    let diff = nixq::structural_diff(expected, observed);
     if diff.is_empty() {
         format!("expected: {expected:?}\nobserved: {observed:?}")
     } else {
@@ -237,16 +237,17 @@ mod tests {
         let temp = TempStore::new();
         let store = temp.store.clone().with_update(true);
         let value = json!({"flag": true});
-        assert_eq!(store.assert_match("flagged", &value, false), AssayOutcome::Pass);
+        assert_eq!(
+            store.assert_match("flagged", &value, false),
+            AssayOutcome::Pass
+        );
         assert_eq!(store.read("flagged").unwrap(), Some(value));
     }
 }
 
 #[cfg(test)]
 mod golden_contract {
-    use id_effect::testing::snapshot::{
-        assert_golden_effect, GoldenBuilder, SnapshotAssertion,
-    };
+    use id_effect::testing::snapshot::{GoldenBuilder, SnapshotAssertion, assert_golden_effect};
     use id_effect::{Effect, succeed};
 
     #[test]

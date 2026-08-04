@@ -2,9 +2,9 @@
 
 use std::collections::BTreeMap;
 
+use id_effect::schema::HasSchema;
 use id_effect::schema::parse::{ParseError, Schema, Unknown};
 use id_effect::schema::unknown_from_serde_json;
-use id_effect::schema::HasSchema;
 use serde_json::Value;
 
 use crate::claims::Claim;
@@ -159,10 +159,7 @@ fn encode_claim_unknown(claim: Claim) -> Unknown {
         } => {
             obj.insert("claim".into(), Unknown::String("subset".into()));
             insert_nix_field(&mut obj, "expr", &expr);
-            obj.insert(
-                "expected".into(),
-                unknown_from_serde_json(expected_subset),
-            );
+            obj.insert("expected".into(), unknown_from_serde_json(expected_subset));
         }
         Claim::SubsetValues {
             actual,
@@ -170,10 +167,7 @@ fn encode_claim_unknown(claim: Claim) -> Unknown {
         } => {
             obj.insert("claim".into(), Unknown::String("subset".into()));
             obj.insert("actual".into(), unknown_from_serde_json(actual));
-            obj.insert(
-                "expected".into(),
-                unknown_from_serde_json(expected_subset),
-            );
+            obj.insert("expected".into(), unknown_from_serde_json(expected_subset));
         }
         Claim::HasAttrs { expr, attrs } => {
             obj.insert("claim".into(), Unknown::String("hasAttrs".into()));
@@ -273,10 +267,7 @@ fn string_array_field(
             .enumerate()
             .map(|(idx, item)| match item {
                 Unknown::String(s) => Ok(s.clone()),
-                _ => Err(ParseError::new(
-                    format!("{key}[{idx}]"),
-                    "expected string",
-                )),
+                _ => Err(ParseError::new(format!("{key}[{idx}]"), "expected string")),
             })
             .collect(),
         Some(_) => Err(ParseError::new(key, "expected array")),
@@ -492,9 +483,19 @@ mod tests {
         assert!(decode_claim_json(&json!({"claim": "eq"})).is_err());
         assert!(decode_claim_json(&json!({"claim": "law", "name": "x"})).is_err());
         assert!(decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": -1})).is_err());
-        assert!(decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": 1, "trials": 9999999999i64})).is_err());
-        assert!(decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": 1, "trials": "lots"})).is_err());
-        assert!(decode_claim_json(&json!({"claim": "hasAttrs", "expr": "x", "attrs": [1]})).is_err());
+        assert!(
+            decode_claim_json(
+                &json!({"claim": "prop", "name": "x", "seed": 1, "trials": 9999999999i64})
+            )
+            .is_err()
+        );
+        assert!(
+            decode_claim_json(&json!({"claim": "prop", "name": "x", "seed": 1, "trials": "lots"}))
+                .is_err()
+        );
+        assert!(
+            decode_claim_json(&json!({"claim": "hasAttrs", "expr": "x", "attrs": [1]})).is_err()
+        );
         assert!(decode_claim_json(&json!({"claim": "subset", "actual": {}})).is_err());
         let _ = bad;
     }
@@ -561,7 +562,13 @@ mod tests {
             "trials": 42
         }))
         .expect("decode");
-        assert!(matches!(with_valid, Claim::Prop { trials: Some(42), .. }));
+        assert!(matches!(
+            with_valid,
+            Claim::Prop {
+                trials: Some(42),
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -574,5 +581,4 @@ mod tests {
         .expect("decode");
         assert!(matches!(decoded, Claim::Throws { pattern: None, .. }));
     }
-
 }

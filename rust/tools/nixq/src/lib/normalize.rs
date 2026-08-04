@@ -43,9 +43,7 @@ fn is_derivation_like(map: &Map<String, Value>) -> bool {
     if map.get("type").and_then(Value::as_str) == Some("derivation") {
         return true;
     }
-    map
-        .get("outPath")
-        .is_some_and(Value::is_string)
+    map.get("outPath").is_some_and(Value::is_string)
         || map.get("drvPath").is_some_and(Value::is_string)
 }
 

@@ -2,9 +2,9 @@
 
 use std::time::{Duration, Instant};
 
-use id_effect::{Clock,
-    fail, retry_with_clock, run_test_with_clock, succeed, Effect, Exit, Needs, Schedule,
-    TestClock,
+use id_effect::{
+    Clock, Effect, Exit, Needs, Schedule, TestClock, fail, retry_with_clock, run_test_with_clock,
+    succeed,
 };
 
 use crate::caps::{AssayEnv, ClockKey};
@@ -46,13 +46,13 @@ pub fn interpret_claim_with_retry(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    use id_effect::{Clock,build_env, run_test, run_test_with_clock, Cap, FromEnv};
+    use id_effect::{Cap, Clock, FromEnv, build_env, run_test, run_test_with_clock};
 
     use super::*;
-    use crate::caps::{mock_providers, AssayEnv, MockNixEval, NixEvaluatorKey};
+    use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, mock_providers};
     use crate::eval::{EvalBackend, EvalResult};
     use crate::verdict::CaseVerdict;
 

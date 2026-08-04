@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use id_effect::concurrency::FiberHandle;
-use id_effect::runtime::{run_blocking, run_fork, ThreadSleepRuntime};
+use id_effect::runtime::{ThreadSleepRuntime, run_blocking, run_fork};
 use id_effect::{Cap, Cause, Effect, Exit, Needs};
 use serde::Serialize;
 
@@ -13,10 +13,10 @@ use crate::batch::{partition_cases, run_batch};
 use crate::caps::NixEvaluatorKey;
 use crate::caps::{AssayEnv, NixWorkerPoolKey, SnapshotStoreKey};
 use crate::claims::Claim;
-use crate::timeout::interpret_claim_with_retry;
 use crate::compat::load_compat_suite;
-use crate::discover::{discover_suites, suite_kind, SuiteKind};
+use crate::discover::{SuiteKind, discover_suites, suite_kind};
 use crate::outcome::AssayOutcome;
+use crate::timeout::interpret_claim_with_retry;
 use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome};
 
 #[derive(Debug, Clone)]
@@ -146,8 +146,9 @@ fn run_cases_on_env(
         for (name, claim) in isolated {
             let env_clone = env.clone();
             let case_name = name.clone();
-            let case_handle =
-                run_fork(&rt, move || (interpret_claim_with_retry(claim, retry), env_clone));
+            let case_handle = run_fork(&rt, move || {
+                (interpret_claim_with_retry(claim, retry), env_clone)
+            });
             let timeout_handle =
                 timeout_ms.map(|limit_ms| spawn_timeout_fiber(&rt, case_name, limit_ms));
             pending.push(PendingCase {
@@ -161,8 +162,8 @@ fn run_cases_on_env(
             let exit = match p.timeout {
                 Some(timeout) => race_case_or_timeout(p.case, timeout),
                 None => {
-                    let exit = run_blocking(p.case.await_exit(), ())
-                        .expect("await_exit is infallible");
+                    let exit =
+                        run_blocking(p.case.await_exit(), ()).expect("await_exit is infallible");
                     let _ = p.case.interrupt();
                     exit
                 }
@@ -174,7 +175,6 @@ fn run_cases_on_env(
     outcomes.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(SuiteReport { outcomes })
 }
-
 
 fn race_case_or_timeout(
     case: FiberHandle<CaseVerdict, InfraError>,
@@ -325,15 +325,15 @@ pub fn run_suite_blocking(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::Instant;
 
-    use id_effect::{build_env, succeed, Cap, FromEnv, run_test, run_test_with_clock, TestClock};
+    use id_effect::{Cap, FromEnv, TestClock, build_env, run_test, run_test_with_clock, succeed};
     use serde_json::json;
 
     use super::*;
-    use crate::caps::{mock_providers, ClockKey, MockNixEval, NixEvaluatorKey};
+    use crate::caps::{ClockKey, MockNixEval, NixEvaluatorKey, mock_providers};
     use crate::claims::interpret_claim;
     use crate::eval::{EvalBackend, EvalResult};
     use crate::pool::{MockWorkerPool, NixWorkerPool};
@@ -360,9 +360,27 @@ mod tests {
 
         let env = mock_env_with_eval(Arc::new(OrderEval));
         let cases: Vec<(String, Claim)> = vec![
-            ("z_last".into(), Claim::Eq { left_expr: "1".into(), right_expr: "1".into() }),
-            ("a_first".into(), Claim::Eq { left_expr: "1".into(), right_expr: "1".into() }),
-            ("m_mid".into(), Claim::Eq { left_expr: "1".into(), right_expr: "1".into() }),
+            (
+                "z_last".into(),
+                Claim::Eq {
+                    left_expr: "1".into(),
+                    right_expr: "1".into(),
+                },
+            ),
+            (
+                "a_first".into(),
+                Claim::Eq {
+                    left_expr: "1".into(),
+                    right_expr: "1".into(),
+                },
+            ),
+            (
+                "m_mid".into(),
+                Claim::Eq {
+                    left_expr: "1".into(),
+                    right_expr: "1".into(),
+                },
+            ),
         ];
 
         let rt = ThreadSleepRuntime::default();
@@ -394,14 +412,29 @@ mod tests {
         let env = mock_env_with_eval(Arc::new(MockNixEval::default()));
         let effect = Effect::new(move |env: &mut AssayEnv| {
             let cases: Vec<(String, Claim)> = vec![
-                ("b".into(), Claim::Eq { left_expr: "x".into(), right_expr: "x".into() }),
-                ("a".into(), Claim::Eq { left_expr: "y".into(), right_expr: "y".into() }),
+                (
+                    "b".into(),
+                    Claim::Eq {
+                        left_expr: "x".into(),
+                        right_expr: "x".into(),
+                    },
+                ),
+                (
+                    "a".into(),
+                    Claim::Eq {
+                        left_expr: "y".into(),
+                        right_expr: "y".into(),
+                    },
+                ),
             ];
             let rt = ThreadSleepRuntime::default();
             let mut handles = Vec::new();
             for (name, claim) in cases {
                 let env_clone = env.clone();
-                handles.push((name, run_fork(&rt, move || (interpret_claim(claim), env_clone))));
+                handles.push((
+                    name,
+                    run_fork(&rt, move || (interpret_claim(claim), env_clone)),
+                ));
             }
             let mut outcomes = Vec::new();
             for (name, h) in handles {
@@ -484,7 +517,10 @@ mod tests {
 
     #[test]
     fn succeed_smoke_for_run_suite_effect() {
-        let exit = run_test(succeed::<SuiteReport, InfraError, ()>(SuiteReport { outcomes: vec![] }), ());
+        let exit = run_test(
+            succeed::<SuiteReport, InfraError, ()>(SuiteReport { outcomes: vec![] }),
+            (),
+        );
         assert!(matches!(exit, Exit::Success(_)));
     }
 
@@ -492,10 +528,8 @@ mod tests {
     fn run_discovered_runs_suites_concurrently_under_pool() {
         use std::fs;
 
-        let root = std::env::temp_dir().join(format!(
-            "assay_parallel_suites_{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("assay_parallel_suites_{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(root.join("a")).unwrap();
         fs::create_dir_all(root.join("b")).unwrap();

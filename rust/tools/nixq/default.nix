@@ -8,13 +8,12 @@
   ...
 }:
 pkgs.writeShellApplication {
-  name = "assay";
+  name = "nixq";
   runtimeInputs = [
     cargo
     rustc
     pkgs.gcc
     pkgs.pkg-config
-    pkgs.nix
     pkgs.git
   ];
   text = ''
@@ -24,24 +23,23 @@ pkgs.writeShellApplication {
       root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
     fi
     manifest="$root/rust/Cargo.toml"
-    bin="$root/rust/target/debug/assay"
+    bin="$root/rust/target/debug/nixq"
     if [[ ! -f "$manifest" ]]; then
-      echo "assay: cannot find rust workspace at $manifest" >&2
+      echo "nixq: cannot find rust workspace at $manifest" >&2
       exit 127
     fi
-    # Rebuild when missing or when sources are newer than the binary.
     needs_build=0
     if [[ ! -x "$bin" ]]; then
       needs_build=1
     else
-      newest="$(find "$root/rust/tools/assay/src" "$root/rust/tools/nixq/src" -type f -newer "$bin" | head -n1 || true)"
+      newest="$(find "$root/rust/tools/nixq/src" -type f -newer "$bin" | head -n1 || true)"
       if [[ -n "$newest" ]]; then
         needs_build=1
       fi
     fi
     if [[ "$needs_build" -eq 1 ]]; then
-      echo "assay: building (cargo -p assay)…" >&2
-      env -u RUSTC_WRAPPER cargo build --manifest-path "$manifest" -p assay
+      echo "nixq: building (cargo -p nixq)…" >&2
+      env -u RUSTC_WRAPPER cargo build --manifest-path "$manifest" -p nixq
     fi
     exec "$bin" "$@"
   '';

@@ -16,8 +16,7 @@ pub fn parse_assay_suite(v: &Value) -> anyhow::Result<Vec<(String, Claim)>> {
         .and_then(|c| c.as_object())
         .context("assay suite missing cases object")?;
 
-    decode_suite_cases(&Value::Object(cases.clone()))
-        .map_err(|e| anyhow::anyhow!("{e:?}"))
+    decode_suite_cases(&Value::Object(cases.clone())).map_err(|e| anyhow::anyhow!("{e:?}"))
 }
 
 /// Load suite from `.assay.nix` via `nix eval --json`, or from `.json`.
@@ -42,7 +41,6 @@ fn nix_eval_file(path: &Path) -> anyhow::Result<Value> {
         other => anyhow::anyhow!("nix eval failed: {other:?}"),
     })
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -100,5 +98,4 @@ mod tests {
         let path = std::env::temp_dir().join(format!("assay-missing-{}.json", std::process::id()));
         assert!(load_assay_suite(&path).is_err());
     }
-
 }

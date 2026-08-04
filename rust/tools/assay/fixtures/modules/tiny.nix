@@ -1,7 +1,6 @@
 # Tiny options module for Assay `Claim::Module` documentation.
 # Pure Nix data — not executed in Rust unit tests.
-{ lib, ... }:
-{
+{lib, ...}: {
   options = {
     assay.tiny.enable = lib.mkEnableOption "tiny assay fixture";
     assay.tiny.message = lib.mkOption {

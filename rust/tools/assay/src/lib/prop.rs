@@ -23,7 +23,6 @@ pub fn run_prop_by_name(name: &str, seed: u64, trials: u32) -> AssayOutcome {
     }
 }
 
-
 /// Seeded pseudo-random generator with a stable value sequence per seed.
 #[derive(Debug, Clone)]
 pub struct Gen {
@@ -32,9 +31,7 @@ pub struct Gen {
 
 impl Gen {
     pub fn new(seed: u64) -> Self {
-        Self {
-            state: seed.max(1),
-        }
+        Self { state: seed.max(1) }
     }
 
     pub fn gen_bool(&mut self) -> bool {
@@ -88,11 +85,7 @@ impl Gen {
 
     fn gen_array(&mut self, depth: u32) -> Value {
         let len = self.gen_u32(MAX_COLLECTION_LEN as u32 + 1) as usize;
-        Value::Array(
-            (0..len)
-                .map(|_| self.gen_json(depth - 1))
-                .collect(),
-        )
+        Value::Array((0..len).map(|_| self.gen_json(depth - 1)).collect())
     }
 
     fn gen_object(&mut self, depth: u32) -> Value {
@@ -208,10 +201,7 @@ mod tests {
 
     #[test]
     fn counterexample_is_shrunk() {
-        let failing = Value::Array(vec![
-            Value::Number(10.into()),
-            Value::Number(20.into()),
-        ]);
+        let failing = Value::Array(vec![Value::Number(10.into()), Value::Number(20.into())]);
         let outcome = prop_assert(1, 1, |_| Err(failing.clone()));
         match outcome {
             AssayOutcome::Counterexample { shrunk, .. } => {

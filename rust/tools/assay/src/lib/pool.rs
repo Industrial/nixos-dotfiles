@@ -102,9 +102,11 @@ impl NixWorkerPool for SemaphoreWorkerPool {
     fn acquire(&self) -> Result<PoolGuard, InfraError> {
         let mut avail = self.inner.available.lock().unwrap();
         while *avail == 0 {
-            avail = self.inner.cvar.wait(avail).map_err(|_| {
-                InfraError::Worker("worker pool lock poisoned".into())
-            })?;
+            avail = self
+                .inner
+                .cvar
+                .wait(avail)
+                .map_err(|_| InfraError::Worker("worker pool lock poisoned".into()))?;
         }
         *avail -= 1;
         drop(avail);

@@ -10,7 +10,7 @@
 use std::fmt::Write as _;
 use std::io::{self, Write};
 
-use id_effect::{runtime::run_blocking, succeed, Effect, Stream};
+use id_effect::{Effect, Stream, runtime::run_blocking, succeed};
 use serde::Serialize;
 
 use crate::outcome::AssayOutcome;
@@ -50,7 +50,9 @@ struct JsonOutcome {
 }
 
 /// Build a finite stream over case outcomes (buffer-all v1).
-pub fn outcome_stream(outcomes: &[(String, AssayOutcome)]) -> Stream<(String, AssayOutcome), (), ()> {
+pub fn outcome_stream(
+    outcomes: &[(String, AssayOutcome)],
+) -> Stream<(String, AssayOutcome), (), ()> {
     let owned: Vec<(String, AssayOutcome)> = outcomes.to_vec();
     Stream::from_iterable(owned)
 }
@@ -133,7 +135,11 @@ fn write_json(outcomes: &[(String, AssayOutcome)], writer: &mut dyn Write) -> io
             outcome: outcome.clone(),
         })
         .collect();
-    writeln!(writer, "{}", serde_json::to_string_pretty(&rows).map_err(io::Error::other)?)
+    writeln!(
+        writer,
+        "{}",
+        serde_json::to_string_pretty(&rows).map_err(io::Error::other)?
+    )
 }
 
 /// Emit a full report for `outcomes` to `writer`.
@@ -296,34 +302,35 @@ mod tests {
     fn tap_line_other_outcome_variants() {
         assert!(format_tap_line(1, "r", &AssayOutcome::Recursion).contains("infinite recursion"));
         assert!(format_tap_line(1, "t", &AssayOutcome::Timeout).contains("timeout"));
+        assert!(format_tap_line(1, "l", &AssayOutcome::ResourceLeak).contains("resource leak"));
         assert!(
-            format_tap_line(1, "l", &AssayOutcome::ResourceLeak).contains("resource leak")
+            format_tap_line(
+                1,
+                "c",
+                &AssayOutcome::Counterexample {
+                    seed: 1,
+                    shrunk: serde_json::json!(null),
+                }
+            )
+            .contains("counterexample")
         );
-        assert!(format_tap_line(
-            1,
-            "c",
-            &AssayOutcome::Counterexample {
-                seed: 1,
-                shrunk: serde_json::json!(null),
-            }
-        )
-        .contains("counterexample"));
-        assert!(format_tap_line(
-            1,
-            "s",
-            &AssayOutcome::SnapshotMismatch {
-                path: "golden.json".into(),
-                diff: "mismatch".into(),
-            }
-        )
-        .contains("mismatch"));
+        assert!(
+            format_tap_line(
+                1,
+                "s",
+                &AssayOutcome::SnapshotMismatch {
+                    path: "golden.json".into(),
+                    diff: "mismatch".into(),
+                }
+            )
+            .contains("mismatch")
+        );
     }
 
     #[test]
     fn outcome_stream_collect_preserves_order() {
         let outcomes = sample_outcomes();
-        let collected = run_blocking(outcome_stream(&outcomes).run_collect(), ())
-            .expect("collect");
+        let collected = run_blocking(outcome_stream(&outcomes).run_collect(), ()).expect("collect");
         assert_eq!(collected.len(), 2);
         assert_eq!(collected[0].0, "passing");
         assert_eq!(collected[1].0, "failing");

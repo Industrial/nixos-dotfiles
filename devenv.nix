@@ -57,6 +57,10 @@
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
   };
+  nixq = pkgs.callPackage ./rust/tools/nixq {
+    rustc = pkgs-unstable.rustc;
+    cargo = pkgs-unstable.cargo;
+  };
 
   # Nightly toolchain for cargo-llvm-cov --branch (stable rejects -Z coverage-options=branch).
   rust-nightly = inputs.fenix.packages.${system}.complete.withComponents [
@@ -92,6 +96,7 @@ in {
 
     nix-unit
     assay
+    nixq
     namaka
     nixt
 
@@ -181,6 +186,18 @@ in {
         unset RUSTC_WRAPPER || true
         cd "$DEVENV_ROOT/rust"
         cargo llvm-cov nextest -p assay --lib --branch \
+          --fail-under-lines 95 --fail-under-regions 95 \
+          --no-cfg-coverage
+      '';
+    };
+
+    nixq-coverage = {
+      exec = ''
+        set -euo pipefail
+        export PATH="${rust-nightly}/bin:$PATH"
+        unset RUSTC_WRAPPER || true
+        cd "$DEVENV_ROOT/rust"
+        cargo llvm-cov nextest -p nixq --lib --branch \
           --fail-under-lines 95 --fail-under-regions 95 \
           --no-cfg-coverage
       '';

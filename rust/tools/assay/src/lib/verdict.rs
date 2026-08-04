@@ -45,10 +45,7 @@ pub enum CaseVerdict {
 pub enum InfraError {
     SuiteLoad(String),
     Capability(String),
-    Timeout {
-        case: String,
-        limit_ms: u64,
-    },
+    Timeout { case: String, limit_ms: u64 },
     Worker(String),
     Io(String),
 }
@@ -68,7 +65,11 @@ pub fn outcome_to_exit(outcome: AssayOutcome) -> Exit<CaseVerdict, InfraError> {
             right,
             diff,
         }),
-        AssayOutcome::EvalError { kind, message, span: _ } => match kind.as_str() {
+        AssayOutcome::EvalError {
+            kind,
+            message,
+            span: _,
+        } => match kind.as_str() {
             "panic" => Exit::die(message),
             "suite_load" => Exit::fail(InfraError::SuiteLoad(message)),
             "nix_missing" => Exit::fail(InfraError::Capability(message)),
@@ -125,7 +126,9 @@ fn verdict_to_outcome(verdict: CaseVerdict) -> AssayOutcome {
             span: None,
         },
         CaseVerdict::ExpectedThrow => AssayOutcome::Pass,
-        CaseVerdict::SnapshotMismatch { path, diff } => AssayOutcome::SnapshotMismatch { path, diff },
+        CaseVerdict::SnapshotMismatch { path, diff } => {
+            AssayOutcome::SnapshotMismatch { path, diff }
+        }
         CaseVerdict::Counterexample { seed, shrunk } => {
             AssayOutcome::Counterexample { seed, shrunk }
         }
@@ -197,9 +200,9 @@ impl InfraError {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use id_effect::failure::pretty_exit;
     use serde_json::json;
-    use super::*;
 
     #[test]
     fn exit_succeed_pass() {
@@ -236,7 +239,10 @@ mod tests {
             diff: "left != right".into(),
         };
         let exit = outcome_to_exit(original.clone());
-        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
         assert_eq!(exit_to_outcome(exit), original);
     }
 
@@ -292,7 +298,10 @@ mod tests {
             message: "bad".into(),
             span: None,
         };
-        assert_eq!(exit_to_outcome(outcome_to_exit(suite_err.clone())), suite_err);
+        assert_eq!(
+            exit_to_outcome(outcome_to_exit(suite_err.clone())),
+            suite_err
+        );
 
         for kind in ["io", "json"] {
             let err = AssayOutcome::EvalError {
@@ -322,12 +331,18 @@ mod tests {
             message: "boom".into(),
             span: None,
         };
-        assert!(matches!(outcome_to_exit(throw.clone()), Exit::Success(CaseVerdict::EvalThrow { .. })));
-        assert_eq!(exit_to_outcome(outcome_to_exit(throw)), AssayOutcome::EvalError {
-            kind: "throw".into(),
-            message: "boom".into(),
-            span: None,
-        });
+        assert!(matches!(
+            outcome_to_exit(throw.clone()),
+            Exit::Success(CaseVerdict::EvalThrow { .. })
+        ));
+        assert_eq!(
+            exit_to_outcome(outcome_to_exit(throw)),
+            AssayOutcome::EvalError {
+                kind: "throw".into(),
+                message: "boom".into(),
+                span: None,
+            }
+        );
 
         let cx = AssayOutcome::Counterexample {
             seed: 1,
@@ -363,7 +378,10 @@ mod tests {
         // Both/Then prefer left when left is not Pass — here SuiteLoad maps to non-Pass
         let left = Cause::Fail(InfraError::SuiteLoad("bad".into()));
         let right = Cause::Fail(InfraError::Io("disk".into()));
-        match infra_cause_to_outcome(&Cause::Both(Box::new(left.clone()), Box::new(right.clone()))) {
+        match infra_cause_to_outcome(&Cause::Both(
+            Box::new(left.clone()),
+            Box::new(right.clone()),
+        )) {
             AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "suite_load"),
             other => panic!("expected suite_load, got {other:?}"),
         }
@@ -412,7 +430,10 @@ mod tests {
 
     #[test]
     fn into_exit_helpers() {
-        assert!(matches!(CaseVerdict::Pass.into_exit(), Exit::Success(CaseVerdict::Pass)));
+        assert!(matches!(
+            CaseVerdict::Pass.into_exit(),
+            Exit::Success(CaseVerdict::Pass)
+        ));
         assert!(matches!(
             InfraError::Worker("w".into()).into_exit(),
             Exit::Failure(Cause::Fail(InfraError::Worker(_)))
@@ -506,5 +527,4 @@ mod tests {
         let back: InfraError = serde_json::from_str(&json).unwrap();
         assert_eq!(back, err);
     }
-
 }

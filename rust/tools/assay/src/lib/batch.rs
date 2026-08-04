@@ -7,14 +7,12 @@
 use serde_json::Value;
 
 use crate::claims::{Claim, interpret_claim_with};
-use crate::diff::structural_diff;
 use crate::eval::{EvalBackend, EvalResult};
-use crate::normalize::normalize_value;
-use crate::optics_json::value_contains_subset;
 use crate::outcome::AssayOutcome;
 use crate::snapshot::SnapshotStore;
 use crate::verdict::{CaseVerdict, InfraError, outcome_to_exit};
 use id_effect::Exit;
+use nixq::{normalize_value, structural_diff, value_contains_subset};
 
 /// Marker embedded in generated Nix so mocks / debuggers can recognize batches.
 pub const BATCH_MARKER: &str = "__assayBatch";
@@ -23,9 +21,10 @@ pub const BATCH_MARKER: &str = "__assayBatch";
 pub fn is_batchable(claim: &Claim) -> bool {
     match claim {
         // Eq/subset/hasAttrs/snapshot — values are JSON-serializable on the happy path.
-        Claim::Eq { .. } | Claim::Subset { .. } | Claim::HasAttrs { .. } | Claim::Snapshot { .. } => {
-            true
-        }
+        Claim::Eq { .. }
+        | Claim::Subset { .. }
+        | Claim::HasAttrs { .. }
+        | Claim::Snapshot { .. } => true,
         // All throws stay process-isolated: Nix 2.31+ `tryEval` catches `throw`/`assert`
         // but NOT primop type errors (e.g. `builtins.add "x" 1`), and pattern throws need stderr.
         Claim::EqValues { .. }
@@ -131,11 +130,7 @@ fn wrap_nix_attr_names(expr: &str) -> String {
 
 /// Build a single Nix expression that evaluates every batchable claim.
 fn build_batch_expr(cases: &[(String, Claim)]) -> (String, Vec<BatchSlot>) {
-    let slots: Vec<BatchSlot> = cases
-        .iter()
-        .cloned()
-        .map(|(n, c)| to_slot(n, c))
-        .collect();
+    let slots: Vec<BatchSlot> = cases.iter().cloned().map(|(n, c)| to_slot(n, c)).collect();
 
     let mut items = Vec::with_capacity(slots.len());
     for (idx, slot) in slots.iter().enumerate() {
@@ -176,7 +171,6 @@ fn build_batch_expr(cases: &[(String, Claim)]) -> (String, Vec<BatchSlot>) {
     );
     (expr, slots)
 }
-
 
 fn nix_string_literal(s: &str) -> String {
     let escaped = s
@@ -288,9 +282,7 @@ fn slot_outcome(slot: &BatchSlot, row: &Value, store: &SnapshotStore) -> AssayOu
                     } else {
                         AssayOutcome::Fail {
                             claim: "hasAttrs".into(),
-                            left: Some(Value::Array(
-                                keys.into_iter().map(Value::String).collect(),
-                            )),
+                            left: Some(Value::Array(keys.into_iter().map(Value::String).collect())),
                             right: None,
                             diff: format!("missing attrs: {missing:?}"),
                         }
@@ -310,9 +302,7 @@ fn slot_outcome(slot: &BatchSlot, row: &Value, store: &SnapshotStore) -> AssayOu
         }
         (BatchKind::Snapshot { snap_name }, "snapshot") => {
             match decode_try(row.get("primary").unwrap_or(&Value::Null)) {
-                Ok(Some(actual)) => {
-                    store.assert_match(snap_name, &actual, store.update_snapshots)
-                }
+                Ok(Some(actual)) => store.assert_match(snap_name, &actual, store.update_snapshots),
                 Ok(None) => AssayOutcome::EvalError {
                     kind: "throw".into(),
                     message: "snapshot expr failed to evaluate".into(),
@@ -332,7 +322,6 @@ fn slot_outcome(slot: &BatchSlot, row: &Value, store: &SnapshotStore) -> AssayOu
     }
 }
 
-
 #[cfg(test)]
 thread_local! {
     pub(crate) static FORCE_BATCH_JSON_EVAL: std::cell::Cell<bool> =
@@ -350,9 +339,9 @@ fn eval_batch_expr(eval: &dyn EvalBackend, expr: &str) -> Result<Value, InfraErr
             EvalResult::Err(AssayOutcome::EvalError { message, .. }) => {
                 Err(InfraError::Worker(format!("batch eval failed: {message}")))
             }
-            EvalResult::Err(other) => Err(InfraError::Worker(format!(
-                "batch eval failed: {other:?}"
-            ))),
+            EvalResult::Err(other) => {
+                Err(InfraError::Worker(format!("batch eval failed: {other:?}")))
+            }
         };
     }
 
@@ -400,7 +389,6 @@ fn eval_batch_expr(eval: &dyn EvalBackend, expr: &str) -> Result<Value, InfraErr
         },
     }
 }
-
 
 fn run_batch_fallback(
     cases: &[(String, Claim)],
@@ -546,7 +534,6 @@ mod tests {
         assert_eq!(slots[0].name, "add");
     }
 
-
     use crate::caps::MockNixEval;
     use serde_json::json;
 
@@ -599,43 +586,105 @@ mod tests {
             "left": {"ok": true, "value": 1},
             "right": {"ok": true, "value": 2}
         });
-        assert!(matches!(slot_outcome(&slot, &fail_row, &store), AssayOutcome::Fail { .. }));
+        assert!(matches!(
+            slot_outcome(&slot, &fail_row, &store),
+            AssayOutcome::Fail { .. }
+        ));
 
-        let left_throw = json!({"kind": "eq", "left": {"ok": false}, "right": {"ok": true, "value": 1}});
-        assert!(matches!(slot_outcome(&slot, &left_throw, &store), AssayOutcome::EvalError { .. }));
+        let left_throw =
+            json!({"kind": "eq", "left": {"ok": false}, "right": {"ok": true, "value": 1}});
+        assert!(matches!(
+            slot_outcome(&slot, &left_throw, &store),
+            AssayOutcome::EvalError { .. }
+        ));
 
         let mismatch = json!({"kind": "subset", "primary": {"ok": true, "value": {}}});
-        assert!(matches!(slot_outcome(&slot, &mismatch, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&slot, &mismatch, &store),
+            AssayOutcome::EvalError { .. }
+        ));
     }
 
     #[test]
     fn slot_outcome_subset_hasattrs_snapshot_paths() {
         let store = SnapshotStore::new(PathBuf::from("/tmp/assay-slot2"));
-        let subset = sample_slot("s", BatchKind::Subset { expected: json!({"a": 1}) });
-        let subset_ok = json!({"kind": "subset", "primary": {"ok": true, "value": {"a": 1, "b": 2}}});
-        assert_eq!(slot_outcome(&subset, &subset_ok, &store), AssayOutcome::Pass);
+        let subset = sample_slot(
+            "s",
+            BatchKind::Subset {
+                expected: json!({"a": 1}),
+            },
+        );
+        let subset_ok =
+            json!({"kind": "subset", "primary": {"ok": true, "value": {"a": 1, "b": 2}}});
+        assert_eq!(
+            slot_outcome(&subset, &subset_ok, &store),
+            AssayOutcome::Pass
+        );
 
         let subset_fail = json!({"kind": "subset", "primary": {"ok": true, "value": {"a": 9}}});
-        assert!(matches!(slot_outcome(&subset, &subset_fail, &store), AssayOutcome::Fail { .. }));
+        assert!(matches!(
+            slot_outcome(&subset, &subset_fail, &store),
+            AssayOutcome::Fail { .. }
+        ));
 
-        let has = sample_slot("h", BatchKind::HasAttrs { attrs: vec!["a".into()] });
+        let has = sample_slot(
+            "h",
+            BatchKind::HasAttrs {
+                attrs: vec!["a".into()],
+            },
+        );
         let has_ok = json!({"kind": "hasAttrs", "primary": {"ok": true, "keys": ["a"]}});
         assert_eq!(slot_outcome(&has, &has_ok, &store), AssayOutcome::Pass);
         let has_missing = json!({"kind": "hasAttrs", "primary": {"ok": true, "keys": []}});
-        assert!(matches!(slot_outcome(&has, &has_missing, &store), AssayOutcome::Fail { .. }));
+        assert!(matches!(
+            slot_outcome(&has, &has_missing, &store),
+            AssayOutcome::Fail { .. }
+        ));
 
-        let snap = sample_slot("snap", BatchKind::Snapshot { snap_name: "__missing__".into() });
+        let snap = sample_slot(
+            "snap",
+            BatchKind::Snapshot {
+                snap_name: "__missing__".into(),
+            },
+        );
         let snap_row = json!({"kind": "snapshot", "primary": {"ok": true, "value": {"x": 1}}});
-        assert!(matches!(slot_outcome(&snap, &snap_row, &store), AssayOutcome::SnapshotMismatch { .. }));
+        assert!(matches!(
+            slot_outcome(&snap, &snap_row, &store),
+            AssayOutcome::SnapshotMismatch { .. }
+        ));
     }
 
     #[test]
     fn build_batch_expr_covers_all_kinds() {
         let cases = vec![
-            ("eq".into(), Claim::Eq { left_expr: "1".into(), right_expr: "2".into() }),
-            ("sub".into(), Claim::Subset { expr: "v".into(), expected_subset: json!({}) }),
-            ("has".into(), Claim::HasAttrs { expr: "v".into(), attrs: vec!["a".into()] }),
-            ("snap".into(), Claim::Snapshot { name: "g".into(), expr: "v".into() }),
+            (
+                "eq".into(),
+                Claim::Eq {
+                    left_expr: "1".into(),
+                    right_expr: "2".into(),
+                },
+            ),
+            (
+                "sub".into(),
+                Claim::Subset {
+                    expr: "v".into(),
+                    expected_subset: json!({}),
+                },
+            ),
+            (
+                "has".into(),
+                Claim::HasAttrs {
+                    expr: "v".into(),
+                    attrs: vec!["a".into()],
+                },
+            ),
+            (
+                "snap".into(),
+                Claim::Snapshot {
+                    name: "g".into(),
+                    expr: "v".into(),
+                },
+            ),
         ];
         let (expr, slots) = build_batch_expr(&cases);
         assert!(expr.contains("subset"));
@@ -648,8 +697,20 @@ mod tests {
     #[test]
     fn run_batch_mock_json_paths() {
         let cases = vec![
-            ("eq_ok".into(), Claim::Eq { left_expr: "1".into(), right_expr: "1".into() }),
-            ("eq_fail".into(), Claim::Eq { left_expr: "1".into(), right_expr: "2".into() }),
+            (
+                "eq_ok".into(),
+                Claim::Eq {
+                    left_expr: "1".into(),
+                    right_expr: "1".into(),
+                },
+            ),
+            (
+                "eq_fail".into(),
+                Claim::Eq {
+                    left_expr: "1".into(),
+                    right_expr: "2".into(),
+                },
+            ),
         ];
         let results = json!({
             BATCH_MARKER: true,
@@ -658,12 +719,18 @@ mod tests {
                 {"kind": "eq", "left": {"ok": true, "value": 1}, "right": {"ok": true, "value": 2}},
             ]
         });
-        let eval = MockBatchJsonEval { inner: MockNixEval::default(), results };
+        let eval = MockBatchJsonEval {
+            inner: MockNixEval::default(),
+            results,
+        };
         let store = SnapshotStore::new(PathBuf::from("/tmp/assay-batch-mock"));
         let outs = run_batch(&cases, &eval, &store).expect("batch");
         assert_eq!(outs.len(), 2);
         assert!(matches!(outs[0].1, Exit::Success(CaseVerdict::Pass)));
-        assert!(matches!(outs[1].1, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            outs[1].1,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     struct FailingBatchEval(MockNixEval);
@@ -685,7 +752,13 @@ mod tests {
     fn run_batch_fallback_runs_isolated_interpreter() {
         let mock = MockNixEval::default();
         mock.set("a", EvalResult::Ok(json!(1)));
-        let cases = vec![("eq".into(), Claim::Eq { left_expr: "a".into(), right_expr: "a".into() })];
+        let cases = vec![(
+            "eq".into(),
+            Claim::Eq {
+                left_expr: "a".into(),
+                right_expr: "a".into(),
+            },
+        )];
         let store = SnapshotStore::new(PathBuf::from("/tmp/assay-batch-fallback"));
         let outs = run_batch(&cases, &FailingBatchEval(mock), &store).expect("fallback");
         assert!(matches!(outs[0].1, Exit::Success(CaseVerdict::Pass)));
@@ -693,10 +766,24 @@ mod tests {
 
     #[test]
     fn is_batchable_covers_non_batchable_variants() {
-        assert!(!is_batchable(&Claim::EqValues { left: json!(1), right: json!(1) }));
-        assert!(!is_batchable(&Claim::Forces { expr: "x".into(), paths: vec![] }));
-        assert!(!is_batchable(&Claim::Module { imports_expr: "[]".into(), args_expr: "{}".into(), expect: json!({}) }));
-        assert!(!is_batchable(&Claim::Prop { name: "always_pass".into(), seed: 1, trials: None }));
+        assert!(!is_batchable(&Claim::EqValues {
+            left: json!(1),
+            right: json!(1)
+        }));
+        assert!(!is_batchable(&Claim::Forces {
+            expr: "x".into(),
+            paths: vec![]
+        }));
+        assert!(!is_batchable(&Claim::Module {
+            imports_expr: "[]".into(),
+            args_expr: "{}".into(),
+            expect: json!({})
+        }));
+        assert!(!is_batchable(&Claim::Prop {
+            name: "always_pass".into(),
+            seed: 1,
+            trials: None
+        }));
     }
 
     #[test]
@@ -842,24 +929,57 @@ mod tests {
             "left": {"ok": true, "value": 1},
             "right": {"ok": false}
         });
-        assert!(matches!(slot_outcome(&eq, &right_throw, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&eq, &right_throw, &store),
+            AssayOutcome::EvalError { .. }
+        ));
 
-        let subset = sample_slot("s", BatchKind::Subset { expected: json!({"a": 1}) });
+        let subset = sample_slot(
+            "s",
+            BatchKind::Subset {
+                expected: json!({"a": 1}),
+            },
+        );
         let bad_decode = json!({"kind": "subset", "primary": "nope"});
-        assert!(matches!(slot_outcome(&subset, &bad_decode, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&subset, &bad_decode, &store),
+            AssayOutcome::EvalError { .. }
+        ));
 
         let subset_throw = json!({"kind": "subset", "primary": {"ok": false}});
-        assert!(matches!(slot_outcome(&subset, &subset_throw, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&subset, &subset_throw, &store),
+            AssayOutcome::EvalError { .. }
+        ));
 
-        let has = sample_slot("h", BatchKind::HasAttrs { attrs: vec!["a".into()] });
+        let has = sample_slot(
+            "h",
+            BatchKind::HasAttrs {
+                attrs: vec!["a".into()],
+            },
+        );
         let has_false = json!({"kind": "hasAttrs", "primary": {"ok": false}});
-        assert!(matches!(slot_outcome(&has, &has_false, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&has, &has_false, &store),
+            AssayOutcome::EvalError { .. }
+        ));
         let has_none = json!({"kind": "hasAttrs", "primary": {"oops": true}});
-        assert!(matches!(slot_outcome(&has, &has_none, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&has, &has_none, &store),
+            AssayOutcome::EvalError { .. }
+        ));
 
-        let snap = sample_slot("snap", BatchKind::Snapshot { snap_name: "g".into() });
+        let snap = sample_slot(
+            "snap",
+            BatchKind::Snapshot {
+                snap_name: "g".into(),
+            },
+        );
         let snap_throw = json!({"kind": "snapshot", "primary": {"ok": false}});
-        assert!(matches!(slot_outcome(&snap, &snap_throw, &store), AssayOutcome::EvalError { .. }));
+        assert!(matches!(
+            slot_outcome(&snap, &snap_throw, &store),
+            AssayOutcome::EvalError { .. }
+        ));
     }
 
     #[test]

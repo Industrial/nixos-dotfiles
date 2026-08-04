@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use id_effect::{Clock, Never, TestClock, caps, mock_capability, provide, Effect};
-use std::time::Duration;
+use id_effect::{Clock, Effect, Never, TestClock, caps, mock_capability, provide};
 use serde_json::Value;
+use std::time::Duration;
 
 use crate::eval::{EvalBackend, EvalResult, ProcessNixEval};
 use crate::outcome::AssayOutcome;
@@ -27,7 +27,12 @@ pub type ClockKey = Arc<dyn Clock + Send + Sync>;
 pub type NixWorkerPoolKey = Arc<dyn NixWorkerPool + Send + Sync>;
 
 /// Required capabilities for an Assay run or unit-test harness.
-pub type AssayEnv = caps!(NixEvaluatorKey, SnapshotStoreKey, ClockKey, NixWorkerPoolKey);
+pub type AssayEnv = caps!(
+    NixEvaluatorKey,
+    SnapshotStoreKey,
+    ClockKey,
+    NixWorkerPoolKey
+);
 
 // --- Live providers ---
 
@@ -122,10 +127,7 @@ pub struct MockNixEval {
 
 impl MockNixEval {
     pub fn set(&self, expr: &str, result: EvalResult) {
-        self.values
-            .lock()
-            .unwrap()
-            .insert(expr.into(), result);
+        self.values.lock().unwrap().insert(expr.into(), result);
     }
 }
 
@@ -139,9 +141,7 @@ impl EvalBackend for MockNixEval {
             let l = self.eval_json(left);
             let r = self.eval_json(right);
             return match (l, r) {
-                (EvalResult::Ok(a), EvalResult::Ok(b)) => {
-                    EvalResult::Ok(Value::Array(vec![a, b]))
-                }
+                (EvalResult::Ok(a), EvalResult::Ok(b)) => EvalResult::Ok(Value::Array(vec![a, b])),
                 (EvalResult::Err(e), _) | (_, EvalResult::Err(e)) => EvalResult::Err(e),
             };
         }
@@ -294,10 +294,7 @@ mod tests {
     fn mock_nix_eval_returns_configured_values() {
         let mock = Arc::new(MockNixEval::default());
         mock.set("x", EvalResult::Ok(serde_json::json!(42)));
-        assert_eq!(
-            mock.eval_json("x"),
-            EvalResult::Ok(serde_json::json!(42))
-        );
+        assert_eq!(mock.eval_json("x"), EvalResult::Ok(serde_json::json!(42)));
     }
 
     #[test]
@@ -340,7 +337,10 @@ mod tests {
             mock.eval_json(batched),
             EvalResult::Ok(serde_json::json!([1, 2]))
         );
-        assert_eq!(mock.eval_json("missing"), EvalResult::Ok(serde_json::json!(null)));
+        assert_eq!(
+            mock.eval_json("missing"),
+            EvalResult::Ok(serde_json::json!(null))
+        );
     }
 
     #[test]
@@ -416,7 +416,10 @@ mod tests {
                 span: None,
             }),
         );
-        assert!(matches!(mock.eval_json("[ (1) (bad) ]"), EvalResult::Err(_)));
+        assert!(matches!(
+            mock.eval_json("[ (1) (bad) ]"),
+            EvalResult::Err(_)
+        ));
     }
 
     #[test]

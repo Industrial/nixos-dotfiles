@@ -32,7 +32,11 @@ fn diff_values(left: &Value, right: &Value, path: &str, lines: &mut Vec<String>)
         (Value::Array(left_items), Value::Array(right_items)) => {
             diff_array(left_items, right_items, path, lines);
         }
-        _ => lines.push(format!("~ {path}: {} -> {}", format_value(left), format_value(right))),
+        _ => lines.push(format!(
+            "~ {path}: {} -> {}",
+            format_value(left),
+            format_value(right)
+        )),
     }
 }
 
@@ -49,9 +53,15 @@ fn diff_object(
     for key in keys {
         let child_path = join_path(path, key);
         match (left.get(key), right.get(key)) {
-            (Some(left_val), Some(right_val)) => diff_values(left_val, right_val, &child_path, lines),
-            (Some(left_val), None) => lines.push(format!("- {child_path}: {}", format_value(left_val))),
-            (None, Some(right_val)) => lines.push(format!("+ {child_path}: {}", format_value(right_val))),
+            (Some(left_val), Some(right_val)) => {
+                diff_values(left_val, right_val, &child_path, lines)
+            }
+            (Some(left_val), None) => {
+                lines.push(format!("- {child_path}: {}", format_value(left_val)))
+            }
+            (None, Some(right_val)) => {
+                lines.push(format!("+ {child_path}: {}", format_value(right_val)))
+            }
             (None, None) => {}
         }
     }
@@ -62,16 +72,25 @@ fn diff_array(left: &[Value], right: &[Value], path: &str, lines: &mut Vec<Strin
     for index in 0..max_len {
         let child_path = format!("{path}[{index}]");
         match (left.get(index), right.get(index)) {
-            (Some(left_val), Some(right_val)) => diff_values(left_val, right_val, &child_path, lines),
-            (Some(left_val), None) => lines.push(format!("- {child_path}: {}", format_value(left_val))),
-            (None, Some(right_val)) => lines.push(format!("+ {child_path}: {}", format_value(right_val))),
+            (Some(left_val), Some(right_val)) => {
+                diff_values(left_val, right_val, &child_path, lines)
+            }
+            (Some(left_val), None) => {
+                lines.push(format!("- {child_path}: {}", format_value(left_val)))
+            }
+            (None, Some(right_val)) => {
+                lines.push(format!("+ {child_path}: {}", format_value(right_val)))
+            }
             (None, None) => {}
         }
     }
 }
 
 fn join_path(path: &str, key: &str) -> String {
-    if key.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+    if key
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    {
         format!("{path}.{key}")
     } else {
         let escaped = key.replace('\\', "\\\\").replace('"', "\\\"");
@@ -132,5 +151,22 @@ mod tests {
         let left = json!({ "outPath": "/nix/store/a", "name": "a" });
         let right = json!({ "outPath": "/nix/store/b", "name": "a" });
         assert!(!values_equal(&left, &right));
+    }
+
+    #[test]
+    fn structural_diff_array_length_and_special_keys() {
+        let left = json!({ "a b": 1, "xs": [1, 2] });
+        let right = json!({ "a b": 1, "xs": [1] });
+        let diff = structural_diff(&left, &right);
+        assert!(diff.contains("- $.xs[1]: 2"));
+
+        let left = json!({ "a b": [1] });
+        let right = json!({ "a b": [1, 2] });
+        let diff = structural_diff(&left, &right);
+        assert!(diff.contains("+ $") && diff.contains("2"));
+
+        let left = json!("hi");
+        let right = json!("bye");
+        assert!(structural_diff(&left, &right).contains("~ $:"));
     }
 }

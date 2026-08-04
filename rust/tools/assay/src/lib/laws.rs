@@ -8,11 +8,8 @@ use crate::prop::{Gen, prop_assert};
 const LAW_TRIALS: u32 = 128;
 
 /// Built-in law names exposed to suite `law` claims and the CLI.
-pub const BUILTIN_LAW_NAMES: &[&str] = &[
-    "merge_identity",
-    "merge_associativity",
-    "merge_idempotent",
-];
+pub const BUILTIN_LAW_NAMES: &[&str] =
+    &["merge_identity", "merge_associativity", "merge_idempotent"];
 
 /// Run a single built-in law by name.
 pub fn run_law_by_name(name: &str, seed: u64) -> AssayOutcome {
@@ -27,7 +24,6 @@ pub fn run_law_by_name(name: &str, seed: u64) -> AssayOutcome {
         },
     }
 }
-
 
 /// `a ∪ {} == a` and `{} ∪ a == a` for object maps.
 pub fn law_merge_identity(seed: u64) -> AssayOutcome {
@@ -105,10 +101,7 @@ thread_local! {
     static FORCE_BAD_MERGE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
-fn merge_maps(
-    left: &Map<String, Value>,
-    right: &Map<String, Value>,
-) -> Map<String, Value> {
+fn merge_maps(left: &Map<String, Value>, right: &Map<String, Value>) -> Map<String, Value> {
     #[cfg(test)]
     if FORCE_BAD_MERGE.with(|flag| flag.get()) {
         if left == right {
@@ -164,7 +157,10 @@ mod tests {
     fn run_builtin_laws_returns_three_checks() {
         let laws = run_builtin_laws(11);
         assert_eq!(laws.len(), 3);
-        assert!(laws.iter().all(|(_, outcome)| *outcome == AssayOutcome::Pass));
+        assert!(
+            laws.iter()
+                .all(|(_, outcome)| *outcome == AssayOutcome::Pass)
+        );
     }
 
     #[test]
@@ -175,7 +171,10 @@ mod tests {
     #[test]
     fn run_law_by_name_dispatches_all_builtins() {
         assert_eq!(run_law_by_name("merge_identity", 1), AssayOutcome::Pass);
-        assert_eq!(run_law_by_name("merge_associativity", 2), AssayOutcome::Pass);
+        assert_eq!(
+            run_law_by_name("merge_associativity", 2),
+            AssayOutcome::Pass
+        );
     }
 
     #[test]
@@ -260,4 +259,3 @@ mod proptest_laws {
         }
     }
 }
-

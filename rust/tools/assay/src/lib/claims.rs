@@ -5,14 +5,12 @@ use serde_json::Value;
 use id_effect::{Cause, Effect, Exit};
 
 use crate::caps::{AssayEnv, NixEvaluatorKey, NixWorkerPoolKey, SnapshotStoreKey};
-use crate::diff::structural_diff;
 use crate::eval::{EvalBackend, EvalResult};
 use crate::force::check_forces;
-use crate::normalize::normalize_value;
-use crate::optics_json::{value_contains_subset, value_has_attrs};
 use crate::outcome::AssayOutcome;
 use crate::snapshot::SnapshotStore;
 use crate::verdict::{CaseVerdict, InfraError, outcome_to_exit};
+use nixq::{normalize_value, structural_diff, value_contains_subset, value_has_attrs};
 
 /// A single test claim authored in Nix and interpreted by the runner.
 #[derive(Debug, Clone, PartialEq)]
@@ -89,10 +87,16 @@ pub(crate) fn interpret_claim_with(
     claim: &Claim,
 ) -> Result<CaseVerdict, InfraError> {
     let outcome = match claim {
-        Claim::Eq { left_expr, right_expr } => interpret_eq(left_expr, right_expr, eval),
+        Claim::Eq {
+            left_expr,
+            right_expr,
+        } => interpret_eq(left_expr, right_expr, eval),
         Claim::EqValues { left, right } => interpret_eq_values(left, right),
         Claim::Throws { expr, pattern } => interpret_throws(expr, pattern.as_deref(), eval),
-        Claim::Subset { expr, expected_subset } => interpret_subset(expr, expected_subset, eval),
+        Claim::Subset {
+            expr,
+            expected_subset,
+        } => interpret_subset(expr, expected_subset, eval),
         Claim::SubsetValues {
             actual,
             expected_subset,
@@ -101,9 +105,15 @@ pub(crate) fn interpret_claim_with(
         Claim::HasAttrsValues { actual, attrs } => interpret_has_attrs_values(actual, attrs),
         Claim::Snapshot { name, expr } => interpret_snapshot(name, expr, eval, store),
         Claim::Forces { expr, paths } => check_forces(expr, paths, eval),
-        Claim::Module { imports_expr, args_expr, expect } => interpret_module(imports_expr, args_expr, expect, eval),
+        Claim::Module {
+            imports_expr,
+            args_expr,
+            expect,
+        } => interpret_module(imports_expr, args_expr, expect, eval),
         Claim::Law { name, seed } => crate::laws::run_law_by_name(name, *seed),
-        Claim::Prop { name, seed, trials } => crate::prop::run_prop_by_name(name, *seed, trials.unwrap_or(128)),
+        Claim::Prop { name, seed, trials } => {
+            crate::prop::run_prop_by_name(name, *seed, trials.unwrap_or(128))
+        }
     };
     outcome_to_result(outcome)
 }
@@ -161,11 +171,7 @@ fn compare_eq(left: Value, right: Value) -> AssayOutcome {
     }
 }
 
-fn interpret_throws(
-    expr: &str,
-    pattern: Option<&str>,
-    eval: &dyn EvalBackend,
-) -> AssayOutcome {
+fn interpret_throws(expr: &str, pattern: Option<&str>, eval: &dyn EvalBackend) -> AssayOutcome {
     match eval.eval_json(expr) {
         EvalResult::Ok(value) => AssayOutcome::Fail {
             claim: "throws".into(),
@@ -186,9 +192,7 @@ fn interpret_throws(
                         claim: "throws".into(),
                         left: None,
                         right: None,
-                        diff: format!(
-                            "throw message {message:?} does not contain pattern {pat:?}"
-                        ),
+                        diff: format!("throw message {message:?} does not contain pattern {pat:?}"),
                     }
                 }
             } else {
@@ -227,11 +231,7 @@ fn interpret_module(
     }
 }
 
-fn interpret_subset(
-    expr: &str,
-    expected_subset: &Value,
-    eval: &dyn EvalBackend,
-) -> AssayOutcome {
+fn interpret_subset(expr: &str, expected_subset: &Value, eval: &dyn EvalBackend) -> AssayOutcome {
     let actual = match eval.eval_json(expr) {
         EvalResult::Ok(v) => v,
         EvalResult::Err(out) => return out,
@@ -273,14 +273,18 @@ fn interpret_has_attrs_values(value: &Value, attrs: &[String]) -> AssayOutcome {
     }
 }
 
-fn interpret_snapshot(name: &str, expr: &str, eval: &dyn EvalBackend, store: &SnapshotStore) -> AssayOutcome {
+fn interpret_snapshot(
+    name: &str,
+    expr: &str,
+    eval: &dyn EvalBackend,
+    store: &SnapshotStore,
+) -> AssayOutcome {
     let actual = match eval.eval_json(expr) {
         EvalResult::Ok(v) => normalize_value(&v),
         EvalResult::Err(out) => return out,
     };
     store.assert_match(name, &actual, store.update_snapshots)
 }
-
 
 fn is_throw_outcome(out: &AssayOutcome) -> bool {
     matches!(
@@ -309,7 +313,8 @@ mod tests {
     use crate::verdict::CaseVerdict;
 
     fn run_claim_test<F>(setup: F, claim: Claim) -> Exit<CaseVerdict, InfraError>
-    where F: FnOnce(&MockNixEval),
+    where
+        F: FnOnce(&MockNixEval),
     {
         let mock = Arc::new(MockNixEval::default());
         setup(&mock);
@@ -328,7 +333,8 @@ mod tests {
             |eval| {
                 eval.set("a", EvalResult::Ok(serde_json::json!({"x": 1})));
                 eval.set("b", EvalResult::Ok(serde_json::json!({"x": 1})));
-            }, claim,
+            },
+            claim,
         );
         assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
     }
@@ -343,9 +349,13 @@ mod tests {
             |eval| {
                 eval.set("a", EvalResult::Ok(serde_json::json!({"x": 1})));
                 eval.set("b", EvalResult::Ok(serde_json::json!({"x": 2})));
-            }, claim,
+            },
+            claim,
         );
-        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -364,7 +374,8 @@ mod tests {
                         span: None,
                     }),
                 );
-            }, claim,
+            },
+            claim,
         );
         assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
     }
@@ -376,9 +387,13 @@ mod tests {
             pattern: None,
         };
         let exit = run_claim_test(
-            |eval| eval.set("ok", EvalResult::Ok(serde_json::json!(1))), claim,
+            |eval| eval.set("ok", EvalResult::Ok(serde_json::json!(1))),
+            claim,
         );
-        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -419,7 +434,10 @@ mod tests {
             },
             fail,
         );
-        assert!(matches!(fail_exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            fail_exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -429,7 +447,12 @@ mod tests {
             expected_subset: serde_json::json!({"a": {"b": 1}}),
         };
         let pass_exit = run_claim_test(
-            |eval| eval.set("v", EvalResult::Ok(serde_json::json!({"a": {"b": 1}, "c": 2}))),
+            |eval| {
+                eval.set(
+                    "v",
+                    EvalResult::Ok(serde_json::json!({"a": {"b": 1}, "c": 2})),
+                )
+            },
             pass,
         );
         assert!(matches!(pass_exit, Exit::Success(CaseVerdict::Pass)));
@@ -439,10 +462,18 @@ mod tests {
             expected_subset: serde_json::json!({"a": {"b": 9}}),
         };
         let fail_exit = run_claim_test(
-            |eval| eval.set("v", EvalResult::Ok(serde_json::json!({"a": {"b": 1}, "c": 2}))),
+            |eval| {
+                eval.set(
+                    "v",
+                    EvalResult::Ok(serde_json::json!({"a": {"b": 1}, "c": 2})),
+                )
+            },
             fail,
         );
-        assert!(matches!(fail_exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            fail_exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -465,7 +496,10 @@ mod tests {
             |eval| eval.set("v", EvalResult::Ok(serde_json::json!({"a": 1, "b": 2}))),
             fail,
         );
-        assert!(matches!(fail_exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            fail_exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -475,9 +509,13 @@ mod tests {
             expr: "v".into(),
         };
         let exit = run_claim_test(
-            |eval| eval.set("v", EvalResult::Ok(serde_json::json!({"x": 1}))), claim,
+            |eval| eval.set("v", EvalResult::Ok(serde_json::json!({"x": 1}))),
+            claim,
         );
-        assert!(matches!(exit, Exit::Success(CaseVerdict::SnapshotMismatch { .. })));
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::SnapshotMismatch { .. })
+        ));
     }
 
     #[test]
@@ -487,7 +525,10 @@ mod tests {
             paths: vec!["a".into()],
         };
         let exit = run_claim_test(|_eval| {}, claim);
-        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -509,7 +550,8 @@ mod tests {
                         "other": "ignored"
                     })),
                 );
-            }, claim,
+            },
+            claim,
         );
         assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
     }
@@ -528,11 +570,17 @@ mod tests {
             |eval| {
                 eval.set(
                     &expr,
-                    EvalResult::Ok(serde_json::json!({ "assay": { "tiny": { "message": "nope" } } })),
+                    EvalResult::Ok(
+                        serde_json::json!({ "assay": { "tiny": { "message": "nope" } } }),
+                    ),
                 );
-            }, claim,
+            },
+            claim,
         );
-        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
@@ -555,56 +603,81 @@ mod tests {
                         span: None,
                     }),
                 );
-            }, claim,
+            },
+            claim,
         );
         assert!(matches!(exit, Exit::Success(CaseVerdict::EvalThrow { .. })));
     }
     #[test]
     fn eq_values_pass_without_nix() {
-        let exit = run_claim_test(|_eval| {}, Claim::EqValues {
-            left: serde_json::json!(1),
-            right: serde_json::json!(1),
-        });
+        let exit = run_claim_test(
+            |_eval| {},
+            Claim::EqValues {
+                left: serde_json::json!(1),
+                right: serde_json::json!(1),
+            },
+        );
         assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
     }
 
     #[test]
     fn eq_values_fail_when_different() {
-        let exit = run_claim_test(|_eval| {}, Claim::EqValues {
-            left: serde_json::json!(1),
-            right: serde_json::json!(2),
-        });
-        assert!(matches!(exit, Exit::Success(CaseVerdict::AssertFail { .. })));
+        let exit = run_claim_test(
+            |_eval| {},
+            Claim::EqValues {
+                left: serde_json::json!(1),
+                right: serde_json::json!(2),
+            },
+        );
+        assert!(matches!(
+            exit,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 
     #[test]
     fn subset_values_and_hasattrs_values() {
-        let sub = run_claim_test(|_eval| {}, Claim::SubsetValues {
-            actual: serde_json::json!({"a": 1, "b": 2}),
-            expected_subset: serde_json::json!({"a": 1}),
-        });
+        let sub = run_claim_test(
+            |_eval| {},
+            Claim::SubsetValues {
+                actual: serde_json::json!({"a": 1, "b": 2}),
+                expected_subset: serde_json::json!({"a": 1}),
+            },
+        );
         assert!(matches!(sub, Exit::Success(CaseVerdict::Pass)));
 
-        let has = run_claim_test(|_eval| {}, Claim::HasAttrsValues {
-            actual: serde_json::json!({"a": 1}),
-            attrs: vec!["a".into()],
-        });
+        let has = run_claim_test(
+            |_eval| {},
+            Claim::HasAttrsValues {
+                actual: serde_json::json!({"a": 1}),
+                attrs: vec!["a".into()],
+            },
+        );
         assert!(matches!(has, Exit::Success(CaseVerdict::Pass)));
     }
 
     #[test]
     fn law_and_prop_claims_run() {
-        let law = run_claim_test(|_eval| {}, Claim::Law {
-            name: "merge_idempotent".into(),
-            seed: 1,
-        });
-        assert!(matches!(law, Exit::Success(CaseVerdict::Pass) | Exit::Success(CaseVerdict::AssertFail { .. })));
+        let law = run_claim_test(
+            |_eval| {},
+            Claim::Law {
+                name: "merge_idempotent".into(),
+                seed: 1,
+            },
+        );
+        assert!(matches!(
+            law,
+            Exit::Success(CaseVerdict::Pass) | Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
 
-        let prop = run_claim_test(|_eval| {}, Claim::Prop {
-            name: "always_pass".into(),
-            seed: 1,
-            trials: Some(4),
-        });
+        let prop = run_claim_test(
+            |_eval| {},
+            Claim::Prop {
+                name: "always_pass".into(),
+                seed: 1,
+                trials: Some(4),
+            },
+        );
         assert!(matches!(prop, Exit::Success(CaseVerdict::Pass)));
     }
 
@@ -631,10 +704,7 @@ mod tests {
     fn interpret_throws_propagates_non_throw_eval_error() {
         let exit = run_claim_test(
             |eval| {
-                eval.set(
-                    "expr",
-                    EvalResult::Err(AssayOutcome::Timeout),
-                );
+                eval.set("expr", EvalResult::Err(AssayOutcome::Timeout));
             },
             Claim::Throws {
                 expr: "expr".into(),
@@ -643,5 +713,4 @@ mod tests {
         );
         assert!(matches!(exit, Exit::Failure(_)));
     }
-
 }

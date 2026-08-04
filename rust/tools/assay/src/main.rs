@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use id_effect::{Cause, Exit, run_with};
 use id_effect::failure::pretty_cause;
+use id_effect::{Cause, Exit, run_with};
 use id_effect_cli::{cause_max_exit_byte, exit_code_for_cause};
 use serde::Serialize;
 
@@ -13,10 +13,13 @@ use assay::caps::live_providers;
 use assay::discover::discover_suites;
 use assay::run::{RunOptions, run_discovered, run_suite, summarize};
 use assay::verdict::{CaseVerdict, InfraError, exit_to_outcome};
-use assay::{report_outcomes_stdout, AssayOutcome, ReportFormat, SuiteReport};
+use assay::{AssayOutcome, ReportFormat, SuiteReport, report_outcomes_stdout};
 
 #[derive(Parser)]
-#[command(name = "assay", about = "Nix unit testing: discover and run assay suites")]
+#[command(
+    name = "assay",
+    about = "Nix unit testing: discover and run assay suites"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -40,7 +43,9 @@ enum Commands {
         #[arg(long)]
         no_batch: bool,
     },
-    Discover { path: PathBuf },
+    Discover {
+        path: PathBuf,
+    },
     Laws {
         #[arg(long, default_value_t = 0)]
         seed: u64,
@@ -147,8 +152,8 @@ fn legacy_outcomes(report: &SuiteReport) -> Vec<(String, AssayOutcome)> {
 fn resolve_format(json: bool, format: Option<&str>) -> Result<ReportFormat, String> {
     match (json, format) {
         (true, Some(f)) => {
-            let parsed = ReportFormat::parse(f)
-                .ok_or_else(|| format!("unknown report format: {f}"))?;
+            let parsed =
+                ReportFormat::parse(f).ok_or_else(|| format!("unknown report format: {f}"))?;
             if parsed != ReportFormat::Json {
                 return Err(format!("--json conflicts with --format {f}"));
             }
@@ -196,7 +201,11 @@ fn cmd_laws(seed: u64, json: bool) -> ExitCode {
         }
     } else {
         for (name, outcome) in laws {
-            let mark = if outcome == AssayOutcome::Pass { "PASS" } else { "FAIL" };
+            let mark = if outcome == AssayOutcome::Pass {
+                "PASS"
+            } else {
+                "FAIL"
+            };
             println!("{mark} {name}");
         }
     }

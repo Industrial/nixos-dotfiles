@@ -69,8 +69,7 @@ pub fn load_compat_suite(path: &Path) -> anyhow::Result<CompatSuite> {
 }
 
 fn load_json_file(path: &Path) -> anyhow::Result<CompatSuite> {
-    let data =
-        std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let data = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let v: Value = serde_json::from_str(&data)?;
     parse_compat_json(&v)
 }
@@ -307,15 +306,10 @@ mod tests {
         let nix_path = dir.join("suite.nix");
         let json_path = dir.join("suite.json");
         std::fs::write(&nix_path, "invalid nix {{{").unwrap();
-        std::fs::write(
-            &json_path,
-            r#"{"sidecar": {"expr": "1", "expected": "1"}}"#,
-        )
-        .unwrap();
+        std::fs::write(&json_path, r#"{"sidecar": {"expr": "1", "expected": "1"}}"#).unwrap();
         let suite = load_compat_suite(&nix_path).expect("sidecar fallback");
         assert_eq!(suite.cases.len(), 1);
         assert_eq!(suite.cases[0].name, "sidecar");
         let _ = std::fs::remove_dir_all(dir);
     }
-
 }

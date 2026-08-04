@@ -14,9 +14,9 @@ pub fn fold_object_keys(value: &Value, mut visit: impl FnMut(&str)) {
 /// Recursive structural subset: every key in `expected` exists in `actual` with matching values.
 pub fn value_contains_subset(actual: &Value, expected: &Value) -> bool {
     match (actual, expected) {
-        (Value::Object(a), Value::Object(e)) => e.iter().all(|(k, v)| {
-            a.get(k).is_some_and(|av| value_contains_subset(av, v))
-        }),
+        (Value::Object(a), Value::Object(e)) => e
+            .iter()
+            .all(|(k, v)| a.get(k).is_some_and(|av| value_contains_subset(av, v))),
         _ => actual == expected,
     }
 }
@@ -36,7 +36,7 @@ pub fn value_has_attrs(value: &Value, attrs: &[String]) -> bool {
 
 #[cfg(feature = "optics")]
 mod traversal_impl {
-    use super::{fold_object_keys, value_has_attrs};
+    use super::fold_object_keys;
     use id_effect_optics::traversal::Traversal;
     use serde_json::Value;
 
@@ -45,10 +45,8 @@ mod traversal_impl {
         Traversal::new(
             |value, mut f| {
                 if let Value::Object(map) = value {
-                    let updated: serde_json::Map<String, Value> = map
-                        .into_iter()
-                        .map(|(k, v)| (f(k), v))
-                        .collect();
+                    let updated: serde_json::Map<String, Value> =
+                        map.into_iter().map(|(k, v)| (f(k), v)).collect();
                     Value::Object(updated)
                 } else {
                     value
@@ -60,7 +58,7 @@ mod traversal_impl {
         )
     }
 
-    /// `hasAttrs` via optics traversal — mirrors [`value_has_attrs`].
+    /// `hasAttrs` via optics traversal — mirrors [`super::value_has_attrs`].
     pub fn value_has_attrs_via_traversal(value: &Value, attrs: &[String]) -> bool {
         if attrs.is_empty() {
             return true;
@@ -73,6 +71,7 @@ mod traversal_impl {
     #[cfg(test)]
     mod traversal_tests {
         use super::*;
+        use crate::optics::value_has_attrs;
 
         #[test]
         fn traversal_matches_direct_has_attrs() {
@@ -171,5 +170,16 @@ mod tests {
         let mut keys = Vec::new();
         fold_object_keys(&serde_json::json!(null), |k| keys.push(k.to_string()));
         assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn subset_scalar_expected_object_fails() {
+        assert!(!value_contains_subset(
+            &serde_json::json!(1),
+            &serde_json::json!({"a": 1})
+        ));
+        let mut keys = Vec::new();
+        fold_object_keys(&serde_json::json!({"z": 1}), |k| keys.push(k.to_string()));
+        assert_eq!(keys, vec!["z"]);
     }
 }
