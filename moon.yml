@@ -4,3 +4,22 @@ language: 'bash'
 tasks:
   format:
     command: 'treefmt'
+  test:
+    description: 'Run Assay on all *.assay.nix suites across the repository'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'assay'
+      - 'run'
+      - '.'
+    inputs:
+      - '**/*.assay.nix'
+      - '**/*.assay.json'
+      - 'common/assay/**/*'
+      - 'common/**/*.nix'
+      - 'rust/tools/assay/src/**/*'
+      - 'rust/tools/assay/Cargo.toml'
+    options:
+      # Whole-repo discovery; do not treat as always-cacheable across env changes.
+      cache: true

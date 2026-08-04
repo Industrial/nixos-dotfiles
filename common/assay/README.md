@@ -100,6 +100,19 @@ Run (once the CLI is installed):
 devenv shell -- assay run common/assay/tests
 ```
 
+
+## Whole-repo moon task
+
+Discover and run every `*.assay.nix` under the repository (skips `.git`, `.devenv`, `node_modules`, `target`, …):
+
+```bash
+moon run test
+# equivalent:
+devenv shell -- assay run .
+```
+
+Colocate suites next to the Nix they exercise (`common/settings.assay.nix`, `features/…/foo.assay.nix`).
+
 ## Authoring checklist
 
 1. One logical assertion per case name.

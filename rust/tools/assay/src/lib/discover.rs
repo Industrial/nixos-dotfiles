@@ -62,12 +62,35 @@ fn walk_dir(dir: &Path, suites: &mut Vec<SuiteFile>) -> anyhow::Result<()> {
         let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if should_skip_dir(name) {
+                continue;
+            }
             walk_dir(&path, suites)?;
         } else if let Some(kind) = suite_kind(&path) {
             suites.push(SuiteFile { path, kind });
         }
     }
     Ok(())
+}
+
+/// Directories excluded from whole-repo discovery (caches, VCS, build outputs).
+fn should_skip_dir(name: &str) -> bool {
+    matches!(
+        name,
+        ".git"
+            | ".devenv"
+            | ".direnv"
+            | ".moon"
+            | ".cache"
+            | ".hermes"
+            | "node_modules"
+            | "target"
+            | "result"
+            | "__pycache__"
+            | "vendor"
+    ) || name.starts_with("target-")
+        || name.starts_with("result-")
 }
 
 fn is_fixtures_compat_child(path: &Path) -> bool {
@@ -101,6 +124,32 @@ mod tests {
         assert_eq!(suite_kind(assay), Some(SuiteKind::AssayNix));
         assert_eq!(suite_kind(compat_nix), Some(SuiteKind::CompatNix));
         assert_eq!(suite_kind(Path::new("other/foo.json")), None);
+    }
+
+    #[test]
+    fn should_skip_dir_ignores_caches_and_vcs() {
+        assert!(should_skip_dir(".git"));
+        assert!(should_skip_dir("node_modules"));
+        assert!(should_skip_dir("target-ci-stable"));
+        assert!(should_skip_dir("result-2"));
+        assert!(!should_skip_dir("common"));
+        assert!(!should_skip_dir("features"));
+    }
+
+    #[test]
+    fn discover_skips_nested_git_and_node_modules() {
+        let root = std::env::temp_dir().join(format!("assay_discover_skip_{}", std::process::id()));
+        fs::remove_dir_all(&root).ok();
+        write_file(&root.join("keep/demo.assay.nix"), "#");
+        write_file(&root.join(".git/hidden.assay.nix"), "#");
+        write_file(&root.join("node_modules/pkg/hidden.assay.nix"), "#");
+        write_file(&root.join("target/hidden.assay.nix"), "#");
+
+        let found = discover_suites(&root).expect("discover");
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.ends_with("keep/demo.assay.nix"));
+
+        fs::remove_dir_all(&root).ok();
     }
 
     #[test]
