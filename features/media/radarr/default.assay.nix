@@ -2,9 +2,9 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = let
-      pkgs = { radarr = "radarr"; };
-    in import ./default.nix { inherit pkgs; };
-
+    pkgs = {radarr = "radarr";};
+  in
+    import ./default.nix {inherit pkgs;};
 in
   assay.suite "radarr" {
     description = assay.eq mod.systemd.services.radarr.description "Radarr Daemon";

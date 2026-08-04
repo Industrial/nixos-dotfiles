@@ -2,9 +2,9 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = let
-      pkgs = { jellyseerr = "jellyseerr"; };
-    in import ./default.nix { inherit pkgs; };
-
+    pkgs = {jellyseerr = "jellyseerr";};
+  in
+    import ./default.nix {inherit pkgs;};
 in
   assay.suite "jellyseerr" {
     enabled = assay.eq mod.services.jellyseerr.enable true;

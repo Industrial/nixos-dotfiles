@@ -2,9 +2,9 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = let
-      pkgs = { prowlarr = "prowlarr"; };
-    in import ./default.nix { inherit pkgs; };
-
+    pkgs = {prowlarr = "prowlarr";};
+  in
+    import ./default.nix {inherit pkgs;};
 in
   assay.suite "prowlarr" {
     description = assay.eq mod.systemd.services.prowlarr.description "Prowlarr Daemon";
