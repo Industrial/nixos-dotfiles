@@ -12,11 +12,18 @@ in
 
     intInRangePasses = assay.eq (al.assertIntInRange 0 10 5) 5;
 
-    listOfTypePasses = assay.eq (al.assertListOfType "string" [ "a" "b" ]) [ "a" "b" ];
+    listOfTypePasses = assay.eq (al.assertListOfType "string" ["a" "b"]) ["a" "b"];
 
-    hasAttrsPasses = assay.eq (al.assertHasAttrs [ "a" "b" ] { a = 1; b = 2; }) { a = 1; b = 2; };
+    hasAttrsPasses =
+      assay.eq (al.assertHasAttrs ["a" "b"] {
+        a = 1;
+        b = 2;
+      }) {
+        a = 1;
+        b = 2;
+      };
 
-    elemPasses = assay.eq (al.assertElem "x" [ "x" "y" ]) "x";
+    elemPasses = assay.eq (al.assertElem "x" ["x" "y"]) "x";
 
     emptyStringThrows = assay.throws "(import ${./../../assert.nix}).assertNonEmptyString \"\"" null;
 
