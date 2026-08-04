@@ -182,6 +182,15 @@ in {
         always_run = true;
         entry = "devenv shell -- bin/git-hooks/deepsec-pre-push";
       };
+      moon-test = {
+        enable = true;
+        stages = ["pre-commit"];
+        name = "moon test (assay)";
+        description = "Run moon :test (assay across the repo)";
+        pass_filenames = false;
+        always_run = true;
+        entry = "devenv shell -- assay run .";
+      };
     };
   };
 }
