@@ -1,17 +1,16 @@
 //! Run assay suites and collect `Exit` outcomes.
 
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 
 use id_effect::concurrency::FiberHandle;
 use id_effect::runtime::{run_blocking, run_fork, ThreadSleepRuntime};
-use id_effect::{Cap, Effect, Exit, run_test, run_test_with_clock, TestClock};
+use id_effect::{Cap, Cause, Effect, Exit, Needs};
 use serde::Serialize;
 
 use crate::assay_suite::load_assay_suite;
-use crate::caps::{AssayEnv, ClockKey, SnapshotStoreKey};
-use crate::claims::{Claim, interpret_claim};
+use crate::caps::{AssayEnv, NixWorkerPoolKey, SnapshotStoreKey};
+use crate::claims::Claim;
 use crate::timeout::interpret_claim_with_retry;
 use crate::compat::load_compat_suite;
 use crate::discover::{discover_suites, suite_kind, SuiteKind};
@@ -47,23 +46,34 @@ pub fn run_suite(path: &Path, opts: &RunOptions) -> Effect<SuiteReport, InfraErr
     Effect::new(move |env| run_suite_on_env(&path, &opts, env))
 }
 
+fn apply_snapshot_update(env: &mut AssayEnv, update: bool) {
+    if update {
+        let updated = env.get::<Cap<SnapshotStoreKey>>().clone().with_update(true);
+        env.insert::<Cap<SnapshotStoreKey>>(updated);
+    }
+}
+
+fn load_suite_cases(path: &Path, env: &AssayEnv) -> Result<Vec<(String, Claim)>, InfraError> {
+    // Suite load is a nix eval — share the worker pool with claim evals.
+    let pool = Needs::<NixWorkerPoolKey>::need(env);
+    let _slot = pool.acquire()?;
+    let kind = suite_kind(path).unwrap_or(SuiteKind::CompatJson);
+    match kind {
+        SuiteKind::CompatJson | SuiteKind::CompatNix => load_compat_cases(path),
+        SuiteKind::AssayNix => {
+            load_assay_suite(path).map_err(|e| InfraError::SuiteLoad(e.to_string()))
+        }
+    }
+}
+
 fn run_suite_on_env(
     path: &Path,
     opts: &RunOptions,
     env: &mut AssayEnv,
 ) -> Result<SuiteReport, InfraError> {
-    if opts.update_snapshots {
-        let updated = env.get::<Cap<SnapshotStoreKey>>().clone().with_update(true);
-        env.insert::<Cap<SnapshotStoreKey>>(updated);
-    }
+    apply_snapshot_update(env, opts.update_snapshots);
     let retry = opts.retry_flaky_eval;
-    let kind = suite_kind(path).unwrap_or(SuiteKind::CompatJson);
-    let cases = match kind {
-        SuiteKind::CompatJson | SuiteKind::CompatNix => load_compat_cases(path)?,
-        SuiteKind::AssayNix => {
-            load_assay_suite(path).map_err(|e| InfraError::SuiteLoad(e.to_string()))?
-        }
-    };
+    let cases = load_suite_cases(path, env)?;
 
     let rt = ThreadSleepRuntime::default();
     let timeout_ms = opts.case_timeout_ms;
@@ -170,16 +180,58 @@ pub fn run_discovered(root: &Path, opts: &RunOptions) -> Effect<SuiteReport, Inf
     let root = root.to_path_buf();
     let opts = opts.clone();
     Effect::new(move |env| {
+        apply_snapshot_update(env, opts.update_snapshots);
+        // Snapshot update already applied; don't re-mutate per suite clone.
+        let suite_opts = RunOptions {
+            update_snapshots: false,
+            ..opts.clone()
+        };
+
+        let suites = discover_suites(&root).map_err(|e| InfraError::Io(e.to_string()))?;
+        let rt = ThreadSleepRuntime::default();
+        let mut handles = Vec::with_capacity(suites.len());
+        for suite in suites {
+            let env_clone = env.clone();
+            let opts = suite_opts.clone();
+            let path = suite.path;
+            handles.push(run_fork(&rt, move || {
+                (
+                    Effect::new(move |env| {
+                        let prefix = path.display().to_string();
+                        let report = run_suite_on_env(&path, &opts, env)?;
+                        Ok(report
+                            .outcomes
+                            .into_iter()
+                            .map(|(name, exit)| (format!("{prefix}::{name}"), exit))
+                            .collect::<Vec<_>>())
+                    }),
+                    env_clone,
+                )
+            }));
+        }
+
         let mut all = Vec::new();
-        for suite in discover_suites(&root).map_err(|e| InfraError::Io(e.to_string()))? {
-            let prefix = suite.path.display().to_string();
-            for (name, exit) in run_suite_on_env(&suite.path, &opts, env)?.outcomes {
-                all.push((format!("{prefix}::{name}"), exit));
+        for handle in handles {
+            let exit = run_blocking(handle.await_exit(), ()).expect("await_exit is infallible");
+            let _ = handle.interrupt();
+            match exit {
+                Exit::Success(outcomes) => all.extend(outcomes),
+                Exit::Failure(cause) => return Err(suite_fiber_infra(cause)),
             }
         }
         all.sort_by(|a, b| a.0.cmp(&b.0));
         Ok(SuiteReport { outcomes: all })
     })
+}
+
+fn suite_fiber_infra(cause: Cause<InfraError>) -> InfraError {
+    match cause {
+        Cause::Fail(err) => err,
+        Cause::Die(msg) => InfraError::Worker(msg),
+        Cause::Interrupt(id) => InfraError::Worker(format!("interrupted suite fiber {id:?}")),
+        Cause::Both(left, _) => suite_fiber_infra(*left),
+        Cause::Then(_, right) => suite_fiber_infra(*right),
+    }
 }
 
 pub fn summarize(report: &SuiteReport) -> RunSummary {
@@ -218,11 +270,12 @@ mod tests {
     use std::sync::Arc;
     use std::time::Instant;
 
-    use id_effect::{build_env, succeed, Cap, FromEnv};
+    use id_effect::{build_env, succeed, Cap, FromEnv, run_test, run_test_with_clock, TestClock};
     use serde_json::json;
 
     use super::*;
     use crate::caps::{mock_providers, ClockKey, MockNixEval, NixEvaluatorKey};
+    use crate::claims::interpret_claim;
     use crate::eval::{EvalBackend, EvalResult};
     use crate::pool::{MockWorkerPool, NixWorkerPool};
 
@@ -241,7 +294,8 @@ mod tests {
             fn eval_json(&self, expr: &str) -> EvalResult {
                 let _ = ORDER.fetch_add(1, Ordering::SeqCst);
                 let _ = expr;
-                EvalResult::Ok(json!(42))
+                // Batched eq expects a 2-element list.
+                EvalResult::Ok(json!([42, 42]))
             }
         }
 
@@ -373,5 +427,48 @@ mod tests {
     fn succeed_smoke_for_run_suite_effect() {
         let exit = run_test(succeed::<SuiteReport, InfraError, ()>(SuiteReport { outcomes: vec![] }), ());
         assert!(matches!(exit, Exit::Success(_)));
+    }
+
+    #[test]
+    fn run_discovered_runs_suites_concurrently_under_pool() {
+        use std::fs;
+
+        let root = std::env::temp_dir().join(format!(
+            "assay_parallel_suites_{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("a")).unwrap();
+        fs::create_dir_all(root.join("b")).unwrap();
+        fs::create_dir_all(root.join("c")).unwrap();
+        for name in ["a", "b", "c"] {
+            fs::write(
+                root.join(name).join("suite.json"),
+                r#"{"n":{"expr":"1","expected":"1"}}"#,
+            )
+            .unwrap();
+        }
+
+        let pool = Arc::new(MockWorkerPool::new(8));
+        pool.set_block_ms(30);
+        let mut built = build_env(mock_providers()).expect("env");
+        built.insert::<Cap<NixEvaluatorKey>>(Arc::new(MockNixEval::default()) as _);
+        built.insert::<Cap<crate::caps::NixWorkerPoolKey>>(pool.clone() as _);
+        let env = AssayEnv::from_env(built);
+
+        let report = run_blocking(
+            run_discovered(&root, &RunOptions::default()),
+            env,
+        )
+        .expect("discovered");
+        let _ = fs::remove_dir_all(&root);
+
+        assert_eq!(report.outcomes.len(), 3);
+        // Overlapping acquires across suite fibers — serial would peak at 1.
+        assert!(
+            pool.max_in_flight() >= 2,
+            "expected concurrent suite/case pool use, max_in_flight={}",
+            pool.max_in_flight()
+        );
     }
 }

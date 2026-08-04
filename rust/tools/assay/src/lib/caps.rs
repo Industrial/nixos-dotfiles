@@ -106,13 +106,55 @@ impl MockNixEval {
 
 impl EvalBackend for MockNixEval {
     fn eval_json(&self, expr: &str) -> EvalResult {
-        self.values
-            .lock()
-            .unwrap()
-            .get(expr)
-            .cloned()
-            .unwrap_or(EvalResult::Ok(Value::Null))
+        if let Some(hit) = self.values.lock().unwrap().get(expr).cloned() {
+            return hit;
+        }
+        // Batched eq form: [(left) (right)] — resolve sides independently.
+        if let Some((left, right)) = split_eq_pair(expr) {
+            let l = self.eval_json(left);
+            let r = self.eval_json(right);
+            return match (l, r) {
+                (EvalResult::Ok(a), EvalResult::Ok(b)) => {
+                    EvalResult::Ok(Value::Array(vec![a, b]))
+                }
+                (EvalResult::Err(e), _) | (_, EvalResult::Err(e)) => EvalResult::Err(e),
+            };
+        }
+        EvalResult::Ok(Value::Null)
     }
+}
+
+/// Parse assay batched-eq wrapper `[({left}) ({right})]`.
+fn split_eq_pair(expr: &str) -> Option<(&str, &str)> {
+    let trimmed = expr.trim();
+    let inner = trimmed.strip_prefix('[')?.strip_suffix(']')?.trim();
+    let (left_raw, right_raw) = split_top_level_pair(inner)?;
+    let left = unwrap_parens(left_raw.trim())?;
+    let right = unwrap_parens(right_raw.trim())?;
+    Some((left, right))
+}
+
+fn unwrap_parens(s: &str) -> Option<&str> {
+    s.strip_prefix('(')?.strip_suffix(')')
+}
+
+fn split_top_level_pair(s: &str) -> Option<(&str, &str)> {
+    let mut depth = 0i32;
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth -= 1,
+            ' ' | '\t' | '\n' if depth == 0 => {
+                let left = s[..i].trim();
+                let right = s[i..].trim();
+                if !left.is_empty() && !right.is_empty() {
+                    return Some((left, right));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 mock_capability!(

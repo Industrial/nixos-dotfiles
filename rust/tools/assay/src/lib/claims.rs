@@ -103,12 +103,19 @@ fn cause_to_infra(cause: Cause<InfraError>) -> InfraError {
 }
 
 fn interpret_eq(left_expr: &str, right_expr: &str, eval: &dyn EvalBackend) -> AssayOutcome {
-    let left = match eval.eval_json(left_expr) {
-        EvalResult::Ok(v) => normalize_value(&v),
-        EvalResult::Err(out) => return out,
-    };
-    let right = match eval.eval_json(right_expr) {
-        EvalResult::Ok(v) => normalize_value(&v),
+    // One nix process for both sides — process spawn dominates tiny exprs.
+    let pair_expr = format!("[({left_expr}) ({right_expr})]");
+    let (left, right) = match eval.eval_json(&pair_expr) {
+        EvalResult::Ok(Value::Array(arr)) if arr.len() == 2 => {
+            (normalize_value(&arr[0]), normalize_value(&arr[1]))
+        }
+        EvalResult::Ok(other) => {
+            return AssayOutcome::EvalError {
+                kind: "eq_pair".into(),
+                message: format!("eq pair eval expected 2-element list, got {other}"),
+                span: None,
+            };
+        }
         EvalResult::Err(out) => return out,
     };
     if left == right {
