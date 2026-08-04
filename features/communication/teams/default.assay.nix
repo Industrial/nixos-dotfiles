@@ -3,11 +3,11 @@ let
   assay = import ./../../../common/assay/default.nix;
   modFile = toString ./default.nix;
   packages = ''
-    let
+(    let
       pkgs = { "teams-for-linux" = "teams-for-linux"; };
       mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages
-  '';
+    in mod.environment.systemPackages)
+'';
 in
   assay.suite "teams" {
     systemPackages = assay.eq packages ''[ "teams-for-linux" ]'';

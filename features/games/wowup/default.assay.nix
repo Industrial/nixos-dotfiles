@@ -3,11 +3,11 @@ let
   assay = import ./../../../common/assay/default.nix;
   modFile = toString ./default.nix;
   packages = ''
-    let
+(    let
       pkgs = { "wowup-cf" = "wowup-cf"; };
       mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages
-  '';
+    in mod.environment.systemPackages)
+'';
 in
   assay.suite "wowup" {
     systemPackages = assay.eq packages ''[ "wowup-cf" ]'';

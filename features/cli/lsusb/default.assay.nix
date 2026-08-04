@@ -3,11 +3,11 @@ let
   assay = import ./../../../common/assay/default.nix;
   modFile = toString ./default.nix;
   packages = ''
-    let
+(    let
       pkgs = { usbutils = "usbutils"; };
       mod = import ${modFile} { inherit pkgs; };
-    in mod.environment.systemPackages
-  '';
+    in mod.environment.systemPackages)
+'';
 in
   assay.suite "lsusb" {
     systemPackages = assay.eq packages ''[ "usbutils" ]'';
