@@ -53,7 +53,15 @@ mod tests {
         };
         assert!(io.to_string().contains("io error"));
         assert!(InfraError::Json("x".into()).to_string().contains("json"));
-        assert!(PathError::Invalid("i".into()).to_string().contains("invalid"));
-        assert!(PathError::NotFound("n".into()).to_string().contains("not found"));
+        assert!(
+            PathError::Invalid("i".into())
+                .to_string()
+                .contains("invalid")
+        );
+        assert!(
+            PathError::NotFound("n".into())
+                .to_string()
+                .contains("not found")
+        );
     }
 }
