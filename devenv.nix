@@ -65,6 +65,14 @@
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
   };
+  nixfetch = pkgs.callPackage ./rust/tools/nixfetch {
+    rustc = pkgs-unstable.rustc;
+    cargo = pkgs-unstable.cargo;
+  };
+  nix1 = pkgs.callPackage ./rust/tools/nix1 {
+    rustc = pkgs-unstable.rustc;
+    cargo = pkgs-unstable.cargo;
+  };
   nixstore = pkgs.callPackage ./rust/tools/nixstore {
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
@@ -106,6 +114,8 @@ in {
     assay
     nixq
     nixdrv
+    nixfetch
+    nix1
     nixstore
     namaka
     nixt
@@ -220,6 +230,18 @@ in {
         unset RUSTC_WRAPPER || true
         cd "$DEVENV_ROOT/rust"
         cargo llvm-cov nextest -p nixdrv --lib --branch \
+          --fail-under-lines 95 --fail-under-regions 95 \
+          --no-cfg-coverage
+      '';
+    };
+
+    nixfetch-coverage = {
+      exec = ''
+        set -euo pipefail
+        export PATH="${rust-nightly}/bin:$PATH"
+        unset RUSTC_WRAPPER || true
+        cd "$DEVENV_ROOT/rust"
+        cargo llvm-cov nextest -p nixfetch --lib --branch \
           --fail-under-lines 95 --fail-under-regions 95 \
           --no-cfg-coverage
       '';

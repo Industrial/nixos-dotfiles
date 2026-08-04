@@ -51,6 +51,7 @@
     ../features/cli/ngrok
     ../features/cli/nettools
     ../features/cli/nix-tree
+    ../features/cli/nix1-hash
     ../features/cli/p
     ../features/cli/p7zip
     ../features/cli/procs

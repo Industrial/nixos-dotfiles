@@ -117,6 +117,80 @@ tasks:
       - 'rust/Cargo.lock'
     options:
       cache: true
+  nixfetch-test:
+    description: 'nixfetch unit tests'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nixfetch'
+    inputs:
+      - 'rust/tools/nixfetch/src/**/*'
+      - 'rust/tools/nixfetch/Cargo.toml'
+      - 'rust/tools/nixfetch/fixtures/**/*'
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true
+  nix1-test:
+    description: 'nix1 unit tests'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nix1'
+    inputs:
+      - 'rust/tools/nix1/src/**/*'
+      - 'rust/tools/nix1/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true
+  nix1-oracle:
+    description: 'nix1 oracle tests (includes live nix-hash when present)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nix1'
+      - '--'
+      - 'oracle'
+    inputs:
+      - 'rust/tools/nix1/src/**/*'
+      - 'rust/tools/nix1/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true
+  nixfetch-coverage:
+    description: 'nixfetch crate llvm-cov (≥95% lines/regions; nightly --branch)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'nixfetch-coverage'
+    inputs:
+      - 'rust/tools/nixfetch/src/**/*'
+      - 'rust/tools/nixfetch/Cargo.toml'
+      - 'rust/tools/nixfetch/fixtures/**/*'
+      - 'rust/Cargo.toml'
+      - 'rust/Cargo.lock'
+    options:
+      cache: true
   nixstore-test:
     description: nixstore unit tests
     command: devenv

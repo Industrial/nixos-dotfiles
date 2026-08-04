@@ -1,0 +1,37 @@
+[package]
+name = "nix1"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "nix1 — OS-facing 1:1 Nix CLI reimplementations (start: nix1-hash)"
+license = "MIT"
+
+[dependencies]
+base64 = "0.22"
+blake3 = "1.5"
+clap = { version = "4.4", features = ["derive"] }
+hex = "0.4"
+md-5 = "0.10"
+nixdrv = { path = "../nixdrv" }
+nixfetch = { path = "../nixfetch" }
+sha1 = "0.10"
+sha2 = "0.10"
+thiserror = "1.0"
+id_effect = { path = "/data/Code/rust/id_effect/crates/id_effect", features = [
+  "schema-serde",
+] }
+id_effect_macro = { path = "/data/Code/rust/id_effect/crates/id_effect_macro" }
+id_effect_proc_macro = { path = "/data/Code/rust/id_effect/crates/id_effect_proc_macro" }
+id_effect_cli = { path = "/data/Code/rust/id_effect/crates/id_effect_cli", optional = true }
+
+[features]
+default = ["cli-exit"]
+cli-exit = ["dep:id_effect_cli"]
+
+[lib]
+name = "nix1"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "nix1-hash"
+path = "src/bin/nix1_hash.rs"
