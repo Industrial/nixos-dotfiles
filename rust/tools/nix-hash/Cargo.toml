@@ -1,9 +1,9 @@
 [package]
-name = "nix1"
+name = "nix-hash"
 version = "0.1.0"
 edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
-description = "nix1 — OS-facing 1:1 Nix CLI reimplementations (start: nix1-hash)"
+description = "1:1 Rust reimplementation of stock nix-hash"
 license = "MIT"
 
 [dependencies]
@@ -29,9 +29,9 @@ default = ["cli-exit"]
 cli-exit = ["dep:id_effect_cli"]
 
 [lib]
-name = "nix1"
+name = "nix_hash"
 path = "src/lib/mod.rs"
 
 [[bin]]
-name = "nix1-hash"
-path = "src/bin/nix1_hash.rs"
+name = "nix-hash"
+path = "src/bin/nix_hash.rs"

@@ -138,8 +138,8 @@ tasks:
       - 'rust/Cargo.toml'
     options:
       cache: true
-  nix1-test:
-    description: 'nix1 unit tests'
+  nix-hash-test:
+    description: 'nix-hash unit tests'
     command: 'devenv'
     args:
       - 'shell'
@@ -149,15 +149,15 @@ tasks:
       - '--manifest-path'
       - 'rust/Cargo.toml'
       - '-p'
-      - 'nix1'
+      - 'nix-hash'
     inputs:
-      - 'rust/tools/nix1/src/**/*'
-      - 'rust/tools/nix1/Cargo.toml'
+      - 'rust/tools/nix-hash/src/**/*'
+      - 'rust/tools/nix-hash/Cargo.toml'
       - 'rust/Cargo.toml'
     options:
       cache: true
-  nix1-oracle:
-    description: 'nix1 oracle tests (includes live nix-hash when present)'
+  nix-hash-oracle:
+    description: 'nix-hash oracle tests (differential vs stock when present)'
     command: 'devenv'
     args:
       - 'shell'
@@ -167,12 +167,12 @@ tasks:
       - '--manifest-path'
       - 'rust/Cargo.toml'
       - '-p'
-      - 'nix1'
+      - 'nix-hash'
       - '--'
       - 'oracle'
     inputs:
-      - 'rust/tools/nix1/src/**/*'
-      - 'rust/tools/nix1/Cargo.toml'
+      - 'rust/tools/nix-hash/src/**/*'
+      - 'rust/tools/nix-hash/Cargo.toml'
       - 'rust/Cargo.toml'
     options:
       cache: true
@@ -224,4 +224,3 @@ tasks:
       - rust/Cargo.lock
     options:
       cache: true
-

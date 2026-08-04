@@ -1,4 +1,4 @@
-//! Hash algorithm selection for `nix1-hash`.
+//! Hash algorithm selection for `nix-hash`.
 
 use md5::{Digest as _, Md5};
 use sha1::Sha1;

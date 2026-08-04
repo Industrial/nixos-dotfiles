@@ -6,9 +6,7 @@
 use base64::Engine;
 
 use crate::algo::HashAlgo;
-use crate::encode::{
-    Encoding, format_digest, nix_base32_decode_full, nix_base32_len,
-};
+use crate::encode::{Encoding, format_digest, nix_base32_decode_full, nix_base32_len};
 use crate::error::HashError;
 
 /// Decode a convert-mode hash string into `(algo, digest)`.
@@ -28,7 +26,10 @@ pub fn parse_any_hash(
         if looks_like_algo_name(algo_s) && !rest.is_empty() && !rest.contains(':') {
             // Prefer SRI when the algo token is a known hash name and the rest
             // is not a typed `algo:payload` (those use `:`).
-            if rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=') {
+            if rest
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+            {
                 let algo = HashAlgo::parse(algo_s).map_err(HashError::Convert)?;
                 check_hint(algo, type_hint)?;
                 let bytes = base64::engine::general_purpose::STANDARD
@@ -148,12 +149,7 @@ mod tests {
 
     #[test]
     fn to_sri_from_prefixed_base32() {
-        let out = convert_hash(
-            &format!("sha256:{HELLO_B32}"),
-            None,
-            Encoding::Sri,
-        )
-        .unwrap();
+        let out = convert_hash(&format!("sha256:{HELLO_B32}"), None, Encoding::Sri).unwrap();
         assert_eq!(out, HELLO_SRI);
     }
 

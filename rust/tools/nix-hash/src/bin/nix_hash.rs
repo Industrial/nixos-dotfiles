@@ -1,17 +1,15 @@
-//! `nix1-hash` — 1:1 CLI surface with stock `nix-hash`.
+//! `nix-hash` — 1:1 CLI surface with stock classic `nix-hash`.
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Parser;
 
-use nix1::{
-    CRATE_VERSION, Encoding, HashAlgo, HashError, run_convert, run_hash_paths,
-};
+use nix_hash::{CRATE_VERSION, Encoding, HashAlgo, HashError, run_convert, run_hash_paths};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "nix1-hash",
+    name = "nix-hash",
     version = CRATE_VERSION,
     about = "compute the cryptographic hash of a path (Rust; 1:1 with nix-hash)",
     disable_help_subcommand = true

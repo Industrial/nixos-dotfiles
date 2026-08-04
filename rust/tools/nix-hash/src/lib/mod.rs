@@ -1,4 +1,4 @@
-//! nix1 — OS-facing 1:1 Nix CLI reimplementations (id_effect).
+//! nix-hash — 1:1 Rust reimplementation of stock `nix-hash` (id_effect).
 
 #![forbid(unsafe_code)]
 
@@ -30,7 +30,7 @@ mod smoke {
 
     #[test]
     fn crate_meta() {
-        assert_eq!(CRATE_NAME, "nix1");
+        assert_eq!(CRATE_NAME, "nix-hash");
         assert!(!CRATE_VERSION.is_empty());
     }
 

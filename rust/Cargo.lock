@@ -1102,7 +1102,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nix1"
+name = "nix-hash"
 version = "0.1.0"
 dependencies = [
  "base64",

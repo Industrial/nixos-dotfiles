@@ -1,4 +1,4 @@
-//! Library entry used by `nix1-hash` binary.
+//! Library entry used by `nix-hash` binary.
 
 use std::path::Path;
 

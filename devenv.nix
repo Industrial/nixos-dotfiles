@@ -69,7 +69,7 @@
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
   };
-  nix1 = pkgs.callPackage ./rust/tools/nix1 {
+  nixHash = pkgs.callPackage ./rust/tools/nix-hash {
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
   };
@@ -115,7 +115,7 @@ in {
     nixq
     nixdrv
     nixfetch
-    nix1
+    nixHash
     nixstore
     namaka
     nixt

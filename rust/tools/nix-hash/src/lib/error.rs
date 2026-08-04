@@ -1,4 +1,4 @@
-//! Errors for nix1-hash.
+//! Errors for nix-hash.
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum HashError {

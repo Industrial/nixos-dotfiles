@@ -102,13 +102,16 @@ mod tests {
     #[test]
     fn sha1_base32_matches_nix_hash() {
         let dig = hex::decode("e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6").unwrap();
-        assert_eq!(nix_base32_encode_full(&dig), "nvd61k9nalji1zl9rrdfmsmvyyjqpzg4");
+        assert_eq!(
+            nix_base32_encode_full(&dig),
+            "nvd61k9nalji1zl9rrdfmsmvyyjqpzg4"
+        );
     }
 
     #[test]
     fn sha256_base32_matches_nix_hash() {
-        let dig =
-            hex::decode("0a430879c266f8b57f4092a0f935cf3facd48bbccde5760d4748ca405171e969").unwrap();
+        let dig = hex::decode("0a430879c266f8b57f4092a0f935cf3facd48bbccde5760d4748ca405171e969")
+            .unwrap();
         assert_eq!(
             nix_base32_encode_full(&dig),
             "0sg9f58l1jj88w6pdrfdpj5x9b1zrwszk84j81zvby36q9whhhqa"
@@ -117,8 +120,8 @@ mod tests {
 
     #[test]
     fn truncate_is_compress_hash() {
-        let dig =
-            hex::decode("0a430879c266f8b57f4092a0f935cf3facd48bbccde5760d4748ca405171e969").unwrap();
+        let dig = hex::decode("0a430879c266f8b57f4092a0f935cf3facd48bbccde5760d4748ca405171e969")
+            .unwrap();
         assert_eq!(
             hex::encode(maybe_truncate(&dig, true)),
             "c7a67e74852e32f52e317bc9f935cf3facd48bbc"

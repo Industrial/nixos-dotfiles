@@ -18,7 +18,7 @@ fn temp_hello() -> PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let n = SEQ.fetch_add(1, Ordering::Relaxed);
-    let dir = std::env::temp_dir().join(format!("nix1-oracle-{}-{n}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("nix-hash-oracle-{}-{n}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let path = dir.join("f");
@@ -34,7 +34,14 @@ fn oracle_flat_md5_matches_stock_when_present() {
         eprintln!("nix-hash not available; skipping live oracle");
         return;
     };
-    let got = run_hash_paths(&[path.as_path()], HashAlgo::Md5, true, false, Encoding::Base16).unwrap();
+    let got = run_hash_paths(
+        &[path.as_path()],
+        HashAlgo::Md5,
+        true,
+        false,
+        Encoding::Base16,
+    )
+    .unwrap();
     assert_eq!(got.join("\n"), want);
 }
 
@@ -43,7 +50,12 @@ fn oracle_recursive_sha256_encodings_match_stock_when_present() {
     let path = temp_hello();
     let p = path.to_string_lossy();
     let cases: &[(&[&str], HashAlgo, Encoding, bool)] = &[
-        (&["--type", "sha256", p.as_ref()], HashAlgo::Sha256, Encoding::Base16, false),
+        (
+            &["--type", "sha256", p.as_ref()],
+            HashAlgo::Sha256,
+            Encoding::Base16,
+            false,
+        ),
         (
             &["--type", "sha256", "--base32", p.as_ref()],
             HashAlgo::Sha256,
@@ -82,8 +94,14 @@ fn oracle_recursive_sha256_encodings_match_stock_when_present() {
 #[test]
 fn oracle_to_sri_matches_stock_when_present() {
     let path = temp_hello();
-    let flat =
-        run_hash_paths(&[path.as_path()], HashAlgo::Sha256, true, false, Encoding::Base16).unwrap();
+    let flat = run_hash_paths(
+        &[path.as_path()],
+        HashAlgo::Sha256,
+        true,
+        false,
+        Encoding::Base16,
+    )
+    .unwrap();
     let hex = &flat[0];
     let Some(want) = stock_nix_hash(&["--to-sri", "--type", "sha256", hex]) else {
         eprintln!("nix-hash not available; skipping");
@@ -96,7 +114,14 @@ fn oracle_to_sri_matches_stock_when_present() {
 #[test]
 fn embedded_flat_sha256_hello() {
     let path = temp_hello();
-    let got = run_hash_paths(&[path.as_path()], HashAlgo::Sha256, true, false, Encoding::Base16).unwrap();
+    let got = run_hash_paths(
+        &[path.as_path()],
+        HashAlgo::Sha256,
+        true,
+        false,
+        Encoding::Base16,
+    )
+    .unwrap();
     assert_eq!(
         got[0],
         "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"

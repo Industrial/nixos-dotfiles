@@ -1,6 +1,6 @@
 # Host package: cargo-built wrapper against the local rust workspace (dev-first).
-# Requires the .dotfiles checkout at evaluation*time of the wrapper's runtime
-# (NIX1_ROOT / DEVENV_ROOT / git toplevel). Same approach as rust/tools/*/default.nix.
+# Requires the .dotfiles checkout at runtime
+# (DOTFILES_ROOT / DEVENV_ROOT / git toplevel).
 {
   lib,
   pkgs,
@@ -9,7 +9,7 @@
   ...
 }:
 pkgs.writeShellApplication {
-  name = "nix1-hash";
+  name = "nixq";
   runtimeInputs = [
     cargo
     rustc
@@ -19,17 +19,17 @@ pkgs.writeShellApplication {
   ];
   text = ''
     set -euo pipefail
-    root="''${NIX1_ROOT:-''${DEVENV_ROOT:-}}"
+    root="''${DOTFILES_ROOT:-''${DEVENV_ROOT:-}}"
     if [[ -z "$root" ]]; then
       root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     fi
     if [[ -z "$root" || ! -f "$root/rust/Cargo.toml" ]]; then
-      echo "nix1-hash: set NIX1_ROOT to your .dotfiles checkout (need rust/Cargo.toml)" >&2
+      echo "nixq: set DOTFILES_ROOT to your .dotfiles checkout (need rust/Cargo.toml)" >&2
       exit 127
     fi
     manifest="$root/rust/Cargo.toml"
-    bin="$root/rust/target/release/nix1-hash"
-    debug="$root/rust/target/debug/nix1-hash"
+    bin="$root/rust/target/release/nixq"
+    debug="$root/rust/target/debug/nixq"
     if [[ ! -x "$bin" ]]; then
       bin="$debug"
     fi
@@ -37,15 +37,15 @@ pkgs.writeShellApplication {
     if [[ ! -x "$bin" ]]; then
       needs_build=1
     else
-      newest="$(find "$root/rust/tools/nix1/src" "$root/rust/tools/nixfetch/src" "$root/rust/tools/nixdrv/src" -type f -newer "$bin" 2>/dev/null | head -n1 || true)"
+      newest="$(find "$root/rust/tools/nixq/src" -type f -newer "$bin" 2>/dev/null | head -n1 || true)"
       if [[ -n "$newest" ]]; then
         needs_build=1
       fi
     fi
     if [[ "$needs_build" -eq 1 ]]; then
-      echo "nix1-hash: building (cargo -p nix1 --release)…" >&2
-      env -u RUSTC_WRAPPER cargo build --release --manifest-path "$manifest" -p nix1
-      bin="$root/rust/target/release/nix1-hash"
+      echo "nixq: building (cargo -p nixq --release)…" >&2
+      env -u RUSTC_WRAPPER cargo build --release --manifest-path "$manifest" -p nixq
+      bin="$root/rust/target/release/nixq"
     fi
     exec "$bin" "$@"
   '';
