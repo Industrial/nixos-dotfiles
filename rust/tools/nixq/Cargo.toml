@@ -18,6 +18,7 @@ id_effect_macro = { path = "/data/Code/rust/id_effect/crates/id_effect_macro" }
 id_effect_proc_macro = { path = "/data/Code/rust/id_effect/crates/id_effect_proc_macro" }
 id_effect_cli = { path = "/data/Code/rust/id_effect/crates/id_effect_cli", optional = true }
 id_effect_optics = { path = "/data/Code/rust/id_effect/crates/id_effect_optics", optional = true }
+nixstore = { path = "../nixstore" }
 
 [features]
 default = ["cli-exit", "optics"]

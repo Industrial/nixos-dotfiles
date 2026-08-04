@@ -235,3 +235,50 @@ mod tests {
         ));
     }
 }
+
+
+/// Delegate path-info queries to nixstore (no SQL in nixq).
+pub fn cmd_path_info(
+    paths: Vec<String>,
+    flags: nixstore::PathInfoFlags,
+    store: Option<std::path::PathBuf>,
+) -> Result<serde_json::Value, nixstore::InfraError> {
+    use id_effect::{FromEnv, Exit, run_test};
+    use nixstore::caps::{NixstoreEnv, providers_for_store};
+    let root = nixstore::resolve_store_root(store);
+    let env = NixstoreEnv::from_env(providers_for_store(&root));
+    match run_test(nixstore::cmd_path_info(paths, flags), env) {
+        Exit::Success(v) => Ok(v),
+        Exit::Failure(cause) => Err(match cause {
+            id_effect::Cause::Fail(e) => e,
+            id_effect::Cause::Die(msg) => nixstore::InfraError::Json(msg),
+            other => nixstore::InfraError::Json(format!("{other:?}")),
+        }),
+    }
+}
+
+#[cfg(test)]
+mod path_info_tests {
+    use super::*;
+    use nixstore::PathInfoFlags;
+
+    #[test]
+    fn path_info_fixture_json() {
+        let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../nixstore/fixtures/minimal");
+        let path = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a".to_string();
+        let v = cmd_path_info(
+            vec![path.clone()],
+            PathInfoFlags {
+                json: true,
+                closure_size: true,
+                referrers: true,
+                ..Default::default()
+            },
+            Some(root),
+        )
+        .expect("query");
+        assert_eq!(v[&path]["narSize"], 100);
+        assert_eq!(v[&path]["closureSize"], 350);
+    }
+}

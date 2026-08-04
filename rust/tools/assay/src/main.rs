@@ -1,6 +1,6 @@
 //! Assay CLI — discover and run Nix unit test suites.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
@@ -85,7 +85,7 @@ fn main() -> ExitCode {
 }
 
 fn cmd_run(
-    path: &PathBuf,
+    path: &Path,
     json: bool,
     format: Option<&str>,
     update_snapshots: bool,
@@ -166,7 +166,7 @@ fn resolve_format(json: bool, format: Option<&str>) -> Result<ReportFormat, Stri
     }
 }
 
-fn cmd_discover(path: &PathBuf) -> ExitCode {
+fn cmd_discover(path: &Path) -> ExitCode {
     match discover_suites(path) {
         Ok(suites) => {
             for suite in suites {

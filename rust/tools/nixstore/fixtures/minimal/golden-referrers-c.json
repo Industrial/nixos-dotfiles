@@ -1,0 +1,19 @@
+{
+  "narHash": "sha256-MzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM=",
+  "narSize": 50,
+  "references": [
+    "/nix/store/cccccccccccccccccccccccccccccccc-c"
+  ],
+  "registrationTime": 1002,
+  "ultimate": false,
+  "deriver": null,
+  "signatures": [
+    "sig1"
+  ],
+  "referrers": [
+    "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a",
+    "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b",
+    "/nix/store/cccccccccccccccccccccccccccccccc-c"
+  ],
+  "closureSize": 50
+}

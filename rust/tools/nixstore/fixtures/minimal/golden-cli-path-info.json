@@ -1,0 +1,13 @@
+{
+  "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a": {
+    "deriver": null,
+    "narHash": "sha256-ERERERERERERERERERERERERERERERERERERERERERE=",
+    "narSize": 100,
+    "references": [
+      "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b",
+      "/nix/store/cccccccccccccccccccccccccccccccc-c"
+    ],
+    "registrationTime": 1000,
+    "ultimate": true
+  }
+}

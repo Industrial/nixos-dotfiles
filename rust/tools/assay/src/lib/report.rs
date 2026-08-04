@@ -10,7 +10,7 @@
 use std::fmt::Write as _;
 use std::io::{self, Write};
 
-use id_effect::{Effect, Stream, runtime::run_blocking, succeed};
+use id_effect::{Effect, Stream, runtime::run_blocking};
 use serde::Serialize;
 
 use crate::outcome::AssayOutcome;
@@ -229,6 +229,8 @@ pub fn collect_formatted_lines(
 
 #[cfg(test)]
 mod tests {
+    use id_effect::succeed;
+
     use super::*;
 
     fn sample_outcomes() -> Vec<(String, AssayOutcome)> {

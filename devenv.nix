@@ -61,6 +61,14 @@
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
   };
+  nixdrv = pkgs.callPackage ./rust/tools/nixdrv {
+    rustc = pkgs-unstable.rustc;
+    cargo = pkgs-unstable.cargo;
+  };
+  nixstore = pkgs.callPackage ./rust/tools/nixstore {
+    rustc = pkgs-unstable.rustc;
+    cargo = pkgs-unstable.cargo;
+  };
 
   # Nightly toolchain for cargo-llvm-cov --branch (stable rejects -Z coverage-options=branch).
   rust-nightly = inputs.fenix.packages.${system}.complete.withComponents [
@@ -97,6 +105,8 @@ in {
     nix-unit
     assay
     nixq
+    nixdrv
+    nixstore
     namaka
     nixt
 
@@ -145,7 +155,7 @@ in {
     rust = {
       enable = true;
       channel = "stable";
-      components = ["rustfmt" "clippy" "rust-analyzer"];
+      components = ["rustfmt" "rust-analyzer"];
     };
 
     javascript = {
@@ -200,6 +210,28 @@ in {
         cargo llvm-cov nextest -p nixq --lib --branch \
           --fail-under-lines 95 --fail-under-regions 95 \
           --no-cfg-coverage
+      '';
+    };
+
+    nixdrv-coverage = {
+      exec = ''
+        set -euo pipefail
+        export PATH="${rust-nightly}/bin:$PATH"
+        unset RUSTC_WRAPPER || true
+        cd "$DEVENV_ROOT/rust"
+        cargo llvm-cov nextest -p nixdrv --lib --branch \
+          --fail-under-lines 95 --fail-under-regions 95 \
+          --no-cfg-coverage
+      '';
+    };
+
+    nixstore-coverage = {
+      exec = ''
+        set -euo pipefail
+        export PATH="${rust-nightly}/bin:$PATH"
+        unset RUSTC_WRAPPER || true
+        cd "$DEVENV_ROOT/rust"
+        cargo llvm-cov nextest -p nixstore --lib --branch           --fail-under-lines 95 --fail-under-regions 95           --no-cfg-coverage
       '';
     };
   };

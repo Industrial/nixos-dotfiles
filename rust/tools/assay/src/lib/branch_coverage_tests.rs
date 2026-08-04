@@ -10,7 +10,7 @@ use crate::assay_suite::parse_assay_suite;
 use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, NixWorkerPoolKey, mock_providers};
 use crate::claims::Claim;
 use crate::discover::{SuiteKind, discover_suites, suite_kind};
-use crate::eval::{EvalBackend, EvalResult, NixEval, ProcessNixEval, classify_stderr};
+use crate::eval::{EvalBackend, EvalResult, ProcessNixEval, classify_stderr};
 use crate::laws::{law_merge_associativity, run_law_by_name};
 use crate::outcome::AssayOutcome;
 use crate::pool::MockWorkerPool;
@@ -18,10 +18,7 @@ use crate::prop::{Gen, run_prop_by_name};
 use crate::run::{RunOptions, run_suite_blocking, summarize, summarize_exits};
 use crate::schema::{decode_claim_json, encode_claim_json};
 use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};
-use nixq::{
-    fold_object_keys, normalize_value, object_keys_traversal, structural_diff,
-    value_has_attrs_via_traversal,
-};
+use nixq::{fold_object_keys, structural_diff, value_has_attrs_via_traversal};
 
 #[test]
 fn verdict_unknown_eval_kind_maps_to_eval_throw() {

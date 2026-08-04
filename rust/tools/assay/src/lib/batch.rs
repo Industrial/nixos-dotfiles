@@ -30,11 +30,14 @@ pub fn is_batchable(claim: &Claim) -> bool {
         Claim::EqValues { .. }
         | Claim::SubsetValues { .. }
         | Claim::HasAttrsValues { .. }
+        | Claim::Drv { .. }
+        | Claim::DrvValues { .. }
         | Claim::Throws { .. }
         | Claim::Forces { .. }
         | Claim::Module { .. }
         | Claim::Law { .. }
-        | Claim::Prop { .. } => false,
+        | Claim::Prop { .. }
+        | Claim::PathInfo { .. } => false,
     }
 }
 
@@ -54,10 +57,11 @@ struct BatchSlot {
     secondary_expr: Option<String>,
 }
 
+type NamedClaim = (String, Claim);
+type NamedExit = (String, Exit<CaseVerdict, InfraError>);
+
 /// Partition cases into batchable slots and claims that must stay isolated.
-pub fn partition_cases(
-    cases: Vec<(String, Claim)>,
-) -> (Vec<(String, Claim)>, Vec<(String, Claim)>) {
+pub fn partition_cases(cases: Vec<NamedClaim>) -> (Vec<NamedClaim>, Vec<NamedClaim>) {
     let mut batchable = Vec::new();
     let mut isolated = Vec::new();
     for (name, claim) in cases {
@@ -391,11 +395,11 @@ fn eval_batch_expr(eval: &dyn EvalBackend, expr: &str) -> Result<Value, InfraErr
 }
 
 fn run_batch_fallback(
-    cases: &[(String, Claim)],
+    cases: &[NamedClaim],
     eval: &dyn EvalBackend,
     store: &SnapshotStore,
     batch_err: InfraError,
-) -> Result<Vec<(String, Exit<CaseVerdict, InfraError>)>, InfraError> {
+) -> Result<Vec<NamedExit>, InfraError> {
     let _ = batch_err; // reserved for future tracing
     let mut out = Vec::with_capacity(cases.len());
     for (name, claim) in cases {
@@ -411,10 +415,10 @@ fn run_batch_fallback(
 
 /// Evaluate all batchable claims in one nix process; return verdicts.
 pub fn run_batch(
-    cases: &[(String, Claim)],
+    cases: &[NamedClaim],
     eval: &dyn EvalBackend,
     store: &SnapshotStore,
-) -> Result<Vec<(String, Exit<CaseVerdict, InfraError>)>, InfraError> {
+) -> Result<Vec<NamedExit>, InfraError> {
     if cases.is_empty() {
         return Ok(Vec::new());
     }

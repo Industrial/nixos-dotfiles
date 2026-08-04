@@ -1,11 +1,8 @@
 //! Deterministic timeouts and flaky-eval retry via [`TestClock`].
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use id_effect::{
-    Clock, Effect, Exit, Needs, Schedule, TestClock, fail, retry_with_clock, run_test_with_clock,
-    succeed,
-};
+use id_effect::{Effect, Needs};
 
 use crate::caps::{AssayEnv, ClockKey};
 use crate::claims::{Claim, interpret_claim};
@@ -48,8 +45,12 @@ pub fn interpret_claim_with_retry(
 mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Instant;
 
-    use id_effect::{Cap, Clock, FromEnv, build_env, run_test, run_test_with_clock};
+    use id_effect::{
+        Cap, Clock, Exit, FromEnv, Schedule, TestClock, build_env, fail, retry_with_clock, run_test,
+        run_test_with_clock, succeed,
+    };
 
     use super::*;
     use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, mock_providers};

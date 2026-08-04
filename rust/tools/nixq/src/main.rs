@@ -3,19 +3,23 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand};
 use id_effect::failure::pretty_cause;
 use id_effect::{Cause, RunError, run_with};
 use id_effect_cli::exit_code_for_cause;
 
 use nixq::caps::live_providers;
-use nixq::commands::{cmd_diff, cmd_force_path, cmd_get, cmd_has_attrs, cmd_normalize, cmd_subset};
+use nixq::commands::{
+    cmd_diff, cmd_force_path, cmd_get, cmd_has_attrs, cmd_normalize, cmd_path_info, cmd_subset,
+};
 use nixq::error::{InfraError, PredicateResult};
 
 #[derive(Parser)]
 #[command(
     name = "nixq",
-    about = "JSON/attrpath query: get, has-attrs, subset, force-path, normalize, diff"
+    about = "JSON/attrpath query + path-info via nixstore",
+    // Free `-h` for nix-compatible `--human-readable` on path-info.
+    disable_help_flag = true
 )]
 struct Cli {
     #[command(subcommand)]
@@ -61,16 +65,87 @@ enum Commands {
         #[arg(long, short = 'f', default_value = "-")]
         file: PathBuf,
     },
+    /// Query Nix store path-info (delegates to nixstore)
+    PathInfo {
+        paths: Vec<String>,
+        #[arg(long)]
+        json: bool,
+        #[arg(long, short = 's')]
+        size: bool,
+        #[arg(long, short = 'S')]
+        closure_size: bool,
+        #[arg(long, short = 'h')]
+        human_readable: bool,
+        #[arg(long)]
+        sigs: bool,
+        #[arg(long)]
+        referrers: bool,
+        #[arg(long)]
+        store: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
-    match Cli::parse().command {
+    let mut cmd = Cli::command();
+    cmd = cmd.arg(
+        clap::Arg::new("help")
+            .long("help")
+            .action(ArgAction::Help)
+            .global(true)
+            .help("Print help"),
+    );
+    let matches = cmd.get_matches();
+    let cli = Cli::from_arg_matches(&matches).unwrap_or_else(|e| e.exit());
+    match cli.command {
         Commands::Get { attrpath, file } => run_value(cmd_get(file, attrpath)),
         Commands::HasAttrs { attrs, file } => run_pred(cmd_has_attrs(file, attrs)),
         Commands::Subset { expected, file } => run_pred(cmd_subset(file, expected)),
         Commands::ForcePath { paths, file } => run_pred(cmd_force_path(file, paths)),
         Commands::Normalize { file } => run_value(cmd_normalize(file)),
         Commands::Diff { right, file } => run_diff(cmd_diff(file, right)),
+        Commands::PathInfo {
+            paths,
+            json,
+            size,
+            closure_size,
+            human_readable,
+            sigs,
+            referrers,
+            store,
+        } => {
+            if paths.is_empty() {
+                eprintln!("nixq path-info: at least one PATH required");
+                return ExitCode::from(2);
+            }
+            match cmd_path_info(
+                paths,
+                nixstore::PathInfoFlags {
+                    json,
+                    size,
+                    closure_size,
+                    human_readable,
+                    sigs,
+                    referrers,
+                },
+                store,
+            ) {
+                Ok(v) => {
+                    if let Some(text) = v.get("__text__").and_then(|t| t.as_str()) {
+                        println!("{text}");
+                    } else {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&v).unwrap_or_else(|_| v.to_string())
+                        );
+                    }
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    ExitCode::from(2)
+                }
+            }
+        }
     }
 }
 

@@ -3,19 +3,18 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use id_effect::Clock;
-use id_effect::{Cap, Exit, FromEnv, build_env};
+use id_effect::{Exit, Clock};
 use serde_json::{Value, json};
 
 use crate::batch::{BATCH_MARKER, FORCE_BATCH_JSON_EVAL, is_batchable, partition_cases, run_batch};
-use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, StdClock, mock_providers};
+use crate::caps::{MockNixEval, StdClock};
 use crate::claims::Claim;
 use crate::eval::{EvalBackend, EvalResult};
 use crate::outcome::AssayOutcome;
 use crate::pool::{NixWorkerPool, SemaphoreWorkerPool};
 use crate::prop::{BUILTIN_PROP_NAMES, Gen, run_prop_by_name};
 use crate::report::{ReportFormat, collect_formatted_lines, format_line, report_outcomes_stdout};
-use crate::run::{RunSummary, SuiteReport, summarize, summarize_exits};
+use crate::run::{RunSummary, SuiteReport, summarize_exits};
 use crate::schema::{decode_claim_json, encode_claim_json};
 use crate::snapshot::SnapshotStore;
 use crate::verdict::{CaseVerdict, InfraError, exit_to_outcome, outcome_to_exit};
@@ -39,11 +38,6 @@ impl BatchJsonEval {
         Self {
             inner: MockNixEval::default(),
         }
-    }
-
-    fn with_inner(mut self, setup: impl FnOnce(&MockNixEval)) -> Self {
-        setup(&self.inner);
-        self
     }
 
     fn batch_results(&self, _expr: &str) -> EvalResult {
@@ -85,12 +79,6 @@ impl BatchJsonEval {
             ]
         }))
     }
-}
-
-fn mock_env(eval: Arc<dyn EvalBackend + Send + Sync>) -> AssayEnv {
-    let mut built = build_env(mock_providers()).expect("env");
-    built.insert::<Cap<NixEvaluatorKey>>(eval);
-    AssayEnv::from_env(built)
 }
 
 #[test]

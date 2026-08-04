@@ -22,6 +22,8 @@ tasks:
       - 'rust/tools/assay/Cargo.toml'
       - 'rust/tools/nixq/src/**/*'
       - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
     options:
       # Whole-repo discovery; do not treat as always-cacheable across env changes.
       cache: true
@@ -37,6 +39,8 @@ tasks:
       - 'rust/tools/assay/Cargo.toml'
       - 'rust/tools/nixq/src/**/*'
       - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
       - 'rust/Cargo.toml'
       - 'rust/Cargo.lock'
     options:
@@ -56,6 +60,8 @@ tasks:
     inputs:
       - 'rust/tools/nixq/src/**/*'
       - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
       - 'rust/Cargo.toml'
     options:
       cache: true
@@ -69,7 +75,79 @@ tasks:
     inputs:
       - 'rust/tools/nixq/src/**/*'
       - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
       - 'rust/Cargo.toml'
       - 'rust/Cargo.lock'
     options:
       cache: true
+  nixdrv-test:
+    description: 'nixdrv unit tests'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nixdrv'
+    inputs:
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
+      - 'rust/tools/nixq/src/**/*'
+      - 'rust/tools/nixq/Cargo.toml'
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true
+  nixdrv-coverage:
+    description: 'nixdrv crate llvm-cov (≥95% lines/regions; nightly --branch)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'nixdrv-coverage'
+    inputs:
+      - 'rust/tools/nixdrv/src/**/*'
+      - 'rust/tools/nixdrv/Cargo.toml'
+      - 'rust/Cargo.toml'
+      - 'rust/Cargo.lock'
+    options:
+      cache: true
+  nixstore-test:
+    description: nixstore unit tests
+    command: devenv
+    args:
+      - shell
+      - --
+      - cargo
+      - test
+      - --manifest-path
+      - rust/Cargo.toml
+      - -p
+      - nixstore
+    inputs:
+      - rust/tools/nixstore/src/**/*
+      - rust/tools/nixstore/Cargo.toml
+      - rust/tools/nixstore/fixtures/**/*
+      - rust/Cargo.toml
+    options:
+      cache: true
+  nixstore-coverage:
+    description: nixstore crate llvm-cov
+    command: devenv
+    args:
+      - shell
+      - --
+      - nixstore-coverage
+    inputs:
+      - rust/tools/nixstore/src/**/*
+      - rust/tools/nixstore/Cargo.toml
+      - rust/Cargo.toml
+      - rust/Cargo.lock
+    options:
+      cache: true
+

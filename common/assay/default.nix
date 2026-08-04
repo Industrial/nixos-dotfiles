@@ -33,6 +33,8 @@
 
   drv = args: {claim = "drv";} // args;
 
+  pathInfo = args: {claim = "pathInfo";} // args;
+
   forces = expr: paths: {
     claim = "forces";
     inherit expr paths;

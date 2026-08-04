@@ -13,6 +13,7 @@ use crate::eval::{EvalBackend, EvalResult, ProcessNixEval};
 use crate::outcome::AssayOutcome;
 use crate::pool::{MockWorkerPool, NixWorkerPool, SemaphoreWorkerPool};
 use crate::snapshot::SnapshotStore;
+use nixstore::{MockPathInfoStore, PathInfoStore, SqlitePathInfoStore};
 
 /// Nix evaluation backend injected at the runner edge.
 pub type NixEvaluatorKey = Arc<dyn EvalBackend + Send + Sync>;
@@ -26,12 +27,16 @@ pub type ClockKey = Arc<dyn Clock + Send + Sync>;
 /// Bounded concurrent Nix worker slots.
 pub type NixWorkerPoolKey = Arc<dyn NixWorkerPool + Send + Sync>;
 
+/// Read-only Nix store path-info (sqlite).
+pub type PathInfoStoreKey = Arc<dyn PathInfoStore>;
+
 /// Required capabilities for an Assay run or unit-test harness.
 pub type AssayEnv = caps!(
     NixEvaluatorKey,
     SnapshotStoreKey,
     ClockKey,
-    NixWorkerPoolKey
+    NixWorkerPoolKey,
+    PathInfoStoreKey
 );
 
 // --- Live providers ---
@@ -42,6 +47,7 @@ pub type AssayEnv = caps!(
 pub struct ProcessNixEvalLive;
 
 impl ProcessNixEvalLive {
+    #[allow(clippy::new_ret_no_self)] // ProviderSpecDerive factory returns capability key
     fn new() -> NixEvaluatorKey {
         Arc::new(ProcessNixEval)
     }
@@ -53,6 +59,7 @@ impl ProcessNixEvalLive {
 pub struct FsSnapshotStoreLive;
 
 impl FsSnapshotStoreLive {
+    #[allow(clippy::new_ret_no_self)] // ProviderSpecDerive factory returns capability key
     fn new() -> SnapshotStoreKey {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/goldens");
         SnapshotStore::new(root)
@@ -90,6 +97,7 @@ impl Clock for StdClock {
 pub struct LiveClockLive;
 
 impl LiveClockLive {
+    #[allow(clippy::new_ret_no_self)] // ProviderSpecDerive factory returns capability key
     fn new() -> ClockKey {
         Arc::new(StdClock)
     }
@@ -101,6 +109,7 @@ impl LiveClockLive {
 pub struct SemaphoreWorkerPoolLive;
 
 impl SemaphoreWorkerPoolLive {
+    #[allow(clippy::new_ret_no_self)] // ProviderSpecDerive factory returns capability key
     fn new() -> NixWorkerPoolKey {
         Arc::new(SemaphoreWorkerPool::default_live())
     }
@@ -112,6 +121,7 @@ impl SemaphoreWorkerPoolLive {
 pub struct AssayTestClockLive;
 
 impl AssayTestClockLive {
+    #[allow(clippy::new_ret_no_self)] // ProviderSpecDerive factory returns capability key
     fn new() -> ClockKey {
         Arc::new(TestClock::new(Instant::now()))
     }
@@ -233,23 +243,44 @@ pub fn require_store(store: Option<&FakeStore>) -> Result<&FakeStore, AssayOutco
     })
 }
 
+#[derive(::id_effect::ProviderSpecDerive)]
+#[provides(PathInfoStoreKey)]
+pub struct SqlitePathInfoStoreLive;
+
+impl SqlitePathInfoStoreLive {
+    #[allow(clippy::new_ret_no_self)] // ProviderSpecDerive factory returns capability key
+    fn new() -> PathInfoStoreKey {
+        let root = std::env::var("ASSAY_NIX_STORE").unwrap_or_else(|_| "/nix".into());
+        Arc::new(SqlitePathInfoStore::new(root))
+    }
+}
+
+mock_capability!(
+    MockPathInfoStoreLive,
+    PathInfoStoreKey,
+    "pathinfo/mock",
+    || Arc::new(MockPathInfoStore::default()) as PathInfoStoreKey
+);
+
 /// Default live provider list for `run_with` at the application edge.
-pub fn live_providers() -> [id_effect::ProviderBox; 4] {
+pub fn live_providers() -> [id_effect::ProviderBox; 5] {
     [
         provide!(ProcessNixEvalLive),
         provide!(FsSnapshotStoreLive),
         provide!(LiveClockLive),
         provide!(SemaphoreWorkerPoolLive),
+        provide!(SqlitePathInfoStoreLive),
     ]
 }
 
 #[cfg(test)]
-pub fn mock_providers() -> [id_effect::ProviderBox; 4] {
+pub fn mock_providers() -> [id_effect::ProviderBox; 5] {
     [
         provide!(MockNixEvalLive),
         provide!(MockSnapshotStoreLive),
         provide!(AssayTestClockLive),
         provide!(MockWorkerPoolLive),
+        provide!(MockPathInfoStoreLive),
     ]
 }
 
@@ -265,6 +296,7 @@ mod tests {
         assert!(env.has::<Cap<SnapshotStoreKey>>());
         assert!(env.has::<Cap<ClockKey>>());
         assert!(env.has::<Cap<NixWorkerPoolKey>>());
+        assert!(env.has::<Cap<PathInfoStoreKey>>());
     }
 
     #[test]
@@ -274,20 +306,22 @@ mod tests {
         assert!(env.has::<Cap<SnapshotStoreKey>>());
         assert!(env.has::<Cap<ClockKey>>());
         assert!(env.has::<Cap<NixWorkerPoolKey>>());
+        assert!(env.has::<Cap<PathInfoStoreKey>>());
     }
 
     #[test]
     fn run_test_reads_all_caps() {
         let env = AssayEnv::from_env(build_env(mock_providers()).expect("env"));
-        let effect: Effect<(bool, bool, bool, bool), (), AssayEnv> = Effect::new(|env| {
+        let effect: Effect<(bool, bool, bool, bool, bool), (), AssayEnv> = Effect::new(|env| {
             let _nix = Needs::<NixEvaluatorKey>::need(env);
             let _snap = Needs::<SnapshotStoreKey>::need(env);
             let _clock = Needs::<ClockKey>::need(env);
             let _pool = Needs::<NixWorkerPoolKey>::need(env);
-            Ok((true, true, true, true))
+            let _pi = Needs::<PathInfoStoreKey>::need(env);
+            Ok((true, true, true, true, true))
         });
         let exit = run_test(effect, env);
-        assert_eq!(exit, Exit::Success((true, true, true, true)));
+        assert_eq!(exit, Exit::Success((true, true, true, true, true)));
     }
 
     #[test]
@@ -306,7 +340,7 @@ mod tests {
 
     #[test]
     fn fake_store_denies_ifd_by_default() {
-        assert!(!FakeStore::default().allow_ifd());
+        assert!(!FakeStore.allow_ifd());
     }
 
     #[test]

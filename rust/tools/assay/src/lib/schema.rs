@@ -101,6 +101,23 @@ fn decode_claim_unknown(value: &Unknown) -> Result<Claim, ParseError> {
                 })
             }
         }
+        "drv" => {
+            let project = string_array_field(obj, "project")?;
+            let expected = json_field(obj, "expected")?;
+            if obj.contains_key("actual") {
+                Ok(Claim::DrvValues {
+                    actual: json_field(obj, "actual")?,
+                    project,
+                    expected,
+                })
+            } else {
+                Ok(Claim::Drv {
+                    expr: source_field(obj, "expr")?,
+                    project,
+                    expected,
+                })
+            }
+        }
         "snapshot" => Ok(Claim::Snapshot {
             name: require_str(obj, "name")?,
             expr: source_field(obj, "expr")?,
@@ -122,6 +139,14 @@ fn decode_claim_unknown(value: &Unknown) -> Result<Claim, ParseError> {
             name: require_str(obj, "name")?,
             seed: u64_field(obj, "seed")?,
             trials: optional_u32_field(obj, "trials")?,
+        }),
+        "pathInfo" => Ok(Claim::PathInfo {
+            path: require_str(obj, "path")?,
+            expect: json_field(obj, "expect")?,
+            referrers: optional_bool_field(obj, "referrers")?.unwrap_or(false),
+            closure_size: optional_bool_field(obj, "closureSize")?
+                .or(optional_bool_field(obj, "closure_size")?)
+                .unwrap_or(false),
         }),
         other => Err(ParseError::new(
             "claim",
@@ -185,6 +210,32 @@ fn encode_claim_unknown(claim: Claim) -> Unknown {
                 Unknown::Array(attrs.into_iter().map(Unknown::String).collect()),
             );
         }
+        Claim::Drv {
+            expr,
+            project,
+            expected,
+        } => {
+            obj.insert("claim".into(), Unknown::String("drv".into()));
+            insert_nix_field(&mut obj, "expr", &expr);
+            obj.insert(
+                "project".into(),
+                Unknown::Array(project.into_iter().map(Unknown::String).collect()),
+            );
+            obj.insert("expected".into(), unknown_from_serde_json(expected));
+        }
+        Claim::DrvValues {
+            actual,
+            project,
+            expected,
+        } => {
+            obj.insert("claim".into(), Unknown::String("drv".into()));
+            obj.insert("actual".into(), unknown_from_serde_json(actual));
+            obj.insert(
+                "project".into(),
+                Unknown::Array(project.into_iter().map(Unknown::String).collect()),
+            );
+            obj.insert("expected".into(), unknown_from_serde_json(expected));
+        }
         Claim::Snapshot { name, expr } => {
             obj.insert("claim".into(), Unknown::String("snapshot".into()));
             obj.insert("name".into(), Unknown::String(name));
@@ -215,6 +266,22 @@ fn encode_claim_unknown(claim: Claim) -> Unknown {
                 "seed".into(),
                 Unknown::I64(i64::try_from(seed).unwrap_or(i64::MAX)),
             );
+        }
+        Claim::PathInfo {
+            path,
+            expect,
+            referrers,
+            closure_size,
+        } => {
+            obj.insert("claim".into(), Unknown::String("pathInfo".into()));
+            obj.insert("path".into(), Unknown::String(path));
+            obj.insert("expect".into(), unknown_from_serde_json(expect));
+            if referrers {
+                obj.insert("referrers".into(), Unknown::Bool(true));
+            }
+            if closure_size {
+                obj.insert("closureSize".into(), Unknown::Bool(true));
+            }
         }
         Claim::Prop { name, seed, trials } => {
             obj.insert("claim".into(), Unknown::String("prop".into()));
@@ -281,6 +348,15 @@ fn u64_field(obj: &BTreeMap<String, Unknown>, key: &str) -> Result<u64, ParseErr
         Some(Unknown::I64(_)) => Err(ParseError::new(key, "seed must be non-negative")),
         Some(_) => Err(ParseError::new(key, "expected integer")),
         None => Err(ParseError::new(key, format!("missing field {key}"))),
+    }
+}
+
+
+fn optional_bool_field(obj: &BTreeMap<String, Unknown>, key: &str) -> Result<Option<bool>, ParseError> {
+    match obj.get(key) {
+        None => Ok(None),
+        Some(Unknown::Bool(b)) => Ok(Some(*b)),
+        Some(other) => Err(ParseError::new(key, format!("expected bool, got {other:?}"))),
     }
 }
 
@@ -409,6 +485,38 @@ mod tests {
         round_trip(Claim::SubsetValues {
             actual: json!({"a": 1}),
             expected_subset: json!({"a": 1}),
+        });
+    }
+
+    #[test]
+    fn drv_values_claim_round_trips() {
+        round_trip(Claim::DrvValues {
+            actual: json!({
+                "type": "derivation",
+                "name": "hello-2.12.3",
+                "outPath": "/nix/store/abc-hello-2.12.3"
+            }),
+            project: vec!["name".into(), "outPath".into()],
+            expected: json!({"name": "hello-2.12.3"}),
+        });
+    }
+
+    #[test]
+    fn path_info_claim_round_trips() {
+        round_trip(Claim::PathInfo {
+            path: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a".into(),
+            expect: json!({"narSize": 100}),
+            referrers: true,
+            closure_size: true,
+        });
+    }
+
+    #[test]
+    fn drv_expr_claim_round_trips() {
+        round_trip(Claim::Drv {
+            expr: "pkgs.hello.drvPath".into(),
+            project: vec!["name".into()],
+            expected: json!({"name": "hello"}),
         });
     }
 

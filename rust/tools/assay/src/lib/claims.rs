@@ -4,7 +4,7 @@ use serde_json::Value;
 
 use id_effect::{Cause, Effect, Exit};
 
-use crate::caps::{AssayEnv, NixEvaluatorKey, NixWorkerPoolKey, SnapshotStoreKey};
+use crate::caps::{AssayEnv, NixEvaluatorKey, NixWorkerPoolKey, PathInfoStoreKey, SnapshotStoreKey};
 use crate::eval::{EvalBackend, EvalResult};
 use crate::force::check_forces;
 use crate::outcome::AssayOutcome;
@@ -44,6 +44,16 @@ pub enum Claim {
         actual: Value,
         attrs: Vec<String>,
     },
+    Drv {
+        expr: String,
+        project: Vec<String>,
+        expected: Value,
+    },
+    DrvValues {
+        actual: Value,
+        project: Vec<String>,
+        expected: Value,
+    },
     Snapshot {
         name: String,
         expr: String,
@@ -68,6 +78,13 @@ pub enum Claim {
         seed: u64,
         trials: Option<u32>,
     },
+    /// Assert `expect` is a structural subset of store path-info JSON.
+    PathInfo {
+        path: String,
+        expect: Value,
+        referrers: bool,
+        closure_size: bool,
+    },
 }
 
 /// Interpret `claim` using capabilities from [`AssayEnv`].
@@ -77,13 +94,23 @@ pub fn interpret_claim(claim: Claim) -> Effect<CaseVerdict, InfraError, AssayEnv
         let _slot = pool.acquire()?;
         let eval = id_effect::Needs::<NixEvaluatorKey>::need(env);
         let store = id_effect::Needs::<SnapshotStoreKey>::need(env);
-        interpret_claim_with(eval.as_ref(), store, &claim)
+        let path_info = id_effect::Needs::<PathInfoStoreKey>::need(env);
+        interpret_claim_with_path_info(eval.as_ref(), store, Some(path_info.as_ref()), &claim)
     })
 }
 
 pub(crate) fn interpret_claim_with(
     eval: &dyn EvalBackend,
     store: &SnapshotStore,
+    claim: &Claim,
+) -> Result<CaseVerdict, InfraError> {
+    interpret_claim_with_path_info(eval, store, None, claim)
+}
+
+pub(crate) fn interpret_claim_with_path_info(
+    eval: &dyn EvalBackend,
+    store: &SnapshotStore,
+    path_info: Option<&dyn nixstore::PathInfoStore>,
     claim: &Claim,
 ) -> Result<CaseVerdict, InfraError> {
     let outcome = match claim {
@@ -103,6 +130,16 @@ pub(crate) fn interpret_claim_with(
         } => interpret_subset_values(actual, expected_subset),
         Claim::HasAttrs { expr, attrs } => interpret_has_attrs(expr, attrs, eval),
         Claim::HasAttrsValues { actual, attrs } => interpret_has_attrs_values(actual, attrs),
+        Claim::Drv {
+            expr,
+            project,
+            expected,
+        } => interpret_drv(expr, project, expected, eval),
+        Claim::DrvValues {
+            actual,
+            project,
+            expected,
+        } => interpret_drv_values(actual, project, expected),
         Claim::Snapshot { name, expr } => interpret_snapshot(name, expr, eval, store),
         Claim::Forces { expr, paths } => check_forces(expr, paths, eval),
         Claim::Module {
@@ -113,6 +150,16 @@ pub(crate) fn interpret_claim_with(
         Claim::Law { name, seed } => crate::laws::run_law_by_name(name, *seed),
         Claim::Prop { name, seed, trials } => {
             crate::prop::run_prop_by_name(name, *seed, trials.unwrap_or(128))
+        }
+        Claim::PathInfo {
+            path,
+            expect,
+            referrers,
+            closure_size,
+        } => {
+            let default = nixstore::SqlitePathInfoStore::from_default();
+            let pi = path_info.unwrap_or(&default);
+            interpret_path_info(path, expect, *referrers, *closure_size, pi)
         }
     };
     outcome_to_result(outcome)
@@ -273,6 +320,83 @@ fn interpret_has_attrs_values(value: &Value, attrs: &[String]) -> AssayOutcome {
     }
 }
 
+fn interpret_drv(
+    expr: &str,
+    project_fields: &[String],
+    expected: &Value,
+    eval: &dyn EvalBackend,
+) -> AssayOutcome {
+    match eval.eval_json(expr) {
+        EvalResult::Ok(v) => interpret_drv_values(&v, project_fields, expected),
+        EvalResult::Err(out) => out,
+    }
+}
+
+fn interpret_drv_values(
+    actual: &Value,
+    project_fields: &[String],
+    expected: &Value,
+) -> AssayOutcome {
+    let drv = match nixdrv::Derivation::from_json(actual) {
+        Ok(d) => d,
+        Err(e) => {
+            return AssayOutcome::EvalError {
+                kind: "drv".into(),
+                message: e.to_string(),
+                span: None,
+            };
+        }
+    };
+    let fields: Vec<&str> = project_fields.iter().map(String::as_str).collect();
+    let projected = nixdrv::project(&drv, &fields);
+    if value_contains_subset(&projected, expected) {
+        AssayOutcome::Pass
+    } else {
+        let diff = structural_diff(&projected, expected);
+        AssayOutcome::Fail {
+            claim: "drv".into(),
+            left: Some(projected),
+            right: Some(expected.clone()),
+            diff,
+        }
+    }
+}
+
+
+fn interpret_path_info(
+    path: &str,
+    expect: &Value,
+    referrers: bool,
+    closure_size: bool,
+    store: &dyn nixstore::PathInfoStore,
+) -> AssayOutcome {
+    let opts = nixstore::QueryOpts {
+        include_referrers: referrers,
+        include_closure_size: closure_size,
+    };
+    match store.query(path, opts) {
+        Ok(info) => {
+            let actual = info.to_json_value();
+            if value_contains_subset(&actual, expect) {
+                AssayOutcome::Pass
+            } else {
+                let diff = structural_diff(&actual, expect);
+                AssayOutcome::Fail {
+                    claim: "pathInfo".into(),
+                    left: Some(actual),
+                    right: Some(expect.clone()),
+                    diff,
+                }
+            }
+        }
+        Err(e) => AssayOutcome::EvalError {
+            kind: "pathInfo".into(),
+            message: e.to_string(),
+            span: None,
+        },
+    }
+}
+
 fn interpret_snapshot(
     name: &str,
     expr: &str,
@@ -308,7 +432,7 @@ mod tests {
     use id_effect::{Cap, Exit, FromEnv, build_env, run_test};
 
     use super::*;
-    use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, mock_providers};
+    use crate::caps::{AssayEnv, MockNixEval, NixEvaluatorKey, PathInfoStoreKey, mock_providers};
 
     use crate::verdict::CaseVerdict;
 
@@ -701,6 +825,75 @@ mod tests {
     }
 
     #[test]
+    fn drv_values_passes_on_projected_subset() {
+        let drv_json = serde_json::json!({
+            "type": "derivation",
+            "name": "hello-2.12.3",
+            "outPath": "/nix/store/abc-hello-2.12.3",
+            "drvPath": "/nix/store/xyz.drv"
+        });
+        let pass = run_claim_test(
+            |_eval| {},
+            Claim::DrvValues {
+                actual: drv_json.clone(),
+                project: vec!["name".into(), "outPath".into()],
+                expected: serde_json::json!({"name": "hello-2.12.3"}),
+            },
+        );
+        assert!(matches!(pass, Exit::Success(CaseVerdict::Pass)));
+
+        let fail = run_claim_test(
+            |_eval| {},
+            Claim::DrvValues {
+                actual: drv_json,
+                project: vec!["name".into()],
+                expected: serde_json::json!({"name": "wrong-name"}),
+            },
+        );
+        assert!(matches!(
+            fail,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
+    }
+
+    #[test]
+    fn drv_values_rejects_invalid_derivation_json() {
+        let exit = run_claim_test(
+            |_eval| {},
+            Claim::DrvValues {
+                actual: serde_json::json!("not-a-drv"),
+                project: vec!["name".into()],
+                expected: serde_json::json!({}),
+            },
+        );
+        match exit {
+            Exit::Success(CaseVerdict::EvalThrow { kind, .. }) => {
+                assert_eq!(kind, "drv");
+            }
+            other => panic!("expected drv eval throw, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn drv_expr_mode_delegates_to_eval() {
+        let drv_json = serde_json::json!({
+            "type": "derivation",
+            "name": "hello-2.12.3",
+            "outPath": "/nix/store/abc-hello-2.12.3",
+            "drvPath": "/nix/store/xyz.drv"
+        });
+        let exit = run_claim_test(
+            |eval| eval.set("drv_expr", EvalResult::Ok(drv_json)),
+            Claim::Drv {
+                expr: "drv_expr".into(),
+                project: vec!["name".into()],
+                expected: serde_json::json!({"name": "hello-2.12.3"}),
+            },
+        );
+        assert!(matches!(exit, Exit::Success(CaseVerdict::Pass)));
+    }
+
+    #[test]
     fn interpret_throws_propagates_non_throw_eval_error() {
         let exit = run_claim_test(
             |eval| {
@@ -712,5 +905,51 @@ mod tests {
             },
         );
         assert!(matches!(exit, Exit::Failure(_)));
+    }
+
+    #[test]
+    fn path_info_subset_pass_fail() {
+        use nixstore::{MockPathInfoStore, PathInfo};
+        let mock = Arc::new(MockPathInfoStore::default());
+        mock.set(PathInfo {
+            path: "/nix/store/x-a".into(),
+            nar_hash: "sha256-AA".into(),
+            nar_size: 42,
+            deriver: None,
+            registration_time: 1,
+            ultimate: true,
+            signatures: vec![],
+            ca: None,
+            references: vec!["/nix/store/y-b".into()],
+            referrers: None,
+            closure_size: None,
+        });
+        let mut built = build_env(mock_providers()).expect("env");
+        built.insert::<Cap<NixEvaluatorKey>>(Arc::new(MockNixEval::default()));
+        built.insert::<Cap<PathInfoStoreKey>>(mock.clone() as PathInfoStoreKey);
+        let env = AssayEnv::from_env(built);
+        let pass = run_test(
+            interpret_claim(Claim::PathInfo {
+                path: "/nix/store/x-a".into(),
+                expect: serde_json::json!({"narSize": 42}),
+                referrers: false,
+                closure_size: false,
+            }),
+            env.clone(),
+        );
+        assert!(matches!(pass, Exit::Success(CaseVerdict::Pass)));
+        let fail = run_test(
+            interpret_claim(Claim::PathInfo {
+                path: "/nix/store/x-a".into(),
+                expect: serde_json::json!({"narSize": 99}),
+                referrers: false,
+                closure_size: false,
+            }),
+            env,
+        );
+        assert!(matches!(
+            fail,
+            Exit::Success(CaseVerdict::AssertFail { .. })
+        ));
     }
 }

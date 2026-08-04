@@ -218,7 +218,7 @@ mod tests {
             AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "nix_missing"),
             other => panic!("expected nix_missing, got {other:?}"),
         }
-        let err2 = nix_spawn_error_for_path(io::Error::new(io::ErrorKind::Other, "x"), p);
+        let err2 = nix_spawn_error_for_path(io::Error::other("x"), p);
         match err2 {
             AssayOutcome::EvalError { kind, .. } => assert_eq!(kind, "io"),
             other => panic!("expected io, got {other:?}"),
