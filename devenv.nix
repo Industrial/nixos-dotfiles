@@ -51,7 +51,12 @@
   };
 
   # Local Rust tools (callPackage from repo root).
-  assay = pkgs.callPackage ./rust/tools/assay {};
+  # Assay needs rustc ≥1.95 (sysinfo via id_effect); devenv-nixpkgs stable is older.
+  pkgs-unstable = import inputs.nixpkgs-unstable {inherit system;};
+  assay = pkgs.callPackage ./rust/tools/assay {
+    rustc = pkgs-unstable.rustc;
+    cargo = pkgs-unstable.cargo;
+  };
 
   lean-ctx = pkgs.rustPlatform.buildRustPackage rec {
     pname = "lean-ctx";

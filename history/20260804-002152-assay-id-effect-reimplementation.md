@@ -2,7 +2,7 @@
 title: Assay × id_effect — full reimplementation plan
 slug: assay-id-effect-reimplementation
 created: 2026-08-04T00:21:52+02:00
-status: in-progress (pln-msdsxzod-6vovij; wave0 shipped; wave6 leaf-ie-docs-book-links shipped)
+status: product-complete (tip 2d43678e; devenv assay wrapper; maestro mission failed due to abandoned leaf receipts — code landed)
 risk_class: high
 mode: heavy
 sources:
