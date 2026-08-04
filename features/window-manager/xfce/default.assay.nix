@@ -2,15 +2,15 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = let
-      pkgs = {
-        pinentry-qt = "pinentry-qt";
-        wmctrl = "wmctrl";
-        xarchiver = "xarchiver";
-        xfce = { };
-        xorg = { xwininfo = "xwininfo"; };
-      };
-    in import ./default.nix { inherit pkgs; };
-
+    pkgs = {
+      pinentry-qt = "pinentry-qt";
+      wmctrl = "wmctrl";
+      xarchiver = "xarchiver";
+      xfce = {};
+      xorg = {xwininfo = "xwininfo";};
+    };
+  in
+    import ./default.nix {inherit pkgs;};
 in
   assay.suite "xfce" {
     xfceEnable = assay.eq mod.services.xserver.desktopManager.xfce.enable true;
