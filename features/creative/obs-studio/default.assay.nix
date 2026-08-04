@@ -8,9 +8,8 @@ let
       "obs-pipewire-audio-capture" = "obs-pipewire-audio-capture";
     };
   };
-  mod = import ./default.nix { inherit pkgs; };
-
+  mod = import ./default.nix {inherit pkgs;};
 in
   assay.suite "obs-studio" {
-    systemPackages = assay.eq mod.environment.systemPackages [ "v4l-utils" ];
+    systemPackages = assay.eq mod.environment.systemPackages ["v4l-utils"];
   }
