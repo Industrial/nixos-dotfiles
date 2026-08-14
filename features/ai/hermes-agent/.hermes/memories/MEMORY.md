@@ -7,3 +7,5 @@ Moon build via /nix/store/2c06qk0fcky5ljn46dlr3cfza05s0n9s-moon-cli-2.3.3/bin/mo
 Formatted codebase using moon run :format and verified with moon run :ci-format.
 §
 Fixed formatting by running moon run :format and verified with moon run :ci-format.
+§
+User prefers class-level skill organization over flat skill lists. User values concise, direct responses over verbose explanations. User prefers NixOS configuration work without Home Manager. User wants skills that capture practical techniques, not session narratives.
