@@ -22,8 +22,8 @@ pub fn parse_any_hash(
         return Err(HashError::Convert("empty hash".into()));
     }
 
-    if let Some((algo_s, rest)) = s.split_once('-') {
-        if looks_like_algo_name(algo_s) && !rest.is_empty() && !rest.contains(':') {
+    if let Some((algo_s, rest)) = s.split_once('-')
+        && looks_like_algo_name(algo_s) && !rest.is_empty() && !rest.contains(':') {
             // Prefer SRI when the algo token is a known hash name and the rest
             // is not a typed `algo:payload` (those use `:`).
             if rest
@@ -44,16 +44,14 @@ pub fn parse_any_hash(
                 return Ok((algo, bytes));
             }
         }
-    }
 
-    if let Some((algo_s, rest)) = s.split_once(':') {
-        if looks_like_algo_name(algo_s) {
+    if let Some((algo_s, rest)) = s.split_once(':')
+        && looks_like_algo_name(algo_s) {
             let algo = HashAlgo::parse(algo_s).map_err(HashError::Convert)?;
             check_hint(algo, type_hint)?;
             let digest = decode_raw_for_algo(rest, algo)?;
             return Ok((algo, digest));
         }
-    }
 
     let algo = type_hint.ok_or_else(|| {
         HashError::Convert(format!(
@@ -68,15 +66,14 @@ fn looks_like_algo_name(s: &str) -> bool {
 }
 
 fn check_hint(algo: HashAlgo, hint: Option<HashAlgo>) -> Result<(), HashError> {
-    if let Some(h) = hint {
-        if h != algo {
+    if let Some(h) = hint
+        && h != algo {
             return Err(HashError::Convert(format!(
                 "hash algorithm mismatch: string says '{}', --type says '{}'",
                 algo.as_str(),
                 h.as_str()
             )));
         }
-    }
     Ok(())
 }
 
@@ -89,16 +86,15 @@ fn decode_raw_for_algo(raw: &str, algo: HashAlgo) -> Result<Vec<u8>, HashError> 
         return hex::decode(raw).map_err(|e| HashError::Convert(e.to_string()));
     }
 
-    if raw.len() == b32_len && raw.chars().all(|c| crate::encode::is_nix_base32_char(c)) {
+    if raw.len() == b32_len && raw.chars().all(crate::encode::is_nix_base32_char) {
         return nix_base32_decode_full(raw, want).map_err(HashError::Convert);
     }
 
     // Bare standard base64 digest (rare; SRI without algo prefix handled above).
-    if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(raw) {
-        if bytes.len() == want {
+    if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(raw)
+        && bytes.len() == want {
             return Ok(bytes);
         }
-    }
 
     // SRI form with --type already known: `sha256-…` still reaches here if
     // algo token check failed; try stripping matching prefix.

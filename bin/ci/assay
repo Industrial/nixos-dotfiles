@@ -2,5 +2,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
-devenv shell -- assay run .
-devenv shell -- bin/assay-coverage-check
+# Avoid `devenv shell` here: realizing the full profile builds lean-ctx and breaks on CI.
+ASSAY_FLAKE="$(jq -r '.nodes.assay.locked | "github:\(.owner)/\(.repo)/\(.rev)"' devenv.lock)"
+nix shell "${ASSAY_FLAKE}#assay" -c assay run .
+./bin/assay-coverage-check
