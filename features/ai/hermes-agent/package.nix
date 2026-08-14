@@ -85,6 +85,16 @@ python3Packages.buildPythonApplication rec {
 
   pythonImportsCheck = ["hermes_cli"];
 
+  # Devenv (and some nix shells) inject PYTHONPATH with a different Python's
+  # site-packages (e.g. 3.13). Hermes is built against Python 3.14; inheriting
+  # that path breaks native extensions (missing pydantic_core._pydantic_core).
+  makeWrapperArgs = [
+    "--unset-env"
+    "PYTHONPATH"
+    "--unset-env"
+    "PYTHONHOME"
+  ];
+
   # Upstream pins == in pyproject; nixpkgs may carry slightly different versions.
   pythonRelaxDeps = [
     "openai"
