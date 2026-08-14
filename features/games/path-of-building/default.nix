@@ -1,5 +1,5 @@
 {pkgs, ...}: {
   environment.systemPackages = with pkgs; [
-    path-of-building
+    rusty-path-of-building
   ];
 }

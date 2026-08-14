@@ -1,0 +1,8 @@
+name: 'Assay'
+description: 'Run Assay suites and colocated coverage gate'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run assay + coverage check
+      shell: bash
+      run: ./bin/ci/assay

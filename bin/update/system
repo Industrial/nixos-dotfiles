@@ -1,10 +1,23 @@
 #!/usr/bin/env bash
-echo "> update > system"
-exec > >(tee ./logs/update-system) 2>&1
 set -e
 
-echo "> update > system > cd hosts/$(hostname)"
-cd "hosts/$(hostname)"
+dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
+log_file="$dotfiles_root/logs/update-system"
+mkdir -p "$(dirname "$log_file")"
+
+echo "> update > system"
+if command -v stdbuf >/dev/null 2>&1; then
+  exec > >(stdbuf -oL tee "$log_file") 2>&1
+else
+  exec > >(tee "$log_file") 2>&1
+fi
+
+source "$(dirname "$0")/../lib/root-cmd.sh"
+
+host_dir="$dotfiles_root/hosts/$(hostname)"
+
+echo "> update > system > cd $host_dir"
+cd "$host_dir"
 
 # Always `switch` so the new generation is activated immediately (PATH, services, new
 # packages). Some upgrades still need a reboot for the kernel or firmware path to match
@@ -17,12 +30,19 @@ if [ "$booted" != "$profile" ]; then
   echo "> update > system >   booted:  $booted"
   echo "> update > system >   profile: $profile"
 fi
-echo "> update > system > sudo nixos-rebuild switch --flake \".#$(hostname)\""
-sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --option eval-cache false
+echo "> update > system > nixos-rebuild switch --flake \".#$(hostname)\""
+rebuild="cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --option eval-cache false"
+if command -v script >/dev/null 2>&1; then
+  # exec>tee makes stdout a pipe; script allocates a pty so nixos-rebuild shows live progress.
+  root_cmd script -qefc "$rebuild" /dev/null
+else
+  root_cmd sh -c "$rebuild"
+fi
 
-cd ../..
+cd "$dotfiles_root"
 bin/update/login-shell "tom"
 
 features/network/ladybird/bin/link-files-nixos
 features/programming/cursor/bin/link-files-nixos
 features/ai/opencode/bin/link-files-nixos
+features/ai/hermes-agent/bin/link-files-nixos

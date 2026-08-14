@@ -23,9 +23,9 @@
     ../features/cli/c
     ../features/cli/calcurse
     ../features/cli/cheatsheet
-    ../features/cli/cl
     ../features/cli/create-ssh-key
     ../features/cli/oomkiller
+    ../features/cli/assay
     ../features/cli/direnv
     ../features/cli/du
     ../features/cli/dust
@@ -51,6 +51,11 @@
     ../features/cli/ngrok
     ../features/cli/nettools
     ../features/cli/nix-tree
+    ../features/cli/nix-hash
+    ../features/cli/nixq
+    ../features/cli/nixdrv
+    ../features/cli/nixstore
+    ../features/cli/nixfetch
     ../features/cli/p
     ../features/cli/p7zip
     ../features/cli/procs
@@ -60,16 +65,11 @@
     ../features/cli/starship
     ../features/cli/unrar
     ../features/cli/unzip
-    ../features/cli/cat
-    ../features/cli/head
-    ../features/cli/ls
-    ../features/cli/sort
-    ../features/cli/wc
-    ../features/cli/rev
     ../features/cli/zellij
 
     # Core NixOS Configuration
     ../features/nixos
+    ../features/nixos/auto-update
     ../features/nixos/bluetooth
     ../features/nixos/boot
     ../features/nixos/docker
@@ -101,11 +101,12 @@
     ../features/storage/qdirstat
 
     # VPN
-    ../features/network/mullvad
+    #../features/network/mullvad
 
     # Network Browsers
     ../features/network/chromium
     ../features/network/firefox
+    ../features/network/searx
 
     # Media (common to all hosts)
     ../features/media/calibre

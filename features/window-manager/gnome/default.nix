@@ -3,6 +3,7 @@
   pkgs,
   lib,
   config,
+  settings,
   ...
 }: {
   # Import dconf configuration and workspace setup
@@ -38,7 +39,6 @@
     displayManager = {
       gdm = {
         enable = true;
-        wayland = true;
       };
     };
 
@@ -86,10 +86,7 @@
       tela-icon-theme
       nordzy-icon-theme
       candy-icons
-      nordic
-      dracula-theme
       catppuccin-gtk
-      gruvbox-gtk-theme
       bibata-cursors
       nordzy-cursor-theme
       catppuccin-cursors
@@ -112,10 +109,6 @@
       gnomeExtensions.clipboard-indicator
       gnomeExtensions.gsconnect
       gnomeExtensions.quick-settings-tweaker
-
-      # Media & Entertainment
-      gnomeExtensions.sound-output-device-chooser
-      gnomeExtensions.spotify-tray
 
       # Advanced Features
       gnomeExtensions.night-theme-switcher
@@ -182,4 +175,10 @@
       ];
     };
   };
+
+  # Match Hyprland monitor mode on DP-1 (Mutter reads ~/.config/monitors.xml).
+  system.activationScripts.gnome-monitors = lib.stringAfter ["etc"] ''
+    mkdir -p /home/${settings.username}/.config
+    ln -sfn ${./monitors.xml} /home/${settings.username}/.config/monitors.xml
+  '';
 }

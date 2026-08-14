@@ -1,5 +1,47 @@
 {
   "nodes": {
+    "assay": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1786276759,
+        "narHash": "sha256-qIKlfwaZwawwbVddBLsRglpD6LnpZwpTb1b6xcdRN3Q=",
+        "owner": "Industrial",
+        "repo": "assay",
+        "rev": "ccf69c10e3e2d0856e60d7178a401de967732589",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Industrial",
+        "repo": "assay",
+        "type": "github"
+      }
+    },
+    "definitively": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "nixpkgs-unstable": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780653512,
+        "narHash": "sha256-pHCO0hWSAaFLGErM8E0PkIRq///Cx/sSm/CE2JbF5bQ=",
+        "owner": "Industrial",
+        "repo": "definitively",
+        "rev": "c7b575b9e3526b5595a5561a19482d35cd0a8a2c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Industrial",
+        "ref": "definitively-v0.4.1",
+        "repo": "definitively",
+        "type": "github"
+      }
+    },
     "devenv": {
       "locked": {
         "dir": "src/modules",
@@ -98,21 +140,18 @@
       }
     },
     "nixpkgs": {
-      "inputs": {
-        "nixpkgs-src": "nixpkgs-src"
-      },
       "locked": {
-        "lastModified": 1776348333,
-        "narHash": "sha256-ZyrYhlLGGuN5ieW7pE65meJJYnNz5el9vJtGBEJyDMQ=",
-        "owner": "cachix",
-        "repo": "devenv-nixpkgs",
-        "rev": "efff47329167854ce48541c7ef731bf120753c7e",
+        "lastModified": 1786106723,
+        "narHash": "sha256-zDSUbpoeo/9ZmD2+wXnzxoo1+uhL8vxc0b8yuYMKYq0=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f13ff45afd1bb73e640eaa08a7066dbed07e3238",
         "type": "github"
       },
       "original": {
-        "owner": "cachix",
-        "ref": "rolling",
-        "repo": "devenv-nixpkgs",
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
         "type": "github"
       }
     },
@@ -149,12 +188,33 @@
         "type": "github"
       }
     },
+    "nixpkgs_2": {
+      "inputs": {
+        "nixpkgs-src": "nixpkgs-src"
+      },
+      "locked": {
+        "lastModified": 1776348333,
+        "narHash": "sha256-ZyrYhlLGGuN5ieW7pE65meJJYnNz5el9vJtGBEJyDMQ=",
+        "owner": "cachix",
+        "repo": "devenv-nixpkgs",
+        "rev": "efff47329167854ce48541c7ef731bf120753c7e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cachix",
+        "ref": "rolling",
+        "repo": "devenv-nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
+        "assay": "assay",
+        "definitively": "definitively",
         "devenv": "devenv",
         "fenix": "fenix",
         "git-hooks": "git-hooks",
-        "nixpkgs": "nixpkgs",
+        "nixpkgs": "nixpkgs_2",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "rust-overlay": "rust-overlay"
       }

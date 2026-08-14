@@ -71,11 +71,8 @@ mod tests {
         let result = get_user_processes(&system);
         if let Ok(processes) = result {
             // Should be a vector (can be empty or have processes)
-            assert!(processes.len() >= 0);
-            // If there are processes, they should have valid PIDs
-            for process in processes {
+            for process in &processes {
                 assert!(process.pid > 0);
-                // Memory is u64, so it's always >= 0, no need to check
             }
         }
     }

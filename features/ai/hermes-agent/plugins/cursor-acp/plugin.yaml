@@ -1,0 +1,7 @@
+name: cursor-acp
+version: 0.1.0
+description: >
+  Cursor CLI ACP provider. Routes Hermes conversations through cursor agent acp using the user's existing Cursor subscription. Authenticates via ~/.cursor/cli-config.json — no API key required.
+
+provides_tools: []
+provides_hooks: []

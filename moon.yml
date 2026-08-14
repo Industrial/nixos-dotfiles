@@ -1,0 +1,61 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+id: 'dotfiles'
+language: 'bash'
+tasks:
+  format:
+    command: 'treefmt'
+  test:
+    description: 'Run Assay on all *.assay.nix suites across the repository'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'assay'
+      - 'run'
+      - '.'
+    inputs:
+      - '**/*.assay.nix'
+      - '**/*.assay.json'
+      - 'common/assay/**/*'
+      - 'common/**/*.nix'
+    options:
+      # Whole-repo discovery; do not treat as always-cacheable across env changes.
+      cache: true
+  nix-hash-test:
+    description: 'nix-hash unit tests'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nix-hash'
+    inputs:
+      - 'rust/tools/nix-hash/src/**/*'
+      - 'rust/tools/nix-hash/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true
+  nix-hash-oracle:
+    description: 'nix-hash oracle tests (differential vs stock when present)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'cargo'
+      - 'test'
+      - '--manifest-path'
+      - 'rust/Cargo.toml'
+      - '-p'
+      - 'nix-hash'
+      - '--'
+      - 'oracle'
+    inputs:
+      - 'rust/tools/nix-hash/src/**/*'
+      - 'rust/tools/nix-hash/Cargo.toml'
+      - 'rust/Cargo.toml'
+    options:
+      cache: true

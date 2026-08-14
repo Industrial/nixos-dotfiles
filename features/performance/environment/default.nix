@@ -20,8 +20,9 @@
       # Optimize Java performance
       "JAVA_OPTS" = "-Xmx4g -Xms2g";
 
-      # Optimize Rust performance
-      "RUSTFLAGS" = "-C target-cpu=native";
+      # Do not set RUSTFLAGS=-C target-cpu=native system-wide: it breaks
+      # reproducible Nix builds of crates with AVX512 code paths (e.g.
+      # lean-ctx → rten-gemm: LLVM cannot select vpdpbusd.512 on Zen4).
 
       # Optimize Go performance
       "GOMAXPROCS" = "auto";

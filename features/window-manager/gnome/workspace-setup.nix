@@ -2,13 +2,42 @@
 {
   pkgs,
   lib,
-  config,
-  settings,
   ...
-}: {
-  # Systemd user service for workspace launcher
-  # This service launches applications at login and the auto-move-windows
-  # extension will move them to their assigned workspaces
+}: let
+  workspaceLauncher = pkgs.writeShellApplication {
+    name = "workspace-launcher";
+    runtimeInputs = with pkgs; [
+      systemd
+      gtk3
+    ];
+    text = ''
+      set -euo pipefail
+
+      # org.gnome.Shell appears on the session bus when the compositor is ready.
+      # Shell.Eval returns false on GNOME 49+ and must not be used as a probe.
+      deadline=$((SECONDS + 120))
+      while ! busctl --user --timeout 2 status org.gnome.Shell >/dev/null 2>&1; do
+        if (( SECONDS >= deadline )); then
+          echo "Timed out waiting for org.gnome.Shell on session bus" >&2
+          exit 1
+        fi
+        sleep 1
+      done
+
+      echo "GNOME Shell is ready, launching applications..."
+
+      # Give auto-move-windows a moment to register window rules.
+      sleep 2
+
+      gtk-launch librewolf.desktop &
+      gtk-launch cursor.desktop &
+      gtk-launch obsidian.desktop &
+      gtk-launch spotify.desktop &
+      gtk-launch discord.desktop &
+      gtk-launch signal-desktop.desktop &
+    '';
+  };
+in {
   systemd.user.services."gnome-workspace-launcher" = {
     description = "Launch applications on specific workspaces";
     after = ["graphical-session.target"];
@@ -17,46 +46,8 @@
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = pkgs.writeShellScript "workspace-launcher" ''
-        #!/usr/bin/env bash
-        set -euo pipefail
-
-        # Wait for GNOME Shell to be ready
-        # Check if GNOME Shell is running via D-Bus
-        until gdbus call --session \
-          --dest org.gnome.Shell \
-          --object-path /org/gnome/Shell \
-          --method org.gnome.Shell.Eval "true" > /dev/null 2>&1; do
-          echo "Waiting for GNOME Shell to be ready..."
-          sleep 0.5
-        done
-
-        echo "GNOME Shell is ready, launching applications..."
-
-        # Wait a bit more for auto-move-windows extension to be ready
-        sleep 2
-
-        # Launch applications (they'll be moved to workspaces by auto-move-windows extension)
-        # Applications will be moved based on the application-list configuration in dconf.nix
-
-        # Launch Librewolf on workspace 1 (index 0) - will be moved by extension
-        librewolf &
-
-        # Launch VS Code/Cursor on workspace 2 (index 1) - will be moved by extension
-        cursor &
-
-        # Launch Obsidian on workspace 4 (index 3) - will be moved by extension
-        obsidian &
-
-        # Launch Spotify on workspace 6 (index 5) - will be moved by extension
-        spotify &
-
-        # Launch Discord on workspace 8 (index 7) - will be moved by extension
-        discord &
-
-        # Launch Discord on workspace 8 (index 7) - will be moved by extension
-        signal-desktop &
-      '';
+      TimeoutStartSec = "3min";
+      ExecStart = lib.getExe workspaceLauncher;
     };
 
     wantedBy = ["graphical-session.target"];

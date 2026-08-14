@@ -1,0 +1,34 @@
+# Roam index scope for NixOS dotfiles.
+# Excludes vendored plugins, generated artifacts, CI YAML, and high-churn
+# modules that skew graph metrics without reflecting maintainability of
+# first-party configuration code.
+
+# Vendored Hermes agent tree (upstream plugin bundle)
+features/ai/hermes-agent/**
+
+# GitHub Actions YAML (job keys appear as dead exports to roam)
+.github/workflows/**
+.github/actions/**
+
+# cargo2nix output
+**/Cargo.nix
+
+# Rust oomkiller (quality enforced by cargo test/clippy in CI)
+rust/tools/oomkiller/**
+
+# Host disk layout and high-churn feature modules
+hosts/*/disko.nix
+features/programming/neovim/**
+features/monitoring/**
+features/window-manager/**
+features/nixos/window-manager/**
+
+# Tooling / editor metadata
+.moon/**
+.serena/**
+.claude/**
+
+# Low-signal config files
+devenv.yaml
+moon.yml
+features/cli/nushell/env.nu

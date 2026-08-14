@@ -111,11 +111,10 @@ The CI pipeline will automatically check formatting, run security scans, and val
 .
 ├── bin/              # Utility scripts
 ├── common/           # Common NixOS configuration
-├── config/           # Configuration files
 ├── features/         # Feature modules (organized by category)
 ├── hosts/            # Host-specific configurations
 │   ├── drakkar/      # Desktop workstation
-│   ├── huginn/       # Server
+│   ├── huginn/       # Tablet (StarLite 5)
 │   └── mimir/        # Server
 ├── profiles/         # User profiles
 └── devenv.nix        # Development environment configuration

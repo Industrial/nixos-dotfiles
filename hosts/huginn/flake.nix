@@ -5,6 +5,13 @@
       url = "github:nixos/nixpkgs/nixpkgs-unstable";
     };
 
+    # Hyprland 0.55+ (Lua configs); nixpkgs-unstable may lag behind.
+    # Do not pin hyprland.inputs.nixpkgs here: Hyprland may require a newer nixpkgs
+    # (e.g. lua5_5) than this flake's nixpkgs provides.
+    hyprland = {
+      url = "github:hyprwm/hyprland";
+    };
+
     # Hardware Support.
     nixos-hardware = {
       url = "github:NixOS/nixos-hardware/master";
@@ -50,26 +57,6 @@
       };
     };
 
-    # Generate Kubernetes Configurations with Nix.
-    kubenix = {
-      url = "github:hall/kubenix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
-    # MicroVM
-    microvm = {
-      url = "github:astro/microvm.nix";
-      inputs = {
-        nixpkgs = {
-          follows = "nixpkgs";
-        };
-      };
-    };
-
     # Disko
     disko = {
       url = "github:nix-community/disko";
@@ -80,47 +67,15 @@
       };
     };
 
-    # cl tool source
-    cl-src = {
-      url = "path:../../rust/tools/cl"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
-    };
-
     # oomkiller tool source
     oomkiller-src = {
       url = "path:../../rust/tools/oomkiller"; # Path relative to this flake.nix
       flake = false; # Treat as a source tree, not a flake
     };
 
-    # wc tool source (Rust, GNU-compatible)
-    wc-src = {
-      url = "path:../../rust/tools/wc";
-      flake = false;
-    };
-
-    cat-src = {
-      url = "path:../../rust/tools/cat";
-      flake = false;
-    };
-
-    sort-src = {
-      url = "path:../../rust/tools/sort";
-      flake = false;
-    };
-
-    ls-src = {
-      url = "path:../../rust/tools/ls";
-      flake = false;
-    };
-
-    head-src = {
-      url = "path:../../rust/tools/head";
-      flake = false;
-    };
-
-    rev-src = {
-      url = "path:../../rust/tools/rev";
-      flake = false;
+    # Assay workspace (assay, nixq, nixdrv, nixstore, nixfetch)
+    assay = {
+      url = "github:Industrial/assay";
     };
   };
 
@@ -202,18 +157,6 @@
           # Security (commented for future use)
           # ../../features/security/kernel
           # ../../features/security/tailscale
-
-          # Virtual Machine (commented for future use)
-          #../../features/virtual-machine/base
-          #../../features/virtual-machine/kubernetes/k3s
-          #../../features/virtual-machine/kubernetes/master
-          #../../features/virtual-machine/kubernetes/node
-          ##inputs.microvm.nixosModules.host
-          ##../../features/virtual-machine/microvm/host
-          ##../../features/virtual-machine/microvm/target/host-network.nix
-          #../../features/virtual-machine/microvm/web/host-network.nix
-          #../../features/virtual-machine/ssh
-          #../../features/virtual-machine/virtualbox
 
           # Window Manager (commented for future use)
           #../../features/window-manager/ghostty

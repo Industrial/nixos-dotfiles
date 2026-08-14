@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cursor-acp"
+version = "0.1.0"
+description = "Cursor CLI ACP model-provider plugin for Hermes Agent"
+readme = "README.md"
+requires-python = ">=3.11"
+
+# No runtime deps — provider registration is pure Python against Hermes internals.
+dependencies = []
+
+[project.urls]
+Homepage = "https://cursor.com"
+
+# This is what Hermes discovers via importlib.metadata at session start.
+# The key ("cursor-acp") is the plugin name; the value is the Python package
+# that contains register().
+[project.entry-points."hermes_agent.plugins"]
+cursor-acp = "cursor_acp"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cursor_acp*"]

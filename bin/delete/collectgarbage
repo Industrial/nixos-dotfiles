@@ -3,5 +3,7 @@ echo "> delete > collectgarbage"
 exec > >(tee ./logs/delete-collectgarbage) 2>&1
 set -e
 
-echo "> sudo nix-collect-garbage -d"
-sudo nix-collect-garbage -d
+source "$(dirname "$0")/../lib/root-cmd.sh"
+
+echo "> nix-collect-garbage -d"
+root_cmd nix-collect-garbage -d

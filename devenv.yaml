@@ -1,4 +1,14 @@
 inputs:
+  assay:
+    url: github:Industrial/assay
+  definitively:
+    url: github:Industrial/definitively/definitively-v0.4.1
+    flake: true
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
+      nixpkgs-unstable:
+        follows: nixpkgs-unstable
   fenix:
     url: github:nix-community/fenix
     inputs:

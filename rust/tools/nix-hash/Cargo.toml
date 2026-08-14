@@ -1,0 +1,35 @@
+[package]
+name = "nix-hash"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "1:1 Rust reimplementation of stock nix-hash"
+license = "MIT"
+
+[dependencies]
+base64 = "0.22"
+blake3 = "1.5"
+clap = { version = "4.4", features = ["derive"] }
+hex = "0.4"
+md-5 = "0.10"
+nixdrv = { git = "https://github.com/Industrial/assay", package = "nixdrv" }
+nixfetch = { git = "https://github.com/Industrial/assay", package = "nixfetch" }
+sha1 = "0.10"
+sha2 = "0.10"
+thiserror = "1.0"
+id_effect = { version = "0.4", features = ["schema-serde"] }
+id_effect_macro = "0.4"
+id_effect_proc_macro = "0.4"
+id_effect_cli = { version = "0.4", optional = true }
+
+[features]
+default = ["cli-exit"]
+cli-exit = ["dep:id_effect_cli"]
+
+[lib]
+name = "nix_hash"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "nix-hash"
+path = "src/bin/nix_hash.rs"

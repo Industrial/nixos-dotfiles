@@ -2,13 +2,17 @@
 # Same Install4J + bundled JRE pattern as TWS: run installer and app under
 # steam-run on NixOS.
 #
+# Steam-run's FHS includes libX11 but not libXtst / related AWT X libs, so the
+# bundled Zulu JRE fails with: libawt_xawt.so: libXtst.so.6: cannot open ...
+# We inject those libs via LD_LIBRARY_PATH inside steam-run.
+#
 # Logs: default `~/.cache/ib-gateway-launch.log` (override with IBGW_LOG).
 {
   pkgs,
   lib,
   ...
 }: let
-  inherit (pkgs) stdenv fetchurl steam-run;
+  inherit (pkgs) stdenv fetchurl steam-run symlinkJoin;
 
   installerUrl = "https://download2.interactivebrokers.com/installers/ibgateway/latest-standalone/ibgateway-latest-standalone-linux-x64.sh";
 
@@ -16,6 +20,21 @@
   installerHash = "sha256-hcU2gis0Tv/2OgniJrP+QmLn3AqIA6SVCeZw/cYfxFA=";
 
   launcherTemplate = ./ib-gateway-launcher.sh.in;
+
+  # Minimal X libs for Java AWT (splash + Toolkit) that steam-run omits.
+  # Prefer top-level attrs (xorg.* is deprecated / renamed).
+  awtXLibs = symlinkJoin {
+    name = "ib-gateway-awt-xlibs";
+    paths = with pkgs; [
+      libxtst
+      libxi
+      libxrender
+      libxext
+      libxrandr
+      libxcursor
+      libxfixes
+    ];
+  };
 
   ib-gateway = stdenv.mkDerivation {
     pname = "ib-gateway-latest-standalone";
@@ -48,6 +67,7 @@
         -e "s#@shell@#${stdenv.shell}#g" \
         -e "s#@steamrun@#${steam-run}/bin/steam-run#g" \
         -e "s#@gwroot@#$out/opt/ib-gateway#g" \
+        -e "s#@awtxlibs@#${awtXLibs}/lib#g" \
         "${launcherTemplate}" > "$out/bin/ibgateway"
       chmod +x "$out/bin/ibgateway"
 

@@ -37,10 +37,6 @@ in {
             pkgs.gnomeExtensions.gsconnect.extensionUuid
             pkgs.gnomeExtensions.quick-settings-tweaker.extensionUuid
 
-            # Media & Entertainment
-            pkgs.gnomeExtensions.sound-output-device-chooser.extensionUuid
-            pkgs.gnomeExtensions.spotify-tray.extensionUuid
-
             # Advanced Features
             pkgs.gnomeExtensions.night-theme-switcher.extensionUuid
 
@@ -103,7 +99,7 @@ in {
           gtk-im-preedit-style = "callback";
           gtk-im-status-style = "callback";
           gtk-key-theme = "";
-          gtk-theme = "Nordic";
+          gtk-theme = "Catppuccin-Mocha-Standard-Blue-Dark";
           icon-theme = "Papirus-Dark";
           locate-pointer = false;
           menubar-accel = "F10";
