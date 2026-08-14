@@ -17,12 +17,10 @@ nixfetch = { git = "https://github.com/Industrial/assay", package = "nixfetch" }
 sha1 = "0.10"
 sha2 = "0.10"
 thiserror = "1.0"
-id_effect = { path = "/data/Code/rust/id_effect/crates/id_effect", features = [
-  "schema-serde",
-] }
-id_effect_macro = { path = "/data/Code/rust/id_effect/crates/id_effect_macro" }
-id_effect_proc_macro = { path = "/data/Code/rust/id_effect/crates/id_effect_proc_macro" }
-id_effect_cli = { path = "/data/Code/rust/id_effect/crates/id_effect_cli", optional = true }
+id_effect = { version = "0.4", features = ["schema-serde"] }
+id_effect_macro = "0.4"
+id_effect_proc_macro = "0.4"
+id_effect_cli = { version = "0.4", optional = true }
 
 [features]
 default = ["cli-exit"]

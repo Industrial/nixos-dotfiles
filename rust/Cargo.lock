@@ -771,24 +771,8 @@ checksum = "82526e3a02ceb6c6159802cd6fc217f86db8ed98ab294e98650e5a940d823768"
 dependencies = [
  "flume",
  "futures",
- "id_effect_macro 0.4.0",
- "id_effect_proc_macro 0.4.0",
- "im",
- "jiff",
- "rayon",
- "serde_json",
- "sysinfo 0.33.1",
- "tokio",
-]
-
-[[package]]
-name = "id_effect"
-version = "0.5.0"
-dependencies = [
- "flume",
- "futures",
- "id_effect_macro 0.5.0",
- "id_effect_proc_macro 0.5.0",
+ "id_effect_macro",
+ "id_effect_proc_macro",
  "im",
  "jiff",
  "rayon",
@@ -804,18 +788,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5d237981984f0509d52f1f7f1ff9636fa070504bb5ceaa0890d6d2387f464af"
 dependencies = [
  "clap",
- "id_effect 0.4.0",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
-name = "id_effect_cli"
-version = "0.5.0"
-dependencies = [
- "clap",
- "id_effect 0.5.0",
+ "id_effect",
  "serde",
  "serde_json",
  "toml",
@@ -828,16 +801,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69b5bc0d9464ccd40e1e4d0833753c7d8fa51a1a27838cde1bafc4b5ca4ac397"
 
 [[package]]
-name = "id_effect_macro"
-version = "0.5.0"
-
-[[package]]
 name = "id_effect_optics"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92adc3b7cf8af6aa784c0809f633a99517bab0ffb97bf2c659f1f90b473cedb7"
 dependencies = [
- "id_effect 0.4.0",
+ "id_effect",
  "im",
  "serde",
  "serde_json",
@@ -849,15 +818,6 @@ name = "id_effect_proc_macro"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "30d6cedd32fc1fa75608214f2e2487388655ed374765e2802724aee3d829ac67"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "id_effect_proc_macro"
-version = "0.5.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1070,10 +1030,10 @@ dependencies = [
  "blake3",
  "clap",
  "hex",
- "id_effect 0.5.0",
- "id_effect_cli 0.5.0",
- "id_effect_macro 0.5.0",
- "id_effect_proc_macro 0.5.0",
+ "id_effect",
+ "id_effect_cli",
+ "id_effect_macro",
+ "id_effect_proc_macro",
  "md-5",
  "nixdrv",
  "nixfetch",
@@ -1089,10 +1049,10 @@ source = "git+https://github.com/Industrial/assay#ccf69c10e3e2d0856e60d7178a401d
 dependencies = [
  "clap",
  "hex",
- "id_effect 0.4.0",
- "id_effect_cli 0.4.0",
- "id_effect_macro 0.4.0",
- "id_effect_proc_macro 0.4.0",
+ "id_effect",
+ "id_effect_cli",
+ "id_effect_macro",
+ "id_effect_proc_macro",
  "nixq",
  "rstest",
  "serde",
@@ -1109,10 +1069,10 @@ dependencies = [
  "base64",
  "clap",
  "hex",
- "id_effect 0.4.0",
- "id_effect_cli 0.4.0",
- "id_effect_macro 0.4.0",
- "id_effect_proc_macro 0.4.0",
+ "id_effect",
+ "id_effect_cli",
+ "id_effect_macro",
+ "id_effect_proc_macro",
  "nixdrv",
  "reqwest",
  "serde",
@@ -1127,11 +1087,11 @@ version = "0.1.0"
 source = "git+https://github.com/Industrial/assay#ccf69c10e3e2d0856e60d7178a401de967732589"
 dependencies = [
  "clap",
- "id_effect 0.4.0",
- "id_effect_cli 0.4.0",
- "id_effect_macro 0.4.0",
+ "id_effect",
+ "id_effect_cli",
+ "id_effect_macro",
  "id_effect_optics",
- "id_effect_proc_macro 0.4.0",
+ "id_effect_proc_macro",
  "nixstore",
  "serde",
  "serde_json",
@@ -1146,10 +1106,10 @@ dependencies = [
  "base64",
  "clap",
  "hex",
- "id_effect 0.4.0",
- "id_effect_cli 0.4.0",
- "id_effect_macro 0.4.0",
- "id_effect_proc_macro 0.4.0",
+ "id_effect",
+ "id_effect_cli",
+ "id_effect_macro",
+ "id_effect_proc_macro",
  "rusqlite",
  "serde",
  "serde_json",
