@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Fail if any in-scope *.nix lacks a colocated *.assay.nix suite.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+python3 - "$ROOT" <<'PY'
+import fnmatch
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+allow_raw = (root / "common/assay/coverage-allowlist.txt").read_text().splitlines()
+allow = []
+for line in allow_raw:
+    line = line.strip()
+    if not line or line.startswith("#"):
+        continue
+    allow.append(line)
+
+skip_parts = {".git", ".devenv", ".direnv", ".moon", "node_modules", "target", ".cursor"}
+
+def excluded(rel: Path) -> bool:
+    s = rel.as_posix()
+    for pat in allow:
+        if fnmatch.fnmatch(s, pat) or s == pat:
+            return True
+    return False
+
+def has_assay(rel: Path) -> bool:
+    # D1: foo.nix -> foo.assay.nix; default.nix -> default.assay.nix only.
+    return (root / rel.parent / f"{rel.stem}.assay.nix").exists()
+
+missing = []
+nix_count = 0
+for p in root.rglob("*.nix"):
+    rel = p.relative_to(root)
+    if any(part in skip_parts or part.startswith("result") for part in rel.parts):
+        continue
+    if p.name.endswith(".assay.nix"):
+        continue
+    if excluded(rel):
+        continue
+    nix_count += 1
+    if not has_assay(rel):
+        missing.append(rel.as_posix())
+
+if missing:
+    print(f"assay-coverage-check: FAIL — {len(missing)}/{nix_count} nix files lack colocated suites:", file=sys.stderr)
+    for m in missing:
+        print(f"  {m}", file=sys.stderr)
+    sys.exit(1)
+print(f"assay-coverage-check: OK — {nix_count} nix files covered")
+PY

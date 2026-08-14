@@ -156,3 +156,14 @@ If the JSON object has an `actual` key, the runner uses value-mode variants (`Eq
 
 `throws` claims always keep Nix expression strings (and optional `pattern`).
 
+## Coverage gate
+
+Every in-scope `*.nix` must have a colocated `<stem>.assay.nix`.
+
+```bash
+devenv shell -- bin/assay-coverage-check
+devenv shell -- assay run .
+```
+
+Exclusions live in `common/assay/coverage-allowlist.txt` (generated flakes, `Cargo.nix`, hermes templates).
+CI runs both via `.github/actions/assay` on main and PRs.
