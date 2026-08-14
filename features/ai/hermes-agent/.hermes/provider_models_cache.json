@@ -1,7 +1,7 @@
 {
   "openrouter": {
-    "fp": "9614ac626d9fc797",
-    "at": 1786651854.7614477,
+    "fp": "71cf215658c7e3ec",
+    "at": 1786748859.2820837,
     "models": [
       "anthropic/claude-fable-5",
       "anthropic/claude-opus-5",
@@ -20,9 +20,10 @@
       "openai/gpt-5.5-pro",
       "openai/gpt-5.4-mini",
       "google/gemini-3.1-pro-preview",
-      "google/gemini-3.6-flash",
+      "google/gemini-3.7-flash",
       "x-ai/grok-4.6",
       "deepseek/deepseek-v4-pro",
+      "deepseek/deepseek-v4-pro-0813",
       "deepseek/deepseek-v4-flash",
       "deepseek/deepseek-v4-flash-0731",
       "qwen/qwen3.8-max",
@@ -40,8 +41,8 @@
     ]
   },
   "anthropic": {
-    "fp": "91fbb0c3e131c937",
-    "at": 1786651856.9354749,
+    "fp": "2dd4e4fcc4db3dce",
+    "at": 1786748861.3505669,
     "models": [
       "claude-fable-5",
       "claude-opus-4-8",
@@ -56,8 +57,8 @@
     ]
   },
   "copilot": {
-    "fp": "a5e2c3c946ab1d97",
-    "at": 1786651855.06142,
+    "fp": "6f252e432f03e1f4",
+    "at": 1786748859.5452023,
     "models": [
       "gpt-5.4",
       "gpt-5.4-mini",
