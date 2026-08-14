@@ -52,7 +52,7 @@ mod tests {
         let result = is_memory_threshold_exceeded(&mut system);
         if let Ok(value) = result {
             // Value should be a boolean (true or false)
-            assert!(value == true || value == false);
+            let _: bool = value;
         }
     }
 

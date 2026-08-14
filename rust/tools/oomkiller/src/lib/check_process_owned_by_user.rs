@@ -32,7 +32,7 @@ mod tests {
         assert!(result.is_ok());
         if let Ok(is_owned) = result {
             // Process doesn't exist, so should be false
-            assert_eq!(is_owned, false);
+            assert!(!is_owned);
         }
     }
 
@@ -51,7 +51,7 @@ mod tests {
             assert!(result.is_ok());
             if let Ok(is_owned) = result {
                 // Current process should be owned by current user
-                assert_eq!(is_owned, true);
+                assert!(is_owned);
             }
         }
     }
@@ -72,7 +72,7 @@ mod tests {
             if let Ok(is_owned) = result {
                 // Current process should not be owned by root (unless we're root)
                 // This test verifies the function correctly checks UID
-                assert!(is_owned == false || is_owned == true); // Either is valid depending on user
+                let _ = is_owned;
             }
         }
     }

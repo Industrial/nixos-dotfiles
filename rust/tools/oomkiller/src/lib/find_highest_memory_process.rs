@@ -42,17 +42,8 @@ mod tests {
         let mut system = System::new_all();
         system.refresh_all();
         let result = find_highest_memory_process(&system);
-        if let Ok(option) = result {
-            // Should be Some(ProcessInfo) or None
-            match option {
-                Some(process) => {
-                    assert!(process.pid > 0);
-                    // Memory should be valid
-                }
-                None => {
-                    // No processes found, which is valid
-                }
-            }
+        if let Ok(Some(process)) = result {
+            assert!(process.pid > 0);
         }
     }
 

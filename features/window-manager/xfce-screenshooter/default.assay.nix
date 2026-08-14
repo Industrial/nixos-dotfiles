@@ -6,7 +6,9 @@ let
       hostname = "h";
       username = "u";
     };
-    pkgs = {xfce4-screenshooter = "xfce4-screenshooter";};
+    pkgs = {
+      xfce = {xfce4-screenshooter = "xfce4-screenshooter";};
+    };
   };
 in
   assay.suite "xfce-screenshooter" {

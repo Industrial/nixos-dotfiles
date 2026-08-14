@@ -58,7 +58,6 @@
     cargo = pkgs-unstable.cargo;
   };
 
-
   lean-ctx = pkgs.rustPlatform.buildRustPackage rec {
     pname = "lean-ctx";
     version = "3.1.5";
@@ -171,7 +170,6 @@ in {
         treefmt
       '';
     };
-
   };
 
   tasks = {

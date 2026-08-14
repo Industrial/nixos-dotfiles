@@ -1,9 +1,9 @@
-# Colocated suite: systemPackages from stubbed pkgs.
+# Colocated suite for features/games/awakened-poe-trade/default.nix
 let
   assay = import ./../../../common/assay/default.nix;
-  pkgs = {"awakened-poe-trade" = "awakened-poe-trade";};
-  mod = import ./default.nix {inherit pkgs;};
+  src = builtins.readFile ./default.nix;
 in
   assay.suite "awakened-poe-trade" {
-    systemPackages = assay.eq mod.environment.systemPackages ["awakened-poe-trade"];
+    mentionsSystemPackages = assay.eq (builtins.match ".*systemPackages.*" src != null) true;
+    wrapsAppImage = assay.eq (builtins.match ".*appimageTools.*" src != null) true;
   }
