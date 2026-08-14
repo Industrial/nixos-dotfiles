@@ -4,5 +4,7 @@ let
   src = builtins.readFile ./package.nix;
 in
   assay.suite "package" {
-    hasImports = assay.eq (builtins.match ".*imports.*=.*" src != null) true;
+    hasPname = assay.eq (builtins.match ".*pname = \"hermes-agent\".*" src != null) true;
+    unsetsPythonPath =
+      assay.eq (builtins.match ".*--unset-env\".*\"PYTHONPATH\".*" src != null) true;
   }
