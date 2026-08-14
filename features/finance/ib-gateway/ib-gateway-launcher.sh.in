@@ -3,6 +3,7 @@ set -euo pipefail
 export _JAVA_AWT_WM_NONREPARENTING="${_JAVA_AWT_WM_NONREPARENTING:-1}"
 steamrun="@steamrun@"
 gwroot="@gwroot@"
+awtxlibs="@awtxlibs@"
 LOG="${IBGW_LOG:-$HOME/.cache/ib-gateway-launch.log}"
 mkdir -p "$(dirname "$LOG")"
 if [ -t 1 ]; then
@@ -11,4 +12,8 @@ else
   exec >>"$LOG" 2>&1
 fi
 echo "=== ib-gateway $(date -Is) pid=$$ DISPLAY=${DISPLAY:-} WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} ==="
-exec "$steamrun" "$gwroot/ibgateway" "$@"
+# steam-run FHS lacks libXtst (needed by bundled JRE AWT). Keep any path the
+# caller set, but always prepend our AWT X libdir.
+exec "$steamrun" env \
+  LD_LIBRARY_PATH="${awtxlibs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "$gwroot/ibgateway" "$@"
