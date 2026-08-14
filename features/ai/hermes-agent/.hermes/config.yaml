@@ -1,6 +1,6 @@
 model:
-  default: auto/best-free
-  provider: openrouter
+  default: claude-sonnet-4.6
+  provider: github-copilot
   base_url: http://127.0.0.1:20128/v1
   api_mode: chat_completions
   api_key: ''
@@ -380,7 +380,7 @@ security:
   allow_lazy_installs: true
 cron:
   wrap_response: true
-  max_parallel_jobs: null
+  max_parallel_jobs:
 kanban:
   dispatch_in_gateway: true
   dispatch_interval_seconds: 60
@@ -430,16 +430,16 @@ mcp_servers:
     command: roam
     args:
       - mcp
-    enabled: true
+    enabled: false
   context7:
     command: context7-mcp
     args: []
-    enabled: true
+    enabled: false
   serena:
     command: serena
     args:
       - start-mcp-server
-    enabled: true
+    enabled: false
   searxng:
     command: npx
     args:
@@ -447,10 +447,10 @@ mcp_servers:
       - mcp-searxng
     env:
       SEARXNG_URL: http://0.0.0.0:4001
-    enabled: true
+    enabled: false
   maestro:
     command: maestro
     args:
       - mcp
       - serve
-    enabled: true
+    enabled: false

@@ -107,7 +107,12 @@ fn oracle_to_sri_matches_stock_when_present() {
         eprintln!("nix-hash not available; skipping");
         return;
     };
-    let got = run_convert(std::slice::from_ref(hex), Some(HashAlgo::Sha256), Encoding::Sri).unwrap();
+    let got = run_convert(
+        std::slice::from_ref(hex),
+        Some(HashAlgo::Sha256),
+        Encoding::Sri,
+    )
+    .unwrap();
     assert_eq!(got.join("\n"), want);
 }
 
