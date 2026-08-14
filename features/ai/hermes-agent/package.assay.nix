@@ -6,5 +6,5 @@ in
   assay.suite "package" {
     hasPname = assay.eq (builtins.match ".*pname = \"hermes-agent\".*" src != null) true;
     unsetsPythonPath =
-      assay.eq (builtins.match ".*--unset-env\".*\"PYTHONPATH\".*" src != null) true;
+      assay.eq (builtins.match ".*--unset\".*\"PYTHONPATH\".*" src != null) true;
   }

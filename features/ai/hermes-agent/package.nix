@@ -88,10 +88,11 @@ python3Packages.buildPythonApplication rec {
   # Devenv (and some nix shells) inject PYTHONPATH with a different Python's
   # site-packages (e.g. 3.13). Hermes is built against Python 3.14; inheriting
   # that path breaks native extensions (missing pydantic_core._pydantic_core).
+  # makeWrapper (shell) uses --unset, not makeBinaryWrapper's --unset-env.
   makeWrapperArgs = [
-    "--unset-env"
+    "--unset"
     "PYTHONPATH"
-    "--unset-env"
+    "--unset"
     "PYTHONHOME"
   ];
 
