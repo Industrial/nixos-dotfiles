@@ -1,8 +1,10 @@
-# nixstore — Nix store path-info / GC CLI
-#
-# Dev-first: cargo-built wrapper (see ./package.nix).
-{pkgs, ...}: {
+# nixstore — store path-info CLI (from github:Industrial/assay).
+{
+  pkgs,
+  inputs,
+  ...
+}: {
   environment.systemPackages = [
-    (pkgs.callPackage ./package.nix {})
+    inputs.assay.packages.${pkgs.system}.nixstore
   ];
 }

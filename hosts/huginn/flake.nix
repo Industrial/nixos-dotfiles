@@ -73,10 +73,9 @@
       flake = false; # Treat as a source tree, not a flake
     };
 
-    # assay tool source
-    assay-src = {
-      url = "path:../../rust/tools/assay"; # Path relative to this flake.nix
-      flake = false; # Treat as a source tree, not a flake
+    # Assay workspace (assay, nixq, nixdrv, nixstore, nixfetch)
+    assay = {
+      url = "github:Industrial/assay";
     };
   };
 

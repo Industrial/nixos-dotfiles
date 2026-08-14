@@ -1,8 +1,10 @@
-# nixfetch — fixed-output fetch + hash verify CLI
-#
-# Dev-first: cargo-built wrapper (see ./package.nix).
-{pkgs, ...}: {
+# nixfetch — fixed-output fetch / hash verify CLI (from github:Industrial/assay).
+{
+  pkgs,
+  inputs,
+  ...
+}: {
   environment.systemPackages = [
-    (pkgs.callPackage ./package.nix {})
+    inputs.assay.packages.${pkgs.system}.nixfetch
   ];
 }

@@ -2,10 +2,5 @@
 resolver = "3"
 members = [
   "tools/oomkiller",
-  "tools/assay",
-  "tools/nixq",
-  "tools/nixdrv",
-  "tools/nixstore",
-  "tools/nixfetch",
   "tools/nix-hash",
 ]

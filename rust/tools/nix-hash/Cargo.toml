@@ -12,8 +12,8 @@ blake3 = "1.5"
 clap = { version = "4.4", features = ["derive"] }
 hex = "0.4"
 md-5 = "0.10"
-nixdrv = { path = "../nixdrv" }
-nixfetch = { path = "../nixfetch" }
+nixdrv = { git = "https://github.com/Industrial/assay", package = "nixdrv" }
+nixfetch = { git = "https://github.com/Industrial/assay", package = "nixfetch" }
 sha1 = "0.10"
 sha2 = "0.10"
 thiserror = "1.0"

@@ -1,11 +1,10 @@
+# assay — Nix unit testing CLI (from github:Industrial/assay).
 {
   pkgs,
   inputs,
   ...
-}: let
-  assayPkg = pkgs.callPackage inputs.assay-src {};
-in {
-  environment.systemPackages = with pkgs; [
-    assayPkg
+}: {
+  environment.systemPackages = [
+    inputs.assay.packages.${pkgs.system}.assay
   ];
 }

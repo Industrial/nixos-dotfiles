@@ -50,41 +50,14 @@
     doCheck = false;
   };
 
-  # Local Rust tools (callPackage from repo root).
-  # Assay needs rustc ≥1.95 (sysinfo via id_effect); devenv-nixpkgs stable is older.
+  # Assay workspace tools (github:Industrial/assay) + local nix-hash.
   pkgs-unstable = import inputs.nixpkgs-unstable {inherit system;};
-  assay = pkgs.callPackage ./rust/tools/assay {
-    rustc = pkgs-unstable.rustc;
-    cargo = pkgs-unstable.cargo;
-  };
-  nixq = pkgs.callPackage ./rust/tools/nixq {
-    rustc = pkgs-unstable.rustc;
-    cargo = pkgs-unstable.cargo;
-  };
-  nixdrv = pkgs.callPackage ./rust/tools/nixdrv {
-    rustc = pkgs-unstable.rustc;
-    cargo = pkgs-unstable.cargo;
-  };
-  nixfetch = pkgs.callPackage ./rust/tools/nixfetch {
-    rustc = pkgs-unstable.rustc;
-    cargo = pkgs-unstable.cargo;
-  };
+  assayPkgs = inputs.assay.packages.${system};
   nixHash = pkgs.callPackage ./rust/tools/nix-hash {
     rustc = pkgs-unstable.rustc;
     cargo = pkgs-unstable.cargo;
   };
-  nixstore = pkgs.callPackage ./rust/tools/nixstore {
-    rustc = pkgs-unstable.rustc;
-    cargo = pkgs-unstable.cargo;
-  };
 
-  # Nightly toolchain for cargo-llvm-cov --branch (stable rejects -Z coverage-options=branch).
-  rust-nightly = inputs.fenix.packages.${system}.complete.withComponents [
-    "rustc"
-    "cargo"
-    "rust-std"
-    "llvm-tools-preview"
-  ];
 
   lean-ctx = pkgs.rustPlatform.buildRustPackage rec {
     pname = "lean-ctx";
@@ -111,12 +84,12 @@ in {
     inputs.definitively.packages.${system}.definitively
 
     nix-unit
-    assay
-    nixq
-    nixdrv
-    nixfetch
+    assayPkgs.assay
+    assayPkgs.nixq
+    assayPkgs.nixdrv
+    assayPkgs.nixfetch
+    assayPkgs.nixstore
     nixHash
-    nixstore
     namaka
     nixt
 
@@ -199,63 +172,6 @@ in {
       '';
     };
 
-    assay-coverage = {
-      exec = ''
-        set -euo pipefail
-        export PATH="${rust-nightly}/bin:$PATH"
-        unset RUSTC_WRAPPER || true
-        cd "$DEVENV_ROOT/rust"
-        cargo llvm-cov nextest -p assay --lib --branch \
-          --fail-under-lines 95 --fail-under-regions 95 \
-          --no-cfg-coverage
-      '';
-    };
-
-    nixq-coverage = {
-      exec = ''
-        set -euo pipefail
-        export PATH="${rust-nightly}/bin:$PATH"
-        unset RUSTC_WRAPPER || true
-        cd "$DEVENV_ROOT/rust"
-        cargo llvm-cov nextest -p nixq --lib --branch \
-          --fail-under-lines 95 --fail-under-regions 95 \
-          --no-cfg-coverage
-      '';
-    };
-
-    nixdrv-coverage = {
-      exec = ''
-        set -euo pipefail
-        export PATH="${rust-nightly}/bin:$PATH"
-        unset RUSTC_WRAPPER || true
-        cd "$DEVENV_ROOT/rust"
-        cargo llvm-cov nextest -p nixdrv --lib --branch \
-          --fail-under-lines 95 --fail-under-regions 95 \
-          --no-cfg-coverage
-      '';
-    };
-
-    nixfetch-coverage = {
-      exec = ''
-        set -euo pipefail
-        export PATH="${rust-nightly}/bin:$PATH"
-        unset RUSTC_WRAPPER || true
-        cd "$DEVENV_ROOT/rust"
-        cargo llvm-cov nextest -p nixfetch --lib --branch \
-          --fail-under-lines 95 --fail-under-regions 95 \
-          --no-cfg-coverage
-      '';
-    };
-
-    nixstore-coverage = {
-      exec = ''
-        set -euo pipefail
-        export PATH="${rust-nightly}/bin:$PATH"
-        unset RUSTC_WRAPPER || true
-        cd "$DEVENV_ROOT/rust"
-        cargo llvm-cov nextest -p nixstore --lib --branch           --fail-under-lines 95 --fail-under-regions 95           --no-cfg-coverage
-      '';
-    };
   };
 
   tasks = {
@@ -288,14 +204,9 @@ in {
         always_run = true;
         entry = "devenv shell -- assay run .";
       };
+      # Coverage for assay crates lives in github:Industrial/assay.
       moon-coverage = {
-        enable = true;
-        stages = ["pre-commit" "pre-push"];
-        name = "moon coverage (assay)";
-        description = "Run assay-coverage (≥95% lines/branches via llvm-cov)";
-        pass_filenames = false;
-        always_run = true;
-        entry = "devenv shell -- assay-coverage";
+        enable = false;
       };
     };
   };

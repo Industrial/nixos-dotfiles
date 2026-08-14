@@ -37,7 +37,7 @@ pkgs.writeShellApplication {
     if [[ ! -x "$bin" ]]; then
       needs_build=1
     else
-      newest="$(find "$root/rust/tools/nix-hash/src" "$root/rust/tools/nixfetch/src" "$root/rust/tools/nixdrv/src" -type f -newer "$bin" 2>/dev/null | head -n1 || true)"
+      newest="$(find "$root/rust/tools/nix-hash/src" -type f -newer "$bin" 2>/dev/null | head -n1 || true)"
       if [[ -n "$newest" ]]; then
         needs_build=1
       fi

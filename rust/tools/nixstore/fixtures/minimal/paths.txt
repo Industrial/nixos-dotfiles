@@ -1,3 +1,0 @@
-A=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a
-B=/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b
-C=/nix/store/cccccccccccccccccccccccccccccccc-c

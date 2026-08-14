@@ -1,8 +1,10 @@
-# nixq — NixOS query / structural equality CLI
-#
-# Dev-first: cargo-built wrapper (see ./package.nix).
-{pkgs, ...}: {
+# nixq — NixOS query / structural equality CLI (from github:Industrial/assay).
+{
+  pkgs,
+  inputs,
+  ...
+}: {
   environment.systemPackages = [
-    (pkgs.callPackage ./package.nix {})
+    inputs.assay.packages.${pkgs.system}.nixq
   ];
 }

@@ -1,4 +1,6 @@
 inputs:
+  assay:
+    url: github:Industrial/assay
   definitively:
     url: github:Industrial/definitively/definitively-v0.4.1
     flake: true
