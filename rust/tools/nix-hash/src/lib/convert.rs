@@ -23,35 +23,39 @@ pub fn parse_any_hash(
     }
 
     if let Some((algo_s, rest)) = s.split_once('-')
-        && looks_like_algo_name(algo_s) && !rest.is_empty() && !rest.contains(':') {
-            // Prefer SRI when the algo token is a known hash name and the rest
-            // is not a typed `algo:payload` (those use `:`).
-            if rest
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
-            {
-                let algo = HashAlgo::parse(algo_s).map_err(HashError::Convert)?;
-                check_hint(algo, type_hint)?;
-                let bytes = base64::engine::general_purpose::STANDARD
-                    .decode(rest)
-                    .map_err(|e| HashError::Convert(format!("invalid SRI base64: {e}")))?;
-                if bytes.len() != algo.digest_len() {
-                    return Err(HashError::Convert(format!(
-                        "hash '{s}' has wrong length for hash algorithm '{}'",
-                        algo.as_str()
-                    )));
-                }
-                return Ok((algo, bytes));
-            }
-        }
-
-    if let Some((algo_s, rest)) = s.split_once(':')
-        && looks_like_algo_name(algo_s) {
+        && looks_like_algo_name(algo_s)
+        && !rest.is_empty()
+        && !rest.contains(':')
+    {
+        // Prefer SRI when the algo token is a known hash name and the rest
+        // is not a typed `algo:payload` (those use `:`).
+        if rest
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+        {
             let algo = HashAlgo::parse(algo_s).map_err(HashError::Convert)?;
             check_hint(algo, type_hint)?;
-            let digest = decode_raw_for_algo(rest, algo)?;
-            return Ok((algo, digest));
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(rest)
+                .map_err(|e| HashError::Convert(format!("invalid SRI base64: {e}")))?;
+            if bytes.len() != algo.digest_len() {
+                return Err(HashError::Convert(format!(
+                    "hash '{s}' has wrong length for hash algorithm '{}'",
+                    algo.as_str()
+                )));
+            }
+            return Ok((algo, bytes));
         }
+    }
+
+    if let Some((algo_s, rest)) = s.split_once(':')
+        && looks_like_algo_name(algo_s)
+    {
+        let algo = HashAlgo::parse(algo_s).map_err(HashError::Convert)?;
+        check_hint(algo, type_hint)?;
+        let digest = decode_raw_for_algo(rest, algo)?;
+        return Ok((algo, digest));
+    }
 
     let algo = type_hint.ok_or_else(|| {
         HashError::Convert(format!(
@@ -67,13 +71,14 @@ fn looks_like_algo_name(s: &str) -> bool {
 
 fn check_hint(algo: HashAlgo, hint: Option<HashAlgo>) -> Result<(), HashError> {
     if let Some(h) = hint
-        && h != algo {
-            return Err(HashError::Convert(format!(
-                "hash algorithm mismatch: string says '{}', --type says '{}'",
-                algo.as_str(),
-                h.as_str()
-            )));
-        }
+        && h != algo
+    {
+        return Err(HashError::Convert(format!(
+            "hash algorithm mismatch: string says '{}', --type says '{}'",
+            algo.as_str(),
+            h.as_str()
+        )));
+    }
     Ok(())
 }
 
@@ -92,9 +97,10 @@ fn decode_raw_for_algo(raw: &str, algo: HashAlgo) -> Result<Vec<u8>, HashError> 
 
     // Bare standard base64 digest (rare; SRI without algo prefix handled above).
     if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(raw)
-        && bytes.len() == want {
-            return Ok(bytes);
-        }
+        && bytes.len() == want
+    {
+        return Ok(bytes);
+    }
 
     // SRI form with --type already known: `sha256-…` still reaches here if
     // algo token check failed; try stripping matching prefix.
