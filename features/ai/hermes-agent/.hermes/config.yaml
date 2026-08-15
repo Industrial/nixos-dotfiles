@@ -1,5 +1,5 @@
 model:
-  default: nvidia/nemotron-3.5-lightning:free
+  default: nvidia/nemotron-3-super-120b-a12b:free
   provider: openrouter
   base_url: ''
   api_mode: chat_completions
