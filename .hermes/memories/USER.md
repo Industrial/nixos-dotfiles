@@ -1,0 +1,1 @@
+Tom builds AI/agent feature integrations in his NixOS dotfiles repo. Prefers incremental workflow: research docs first, discuss findings, then implement. Says "Do nothing else" for scoped steps. Wants all files written in one pass when "implement" is said.
