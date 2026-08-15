@@ -46,6 +46,29 @@ NOTE: `features/ai/hermes-agent/plugins/` is where Nix-built Python plugin *pack
   See also: references/intro-to-prism.md
   ```
 
+## What to Version Control
+
+When setting up skill directories or Hermes configuration in a repository:
+- **Version control these specific paths**:
+  - `.hermes/config.yaml`
+  - `.hermes/skills/` (your custom skills)
+  - `.hermes/plugins/` (your custom plugins)
+  - `.hermes/memories/` (if you want to persist memories across clones)
+  - `.hermes/cron/` (if you want to share cron jobs)
+- **Do NOT version control**: Runtime/cache data including:
+  - `.hermes/sessions/`, `.hermes/logs/`, `.hermes/cache/`
+  - `.hermes/image_cache/`, `.hermes/audio_cache/`, `.hermes/pastes/`
+  - `*.db`, `*.db-shm`, `*.db-wal`, `*.log`
+  - `.hermes_history`, `state.db*`, `verification_evidence.db`
+  - Model caches: `models_dev_cache.json`, `provider_models_cache.json`, `ollama_cloud_models_cache.json`
+  - Lock files: `*.lock`, `auth.lock`, `processes.json`
+  - Temporary files: `interrupt_debug.log`, `.update_check`
+  - Environment secrets: `.env`
+  - Sandboxes and pairing: `.hermes/sandboxes/`, `.hermes/pairing/`
+  - Hooks: `.hermes/hooks/`
+- The `~/.hermes/skills/` tree (symlinked from `features/ai/hermes-agent/.hermes/skills/`) should contain only skill definitions and user-created content
+- See also: references/version-control-guidance.md
+
 ## Updating the Library
 
 - To add a new convention, create a new umbrella skill (e.g. `skill-library-structure`) and document the change there.
