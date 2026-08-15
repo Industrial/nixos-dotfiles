@@ -3,7 +3,7 @@ name: skill-library-structure
 description: |
   Class‑level convention for organizing Hermes skills within the project.
   Every skill that belongs to the shared library must follow this pattern:
-  - reside under `features/ai/hermes-agent/plugins/<plugin>/`
+  - reside under `features/ai/hermes-agent/.hermes/skills/`
   - contain a `SKILL.md` with rich documentation
   - include a `references/` directory for session‑specific detail, research excerpts, API specs, and external citations
   - include a `templates/` directory for starter files (configs, scaffolds)

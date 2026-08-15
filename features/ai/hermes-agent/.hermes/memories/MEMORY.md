@@ -9,3 +9,7 @@ Formatted codebase using moon run :format and verified with moon run :ci-format.
 Fixed formatting by running moon run :format and verified with moon run :ci-format.
 §
 User prefers class-level skill organization over flat skill lists. User values concise, direct responses over verbose explanations. User prefers NixOS configuration work without Home Manager. User wants skills that capture practical techniques, not session narratives.
+§
+Hermes skills are organized under features/ai/hermes-agent/.hermes/skills/ (symlinked to ~/.hermes/skills/) with class-level grouping: core/ (id, agent, design, development, infrastructure, integrations, research, system, utilities) and top-level for moved skills (design, development, infrastructure, research, system)
+§
+Updated skill-library-structure skill to reflect that Hermes skills are stored under features/ai/hermes-agent/.hermes/skills/ (symlinked to ~/.hermes/skills/) and organized in a class-level tree structure.
