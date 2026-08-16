@@ -263,6 +263,11 @@ Before declaring done, run this checklist for **each** touched skill:
 - [ ] Patch outdated/incorrect skills immediately when discovered
 - [ ] Follow preference order: 1) Update currently-loaded skill 2) Update existing umbrella 3) Add support file 4) Create new class-level skill
 - [ ] Do NOT capture: environment-dependent failures, negative tool claims, transient errors, one-off task narratives
+- [ ] When user provides a correction or redirection (e.g., "I meant more X..."), treat this as a high-priority signal to adjust your approach immediately
+- [ ] When analyzing the Industrial/nixos-dotfiles repo specifically, prioritize examination of NixOS system configuration (hosts/, profiles/, features/, flake.nix) over AI/agent features unless explicitly asked otherwise
+- [ ] When instructed to "update the skill library" or similar, actively apply the skill update framework: look for signals (user corrections, workflow corrections, non-trivial techniques, outdated skills) and take action according to preference order (update loaded skill → update umbrella → add support file → create new class-level skill)
+- [ ] When reviewing conversations for skill updates, prioritize signals in this order: user corrections → workflow corrections → non-trivial techniques → outdated skills
+- [ ] When the user asks to "update the skill library" or similar, actively look for opportunities to improve the skill system itself, not just create new content
 
 ### Deliverable to user
 
