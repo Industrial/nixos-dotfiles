@@ -1,5 +1,17 @@
-use crate::{find_highest_memory_process, is_memory_threshold_exceeded, kill_process};
+use crate::{
+    find_highest_memory_process, format_bytes, is_memory_threshold_exceeded, kill_process,
+    MEMORY_THRESHOLD_PERCENT,
+};
 use sysinfo::System;
+
+/// Truncate cmdline for journal readability.
+fn truncate_cmdline(cmdline: &str, max_chars: usize) -> String {
+    if cmdline.chars().count() <= max_chars {
+        return cmdline.to_string();
+    }
+    let truncated: String = cmdline.chars().take(max_chars.saturating_sub(3)).collect();
+    format!("{truncated}...")
+}
 
 /// Performs one iteration of the daemon loop.
 ///
@@ -13,36 +25,55 @@ use sysinfo::System;
 /// * `Ok(())` if the iteration completed successfully
 /// * `Err(String)` if memory reading failed (should cause daemon to exit)
 pub fn daemon_iteration(system: &mut System) -> Result<(), String> {
-    // Check if memory threshold is exceeded (only refreshes memory, not all processes)
     let threshold_exceeded = is_memory_threshold_exceeded(system)?;
 
     if threshold_exceeded {
-        // Memory threshold exceeded - log this event
-        println!("Memory threshold exceeded (90%)");
+        let total = system.total_memory();
+        let used = system.used_memory();
+        let usage_percent = if total == 0 {
+            0.0
+        } else {
+            (used as f64 / total as f64) * 100.0
+        };
 
-        // Only now refresh all processes (expensive operation, only when needed)
-        // This is the key optimization: we don't scan all processes every iteration
+        println!(
+            "Memory threshold exceeded ({threshold}%): used={} / total={} ({usage_percent:.1}%)",
+            format_bytes(used),
+            format_bytes(total),
+            threshold = MEMORY_THRESHOLD_PERCENT as u32,
+        );
+
+        // Only now refresh all processes (expensive; only when needed)
         system.refresh_all();
 
-        // Find and kill highest memory process (system already refreshed above)
         match find_highest_memory_process(system) {
             Ok(Some(process)) => {
-                // Found a process to kill
+                let cmdline = if process.cmdline.is_empty() {
+                    "(no cmdline)".to_string()
+                } else {
+                    truncate_cmdline(&process.cmdline, 240)
+                };
                 if let Err(e) = kill_process(&process) {
-                    eprintln!("Failed to kill process {}: {}", process.pid, e);
+                    eprintln!(
+                        "Failed to kill pid={} name={} rss={}: {e}",
+                        process.pid,
+                        process.name,
+                        format_bytes(process.memory),
+                    );
                 } else {
                     println!(
-                        "Killed process {} (memory: {} bytes)",
-                        process.pid, process.memory
+                        "Killed process name={} pid={} rss={} cmdline={cmdline}",
+                        process.name,
+                        process.pid,
+                        format_bytes(process.memory),
                     );
                 }
             }
             Ok(None) => {
-                // No processes found to kill
                 eprintln!("Memory threshold exceeded but no killable process found");
             }
             Err(e) => {
-                eprintln!("Failed to find highest memory process: {}", e);
+                eprintln!("Failed to find highest memory process: {e}");
             }
         }
     }
@@ -56,7 +87,6 @@ mod tests {
 
     #[test]
     fn test_daemon_iteration_returns_result() {
-        // Test that daemon_iteration returns a Result
         let mut system = System::new_all();
         let result = daemon_iteration(&mut system);
         assert!(result.is_ok() || result.is_err());
@@ -64,20 +94,21 @@ mod tests {
 
     #[test]
     fn test_daemon_iteration_handles_memory_check() {
-        // Test that the function handles memory checking
-        // This will either succeed (memory check works) or fail (memory check fails)
         let mut system = System::new_all();
         let result = daemon_iteration(&mut system);
-        // Should return Ok if memory check succeeds, Err if it fails
         assert!(result.is_ok() || result.is_err());
     }
 
     #[test]
     fn test_daemon_iteration_completes() {
-        // Test that the function completes without panicking
-        // This is a basic smoke test
         let mut system = System::new_all();
         let _result = daemon_iteration(&mut system);
-        // If we get here, the function completed
+    }
+
+    #[test]
+    fn test_truncate_cmdline() {
+        assert_eq!(truncate_cmdline("short", 10), "short");
+        assert_eq!(truncate_cmdline("abcdefghij", 10), "abcdefghij");
+        assert_eq!(truncate_cmdline("abcdefghijkl", 10), "abcdefg...");
     }
 }
