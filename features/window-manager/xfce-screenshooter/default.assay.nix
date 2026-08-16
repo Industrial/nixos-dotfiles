@@ -7,7 +7,7 @@ let
       username = "u";
     };
     pkgs = {
-      xfce = {xfce4-screenshooter = "xfce4-screenshooter";};
+      xfce4-screenshooter = "xfce4-screenshooter";
     };
   };
 in
