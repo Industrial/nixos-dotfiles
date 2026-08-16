@@ -77,39 +77,48 @@
     };
   };
 
-  outputs = inputs @ {...}: let
+  outputs = inputs @ { ... }: let
     hostname = "drakkar";
     settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
   in {
-    nixosConfigurations = {
-      "${hostname}" = inputs.nixpkgs.lib.nixosSystem {
-        inherit (settings) system;
-        specialArgs = {
-          inherit inputs settings;
+    nixosConfigurations."${hostname}" = inputs.nixpkgs.lib.nixosSystem {
+      inherit (settings) system;
+      specialArgs = {
+        inherit inputs settings;
+        nixpkgs = import inputs.nixpkgs {
+          overlays = [
+            (self: super: {
+              python3Packages = super.python3Packages // {
+                nanoemoji = super.python3Packages.nanoemoji.overrideAttrs (old: {
+                  hash = "sha256-FysyKC01XBnRiur5RR9fcsTxQqE8x0JJHSoe3q6JtKc=";
+                });
+              };
+            })
+          ];
         };
-        modules = [
-          # System Configuration (host-specific)
-          inputs.disko.nixosModules.disko
-          ./disko.nix
-          ./filesystems.nix
-          ./hardware.nix
-
-          # Profiles
-          ../../profiles/ai.nix
-          ../../profiles/base.nix
-          ../../profiles/development.nix
-          ../../profiles/desktop.nix
-          ../../profiles/gaming.nix
-          # ../../profiles/creative.nix
-          ../../profiles/communication.nix
-          # ../../profiles/crypto.nix
-          # ../../profiles/learning.nix
-
-          # Host-specific additions
-          ../../features/nixos/graphics/amd.nix
-          ../../features/hardware/zsa-voyager
-        ];
       };
+      modules = [
+        # System Configuration (host-specific)
+        inputs.disko.nixosModules.disko
+        ./disko.nix
+        ./filesystems.nix
+        ./hardware.nix
+
+        # Profiles
+        ../../profiles/ai.nix
+        ../../profiles/base.nix
+        ../../profiles/development.nix
+        ../../profiles/desktop.nix
+        ../../profiles/gaming.nix
+        # ../../profiles/creative.nix
+        ../../profiles/communication.nix
+        # ../../profiles/crypto.nix
+        # ../../profiles/learning.nix
+
+        # Host-specific additions
+        ../../features/nixos/graphics/amd.nix
+        ../../features/hardware/zsa-voyager
+      ];
     };
   };
 }
