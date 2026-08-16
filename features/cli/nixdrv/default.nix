@@ -5,6 +5,6 @@
   ...
 }: {
   environment.systemPackages = [
-    inputs.assay.packages.${pkgs.system}.nixdrv
+    inputs.assay.packages.${pkgs.stdenv.hostPlatform.system}.nixdrv
   ];
 }

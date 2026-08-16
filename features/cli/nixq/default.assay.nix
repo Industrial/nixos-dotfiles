@@ -1,7 +1,7 @@
 # Colocated suite: systemPackages lands nixq from the assay flake.
 let
   assay = import ./../../../common/assay/default.nix;
-  pkgs = {system = "x86_64-linux";};
+  pkgs = {stdenv.hostPlatform.system = "x86_64-linux";};
   inputs = {
     assay.packages.x86_64-linux.nixq = "nixq";
   };

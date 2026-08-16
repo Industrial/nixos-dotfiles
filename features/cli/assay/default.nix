@@ -5,6 +5,6 @@
   ...
 }: {
   environment.systemPackages = [
-    inputs.assay.packages.${pkgs.system}.assay
+    inputs.assay.packages.${pkgs.stdenv.hostPlatform.system}.assay
   ];
 }
