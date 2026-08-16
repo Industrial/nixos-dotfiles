@@ -168,19 +168,6 @@
     "use_count": 11,
     "view_count": 11
   },
-  "hermes-omniroute-routing": {
-    "archived_at": null,
-    "created_at": "2026-08-13T20:19:06.249261+00:00",
-    "created_by": "agent",
-    "last_patched_at": "2026-08-13T20:19:26.780451+00:00",
-    "last_used_at": "2026-08-13T20:29:13.923335+00:00",
-    "last_viewed_at": "2026-08-13T20:29:13.913417+00:00",
-    "patch_count": 2,
-    "pinned": false,
-    "state": "active",
-    "use_count": 2,
-    "view_count": 2
-  },
   "hermes-plugin-authoring": {
     "archived_at": null,
     "created_at": "2026-05-26T18:27:10.793639+00:00",

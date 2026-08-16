@@ -394,9 +394,6 @@ x_search:
   retries: 2
 _config_version: 23
 custom_providers:
-  - name: omniroute
-    base_url: http://127.0.0.1:20128/v1
-    key_env: OMNIROUTE_API_KEY
 mcp_servers:
   lean-ctx:
     command: lean-ctx
