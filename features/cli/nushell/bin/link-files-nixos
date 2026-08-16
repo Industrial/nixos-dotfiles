@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > cli > nushell > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+sourceDir="${currentDirectoryPath}/features/cli/nushell"
+targetDir="${HOME}/.config/nushell"
+
+mkdir -p "${targetDir}"
+
+for file in env.nu config.nu login.nu starship.nu havamal.nu; do
+  target="${targetDir}/${file}"
+  if [ -f "${target}" ] && [ ! -L "${target}" ]; then
+    echo "  backing up ${file} -> ${file}.backup"
+    mv "${target}" "${target}.backup"
+  fi
+  ln -sf "${sourceDir}/${file}" "${target}"
+done

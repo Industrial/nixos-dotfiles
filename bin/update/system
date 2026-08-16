@@ -31,9 +31,7 @@ if [ "$booted" != "$profile" ]; then
   echo "> update > system >   profile: $profile"
 fi
 echo "> update > system > nixos-rebuild switch --flake \".#$(hostname)\""
-# --print-build-logs (-L) + --log-format raw: multiline build logs instead of the
-# single-line progress status ("[N/M built] building …").
-rebuild="cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --print-build-logs --log-format raw --option eval-cache false"
+rebuild="cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --print-build-logs"
 if command -v script >/dev/null 2>&1; then
   # exec>tee makes stdout a pipe; script allocates a pty so nix keeps line buffering.
   root_cmd script -qefc "$rebuild" /dev/null
@@ -48,3 +46,4 @@ features/network/ladybird/bin/link-files-nixos
 features/programming/cursor/bin/link-files-nixos
 features/ai/opencode/bin/link-files-nixos
 features/ai/hermes-agent/bin/link-files-nixos
+features/cli/nushell/bin/link-files-nixos

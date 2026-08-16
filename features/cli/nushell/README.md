@@ -18,17 +18,21 @@ ls | where size > 1MB       # Filter with structured data
 
 ## Configuration Files
 
-- `default.nix` - NixOS module (installs Nushell package)
-- `env.nu` - Environment variables (equivalent to Fish env setup)
-- `config.nu` - Main configuration (equivalent to Fish config.fish)
+- `default.nix` — NixOS module (package + activation symlinks)
+- `env.nu` — session vars (XDG/PATH/direnv) + `source starship.nu`
+- `starship.nu` — official `starship init nu` (PROMPT_* via export-env)
+- `login.nu` — bash login env import (NixOS/profile vars Nu does not get for free)
+- `havamal.nu` — Hávamál random stanza (`havamal` command + startup print)
+- `config.nu` — interactive config (aliases, keybinds, vi indicators, Hávamál)
 
-These files should be symlinked to `~/.config/nushell/` for Nushell to use them.
+Linked into `~/.config/nushell/` on activate / `bin/update/system`.
 
 ## Features Implemented
 
 ### ✅ Parity with Fish
 - Vi mode (limited compared to Fish)
 - Starship prompt integration
+- Hávamál random stanza on startup (`havamal` to reprint)
 - Direnv hooks
 - Custom commands: `l`, `ll`, `g`, `c`, `cl`, `p`
 - FZF keybindings: Ctrl-R, Ctrl-T, Alt-C
@@ -44,16 +48,19 @@ These files should be symlinked to `~/.config/nushell/` for Nushell to use them.
 
 ## Installation
 
-After rebuilding NixOS with the Nushell feature enabled:
+Config is linked automatically:
+
+- **On every `nixos-rebuild switch`** via `system.activationScripts.linkNushellConfig`
+- **After `bin/update/system`** via `features/cli/nushell/bin/link-files-nixos`
+
+Manual (same as the update helper):
 
 ```bash
-# Symlink config files (one-time setup)
-ln -sf ~/.dotfiles/features/cli/nushell/env.nu ~/.config/nushell/env.nu
-ln -sf ~/.dotfiles/features/cli/nushell/config.nu ~/.config/nushell/config.nu
-
-# Launch Nushell
+cd ~/.dotfiles && features/cli/nushell/bin/link-files-nixos
 nu
 ```
+
+First-run Nushell may create stock `~/.config/nushell/*.nu`; activation/`link-files-nixos` backs those up and replaces them with symlinks into this feature.
 
 ## Usage Patterns
 

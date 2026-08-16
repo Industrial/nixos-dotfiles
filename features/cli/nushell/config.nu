@@ -11,6 +11,10 @@ $env.config = ($env.config | merge {
     show_banner: false
 })
 
+# Hávamál — random stanza on interactive start (Fish sources the plugin instead)
+source havamal.nu
+havamal | print
+
 # ============================================================================
 # Custom Commands (equivalent to Fish aliases/functions)
 # ============================================================================
@@ -112,18 +116,12 @@ $env.config = ($env.config | merge {
 })
 
 # ============================================================================
-# Starship Prompt Integration
+# Prompt indicators (Starship: env.nu → starship.nu)
 # ============================================================================
 
-# Starship uses same starship.toml as Fish for consistency
-# Simply set the prompt - starship handles the rest via STARSHIP_SESSION_KEY
-$env.STARSHIP_SHELL = "nu"
-$env.PROMPT_COMMAND = { || starship prompt --cmd-duration $env.CMD_DURATION_MS --status $env.LAST_EXIT_CODE }
-$env.PROMPT_COMMAND_RIGHT = { || starship prompt --right --cmd-duration $env.CMD_DURATION_MS --status $env.LAST_EXIT_CODE }
-$env.PROMPT_INDICATOR = { || "" }
+# Vi-mode indicators only; Starship owns PROMPT_COMMAND via starship.nu
 $env.PROMPT_INDICATOR_VI_INSERT = { || ": " }
 $env.PROMPT_INDICATOR_VI_NORMAL = { || "> " }
-$env.PROMPT_MULTILINE_INDICATOR = { || "::: " }
 
 # ============================================================================
 # Completions & Suggestions

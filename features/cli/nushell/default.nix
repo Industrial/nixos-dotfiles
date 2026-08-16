@@ -2,17 +2,30 @@
   settings,
   pkgs,
   ...
-}: {
+}: let
+  # Mutable checkout so edits apply without a rebuild (same pattern as hyprland).
+  nushellDir = "${settings.userdir}/.dotfiles/features/cli/nushell";
+  havamal = pkgs.callPackage ../fish/havamal.nix {inherit settings pkgs;};
+in {
   environment.systemPackages = with pkgs; [
     nushell
   ];
 
-  # Note: Nushell configuration files (config.nu, env.nu) are managed separately
-  # in ~/.config/nushell/ to allow for easier customization and testing
-  #
-  # To switch to Nushell interactively:
-  #   1. Type 'nu' from Fish
-  #   2. Or use: exec nu
-  #
-  # Fish remains the default login shell for stability and POSIX compatibility
+  # Fish remains the default login shell; `nu` is interactive.
+  # Link config on every activation so a fresh `~/.config/nushell` from first
+  # `nu` launch cannot shadow starship / aliases / Hávamál.
+  system.activationScripts.linkNushellConfig = {
+    text = ''
+      mkdir -p /home/${settings.username}/.config/nushell
+      for file in env.nu config.nu login.nu starship.nu havamal.nu; do
+        target=/home/${settings.username}/.config/nushell/$file
+        if [ -f "$target" ] && [ ! -L "$target" ]; then
+          mv "$target" "$target.backup"
+        fi
+        ln -sfn ${nushellDir}/$file "$target"
+      done
+      ln -sfn ${havamal}/share/fish/stanzas /home/${settings.username}/.config/nushell/havamal-stanzas
+      chown -R ${settings.username}:users /home/${settings.username}/.config/nushell
+    '';
+  };
 }

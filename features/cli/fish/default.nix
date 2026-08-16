@@ -50,7 +50,7 @@ in {
       fish
     ];
     sessionVariables = {
-      EDITOR = "vnim";
+      EDITOR = "nvim";
       GIT_EDITOR = "nvim";
       DIFFPROG = "nvim -d";
       XDG_CACHE_HOME = "$HOME/.cache";
