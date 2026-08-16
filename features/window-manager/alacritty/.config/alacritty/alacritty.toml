@@ -1,3 +1,6 @@
+# No [shell] override — Alacritty runs $SHELL (login shell / user preference).
+# Prefer `nu` via chsh / users.users.<name>.shell when ready; do not hardcode fish.
+
 [font]
 normal.family = "IosevkaTerm Nerd Font Mono"
 normal.style = "Regular"
