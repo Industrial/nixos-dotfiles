@@ -20,13 +20,12 @@
     ../features/programming/devenv
     ../features/programming/docker-compose
     ../features/programming/git
-    ../features/programming/gitbutler
     ../features/programming/gitkraken
     ../features/programming/glogg
-    ../features/programming/insomnia
+    # ../features/programming/insomnia
     ../features/programming/node
     ../features/programming/pgadmin
     ../features/programming/python
-    ../features/programming/zig
+    # ../features/programming/zig
   ];
 }

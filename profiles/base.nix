@@ -14,18 +14,16 @@
     ../features/ci/comin
 
     # CLI Tools
+    ../features/cli/assay
     ../features/cli/bandwhich
     ../features/cli/bat
     ../features/cli/bluetuith
     ../features/cli/broot
     ../features/cli/btop
-    ../features/cli/nvtop
     ../features/cli/c
     ../features/cli/calcurse
     ../features/cli/cheatsheet
     ../features/cli/create-ssh-key
-    ../features/cli/oomkiller
-    ../features/cli/assay
     ../features/cli/direnv
     ../features/cli/du
     ../features/cli/dust
@@ -35,27 +33,30 @@
     ../features/cli/fd
     ../features/cli/fish
     ../features/cli/fzf
-    ../features/cli/nushell
     ../features/cli/g
+    ../features/cli/gix
     ../features/cli/gpg
     ../features/cli/gping
-    ../features/cli/gix
     ../features/cli/jq
     ../features/cli/killall
     ../features/cli/l
     ../features/cli/lazygit
     ../features/cli/ll
     ../features/cli/lnav
-    ../features/cli/lsusb
     ../features/cli/lsof
-    ../features/cli/ngrok
+    ../features/cli/lsusb
     ../features/cli/nettools
-    ../features/cli/nix-tree
+    ../features/cli/ngrok
     ../features/cli/nix-hash
-    ../features/cli/nixq
+    ../features/cli/nix-tree
     ../features/cli/nixdrv
-    ../features/cli/nixstore
     ../features/cli/nixfetch
+    ../features/cli/nixos-update-notifier
+    ../features/cli/nixq
+    ../features/cli/nixstore
+    ../features/cli/nushell
+    ../features/cli/nvtop
+    ../features/cli/oomkiller
     ../features/cli/p
     ../features/cli/p7zip
     ../features/cli/procs
@@ -65,6 +66,7 @@
     ../features/cli/starship
     ../features/cli/unrar
     ../features/cli/unzip
+    ../features/cli/usbtree
     ../features/cli/zellij
 
     # Core NixOS Configuration

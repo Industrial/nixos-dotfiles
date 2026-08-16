@@ -16,8 +16,8 @@
     ../features/window-manager/alacritty
     ../features/window-manager/gnome
     ../features/window-manager/hyprland
-    ../features/window-manager/kitty
-    ../features/window-manager/terax
+    # ../features/window-manager/kitty
+    # ../features/window-manager/terax
     ../features/window-manager/stylix
     ../features/window-manager/xclip
     ../features/window-manager/xfce-screenshooter
