@@ -172,7 +172,10 @@ in
     xdg = {
       portal = {
         enable = true;
-        wlr.enable = true;
+        # Do not enable xdg-desktop-portal-wlr alongside Hyprland's portal — they
+        # race for ScreenCast and break Signal/WebRTC share (black/blank remote).
+        # programs.hyprland.portalPackage already provides xdg-desktop-portal-hyprland.
+        wlr.enable = false;
         extraPortals = [
           pkgs.xdg-desktop-portal-gtk
         ];
