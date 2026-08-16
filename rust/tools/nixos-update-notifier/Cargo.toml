@@ -1,0 +1,25 @@
+[package]
+name = "nixos-update-notifier"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Notify when NixOS flake updates are available, listing exact package changes"
+license = "MIT"
+
+# Standalone crate (own Cargo.lock for nix buildRustPackage).
+[workspace]
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+notify-rust = "4.11"
+regex = "1.11"
+tempfile = "3.20"
+thiserror = "2.0"
+
+[lib]
+name = "nixos_update_notifier"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "nixos-update-notifier"
+path = "src/main.rs"
