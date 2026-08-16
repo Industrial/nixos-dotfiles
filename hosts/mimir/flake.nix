@@ -71,6 +71,12 @@
       flake = false; # Treat as a source tree, not a flake
     };
 
+    # nixos-update-notifier tool source
+    nixos-update-notifier-src = {
+      url = "path:../../rust/tools/nixos-update-notifier";
+      flake = false;
+    };
+
     # Assay workspace (assay, nixq, nixdrv, nixstore, nixfetch)
     assay = {
       url = "github:Industrial/assay";

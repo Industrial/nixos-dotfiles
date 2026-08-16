@@ -71,13 +71,19 @@
       flake = false; # Treat as a source tree, not a flake
     };
 
+    # nixos-update-notifier tool source
+    nixos-update-notifier-src = {
+      url = "path:../../rust/tools/nixos-update-notifier";
+      flake = false;
+    };
+
     # Assay workspace (assay, nixq, nixdrv, nixstore, nixfetch)
     assay = {
       url = "github:Industrial/assay";
     };
   };
 
-  outputs = inputs @ { ... }: let
+  outputs = inputs @ {...}: let
     hostname = "drakkar";
     settings = (import ../../common/settings.nix {hostname = hostname;}).settings;
   in {
@@ -88,11 +94,13 @@
         nixpkgs = import inputs.nixpkgs {
           overlays = [
             (self: super: {
-              python3Packages = super.python3Packages // {
-                nanoemoji = super.python3Packages.nanoemoji.overrideAttrs (old: {
-                  hash = "sha256-FysyKC01XBnRiur5RR9fcsTxQqE8x0JJHSoe3q6JtKc=";
-                });
-              };
+              python3Packages =
+                super.python3Packages
+                // {
+                  nanoemoji = super.python3Packages.nanoemoji.overrideAttrs (old: {
+                    hash = "sha256-FysyKC01XBnRiur5RR9fcsTxQqE8x0JJHSoe3q6JtKc=";
+                  });
+                };
             })
           ];
         };

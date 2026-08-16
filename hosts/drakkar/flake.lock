@@ -644,6 +644,18 @@
         "type": "github"
       }
     },
+    "nixos-update-notifier-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/nixos-update-notifier",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/nixos-update-notifier",
+        "type": "path"
+      },
+      "parent": []
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1786106723,
@@ -810,6 +822,7 @@
         "hyprland": "hyprland",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-hardware": "nixos-hardware",
+        "nixos-update-notifier-src": "nixos-update-notifier-src",
         "nixpkgs": "nixpkgs_5",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
