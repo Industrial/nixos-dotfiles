@@ -3,7 +3,7 @@ copy_command "wl-copy --trim-newline"
 copy_on_select true
 default_layout "system"
 default_mode "normal"
-default_shell "fish"
+// Inherit $SHELL (login shell). Was hardcoded to "fish"; do not pin a shell here.
 layout_dir "/etc/zellij/layouts"
 mouse_mode true
 on_force_close "quit"

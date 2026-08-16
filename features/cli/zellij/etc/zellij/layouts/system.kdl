@@ -100,10 +100,17 @@ layout {
           command "spotify_player"
         }
       }
-      pane {
-        cwd "/home/tom"
-        command "watch"
-        args "-n" "2" "wpctl" "status"
+
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "watch"
+          args "-n" "2" "wpctl" "status"
+        }
+        pane {
+          cwd "/home/tom"
+          command "usbtree"
+        }
       }
     }
   }
@@ -122,37 +129,6 @@ layout {
       pane {
         cwd "/home/tom/.dotfiles"
         command "nvim"
-      }
-    }
-  }
-
-  tab name="vim" {
-    pane split_direction="vertical" {
-      pane split_direction="horizontal" {
-        pane {
-          cwd "/home/tom/Code"
-        }
-        pane {
-          cwd "/home/tom/Code"
-        }
-      }
-      pane split_direction="vertical" {
-        cwd "/home/tom/Code"
-      }
-    }
-  }
-
-  tab name="usb" {
-    pane split_direction="vertical" {
-      pane {
-        cwd "/home/tom"
-        command "usbtree"
-        args "--watch"
-      }
-      pane {
-        cwd "/home/tom"
-        command "lsusb"
-        args "-t"
       }
     }
   }
