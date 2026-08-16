@@ -5,4 +5,5 @@ let
 in
   assay.suite "drakkar-hardware" {
     nonEmpty = assay.eq ((builtins.stringLength src) > 20) true;
+    rfkillWlan = assay.eq (builtins.match ".*rfkill-block-wlan.*" src != null) true;
   }
