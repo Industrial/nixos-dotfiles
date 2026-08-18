@@ -32,6 +32,16 @@ def ll [...args] {
 # g - git shorthand
 alias g = git
 
+# df / df -h → sys disks; other flags still hit GNU df (^df)
+def --wrapped df [...rest] {
+    let only_human = ($rest | all {|a| $a in ["-h", "--human-readable"]})
+    if ($rest | is-empty) or $only_human {
+        sys disks
+    } else {
+        ^df ...$rest
+    }
+}
+
 # c - cd and list (matches Fish version)
 def c [path: string] {
     cd $path

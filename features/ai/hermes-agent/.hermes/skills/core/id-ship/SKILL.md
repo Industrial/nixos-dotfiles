@@ -12,6 +12,7 @@ Complete git/GitHub operations to release work.
 
 ## Activities
 - Pull latest changes: `git pull --rebase`
+- Commit changes incrementally: make small, logical commits from unstaged changes (group related files, stage each group, commit with concise message)
 - Push to remote: `git push`
 - Verify status: `git status` (must show "up to date with origin")
 - Clean up: clear stashes, prune remote branches
