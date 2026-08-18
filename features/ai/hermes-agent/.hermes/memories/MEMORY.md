@@ -11,3 +11,5 @@ Created andromeda-development skill covering configuration management, strategy 
 User prefers class-level skill organization over flat skill lists. Values concise, direct responses. Updated andromeda-development skill with troubleshooting sections for test import errors and slow test execution based on session learnings.
 §
 User prefers concrete, implemented solutions over theoretical discussions. When designing systems, they value seeing actual code implementations that follow established patterns in the codebase, not just abstract designs. They appreciate when abstract patterns are connected to concrete examples from the specific codebase being worked on.
+§
+When working with NixOS features in this repo, check if they need to be added to profiles/base.nix to be active on all hosts. Secure Boot module was created but not active until added to base profile.
