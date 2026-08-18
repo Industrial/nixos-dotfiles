@@ -116,13 +116,14 @@ hl.on("hyprland.start", function()
   -- hl.exec_cmd("librewolf")
   -- hl.exec_cmd("spotify")
 
-  -- Supportive
-  hl.exec_cmd("ashell --config-path /etc/xdg/ashell/config.toml")
+  -- Desktop shell: Caelestia (bar, launcher, notifications).
+  -- ashell/wofi/mako stay installed for rollback but are not started.
+  hl.exec_cmd("bash -lc 'caelestia-shell >>/tmp/caelestia-shell.log 2>&1'")
   hl.exec_cmd("blueman-applet")
   hl.exec_cmd("gnome-keyring-daemon --start --components=ssh")
-  hl.exec_cmd("hyprpaper")
+  -- Wallpaper owned by Caelestia; hyprpaper left installed unused.
+  -- hl.exec_cmd("hyprpaper")
   hl.exec_cmd("hyprsunset")
-  hl.exec_cmd("mako")
   hl.exec_cmd("nm-applet --indicator")
   hl.exec_cmd("polkit-gnome/polkit-gnome-authentication-agent-1")
 end)
@@ -152,7 +153,7 @@ hl.bind("SUPER + CTRL + Space", hl.dsp.window.float({ action = "toggle" }))
 
 -- Application
 hl.bind("SUPER + Return", hl.dsp.exec_cmd("alacritty"))
-hl.bind("SUPER + CTRL + P", hl.dsp.exec_cmd("wofi --show run"))
+hl.bind("SUPER + CTRL + P", hl.dsp.global("caelestia:launcher"))
 
 -- Focus
 hl.bind("SUPER + H", hl.dsp.focus({ direction = "l" }))

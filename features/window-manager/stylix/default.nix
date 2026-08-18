@@ -9,7 +9,8 @@
   # atelier-estuary
   # atelier-plateau
   # equilibrium-gray-dark.yaml
-  theme = "equilibrium-gray-dark";
+  # base16 gruvbox dark hard (pair with: caelestia scheme set -n gruvbox -f hard -m dark)
+  theme = "gruvbox-dark-hard";
 in {
   environment.systemPackages = with pkgs; [
     tinted-theming-schemes

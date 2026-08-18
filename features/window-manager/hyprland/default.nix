@@ -18,6 +18,25 @@
   hyprlandPortal = hyprPkgs.xdg-desktop-portal-hyprland;
   # Live config under the git checkout (edit + `hyprctl reload` / restart Hyprland — no rebuild).
   dotfilesHyprDir = "${settings.userdir}/.dotfiles/features/window-manager/hyprland";
+  hasCaelestia = inputs ? caelestia-shell;
+  caelestiaShellPkg =
+    if hasCaelestia
+    then inputs.caelestia-shell.packages.${system}.with-cli
+    else null;
+  # with-cli wraps the shell but does not put `caelestia` on system PATH.
+  caelestiaCliPkg =
+    if hasCaelestia
+    then inputs.caelestia-shell.inputs.caelestia-cli.packages.${system}.default
+    else null;
+  nestedCaelestiaLauncher = pkgs.writeShellScriptBin "nested-caelestia-hyprland" ''
+    set -euo pipefail
+    if [ -z "''${WAYLAND_DISPLAY:-}" ]; then
+      echo "nested-caelestia-hyprland: need a parent Wayland session" >&2
+      exit 1
+    fi
+    export XDG_CURRENT_DESKTOP=Hyprland
+    exec ${hyprlandPkg}/bin/Hyprland --config ${dotfilesHyprDir}/hyprland-nested-caelestia.lua
+  '';
 in
   assert lib.assertMsg (inputs ? hyprland) ''
     features/window-manager/hyprland: add a `hyprland` flake input, for example:
@@ -76,6 +95,9 @@ in
           fi
 
           ln -sfn "${dotfilesHyprDir}/xdph.conf" /home/${settings.username}/.config/hypr/xdph.conf
+          if [ -f "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" ]; then
+            ln -sfn "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" /home/${settings.username}/.config/hypr/hyprland-nested-caelestia.lua
+          fi
         '';
       };
     };
@@ -84,6 +106,10 @@ in
       etc = {
         "xdg/hypr/hyprland.lua" = {
           source = ./hyprland.lua;
+          mode = "0644";
+        };
+        "xdg/hypr/hyprland-nested-caelestia.lua" = {
+          source = ./hyprland-nested-caelestia.lua;
           mode = "0644";
         };
         "xdg/hypr/hyprland.conf.hyprlang" = {
@@ -166,6 +192,13 @@ in
 
         # GNOME Keyring for password management
         gnome-keyring
+      ]
+      ++ lib.optionals hasCaelestia [
+        caelestiaShellPkg
+        caelestiaCliPkg
+        nestedCaelestiaLauncher
+        material-symbols
+        nerd-fonts.caskaydia-cove
       ];
     };
 

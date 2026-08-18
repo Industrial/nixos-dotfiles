@@ -10,6 +10,18 @@
       url = "github:hyprwm/hyprland";
     };
 
+    # Caelestia Shell (Quickshell) - nested tryout; see hyprland-nested-caelestia.lua
+    # git.outfoxxed.me is often unreachable; use the GitHub mirror for quickshell.
+    quickshell = {
+      url = "github:quickshell-mirror/quickshell/28771c7c74b42e20afca0b1b63980cb46515537c";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    caelestia-shell = {
+      url = "github:caelestia-dots/shell";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.quickshell.follows = "quickshell";
+    };
+
     # Hardware Support.
     nixos-hardware = {
       url = "github:NixOS/nixos-hardware/master";
