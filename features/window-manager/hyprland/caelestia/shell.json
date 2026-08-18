@@ -1,0 +1,23 @@
+{
+  "general": {
+    "apps": {
+      "terminal": [
+        "alacritty"
+      ]
+    }
+  },
+  "bar": {
+    "workspaces": {
+      "shown": 10
+    }
+  },
+  "launcher": {
+    "maxWallpapers": 99,
+    "useFuzzy": {
+      "wallpapers": true
+    }
+  },
+  "paths": {
+    "wallpaperDir": "/data/Images/Wallpapers"
+  }
+}

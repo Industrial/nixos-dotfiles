@@ -57,6 +57,12 @@ hl.config({
 })
 
 -----------------
+---- ENVIRONMENT ----
+-----------------
+
+hl.env("CAELESTIA_WALLPAPERS_DIR", "/data/Images/Wallpapers")
+
+-----------------
 ---- AUTOSTART ----
 -----------------
 

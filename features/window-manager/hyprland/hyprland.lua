@@ -104,6 +104,8 @@ hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = "default
 -- Install hyprcursor themes to ~/.local/share/icons/
 hl.env("HYPRCURSOR_THEME", "Bibata-Modern-Classic")
 hl.env("HYPRCURSOR_SIZE", "24")
+-- Caelestia wallpaper library (recursive categories under this dir)
+hl.env("CAELESTIA_WALLPAPERS_DIR", "/data/Images/Wallpapers")
 
 -----------------
 ---- AUTOSTART ----

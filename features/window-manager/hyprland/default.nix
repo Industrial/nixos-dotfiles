@@ -98,6 +98,16 @@ in
           if [ -f "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" ]; then
             ln -sfn "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" /home/${settings.username}/.config/hypr/hyprland-nested-caelestia.lua
           fi
+
+          # Caelestia: managed shell.json + wallpaper library symlink for the picker
+          mkdir -p /home/${settings.username}/.config/caelestia
+          mkdir -p /home/${settings.username}/Pictures
+          if [ -f "${dotfilesHyprDir}/caelestia/shell.json" ]; then
+            ln -sfn "${dotfilesHyprDir}/caelestia/shell.json" /home/${settings.username}/.config/caelestia/shell.json
+          fi
+          if [ -d /data/Images/Wallpapers ]; then
+            ln -sfn /data/Images/Wallpapers /home/${settings.username}/Pictures/Wallpapers
+          fi
         '';
       };
     };
@@ -130,6 +140,10 @@ in
         };
         "xdg/ashell/config.toml" = {
           source = ./ashell.toml;
+          mode = "0644";
+        };
+        "xdg/caelestia/shell.json" = {
+          source = ./caelestia/shell.json;
           mode = "0644";
         };
         "xdg/hypr/xdph.conf" = {
