@@ -1,6 +1,6 @@
 use crate::{
-    find_highest_memory_process, format_bytes, is_memory_threshold_exceeded, kill_process,
-    MEMORY_THRESHOLD_PERCENT,
+    MEMORY_THRESHOLD_PERCENT, find_highest_memory_process, format_bytes,
+    is_memory_threshold_exceeded, kill_process,
 };
 use sysinfo::System;
 

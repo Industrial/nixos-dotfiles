@@ -56,6 +56,7 @@ All improvements should be validated against existing NixOS assays before commit
 
 - `references/nixos-improvements-analysis.md` - Comprehensive improvements analysis
 - `templates/` - Nix module starter templates
+  - `templates/feature-structure.md` - Standard structure for NixOS features
 - `scripts/` - Verification and validation scripts
 
 ## Recent Changes (session-specific)
@@ -97,3 +98,67 @@ To add a new improvement:
 3. Verify against existing assays
 4. Document in `references/nixos-improvements-analysis.md`
 5. Add entry to the improvements framework table
+
+## Standard NixOS Feature Structure
+
+For features in `features/<category>/<name>/` (cli, nixos, etc.):
+
+### Required Files
+- `package.nix` - Defines the package using appropriate builders (buildRustPackage, etc.)
+- `default.nix` - Includes the package in environment.systemPackages or appropriate NixOS module options
+
+### Optional Files
+- `default.assay.nix` - Assay unit tests for the feature
+
+### Standard Patterns
+
+**package.nix** (for Rust packages):
+```nix
+{ lib, pkgs, ... }: 
+  pkgs.buildRustPackage rec {
+    pname = "<featurename>";
+    version = "<version>";
+
+    src = pkgs.fetchFromGitHub {
+      owner = "<owner>";
+      repo = "<repo>";
+      rev = "<rev>";
+      sha256 = "<sha256>";
+    };
+
+    # ... other package configuration
+
+    meta = {
+      description = "<description>";
+      homepage = "<homepage>";
+      license = lib.licenses.<license>;
+      platforms = pkgs.platforms.linux;
+      maintainers = [pkgs.maintainers.unknown];
+    };
+  }
+```
+
+**default.nix**:
+```nix
+{ lib, pkgs, ... }:
+{
+  environment.systemPackages = [ (pkgs.callPackage ./package.nix {}) ];
+}
+```
+
+**default.assay.nix**:
+```nix
+let
+  assay = import ./../../../common/assay/default.nix;
+  mod = let
+    pkgs = {
+      <featurename> = "<featurename>";
+    };
+  in
+    import ./default.nix {inherit pkgs;};
+in
+  assay.suite "<featurename>" {
+    systemPackages = assay.eq mod.environment.systemPackages ["<featurename>"];
+  }
+```
+See `templates/feature-structure.md` for a reference.
