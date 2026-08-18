@@ -41,8 +41,8 @@ hl.config({
       },
       inactive_border = "rgba(3c3836aa)",
     },
-    -- Master is more usable on 32:9 than dwindle alone.
-    layout = "master",
+    -- Dwindle: free directional swaps (move left/right/up/down).
+    layout = "dwindle",
     allow_tearing = false,
   },
 
@@ -133,8 +133,7 @@ hl.window_rule({ match = { class = "^(nm-connection-editor)$" }, float = true, c
 hl.window_rule({ match = { class = "^(org.gnome.Settings)$" }, float = true })
 hl.window_rule({ match = { class = "^(org.gnome.Nautilus)$" }, float = false })
 
--- Prefer coding / browsing workspaces on open (silent)
-hl.window_rule({ match = { class = "^(Alacritty)$" }, workspace = "1 silent" })
+-- Prefer browsing workspace on open (silent); terminals stay on the current workspace
 hl.window_rule({ match = { class = "^(librewolf|firefox|brave-browser)$" }, workspace = "2 silent" })
 
 -- Caelestia layers: keep snappy, lightly blurred

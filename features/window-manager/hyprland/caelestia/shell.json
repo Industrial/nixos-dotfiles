@@ -1,92 +1,92 @@
 {
-  "general": {
-    "apps": {
-      "terminal": [
-        "alacritty"
-      ],
-      "audio": [
-        "pavucontrol"
-      ],
-      "explorer": [
-        "nautilus"
-      ]
-    },
-    "idle": {
-      "lockBeforeSleep": true,
-      "inhibitWhenAudio": true,
-      "inhibitWhenCharging": false,
-      "timeouts": [
-        {
-          "timeout": 300,
-          "idleAction": "lock"
+    "bar": {
+        "persistent": true,
+        "tray": {
+            "compact": true
         },
-        {
-          "timeout": 600,
-          "idleAction": "dpms off",
-          "returnAction": "dpms on"
-        },
-        {
-          "timeout": 900,
-          "idleAction": [
-            "systemctl",
-            "suspend"
-          ]
+        "workspaces": {
+            "perMonitorWorkspaces": true,
+            "shown": 10
         }
-      ]
-    }
-  },
-  "bar": {
-    "persistent": true,
-    "workspaces": {
-      "shown": 10,
-      "perMonitorWorkspaces": true
     },
-    "tray": {
-      "compact": true
+    "general": {
+        "apps": {
+            "audio": [
+                "pavucontrol"
+            ],
+            "explorer": [
+                "nautilus"
+            ],
+            "terminal": [
+                "alacritty"
+            ]
+        },
+        "idle": {
+            "inhibitWhenAudio": true,
+            "inhibitWhenCharging": false,
+            "lockBeforeSleep": true,
+            "timeouts": [
+                {
+                    "idleAction": "lock",
+                    "timeout": 300
+                },
+                {
+                    "idleAction": "dpms off",
+                    "returnAction": "dpms on",
+                    "timeout": 600
+                },
+                {
+                    "idleAction": [
+                        "systemctl",
+                        "suspend"
+                    ],
+                    "timeout": 900
+                }
+            ]
+        }
+    },
+    "launcher": {
+        "maxWallpapers": 99,
+        "useFuzzy": {
+            "wallpapers": true
+        }
+    },
+    "lock": {
+        "enabled": true
+    },
+    "osd": {
+        "enableBrightness": true,
+        "enableMicrophone": true,
+        "enabled": true
+    },
+    "paths": {
+        "wallpaperDir": "/data/Images/Wallpapers"
+    },
+    "session": {
+        "enabled": true
+    },
+    "utilities": {
+        "quickToggles": [
+            {
+                "enabled": true,
+                "id": "wifi"
+            },
+            {
+                "enabled": true,
+                "id": "bluetooth"
+            },
+            {
+                "enabled": true,
+                "id": "mic"
+            },
+            {
+                "enabled": true,
+                "id": "gameMode"
+            },
+            {
+                "enabled": true,
+                "id": "dnd"
+            }
+        ]
     }
-  },
-  "launcher": {
-    "maxWallpapers": 99,
-    "useFuzzy": {
-      "wallpapers": true
-    }
-  },
-  "osd": {
-    "enabled": true,
-    "enableBrightness": true,
-    "enableMicrophone": true
-  },
-  "session": {
-    "enabled": true
-  },
-  "lock": {
-    "enabled": true
-  },
-  "paths": {
-    "wallpaperDir": "/data/Images/Wallpapers"
-  },
-  "utilities": {
-    "quickToggles": [
-      {
-        "id": "wifi",
-        "enabled": true
-      },
-      {
-        "id": "bluetooth",
-        "enabled": true
-      },
-      {
-        "id": "mic",
-        "enabled": true
-      },
-      {
-        "id": "gameMode",
-        "enabled": true
-      },
-      {
-        "id": "dnd",
-        "enabled": true
-      }
-    ]
-  }
 }

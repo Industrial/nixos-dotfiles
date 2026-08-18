@@ -47,4 +47,4 @@ Primary: `hyprland.lua`. Shell: Caelestia.
 
 ## Layout
 
-Master layout (ultrawide-friendly). VRR=0 by default (Caelestia flicker guidance).
+Dwindle tiling (directional focus/move). VRR=0 by default (Caelestia flicker guidance).

@@ -10,7 +10,7 @@ in
     hasCaelestiaGuard = assay.eq (builtins.match ".*hasCaelestia.*" src != null) true;
     installsHyprpolkit = assay.eq (builtins.match ".*hyprpolkitagent.*" src != null) true;
     luaUsesCaelestia = assay.eq (builtins.match ".*caelestia-shell.*" lua != null) true;
-    luaHasMaster = assay.eq (builtins.match ".*master.*" lua != null) true;
+    luaHasDwindle = assay.eq (builtins.match ".*layout = \"dwindle\".*" lua != null) true;
     shellIdleConfigured = assay.eq (builtins.match ".*lockBeforeSleep.*" shell != null) true;
     shellWallpaperDir = assay.eq (builtins.match ".*Wallpapers.*" shell != null) true;
   }
