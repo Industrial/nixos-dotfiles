@@ -103,7 +103,7 @@ The following improvements were captured during the 2026-08-15 session:
 - **Verification**: Assay structure validated; PR #107 open on GitHub
 - **Notes**: LUKS encryption with initrd unlock support; file missing trailing newline (fixed in commit)
 
-#### Secure Boot Implementation (Priority: Security)\n- **File**: `features/nixos/secure-boot/default.nix`\n- **Change**: Added `boot.loader.systemd-boot.enable`, `boot.loader.secureBoot.enable`, `boot.loader.efi.canTouchEfiVariables`\n- **Verification**: Assay structure validated; PR #108 open on GitHub\n- **Notes**: UEFI Secure Boot with systemd-boot configuration. Now enabled in base profile for all hosts.
+#### Secure Boot Implementation (Priority: Security)\\n- **File**: `features/nixos/secure-boot/default.nix`\\n- **Change**: Added `boot.loader.systemd-boot.enable`, `boot.loader.secureBoot.enable`, `boot.loader.efi.canTouchEfiVariables`\\n- **Verification**: Assay structure validated; PR #108 open on GitHub\\n- **Notes**: UEFI Secure Boot with systemd-boot configuration. **Enabled in base profile** (commit 5756c304) making it active for all hosts (drakkar, huginn, mimir) upon next rebuild.
 
 #### NixOS Improvements Analysis (Priority: Modernization)
 - **File**: `NIXOS_IMPROVEMENTS.md` (root repo, 239 lines)
