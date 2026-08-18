@@ -94,6 +94,9 @@ hl.config({
   },
 })
 
+-- 3-finger horizontal swipe switches workspaces (laptops/tablets)
+hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+
 hl.curve("myBezier", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.05 } } })
 
 hl.animation({ leaf = "windows", enabled = true, speed = 7, bezier = "myBezier" })
