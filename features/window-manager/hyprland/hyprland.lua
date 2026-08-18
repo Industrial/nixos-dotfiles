@@ -123,11 +123,10 @@ hl.on("hyprland.start", function()
   hl.exec_cmd("bash -lc 'caelestia-shell >>/tmp/caelestia-shell.log 2>&1'")
   hl.exec_cmd("blueman-applet")
   hl.exec_cmd("gnome-keyring-daemon --start --components=ssh")
-  -- Wallpaper owned by Caelestia; hyprpaper left installed unused.
-  -- hl.exec_cmd("hyprpaper")
+  -- Wallpaper owned by Caelestia
   hl.exec_cmd("hyprsunset")
   hl.exec_cmd("nm-applet --indicator")
-  hl.exec_cmd("polkit-gnome/polkit-gnome-authentication-agent-1")
+  hl.exec_cmd("hyprpolkitagent")
 end)
 
 -- TODO: this broke (hyprlang gestures block):

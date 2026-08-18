@@ -119,6 +119,55 @@
         "type": "github"
       }
     },
+    "caelestia-cli": {
+      "inputs": {
+        "caelestia-shell": [
+          "caelestia-shell"
+        ],
+        "nixpkgs": [
+          "caelestia-shell",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786674943,
+        "narHash": "sha256-UwVo4emt9+GDslfabJfCkfO1uOqdhLroqByMEd9RpGk=",
+        "owner": "caelestia-dots",
+        "repo": "cli",
+        "rev": "9857e1a5c4dad637a6220fa4290026559ba86c18",
+        "type": "github"
+      },
+      "original": {
+        "owner": "caelestia-dots",
+        "repo": "cli",
+        "type": "github"
+      }
+    },
+    "caelestia-shell": {
+      "inputs": {
+        "caelestia-cli": "caelestia-cli",
+        "m3shapes": "m3shapes",
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "quickshell": [
+          "quickshell"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786897751,
+        "narHash": "sha256-NbE+tIQYWOMLmIotwV6U7KAOPuMuLOO9UAjPGJU9vUI=",
+        "owner": "caelestia-dots",
+        "repo": "shell",
+        "rev": "ad8dca0a8bdc8c92fe6581f36c70ee4d7e65388d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "caelestia-dots",
+        "repo": "shell",
+        "type": "github"
+      }
+    },
     "comin": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -626,6 +675,23 @@
         "type": "github"
       }
     },
+    "m3shapes": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1781017666,
+        "narHash": "sha256-kfHyzZaPHgqZML48OA+5JwBOsLdQJ2ci/aGPShvUB4Y=",
+        "owner": "soramanew",
+        "repo": "m3shapes",
+        "rev": "bdc327b29f95394a732baf3c9b19658ba23755b6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "soramanew",
+        "repo": "m3shapes",
+        "rev": "bdc327b29f95394a732baf3c9b19658ba23755b6",
+        "type": "github"
+      }
+    },
     "nix-vscode-extensions": {
       "inputs": {
         "nixpkgs": [
@@ -661,6 +727,18 @@
         "repo": "nixos-hardware",
         "type": "github"
       }
+    },
+    "nixos-update-notifier-src": {
+      "flake": false,
+      "locked": {
+        "path": "../../rust/tools/nixos-update-notifier",
+        "type": "path"
+      },
+      "original": {
+        "path": "../../rust/tools/nixos-update-notifier",
+        "type": "path"
+      },
+      "parent": []
     },
     "nixpkgs": {
       "locked": {
@@ -792,17 +870,41 @@
         "type": "github"
       }
     },
+    "quickshell": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785704021,
+        "narHash": "sha256-eQtczKMAS4ItlB4pr1B3MqBZiyRVl2nkqNdtyRSQMa8=",
+        "owner": "quickshell-mirror",
+        "repo": "quickshell",
+        "rev": "28771c7c74b42e20afca0b1b63980cb46515537c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "quickshell-mirror",
+        "repo": "quickshell",
+        "rev": "28771c7c74b42e20afca0b1b63980cb46515537c",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "assay": "assay",
+        "caelestia-shell": "caelestia-shell",
         "comin": "comin",
         "disko": "disko",
         "hyprland": "hyprland",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-hardware": "nixos-hardware",
+        "nixos-update-notifier-src": "nixos-update-notifier-src",
         "nixpkgs": "nixpkgs_3",
         "nixvim": "nixvim",
         "oomkiller-src": "oomkiller-src",
+        "quickshell": "quickshell",
         "stylix": "stylix"
       }
     },

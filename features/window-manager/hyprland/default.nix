@@ -3,8 +3,6 @@
 # Lua config (hyprland.lua) requires Hyprland 0.55+; pin via flake input `hyprland`
 # (nixpkgs-unstable may still ship an older release).
 # See https://hypr.land/news/26_lua/ and https://wiki.hypr.land/Nix/Hyprland-on-NixOS/
-# TODO: Integrate these plugins/functionalities:
-# - https://github.com/raybbian/hyprtasking
 {
   pkgs,
   lib,
@@ -82,14 +80,6 @@ in
             ln -sfn /etc/xdg/hypr/hyprland.conf.hyprlang /home/${settings.username}/.config/hypr/hyprland.conf.hyprlang
           fi
 
-          if [ ! -f /home/${settings.username}/.config/hypr/hypridle.conf ]; then
-            ln -sfn /etc/xdg/hypr/hypridle.conf /home/${settings.username}/.config/hypr/hypridle.conf
-          fi
-
-          if [ ! -f /home/${settings.username}/.config/hypr/hyprpaper.conf ]; then
-            ln -sfn /etc/xdg/hypr/hyprpaper.conf /home/${settings.username}/.config/hypr/hyprpaper.conf
-          fi
-
           if [ ! -f /home/${settings.username}/.config/hypr/hyprsunset.conf ]; then
             ln -sfn /etc/xdg/hypr/hyprsunset.conf /home/${settings.username}/.config/hypr/hyprsunset.conf
           fi
@@ -126,20 +116,8 @@ in
           source = ./hyprland.conf.hyprlang;
           mode = "0644";
         };
-        "xdg/hypr/hypridle.conf" = {
-          source = ./hypridle.conf;
-          mode = "0644";
-        };
-        "xdg/hypr/hyprpaper.conf" = {
-          source = ./hyprpaper.conf;
-          mode = "0644";
-        };
         "xdg/hypr/hyprsunset.conf" = {
           source = ./hyprsunset.conf;
-          mode = "0644";
-        };
-        "xdg/ashell/config.toml" = {
-          source = ./ashell.toml;
           mode = "0644";
         };
         "xdg/caelestia/shell.json" = {
@@ -162,49 +140,41 @@ in
       systemPackages = with pkgs; [
         # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
         hyprlandPkg
-        # Lock screen
-        hyprlock
-        # Idle screen
-        hypridle
-        # Wallpaper manager
-        hyprpaper
         # Cursor theme manager
         hyprcursor
         # Blue-light filter / Night light
         hyprsunset
-        # Bar
-        ashell
-        # Application launcher
-        wofi
-        # Notification daemon
-        mako
 
-        # WiFi/Network GUI (system tray)
+        # WiFi/Network GUI (kept for settings apps; tray via Caelestia)
         networkmanagerapplet
-        # NetworkManager dmenu launcher
         networkmanager_dmenu
-        # Bluetooth manager GUI
         blueman
-        # Audio control GUI
         pavucontrol
-        # Settings (optional)
         gnome-control-center
 
-        # Polkit for authentication dialogs
-        polkit_gnome
+        # Polkit (Hyprland-native)
+        hyprpolkitagent
+
+        # Caelestia CLI / desktop utilities
+        grim
+        slurp
+        swappy
+        cliphist
+        wl-clipboard
+        fuzzel
+        gpu-screen-recorder
+
+        # Qt Wayland
+        qt5.qtwayland
+        qt6.qtwayland
 
         # System utilities
-        brightnessctl # Screen brightness control
-        wireplumber # Audio system (usually handled by systemd)
-        playerctl # Media player control
+        brightnessctl
+        wireplumber
+        playerctl
 
-        # File manager
         nautilus
-
-        # Terminal
         alacritty
-
-        # GNOME Keyring for password management
         gnome-keyring
       ]
       ++ lib.optionals hasCaelestia [
