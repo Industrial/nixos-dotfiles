@@ -65,8 +65,8 @@ hl.config({
     enabled = true,
   },
 
+  -- Note: window pseudotile is hl.dsp.window.pseudo(), not a dwindle key (0.55+).
   dwindle = {
-    pseudotile = true,
     preserve_split = true,
   },
 
@@ -76,10 +76,7 @@ hl.config({
     orientation = "left",
   },
 
-  gestures = {
-    workspace_swipe = true,
-    workspace_swipe_fingers = 3,
-  },
+  -- Trackpad workspace swipe is configured via hl.gesture() (0.55+), not gestures.*.
 
   misc = {
     -- 0 = off (Caelestia FAQ: VRR can flicker with shell)
