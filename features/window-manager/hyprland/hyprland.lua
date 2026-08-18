@@ -113,20 +113,16 @@ hl.env("CAELESTIA_WALLPAPERS_DIR", "/data/Images/Wallpapers")
 
 -- See https://wiki.hypr.land/Configuring/Basics/Autostart/
 hl.on("hyprland.start", function()
-  -- Applications
-  -- hl.exec_cmd("bisq")
-  -- hl.exec_cmd("librewolf")
-  -- hl.exec_cmd("spotify")
-
-  -- Desktop shell: Caelestia (bar, launcher, notifications).
-  -- ashell/wofi/mako stay installed for rollback but are not started.
-  hl.exec_cmd("bash -lc 'caelestia-shell >>/tmp/caelestia-shell.log 2>&1'")
-  hl.exec_cmd("blueman-applet")
+  -- Ordered: secrets → auth → clipboard → shell → applets
   hl.exec_cmd("gnome-keyring-daemon --start --components=ssh")
-  -- Wallpaper owned by Caelestia
-  hl.exec_cmd("hyprsunset")
-  hl.exec_cmd("nm-applet --indicator")
   hl.exec_cmd("hyprpolkitagent")
+  hl.exec_cmd("wl-paste --type text --watch cliphist store")
+  hl.exec_cmd("wl-paste --type image --watch cliphist store")
+  hl.exec_cmd("bash -lc 'caelestia-shell >>/tmp/caelestia-shell.log 2>&1'")
+  hl.exec_cmd("hyprsunset")
+  -- Tray icons optional; Caelestia status icons are primary
+  -- hl.exec_cmd("blueman-applet")
+  -- hl.exec_cmd("nm-applet --indicator")
 end)
 
 -- TODO: this broke (hyprlang gestures block):
@@ -142,10 +138,16 @@ end)
 ---- KEYBINDINGS ----
 ---------------------
 
--- Session
+-- Session / Caelestia shell
 hl.bind("SUPER + CTRL + SHIFT + R", hl.dsp.exec_cmd("hyprctl reload"))
-hl.bind("SUPER + CTRL + SHIFT + Q", hl.dsp.exit())
-hl.bind("SUPER + CTRL + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
+hl.bind("SUPER + CTRL + SHIFT + Q", hl.dsp.global("caelestia:session"))
+hl.bind("SUPER + CTRL + SHIFT + L", hl.dsp.global("caelestia:lock"))
+hl.bind("SUPER + CTRL + SHIFT + C", hl.dsp.global("caelestia:clearNotifs"))
+hl.bind("SUPER + CTRL + SHIFT + B", hl.dsp.global("caelestia:sidebar"))
+hl.bind(
+  "SUPER + CTRL + ALT + R",
+  hl.dsp.exec_cmd("bash -lc 'pkill -x caelestia-shell || true; sleep 0.2; caelestia-shell >>/tmp/caelestia-shell.log 2>&1'")
+)
 
 -- Window
 hl.bind("SUPER + CTRL + C", hl.dsp.window.close())
@@ -192,25 +194,28 @@ hl.bind("SUPER + CTRL + 8", hl.dsp.window.move({ workspace = 8 }))
 hl.bind("SUPER + CTRL + 9", hl.dsp.window.move({ workspace = 9 }))
 hl.bind("SUPER + CTRL + 0", hl.dsp.window.move({ workspace = 10 }))
 
--- Audio
-hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"))
-hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"))
+-- Volume via wpctl (Caelestia OSD follows PipeWire); brightness/media via globals
+hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ 0; wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+"))
+hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ 0; wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"))
 hl.bind("XF86AudioMute", hl.dsp.exec_cmd("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"))
+hl.bind("XF86AudioPlay", hl.dsp.global("caelestia:mediaToggle"))
+hl.bind("XF86AudioPause", hl.dsp.global("caelestia:mediaToggle"))
+hl.bind("XF86AudioNext", hl.dsp.global("caelestia:mediaNext"))
+hl.bind("XF86AudioPrev", hl.dsp.global("caelestia:mediaPrev"))
+hl.bind("XF86MonBrightnessUp", hl.dsp.global("caelestia:brightnessUp"))
+hl.bind("XF86MonBrightnessDown", hl.dsp.global("caelestia:brightnessDown"))
 
--- Brightness
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("brightnessctl set +10%"))
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("brightnessctl set 10%-"))
+-- Clipboard / emoji (Caelestia CLI)
+hl.bind("SUPER + CTRL + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard"))
+hl.bind("SUPER + CTRL + SHIFT + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard -d"))
+hl.bind("SUPER + CTRL + PERIOD", hl.dsp.exec_cmd("pkill fuzzel || caelestia emoji -p"))
 
--- TODO (hyprlang): scroll workspaces with SUPER + wheel
--- hl.bind("SUPER + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
--- hl.bind("SUPER + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
+-- Screenshots / record (Caelestia CLI)
+hl.bind("PRINT", hl.dsp.exec_cmd("caelestia screenshot"))
+hl.bind("SUPER + PRINT", hl.dsp.exec_cmd("caelestia screenshot -r"))
+hl.bind("SUPER + SHIFT + PRINT", hl.dsp.global("caelestia:screenshotFreeze"))
+hl.bind("SUPER + CTRL + PRINT", hl.dsp.exec_cmd("caelestia record"))
 
--- TODO (hyprlang): mouse drag/resize
--- hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
--- hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
-
--- TODO (hyprlang): desktop integration binds
--- hl.bind("SUPER + SHIFT + N", hl.dsp.exec_cmd("networkmanager_dmenu"))
--- hl.bind("SUPER + SHIFT + B", hl.dsp.exec_cmd("blueman-manager"))
--- hl.bind("SUPER + SHIFT + A", hl.dsp.exec_cmd("pavucontrol"))
--- hl.bind("SUPER + SHIFT + S", hl.dsp.exec_cmd("gnome-control-center"))
+-- TODO (hyprlang): scroll workspaces with SUPER + wheel — wave 2
+-- TODO (hyprlang): mouse drag/resize — wave 2
+-- TODO (hyprlang): window rules / gestures — wave 2
