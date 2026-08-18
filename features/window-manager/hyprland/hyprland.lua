@@ -208,10 +208,9 @@ hl.bind("XF86AudioPrev", hl.dsp.global("caelestia:mediaPrev"), { locked = true }
 hl.bind("XF86MonBrightnessUp", hl.dsp.global("caelestia:brightnessUp"), { locked = true })
 hl.bind("XF86MonBrightnessDown", hl.dsp.global("caelestia:brightnessDown"), { locked = true })
 
--- Clipboard / emoji
+-- Clipboard
 hl.bind("SUPER + CTRL + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard"))
 hl.bind("SUPER + CTRL + SHIFT + V", hl.dsp.exec_cmd("pkill fuzzel || caelestia clipboard -d"))
-hl.bind("SUPER + CTRL + PERIOD", hl.dsp.exec_cmd("pkill fuzzel || caelestia emoji -p"))
 
 -- Screenshots / record
 hl.bind("PRINT", hl.dsp.exec_cmd("caelestia screenshot"))
