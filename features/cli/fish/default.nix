@@ -59,12 +59,4 @@ in {
       XDG_STATE_HOME = "$HOME/.local/state";
     };
   };
-
-  users = {
-    users = {
-      "${settings.username}" = {
-        shell = pkgs.fish;
-      };
-    };
-  };
 }

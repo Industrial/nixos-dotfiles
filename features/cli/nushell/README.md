@@ -4,10 +4,9 @@ This Nushell setup mirrors the Fish shell configuration for easy comparison and 
 
 ## Quick Start
 
-```bash
-# From Fish, launch Nushell
-nu
+Nushell is the default login shell. Fish remains available (`fish`) for fallback.
 
+```bash
 # Try some commands
 l                           # List files (same as Fish)
 g status                    # Git status (same as Fish)
@@ -112,25 +111,17 @@ ls | group-by type | transpose key count | sort-by count
 
 ## When to Use Nushell vs Fish
 
-**Use Nushell for:**
+**Use Nushell (default login shell) for:**
+- Daily interactive shell work
 - Working with JSON, YAML, CSV, APIs
 - Data exploration and analysis
 - Scripts that manipulate structured data
-- Learning functional programming paradigms
 
 **Use Fish for:**
-- Daily interactive shell work
-- When you need mature vi mode
-- When completions are critical
+- Mature vi mode / richer completions
 - Traditional Unix text processing
-- Stable, no-surprises environment
+- Stable fallback when Nushell behavior surprises you
 
-## Future Migration Path
+## Fallback
 
-After Nushell 1.0 is released (TBD 2026-2027), evaluate:
-- Vi mode improvements
-- Completion system maturity
-- FZF integration status
-- API stability
-
-Then decide if full migration makes sense.
+Type `fish` (or set the user shell back temporarily) if you need the previous default.

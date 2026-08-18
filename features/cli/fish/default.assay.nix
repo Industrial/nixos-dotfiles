@@ -22,5 +22,5 @@ let
   };
 in
   assay.suite "fish" {
-    shape = assay.hasAttrs mod ["programs" "environment" "users"];
+    shape = assay.hasAttrs mod ["programs" "environment"];
   }

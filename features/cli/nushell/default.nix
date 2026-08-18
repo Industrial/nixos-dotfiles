@@ -7,11 +7,17 @@
   nushellDir = "${settings.userdir}/.dotfiles/features/cli/nushell";
   havamal = pkgs.callPackage ../fish/havamal.nix {inherit settings pkgs;};
 in {
-  environment.systemPackages = with pkgs; [
-    nushell
-  ];
+  environment = {
+    systemPackages = with pkgs; [
+      nushell
+    ];
+    shells = with pkgs; [
+      nushell
+    ];
+  };
 
-  # Fish remains the default login shell; `nu` is interactive.
+  users.users."${settings.username}".shell = pkgs.nushell;
+
   # Link config on every activation so a fresh `~/.config/nushell` from first
   # `nu` launch cannot shadow starship / aliases / Hávamál.
   system.activationScripts.linkNushellConfig = {
