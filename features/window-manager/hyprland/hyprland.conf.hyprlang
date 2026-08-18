@@ -95,7 +95,7 @@ dwindle {
     # Open terminal
     bind = SUPER, Return, exec, alacritty
     # Run command (dmenu-like)
-    bind = SUPER CTRL, P, exec, wofi --show run
+    bind = SUPER CTRL, P, global, caelestia:launcher
   # Focus
     # Move focus left
     bind = SUPER, h, movefocus, l
@@ -203,11 +203,9 @@ xwayland {
   exec-once = librewolf
   exec-once = spotify
   # Supportive
-  exec-once = ashell --config-path /etc/xdg/ashell/config.toml
+  exec-once = caelestia-shell
   exec-once = blueman-applet
   exec-once = gnome-keyring-daemon --start --components=ssh
-  exec-once = hyprpaper
-  exec-once = hyprsunset
-  exec-once = mako
-  exec-once = nm-applet --indicator
+    exec-once = hyprsunset
+    exec-once = nm-applet --indicator
   exec-once = polkit-gnome/polkit-gnome-authentication-agent-1
