@@ -64,5 +64,29 @@
   },
   "paths": {
     "wallpaperDir": "/data/Images/Wallpapers"
+  },
+  "utilities": {
+    "quickToggles": [
+      {
+        "id": "wifi",
+        "enabled": true
+      },
+      {
+        "id": "bluetooth",
+        "enabled": true
+      },
+      {
+        "id": "mic",
+        "enabled": true
+      },
+      {
+        "id": "gameMode",
+        "enabled": true
+      },
+      {
+        "id": "dnd",
+        "enabled": true
+      }
+    ]
   }
 }

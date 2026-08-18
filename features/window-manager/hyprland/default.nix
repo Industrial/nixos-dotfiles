@@ -26,6 +26,17 @@
     if hasCaelestia
     then inputs.caelestia-shell.inputs.caelestia-cli.packages.${system}.default
     else null;
+  monitorProfile = pkgs.writeShellScriptBin "hypr-monitor-profile" (
+    let
+      raw = builtins.readFile ./hypr-monitor-profile.sh;
+      # Drop shebang; writeShellScriptBin supplies one.
+      body =
+        if lib.hasPrefix "#!" raw
+        then lib.concatStringsSep "\n" (lib.drop 1 (lib.splitString "\n" raw))
+        else raw;
+    in
+      body
+  );
   nestedCaelestiaLauncher = pkgs.writeShellScriptBin "nested-caelestia-hyprland" ''
     set -euo pipefail
     if [ -z "''${WAYLAND_DISPLAY:-}" ]; then
@@ -176,6 +187,8 @@ in
         nautilus
         alacritty
         gnome-keyring
+
+        monitorProfile
       ]
       ++ lib.optionals hasCaelestia [
         caelestiaShellPkg
