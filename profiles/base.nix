@@ -82,6 +82,7 @@
     ../features/nixos/networking/firewall.nix
     ../features/nixos/security/no-defaults
     ../features/nixos/security/sudo
+    ../features/nixos/secure-boot
     ../features/nixos/systemd
     ../features/nixos/sound
     ../features/nixos/users
