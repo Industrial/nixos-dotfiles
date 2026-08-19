@@ -175,7 +175,8 @@
           # ../../features/security/kernel
           # ../../features/security/tailscale
 
-          # Window Manager (commented for future use)
+          # Window Manager
+          ../../features/window-manager/hyprland
           #../../features/window-manager/ghostty
           #../../features/window-manager/slock
           # ../../features/window-manager/xfce
