@@ -20,7 +20,7 @@
   installerUrl = "https://download2.interactivebrokers.com/installers/tws/stable-standalone/tws-stable-standalone-linux-x64.sh";
 
   # nix-prefetch-url "${installerUrl}"
-  installerHash = "sha256-rGsJDvhcw2klGYOCwVFiPmGWh2CKGQa1wTZh2JGIyWc=";
+  installerHash = "sha256-GkTIMbhr4bEeX2oImsxkBXc2ZT9pdhL88pEfNPIm2vE=";
 
   launcherTemplate = ./tws-launcher.sh.in;
 

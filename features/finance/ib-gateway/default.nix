@@ -17,7 +17,7 @@
   installerUrl = "https://download2.interactivebrokers.com/installers/ibgateway/latest-standalone/ibgateway-latest-standalone-linux-x64.sh";
 
   # nix-prefetch-url "${installerUrl}"
-  installerHash = "sha256-hcU2gis0Tv/2OgniJrP+QmLn3AqIA6SVCeZw/cYfxFA=";
+  installerHash = "sha256-exuclHkgWwMccocdLXLiPFgRnAWGw08cVCERwvsk13w=";
 
   launcherTemplate = ./ib-gateway-launcher.sh.in;
 
