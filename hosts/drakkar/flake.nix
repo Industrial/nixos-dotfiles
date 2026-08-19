@@ -180,6 +180,7 @@
         #../../features/window-manager/slock
         # ../../features/window-manager/xfce
         ];
+        ];
       ];
     };
   };
