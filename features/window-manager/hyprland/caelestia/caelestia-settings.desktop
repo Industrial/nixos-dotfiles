@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Caelestia Settings
+GenericName=Settings
+Comment=Configure Caelestia Shell (Nexus)
+Exec=caelestia shell nexus open
+Icon=preferences-system
+Categories=Settings;DesktopSettings;
+Keywords=settings;preferences;caelestia;nexus;shell;
+StartupNotify=false
+NoDisplay=false

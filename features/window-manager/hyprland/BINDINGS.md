@@ -22,6 +22,7 @@ Primary: `hyprland.lua`. Shell: Caelestia.
 | SUPER+CTRL+C/Q/Space | close / kill / float |
 | SUPER+Return | alacritty |
 | SUPER+CTRL+P | Caelestia launcher |
+| SUPER+CTRL+, | Caelestia Settings (Nexus) |
 | SUPER+H/J/K/L | focus |
 | SUPER+CTRL+H/J/K/L | move window |
 | SUPER+1…0 | workspace 1–10 |

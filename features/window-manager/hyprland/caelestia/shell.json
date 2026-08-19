@@ -1,6 +1,32 @@
 {
     "bar": {
         "persistent": true,
+        "statusIcons": [
+            {
+                "enabled": true,
+                "id": "lockStatus"
+            },
+            {
+                "enabled": true,
+                "id": "audio"
+            },
+            {
+                "enabled": true,
+                "id": "microphone"
+            },
+            {
+                "enabled": true,
+                "id": "network"
+            },
+            {
+                "enabled": true,
+                "id": "bluetooth"
+            },
+            {
+                "enabled": true,
+                "id": "battery"
+            }
+        ],
         "tray": {
             "compact": true
         },
@@ -46,6 +72,9 @@
         }
     },
     "launcher": {
+        "hiddenApps": [
+            "org.gnome.Settings"
+        ],
         "maxWallpapers": 99,
         "useFuzzy": {
             "wallpapers": true

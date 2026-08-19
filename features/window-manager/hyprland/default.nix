@@ -102,9 +102,13 @@ in
 
           # Caelestia: managed shell.json + wallpaper library symlink for the picker
           mkdir -p /home/${settings.username}/.config/caelestia
+          mkdir -p /home/${settings.username}/.local/share/applications
           mkdir -p /home/${settings.username}/Pictures
           if [ -f "${dotfilesHyprDir}/caelestia/shell.json" ]; then
             ln -sfn "${dotfilesHyprDir}/caelestia/shell.json" /home/${settings.username}/.config/caelestia/shell.json
+          fi
+          if [ -f "${dotfilesHyprDir}/caelestia/caelestia-settings.desktop" ]; then
+            ln -sfn "${dotfilesHyprDir}/caelestia/caelestia-settings.desktop" /home/${settings.username}/.local/share/applications/caelestia-settings.desktop
           fi
           if [ -d /data/Images/Wallpapers ]; then
             ln -sfn /data/Images/Wallpapers /home/${settings.username}/Pictures/Wallpapers
@@ -161,7 +165,6 @@ in
         networkmanager_dmenu
         blueman
         pavucontrol
-        gnome-control-center
 
         # Polkit (Hyprland-native)
         hyprpolkitagent

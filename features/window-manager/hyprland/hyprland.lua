@@ -130,8 +130,10 @@ end)
 hl.window_rule({ match = { class = "^(pavucontrol)$" }, float = true, center = true })
 hl.window_rule({ match = { class = "^(blueman-manager)$" }, float = true, center = true })
 hl.window_rule({ match = { class = "^(nm-connection-editor)$" }, float = true, center = true })
-hl.window_rule({ match = { class = "^(org.gnome.Settings)$" }, float = true })
 hl.window_rule({ match = { class = "^(org.gnome.Nautilus)$" }, float = false })
+
+-- Chromium/Electron request maximize on open; keep them tiled with siblings.
+hl.window_rule({ match = { class = ".*" }, suppress_event = "maximize" })
 
 -- Prefer browsing workspace on open (silent); terminals stay on the current workspace
 hl.window_rule({ match = { class = "^(librewolf|firefox|brave-browser)$" }, workspace = "2 silent" })
@@ -168,6 +170,7 @@ hl.bind("SUPER + CTRL + Space", hl.dsp.window.float({ action = "toggle" }))
 -- Application
 hl.bind("SUPER + Return", hl.dsp.exec_cmd("alacritty"))
 hl.bind("SUPER + CTRL + P", hl.dsp.global("caelestia:launcher"))
+hl.bind("SUPER + CTRL + comma", hl.dsp.global("caelestia:nexus"))
 
 -- Focus / move
 hl.bind("SUPER + H", hl.dsp.focus({ direction = "l" }))
