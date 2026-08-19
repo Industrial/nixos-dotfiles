@@ -69,6 +69,15 @@ in {
 
   scripts = {
     format.exec = "treefmt";
+    # Dotfiles-appropriate targets for git-hooks-prek entry points.
+    pre-push.exec = ''
+      unset GIT_INDEX_FILE GIT_PREFIX || true
+      assay run .
+    '';
+    pre-commit.exec = ''
+      unset GIT_INDEX_FILE GIT_PREFIX || true
+      assay run .
+    '';
   };
 
   # Project-specific hooks (deepsec + full-repo assay).
