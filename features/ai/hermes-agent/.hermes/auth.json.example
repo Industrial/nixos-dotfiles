@@ -1,9 +1,0 @@
-{
-  "version": 1,
-  "providers": {},
-  "active_provider": null,
-  "suppressed_sources": {
-    "openrouter": ["env:OPENROUTER_API_KEY"]
-  },
-  "credential_pool": {}
-}

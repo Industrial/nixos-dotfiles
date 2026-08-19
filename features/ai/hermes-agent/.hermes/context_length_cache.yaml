@@ -1,2 +1,0 @@
-context_lengths:
-  auto/coding:free@http://127.0.0.1:20128/v1/: 1000000

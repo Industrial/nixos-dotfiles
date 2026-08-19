@@ -1,4 +1,6 @@
 # AI Profile
+# Desktop/local AI apps only. Project agent CLIs (maestro, serena, hermes,
+# context7, lean-ctx, roam, omniroute) come from `.cursor/nix` in product devenvs.
 {
   config,
   lib,
@@ -13,9 +15,7 @@
     # ../features/ai/ollama
     # ../features/ai/anythingllm-desktop
     ../features/ai/claude-code
-    ../features/ai/hermes-agent
     ../features/ai/lmstudio
     ../features/ai/opencode
-    ../features/ai/maestro
   ];
 }
