@@ -393,7 +393,7 @@ x_search:
   timeout_seconds: 180
   retries: 2
 _config_version: 23
-custom_providers:
+custom_providers: null
 mcp_servers:
   lean-ctx:
     command: lean-ctx
@@ -403,16 +403,16 @@ mcp_servers:
     command: roam
     args:
       - mcp
-    enabled: false
+    enabled: true
   context7:
     command: context7-mcp
     args: []
-    enabled: false
+    enabled: true
   serena:
     command: serena
     args:
       - start-mcp-server
-    enabled: false
+    enabled: true
   searxng:
     command: npx
     args:

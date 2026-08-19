@@ -44,7 +44,7 @@ Primary: `hyprland.lua`. Shell: Caelestia.
 
 ## Idle (Caelestia)
 
-300s lock → 600s dpms → 900s suspend (inhibit while audio playing).
+Automatic idle lock / DPMS / suspend is **disabled** (`general.idle.timeouts: []`) so long-running jobs and trading bots are not interrupted. Manual lock still works: SUPER+CTRL+SHIFT+L.
 
 ## Layout
 

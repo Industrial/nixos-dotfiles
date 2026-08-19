@@ -102,10 +102,11 @@ Be aware that some Hermes operations require explicit user consent:
 **Problem:** Trying to edit Hermes configuration files directly when the system blocks such modifications for security reasons.
 **Solution:** Use `hermes config set/get` commands for modifying configuration values instead of direct file edits.
 **Verification:** Check if the system prompts you to use `hermes config` when attempting direct edits.
+**Example from session:** When attempting to patch `/home/tom/.hermes/config.yaml` directly to enable MCP servers, the system refused with: "Refusing to write to Hermes config file: /home/tom/.hermes/config.yaml\nAgent cannot modify security-sensitive configuration. Edit ~/.hermes/config.yaml directly or use 'hermes config' instead." The correct approach was to use `hermes config set mcp_servers.<server-name>.enabled true` for each server.
 
 ### Making Unrequested Changes
 **Problem:** Making configuration or code changes when the user only requested analysis, reporting, or information gathering.
-**Solution:** Always clarify user intent before making modifications. When asked to "analyze and report", "explain why", or similar phrases, limit actions to investigation and reporting only unless explicitly authorized to make changes.
+**Solution:** Always clarify user intent before making modifications. When asked to "analyze and report" or similar phrases, limit actions to investigation and reporting only unless explicitly authorized to make changes.
 **Verification:** Before running any modification commands (like `hermes config set`, `patch`, `write_file`), confirm with the user that changes are expected and desired.
 **Example from session:** When user asked to analyze why onboarding showed "Verification skipped (NEXT_PUBLIC_VERIDAS_MOCK=true)" despite .env having false value, the correct approach was to investigate and report the root cause (hardcoded message in component) rather than attempting to modify code or configuration.
 
@@ -130,6 +131,33 @@ hermes config list
 ```
 
 **Note**: Direct edits to configuration files in `~/.hermes` or project `.hermes` directories may be blocked for security reasons. The system will prompt to use `hermes config` instead when attempting to modify sensitive settings.
+
+**Example - Enabling MCP Servers**:
+```bash
+# Enable the roam-code MCP server
+hermes config set mcp_servers.roam-code.enabled true
+
+# Enable the context7 MCP server  
+hermes config set mcp_servers.context7.enabled true
+
+# Enable the serena MCP server
+hermes config set mcp_servers.serena.enabled true
+
+# Verify the changes
+hermes config get mcp_servers.roam-code.enabled
+hermes config get mcp_servers.context7.enabled
+hermes config get mcp_servers.serena.enabled
+```
+hermes config set mcp_servers.context7.enabled true
+
+# Enable the serena MCP server
+hermes config set mcp_servers.serena.enabled true
+
+# Verify the changes
+hermes config get mcp_servers.roam-code.enabled
+hermes config get mcp_servers.context7.enabled
+hermes config get mcp_servers.serena.enabled
+```
 
 ## Validation
 
