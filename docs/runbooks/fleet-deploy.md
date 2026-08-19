@@ -7,7 +7,8 @@ Operator push-deploy for Drakkar, Huginn, and Mimir using **deploy-rs** on the *
 1. Root flake checked out at `~/.dotfiles` (or `$DOTFILES_ROOT`).
 2. Operator SSH key on target (`tom@<host>`), tested over **Tailscale**.
 3. `tom` in `wheel`; sudo available (`interactiveSudo = true` in deploy profile).
-4. **Comin absent** — pull-deploy is not in this configuration; do not add it back while deploy-rs is primary.
+4. **Operator pubkeys** in `features/fleet/operator-ssh.nix` — one slot per host (`drakkar` enrolled; huginn/mimir filled from those machines later).
+5. Client SSH uses `IdentitiesOnly` for `drakkar huginn mimir` (system `/etc/ssh/ssh_config`).
 
 ## Local validation
 

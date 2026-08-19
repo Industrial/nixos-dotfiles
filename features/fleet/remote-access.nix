@@ -1,8 +1,9 @@
-# Remote fleet access — SSH + Tailscale
+# Remote fleet access — SSH + Tailscale + operator keys
 {lib, ...}: {
   imports = [
     ../network/ssh
     ../security/tailscale
+    ./operator-ssh.nix
   ];
 
   # Pull-deploy (comin) removed from tree; push-deploy only.

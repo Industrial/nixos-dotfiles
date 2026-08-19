@@ -95,8 +95,11 @@ Be aware that some Hermes operations require explicit user consent:
 
 ### Neglecting to Verify Success
 **Problem:** Assuming the copy succeeded without checking, leading to undetectable configuration issues.
-**Solution:** Always verify that key configuration files exist in the target location after copying.
-**Verification:** Check for `config.yaml`, `.env`, and directory structure in the target `.hermes` folder.
+**Solution:** Always verify that key configuration files exist in the target location after copying AND validate their content/syntax.
+**Verification:** 
+- Check for `config.yaml`, `.env`, and directory structure in the target `.hermes` folder.
+- Validate syntax of modified configuration files (e.g., yamllint for YAML, jq for JSON, nix-instantiate --parse for Nix)
+- For application configuration, run associated tests to ensure functionality is preserved
 
 ### Attempting Direct File Edits
 **Problem:** Trying to edit Hermes configuration files directly when the system blocks such modifications for security reasons.
