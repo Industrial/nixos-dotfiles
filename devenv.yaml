@@ -1,3 +1,8 @@
+# Shared Industrial features: `.cursor/nix` (cursor-setup submodule).
+# Project-only flake inputs stay here.
+imports:
+  - ./.cursor/nix
+
 inputs:
   assay:
     url: github:Industrial/assay

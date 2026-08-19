@@ -6,8 +6,10 @@
 
 ```bash
 git submodule update --init --recursive .cursor
-devenv shell   # installs lean-ctx, roam, definitively, Serena uv venv, moon
+devenv shell   # imports `.cursor/nix` — lean-ctx, roam, maestro, serena, assay, moon, …
 ```
+
+Shared tooling is provisioned via `cursor.features.*` in root `devenv.nix` (same pattern as other Industrial repos; no separate top-level `nix/` facade).
 
 ## Git pre-push (deepsec)
 
