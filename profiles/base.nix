@@ -9,10 +9,6 @@
   ...
 }: {
   imports = [
-    # CI/CD Tools
-    inputs.comin.nixosModules.comin
-    ../features/ci/comin
-
     # CLI Tools
     ../features/cli/assay
     ../features/cli/bandwhich

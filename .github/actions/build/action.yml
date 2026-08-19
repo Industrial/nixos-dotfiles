@@ -20,5 +20,5 @@ runs:
             exit 1
             ;;
         esac
-        cd "hosts/$HOST"
+        cd "$GITHUB_WORKSPACE"
         nix build ".#nixosConfigurations.$HOST.config.system.build.toplevel"

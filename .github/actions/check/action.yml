@@ -20,6 +20,6 @@ runs:
             exit 1
             ;;
         esac
-        cd "hosts/$HOST"
+        cd "$GITHUB_WORKSPACE"
         nix flake check
         nix build --dry-run ".#nixosConfigurations.$HOST.config.system.build.toplevel"

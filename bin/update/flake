@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 echo "> update > flake"
+dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$dotfiles_root"
 exec > >(tee ./logs/update-flake) 2>&1
 set -e
 
 bin/update/channels
 
-echo "> update > flake > cd hosts/$(hostname)"
-cd "hosts/$(hostname)"
+echo "> update > flake > cd $dotfiles_root"
+cd "$dotfiles_root"
 
 echo "> update > flake > nix --experimental-features \"nix-command flakes\" flake update"
 nix --experimental-features "nix-command flakes" flake update

@@ -24,6 +24,7 @@ Start in **ORIENT** mode and follow the ID workflow protocol. This is the main e
    lane:<tiny|normal|heavy>
    ```
    Where MODE is one of: ORIENT, RESEARCH, PLAN, EXECUTE, REVIEW, SHIP
+   These declarations are part of the agent's response text and should NOT be executed as shell commands.
 
 3. **Auto-route by lane** (based on `id-workflow/lanes.md`):
    - `tiny` + clear → brief RESEARCH or EXECUTE (if files known)
@@ -48,8 +49,12 @@ When the `id` skill is active (either manually loaded or contextually suggested)
 3. Declare your mode and lane in every response
 4. Progress through the workflow as exit criteria are met
 5. Use the mode-specific skills for guidance in each phase
+6. Consider archiving significant work products (like plans) with timestamps in a history/ directory for future reference
+7. In restricted environments where only memory/skill tools are allowed (e.g., when terminal/code_exec tools are denied), focus on skill updates, memory management, and planning rather than attempting to execute code or run commands
+8. Remember that `[ID:<MODE>]` and `lane:<...>` declarations are part of the agent's response text and should NOT be executed as shell commands
 
 ## Key Difference from Slash Command
 - **Slash command**: Manual invocation via `/id` in editor
 - **Hermes skill**: Contextually activated based on conversation/task detection
+- **Same outcome**: Both provide the ID workflow orchestration with mode gating and Maestro tracking
 - **Same outcome**: Both provide the ID workflow orchestration with mode gating and Maestro tracking

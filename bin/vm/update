@@ -7,7 +7,7 @@ VM_NAME="$1"
 echo "> vm > update > ${VM_NAME}"
 
 REPO_PATH="/home/tom/.dotfiles"
-GIT_PATH="git+file://${REPO_PATH}?dir=./hosts/${VM_NAME}"
+GIT_PATH="git+file://${REPO_PATH}"
 
 # Create or update the MicroVM.
 if [ ! -d "/var/lib/microvms/${VM_NAME}" ]; then

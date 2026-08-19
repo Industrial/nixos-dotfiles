@@ -3,7 +3,7 @@ echo "> repl"
 exec > >(tee ./logs/repl) 2>&1
 set -e
 
-echo "> repl > cd hosts/$(hostname)"
-
-cd "hosts/$(hostname)"
+dotfiles_root="$(cd "$(dirname "$0")/.." && pwd)"
+echo "> repl > cd $dotfiles_root"
+cd "$dotfiles_root"
 nix repl --extra-experimental-features "flakes repl-flake" ".#"

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "manifest": {
+    "hermes-enable-mcp-servers/SKILL.md": [
+      1787083868387978229,
+      578
+    ]
+  },
+  "skills": [
+    {
+      "skill_name": "hermes-enable-mcp-servers",
+      "category": "hermes-enable-mcp-servers",
+      "frontmatter_name": "hermes-enable-mcp-servers",
+      "description": "Enable and verify Hermes MCP servers (lean-ctx, roam, mae...",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    }
+  ],
+  "category_descriptions": {}
+}

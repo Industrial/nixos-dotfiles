@@ -164,6 +164,8 @@ NOTE: `features/ai/hermes-agent/plugins/` is where Nix-built Python plugin *pack
 - Use **class‑level** names that describe a category of work, not a specific issue, PR number, or fleeting error.
 - Examples of valid names: `brainstorm-code`, `prism-analysis`, `superpowers-integration`.
 - Invalid names: `fix-#1234`, `debug-auth-error`, `PR-5678`, `audit-today`.
+- **Exception**: Skills that document reusable procedures for managing classes of similar entities (like multiple NixOS hosts) may include the entity type in the name when it truly represents a class (e.g., `nixos-host-management` is acceptable as it refers to the class of NixOS host management work, not a specific host).
+- **Exception**: Skills that document reusable procedures for managing classes of similar entities (like multiple NixOS hosts) may include the entity type in the name when it truly represents a class (e.g., `nixos-host-management` is acceptable as it refers to the class of NixOS host management work, not a specific host).
 
 ## Skill Content
 

@@ -1,0 +1,30 @@
+# Drakkar system configuration (desktop)
+{inputs, ...}: {
+  imports = [
+    inputs.disko.nixosModules.disko
+    ./disko.nix
+    ./filesystems.nix
+    ./hardware.nix
+    ../../profiles/base.nix
+    ../../profiles/development.nix
+    ../../profiles/desktop.nix
+    ../../profiles/gaming.nix
+    ../../profiles/communication.nix
+    ../../features/nixos/graphics/amd.nix
+    ../../features/hardware/zsa-voyager
+    ../../features/window-manager/hyprland
+    ../../features/fleet/remote-access.nix
+  ];
+
+  nixpkgs.overlays = [
+    (final: prev: {
+      python3Packages =
+        prev.python3Packages
+        // {
+          nanoemoji = prev.python3Packages.nanoemoji.overrideAttrs (_old: {
+            hash = "sha256-FysyKC01XBnRiur5RR9fcsTxQqE8x0JJHSoe3q6JtKc=";
+          });
+        };
+    })
+  ];
+}

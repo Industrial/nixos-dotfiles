@@ -14,7 +14,7 @@ fi
 
 source "$(dirname "$0")/../lib/root-cmd.sh"
 
-host_dir="$dotfiles_root/hosts/$(hostname)"
+host_dir="$dotfiles_root"
 
 echo "> update > system > cd $host_dir"
 cd "$host_dir"

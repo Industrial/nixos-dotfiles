@@ -7,8 +7,9 @@ if [ $# -lt 1 ]; then
   exit 1
 fi
 
+dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
 HOST="$1"
-cd "hosts/$HOST" || exit 1
+cd "$dotfiles_root" || exit 1
 
 if [ ! -f "flake.lock" ]; then
   echo "No flake.lock found for $HOST, skipping"

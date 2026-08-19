@@ -6,7 +6,7 @@
   ...
 }: let
   notifierPkg = pkgs.callPackage inputs.nixos-update-notifier-src {};
-  flakeDir = "${settings.userdir}/.dotfiles/hosts/${settings.hostname}";
+  flakeDir = "${settings.userdir}/.dotfiles";
 in {
   environment.systemPackages = [
     notifierPkg

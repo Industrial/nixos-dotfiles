@@ -19,6 +19,13 @@ Obey `.cursor/commands/id-workflow/PROTOCOL.md` for mode declaration, write bans
 
 ## Core Principles
 
+- For Assay-specific strategic context, see `references/assay-strategic-plan.md`
+- **Be concise and direct** - user prefers minimal verbosity and concrete solutions over theoretical discussions
+- **Focus on implemented solutions** - value seeing actual code implementations that follow established patterns
+- **Match existing code style** - surgical edits only, touch what the task requires
+- **Verify changes** - use terminal for builds, tests, and inspection; confirm they pass before claiming work done
+- **Establish and respect benchmarks** - define baseline metrics; improvements must enhance performance or functionality without degrading baseline numbers
+
 ### Think Before You Act
 - Decompose until each leaf is one PR, one session, one verifiable outcome (1 task ↔ 1 PR)
 - Ground every claim in evidence: read specs, ADRs, code paths; never invent structure
@@ -304,6 +311,7 @@ Reject your draft if any fail:
 - [ ] Parallel waves map to **single-message multi-Task** dispatch
 - [ ] Dependencies acyclic; wave order executable
 - [ ] Mid-level engineer could implement any leaf without clarifying questions
+- [ ] For Assay-related work, strategic context from `references/assay-strategic-plan.md` has been considered
 
 ## Anti-patterns (Do Not)
 - Planning in the parent while skipping parallel recon subagents

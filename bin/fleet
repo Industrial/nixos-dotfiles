@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Fleet push-deploy wrapper (deploy-rs).
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+HOSTS=(drakkar huginn mimir)
+
+deploy_cmd() {
+  nix run --accept-flake-config github:serokell/deploy-rs -- "$@"
+}
+
+usage() {
+  cat <<EOF
+Usage: fleet <command> [host|all] [deploy-rs flags...]
+
+Commands:
+  status              SSH reachability probe for all hosts
+  check [host|all]    nix flake check; optional --dry-activate per host
+  deploy [host|all]   deploy-rs activate (pass --dry-activate to dry-run)
+
+Examples:
+  fleet check huginn
+  fleet deploy huginn --dry-activate
+  fleet deploy all
+EOF
+  exit 1
+}
+
+[[ $# -ge 1 ]] || usage
+cmd="$1"
+shift
+
+case "$cmd" in
+  status)
+    for h in "${HOSTS[@]}"; do
+      printf '=== %s ===\n' "$h"
+      if ssh -o ConnectTimeout=5 -o BatchMode=yes "$h" hostname 2>/dev/null; then
+        echo ok
+      else
+        echo unreachable
+      fi
+    done
+    ;;
+  check)
+    nix flake check
+    target="${1:-}"
+    shift || true
+    if [[ -z "$target" || "$target" == "all" ]]; then
+      for h in "${HOSTS[@]}"; do
+        echo "> fleet check deploy .#$h --dry-activate"
+        deploy_cmd ".#$h" --dry-activate "$@" || true
+      done
+    else
+      deploy_cmd ".#$target" --dry-activate "$@"
+    fi
+    ;;
+  deploy)
+    target="${1:-}"
+    [[ -n "$target" ]] || usage
+    shift
+    if [[ "$target" == "all" ]]; then
+      deploy_cmd . "$@"
+    else
+      deploy_cmd ".#$target" "$@"
+    fi
+    ;;
+  *) usage ;;
+esac

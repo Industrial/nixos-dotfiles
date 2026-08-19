@@ -12,7 +12,7 @@
   enableAutoUpdate = false;
 
   dotfilesDir = "${settings.userdir}/.dotfiles";
-  hostFlakeDir = "${dotfilesDir}/hosts/${settings.hostname}";
+  hostFlakeDir = dotfilesDir;
   logFile = "${dotfilesDir}/logs/nixos-auto-update";
 
   updateScript = pkgs.writeShellScript "nixos-auto-update" ''
