@@ -1,0 +1,153 @@
+name: andromeda-ddd-refactoring
+description: >
+  Refactor Andromeda kernel concepts to proper DDD domain layer. Move value objects and entities
+  from kernel/* to domain/* following hexagonal architecture principles.
+tags: [ddd, refactoring, andromeda, domain-driven-design]
+---
+
+# Andromeda DDD Refactoring Skill
+
+This skill documents the process of refactoring Andromeda kernel concepts to a proper domain-driven design structure by moving value objects and entities from `notebooks/andromeda/kernel/` to `notebooks/andromeda/domain/`.
+
+## When to Use
+
+Use this skill when:
+- Refactoring Andromeda to follow proper DDD principles
+- Moving kernel concepts to domain layer
+- Creating bounded contexts in the domain layer
+- Preparing for hexagonal architecture implementation
+
+## Step-by-Step Process
+
+### 1. Create the Domain File
+First create the equivalent file in the domain directory structure:
+
+```bash
+# Example for Pair value object
+mkdir -p notebooks/andromeda/domain/kernel
+cp notebooks/andromeda/kernel/pair.py notebooks/andromeda/domain/kernel/pair.py
+# Update imports in the copied file if needed (usually kernel imports become domain imports)
+```
+
+### 2. Update All Imports
+Find and replace all imports of the old location with the new domain location:
+
+```bash
+# Find all files importing from the old location
+grep -r "from andromeda.kernel.pair import" notebooks/andromeda/ --include="*.py"
+
+# Replace each import manually or use refactoring tool
+# Example replacement:
+# from andromeda.kernel.pair import Pair
+# becomes:
+# from andromeda.domain.pair import Pair
+```
+
+### 3. Update __init__.py Exports
+If the concept was exported from kernel/__init__.py, update it:
+
+```python
+# Remove from kernel exports:
+# from andromeda.kernel.pair import Pair, InvalidPairError
+
+# Add to andromeda/__init__.py or create domain exports:
+from andromeda.domain.pair import Pair, InvalidPairError
+```
+
+### 4. Verify All References Updated
+Check that no references to the old location remain:
+
+```bash
+grep -r "andromeda.kernel.pair" notebooks/andromeda/ --include="*.py"
+# Should return no results
+```
+
+### 5. Remove the Old File
+Once all references are updated and tests pass:
+
+```bash
+rm notebooks/andromeda/kernel/pair.py
+```
+
+### 6. Run Tests
+Verify the refactoring didn't break anything:
+
+```bash
+# Run relevant tests
+moon run :test
+# Or specific test suites
+pytest notebooks/andromeda/kernel/pair_test.py -v
+```
+
+## Key Principles Followed
+
+1. **Single Responsibility**: Each file contains exactly one domain concept
+2. **Ubiquitous Language**: Domain terms are consistent throughout codebase
+3. **Bounded Contexts**: Related concepts grouped under appropriate domain directories
+4. **Hexagonal Architecture**: Domain layer isolated from infrastructure concerns
+5. **Immutability**: Value objects use `@dataclass(frozen=True, slots=True)`
+
+## Directory Structure Created
+
+After refactoring, the domain structure should look like:
+
+```
+notebooks/andromeda/domain/
+├── kernel/           # Basic kernel value objects
+│   ├── pair.py       # Pair value object
+│   ├── side.py       # Side value object
+│   └── stake.py      # StakeAmount and Leverage value objects
+├── trading/          # Trading core concepts
+│   ├── order_intent.py   # OrderIntent value object
+│   └── trade.py            # Trade entity
+├── strategy/         # Strategy domain concepts
+│   └── signals.py        # EntrySignal/ExitSignal value objects
+├── venue/            # Venue abstractions
+│   └── venue.py        # Venue base class
+├── bot/              # Bot lifecycle
+│   ├── state.py        # BotStateMachine entity
+│   └── runner.py       # BotRunner entity
+├── execution/        # Execution pipeline
+│   ├── pipeline.py     # PaperPipeline
+│   └── paper.py        # Paper execution adapters
+└── datacatalog/      # Data storage abstractions
+    ├── trades_store.py
+    ├── book_store.py
+    └── bars_store.py
+```
+
+## Verification Checklist
+
+Before considering the refactoring complete:
+- [ ] All imports updated from `andromeda.kernel.*` to `andromeda.domain.*`
+- [ ] No remaining references to old kernel location
+- [ ] All existing tests pass
+- [ ] The concept works identically in its new location
+- [ ] No breaking changes to public APIs
+- [ ] Documentation/GLOSSARY updated if needed
+
+## Troubleshooting
+
+### Circular Dependencies
+If you encounter circular dependencies after moving:
+- Check if the moved concept depends on something that depends on it
+- Consider extracting shared interfaces or using dependency injection
+- Move interdependent concepts together
+
+### Import Errors
+If tests fail with import errors:
+- Verify all imports point to the correct new location
+- Check that `__init__.py` files properly export the concepts
+- Ensure PYTHONPATH includes the notebooks directory
+
+### Test Failures
+If tests fail behaviorally:
+- Confirm the domain concept implementation is identical
+- Check that frozen=True, slots=True didn't break anything
+- Verify validation logic in `__post_init__` is preserved
+
+## Related Skills
+
+- `andromeda-development`: General Andromeda development practices
+- `core/design/development/react`: For UI-related refactorings
+- `core/infrastructure/prism`: For analyzing structural changes

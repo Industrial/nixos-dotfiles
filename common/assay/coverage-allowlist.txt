@@ -3,3 +3,4 @@
 .devenv.flake.nix
 .deepsec/flake.nix
 **/Cargo.nix
+features/ai/hermes-agent/.hermes/skills/**/templates/**
