@@ -5,4 +5,5 @@ let
 in
   assay.suite "learning" {
     hasImports = assay.eq (builtins.match ".*imports.*=.*" src != null) true;
+    importsOnlyoffice = assay.eq (builtins.match ".*features/office/onlyoffice.*" src != null) true;
   }

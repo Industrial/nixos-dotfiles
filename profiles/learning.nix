@@ -14,5 +14,6 @@
     # ../features/learning/tolaria
     # ../features/learning/zotero
     # ../features/office/obsidian
+    ../features/office/onlyoffice
   ];
 }
