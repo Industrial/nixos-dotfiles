@@ -61,7 +61,16 @@ case "$cmd" in
     [[ -n "$target" ]] || usage
     shift
     if [[ "$target" == "all" ]]; then
-      deploy_cmd . "$@"
+      # Per-host so one unreachable node does not block the rest.
+      failed=0
+      for h in "${HOSTS[@]}"; do
+        echo "> fleet deploy .#$h"
+        if ! deploy_cmd ".#$h" "$@"; then
+          echo "> fleet deploy .#$h FAILED (continuing)"
+          failed=1
+        fi
+      done
+      exit "$failed"
     else
       deploy_cmd ".#$target" "$@"
     fi

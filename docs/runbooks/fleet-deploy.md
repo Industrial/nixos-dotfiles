@@ -25,7 +25,7 @@ bin/fleet deploy huginn --dry-activate   # always first on a new generation
 bin/fleet deploy huginn
 ```
 
-Deploy all nodes:
+Deploy all nodes (continues if one host fails; non-zero exit if any failed):
 
 ```bash
 bin/fleet deploy all
