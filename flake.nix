@@ -66,9 +66,10 @@
     mkDeployNode = hostname: {
       inherit hostname;
       profiles.system = {
-        user = "tom";
+        # Profile owner must be root for NixOS system activation.
+        # SSH as tom; escalate via passwordless sudo (operator-ssh.nix).
+        user = "root";
         sshUser = "tom";
-        # Passwordless sudo for tom on fleet hosts (features/fleet/operator-ssh.nix).
         interactiveSudo = false;
         path = deployLib.activate.nixos nixosConfigurations.${hostname};
       };
