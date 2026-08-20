@@ -9,4 +9,5 @@ in
     hasMimirSlot = assay.eq (builtins.match ".*mimir = null.*" src != null) true;
     hasIdentitiesOnly = assay.eq (builtins.match ".*IdentitiesOnly yes.*" src != null) true;
     hasFleetHosts = assay.eq (builtins.match ".*drakkar huginn mimir.*" src != null) true;
+    hasNopasswdSudo = assay.eq (builtins.match ".*NOPASSWD.*" src != null) true;
   }

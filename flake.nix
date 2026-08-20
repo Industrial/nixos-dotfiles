@@ -68,7 +68,8 @@
       profiles.system = {
         user = "tom";
         sshUser = "tom";
-        interactiveSudo = true;
+        # Passwordless sudo for tom on fleet hosts (features/fleet/operator-ssh.nix).
+        interactiveSudo = false;
         path = deployLib.activate.nixos nixosConfigurations.${hostname};
       };
     };

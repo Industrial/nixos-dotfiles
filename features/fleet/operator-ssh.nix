@@ -7,6 +7,9 @@
 #   cat ~/.ssh/id_ed25519.pub).
 # Client: IdentitiesOnly so only the local fleet key is offered (avoids
 # MaxAuthTries exhaustion and does not advertise unrelated agent identities).
+#
+# Privilege: SSH is key-only; deploy-rs activates as root via passwordless sudo
+# for the operator (interactiveSudo = false in flake deploy profile).
 {
   lib,
   settings,
@@ -25,6 +28,19 @@
     lib.filter (k: k != null) (lib.attrValues operatorPubKeys);
 in {
   users.users.${settings.username}.openssh.authorizedKeys.keys = enrolledKeys;
+
+  # deploy-rs runs activation through sudo; SSH key already gates who can connect.
+  security.sudo.extraRules = [
+    {
+      users = [settings.username];
+      commands = [
+        {
+          command = "ALL";
+          options = ["NOPASSWD"];
+        }
+      ];
+    }
+  ];
 
   programs.ssh.extraConfig = ''
     Host ${fleetHosts}
