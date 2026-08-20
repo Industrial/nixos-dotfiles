@@ -9,26 +9,51 @@ category: rust
 This skill covers setting up benchmarking in CI for Rust projects using GitHub Actions and criterion.
 
 ## Triggers
+# Set up benchmarking in CI for Rust projects using GitHub Actions and criterion.
 
-- Adding benchmarking to a Rust project
-- Setting up CI for Rust projects with benchmarking
+## Trigger
+When you want to add automated benchmarking to a Rust project's CI pipeline that uses criterion for benchmarks.
 
 ## Steps
+1. **Ensure criterion is in dev-dependencies**: Add criterion to [dev-dependencies] in Cargo.toml.
+2. **Create benches directory**: If it doesn't exist, create a benches/ directory at the project root.
+3. **Add benchmark files**: Place your benchmark code in benches/ following criterion's conventions.
+4. **Modify CI workflow**: Add a benchmark job to your GitHub Actions workflow (e.g., .github/workflows/ci.yml):
+   ```yaml
+   benchmark:
+     needs: test
+     runs-on: ubuntu-latest
+     steps:
+       - uses: actions/checkout@v4
+       - uses: DeterminateSystems/nix-installer-action@v16
+       - uses: dtolnay/rust-toolchain@stable
+       - uses: Swatinem/rust-cache@v2
+       - name: Benchmark
+         run: cargo bench
+       - name: Upload benchmark results
+         uses: actions/upload-artifact@v4
+         with:
+           name: criterion-reports
+           path: target/criterion
+   ```
+5. **Verify**: Ensure the benchmark job runs after tests and successfully uploads the criterion reports.
 
-1. Ensure the project has a `benches` directory and `criterion` in dev-dependencies.
-2. Add a benchmark job to the GitHub Actions CI workflow (e.g., .github/workflows/ci.yml):
-   - The job should depend on the test job (needs: test)
-   - Use the same setup as the test job (actions/checkout, DeterminateSystems/nix-installer-action, dtolnay/rust-toolchain, Swatinem/rust-cache)
-   - Run `cargo bench`
-   - Upload the benchmark results as an artifact (using actions/upload-artifact) from `target/criterion`
-3. Fix common Rust issues that break CI:
-   a. Path separators: Replace `std::fs:` and `std::env:` with `std::fs::` and `std::env::`.
-   b. Match arms in tests: Change `=> assert_eq!(kind, "X");` to `=> { assert_eq!(kind, "X") },` and similarly for panic! arms.
-   c. Test assertions: Change `if let Ok(EvalResult::Ok(value)) = result` to `if let EvalResult::Ok(value) = result`.
-   d. Remove unused imports (e.g., unused SimpleNixEval).
-   e. Address clippy warnings: Remove needless `return` statements and add `#[allow(clippy::result_unit_err)]` if necessary.
-4. Commit and push the changes.
+## Pitfalls
+- Make sure the benchmark job has the same setup as other jobs (checkout, nix installer, rust toolchain, rust-cache).
+- The benchmark job should depend on the test job (needs: test) to ensure code is tested before benchmarking.
+- Ensure the upload-artifact step correctly points to where criterion outputs its reports (usually target/criterion).
+- If using a different CI system, adapt the steps accordingly but maintain the same principles: checkout, setup, benchmark, upload.
+
+## Verification
+- Check that the benchmark job appears in your CI workflow.
+- Verify that when you push changes, the benchmark job runs after the test job.
+- Confirm that criterion reports are available as downloadable artifacts in the workflow run.
+- Optionally, run cargo bench locally to ensure benchmarks execute correctly.
 
 ## References
+- criterion documentation: https://docs.rs/criterion
+- GitHub Actions workflow syntax: https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions
+- actions/upload-artifact: https://github.com/actions/upload-artifact
 
-See references/rust-benchmark-ci-session-details.md for session-specific details.
+## Session-Specific Details (Assay Project)
+See references/rust-benchmark-ci-assay-session.md for details from the Assay project implementation.
