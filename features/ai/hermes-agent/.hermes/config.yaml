@@ -393,7 +393,7 @@ x_search:
   timeout_seconds: 180
   retries: 2
 _config_version: 23
-custom_providers: null
+custom_providers:
 mcp_servers:
   lean-ctx:
     command: lean-ctx
