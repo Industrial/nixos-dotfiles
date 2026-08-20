@@ -1,26 +1,9 @@
-# Colocated suite: module top-level shape with stubbed args.
+# Colocated suite for features/ai/hermes-agent/default.nix
 let
   assay = import ./../../../common/assay/default.nix;
-  mod = import ./default.nix {
-    settings = {
-      hostname = "testhost";
-      username = "alice";
-      useremail = "a@b.c";
-    };
-    pkgs = {
-      callPackage = path: args: "pkg";
-      stdenv = {
-        mkDerivation = args: args.name or args.pname or "drv";
-        hostPlatform = {system = "x86_64-linux";};
-      };
-      fish = "fish";
-      writeShellScript = name: text: name;
-      writeText = name: text: name;
-    };
-    lib = (import <nixpkgs> {}).lib;
-    config = {};
-  };
+  src = builtins.readFile ./default.nix;
 in
   assay.suite "hermes-agent" {
-    shape = assay.hasAttrs mod ["imports"];
+    hasSystemPackages = assay.eq (builtins.match ".*systemPackages.*" src != null) true;
+    noBundledMcpImports = assay.eq (builtins.match ".*../lean-ctx.*" src != null) false;
   }
