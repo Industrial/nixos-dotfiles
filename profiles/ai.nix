@@ -19,5 +19,6 @@
     ../features/ai/hermes-agent
     ../features/ai/lmstudio
     ../features/ai/opencode
+    ../features/ai/paperclip
   ];
 }
