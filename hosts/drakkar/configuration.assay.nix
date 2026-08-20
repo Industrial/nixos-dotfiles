@@ -5,4 +5,5 @@ in
   assay.suite "configuration" {
     nonEmpty = assay.eq ((builtins.stringLength src) > 50) true;
     importsFleet = assay.eq (builtins.match ".*features/fleet/remote-access.*" src != null) true;
+    importsLearning = assay.eq (builtins.match ".*profiles/learning.nix.*" src != null) true;
   }
