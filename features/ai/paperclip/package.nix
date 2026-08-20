@@ -1,5 +1,8 @@
 # paperclipai CLI wrapper — pins the official npm package and runs via npx.
 # https://www.npmjs.com/package/paperclipai
+#
+# Embedded Postgres ships unpatched Linux binaries. On NixOS that requires
+# programs.nix-ld (enabled in default.nix) so initdb/postgres can load.
 {
   writeShellApplication,
   nodejs_22,
