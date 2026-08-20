@@ -5,12 +5,14 @@
     ./disko.nix
     ./filesystems.nix
     ./hardware.nix
+    ../../profiles/ai.nix
     ../../profiles/base.nix
-    ../../profiles/development.nix
-    ../../profiles/desktop.nix
-    ../../profiles/gaming.nix
     ../../profiles/communication.nix
-    ../../profiles/learning.nix
+    #../../profiles/creative.nix
+    ../../profiles/desktop.nix
+    ../../profiles/development.nix
+    ../../profiles/gaming.nix
+    #../../profiles/learning.nix
     ../../features/nixos/graphics/amd.nix
     ../../features/hardware/zsa-voyager
     ../../features/window-manager/hyprland
