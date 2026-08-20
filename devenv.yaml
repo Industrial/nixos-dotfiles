@@ -33,3 +33,6 @@ inputs:
     inputs:
       nixpkgs:
         follows: nixpkgs
+
+nixConfig:
+  git-ignore-untracked = true
