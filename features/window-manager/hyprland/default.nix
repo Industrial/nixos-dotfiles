@@ -100,6 +100,12 @@ in
             ln -sfn "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" /home/${settings.username}/.config/hypr/hyprland-nested-caelestia.lua
           fi
 
+          monitors_src="${dotfilesHyprDir}/monitors.${settings.hostname}.lua"
+          if [ ! -f "''$monitors_src" ]; then
+            monitors_src="${dotfilesHyprDir}/monitors.default.lua"
+          fi
+          ln -sfn "''$monitors_src" /home/${settings.username}/.config/hypr/monitors.lua
+
           # Caelestia: managed shell.json + wallpaper library symlink for the picker
           mkdir -p /home/${settings.username}/.config/caelestia
           mkdir -p /home/${settings.username}/.local/share/applications

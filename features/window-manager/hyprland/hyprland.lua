@@ -7,14 +7,36 @@
 ---- MONITOR ----
 -----------------
 
--- 8K ultrawide; bitdepth 8 required for PipeWire screen share.
-hl.monitor({
-  output = "DP-1",
-  mode = "7680x2160@59.99",
-  position = "auto",
-  scale = 1,
-  bitdepth = 8,
-})
+-- Host-specific monitors: activation symlinks ~/.config/hypr/monitors.lua on switch;
+-- until then, fall back to the dotfiles checkout by hostname.
+local home = os.getenv("HOME")
+local dotfiles = home .. "/.dotfiles/features/window-manager/hyprland"
+local hostname = (io.popen("hostname -s 2>/dev/null"):read("*l") or ""):match("^(%S+)") or ""
+local candidates = {
+  home .. "/.config/hypr/monitors.lua",
+}
+if hostname ~= "" then
+  table.insert(candidates, dotfiles .. "/monitors." .. hostname .. ".lua")
+end
+table.insert(candidates, dotfiles .. "/monitors.default.lua")
+
+local loaded = false
+for _, path in ipairs(candidates) do
+  if pcall(dofile, path) then
+    loaded = true
+    break
+  end
+end
+
+if not loaded then
+  hl.monitor({
+    output = "",
+    mode = "preferred",
+    position = "auto",
+    scale = 1,
+    bitdepth = 8,
+  })
+end
 
 --------------------
 ---- LOOK & FEEL ----
