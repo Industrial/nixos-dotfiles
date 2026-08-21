@@ -102,6 +102,8 @@ def _tick_size_for_pair(self, pair: object) -> float:
   - Branches (Branch), Missed branches (BrPart)
   - Percentage covered (Cover)
 - **Must reach ≥95% total coverage** as configured in moon.yml
+- **Note**: Due to floating-point precision in coverage calculations, exactly 95.00% may sometimes fail the threshold check. Aim for >95.00% to ensure reliable passage.
+- **Important**: The coverage task depends on test and acceptance tasks - ensure they run in correct order or run them separately first if needed
 
 ### Understanding Coverage Output
 Example of passing coverage:
@@ -120,10 +122,11 @@ andromeda:coverage | Required test coverage of 95% reached. Total coverage: 95.0
 ## Key Principles
 
 1. **Respect Architectural Boundaries**: Level-1 strategies must remain independent of Andromeda internals
-2. **Document Constraints Clearly**: Use comments to prevent AI from reverting intentional changes
-3. **Verify Thoroughly**: Always run tests and coverage after making changes
+2. **Document Constraints Clearly**: Use comments to prevent AI from reverting intentional changes (e.g., `# COVERAGE THRESHOLD MUST BE 95% - AI MAY NEVER CHANGE THIS VALUE`)
+3. **Verify Thoroughly**: Always run both tests and coverage after making changes
 4. **Keep It Simple**: When removing Andromeda imports, prefer simple defaults over complex workarounds
 5. **Preserve Intent**: Fixes should maintain the original purpose (e.g., making edge filter inert with small default)
+6. **Mind Task Dependencies**: Remember that coverage task depends on test and acceptance tasks - run them in correct order or separately if needed
 ## Apply Domain-Driven Design
 Organize code into bounded contexts with clear domain models. Move data classes and entities to a structured `domain/` directory following DDD principles:
    - Kernel types (Pair, Side, StakeAmount) in `domain/kernel/`
