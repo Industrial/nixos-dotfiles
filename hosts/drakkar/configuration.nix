@@ -18,6 +18,7 @@
     ../../features/window-manager/hyprland
     ../../features/fleet/remote-access.nix
     ../../features/storage/nfs-client
+    ../../features/fleet/nix-remote-builder-server.nix
   ];
 
   nixpkgs.overlays = [

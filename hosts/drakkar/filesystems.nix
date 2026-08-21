@@ -24,4 +24,8 @@
     fsType = "nfs4";
     options = ["x-systemd.automount" "nofail" "timeo=14" "x-systemd.idle-timeout=600"];
   };
+
+  systemd.tmpfiles.rules = [
+    "d /data/cache 0755 tom users -"
+  ];
 }

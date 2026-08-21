@@ -7,7 +7,7 @@ Operator push-deploy for Drakkar, Huginn, and Mimir using **deploy-rs** on the *
 1. Root flake checked out at `~/.dotfiles` (or `$DOTFILES_ROOT`).
 2. Operator SSH key on target (`tom@<host>`), tested over **Tailscale**.
 3. SSH as `tom` (`sshUser`); activate as `root` (`user`) via **passwordless sudo** (`interactiveSudo = false`; NOPASSWD in `features/fleet/operator-ssh.nix`).
-4. **Operator pubkeys** in `features/fleet/operator-ssh.nix` — one slot per host (`drakkar` enrolled; huginn/mimir filled from those machines later).
+4. **Operator pubkeys** in `features/fleet/operator-ssh.nix` — one Ed25519 slot per host (all three enrolled).
 5. Client SSH uses `IdentitiesOnly` for `drakkar huginn mimir` (system `/etc/ssh/ssh_config`).
 
 ## Local validation
@@ -77,3 +77,4 @@ Do not re-enable comin while deploy-rs is primary — dual apply races NixOS gen
 - ADR: `docs/adr/0001-fleet-deploy-rs.md`
 - Principle: `docs/principles/fleet-deploy.md`
 - Maestro mission: `pln-mt0fxitc-f74sm9`
+- Remote builds: `docs/runbooks/nix-remote-build.md`

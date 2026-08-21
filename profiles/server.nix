@@ -10,5 +10,6 @@
     ../features/window-manager/hyprland
     ../features/fleet/remote-access.nix
     ../features/storage/nfs-server
+    ../features/fleet/nix-remote-builder-client.nix
   ];
 }
