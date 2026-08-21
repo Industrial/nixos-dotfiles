@@ -184,6 +184,8 @@ $env.config = ($env.config | merge {
         max_size: 100000
         sync_on_enter: true
         file_format: "sqlite"
+        # Per-session up/down history (fish-like); merges into sqlite on exit
+        isolation: true
     }
 })
 
