@@ -17,6 +17,7 @@
     ../../features/hardware/zsa-voyager
     ../../features/window-manager/hyprland
     ../../features/fleet/remote-access.nix
+    ../../features/storage/nfs-client
   ];
 
   nixpkgs.overlays = [

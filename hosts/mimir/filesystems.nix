@@ -26,4 +26,11 @@
       options = ["compress=zstd" "defaults"];
     };
   };
+
+  systemd.tmpfiles.rules = [
+    "d /data/archive 0755 tom users -"
+    "d /data/docker 0755 tom users -"
+    "d /data/scratch 0777 tom users -"
+    "d /data/cache 0755 tom users -"
+  ];
 }
