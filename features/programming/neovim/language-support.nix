@@ -503,7 +503,7 @@
     bash-language-server
 
     # Docker Language Server
-    dockerfile-language-server-nodejs
+    dockerfile-language-server
 
     # TypeScript / JavaScript formatter
     eslint

@@ -105,13 +105,22 @@
     ];
   };
 
-  # Disable package doc outputs globally to avoid pulling fragile doc builds
-  # (e.g. python docs via sphinx/docutils) into system-path.
-  documentation = {
-    doc = {
-      enable = false;
-    };
-  };
+  # # Disable package doc outputs globally to avoid pulling fragile doc builds
+  # # (e.g. python docs via sphinx/docutils) into system-path.
+  # # Disable package doc outputs globally to avoid pulling fragile doc builds
+  # # (e.g. python docs via sphinx/docutils) into system-path.
+  # documentation = {
+  #   doc = {
+  #     enable = false;
+  #   };
+  #   man = {
+  #     enable = false;
+  #     generateCaches = false;
+  #     man-db = {
+  #       enable = false;
+  #     };
+  #   };
+  # };
 
   # Cap journal size so a runaway user unit cannot fill /var/log/journal and
   # break dbus-broker reload during nixos-rebuild switch.

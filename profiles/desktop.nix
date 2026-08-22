@@ -14,7 +14,7 @@
     #../features/window-manager/slock
     ../features/nixos/window-manager
     ../features/window-manager/alacritty
-    ../features/window-manager/gnome
+    # ../features/window-manager/gnome
     ../features/window-manager/hyprland
     # ../features/window-manager/kitty
     # ../features/window-manager/terax

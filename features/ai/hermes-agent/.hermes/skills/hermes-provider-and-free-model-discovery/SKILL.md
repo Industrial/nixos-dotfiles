@@ -120,7 +120,7 @@ minimax, stepfun, moonshotai, tencent-tokenhub, bedrock, azure-foundry,
 groq, together, arcee, gmi, novita, kilocode, opencode-zen, opencode-go,
 copilot, copilot-acp, qwen-oauth
 
-## Pitfalls
+### Pitfalls
 
 ### "Free" model has hidden usage limits
 Many "free" models on OpenRouter and Nous Portal are rate-cimited or
@@ -137,3 +137,24 @@ confirmation.
 The Portal's `/api/nous/recommended-models` endpoint is the live source of
 truth. Free models rotate based on partnerships. Don't hardcode a specific
 free model slug from today — use the endpoint at query time.
+
+### Hugging Face provider only uses `HF_TOKEN`, not `HUGGING_FACE_HUB_TOKEN`
+The Hugging Face provider in Hermes (`huggingface`, aliases: `hf`, `hugging-face`, `huggingface-hub`)
+only reads the `HF_TOKEN` environment variable for authentication. If you set
+`HUGGING_FACE_HUB_TOKEN` in your `.hermes/.env`, it will be ignored. Use:
+```bash
+HF_TOKEN=hf_xxxxxxxxxxxx
+```
+The provider uses the Inference Providers router at `https://router.huggingface.co/v1`
+with these curated agentic models:
+- `moonshotai/Kimi-K2.5`
+- `Qwen/Qwen3.5-397B-A17B`
+- `Qwen/Qwen3.5-35B-A3B`
+- `deepseek-ai/DeepSeek-V3.2`
+- `MiniMaxAI/MiniMax-M2.5`
+- `zai-org/GLM-5`
+- `XiaomiMiMo/MiMo-V2-Flash`
+- `moonshotai/Kimi-K2-Thinking`
+- `moonshotai/Kimi-K2.6`
+
+Free tier: 30K characters/month on Hugging Face Inference API.
