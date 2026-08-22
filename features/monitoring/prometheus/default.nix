@@ -58,7 +58,9 @@
           static_configs = [
             {
               targets = [
-                "0.0.0.0:9002"
+                "0.0.0.0:9002" # mimir (local)
+                "drakkar:9002"
+                "huginn:9002"
               ];
             }
           ];
