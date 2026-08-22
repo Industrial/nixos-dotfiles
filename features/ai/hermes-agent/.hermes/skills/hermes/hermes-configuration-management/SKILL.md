@@ -15,6 +15,7 @@ Manages backing up, replacing, synchronizing, and restoring Hermes Agent configu
 - Backing up Hermes configuration before making experimental changes
 - Restoring Hermes configuration from a known-good backup
 - Setting up Hermes in a new environment based on an existing configuration
+- Discovering which providers Hermes supports and which offer free model tiers
 
 ## Step-by-Step Procedure
 
@@ -105,13 +106,7 @@ Be aware that some Hermes operations require explicit user consent:
 **Problem:** Trying to edit Hermes configuration files directly when the system blocks such modifications for security reasons.
 **Solution:** Use `hermes config set/get` commands for modifying configuration values instead of direct file edits.
 **Verification:** Check if the system prompts you to use `hermes config` when attempting direct edits.
-**Example from session:** When attempting to patch `/home/tom/.hermes/config.yaml` directly to enable MCP servers, the system refused with: "Refusing to write to Hermes config file: /home/tom/.hermes/config.yaml\nAgent cannot modify security-sensitive configuration. Edit ~/.hermes/config.yaml directly or use 'hermes config' instead." The correct approach was to use `hermes config set mcp_servers.<server-name>.enabled true` for each server.
-
-### Making Unrequested Changes
-**Problem:** Making configuration or code changes when the user only requested analysis, reporting, or information gathering.
-**Solution:** Always clarify user intent before making modifications. When asked to "analyze and report" or similar phrases, limit actions to investigation and reporting only unless explicitly authorized to make changes.
-**Verification:** Before running any modification commands (like `hermes config set`, `patch`, `write_file`), confirm with the user that changes are expected and desired.
-**Example from session:** When user asked to analyze why onboarding showed "Verification skipped (NEXT_PUBLIC_VERIDAS_MOCK=true)" despite .env having false value, the correct approach was to investigate and report the root cause (hardcoded message in component) rather than attempting to modify code or configuration.
+**Example from session:** When attempting to patch `/home/tom/.hermes/config.yaml` directly to enable MCP servers, the system refused with: "Refusing to write to Hermes config file: /home/tom/.hermes/config.yaml — Agent cannot modify security-sensitive configuration. Edit ~/.hermes/config.yaml directly or use 'hermes config' instead." The correct approach was to use `hermes config set mcp_servers.<server-name>.enabled true` for each server.
 
 ### Making Unrequested Changes
 **Problem:** Making configuration or code changes when the user only requested analysis, reporting, or information gathering.
@@ -140,17 +135,7 @@ hermes config list
 # Enable the roam-code MCP server
 hermes config set mcp_servers.roam-code.enabled true
 
-# Enable the context7 MCP server  
-hermes config set mcp_servers.context7.enabled true
-
-# Enable the serena MCP server
-hermes config set mcp_servers.serena.enabled true
-
-# Verify the changes
-hermes config get mcp_servers.roam-code.enabled
-hermes config get mcp_servers.context7.enabled
-hermes config get mcp_servers.serena.enabled
-```
+# Enable the context7 MCP server
 hermes config set mcp_servers.context7.enabled true
 
 # Enable the serena MCP server
@@ -189,17 +174,7 @@ hermes --version
 - **Verification**: After enabling/disabling MCP servers, verify with `hermes config get mcp_servers.<server_name>.enabled`
 - **Communication**: When user requests analysis/reporting, focus on investigation and communication rather than making unsolicited changes
 - **Analysis-Only Requests**: When user asks to analyze or report (e.g., "analyze why", "explain", "report"), limit actions to investigation and reporting only; do not make configuration or code changes unless explicitly authorized.
-- **Build-Time Variables**: Some variables like `NEXT_PUBLIC_*` are inlined at build time (e.g., in Dockerfiles); changing `.env` at runtime won’t affect them; you may need to rebuild images with correct build-args.
-
-### Attempting Direct File Edits
-**Problem:** Trying to edit Hermes configuration files directly when the system blocks such modifications for security reasons.
-**Solution:** Use `hermes config set/get` commands for modifying configuration values instead of direct file edits.
-**Verification:** Check if the system prompts you to use `hermes config` when attempting direct edits.
-
-### Attempting Direct File Edits
-**Problem:** Trying to edit Hermes configuration files directly when the system blocks such modifications for security reasons.
-**Solution:** Use `hermes config set/get` commands for modifying configuration values instead of direct file edits.
-**Verification:** Check if the system prompts you to use `hermes config` when attempting direct edits.
+- **Build-Time Variables**: Some variables like `NEXT_PUBLIC_*` are inlined at build time (e.g., in Dockerfiles); changing `.env` at runtime will not affect them; you may need to rebuild images with correct build-args.
 
 ## Handling Consent Requirements
 
@@ -224,7 +199,7 @@ When you encounter a consent requirement:
 - `~/.hermes` - Personal Hermes configuration
 - Contains: `config.yaml`, `.env`, skills, plugins, caches, logs
 
-### Project/Local Configuration  
+### Project/Local Configuration
 - `./.hermes` - Project-specific Hermes configuration
 - Often found in monorepos or development environments
 
@@ -232,4 +207,9 @@ When you encounter a consent requirement:
 - `./nix/features/hermes-agent/templates/` - Template configurations for NixOS deployments
 - Contains: `config.yaml`, `.env.example`, `auth.json.example`
 
-## Related Skills\n\n- `hermes-plugin-development` - For developing Hermes plugins that may interact with configuration\n- `hermes-lmstudio-connection` - For configuring specific model connections\n- `skill-library-structure` - For understanding how Hermes skills are organized\n\n## Using hermes config for Individual Settings\n\nFor modifying specific configuration values without replacing entire files, use the `hermes config` command:\n\n```bash\n# Set a configuration value\nhermes config set <key> <value>\n\n# Get a configuration value\nhermes config get <key>\n\n# List all configuration\nhermes config list\n```\n\n**Note**: Direct edits to configuration files in `~/.hermes` or project `.hermes` directories may be blocked for security reasons. The system will prompt to use `hermes config` instead when attempting to modify sensitive settings.\n\n## Validation\n\nAfter replacing configuration, validate that Hermes functions correctly:\n```bash\n# Test basic Hermes operation\nhermes --version\n\n# Test configuration loading\nhermes config get model.default\n\n# If using in a development environment with devenv:\ndevenv shell\nhermes --version\n```\n\n## Notes\n\n- Hermes configuration includes both user-specific settings (API keys, preferences) and system settings (model configurations, tool configurations)\n- Be cautious when sharing configurations that may contain sensitive information like API keys\n- Consider using `.env.example` templates and actual `.env` files with proper secret management\n- Some configuration elements may be environment-specific (paths, ports, etc.) and require adjustment after copying\n- **Critical**: Always respect Hermes' consent mechanism for destructive operations - the system will block actions like removing configurations without explicit user approval\n- **Best Practice**: Use `hermes config set` for individual MCP server enables/disables rather than editing config files directly\n- **Verification**: After enabling/disabling MCP servers, verify with `hermes config get mcp_servers.<server_name>.enabled`
+## Related Skills
+
+- `hermes-plugin-development` - For developing Hermes plugins that may interact with configuration
+- `hermes-lmstudio-connection` - For configuring specific model connections
+- `hermes-provider-and-free-model-discovery` - For enumerating supported providers and free model tiers
+- `skill-library-structure` - For understanding how Hermes skills are organized

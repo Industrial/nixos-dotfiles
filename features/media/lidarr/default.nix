@@ -1,7 +1,7 @@
 # Lidarr is a music collection manager for Usenet and BitTorrent users, port = 8686.
 {pkgs, ...}: let
   name = "lidarr";
-  directoryPath = "/mnt/well/services/${name}";
+  directoryPath = "/data/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [

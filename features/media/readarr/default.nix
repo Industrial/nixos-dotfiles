@@ -1,7 +1,7 @@
 # Readarr is a movie collection manager for Usenet and BitTorrent users. Port = 7878.
 {pkgs, ...}: let
   name = "readarr";
-  directoryPath = "/mnt/well/services/${name}";
+  directoryPath = "/data/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [

@@ -6,7 +6,7 @@
 # 7359/udp is also used for auto-discovery. This is not configurable.
 {...}: let
   username = "jellyfin";
-  directoryPath = "/mnt/well/services/jellyfin";
+  directoryPath = "/data/services/jellyfin";
 in {
   services = {
     jellyfin = {

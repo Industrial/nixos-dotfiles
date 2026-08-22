@@ -31,12 +31,7 @@ Class-level skill for documenting and tracking NixOS configuration improvements,
 - Service dependency management
 - Cron job enhancements
 
-### Category: Usability (Priority 4)
-- User configuration enhancements
-- Network/DNS setup (dnscrypt-proxy2)
-- Firewall with specific rules
-- Swap/memory management
-
+### Category: Usability (Priority 4)\n- User configuration enhancements\n- Network/DNS setup (dnscrypt-proxy2)\n- Firewall with specific rules\n- Swap/memory management\n- Desktop application environment troubleshooting (e.g., Lutris/Steam environment inheritance)\n
 ### Category: Modernization (Priority 5)
 - Nix 3.0+ option migration
 - Module system best practices
@@ -53,11 +48,7 @@ All improvements should be validated against existing NixOS assays before commit
 - `hermes-plugin-authoring` - For Hermes Agent plugin development (if NixOS plugins needed)
 - `maestro-design` - For product-spec authoring when NixOS changes affect broader workflows
 
-## Associated Files
-
-- `references/nixos-improvements-analysis.md` - Comprehensive improvements analysis
-- `references/safe-nixos-update-procedure.md` - Safe NixOS update procedures that preserve user sessions
-- `scripts/verify-host-config-consistency.sh` - Bash script to verify host flake.nix consistency
+## Associated Files\n\n- `references/nixos-improvements-analysis.md` - Comprehensive improvements analysis\n- `references/safe-nixos-update-procedure.md` - Safe NixOS update procedures that preserve user sessions\n- `scripts/verify-host-config-consistency.sh` - Bash script to verify host flake.nix consistency\n- `references/lutris-steam-environment-troubleshooting.md` - Troubleshooting guide for Lutris/Steam environment inheritance issues
 ## Recent Changes (session-specific)
 
 This skill captures NixOS configuration improvements learned during session work. Each improvement entry includes:
@@ -66,6 +57,30 @@ This skill captures NixOS configuration improvements learned during session work
 - Proposed improvement
 - Assay verification status
 - Implementation notes
+
+### Session 2026-08-21 Improvements
+
+The following improvements were captured during the 2026-08-21 session:
+
+#### Enabling Shared Features via Profile Imports (Priority: Reliability)
+- **File**: `profiles/development.nix`
+- **Change**: Uncommented `../features/programming/neovim` import line
+- **Impact**: Enabled NeoVim on all three hosts (Drakkar, Mimir, Huginn) through the profile inheritance chain
+- **Inheritance chains verified**:
+  - Drakkar: `hosts/drakkar/configuration.nix` → `profiles/development.nix`
+  - Mimir: `hosts/mimir/configuration.nix` → `profiles/server.nix` → `profiles/development.nix`
+  - Huginn: `hosts/huginn/configuration.nix` → `profiles/mobile.nix` → `profiles/development.nix`
+- **Verification**: Ad-hoc script verified import is uncommented, all inheritance chains trace correctly, and the neovim feature module has `programs.nixvim.enable = true` (5/5 checks passed)
+- **Notes**: When a feature is imported in a shared profile (base, development, desktop, etc.) it cascades to every host that inherits that profile. This is the most efficient way to enable a feature fleet-wide with a single change. Always verify the complete inheritance chain for each target host before and after the change.
+
+#### Nixvim Plugin Version Conflict: Legacy Treesitter Refactor Removal (Priority: Modernization)
+- **File**: `features/programming/neovim/language-support.nix`
+- **Change**: Removed `treesitter-refactor` plugin module; kept `treesitter` (new main-branch module) and `treesitter-context`
+- **Root cause**: `treesitter-refactor` is a legacy nvim-treesitter consumer that bundles its own copy of the old `nvim-treesitter` package, conflicting with the new main-branch `treesitter` module. Error: "You cannot include two different versions of nvim-treesitter, perhaps you included a legacy plugin together with a new one?"
+- **Fix**: Removed the `treesitter-refactor = { enable = true; };` block entirely; added a comment documenting why
+- **Verification**: `nix flake check --impure` error changed from the treesitter conflict to an unrelated pre-existing sphinx/python error, confirming the conflict was resolved. Assay tests for `neovim` and `language-support` still pass (2/2 each)
+- **Upstream reference**: https://github.com/nix-community/nixvim/issues/4188 — nixvim maintainers confirmed: "The short-term fix is to disable that plugin or otherwise avoid mixing the new nvim-treesitter package with legacy consumers"
+- **Key takeaway**: When enabling nixvim features, inspect all plugin configurations for legacy nvim-treesitter consumers. The new `treesitter` module uses Neovim's native treesitter APIs; legacy plugins that call `require('nvim-treesitter.configs').setup()` will conflict. Use `git stash` + `nix flake check` before/after to isolate whether an error is from your change or pre-existing.
 
 ### Session 2026-08-19 Improvements
 
@@ -114,6 +129,30 @@ This skill captures NixOS configuration improvements learned during session work
 - Assay verification status
 - Implementation notes
 
+### Session 2026-08-21 Improvements
+
+The following improvements were captured during the 2026-08-21 session:
+
+#### Enabling Shared Features via Profile Imports (Priority: Reliability)
+- **File**: `profiles/development.nix`
+- **Change**: Uncommented `../features/programming/neovim` import line
+- **Impact**: Enabled NeoVim on all three hosts (Drakkar, Mimir, Huginn) through the profile inheritance chain
+- **Inheritance chains verified**:
+  - Drakkar: `hosts/drakkar/configuration.nix` → `profiles/development.nix`
+  - Mimir: `hosts/mimir/configuration.nix` → `profiles/server.nix` → `profiles/development.nix`
+  - Huginn: `hosts/huginn/configuration.nix` → `profiles/mobile.nix` → `profiles/development.nix`
+- **Verification**: Ad-hoc script verified import is uncommented, all inheritance chains trace correctly, and the neovim feature module has `programs.nixvim.enable = true` (5/5 checks passed)
+- **Notes**: When a feature is imported in a shared profile (base, development, desktop, etc.) it cascades to every host that inherits that profile. This is the most efficient way to enable a feature fleet-wide with a single change. Always verify the complete inheritance chain for each target host before and after the change.
+
+#### Nixvim Plugin Version Conflict: Legacy Treesitter Refactor Removal (Priority: Modernization)
+- **File**: `features/programming/neovim/language-support.nix`
+- **Change**: Removed `treesitter-refactor` plugin module; kept `treesitter` (new main-branch module) and `treesitter-context`
+- **Root cause**: `treesitter-refactor` is a legacy nvim-treesitter consumer that bundles its own copy of the old `nvim-treesitter` package, conflicting with the new main-branch `treesitter` module. Error: "You cannot include two different versions of nvim-treesitter, perhaps you included a legacy plugin together with a new one?"
+- **Fix**: Removed the `treesitter-refactor = { enable = true; };` block entirely; added a comment documenting why
+- **Verification**: `nix flake check --impure` error changed from the treesitter conflict to an unrelated pre-existing sphinx/python error, confirming the conflict was resolved. Assay tests for `neovim` and `language-support` still pass (2/2 each)
+- **Upstream reference**: https://github.com/nix-community/nixvim/issues/4188 — nixvim maintainers confirmed: "The short-term fix is to disable that plugin or otherwise avoid mixing the new nvim-treesitter package with legacy consumers"
+- **Key takeaway**: When enabling nixvim features, inspect all plugin configurations for legacy nvim-treesitter consumers. The new `treesitter` module uses Neovim's native treesitter APIs; legacy plugins that call `require('nvim-treesitter.configs').setup()` will conflict. Use `git stash` + `nix flake check` before/after to isolate whether an error is from your change or pre-existing.
+
 ### Session 2026-08-19 Improvements
 
 The following improvements were captured during the 2026-08-19 session:
@@ -160,6 +199,30 @@ This skill captures NixOS configuration improvements learned during session work
 - Proposed improvement
 - Assay verification status
 - Implementation notes
+
+### Session 2026-08-21 Improvements
+
+The following improvements were captured during the 2026-08-21 session:
+
+#### Enabling Shared Features via Profile Imports (Priority: Reliability)
+- **File**: `profiles/development.nix`
+- **Change**: Uncommented `../features/programming/neovim` import line
+- **Impact**: Enabled NeoVim on all three hosts (Drakkar, Mimir, Huginn) through the profile inheritance chain
+- **Inheritance chains verified**:
+  - Drakkar: `hosts/drakkar/configuration.nix` → `profiles/development.nix`
+  - Mimir: `hosts/mimir/configuration.nix` → `profiles/server.nix` → `profiles/development.nix`
+  - Huginn: `hosts/huginn/configuration.nix` → `profiles/mobile.nix` → `profiles/development.nix`
+- **Verification**: Ad-hoc script verified import is uncommented, all inheritance chains trace correctly, and the neovim feature module has `programs.nixvim.enable = true` (5/5 checks passed)
+- **Notes**: When a feature is imported in a shared profile (base, development, desktop, etc.) it cascades to every host that inherits that profile. This is the most efficient way to enable a feature fleet-wide with a single change. Always verify the complete inheritance chain for each target host before and after the change.
+
+#### Nixvim Plugin Version Conflict: Legacy Treesitter Refactor Removal (Priority: Modernization)
+- **File**: `features/programming/neovim/language-support.nix`
+- **Change**: Removed `treesitter-refactor` plugin module; kept `treesitter` (new main-branch module) and `treesitter-context`
+- **Root cause**: `treesitter-refactor` is a legacy nvim-treesitter consumer that bundles its own copy of the old `nvim-treesitter` package, conflicting with the new main-branch `treesitter` module. Error: "You cannot include two different versions of nvim-treesitter, perhaps you included a legacy plugin together with a new one?"
+- **Fix**: Removed the `treesitter-refactor = { enable = true; };` block entirely; added a comment documenting why
+- **Verification**: `nix flake check --impure` error changed from the treesitter conflict to an unrelated pre-existing sphinx/python error, confirming the conflict was resolved. Assay tests for `neovim` and `language-support` still pass (2/2 each)
+- **Upstream reference**: https://github.com/nix-community/nixvim/issues/4188 — nixvim maintainers confirmed: "The short-term fix is to disable that plugin or otherwise avoid mixing the new nvim-treesitter package with legacy consumers"
+- **Key takeaway**: When enabling nixvim features, inspect all plugin configurations for legacy nvim-treesitter consumers. The new `treesitter` module uses Neovim's native treesitter APIs; legacy plugins that call `require('nvim-treesitter.configs').setup()` will conflict. Use `git stash` + `nix flake check` before/after to isolate whether an error is from your change or pre-existing.
 
 ### Session 2026-08-19 Improvements
 

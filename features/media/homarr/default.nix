@@ -6,7 +6,7 @@
 in {
   environment = {
     systemPackages = with pkgs; [
-      nodejs-18_x  # Homarr requires Node.js
+      nodejs  # Homarr requires Node.js
     ];
   };
 
@@ -16,12 +16,13 @@ in {
         description = "Homarr Dashboard";
         wantedBy = ["multi-user.target"];
         after = ["network-online.target"];
+        wants = ["network-online.target"];
         serviceConfig = {
           Type = "simple";
           User = "${name}";
           Group = "data";
           WorkingDirectory = directoryPath;
-          ExecStart = "${pkgs.nodejs-18_x}/bin/npm start";
+          ExecStart = "${pkgs.nodejs}/bin/npm start";
           Environment = [
             "HOST=0.0.0.0"
             "PORT=7575"
@@ -31,12 +32,11 @@ in {
         };
       };
     };
-  };
-
-  tmpfiles = {
-    rules = [
-      "d ${directoryPath} 0770 ${name} data - -"
-    ];
+    tmpfiles = {
+      rules = [
+        "d ${directoryPath} 0770 ${name} data - -"
+      ];
+    };
   };
 
   users = {
@@ -49,9 +49,8 @@ in {
         extraGroups = ["data"];
       };
     };
-  };
-
-  groups = {
-    "${name}" = {};
+    groups = {
+      "${name}" = {};
+    };
   };
 }

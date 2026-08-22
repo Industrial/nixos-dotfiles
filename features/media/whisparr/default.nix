@@ -2,7 +2,7 @@
 # Whisparr is a software that helps you find, download and organize your PORN ITS PORN. Port = 6969.
 {pkgs, ...}: let
   name = "whisparr";
-  directoryPath = "/mnt/well/services/${name}";
+  directoryPath = "/data/services/${name}";
 in {
   environment = {
     systemPackages = with pkgs; [

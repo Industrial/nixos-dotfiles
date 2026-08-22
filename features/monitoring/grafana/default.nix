@@ -9,6 +9,7 @@
         };
         security = {
           disable_gravatar = true;
+          secret_key = "SW2YcwTIb9zpOOhoPsMm";
         };
         server = {
           domain = settings.hostname;
@@ -45,11 +46,4 @@
       };
     };
   };
-
-  # services.nginx.virtualHosts.${config.services.grafana.settings.server.domain} = {
-  #   locations."/" = {
-  #     proxyPass = "http://${config.services.grafana.settings.server.http_addr}:${toString config.services.grafana.settings.server.http_port}";
-  #     proxyWebsockets = true;
-  #   };
-  # };
 }

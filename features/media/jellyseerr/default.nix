@@ -1,7 +1,7 @@
 # Jellyseerr is a media request management system for Jellyfin, Plex, and Emby. Port = 5055.
 {pkgs, ...}: let
   name = "jellyseerr";
-  directoryPath = "/mnt/well/services/${name}";
+  directoryPath = "/data/services/${name}";
 in {
   services = {
     jellyseerr = {

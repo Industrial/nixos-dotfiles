@@ -19,6 +19,7 @@
     ../../features/fleet/remote-access.nix
     ../../features/storage/nfs-client
     ../../features/fleet/nix-remote-builder-server.nix
+      ../../features/monitoring/prometheus-agent/default.nix
   ];
 
   nixpkgs.overlays = [

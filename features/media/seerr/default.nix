@@ -1,12 +1,11 @@
-# Overseerr is a request management and media discovery tool for Plex, Sonarr, and Radarr. Port = 5055.
-{pkgs, ...}: let
-  name = "overseerr";
+# Seerr is a request management and media discovery tool for Plex, Sonarr, and Radarr. Port = 5055.
+{config, lib, pkgs, ...}: let
+  name = "seerr";
   directoryPath = "/data/services/${name}";
 in {
   services = {
-    overseerr = {
+    seerr = {
       enable = true;
-      package = pkgs.overseerr;
     };
   };
 
@@ -29,7 +28,6 @@ in {
         extraGroups = ["data"];
       };
     };
-
     groups = {
       "${name}" = {};
     };
