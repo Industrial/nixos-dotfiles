@@ -21,9 +21,10 @@
         treesitter-context = {
           enable = true;
         };
-        treesitter-refactor = {
-          enable = true;
-        };
+        # Note: treesitter-refactor removed — it is a legacy consumer that
+        # conflicts with the new nvim-treesitter main-branch module, causing
+        # "two different versions of nvim-treesitter" evaluation errors.
+        # See https://github.com/nix-community/nixvim/issues/4188.
 
         # Nix
         nix = {

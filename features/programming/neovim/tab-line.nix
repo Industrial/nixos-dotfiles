@@ -1,5 +1,5 @@
 {...}: {
-  programs.nixvim.plugins.barbar = {
+  programs.nixvim.plugins.bufferline = {
     enable = true;
   };
 }
