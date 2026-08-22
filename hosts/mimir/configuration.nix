@@ -22,7 +22,6 @@
     ../../features/monitoring/prometheus/default.nix
     ../../features/nixos/graphics/amd.nix
     ../../features/storage/nfs-server
-    ../../features/winow-manager/hyprland
 
     # ../../features/media/jellyfin/default.nix
     # ../../features/media/lidarr/default.nix
