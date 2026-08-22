@@ -15,7 +15,8 @@
           domain = settings.hostname;
           enforce_domain = false;
           http_addr = "0.0.0.0";
-          http_port = 9000;
+          # 9000 is taken on mimir by the rootless container stack (yb-tserver UI).
+          http_port = 3000;
         };
       };
       provision = {
