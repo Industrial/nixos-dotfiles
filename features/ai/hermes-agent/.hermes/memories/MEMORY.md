@@ -1,6 +1,6 @@
 Coverage threshold for andromeda project is set to 95% in notebooks/andromeda/moon.yml and must never be changed by AI.
 §
-Created andromeda-development skill covering configuration management, strategy purity, and verification procedures for Andromeda codebase.
+Andromeda-development skill holds the durable ops knowledge (paper-session ops, QuestDB md_micro, exit parity). Live paper session state: 50-pair config, run 2026-08-22_16-00-25, warmup 175 bars/pair at ~1/min; only ~45/50 HL instrument IDs real (BONK/PEPE/GRT/MANA/MKR dead). Watchdog cron 77514092e4fb.
 §
 User prefers class-level skill organization over flat skill lists. Values concise, direct responses. Updated andromeda-development skill with troubleshooting sections for test import errors and slow test execution based on session learnings.
 §

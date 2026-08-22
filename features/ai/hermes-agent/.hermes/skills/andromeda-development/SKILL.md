@@ -174,6 +174,70 @@ When moving kernel concepts to the domain layer (e.g., Pair, Side, StakeAmount):
    - Run relevant tests to ensure nothing broke
 
 ### Key Learnings from Pair and Side Refactoring\\n- **Multiple Passes Essential**: Single search/replace misses references in:\\n  * Function-scoped imports (inside def functions)\\n  * Conditional imports (inside if blocks)\\n  * Import aliases (import X as Y)\\n  * Multiple imports on one line (from ... import A, B, C)\\n- **__init__.py Requires Coordinated Changes**:\\n  * Must update BOTH the exporting module (__init__.py) AND importing modules\\n  * Forgetting to update either side breaks imports\\n  * Check both notebooks/andromeda/__init__.py and notebooks/andromeda/kernel/__init__.py\\n- **Error Handling Migration Often Needs Second Pass**:\\n  * When creating domain/errors.py, update domain files to import from domain.errors\\n  * This often happens AFTER the initial move\\n  * Example: domain/pair.py needs to import InvalidPairError from domain.errors after errors.py exists\\n  * Learned in Session: Always do a second pass specifically for error imports after creating domain/errors.py\\n- **Hidden Dependencies Watch For**:\\n  * runtime_checkable from typing (easy to miss in Protocol classes)\\n  * Imports used in decorators or type hints\\n  * Imports in test files that use the concept\\n  * Configuration files that reference the concept\\n  * Learned in Session: Check for missing imports like runtime_checkable in Protocol definitions\\n  * Learned in Session: Fixed missing runtime_checkable import in bot/runner.py for VenueExecutor Protocol\\n  * Learned in Session: When tests fail after refactor, check both the specific file AND its dependencies - sometimes the error is in an imported module that also needs updating\\n- **Verification Commands That Help**:\\n  * Pre-count: `grep -r \\\"from andromeda.kernel.[Concept] import\\\" notebooks/andromeda/ --include=\\\"*.py\\\" | wc -l`\\n  * Post-import update: Same command to see progress\\n  * Final verification: `grep -r \\\"andromeda.kernel.[Concept]\\\" notebooks/andromeda/ --include=\\\"*.py\\\"`\\n  * Syntax check: `find notebooks/andromeda -name \\\"*.py\\\" -exec python3 -m py_compile {} \\\\; 2>&1 | grep -v \\\"^$\\\"`\\n- **Order of Operations Matters**:\\n  1. Create new domain file with correct internal imports\\n  2. Update ALL import references (may need multiple iterations)\\n  3. Update module exports in __init__.py files\\n  4. Handle error migration if needed (second pass - do this AFTER creating domain/errors.py)\\n  5. Verify thoroughly with multiple checks\\n  6. Remove old file\\n  7. Final syntax and import verification\\n- **Time Investment**: Typically 45-60 minutes per concept when accounting for error migration and hidden references\\n- **Backward Compatibility Strategy**: The kernel/__init__.py can maintain imports from domain to preserve existing import paths during transition\\n\\n### Troubleshooting DDD Refactoring\\n- **ImportError after refactor**: Check that __init__.py exports are correct and PYTHONPATH includes notebooks/\\n- **Circular imports**: If domain.A imports domain.B and domain.B imports domain.A, consider:\\n  * Moving shared constants/errors to domain/errors.py or domain/kernel.py\\n  * Using dependency injection or interfaces\\n  * Refactoring to break the cycle\\n- **Missing attribute errors**: Verify that all methods and properties were copied exactly\\n- **Test failures**: Run tests in isolation to identify which specific import is broken\\n- **Persistent old references**: Use `grep -r \\\"andromeda.kernel.[Concept]\\\" notebooks/andromeda/ --include=\\\"*.py\\\"` to find stragglers\\n- **Learned in Session**: When tests fail after refactor, check both the specific file AND its dependencies - sometimes the error is in an imported module that also needs updating
+## Operational Inspection (Paper/Live Sessions)
+
+How to answer "what did the last session do?" — verified paths, not guesses:
+- Run artifacts: `notebooks/runs/andromeda/{mode}/{timestamp}_{slug}/` with meta.json, status.json, config.snapshot.json, run.log, decisions/rows.jsonl.
+- Since 2026-08-22, `run_paper_session()` owns the lifecycle: per-tick decision journal + counter refreshes, finalize to done/failed with exit_code on both clean and crash exits. serve-api/up disables the container-seeded stub dir (`run_dir_enabled=False`).
+- Legacy dirs (pre-fix): `status.json` stuck at `"running"` + 0-byte run.log + empty decisions/. Cross-check aliveness with `ps aux | grep 'andromeda up'`; a frozen updated_at mid-session now signals a stalled feed.
+- Logs go to an in-process ring served by `GET /api/v1/logs` AND run.log when attach_log=True. Ring eviction is permanent — pull early when investigating.
+- Live state: FreqUI-style REST API, Bearer token extracted via jq from config, never printed. Stall signature: log silence >15 min + empty/stale pair_candles + open trade current_rate frozen at open_rate — paper stops are evaluated in-process, so restart promptly.
+- Shell policy: `systemctl`/`ss`/`docker`/`python3 -c`/heredoc-python are permanently blocked in ctx_shell; use /proc forensics, curl probes, and jq instead.
+
+Warmup accounting (don't misread the logs):
+- `forward collecting iter=1130/175` — the numerator counts TICKS (one per bar event across all pairs), NOT bars. Real progress = `rows=` in the latest `wrote md_micro venue=hl pair=X` lines (~1 bar/min/pair).
+- Warmup gate is PER PAIR (`_micro_covers_train`): each pair needs its own 175 micro rows before FreqAI predicts for it. Pairs become tradeable independently; a non-empty `pending_micro` list does not mean nothing can trade.
+- Dead pairs never warm: `instrument not found in cache: X-USD-PERP.HYPERLIQUID` subscribe errors mean that ID doesn't exist on HL — the pair stays in `pending_micro` forever. Prune them from the pairlist; effective universe = healthy pairs only.
+
+Stale background notifications: killing a long-lived `terminal(background=true)` bot emits SIGTERM notices LATER that replay its OLD crash traceback. Before diagnosing one, check which pid is actually alive (`ps aux | grep 'andromeda up'`) and read the NEWEST run dir — the notice usually describes an already-fixed problem. Never restart off these notices.
+
+Full endpoint table, TDD test seams, and diagnostics recipe: see `references/paper-session-operations.md`.
+
+## QuestDB-First Data Storage
+
+- ALL market data lives in QuestDB `md_*` tables via PGWire: `md_bar`, `md_trade`, `md_l2`, `md_mark`, `md_index`, `md_funding`, `md_oi`, and (since 2026-08-22) `md_micro` for derived per-bar micro features. `sync_catalog_micro_from_hl` writes `md_micro` rows (features serialized as a JSON column) — it no longer produces parquet sidecars on the HL paper/live path.
+- Parquet is legacy/offline only: `load_catalog_micro` resolves from QuestDB first; the parquet fallback fires only when no store is reachable. The CME/MarketTaS offline path (`sync_catalog_micro_from_features`) intentionally still uses parquet.
+- Contract tests must assert zero parquet leakage: `[p for p in tmp_path.rglob("*.parquet")] == []` after any sync operation.
+- NaN/inf is REAL in live HL data (book/ctx gaps): serializing features with `json.dumps(..., allow_nan=False)` crashed the production session thread (`ValueError: Out of range float values are not JSON compliant: nan`). Filter non-finite values BEFORE serialization — the lookup layer already skips them, so dropping at write is lossless. Contract test: `hl_micro_nan_test.py`.
+- Adding an `md_*` table touches five files, always together: `adapters/questdb/rows/md_<x>.py` (frozen slots dataclass + `to_insert_params()` naive-UTC conversion), `repositories.py` (INSERT/SELECT SQL constants + `<X>Repository`), `catalog_store.py` (facade `write_<x>`/`load_<x>`, tag instrument_id via mappers), `testing/memory_store.py` (in-memory double), `deployments/questdb/schema.sql` (CREATE TABLE — designated timestamp + instrument_id).
+- Read semantics: an explicitly-passed store is authoritative even when empty; an auto-discovered store with no rows falls back to parquet (protects offline tooling).
+
+Storage/TDD details and known gotchas: see `references/questdb-storage-and-tdd.md`.
+
+## TDD Conventions In This Repo
+
+- Test files use `*_test.py` suffix (pyproject `[tool.pytest.ini_options]` matches both prefixes).
+- Deterministic session drives: `run_paper_loop`/`run_paper_session` accept `bar_events=[datetime, ...]` + `max_iterations` — full loop coverage with no network. Build `ForwardSessionService` via the composition makers exactly as `paper_session_test._forward_session` does.
+- Use `MemoryQuestDbStore` (`contexts/catalog/testing/memory_store.py`) whenever a test needs a write→read round-trip through the catalog store. A `MagicMock` store silently drops writes — round-trip assertions read back empty and waste a debug cycle.
+- Naming trap: forward-session TICK snapshots key the counter as `iteration` (singular); the loop RESULT dict uses `iterations` (plural).
+- Prove contracts against the PRODUCTION path, not just the new wrapper: e.g. wire `PaperSessionHost._run` and `_cmd_serve_api`, not only `run_paper_session`. CLI test fakes (`class _Container`) must carry every attribute the command touches (`api_token`, `raw_config`, `run_dir_enabled`, `session.venue`) — pytest reports AttributeError at the first missing one, which may look unrelated to your change.
+- `devenv shell -- <cmd>` re-runs prek hook installation every invocation (noisy, slow). For quick probes run `.devenv/state/venv/bin/python script.py` directly; when devenv swallows script stdout, redirect inside the command to a file and read that.
+
+## Paper/Backtest Exit Parity
+
+The paper pipeline and the NT backtest host enforce different exit sets. Gap
+found+fixed 2026-08-22 (verified e2e): `max_holding_bars` (AFML time barrier)
+was enforced in backtest but NOT in `PaperPipeline` — paper positions with no
+stop hit and no model flip stayed open forever ("enters but never exits").
+Fix shipped: `evaluate_level1_exit(..., max_hold_minutes=)` +
+`EXIT_REASON_MAX_HOLDING`; `PaperPipeline._max_hold_minutes()` derives
+`strategy.max_holding_bars.value × timeframe`. E2E proof: flat confident model
+→ trade force-closes at exactly open_bar + 35 bars, tag `max_holding`.
+Contract tests in `contexts/execution/max_holding_exit_test.py`. Before
+debugging "no exits", enumerate each host's exit set — a per-bar trace of
+`StrategyRunner.populate_entry_exit` proves signal generation independently of
+enforcement. When adding any strategy-level exit knob, grep both hosts for its
+enforcement — parity is per-knob, not automatic.
+
+Full repro harness, API construction gotchas (SessionRunner kwargs, futures
+trading_mode for shorts), 50-pair config sizing, and QuestDB persistence
+verification via /proc socket forensics:
+see `references/paper-backtest-exit-parity.md`.
+
+50-pair scaling run: startup sequence (env var, schema apply, launch pattern),
+monitoring recipe, warmup timeline, and watchdog cron setup:
+see `references/50pair-paper-session-ops.md`.
+
 ## Venue Abstraction Layer Implementation
 
 ### Overview

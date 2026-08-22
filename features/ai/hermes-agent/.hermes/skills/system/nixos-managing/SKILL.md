@@ -155,6 +155,28 @@ man configuration.nix | grep -A3 "PasswordAuthentication"
 2. Note the NixOS version it applies to
 3. Only then include it in configuration
 
+## Module option pitfalls
+
+- List-type module options (e.g. `services.prometheus.exporters.node.enabledCollectors`)
+  **concatenate across every module import**. Two modules each setting the same
+  list merge silently — per-file audits pass while the merged config is wrong.
+  Always verify the evaluated merged config (`nix eval … config.<option>`) or a
+  generated artifact like `config.systemd.units."<unit>".text`. Worked example:
+  `nixos-deploy-rs` skill → `scripts/verify-node-exporter-flags.sh`.
+- Programs using Go's flag parser reject any flag given twice
+  (`error: flag 'X' cannot be repeated`) — so a duplicated list entry becomes a
+  repeated CLI flag, instant exit(1), systemd start-limit-hit crash-loop.
+  Same applies to a name appearing in both an enable-list and disable-list:
+  NixOS renders both literally (`--collector.X` AND `--no-collector.X`).
+- **Single-owner rule for shared service subtrees**: exactly one feature module
+  should own a given option subtree (e.g. `prometheus-exporter` owns
+  `services.prometheus.exporters.node`; the server module must not re-declare
+  it). When deduplicating by DELETING one copy, check every importing host
+  first — a host that imported only the deleted copy loses the setting
+  entirely and silently (real case: removing the exporter block from the
+  server module would have left mimir with no node-exporter at all; fix was
+  adding the exporter-module import there).
+
 ## Core Mental Model
 
 NixOS is **declarative and atomic**. Every change produces a new **generation**. You can always roll back.
@@ -221,6 +243,34 @@ Secrets live at `/run/agenix/` or `/run/secrets/` — never in Nix store.
 
 See [configuration.md](configuration.md) for patterns.
 
-See [configuration.md](configuration.md) for patterns.
+## Assay (colocated `*.assay.nix`) conventions
 
-See [configuration.md](configuration.md) for patterns.
+- Stub `pkgs` with the EXACT attr names the module's `with pkgs;` block
+  references — hyphens included (`{qbittorrent-nox = "qbittorrent-nox";}`).
+  A wrong key is an eval-time `undefined variable`, and because suites load
+  repo-wide it blocks every commit until fixed.
+- A module import in a test must supply EVERY argument the module declares:
+  `{config, lib, pkgs, ...}` needs `config = {}; lib = {};` passed even when
+  unused ("function called without required argument").
+- Host-config assays assert what is CURRENTLY imported (e.g. fleet
+  remote-access, real profiles). When a cleanup commit deletes a profile,
+  update its host assay in the same change or the suite fails stale.
+
+## Committing in this repo (devenv + prek hook gauntlet)
+
+Hooks are `devenv shell -- <entry>` wrappers (moon test/assay, commitizen,
+pre-commit, deepsec pre-push). Plain `git commit` fails with
+`No such file or directory` because hook entries (e.g. bare `pre-commit`)
+only exist inside devenv — **always commit via `devenv shell -- git commit …`**.
+
+- Commitizen enforces Conventional Commits (`fix:`, `feat:`, `test:`,
+  `chore:` scopes like `(monitoring)` / `(nixos)` match repo history).
+- prek evaluates the **exact staged tree**, stashing everything else: a
+  pathspec-limited commit of fix N runs the suite against HEAD-with-fix-N-only.
+  If earlier broken-in-HEAD suites exist, land their repair FIRST as its own
+  `test:` commit, then the functional change.
+- The repo's canonical gate is `devenv shell -- assay run .`
+  (540 suites at last count) plus `nix flake check`.
+- Operator preference: do NOT bundle unrelated cleanup (`rm`, etc.) into a
+  verification or commit command — issue single-purpose commands; compound
+  commands were denied twice this session.

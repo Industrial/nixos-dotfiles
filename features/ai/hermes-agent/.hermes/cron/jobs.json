@@ -1,0 +1,44 @@
+{
+  "jobs": [
+    {
+      "id": "77514092e4fb",
+      "name": "andromeda-paper-watchdog",
+      "prompt": "You are a trading-bot watchdog. Check the Andromeda paper session and report status.\n\n1. Run: ls -t /data/Code/rust/solana-yield-optimizer/notebooks/runs/andromeda/paper/ | head -1 to find the latest run dir R=/data/Code/rust/solana-yield-optimizer/notebooks/runs/andromeda/paper/<latest>\n2. cat $R/status.json \u2014 note phase, n_bars, n_trades, updated_at\n3. Check the process: ps aux | grep 'andromeda up' | grep -v grep \u2014 if absent, the bot died; report loudly with the last 30 lines of $R/run.log\n4. Query the bot API (token is in /data/Code/rust/solana-yield-optimizer/python/andromeda/configs/andromeda.freqai-afml.hl.paper.json under api_server.api_token):\n   curl -sS -H \"Authorization: Bearer $TOK\" http://127.0.0.1:8080/api/v1/count\n   curl -sS -H \"Authorization: Bearer $TOK\" http://127.0.0.1:8080/api/v1/profit\n5. Count md_micro rows: use python via script file (/tmp pattern) or jq on API output.\n6. Report concisely in this format:\n   [paper-watch] <UTC time> phase=<phase> iter_bars=<n_bars> open_trades=<count.current> closed=<profit.trade_count> pnl=<profit_all_coin> proc=alive|DEAD\n   Plus one line noting anything anomalous (no bar progress for >15min, process dead, error spam).\n\nThis job runs every 10 minutes. Keep reports short \u2014 it's a watchdog ping, not an essay. If the run has finalized (phase != running) report that prominently so the user can stop the job.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": "openrouter",
+      "model_snapshot": "stealth/ox-alpha",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "once",
+        "run_at": "2026-08-22T18:01:01.728156+02:00",
+        "display": "once in 10m"
+      },
+      "schedule_display": "once in 10m",
+      "repeat": {
+        "times": 18,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-08-22T17:50:48.068497+02:00",
+      "next_run_at": "2026-08-22T18:01:01.728156+02:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null
+    }
+  ],
+  "updated_at": "2026-08-22T17:51:01.728451+02:00"
+}
