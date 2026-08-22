@@ -3,7 +3,20 @@
   imports = [
     ./filesystems.nix
     ./hardware.nix
-    ../../profiles/mobile.nix
-      ../../features/monitoring/prometheus-agent/default.nix
+
+    # ../../profiles/ai.nix
+    ../../profiles/base.nix
+    ../../profiles/communication.nix
+    #../../profiles/creative.nix
+    ../../profiles/desktop.nix
+    ../../profiles/development.nix
+    #../../profiles/gaming.nix
+    ../../profiles/learning.nix
+
+    ../../features/fleet/nix-remote-builder-server.nix
+    ../../features/fleet/remote-access.nix
+    ../../features/monitoring/prometheus-agent/default.nix
+    ../../features/nixos/graphics/amd.nix
+    ../../features/storage/nfs-client
   ];
 }

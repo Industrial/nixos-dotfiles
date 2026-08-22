@@ -12,10 +12,10 @@
 }: {
   imports = [
     # ../features/ai/anythingllm-desktop
-    ../features/ai/claude-code
+    # ../features/ai/claude-code
     #../features/ai/hermes-agent
     # ../features/ai/litellm
-    ../features/ai/lmstudio
+    # ../features/ai/lmstudio
     # ../features/ai/n8n
     # ../features/ai/ollama
     #../features/ai/opencode

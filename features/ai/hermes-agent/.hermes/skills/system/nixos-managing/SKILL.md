@@ -217,5 +217,10 @@ Secrets live at `/run/agenix/` or `/run/secrets/` — never in Nix store.
 - `services.*` — enable/configure systemd services
 - `boot.loader.*` — bootloader and kernel settings
 - `nix.settings.*` — substituters, trusted users, features
+- **Python version**: `python313` is recommended (avoids docutils 0.23 `TypeError` crash in `python3.12-doc`); `python312` is available but avoid `python3.12-doc` which pulls the buggy docutils version)
+
+See [configuration.md](configuration.md) for patterns.
+
+See [configuration.md](configuration.md) for patterns.
 
 See [configuration.md](configuration.md) for patterns.
