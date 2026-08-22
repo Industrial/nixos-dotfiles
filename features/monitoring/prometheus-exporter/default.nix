@@ -1,4 +1,5 @@
-# Prometheus agent for monitoring hosts with node exporter
+# Node exporter agent for fleet-wide host monitoring (single source of truth
+# for services.prometheus.exporters.node)
 {config, lib, pkgs, ...}: {
   services.prometheus.exporters.node = {
     enable = true;

@@ -11,61 +11,6 @@
       listenAddress = "0.0.0.0";
       port = 9001;
 
-      # Node Exporter configuration
-      exporters = {
-        node = {
-          enable = true;
-          port = 9002; # Keep port 9002 as requested
-          enabledCollectors = [
-            "systemd"
-            "tcpstat"
-            "diskstats"
-            "filesystem"
-            "loadavg"
-            "meminfo"
-            "netdev"
-            "processes"
-            "cpu"
-            "conntrack"
-            "entropy"
-            "filefd"
-            "infiniband"
-            "interrupts"
-            "ksmd"
-            "logind"
-            "mdadm"
-            "meminfo_numa"
-            "mountstats"
-            "nfs"
-            "nfsd"
-            "pressure"
-            "rapl"
-            "schedstat"
-            "sockstat"
-            "softnet"
-            "stat"
-            "textfile"
-            "time"
-            "thermal_zone"
-            "udp_queues"
-            "uname"
-            "vmstat"
-            "xfs"
-            "zfs"
-          ];
-          disabledCollectors = [
-            "bonding"
-            "hwmon"
-            "ipvs"
-            "powersupplyclass"
-            "runit"
-            "supervisord"
-            "tapestats"
-            "wifi"
-          ];
-        };
-      };
-
       # Alertmanager configuration
       alertmanager = {
         enable = true;
