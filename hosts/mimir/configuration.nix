@@ -18,7 +18,6 @@
     ../../features/fleet/nix-remote-builder-client.nix
     ../../features/fleet/remote-access.nix
     ../../features/monitoring/grafana/default.nix
-    ../../features/monitoring/prometheus-agent/default.nix
     ../../features/monitoring/prometheus/default.nix
     ../../features/nixos/graphics/amd.nix
     ../../features/storage/nfs-server

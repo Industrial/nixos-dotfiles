@@ -33,7 +33,6 @@
       "stat"
       "time"
       "thermal_zone"
-      "tcpstat"
       "udp_queues"
       "uname"
       "vmstat"
@@ -47,7 +46,6 @@
       "powersupplyclass"
       "runit"
       "supervisord"
-      "systemd"
       "tapestats"
       "wifi"
     ];
