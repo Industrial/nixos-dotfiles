@@ -23,15 +23,16 @@
     ../../features/nixos/graphics/amd.nix
     ../../features/storage/nfs-server
 
-    # ../../features/media/jellyfin/default.nix
-    # ../../features/media/lidarr/default.nix
-    # ../../features/media/sonarr/default.nix
-    # ../../features/media/radarr/default.nix
-    # ../../features/media/prowlarr/default.nix
-    # ../../features/media/qbittorrent/default.nix
-    # ../../features/media/readarr/default.nix
-    # ../../features/media/seerr/default.nix
-    # ../../features/media/invidious/default.nix
-    # ../../features/media/homarr/default.nix
+    ../../features/media/jellyfin/default.nix
+    ../../features/media/lidarr/default.nix
+    ../../features/media/sonarr/default.nix
+    ../../features/media/radarr/default.nix
+    ../../features/media/prowlarr/default.nix
+    ../../features/media/qbittorrent/default.nix
+    ../../features/media/readarr/default.nix
+    ../../features/media/seerr/default.nix
+    ../../features/media/invidious/default.nix
+    # ../../features/media/homarr/default.nix  # broken: module runs `npm start`
+    #   in an empty dir, never provisions app code; no services.homarr upstream
   ];
 }
