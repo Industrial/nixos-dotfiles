@@ -2,7 +2,10 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = let
-    pkgs = {prowlarr = "prowlarr";};
+    pkgs = {
+      prowlarr = "prowlarr";
+      diffutils = "/bin/cmp";
+    };
   in
     import ./default.nix {inherit pkgs;};
   activation =

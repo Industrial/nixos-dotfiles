@@ -53,7 +53,7 @@ in {
       else
         mkdir -p "$(dirname "$target")"
         if [ -f "$target" ] && [ ! -L "$target" ]; then
-          if ! cmp -s "$target" "$source"; then
+          if ! ${pkgs.diffutils}/bin/cmp -s "$target" "$source"; then
             cp -a "$target" "$target.bak.$(date +%Y%m%d%H%M%S)"
           fi
         fi
