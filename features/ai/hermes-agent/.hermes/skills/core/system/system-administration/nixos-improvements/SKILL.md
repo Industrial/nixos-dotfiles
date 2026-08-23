@@ -49,6 +49,15 @@ All improvements should be validated against existing NixOS assays before commit
 - `maestro-design` - For product-spec authoring when NixOS changes affect broader workflows
 
 ## Associated Files\n\n- `references/nixos-improvements-analysis.md` - Comprehensive improvements analysis\n- `references/safe-nixos-update-procedure.md` - Safe NixOS update procedures that preserve user sessions\n- `scripts/verify-host-config-consistency.sh` - Bash script to verify host flake.nix consistency\n- `references/lutris-steam-environment-troubleshooting.md` - Troubleshooting guide for Lutris/Steam environment inheritance issues
+- `references/assay-suite-authoring.md` - Authoring colocated assay suites: claim-semantics gotchas, module/package/generated-file skeletons, sensitive-data rules, gap-inventory method
+
+### Session 2026-08-23: Assay-Gap Unit-Test Coverage
+Closed every tracked `.nix` file lacking a `<stem>.assay.nix` complement (7 new suites; full gate 582/582). Key learnings captured in `references/assay-suite-authoring.md`:
+- **Filter inventories to git-tracked files** (`git ls-files --error-unmatch`) — devenv state dirs and nested runtime trees otherwise produce false gaps.
+- **Check HEAD-vs-worktree drift before rewriting**: a suite can exist at HEAD but be deleted locally (homarr, d1445335); when superseding, preserve every original assertion.
+- **`.hermes/` trees are off limits** for test/helper files (user directive) — hermes plugin templates stay exempt from assay coverage; record exemptions in the repo `history/` ledger.
+- **Repo hooks outside devenv shell**: meta hooks named literally `pre-commit`/`pre-push` fail ENOENT after real gates pass; use `SKIP=pre-commit` / `SKIP=pre-push` or operate from `devenv shell`.
+
 ## Recent Changes (session-specific)
 
 This skill captures NixOS configuration improvements learned during session work. Each improvement entry includes:

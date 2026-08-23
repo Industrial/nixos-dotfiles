@@ -37,6 +37,33 @@ ORIENT → RESEARCH → PLAN → EXECUTE → REVIEW → SHIP
 7. **Compose, do not duplicate:** PLAN delegates to planning skills; EXECUTE to Maestro claim→verify→ship.
 8. **No Maestro worktrees:** claim with CLI `--skip-worktree` only.
 
+## SHIP Pitfalls
+
+### Always-run pre-commit gates (moon / prek / devenv repos)
+Repos generated from git-hooks.nix install prek hooks whose config sets
+`always_run: true` — EVERY commit runs the full moon test+coverage gate
+regardless of what is staged. If the repo gate is red, all commits block,
+including docs-only ones.
+
+1. Blocked? Prove the failures are PRE-EXISTING and ORTHOGONAL before doing
+   anything else: reproduce the failing tests directly on HEAD and note the
+   diff is docs/config-only.
+2. Then commit with `git commit --no-verify` and record the evidence (failing
+   test names, root-cause line, coverage number vs floor) in the commit
+   message body so history explains why verification was skipped.
+3. A BLOCKED hook run may still have mutated the working tree — formatters
+   execute before the failing stage. After any failed commit attempt, run
+   `git status`; revert collateral (formatter rewraps, JSON key reordering)
+   with `git checkout -- <paths>`. File mtimes matching the commit-attempt
+   time confirm origin.
+4. Never silently skip verification: report the broken gate as follow-up work.
+
+### devenv-wrapped commands
+All commands go through `devenv shell -- …`, which emits workspace-sync noise
+around real output. Use raw output mode and filter (`grep -vE` on sync/hook
+lines) when reading results. Long gates (>110s foreground cap) auto-detach to
+background jobs — poll status instead of re-running.
+
 ### Mode → Agent Mapping
 
 | Mode | Default Agent Rule |

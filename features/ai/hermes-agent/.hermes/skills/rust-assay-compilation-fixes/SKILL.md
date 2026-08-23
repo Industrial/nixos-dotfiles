@@ -51,6 +51,12 @@ When compiling the Assay Rust codebase (`cargo check` or `cargo build`) and enco
 - Optionally, run the full test suite with `cargo test`.
 - Verify the CI workflow includes a benchmark job that depends on test and uploads criterion results.
 
+## Scope note
+This skill covers Rust compilation/lint fixes in Assay only. Release mechanics
+(unpushed/unreleased audits, version bumps, tagging, crates.io publish) live in
+`devops/release-engineering`; its `references/assay-v0.2.0-release-state.md`
+records this repo's CI/release pipeline and the 2026-08-23 audit.
+
 ## References
 - See the Assay repository commit history for examples of these fixes.
 - Refer to `crates/assay/src/lib/eval.rs` and `crates/assay/src/lib/simple_eval.rs` for before/after examples.

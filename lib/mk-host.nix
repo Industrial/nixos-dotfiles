@@ -5,5 +5,9 @@ in
   inputs.nixpkgs.lib.nixosSystem {
     inherit (settings) system;
     specialArgs = {inherit inputs settings;};
-    modules = [../hosts/${hostname}/configuration.nix];
+    modules = [
+      ../hosts/${hostname}/configuration.nix
+      # Fleet-local packages not (yet) in nixpkgs.
+      {nixpkgs.overlays = [(final: prev: {homarr = final.callPackage ../pkgs/homarr {};})];}
+    ];
   }

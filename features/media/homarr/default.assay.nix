@@ -1,35 +1,27 @@
-# Colocated suite for features/media/homarr/default.nix.
-# Guards the OCI-container implementation (the earlier in-repo module ran
-# `npm start` from an empty directory and never worked).
+# Colocated suite: homarr systemd module with stubbed pkgs.
 let
   assay = import ./../../../common/assay/default.nix;
   mod = import ./default.nix {
-    pkgs = {};
-    lib = {};
-    config = {};
+    homarr = "homarr";
+    pkgs = {homarr = "homarr";};
   };
-  container = mod.virtualisation.oci-containers.containers.homarr;
-  rules = builtins.concatStringsSep "\n" mod.systemd.tmpfiles.rules;
+  svc = mod.systemd.services."homarr";
 in
   assay.suite "homarr" {
-    usesUpstreamOciImage =
-      assay.eq container.image "ghcr.io/homarr-labs/homarr:latest";
-    dashboardPortMapped = assay.eq container.ports ["7575:7575"];
-    keepsEncryptionKeyConfigured = assay.eq
-      (container.environment ? "SECRET_ENCRYPTION_KEY")
+    systemPackages = assay.eq mod.environment.systemPackages ["homarr"];
+    unitDescription = assay.eq svc.description "Homarr Dashboard";
+    runsAsServiceUser = assay.eq svc.serviceConfig.User "homarr";
+    dataGroup = assay.eq svc.serviceConfig.Group "data";
+    webPort = assay.eq svc.environment.WEB_PORT "7575";
+    sqliteDb = assay.eq
+      (svc.environment.DB_URL)
+      "/data/services/homarr/appdata/db/db.sqlite";
+    externalRedis = assay.eq svc.environment.REDIS_IS_EXTERNAL "true";
+    tmpfilesAppdata = assay.eq
+      (builtins.any
+        (r: builtins.match ".*/appdata .*" r != null)
+        mod.systemd.tmpfiles.rules)
       true;
-    firewallOpensDashboard = assay.eq
-      (builtins.elem 7575 mod.networking.firewall.allowedTCPPorts)
-      true;
-    persistentDataDir = assay.eq
-      (builtins.match ".*d /data/services/homarr/data .*" rules != null)
-      true;
-    persistentAppdataDir = assay.eq
-      (builtins.match ".*d /data/services/homarr/appdata .*" rules != null)
-      true;
-    # No native systemd services may exist: the dashboard must stay
-    # container-based (this is what failed with `npm start` before).
-    noNativeServiceDefinitions = assay.eq
-      (builtins.attrNames (mod.systemd.services or {}))
-      [];
+    serviceUser = assay.eq mod.users.users."homarr".isSystemUser true;
+    extraGroupData = assay.eq mod.users.users."homarr".extraGroups ["data"];
   }

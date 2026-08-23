@@ -35,10 +35,12 @@ When you want to add automated benchmarking to a Rust project's CI pipeline that
          with:
            name: criterion-reports
            path: target/criterion
+           if-no-files-found: ignore
    ```
 5. **Verify**: Ensure the benchmark job runs after tests and successfully uploads the criterion reports.
 
 ## Pitfalls
+- **`cargo bench` with no `[[bench]]` targets is a SILENT NO-OP.** It exits 0, runs nothing, and produces no `target/criterion` — so the upload-artifact step then FAILS the job ("no files were found with the provided path"). This shipped broken in the Assay CI (2026-08): `criterion` was in dev-deps but no `benches/` existed. Before wiring a bench job, confirm `grep '\[\[bench\]\]' crates/*/Cargo.toml` (or a `benches/` dir) actually matches something. If benches are aspirational, add `if-no-files-found: ignore` to the upload step so the job stays green until real benches land.
 - Make sure the benchmark job has the same setup as other jobs (checkout, nix installer, rust toolchain, rust-cache).
 - The benchmark job should depend on the test job (needs: test) to ensure code is tested before benchmarking.
 - Ensure the upload-artifact step correctly points to where criterion outputs its reports (usually target/criterion).

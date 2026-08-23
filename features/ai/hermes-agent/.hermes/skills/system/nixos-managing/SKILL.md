@@ -176,6 +176,15 @@ man configuration.nix | grep -A3 "PasswordAuthentication"
   entirely and silently (real case: removing the exporter block from the
   server module would have left mimir with no node-exporter at all; fix was
   adding the exporter-module import there).
+- **`nix eval --apply` attr-existence checks**: the `?` operator cannot take
+  a computed attribute name (`units ? (name + ".service")` is a parse error).
+  Use `builtins.hasAttr (name + ".service") units` when checking generated
+  per-service units in a loop.
+- **`pkgs.writers.writePython3` enforces pycodestyle at BUILD time** (E401,
+  E302, E501 ≤79 cols...). Embedded python scripts in modules must be
+  pep8-clean or `nix flake check` / deploy fails while building the writer
+  derivation — run `nix log <drv>` for the lint list when it does. Same
+  class of gate exists for other writers variants.
 
 ## Core Mental Model
 
@@ -243,6 +252,28 @@ Secrets live at `/run/agenix/` or `/run/secrets/` — never in Nix store.
 
 See [configuration.md](configuration.md) for patterns.
 
+## Service health: unit state lies, probe the port
+
+`systemctl is-active <unit>` is insufficient evidence in both directions:
+- oci-container units (virtualisation.oci-containers) report `inactive`
+  while the container serves fine — verify by HTTP probe instead.
+- .NET apps (readarr) go `active` before they listen — sleep, then probe.
+- A unit can stay `failed` across many deploys because switch does not
+  restart unchanged units (real case: grafana failed on a port collision at
+  first enable; every later deploy "confirmed" while the dashboard was down).
+Smoke-check pattern after any deploy:
+`systemctl is-active <unit>` + `curl -s -o /dev/null -w "%{http_code}"
+http://127.0.0.1:<port>/` — any code <500 (200/302/307) means the app is up.
+
+## Port collisions with rootless containers
+
+A host's rootless docker/podman stack binds host ports independently of
+NixOS (`rootlesskit` visible in `ss -tlnp` users). Symptom: NixOS service
+crash-loops with "address already in use", or the port answers with the
+WRONG app (404 from yugabyte when you expected grafana). Fix on the NixOS
+side — move OUR service to a free port (check with `ss` first), never remap
+the user's containers.
+
 ## Assay (colocated `*.assay.nix`) conventions
 
 - Stub `pkgs` with the EXACT attr names the module's `with pkgs;` block
@@ -274,3 +305,25 @@ only exist inside devenv — **always commit via `devenv shell -- git commit …
 - Operator preference: do NOT bundle unrelated cleanup (`rm`, etc.) into a
   verification or commit command — issue single-purpose commands; compound
   commands were denied twice this session.
+- **Index hygiene**: this repo often carries unrelated PRE-STAGED files
+  (e.g. `features/ai/hermes-agent/.hermes/*`). A bare `git commit` — and
+  especially `git commit --amend` — sweeps all of it into your commit.
+  Always pass an explicit pathspec, and after any commit/amend run
+  `git show --stat HEAD` to confirm exactly what landed. If foreign files
+  got swept: `git reset --soft HEAD^` (safe while unpushed), re-commit with
+  pathspec; the index keeps the foreign staging untouched.
+- **Verify the committed tree, not a dirty worktree**: when the worktree
+  carries unrelated changes, evaluation against it proves nothing about
+  HEAD. `git worktree add /tmp/hermes-verify-head-worktree HEAD`, run the
+  checks there (adjust any script's REPO path first), then remove it.
+  Evidence about HEAD outranks evidence about a worktree.
+- **Untracked files are invisible to flake evals** (`error: Path '...' is
+  not tracked by Git`): a brand-new module file fails deploy/eval until
+  `git add`ed — the fix is staging the file, not changing the code.
+- **Worktree `cd` trap**: terminal state persists across calls — a leftover
+  `cd /tmp/<worktree>` from verification makes every LATER command (deploys,
+  evals) run against the stale snapshot silently. Real case: a deploy
+  "confirmed" while shipping the old config because bin/fleet resolved ROOT
+  inside a throwaway worktree. Pin `workdir` explicitly on every command, or
+  cd back immediately after worktree checks; if a stale deploy slipped
+  through, redeploy from the real tree before trusting any result.

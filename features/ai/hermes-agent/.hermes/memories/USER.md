@@ -2,6 +2,12 @@ User prefers using 'hermes config set' for individual configuration changes rath
 §
 User appreciates when agents archive significant work products (like plans) with timestamps in a history/ directory for future reference, as demonstrated in the Assay planning session.
 §
-User values concise, direct responses and verification of changes. Prefers NixOS configuration work without Home Manager. Likes class-level skill organization. Wants skills that capture practical techniques, not session narratives. Expects both default.nix and associated test files (*.assay.nix) to be added together for NixOS features.
+Values concise direct responses and verification of changes; prefers NixOS work without Home Manager; likes class-level skill organization; expects default.nix + assay test files added together.
 §
-User prefers using existing Nix-managed modules in features/media/ and features/monitoring/ rather than creating new ones when setting up media services on NixOS fleet. All services are already available and use /mnt/well/services/${servicename} for persistent state - no JSON files or external state management needed.
+NixOS fleet: reuse existing modules in features/media/ and features/monitoring/ rather than creating new ones; persistent state at /mnt/well/services/<name>.
+§
+Andromeda paper bot = live ops: watchdog cron on long sessions; 'analyze/report only' forbids restarts/kills/code changes; claims need TDD RED→GREEN + real-execution evidence; ledgers under repo history/.
+§
+Hermes skill-name collision: bare skill_view('id-workflow') is refused as ambiguous (exists at core/id-workflow AND core/utilities/workflow/id-workflow) — load by full path 'core/id-workflow'.
+§
+User prefers mermaid diagrams in markdown docs — never ASCII box art. Flowcharts for layer maps, sequence diagrams for traces. See skill: documentation/architecture-doc-authoring.

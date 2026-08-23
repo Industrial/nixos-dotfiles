@@ -49,10 +49,14 @@ checks = builtins.mapAttrs (_: c: c.deployChecks self.deploy) deploy-rs.lib;
 ### 3. Operator commands
 ```bash
 nix flake check
-deploy .#huginn --dry-activate   # or project bin/fleet check huginn
-deploy .#huginn
-deploy .                         # all nodes
+bin/fleet check <host>           # flake check + per-host dry-activate
+bin/fleet deploy <host>          # single host
+bin/fleet deploy all             # all nodes; wrapper goes host-by-host so one
+                                 # unreachable node does not block the rest,
+                                 # exits non-zero if any host failed
 ```
+Prefer the `bin/fleet` wrapper over bare `deploy`: `deploy .` aborts the
+whole run on the first unreachable node.
 
 ### 4. Conflict with comin
 Never leave `services.comin.enable = true` while deploy-rs is primary.
@@ -82,6 +86,36 @@ Never leave `services.comin.enable = true` while deploy-rs is primary.
   that configures the exporter, and always verify the **evaluated merged
   config**, not the source files — use
   `scripts/verify-node-exporter-flags.sh` (bash+jq, no python needed).
+- Trusting `pwd` across tool calls. The terminal session keeps its working
+  directory between commands, so any earlier `cd /tmp/...` (e.g. into a
+  throwaway verification worktree) silently redirects every later
+  `bin/fleet`, `nix eval .#…`, and relative-path edit to that copy — this
+  produced a confirmed deploy of a STALE config whose smoke check then
+  failed against the wrong generation. Pass explicit `workdir` on every
+  command and when a result contradicts the tree you just edited (`grep`
+  says enabled, eval says absent), suspect the wrong checkout BEFORE
+  suspecting Nix.
+- Trusting "Deployment confirmed" as proof of health. switch-to-configuration
+  does NOT restart UNCHANGED units, so a unit left `failed` by an earlier
+  deploy stays down while every subsequent deploy confirms fine — a grafana
+  instance sat silently failed across many green deploys this way (its port
+  had been taken by a container). Rule: after any deploy, smoke-check every
+  unit you care about (`systemctl is-active` + local HTTP probe); when taking
+  over an unfamiliar fleet, sweep ALL service units once before trusting it.
+- Port assignments must be checked against the target's live listeners
+  (`sudo ss -tlnp`) BEFORE choosing them — long-lived container stacks squat
+  host ports invisibly in the Nix config (on mimir: 5432/5433/9000 and more,
+  held by rootlesskit). A config-only review cannot see these collisions.
+- Mangled multi-tool calls: a patch whose arguments got merged from a todo
+  update silently applied only partially or not at all (a "confirmed"
+  prowlarr deploy was later found to be a no-op). After any malformed tool
+  call, RE-READ the target file before proceeding; never assume the edit
+  landed just because output looked plausible.
+- Fuzzy-match patches anchoring on too-short old_strings can duplicate
+  adjacent lines instead of replacing them (two imports became four, and an
+  unrelated commented line silently reverted). For host import lists,
+  prefer rewriting the whole block/file once over iterative patches, then
+  re-read to confirm every entry appears exactly once.
 
 ## Debugging flaky deploys
 
@@ -100,6 +134,38 @@ Never leave `services.comin.enable = true` while deploy-rs is primary.
    `ssh <host> -- bash -c '"..."'`.
 6. After fixing, verify the merged config evaluates clean (script above),
    then soak 10+ consecutive deploys before calling it fixed.
+7. **Prove it at the end of the chain**: config-eval PASS is necessary but
+   not sufficient — finish with a real `bin/fleet deploy all` (or per host)
+   and post-deploy health checks on every target:
+   `systemctl is-active <unit>` + `curl :<port>/metrics` HTTP 200 + grep the
+   journal for the original error signature. A "successful" deploy with a
+   dead unit is exactly the failure mode this class of bug produces.
+
+## Renaming feature modules
+
+Use `git mv features/monitoring/<old> features/monitoring/<new>` so history
+follows, then update import paths in every `hosts/*/configuration.nix`
+(`search_files` for the old name — expect 1 line per importing host), plus
+any comments naming the module. Re-run merged-config eval + `nix flake
+check` before committing; a rename that misses a host import breaks only
+that host's eval.
+
+## Enabling features one-by-one (enable → deploy → smoke)
+
+For "enable X, deploy, verify" loops (e.g. media features on mimir — full
+table of units/ports/probes in `nixos-fleet-management` →
+`references/mimir-media-stack.md`):
+
+1. Uncomment/add the import (exactly once), deploy that single feature.
+2. Smoke = `systemctl is-active <unit>` + `curl` the port over SSH;
+   200/302/307 all mean up. Read `journalctl -u <unit>` on the target for
+   any rollback.
+3. Check for port squatters BEFORE enabling anything new: mimir's rootless
+   containers own 5432/5433/6379/5672/4317-4318 etc.
+4. A feature whose unit can never start is an honest FAIL: document it,
+   leave it disabled with a comment saying why, and keep the rest deployed.
+5. Finish with one final clean deploy and a full-fleet smoke sweep, then
+   commit with per-feature evidence in the message.
 
 ## Committing the fix
 
