@@ -1,56 +1,30 @@
-# Homarr is a self-hosted dashboard for all your applications.
-# Port: 7575
-{config, lib, pkgs, ...}: let
+# Homarr dashboard (official container image) — port 7575.
+# The previous in-repo module ran `npm start` from an empty directory and
+# never provisioned application code; nixpkgs has no homarr package or
+# services.homarr module, so run the upstream OCI image instead.
+{pkgs, ...}: let
   name = "homarr";
   directoryPath = "/data/services/${name}";
 in {
-  environment = {
-    systemPackages = with pkgs; [
-      nodejs  # Homarr requires Node.js
+  virtualisation.oci-containers.containers.${name} = {
+    image = "ghcr.io/homarr-labs/homarr:latest";
+    ports = ["7575:7575"];
+    environment = {
+      SECRET_ENCRYPTION_KEY = "a203bd976170059a5b560b8ade34fcb4951f970f94792abefbafad1377610d28";
+    };
+    volumes = [
+      "${directoryPath}/data:/data"
+      "${directoryPath}/appdata:/appdata"
     ];
   };
 
+  # Container data lives under the fleet-standard NFS-backed path.
   systemd = {
-    services = {
-      "${name}" = {
-        description = "Homarr Dashboard";
-        wantedBy = ["multi-user.target"];
-        after = ["network-online.target"];
-        wants = ["network-online.target"];
-        serviceConfig = {
-          Type = "simple";
-          User = "${name}";
-          Group = "data";
-          WorkingDirectory = directoryPath;
-          ExecStart = "${pkgs.nodejs}/bin/npm start";
-          Environment = [
-            "HOST=0.0.0.0"
-            "PORT=7575"
-          ];
-          Restart = "always";
-          RestartSec = 5;
-        };
-      };
-    };
-    tmpfiles = {
-      rules = [
-        "d ${directoryPath} 0770 ${name} data - -"
-      ];
-    };
+    tmpfiles.rules = [
+      "d ${directoryPath}/data 0755 root root - -"
+      "d ${directoryPath}/appdata 0755 root root - -"
+    ];
   };
 
-  users = {
-    users = {
-      "${name}" = {
-        isSystemUser = true;
-        home = "/home/${name}";
-        createHome = true;
-        group = "${name}";
-        extraGroups = ["data"];
-      };
-    };
-    groups = {
-      "${name}" = {};
-    };
-  };
+  networking.firewall.allowedTCPPorts = [7575];
 }

@@ -28,11 +28,11 @@
     ../../features/media/sonarr/default.nix
     ../../features/media/radarr/default.nix
     ../../features/media/prowlarr/default.nix
+    ../../features/media/arr-wiring.nix
     ../../features/media/qbittorrent/default.nix
     ../../features/media/readarr/default.nix
     ../../features/media/seerr/default.nix
     ../../features/media/invidious/default.nix
-    # ../../features/media/homarr/default.nix  # broken: module runs `npm start`
-    #   in an empty dir, never provisions app code; no services.homarr upstream
+    ../../features/media/homarr/default.nix
   ];
 }
