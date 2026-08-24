@@ -29,11 +29,11 @@ for (const it of appItems) {
   let opts = {};
   try { opts = JSON.parse(it.options).json || {}; } catch {}
   if (it.kind === "app") {
-    const arow = db.prepare("SELECT name,url,ping_url FROM app WHERE id = ?").get(opts.appId);
+    const arow = db.prepare("SELECT name,href,ping_url FROM app WHERE id = ?").get(opts.appId);
     if (arow) {
       spec.apps.push({
         name: arow.name,
-        url: arow.url,
+        url: arow.href,
         pingUrl: arow.ping_url ?? undefined,
         x: it.x ?? 0,
         y: it.y ?? 0,

@@ -35,7 +35,8 @@ db.pragma("journal_mode = WAL");
 let board = db.prepare("SELECT id FROM board WHERE name = ?").get(spec.board.name);
 if (!board) {
   const bid = id();
-  db.prepare("INSERT INTO board (id,name,is_public) VALUES (?, ?, 0)").run(bid, spec.board.name);
+  db.prepare(`INSERT INTO board (id,name,is_public,background_image_attachment,background_image_repeat,background_image_size,primary_color,secondary_color,opacity,disable_status,item_radius)
+              VALUES (?, ?, 0, 'fixed', 'no-repeat', 'cover', '#fa5252', '#fd7e14', 100, 0, 'lg')`).run(bid, spec.board.name);
   board = {id: bid};
 }
 const boardId = board.id;
@@ -71,13 +72,17 @@ for (const integ of spec.integrations || []) {
     const enc = encryptSecret(value);
     const existing = db.prepare("SELECT kind FROM integrationSecret WHERE integration_id = ? AND kind = ?").get(row.id, kind);
     if (existing) {
+      // Skip values the export flow redacted (never overwrite a real secret
+      // with the placeholder from board.json round-trips).
+      if (value === "SET-IN-api-keys-nix" || value.startsWith("<") && value.endsWith(">")) continue;
       db.prepare("UPDATE integrationSecret SET value = ?, updated_at = strftime('%s','now') WHERE integration_id = ? AND kind = ?")
         .run(enc, row.id, kind);
+      console.log(`secret updated: ${integ.name}.${kind}`);
     } else {
       db.prepare("INSERT INTO integrationSecret (kind,value,updated_at,integration_id) VALUES (?, ?, strftime('%s','now'), ?)")
         .run(kind, enc, row.id);
+      console.log(`secret set: ${integ.name}.${kind}`);
     }
-    console.log(`secret set: ${integ.name}.${kind}`);
   }
 }
 
@@ -86,17 +91,20 @@ for (const app of spec.apps || []) {
   let arow = db.prepare("SELECT id FROM app WHERE name = ?").get(app.name);
   if (!arow) {
     const aid = id();
-    db.prepare("INSERT INTO app (id,name,url,href,ping_url) VALUES (?, ?, ?, ?, ?)")
-      .run(aid, app.name, app.url ?? null, app.href ?? app.url ?? null, app.pingUrl ?? null);
+    db.prepare("INSERT INTO app (id,name,icon_url,href,ping_url) VALUES (?, ?, ?, ?, ?)")
+      .run(aid, app.name,
+        app.iconUrl ?? `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${app.name.toLowerCase()}.svg`,
+        app.href ?? app.url ?? null,
+        app.pingUrl ?? app.url ?? null);
     arow = {id: aid};
     console.log(`app created: ${app.name}`);
   } else {
-    db.prepare("UPDATE app SET url = ?, href = ?, ping_url = ? WHERE id = ?")
-      .run(app.url ?? null, app.href ?? app.url ?? null, app.pingUrl ?? null, arow.id);
+    db.prepare("UPDATE app SET href = COALESCE(?, href), ping_url = COALESCE(?, ping_url) WHERE id = ?")
+      .run(app.href ?? app.url ?? null, app.pingUrl ?? app.url ?? null, arow.id);
   }
 
   // tile on the board bound to the app
-  let item = db.prepare("SELECT i.id FROM item i JOIN item_layout il ON il.item_id = i.id WHERE i.board_id = ? AND i.kind = 'app' AND i.options LIKE ?")
+  let item = db.prepare(`SELECT i.id FROM item i WHERE i.board_id = ? AND i.kind = 'app' AND i.options LIKE ?`)
     .get(boardId, `%"appId":"${arow.id}"%`);
   if (!item) {
     const iid = id();
