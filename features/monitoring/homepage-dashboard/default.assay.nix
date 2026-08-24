@@ -6,7 +6,7 @@ let
 in
   assay.suite "homepage-dashboard" {
     enabled = assay.eq hp.enable true;
-    listenPort = assay.eq hp.listenPort 8080;
+    listenPort = assay.eq hp.listenPort 8083;
     titleSet = assay.eq (hp.settings ? "title") true;
     servicesDeclared = assay.eq ((builtins.length hp.services) > 0) true;
     widgetsDeclared = assay.eq ((builtins.length hp.widgets) > 0) true;

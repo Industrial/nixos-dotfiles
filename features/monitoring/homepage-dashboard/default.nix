@@ -3,7 +3,8 @@
     homepage-dashboard = {
       enable = true;
 
-      listenPort = 8080;
+      # 8080 is qbittorrent-nox's WebUI; homepage moves to 8083.
+      listenPort = 8083;
 
       # https://gethomepage.dev/latest/configs/settings/
       settings = {
@@ -131,6 +132,13 @@
                 icon = "http://${settings.hostname}:8989/Content/Images/logo.svg";
                 href = "http://${settings.hostname}:8989";
                 description = "TV Shows";
+              };
+            }
+            {
+              qBittorrent = {
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/qbittorrent.svg";
+                href = "http://${settings.hostname}:8080";
+                description = "Torrent Client";
               };
             }
             {
