@@ -18,6 +18,7 @@
     ../../features/fleet/nix-remote-builder-client.nix
     ../../features/fleet/remote-access.nix
     ../../features/monitoring/grafana/default.nix
+    ../../features/monitoring/homepage-dashboard
     ../../features/monitoring/prometheus-exporter/default.nix
     ../../features/monitoring/prometheus/default.nix
     ../../features/nixos/graphics/amd.nix
@@ -33,6 +34,5 @@
     ../../features/media/readarr/default.nix
     ../../features/media/seerr/default.nix
     ../../features/media/invidious/default.nix
-    ../../features/media/homarr/default.nix
   ];
 }
