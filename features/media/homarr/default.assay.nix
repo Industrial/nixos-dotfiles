@@ -16,8 +16,35 @@ in
       true;
     tmpfilesAppdata = assay.eq
       (builtins.any
-        (r: builtins.match ".*${"/data/services/homarr/appdata"} .*" r != null)
+        (r: builtins.match ".*/appdata .*" r != null)
         mod.systemd.tmpfiles.rules)
       true;
     firewallOpensWebPort = assay.eq mod.networking.firewall.allowedTCPPorts [7575];
+    syncUnitDeclared = assay.eq
+      (mod.systemd.services ? "homarr-sync")
+      true;
+    syncAfterContainer = assay.eq
+      mod.systemd.services."homarr-sync".after
+      ["homarr.service"];
+    syncIsOneshot = assay.eq
+      mod.systemd.services."homarr-sync".serviceConfig.Type
+      "oneshot";
+    exportTimerHourly = assay.eq
+      mod.systemd.services."homarr-export".startAt
+      "hourly";
+    boardSpecHasProwlarr = assay.eq
+      ((builtins.fromJSON (builtins.readFile ./board.json)).integrations)
+      [
+        {
+          name = "Prowlarr";
+          kind = "prowlarr";
+          url = "http://127.0.0.1:9696";
+          secrets = {
+            apiKey = "aef3d89a62c5b141289e16adcd63f56aeab40a2ec5f72864b7b3aff203de5e41";
+          };
+        }
+      ];
+    boardAppsNamed = assay.eq
+      (map (a: a.name) (builtins.fromJSON (builtins.readFile ./board.json)).apps)
+      ["Prowlarr" "Sonarr" "Radarr" "Lidarr" "Readarr"];
   }

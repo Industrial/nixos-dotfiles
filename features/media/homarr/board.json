@@ -1,0 +1,18 @@
+{
+  "board": {"name": "dashboard"},
+  "integrations": [
+    {
+      "name": "Prowlarr",
+      "kind": "prowlarr",
+      "url": "http://127.0.0.1:9696",
+      "secrets": {"apiKey": "aef3d89a62c5b141289e16adcd63f56aeab40a2ec5f72864b7b3aff203de5e41"}
+    }
+  ],
+  "apps": [
+    {"name": "Prowlarr", "url": "http://127.0.0.1:9696", "x": 0, "y": 0},
+    {"name": "Sonarr", "url": "http://127.0.0.1:8989", "x": 1, "y": 0},
+    {"name": "Radarr", "url": "http://127.0.0.1:7878", "x": 2, "y": 0},
+    {"name": "Lidarr", "url": "http://127.0.0.1:8686", "x": 3, "y": 0},
+    {"name": "Readarr", "url": "http://127.0.0.1:8787", "x": 4, "y": 0}
+  ]
+}
