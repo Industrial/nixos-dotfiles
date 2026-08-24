@@ -25,16 +25,19 @@ let
   provider = builtins.head mod.services.grafana.provision.dashboards.settings.providers;
   fleet = builtins.fromJSON (builtins.readFile ./dashboards/fleet.json);
   panelTitles = map (p: p.title) fleet.panels;
+  # uid of the DB-assigned Prometheus datasource on mimir; provisioning
+  # must NOT set a uid (Grafana aborts when rewriting an existing one).
+  liveDsUid = "PBFA97CFB590B2093";
 in
   assay.suite "grafana" {
     shape = assay.hasAttrs mod ["services"];
-    datasourceUidPinned = assay.eq ds.uid "prometheus";
+    datasourceUidNotPinned = assay.eq (ds ? uid) false;
     dashboardProviderReadsDirectory = assay.eq provider.options.path ./dashboards;
     fleetDashboardValidJson = assay.eq fleet.title "Fleet Overview";
     fleetDashboardHasFixedUid = assay.eq fleet.uid "fleet-overview";
     fleetDashboardRefreshes = assay.eq fleet.refresh "10s";
-    fleetQueriesUsePinnedDatasource = assay.eq
-      (builtins.all (t: t.datasource.uid == "prometheus")
+    fleetQueriesUseLiveDatasourceUid = assay.eq
+      (builtins.all (t: t.datasource.uid == liveDsUid)
         (builtins.concatMap (p: p.targets or [])
           (builtins.filter (p: p.type != "row") fleet.panels)))
       true;

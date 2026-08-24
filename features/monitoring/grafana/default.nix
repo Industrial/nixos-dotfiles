@@ -20,9 +20,11 @@
         };
       };
 
-      # Stable datasource UID: provisioned dashboards reference it directly
-      # (${DS_PROMETHEUS}/000000001 placeholders in host.json never resolved,
-      # so that dashboard's panels had no working datasource).
+      # NOTE: deliberately NO uid pin on the datasource. This Grafana
+      # version's provisioner aborts startup ("data source not found")
+      # if provisioning tries to change the uid of an existing datasource.
+      # Dashboards reference the DB-assigned uid of the first datasource:
+      # PBFA97CFB590B2093 (stable since db creation).
       provision = {
         datasources = {
           settings = {
@@ -32,7 +34,6 @@
                 type = "prometheus";
                 access = "proxy";
                 url = "http://0.0.0.0:9001";
-                uid = "prometheus";
                 isDefault = true;
               }
             ];
