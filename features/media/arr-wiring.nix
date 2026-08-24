@@ -75,6 +75,29 @@ EOF
     categories = json.loads(os.environ["CATEGORIES"])
 
 
+    def wait_ready(app, port, timeout=180):
+        """Block until http://127.0.0.1:<port> answers at all.
+
+        systemd 'after' only guarantees the unit started, not that the
+        app is listening; Prowlarr tests connectivity when an application
+        is registered, so a too-early POST fails with 400.
+        Any HTTP response (even 401/404) proves the server is up.
+        """
+        url = f"http://127.0.0.1:{port}/ping"
+        deadline = time.time() + timeout
+        while True:
+            try:
+                urllib.request.urlopen(url, timeout=5).read()
+                return True
+            except urllib.error.HTTPError:
+                return True
+            except Exception:
+                if time.time() > deadline:
+                    print(f"WARNING {app}: not reachable after {timeout}s")
+                    return False
+                time.sleep(3)
+
+
     def req(method, path, key, body=None):
         data = json.dumps(body).encode() if body is not None else None
         r = urllib.request.Request(base + path, data=data, method=method)
@@ -130,6 +153,10 @@ EOF
         # One misbehaving app must not take down wiring for the rest
         # (or the boot): log the API's own error body and carry on.
         try:
+            port = int(targets[app]["url"].rsplit(":", 1)[1])
+            if not wait_ready(app, port):
+                failures.append(app)
+                continue
             if name in existing:
                 cur = {
                     f.get("name"): f.get("value")
