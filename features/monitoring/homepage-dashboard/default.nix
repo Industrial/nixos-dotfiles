@@ -53,13 +53,15 @@
             {
               Grafana = {
                 icon = "https://grafana.com/img/fav32.png";
-                href = "http://${settings.hostname}:9000";
+                # Grafana listens on 3000; mimir's rootless container stack
+                # (monorepo compose, yb-tserver UI) owns 9000.
+                href = "http://${settings.hostname}:3000";
                 description = "Grafana dashboard for monitoring";
               };
             }
             {
               Prometheus = {
-                icon = "https://prometheus.io/assets/prometheus_logo_grey.svg";
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/prometheus.svg";
                 href = "http://${settings.hostname}:9001";
                 description = "Prometheus monitoring system and time series database";
               };
@@ -77,27 +79,16 @@
           Search = [
             {
               SearXNG = {
-                icon = "https://invidious.snopyta.org/favicon.ico";
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/searxng.svg";
                 href = "http://${settings.hostname}:4001";
                 description = "SearXNG is a free anonymous google";
               };
             }
             {
               Invidious = {
-                icon = "https://invidious.snopyta.org/favicon.ico";
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/invidious.svg";
                 href = "http://${settings.hostname}:4000";
                 description = "Invidious is an alternative front-end to YouTube";
-              };
-            }
-          ];
-        }
-        {
-          News = [
-            {
-              TinyTinyRSS = {
-                icon = "https://tt-rss.org/images/ttrss-icon.png";
-                href = "http://${settings.hostname}:9312";
-                description = "News";
               };
             }
           ];
@@ -155,20 +146,9 @@
             }
             {
               Jellyfin = {
-                icon = "http://${settings.hostname}:8096/web/assets/img/banner-light.png";
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/jellyfin.svg";
                 href = "http://${settings.hostname}:8096";
                 description = "Media Player";
-              };
-            }
-          ];
-        }
-        {
-          LLM = [
-            {
-              Ollama = {
-                # icon = "";
-                href = "http://0.0.0.0:5001/drive";
-                description = "Fully-featured, beautiful web interface for Ollama LLMs - built with NextJS. Deploy with a single click.";
               };
             }
           ];

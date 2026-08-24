@@ -3,6 +3,9 @@ let
   assay = import ./../../../common/assay/default.nix;
   mod = import ./default.nix {settings.hostname = "mimir";};
   hp = mod.services.homepage-dashboard;
+  monitoring = (builtins.head (builtins.filter (s: s ? "Monitoring") hp.services)).Monitoring;
+  search = (builtins.head (builtins.filter (s: s ? "Search") hp.services)).Search;
+  media = (builtins.head (builtins.filter (s: s ? "Media") hp.services)).Media;
 in
   assay.suite "homepage-dashboard" {
     enabled = assay.eq hp.enable true;
@@ -12,4 +15,22 @@ in
     titleSet = assay.eq (hp.settings ? "title") true;
     servicesDeclared = assay.eq ((builtins.length hp.services) > 0) true;
     widgetsDeclared = assay.eq ((builtins.length hp.widgets) > 0) true;
+    # Grafana runs on 3000; 9000 belongs to mimir's rootless monorepo compose
+    # stack (yb-tserver UI).
+    grafanaHref = assay.eq (builtins.head monitoring).Grafana.href "http://mimir:3000";
+    prometheusIcon =
+      assay.eq (builtins.elemAt monitoring 1).Prometheus.icon
+      "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/prometheus.svg";
+    searxngIcon =
+      assay.eq (builtins.head search).SearXNG.icon
+      "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/searxng.svg";
+    jellyfinIcon =
+      assay.eq (builtins.elemAt media 7).Jellyfin.icon
+      "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/jellyfin.svg";
+    invidiousIcon =
+      assay.eq (builtins.elemAt search 1).Invidious.icon
+      "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/invidious.svg";
+    # TinyTinyRSS and Ollama are gone from the fleet.
+    noRemovedCategories =
+      assay.eq (builtins.all (s: !(s ? "News" || s ? "LLM")) hp.services) true;
   }
