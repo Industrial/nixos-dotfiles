@@ -6,6 +6,11 @@
       # 8080 is qbittorrent-nox's WebUI; homepage moves to 8083.
       listenPort = 8083;
 
+      # Homepage v1 validates the request Host header against
+      # HOMEPAGE_ALLOWED_HOSTS; the module default only allows localhost:8082,
+      # so any request addressed to the host itself failed host validation.
+      allowedHosts = "${settings.hostname}:8083,localhost:8083,127.0.0.1:8083";
+
       # https://gethomepage.dev/latest/configs/settings/
       settings = {
         title = "Dashboard";

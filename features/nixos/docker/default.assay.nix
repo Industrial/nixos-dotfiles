@@ -1,4 +1,4 @@
-# Colocated suite: docker enable + user in docker group.
+# Colocated suite: rootless-only docker (rootful daemon disabled).
 let
   assay = import ./../../../common/assay/default.nix;
   mod = import ./default.nix {
@@ -10,5 +10,7 @@ let
   };
 in
   assay.suite "docker" {
-    enabled = assay.eq mod.virtualisation.docker.enable true;
+    rootfulDisabled = assay.eq mod.virtualisation.docker.enable false;
+    rootlessEnabled = assay.eq mod.virtualisation.docker.rootless.enable true;
+    socketVariableSet = assay.eq mod.virtualisation.docker.rootless.setSocketVariable true;
   }

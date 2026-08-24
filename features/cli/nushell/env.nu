@@ -16,6 +16,16 @@ $env.XDG_DATA_HOME = $"($env.HOME)/.local/share"
 $env.XDG_STATE_HOME = $"($env.HOME)/.local/state"
 
 # -----------------------------------------------------------------------------
+# Rootless Docker — same contract as virtualisation.docker.rootless.setSocketVariable
+# (environment.extraInit only reaches POSIX shells; fish has its own glue in
+# /etc/fish/nixos-env-preinit.fish). Without this, nu terminals fall back to
+# /var/run/docker.sock — the rootful daemon we deliberately disabled.
+# -----------------------------------------------------------------------------
+if ("DOCKER_HOST" not-in $env) and ($env.XDG_RUNTIME_DIR? != null) {
+  $env.DOCKER_HOST = $"unix://($env.XDG_RUNTIME_DIR)/docker.sock"
+}
+
+# -----------------------------------------------------------------------------
 # PATH — user bins first (Nu keeps PATH as a list)
 # -----------------------------------------------------------------------------
 def --env prepend-path [dir: string] {
