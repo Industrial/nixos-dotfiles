@@ -20,6 +20,7 @@
     radarr.port = 7878;
     readarr.port = 8787;
     lidarr.port = 8686;
+    whisparr.port = 6969;
   };
   appList = builtins.attrNames apps;
 
@@ -103,6 +104,7 @@ EOF
         "radarr": ("Radarr", "Radarr", "RadarrSettings"),
         "readarr": ("Readarr", "Readarr", "ReadarrSettings"),
         "lidarr": ("Lidarr", "Lidarr", "LidarrSettings"),
+        "whisparr": ("Whisparr", "Whisparr", "WhisparrSettings"),
     }
 
     for app, (name, implementation, contract) in implementations.items():
@@ -182,6 +184,7 @@ in {
         radarr = [2000];
         lidarr = [3000];
         readarr = [7000];
+        whisparr = [8000];
       };
     };
     serviceConfig = {

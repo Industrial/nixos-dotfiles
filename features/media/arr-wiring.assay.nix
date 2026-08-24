@@ -4,7 +4,7 @@
 let
   assay = import ./../../common/assay/default.nix;
   keys = import ./api-keys.nix;
-  apps = ["lidarr" "prowlarr" "radarr" "readarr" "sonarr"];
+  apps = ["lidarr" "prowlarr" "radarr" "readarr" "sonarr" "whisparr"];
 
   fakeWriter = name: text: {inherit name text;};
   pkgs' = {

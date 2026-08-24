@@ -5,7 +5,7 @@ let
   assay = import ./../../common/assay/default.nix;
   keys = import ./api-keys.nix;
   # builtins.attrNames returns names in alphabetical order.
-  expectedApps = ["lidarr" "prowlarr" "radarr" "readarr" "sonarr"];
+  expectedApps = ["lidarr" "prowlarr" "radarr" "readarr" "sonarr" "whisparr"];
   plausibleKey = k: builtins.match "[0-9A-Za-z]{64}" k != null;
 in
   assay.suite "media-api-keys" {

@@ -32,6 +32,7 @@
     ../../features/media/arr-wiring.nix
     ../../features/media/qbittorrent/default.nix
     ../../features/media/readarr/default.nix
+    ../../features/media/whisparr/default.nix
     ../../features/media/seerr/default.nix
     ../../features/media/invidious/default.nix
   ];
