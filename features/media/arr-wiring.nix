@@ -98,6 +98,7 @@ EOF
     existing_apps = json.loads(
         req("GET", "/applications", prowlarr_key).read())
     existing = {a["name"]: a for a in existing_apps}
+    failures = []
 
     implementations = {
         "sonarr": ("Sonarr", "Sonarr", "SonarrSettings"),
@@ -126,26 +127,36 @@ EOF
             "profileId": profile_id,
             "enable": True,
         }
-        if name in existing:
-            cur = {
-                f.get("name"): f.get("value")
-                for f in existing[name].get("fields", [])
-            }
-            same = (
-                cur.get("baseUrl") == target["url"]
-                and cur.get("apiKey") == target["key"]
-                and existing[name].get("enable", False)
-            )
-            if same:
-                print(f"{app}: unchanged")
-                continue
-            body["id"] = existing[name]["id"]
-            req("PUT", f"/applications/{body['id']}",
-                prowlarr_key, body).read()
-            print(f"{app}: updated")
-        else:
-            req("POST", "/applications", prowlarr_key, body).read()
-            print(f"{app}: registered")
+        # One misbehaving app must not take down wiring for the rest
+        # (or the boot): log the API's own error body and carry on.
+        try:
+            if name in existing:
+                cur = {
+                    f.get("name"): f.get("value")
+                    for f in existing[name].get("fields", [])
+                }
+                same = (
+                    cur.get("baseUrl") == target["url"]
+                    and cur.get("apiKey") == target["key"]
+                    and existing[name].get("enable", False)
+                )
+                if same:
+                    print(f"{app}: unchanged")
+                    continue
+                body["id"] = existing[name]["id"]
+                req("PUT", f"/applications/{body['id']}",
+                    prowlarr_key, body).read()
+                print(f"{app}: updated")
+            else:
+                req("POST", "/applications", prowlarr_key, body).read()
+                print(f"{app}: registered")
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace").strip()
+            print(f"WARNING {app}: HTTP {e.code}: {detail}")
+            failures.append(app)
+
+    if failures:
+        print("wiring incomplete for: " + " ".join(failures))
 
     # Indexer sync to applications: the ApplicationsSync command is not
     # exposed by current Prowlarr builds, but ApplicationIndexerSync is.
