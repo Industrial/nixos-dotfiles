@@ -19,6 +19,10 @@
           http_port = 3000;
         };
       };
+
+      # Stable datasource UID: provisioned dashboards reference it directly
+      # (${DS_PROMETHEUS}/000000001 placeholders in host.json never resolved,
+      # so that dashboard's panels had no working datasource).
       provision = {
         datasources = {
           settings = {
@@ -28,6 +32,7 @@
                 type = "prometheus";
                 access = "proxy";
                 url = "http://0.0.0.0:9001";
+                uid = "prometheus";
                 isDefault = true;
               }
             ];
@@ -39,7 +44,9 @@
               {
                 options.name = "default";
                 options.type = "file";
-                options.path = ./dashboards/host.json;
+                # A provider path must be a DIRECTORY; the previous
+                # single-file path never provisioned anything.
+                options.path = ./dashboards;
               }
             ];
           };
