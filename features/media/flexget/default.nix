@@ -8,8 +8,18 @@
   # nixpkgs' flexget omits the 'cryptography' dependency that upstream's
   # utils/waf module imports during daemon startup (crashes with
   # ModuleNotFoundError before serving). Add it via an override.
-  flexgetFixed = pkgs.flexget.overridePythonAttrs (old: {
+  flexgetFixed = pkgs.flexget.overridePythonAttrs (old: let
+    py = pkgs.python3;
+    webui = pkgs.callPackage ./webui.nix {};
+  in {
     dependencies = (old.dependencies or []) ++ [pkgs.python3Packages.cryptography];
+    # nixpkgs builds from the GitHub tarball where ui/v2/dist is only a
+    # "build it yourself" stub page; the PyPI wheel ships the prebuilt
+    # bundle. Replace the stub with the real UI.
+    postInstall = (old.postInstall or "") + ''
+      rm -rf "$out/${py.sitePackages}/flexget/ui/v2"
+      cp -r "${webui}/share/webui" "$out/${py.sitePackages}/flexget/ui/v2"
+    '';
   });
 in {
   services.flexget = {
