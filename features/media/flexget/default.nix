@@ -29,6 +29,17 @@ in {
     "+${pkgs.coreutils}/bin/rm -f ${directoryPath}/.flexget-lock"
   ];
 
+  # Quiesce before the switch restarts units: the previous generation may
+  # be mid crash-loop (Restart=always), and its auto-restart racing the
+  # new daemon's boot leaves a fresh lock -> "Another process is running"
+  # -> failed activation -> rollback. Runs as root on every activation.
+  system.activationScripts.flexgetQuiesce = {
+    text = ''
+      ${pkgs.systemd}/bin/systemctl stop flexget.service 2>/dev/null || true
+      ${pkgs.coreutils}/bin/rm -f ${directoryPath}/.flexget-lock
+    '';
+  };
+
   systemd.tmpfiles.rules = [
     "d ${directoryPath} 0770 flexget data - -"
   ];
