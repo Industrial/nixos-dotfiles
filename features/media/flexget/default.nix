@@ -5,6 +5,12 @@
 # the repo stays the single source of truth with no host-clone dependency.
 {pkgs, ...}: let
   directoryPath = "/data/services/flexget";
+  # nixpkgs' flexget omits the 'cryptography' dependency that upstream's
+  # utils/waf module imports during daemon startup (crashes with
+  # ModuleNotFoundError before serving). Add it via an override.
+  flexgetFixed = pkgs.flexget.overridePythonAttrs (old: {
+    dependencies = (old.dependencies or []) ++ [pkgs.python3Packages.cryptography];
+  });
 in {
   services.flexget = {
     enable = true;
@@ -13,6 +19,7 @@ in {
     # Schedules live in the YAML (web_server + schedules sections).
     systemScheduler = false;
     config = builtins.readFile ./config/config.yml;
+    package = flexgetFixed;
   };
 
   # FlexGet refuses to start on a stale lock ("Another process (PID ...) is
