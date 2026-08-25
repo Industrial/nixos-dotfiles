@@ -28,8 +28,20 @@ in {
     };
   };
 
+  # The module BindPaths-includes download/incomplete dirs into its root
+  # namespace BEFORE ExecStartPre runs -- a missing dir aborts the unit at
+  # step NAMESPACE (status 226). Create them at activation time instead.
+  system.activationScripts.transmissionDirs = {
+    text = ''
+      ${pkgs.coreutils}/bin/mkdir -p ${directoryPath}/downloads ${directoryPath}/downloads/incomplete
+      ${pkgs.coreutils}/bin/chown transmission:data ${directoryPath} ${directoryPath}/downloads ${directoryPath}/downloads/incomplete
+      ${pkgs.coreutils}/bin/chmod 0770 ${directoryPath} ${directoryPath}/downloads ${directoryPath}/downloads/incomplete
+    '';
+  };
+
   systemd.tmpfiles.rules = [
     "d ${directoryPath} 0770 transmission data - -"
     "d ${directoryPath}/downloads 0770 transmission data - -"
+    "d ${directoryPath}/downloads/incomplete 0770 transmission data - -"
   ];
 }
