@@ -3,7 +3,7 @@
 # Uses the native services.flexget module; the YAML below is embedded into
 # the Nix store at eval time and installed by the unit's ExecStartPre, so
 # the repo stays the single source of truth with no host-clone dependency.
-{pkgs, ...}: let
+{pkgs, lib, ...}: let
   directoryPath = "/data/services/flexget";
   # nixpkgs' flexget omits the 'cryptography' dependency that upstream's
   # utils/waf module imports during daemon startup (crashes with
@@ -28,6 +28,12 @@ in {
   systemd.services.flexget.serviceConfig.ExecStartPre = [
     "+${pkgs.coreutils}/bin/rm -f ${directoryPath}/.flexget-lock"
   ];
+
+  # The module's ExecStop ('flexget daemon stop') spawns a second Python
+  # process that recreates the lockfile while the unit is being restarted,
+  # racing the new daemon's own boot ("Another process (PID ...) is
+  # running"). SIGTERM alone stops the daemon cleanly -- drop ExecStop.
+  systemd.services.flexget.serviceConfig.ExecStop = lib.mkForce "";
 
   # Quiesce before the switch restarts units: the previous generation may
   # be mid crash-loop (Restart=always), and its auto-restart racing the
