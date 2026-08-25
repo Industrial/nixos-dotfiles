@@ -30,8 +30,11 @@
     ../../features/media/radarr/default.nix
     ../../features/media/prowlarr/default.nix
     ../../features/media/arr-wiring.nix
+    ../../features/media/flexget/default.nix
+    ../../features/media/jackett/default.nix
     ../../features/media/qbittorrent/default.nix
     ../../features/media/readarr/default.nix
+    ../../features/media/transmission/default.nix
     ../../features/media/whisparr/default.nix
     ../../features/media/seerr/default.nix
     ../../features/media/invidious/default.nix

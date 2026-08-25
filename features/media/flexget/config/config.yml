@@ -1,0 +1,37 @@
+# FlexGet automation config — repo-owned, installed by the unit's
+# ExecStartPre. Sources: Jackett torznab endpoints; targets: Transmission RPC.
+web_server:
+  bind: 0.0.0.0
+  port: 5050
+  web_ui: yes
+  base_url: /
+
+schedules:
+  - tasks: [tv-sonarr-feed, movies]
+    schedule:
+      hour: "*/6"
+      minute: 15
+
+tasks:
+  # Example torznab task: pull the indexer feed from Jackett and hand
+  # matches to Transmission. Indexer/apikey must be set per-install in
+  # Jackett (its API key lives on first boot in
+  # /data/services/jackett/ServerConfig.json).
+  tv-sonarr-feed:
+    rss:
+      url: http://127.0.0.1:9117/torznab/all/api?apikey=CHANGE-JACKETT-KEY&cat=5030,5040
+      all_entries: no
+    series:
+      - example-show
+    transmission:
+      host: 127.0.0.1
+      port: 9091
+
+  movies:
+    rss:
+      url: http://127.0.0.1:9117/torznab/all/api?apikey=CHANGE-JACKETT-KEY&cat=2000,2045
+      all_entries: no
+    movie_queue: accept
+    transmission:
+      host: 127.0.0.1
+      port: 9091
