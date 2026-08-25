@@ -96,38 +96,24 @@
         {
           Media = [
             {
-              Lidarr = {
-                icon = "http://${settings.hostname}:8686/Content/Images/logo.svg";
-                href = "http://${settings.hostname}:8686";
-                description = "Music";
+              Jackett = {
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/jackett.svg";
+                href = "http://${settings.hostname}:9117";
+                description = "Indexer Proxy";
               };
             }
             {
-              Radarr = {
-                icon = "http://${settings.hostname}:7878/Content/Images/logo.svg";
-                href = "http://${settings.hostname}:7878";
-                description = "Movies";
+              FlexGet = {
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/flexget.svg";
+                href = "http://${settings.hostname}:5050";
+                description = "Download Automation";
               };
             }
             {
-              Readarr = {
-                icon = "http://${settings.hostname}:8787/Content/Images/logo.svg";
-                href = "http://${settings.hostname}:8787";
-                description = "Books";
-              };
-            }
-            {
-              Prowlarr = {
-                icon = "http://${settings.hostname}:9696/Content/Images/logo.svg";
-                href = "http://${settings.hostname}:9696";
-                description = "Indexer";
-              };
-            }
-            {
-              Sonarr = {
-                icon = "http://${settings.hostname}:8989/Content/Images/logo.svg";
-                href = "http://${settings.hostname}:8989";
-                description = "TV Shows";
+              Transmission = {
+                icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/transmission.svg";
+                href = "http://${settings.hostname}:9091";
+                description = "Torrent Client";
               };
             }
             {
@@ -135,13 +121,6 @@
                 icon = "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/qbittorrent.svg";
                 href = "http://${settings.hostname}:8080";
                 description = "Torrent Client";
-              };
-            }
-            {
-              Whisparr = {
-                icon = "http://${settings.hostname}:6969/Content/Images/logo.svg";
-                href = "http://${settings.hostname}:6969";
-                description = "Porn";
               };
             }
             {
