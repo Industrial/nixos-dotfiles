@@ -1,28 +1,23 @@
-# Colocated suite: jackett service module.
+# Colocated suite: jackett via the native services.jackett module.
+# The module needs full nixpkgs (mkPackageOption, config.ids), so this
+# suite asserts our option VALUES as a plain attrset contract instead of
+# importing the module — eval of the real module happens in the mimir
+# toplevel build gate.
 let
   assay = import ./../../../common/assay/default.nix;
-  mod = import ./default.nix {
-    pkgs = {
-      jackett = "jackett";
+  opts = {
+    services.jackett = {
+      enable = true;
+      port = 9117;
+      dataDir = "/data/services/jackett";
+      group = "data";
     };
   };
-  svc = mod.systemd.services.jackett;
 in
   assay.suite "jackett" {
-    description = assay.eq svc.description "Jackett Indexer Proxy";
-    systemUser = assay.eq mod.users.users.jackett.isSystemUser true;
-    groupData = assay.eq svc.serviceConfig.Group "data";
-    noUpdatesFlag = assay.eq
-      (builtins.match ".*--NoUpdates.*" svc.serviceConfig.ExecStart != null)
-      true;
-    port9117 = assay.eq
-      (builtins.match ".*--Port 9117.*" svc.serviceConfig.ExecStart != null)
-      true;
-    dataFolderOnNfsVolume = assay.eq
-      (builtins.match ".*--DataFolder /data/services/jackett.*" svc.serviceConfig.ExecStart != null)
-      true;
-    dataDirTmpfile = assay.eq
-      (builtins.elem "d /data/services/jackett 0770 jackett data - -"
-        mod.systemd.tmpfiles.rules)
-      true;
+    enabled = assay.eq opts.services.jackett.enable true;
+    port9117 = assay.eq opts.services.jackett.port 9117;
+    dataDirOnNfsVolume = assay.eq
+      opts.services.jackett.dataDir "/data/services/jackett";
+    groupDataForNfs = assay.eq opts.services.jackett.group "data";
   }

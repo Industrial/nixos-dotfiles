@@ -1,83 +1,35 @@
 # Transmission is a BitTorrent client. Port = 9091 (RPC), 51413 (peer).
+#
+# Uses the native services.transmission module: settings below are merged
+# into .config/transmission-daemon/settings.json by the unit's pre-start
+# on EVERY start, so there is no symlink/drift machinery to get wrong.
 {pkgs, ...}: let
-  name = "transmission";
-  directoryPath = "/data/services/${name}";
-  configDir = "${directoryPath}/.config/transmission-daemon";
-  dotfilesRepo = "/data/dotfiles";
-  settingsSource = "${dotfilesRepo}/features/media/transmission/config/settings.json";
+  directoryPath = "/data/services/transmission";
 in {
-  environment = {
-    systemPackages = with pkgs; [
-      transmission_4
-    ];
-  };
-
-  systemd = {
-    services = {
-      "${name}" = {
-        description = "Transmission BitTorrent Daemon";
-        wantedBy = ["multi-user.target"];
-        after = ["network-online.target"];
-        wants = ["network-online.target"];
-        serviceConfig = {
-          Type = "simple";
-          User = "${name}";
-          Group = "data";
-          # -g is the SETTINGS dir (transmission-daemon resolves
-          # settings.json directly inside it) — pointing it at the data
-          # root made the daemon ignore our declarative settings.json and
-          # self-generate defaults with rpc-host-whitelist enabled (403s).
-          ExecStart = "${pkgs.transmission_4}/bin/transmission-daemon -f -g ${configDir}";
-          ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${configDir}";
-          Restart = "always";
-          RestartSec = 5;
-        };
-      };
-    };
-    tmpfiles = {
-      rules = [
-        "d ${directoryPath} 0770 ${name} data - -"
-        "d ${directoryPath}/downloads 0770 ${name} data - -"
-      ];
+  services.transmission = {
+    enable = true;
+    # Required since the transmission_3 -> _4 default flip (NixOS 24.11).
+    package = pkgs.transmission_4;
+    # Settings dir becomes <home>/.config/transmission-daemon.
+    home = directoryPath;
+    group = "data";
+    performanceNetParameters = true;
+    openPeerPorts = true;
+    settings = {
+      download-dir = "${directoryPath}/downloads";
+      incomplete-dir = "${directoryPath}/downloads/incomplete";
+      incomplete-dir-enabled = true;
+      rpc-bind-address = "0.0.0.0";
+      # Fleet access by hostname; whitelists would 403 remote clients.
+      rpc-host-whitelist-enabled = false;
+      rpc-whitelist-enabled = false;
+      start-added-torrents = true;
+      umask = 2;
     };
   };
 
-  # Link the declarative settings.json into the daemon config dir
-  # (idempotent). A pre-existing real file is backed up once before the
-  # first link takes over; a missing repo checkout degrades gracefully to
-  # the live file. Group-writable source so UI edits flow back through NFS.
-  system.activationScripts.transmissionSettings = {
-    text = ''
-      source="${settingsSource}"
-      target="${configDir}/settings.json"
-      if [ ! -f "$source" ]; then
-        echo "transmission: $source missing (is ${dotfilesRepo} cloned?); keeping existing settings" >&2
-      else
-        mkdir -p "$(dirname "$target")"
-        if [ -f "$target" ] && [ ! -L "$target" ]; then
-          if ! ${pkgs.diffutils}/bin/cmp -s "$target" "$source"; then
-            cp -a "$target" "$target.bak.$(date +%Y%m%d%H%M%S)"
-          fi
-        fi
-        ln -sfn "$source" "$target"
-        chgrp data "$source" 2>/dev/null || true
-        chmod 0664 "$source"
-      fi
-    '';
-  };
-
-  users = {
-    users = {
-      "${name}" = {
-        isSystemUser = true;
-        home = "/home/${name}";
-        createHome = true;
-        group = "${name}";
-        extraGroups = ["data"];
-      };
-    };
-    groups = {
-      "${name}" = {};
-    };
-  };
+  systemd.tmpfiles.rules = [
+    "d ${directoryPath} 0770 transmission data - -"
+    "d ${directoryPath}/downloads 0770 transmission data - -"
+  ];
 }

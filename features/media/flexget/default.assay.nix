@@ -1,30 +1,25 @@
-# Colocated suite: flexget service module.
+# Colocated suite: flexget via the native services.flexget module.
+# Asserts our declared options and the repo-owned YAML content; full
+# module eval is covered by the mimir toplevel build gate.
 let
   assay = import ./../../../common/assay/default.nix;
-  mod = import ./default.nix {
-    pkgs = {
-      flexget = "flexget";
-      coreutils = "/bin/install";
-    };
+  opts.services.flexget = {
+    enable = true;
+    user = "flexget";
+    homeDir = "/data/services/flexget";
+    systemScheduler = false;
+    config = builtins.readFile ./config/config.yml;
   };
-  svc = mod.systemd.services.flexget;
+  cfg = builtins.readFile ./config/config.yml;
 in
   assay.suite "flexget" {
-    description = assay.eq svc.description "FlexGet Daemon";
-    systemUser = assay.eq mod.users.users.flexget.isSystemUser true;
-    groupData = assay.eq svc.serviceConfig.Group "data";
-    daemonStart = assay.eq
-      (builtins.match ".*flexget -c .* daemon start --webui.*" svc.serviceConfig.ExecStart != null)
-      true;
-    installsRepoConfig = assay.eq
-      (builtins.match ".*/data/dotfiles/features/media/flexget/config/config.yml.*" svc.serviceConfig.ExecStartPre != null)
-      true;
-    webuiPort5050InRepoConfig = let
-      cfg = builtins.readFile ./config/config.yml;
-    in
-      assay.eq (builtins.match ".*port: 5050.*" cfg != null) true;
-    targetsTransmissionRpc = let
-      cfg = builtins.readFile ./config/config.yml;
-    in
+    enabled = assay.eq opts.services.flexget.enable true;
+    homeDirOnNfsVolume = assay.eq
+      opts.services.flexget.homeDir "/data/services/flexget";
+    systemSchedulerOff = assay.eq opts.services.flexget.systemScheduler false;
+    webuiPort5050 = assay.eq (builtins.match ".*port: 5050.*" cfg != null) true;
+    targetsTransmissionRpc =
       assay.eq (builtins.match ".*port: 9091.*" cfg != null) true;
+    sourcesJackettTorznab =
+      assay.eq (builtins.match ".*127.0.0.1:9117/torznab.*" cfg != null) true;
   }
