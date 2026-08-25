@@ -23,7 +23,11 @@ in {
           Type = "simple";
           User = "${name}";
           Group = "data";
-          ExecStart = "${pkgs.transmission_4}/bin/transmission-daemon -f -g ${directoryPath}";
+          # -g is the SETTINGS dir (transmission-daemon resolves
+          # settings.json directly inside it) — pointing it at the data
+          # root made the daemon ignore our declarative settings.json and
+          # self-generate defaults with rpc-host-whitelist enabled (403s).
+          ExecStart = "${pkgs.transmission_4}/bin/transmission-daemon -f -g ${configDir}";
           ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${configDir}";
           Restart = "always";
           RestartSec = 5;

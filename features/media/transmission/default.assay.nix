@@ -19,7 +19,7 @@ in
     systemUser = assay.eq mod.users.users.transmission.isSystemUser true;
     groupData = assay.eq svc.serviceConfig.Group "data";
     foregroundFlag = assay.eq
-      (builtins.match ".*transmission-daemon -f -g /data/services/transmission.*" svc.serviceConfig.ExecStart != null)
+      (builtins.match ".*transmission-daemon -f -g /data/services/transmission/.config/transmission-daemon.*" svc.serviceConfig.ExecStart != null)
       true;
     activationScriptDeclared =
       assay.eq (mod.system.activationScripts ? transmissionSettings) true;
