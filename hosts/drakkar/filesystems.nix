@@ -27,5 +27,7 @@
 
   systemd.tmpfiles.rules = [
     "d /data/cache 0755 tom users -"
+    # Local game root only — do not use mimir as a game station.
+    "d /data/Games 0755 tom users -"
   ];
 }

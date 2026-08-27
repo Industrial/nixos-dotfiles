@@ -1,37 +1,50 @@
 # FlexGet automation config — repo-owned, embedded into the nix store by
 # the module. Sources: Jackett torznab endpoints; targets: Transmission RPC.
-#
-# NOTE: this is a minimal working skeleton. Replace CHANGE-JACKETT-KEY with
-# Jackett's API key (shown in its UI after first boot) and curate the
-# series/movie filters before expecting useful automation.
 web_server:
   bind: 0.0.0.0
   port: 5050
   web_ui: yes
   base_url: /
-
 schedules:
   - tasks: [tv, movies]
     schedule:
       hour: "*/6"
       minute: 15
-
+  - tasks: [test-download]
+    schedule:
+      minute: "*/5"
+templates:
+  # Template for Jackett->Transmission: handles magnet links via exec
+  jackett-transmission:
+    no_entries_ok: yes
 tasks:
   tv:
+    template: jackett-transmission
     rss:
-      url: http://127.0.0.1:9117/torznab/all/api?apikey=CHANGE-JACKETT-KEY&cat=5030,5040
+      url: http://127.0.0.1:9117/torznab/all/api?apikey=awonppv9e1gjf3hh6iibdyc1k6ryy46s&cat=5030,5040
       all_entries: no
     series:
       - example-show
-    transmission:
-      host: 127.0.0.1
-      port: 9091
-
+    exec:
+      on_output:
+        for_accepted: /run/current-system/sw/bin/transmission-remote 127.0.0.1:9091 -a "{{url}}"
   movies:
+    template: jackett-transmission
     rss:
-      url: http://127.0.0.1:9117/torznab/all/api?apikey=CHANGE-JACKETT-KEY&cat=2000,2045
+      url: http://127.0.0.1:9117/torznab/all/api?apikey=awonppv9e1gjf3hh6iibdyc1k6ryy46s&cat=2000,2045
       all_entries: no
     accept_all: no
-    transmission:
-      host: 127.0.0.1
-      port: 9091
+    exec:
+      on_output:
+        for_accepted: /run/current-system/sw/bin/transmission-remote 127.0.0.1:9091 -a "{{url}}"
+  # Test task - downloads Big Buck Bunny (public domain) to verify pipeline
+  test-download:
+    template: jackett-transmission
+    rss:
+      url: http://127.0.0.1:9117/torznab/all/api?apikey=awonppv9e1gjf3hh6iibdyc1k6ryy46s&cat=2000&q=Big+Buck+Bunny
+      all_entries: yes
+    limit_new: 1
+    accept_all: yes
+    exec:
+      on_output:
+        for_accepted: /run/current-system/sw/bin/transmission-remote 127.0.0.1:9091 -a "{{url}}"
