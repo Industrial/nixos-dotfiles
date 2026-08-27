@@ -1,0 +1,23 @@
+# Skill-name collisions: which copy wins, and why.
+#
+# A skill's directory basename IS its name to Claude Code, so two skills called
+# `react` cannot both exist. Names whose copies are byte-identical resolve
+# silently in vendor-skills; only genuinely differing content lands here.
+#
+# The name stays plain — no cursor-* / hermes-* prefixes. If it is both `react`,
+# it is called `react`.
+#
+# Format: name<TAB>path<TAB>rationale
+# Paths are relative to the dotfiles root (or absolute).
+#
+# Selection policy, in order: a complete skill beats a pointer or stub; then the
+# one with supporting references/; then the most recently updated. Byte count is
+# a hint, not the rule.
+
+id-workflow	features/ai/hermes-agent/.hermes/skills/core/id-workflow	The .cursor copy (1457B) is a pointer at .cursor/commands/id-workflow/ — useless in a system-wide payload that must not assume a project .cursor checkout. This one carries the whole mode machine and is the newest of the three.
+mcp-debug	features/ai/hermes-agent/.hermes/skills/workflow/mcp-debug	Bodies are identical apart from a trailing newline. This description ("inspect and debug MCP tool calls, when MCP servers misbehave") matches how the server is actually used here, and it is the copy already on the roster.
+new-skill	features/ai/hermes-agent/.hermes/skills/workflow/new-skill	Slightly larger, carries a second file, and is the copy already on the roster. Its body targets .cursor/skills paths — a stale-path instance of risk R6, tracked separately rather than patched here.
+nixos-deploy-rs	features/ai/hermes-agent/.hermes/skills/system/nixos-deploy-rs	Same description as the .cursor copy but a strict superset: 14517B across 3 files vs 2009B in 1, and newer (2026-08-25 vs 08-20).
+nixos-managing	features/ai/hermes-agent/.hermes/skills/system/nixos-managing	Same description as the .cursor copy, 24469B across 10 files vs 9195B across 9, and newer (2026-08-25 vs 08-20).
+plan-hierarchically	features/ai/hermes-agent/.hermes/skills/core/development/plan-hierarchically	Larger in total (22420B vs 21695B) because content moved into references/assay-strategic-plan.md and references/maestro-cli-loop.md, which is the shape a skill should have. Newest of the two.
+playwright-cli	.cursor/skills/playwright/playwright-skill/playwright-cli	The only one of the three with an explicit trust-boundary section warning about indirect prompt injection from untrusted pages, and the most informative description. Smaller SKILL.md than the sibling copy, but better content.

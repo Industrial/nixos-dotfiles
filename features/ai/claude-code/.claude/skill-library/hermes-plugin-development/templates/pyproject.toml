@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PLUGIN_NAME"
+version = "0.1.0"
+description = "TODO"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.entry-points."hermes_agent.plugins"]
+PLUGIN_NAME = "PLUGIN_PACKAGE"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["PLUGIN_PACKAGE*"]

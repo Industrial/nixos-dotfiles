@@ -38,7 +38,46 @@
       "origin": null,
       "enabled_toolsets": null,
       "workdir": null
+    },
+    {
+      "id": "8460b550e00e",
+      "name": "cme-import-completion-watchdog",
+      "prompt": "Check whether the CME batch import finished and verify it. Run these exact commands via ctx_shell in /data/Code/rust/solana-yield-optimizer:\n\n1. `grep -c \"exit=0\" /tmp/cme_batch_import.log` \u2014 counts completed session imports (176 = all done)\n2. `grep -q \"ALL DONE\" /tmp/cme_batch_import.log && echo DONE || echo RUNNING`\n3. `.devenv/state/venv/bin/python /tmp/verify_cme_complete.py` \u2014 completeness verification vs source parquets\n\nThen:\n- If the verification prints VERDICT: COMPLETE, report the full summary: sessions scanned, bar/l2/trade days present, any missing lists, and state the import is verified complete. Also check `tail -3 /tmp/cme_batch_import.log` for any non-zero exit lines and include them if present.\n- If INCOMPLETE or still RUNNING, report progress: how many of 176 sessions done, which days are missing, and whether any failures (non-zero exits) occurred.\n- If any session failed (look for `exit=` values that are not 0), list those days.\n\nKeep the report concise and factual. Do not restart anything, do not modify files, do not schedule further jobs \u2014 this is analyze/report only.",
+      "skills": [],
+      "skill": null,
+      "model": null,
+      "provider": null,
+      "provider_snapshot": "openrouter",
+      "model_snapshot": "stealth/ox-alpha",
+      "base_url": null,
+      "script": null,
+      "no_agent": false,
+      "context_from": null,
+      "schedule": {
+        "kind": "once",
+        "run_at": "2026-08-25T00:33:30.462544+02:00",
+        "display": "once in 30m"
+      },
+      "schedule_display": "once in 30m",
+      "repeat": {
+        "times": 1,
+        "completed": 0
+      },
+      "enabled": true,
+      "state": "scheduled",
+      "paused_at": null,
+      "paused_reason": null,
+      "created_at": "2026-08-25T00:03:30.462964+02:00",
+      "next_run_at": "2026-08-25T00:33:30.462544+02:00",
+      "last_run_at": null,
+      "last_status": null,
+      "last_error": null,
+      "last_delivery_error": null,
+      "deliver": "local",
+      "origin": null,
+      "enabled_toolsets": null,
+      "workdir": null
     }
   ],
-  "updated_at": "2026-08-22T17:51:01.728451+02:00"
+  "updated_at": "2026-08-25T00:03:30.507708+02:00"
 }

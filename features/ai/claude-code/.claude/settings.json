@@ -1,0 +1,178 @@
+{
+  "enabledPlugins": {
+    "claude-obsidian@claude-obsidian-marketplace": false,
+    "gitkraken-hooks@gitkraken": true,
+    "id-workflow@idclear": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-obsidian-marketplace": {
+      "source": {
+        "repo": "AgriciDaniel/claude-obsidian",
+        "source": "github"
+      }
+    },
+    "gitkraken": {
+      "source": {
+        "path": "/home/tom/.claude/plugins/marketplaces/gitkraken",
+        "source": "directory"
+      }
+    },
+    "idclear": {
+      "source": {
+        "path": "/home/tom/.claude/harness",
+        "source": "directory"
+      }
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/zh33b0yfy11f03l75kp6q64h3ws56nlq-lean-ctx-3.9.18/bin/lean-ctx hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/kacwmr4ld12379abapx8sirlpn766v19-lean-ctx-3.9.18/bin/lean-ctx hook read-dedup",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/zh33b0yfy11f03l75kp6q64h3ws56nlq-lean-ctx-3.9.18/bin/lean-ctx hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/kacwmr4ld12379abapx8sirlpn766v19-lean-ctx-3.9.18/bin/lean-ctx hook rewrite",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash|bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/kacwmr4ld12379abapx8sirlpn766v19-lean-ctx-3.9.18/bin/lean-ctx hook redirect",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|read|ReadFile|read_file|View|view|Grep|grep|Search|search|ListFiles|list_files|ListDirectory|list_directory|Glob|glob"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/zh33b0yfy11f03l75kp6q64h3ws56nlq-lean-ctx-3.9.18/bin/lean-ctx hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/zh33b0yfy11f03l75kp6q64h3ws56nlq-lean-ctx-3.9.18/bin/lean-ctx hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/zh33b0yfy11f03l75kp6q64h3ws56nlq-lean-ctx-3.9.18/bin/lean-ctx hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "/nix/store/zh33b0yfy11f03l75kp6q64h3ws56nlq-lean-ctx-3.9.18/bin/lean-ctx hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ]
+  },
+  "permissions": {
+    "//allow": [
+      "The id-workflow hooks deny native Read/Grep and route them to lean-ctx and",
+      "roam-code. A denied native tool plus an unapproved replacement is a session",
+      "that cannot read anything at all, so the replacements are pre-approved here.",
+      "The split mirrors the native permission model rather than widening it:",
+      "read-class tools are allowed the way native Read and Grep are, while the",
+      "write and execute class (ctx_patch, ctx_shell) is deliberately absent and",
+      "still prompts, the way native Edit, Write and Bash do."
+    ],
+    "allow": [
+      "mcp__lean-ctx__ctx_read",
+      "mcp__lean-ctx__ctx_search",
+      "mcp__lean-ctx__ctx_tree",
+      "mcp__lean-ctx__ctx_glob",
+      "mcp__lean-ctx__ctx_compose",
+      "mcp__lean-ctx__ctx_callgraph",
+      "mcp__lean-ctx__ctx_expand",
+      "mcp__roam-code__roam_search_symbol",
+      "mcp__roam-code__roam_context",
+      "mcp__roam-code__roam_uses",
+      "mcp__roam-code__roam_deps",
+      "mcp__roam-code__roam_explore",
+      "mcp__roam-code__roam_trace",
+      "mcp__roam-code__roam_understand",
+      "mcp__roam-code__roam_diff",
+      "mcp__searxng__searxng_web_search",
+      "mcp__searxng__web_url_read",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./.hermes/auth.json)",
+      "Read(./**/*.pem)",
+      "Read(./**/id_rsa*)",
+      "Read(//home/tom/.claude/.credentials.json)",
+      "Grep",
+      "Glob"
+    ]
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "statusLine": {
+    "command": "$HOME/.claude/harness/plugins/id-workflow/statusline.sh",
+    "padding": 0,
+    "type": "command"
+  },
+  "tui": "fullscreen"
+}

@@ -1,0 +1,1 @@
+I want you to use Maestro-centric development. As you run `bun run ci:pre-push`, for each problem found create simple small Maestro tasks (or specs). Include problems, type errors etc found in other libraries and places around the monorepo. Finish the Maestro tasks one by one.

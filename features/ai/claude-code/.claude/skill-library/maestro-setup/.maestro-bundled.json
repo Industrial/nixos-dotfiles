@@ -1,0 +1,29 @@
+{
+  "managedBy": "maestro",
+  "skillName": "maestro-setup",
+  "installedAt": "2026-05-26T19:28:13.736Z",
+  "maestroVersion": "0.106.1",
+  "fileHashes": {
+    "reference/context-templates/architecture.md": "edcb1276292f4402486aed9e8444aa9ca2cdeee0ab57393bf5f4c96e98f3dd5a",
+    "reference/context-templates/index.md": "52efe3b0782eeab952d4ef4e5f77d21006130fe3dda2f34d1c8f26170eda3f43",
+    "reference/context-templates/planning.md": "fc1294d777325c61e24bc2cadb9e4201b957691948592f4edd8d63e62ae237e8",
+    "reference/context-templates/product-sense.md": "87c5d996546a6602f586f1f780f2f5d4756990b225eee0be9902ceb26a26dfc2",
+    "reference/context-templates/quality-gates.md": "4c41618a46ca09c1fcbd691f10285dfb7bb68c3ddd5685b40db26a842cc81fc8",
+    "reference/context-templates/security.md": "78cd6d3885984d6d7658c433a83b273d302d7b2def34c44fd35ea343d00b2599",
+    "reference/context-templates/workflow.md": "6829fef9fe2f5b8bf0de63869167ea84f9a0a767a64ba8fd5954b9ab1c59d53b",
+    "reference/github-workflow/maestro-verify.yml.template": "657a80d0fe7e89945be27c4311a877b747d630121ac1912b5c88f4b043777128",
+    "reference/init-deep.md": "5e9512de9e956ce62e39982a685b9f5f50d9a75782226de611f6801260210268",
+    "reference/setup-report-template.md": "b5195d38c18e31f52de42cd02b9e322edf377c0b95ff6d3be20f5a24bc2b5350",
+    "reference/styleguides/cpp.md": "3a7e0494069cc79de16acc06eb5167000f9663076d5568d36e6ade059c0ef9d0",
+    "reference/styleguides/csharp.md": "ffac481d7827ccdf48c18dced12d19f5edb3b3b725bc293894d031a8daeda3f3",
+    "reference/styleguides/dart.md": "c739d0d9f4b51082f53ab3986f87348d53afee4e0de6d46dc82675c60d272d8a",
+    "reference/styleguides/general.md": "fd3ff9bb49814fe0fe3c0d3cab5b2179790af4d4df94797cc90d126fa924b498",
+    "reference/styleguides/go.md": "21e62b2d85131fd6b5c866cc215f0ea9da336ec09befd3be7a288ce57018f27f",
+    "reference/styleguides/html-css.md": "9e53a37cd573247d3221a0ef4a3587f36c09d2ade91c38d15ce36e9ce39be96d",
+    "reference/styleguides/javascript.md": "db83dc5851013e0dbdb187827157d4f7caae4f3540f4fe64dbf348d239b9f9c9",
+    "reference/styleguides/python.md": "3d34d25813eba4b5a6dab9e83074fd0b1c8f4ead8ac89b779a74ff740fc8284d",
+    "reference/styleguides/rust.md": "2f6eee661982be41240769ea0b1f94671714caf3b3578bf150cca01ebce2eb23",
+    "reference/styleguides/typescript.md": "6e4a4069e64995d9a690c3eedb545127f2751cb07d700f52d97464e2fca7c90d",
+    "SKILL.md": "233a659772f4b28f60ffdc7b63e353b61364951d3c1a0dd4fa824d5cec665ca0"
+  }
+}

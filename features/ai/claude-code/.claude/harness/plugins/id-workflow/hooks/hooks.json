@@ -1,0 +1,93 @@
+{
+	"description": "ID workflow rails: mode state, per-mode write bans, tool routing, formatting, and turn-end verification.",
+	"hooks": {
+		"SessionStart": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-scratch-dir.sh",
+						"timeout": 5
+					},
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/session-id-context.sh",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"UserPromptSubmit": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/id-mode-from-prompt.sh",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"PreToolUse": [
+			{
+				"matcher": "Write|Edit|NotebookEdit|mcp__lean-ctx__ctx_edit|mcp__lean-ctx__ctx_patch",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/guard-write-paths.sh",
+						"timeout": 5
+					},
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/guard-id-mode.sh",
+						"timeout": 5
+					}
+				]
+			},
+			{
+				"matcher": "Read|Grep|Edit|Write|NotebookEdit|WebSearch|WebFetch",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/block-native-tools.sh",
+						"timeout": 5
+					}
+				]
+			},
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/guard-bash.sh",
+						"timeout": 5
+					}
+				]
+			}
+		],
+		"PostToolUse": [
+			{
+				"matcher": "mcp__lean-ctx__ctx_patch|mcp__lean-ctx__ctx_edit|Edit|Write|NotebookEdit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/format-after-edit.sh",
+						"timeout": 30
+					}
+				]
+			}
+		],
+		"Stop": [
+			{
+				"hooks": [
+					{
+						"type": "command",
+						"command": "\"${CLAUDE_PLUGIN_ROOT}\"/hooks/stop-verify-gate.sh",
+						"timeout": 300,
+						"statusMessage": "Verifying changed code (lint + typecheck)"
+					}
+				]
+			}
+		]
+	}
+}

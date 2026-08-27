@@ -1,0 +1,6 @@
+source: https://github.com/aeshakhzod/nixos-and-flakes-skill
+path: skills/nix/
+commit: c9a423b2af834633e6ef714de603fe73e6f0b195
+license: MIT
+based-on: ryan4yin/nixos-and-flakes-book
+fetched: 2026-08-20T07:04:27Z

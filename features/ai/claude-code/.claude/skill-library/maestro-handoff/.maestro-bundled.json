@@ -1,0 +1,9 @@
+{
+  "managedBy": "maestro",
+  "skillName": "maestro-handoff",
+  "installedAt": "2026-05-26T19:28:13.736Z",
+  "maestroVersion": "0.106.1",
+  "fileHashes": {
+    "SKILL.md": "66adced7ab1c5f03f68596cf77a81351adacb56df922f787686cf21375a58017"
+  }
+}

@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# features > ai > claude-code > vendor-skills
+#
+# Vendors every skill from the source trees into the payload as REAL directories.
+#
+# Why a script and not a one-off `cp -r`: copying 191 skills out of the .cursor
+# submodule forks them from their upstream. A fork with no refresh path rots on
+# the first upstream change, so the vendoring itself is the deliverable and the
+# payload is its output. Re-run this after the submodule moves.
+#
+#   bin/vendor-skills             apply
+#   bin/vendor-skills --dry-run   report what would happen, write nothing
+#   bin/vendor-skills --check     exit 1 if the payload is out of date (CI)
+#
+# Two rules the payload depends on:
+#
+#   1. No symlinks, ever. Sources contain them; `cp -aL` dereferences, and every
+#      copy is asserted link-free afterwards. A silent `cp -a` here would defeat
+#      the entire point of the vendoring.
+#   2. A skill lives in exactly one tier. If a name is already in .claude/skills/
+#      (tier 1) it is refreshed there; otherwise it lands in .claude/skill-library/
+#      (tier 2). Never both — two copies drift, and the drift is invisible.
+#
+# Duplicate names across sources: byte-identical SKILL.md files resolve silently
+# (the hermes tree mirrors several skills under core/). Names whose content
+# genuinely differs are read from collisions.tsv, which records the winner and
+# why. An unresolved conflict is a hard error, not a coin flip.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+feature="$(dirname "$here")"
+payload="$feature/.claude"
+library="$payload/skill-library"
+roster="$payload/skills"
+collisions="$feature/collisions.tsv"
+renames="$feature/renames.tsv"
+dotfiles="$(cd "$feature/../../.." && pwd)"
+
+# Source trees. The .pre-dotfiles backup carries two skills (diagram-design,
+# lean-ctx) that exist nowhere else; it is optional so the script keeps working
+# once that backup is pruned.
+sources=(
+  "$dotfiles/.cursor/skills"
+  "$feature/../hermes-agent/.hermes/skills"
+  "$HOME/.maestro/skills"
+)
+for extra in "$HOME"/.claude.pre-dotfiles.*/skills; do
+  [ -d "$extra" ] && sources+=("$extra")
+done
+
+mode=apply
+case "${1:-}" in
+  --dry-run) mode=dry-run ;;
+  --check) mode=check ;;
+  "") ;;
+  *)
+    echo "usage: vendor-skills [--dry-run|--check]" >&2
+    exit 2
+    ;;
+esac
+
+[ -d "$payload" ] || {
+  echo "no payload at $payload" >&2
+  exit 1
+}
+
+# --- naming ------------------------------------------------------------------
+# A skill's name is the directory name it gets under .claude/skills/, and that
+# string is what the model matches a task against. The source directory name is
+# right almost always, so it is the default.
+#
+# Front-matter `name:` is deliberately NOT used as the default. It disagrees
+# with the directory in ~20 places and is usually the worse of the two: it
+# carries vendor prefixes the roster does not want (`vercel-composition-patterns`
+# for composition-patterns/, `mindrally-react` for react/) and sometimes holds a
+# prose title rather than a name at all.
+#
+# Where the source directory name really is unusable — a fragment like
+# `entities/` inside a mikro-orm/ collection, or an underscored path from an
+# upstream that does not use hyphens — renames.tsv names the skill explicitly.
+# Underscores are normalised to hyphens unconditionally; Claude Code skill names
+# are hyphenated slugs.
+skill_name() {
+  local skill_md="$1" dir name mapped
+  dir="$(dirname "$skill_md")"
+
+  if [ -f "$renames" ]; then
+    mapped="$(awk -F'\t' -v d="$dir" '$0 !~ /^#/ && $1 != "" && d ~ "/" $1 "$" {print $2}' "$renames" | head -1)"
+    if [ -n "$mapped" ]; then
+      printf '%s\n' "$mapped"
+      return
+    fi
+  fi
+
+  name="$(basename "$dir")"
+  printf '%s\n' "${name//_/-}"
+}
+
+# --- enumerate ---------------------------------------------------------------
+# One line per skill directory: name<TAB>hash<TAB>path, sorted so repeated runs
+# over unchanged sources produce identical output and --check is meaningful.
+inventory="$(mktemp)"
+trap 'rm -f "$inventory" "$inventory.names"' EXIT
+
+for src in "${sources[@]}"; do
+  [ -d "$src" ] || continue
+  find "$src" -name SKILL.md -type f 2>/dev/null | while read -r skill_md; do
+    printf '%s\t%s\t%s\n' \
+      "$(skill_name "$skill_md")" \
+      "$(sha1sum <"$skill_md" | cut -c1-16)" \
+      "$(dirname "$skill_md")"
+  done
+done | sort >"$inventory"
+
+total_files="$(wc -l <"$inventory")"
+cut -f1 "$inventory" | sort -u >"$inventory.names"
+total_names="$(wc -l <"$inventory.names")"
+
+# --- resolve -----------------------------------------------------------------
+# The chosen source directory for a name, or non-zero when the name has several
+# distinct contents and collisions.tsv does not name a winner.
+resolve() {
+  local name="$1" paths hashes winner
+  paths="$(awk -F'\t' -v n="$name" '$1 == n {print $3}' "$inventory")"
+  hashes="$(awk -F'\t' -v n="$name" '$1 == n {print $2}' "$inventory" | sort -u)"
+
+  if [ "$(printf '%s\n' "$hashes" | wc -l)" -eq 1 ]; then
+    printf '%s\n' "$paths" | head -1
+    return 0
+  fi
+
+  if [ -f "$collisions" ]; then
+    winner="$(awk -F'\t' -v n="$name" '$0 !~ /^#/ && $1 == n {print $2}' "$collisions" | head -1)"
+    # Rows carry dotfiles-relative paths so the file stays readable; absolute
+    # paths are honoured too, for sources outside the repo.
+    case "$winner" in
+      /*) ;;
+      ?*) winner="$dotfiles/$winner" ;;
+    esac
+    if [ -n "$winner" ] && [ -f "$winner/SKILL.md" ]; then
+      printf '%s\n' "$winner"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+# --- copy --------------------------------------------------------------------
+# Destination is derived from $payload only, so a malformed name cannot escape
+# it. -L dereferences; the assertion afterwards is what actually guarantees the
+# no-symlink invariant.
+vendor_one() {
+  local name="$1" src="$2" dest
+
+  case "$name" in
+    "" | . | .. | */* | .*)
+      echo "refusing suspicious skill name: '$name'" >&2
+      return 1
+      ;;
+  esac
+
+  if [ -d "$roster/$name" ]; then
+    dest="$roster/$name"
+  else
+    dest="$library/$name"
+  fi
+
+  [ "$mode" = apply ] || return 0
+
+  rm -rf "$dest"
+  mkdir -p "$(dirname "$dest")"
+  cp -aL "$src" "$dest"
+
+  if [ -n "$(find "$dest" -type l -print -quit)" ]; then
+    echo "symlink survived the copy into $dest" >&2
+    return 1
+  fi
+}
+
+# --- run ---------------------------------------------------------------------
+resolved=0
+deduped=0
+unresolved=()
+
+while read -r name; do
+  distinct="$(awk -F'\t' -v n="$name" '$1 == n {print $2}' "$inventory" | sort -u | wc -l)"
+  copies="$(awk -F'\t' -v n="$name" '$1 == n' "$inventory" | wc -l)"
+  if [ "$copies" -gt 1 ] && [ "$distinct" -eq 1 ]; then
+    deduped=$((deduped + 1))
+  fi
+
+  if src="$(resolve "$name")"; then
+    vendor_one "$name" "$src"
+    resolved=$((resolved + 1))
+  else
+    unresolved+=("$name")
+  fi
+done <"$inventory.names"
+
+echo "vendor-skills [$mode]"
+echo "  sources:      ${#sources[@]}"
+echo "  SKILL.md:     $total_files"
+echo "  unique names: $total_names"
+echo "  auto-deduped: $deduped (byte-identical duplicates)"
+echo "  resolved:     $resolved"
+echo "  unresolved:   ${#unresolved[@]}"
+
+if [ "${#unresolved[@]}" -gt 0 ]; then
+  printf '    %s\n' "${unresolved[@]}"
+  echo "  add a row to $collisions for each: name<TAB>winning-path<TAB>rationale" >&2
+  [ "$mode" = dry-run ] || exit 1
+fi
+
+if [ "$mode" = apply ]; then
+  links="$(find "$payload" -type l | wc -l)"
+  echo "  symlinks in payload: $links"
+  [ "$links" -eq 0 ] || exit 1
+fi
+
+if [ "$mode" = check ]; then
+  missing=0
+  while read -r name; do
+    if [ ! -d "$roster/$name" ] && [ ! -d "$library/$name" ]; then
+      echo "  missing from payload: $name"
+      missing=$((missing + 1))
+    fi
+  done <"$inventory.names"
+  [ "$missing" -eq 0 ] || exit 1
+  echo "  payload covers every source skill"
+fi

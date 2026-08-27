@@ -1,17 +1,23 @@
-Coverage threshold for andromeda project is set to 95% in notebooks/andromeda/moon.yml and must never be changed by AI.
+Coverage threshold for andromeda project is set to 95% in python/andromeda/moon.yml and must never be changed by AI.
 §
 User prefers class-level skill organization, concise direct responses with verification of changes, and concrete implemented solutions connected to codebase patterns rather than abstract designs.
 §
-When working with NixOS features in this repo, check if they need to be added to profiles/base.nix to be active on all hosts. Secure Boot module was created but not active until added to base profile.
+When working with NixOS features in this repo, check if they need to be added to profiles/base.nix to be active on all hosts (Secure Boot module sat inactive until added). Fleet uses no Home Manager.
 §
-Persistent service state lives in /data/services/<name> (NFS-exported). Mimir's rootless containers own ports 5432/5433 - NixOS postgresql stays on 5434. features/media/homarr now runs as an OCI container (ghcr.io/homarr-labs/homarr) and works; never reintroduce the old npm-start variant.
+Mimir media 2026-08: jackett/transmission/flexget native NixOS modules (:9117/:9091/:5050), arr kept-unimported, homepage-dashboard :8083; secrets in api-keys.nix.
 §
-User prefers concise, direct responses, verification of changes, NixOS configuration work without Home Manager, class-level skill organization, and using 'hermes config set' for individual configuration changes due to security restrictions.
-§
-Prometheus on mimir (:9001) scrapes node_exporters fleet-wide via <host>:9002 targets in its nodes job.
+contexts/ gone; services/runner/ FINAL = RunnerService(ABC) + Live/Historical subclasses (<name>_service.py); warmup math in domain/session_warmup.py. User flip-flops hierarchies by explicit order — execute literally.
 §
 .hermes directories (repo-root and features/ai/hermes-agent/.hermes) are off limits — never create, modify, or test there; hermes plugin templates stay exempt from assay suites by user directive 2026-08-23.
 §
-Dotfiles repo: meta git hooks named 'pre-commit'/'pre-push' invoke those literal binary names which don't exist outside devenv; commits/pushes fail with ENOENT after real gates pass — use SKIP=pre-commit for commits and SKIP=pre-push for pushes (moon-test/assay and deepsec still run).
+Dotfiles repo: meta git hooks 'pre-commit'/'pre-push' invoke binaries missing outside devenv → SKIP=pre-commit for commits, SKIP=pre-push for pushes (moon-test/assay and deepsec still run).
 §
-Assay authoring: builtins.match is POSIX ERE (write [ as [[]); `or` is a keyword, use ?-defaults; subset claim is positional on lists (set-containment only for attrsets); colocated suites import modules with stub pkgs/lib/writers args.
+Maestro CLI here: /nix/store/dlsk98hadp25cjcsjfrpy7vv7b1ldanz-maestro-0.106.1/bin/maestro (not on devenv PATH); run `lean-ctx allow maestro` once if shell-blocked.
+§
+skill_manage takes bare skill names and file_content= for write_file; skill_view may need the qualified path ('core/id-workflow').
+§
+CME pipeline fixed+verified 2026-08-24 (real MarketTaS datasource replaced stub, chunked micro writes, contract economics); details in andromeda-dev skill refs.
+§
+Fleet hosts log in with nushell: run remote bash via `ssh h 'bash -s' < script.sh`; bare bash loops/heredocs hit nu parse errors.
+§
+Paper↔backtest reconciliation (HL freqai-afml): config afml gate block reaches ONLY the backtest host; paper runs class defaults. NT startup gate counts post-trade_start engine bars — short replay windows silently give 0 trades. Skill ref paper-backtest-reconciliation.md.

@@ -1,0 +1,16 @@
+{
+	"name": "idclear",
+	"owner": {
+		"name": "IdClear"
+	},
+	"metadata": {
+		"description": "IdClear's Claude Code plugins."
+	},
+	"plugins": [
+		{
+			"name": "id-workflow",
+			"source": "./plugins/id-workflow",
+			"description": "Industrial Delivery rails: mode machine, per-mode write bans, tool routing, and a turn-end verification gate — all enforced by hooks."
+		}
+	]
+}

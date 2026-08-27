@@ -6,13 +6,13 @@
     ./filesystems.nix
     ./hardware.nix
 
-    # ../../profiles/ai.nix
+    ../../profiles/ai.nix
     ../../profiles/base.nix
     ../../profiles/communication.nix
     #../../profiles/creative.nix
     ../../profiles/desktop.nix
     ../../profiles/development.nix
-    #../../profiles/gaming.nix
+    ../../profiles/gaming.nix
     ../../profiles/learning.nix
 
     ../../features/fleet/nix-remote-builder-server.nix

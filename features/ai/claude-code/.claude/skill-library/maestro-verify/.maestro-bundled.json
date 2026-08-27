@@ -1,0 +1,15 @@
+{
+  "managedBy": "maestro",
+  "skillName": "maestro-verify",
+  "installedAt": "2026-05-26T19:28:13.736Z",
+  "maestroVersion": "0.106.1",
+  "fileHashes": {
+    "reference/auto-merge.md": "e597b09d4d72e91c9070ecc9a3a3c0c68e25cb706cc6ed3437d409e0edba5861",
+    "reference/deploy-and-runtime.md": "73b16ccb3fb08d386774ad9966db36198f4c7826664b17ee0cffa3c665c3083b",
+    "reference/plan-and-proof.md": "3451b4c664a5ef5e23151d6d54e591231230084b1b6ac5c6253020d5609e0aa1",
+    "reference/trust-verifier.md": "3ae5e958440172f3dbbc2d14693523ac3aaa930bc7cde023dcf3bf926ed3eeda",
+    "reference/verdict.md": "55d9cae1be4b02a5e5a76117df8c24feb01b84419cf2394df93d7109891b29e2",
+    "reference/witness-levels.md": "16581561a00a43840512396cb1883677511589f210d4f88d46f1f7c8cfb1073c",
+    "SKILL.md": "c1fb27461c24a9a081b8d92a2139c4cbe3fc3a0716a77888695a75c147503816"
+  }
+}

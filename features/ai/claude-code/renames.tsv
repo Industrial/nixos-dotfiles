@@ -1,0 +1,47 @@
+# Source directories whose basename is a bad skill name.
+#
+# The default is the source directory name, which is right for ~230 of the 260
+# skills. This file is the exception list, and it exists because the name is the
+# only thing the model sees when deciding whether a skill applies. A skill called
+# `entities` or `core` or `pom` tells it nothing.
+#
+# NOT listed here on purpose: skills whose front-matter `name:` merely adds a
+# vendor prefix the roster does not want — composition-patterns (front-matter
+# says vercel-composition-patterns), react-best-practices, react-view-transitions,
+# disk-audit, docker-cleanup. The directory name is the better one there.
+#
+# Underscores are normalised to hyphens by the script, so literature_search_arxiv
+# and workflow_skill_creator need no row.
+#
+# Format: source-path-suffix<TAB>skill-name
+
+typescript/mikro-orm/entities	mikro-orm-entities
+typescript/mikro-orm/fundamentals	mikro-orm-fundamentals
+typescript/mikro-orm/idclear	mikro-orm-idclear
+typescript/mikro-orm/migrations	mikro-orm-migrations
+typescript/mikro-orm/persistence	mikro-orm-persistence
+typescript/mikro-orm/querying	mikro-orm-querying
+
+playwright/playwright-skill/ci	playwright-ci
+playwright/playwright-skill/core	playwright-core
+playwright/playwright-skill/migration	playwright-migration
+playwright/playwright-skill/pom	playwright-pom
+
+temporal/skill-temporal-cloud	temporal-cloud
+temporal/skill-temporal-design	temporal-workflow-design-critic
+temporal/skill-temporal-developer	temporal-developer
+
+nextjs/mindrally-nextjs-react-typescript	nextjs-react-typescript
+nextjs/mindrally-optimized-nextjs-typescript	optimized-nextjs-typescript
+
+# The directory says management-talk; the skill is an outsider-perspective review
+# pass and the roster has always called it scrutinize.
+productivity/management-talk	scrutinize
+
+# Two unrelated skills both called `react`. The cursor one is general React
+# guidance and keeps the plain name. The hermes one is the @json-render/react
+# renderer — naming it `react` would hijack every React task, so it gets the
+# name its content actually describes. This is disambiguation by subject, not a
+# source prefix.
+react/mindrally-react	react
+development/react	json-render-react

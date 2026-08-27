@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# features > ai > claude-code > link-files-nixos
+#
+# ~/.claude becomes a symlink to this feature's .claude payload, mirroring how
+# features/ai/hermes-agent owns ~/.hermes.
+#
+# One difference from .hermes: Claude Code writes runtime state into ~/.claude
+# (projects/, the plugin cache, .credentials.json, history.jsonl, sessions/).
+# That state lands inside the payload and is gitignored -- see ../.gitignore.
+# An existing real ~/.claude is moved aside rather than deleted, and its runtime
+# state is carried over so auth and the plugin marketplace cache survive.
+#
+# ~/.claude.json is handled too, and it is NOT part of the payload. Claude Code
+# reads user-scope MCP servers from exactly three places -- `mcpServers` at the
+# top of ~/.claude.json, a project's ./.mcp.json, or --mcp-config -- and
+# .claude/mcp.json is none of them. That file sat dead for the whole life of
+# this feature: every session outside a project with its own ./.mcp.json got
+# zero MCP servers while the id-workflow hooks still denied the native tools
+# that route to them, which is a session that can neither read nor search.
+#
+# So mcp.json becomes the declarative source and this script projects it into
+# the one path Claude actually reads. ~/.claude.json itself is mutable runtime
+# state (~56KB of caches, onboarding flags and per-project history that Claude
+# rewrites constantly), so it lives beside the payload as a gitignored file and
+# ~/.claude.json symlinks to it. Claude Code writes THROUGH that symlink rather
+# than replacing it -- verified, and the reason a symlink is viable at all.
+set -euo pipefail
+echo "features > ai > claude-code > link-files-nixos"
+
+currentDirectoryPath=$(pwd)
+featureDirectoryPath="${currentDirectoryPath}/features/ai/claude-code"
+sourceDirectoryPath="${featureDirectoryPath}/.claude"
+targetDirectoryPath="${HOME}/.claude"
+
+# Declarative MCP servers in, mutable Claude state out.
+mcpDeclarationPath="${sourceDirectoryPath}/mcp.json"
+claudeStatePath="${featureDirectoryPath}/claude.json"
+claudeStateTarget="${HOME}/.claude.json"
+
+[ -d "${sourceDirectoryPath}" ] || {
+  echo "  run this from the dotfiles root (no ${sourceDirectoryPath})" >&2
+  exit 1
+}
+
+# ---- 1. ~/.claude -> the payload -------------------------------------------
+
+if [ -L "${targetDirectoryPath}" ] &&
+  [ "$(readlink -f "${targetDirectoryPath}")" = "$(readlink -f "${sourceDirectoryPath}")" ]; then
+  echo "  ~/.claude already linked"
+else
+  if [ -L "${targetDirectoryPath}" ]; then
+    rm -f "${targetDirectoryPath}"
+  elif [ -e "${targetDirectoryPath}" ]; then
+    backupPath="${targetDirectoryPath}.pre-dotfiles.$(date +%Y%m%d-%H%M%S)"
+    mv "${targetDirectoryPath}" "${backupPath}"
+    echo "  moved existing ~/.claude -> ${backupPath}"
+    # Keep this list in step with ../.gitignore: anything gitignored there is
+    # runtime state, and runtime state is what has to survive the swap.
+    for item in \
+      .credentials.json .last-cleanup backups cache daemon daemon.lock \
+      daemon.log daemon.status.json debug file-history history.jsonl jobs \
+      paste-cache plans plugins projects session-env sessions shell-snapshots \
+      stats-cache.json statsig todos; do
+      [ -e "${backupPath}/${item}" ] || continue
+      [ -e "${sourceDirectoryPath}/${item}" ] && continue
+      cp -a "${backupPath}/${item}" "${sourceDirectoryPath}/${item}"
+    done
+    echo "  carried over runtime state (gitignored)"
+  fi
+
+  ln -sfn "${sourceDirectoryPath}" "${targetDirectoryPath}"
+  echo "  ~/.claude -> ${sourceDirectoryPath}"
+fi
+
+# ---- 2. ~/.claude.json -> gitignored state, seeded with the MCP servers -----
+
+# An existing real file is moved into place rather than discarded: it carries
+# the OAuth account and onboarding flags, and losing it forces a re-login.
+if [ ! -L "${claudeStateTarget}" ] && [ -f "${claudeStateTarget}" ]; then
+  if [ -f "${claudeStatePath}" ]; then
+    backupPath="${claudeStateTarget}.pre-dotfiles.$(date +%Y%m%d-%H%M%S)"
+    cp -a "${claudeStateTarget}" "${backupPath}"
+    echo "  ${claudeStatePath} already exists; kept a copy at ${backupPath}"
+  else
+    mv "${claudeStateTarget}" "${claudeStatePath}"
+    echo "  moved existing ~/.claude.json into the feature"
+  fi
+  rm -f "${claudeStateTarget}"
+fi
+
+[ -f "${claudeStatePath}" ] || echo '{}' >"${claudeStatePath}"
+
+# Merge, never overwrite. `*` is a recursive merge with the right-hand side
+# winning, so a server declared in mcp.json is authoritative while one added by
+# hand with `claude mcp add -s user` survives a re-run.
+if [ -f "${mcpDeclarationPath}" ]; then
+  merged="$(jq -s '
+    .[0] as $state | .[1] as $declared
+    | $state
+    | .mcpServers = (($state.mcpServers // {}) * ($declared.mcpServers // {}))
+  ' "${claudeStatePath}" "${mcpDeclarationPath}")"
+  printf '%s\n' "${merged}" >"${claudeStatePath}"
+  echo "  seeded $(jq -r '.mcpServers | keys | length' <<<"${merged}") MCP servers into claude.json"
+else
+  echo "  WARNING: no ${mcpDeclarationPath}; MCP servers not seeded" >&2
+fi
+
+chmod 600 "${claudeStatePath}"
+ln -sfn "${claudeStatePath}" "${claudeStateTarget}"
+echo "  ~/.claude.json -> ${claudeStatePath}"

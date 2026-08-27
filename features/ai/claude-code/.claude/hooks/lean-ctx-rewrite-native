@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "/nix/store/kacwmr4ld12379abapx8sirlpn766v19-lean-ctx-3.9.18/bin/lean-ctx" hook rewrite

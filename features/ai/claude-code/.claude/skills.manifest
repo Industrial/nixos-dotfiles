@@ -1,0 +1,126 @@
+# Which skills get a directory in .claude/skills/ — and therefore a slot in every
+# session's start-up roster.
+#
+# Everything NOT listed here is still fully present, as real content, in
+# .claude/skill-library/. The `skill-library` skill indexes it by name,
+# description and path, so an archived skill costs nothing until it is invoked
+# and then hands over the exact file to read. Nothing is deleted and nothing is
+# unreachable; the only thing this file decides is whether Claude pays for a
+# skill's description at session start or on demand.
+#
+# Why prune at all: at 210 entries the roster overflowed and roughly 150 skills
+# were listed by name with the description silently dropped. A skill whose
+# description never reaches the model cannot be auto-invoked — it costs a line
+# and buys nothing. There are 262 skills now, so the tier split is not optional.
+# 70 entries is proven to render intact; this file holds 81, which is why the
+# budget in bin/check-payload is 90 rather than "as many as fit".
+#
+# The bar — replacing the old "would this repo's TypeScript stack trigger it?",
+# which was wrong for a system-wide setup:
+#
+#   1. the workflow rails — ID, Maestro, review and commit craft
+#   2. the languages actually in use on this machine — Rust, Python, Nix, TS
+#   3. trading and quant work
+#   4. testing, debugging and design craft
+#   5. anything a .claude/commands/*.md invokes by name
+#
+# Archiving is the default for anything new. A skill that should auto-invoke has
+# to be argued for here.
+#
+#   bash .claude/harness/plugins/id-workflow/hooks/sync-skills.sh          apply
+#   bash .claude/harness/plugins/id-workflow/hooks/sync-skills.sh --check  verify
+
+# --- workflow rails ---------------------------------------------------------
+id-workflow
+plan-hierarchically
+implement-hierarchical-plan
+agent-role-selection
+debate-mode
+activate-tooling
+maestro
+new-skill
+skill-library
+scrutinize
+debug-mantra
+post-mortem
+tdd
+writing-commit-messages
+pr-lifecycle
+rebase
+merge-conflicts
+submodule-sync
+pre-push-ci
+improve-test-coverage
+definitively-programs
+mcp-debug
+mcp-tool-selection
+lean-ctx
+hermes-tool-routing-hooks
+
+# --- nix and this machine ---------------------------------------------------
+nix-and-flakes
+nixos-docs
+nixos-managing
+nixos-deploy-rs
+nixos-fleet-management
+nixos-media-service-creation
+devenv-troubleshooting
+devenv-submodule-handling
+devenv-tool-update
+assay-run-tests
+idclear-cursor-nix-features
+idclear-git-hooks-config
+
+# --- rust -------------------------------------------------------------------
+rust-devenv
+rust-compilation-fixes
+rust-assay-compilation-fixes
+rust-benchmark-ci
+fleet-rust-tooling
+
+# --- trading and research ---------------------------------------------------
+strategy-portfolio-loop
+andromeda-development
+scientific-method
+
+# --- software architecture --------------------------------------------------
+architecture-decision-records
+domain-modeling
+ubiquitous-language
+domain-driven-design
+hexagonal-architecture
+clean-architecture
+system-design
+
+# --- typescript, effect, web ------------------------------------------------
+effect.ts-fundamentals
+effect.ts-architect
+effect.ts-data-modeling
+effect.ts-react
+effect.ts-testing
+mikro-orm-fundamentals
+mikro-orm-entities
+mikro-orm-querying
+mikro-orm-persistence
+mikro-orm-migrations
+logto-nextjs-app-router
+logto-management-api
+nextjs16-skills
+next-best-practices
+next-cache-components
+react
+react-best-practices
+react-query
+composition-patterns
+
+# --- testing and frontend craft ---------------------------------------------
+playwright-skill
+playwright-cli
+playwright-e2e-testing
+playwright-regression-testing
+frontend-testing
+frontend-design
+impeccable
+baseline-ui
+ui-design
+idclear-e2e-suite

@@ -1,0 +1,9 @@
+name: PLUGIN_NAME
+version: 0.1.0
+description: >
+  TODO
+
+author: ""
+homepage: ""
+provides_tools: []
+provides_hooks: []

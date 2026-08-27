@@ -1,0 +1,56 @@
+# Runtime state Claude Code writes into ~/.claude, which is a symlink to
+# .claude/ here. Declarative config stays tracked:
+#
+#   CLAUDE.md  README.md  settings.json  skills.manifest
+#   commands/  rules/  harness/  id-workflow/  skill-library/  skills/
+#
+# skills/ and skill-library/ are DISJOINT halves of one set, not a copy and its
+# source: skills.manifest promotes ~81 entries into skills/ (auto-invocable,
+# on every session roster) and leaves the rest in skill-library/ (indexed by
+# the `skill-library` skill). Neither is derivable from the other, so both are
+# tracked. sync-skills.sh moves entries between them; it does not regenerate
+# either from scratch.
+
+# --- credentials and identity ---
+.claude/.credentials.json
+
+# --- session and conversation state ---
+.claude/history.jsonl
+.claude/projects/
+.claude/sessions/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/paste-cache/
+.claude/todos/
+.claude/plans/
+.claude/file-history/
+
+# --- background daemon and job runner ---
+.claude/daemon/
+.claude/daemon.lock
+.claude/daemon.log
+.claude/daemon.status.json
+.claude/jobs/
+
+# --- caches, telemetry, housekeeping ---
+.claude/cache/
+.claude/backups/
+.claude/debug/
+.claude/stats-cache.json
+.claude/statsig/
+.claude/.last-cleanup
+
+# --- externally managed ---
+# plugins/ holds marketplaces cloned by Claude Code (gitkraken, official LSPs).
+# The one marketplace this repo owns lives in harness/, which stays tracked.
+.claude/plugins/
+
+# --- machine-local overrides ---
+.claude/settings.local.json
+
+# ~/.claude.json symlinks here (see bin/link-files-nixos). It is Claude Code's
+# own mutable state -- OAuth account, onboarding flags, per-project history,
+# caches -- and only its `mcpServers` key is declarative. That key's source of
+# truth is the tracked .claude/mcp.json, which the linker merges in on every
+# run, so nothing is lost by keeping the file itself out of git.
+claude.json

@@ -1,0 +1,9 @@
+{
+  "managedBy": "maestro",
+  "skillName": "maestro-task",
+  "installedAt": "2026-05-26T19:28:13.736Z",
+  "maestroVersion": "0.106.1",
+  "fileHashes": {
+    "SKILL.md": "8d99d3c62660cd167517347eefa3a071d018d0a2e4152affbaf202a8683dc5ca"
+  }
+}

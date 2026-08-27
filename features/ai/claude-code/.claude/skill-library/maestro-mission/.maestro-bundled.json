@@ -1,0 +1,9 @@
+{
+  "managedBy": "maestro",
+  "skillName": "maestro-mission",
+  "installedAt": "2026-05-26T19:28:13.736Z",
+  "maestroVersion": "0.106.1",
+  "fileHashes": {
+    "SKILL.md": "a987d61cce7bde9f1cf9249ac985e0f4e6305e2f409fae164afab2013266cfb2"
+  }
+}

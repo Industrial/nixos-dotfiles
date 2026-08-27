@@ -1,0 +1,5 @@
+source: https://github.com/marceloeatworld/nixos-ai-skill
+commit: 3147989b8127fd7c5b7dad15929c3a66f7727e3f
+license: unknown - upstream has no LICENSE file; references regenerated from official NixOS docs
+note: references auto-generated from NixOS/nix.dev, nixpkgs, nix-pills, release-wiki
+fetched: 2026-08-20T07:04:27Z

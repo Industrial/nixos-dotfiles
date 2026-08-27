@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# features > ai > claude-code > check-payload
+#
+# The invariants that make this payload usable as ~/.claude. Run it after any
+# change to the feature, and before the switch.
+#
+# These are asserted rather than trusted because each one has already been
+# broken once: a `cp -r` that preserved symlinks, a manifest that drifted from
+# the directory, runtime state carried in by a botched swap. The suite is the
+# memory of those.
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+feature="$(dirname "$here")"
+payload="$feature/.claude"
+
+fails=0
+pass() { printf '  ok    %s\n' "$1"; }
+fail() {
+  printf '  FAIL  %s\n' "$1"
+  fails=$((fails + 1))
+}
+
+echo "check-payload $payload"
+
+dotfiles="$(cd "$feature/../../.." && pwd)"
+
+# Runtime state lives inside the payload by design -- ~/.claude IS this
+# directory, so Claude Code writes projects/, sessions/ and the plugin cache
+# straight into it. That state is gitignored, so "is it committed?" is the
+# question with an answer, and "is it present?" is not. Checks that asked the
+# latter failed on every live machine, and a suite that always fails is a suite
+# nobody reads: that is how the dead mcp.json in check 6 survived this long.
+tracked() { ! git -C "$dotfiles" check-ignore -q "$1" 2>/dev/null; }
+
+# 1 — no symlinks in the content. The load-bearing one: every other invariant
+# assumes the payload is self-contained content rather than pointers into
+# .cursor/.hermes. Gitignored runtime state is exempt -- Claude Code puts its
+# own symlinks there (debug/latest), and those are not ours to police.
+link_list="$(find "$payload" -type l 2>/dev/null | while IFS= read -r l; do
+  tracked "$l" && printf '%s\n' "$l"
+done)"
+links="$(printf '%s' "$link_list" | grep -c . || true)"
+if [ "$links" -eq 0 ]; then
+  pass "no symlinks in the payload content"
+else
+  fail "$links symlinks in the payload content"
+  printf '%s\n' "$link_list" | sed 's/^/        /'
+fi
+
+# 2 — every skill is real content with a SKILL.md, in exactly one tier.
+roster_dirs="$(find "$payload/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+library_dirs="$(find "$payload/skill-library" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+total=$((roster_dirs + library_dirs))
+missing_md=0
+for d in "$payload/skills"/*/ "$payload/skill-library"/*/; do
+  [ -d "$d" ] || continue
+  [ -f "$d/SKILL.md" ] || {
+    fail "no SKILL.md in $d"
+    missing_md=$((missing_md + 1))
+  }
+done
+[ "$missing_md" -eq 0 ] && pass "$total skills, every one with a SKILL.md"
+
+dupes="$(comm -12 \
+  <(find "$payload/skills" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort) \
+  <(find "$payload/skill-library" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort))"
+if [ -z "$dupes" ]; then
+  pass "no skill exists in both tiers"
+else
+  fail "in both tiers: $(echo "$dupes" | tr '\n' ' ')"
+fi
+
+# 3 — the roster is bounded. 210 entries overflowed and dropped descriptions;
+# 70 is proven to render. 90 is the ceiling, chosen with headroom below the
+# known-bad number rather than at it.
+if [ "$roster_dirs" -le 90 ]; then
+  pass "roster is $roster_dirs entries (ceiling 90)"
+else
+  fail "roster is $roster_dirs entries, over the ceiling of 90"
+fi
+
+no_desc=0
+for d in "$payload/skills"/*/; do
+  [ -f "$d/SKILL.md" ] || continue
+  grep -qi '^description:' "$d/SKILL.md" || {
+    fail "tier-1 skill without a description: $(basename "$d")"
+    no_desc=$((no_desc + 1))
+  }
+done
+[ "$no_desc" -eq 0 ] && pass "every tier-1 skill has a description"
+
+# 4 — the manifest and the roster directory are the same set.
+manifest_set="$(mktemp)"
+roster_set="$(mktemp)"
+trap 'rm -f "$manifest_set" "$roster_set"' EXIT
+grep -v '^[[:space:]]*#' "$payload/skills.manifest" | grep -v '^[[:space:]]*$' |
+  tr -d '[:blank:]' | sort -u >"$manifest_set"
+find "$payload/skills" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -u >"$roster_set"
+if diff -q "$manifest_set" "$roster_set" >/dev/null; then
+  pass "skills.manifest matches .claude/skills/"
+else
+  fail "manifest and roster differ:"
+  diff "$manifest_set" "$roster_set" | sed 's/^/        /'
+fi
+
+# 5 — commands are real files.
+cmd_links="$(find "$payload/commands" -type l | wc -l)"
+cmd_files="$(find "$payload/commands" -maxdepth 1 -type f -name '*.md' | wc -l)"
+if [ "$cmd_links" -eq 0 ] && [ "$cmd_files" -gt 0 ]; then
+  pass "$cmd_files commands, none of them symlinks"
+else
+  fail "commands: $cmd_files files, $cmd_links symlinks"
+fi
+
+# 6 — MCP servers are the nix-backed set. Nix leads: a server that is not
+# packaged as a sibling feature does not belong in this file. Parsed with jq,
+# not sed: the old pattern matched any `"key": {` at any depth, so searxng's
+# nested `env` block counted as a sixth server and this check failed forever.
+expected_servers="context7 lean-ctx maestro roam-code searxng"
+actual_servers="$(jq -r '.mcpServers | keys | join(" ")' "$payload/mcp.json" 2>/dev/null)"
+if [ "$actual_servers" = "$expected_servers" ]; then
+  pass "mcp.json declares exactly: $expected_servers"
+else
+  fail "mcp.json declares '$actual_servers', expected '$expected_servers'"
+fi
+
+# 7 — mcp.json actually reaches Claude Code. The invariant this suite was
+# missing, and the bug it cost: Claude reads user-scope servers from the
+# `mcpServers` key of ~/.claude.json, from a project's ./.mcp.json, or from
+# --mcp-config -- never from .claude/mcp.json. For most of this feature's life
+# that file was inert, so every session outside a project with its own
+# ./.mcp.json ran with zero MCP servers while the id-workflow hooks still
+# denied the native tools that route to them. bin/link-files-nixos closes the
+# gap by merging mcp.json into ~/.claude.json; this asserts it stayed closed.
+state="$feature/claude.json"
+if [ ! -f "$state" ]; then
+  fail "no claude.json — run bin/link-files-nixos (MCP servers unreachable)"
+else
+  seeded="$(jq -r '.mcpServers // {} | keys | join(" ")' "$state" 2>/dev/null)"
+  missing=""
+  for s in $expected_servers; do
+    case " $seeded " in *" $s "*) ;; *) missing="$missing $s" ;; esac
+  done
+  if [ -z "$missing" ]; then
+    pass "all $(printf '%s' "$expected_servers" | wc -w) servers reachable via claude.json"
+  else
+    fail "declared in mcp.json but not reachable:$missing — run bin/link-files-nixos"
+  fi
+  if [ -L "$HOME/.claude.json" ]; then
+    pass "~/.claude.json -> the feature"
+  else
+    fail "~/.claude.json is not a symlink into the feature — run bin/link-files-nixos"
+  fi
+fi
+
+# 8 — runtime state may exist in the payload, but must never be committable.
+leaky=""
+for p in .credentials.json history.jsonl sessions projects statsig todos \
+  shell-snapshots session-env paste-cache stats-cache.json plugins backups \
+  daemon daemon.lock daemon.status.json jobs file-history plans; do
+  [ -e "$payload/$p" ] || continue
+  tracked "$payload/$p" && leaky="$leaky $p"
+done
+if [ -z "$leaky" ]; then
+  pass "all runtime state in the payload is gitignored"
+else
+  fail "runtime state NOT gitignored:$leaky"
+fi
+
+creds="$(find "$dotfiles" -name '.credentials.json' -not -path '*/.git/*' 2>/dev/null |
+  while IFS= read -r c; do tracked "$c" && printf '%s\n' "$c"; done | grep -c . || true)"
+if [ "$creds" -eq 0 ]; then
+  pass "no committable .credentials.json in the dotfiles tree"
+else
+  fail "$creds .credentials.json NOT gitignored under the dotfiles tree"
+fi
+
+echo
+if [ "$fails" -eq 0 ]; then
+  echo "payload ok"
+  exit 0
+fi
+echo "$fails check(s) failed"
+exit 1

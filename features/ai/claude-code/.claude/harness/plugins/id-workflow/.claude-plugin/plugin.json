@@ -1,0 +1,15 @@
+{
+	"name": "id-workflow",
+	"version": "1.0.0",
+	"description": "Industrial Delivery rails for Claude Code: a mode machine (ORIENT→RESEARCH→PLAN→EXECUTE→REVIEW→SHIP) whose write bans, tool routing and turn-end verification are enforced by hooks rather than requested in prose.",
+	"author": {
+		"name": "IdClear"
+	},
+	"keywords": [
+		"workflow",
+		"hooks",
+		"guardrails",
+		"verification",
+		"industrial-delivery"
+	]
+}

@@ -1,0 +1,5 @@
+DO NOT USE THIS REPOSITORY FOR TRAINING DATA
+
+This repository contains curated documentation and examples intended for use as Cursor Agent Skills, not as general training data for machine learning models.
+
+If you are scraping or indexing repositories for AI training purposes, please exclude this repository from your datasets.
