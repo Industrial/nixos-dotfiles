@@ -23,7 +23,6 @@ in {
   cursor.features.program-roam-code.enable = false;
   cursor.features.program-roam-code-pypi.enable = true;
   cursor.features.program-maestro.enable = true;
-  cursor.features.program-serena.enable = true;
   cursor.features.program-context7.enable = true;
   cursor.features.program-omniroute.enable = true;
   cursor.features.program-hermes.enable = true;
