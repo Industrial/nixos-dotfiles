@@ -55,6 +55,11 @@
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   nixConfig = {
@@ -67,10 +72,20 @@
 
   outputs = inputs @ {self, ...}: let
     lib = inputs.nixpkgs.lib;
-    hosts = ["drakkar" "huginn" "mimir"];
+    system = "x86_64-linux";
+    pkgs = inputs.nixpkgs.legacyPackages.${system};
+    hosts = ["drakkar" "huginn" "mimir" "muninn"];
     mkHost = import ./lib/mk-host.nix {inherit inputs;};
-    nixosConfigurations = lib.genAttrs hosts mkHost;
-    deployLib = inputs.deploy-rs.lib.x86_64-linux;
+    nixosConfigurations =
+      lib.genAttrs hosts mkHost
+      // {
+        # Installer ISO configuration
+        installer = lib.nixosSystem {
+          inherit system;
+          modules = [./installer/configuration.nix];
+        };
+      };
+    deployLib = inputs.deploy-rs.lib.${system};
     mkDeployNode = hostname: {
       inherit hostname;
       profiles.system = {
@@ -85,13 +100,16 @@
   in {
     inherit nixosConfigurations;
 
+    # Build with: nix build .#installer-iso
+    packages.${system}.installer-iso = nixosConfigurations.installer.config.system.build.isoImage;
+
     deploy = {
       type = "deploy";
       nodes = lib.genAttrs hosts mkDeployNode;
     };
 
-    checks.x86_64-linux = deployLib.deployChecks self.deploy;
+    checks.${system} = deployLib.deployChecks self.deploy;
 
-    formatter.x86_64-linux = inputs.nixpkgs.legacyPackages.x86_64-linux.alejandra;
+    formatter.${system} = pkgs.alejandra;
   };
 }

@@ -24,12 +24,12 @@
     ../../features/nixos/graphics/amd.nix
     ../../features/storage/nfs-server
 
-    ../../features/media/jellyfin/default.nix
-    ../../features/media/flexget/default.nix
-    ../../features/media/jackett/default.nix
-    ../../features/media/qbittorrent/default.nix
-    ../../features/media/transmission/default.nix
-    ../../features/media/seerr/default.nix
-    ../../features/media/invidious/default.nix
+    # ../../features/media/jellyfin/default.nix
+    # ../../features/media/flexget/default.nix
+    # ../../features/media/jackett/default.nix
+    ../../features/media/qbittorrent-nox/default.nix
+    # ../../features/media/transmission/default.nix
+    # ../../features/media/seerr/default.nix
+    # ../../features/media/invidious/default.nix
   ];
 }

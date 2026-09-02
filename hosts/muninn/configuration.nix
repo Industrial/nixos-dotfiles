@@ -1,4 +1,4 @@
-# Huginn system configuration (tablet)
+# Muninn system configuration (tablet)
 {inputs, ...}: {
   imports = [
     inputs.disko.nixosModules.disko

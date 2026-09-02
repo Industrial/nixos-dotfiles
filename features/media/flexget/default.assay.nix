@@ -14,12 +14,13 @@ let
 in
   assay.suite "flexget" {
     enabled = assay.eq opts.services.flexget.enable true;
-    homeDirOnNfsVolume = assay.eq
+    homeDirOnNfsVolume =
+      assay.eq
       opts.services.flexget.homeDir "/data/services/flexget";
     systemSchedulerOff = assay.eq opts.services.flexget.systemScheduler false;
     webuiPort5050 = assay.eq (builtins.match ".*port: 5050.*" cfg != null) true;
     targetsTransmissionRpc =
-      assay.eq (builtins.match ".*port: 9091.*" cfg != null) true;
+      assay.eq (builtins.match ".*127.0.0.1:9091.*" cfg != null) true;
     sourcesJackettTorznab =
       assay.eq (builtins.match ".*127.0.0.1:9117/torznab.*" cfg != null) true;
   }
