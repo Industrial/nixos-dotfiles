@@ -623,26 +623,29 @@ impl LiveAudioService {
         // Get default sink info
         let result = Rc::new(RefCell::new(AudioState::default()));
         let result_clone = result.clone();
-        let mainloop_clone = mainloop.clone();
+        let done = Rc::new(RefCell::new(false));
+        let done_clone = done.clone();
 
         let introspect = context.borrow().introspect();
         let _op = introspect.get_server_info(move |info| {
             if let Some(sink_name) = &info.default_sink_name {
                 result_clone.borrow_mut().sink_name = Some(sink_name.to_string());
             }
-            mainloop_clone
-                .borrow_mut()
-                .quit(libpulse_binding::def::Retval(0));
+            *done_clone.borrow_mut() = true;
         });
 
-        mainloop.borrow_mut().run().ok();
+        while !*done.borrow() {
+            mainloop.borrow_mut().iterate(true);
+        }
 
         // Get sink volume info
         let result_clone = result.clone();
-        let mainloop_clone = mainloop.clone();
         let sink_name = result.borrow().sink_name.clone();
 
         if let Some(name) = sink_name {
+            let done = Rc::new(RefCell::new(false));
+            let done_clone = done.clone();
+
             let introspect = context.borrow().introspect();
             let _op = introspect.get_sink_info_by_name(&name, move |list| {
                 if let libpulse_binding::callbacks::ListResult::Item(info) = list {
@@ -652,13 +655,13 @@ impl LiveAudioService {
                         * 100.0) as u32;
                     result_clone.borrow_mut().volume = percent.min(100);
                     result_clone.borrow_mut().muted = info.mute;
-                    mainloop_clone
-                        .borrow_mut()
-                        .quit(libpulse_binding::def::Retval(0));
                 }
+                *done_clone.borrow_mut() = true;
             });
 
-            mainloop.borrow_mut().run().ok();
+            while !*done.borrow() {
+                mainloop.borrow_mut().iterate(true);
+            }
         }
 
         // Return the result
@@ -704,7 +707,8 @@ impl LiveAudioService {
         }
 
         // Get default sink and set volume
-        let mainloop_clone = mainloop.clone();
+        let done = Rc::new(RefCell::new(false));
+        let done_clone = done.clone();
         let context_clone = context.clone();
         let volume_level = volume.min(100);
 
@@ -722,12 +726,12 @@ impl LiveAudioService {
 
                 introspect.set_sink_volume_by_name(&name, &cv, None);
             }
-            mainloop_clone
-                .borrow_mut()
-                .quit(libpulse_binding::def::Retval(0));
+            *done_clone.borrow_mut() = true;
         });
 
-        mainloop.borrow_mut().run().ok();
+        while !*done.borrow() {
+            mainloop.borrow_mut().iterate(true);
+        }
     }
 
     fn toggle_sink_mute() {
@@ -766,7 +770,8 @@ impl LiveAudioService {
         }
 
         // Get current mute state and toggle
-        let mainloop_clone = mainloop.clone();
+        let done = Rc::new(RefCell::new(false));
+        let done_clone = done.clone();
         let context_clone = context.clone();
 
         let introspect = context.borrow().introspect();
@@ -774,7 +779,7 @@ impl LiveAudioService {
             if let Some(sink_name) = &info.default_sink_name {
                 let name = sink_name.to_string();
                 let name_inner = name.clone();
-                let mainloop_inner = mainloop_clone.clone();
+                let done_inner = done_clone.clone();
                 let context_inner = context_clone.clone();
 
                 let introspect = context_clone.borrow().introspect();
@@ -783,15 +788,17 @@ impl LiveAudioService {
                         let new_mute = !sink_info.mute;
                         let mut introspect = context_inner.borrow().introspect();
                         introspect.set_sink_mute_by_name(&name_inner, new_mute, None);
-                        mainloop_inner
-                            .borrow_mut()
-                            .quit(libpulse_binding::def::Retval(0));
                     }
+                    *done_inner.borrow_mut() = true;
                 });
+            } else {
+                *done_clone.borrow_mut() = true;
             }
         });
 
-        mainloop.borrow_mut().run().ok();
+        while !*done.borrow() {
+            mainloop.borrow_mut().iterate(true);
+        }
     }
 }
 
