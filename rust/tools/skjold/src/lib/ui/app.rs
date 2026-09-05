@@ -11,21 +11,21 @@ use iced::{Color, Element, Length, Subscription, Task, Theme};
 use iced_exwlshell::to_layer_message;
 
 use crate::capabilities::{
-    AudioService, BatteryService, BluetoothService, LauncherService, SessionService,
-    SystemInfoService, TimeService, WorkspaceService,
+    AudioService, BatteryService, BluetoothService, LauncherService, NetworkService,
+    SessionService, SystemInfoService, TimeService, WorkspaceService,
 };
 use crate::domain::{
     AudioState, BatteryStatus, BluetoothState, Clock, CpuLoad, LauncherEntry, LauncherState,
-    SessionAction, ThermalSensors, Workspace,
+    NetworkState, SessionAction, ThermalSensors, Workspace,
 };
 use crate::providers::{
     LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
-    LiveLauncherService, LiveSessionService, LiveSystemInfoService, LiveTimeService,
-    LiveWorkspaceService,
+    LiveLauncherService, LiveNetworkService, LiveSessionService, LiveSystemInfoService,
+    LiveTimeService, LiveWorkspaceService,
 };
 use crate::ui::widgets::{
-    audio_widget, battery_widget, bluetooth_widget, cpu_widget, launcher_widget, session_widget,
-    thermal_widget, workspaces_widget,
+    audio_widget, battery_widget, bluetooth_widget, cpu_widget, launcher_widget, network_widget,
+    session_widget, thermal_widget, workspaces_widget,
 };
 
 /// Messages for the Skjold application.
@@ -114,6 +114,10 @@ pub struct SkjoldApp {
     audio_service: Arc<LiveAudioService>,
     /// Current audio state.
     audio: AudioState,
+    /// Network service capability.
+    network_service: Arc<LiveNetworkService>,
+    /// Current network state.
+    network: NetworkState,
 }
 
 impl SkjoldApp {
@@ -128,6 +132,7 @@ impl SkjoldApp {
         launcher_service: Arc<LiveLauncherService>,
         workspace_service: Arc<LiveWorkspaceService>,
         audio_service: Arc<LiveAudioService>,
+        network_service: Arc<LiveNetworkService>,
     ) -> Self {
         // Get initial workspace state
         let workspaces = workspace_service.get_workspaces();
@@ -145,6 +150,7 @@ impl SkjoldApp {
         let battery = battery_service.get_status();
         let bluetooth = bluetooth_service.get_state();
         let audio = audio_service.get_state();
+        let network = network_service.get_state();
 
         // Get launcher entries
         let launcher_entries = launcher_service.get_entries();
@@ -178,6 +184,8 @@ impl SkjoldApp {
             launcher_entries,
             audio_service,
             audio,
+            network_service,
+            network,
         }
     }
 
@@ -192,6 +200,7 @@ impl SkjoldApp {
         launcher_service: Arc<LiveLauncherService>,
         workspace_service: Arc<LiveWorkspaceService>,
         audio_service: Arc<LiveAudioService>,
+        network_service: Arc<LiveNetworkService>,
     ) -> (Self, Task<Message>) {
         // Get initial workspace state
         let workspaces = workspace_service.get_workspaces();
@@ -209,6 +218,7 @@ impl SkjoldApp {
         let battery = battery_service.get_status();
         let bluetooth = bluetooth_service.get_state();
         let audio = audio_service.get_state();
+        let network = network_service.get_state();
 
         // Get launcher entries
         let launcher_entries = launcher_service.get_entries();
@@ -242,6 +252,8 @@ impl SkjoldApp {
             launcher_entries,
             audio_service,
             audio,
+            network_service,
+            network,
         };
 
         (app, Task::none())
@@ -270,6 +282,8 @@ impl SkjoldApp {
                 self.bluetooth = self.bluetooth_service.get_state();
                 self.audio_service.refresh();
                 self.audio = self.audio_service.get_state();
+                self.network_service.refresh();
+                self.network = self.network_service.get_state();
                 Task::none()
             }
             Message::BluetoothToggle => {
@@ -395,6 +409,7 @@ impl SkjoldApp {
         let battery_display = battery_widget(&self.battery);
         let bluetooth_display = bluetooth_widget(&self.bluetooth, Message::BluetoothToggle);
         let audio_display = audio_widget(&self.audio, Message::AudioToggleMute);
+        let network_display = network_widget(&self.network);
         let session_display = session_widget(
             self.session_menu_expanded,
             Message::SessionMenuToggle,
@@ -407,7 +422,7 @@ impl SkjoldApp {
             .style(iced::widget::button::text)
             .on_press(Message::LauncherToggle);
 
-        // Main row: launcher | workspaces | spacer | cpu | temp | battery | audio | bluetooth | clock | session
+        // Main row: launcher | workspaces | spacer | cpu | temp | battery | network | audio | bluetooth | clock | session
         let content = row![
             launcher_btn,
             workspace_display,
@@ -415,6 +430,7 @@ impl SkjoldApp {
             cpu_display,
             thermal_display,
             battery_display,
+            network_display,
             audio_display,
             bluetooth_display,
             clock_display,

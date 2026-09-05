@@ -183,3 +183,26 @@ pub struct AudioState {
     /// Name of the default sink (output device).
     pub sink_name: Option<String>,
 }
+
+/// Network connection type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NetworkType {
+    #[default]
+    Disconnected,
+    Wired,
+    Wireless,
+    Vpn,
+}
+
+/// Network state.
+#[derive(Debug, Clone, Default)]
+pub struct NetworkState {
+    /// Connection type.
+    pub network_type: NetworkType,
+    /// Whether connected to the internet.
+    pub connected: bool,
+    /// Connection name (SSID for wifi, interface for wired).
+    pub connection_name: Option<String>,
+    /// Signal strength for wireless (0-100).
+    pub signal_strength: Option<u8>,
+}

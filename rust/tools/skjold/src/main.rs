@@ -11,8 +11,8 @@ use iced_exwlshell::settings::{LayerShellSettings, Settings};
 
 use skjold::providers::{
     LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
-    LiveLauncherService, LiveSessionService, LiveSystemInfoService, LiveTimeService,
-    LiveWorkspaceService, live_providers,
+    LiveLauncherService, LiveNetworkService, LiveSessionService, LiveSystemInfoService,
+    LiveTimeService, LiveWorkspaceService, live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -28,6 +28,7 @@ static SESSION_SERVICE: OnceLock<Arc<LiveSessionService>> = OnceLock::new();
 static LAUNCHER_SERVICE: OnceLock<Arc<LiveLauncherService>> = OnceLock::new();
 static WORKSPACE_SERVICE: OnceLock<Arc<LiveWorkspaceService>> = OnceLock::new();
 static AUDIO_SERVICE: OnceLock<Arc<LiveAudioService>> = OnceLock::new();
+static NETWORK_SERVICE: OnceLock<Arc<LiveNetworkService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
     let (
@@ -40,6 +41,7 @@ fn main() -> Result<(), iced_exwlshell::Error> {
         launcher_service,
         workspace_service,
         audio_service,
+        network_service,
     ) = live_providers();
 
     // Store providers for the default function
@@ -70,6 +72,9 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     AUDIO_SERVICE
         .set(audio_service)
         .unwrap_or_else(|_| panic!("AUDIO_SERVICE already initialized"));
+    NETWORK_SERVICE
+        .set(network_service)
+        .unwrap_or_else(|_| panic!("NETWORK_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -121,6 +126,10 @@ fn default() -> SkjoldApp {
         .get()
         .expect("AUDIO_SERVICE not initialized")
         .clone();
+    let network_service = NETWORK_SERVICE
+        .get()
+        .expect("NETWORK_SERVICE not initialized")
+        .clone();
     SkjoldApp::new_default(
         hyprland,
         time_service,
@@ -131,6 +140,7 @@ fn default() -> SkjoldApp {
         launcher_service,
         workspace_service,
         audio_service,
+        network_service,
     )
 }
 

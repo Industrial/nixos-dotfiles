@@ -12,12 +12,12 @@ use hyprland::shared::{HyprData, HyprDataActive};
 use sysinfo::{Components, System};
 
 use crate::capabilities::{
-    AudioService, BatteryService, BluetoothService, LauncherService, SessionService,
-    SystemInfoService, TimeService, WorkspaceService,
+    AudioService, BatteryService, BluetoothService, LauncherService, NetworkService,
+    SessionService, SystemInfoService, TimeService, WorkspaceService,
 };
 use crate::domain::{
-    AudioState, BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction,
-    ThermalSensors, Workspace,
+    AudioState, BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, NetworkState, NetworkType,
+    SessionAction, ThermalSensors, Workspace,
 };
 
 /// Live implementation of TimeService.
@@ -804,6 +804,202 @@ impl AudioService for LiveAudioService {
     }
 }
 
+// === Network Service (Wave 6) ===
+
+/// Live implementation of NetworkService using NetworkManager D-Bus.
+pub struct LiveNetworkService {
+    state: Mutex<NetworkState>,
+}
+
+impl LiveNetworkService {
+    pub fn new() -> Self {
+        let state = Self::query_network_state();
+        Self {
+            state: Mutex::new(state),
+        }
+    }
+
+    fn query_network_state() -> NetworkState {
+        // Try to get NetworkManager state via D-Bus
+        let connection = match zbus::blocking::Connection::system() {
+            Ok(conn) => conn,
+            Err(_) => return NetworkState::default(),
+        };
+
+        // Get NetworkManager proxy
+        let nm_proxy = match connection.call_method(
+            Some("org.freedesktop.NetworkManager"),
+            "/org/freedesktop/NetworkManager",
+            Some("org.freedesktop.DBus.Properties"),
+            "Get",
+            &("org.freedesktop.NetworkManager", "State"),
+        ) {
+            Ok(reply) => reply,
+            Err(_) => return NetworkState::default(),
+        };
+
+        // Parse state (NM_STATE values: 0=unknown, 10=asleep, 20=disconnected,
+        // 30=disconnecting, 40=connecting, 50=connected_local, 60=connected_site, 70=connected_global)
+        let state_variant: zbus::zvariant::OwnedValue = match nm_proxy.body().deserialize() {
+            Ok(v) => v,
+            Err(_) => return NetworkState::default(),
+        };
+
+        let nm_state: u32 = match state_variant.downcast_ref::<u32>() {
+            Ok(s) => s,
+            Err(_) => return NetworkState::default(),
+        };
+
+        let connected = nm_state >= 60; // connected_site or connected_global
+
+        // Get primary connection
+        let conn_reply = match connection.call_method(
+            Some("org.freedesktop.NetworkManager"),
+            "/org/freedesktop/NetworkManager",
+            Some("org.freedesktop.DBus.Properties"),
+            "Get",
+            &("org.freedesktop.NetworkManager", "PrimaryConnection"),
+        ) {
+            Ok(reply) => reply,
+            Err(_) => {
+                return NetworkState {
+                    connected,
+                    network_type: if connected {
+                        NetworkType::Wired
+                    } else {
+                        NetworkType::Disconnected
+                    },
+                    ..Default::default()
+                };
+            }
+        };
+
+        let conn_path_variant: zbus::zvariant::OwnedValue = match conn_reply.body().deserialize() {
+            Ok(v) => v,
+            Err(_) => {
+                return NetworkState {
+                    connected,
+                    network_type: if connected {
+                        NetworkType::Wired
+                    } else {
+                        NetworkType::Disconnected
+                    },
+                    ..Default::default()
+                };
+            }
+        };
+
+        let conn_path: &zbus::zvariant::ObjectPath = match conn_path_variant.downcast_ref() {
+            Ok(p) => p,
+            Err(_) => {
+                return NetworkState {
+                    connected,
+                    network_type: if connected {
+                        NetworkType::Wired
+                    } else {
+                        NetworkType::Disconnected
+                    },
+                    ..Default::default()
+                };
+            }
+        };
+
+        if conn_path.as_str() == "/" {
+            return NetworkState {
+                connected: false,
+                network_type: NetworkType::Disconnected,
+                ..Default::default()
+            };
+        }
+
+        // Get connection type
+        let type_reply = match connection.call_method(
+            Some("org.freedesktop.NetworkManager"),
+            conn_path.as_str(),
+            Some("org.freedesktop.DBus.Properties"),
+            "Get",
+            &("org.freedesktop.NetworkManager.Connection.Active", "Type"),
+        ) {
+            Ok(reply) => reply,
+            Err(_) => {
+                return NetworkState {
+                    connected,
+                    network_type: NetworkType::Wired,
+                    ..Default::default()
+                };
+            }
+        };
+
+        let type_variant: zbus::zvariant::OwnedValue = match type_reply.body().deserialize() {
+            Ok(v) => v,
+            Err(_) => {
+                return NetworkState {
+                    connected,
+                    network_type: NetworkType::Wired,
+                    ..Default::default()
+                };
+            }
+        };
+
+        let conn_type: String = match type_variant.downcast_ref::<String>() {
+            Ok(t) => t.clone(),
+            Err(_) => "unknown".to_string(),
+        };
+
+        let network_type = match conn_type.as_str() {
+            "802-11-wireless" => NetworkType::Wireless,
+            "802-3-ethernet" => NetworkType::Wired,
+            "vpn" | "wireguard" => NetworkType::Vpn,
+            _ => NetworkType::Wired,
+        };
+
+        // Get connection ID (name)
+        let id_reply = connection.call_method(
+            Some("org.freedesktop.NetworkManager"),
+            conn_path.as_str(),
+            Some("org.freedesktop.DBus.Properties"),
+            "Get",
+            &("org.freedesktop.NetworkManager.Connection.Active", "Id"),
+        );
+
+        let connection_name = id_reply.ok().and_then(|reply| {
+            let id_variant: zbus::zvariant::OwnedValue = reply.body().deserialize().ok()?;
+            id_variant.downcast_ref::<String>().ok().map(|s| s.clone())
+        });
+
+        // TODO: Get signal strength for wireless connections
+        let signal_strength = if network_type == NetworkType::Wireless {
+            Some(75u8) // Placeholder - would need to query AccessPoint
+        } else {
+            None
+        };
+
+        NetworkState {
+            network_type,
+            connected,
+            connection_name,
+            signal_strength,
+        }
+    }
+}
+
+impl Default for LiveNetworkService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NetworkService for LiveNetworkService {
+    fn get_state(&self) -> NetworkState {
+        self.state.lock().unwrap().clone()
+    }
+
+    fn refresh(&self) {
+        let state = Self::query_network_state();
+        *self.state.lock().unwrap() = state;
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -815,6 +1011,7 @@ pub fn live_providers() -> (
     Arc<LiveLauncherService>,
     Arc<LiveWorkspaceService>,
     Arc<LiveAudioService>,
+    Arc<LiveNetworkService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -826,5 +1023,6 @@ pub fn live_providers() -> (
         Arc::new(LiveLauncherService::new()),
         Arc::new(LiveWorkspaceService::new()),
         Arc::new(LiveAudioService::new()),
+        Arc::new(LiveNetworkService::new()),
     )
 }
