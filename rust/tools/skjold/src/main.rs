@@ -100,7 +100,7 @@ fn main() -> Result<(), iced_exwlshell::Error> {
         .subscription(subscription)
         .style(style)
         .font(NERD_FONT_BYTES)
-        .default_font(Font::MONOSPACE)
+        .default_font(Font::with_name("JetBrainsMono Nerd Font Mono"))
         .settings(Settings {
             layer_settings: LayerShellSettings {
                 size: LayerSize::fill_width(PANEL_HEIGHT),
