@@ -72,6 +72,14 @@ in {
     NIXPKGS_ALLOW_UNFREE = "1";
     LLVM_COV = "${pkgs.llvmPackages.llvm}/bin/llvm-cov";
     LLVM_PROFDATA = "${pkgs.llvmPackages.llvm}/bin/llvm-profdata";
+    # Linker paths for skjold (Wayland/PulseAudio)
+    LIBRARY_PATH = lib.makeLibraryPath [
+      pkgs.wayland
+      pkgs.libxkbcommon
+      pkgs.vulkan-loader
+      pkgs.libGL
+      pkgs.libpulseaudio
+    ];
   };
 
   scripts = {
