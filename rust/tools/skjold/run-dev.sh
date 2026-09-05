@@ -7,8 +7,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BINARY="$WORKSPACE_ROOT/target/release/skjold"
 
-# Build if requested or binary doesn't exist
+# Build if requested, binary doesn't exist, or sources are newer than binary
+needs_build=false
 if [[ "${1:-}" == "--build" ]] || [[ ! -x "$BINARY" ]]; then
+    needs_build=true
+elif [[ -x "$BINARY" ]]; then
+    # Check if any source file or Cargo.toml is newer than binary
+    if find "$SCRIPT_DIR/src" -name '*.rs' -newer "$BINARY" 2>/dev/null | grep -q . \
+        || [[ "$SCRIPT_DIR/Cargo.toml" -nt "$BINARY" ]]; then
+        echo "Sources changed, rebuilding..." >&2
+        needs_build=true
+    fi
+fi
+
+if [[ "$needs_build" == "true" ]]; then
     echo "Building skjold..." >&2
     cd "$WORKSPACE_ROOT"
     cargo build --release -p skjold
