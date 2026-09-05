@@ -172,3 +172,14 @@ pub struct LauncherState {
     /// Currently selected index in filtered results.
     pub selected: usize,
 }
+
+/// Audio output state.
+#[derive(Debug, Clone, Default)]
+pub struct AudioState {
+    /// Volume level (0-100).
+    pub volume: u32,
+    /// Whether output is muted.
+    pub muted: bool,
+    /// Name of the default sink (output device).
+    pub sink_name: Option<String>,
+}

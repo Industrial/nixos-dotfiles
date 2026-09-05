@@ -12,11 +12,12 @@ use hyprland::shared::{HyprData, HyprDataActive};
 use sysinfo::{Components, System};
 
 use crate::capabilities::{
-    BatteryService, BluetoothService, LauncherService, SessionService, SystemInfoService,
-    TimeService, WorkspaceService,
+    AudioService, BatteryService, BluetoothService, LauncherService, SessionService,
+    SystemInfoService, TimeService, WorkspaceService,
 };
 use crate::domain::{
-    BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors, Workspace,
+    AudioState, BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction,
+    ThermalSensors, Workspace,
 };
 
 /// Live implementation of TimeService.
@@ -544,6 +545,265 @@ impl WorkspaceService for LiveWorkspaceService {
     }
 }
 
+// === Audio Service (Wave 5) ===
+
+/// Live implementation of AudioService using PulseAudio.
+pub struct LiveAudioService {
+    state: Mutex<AudioState>,
+}
+
+impl LiveAudioService {
+    pub fn new() -> Self {
+        let state = Self::query_audio_state();
+        Self {
+            state: Mutex::new(state),
+        }
+    }
+
+    fn query_audio_state() -> AudioState {
+        use libpulse_binding::context::Context;
+        use libpulse_binding::mainloop::standard::Mainloop;
+        use libpulse_binding::proplist::Proplist;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let mut proplist = Proplist::new().unwrap();
+        proplist
+            .set_str(
+                libpulse_binding::proplist::properties::APPLICATION_NAME,
+                "skjold",
+            )
+            .ok();
+
+        let mainloop = Rc::new(RefCell::new(
+            Mainloop::new().expect("Failed to create PulseAudio mainloop"),
+        ));
+        let context = Rc::new(RefCell::new(
+            Context::new_with_proplist(&*mainloop.borrow(), "skjold", &proplist)
+                .expect("Failed to create PulseAudio context"),
+        ));
+
+        // Connect to PulseAudio
+        context
+            .borrow_mut()
+            .connect(None, libpulse_binding::context::FlagSet::NOFLAGS, None)
+            .expect("Failed to connect to PulseAudio");
+
+        // Wait for connection
+        loop {
+            mainloop.borrow_mut().iterate(true);
+            match context.borrow().get_state() {
+                libpulse_binding::context::State::Ready => break,
+                libpulse_binding::context::State::Failed
+                | libpulse_binding::context::State::Terminated => {
+                    return AudioState::default();
+                }
+                _ => {}
+            }
+        }
+
+        // Get default sink info
+        let result = Rc::new(RefCell::new(AudioState::default()));
+        let result_clone = result.clone();
+        let mainloop_clone = mainloop.clone();
+
+        let introspect = context.borrow().introspect();
+        let _op = introspect.get_server_info(move |info| {
+            if let Some(sink_name) = &info.default_sink_name {
+                result_clone.borrow_mut().sink_name = Some(sink_name.to_string());
+            }
+            mainloop_clone
+                .borrow_mut()
+                .quit(libpulse_binding::def::Retval(0));
+        });
+
+        mainloop.borrow_mut().run().ok();
+
+        // Get sink volume info
+        let result_clone = result.clone();
+        let mainloop_clone = mainloop.clone();
+        let sink_name = result.borrow().sink_name.clone();
+
+        if let Some(name) = sink_name {
+            let introspect = context.borrow().introspect();
+            let _op = introspect.get_sink_info_by_name(&name, move |list| {
+                if let libpulse_binding::callbacks::ListResult::Item(info) = list {
+                    let volume = info.volume.avg();
+                    let percent = (volume.0 as f64
+                        / libpulse_binding::volume::Volume::NORMAL.0 as f64
+                        * 100.0) as u32;
+                    result_clone.borrow_mut().volume = percent.min(100);
+                    result_clone.borrow_mut().muted = info.mute;
+                    mainloop_clone
+                        .borrow_mut()
+                        .quit(libpulse_binding::def::Retval(0));
+                }
+            });
+
+            mainloop.borrow_mut().run().ok();
+        }
+
+        // Return the result
+        Rc::try_unwrap(result)
+            .unwrap_or_else(|rc| RefCell::new(rc.borrow().clone()))
+            .into_inner()
+    }
+
+    fn set_sink_volume(volume: u32) {
+        use libpulse_binding::context::Context;
+        use libpulse_binding::mainloop::standard::Mainloop;
+        use libpulse_binding::proplist::Proplist;
+        use libpulse_binding::volume::{ChannelVolumes, Volume};
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let mut proplist = Proplist::new().unwrap();
+        proplist
+            .set_str(
+                libpulse_binding::proplist::properties::APPLICATION_NAME,
+                "skjold",
+            )
+            .ok();
+
+        let mainloop = Rc::new(RefCell::new(Mainloop::new().unwrap()));
+        let context = Rc::new(RefCell::new(
+            Context::new_with_proplist(&*mainloop.borrow(), "skjold", &proplist).unwrap(),
+        ));
+
+        context
+            .borrow_mut()
+            .connect(None, libpulse_binding::context::FlagSet::NOFLAGS, None)
+            .ok();
+
+        loop {
+            mainloop.borrow_mut().iterate(true);
+            match context.borrow().get_state() {
+                libpulse_binding::context::State::Ready => break,
+                libpulse_binding::context::State::Failed
+                | libpulse_binding::context::State::Terminated => return,
+                _ => {}
+            }
+        }
+
+        // Get default sink and set volume
+        let mainloop_clone = mainloop.clone();
+        let context_clone = context.clone();
+        let volume_level = volume.min(100);
+
+        let introspect = context.borrow().introspect();
+        let _op = introspect.get_server_info(move |info| {
+            if let Some(sink_name) = &info.default_sink_name {
+                let name = sink_name.to_string();
+                let mut introspect = context_clone.borrow().introspect();
+
+                // Calculate volume
+                let vol = Volume((Volume::NORMAL.0 as f64 * volume_level as f64 / 100.0) as u32);
+                let mut cv = ChannelVolumes::default();
+                cv.set_len(2);
+                cv.set(2, vol);
+
+                introspect.set_sink_volume_by_name(&name, &cv, None);
+            }
+            mainloop_clone
+                .borrow_mut()
+                .quit(libpulse_binding::def::Retval(0));
+        });
+
+        mainloop.borrow_mut().run().ok();
+    }
+
+    fn toggle_sink_mute() {
+        use libpulse_binding::context::Context;
+        use libpulse_binding::mainloop::standard::Mainloop;
+        use libpulse_binding::proplist::Proplist;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let mut proplist = Proplist::new().unwrap();
+        proplist
+            .set_str(
+                libpulse_binding::proplist::properties::APPLICATION_NAME,
+                "skjold",
+            )
+            .ok();
+
+        let mainloop = Rc::new(RefCell::new(Mainloop::new().unwrap()));
+        let context = Rc::new(RefCell::new(
+            Context::new_with_proplist(&*mainloop.borrow(), "skjold", &proplist).unwrap(),
+        ));
+
+        context
+            .borrow_mut()
+            .connect(None, libpulse_binding::context::FlagSet::NOFLAGS, None)
+            .ok();
+
+        loop {
+            mainloop.borrow_mut().iterate(true);
+            match context.borrow().get_state() {
+                libpulse_binding::context::State::Ready => break,
+                libpulse_binding::context::State::Failed
+                | libpulse_binding::context::State::Terminated => return,
+                _ => {}
+            }
+        }
+
+        // Get current mute state and toggle
+        let mainloop_clone = mainloop.clone();
+        let context_clone = context.clone();
+
+        let introspect = context.borrow().introspect();
+        let _op = introspect.get_server_info(move |info| {
+            if let Some(sink_name) = &info.default_sink_name {
+                let name = sink_name.to_string();
+                let name_inner = name.clone();
+                let mainloop_inner = mainloop_clone.clone();
+                let context_inner = context_clone.clone();
+
+                let introspect = context_clone.borrow().introspect();
+                let _op = introspect.get_sink_info_by_name(&name, move |list| {
+                    if let libpulse_binding::callbacks::ListResult::Item(sink_info) = list {
+                        let new_mute = !sink_info.mute;
+                        let mut introspect = context_inner.borrow().introspect();
+                        introspect.set_sink_mute_by_name(&name_inner, new_mute, None);
+                        mainloop_inner
+                            .borrow_mut()
+                            .quit(libpulse_binding::def::Retval(0));
+                    }
+                });
+            }
+        });
+
+        mainloop.borrow_mut().run().ok();
+    }
+}
+
+impl Default for LiveAudioService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AudioService for LiveAudioService {
+    fn get_state(&self) -> AudioState {
+        self.state.lock().unwrap().clone()
+    }
+
+    fn set_volume(&self, volume: u32) {
+        Self::set_sink_volume(volume);
+        self.refresh();
+    }
+
+    fn toggle_mute(&self) {
+        Self::toggle_sink_mute();
+        self.refresh();
+    }
+
+    fn refresh(&self) {
+        let state = Self::query_audio_state();
+        *self.state.lock().unwrap() = state;
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -554,6 +814,7 @@ pub fn live_providers() -> (
     Arc<LiveSessionService>,
     Arc<LiveLauncherService>,
     Arc<LiveWorkspaceService>,
+    Arc<LiveAudioService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -564,5 +825,6 @@ pub fn live_providers() -> (
         Arc::new(LiveSessionService),
         Arc::new(LiveLauncherService::new()),
         Arc::new(LiveWorkspaceService::new()),
+        Arc::new(LiveAudioService::new()),
     )
 }

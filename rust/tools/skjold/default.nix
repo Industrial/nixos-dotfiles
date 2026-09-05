@@ -9,6 +9,7 @@
   libxkbcommon,
   vulkan-loader,
   libGL,
+  libpulseaudio,
 }:
 rustPlatform.buildRustPackage {
   pname = "skjold";
@@ -35,6 +36,7 @@ rustPlatform.buildRustPackage {
     libxkbcommon
     vulkan-loader
     libGL
+    libpulseaudio
   ];
 
   # Iced dlopen()s these at runtime for Wayland - must run after fixupPhase shrinks rpath

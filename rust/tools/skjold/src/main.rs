@@ -10,9 +10,9 @@ use iced_exwlshell::reexport::{Anchor, Layer, LayerSize};
 use iced_exwlshell::settings::{LayerShellSettings, Settings};
 
 use skjold::providers::{
-    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveLauncherService,
-    LiveSessionService, LiveSystemInfoService, LiveTimeService, LiveWorkspaceService,
-    live_providers,
+    LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
+    LiveLauncherService, LiveSessionService, LiveSystemInfoService, LiveTimeService,
+    LiveWorkspaceService, live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -27,6 +27,7 @@ static BLUETOOTH_SERVICE: OnceLock<Arc<LiveBluetoothService>> = OnceLock::new();
 static SESSION_SERVICE: OnceLock<Arc<LiveSessionService>> = OnceLock::new();
 static LAUNCHER_SERVICE: OnceLock<Arc<LiveLauncherService>> = OnceLock::new();
 static WORKSPACE_SERVICE: OnceLock<Arc<LiveWorkspaceService>> = OnceLock::new();
+static AUDIO_SERVICE: OnceLock<Arc<LiveAudioService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
     let (
@@ -38,6 +39,7 @@ fn main() -> Result<(), iced_exwlshell::Error> {
         session_service,
         launcher_service,
         workspace_service,
+        audio_service,
     ) = live_providers();
 
     // Store providers for the default function
@@ -65,6 +67,9 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     WORKSPACE_SERVICE
         .set(workspace_service)
         .unwrap_or_else(|_| panic!("WORKSPACE_SERVICE already initialized"));
+    AUDIO_SERVICE
+        .set(audio_service)
+        .unwrap_or_else(|_| panic!("AUDIO_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -112,6 +117,10 @@ fn default() -> SkjoldApp {
         .get()
         .expect("WORKSPACE_SERVICE not initialized")
         .clone();
+    let audio_service = AUDIO_SERVICE
+        .get()
+        .expect("AUDIO_SERVICE not initialized")
+        .clone();
     SkjoldApp::new_default(
         hyprland,
         time_service,
@@ -121,6 +130,7 @@ fn default() -> SkjoldApp {
         session_service,
         launcher_service,
         workspace_service,
+        audio_service,
     )
 }
 

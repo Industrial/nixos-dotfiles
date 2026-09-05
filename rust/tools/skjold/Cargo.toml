@@ -35,6 +35,9 @@ zbus = "5"
 freedesktop-desktop-entry = "0.7"
 fuzzy-matcher = "0.3"
 
+# Audio
+libpulse-binding = "2"
+
 # Error handling
 thiserror = "2"
 

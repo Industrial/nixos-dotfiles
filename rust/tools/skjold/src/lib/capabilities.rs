@@ -3,7 +3,8 @@
 //! MVP uses simple traits. Full id_effect integration in Wave 2.
 
 use crate::domain::{
-    BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors, Workspace,
+    AudioState, BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction,
+    ThermalSensors, Workspace,
 };
 
 /// Capability for time operations.
@@ -86,5 +87,22 @@ pub trait WorkspaceService: Send + Sync {
     fn switch_to(&self, id: i32);
 
     /// Refresh workspace state.
+    fn refresh(&self);
+}
+
+// === Audio Capabilities (Wave 5) ===
+
+/// Capability for audio control via PulseAudio.
+pub trait AudioService: Send + Sync {
+    /// Get current audio state.
+    fn get_state(&self) -> AudioState;
+
+    /// Set volume (0-100).
+    fn set_volume(&self, volume: u32);
+
+    /// Toggle mute.
+    fn toggle_mute(&self);
+
+    /// Refresh audio state.
     fn refresh(&self);
 }

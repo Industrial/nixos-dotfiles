@@ -1,5 +1,6 @@
 //! UI widgets for system status display.
 
+mod audio;
 mod battery;
 mod bluetooth;
 mod cpu;
@@ -8,6 +9,7 @@ mod session;
 mod thermal;
 mod workspaces;
 
+pub use audio::audio_widget;
 pub use battery::battery_widget;
 pub use bluetooth::bluetooth_widget;
 pub use cpu::cpu_widget;
