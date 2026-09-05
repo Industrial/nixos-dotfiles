@@ -37,3 +37,30 @@ pub enum HyprlandEvent {
     WindowOpened,
     WindowClosed,
 }
+
+// === System Info Models (Wave 1) ===
+
+/// Battery status information.
+#[derive(Debug, Clone, Default)]
+pub struct BatteryStatus {
+    /// Battery charge percentage (0-100).
+    pub percentage: u8,
+    /// Whether the battery is currently charging.
+    pub charging: bool,
+    /// Whether a battery is present in the system.
+    pub present: bool,
+}
+
+/// CPU load information.
+#[derive(Debug, Clone, Default)]
+pub struct CpuLoad {
+    /// Overall CPU usage as a percentage (0-100).
+    pub usage_percent: f32,
+}
+
+/// Thermal sensor readings.
+#[derive(Debug, Clone, Default)]
+pub struct ThermalSensors {
+    /// CPU temperature in Celsius, if available.
+    pub cpu_temp_celsius: Option<f32>,
+}

@@ -9,7 +9,9 @@ use iced_exwlshell::layershell::application;
 use iced_exwlshell::reexport::{Anchor, Layer, LayerSize};
 use iced_exwlshell::settings::{LayerShellSettings, Settings};
 
-use skjold::providers::{LiveHyprlandIpc, LiveTimeService, live_providers};
+use skjold::providers::{
+    LiveBatteryService, LiveHyprlandIpc, LiveSystemInfoService, LiveTimeService, live_providers,
+};
 use skjold::ui::SkjoldApp;
 
 const PANEL_HEIGHT: u32 = 32;
@@ -17,9 +19,11 @@ const PANEL_HEIGHT: u32 = 32;
 // Store providers globally for the application factory
 static HYPRLAND: OnceLock<Arc<LiveHyprlandIpc>> = OnceLock::new();
 static TIME_SERVICE: OnceLock<Arc<LiveTimeService>> = OnceLock::new();
+static SYSTEM_INFO: OnceLock<Arc<LiveSystemInfoService>> = OnceLock::new();
+static BATTERY_SERVICE: OnceLock<Arc<LiveBatteryService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
-    let (hyprland, time_service) = live_providers();
+    let (hyprland, time_service, system_info, battery_service) = live_providers();
 
     // Store providers for the default function
     HYPRLAND
@@ -28,6 +32,12 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     TIME_SERVICE
         .set(time_service)
         .unwrap_or_else(|_| panic!("TIME_SERVICE already initialized"));
+    SYSTEM_INFO
+        .set(system_info)
+        .unwrap_or_else(|_| panic!("SYSTEM_INFO already initialized"));
+    BATTERY_SERVICE
+        .set(battery_service)
+        .unwrap_or_else(|_| panic!("BATTERY_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -51,7 +61,15 @@ fn default() -> SkjoldApp {
         .get()
         .expect("TIME_SERVICE not initialized")
         .clone();
-    SkjoldApp::new_default(hyprland, time_service)
+    let system_info = SYSTEM_INFO
+        .get()
+        .expect("SYSTEM_INFO not initialized")
+        .clone();
+    let battery_service = BATTERY_SERVICE
+        .get()
+        .expect("BATTERY_SERVICE not initialized")
+        .clone();
+    SkjoldApp::new_default(hyprland, time_service, system_info, battery_service)
 }
 
 fn namespace() -> String {

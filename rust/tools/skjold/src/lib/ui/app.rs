@@ -10,9 +10,12 @@ use iced::{Color, Element, Length, Subscription, Task, Theme};
 
 use iced_exwlshell::to_layer_message;
 
-use crate::capabilities::TimeService;
-use crate::domain::Clock;
-use crate::providers::{LiveHyprlandIpc, LiveTimeService};
+use crate::capabilities::{BatteryService, SystemInfoService, TimeService};
+use crate::domain::{BatteryStatus, Clock, CpuLoad, ThermalSensors};
+use crate::providers::{
+    LiveBatteryService, LiveHyprlandIpc, LiveSystemInfoService, LiveTimeService,
+};
+use crate::ui::widgets::{battery_widget, cpu_widget, thermal_widget};
 
 /// Messages for the Skjold application.
 #[to_layer_message]
@@ -20,6 +23,8 @@ use crate::providers::{LiveHyprlandIpc, LiveTimeService};
 pub enum Message {
     /// Clock tick - update time display.
     Tick,
+    /// System info refresh tick.
+    SystemInfoTick,
     /// Workspace button clicked.
     SwitchWorkspace(i32),
     /// Active workspace changed (from click or event).
@@ -50,11 +55,26 @@ pub struct SkjoldApp {
     hyprland: Arc<LiveHyprlandIpc>,
     /// Time service capability.
     time_service: Arc<LiveTimeService>,
+    /// System info service capability.
+    system_info: Arc<LiveSystemInfoService>,
+    /// Battery service capability.
+    battery_service: Arc<LiveBatteryService>,
+    /// Current CPU load.
+    cpu_load: CpuLoad,
+    /// Current thermal sensors.
+    thermal: ThermalSensors,
+    /// Current battery status.
+    battery: BatteryStatus,
 }
 
 impl SkjoldApp {
     /// Create a new Skjold application with live providers (for iced_exwlshell default fn).
-    pub fn new_default(hyprland: Arc<LiveHyprlandIpc>, time_service: Arc<LiveTimeService>) -> Self {
+    pub fn new_default(
+        hyprland: Arc<LiveHyprlandIpc>,
+        time_service: Arc<LiveTimeService>,
+        system_info: Arc<LiveSystemInfoService>,
+        battery_service: Arc<LiveBatteryService>,
+    ) -> Self {
         let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
         let occupied: HashSet<i32> = hyprland
             .get_workspaces()
@@ -66,12 +86,23 @@ impl SkjoldApp {
             })
             .unwrap_or_default();
 
+        // Get initial system info
+        system_info.refresh();
+        let cpu_load = system_info.get_cpu_load();
+        let thermal = system_info.get_thermal();
+        let battery = battery_service.get_status();
+
         Self {
             clock: Clock::now(),
             active_workspace_id: initial_ws,
             occupied_workspaces: occupied,
             hyprland,
             time_service,
+            system_info,
+            battery_service,
+            cpu_load,
+            thermal,
+            battery,
         }
     }
 
@@ -79,6 +110,8 @@ impl SkjoldApp {
     pub fn new(
         hyprland: Arc<LiveHyprlandIpc>,
         time_service: Arc<LiveTimeService>,
+        system_info: Arc<LiveSystemInfoService>,
+        battery_service: Arc<LiveBatteryService>,
     ) -> (Self, Task<Message>) {
         // Query initial state
         let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
@@ -92,12 +125,23 @@ impl SkjoldApp {
             })
             .unwrap_or_default();
 
+        // Get initial system info
+        system_info.refresh();
+        let cpu_load = system_info.get_cpu_load();
+        let thermal = system_info.get_thermal();
+        let battery = battery_service.get_status();
+
         let app = Self {
             clock: Clock::now(),
             active_workspace_id: initial_ws,
             occupied_workspaces: occupied,
             hyprland,
             time_service,
+            system_info,
+            battery_service,
+            cpu_load,
+            thermal,
+            battery,
         };
 
         (app, Task::none())
@@ -115,6 +159,13 @@ impl SkjoldApp {
                 self.clock = Clock {
                     time: self.time_service.now(),
                 };
+                Task::none()
+            }
+            Message::SystemInfoTick => {
+                self.system_info.refresh();
+                self.cpu_load = self.system_info.get_cpu_load();
+                self.thermal = self.system_info.get_thermal();
+                self.battery = self.battery_service.get_status();
                 Task::none()
             }
             Message::SwitchWorkspace(id) => Task::perform(
@@ -192,10 +243,18 @@ impl SkjoldApp {
         // Clock display
         let clock_display = text(self.clock.formatted()).size(16);
 
-        // Main row: workspaces | spacer | clock
+        // System info widgets
+        let cpu_display = cpu_widget(&self.cpu_load);
+        let thermal_display = thermal_widget(&self.thermal);
+        let battery_display = battery_widget(&self.battery);
+
+        // Main row: workspaces | spacer | cpu | temp | battery | clock
         let content = row![
             row(workspace_buttons).spacing(4),
             Space::new().width(Length::Fill),
+            cpu_display,
+            thermal_display,
+            battery_display,
             clock_display,
         ]
         .spacing(16)
@@ -211,10 +270,14 @@ impl SkjoldApp {
     pub fn subscription(&self) -> Subscription<Message> {
         let clock_tick = iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick);
 
+        // System info refresh every 5 seconds
+        let system_info_tick =
+            iced::time::every(Duration::from_secs(5)).map(|_| Message::SystemInfoTick);
+
         // Hyprland event subscription
         let hyprland_events = Subscription::run(hyprland_event_stream);
 
-        Subscription::batch([clock_tick, hyprland_events])
+        Subscription::batch([clock_tick, system_info_tick, hyprland_events])
     }
 
     /// Application theme.
