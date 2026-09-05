@@ -12,10 +12,11 @@ use hyprland::shared::{HyprData, HyprDataActive};
 use sysinfo::{Components, System};
 
 use crate::capabilities::{
-    BatteryService, BluetoothService, SessionService, SystemInfoService, TimeService,
+    BatteryService, BluetoothService, LauncherService, SessionService, SystemInfoService,
+    TimeService,
 };
 use crate::domain::{
-    BatteryStatus, BluetoothState, CpuLoad, SessionAction, ThermalSensors, Workspace,
+    BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors, Workspace,
 };
 
 /// Live implementation of TimeService.
@@ -334,6 +335,147 @@ impl SessionService for LiveSessionService {
     }
 }
 
+// === Launcher Providers (Wave 3) ===
+
+/// Live implementation of LauncherService.
+/// Parses .desktop files and provides fuzzy search.
+pub struct LiveLauncherService {
+    entries: Mutex<Vec<LauncherEntry>>,
+}
+
+impl LiveLauncherService {
+    pub fn new() -> Self {
+        let service = Self {
+            entries: Mutex::new(Vec::new()),
+        };
+        service.refresh();
+        service
+    }
+
+    fn parse_desktop_files() -> Vec<LauncherEntry> {
+        use freedesktop_desktop_entry::{DesktopEntry, Iter, default_paths};
+
+        let mut entries = Vec::new();
+        let locales: &[&str] = &[];
+
+        // Use default XDG paths - Iter::new takes the paths slice directly
+        for entry_path in Iter::new(default_paths()) {
+            let Ok(de) = DesktopEntry::from_path(&entry_path, None::<&[&str]>) else {
+                continue;
+            };
+
+            // Skip hidden and NoDisplay entries
+            if de.no_display() || de.hidden() {
+                continue;
+            }
+
+            // Skip entries without Exec
+            let Some(exec) = de.exec() else {
+                continue;
+            };
+
+            entries.push(LauncherEntry {
+                name: de.name(locales).map(|s| s.to_string()).unwrap_or_default(),
+                generic_name: de.generic_name(locales).map(|s| s.to_string()),
+                comment: de.comment(locales).map(|s| s.to_string()),
+                exec: exec.to_string(),
+                icon: de.icon().map(|s| s.to_string()),
+                categories: de
+                    .categories()
+                    .map(|cats| cats.into_iter().map(|s| s.to_string()).collect())
+                    .unwrap_or_default(),
+                terminal: de.terminal(),
+                desktop_path: entry_path.to_string_lossy().to_string(),
+            });
+        }
+
+        // Sort by name and deduplicate
+        entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        entries.dedup_by(|a, b| a.name == b.name);
+        entries
+    }
+}
+
+impl Default for LiveLauncherService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LauncherService for LiveLauncherService {
+    fn get_entries(&self) -> Vec<LauncherEntry> {
+        self.entries.lock().unwrap().clone()
+    }
+
+    fn search(&self, query: &str) -> Vec<usize> {
+        use fuzzy_matcher::FuzzyMatcher;
+        use fuzzy_matcher::skim::SkimMatcherV2;
+
+        if query.is_empty() {
+            // Return all indices
+            return (0..self.entries.lock().unwrap().len()).collect();
+        }
+
+        let entries = self.entries.lock().unwrap();
+        let matcher = SkimMatcherV2::default();
+
+        let mut scored: Vec<(usize, i64)> = entries
+            .iter()
+            .enumerate()
+            .filter_map(|(i, entry)| {
+                // Match against name and generic name
+                let name_score = matcher.fuzzy_match(&entry.name, query).unwrap_or(0);
+                let generic_score = entry
+                    .generic_name
+                    .as_ref()
+                    .and_then(|g| matcher.fuzzy_match(g, query))
+                    .unwrap_or(0);
+
+                let best_score = name_score.max(generic_score);
+                if best_score > 0 {
+                    Some((i, best_score))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by score descending
+        scored.sort_by(|a, b| b.1.cmp(&a.1));
+        scored.into_iter().map(|(i, _)| i).collect()
+    }
+
+    fn launch(&self, index: usize) {
+        let entries = self.entries.lock().unwrap();
+        let Some(entry) = entries.get(index) else {
+            return;
+        };
+
+        // Parse exec command, removing field codes like %f, %u, etc.
+        let exec = entry
+            .exec
+            .split_whitespace()
+            .filter(|s| !s.starts_with('%'))
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if entry.terminal {
+            // Launch in terminal
+            let _ = std::process::Command::new("foot")
+                .args(["-e", "sh", "-c", &exec])
+                .spawn();
+        } else {
+            // Launch directly via shell
+            let _ = std::process::Command::new("sh").args(["-c", &exec]).spawn();
+        }
+    }
+
+    fn refresh(&self) {
+        let new_entries = Self::parse_desktop_files();
+        *self.entries.lock().unwrap() = new_entries;
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -342,6 +484,7 @@ pub fn live_providers() -> (
     Arc<LiveBatteryService>,
     Arc<LiveBluetoothService>,
     Arc<LiveSessionService>,
+    Arc<LiveLauncherService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -350,5 +493,6 @@ pub fn live_providers() -> (
         Arc::new(LiveBatteryService),
         Arc::new(LiveBluetoothService::new()),
         Arc::new(LiveSessionService),
+        Arc::new(LiveLauncherService::new()),
     )
 }

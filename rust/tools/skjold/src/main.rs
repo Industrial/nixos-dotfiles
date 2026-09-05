@@ -10,8 +10,8 @@ use iced_exwlshell::reexport::{Anchor, Layer, LayerSize};
 use iced_exwlshell::settings::{LayerShellSettings, Settings};
 
 use skjold::providers::{
-    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveSessionService,
-    LiveSystemInfoService, LiveTimeService, live_providers,
+    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveLauncherService,
+    LiveSessionService, LiveSystemInfoService, LiveTimeService, live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -24,10 +24,18 @@ static SYSTEM_INFO: OnceLock<Arc<LiveSystemInfoService>> = OnceLock::new();
 static BATTERY_SERVICE: OnceLock<Arc<LiveBatteryService>> = OnceLock::new();
 static BLUETOOTH_SERVICE: OnceLock<Arc<LiveBluetoothService>> = OnceLock::new();
 static SESSION_SERVICE: OnceLock<Arc<LiveSessionService>> = OnceLock::new();
+static LAUNCHER_SERVICE: OnceLock<Arc<LiveLauncherService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
-    let (hyprland, time_service, system_info, battery_service, bluetooth_service, session_service) =
-        live_providers();
+    let (
+        hyprland,
+        time_service,
+        system_info,
+        battery_service,
+        bluetooth_service,
+        session_service,
+        launcher_service,
+    ) = live_providers();
 
     // Store providers for the default function
     HYPRLAND
@@ -48,6 +56,9 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     SESSION_SERVICE
         .set(session_service)
         .unwrap_or_else(|_| panic!("SESSION_SERVICE already initialized"));
+    LAUNCHER_SERVICE
+        .set(launcher_service)
+        .unwrap_or_else(|_| panic!("LAUNCHER_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -87,6 +98,10 @@ fn default() -> SkjoldApp {
         .get()
         .expect("SESSION_SERVICE not initialized")
         .clone();
+    let launcher_service = LAUNCHER_SERVICE
+        .get()
+        .expect("LAUNCHER_SERVICE not initialized")
+        .clone();
     SkjoldApp::new_default(
         hyprland,
         time_service,
@@ -94,6 +109,7 @@ fn default() -> SkjoldApp {
         battery_service,
         bluetooth_service,
         session_service,
+        launcher_service,
     )
 }
 

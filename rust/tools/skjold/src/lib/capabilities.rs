@@ -2,7 +2,9 @@
 //!
 //! MVP uses simple traits. Full id_effect integration in Wave 2.
 
-use crate::domain::{BatteryStatus, BluetoothState, CpuLoad, SessionAction, ThermalSensors};
+use crate::domain::{
+    BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors,
+};
 
 /// Capability for time operations.
 pub trait TimeService: Send + Sync {
@@ -51,4 +53,21 @@ pub trait SessionService: Send + Sync {
 
     /// Check if an action is available.
     fn is_available(&self, action: SessionAction) -> bool;
+}
+
+// === Launcher Capabilities (Wave 3) ===
+
+/// Capability for application launcher.
+pub trait LauncherService: Send + Sync {
+    /// Get all available applications.
+    fn get_entries(&self) -> Vec<LauncherEntry>;
+
+    /// Search entries by query (fuzzy match).
+    fn search(&self, query: &str) -> Vec<usize>;
+
+    /// Launch an application by index.
+    fn launch(&self, index: usize);
+
+    /// Refresh the application list.
+    fn refresh(&self);
 }

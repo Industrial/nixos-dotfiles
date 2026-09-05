@@ -31,6 +31,10 @@ sysinfo = "0.35"
 # D-Bus
 zbus = "5"
 
+# Launcher
+freedesktop-desktop-entry = "0.7"
+fuzzy-matcher = "0.3"
+
 # Error handling
 thiserror = "2"
 

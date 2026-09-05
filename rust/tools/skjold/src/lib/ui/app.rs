@@ -11,15 +11,19 @@ use iced::{Color, Element, Length, Subscription, Task, Theme};
 use iced_exwlshell::to_layer_message;
 
 use crate::capabilities::{
-    BatteryService, BluetoothService, SessionService, SystemInfoService, TimeService,
+    BatteryService, BluetoothService, LauncherService, SessionService, SystemInfoService,
+    TimeService,
 };
-use crate::domain::{BatteryStatus, BluetoothState, Clock, CpuLoad, SessionAction, ThermalSensors};
+use crate::domain::{
+    BatteryStatus, BluetoothState, Clock, CpuLoad, LauncherEntry, LauncherState, SessionAction,
+    ThermalSensors,
+};
 use crate::providers::{
-    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveSessionService,
-    LiveSystemInfoService, LiveTimeService,
+    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveLauncherService,
+    LiveSessionService, LiveSystemInfoService, LiveTimeService,
 };
 use crate::ui::widgets::{
-    battery_widget, bluetooth_widget, cpu_widget, session_widget, thermal_widget,
+    battery_widget, bluetooth_widget, cpu_widget, launcher_widget, session_widget, thermal_widget,
 };
 
 /// Messages for the Skjold application.
@@ -44,6 +48,14 @@ pub enum Message {
     SessionMenuToggle,
     /// Execute a session action.
     SessionAction(SessionAction),
+    /// Toggle launcher visibility.
+    LauncherToggle,
+    /// Launcher search query changed.
+    LauncherQueryChange(String),
+    /// Launcher item selected.
+    LauncherSelect(usize),
+    /// Close launcher.
+    LauncherClose,
 }
 
 /// Hyprland events we subscribe to.
@@ -80,10 +92,16 @@ pub struct SkjoldApp {
     bluetooth_service: Arc<LiveBluetoothService>,
     /// Session service capability.
     session_service: Arc<LiveSessionService>,
+    /// Launcher service capability.
+    launcher_service: Arc<LiveLauncherService>,
     /// Current Bluetooth state.
     bluetooth: BluetoothState,
     /// Whether the session menu is expanded.
     session_menu_expanded: bool,
+    /// Launcher state.
+    launcher: LauncherState,
+    /// Cached launcher entries.
+    launcher_entries: Vec<LauncherEntry>,
 }
 
 impl SkjoldApp {
@@ -95,6 +113,7 @@ impl SkjoldApp {
         battery_service: Arc<LiveBatteryService>,
         bluetooth_service: Arc<LiveBluetoothService>,
         session_service: Arc<LiveSessionService>,
+        launcher_service: Arc<LiveLauncherService>,
     ) -> Self {
         let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
         let occupied: HashSet<i32> = hyprland
@@ -114,6 +133,10 @@ impl SkjoldApp {
         let battery = battery_service.get_status();
         let bluetooth = bluetooth_service.get_state();
 
+        // Get launcher entries
+        let launcher_entries = launcher_service.get_entries();
+        let filtered: Vec<usize> = (0..launcher_entries.len()).collect();
+
         Self {
             clock: Clock::now(),
             active_workspace_id: initial_ws,
@@ -127,8 +150,17 @@ impl SkjoldApp {
             battery,
             bluetooth_service,
             session_service,
+            launcher_service,
             bluetooth,
             session_menu_expanded: false,
+            launcher: LauncherState {
+                visible: false,
+                query: String::new(),
+                entries: Vec::new(), // Stored separately
+                filtered,
+                selected: 0,
+            },
+            launcher_entries,
         }
     }
 
@@ -140,6 +172,7 @@ impl SkjoldApp {
         battery_service: Arc<LiveBatteryService>,
         bluetooth_service: Arc<LiveBluetoothService>,
         session_service: Arc<LiveSessionService>,
+        launcher_service: Arc<LiveLauncherService>,
     ) -> (Self, Task<Message>) {
         // Query initial state
         let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
@@ -160,6 +193,10 @@ impl SkjoldApp {
         let battery = battery_service.get_status();
         let bluetooth = bluetooth_service.get_state();
 
+        // Get launcher entries
+        let launcher_entries = launcher_service.get_entries();
+        let filtered: Vec<usize> = (0..launcher_entries.len()).collect();
+
         let app = Self {
             clock: Clock::now(),
             active_workspace_id: initial_ws,
@@ -173,8 +210,17 @@ impl SkjoldApp {
             battery,
             bluetooth_service,
             session_service,
+            launcher_service,
             bluetooth,
             session_menu_expanded: false,
+            launcher: LauncherState {
+                visible: false,
+                query: String::new(),
+                entries: Vec::new(),
+                filtered,
+                selected: 0,
+            },
+            launcher_entries,
         };
 
         (app, Task::none())
@@ -215,6 +261,33 @@ impl SkjoldApp {
             Message::SessionAction(action) => {
                 self.session_service.execute(action);
                 self.session_menu_expanded = false;
+                Task::none()
+            }
+            Message::LauncherToggle => {
+                self.launcher.visible = !self.launcher.visible;
+                if self.launcher.visible {
+                    // Reset state when opening
+                    self.launcher.query.clear();
+                    self.launcher.filtered = (0..self.launcher_entries.len()).collect();
+                    self.launcher.selected = 0;
+                }
+                Task::none()
+            }
+            Message::LauncherQueryChange(query) => {
+                self.launcher.query = query.clone();
+                self.launcher.filtered = self.launcher_service.search(&query);
+                self.launcher.selected = 0;
+                Task::none()
+            }
+            Message::LauncherSelect(index) => {
+                self.launcher_service.launch(index);
+                self.launcher.visible = false;
+                self.launcher.query.clear();
+                Task::none()
+            }
+            Message::LauncherClose => {
+                self.launcher.visible = false;
+                self.launcher.query.clear();
                 Task::none()
             }
             Message::SwitchWorkspace(id) => Task::perform(
@@ -303,8 +376,15 @@ impl SkjoldApp {
             Message::SessionAction,
         );
 
-        // Main row: workspaces | spacer | cpu | temp | battery | bluetooth | clock | session
+        // Launcher toggle button
+        let launcher_btn = button(text("\u{f0349}").size(14)) // nf-md-magnify
+            .padding(8)
+            .style(iced::widget::button::text)
+            .on_press(Message::LauncherToggle);
+
+        // Main row: launcher | workspaces | spacer | cpu | temp | battery | bluetooth | clock | session
         let content = row![
+            launcher_btn,
             row(workspace_buttons).spacing(4),
             Space::new().width(Length::Fill),
             cpu_display,
@@ -317,10 +397,31 @@ impl SkjoldApp {
         .spacing(16)
         .padding(8);
 
-        container(content)
-            .width(Length::Fill)
-            .height(Length::Shrink)
+        // If launcher is visible, render overlay on top
+        // Note: Full overlay requires separate layer-shell surface - for now just show inline
+        if self.launcher.visible {
+            let launcher_overlay = launcher_widget(
+                &self.launcher,
+                &self.launcher_entries,
+                Message::LauncherQueryChange,
+                Message::LauncherSelect,
+                Message::LauncherClose,
+            );
+
+            // Stack panel content under launcher overlay
+            iced::widget::stack![
+                container(content)
+                    .width(Length::Fill)
+                    .height(Length::Shrink),
+                launcher_overlay,
+            ]
             .into()
+        } else {
+            container(content)
+                .width(Length::Fill)
+                .height(Length::Shrink)
+                .into()
+        }
     }
 
     /// Subscriptions for background tasks.

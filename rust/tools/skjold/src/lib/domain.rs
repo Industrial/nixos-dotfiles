@@ -122,3 +122,53 @@ impl SessionAction {
         }
     }
 }
+
+// === Launcher Models (Wave 3) ===
+
+/// An application entry from a .desktop file.
+#[derive(Debug, Clone)]
+pub struct LauncherEntry {
+    /// Application name.
+    pub name: String,
+    /// Optional generic name.
+    pub generic_name: Option<String>,
+    /// Comment/description.
+    pub comment: Option<String>,
+    /// Exec command.
+    pub exec: String,
+    /// Icon name.
+    pub icon: Option<String>,
+    /// Categories for filtering.
+    pub categories: Vec<String>,
+    /// Whether this is a terminal application.
+    pub terminal: bool,
+    /// Path to the .desktop file (for deduplication).
+    pub desktop_path: String,
+}
+
+impl LauncherEntry {
+    /// Get the display name (name or generic name).
+    pub fn display_name(&self) -> &str {
+        &self.name
+    }
+
+    /// Get the subtitle (generic name or comment).
+    pub fn subtitle(&self) -> Option<&str> {
+        self.generic_name.as_deref().or(self.comment.as_deref())
+    }
+}
+
+/// Launcher state.
+#[derive(Debug, Clone, Default)]
+pub struct LauncherState {
+    /// Whether the launcher is visible.
+    pub visible: bool,
+    /// Current search query.
+    pub query: String,
+    /// All available applications.
+    pub entries: Vec<LauncherEntry>,
+    /// Filtered results based on query.
+    pub filtered: Vec<usize>,
+    /// Currently selected index in filtered results.
+    pub selected: usize,
+}
