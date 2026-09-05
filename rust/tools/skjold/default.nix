@@ -4,6 +4,7 @@
   lib,
   rustPlatform,
   pkg-config,
+  patchelf,
   wayland,
   libxkbcommon,
   vulkan-loader,
@@ -26,6 +27,7 @@ rustPlatform.buildRustPackage {
 
   nativeBuildInputs = [
     pkg-config
+    patchelf
   ];
 
   buildInputs = [
