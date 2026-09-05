@@ -37,8 +37,8 @@ rustPlatform.buildRustPackage {
     libGL
   ];
 
-  # Iced needs these at runtime for Wayland
-  postInstall = ''
+  # Iced dlopen()s these at runtime for Wayland - must run after fixupPhase shrinks rpath
+  postFixup = ''
     patchelf --add-rpath ${lib.makeLibraryPath [wayland libxkbcommon vulkan-loader libGL]} $out/bin/skjold
   '';
 
