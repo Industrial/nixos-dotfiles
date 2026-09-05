@@ -2,4 +2,4 @@
 
 mod app;
 
-pub use app::SkjoldApp;
+pub use app::{Message, SkjoldApp};

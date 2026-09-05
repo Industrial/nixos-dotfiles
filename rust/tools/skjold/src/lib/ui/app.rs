@@ -4,14 +4,18 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use iced::widget::{button, container, row, text};
+use iced::futures::channel::mpsc::Sender;
+use iced::widget::{Space, button, container, row, text};
 use iced::{Color, Element, Length, Subscription, Task, Theme};
+
+use iced_exwlshell::to_layer_message;
 
 use crate::capabilities::TimeService;
 use crate::domain::Clock;
 use crate::providers::{LiveHyprlandIpc, LiveTimeService};
 
 /// Messages for the Skjold application.
+#[to_layer_message]
 #[derive(Debug, Clone)]
 pub enum Message {
     /// Clock tick - update time display.
@@ -49,7 +53,29 @@ pub struct SkjoldApp {
 }
 
 impl SkjoldApp {
-    /// Create a new Skjold application with live providers.
+    /// Create a new Skjold application with live providers (for iced_exwlshell default fn).
+    pub fn new_default(hyprland: Arc<LiveHyprlandIpc>, time_service: Arc<LiveTimeService>) -> Self {
+        let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
+        let occupied: HashSet<i32> = hyprland
+            .get_workspaces()
+            .map(|wss| {
+                wss.into_iter()
+                    .filter(|ws| ws.windows > 0)
+                    .map(|ws| ws.id)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        Self {
+            clock: Clock::now(),
+            active_workspace_id: initial_ws,
+            occupied_workspaces: occupied,
+            hyprland,
+            time_service,
+        }
+    }
+
+    /// Create a new Skjold application with live providers (returns Task for standard iced).
     pub fn new(
         hyprland: Arc<LiveHyprlandIpc>,
         time_service: Arc<LiveTimeService>,
@@ -129,6 +155,8 @@ impl SkjoldApp {
                 }
                 Task::none()
             }
+            // Layer-shell messages added by #[to_layer_message] macro - ignore for now
+            _ => Task::none(),
         }
     }
 
@@ -167,7 +195,7 @@ impl SkjoldApp {
         // Main row: workspaces | spacer | clock
         let content = row![
             row(workspace_buttons).spacing(4),
-            iced::widget::horizontal_space(),
+            Space::new().width(Length::Fill),
             clock_display,
         ]
         .spacing(16)
@@ -198,7 +226,7 @@ impl SkjoldApp {
 /// Stream Hyprland events as Iced messages.
 /// Uses a background thread since EventListener is not Send.
 fn hyprland_event_stream() -> impl iced::futures::Stream<Item = Message> {
-    iced::stream::channel(32, |sender| async move {
+    iced::stream::channel(32, |sender: Sender<Message>| async move {
         use hyprland::event_listener::EventListener;
         use std::sync::mpsc;
 

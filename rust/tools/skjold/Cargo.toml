@@ -13,7 +13,8 @@ id_effect_macro = "0.4"
 id_effect_proc_macro = "0.4"
 
 # UI
-iced = { version = "0.13", features = ["tokio"] }
+iced = { version = "0.14", features = ["tokio", "wgpu"] }
+iced_exwlshell = "0.20"
 
 # Hyprland IPC
 hyprland = "0.4.0-beta.3"
@@ -26,6 +27,10 @@ chrono = "0.4"
 
 # Error handling
 thiserror = "2"
+
+# Pin winit versions to match iced_exwlshell upstream
+winit-core = "=0.31.0-beta.2"
+winit-common = "=0.31.0-beta.2"
 
 [lib]
 name = "skjold"
