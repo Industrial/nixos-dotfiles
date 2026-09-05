@@ -63,6 +63,7 @@ in {
     libxkbcommon
     vulkan-loader
     libGL
+    libpulseaudio
   ];
 
   env = {
