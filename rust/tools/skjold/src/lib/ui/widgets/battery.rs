@@ -1,7 +1,10 @@
 //! Battery status widget.
 
 use iced::widget::{row, text};
-use iced::{Color, Element};
+use iced::{Color, Element, Font};
+
+/// Nerd Font for icons
+const NERD_FONT: Font = Font::with_name("JetBrainsMono Nerd Font Mono");
 
 use crate::domain::BatteryStatus;
 
@@ -36,7 +39,7 @@ pub fn battery_widget<'a, Message: 'a>(status: &BatteryStatus) -> Element<'a, Me
     };
 
     row![
-        text(icon).size(16).color(color),
+        text(icon).size(16).color(color).font(NERD_FONT),
         text(format!("{}%", status.percentage))
             .size(14)
             .color(color),
