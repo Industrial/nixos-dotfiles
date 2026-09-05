@@ -464,63 +464,63 @@ impl SkjoldApp {
 
     /// Render the application.
     pub fn view(&self) -> Element<'_, Message> {
-        // Workspace indicator using the workspace widget
+        // Colors for the fufexan-style design
+        let pill_bg = Color::from_rgba(0.12, 0.12, 0.14, 0.85); // Dark semi-transparent
+        let text_color = Color::from_rgb(0.92, 0.86, 0.70); // Gruvbox fg
+
+        // Workspace indicator (left pill)
         let workspace_display = workspaces_widget(
             &self.workspaces,
             Some(self.active_workspace_id),
             Message::SwitchWorkspace,
         );
 
-        // Clock display
-        let clock_display = text(self.clock.formatted()).size(16);
+        let left_pill =
+            container(workspace_display)
+                .padding([6, 12])
+                .style(move |_theme: &Theme| container::Style {
+                    background: Some(iced::Background::Color(pill_bg)),
+                    border: iced::Border {
+                        color: Color::TRANSPARENT,
+                        width: 0.0,
+                        radius: 16.0.into(),
+                    },
+                    ..Default::default()
+                });
 
-        // System info widgets
+        // System status widgets (right pill) - minimal like fufexan
         let cpu_display = cpu_widget(&self.cpu_load);
-        let thermal_display = thermal_widget(&self.thermal);
-        let battery_display = battery_widget(&self.battery);
-        let bluetooth_display = bluetooth_widget(&self.bluetooth, Message::BluetoothToggle);
-        let audio_display = audio_widget(&self.audio, Message::AudioToggleMute);
         let network_display = network_widget(&self.network);
-        let window_list_display = window_list_widget(&self.windows, Message::FocusWindow);
-        let notification_display = notification_widget(
-            &self.notifications,
-            Message::DismissNotification,
-            Message::ClearNotifications,
-        );
-        let tray_display = system_tray_widget(&self.tray_items, |bus, path| {
-            Message::TrayActivate(bus, path)
-        });
-        let session_display = session_widget(
-            self.session_menu_expanded,
-            Message::SessionMenuToggle,
-            Message::SessionAction,
-        );
+        let audio_display = audio_widget(&self.audio, Message::AudioToggleMute);
+        let battery_display = battery_widget(&self.battery);
+        let clock_display = text(self.clock.formatted()).size(14).color(text_color);
 
-        // Launcher toggle button
-        let launcher_btn = button(text("\u{f0349}").size(14)) // nf-md-magnify
-            .padding(8)
-            .style(iced::widget::button::text)
-            .on_press(Message::LauncherToggle);
-
-        // Main row: launcher | workspaces | windows | spacer | tray | cpu | temp | battery | network | audio | bluetooth | notifications | clock | session
-        let content = row![
-            launcher_btn,
-            workspace_display,
-            window_list_display,
-            Space::new().width(Length::Fill),
-            tray_display,
+        let right_content = row![
             cpu_display,
-            thermal_display,
-            battery_display,
             network_display,
             audio_display,
-            bluetooth_display,
-            notification_display,
+            battery_display,
             clock_display,
-            session_display,
         ]
         .spacing(16)
-        .padding(8);
+        .align_y(iced::Alignment::Center);
+
+        let right_pill = container(right_content)
+            .padding([6, 16])
+            .style(move |_theme: &Theme| container::Style {
+                background: Some(iced::Background::Color(pill_bg)),
+                border: iced::Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: 16.0.into(),
+                },
+                ..Default::default()
+            });
+
+        // Main layout: left pill | spacer | right pill
+        let content = row![left_pill, Space::new().width(Length::Fill), right_pill,]
+            .padding([4, 8])
+            .align_y(iced::Alignment::Center);
 
         // If launcher is visible, render overlay on top
         // Note: Full overlay requires separate layer-shell surface - for now just show inline
