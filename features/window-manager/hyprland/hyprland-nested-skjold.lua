@@ -59,13 +59,19 @@ hl.config({
 ---- AUTOSTART ----
 -----------------
 
+-- Dev workflow: use run-dev.sh which handles builds and library paths
+-- First build: cd ~/.dotfiles/rust && cargo build --release -p skjold
+-- Or: ~/.dotfiles/rust/tools/skjold/run-dev.sh --build
+local dev_runner = os.getenv("HOME") .. "/.dotfiles/rust/tools/skjold/run-dev.sh"
+local skjold_cmd = "if [ -x '" .. dev_runner .. "' ]; then " .. dev_runner .. "; else skjold; fi"
+
 hl.on("hyprland.start", function()
-  -- Launch Skjold panel
-  hl.exec_cmd("skjold >>/tmp/skjold.log 2>&1")
+  -- Launch Skjold panel (dev runner if exists, otherwise system binary)
+  hl.exec_cmd("bash -c '" .. skjold_cmd .. " >>/tmp/skjold.log 2>&1'")
 end)
 
--- Manual restart if needed
-hl.bind("ALT + SHIFT + S", hl.dsp.exec_cmd("pkill -x skjold || true; sleep 0.2; skjold >>/tmp/skjold.log 2>&1"))
+-- Manual restart if needed (ALT+SHIFT+S) - also rebuilds if source changed
+hl.bind("ALT + SHIFT + S", hl.dsp.exec_cmd("pkill -x skjold || true; sleep 0.2; bash -c '" .. dev_runner .. " --build >>/tmp/skjold.log 2>&1'"))
 
 ---------------------
 ---- KEYBINDINGS ----
