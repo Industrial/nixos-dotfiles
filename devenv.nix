@@ -56,6 +56,13 @@ in {
     lazysql
 
     llvmPackages.llvm
+
+    # Wayland/Iced build deps for skjold dev workflow
+    pkg-config
+    wayland
+    libxkbcommon
+    vulkan-loader
+    libGL
   ];
 
   env = {
