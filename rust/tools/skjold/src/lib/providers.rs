@@ -15,11 +15,13 @@ use sysinfo::{Components, System};
 
 use crate::capabilities::{
     AudioService, BatteryService, BluetoothService, LauncherService, NetworkService,
-    NotificationService, SessionService, SystemInfoService, TimeService, WorkspaceService,
+    NotificationService, SessionService, SystemInfoService, SystemTrayService, TimeService,
+    WorkspaceService,
 };
 use crate::domain::{
     AudioState, BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, NetworkState, NetworkType,
-    NotificationInfo, NotificationUrgency, SessionAction, ThermalSensors, Workspace,
+    NotificationInfo, NotificationUrgency, SessionAction, ThermalSensors, TrayCategory, TrayItem,
+    TrayStatus, Workspace,
 };
 
 /// Live implementation of TimeService.
@@ -1176,6 +1178,210 @@ impl NotificationService for LiveNotificationService {
     }
 }
 
+// === System Tray Provider (Wave 9) ===
+
+/// Live system tray service using D-Bus StatusNotifierWatcher.
+pub struct LiveSystemTrayService {
+    items: Mutex<Vec<TrayItem>>,
+}
+
+impl LiveSystemTrayService {
+    pub fn new() -> Self {
+        let service = Self {
+            items: Mutex::new(Vec::new()),
+        };
+        service.refresh();
+        service
+    }
+
+    fn query_tray_items() -> Vec<TrayItem> {
+        let Ok(connection) = zbus::blocking::Connection::session() else {
+            return Vec::new();
+        };
+
+        // Query StatusNotifierWatcher for registered items
+        let Some(proxy) = zbus::blocking::fdo::PropertiesProxy::builder(&connection)
+            .destination("org.kde.StatusNotifierWatcher")
+            .ok()
+            .and_then(|b| b.path("/StatusNotifierWatcher").ok())
+            .and_then(|b| b.build().ok())
+        else {
+            return Vec::new();
+        };
+
+        // Get RegisteredStatusNotifierItems property
+        let Ok(items_value) = proxy.get(
+            "org.kde.StatusNotifierWatcher".try_into().unwrap(),
+            "RegisteredStatusNotifierItems".try_into().unwrap(),
+        ) else {
+            return Vec::new();
+        };
+
+        // Parse the array of service names
+        let Ok(items_array) = <Vec<String>>::try_from(items_value) else {
+            return Vec::new();
+        };
+
+        let mut tray_items = Vec::new();
+
+        for item_service in items_array {
+            // Parse service name - format is usually "bus_name/object_path" or just "bus_name"
+            let (bus_name, object_path) = if let Some(pos) = item_service.find('/') {
+                (
+                    item_service[..pos].to_string(),
+                    item_service[pos..].to_string(),
+                )
+            } else {
+                (item_service.clone(), "/StatusNotifierItem".to_string())
+            };
+
+            // Query item properties
+            if let Some(item) = Self::query_item_properties(&connection, &bus_name, &object_path) {
+                tray_items.push(item);
+            }
+        }
+
+        tray_items
+    }
+
+    fn query_item_properties(
+        connection: &zbus::blocking::Connection,
+        bus_name: &str,
+        object_path: &str,
+    ) -> Option<TrayItem> {
+        let proxy = zbus::blocking::fdo::PropertiesProxy::builder(connection)
+            .destination(bus_name)
+            .ok()?
+            .path(object_path)
+            .ok()?
+            .build()
+            .ok()?;
+
+        let id = proxy
+            .get(
+                "org.kde.StatusNotifierItem".try_into().ok()?,
+                "Id".try_into().ok()?,
+            )
+            .ok()
+            .and_then(|v| String::try_from(v).ok())
+            .unwrap_or_else(|| bus_name.to_string());
+
+        let title = proxy
+            .get(
+                "org.kde.StatusNotifierItem".try_into().ok()?,
+                "Title".try_into().ok()?,
+            )
+            .ok()
+            .and_then(|v| String::try_from(v).ok())
+            .unwrap_or_else(|| id.clone());
+
+        let icon_name = proxy
+            .get(
+                "org.kde.StatusNotifierItem".try_into().ok()?,
+                "IconName".try_into().ok()?,
+            )
+            .ok()
+            .and_then(|v| String::try_from(v).ok())
+            .filter(|s| !s.is_empty());
+
+        let category_str = proxy
+            .get(
+                "org.kde.StatusNotifierItem".try_into().ok()?,
+                "Category".try_into().ok()?,
+            )
+            .ok()
+            .and_then(|v| String::try_from(v).ok())
+            .unwrap_or_default();
+
+        let category = match category_str.as_str() {
+            "Communications" => TrayCategory::Communications,
+            "SystemServices" => TrayCategory::SystemServices,
+            "Hardware" => TrayCategory::Hardware,
+            _ => TrayCategory::ApplicationStatus,
+        };
+
+        let status_str = proxy
+            .get(
+                "org.kde.StatusNotifierItem".try_into().ok()?,
+                "Status".try_into().ok()?,
+            )
+            .ok()
+            .and_then(|v| String::try_from(v).ok())
+            .unwrap_or_default();
+
+        let status = match status_str.as_str() {
+            "Passive" => TrayStatus::Passive,
+            "NeedsAttention" => TrayStatus::NeedsAttention,
+            _ => TrayStatus::Active,
+        };
+
+        Some(TrayItem {
+            bus_name: bus_name.to_string(),
+            object_path: object_path.to_string(),
+            id,
+            title,
+            icon_name,
+            category,
+            status,
+            tooltip: None,
+        })
+    }
+}
+
+impl Default for LiveSystemTrayService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SystemTrayService for LiveSystemTrayService {
+    fn get_items(&self) -> Vec<TrayItem> {
+        self.items.lock().unwrap().clone()
+    }
+
+    fn activate(&self, bus_name: &str, object_path: &str) {
+        if let Ok(connection) = zbus::blocking::Connection::session() {
+            // Call Activate method on the StatusNotifierItem
+            let _ = connection.call_method(
+                Some(bus_name),
+                object_path,
+                Some("org.kde.StatusNotifierItem"),
+                "Activate",
+                &(0i32, 0i32), // x, y coordinates
+            );
+        }
+    }
+
+    fn secondary_activate(&self, bus_name: &str, object_path: &str) {
+        if let Ok(connection) = zbus::blocking::Connection::session() {
+            let _ = connection.call_method(
+                Some(bus_name),
+                object_path,
+                Some("org.kde.StatusNotifierItem"),
+                "SecondaryActivate",
+                &(0i32, 0i32),
+            );
+        }
+    }
+
+    fn context_menu(&self, bus_name: &str, object_path: &str) {
+        if let Ok(connection) = zbus::blocking::Connection::session() {
+            let _ = connection.call_method(
+                Some(bus_name),
+                object_path,
+                Some("org.kde.StatusNotifierItem"),
+                "ContextMenu",
+                &(0i32, 0i32),
+            );
+        }
+    }
+
+    fn refresh(&self) {
+        let items = Self::query_tray_items();
+        *self.items.lock().unwrap() = items;
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -1190,6 +1396,7 @@ pub fn live_providers() -> (
     Arc<LiveNetworkService>,
     Arc<LiveWindowService>,
     Arc<LiveNotificationService>,
+    Arc<LiveSystemTrayService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -1204,5 +1411,6 @@ pub fn live_providers() -> (
         Arc::new(LiveNetworkService::new()),
         Arc::new(LiveWindowService::new()),
         Arc::new(LiveNotificationService::new()),
+        Arc::new(LiveSystemTrayService::new()),
     )
 }

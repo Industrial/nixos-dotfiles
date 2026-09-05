@@ -12,21 +12,23 @@ use iced_exwlshell::to_layer_message;
 
 use crate::capabilities::{
     AudioService, BatteryService, BluetoothService, LauncherService, NetworkService,
-    NotificationService, SessionService, SystemInfoService, TimeService, WindowService,
-    WorkspaceService,
+    NotificationService, SessionService, SystemInfoService, SystemTrayService, TimeService,
+    WindowService, WorkspaceService,
 };
 use crate::domain::{
     AudioState, BatteryStatus, BluetoothState, Clock, CpuLoad, LauncherEntry, LauncherState,
-    NetworkState, NotificationInfo, SessionAction, ThermalSensors, WindowInfo, Workspace,
+    NetworkState, NotificationInfo, SessionAction, ThermalSensors, TrayItem, WindowInfo, Workspace,
 };
 use crate::providers::{
     LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
     LiveLauncherService, LiveNetworkService, LiveNotificationService, LiveSessionService,
-    LiveSystemInfoService, LiveTimeService, LiveWindowService, LiveWorkspaceService,
+    LiveSystemInfoService, LiveSystemTrayService, LiveTimeService, LiveWindowService,
+    LiveWorkspaceService,
 };
 use crate::ui::widgets::{
     audio_widget, battery_widget, bluetooth_widget, cpu_widget, launcher_widget, network_widget,
-    notification_widget, session_widget, thermal_widget, window_list_widget, workspaces_widget,
+    notification_widget, session_widget, system_tray_widget, thermal_widget, window_list_widget,
+    workspaces_widget,
 };
 
 /// Messages for the Skjold application.
@@ -67,6 +69,8 @@ pub enum Message {
     DismissNotification(u32),
     /// Clear all notifications.
     ClearNotifications,
+    /// Activate a tray item.
+    TrayActivate(String, String),
 }
 
 /// Hyprland events we subscribe to.
@@ -133,6 +137,10 @@ pub struct SkjoldApp {
     notification_service: Arc<LiveNotificationService>,
     /// Current notifications.
     notifications: Vec<NotificationInfo>,
+    /// System tray service capability.
+    system_tray_service: Arc<LiveSystemTrayService>,
+    /// Current tray items.
+    tray_items: Vec<TrayItem>,
 }
 
 impl SkjoldApp {
@@ -150,6 +158,7 @@ impl SkjoldApp {
         network_service: Arc<LiveNetworkService>,
         window_service: Arc<LiveWindowService>,
         notification_service: Arc<LiveNotificationService>,
+        system_tray_service: Arc<LiveSystemTrayService>,
     ) -> Self {
         // Get initial workspace state
         let workspaces = workspace_service.get_workspaces();
@@ -170,6 +179,7 @@ impl SkjoldApp {
         let network = network_service.get_state();
         let windows = window_service.get_windows();
         let notifications = notification_service.get_notifications();
+        let tray_items = system_tray_service.get_items();
 
         // Get launcher entries
         let launcher_entries = launcher_service.get_entries();
@@ -209,6 +219,8 @@ impl SkjoldApp {
             windows,
             notification_service,
             notifications,
+            system_tray_service,
+            tray_items,
         }
     }
 
@@ -226,6 +238,7 @@ impl SkjoldApp {
         network_service: Arc<LiveNetworkService>,
         window_service: Arc<LiveWindowService>,
         notification_service: Arc<LiveNotificationService>,
+        system_tray_service: Arc<LiveSystemTrayService>,
     ) -> (Self, Task<Message>) {
         // Get initial workspace state
         let workspaces = workspace_service.get_workspaces();
@@ -246,6 +259,7 @@ impl SkjoldApp {
         let network = network_service.get_state();
         let windows = window_service.get_windows();
         let notifications = notification_service.get_notifications();
+        let tray_items = system_tray_service.get_items();
 
         // Get launcher entries
         let launcher_entries = launcher_service.get_entries();
@@ -285,6 +299,8 @@ impl SkjoldApp {
             windows,
             notification_service,
             notifications,
+            system_tray_service,
+            tray_items,
         };
 
         (app, Task::none())
@@ -317,6 +333,8 @@ impl SkjoldApp {
                 self.network = self.network_service.get_state();
                 self.window_service.refresh();
                 self.windows = self.window_service.get_windows();
+                self.system_tray_service.refresh();
+                self.tray_items = self.system_tray_service.get_items();
                 Task::none()
             }
             Message::BluetoothToggle => {
@@ -379,6 +397,10 @@ impl SkjoldApp {
             Message::ClearNotifications => {
                 self.notification_service.clear_all();
                 self.notifications = self.notification_service.get_notifications();
+                Task::none()
+            }
+            Message::TrayActivate(bus_name, object_path) => {
+                self.system_tray_service.activate(&bus_name, &object_path);
                 Task::none()
             }
             Message::SwitchWorkspace(id) => {
@@ -465,6 +487,9 @@ impl SkjoldApp {
             Message::DismissNotification,
             Message::ClearNotifications,
         );
+        let tray_display = system_tray_widget(&self.tray_items, |bus, path| {
+            Message::TrayActivate(bus, path)
+        });
         let session_display = session_widget(
             self.session_menu_expanded,
             Message::SessionMenuToggle,
@@ -477,12 +502,13 @@ impl SkjoldApp {
             .style(iced::widget::button::text)
             .on_press(Message::LauncherToggle);
 
-        // Main row: launcher | workspaces | windows | spacer | cpu | temp | battery | network | audio | bluetooth | notifications | clock | session
+        // Main row: launcher | workspaces | windows | spacer | tray | cpu | temp | battery | network | audio | bluetooth | notifications | clock | session
         let content = row![
             launcher_btn,
             workspace_display,
             window_list_display,
             Space::new().width(Length::Fill),
+            tray_display,
             cpu_display,
             thermal_display,
             battery_display,

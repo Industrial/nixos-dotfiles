@@ -155,3 +155,25 @@ pub trait NotificationService: Send + Sync {
     /// Get notification count.
     fn count(&self) -> usize;
 }
+
+// === System Tray Capabilities (Wave 9) ===
+
+use crate::domain::TrayItem;
+
+/// Capability for system tray (StatusNotifierItem/SNI).
+pub trait SystemTrayService: Send + Sync {
+    /// Get all registered tray items.
+    fn get_items(&self) -> Vec<TrayItem>;
+
+    /// Activate a tray item (left click).
+    fn activate(&self, bus_name: &str, object_path: &str);
+
+    /// Secondary activate (middle click).
+    fn secondary_activate(&self, bus_name: &str, object_path: &str);
+
+    /// Context menu (right click).
+    fn context_menu(&self, bus_name: &str, object_path: &str);
+
+    /// Refresh tray items.
+    fn refresh(&self);
+}

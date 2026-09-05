@@ -253,3 +253,45 @@ pub struct NotificationInfo {
     /// When the notification was received.
     pub timestamp: DateTime<Local>,
 }
+
+// === System Tray Models (Wave 9) ===
+
+/// Category of a tray item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrayCategory {
+    #[default]
+    ApplicationStatus,
+    Communications,
+    SystemServices,
+    Hardware,
+}
+
+/// Status of a tray item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrayStatus {
+    Passive,
+    #[default]
+    Active,
+    NeedsAttention,
+}
+
+/// A system tray item (StatusNotifierItem).
+#[derive(Debug, Clone)]
+pub struct TrayItem {
+    /// Unique bus name (e.g., :1.234).
+    pub bus_name: String,
+    /// Object path of the item.
+    pub object_path: String,
+    /// Item ID.
+    pub id: String,
+    /// Display title.
+    pub title: String,
+    /// Icon name.
+    pub icon_name: Option<String>,
+    /// Category.
+    pub category: TrayCategory,
+    /// Current status.
+    pub status: TrayStatus,
+    /// Tooltip text.
+    pub tooltip: Option<String>,
+}

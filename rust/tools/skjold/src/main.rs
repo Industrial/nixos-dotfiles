@@ -12,8 +12,8 @@ use iced_exwlshell::settings::{LayerShellSettings, Settings};
 use skjold::providers::{
     LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
     LiveLauncherService, LiveNetworkService, LiveNotificationService, LiveSessionService,
-    LiveSystemInfoService, LiveTimeService, LiveWindowService, LiveWorkspaceService,
-    live_providers,
+    LiveSystemInfoService, LiveSystemTrayService, LiveTimeService, LiveWindowService,
+    LiveWorkspaceService, live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -32,6 +32,7 @@ static AUDIO_SERVICE: OnceLock<Arc<LiveAudioService>> = OnceLock::new();
 static NETWORK_SERVICE: OnceLock<Arc<LiveNetworkService>> = OnceLock::new();
 static WINDOW_SERVICE: OnceLock<Arc<LiveWindowService>> = OnceLock::new();
 static NOTIFICATION_SERVICE: OnceLock<Arc<LiveNotificationService>> = OnceLock::new();
+static SYSTEM_TRAY_SERVICE: OnceLock<Arc<LiveSystemTrayService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
     let (
@@ -47,6 +48,7 @@ fn main() -> Result<(), iced_exwlshell::Error> {
         network_service,
         window_service,
         notification_service,
+        system_tray_service,
     ) = live_providers();
 
     // Store providers for the default function
@@ -86,6 +88,9 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     NOTIFICATION_SERVICE
         .set(notification_service)
         .unwrap_or_else(|_| panic!("NOTIFICATION_SERVICE already initialized"));
+    SYSTEM_TRAY_SERVICE
+        .set(system_tray_service)
+        .unwrap_or_else(|_| panic!("SYSTEM_TRAY_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -149,6 +154,10 @@ fn default() -> SkjoldApp {
         .get()
         .expect("NOTIFICATION_SERVICE not initialized")
         .clone();
+    let system_tray_service = SYSTEM_TRAY_SERVICE
+        .get()
+        .expect("SYSTEM_TRAY_SERVICE not initialized")
+        .clone();
     SkjoldApp::new_default(
         hyprland,
         time_service,
@@ -162,6 +171,7 @@ fn default() -> SkjoldApp {
         network_service,
         window_service,
         notification_service,
+        system_tray_service,
     )
 }
 
