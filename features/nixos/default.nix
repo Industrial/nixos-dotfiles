@@ -30,7 +30,7 @@
       ];
 
       # Enable experimental features for better performance
-      experimental-features = "nix-command flakes";
+      experimental-features = ["nix-command" "flakes"];
 
       # Allow import from derivation for better caching
       allow-import-from-derivation = true;
@@ -124,11 +124,9 @@
 
   # Cap journal size so a runaway user unit cannot fill /var/log/journal and
   # break dbus-broker reload during nixos-rebuild switch.
-  services.journald = {
-    extraConfig = ''
-      SystemMaxUse=1G
-      RuntimeMaxUse=256M
-      MaxFileSec=1week
-    '';
+  services.journald.settings.Journal = {
+    SystemMaxUse = "1G";
+    RuntimeMaxUse = "256M";
+    MaxFileSec = "1week";
   };
 }

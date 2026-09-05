@@ -223,3 +223,33 @@ pub struct WindowInfo {
     /// Workspace ID this window is on.
     pub workspace_id: i32,
 }
+
+// === Notification Models (Wave 8) ===
+
+/// Notification urgency level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NotificationUrgency {
+    Low,
+    #[default]
+    Normal,
+    Critical,
+}
+
+/// A notification received from D-Bus.
+#[derive(Debug, Clone)]
+pub struct NotificationInfo {
+    /// Unique notification ID.
+    pub id: u32,
+    /// Application name.
+    pub app_name: String,
+    /// Notification summary/title.
+    pub summary: String,
+    /// Notification body text.
+    pub body: String,
+    /// Icon name or path.
+    pub icon: Option<String>,
+    /// Urgency level.
+    pub urgency: NotificationUrgency,
+    /// When the notification was received.
+    pub timestamp: DateTime<Local>,
+}

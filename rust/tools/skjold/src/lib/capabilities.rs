@@ -136,3 +136,22 @@ pub trait WindowService: Send + Sync {
     /// Refresh window list.
     fn refresh(&self);
 }
+
+// === Notification Capabilities (Wave 8) ===
+
+use crate::domain::NotificationInfo;
+
+/// Capability for notification display.
+pub trait NotificationService: Send + Sync {
+    /// Get recent notifications.
+    fn get_notifications(&self) -> Vec<NotificationInfo>;
+
+    /// Dismiss a notification by ID.
+    fn dismiss(&self, id: u32);
+
+    /// Clear all notifications.
+    fn clear_all(&self);
+
+    /// Get notification count.
+    fn count(&self) -> usize;
+}

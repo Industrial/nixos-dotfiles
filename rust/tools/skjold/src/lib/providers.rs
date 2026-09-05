@@ -15,11 +15,11 @@ use sysinfo::{Components, System};
 
 use crate::capabilities::{
     AudioService, BatteryService, BluetoothService, LauncherService, NetworkService,
-    SessionService, SystemInfoService, TimeService, WorkspaceService,
+    NotificationService, SessionService, SystemInfoService, TimeService, WorkspaceService,
 };
 use crate::domain::{
     AudioState, BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, NetworkState, NetworkType,
-    SessionAction, ThermalSensors, Workspace,
+    NotificationInfo, NotificationUrgency, SessionAction, ThermalSensors, Workspace,
 };
 
 /// Live implementation of TimeService.
@@ -1105,6 +1105,77 @@ impl WindowService for LiveWindowService {
     }
 }
 
+// === Notification Provider (Wave 8) ===
+
+/// Live notification service.
+/// Stores notifications in memory. A full implementation would implement
+/// the D-Bus org.freedesktop.Notifications interface as a daemon.
+pub struct LiveNotificationService {
+    notifications: Mutex<Vec<NotificationInfo>>,
+    next_id: Mutex<u32>,
+}
+
+impl LiveNotificationService {
+    pub fn new() -> Self {
+        Self {
+            notifications: Mutex::new(Vec::new()),
+            next_id: Mutex::new(1),
+        }
+    }
+
+    /// Add a notification (for testing or internal use).
+    pub fn add_notification(&self, app_name: &str, summary: &str, body: &str) -> u32 {
+        let mut id_lock = self.next_id.lock().unwrap();
+        let id = *id_lock;
+        *id_lock += 1;
+        drop(id_lock);
+
+        let notification = NotificationInfo {
+            id,
+            app_name: app_name.to_string(),
+            summary: summary.to_string(),
+            body: body.to_string(),
+            icon: None,
+            urgency: NotificationUrgency::Normal,
+            timestamp: chrono::Local::now(),
+        };
+
+        let mut notifications = self.notifications.lock().unwrap();
+        // Keep only last 50 notifications
+        if notifications.len() >= 50 {
+            notifications.remove(0);
+        }
+        notifications.push(notification);
+
+        id
+    }
+}
+
+impl Default for LiveNotificationService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl NotificationService for LiveNotificationService {
+    fn get_notifications(&self) -> Vec<NotificationInfo> {
+        self.notifications.lock().unwrap().clone()
+    }
+
+    fn dismiss(&self, id: u32) {
+        let mut notifications = self.notifications.lock().unwrap();
+        notifications.retain(|n| n.id != id);
+    }
+
+    fn clear_all(&self) {
+        self.notifications.lock().unwrap().clear();
+    }
+
+    fn count(&self) -> usize {
+        self.notifications.lock().unwrap().len()
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -1118,6 +1189,7 @@ pub fn live_providers() -> (
     Arc<LiveAudioService>,
     Arc<LiveNetworkService>,
     Arc<LiveWindowService>,
+    Arc<LiveNotificationService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -1131,5 +1203,6 @@ pub fn live_providers() -> (
         Arc::new(LiveAudioService::new()),
         Arc::new(LiveNetworkService::new()),
         Arc::new(LiveWindowService::new()),
+        Arc::new(LiveNotificationService::new()),
     )
 }

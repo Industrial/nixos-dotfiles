@@ -94,6 +94,10 @@
         user = "root";
         sshUser = "tom";
         interactiveSudo = false;
+        # Disable rollback features to avoid dbus subscription timeout during switch.
+        # The dbus monitor can fail if systemd/journald are restarting mid-switch.
+        magicRollback = false;
+        autoRollback = false;
         path = deployLib.activate.nixos nixosConfigurations.${hostname};
       };
     };
