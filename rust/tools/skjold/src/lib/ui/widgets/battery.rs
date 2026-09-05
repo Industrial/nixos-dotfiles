@@ -3,8 +3,8 @@
 use iced::widget::{row, text};
 use iced::{Color, Element, Font};
 
-/// Nerd Font for icons
-const NERD_FONT: Font = Font::with_name("JetBrainsMono Nerd Font Mono");
+/// Nerd Font for icons - uses MONOSPACE to pick up the loaded Nerd Font
+const NERD_FONT: Font = Font::MONOSPACE;
 
 use crate::domain::BatteryStatus;
 
