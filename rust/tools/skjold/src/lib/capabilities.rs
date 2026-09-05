@@ -117,3 +117,22 @@ pub trait NetworkService: Send + Sync {
     /// Refresh network state.
     fn refresh(&self);
 }
+
+// === Window List Capabilities (Wave 7) ===
+
+use crate::domain::WindowInfo;
+
+/// Capability for window/client operations via Hyprland IPC.
+pub trait WindowService: Send + Sync {
+    /// Get all windows on the current workspace.
+    fn get_windows(&self) -> Vec<WindowInfo>;
+
+    /// Get the focused window.
+    fn get_focused(&self) -> Option<WindowInfo>;
+
+    /// Focus a window by address.
+    fn focus(&self, address: &str);
+
+    /// Refresh window list.
+    fn refresh(&self);
+}

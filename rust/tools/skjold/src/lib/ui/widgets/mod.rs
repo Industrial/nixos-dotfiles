@@ -8,6 +8,7 @@ mod launcher;
 mod network;
 mod session;
 mod thermal;
+mod window_list;
 mod workspaces;
 
 pub use audio::audio_widget;
@@ -18,4 +19,5 @@ pub use launcher::launcher_widget;
 pub use network::network_widget;
 pub use session::session_widget;
 pub use thermal::thermal_widget;
+pub use window_list::window_list_widget;
 pub use workspaces::workspaces_widget;

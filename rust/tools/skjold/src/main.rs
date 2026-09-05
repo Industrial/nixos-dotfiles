@@ -12,7 +12,7 @@ use iced_exwlshell::settings::{LayerShellSettings, Settings};
 use skjold::providers::{
     LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
     LiveLauncherService, LiveNetworkService, LiveSessionService, LiveSystemInfoService,
-    LiveTimeService, LiveWorkspaceService, live_providers,
+    LiveTimeService, LiveWindowService, LiveWorkspaceService, live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -29,6 +29,7 @@ static LAUNCHER_SERVICE: OnceLock<Arc<LiveLauncherService>> = OnceLock::new();
 static WORKSPACE_SERVICE: OnceLock<Arc<LiveWorkspaceService>> = OnceLock::new();
 static AUDIO_SERVICE: OnceLock<Arc<LiveAudioService>> = OnceLock::new();
 static NETWORK_SERVICE: OnceLock<Arc<LiveNetworkService>> = OnceLock::new();
+static WINDOW_SERVICE: OnceLock<Arc<LiveWindowService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
     let (
@@ -42,6 +43,7 @@ fn main() -> Result<(), iced_exwlshell::Error> {
         workspace_service,
         audio_service,
         network_service,
+        window_service,
     ) = live_providers();
 
     // Store providers for the default function
@@ -75,6 +77,9 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     NETWORK_SERVICE
         .set(network_service)
         .unwrap_or_else(|_| panic!("NETWORK_SERVICE already initialized"));
+    WINDOW_SERVICE
+        .set(window_service)
+        .unwrap_or_else(|_| panic!("WINDOW_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -130,6 +135,10 @@ fn default() -> SkjoldApp {
         .get()
         .expect("NETWORK_SERVICE not initialized")
         .clone();
+    let window_service = WINDOW_SERVICE
+        .get()
+        .expect("WINDOW_SERVICE not initialized")
+        .clone();
     SkjoldApp::new_default(
         hyprland,
         time_service,
@@ -141,6 +150,7 @@ fn default() -> SkjoldApp {
         workspace_service,
         audio_service,
         network_service,
+        window_service,
     )
 }
 

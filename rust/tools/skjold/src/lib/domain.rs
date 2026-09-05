@@ -206,3 +206,20 @@ pub struct NetworkState {
     /// Signal strength for wireless (0-100).
     pub signal_strength: Option<u8>,
 }
+
+// === Window List Models (Wave 7) ===
+
+/// Information about a window/client.
+#[derive(Debug, Clone)]
+pub struct WindowInfo {
+    /// Hyprland window address (unique identifier).
+    pub address: String,
+    /// Window title.
+    pub title: String,
+    /// Application class/name.
+    pub class: String,
+    /// Whether this window is currently focused.
+    pub focused: bool,
+    /// Workspace ID this window is on.
+    pub workspace_id: i32,
+}

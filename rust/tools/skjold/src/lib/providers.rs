@@ -6,9 +6,11 @@
 use std::sync::{Arc, Mutex};
 
 use chrono::Local;
-use hyprland::data::{Workspace as HyprWorkspace, Workspaces};
-use hyprland::dispatch::{Dispatch, DispatchType, WorkspaceIdentifierWithSpecial};
-use hyprland::shared::{HyprData, HyprDataActive};
+use hyprland::data::{Client, Clients, Workspace as HyprWorkspace, Workspaces};
+use hyprland::dispatch::{
+    Dispatch, DispatchType, WindowIdentifier, WorkspaceIdentifierWithSpecial,
+};
+use hyprland::shared::{HyprData, HyprDataActive, HyprDataActiveOptional};
 use sysinfo::{Components, System};
 
 use crate::capabilities::{
@@ -70,6 +72,20 @@ impl LiveHyprlandIpc {
             id,
         )))
         .map_err(|e| e.to_string())
+    }
+
+    /// Get all clients (windows).
+    pub fn get_clients(&self) -> Result<Vec<Client>, String> {
+        Clients::get()
+            .map(|clients| clients.into_iter().collect())
+            .map_err(|e| e.to_string())
+    }
+
+    /// Get the active (focused) window.
+    pub fn get_active_window(&self) -> Result<Client, String> {
+        Client::get_active()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "No active window".to_string())
     }
 }
 
@@ -1000,6 +1016,95 @@ impl NetworkService for LiveNetworkService {
     }
 }
 
+// === Window List Provider (Wave 7) ===
+
+use crate::capabilities::WindowService;
+use crate::domain::WindowInfo;
+
+/// Live window service using Hyprland IPC.
+pub struct LiveWindowService {
+    hyprland: LiveHyprlandIpc,
+    windows: Mutex<Vec<WindowInfo>>,
+}
+
+impl LiveWindowService {
+    pub fn new() -> Self {
+        let hyprland = LiveHyprlandIpc;
+        let windows = Self::query_windows(&hyprland);
+        Self {
+            hyprland,
+            windows: Mutex::new(windows),
+        }
+    }
+
+    fn query_windows(hyprland: &LiveHyprlandIpc) -> Vec<WindowInfo> {
+        // Get active workspace first
+        let active_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
+
+        // Get all clients
+        let clients = match hyprland.get_clients() {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+
+        // Get focused window address
+        let focused_addr = hyprland
+            .get_active_window()
+            .ok()
+            .map(|w| w.address.to_string());
+
+        // Filter to current workspace and map to WindowInfo
+        clients
+            .into_iter()
+            .filter(|c| c.workspace.id == active_ws)
+            .map(|c| WindowInfo {
+                address: c.address.to_string(),
+                title: if c.title.len() > 30 {
+                    format!("{}...", &c.title[..27])
+                } else {
+                    c.title.clone()
+                },
+                class: c.class.clone(),
+                focused: focused_addr.as_ref() == Some(&c.address.to_string()),
+                workspace_id: c.workspace.id,
+            })
+            .collect()
+    }
+}
+
+impl Default for LiveWindowService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WindowService for LiveWindowService {
+    fn get_windows(&self) -> Vec<WindowInfo> {
+        self.windows.lock().unwrap().clone()
+    }
+
+    fn get_focused(&self) -> Option<WindowInfo> {
+        self.windows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|w| w.focused)
+            .cloned()
+    }
+
+    fn focus(&self, address: &str) {
+        // Use hyprctl to focus the window
+        let _ = std::process::Command::new("hyprctl")
+            .args(["dispatch", "focuswindow", &format!("address:{}", address)])
+            .output();
+    }
+
+    fn refresh(&self) {
+        let windows = Self::query_windows(&self.hyprland);
+        *self.windows.lock().unwrap() = windows;
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -1012,6 +1117,7 @@ pub fn live_providers() -> (
     Arc<LiveWorkspaceService>,
     Arc<LiveAudioService>,
     Arc<LiveNetworkService>,
+    Arc<LiveWindowService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -1024,5 +1130,6 @@ pub fn live_providers() -> (
         Arc::new(LiveWorkspaceService::new()),
         Arc::new(LiveAudioService::new()),
         Arc::new(LiveNetworkService::new()),
+        Arc::new(LiveWindowService::new()),
     )
 }
