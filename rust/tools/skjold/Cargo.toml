@@ -1,0 +1,36 @@
+[package]
+name = "skjold"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Hyprland panel shell built with id_effect and Iced"
+license = "MIT"
+
+[dependencies]
+# Effects framework
+id_effect = { version = "0.4", features = ["schema-serde"] }
+id_effect_macro = "0.4"
+id_effect_proc_macro = "0.4"
+
+# UI
+iced = { version = "0.13", features = ["tokio"] }
+
+# Hyprland IPC
+hyprland = "0.4.0-beta.3"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Time
+chrono = "0.4"
+
+# Error handling
+thiserror = "2"
+
+[lib]
+name = "skjold"
+path = "src/lib/mod.rs"
+
+[[bin]]
+name = "skjold"
+path = "src/main.rs"

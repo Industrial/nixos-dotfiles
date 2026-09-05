@@ -46,6 +46,18 @@
     export XDG_CURRENT_DESKTOP=Hyprland
     exec ${hyprlandPkg}/bin/Hyprland --config ${dotfilesHyprDir}/hyprland-nested-caelestia.lua
   '';
+  # Skjold panel (custom Hyprland shell)
+  skjoldPkg = pkgs.callPackage ../../../rust/tools/skjold {};
+  # Nested Hyprland session for testing Skjold panel
+  nestedHyprlandLauncher = pkgs.writeShellScriptBin "nested-hyprland" ''
+    set -euo pipefail
+    if [ -z "''${WAYLAND_DISPLAY:-}" ]; then
+      echo "nested-hyprland: need a parent Wayland session" >&2
+      exit 1
+    fi
+    export XDG_CURRENT_DESKTOP=Hyprland
+    exec ${hyprlandPkg}/bin/Hyprland --config ${dotfilesHyprDir}/hyprland-nested-skjold.lua
+  '';
 in
   assert lib.assertMsg (inputs ? hyprland) ''
     features/window-manager/hyprland: add a `hyprland` flake input, for example:
@@ -99,6 +111,9 @@ in
           if [ -f "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" ]; then
             ln -sfn "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" /home/${settings.username}/.config/hypr/hyprland-nested-caelestia.lua
           fi
+          if [ -f "${dotfilesHyprDir}/hyprland-nested-skjold.lua" ]; then
+            ln -sfn "${dotfilesHyprDir}/hyprland-nested-skjold.lua" /home/${settings.username}/.config/hypr/hyprland-nested-skjold.lua
+          fi
 
           monitors_src="${dotfilesHyprDir}/monitors.${settings.hostname}.lua"
           if [ ! -f "''$monitors_src" ]; then
@@ -133,6 +148,10 @@ in
           source = ./hyprland-nested-caelestia.lua;
           mode = "0644";
         };
+        "xdg/hypr/hyprland-nested-skjold.lua" = {
+          source = ./hyprland-nested-skjold.lua;
+          mode = "0644";
+        };
         "xdg/hypr/hyprland.conf.hyprlang" = {
           source = ./hyprland.conf.hyprlang;
           mode = "0644";
@@ -158,54 +177,59 @@ in
         WLR_NO_HARDWARE_CURSORS = "1";
       };
 
-      systemPackages = with pkgs; [
-        # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
-        hyprlandPkg
-        # Cursor theme manager
-        hyprcursor
-        # Blue-light filter / Night light
-        hyprsunset
+      systemPackages = with pkgs;
+        [
+          # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
+          hyprlandPkg
+          # Cursor theme manager
+          hyprcursor
+          # Blue-light filter / Night light
+          hyprsunset
 
-        # WiFi/Network GUI (kept for settings apps; tray via Caelestia)
-        networkmanagerapplet
-        networkmanager_dmenu
-        blueman
-        pavucontrol
+          # WiFi/Network GUI (kept for settings apps; tray via Caelestia)
+          networkmanagerapplet
+          networkmanager_dmenu
+          blueman
+          pavucontrol
 
-        # Polkit (Hyprland-native)
-        hyprpolkitagent
+          # Polkit (Hyprland-native)
+          hyprpolkitagent
 
-        # Caelestia CLI / desktop utilities
-        grim
-        slurp
-        swappy
-        cliphist
-        wl-clipboard
-        fuzzel
-        gpu-screen-recorder
+          # Caelestia CLI / desktop utilities
+          grim
+          slurp
+          swappy
+          cliphist
+          wl-clipboard
+          fuzzel
+          gpu-screen-recorder
 
-        # Qt Wayland
-        qt5.qtwayland
-        qt6.qtwayland
+          # Qt Wayland
+          qt5.qtwayland
+          qt6.qtwayland
 
-        # System utilities
-        brightnessctl
-        wireplumber
-        playerctl
+          # System utilities
+          brightnessctl
+          wireplumber
+          playerctl
 
-        nautilus
-        alacritty
-        gnome-keyring
+          nautilus
+          alacritty
+          gnome-keyring
 
-        monitorProfile
-      ]
-      ++ lib.optionals hasCaelestia [
-        caelestiaShellPkg
-        caelestiaCliPkg
-        nestedCaelestiaLauncher
-        material-symbols
-        nerd-fonts.caskaydia-cove
-      ];
+          monitorProfile
+
+          # Skjold panel (nested testing)
+          skjoldPkg
+          nestedHyprlandLauncher
+        ]
+        ++ lib.optionals hasCaelestia [
+          caelestiaShellPkg
+          caelestiaCliPkg
+          nestedCaelestiaLauncher
+          material-symbols
+          nerd-fonts.caskaydia-cove
+        ];
     };
 
     xdg = {
