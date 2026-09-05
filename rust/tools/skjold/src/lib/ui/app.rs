@@ -12,18 +12,19 @@ use iced_exwlshell::to_layer_message;
 
 use crate::capabilities::{
     BatteryService, BluetoothService, LauncherService, SessionService, SystemInfoService,
-    TimeService,
+    TimeService, WorkspaceService,
 };
 use crate::domain::{
     BatteryStatus, BluetoothState, Clock, CpuLoad, LauncherEntry, LauncherState, SessionAction,
-    ThermalSensors,
+    ThermalSensors, Workspace,
 };
 use crate::providers::{
     LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveLauncherService,
-    LiveSessionService, LiveSystemInfoService, LiveTimeService,
+    LiveSessionService, LiveSystemInfoService, LiveTimeService, LiveWorkspaceService,
 };
 use crate::ui::widgets::{
     battery_widget, bluetooth_widget, cpu_widget, launcher_widget, session_widget, thermal_widget,
+    workspaces_widget,
 };
 
 /// Messages for the Skjold application.
@@ -82,6 +83,10 @@ pub struct SkjoldApp {
     system_info: Arc<LiveSystemInfoService>,
     /// Battery service capability.
     battery_service: Arc<LiveBatteryService>,
+    /// Workspace service capability.
+    workspace_service: Arc<LiveWorkspaceService>,
+    /// Current workspaces list.
+    workspaces: Vec<Workspace>,
     /// Current CPU load.
     cpu_load: CpuLoad,
     /// Current thermal sensors.
@@ -114,17 +119,16 @@ impl SkjoldApp {
         bluetooth_service: Arc<LiveBluetoothService>,
         session_service: Arc<LiveSessionService>,
         launcher_service: Arc<LiveLauncherService>,
+        workspace_service: Arc<LiveWorkspaceService>,
     ) -> Self {
-        let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
-        let occupied: HashSet<i32> = hyprland
-            .get_workspaces()
-            .map(|wss| {
-                wss.into_iter()
-                    .filter(|ws| ws.windows > 0)
-                    .map(|ws| ws.id)
-                    .collect()
-            })
-            .unwrap_or_default();
+        // Get initial workspace state
+        let workspaces = workspace_service.get_workspaces();
+        let initial_ws = workspace_service.get_active().map(|ws| ws.id).unwrap_or(1);
+        let occupied: HashSet<i32> = workspaces
+            .iter()
+            .filter(|ws| ws.windows > 0)
+            .map(|ws| ws.id)
+            .collect();
 
         // Get initial system info
         system_info.refresh();
@@ -145,6 +149,8 @@ impl SkjoldApp {
             time_service,
             system_info,
             battery_service,
+            workspace_service,
+            workspaces,
             cpu_load,
             thermal,
             battery,
@@ -173,18 +179,16 @@ impl SkjoldApp {
         bluetooth_service: Arc<LiveBluetoothService>,
         session_service: Arc<LiveSessionService>,
         launcher_service: Arc<LiveLauncherService>,
+        workspace_service: Arc<LiveWorkspaceService>,
     ) -> (Self, Task<Message>) {
-        // Query initial state
-        let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
-        let occupied: HashSet<i32> = hyprland
-            .get_workspaces()
-            .map(|wss| {
-                wss.into_iter()
-                    .filter(|ws| ws.windows > 0)
-                    .map(|ws| ws.id)
-                    .collect()
-            })
-            .unwrap_or_default();
+        // Get initial workspace state
+        let workspaces = workspace_service.get_workspaces();
+        let initial_ws = workspace_service.get_active().map(|ws| ws.id).unwrap_or(1);
+        let occupied: HashSet<i32> = workspaces
+            .iter()
+            .filter(|ws| ws.windows > 0)
+            .map(|ws| ws.id)
+            .collect();
 
         // Get initial system info
         system_info.refresh();
@@ -205,6 +209,8 @@ impl SkjoldApp {
             time_service,
             system_info,
             battery_service,
+            workspace_service,
+            workspaces,
             cpu_load,
             thermal,
             battery,
@@ -290,24 +296,40 @@ impl SkjoldApp {
                 self.launcher.query.clear();
                 Task::none()
             }
-            Message::SwitchWorkspace(id) => Task::perform(
-                async move {
-                    use hyprland::dispatch::{
-                        Dispatch, DispatchType, WorkspaceIdentifierWithSpecial,
-                    };
-                    let _ = Dispatch::call(DispatchType::Workspace(
-                        WorkspaceIdentifierWithSpecial::Id(id),
-                    ));
-                    id
-                },
-                Message::ActiveWorkspaceChanged,
-            ),
-            Message::ActiveWorkspaceChanged(id) => {
+            Message::SwitchWorkspace(id) => {
+                self.workspace_service.switch_to(id);
                 self.active_workspace_id = id;
+                // Refresh workspace list after switch
+                self.workspaces = self.workspace_service.get_workspaces();
+                self.occupied_workspaces = self
+                    .workspaces
+                    .iter()
+                    .filter(|ws| ws.windows > 0)
+                    .map(|ws| ws.id)
+                    .collect();
                 Task::none()
             }
-            Message::WorkspacesRefreshed(occupied) => {
-                self.occupied_workspaces = occupied.into_iter().collect();
+            Message::ActiveWorkspaceChanged(id) => {
+                self.active_workspace_id = id;
+                self.workspace_service.refresh();
+                self.workspaces = self.workspace_service.get_workspaces();
+                self.occupied_workspaces = self
+                    .workspaces
+                    .iter()
+                    .filter(|ws| ws.windows > 0)
+                    .map(|ws| ws.id)
+                    .collect();
+                Task::none()
+            }
+            Message::WorkspacesRefreshed(_occupied) => {
+                self.workspace_service.refresh();
+                self.workspaces = self.workspace_service.get_workspaces();
+                self.occupied_workspaces = self
+                    .workspaces
+                    .iter()
+                    .filter(|ws| ws.windows > 0)
+                    .map(|ws| ws.id)
+                    .collect();
                 Task::none()
             }
             Message::HyprlandEvent(event) => {
@@ -335,32 +357,12 @@ impl SkjoldApp {
 
     /// Render the application.
     pub fn view(&self) -> Element<'_, Message> {
-        // Workspace buttons (1-10)
-        let workspace_buttons: Vec<Element<Message>> = (1..=10)
-            .map(|i| {
-                let is_active = i == self.active_workspace_id;
-                let is_occupied = self.occupied_workspaces.contains(&i);
-                let label = format!("{}", i);
-
-                let btn = button(text(label).size(14))
-                    .padding(8)
-                    .on_press(Message::SwitchWorkspace(i));
-
-                if is_active {
-                    btn.style(iced::widget::button::primary).into()
-                } else if is_occupied {
-                    // Occupied but not active - use a distinct style
-                    btn.style(|theme: &Theme, status| {
-                        let mut style = iced::widget::button::secondary(theme, status);
-                        style.text_color = Color::from_rgb(0.9, 0.8, 0.5); // Gruvbox yellow
-                        style
-                    })
-                    .into()
-                } else {
-                    btn.style(iced::widget::button::secondary).into()
-                }
-            })
-            .collect();
+        // Workspace indicator using the workspace widget
+        let workspace_display = workspaces_widget(
+            &self.workspaces,
+            Some(self.active_workspace_id),
+            Message::SwitchWorkspace,
+        );
 
         // Clock display
         let clock_display = text(self.clock.formatted()).size(16);
@@ -385,7 +387,7 @@ impl SkjoldApp {
         // Main row: launcher | workspaces | spacer | cpu | temp | battery | bluetooth | clock | session
         let content = row![
             launcher_btn,
-            row(workspace_buttons).spacing(4),
+            workspace_display,
             Space::new().width(Length::Fill),
             cpu_display,
             thermal_display,

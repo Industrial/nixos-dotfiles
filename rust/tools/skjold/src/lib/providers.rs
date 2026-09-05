@@ -13,7 +13,7 @@ use sysinfo::{Components, System};
 
 use crate::capabilities::{
     BatteryService, BluetoothService, LauncherService, SessionService, SystemInfoService,
-    TimeService,
+    TimeService, WorkspaceService,
 };
 use crate::domain::{
     BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors, Workspace,
@@ -476,6 +476,74 @@ impl LauncherService for LiveLauncherService {
     }
 }
 
+// === Workspace Providers (Wave 4) ===
+
+/// Live implementation of WorkspaceService using Hyprland IPC.
+pub struct LiveWorkspaceService {
+    workspaces: Mutex<Vec<Workspace>>,
+    active_id: Mutex<Option<i32>>,
+}
+
+impl LiveWorkspaceService {
+    pub fn new() -> Self {
+        let service = Self {
+            workspaces: Mutex::new(Vec::new()),
+            active_id: Mutex::new(None),
+        };
+        service.refresh();
+        service
+    }
+}
+
+impl Default for LiveWorkspaceService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WorkspaceService for LiveWorkspaceService {
+    fn get_workspaces(&self) -> Vec<Workspace> {
+        self.workspaces.lock().unwrap().clone()
+    }
+
+    fn get_active(&self) -> Option<Workspace> {
+        let active_id = *self.active_id.lock().unwrap();
+        let workspaces = self.workspaces.lock().unwrap();
+        active_id.and_then(|id| workspaces.iter().find(|w| w.id == id).cloned())
+    }
+
+    fn switch_to(&self, id: i32) {
+        let _ = Dispatch::call(DispatchType::Workspace(WorkspaceIdentifierWithSpecial::Id(
+            id,
+        )));
+        // Refresh after switch
+        self.refresh();
+    }
+
+    fn refresh(&self) {
+        // Get all workspaces
+        if let Ok(ws_list) = Workspaces::get() {
+            let workspaces: Vec<Workspace> = ws_list
+                .iter()
+                .map(|ws| Workspace {
+                    id: ws.id,
+                    name: ws.name.clone(),
+                    monitor: ws.monitor.clone(),
+                    windows: ws.windows as u32,
+                    has_fullscreen: ws.fullscreen,
+                    last_window_title: ws.last_window_title.clone(),
+                })
+                .collect();
+            *self.workspaces.lock().unwrap() = workspaces;
+        }
+
+        // Get active workspace
+        if let Ok(active) = HyprWorkspace::get_active() {
+            *self.active_id.lock().unwrap() = Some(active.id);
+        }
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
@@ -485,6 +553,7 @@ pub fn live_providers() -> (
     Arc<LiveBluetoothService>,
     Arc<LiveSessionService>,
     Arc<LiveLauncherService>,
+    Arc<LiveWorkspaceService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
@@ -494,5 +563,6 @@ pub fn live_providers() -> (
         Arc::new(LiveBluetoothService::new()),
         Arc::new(LiveSessionService),
         Arc::new(LiveLauncherService::new()),
+        Arc::new(LiveWorkspaceService::new()),
     )
 }

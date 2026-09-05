@@ -3,7 +3,7 @@
 //! MVP uses simple traits. Full id_effect integration in Wave 2.
 
 use crate::domain::{
-    BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors,
+    BatteryStatus, BluetoothState, CpuLoad, LauncherEntry, SessionAction, ThermalSensors, Workspace,
 };
 
 /// Capability for time operations.
@@ -69,5 +69,22 @@ pub trait LauncherService: Send + Sync {
     fn launch(&self, index: usize);
 
     /// Refresh the application list.
+    fn refresh(&self);
+}
+
+// === Workspace Capabilities (Wave 4) ===
+
+/// Capability for Hyprland workspace operations.
+pub trait WorkspaceService: Send + Sync {
+    /// Get all workspaces.
+    fn get_workspaces(&self) -> Vec<Workspace>;
+
+    /// Get the currently active workspace.
+    fn get_active(&self) -> Option<Workspace>;
+
+    /// Switch to a workspace by ID.
+    fn switch_to(&self, id: i32);
+
+    /// Refresh workspace state.
     fn refresh(&self);
 }

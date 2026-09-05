@@ -11,7 +11,8 @@ use iced_exwlshell::settings::{LayerShellSettings, Settings};
 
 use skjold::providers::{
     LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveLauncherService,
-    LiveSessionService, LiveSystemInfoService, LiveTimeService, live_providers,
+    LiveSessionService, LiveSystemInfoService, LiveTimeService, LiveWorkspaceService,
+    live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -25,6 +26,7 @@ static BATTERY_SERVICE: OnceLock<Arc<LiveBatteryService>> = OnceLock::new();
 static BLUETOOTH_SERVICE: OnceLock<Arc<LiveBluetoothService>> = OnceLock::new();
 static SESSION_SERVICE: OnceLock<Arc<LiveSessionService>> = OnceLock::new();
 static LAUNCHER_SERVICE: OnceLock<Arc<LiveLauncherService>> = OnceLock::new();
+static WORKSPACE_SERVICE: OnceLock<Arc<LiveWorkspaceService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
     let (
@@ -35,6 +37,7 @@ fn main() -> Result<(), iced_exwlshell::Error> {
         bluetooth_service,
         session_service,
         launcher_service,
+        workspace_service,
     ) = live_providers();
 
     // Store providers for the default function
@@ -59,6 +62,9 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     LAUNCHER_SERVICE
         .set(launcher_service)
         .unwrap_or_else(|_| panic!("LAUNCHER_SERVICE already initialized"));
+    WORKSPACE_SERVICE
+        .set(workspace_service)
+        .unwrap_or_else(|_| panic!("WORKSPACE_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -102,6 +108,10 @@ fn default() -> SkjoldApp {
         .get()
         .expect("LAUNCHER_SERVICE not initialized")
         .clone();
+    let workspace_service = WORKSPACE_SERVICE
+        .get()
+        .expect("WORKSPACE_SERVICE not initialized")
+        .clone();
     SkjoldApp::new_default(
         hyprland,
         time_service,
@@ -110,6 +120,7 @@ fn default() -> SkjoldApp {
         bluetooth_service,
         session_service,
         launcher_service,
+        workspace_service,
     )
 }
 
