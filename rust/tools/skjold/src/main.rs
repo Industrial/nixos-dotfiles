@@ -3,11 +3,16 @@
 //! A native Rust panel for Hyprland built with id_effect and Iced.
 //! Uses layer-shell protocol to render as a proper panel, not a window.
 
+use std::borrow::Cow;
 use std::sync::{Arc, OnceLock};
 
+use iced::Font;
 use iced_exwlshell::layershell::application;
 use iced_exwlshell::reexport::{Anchor, Layer, LayerSize};
 use iced_exwlshell::settings::{LayerShellSettings, Settings};
+
+/// JetBrainsMono Nerd Font - embedded at compile time for icon support
+const NERD_FONT_BYTES: &[u8] = include_bytes!("../assets/JetBrainsMonoNerdFont-Regular.ttf");
 
 use skjold::providers::{
     LiveAudioService, LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc,
@@ -103,6 +108,8 @@ fn main() -> Result<(), iced_exwlshell::Error> {
                 layer: Layer::Top,
                 ..Default::default()
             },
+            fonts: vec![Cow::Borrowed(NERD_FONT_BYTES)],
+            default_font: Font::with_name("JetBrainsMono Nerd Font"),
             ..Default::default()
         })
         .run()
