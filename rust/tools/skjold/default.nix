@@ -15,7 +15,12 @@ rustPlatform.buildRustPackage {
 
   src = ../../.; # Workspace root (contains Cargo.lock)
 
-  cargoLock.lockFile = ../../Cargo.lock;
+  cargoLock = {
+    lockFile = ../../Cargo.lock;
+    outputHashes = {
+      "nixdrv-0.1.0" = "sha256-qIKlfwaZwawwbVddBLsRglpD6LnpZwpTb1b6xcdRN3Q=";
+    };
+  };
 
   buildAndTestSubdir = "tools/skjold";
 
