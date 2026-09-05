@@ -11,8 +11,12 @@ use hyprland::dispatch::{Dispatch, DispatchType, WorkspaceIdentifierWithSpecial}
 use hyprland::shared::{HyprData, HyprDataActive};
 use sysinfo::{Components, System};
 
-use crate::capabilities::{BatteryService, SystemInfoService, TimeService};
-use crate::domain::{BatteryStatus, CpuLoad, ThermalSensors, Workspace};
+use crate::capabilities::{
+    BatteryService, BluetoothService, SessionService, SystemInfoService, TimeService,
+};
+use crate::domain::{
+    BatteryStatus, BluetoothState, CpuLoad, SessionAction, ThermalSensors, Workspace,
+};
 
 /// Live implementation of TimeService.
 pub struct LiveTimeService;
@@ -155,17 +159,196 @@ impl BatteryService for LiveBatteryService {
     }
 }
 
+// === D-Bus Providers (Wave 2) ===
+
+/// Live implementation of BluetoothService using D-Bus (bluez).
+pub struct LiveBluetoothService {
+    state: Mutex<BluetoothState>,
+}
+
+impl LiveBluetoothService {
+    pub fn new() -> Self {
+        let service = Self {
+            state: Mutex::new(BluetoothState::default()),
+        };
+        service.refresh();
+        service
+    }
+
+    fn query_bluetooth_state() -> BluetoothState {
+        // Try to connect to system bus and query bluez
+        let Ok(connection) = zbus::blocking::Connection::system() else {
+            return BluetoothState::default();
+        };
+
+        // Query adapter properties via D-Bus
+        let Some(proxy) = zbus::blocking::fdo::PropertiesProxy::builder(&connection)
+            .destination("org.bluez")
+            .ok()
+            .and_then(|b| b.path("/org/bluez/hci0").ok())
+            .and_then(|b| b.build().ok())
+        else {
+            return BluetoothState::default();
+        };
+
+        let powered = proxy
+            .get(
+                "org.bluez.Adapter1".try_into().unwrap(),
+                "Powered".try_into().unwrap(),
+            )
+            .ok()
+            .and_then(|v| <bool>::try_from(v).ok())
+            .unwrap_or(false);
+
+        // Get connected devices by querying object manager
+        let connected_devices = Self::get_connected_devices(&connection);
+
+        BluetoothState {
+            powered,
+            available: true,
+            connected_devices,
+        }
+    }
+
+    fn get_connected_devices(connection: &zbus::blocking::Connection) -> Vec<String> {
+        let mut devices = Vec::new();
+
+        // Query ObjectManager for all bluez objects
+        let Some(proxy) = zbus::blocking::fdo::ObjectManagerProxy::builder(connection)
+            .destination("org.bluez")
+            .ok()
+            .and_then(|b| b.path("/").ok())
+            .and_then(|b| b.build().ok())
+        else {
+            return devices;
+        };
+
+        let Ok(objects) = proxy.get_managed_objects() else {
+            return devices;
+        };
+
+        // Look for Device1 interfaces with Connected=true
+        for (path, interfaces) in objects {
+            if let Some(device_props) = interfaces.get("org.bluez.Device1") {
+                let connected = device_props
+                    .get("Connected")
+                    .and_then(|v| <bool>::try_from(v.clone()).ok())
+                    .unwrap_or(false);
+
+                if connected {
+                    let name = device_props
+                        .get("Name")
+                        .and_then(|v| <String>::try_from(v.clone()).ok())
+                        .unwrap_or_else(|| path.to_string());
+                    devices.push(name);
+                }
+            }
+        }
+
+        devices
+    }
+}
+
+impl Default for LiveBluetoothService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl BluetoothService for LiveBluetoothService {
+    fn get_state(&self) -> BluetoothState {
+        self.state.lock().unwrap().clone()
+    }
+
+    fn toggle_power(&self) {
+        let current = self.state.lock().unwrap().powered;
+
+        // Toggle via D-Bus
+        if let Ok(connection) = zbus::blocking::Connection::system() {
+            if let Some(proxy) = zbus::blocking::fdo::PropertiesProxy::builder(&connection)
+                .destination("org.bluez")
+                .ok()
+                .and_then(|b| b.path("/org/bluez/hci0").ok())
+                .and_then(|b| b.build().ok())
+            {
+                let _ = proxy.set(
+                    "org.bluez.Adapter1".try_into().unwrap(),
+                    "Powered",
+                    zbus::zvariant::Value::from(!current).try_into().unwrap(),
+                );
+            }
+        }
+
+        // Refresh state after toggle
+        self.refresh();
+    }
+
+    fn refresh(&self) {
+        let new_state = Self::query_bluetooth_state();
+        *self.state.lock().unwrap() = new_state;
+    }
+}
+
+/// Live implementation of SessionService using D-Bus (logind).
+pub struct LiveSessionService;
+
+impl SessionService for LiveSessionService {
+    fn execute(&self, action: SessionAction) {
+        match action {
+            SessionAction::Lock => {
+                // Use loginctl lock-session
+                let _ = std::process::Command::new("loginctl")
+                    .arg("lock-session")
+                    .spawn();
+            }
+            SessionAction::Logout => {
+                // Use hyprctl dispatch exit
+                let _ = std::process::Command::new("hyprctl")
+                    .args(["dispatch", "exit"])
+                    .spawn();
+            }
+            SessionAction::Suspend => {
+                // Use systemctl suspend
+                let _ = std::process::Command::new("systemctl")
+                    .arg("suspend")
+                    .spawn();
+            }
+            SessionAction::Reboot => {
+                // Use systemctl reboot
+                let _ = std::process::Command::new("systemctl")
+                    .arg("reboot")
+                    .spawn();
+            }
+            SessionAction::Shutdown => {
+                // Use systemctl poweroff
+                let _ = std::process::Command::new("systemctl")
+                    .arg("poweroff")
+                    .spawn();
+            }
+        }
+    }
+
+    fn is_available(&self, _action: SessionAction) -> bool {
+        // All actions are available on a standard systemd system
+        true
+    }
+}
+
 /// Create the live provider set.
 pub fn live_providers() -> (
     Arc<LiveHyprlandIpc>,
     Arc<LiveTimeService>,
     Arc<LiveSystemInfoService>,
     Arc<LiveBatteryService>,
+    Arc<LiveBluetoothService>,
+    Arc<LiveSessionService>,
 ) {
     (
         Arc::new(LiveHyprlandIpc),
         Arc::new(LiveTimeService),
         Arc::new(LiveSystemInfoService::new()),
         Arc::new(LiveBatteryService),
+        Arc::new(LiveBluetoothService::new()),
+        Arc::new(LiveSessionService),
     )
 }

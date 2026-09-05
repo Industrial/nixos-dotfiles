@@ -28,6 +28,9 @@ chrono = "0.4"
 # System info
 sysinfo = "0.35"
 
+# D-Bus
+zbus = "5"
+
 # Error handling
 thiserror = "2"
 

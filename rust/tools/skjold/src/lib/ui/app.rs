@@ -10,12 +10,17 @@ use iced::{Color, Element, Length, Subscription, Task, Theme};
 
 use iced_exwlshell::to_layer_message;
 
-use crate::capabilities::{BatteryService, SystemInfoService, TimeService};
-use crate::domain::{BatteryStatus, Clock, CpuLoad, ThermalSensors};
-use crate::providers::{
-    LiveBatteryService, LiveHyprlandIpc, LiveSystemInfoService, LiveTimeService,
+use crate::capabilities::{
+    BatteryService, BluetoothService, SessionService, SystemInfoService, TimeService,
 };
-use crate::ui::widgets::{battery_widget, cpu_widget, thermal_widget};
+use crate::domain::{BatteryStatus, BluetoothState, Clock, CpuLoad, SessionAction, ThermalSensors};
+use crate::providers::{
+    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveSessionService,
+    LiveSystemInfoService, LiveTimeService,
+};
+use crate::ui::widgets::{
+    battery_widget, bluetooth_widget, cpu_widget, session_widget, thermal_widget,
+};
 
 /// Messages for the Skjold application.
 #[to_layer_message]
@@ -33,6 +38,12 @@ pub enum Message {
     WorkspacesRefreshed(Vec<i32>),
     /// Hyprland event received.
     HyprlandEvent(HyprlandEventMsg),
+    /// Toggle Bluetooth power.
+    BluetoothToggle,
+    /// Toggle session menu visibility.
+    SessionMenuToggle,
+    /// Execute a session action.
+    SessionAction(SessionAction),
 }
 
 /// Hyprland events we subscribe to.
@@ -65,6 +76,14 @@ pub struct SkjoldApp {
     thermal: ThermalSensors,
     /// Current battery status.
     battery: BatteryStatus,
+    /// Bluetooth service capability.
+    bluetooth_service: Arc<LiveBluetoothService>,
+    /// Session service capability.
+    session_service: Arc<LiveSessionService>,
+    /// Current Bluetooth state.
+    bluetooth: BluetoothState,
+    /// Whether the session menu is expanded.
+    session_menu_expanded: bool,
 }
 
 impl SkjoldApp {
@@ -74,6 +93,8 @@ impl SkjoldApp {
         time_service: Arc<LiveTimeService>,
         system_info: Arc<LiveSystemInfoService>,
         battery_service: Arc<LiveBatteryService>,
+        bluetooth_service: Arc<LiveBluetoothService>,
+        session_service: Arc<LiveSessionService>,
     ) -> Self {
         let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
         let occupied: HashSet<i32> = hyprland
@@ -91,6 +112,7 @@ impl SkjoldApp {
         let cpu_load = system_info.get_cpu_load();
         let thermal = system_info.get_thermal();
         let battery = battery_service.get_status();
+        let bluetooth = bluetooth_service.get_state();
 
         Self {
             clock: Clock::now(),
@@ -103,6 +125,10 @@ impl SkjoldApp {
             cpu_load,
             thermal,
             battery,
+            bluetooth_service,
+            session_service,
+            bluetooth,
+            session_menu_expanded: false,
         }
     }
 
@@ -112,6 +138,8 @@ impl SkjoldApp {
         time_service: Arc<LiveTimeService>,
         system_info: Arc<LiveSystemInfoService>,
         battery_service: Arc<LiveBatteryService>,
+        bluetooth_service: Arc<LiveBluetoothService>,
+        session_service: Arc<LiveSessionService>,
     ) -> (Self, Task<Message>) {
         // Query initial state
         let initial_ws = hyprland.get_active_workspace().map(|ws| ws.id).unwrap_or(1);
@@ -130,6 +158,7 @@ impl SkjoldApp {
         let cpu_load = system_info.get_cpu_load();
         let thermal = system_info.get_thermal();
         let battery = battery_service.get_status();
+        let bluetooth = bluetooth_service.get_state();
 
         let app = Self {
             clock: Clock::now(),
@@ -142,6 +171,10 @@ impl SkjoldApp {
             cpu_load,
             thermal,
             battery,
+            bluetooth_service,
+            session_service,
+            bluetooth,
+            session_menu_expanded: false,
         };
 
         (app, Task::none())
@@ -166,6 +199,22 @@ impl SkjoldApp {
                 self.cpu_load = self.system_info.get_cpu_load();
                 self.thermal = self.system_info.get_thermal();
                 self.battery = self.battery_service.get_status();
+                self.bluetooth_service.refresh();
+                self.bluetooth = self.bluetooth_service.get_state();
+                Task::none()
+            }
+            Message::BluetoothToggle => {
+                self.bluetooth_service.toggle_power();
+                self.bluetooth = self.bluetooth_service.get_state();
+                Task::none()
+            }
+            Message::SessionMenuToggle => {
+                self.session_menu_expanded = !self.session_menu_expanded;
+                Task::none()
+            }
+            Message::SessionAction(action) => {
+                self.session_service.execute(action);
+                self.session_menu_expanded = false;
                 Task::none()
             }
             Message::SwitchWorkspace(id) => Task::perform(
@@ -247,15 +296,23 @@ impl SkjoldApp {
         let cpu_display = cpu_widget(&self.cpu_load);
         let thermal_display = thermal_widget(&self.thermal);
         let battery_display = battery_widget(&self.battery);
+        let bluetooth_display = bluetooth_widget(&self.bluetooth, Message::BluetoothToggle);
+        let session_display = session_widget(
+            self.session_menu_expanded,
+            Message::SessionMenuToggle,
+            Message::SessionAction,
+        );
 
-        // Main row: workspaces | spacer | cpu | temp | battery | clock
+        // Main row: workspaces | spacer | cpu | temp | battery | bluetooth | clock | session
         let content = row![
             row(workspace_buttons).spacing(4),
             Space::new().width(Length::Fill),
             cpu_display,
             thermal_display,
             battery_display,
+            bluetooth_display,
             clock_display,
+            session_display,
         ]
         .spacing(16)
         .padding(8);

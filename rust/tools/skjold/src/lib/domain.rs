@@ -64,3 +64,61 @@ pub struct ThermalSensors {
     /// CPU temperature in Celsius, if available.
     pub cpu_temp_celsius: Option<f32>,
 }
+
+// === D-Bus Models (Wave 2) ===
+
+/// Bluetooth adapter state.
+#[derive(Debug, Clone, Default)]
+pub struct BluetoothState {
+    /// Whether the adapter is powered on.
+    pub powered: bool,
+    /// Whether the adapter is available.
+    pub available: bool,
+    /// Names of connected devices.
+    pub connected_devices: Vec<String>,
+}
+
+/// Session actions for the power menu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionAction {
+    Lock,
+    Logout,
+    Suspend,
+    Reboot,
+    Shutdown,
+}
+
+impl SessionAction {
+    /// Get all session actions.
+    pub fn all() -> &'static [SessionAction] {
+        &[
+            SessionAction::Lock,
+            SessionAction::Logout,
+            SessionAction::Suspend,
+            SessionAction::Reboot,
+            SessionAction::Shutdown,
+        ]
+    }
+
+    /// Get the display label for this action.
+    pub fn label(&self) -> &'static str {
+        match self {
+            SessionAction::Lock => "Lock",
+            SessionAction::Logout => "Logout",
+            SessionAction::Suspend => "Suspend",
+            SessionAction::Reboot => "Reboot",
+            SessionAction::Shutdown => "Shutdown",
+        }
+    }
+
+    /// Get the icon for this action (Nerd Font).
+    pub fn icon(&self) -> &'static str {
+        match self {
+            SessionAction::Lock => "\u{f033e}",     // nf-md-lock
+            SessionAction::Logout => "\u{f0343}",   // nf-md-logout
+            SessionAction::Suspend => "\u{f04b2}",  // nf-md-sleep
+            SessionAction::Reboot => "\u{f0709}",   // nf-md-restart
+            SessionAction::Shutdown => "\u{f0425}", // nf-md-power
+        }
+    }
+}

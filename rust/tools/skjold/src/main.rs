@@ -10,7 +10,8 @@ use iced_exwlshell::reexport::{Anchor, Layer, LayerSize};
 use iced_exwlshell::settings::{LayerShellSettings, Settings};
 
 use skjold::providers::{
-    LiveBatteryService, LiveHyprlandIpc, LiveSystemInfoService, LiveTimeService, live_providers,
+    LiveBatteryService, LiveBluetoothService, LiveHyprlandIpc, LiveSessionService,
+    LiveSystemInfoService, LiveTimeService, live_providers,
 };
 use skjold::ui::SkjoldApp;
 
@@ -21,9 +22,12 @@ static HYPRLAND: OnceLock<Arc<LiveHyprlandIpc>> = OnceLock::new();
 static TIME_SERVICE: OnceLock<Arc<LiveTimeService>> = OnceLock::new();
 static SYSTEM_INFO: OnceLock<Arc<LiveSystemInfoService>> = OnceLock::new();
 static BATTERY_SERVICE: OnceLock<Arc<LiveBatteryService>> = OnceLock::new();
+static BLUETOOTH_SERVICE: OnceLock<Arc<LiveBluetoothService>> = OnceLock::new();
+static SESSION_SERVICE: OnceLock<Arc<LiveSessionService>> = OnceLock::new();
 
 fn main() -> Result<(), iced_exwlshell::Error> {
-    let (hyprland, time_service, system_info, battery_service) = live_providers();
+    let (hyprland, time_service, system_info, battery_service, bluetooth_service, session_service) =
+        live_providers();
 
     // Store providers for the default function
     HYPRLAND
@@ -38,6 +42,12 @@ fn main() -> Result<(), iced_exwlshell::Error> {
     BATTERY_SERVICE
         .set(battery_service)
         .unwrap_or_else(|_| panic!("BATTERY_SERVICE already initialized"));
+    BLUETOOTH_SERVICE
+        .set(bluetooth_service)
+        .unwrap_or_else(|_| panic!("BLUETOOTH_SERVICE already initialized"));
+    SESSION_SERVICE
+        .set(session_service)
+        .unwrap_or_else(|_| panic!("SESSION_SERVICE already initialized"));
 
     application(default, namespace, update, view)
         .subscription(subscription)
@@ -69,7 +79,22 @@ fn default() -> SkjoldApp {
         .get()
         .expect("BATTERY_SERVICE not initialized")
         .clone();
-    SkjoldApp::new_default(hyprland, time_service, system_info, battery_service)
+    let bluetooth_service = BLUETOOTH_SERVICE
+        .get()
+        .expect("BLUETOOTH_SERVICE not initialized")
+        .clone();
+    let session_service = SESSION_SERVICE
+        .get()
+        .expect("SESSION_SERVICE not initialized")
+        .clone();
+    SkjoldApp::new_default(
+        hyprland,
+        time_service,
+        system_info,
+        battery_service,
+        bluetooth_service,
+        session_service,
+    )
 }
 
 fn namespace() -> String {

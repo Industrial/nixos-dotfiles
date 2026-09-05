@@ -2,7 +2,7 @@
 //!
 //! MVP uses simple traits. Full id_effect integration in Wave 2.
 
-use crate::domain::{BatteryStatus, CpuLoad, ThermalSensors};
+use crate::domain::{BatteryStatus, BluetoothState, CpuLoad, SessionAction, ThermalSensors};
 
 /// Capability for time operations.
 pub trait TimeService: Send + Sync {
@@ -28,4 +28,27 @@ pub trait SystemInfoService: Send + Sync {
 
     /// Refresh system info (call periodically).
     fn refresh(&self);
+}
+
+// === D-Bus Capabilities (Wave 2) ===
+
+/// Capability for Bluetooth operations via D-Bus.
+pub trait BluetoothService: Send + Sync {
+    /// Get current Bluetooth state.
+    fn get_state(&self) -> BluetoothState;
+
+    /// Toggle Bluetooth power.
+    fn toggle_power(&self);
+
+    /// Refresh Bluetooth state.
+    fn refresh(&self);
+}
+
+/// Capability for session operations via D-Bus (logind).
+pub trait SessionService: Send + Sync {
+    /// Execute a session action.
+    fn execute(&self, action: SessionAction);
+
+    /// Check if an action is available.
+    fn is_available(&self, action: SessionAction) -> bool;
 }
