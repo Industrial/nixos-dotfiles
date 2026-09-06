@@ -9,6 +9,7 @@
   ...
 }: {
   imports = [
+    ../features/games/appimage
     ../features/games/awakened-poe-trade
     ../features/games/exiled-exchange-2
     ../features/games/lutris

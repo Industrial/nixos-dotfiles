@@ -3,17 +3,12 @@ let
   assay = import ./../../../common/assay/default.nix;
   src = builtins.readFile ./default.nix;
   lua = builtins.readFile ./hyprland.lua;
-  shell = builtins.readFile ./caelestia/shell.json;
 in
   assay.suite "hyprland" {
     nonEmpty = assay.eq ((builtins.stringLength src) > 0) true;
-    hasCaelestiaGuard = assay.eq (builtins.match ".*hasCaelestia.*" src != null) true;
     installsHyprpolkit = assay.eq (builtins.match ".*hyprpolkitagent.*" src != null) true;
-    luaUsesCaelestia = assay.eq (builtins.match ".*caelestia-shell.*" lua != null) true;
     luaLoadsHostMonitors = assay.eq (builtins.match ".*monitors\\.lua.*" lua != null) true;
     monitorsDrakkar = assay.eq (builtins.match ".*7680x2160.*" (builtins.readFile ./monitors.drakkar.lua) != null) true;
     monitorsHuginn = assay.eq (builtins.match ".*2160x1440.*" (builtins.readFile ./monitors.huginn.lua) != null) true;
     luaHasDwindle = assay.eq (builtins.match ".*layout = \"dwindle\".*" lua != null) true;
-    shellIdleConfigured = assay.eq (builtins.match ".*lockBeforeSleep.*" shell != null) true;
-    shellWallpaperDir = assay.eq (builtins.match ".*Wallpapers.*" shell != null) true;
   }
