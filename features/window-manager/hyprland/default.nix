@@ -16,16 +16,6 @@
   hyprlandPortal = hyprPkgs.xdg-desktop-portal-hyprland;
   # Live config under the git checkout (edit + `hyprctl reload` / restart Hyprland — no rebuild).
   dotfilesHyprDir = "${settings.userdir}/.dotfiles/features/window-manager/hyprland";
-  hasCaelestia = inputs ? caelestia-shell;
-  caelestiaShellPkg =
-    if hasCaelestia
-    then inputs.caelestia-shell.packages.${system}.with-cli
-    else null;
-  # with-cli wraps the shell but does not put `caelestia` on system PATH.
-  caelestiaCliPkg =
-    if hasCaelestia
-    then inputs.caelestia-shell.inputs.caelestia-cli.packages.${system}.default
-    else null;
   monitorProfile = pkgs.writeShellScriptBin "hypr-monitor-profile" (
     let
       raw = builtins.readFile ./hypr-monitor-profile.sh;
@@ -37,26 +27,15 @@
     in
       body
   );
-  nestedCaelestiaLauncher = pkgs.writeShellScriptBin "nested-caelestia-hyprland" ''
+  # Nested Hyprland session for testing ashell bar
+  nestedAshellLauncher = pkgs.writeShellScriptBin "nested-ashell-hyprland" ''
     set -euo pipefail
     if [ -z "''${WAYLAND_DISPLAY:-}" ]; then
-      echo "nested-caelestia-hyprland: need a parent Wayland session" >&2
+      echo "nested-ashell-hyprland: need a parent Wayland session" >&2
       exit 1
     fi
     export XDG_CURRENT_DESKTOP=Hyprland
-    exec ${hyprlandPkg}/bin/Hyprland --config ${dotfilesHyprDir}/hyprland-nested-caelestia.lua
-  '';
-  # Skjold panel (custom Hyprland shell)
-  skjoldPkg = pkgs.callPackage ../../../rust/tools/skjold {};
-  # Nested Hyprland session for testing Skjold panel
-  nestedHyprlandLauncher = pkgs.writeShellScriptBin "nested-hyprland" ''
-    set -euo pipefail
-    if [ -z "''${WAYLAND_DISPLAY:-}" ]; then
-      echo "nested-hyprland: need a parent Wayland session" >&2
-      exit 1
-    fi
-    export XDG_CURRENT_DESKTOP=Hyprland
-    exec ${hyprlandPkg}/bin/Hyprland --config ${dotfilesHyprDir}/hyprland-nested-skjold.lua
+    exec ${hyprlandPkg}/bin/Hyprland --config ${dotfilesHyprDir}/hyprland-nested-ashell.lua
   '';
 in
   assert lib.assertMsg (inputs ? hyprland) ''
@@ -108,12 +87,6 @@ in
           fi
 
           ln -sfn "${dotfilesHyprDir}/xdph.conf" /home/${settings.username}/.config/hypr/xdph.conf
-          if [ -f "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" ]; then
-            ln -sfn "${dotfilesHyprDir}/hyprland-nested-caelestia.lua" /home/${settings.username}/.config/hypr/hyprland-nested-caelestia.lua
-          fi
-          if [ -f "${dotfilesHyprDir}/hyprland-nested-skjold.lua" ]; then
-            ln -sfn "${dotfilesHyprDir}/hyprland-nested-skjold.lua" /home/${settings.username}/.config/hypr/hyprland-nested-skjold.lua
-          fi
 
           monitors_src="${dotfilesHyprDir}/monitors.${settings.hostname}.lua"
           if [ ! -f "''$monitors_src" ]; then
@@ -121,18 +94,20 @@ in
           fi
           ln -sfn "''$monitors_src" /home/${settings.username}/.config/hypr/monitors.lua
 
-          # Caelestia: managed shell.json + wallpaper library symlink for the picker
-          mkdir -p /home/${settings.username}/.config/caelestia
-          mkdir -p /home/${settings.username}/.local/share/applications
-          mkdir -p /home/${settings.username}/Pictures
-          if [ -f "${dotfilesHyprDir}/caelestia/shell.json" ]; then
-            ln -sfn "${dotfilesHyprDir}/caelestia/shell.json" /home/${settings.username}/.config/caelestia/shell.json
+          # ashell config
+          mkdir -p /home/${settings.username}/.config/ashell
+          if [ -f "${dotfilesHyprDir}/ashell/config.toml" ]; then
+            ln -sfn "${dotfilesHyprDir}/ashell/config.toml" /home/${settings.username}/.config/ashell/config.toml
           fi
-          if [ -f "${dotfilesHyprDir}/caelestia/caelestia-settings.desktop" ]; then
-            ln -sfn "${dotfilesHyprDir}/caelestia/caelestia-settings.desktop" /home/${settings.username}/.local/share/applications/caelestia-settings.desktop
+
+          # hyprlock config
+          if [ -f "${dotfilesHyprDir}/hyprlock.conf" ]; then
+            ln -sfn "${dotfilesHyprDir}/hyprlock.conf" /home/${settings.username}/.config/hypr/hyprlock.conf
           fi
-          if [ -d /data/Images/Wallpapers ]; then
-            ln -sfn /data/Images/Wallpapers /home/${settings.username}/Pictures/Wallpapers
+
+          # hyprtoolkit config (for hyprlauncher theming)
+          if [ -f "${dotfilesHyprDir}/hyprtoolkit.conf" ]; then
+            ln -sfn "${dotfilesHyprDir}/hyprtoolkit.conf" /home/${settings.username}/.config/hypr/hyprtoolkit.conf
           fi
         '';
       };
@@ -144,24 +119,12 @@ in
           source = ./hyprland.lua;
           mode = "0644";
         };
-        "xdg/hypr/hyprland-nested-caelestia.lua" = {
-          source = ./hyprland-nested-caelestia.lua;
-          mode = "0644";
-        };
-        "xdg/hypr/hyprland-nested-skjold.lua" = {
-          source = ./hyprland-nested-skjold.lua;
-          mode = "0644";
-        };
         "xdg/hypr/hyprland.conf.hyprlang" = {
           source = ./hyprland.conf.hyprlang;
           mode = "0644";
         };
         "xdg/hypr/hyprsunset.conf" = {
           source = ./hyprsunset.conf;
-          mode = "0644";
-        };
-        "xdg/caelestia/shell.json" = {
-          source = ./caelestia/shell.json;
           mode = "0644";
         };
         "xdg/hypr/xdph.conf" = {
@@ -177,59 +140,55 @@ in
         WLR_NO_HARDWARE_CURSORS = "1";
       };
 
-      systemPackages = with pkgs;
-        [
-          # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
-          hyprlandPkg
-          # Cursor theme manager
-          hyprcursor
-          # Blue-light filter / Night light
-          hyprsunset
+      systemPackages = with pkgs; [
+        # Hyprland (pinned to inputs.hyprland for 0.55+ / Lua configs)
+        hyprlandPkg
+        # Cursor theme manager
+        hyprcursor
+        # Blue-light filter / Night light
+        hyprsunset
 
-          # WiFi/Network GUI (kept for settings apps; tray via Caelestia)
-          networkmanagerapplet
-          networkmanager_dmenu
-          blueman
-          pavucontrol
+        # WiFi/Network GUI (kept for settings apps; ashell has tray)
+        networkmanagerapplet
+        networkmanager_dmenu
+        blueman
+        pavucontrol
 
-          # Polkit (Hyprland-native)
-          hyprpolkitagent
+        # Polkit (Hyprland-native)
+        hyprpolkitagent
 
-          # Caelestia CLI / desktop utilities
-          grim
-          slurp
-          swappy
-          cliphist
-          wl-clipboard
-          fuzzel
-          gpu-screen-recorder
+        # Screenshot / clipboard utilities
+        grim
+        slurp
+        swappy
+        cliphist
+        wl-clipboard
+        fuzzel
+        gpu-screen-recorder
 
-          # Qt Wayland
-          qt5.qtwayland
-          qt6.qtwayland
+        # Wallpaper
+        awww
 
-          # System utilities
-          brightnessctl
-          wireplumber
-          playerctl
+        # Qt Wayland
+        qt5.qtwayland
+        qt6.qtwayland
 
-          nautilus
-          alacritty
-          gnome-keyring
+        # System utilities
+        brightnessctl
+        wireplumber
+        playerctl
 
-          monitorProfile
+        nautilus
+        alacritty
+        gnome-keyring
 
-          # Skjold panel (nested testing)
-          skjoldPkg
-          nestedHyprlandLauncher
-        ]
-        ++ lib.optionals hasCaelestia [
-          caelestiaShellPkg
-          caelestiaCliPkg
-          nestedCaelestiaLauncher
-          material-symbols
-          nerd-fonts.caskaydia-cove
-        ];
+        monitorProfile
+
+        # ashell bar + hyprlauncher
+        ashell
+        hyprlauncher
+        nestedAshellLauncher
+      ];
     };
 
     xdg = {
@@ -248,6 +207,24 @@ in
     security = {
       polkit = {
         enable = true;
+      };
+    };
+
+    # Wallpaper rotation timer (15 minutes)
+    systemd.user.services.awww-random = {
+      description = "Random wallpaper switcher";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = "${dotfilesHyprDir}/awww-random.sh";
+      };
+    };
+
+    systemd.user.timers.awww-random = {
+      description = "Random wallpaper every 15 minutes";
+      wantedBy = ["timers.target"];
+      timerConfig = {
+        OnBootSec = "15min";
+        OnUnitActiveSec = "15min";
       };
     };
   }

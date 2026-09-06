@@ -1,7 +1,6 @@
--- Nested Hyprland session for evaluating Caelestia Shell.
--- Launch via: nested-caelestia-hyprland
+-- Nested Hyprland session for evaluating ashell bar.
+-- Launch via: nested-ashell-hyprland
 -- Uses ALT binds so they do not collide with the outer SUPER session.
--- Does NOT start ashell / wofi / mako.
 
 -----------------
 ---- MONITOR ----
@@ -26,18 +25,18 @@ hl.config({
     sensitivity = 0,
   },
   general = {
-    gaps_in = 4,
-    gaps_out = 8,
-    border_size = 2,
+    gaps_in = 3,
+    gaps_out = 3,
+    border_size = 1,
     col = {
-      active_border = "rgba(9ccbfbee)",
-      inactive_border = "rgba(595959aa)",
+      active_border = "rgba(89b4faee)",
+      inactive_border = "rgba(45475aaa)",
     },
     layout = "dwindle",
     allow_tearing = false,
   },
   decoration = {
-    rounding = 8,
+    rounding = 0,
     blur = {
       enabled = true,
       size = 3,
@@ -57,23 +56,16 @@ hl.config({
 })
 
 -----------------
----- ENVIRONMENT ----
------------------
-
-hl.env("CAELESTIA_WALLPAPERS_DIR", "/data/Images/Wallpapers")
-
------------------
 ---- AUTOSTART ----
 -----------------
 
 hl.on("hyprland.start", function()
-  -- `caelestia` CLI is not on system PATH with with-cli alone; use the shell
-  -- binary (on PATH) and log failures for diagnosis.
-  hl.exec_cmd("bash -lc 'caelestia-shell >>/tmp/nested-caelestia-shell.log 2>&1'")
+  -- Launch ashell bar
+  hl.exec_cmd("ashell >>/tmp/nested-ashell.log 2>&1")
 end)
 
--- Manual start if autostart fails/races
-hl.bind("ALT + SHIFT + C", hl.dsp.exec_cmd("bash -lc 'caelestia-shell >>/tmp/nested-caelestia-shell.log 2>&1'"))
+-- Manual restart if needed (ALT+SHIFT+A)
+hl.bind("ALT + SHIFT + A", hl.dsp.exec_cmd("pkill -x ashell || true; sleep 0.2; ashell >>/tmp/nested-ashell.log 2>&1"))
 
 ---------------------
 ---- KEYBINDINGS ----
@@ -87,8 +79,11 @@ hl.bind("ALT + SHIFT + R", hl.dsp.exec_cmd("hyprctl reload"))
 hl.bind("ALT + Q", hl.dsp.window.close())
 hl.bind("ALT + Space", hl.dsp.window.float({ action = "toggle" }))
 
--- Terminal (alacritty already on PATH from parent/system packages)
+-- Terminal
 hl.bind("ALT + Return", hl.dsp.exec_cmd("alacritty"))
+
+-- App launcher (anyrun: Rust, GTK4, themeable, icons)
+hl.bind("ALT + P", hl.dsp.exec_cmd("anyrun"))
 
 -- Focus
 hl.bind("ALT + H", hl.dsp.focus({ direction = "l" }))

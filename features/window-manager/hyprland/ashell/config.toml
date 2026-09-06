@@ -1,0 +1,22 @@
+# ashell configuration - Gruvbox Dark Hard theme
+# Font must match exact family name from: fc-list | cut -d: -f2 | sort -u
+
+[appearance]
+font_name = "IosevkaTerm Nerd Font Mono"
+
+# Gruvbox Dark Hard palette
+primary_color = "#fabd2f"
+success_color = "#b8bb26"
+warning_color = "#fe8019"
+danger_color = "#fb4934"
+text_color = "#ebdbb2"
+workspace_colors = ["#fabd2f", "#b8bb26", "#83a598", "#d3869b"]
+
+[appearance.background_color]
+base = "#1d2021"
+weak = "#282828"
+strong = "#3c3836"
+text = "#ebdbb2"
+
+[appearance.bar]
+surface = "transparent"
