@@ -43,8 +43,12 @@
           enable = true;
         };
 
+        # Note: hmts disabled — hmts.nvim 1.3.0 is incompatible with the
+        # Neovim 0.12 treesitter query API (match tables now map captures to
+        # node lists), crashing with "attempt to call method 'parent'" on
+        # every *.nix buffer.
         hmts = {
-          enable = true;
+          enable = false;
         };
         rainbow-delimiters = {
           enable = true;
@@ -527,10 +531,10 @@
     vscode-langservers-extracted
 
     # Python tooling
-    python311Packages.autopep8
-    python311Packages.black
-    python311Packages.flake8
-    python311Packages.isort
+    python3Packages.autopep8
+    python3Packages.black
+    python3Packages.flake8
+    python3Packages.isort
 
     # Bash Linter
     shellcheck
@@ -542,5 +546,8 @@
 
     # Markdown linter
     vale
+
+    # Required by nvim-treesitter (main branch) for parser management
+    tree-sitter
   ];
 }
