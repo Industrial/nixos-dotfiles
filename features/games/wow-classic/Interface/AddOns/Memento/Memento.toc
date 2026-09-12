@@ -1,0 +1,30 @@
+## Interface: 120105, 120100, 50504, 20506, 11509
+## Title: Memento
+## Author: Arcane Wizard | created by diomsg
+
+## Version: v2.26
+## IconTexture: Interface\AddOns\Memento\assets\icon.blp
+## LoadOnDemand: 0
+## DefaultState: enabled
+
+## Dependencies: ArcaneWizardLibrary
+
+## Notes: This addon automatically takes screenshots of meaningful gameplay events and personal milestones.
+## Notes-deDE: Dieses Addon macht automatisch Screenshots von bedeutenden Spielereignissen und persönlichen Meilensteinen.
+
+## LoadSavedVariablesFirst: 1
+## SavedVariables: Memento_Options_v5
+## SavedVariablesPerCharacter: Memento_DataBossKill
+
+## AddonCompartmentFuncOnEnter: Memento_CompartmentOnEnter
+## AddonCompartmentFuncOnLeave: Memento_CompartmentOnLeave
+## AddonCompartmentFunc: Memento_CompartmentOnClick
+
+## X-BuildDate: 2026-09-06
+## X-E-Mail: feedback@wow-addon.dev
+## X-Github: https://github.com/wow-addon-dev/Memento
+## X-Curseforge: https://www.curseforge.com/wow/addons/memento
+## X-Wago: https://addons.wago.io/addons/memento
+
+Memento.xml
+Memento.lua

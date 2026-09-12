@@ -1,0 +1,20 @@
+## Interface: 11509
+
+## Title: Leatrix Maps
+## Notes: curseforge.com/wow/addons/leatrix-maps
+
+## Version: 1.15.154
+## Author: Leatrix
+## SavedVariables: LeaMapsDB
+## LoadSavedVariablesFirst: true
+
+## IconTexture: Interface\HELPFRAME\HelpIcon-Bug
+## X-Curse-Project-ID: 298842
+## OptionalDeps: ElvUI
+
+Leatrix_Maps_Library.lua
+Leatrix_Maps_Locale.lua
+Leatrix_Maps.xml
+Leatrix_Maps_Icons.lua
+Leatrix_Maps_Reveal.lua
+Leatrix_Maps.lua

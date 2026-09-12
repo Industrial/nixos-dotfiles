@@ -1,0 +1,392 @@
+local _, addonTbl = ...
+local L = addonTbl.API:NewLocale("BigWigs: Common", "enUS")
+
+-- Prototype.lua common words
+L.you = "%s on YOU"
+L.you_icon = "%s on |T13700%d:0|tYOU"
+L.underyou = "%s under YOU"
+L.aboveyou = "%s above YOU"
+L.other = "%s: %s"
+L.onboss = "%s on BOSS"
+L.buff_boss = "Buff on BOSS: %s"
+L.buff_other = "Buff on %s: %s"
+L.magic_buff_boss = "Magic buff on BOSS: %s" -- Magic buff on BOSS: SPELL_NAME
+L.magic_buff_other = "Magic buff on %s: %s" -- Magic buff on NPC_NAME: SPELL_NAME
+L.on = "%s on %s"
+L.stack = "%dx %s on %s" -- "5x SPELL_NAME on PLAYER_OR_NPC" showing how many stacks of a buff/debuff are on a player or NPC
+L.stackyou = "%dx %s on YOU" -- "5x SPELL_NAME on YOU" showing how many stacks of a buff/debuff are on you
+L.stackboss = "%dx %s on BOSS" -- "5x SPELL_NAME on BOSS" showing how many stacks of a buff/debuff are on the boss
+L.stack_gained = "Gained %dx" -- "Gained 5x" for situations where we show how many stacks of a buff were gained since last time a message showed
+L.cast = "<Cast: %s>"
+L.casting = "Casting %s"
+L.soon = "%s soon"
+L.count = "%s (%d)"
+L.count_amount = "%s (%d/%d)"
+L.count_icon = "%s (%d|T13700%d:0|t)"
+L.count_rticon = "%s (%d{rt%d})"
+L.rticon = "%s ({rt%d})"
+L.near = "%s near YOU"
+L.on_group = "%s on GROUP"
+L.boss = "BOSS"
+L.plus = "%s + %s" -- Spell 1 + Spell 2
+L.extra = "%s (%s)" -- SPELL_NAME (short spell name or extra information)
+
+L.phase = "Phase %d"
+L.stage = "Stage %d"
+L.wave = "Wave %d" -- e.g. "Wave 1" (Waves of adds)
+L.wave_count = "Wave %d of %d" -- Wave 1 of 3 (Usually waves of adds)
+L.normal = "Normal mode"
+L.heroic = "Heroic mode"
+L.mythic = "Mythic mode"
+L.hard = "Hard mode"
+L.active = "Active" -- When a boss becomes active, after speech finishes
+L.ready = "Ready" -- When a player is ready to do something
+L.dead = "Dead" -- When a player is dead
+L.general = "General" -- General settings, i.e. things that apply to normal, heroic and mythic mode.
+L.health = "Health" -- The health of an NPC
+L.health_percent = "%d%% Health" -- "10% Health" The health percentage of an NPC
+L.energy = "Energy"
+L.energy_percent = "%d%% Energy" -- "80% Energy" The energy percentage of an NPC
+L.door_open = "Door open" -- When a door is open, usually after a speech from an NPC
+L.gate_open = "Gate open" -- When a gate is open, usually after a speech from an NPC
+L.threat = "Threat"
+
+L.remaining = "%d remaining" -- 5 remaining
+L.duration = "%s for %s sec" -- Spell for 10 seconds
+L.over = "%s over" -- Spell over
+L.removed = "%s removed" -- Spell removed
+L.removed_from = "%s removed from %s" -- Spell removed from Player
+L.removed_by = "%s removed by %s" -- Spell removed by Player
+L.removed_after = "%s removed after %.1fs" -- "Spell removed after 1.1s" (s = seconds)
+L.incoming = "%s incoming" -- Spell incoming
+L.interrupted = "%s interrupted" -- Spell interrupted
+L.interrupted_by = "%s interrupted by %s" -- Spell interrupted by Player
+L.interruptible = "Interruptible" -- when a spell is interruptible
+L.no = "No %s" -- No Spell
+L.intermission = "Intermission"
+L.intermission_over = "Intermission over"
+L.percent = "%d%% - %s" -- 20% - Spell
+L.cancelled = "%s cancelled" -- Spell cancelled
+L.you_die = "You die" -- You will die
+L.you_die_sec = "You die in %d sec" -- "You die in 15 sec" (sec = seconds)
+L.next_ability = "Next ability" -- We don't know what ability will be next, we only know when it will happen (showing a bar)
+L.boss_landing = "%s is landing" -- "NPC_NAME is landing" Used when a flying NPC/dragon/boss is landing
+L.landing = "Landing" -- Used when a flying NPC/dragon/boss is landing
+L.flying_available = "You can fly now"
+L.bosses_too_close = "Bosses are too close" -- When 2 or more bosses are too close to each other, buffing each other with a shield, extra damage, etc.
+L.keep_moving = "Keep moving" -- An ability that forces you to keep moving or you will take damage
+L.stand_still = "Stand still" -- An ability that forces you to stand still or you will take damage
+L.safe_to_stop = "Safe to stop" -- When an ability that forces you to keep moving fades from you, allowing you to stop moving
+L.safe_to_move = "Safe to move" -- When an ability to forces you to stand still fades from you, allowing you to move again
+L.safe = "Safe" -- You are safe from a bad ability
+L.unsafe = "Unsafe" -- You are unsafe (in danger) of a bad ability
+
+-- Add related
+L.add_spawned = "Add spawned" -- singular
+L.adds_spawned = "Adds spawned" -- plural
+L.adds_spawned_count = "%d |4add:adds; spawned" -- 1 add spawned / 2 adds spawned
+L.add_spawning = "Add spawning" -- singular
+L.adds_spawning = "Adds spawning" -- plural
+L.add_incoming = "Add incoming" -- singular
+L.adds_incoming = "Adds incoming" -- plural
+L.spawned = "%s spawned"
+L.spawning = "%s spawning"
+L.next_add = "Next Add"
+L.add_killed = "Add killed (%d/%d)"
+L.add_remaining = "Add killed, %d remaining"
+L.add = "Add"
+L.adds = "Adds"
+L.big_add = "Big Add" -- singular
+L.big_adds = "Big Adds" -- plural
+L.small_add = "Small Add" -- singular
+L.small_adds = "Small Adds" -- plural
+L.eat_adds = "Eat Adds" -- When a boss is going to eat/consume any adds remaining to empower/heal itself. Usually this is a timer. You have to kill all adds in X seconds or they will be eaten.
+
+-- Mob related
+L.killed = "%s killed"
+L.mob_killed = "%s killed (%d/%d)"
+L.mob_remaining = "%s killed, %d remaining"
+
+-- NPCs for follower dungeons
+L.garrick = "Captain Garrick" -- AI paladin tank (NPC 209057)
+L.garrick_short = "*Garrick"
+L.meredy = "Meredy Huntswell" -- AI mage dps (NPC 209059)
+L.meredy_short = "*Meredy"
+L.shuja = "Shuja Grimaxe" -- AI shaman dps (NPC 214390)
+L.shuja_short = "*Shuja"
+L.crenna = "Crenna Earth-Daughter" -- AI druid healer (NPC 209072)
+L.crenna_short = "*Crenna"
+L.austin = "Austin Huxworth" -- AI hunter dps (NPC 209065)
+L.austin_short = "*Austin"
+L.breka = "Warlord Breka Grimaxe" -- AI warrior tank (NPC 215517)
+L.breka_short = "*Breka"
+L.henry = "Henry Garrick" -- AI priest healer (NPC 215011)
+L.henry_short = "*Henry"
+
+-- Localizers note:
+-- The default mod:Berserk(600) uses spell ID 26662 to get the Berserk name
+L.custom_start = "%s engaged - %s in %d min"
+L.custom_start_s = "%s engaged - %s in %d sec"
+L.custom_end = "%s goes %s"
+L.custom_min = "%s in %d min"
+L.custom_sec = "%s in %d sec"
+
+L.focus_only = "|cffff0000Focus target alerts only.|r "
+L.trash = "Trash"
+L.affixes = "Affixes" -- Seasonal affixes for raids and mythic+ dungeons
+
+-- GUI boss dropdown for cast counters
+-- Cast counters are the numbers you see next to spell names that keep increasing e.g. "Bad Spell (3)" <-- that number
+-- This dropdown option will let you choose when that number should reset back to 1
+L.counter_reset_name = "%s cast counter" -- SPELL_NAME cast counter
+L.counter_reset_desc = "Choose when to reset the counter."
+L.reset_casts = "Reset every %d casts" -- Reset every 3 casts
+L.reset_stages = "Reset on stage change"
+L.reset_casts_and_stages = "Reset every %d casts and on stage change"
+L.reset_never = "Never reset"
+
+-- Common raid marking locale
+L.marker = "%s marker"
+L.marker_player_desc = "Mark players affected by '%s' with %s, requires promoted or leader." -- Mark players affected by 'SPELL_NAME' with SKULL_ICON
+L.marker_npc_desc = "Mark %s with %s, requires promoted or leader." -- Mark NPC_NAME with SKULL_ICON
+L.marker_npc_aura_desc = "Mark NPCs affected by '%s' with %s, requires promoted or leader." -- Mark NPCs affected by 'SPELL_NAME' with SKULL_ICON
+L.disabled = "Disabled"
+L.none = "None"
+L.markers = "Markers" -- Plural of marker
+
+-- Ability where two players have to move close to each other
+L.link = "Link"
+L.link_with = "Linked with %s"
+L.link_with_icon = "Linked with |T13700%d:0|t%s"
+L.link_with_rticon = "{rt%d}Linked with %s"
+L.link_both = "%s + %s are linked"
+L.link_both_icon = "|T13700%d:0|t%s + |T13700%d:0|t%s are linked"
+L.link_removed = "Link removed"
+L.link_say_option_name = "Repeating 'Linked' say messages"
+L.link_say_option_desc = "Repeating say messages in chat stating who you are linked with."
+
+-- Abbreviated numbers
+L.amount_one = "%dB" -- Billions 1,000,000,000
+L.amount_two = "%dM" -- Millions 1,000,000
+L.amount_three = "%dK" -- Thousands 1,000
+L.seconds = "%.1fs" -- 1.1 seconds
+
+-- Directions
+L.top = "Top"
+L.top_right = "Top Right"
+L.top_left = "Top Left"
+L.up = "Up"
+L.middle = "Middle"
+L.down = "Down"
+L.bottom = "Bottom"
+L.bottom_right = "Bottom Right"
+L.bottom_left = "Bottom Left"
+L.left = "Left"
+L.right = "Right"
+L.north = "North"
+L.north_east = "North-East"
+L.east = "East" -- I thought you said weast!
+L.south_east = "South-East"
+L.south = "South"
+L.south_west = "South-West"
+L.west = "West"
+L.north_west = "North-West"
+
+-- Sizes
+L.small = "Small"
+L.medium = "Medium"
+L.large = "Large"
+
+-- Schools
+L.fire = "Fire"
+L.frost = "Frost"
+L.shadow = "Shadow"
+L.nature = "Nature"
+L.arcane = "Arcane"
+
+-- Autotalk
+L.autotalk = "Automatic NPC interaction"
+L.autotalk_boss_desc = "Automatically select the NPC dialog options that cause the boss encounter to begin."
+L.autotalk_generic_desc = "Automatically select the NPC dialog options that cause you to progress to the next stage of the dungeon."
+L.autotalk_notice = "Automatically interacting with NPC %s."
+
+-- GUI notes
+L.intermissionOnly = "Intermission Only" -- A note to explain that a specific ability only happens during the intermission stage of a boss fight
+L.stage1Only = "Stage 1 Only" -- A note to explain that a specific ability only happens during stage 1 of a boss fight
+L.stage2Only = "Stage 2 Only"
+L.stage3Only = "Stage 3 Only"
+
+-- GUI notes for renames
+L.generalNote = "This is the text that will generally be used"
+L.timerNote = "This text will be used for timers"
+L.castTimerNote = "This text will only be used for cast timers"
+L.messageCastOverNote = "This text will be used for showing a message when the cast ends"
+L.messageCastStartNote = "This text will be used for showing a message when the cast starts"
+L.messageBeforeCastStartNote = "This text will be used for showing a message before a cast starts"
+L.messageDuringCastNote = "This text will be used for showing messages during the cast"
+L.messageNote = "This text will be used for messages"
+L.messageOnYouNote = "The message shown when this ability is on you"
+L.messageOnOtherNote = "The message shown when this ability is on other people"
+L.messageTauntNowNote = "The message shown when you're a tank and you need to taunt"
+L.messageSpecificHealth = "The message shown when the boss is at %d%% health"
+L.timerOnYouNote = "The text shown in the timer when this ability is on you"
+L.mythicOnlyNote = "This text will be used on Mythic only"
+L.otherDifficultiesNote = "This text will be used on all other difficulties"
+
+-- GUI notes for debuffs
+L.debuffFailureNote = "This debuff will apply to you if you fail"
+L.debuffFailureMoveFromExplosionNote = "This debuff will apply to you if you fail to move away from the explosion"
+L.debuffFailureInterruptNote = "This debuff will apply to you if you fail to interrupt the cast of |cFFFFFFFF%s|r" -- This debuff will apply to you if you fail to interrupt the cast of SPELL_NAME
+L.debuffFailureMoveFromCastNote = "This debuff will apply to you if you fail to move out of the |cFFFFFFFF%s|r cast" -- This debuff will apply to you if you fail to move out of the SPELL_NAME cast
+L.debuffFailureGroupSoakNote = "This debuff will apply to you if your group fails to soak |cFFFFFFFF%s|r" -- This debuff will apply to you if your group fails to soak SPELL_NAME
+L.debuffFailureSafeZoneNote = "This debuff will apply to you if you fail to stand in the safe zone"
+L.debuffHitByOtherPlayerNote = "This debuff will apply to you if you are hit by another player's |cFFFFFFFF%s|r" -- This debuff will apply to you if you are hit by another player's SPELL_NAME
+L.debuffTargetedNote = "This debuff will apply to you if you are being targeted for |cFFFFFFFF%s|r" -- This debuff will apply to you if you are being targeted for SPELL_NAME
+L.preDebuffNote = "This is the pre-debuff, before the main debuff applies to you"
+L.mainDebuffNote = "This is the main debuff that applies to you"
+L.postDebuffNote = "This debuff will apply to you after |cFFFFFFFF%s|r expires" -- This debuff will apply to you after OTHER_DEBUFF expires
+L.debuffUnderYouNote = "This debuff will apply to you if you are standing in a bad place" -- Usually when a player is standing in a pool of something bad, a debuff will apply to them
+L.debuffDotAfterCastNote = "This debuff is a damage over time effect after the |cFFFFFFFF%s|r cast" -- This debuff is a damage over time effect after the SPELL_NAME cast
+L.debuffPossibleAfterCastNote = "This debuff might apply to you after the |cFFFFFFFF%s|r cast" -- This debuff might apply to you after the SPELL_NAME cast
+L.debuffTankAfterCastNote = "This debuff will apply to the tank after the |cFFFFFFFF%s|r cast" -- This debuff will apply to the tank after the SPELL_NAME cast
+L.debuffGroupAfterCastNote = "This debuff will apply to the entire group after the |cFFFFFFFF%s|r cast" -- This debuff will apply to the entire group after the SPELL_NAME cast
+L.debuffWalkIntoObjectNote = "This debuff will apply to you if you purposely walk into the |cFFFFFFFF%s|r" -- This debuff will apply to you if you purposely walk into the OBJECT_NAME (e.g. trap, mine, bomb)
+L.debuffHitByCastNote = "This debuff will apply to you if you are hit by the the |cFFFFFFFF%s|r cast" -- This debuff will apply to you if you are hit by the the SPELL_NAME cast
+L.debuffAddsCast = "This debuff is applied to you by |cFFFFFFFF%s|r" -- This debuff is applied to you by NPC_NAME
+L.debuffPickupNote = "This debuff will apply to you if you pick up the |cFFFFFFFF%s|r" -- This debuff will apply to you if you pick up the OBJECT_NAME
+
+-- Common ability name replacements
+L.laser = "Laser" -- Used for abilities that act like a laser. Usually from the boss to a player, or, from the boss to a specific area
+L.lasers = "Lasers" -- Plural of L.lasers
+L.beam = "Beam" -- Similar to "Laser" (a beam from boss to player/boss to area) but can be used to better describe certain abilities that don't look like a Laser
+L.beams = "Beams" -- Plural of L.beam
+L.bomb = "Bomb" -- Used for debuffs that make players explode
+L.bombs = "Bombs" -- Plural of L.bomb
+L.explosion = "Explosion" -- When the explosion from a bomb-like ability will occur
+L.explosions = "Explosions" -- Plural of L.explosion
+L.knockback = "Knockback" -- Used when an ability knocks players away from a certain point, like a "smash" type ability that knocks you back 10 meters
+L.knockbacks = "Knockbacks" -- Plural of L.knockback
+L.pushback = "Pushback" -- Used when an ability slowly and continually pushes a player away, like winds gradually pushing you away over time
+L.traps = "Traps" -- Used for abilities that act like traps on the floor e.g. move into it and something bad happens like you die, or are rooted, etc.
+L.meteor = "Meteor" -- This one will probably only ever be used for actual meteors
+L.teleport = "Teleport" -- A boss/add/etc teleported somewhere
+L.breath = "Breath" -- When a boss breathes fire/frost/etc on to a player or the raid e.g. a Dragon breathing fire on everyone
+L.roar = "Roar" -- When a boss opens their mouth to let out a loud roar, sometimes used to inflict damage on the raid
+L.leap = "Leap" -- When a boss leaps through the air from one location to another location, or from a location to a player, etc
+L.charge = "Charge" -- When a boss select a new target and charges at it quickly, in the same way someone playing a warrior can charge at a target
+L.full_energy = "Full Energy" -- When a boss reaches full/maximum energy, usually the boss will cast something big and powerful when this happens
+L.weakened = "Weakened" -- When a boss becomes weakened and sometimes takes extra damage, usually the "hit all your cooldowns" part of the fight
+L.immune = "Immune" -- When a boss becomes immune to all damage and you can no longer hurt it
+L.stunned = "Stunned" -- When a boss becomes stunned and cannot cast abilities or move
+L.pool = "Pool" -- A pool or puddle on the ground, usually something bad that you should avoid standing in
+L.pools = "Pools" -- Plural of L.pool
+L.totem = "Totem" -- A totem, usually summoned by a boss, the same thing that shamans summon
+L.totems = "Totems" -- Plural of L.totem
+L.portal = "Portal" -- A portal somewhere, usually leading to a different location
+L.portals = "Portals" -- Plural of L.portal
+L.rift = "Rift" -- Can be used in a similar way as a portal e.g. "Time Rift" but can also be used as a debuff/pool underneath you that you need to run through to remove/despawn it e.g. "Dread Rift"
+L.rifts = "Rifts" -- Plural of L.rift
+L.orb = "Orb" -- A ball/sphere object usually moving and you need to avoid it
+L.orbs = "Orbs" -- Plural for L.orb
+L.spirit = "Spirit" -- Sometimes a boss will summon spirits, similar to ghosts, but not exactly, although you might have the same word for both. e.g. "Spirits of X" or "Wild Spirits"
+L.spirits = "Spirits" -- Plural of L.spirit
+L.tornado = "Tornado" -- 'A tornado is a violently rotating column of air that is in contact with both the surface of the Earth and a cloud' - Wikipedia
+L.tornadoes = "Tornadoes" -- Plural of L.tornado
+L.mark = "Mark" -- Short name for abilites with "Mark" in the name, for example "Mark of Death" or "Toxic Mark" or "Mark of Frost" etc.
+L.marks = "Marks" -- Plural of L.marks
+L.mind_control = "Mind Control" -- Any kind of Mind Control ability, where a player loses control of their character
+L.mind_control_short = "MC" -- Short version of Mind Control, mainly for bars
+L.spell_reflection = "Spell Reflection" -- Any ability that reflects spells
+L.rooted = "Rooted" -- Any ability that roots you in place, preventing you from moving
+
+-- Common ability name replacements A-Z
+L.arrow = "Arrow" -- Any type of ability that looks like an arrow, or has "arrow" in the name. Like an archer's arrow.
+L.arrows = "Arrows" -- Plural of L.arrow
+L.ball = "Ball" -- A ball, like a football, basketball, etc
+L.balls = "Balls" -- Plural of L.ball
+L.blind = "Blind" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.bouncing_ball = "Bouncing Ball" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
+L.bouncing_balls = "Bouncing Balls" -- Plural of L.bouncing_ball
+L.chakram = "Chakram" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)
+L.dodge = "Dodge" -- When you need to continually run around to dodge abilities, like missiles landing on the ground under you
+L.enrage = "Enrage" -- Any enrage buff that can be removed by players using abilities like Soothe (Druid), Tranquilizing Shot (Hunter) and Shiv (Rogue)
+L.fear = "Fear" -- Similar to a warlock or priest ability, when a boss casts a fear on a player or multiple players, that makes them run around out of control
+L.fixate = "Fixate" -- Used when a boss or add is chasing/fixated on a player
+L.fixates = "Fixates" -- Plural of L.fixate
+L.frontal = "Frontal" -- Usually a bad Area-of-Effect ability cast by the boss in front of them
+L.frontal_cone = "Frontal Cone" -- Usually a bad Area-of-Effect ability cast by the boss in a cone/triangle/pizza shape in front of them, don't stand in front of the boss!
+L.grip = "Grip" -- When a boss grapples a player towards them. We use "Grip" because of the Death Knight ability "Death Grip" (49576) but you can use "Grapple" if it makes more sense
+L.grips = "Grips" -- Plural of L.grip
+L.group_damage = "Group Damage" -- Any ability that causes damage to every player in the 5 player group
+L.health_drain = "Health Drain" -- Any ability that drains health from the player
+L.madness = "Madness" -- Any ability that contains the word "Madness" in it e.g. "Rift Madness" (1264756) or "Burning Madness" (307013)
+L.miasma = "Miasma" -- Any ability that contains the word "Miasma" in it e.g. "Consuming Miasma" (1257087) or "Black Miasma" (1275059)
+L.missile = "Missile" -- Short for any ability with the name "Missile" in it e.g. "Fey Missile" (188046) or "Water Missile" (68250)
+L.missiles = "Missiles" -- Plural of L.missile
+L.parasite = "Parasite" -- Any ability where a parasite is involved e.g. "Parasitic Infection", "Parasitic Growth", etc
+L.parasites = "Parasites" -- Plural of L.parasite
+L.pull_in = "Pull In" -- An ability that pulls you in towards the boss against your will
+L.quills = "Quills" -- Short for any ability with the name "Quills" in it e.g. "Searing Quills" (159382) or "Infused Quills" (1242260)
+L.raid_damage = "Raid Damage" -- Any ability that causes damage to every player in the raid
+L.silence = "Silence" -- Any ability that silences a player, preventing their spells being cast
+L.smash = "Smash" -- Short for any ability with the name "smash" in it e.g. "Darkrift Smash" or "Seismic Smash" or "Arcing Smash"
+L.soak = "Soak" -- Abilities you have to stand in on purpose to soak the damage, like a sponge soaks water. Commonly for abilities that split damage between everyone standing in them.
+L.soaks = "Soaks" -- Plural of L.soak
+L.spike = "Spike" -- Short for any ability with the name "spike" in it e.g. "Glacial Spike" or "Fel Spike" or "Volatile Spike"
+L.spikes = "Spikes" -- Plural of L.spike
+L.spread = "Spread" -- An ability that forces you to spread out away from other players, or you might damage them
+L.stomp = "Stomp" -- Short for any ability with the name "Stomp" in it e.g. "Cryostomp" (1261847) or "Powerful Stomp" (296691)
+L.tentacle = "Tentacle" -- Used for bosses that summon tentacles
+L.tentacles = "Tentacles" -- Plural of L.tentacle
+L.vines = "Vines" -- Short for any ability with the name "Vines" in it e.g. "Festering Vines" (1222088) or "Choking Vines" (238593)
+L.waves = "Waves" -- Multiple waves of a bad ability coming from a boss, like waves in the ocean
+L.winds = "Winds" -- Short for any ability with the name "Winds" in it e.g. "Winds of Change" (381517)
+L.whelp = "Whelp" -- Short for Whelpling, a baby dragonkin (Dragon Whelp)
+L.whelps = "Whelps" -- Plural of L.whelp
+
+-- Absorb / Shield related spell renames
+L.absorb = "Absorb" -- Used for shield-like abilities that absorb damage or healing
+L.heal_absorb = "Heal Absorb" -- Used for shield-like abilities that absorb healing only
+L.heal_absorbs = "Heal Absorbs" -- Plural of L.heal_absorb
+L.break_shield = "Break Shield" -- When you need to do something to break an absorb shield on the boss.
+L.break_shields = "Break Shields" -- Plural of L.break_shield
+L.shield = "Shield" -- Abilities that absorb damage/healing creating a "shield" around the boss/player e.g. "Shield on boss" or "Shield remaining"
+
+-- Debuff-related spell renames
+L.debuff = "Debuff"
+L.debuffs = "Debuffs" -- Plural of L.debuff
+L.fire_debuffs = "Fire Debuffs"
+
+-- Dispel-related spell renames
+L.curse = "Curse" -- Any curse-type dispellable debuff, or debuffs called "Curse of XYZ", etc.
+L.curses = "Curses" -- Plural of L.curse
+L.disease = "Disease" -- Any disease-type dispellable debuff, or debuffs called "Disease of XYZ", etc.
+L.dispel = "Dispel" -- General term for any debuff that is dispellable
+L.dispels = "Dispels" -- Plural of L.dispel
+L.dispel_boss = "Dispel Boss" -- When the boss gains a buff (magic or enrage) that you need to dispel
+L.poison = "Poison" -- Any poison-type dispellable debuff, or debuffs called "Poison of XYZ", etc.
+L.bleed = "Bleed" -- Any bleed-type debuff
+L.bleeds = "Bleeds" -- Plural of L.bleed
+
+-- Clearing-related spell renames (when you get a buff that allows you to clear/cleanse/remove other objects in the world, like pools on the ground, traps, or bombs)
+L.clear_bombs = "Clear Bombs"
+L.clear_pools = "Clear Pools"
+
+-- Interrupt-related spell renames
+L.interrupts = "Interrupts" -- General term used when a player needs to interrupt a spell being cast
+L.kick = "Kick" -- General term used when a player needs to interrupt a spell being cast, named after spell "Kick" (1766) from the Rogue class
+L.kicks = "Kicks" -- Plural of L.kick
+
+-- Tank-related spell renames
+L.tank_bomb = "Tank Bomb" -- Similar to L.bomb but only applies to tanks
+L.tank_combo = "Tank Combo" -- Used for tank swap mechanics where the boss casts a sequence of tank buster attacks
+L.tank_debuff = "Tank Debuff" -- Used for debuffs that only apply to tanks, usually an indicator that you need to taunt
+L.tank_frontal = "Tank Frontal" -- Similar to L.frontal_cone but only applies to tanks
+L.tank_hit = "Tank Hit" -- An attack that will only target the tank, usually a spell that does a lot of heavy damage to the tank
+L.tank_knockback = "Tank Knockback" -- Similar to L.knockback but only applies to tanks"
+L.tank_soak = "Tank Soak" -- Similar to L.soak but only applies to tanks
+L.tank_grip = "Tank Grip" -- When a boss grapples the tank towards them. We use "Grip" because of the Death Knight ability "Death Grip" (49576) but you can use "Grapple" if it makes more sense
+
+-- Aura Sections
+L.important = "Important" -- High priority debuffs
+L.achievement = "Achievement: \"%s\"" -- Debuff related to an achievement

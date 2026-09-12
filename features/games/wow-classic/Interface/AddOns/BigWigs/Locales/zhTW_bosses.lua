@@ -1,0 +1,127 @@
+-- March on Quel'Danas
+
+BigWigsAPI.SetBossModuleLocale("Belo'ren, Child of Al'ar", {
+	color_swaps = "換色",
+	["1241292"] = "俯衝",
+})
+
+BigWigsAPI.SetBossModuleLocale("Midnight Falls", {
+	deaths_dirge = "記憶遊戲",
+	heavens_glaives = "戰刃",
+	heavens_lance = "長槍",
+	the_dark_archangel = "大爆炸",
+	prism_kicks = "打斷",
+	dark_constellation = "星宿",
+	dark_rune_bar = "排列符文", -- 解密、玩游戲、把符文按順續排列
+
+	left = "左：%s", -- left/west group bars in p3
+	right = "右：%s", -- right/east group bars in p3
+
+	custom_select_limit_warnings = "傳奇模式：第三階段警報限制",
+	custom_select_limit_warnings_desc = "只顯示你這一側的技能警報。",
+	custom_select_limit_warnings_value1 = "一二隊往左，三四隊往右。",
+	custom_select_limit_warnings_value2 = "奇數隊往左，偶數隊往右。",
+	custom_select_limit_warnings_value3 = "顯示雙側警報。",
+	custom_select_limit_warnings_value4 = "只顯示左側警報。",
+	custom_select_limit_warnings_value5 = "只顯示右側警報。",
+})
+
+-- Midnight World
+
+BigWigsAPI.SetBossModuleLocale("Thorm'belan", {
+	ball_incoming = "球來了，接球！",
+	ball_fail = "漏球了！",
+	tendrils = "藤蔓",
+	tendrils_incoming = "快跑，拉斷藤蔓",
+})
+
+-- The Voidspire
+
+BigWigsAPI.SetBossModuleLocale("Vorasius", {
+	shadowclaw_slam = "猛擊",
+})
+
+BigWigsAPI.SetBossModuleLocale("Vaelgor & Ezzorak", {
+	nullzone = "拉斷", -- 終結守護
+})
+
+BigWigsAPI.SetBossModuleLocale("Lightblinded Vanguard", {
+	aura_of_wrath = "憤慨光環", -- Short for Aura of Wrath 不用縮寫
+	execution_sentence = "死刑宣判", -- Short for Execution Sentence  不用縮寫，或者處決?
+	executes_mythic = "死刑+躲開", -- 死刑宣判+神聖鳴響
+	judgement_red = "紅色審判", -- R for the Red icon. 審判+裁決
+	aura_of_devotion = "奉獻光環", -- Short for Aura of Devotion
+	judgement_blue = "藍色審判", -- B for the Blue icon. 審判+盾猛
+	aura_of_peace = "和平光環", -- Short for Aura of Peace
+	tyrs_wrath_mythic = "吸收+死刑", -- 提爾之盾+死刑宣判，吸收盾/治療吸收盾太長了
+	divine_toll_mythic = "躲開 + 吸收", -- 神聖鳴響+提爾之盾
+
+	empowered_searing_radiance = "強化熾熱烈光",
+	empowered_searing_radiance_desc = "顯示強化熾熱烈光的計時條。",
+
+	empowered_avengers_shield = "強化神聖之盾",
+	empowered_avengers_shield_desc = "顯示強化神聖之盾的計時條。",
+
+	empowered_divine_storm = "強化神性風暴",
+	empowered_divine_storm_desc = "顯示強化神性風暴的計時條。",
+	tornadoes = "神聖暴風", -- The renamed empowered Divine Storm 手冊裡這麼叫
+
+	empowered = "強化%s", -- Empowered version of an ability, [E] Avengers Shield
+})
+
+BigWigsAPI.SetBossModuleLocale("Crown of the Cosmos", {
+	grasp_of_emptiness = "方尖碑",
+	interrupting_tremor = "震顫", --用法術名，或者斷法
+	ravenous_abyss = "深淵", -- 貪婪深淵
+	silverstrike_barrage = "箭雨",  -- 銀殤箭雨
+	cosmic_barrier = "屏障",
+	voidstalker_sting = "釘刺", -- 虛無潛獵者釘刺
+	aspect_of_the_end = "拉斷", -- 終結守護
+	devouring_cosmos = "下個平台", -- 換場地/換平台/下個平台
+})
+
+-- The Venomous Abyss
+
+BigWigsAPI.SetBossModuleLocale("Nek'zali the Soulcoiler", {
+	possession_barrage = "彈幕",
+})
+
+BigWigsAPI.SetBossModuleLocale("The Lost Explorers", {
+	trader_gebbo = "商人",
+	first_mate_nama = "大副",
+	scrollsage_iku = "先知",
+})
+
+BigWigsAPI.SetBossModuleLocale("Vashnik the Malignant", {
+	malignant_catalyst = "催化", -- Short for Malignant Catalyst
+})
+
+BigWigsAPI.SetBossModuleLocale("The Twin Fangs", {
+	coiling_toxin = "射線", -- Short for Coiling Toxin
+	corrosive_spit = "紅圈", -- Short for Corrosive Spit
+})
+
+BigWigsAPI.SetBossModuleLocale("Ula'tek", {
+	mephitic_thrash = "痛擊",
+	call_of_the_serpent = "蛇蛋",
+	gore_rattle = "尾巴",
+	--grasping_fangs = "Tethers",
+	circling_prey = "平台破裂",
+	p3_knock_up = "擊退",
+
+	toxic_womb = "疫鱗", -- 疫鱗渣滓
+	--fester_burst = "Wretch Bubble",
+	toxic_incubation = "腐蝕波",
+
+	--count_amount_side = "%s (%d/%d) %s",
+	--count_side = "%s (%d) %s",
+	--fester_burst_count = "%s (%d-%d)",
+
+	custom_select_limit_warnings = "幽魂之纏分組",
+	custom_select_limit_warnings_desc = "只顯示你所屬分攤組別的計時條。第一階段右側先分攤，中場階段左側先分攤。",
+	custom_select_limit_warnings_value1 = "顯示雙側警報。",
+	custom_select_limit_warnings_value2 = "只顯示左側警報。",
+	custom_select_limit_warnings_value3 = "只顯示右側警報。",
+	custom_select_limit_warnings_value4 = "奇數隊左，偶數隊右。",
+	custom_select_limit_warnings_value5 = "傳奇模式：一二隊左，三四隊右。其他模式：一二三隊左，四五六隊右。",
+})

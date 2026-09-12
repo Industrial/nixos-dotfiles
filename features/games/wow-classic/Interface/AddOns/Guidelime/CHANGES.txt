@@ -1,0 +1,18 @@
+tag a3f3e1ebfe1ad35e4c982e3d6f22a628e770dd28 v5.028
+Author:	max-ri <max_r_@web.de>
+Date:	Mon Jul 13 14:04:06 2026 +0200
+
+v5.028
+
+commit 98c5c7d2dec4fdb732a7fc61cfbff9a9fe8db8c1
+Author: max-ri <max_r_@web.de>
+Date:   Mon Jul 13 14:04:04 2026 +0200
+
+    v5.028
+
+commit 08d0c34e18c4212542b0c16f6a64750a46b06f71
+Author: Borick <51713394+max-ri@users.noreply.github.com>
+Date:   Mon Jul 13 13:58:55 2026 +0200
+
+    new UI version for new TBC/Mists but not for Classic Era (yet)
+

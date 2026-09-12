@@ -1,0 +1,55 @@
+Guidelime.registerGuide(
+[[
+[GA Alliance]
+[N1-6 Northshire]
+[NX6-9 Elwynn Forest]
+[D This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV]
+This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV
+Accept: [QA783]
+TurnIn: [QT783]
+Accept: [QA7]
+Accept: [QA5261]
+TurnIn: [QT5261]
+Accept: [QA33]
+Do [QC33- ][QC7]
+TurnIn: [QT33]
+Sell your items at Brother Danil [G47.6, 41.6 Elwynn Forest].
+[A Warlock,Mage] Buy 10 Water
+TurnIn: [QT7]
+Accept: [QA15]
+Accept: [QA3100][A Warrior]
+Accept: [QA3101][A Paladin]
+Accept: [QA3105][A Warlock]
+Accept: [QA3104][A Mage]
+Accept: [QA18]
+Accept: [QA1598][A Warlock]
+TurnIn: [QT3105][A Warlock]
+Do: [QC1598][A Warlock]
+Do: [QC18]
+TurnIn: [QT18]
+Accept: [QA3903]
+Accept: [QA6]
+Sell your items at Brother Danil [G47.6, 41.6 Elwynn Forest].
+TurnIn: [QT3101][A Paladin]
+TurnIn: [QT1598][A Warlock]
+TurnIn: [QT3104][A Mage]
+TurnIn: [QT3100][A Warrior]
+[T] Get your Level 4 skills at your trainer.
+Do: [QC15]
+TurnIn: [QT3903]
+Accept: [QA3904]
+Do [QC3904- ][QC6]
+Grind Defias in this area till level [XP5 5]
+Use your [H] Hearthstone.
+TurnIn: [QT6]
+TurnIn: [QT15]
+Accept: [QA21]
+Do: [QC21]
+TurnIn: [QT3904]
+Accept: [QA3905]
+TurnIn: [QT21]
+Accept: [QA54]
+TurnIn: [QT3905]
+Accept: [QA2158]
+Thanks for using my guide. If it helped you and you "want to give back a little": There is a Paypal-Link on curseforge. Thanks <3
+]], "TUGs The Ultimate (Leveling) Guides")

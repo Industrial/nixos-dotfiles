@@ -1,0 +1,263 @@
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("Emberdawn", 2805, 2655)
+if not mod then return end
+mod:SetEncounterID(3056)
+mod:SetRespawnTime(30)
+mod:SetStage(1)
+
+--------------------------------------------------------------------------------
+-- Locals
+--
+
+local flamingUpdraftCount = 1
+local searingBeakCount = 1
+local burningGaleCount = 1
+local flamingUpdraftRemaining = 2
+local searingBeakRemaining = 2
+local activeBars = {}
+local activeBarBySpellId = {}
+
+--------------------------------------------------------------------------------
+-- Renames
+--
+
+mod:SetRenames({
+	[466556] = {CL.fire_debuffs, CL.you:format(CL.fire), notes = {CL.generalNote, CL.messageOnYouNote}, original = {466556, CL.you:format(mod:SpellName(466556))}}, -- Flaming Updraft (Fire Debuffs)
+	[466064] = {CL.tank_hit}, -- Searing Beak (Tank Hit)
+	[465904] = {465904, CL.cast:format(mod:SpellName(465904)), CL.over:format(mod:SpellName(465904)), notes = {CL.generalNote, CL.castTimerNote, CL.messageCastOverNote}, original = false}, -- Burning Gale
+})
+
+--------------------------------------------------------------------------------
+-- Auras
+--
+
+mod:SetAuraData({
+	{466091, duration = 8, soundOnApplied = "alarm", note = CL.tank_hit}, -- Searing Beak
+	{466559, duration = 6, soundOnApplied = "warning", note = CL.fire_debuffs}, -- Flaming Updraft
+	{470212, duration = 2, mechanic = "stunned", soundOnApplied = "warning"}, -- Flaming Twisters
+	{472118, soundOnApplied = "underyou", tip = CL.debuffUnderYouNote}, -- Ignited Embers
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+
+function mod:GetOptions()
+	return {
+		{466556, "ME_ONLY_EMPHASIZE"}, -- Flaming Updraft
+		{466064, "TANK_HEALER"}, -- Searing Beak
+		{465904, "CASTBAR"}, -- Burning Gale
+	}
+end
+
+mod:UseCustomTimers(true)
+function mod:OnEncounterStart()
+	flamingUpdraftCount = 1
+	searingBeakCount = 1
+	burningGaleCount = 1
+	flamingUpdraftRemaining = 1
+	searingBeakRemaining = 1
+	activeBars = {}
+	activeBarBySpellId = {}
+	self:SetStage(1)
+	if self:ShouldShowBars() then
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_REMOVED")
+	end
+end
+
+function mod:OnWin()
+	activeBars = {}
+	activeBarBySpellId = {}
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Event Handlers
+--
+
+function mod:CancelBarForSpell(spellId)
+	local priorEventID = activeBarBySpellId[spellId]
+	if priorEventID then
+		local barInfo = activeBars[priorEventID]
+		if barInfo and barInfo.createdAt and (GetTime() - barInfo.createdAt) < 3 then
+			self:StopBar(barInfo.msg)
+			activeBars[priorEventID] = nil
+			activeBarBySpellId[spellId] = nil
+			if spellId == 466556 then -- Flaming Updraft
+				flamingUpdraftCount = flamingUpdraftCount - 1
+				flamingUpdraftRemaining = flamingUpdraftRemaining + 1
+			elseif spellId == 466064 then -- Searing Beak
+				searingBeakCount = searingBeakCount - 1
+				searingBeakRemaining = searingBeakRemaining + 1
+			elseif spellId == 465904 then -- Burning Gale
+				burningGaleCount = burningGaleCount - 1
+			end
+		end
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_ADDED(_, eventInfo)
+	if eventInfo.source ~= 0 then return end -- Enum.EncounterTimelineEventSource.Encounter
+	if C_EncounterTimeline.GetEventState(eventInfo.id) == 1 then -- Paused
+		return -- ignore paused bars when added, they are always canceled some time later
+	end
+	local duration = self:RoundNumber(eventInfo.duration, 1)
+	local barInfo
+	if duration == 6 or duration == 15.5 then -- Flaming Updraft
+		self:CancelBarForSpell(466556)
+		barInfo = self:FlamingUpdraftTimeline(eventInfo)
+	elseif duration == 10 or duration == 13 then -- Searing Beak
+		self:CancelBarForSpell(466064)
+		barInfo = self:SearingBeakTimeline(eventInfo)
+	elseif duration == 15 or (not self:IsWiping() and duration == 30) then -- Burning Gale
+		self:CancelBarForSpell(465904)
+		barInfo = self:BurningGaleTimeline(eventInfo)
+	elseif not self:IsWiping() then
+		self:ErrorForTimelineEvent(eventInfo)
+	end
+	if barInfo then
+		barInfo.createdAt = GetTime()
+		activeBars[eventInfo.id] = barInfo
+		activeBarBySpellId[barInfo.key] = eventInfo.id
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		local state = C_EncounterTimeline.GetEventState(eventID)
+		if state == 0 then -- Active
+			self:ResumeBar(barInfo.key, barInfo.msg)
+		elseif state == 1 then -- Paused
+			if not self:Mythic() then
+				-- ignore bar pausing in Mythic, we use a paused Burning Gale bar as the cast bar.
+				self:PauseBar(barInfo.key, barInfo.msg)
+			end
+		elseif state == 2 then -- Finished
+			self:StopBar(barInfo.msg)
+			if barInfo.callback then
+				barInfo.callback()
+			end
+			activeBars[eventID] = nil
+			if activeBarBySpellId[barInfo.key] == eventID then
+				activeBarBySpellId[barInfo.key] = nil
+			end
+		elseif state == 3 then -- Canceled
+			self:StopBar(barInfo.msg)
+			if not self:IsWiping() and barInfo.cancelCallback then
+				barInfo.cancelCallback()
+			end
+			activeBars[eventID] = nil
+			if activeBarBySpellId[barInfo.key] == eventID then
+				activeBarBySpellId[barInfo.key] = nil
+			end
+		end
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_REMOVED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		self:StopBar(barInfo.msg)
+		activeBars[eventID] = nil
+		if activeBarBySpellId[barInfo.key] == eventID then
+			activeBarBySpellId[barInfo.key] = nil
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Ability Handlers
+--
+
+function mod:FlamingUpdraftTimeline(eventInfo) -- Fire Debuffs
+	if flamingUpdraftRemaining == 0 then return end
+	flamingUpdraftRemaining = flamingUpdraftRemaining - 1
+	local barText = CL.count:format(self:GetRename(466556), flamingUpdraftCount)
+	self:CDBar(466556, eventInfo.duration, barText, nil, eventInfo.id)
+	flamingUpdraftCount = flamingUpdraftCount + 1
+	return {
+		msg = barText,
+		key = 466556,
+		callback = function()
+			self:PersonalMessageFromBlizzMessage(466556, 2, false, self:GetRename(466556, 2)) -- Applies debuffs at the end of the 1.5s cast
+			self:Message(466556, "orange", barText)
+			self:PlaySound(466556, "alarm")
+		end
+	}
+end
+
+function mod:SearingBeakTimeline(eventInfo) -- Tank Hit
+	if searingBeakRemaining == 0 then return end
+	searingBeakRemaining = searingBeakRemaining - 1
+	local barText = CL.count:format(self:GetRename(466064), searingBeakCount)
+	self:CDBar(466064, eventInfo.duration, barText, nil, eventInfo.id)
+	searingBeakCount = searingBeakCount + 1
+	return {
+		msg = barText,
+		key = 466064,
+		callback = function()
+			self:Message(466064, "purple", barText)
+			self:PlaySound(466064, "alert")
+		end
+	}
+end
+
+function mod:BurningGaleTimeline(eventInfo) -- Burning Gale / AoE / Intermission
+	if self:Mythic() then
+		if burningGaleCount % 2 == 1 then
+			local barText = CL.count:format(self:GetRename(465904), (burningGaleCount + 1) / 2)
+			self:CDBar(465904, eventInfo.duration, barText, nil, eventInfo.id)
+			burningGaleCount = burningGaleCount + 1
+			return {
+				msg = barText,
+				key = 465904,
+				callback = function()
+					flamingUpdraftRemaining = 2
+					searingBeakRemaining = 2
+					self:StopBlizzMessages(1)
+					self:SetStage(2)
+					self:Message(465904, "yellow", barText)
+					self:PlaySound(465904, "long")
+				end
+			}
+		else
+			self:CastBar(465904, 21, 2, nil, eventInfo.id) -- 3s cast + 18s channel
+			burningGaleCount = burningGaleCount + 1
+			return {
+				msg = self:GetRename(465904, 2),
+				key = 465904,
+				cancelCallback = function()
+					self:SetStage(1)
+					self:Message(465904, "green", self:GetRename(465904, 3))
+					self:PlaySound(465904, "info")
+				end
+			}
+		end
+	else -- Normal / Heroic
+		if self:GetStage() == 2 then
+			self:SetStage(1)
+			self:StopBar(self:GetRename(465904, 2))
+		end
+		local barText = CL.count:format(self:GetRename(465904), burningGaleCount)
+		self:CDBar(465904, eventInfo.duration, barText, nil, eventInfo.id)
+		burningGaleCount = burningGaleCount + 1
+		return {
+			msg = barText,
+			key = 465904,
+			cancelCallback = function()
+				flamingUpdraftRemaining = 2
+				searingBeakRemaining = 2
+				self:StopBlizzMessages(1)
+				self:SetStage(2)
+				self:Message(465904, "yellow", barText)
+				self:CastBar(465904, 20.5, 2) -- 3s cast + 18s channel - some delay
+				self:PlaySound(465904, "long")
+			end
+		}
+	end
+end

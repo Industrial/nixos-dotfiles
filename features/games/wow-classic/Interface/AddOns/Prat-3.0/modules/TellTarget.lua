@@ -1,0 +1,104 @@
+---------------------------------------------------------------------------------
+--
+-- Prat - A framework for World of Warcraft chat mods
+--
+-- Copyright (C) 2006-2018  Prat Development Team
+--
+-- This program is free software; you can redistribute it and/or
+-- modify it under the terms of the GNU General Public License
+-- as published by the Free Software Foundation; either version 2
+-- of the License, or (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program; if not, write to:
+--
+-- Free Software Foundation, Inc.,
+-- 51 Franklin Street, Fifth Floor,
+-- Boston, MA  02110-1301, USA.
+--
+--
+-------------------------------------------------------------------------------
+
+local ChatFrame_SendTell = _G.ChatFrame_SendTell or _G.ChatFrameUtil.SendTell
+local ChatEdit_UpdateHeader = _G.ChatEdit_UpdateHeader or _G.ChatFrameEditBoxMixin.UpdateHeader
+
+Prat:AddModuleToLoad(function()
+	local module = Prat:NewModule("TellTarget", "AceHook-3.0")
+	local PL = module.PL
+
+	Prat:SetModuleDefaults(module.name, {
+		profile = {
+			on = true,
+		}
+	})
+
+	Prat:SetModuleOptions(module.name, {
+		name = PL["TellTarget"],
+		desc = PL["Adds telltarget slash command (/tt)."],
+		type = "group",
+		args = {
+			info = {
+				name = PL["Adds telltarget slash command (/tt)."],
+				type = "description",
+			}
+		}
+	})
+
+	function module:OnModuleEnable()
+		self:SecureHookScript(_G.ChatFrame1EditBox, "OnTextChanged")
+	end
+
+	function module:OnModuleDisable()
+		self:UnhookAll()
+	end
+
+	--[[------------------------------------------------
+		Core Functions
+	------------------------------------------------]] --
+	function module:GetDescription()
+		return PL["Adds telltarget slash command (/tt)."]
+	end
+
+	function module:OnTextChanged(editBox)
+		local command, msg = editBox:GetText():match("^(/%S+)%s(.*)$")
+		if command == "/tt" or command == PL["/tt"] then
+			self:SendTellToTarget(editBox.chatFrame, msg, editBox)
+		end
+	end
+
+	function module:SendTellToTarget(frame, text, editBox)
+		if frame == nil then
+			frame = DEFAULT_CHAT_FRAME
+		end
+
+		local unitname, realm, fullname
+		if UnitIsPlayer("target") then
+			unitname, realm = UnitName("target")
+			if unitname then
+				if realm and UnitRealmRelationship("target") ~= LE_REALM_RELATION_SAME then
+					fullname = unitname .. "-" .. realm
+				else
+					fullname = unitname
+				end
+			end
+		end
+
+		local target = fullname and fullname:gsub(" ", "") or PL["NoTarget"]
+
+		if editBox then
+			editBox:SetAttribute("chatType", "WHISPER")
+			editBox:SetAttribute("tellTarget", target)
+			editBox:SetText(text)
+			ChatEdit_UpdateHeader(editBox)
+		else
+			ChatFrame_SendTell(target, frame)
+		end
+	end
+
+	return
+end)

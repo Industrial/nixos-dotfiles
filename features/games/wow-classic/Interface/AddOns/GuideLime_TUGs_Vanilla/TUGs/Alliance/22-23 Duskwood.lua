@@ -1,0 +1,67 @@
+Guidelime.registerGuide(
+[[
+[GA Alliance]
+[N22-23 Duskwood]
+[NX23-24 Redridge Mountains]
+[D This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV]
+This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV
+On your way through Duskwood kill spiders for some Gooey Spider legs. It doesnt matter how many you get,even 0 is "ok".
+Accept: [QA66]
+Accept: [QA101]
+TurnIn: [QT66]
+Accept: [QA67]
+Accept: [QA56]
+Accept: [QA163]
+Accept: [QA164]
+Accept: [QA165]
+Get the [P] flightpath at: [G77.12,44.17Duskwood]
+If it is in stock - and you dont have one yet-: Buy a Bronzetube at [G78,48.3Duskwood]
+Do: [QC56]
+Accept: [QA245]
+TurnIn: [QT163]
+Accept: [QA5]
+TurnIn: [QT164]
+Accept: [QA95]
+Accept: [QA226]
+KEEP YOUR Gooey Spider Legs.Whilst grinding east for the spider and wolf quests do the next 2steps (TurnIn The Hermit and Accept Supplies from Darkshire)
+Do [QC226- ][QC245]
+TurnIn: [QT165]
+Accept: [QA148]
+TurnIn: [QT226]
+TurnIn: [QT143]
+Accept: [QA144]
+Accept: [QA65]
+TurnIn: [QT67]
+Accept: [QA68]
+Fly to [F Duskwood]
+TurnIn: [QT148]
+Accept: [QA149]
+TurnIn: [QT5]
+Accept: [QA93]
+TurnIn: [QT56]
+TurnIn: [QT68]
+Accept: [QA69]
+TurnIn: [QT149]
+Accept: [QA154]
+TurnIn: [QT154]
+Accept: [QA157]
+If it is in stock - and you dont have one yet-: Buy a Bronzetube at [G78,48.3Duskwood]. If you dont get it here, we will buy it on the auctionhouse now.
+Fly to [F Stormwind City]
+TurnIn: [QT69]
+Accept: [QA70]
+Go upstairs and loot the Box.
+Buy at the auction house now: 1 Bronze tube. Gooey Spider Legs (you need 6 total), 5 Great Goretuks Snout, 5 Tough Condor Meat, 5 Crisp Spider Meat and 8 Murloc Fin.
+Buy: [CI4371,1 Bronze Tube] 
+Buy: [CI2251,6 Gooey Spider Leg] 
+Buy: [CI1468,8 Murloc Fin] 
+Buy: [CI2296,5 Great Goretusk Snout] 
+Buy: [CI1080,5 Tough Condor Meat] 
+Buy: [CI1081,5 Crisp Spider Meat] 
+[T] Get your Level 22 skills at your trainer.
+TurnIn: [QT70]
+Accept: [QA72]
+TurnIn: [QT72]
+Accept: [QA74]
+The next guide is 23-24 Redridge Mountains. There is another 23-24 guide if you want to do stockades(what I would suggest doing now).
+Thanks for using my guide. If it helped you and you "want to give back a little": There is a Paypal-Link on curseforge. Thanks <3
+]], "TUGs The Ultimate (Leveling) Guides")

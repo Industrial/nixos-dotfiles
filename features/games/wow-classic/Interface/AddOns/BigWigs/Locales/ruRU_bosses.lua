@@ -1,0 +1,127 @@
+-- March on Quel'Danas
+
+BigWigsAPI.SetBossModuleLocale("Belo'ren, Child of Al'ar", {
+	color_swaps = "Смена цветов",
+	["1241292"] = "Прыжок Свет/Бездна",
+})
+
+BigWigsAPI.SetBossModuleLocale("Midnight Falls", {
+	deaths_dirge = "Игра на запоминание",
+	heavens_glaives = "Глефы",
+	heavens_lance = "Копьё",
+	the_dark_archangel = "Большой взрыв",
+	prism_kicks = "Прерывания",
+	dark_constellation = "Звёзды",
+	dark_rune_bar = "Решить игру",
+
+	left = "[Л] %s", -- left/west group bars in p3
+	right = "[П] %s", -- right/east group bars in p3
+
+	custom_select_limit_warnings = "[Эпохальный] Ограничить предупреждения 3-й фазы",
+	custom_select_limit_warnings_desc = "Показывать предупреждения только для способностей на вашей стороне.",
+	custom_select_limit_warnings_value1 = "Группы 1 и 2 идут налево, группы 3 и 4 направо.",
+	custom_select_limit_warnings_value2 = "Нечётные группы налево, чётные направо.",
+	custom_select_limit_warnings_value3 = "Показывать предупреждения для обеих сторон.",
+	custom_select_limit_warnings_value4 = "Показывать предупреждения только для левой стороны.",
+	custom_select_limit_warnings_value5 = "Показывать предупреждения только для правой стороны.",
+})
+
+-- Midnight World
+
+BigWigsAPI.SetBossModuleLocale("Thorm'belan", {
+	ball_incoming = "Шар скоро - не дайте ему коснуться земли",
+	ball_fail = "ПРОВАЛ - шар коснулся земли",
+	tendrils = "Усики",
+	tendrils_incoming = "УБЕГАЙТЕ, чтобы разорвать усики",
+})
+
+-- The Voidspire
+
+BigWigsAPI.SetBossModuleLocale("Vorasius", {
+	shadowclaw_slam = "Удары",
+})
+
+BigWigsAPI.SetBossModuleLocale("Vaelgor & Ezzorak", {
+	nullzone = "Связи",
+})
+
+BigWigsAPI.SetBossModuleLocale("Lightblinded Vanguard", {
+	aura_of_wrath = "Гнев", -- Short for Aura of Wrath
+	execution_sentence = "Приговоры", -- Short for Execution Sentence
+	executes_mythic = "Приговоры + уклонение",
+	judgement_red = "Правосудие [К]", -- R for the Red icon.
+	aura_of_devotion = "Благочестие", -- Short for Aura of Devotion
+	judgement_blue = "Правосудие [С]", -- B for the Blue icon.
+	aura_of_peace = "Мир", -- Short for Aura of Peace
+	tyrs_wrath_mythic = "Поглощения + приговоры",
+	divine_toll_mythic = "Уклонение + поглощения",
+
+	empowered_searing_radiance = "Усиленное обжигающее сияние",
+	empowered_searing_radiance_desc = "Показывать таймер усиленного обжигающего сияния.",
+
+	empowered_avengers_shield = "Усиленный щит мстителя",
+	empowered_avengers_shield_desc = "Показывать таймер усиленного щита мстителя.",
+
+	empowered_divine_storm = "Усиленная божественная буря",
+	empowered_divine_storm_desc = "Показывать таймер усиленной божественной бури.",
+	tornadoes = "Шторм", -- The renamed empowered Divine Storm
+
+	empowered = "[У] %s", -- Empowered version of an ability, [E] Avengers Shield
+})
+
+BigWigsAPI.SetBossModuleLocale("Crown of the Cosmos", {
+	grasp_of_emptiness = "Обелиски",
+	interrupting_tremor = "Прерывание",
+	ravenous_abyss = "Выбежать",
+	silverstrike_barrage = "Линии",
+	cosmic_barrier = "Барьер",
+	voidstalker_sting = "Жала",
+	aspect_of_the_end = "Связи",
+	devouring_cosmos = "След. платформа",
+})
+
+-- The Venomous Abyss
+
+BigWigsAPI.SetBossModuleLocale("Nek'zali the Soulcoiler", {
+	possession_barrage = "Обстрел",
+})
+
+BigWigsAPI.SetBossModuleLocale("The Lost Explorers", {
+	trader_gebbo = "Геббо",
+	first_mate_nama = "Нама",
+	scrollsage_iku = "Ику",
+})
+
+BigWigsAPI.SetBossModuleLocale("Vashnik the Malignant", {
+	malignant_catalyst = "Катализатор", -- Short for Malignant Catalyst
+})
+
+BigWigsAPI.SetBossModuleLocale("The Twin Fangs", {
+	coiling_toxin = "Гной", -- Short for Coiling Toxin(Вероятно, Coiling Ichor - Обвивающий гной)
+	corrosive_spit = "Плевок", -- Short for Corrosive Spit
+})
+
+BigWigsAPI.SetBossModuleLocale("Ula'tek", {
+	mephitic_thrash = "Размах",
+	call_of_the_serpent = "Яйца",
+	gore_rattle = "Хвост",
+	grasping_fangs = "Разорвать связку",  -- tether механика, возможно найдется название получше
+	circling_prey = "Разруш. Платформы",
+	p3_knock_up = "Подкидывание",
+
+	toxic_womb = "Спавн гадины",
+	fester_burst = "Баббл гадины",
+	toxic_incubation = "Волны гадины",
+
+	count_amount_side = "%s (%d/%d) %s",
+	count_side = "%s (%d) %s",
+	fester_burst_count = "%s (%d-%d)",
+
+	custom_select_limit_warnings = "Группа на призрачные кольца",
+	custom_select_limit_warnings_desc = "Показывать только полосы для вашей соак группы (лево или право).  Правая сторона будет первой на первой стадии, левая сторона будет первой на переходке.",
+	custom_select_limit_warnings_value1 = "Показывать предупреждения для обеих сторон.",
+	custom_select_limit_warnings_value2 = "Показывать предупреждения только для левой стороны.",
+	custom_select_limit_warnings_value3 = "Показывать предупреждения только для правой стороны.",
+	custom_select_limit_warnings_value4 = "Нечетные группы слева, четные группы справа.",
+	custom_select_limit_warnings_value5 = "Мифик: группы 1 & 2 идут влево, группы 3 & 4 идут вправо. Остальные сложности: группы 1/2/3 идут влево, группы 4/5/6 идут вправо.",
+})

@@ -1,0 +1,28 @@
+## Interface: 120100, 50504, 40402, 38002, 30405, 20506, 11509
+## Title: BetterBags - Legendary
+## Category: Inventory
+## Notes: Adds a Legendary items filter to BetterBags.
+## Author: OrenYoh
+## Version: 2.1.4
+## IconTexture: Interface\AddOns\BetterBags_Legendary\images\legendary
+## Dependencies: BetterBags
+## SavedVariablesPerCharacter: BetterBags_LegendaryDB
+## X-Curse-Project-ID: 979171
+## X-Wago-ID: v63oYk6b
+
+# Locales
+i18n\enUS.lua
+i18n\frFR.lua
+i18n\ruRU.lua
+i18n\zhCN.lua
+
+# Main
+BetterBags_Legendary.lua
+
+# Core
+core/config.lua
+core/frame.lua
+
+# Modules
+modules/filter.lua
+modules/options.lua

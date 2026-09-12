@@ -1,0 +1,22 @@
+## Interface: 120100, 50504, 40402, 38002, 30405, 20506, 11509
+## Title: BetterBags - Tabards
+## Category: Inventory
+## Notes: Adds a Tabards category to BetterBags.
+## Author: OrenYoh
+## Version: 1.3.15
+## IconTexture: Interface\AddOns\BetterBags_Tabards\images\tabard
+## Dependencies: BetterBags
+## X-Curse-Project-ID: 979135
+## X-Wago-ID: 56n9pDN9
+
+# Locales
+i18n\enUS.lua
+i18n\frFR.lua
+i18n\ruRU.lua
+i18n\zhCN.lua
+
+# Main
+BetterBags_Tabards.lua
+
+# Modules
+modules/filter.lua

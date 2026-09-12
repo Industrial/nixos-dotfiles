@@ -1,22 +1,16 @@
 # Colocated suite: WoW Classic configuration
 let
   assay = import ./../../../common/assay/default.nix;
-  lib = {
-    mkIf = cond: val:
-      if cond
-      then val
-      else null;
+  pkgs = {
+    writeShellScriptBin = name: text: {inherit name text;};
   };
   settings = {
     hostname = "h";
     username = "alice";
   };
-  config = {
-    home.homeDirectory = "/home/alice";
-    lib.file.mkOutOfStoreSymlink = path: path;
-  };
-  mod = import ./default.nix {inherit config lib settings;};
+  mod = import ./default.nix {inherit pkgs settings;};
 in
   assay.suite "wow-classic" {
-    has-wtf-symlink = assay.eq (builtins.hasAttr ''/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF'' mod.home.file) true;
+    has-link-script = assay.eq (builtins.hasAttr "environment" mod && builtins.hasAttr "systemPackages" mod.environment) true;
+    packages-non-empty = assay.eq (builtins.length mod.environment.systemPackages > 0) true;
   }

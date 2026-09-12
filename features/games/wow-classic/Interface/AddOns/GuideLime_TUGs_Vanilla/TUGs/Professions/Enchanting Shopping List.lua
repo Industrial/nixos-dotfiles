@@ -1,0 +1,32 @@
+Guidelime.registerGuide(
+[[
+[N Enchanting Shopping List]
+[NX Enchanting]
+[D This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV]
+This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV
+Shopping List:
+Buy [CI10940, 125 Strange Dust]
+Buy [CI10938, 1 Lesser Magic Essence]
+Buy [CI10939, 12 Greater Magic Essence]
+Buy [CI11101, 1 Formula: Enchant Bracer - Lesser Strength] from Dalria[G35, 52Ashenvale]
+Buy [CI11039, 1 Formula: Enchant Cloak - Minor Agility] from Dalria[G35, 52Ashenvale]
+Buy [CI10998, 25 Lesser Astral Essence]
+Buy [CI11083, 130 Soul Dust]
+Buy [CI11082, 2 Greater Astral Essence]
+Buy [CI11137, 240 Vision Dust]
+Buy [CI11135, 2 Greater Mystic Essence]
+Buy [CI11174, 5 Lesser Nether Essence]
+Buy [CI11176, 195 Dream Dust]
+Buy [CI8831, 40 Purple Lotus]
+Buy [CI16204, 82 Illusion Dust]
+Buy [CI16203, 4 Greater Eternal Essence]
+Buy [CI14344, 2 Large Brilliant Shard]
+Buy [CI6217, 1 Copper Rod]
+Buy [CI6338, 1 Silver Rod]
+Buy [CI11128, 1 Golden Rod]
+Buy [CI5500, 1 Iridescent Pearl]
+Buy [CI11144, 1 Truesilver Rod]
+Buy [CI7971, 1 Black Pearl]
+Buy [CI16206, 1 Arcanite Rod]
+Buy [CI13926, 1 Golden Pearl]
+]], "TUGs The Ultimate (Leveling) Guides")

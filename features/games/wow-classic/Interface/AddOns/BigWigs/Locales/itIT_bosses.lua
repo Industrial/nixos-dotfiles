@@ -1,0 +1,127 @@
+-- March on Quel'Danas
+
+BigWigsAPI.SetBossModuleLocale("Belo'ren, Child of Al'ar", {
+	color_swaps = "Scambio Colori",
+	["1241292"] = "Picchiata Luce/Vuoto",
+})
+
+BigWigsAPI.SetBossModuleLocale("Midnight Falls", {
+	deaths_dirge = "Gioco di memoria",
+	heavens_glaives = "Lame",
+	heavens_lance = "Lancia",
+	the_dark_archangel = "Detonazione",
+	prism_kicks = "Interruzioni",
+	dark_constellation = "Stelle",
+	dark_rune_bar = "Risolvi il gioco",
+
+	left = "[S] %s", -- left/west group bars in p3
+	right = "[D] %s", -- right/east group bars in p3
+
+	custom_select_limit_warnings = "[Mitico] Limita avvisi della fase 3",
+	custom_select_limit_warnings_desc = "Mostra avvisi delle abilità solo del tuo lato.",
+	custom_select_limit_warnings_value1 = "Gruppi 1 e 2 vanno a sinistra, gruppi 3 e 4 vanno a destra.",
+	custom_select_limit_warnings_value2 = "Gruppi dispari a sinistra, gruppi pari a destra.",
+	custom_select_limit_warnings_value3 = "Mostra avvisi per entrambi i lati.",
+	custom_select_limit_warnings_value4 = "Mostra avvisi solo per il lato sinistro.",
+	custom_select_limit_warnings_value5 = "Mostra avvisi solo per il lato destro.",
+})
+
+-- Midnight World
+
+BigWigsAPI.SetBossModuleLocale("Thorm'belan", {
+	ball_incoming = "Palla in arrivo - Non lasciarla cadere",
+	ball_fail = "FALLITO - La palla ha toccato terra",
+	tendrils = "Viticci",
+	tendrils_incoming = "CORRERE VIA per spezzare i viticci",
+})
+
+-- The Voidspire
+
+BigWigsAPI.SetBossModuleLocale("Vorasius", {
+	shadowclaw_slam = "Urto",
+})
+
+BigWigsAPI.SetBossModuleLocale("Vaelgor & Ezzorak", {
+	nullzone = "Catene",
+})
+
+BigWigsAPI.SetBossModuleLocale("Lightblinded Vanguard", {
+	aura_of_wrath = "Ira", -- Short for Aura of Wrath
+	execution_sentence = "Esecuzione", -- Short for Execution Sentence
+	executes_mythic = "Esecuzioni + Schiva",
+	judgement_red = "Giudizio [R]", -- R for the Red icon.
+	aura_of_devotion = "Devozione", -- Short for Aura of Devotion
+	judgement_blue = "Giudizio [B]", -- B for the Blue icon.
+	aura_of_peace = "Pace", -- Short for Aura of Peace
+	tyrs_wrath_mythic = "Assorbimenti + Esecuzioni",
+	divine_toll_mythic = "Schiva + Assorbimenti",
+
+	empowered_searing_radiance = "Radiosità Rovente potenziata",
+	empowered_searing_radiance_desc = "Mostra il timer per la Radiosità Rovente Potenziata.",
+
+	empowered_avengers_shield = "Scudo del Vendicatore potenziato",
+	empowered_avengers_shield_desc = "Mostra il timer per lo Scudo del Vendicatore potenziato.",
+
+	empowered_divine_storm = "Tempesta Divina potenziata",
+	empowered_divine_storm_desc = "Mostra il timer per la Tempesta Divina potenziata.",
+	tornadoes = "Tornadi", -- The renamed empowered Divine Storm
+
+	empowered = "[P] %s", -- Empowered version of an ability, [E] Avengers Shield
+})
+
+BigWigsAPI.SetBossModuleLocale("Crown of the Cosmos", {
+	grasp_of_emptiness = "Obelischi",
+	interrupting_tremor = "Interruzione",
+	ravenous_abyss = "Uscire",
+	silverstrike_barrage = "Linee",
+	cosmic_barrier = "Barriera",
+	voidstalker_sting = "Punture",
+	aspect_of_the_end = "Catene",
+	devouring_cosmos = "Prossima Piattaforma",
+})
+
+-- The Venomous Abyss
+
+BigWigsAPI.SetBossModuleLocale("Nek'zali the Soulcoiler", {
+	--possession_barrage = "Barrage",
+})
+
+BigWigsAPI.SetBossModuleLocale("The Lost Explorers", {
+	--trader_gebbo = "Gebbo",
+	--first_mate_nama = "Nama",
+	--scrollsage_iku = "Iku",
+})
+
+BigWigsAPI.SetBossModuleLocale("Vashnik the Malignant", {
+	--malignant_catalyst = "Catalyst", -- Short for Malignant Catalyst
+})
+
+BigWigsAPI.SetBossModuleLocale("The Twin Fangs", {
+	--coiling_toxin = "Toxin", -- Short for Coiling Toxin
+	--corrosive_spit = "Spit", -- Short for Corrosive Spit
+})
+
+BigWigsAPI.SetBossModuleLocale("Ula'tek", {
+	--mephitic_thrash = "Sweep",
+	--call_of_the_serpent = "Eggs",
+	--gore_rattle = "Tail",
+	--grasping_fangs = "Tethers",
+	--circling_prey = "Platform Break",
+	--p3_knock_up = "Knock Up",
+
+	--toxic_womb = "Wretch Spawn",
+	--fester_burst = "Wretch Bubble",
+	--toxic_incubation = "Wretch Waves",
+
+	--count_amount_side = "%s (%d/%d) %s",
+	--count_side = "%s (%d) %s",
+	--fester_burst_count = "%s (%d-%d)",
+
+	--custom_select_limit_warnings = "Spectral Coils Group",
+	--custom_select_limit_warnings_desc = "Only show bars for your soak group (left or right).  Right side is first in stage one, left side is first in intermission.",
+	--custom_select_limit_warnings_value1 = "Show warnings for both sides.",
+	--custom_select_limit_warnings_value2 = "Show warnings for left side only.",
+	--custom_select_limit_warnings_value3 = "Show warnings for right side only.",
+	--custom_select_limit_warnings_value4 = "Odd groups left, even groups right.",
+	--custom_select_limit_warnings_value5 = "Mythic: Groups 1 & 2 go left, groups 3 & 4 go right. Others: Groups 1/2/3 go left, groups 4/5/6 go right.",
+})

@@ -1,0 +1,48 @@
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("Well Of Eternity Trash", 939)
+if not mod then return end
+mod:SetTrashModule(true)
+mod:RegisterEnableMob(
+	55500 -- Illidan Stormrage
+)
+
+--------------------------------------------------------------------------------
+-- Localization
+--
+
+mod:SetDefaultLocale({
+	custom_on_autotalk = CL.autotalk,
+	custom_on_autotalk_desc = "Instantly select Illidan's gossip option.",
+	custom_on_autotalk_icon = mod:GetMenuIcon("SAY"),
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+
+function mod:GetOptions()
+	return {
+		"custom_on_autotalk", -- Illidan
+	}
+end
+
+function mod:OnBossEnable()
+	self:RegisterMessage("BigWigs_OnBossEngage", "Disable")
+	self:RegisterEvent("GOSSIP_SHOW")
+end
+
+--------------------------------------------------------------------------------
+-- Event Handlers
+--
+
+-- Illidan
+function mod:GOSSIP_SHOW()
+	if self:GetOption("custom_on_autotalk") and self:MobId(self:UnitGUID("npc")) == 55500 then
+		if self:GetGossipOptions() then
+			self:SelectGossipOption(1)
+		end
+	end
+end

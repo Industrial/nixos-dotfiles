@@ -1,0 +1,3502 @@
+local L, BigWigsLoader, BigWigsAPI
+do
+	local _, tbl = ...
+	BigWigsAPI = tbl.API
+	L = BigWigsAPI:GetLocale("BigWigs")
+	BigWigsLoader = tbl.loaderPublic
+end
+local LibSharedMedia = LibStub("LibSharedMedia-3.0")
+
+--------------------------------------------------------------------------------
+-- Saved Settings
+--
+
+local ProfileUtils, db = {}
+do
+	local defaultVoice = "English: Amy"
+	local fontName = "Noto Sans Medium"
+	do
+		local locale = GetLocale()
+		if locale ~= "enUS" then
+			defaultVoice = ("%s: Default (Female)"):format(locale)
+			if locale == "koKR" or locale == "zhCN" or locale == "zhTW" then
+				fontName = LibSharedMedia:GetDefault("font")
+			end
+		end
+	end
+
+	local defaults = {
+		autoSlotKeystone = true,
+		-- Countdown
+		countVoice = defaultVoice,
+		countBegin = 5,
+		countStartSound = "BigWigs: Long",
+		countEndSound = "BigWigs: Alarm",
+		-- Key viewer
+		showViewerDungeonEnd = true,
+		hideFromGuild = false,
+		viewerKeybind = "",
+		windowHeight = 320,
+		viewerPosition = {"LEFT", "LEFT", 15, 0},
+		-- Who has a key?
+		instanceKeysPosition = {"BOTTOM", "TOP", 0, -86},
+		instanceKeysFontName = fontName,
+		instanceKeysFontSize = 16,
+		instanceKeysMonochrome = false,
+		instanceKeysGrowUpwards = false,
+		instanceKeysOutline = "OUTLINE",
+		instanceKeysAlign = "CENTER",
+		instanceKeysColor = {1, 1, 1, 1},
+		instanceKeysOtherDungeonColor = {1, 1, 1, 0.5},
+		instanceKeysShowAllPlayers = false,
+		instanceKeysShowDungeonEnd = false,
+		instanceKeysHideTitle = false,
+		-- Progress %
+		progressTooltip = true,
+		progressTooltipFormat = 3,
+		progressNameplate = false,
+		progressNameplateFormat = 1,
+		progressNameplateTargetOffsetX = 100,
+		progressNameplateTargetOffsetY = 0,
+		progressNameplateOtherOffsetX = 100,
+		progressNameplateOtherOffsetY = 0,
+		progressNameplateFontName = fontName,
+		progressNameplateFontSize = 18,
+		progressNameplateFontColorTarget = {1, 1, 1, 1},
+		progressNameplateFontColorOther = {1, 1, 1, 0.5},
+		progressNameplateOutline = "OUTLINE",
+		progressNameplateMonochrome = false,
+		progressNameplateSlugRendering = true,
+		progressNameplateTargetAlign = "RIGHT",
+		progressNameplateOtherAlign = "RIGHT",
+	}
+	local globalDefaults = {
+		showViewerTeleportTip = true,
+		slashKeys = true,
+		slashKeystone = true,
+	}
+	db = BigWigsLoader.db:RegisterNamespace("MythicPlus", {profile = defaults, global = globalDefaults})
+
+	local function ValidateColor(current, default, alphaLimit)
+		for i = 1, 3 do
+			local n = current[i]
+			if type(n) ~= "number" or n < 0 or n > 1 then
+				current[1] = default[1] -- If 1 entry is bad, reset the whole table
+				current[2] = default[2]
+				current[3] = default[3]
+				current[4] = default[4]
+				return
+			end
+		end
+		if alphaLimit then
+			if type(current[4]) ~= "number" or current[4] < alphaLimit or current[4] > 1 then
+				current[4] = default[4]
+			end
+		elseif current[4] then
+			current[4] = nil
+		end
+	end
+
+	ProfileUtils.ValidateMainSettings = function()
+		for k, v in next, db.profile do
+			local defaultType = type(defaults[k])
+			if defaultType == "nil" then
+				db.profile[k] = nil
+			elseif type(v) ~= defaultType then
+				db.profile[k] = defaults[k]
+			end
+		end
+		for k, v in next, db.global do
+			local defaultType = type(globalDefaults[k])
+			if defaultType == "nil" then
+				db.global[k] = nil
+			elseif type(v) ~= defaultType then
+				db.global[k] = globalDefaults[k]
+			end
+		end
+		if db.profile.countBegin < 3 or db.profile.countBegin > 9 then
+			db.profile.countBegin = defaults.countBegin
+		end
+		local checkCount = math.floor(db.profile.countBegin+0.5)
+		if checkCount ~= db.profile.countBegin then
+			db.profile.countBegin = checkCount
+		end
+		if db.profile.windowHeight < 320 or db.profile.windowHeight > 620 then
+			db.profile.windowHeight = defaults.windowHeight
+		end
+		if type(db.profile.viewerPosition[1]) ~= "string" or type(db.profile.viewerPosition[2]) ~= "string"
+		or type(db.profile.viewerPosition[3]) ~= "number" or type(db.profile.viewerPosition[4]) ~= "number"
+		or not BigWigsAPI.IsValidFramePoint(db.profile.viewerPosition[1]) or not BigWigsAPI.IsValidFramePoint(db.profile.viewerPosition[2]) then
+			db.profile.viewerPosition[1] = defaults.viewerPosition[1]
+			db.profile.viewerPosition[2] = defaults.viewerPosition[2]
+			db.profile.viewerPosition[3] = defaults.viewerPosition[3]
+			db.profile.viewerPosition[4] = defaults.viewerPosition[4]
+		else
+			local x = math.floor(db.profile.viewerPosition[3]+0.5)
+			if x ~= db.profile.viewerPosition[3] then
+				db.profile.viewerPosition[3] = x
+			end
+			local y = math.floor(db.profile.viewerPosition[4]+0.5)
+			if y ~= db.profile.viewerPosition[4] then
+				db.profile.viewerPosition[4] = y
+			end
+		end
+		if type(db.profile.instanceKeysPosition[1]) ~= "string" or type(db.profile.instanceKeysPosition[2]) ~= "string"
+		or type(db.profile.instanceKeysPosition[3]) ~= "number" or type(db.profile.instanceKeysPosition[4]) ~= "number"
+		or not BigWigsAPI.IsValidFramePoint(db.profile.instanceKeysPosition[1]) or not BigWigsAPI.IsValidFramePoint(db.profile.instanceKeysPosition[2]) then
+			db.profile.instanceKeysPosition[1] = defaults.instanceKeysPosition[1]
+			db.profile.instanceKeysPosition[2] = defaults.instanceKeysPosition[2]
+			db.profile.instanceKeysPosition[3] = defaults.instanceKeysPosition[3]
+			db.profile.instanceKeysPosition[4] = defaults.instanceKeysPosition[4]
+		else
+			local x = math.floor(db.profile.instanceKeysPosition[3]+0.5)
+			if x ~= db.profile.instanceKeysPosition[3] then
+				db.profile.instanceKeysPosition[3] = x
+			end
+			local y = math.floor(db.profile.instanceKeysPosition[4]+0.5)
+			if y ~= db.profile.instanceKeysPosition[4] then
+				db.profile.instanceKeysPosition[4] = y
+			end
+		end
+		if db.profile.instanceKeysFontSize < 14 or db.profile.instanceKeysFontSize > 200 then
+			db.profile.instanceKeysFontSize = defaults.instanceKeysFontSize
+		end
+		if db.profile.instanceKeysOutline ~= "NONE" and db.profile.instanceKeysOutline ~= "OUTLINE" and db.profile.instanceKeysOutline ~= "THICKOUTLINE" then
+			db.profile.instanceKeysOutline = defaults.instanceKeysOutline
+		end
+		if db.profile.instanceKeysAlign ~= "LEFT" and db.profile.instanceKeysAlign ~= "CENTER" and db.profile.instanceKeysAlign ~= "RIGHT" then
+			db.profile.instanceKeysAlign = defaults.instanceKeysAlign
+		end
+		ValidateColor(db.profile.instanceKeysColor, defaults.instanceKeysColor, 0.3)
+		ValidateColor(db.profile.instanceKeysOtherDungeonColor, defaults.instanceKeysOtherDungeonColor, 0.3)
+
+		if db.profile.progressTooltipFormat < 1 or db.profile.progressTooltipFormat > 3 or math.floor(db.profile.progressTooltipFormat+0.5) ~= db.profile.progressTooltipFormat then
+			db.profile.progressTooltipFormat = defaults.progressTooltipFormat
+		end
+		if db.profile.progressNameplateFormat < 1 or db.profile.progressNameplateFormat > 3 or math.floor(db.profile.progressNameplateFormat+0.5) ~= db.profile.progressNameplateFormat then
+			db.profile.progressNameplateFormat = defaults.progressNameplateFormat
+		end
+		if db.profile.progressNameplateTargetOffsetX < -300 or db.profile.progressNameplateTargetOffsetX > 300 or math.floor(db.profile.progressNameplateTargetOffsetX+0.5) ~= db.profile.progressNameplateTargetOffsetX then
+			db.profile.progressNameplateTargetOffsetX = defaults.progressNameplateTargetOffsetX
+		end
+		if db.profile.progressNameplateTargetOffsetY < -100 or db.profile.progressNameplateTargetOffsetY > 100 or math.floor(db.profile.progressNameplateTargetOffsetY+0.5) ~= db.profile.progressNameplateTargetOffsetY then
+			db.profile.progressNameplateTargetOffsetY = defaults.progressNameplateTargetOffsetY
+		end
+		if db.profile.progressNameplateOtherOffsetX < -300 or db.profile.progressNameplateOtherOffsetX > 300 or math.floor(db.profile.progressNameplateOtherOffsetX+0.5) ~= db.profile.progressNameplateOtherOffsetX then
+			db.profile.progressNameplateOtherOffsetX = defaults.progressNameplateOtherOffsetX
+		end
+		if db.profile.progressNameplateOtherOffsetY < -100 or db.profile.progressNameplateOtherOffsetY > 100 or math.floor(db.profile.progressNameplateOtherOffsetY+0.5) ~= db.profile.progressNameplateOtherOffsetY then
+			db.profile.progressNameplateOtherOffsetY = defaults.progressNameplateOtherOffsetY
+		end
+		if db.profile.progressNameplateFontSize < 10 or db.profile.progressNameplateFontSize > 200 or math.floor(db.profile.progressNameplateFontSize+0.5) ~= db.profile.progressNameplateFontSize then
+			db.profile.progressNameplateFontSize = defaults.progressNameplateFontSize
+		end
+		if db.profile.progressNameplateTargetAlign ~= "LEFT" and db.profile.progressNameplateTargetAlign ~= "CENTER" and db.profile.progressNameplateTargetAlign ~= "RIGHT" then
+			db.profile.progressNameplateTargetAlign = defaults.progressNameplateTargetAlign
+		end
+		if db.profile.progressNameplateOtherAlign ~= "LEFT" and db.profile.progressNameplateOtherAlign ~= "CENTER" and db.profile.progressNameplateOtherAlign ~= "RIGHT" then
+			db.profile.progressNameplateOtherAlign = defaults.progressNameplateOtherAlign
+		end
+		ValidateColor(db.profile.progressNameplateFontColorTarget, defaults.progressNameplateFontColorTarget, 0.3)
+		ValidateColor(db.profile.progressNameplateFontColorOther, defaults.progressNameplateFontColorOther, 0)
+		if db.profile.progressNameplateOutline ~= "NONE" and db.profile.progressNameplateOutline ~= "OUTLINE" and db.profile.progressNameplateOutline ~= "THICKOUTLINE" then
+			db.profile.progressNameplateOutline = defaults.progressNameplateOutline
+		end
+	end
+	ProfileUtils.ValidateMediaSettings = function()
+		if not BigWigsAPI:HasCountdown(db.profile.countVoice) then
+			db.profile.countVoice = defaults.countVoice
+		end
+		if not LibSharedMedia:IsValid("sound", db.profile.countStartSound) then
+			db.profile.countStartSound = defaults.countStartSound
+		end
+		if not LibSharedMedia:IsValid("sound", db.profile.countEndSound) then
+			db.profile.countEndSound = defaults.countEndSound
+		end
+		if not LibSharedMedia:IsValid("font", db.profile.instanceKeysFontName) or not BigWigsAPI.IsValidMediaPath(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName)) then
+			db.profile.instanceKeysFontName = defaults.instanceKeysFontName
+		end
+		if not LibSharedMedia:IsValid("font", db.profile.progressNameplateFontName) or not BigWigsAPI.IsValidMediaPath(LibSharedMedia:Fetch("font", db.profile.progressNameplateFontName)) then
+			db.profile.progressNameplateFontName = defaults.progressNameplateFontName
+		end
+	end
+
+	local function CopyTable(settingsTable)
+		local copy = {}
+		for key, value in next, settingsTable do
+			if type(value) == "table" then
+				copy[key] = CopyTable(value)
+			else
+				copy[key] = value
+			end
+		end
+		return copy
+	end
+	ProfileUtils.ResetInstanceKeys = function()
+		db.profile.instanceKeysPosition = CopyTable(defaults.instanceKeysPosition)
+		db.profile.instanceKeysFontName = defaults.instanceKeysFontName
+		db.profile.instanceKeysFontSize = defaults.instanceKeysFontSize
+		db.profile.instanceKeysMonochrome = defaults.instanceKeysMonochrome
+		db.profile.instanceKeysGrowUpwards = defaults.instanceKeysGrowUpwards
+		db.profile.instanceKeysOutline = defaults.instanceKeysOutline
+		db.profile.instanceKeysAlign = defaults.instanceKeysAlign
+		db.profile.instanceKeysColor = CopyTable(defaults.instanceKeysColor)
+		db.profile.instanceKeysOtherDungeonColor = CopyTable(defaults.instanceKeysOtherDungeonColor)
+		db.profile.instanceKeysShowAllPlayers = defaults.instanceKeysShowAllPlayers
+		db.profile.instanceKeysShowDungeonEnd = defaults.instanceKeysShowDungeonEnd
+	end
+	ProfileUtils.ResetNameplates = function()
+		db.profile.progressNameplateTargetOffsetX = defaults.progressNameplateTargetOffsetX
+		db.profile.progressNameplateTargetOffsetY = defaults.progressNameplateTargetOffsetY
+		db.profile.progressNameplateOtherOffsetX = defaults.progressNameplateOtherOffsetX
+		db.profile.progressNameplateOtherOffsetY = defaults.progressNameplateOtherOffsetY
+		db.profile.progressNameplateFontName = defaults.progressNameplateFontName
+		db.profile.progressNameplateFontSize = defaults.progressNameplateFontSize
+		db.profile.progressNameplateFontColorTarget = CopyTable(defaults.progressNameplateFontColorTarget)
+		db.profile.progressNameplateFontColorOther = CopyTable(defaults.progressNameplateFontColorOther)
+		db.profile.progressNameplateOutline = defaults.progressNameplateOutline
+		db.profile.progressNameplateMonochrome = defaults.progressNameplateMonochrome
+		db.profile.progressNameplateSlugRendering = defaults.progressNameplateSlugRendering
+		db.profile.progressNameplateTargetAlign = defaults.progressNameplateTargetAlign
+		db.profile.progressNameplateOtherAlign = defaults.progressNameplateOtherAlign
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Data
+--
+
+local roleIcons = {
+	TANK = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Role_Tank:16:16|t",
+	HEALER = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Role_Healer:16:16|t",
+	DAMAGER = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Role_Damage:16:16|t",
+}
+local hiddenIcon = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Private:16:16|t"
+local dungeonNamesTiny = { -- MapChallengeMode DB2
+	[500] = L.keystoneShortName_TheRookery, -- ROOK
+	[504] = L.keystoneShortName_DarkflameCleft, -- DFC
+	[499] = L.keystoneShortName_PrioryOfTheSacredFlame, -- PRIORY
+	[506] = L.keystoneShortName_CinderbrewMeadery, -- BREW
+	[525] = L.keystoneShortName_OperationFloodgate, -- FLOOD
+	[382] = L.keystoneShortName_TheaterOfPain, -- TOP
+	[247] = L.keystoneShortName_TheMotherlode, -- ML
+	[370] = L.keystoneShortName_OperationMechagonWorkshop, -- WORK
+
+	[542] = L.keystoneShortName_EcoDomeAldani, -- ECODOME
+	[378] = L.keystoneShortName_HallsOfAtonement, -- HOA
+	[503] = L.keystoneShortName_AraKaraCityOfEchoes, -- ARAK
+	[392] = L.keystoneShortName_TazaveshSoleahsGambit, -- GAMBIT
+	[391] = L.keystoneShortName_TazaveshStreetsOfWonder, -- STREET
+	[505] = L.keystoneShortName_TheDawnbreaker, -- DAWN
+
+	[199] = L.keystoneShortName_BlackRookHold, -- BRH
+	[210] = L.keystoneShortName_CourtOfStars, -- COS
+	[198] = L.keystoneShortName_DarkheartThicket, -- DHT
+	[197] = L.keystoneShortName_EyeOfAzshara, -- EOA
+	[200] = L.keystoneShortName_HallsOfValor, -- HOV
+	[208] = L.keystoneShortName_MawOfSouls, -- MOS
+	[206] = L.keystoneShortName_NeltharionsLair, -- NL
+	[209] = L.keystoneShortName_TheArcway, -- ARC
+	[207] = L.keystoneShortName_VaultOfTheWardens, -- VOTW
+	[227] = L.keystoneShortName_ReturnToKarazhanLower, -- LKARA
+	[234] = L.keystoneShortName_ReturnToKarazhanUpper, -- UKARA
+	[233] = L.keystoneShortName_CathedralOfEternalNight, -- COEN
+	[239] = L.keystoneShortName_SeatOfTheTriumvirate, -- SOTT
+
+	[557] = L.keystoneShortName_WindrunnerSpire, -- SPIRE
+	[558] = L.keystoneShortName_MagistersTerrace, -- MT
+	[560] = L.keystoneShortName_MaisaraCaverns, -- CAVERN
+	[559] = L.keystoneShortName_NexusPointXenas, -- XENAS
+	[402] = L.keystoneShortName_AlgetharAcademy, -- AA
+	[583] = L.keystoneShortName_SeatOfTheTriumvirate, -- SOTT
+	[161] = L.keystoneShortName_Skyreach, -- SKY
+	[556] = L.keystoneShortName_PitOfSaron, -- PIT
+
+	[249] = L.keystoneShortName_KingsRest, -- REST
+	[250] = L.keystoneShortName_TempleOfSethraliss, -- TEMPLE
+	[399] = L.keystoneShortName_RubyLifePools, -- POOLS
+	[584] = L.keystoneShortName_TheBlindingVale, -- VALE
+	[585] = L.keystoneShortName_VoidscarArena, -- ARENA
+	[586] = L.keystoneShortName_DenOfNalorakk, -- DEN
+	[587] = L.keystoneShortName_MurderRow, -- MURDER
+	[588] = L.keystoneShortName_AltarOfFangs, -- ALTAR
+}
+local dungeonNamesTrimmed = {
+	[500] = L.keystoneShortName_TheRookery_Bar, -- Rookery
+	[504] = L.keystoneShortName_DarkflameCleft_Bar, -- Darkflame
+	[499] = L.keystoneShortName_PrioryOfTheSacredFlame_Bar, -- Priory
+	[506] = L.keystoneShortName_CinderbrewMeadery_Bar, -- Cinderbrew
+	[525] = L.keystoneShortName_OperationFloodgate_Bar, -- Floodgate
+	[382] = L.keystoneShortName_TheaterOfPain_Bar, -- Theater
+	[247] = L.keystoneShortName_TheMotherlode_Bar, -- Motherlode
+	[370] = L.keystoneShortName_OperationMechagonWorkshop_Bar, -- Workshop
+
+	[542] = L.keystoneShortName_EcoDomeAldani_Bar, -- Eco-Dome
+	[378] = L.keystoneShortName_HallsOfAtonement_Bar, -- Halls
+	[503] = L.keystoneShortName_AraKaraCityOfEchoes_Bar, -- Ara-Kara
+	[392] = L.keystoneShortName_TazaveshSoleahsGambit_Bar, -- Gambit
+	[391] = L.keystoneShortName_TazaveshStreetsOfWonder_Bar, -- Streets
+	[505] = L.keystoneShortName_TheDawnbreaker_Bar, -- Dawnbreaker
+
+	[199] = L.keystoneShortName_BlackRookHold_Bar, -- Black Rook
+	[210] = L.keystoneShortName_CourtOfStars_Bar, -- Court
+	[198] = L.keystoneShortName_DarkheartThicket_Bar, -- Darkheart
+	[197] = L.keystoneShortName_EyeOfAzshara_Bar, -- Eye
+	[200] = L.keystoneShortName_HallsOfValor_Bar, -- Halls
+	[208] = L.keystoneShortName_MawOfSouls_Bar, -- Maw
+	[206] = L.keystoneShortName_NeltharionsLair_Bar, -- Lair
+	[209] = L.keystoneShortName_TheArcway_Bar, -- Arcway
+	[207] = L.keystoneShortName_VaultOfTheWardens_Bar, -- Vault
+	[227] = L.keystoneShortName_ReturnToKarazhanLower_Bar, -- Lower Kara
+	[234] = L.keystoneShortName_ReturnToKarazhanUpper_Bar, -- Upper Kara
+	[233] = L.keystoneShortName_CathedralOfEternalNight_Bar, -- Cathedral
+	[239] = L.keystoneShortName_SeatOfTheTriumvirate_Bar, -- Triumvirate
+
+	[557] = L.keystoneShortName_WindrunnerSpire_Bar, -- Spire
+	[558] = L.keystoneShortName_MagistersTerrace_Bar, -- Terrace
+	[560] = L.keystoneShortName_MaisaraCaverns_Bar, -- Caverns
+	[559] = L.keystoneShortName_NexusPointXenas_Bar, -- Xenas
+	[402] = L.keystoneShortName_AlgetharAcademy_Bar, -- Academy
+	[583] = L.keystoneShortName_SeatOfTheTriumvirate_Bar, -- Triumvirate
+	[161] = L.keystoneShortName_Skyreach_Bar, -- Skyreach
+	[556] = L.keystoneShortName_PitOfSaron_Bar, -- Pit
+
+	[249] = L.keystoneShortName_KingsRest_Bar, -- Rest
+	[250] = L.keystoneShortName_TempleOfSethraliss_Bar, -- Temple
+	[399] = L.keystoneShortName_RubyLifePools_Bar, -- Pools
+	[584] = L.keystoneShortName_TheBlindingVale_Bar, -- Vale
+	[585] = L.keystoneShortName_VoidscarArena_Bar, -- Arena
+	[586] = L.keystoneShortName_DenOfNalorakk_Bar, -- Den
+	[587] = L.keystoneShortName_MurderRow_Bar, -- Murder
+	[588] = L.keystoneShortName_AltarOfFangs_Bar, -- Altar
+}
+local dungeonMapWithMultipleKeys = {
+	[1651] = true, -- Return to Karazhan
+	[2441] = true, -- Tazavesh, the Veiled Market
+}
+local teleportList = {
+	-- Current Season (Built Automatically)
+	{},
+	-- Midnight
+	{
+		[2805] = 1254400, -- Windrunner Spire
+		[2811] = 1254572, -- Magisters' Terrace
+		[2813] = 1286809, -- Murder Row
+		[2825] = 1286807, -- Den of Nalorakk
+		[2859] = 1286801, -- The Blinding Vale
+		[2874] = 1254559, -- Maisara Caverns
+		[2915] = 1254563, -- Nexus-Point Xenas
+		[2923] = 1286804, -- Voidscar Arena
+		[2993] = 1286812, -- Altar of Fangs
+	},
+	-- The War Within
+	{
+		[2648] = 445443, -- The Rookery
+		[2649] = 445444, -- Priory of the Sacred Flame
+		[2651] = 445441, -- Darkflame Cleft
+		[2652] = 445269, -- The Stonevault
+		[2660] = 445417, -- Ara-Kara, City of Echoes
+		[2661] = 445440, -- Cinderbrew Meadery
+		[2662] = 445414, -- The Dawnbreaker
+		[2669] = 445416, -- City of Threads
+		[2773] = 1216786, -- Operation: Floodgate
+		[2830] = 1237215, -- Eco-Dome Al'dani
+	},
+	-- Dragonflight
+	{
+		[2451] = 393222, -- Uldaman: Legacy of Tyr
+		[2515] = 393279, -- The Azure Vault
+		[2516] = 393262, -- The Nokhud Offensive
+		[2519] = 393276, -- Neltharus
+		[2520] = 393267, -- Brackenhide Hollow
+		[2521] = 393256, -- Ruby Life Pools
+		[2526] = 393273, -- Algeth'ar Academy
+		[2527] = 393283, -- Halls of Infusion
+		[2579] = 424197, -- Dawn of the Infinite
+	},
+	-- Shadowlands
+	{
+		[2284] = 354469, -- Sanguine Depths
+		[2285] = 354466, -- Spires of Ascension
+		[2286] = 354462, -- The Necrotic Wake
+		[2287] = 354465, -- Halls of Atonement
+		[2289] = 354463, -- Plaguefall
+		[2290] = 354464, -- Mists of Tirna Scithe
+		[2291] = 354468, -- De Other Side
+		[2293] = 354467, -- Theater of Pain
+		[2441] = 367416, -- Tazavesh, the Veiled Market
+	},
+	-- Battle for Azeroth
+	{
+		[1763] = 424187, -- Atal'Dazar
+		[1754] = 410071, -- Freehold
+		[1762] = 1286831, -- King's Rest
+		--[1864] = lw_bfa, -- Shrine of the Storm
+		[1822] = UnitFactionGroup("player") == "Alliance" and 445418 or 464256, -- Siege of Boralus
+		[1877] = 1286828, -- Temple of Sethraliss
+		[1594] = UnitFactionGroup("player") == "Alliance" and 467553 or 467555, -- The MOTHERLODE!!
+		--[1771] = lw_bfa, -- Tol Dagor
+		[1841] = 410074, -- The Underrot
+		[1862] = 424167, -- Waycrest Manor
+		[2097] = 373274, -- Operation: Mechagon
+	},
+	-- Legion
+	{
+		--[1544] = lw_l, -- Assault on Violet Hold
+		--[1677] = lw_l, -- Cathedral of Eternal Night
+		[1571] = 393766, -- Court of Stars
+		[1651] = 373262, -- Return to Karazhan
+		[1501] = 424153, -- Black Rook Hold
+		--[1516] = lw_l, -- The Arcway
+		[1466] = 424163, -- Darkheart Thicket
+		[1458] = 410078, -- Neltharion's Lair
+		--[1456] = lw_l, -- Eye of Azshara
+		--[1492] = lw_l, -- Maw of Souls
+		[1477] = 393764, -- Halls of Valor
+		--[1493] = lw_l, -- Vault of the Wardens
+		[1753] = 1254551, -- Seat of the Triumvirate
+	},
+	-- Warlords of Draenor
+	{
+		[1209] = 159898, -- Skyreach -- XXX 1254557 was also added, which will be used..?
+		[1176] = 159899, -- Shadowmoon Burial Grounds
+		[1208] = 159900, -- Grimrail Depot
+		[1279] = 159901, -- The Everbloom
+		[1195] = 159896, -- Iron Docks
+		[1182] = 159897, -- Auchindoun
+		[1175] = 159895, -- Bloodmaul Slag Mines
+		[1358] = 159902, -- Upper Blackrock Spire
+	},
+	-- Mists of Pandaria
+	{
+		[959] = 131206, -- Shado-Pan Monastery
+		[960] = 131204, -- Temple of the Jade Serpent
+		[961] = 131205, -- Stormstout Brewery
+		[962] = 131225, -- Gate of the Setting Sun
+		[994] = 131222, -- Mogu'shan Palace
+		[1001] = 131231, -- Scarlet Halls
+		[1007] = 131232, -- Scholomance
+		[1011] = 131228, -- Siege of Niuzao Temple
+		--[1112] = lw_mists, -- Pursuing the Black Harvest
+		[1004] = 131229, -- Scarlet Monastery
+	},
+	-- Cataclysm
+	{
+		--[859] = lw_cata, -- Zul'Gurub
+		[643] = 424142, -- Throne of the Tides
+		--[644] = lw_cata, -- Halls of Origination
+		--[645] = lw_cata, -- Blackrock Caverns
+		--[755] = lw_cata, -- Lost City of the Tol'vir
+		--[725] = lw_cata, -- The Stonecore
+		--[938] = lw_cata, -- End Time
+		--[939] = lw_cata, -- Well of Eternity
+		--[940] = lw_cata, -- Hour of Twilight
+		[657] = 410080, -- The Vortex Pinnacle
+		[670] = 445424, -- Grim Batol
+	},
+	-- Wrath of the Lich King
+	{
+		--[576] = lw_wotlk, -- The Nexus
+		--[578] = lw_wotlk, -- The Oculus
+		--[608] = lw_wotlk, -- Violet Hold
+		--[595] = lw_wotlk, -- The Culling of Stratholme
+		--[619] = lw_wotlk, -- Ahn'kahet: The Old Kingdom
+		--[604] = lw_wotlk, -- Gundrak
+		--[574] = lw_wotlk, -- Utgarde Keep
+		--[575] = lw_wotlk, -- Utgarde Pinnacle
+		--[602] = lw_wotlk, -- Halls of Lightning
+		--[601] = lw_wotlk, -- Azjol-Nerub
+		[658] = 1254555, -- Pit of Saron
+		--[599] = lw_wotlk, -- Halls of Stone
+		--[600] = lw_wotlk, -- Drak'Tharon Keep
+		--[650] = lw_wotlk, -- Trial of the Champion
+		--[668] = lw_wotlk, -- Halls of Reflection
+		--[632] = lw_wotlk, -- The Forge of Souls
+	},
+}
+
+for mapID in next, BigWigsLoader.currentExpansion.currentSeason do -- Automatically build the current season list
+	for expansionIndex = 2, #teleportList do
+		local spellID = teleportList[expansionIndex][mapID]
+		if spellID then
+			teleportList[1][mapID] = spellID
+			break
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Locals
+--
+
+local LibKeystone = LibStub("LibKeystone")
+local LibSpec = LibStub("LibSpecialization")
+local bwTooltip = BigWigsAPI.GetTooltip()
+
+local LibKeystoneRequest = LibKeystone.Request
+local LibKeystoneRegister = LibKeystone.Register
+local LibKeystoneUnregister = LibKeystone.Unregister
+
+local guildList, partyList = {}, {}
+local WIDTH_NAME, WIDTH_LEVEL, WIDTH_MAP, WIDTH_RATING = 150, 24, 74, 42
+
+local GetMapUIInfo = C_ChallengeMode.GetMapUIInfo
+
+if db.profile.hideFromGuild then
+	LibKeystone.SetGuildHidden(true)
+end
+
+--------------------------------------------------------------------------------
+-- GUI Widgets
+--
+
+local cellsCurrentlyShowing = {}
+local cellsAvailable = {}
+local tab1, tab2
+
+local mainPanel = CreateFrame("Frame", nil, UIParent, "PortraitFrameTemplate")
+mainPanel:Hide()
+mainPanel:SetSize(350, db.profile.windowHeight)
+do
+	local point, relPoint = db.profile.viewerPosition[1], db.profile.viewerPosition[2]
+	local x, y = db.profile.viewerPosition[3], db.profile.viewerPosition[4]
+	mainPanel:SetPoint(point, UIParent, relPoint, x, y)
+end
+mainPanel:SetFrameStrata("MEDIUM")
+mainPanel:SetFixedFrameStrata(true)
+mainPanel:SetFrameLevel(9500)
+mainPanel:SetFixedFrameLevel(true)
+mainPanel:SetClampedToScreen(true)
+mainPanel:SetMovable(true)
+mainPanel:EnableMouse(true)
+mainPanel:RegisterForDrag("LeftButton")
+mainPanel:SetTitle(L.keystoneTitle)
+mainPanel:SetTitleOffsets(0, 0)
+mainPanel:SetBorder("HeldBagLayout")
+mainPanel:SetPortraitTextureSizeAndOffset(38, -5, 0)
+mainPanel:SetPortraitTextureRaw("Interface\\AddOns\\BigWigs\\Media\\Icons\\minimap_raid.tga")
+mainPanel:SetScript("OnDragStart", mainPanel.StartMoving)
+mainPanel:SetScript("OnDragStop", function(self)
+	self:StopMovingOrSizing()
+	local point, _, relPoint, x, y = self:GetPoint()
+	x = math.floor(x+0.5)
+	y = math.floor(y+0.5)
+	db.profile.viewerPosition[1] = point
+	db.profile.viewerPosition[2] = relPoint
+	db.profile.viewerPosition[3] = x
+	db.profile.viewerPosition[4] = y
+end)
+mainPanel:SetResizable(true)
+mainPanel:SetResizeBounds(350, 320, 350, 620)
+do
+	local function OnMouseDown(self)
+		self:GetParent():StartSizing("BOTTOMRIGHT")
+		bwTooltip:Hide()
+	end
+	local function OnMouseUp(self)
+		local parent = self:GetParent()
+		parent:StopMovingOrSizing()
+		local height = parent:GetHeight()
+		height = math.floor(height+0.5)
+		db.profile.windowHeight = height
+		parent:SetHeight(height)
+	end
+
+	local drag = CreateFrame("Frame", nil, mainPanel)
+	drag:SetWidth(12)
+	drag:SetHeight(12)
+	drag:SetPoint("BOTTOMRIGHT", -3, 5)
+	drag:EnableMouse(true)
+	drag:SetScript("OnMouseDown", OnMouseDown)
+	drag:SetScript("OnMouseUp", OnMouseUp)
+	drag:SetScript("OnEnter", function(self)
+		bwTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		bwTooltip:AddLine(L.dragToResize)
+		bwTooltip:Show()
+	end)
+	drag:SetScript("OnLeave", function() bwTooltip:Hide() end)
+	local tex = drag:CreateTexture(nil, "OVERLAY")
+	tex:SetTexture("Interface\\AddOns\\BigWigs\\Media\\Icons\\draghandle")
+	tex:SetAllPoints(drag)
+
+	local text = mainPanel.TitleContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	text:SetJustifyH("RIGHT")
+	text:SetText("/key")
+	text:SetSize(50, 30)
+	text:SetTextColor(0.65, 0.65, 0.65)
+	text:SetPoint("RIGHT", -26, 0)
+
+	local teleportBar = mainPanel:CreateTexture(nil, nil, nil, 5)
+	teleportBar:Hide()
+	mainPanel.teleportBar = teleportBar
+
+	local tip = CreateFrame("Frame", nil, mainPanel, "GlowBoxTemplate")
+	tip:Hide()
+	mainPanel.tip = tip
+	tip:SetSize(200, 60)
+	tip:SetPoint("BOTTOM", mainPanel, "TOP", 45, 20)
+	local arrow = CreateFrame("Frame", nil, tip, "GlowBoxArrowTemplate")
+	arrow:SetPoint("TOP", tip, "BOTTOM", 20, 5)
+	local tipText = tip:CreateFontString(nil, "OVERLAY", "GameFontHighlightLeft")
+	tipText:SetJustifyH("LEFT")
+	tipText:SetJustifyV("TOP")
+	tipText:SetSize(180, 0)
+	tipText:SetPoint("CENTER")
+	tipText:SetText(L.keystoneTeleportTip)
+end
+
+local UpdateMyKeystone
+do
+	-- XXX temp Lemix
+	local GetContainerNumSlots, GetContainerItemID, GetContainerItemLink = C_Container.GetContainerNumSlots, C_Container.GetContainerItemID, C_Container.GetContainerItemLink
+	local IsItemKeystoneByID, PlayerIsTimerunning = C_Item.IsItemKeystoneByID, PlayerIsTimerunning
+	local strsplit = string.split
+
+	local GetMaxPlayerLevel = GetMaxPlayerLevel
+	local GetWeeklyResetStartTime = C_DateAndTime.GetWeeklyResetStartTime
+	local GetOwnedKeystoneLevel, GetOwnedKeystoneChallengeMapID = C_MythicPlus.GetOwnedKeystoneLevel, C_MythicPlus.GetOwnedKeystoneChallengeMapID
+	local GetPlayerMythicPlusRatingSummary = C_PlayerInfo.GetPlayerMythicPlusRatingSummary
+	local GetRealmName = GetRealmName
+
+	local myKeyLevel, myKeyMap, myRating = 0, 0, 0
+	UpdateMyKeystone = function(self, event, id, isReloadingUi)
+		if event == "PLAYER_ENTERING_WORLD" then
+			if id or isReloadingUi then
+				if SLASH_KEYSTONE3 then
+					SLASH_KEYSTONE3 = nil
+				end
+				if SLASH_KEYSTONE2 and db.global.slashKeys then
+					SLASH_KEYSTONE2 = nil
+				end
+				if SLASH_KEYSTONE1 and db.global.slashKeystone then
+					if not db.global.slashKeys then
+						SLASH_KEYSTONE1 = SLASH_KEYSTONE2
+					else
+						SLASH_KEYSTONE1 = nil
+					end
+				end
+			end
+			if BigWigsLoader.UnitLevel("player") ~= GetMaxPlayerLevel() then
+				return
+			end
+		elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" and id ~= 3 and id ~= 49 then -- 3 = Gossip (key downgrade NPC), 49 = WeeklyRewards (vault)
+			return
+		end
+
+		if type(BigWigs3DB.myKeystones) ~= "table" then
+			BigWigs3DB.myKeystones = {}
+		end
+		local resetStart = GetWeeklyResetStartTime()
+		if type(BigWigs3DB.prevWeeklyReset) ~= "number" or resetStart ~= BigWigs3DB.prevWeeklyReset then
+			BigWigs3DB.prevWeeklyReset = resetStart
+			BigWigs3DB.myKeystones = {}
+		end
+
+		local keyLevel = GetOwnedKeystoneLevel()
+		if type(keyLevel) == "number" then
+			myKeyLevel = keyLevel
+		end
+		-- Keystone instance ID
+		local keyChallengeMapID = GetOwnedKeystoneChallengeMapID()
+		if type(keyChallengeMapID) == "number" then
+			myKeyMap = keyChallengeMapID
+		end
+		-- M+ rating
+		local playerRatingSummary = GetPlayerMythicPlusRatingSummary("player")
+		if type(playerRatingSummary) == "table" and type(playerRatingSummary.currentSeasonScore) == "number" then
+			myRating = playerRatingSummary.currentSeasonScore
+		end
+
+		-- XXX temp Lemix
+		if not keyLevel and not keyChallengeMapID and PlayerIsTimerunning and PlayerIsTimerunning() then
+			for currentBag = 0, 4 do -- 0=Backpack, 1/2/3/4=Bags
+				local slots = GetContainerNumSlots(currentBag)
+				for currentSlot = 1, slots do
+					local itemID = GetContainerItemID(currentBag, currentSlot)
+					if itemID and IsItemKeystoneByID(itemID) then
+						local itemLink = GetContainerItemLink(currentBag, currentSlot)
+						if type(itemLink) == "string" then
+							local _, _, _, strChallengeMapID, strLevel = strsplit(":", itemLink)
+							local challengeMapID = tonumber(strChallengeMapID)
+							local level = tonumber(strLevel)
+							if challengeMapID and level then
+								myKeyMap = challengeMapID
+								myKeyLevel = level
+								myRating = -1
+								break
+							end
+						end
+					end
+				end
+			end
+		end
+
+		local guid = BigWigsLoader.UnitGUID("player")
+		local name = BigWigsLoader.UnitName("player")
+		local realm = GetRealmName()
+		local specID = LibSpec.MySpecialization()
+		BigWigs3DB.myKeystones[guid] = {
+			keyLevel = myKeyLevel,
+			keyMap = myKeyMap,
+			playerRating = myRating,
+			specId = specID or 0,
+			name = name,
+			realm = realm,
+		}
+	end
+	mainPanel:SetScript("OnEvent", UpdateMyKeystone)
+end
+-- If only PLAYER_LOGOUT would work for keystone info, sigh :(
+mainPanel:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
+mainPanel:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+local function WipeCells()
+	for cell in next, cellsCurrentlyShowing do
+		cell:Hide()
+		cell:ClearAttributes()
+		cell:SetScript("PostClick", nil)
+		cell:SetScript("OnUpdate", nil)
+		cell.tooltip = nil
+		cell.playerName = nil
+		cell:ClearAllPoints()
+		cellsAvailable[#cellsAvailable+1] = cell
+	end
+	mainPanel.teleportBar:ClearAllPoints()
+	mainPanel.teleportBar:SetParent(mainPanel)
+	mainPanel.teleportBar:Hide()
+	cellsCurrentlyShowing = {}
+end
+local headersAvailable = {}
+local headersCurrentlyShowing = {}
+local function WipeHeaders()
+	for i = 1, #headersCurrentlyShowing do
+		local header = headersCurrentlyShowing[i]
+		header:Hide()
+		header:ClearAllPoints()
+		headersAvailable[#headersAvailable+1] = header
+	end
+	headersCurrentlyShowing = {}
+end
+
+local teleportButtons = {}
+mainPanel.CloseButton:SetScript("OnClick", function(self)
+	self:UnregisterAllEvents()
+	tab2:SetScript("OnUpdate", nil)
+	WipeCells()
+	WipeHeaders()
+	mainPanel:Hide()
+	tab1:Enable() -- Enable tab1 so :Click always works when we open the main panel again
+end)
+mainPanel.CloseButton:UnregisterAllEvents() -- Remove events registered by the template
+mainPanel.CloseButton:SetScript("OnEvent", mainPanel.CloseButton.Click)
+
+local scrollArea = CreateFrame("ScrollFrame", nil, mainPanel, "ScrollFrameTemplate")
+scrollArea:SetPoint("TOPLEFT", mainPanel, "TOPLEFT", 8, -30)
+scrollArea:SetPoint("BOTTOMRIGHT", mainPanel, "BOTTOMRIGHT", -24, 5)
+
+local scrollChild = CreateFrame("Frame", nil, scrollArea)
+scrollArea:SetScrollChild(scrollChild)
+scrollChild:SetSize(scrollArea:GetWidth(), 320)
+scrollChild:SetPoint("LEFT")
+
+local partyRefreshButton = CreateFrame("Button", nil, scrollChild)
+partyRefreshButton:Hide()
+partyRefreshButton:SetSize(20, 20)
+partyRefreshButton:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
+partyRefreshButton:SetPushedTexture("Interface\\Buttons\\UI-RefreshButton-Down")
+partyRefreshButton:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
+partyRefreshButton:SetScript("OnClick", function()
+	partyList = {}
+	LibKeystoneRequest("PARTY")
+end)
+partyRefreshButton:SetScript("OnEnter", function(self)
+	bwTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	bwTooltip:AddLine(L.keystoneRefreshParty)
+	bwTooltip:Show()
+end)
+partyRefreshButton:SetScript("OnLeave", function() bwTooltip:Hide() end)
+
+-- Refresh button for Guild section
+local guildRefreshButton = CreateFrame("Button", nil, scrollChild)
+guildRefreshButton:Hide()
+guildRefreshButton:SetSize(20, 20)
+guildRefreshButton:SetNormalTexture("Interface\\Buttons\\UI-RefreshButton")
+guildRefreshButton:SetPushedTexture("Interface\\Buttons\\UI-RefreshButton-Down")
+guildRefreshButton:SetHighlightTexture("Interface\\Buttons\\UI-RefreshButton")
+guildRefreshButton:SetScript("OnClick", function()
+	guildList = {}
+	LibSpec.RequestGuildSpecialization()
+	BigWigsLoader.CTimerAfter(0.2, function() LibKeystoneRequest("GUILD") end)
+end)
+guildRefreshButton:SetScript("OnEnter", function(self)
+	bwTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	bwTooltip:AddLine(L.keystoneRefreshGuild)
+	bwTooltip:Show()
+end)
+guildRefreshButton:SetScript("OnLeave", function() bwTooltip:Hide() end)
+
+local OnEnterShowTooltip = function(self)
+	bwTooltip:SetOwner(self, "ANCHOR_TOP")
+	bwTooltip:AddLine(self.tooltip)
+	bwTooltip:Show()
+end
+local function CreateCell()
+	local cell = cellsAvailable[#cellsAvailable]
+	if cell then
+		cellsAvailable[#cellsAvailable] = nil
+		cell:Show()
+		cellsCurrentlyShowing[cell] = true
+		return cell
+	else
+		cell = CreateFrame("Button", nil, scrollChild, "InsecureActionButtonTemplate")
+		cell:SetSize(20, 20)
+		cell:SetScript("OnEnter", OnEnterShowTooltip)
+		cell:SetScript("OnLeave", function() bwTooltip:Hide() end)
+		cell:RegisterForClicks("AnyDown", "AnyUp")
+
+		cell.text = cell:CreateFontString(nil, nil, "GameFontNormal")
+		cell.text:SetAllPoints(cell)
+		cell.text:SetJustifyH("CENTER")
+
+		local bg = cell:CreateTexture(nil, nil, nil, -5)
+		bg:SetAllPoints(cell)
+		bg:SetColorTexture(0, 0, 0, 0.6)
+		cell.bg = bg
+
+		cellsCurrentlyShowing[cell] = true
+		return cell
+	end
+end
+
+for _ = 1, 100 do -- XXX temp (hopefully)
+	CreateCell()
+end
+WipeCells()
+
+local function CreateHeader()
+	local header = headersAvailable[#headersAvailable]
+	if header then
+		headersAvailable[#headersAvailable] = nil
+		headersCurrentlyShowing[#headersCurrentlyShowing+1] = header
+		header:Show()
+		return header
+	else
+		header = scrollChild:CreateFontString(nil, nil, "GameFontNormalLarge")
+		header:SetJustifyH("CENTER")
+		headersCurrentlyShowing[#headersCurrentlyShowing+1] = header
+		return header
+	end
+end
+
+do
+	local function OnEnter(self)
+		bwTooltip:SetOwner(self, "ANCHOR_TOP")
+		if InCombatLockdown() then
+			bwTooltip:AddLine(L.keystoneTeleportInCombat)
+		else
+			local spellName = BigWigsLoader.GetSpellName(self.spellID)
+			if not BigWigsLoader.IsSpellKnownOrInSpellBook(self.spellID) then
+				bwTooltip:AddLine(L.keystoneTeleportNotLearned:format(spellName))
+			else
+				local cd = BigWigsLoader.GetSpellCooldown(self.spellID)
+				if cd.startTime > 0 and cd.duration > 0 then
+					local remainingSeconds = (cd.startTime + cd.duration) - GetTime()
+					local hours = math.floor(remainingSeconds / 3600)
+					remainingSeconds = remainingSeconds % 3600
+					local minutes = math.floor(remainingSeconds / 60)
+					bwTooltip:AddLine(L.keystoneTeleportOnCooldown:format(spellName, hours, minutes))
+				else
+					bwTooltip:AddLine(L.keystoneTeleportReady:format(spellName))
+				end
+			end
+		end
+		bwTooltip:Show()
+	end
+
+	local function SortTable(buttonA, buttonB) return buttonA.text < buttonB.text end
+	local GetRealZoneText = GetRealZoneText
+	local prevButton = nil
+	for expansionIndex = 1, #teleportList do
+		if not teleportButtons[expansionIndex] then
+			teleportButtons[expansionIndex] = {}
+		end
+
+		for mapID, spellID in next, teleportList[expansionIndex] do
+			local button = CreateFrame("Button", nil, scrollChild, "InsecureActionButtonTemplate")
+			teleportButtons[expansionIndex][#teleportButtons[expansionIndex]+1] = button
+			button.text = GetRealZoneText(mapID)
+			button.spellID = spellID
+			button:SetAttribute("type", "spell")
+			button:SetAttribute("spell", spellID)
+			button:Hide()
+			button:SetSize(90, 48)
+			button:SetScript("OnEnter", OnEnter)
+			button:SetScript("OnLeave", function() bwTooltip:Hide() end)
+			button:RegisterForClicks("AnyDown", "AnyUp")
+			button:SetHitRectInsets(-52, 0, 0, 0) -- Allow clicking the icon to work
+
+			local text = button:CreateFontString(nil, nil, "GameFontNormal")
+			text:SetPoint("CENTER")
+			text:SetSize(86, 44) -- Button size minus 4
+			text:SetJustifyH("CENTER")
+			text:SetText(button.text)
+			while text:IsTruncated() do -- For really long single words like "MOTHERLODE!!"
+				text:SetTextScale(text:GetTextScale() - 0.01)
+			end
+
+			local icon = button:CreateTexture()
+			icon:SetSize(48, 48)
+			icon:SetPoint("RIGHT", button, "LEFT", -4, 0)
+			local texture = BigWigsLoader.GetSpellTexture(spellID)
+			icon:SetTexture(texture)
+			icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+			button.icon = icon
+
+			local bg = button:CreateTexture(nil, nil, nil, -5)
+			bg:SetAllPoints(button)
+			bg:SetColorTexture(0, 0, 0, 0.6)
+
+			button.cdbar = button:CreateTexture(nil, nil, nil, 5)
+			button.cdbar:SetPoint("TOPLEFT")
+			button.cdbar:SetPoint("BOTTOMLEFT")
+			button.cdbar:SetColorTexture(1, 1, 1, 0.6)
+			button.cdbar:Hide()
+		end
+		table.sort(teleportButtons[expansionIndex], SortTable)
+		if expansionIndex > 1 then
+			teleportButtons[expansionIndex][1]:SetPoint("TOP", prevButton, "BOTTOM", 0, -36)
+		end
+		for i = 2, #teleportButtons[expansionIndex] do
+			if i % 2 == 0 then
+				teleportButtons[expansionIndex][i]:SetPoint("LEFT", teleportButtons[expansionIndex][i-1], "RIGHT", 60, 0)
+			else
+				prevButton = teleportButtons[expansionIndex][i]
+				prevButton:SetPoint("TOP", teleportButtons[expansionIndex][i-2], "BOTTOM", 0, -6)
+			end
+		end
+	end
+end
+
+--------------------------------------------------------------------------------
+-- GUI Tabs
+--
+
+do
+	local function SelectTab(tab)
+		tab2:SetScript("OnUpdate", nil)
+		WipeCells()
+		WipeHeaders()
+		for expansionIndex = 1, #teleportButtons do
+			local list = teleportButtons[expansionIndex]
+			for i = 1, #list do
+				list[i]:Hide()
+			end
+		end
+
+		partyRefreshButton:ClearAllPoints()
+		partyRefreshButton:Hide()
+		guildRefreshButton:ClearAllPoints()
+		guildRefreshButton:Hide()
+
+		tab.Left:Hide()
+		tab.Middle:Hide()
+		tab.Right:Hide()
+		tab:Disable()
+		tab:SetDisabledFontObject(GameFontHighlightSmall)
+
+		tab.Text:SetPoint("CENTER", tab, "CENTER", 0, -3)
+
+		tab.LeftActive:Show()
+		tab.MiddleActive:Show()
+		tab.RightActive:Show()
+
+		mainPanel.tip:Hide()
+
+		PlaySound(841) -- SOUNDKIT.IG_CHARACTER_INFO_TAB
+	end
+	local function DeselectTab(tab)
+		tab.Left:Show()
+		tab.Middle:Show()
+		tab.Right:Show()
+		tab:Enable()
+
+		tab.Text:SetPoint("CENTER", tab, "CENTER", 0, 2)
+
+		tab.LeftActive:Hide()
+		tab.MiddleActive:Hide()
+		tab.RightActive:Hide()
+	end
+
+	local tab3, tab4
+
+	-- Tab 1 (Online)
+	tab1 = CreateFrame("Button", nil, mainPanel, "PanelTabButtonTemplate")
+	tab1:SetSize(50, 26)
+	tab1:SetPoint("BOTTOMLEFT", 10, -25)
+	tab1:SetClampedToScreen(true)
+	tab1.Text:SetText(L.keystoneTabOnline)
+	tab1:UnregisterAllEvents() -- Remove events registered by the template
+	tab1:RegisterEvent("CHALLENGE_MODE_KEYSTONE_RECEPTABLE_OPEN")
+	-- Tab 1 Event Handler (Used for auto slotting the keystone)
+	do
+		local HasSlottedKeystone, SlotKeystone = C_ChallengeMode.HasSlottedKeystone, C_ChallengeMode.SlotKeystone
+		local GetOwnedKeystoneMapID = C_MythicPlus.GetOwnedKeystoneMapID
+		local GetContainerNumSlots, GetContainerItemLink, PickupContainerItem = C_Container.GetContainerNumSlots, C_Container.GetContainerItemLink, C_Container.PickupContainerItem
+		local text
+		tab1:SetScript("OnEvent", function()
+			if not text then
+				text = ChallengesKeystoneFrame:CreateFontString(nil, nil, "Fancy14Font")
+				text:SetPoint("BOTTOM", ChallengesKeystoneFrame, "BOTTOM", 0, 180)
+				text:SetSize(300, 30)
+				text:SetJustifyH("CENTER")
+			end
+			text:SetText("")
+			if db.profile.autoSlotKeystone then
+				local _, _, _, _, _, _, _, instanceID = BigWigsLoader.GetInstanceInfo()
+				if GetOwnedKeystoneMapID() == instanceID then
+					for currentBag = 0, 4 do -- 0=Backpack, 1/2/3/4=Bags
+						local slots = GetContainerNumSlots(currentBag)
+						for currentSlot = 1, slots do
+							local itemLink = GetContainerItemLink(currentBag, currentSlot)
+							if itemLink and itemLink:find("Hkeystone", nil, true) then
+								text:SetText(L.keystoneAutoSlotFrame)
+								BigWigsLoader.Print(L.keystoneAutoSlotMessage:format(itemLink))
+								if not HasSlottedKeystone() then
+									PickupContainerItem(currentBag, currentSlot)
+									SlotKeystone()
+								end
+							end
+						end
+					end
+				end
+			end
+		end)
+	end
+	-- Tab 1 Click Handler
+	local PlayerIsTimerunning = PlayerIsTimerunning -- XXX temp Lemix
+	tab1:SetScript("OnClick", function(self)
+		SelectTab(self)
+		DeselectTab(tab2)
+		DeselectTab(tab3)
+		DeselectTab(tab4)
+
+		if PlayerIsTimerunning and PlayerIsTimerunning() then -- XXX temp Lemix
+			PlayerIsTimerunning = nil
+			teleportList[1] = teleportList[0]
+			teleportButtons[1] = teleportButtons[0]
+			local newTotal = #teleportButtons[1]
+			local num = newTotal % 2 == 0 and newTotal - 1 or newTotal
+			teleportButtons[2][1]:ClearAllPoints()
+			teleportButtons[2][1]:SetPoint("TOP", teleportButtons[1][num], "BOTTOM", 0, -36)
+		end
+
+		if db.global.showViewerTeleportTip then
+			for _, teleportSpellID in next, teleportList[1] do
+				if BigWigsLoader.IsSpellKnownOrInSpellBook(teleportSpellID) then
+					mainPanel.tip:Show() -- Don't show tip unless we know 1 teleport spell
+					break
+				end
+			end
+		end
+
+		local partyHeader = CreateHeader()
+		partyHeader:SetText(L.keystoneHeaderParty)
+		partyHeader:SetPoint("TOP", scrollChild, "TOP", 0, -0)
+		partyRefreshButton:SetPoint("LEFT", partyHeader, "RIGHT", 5, 0)
+		partyRefreshButton:Show()
+
+		local guildHeader = CreateHeader()
+		guildHeader:SetText(L.keystoneHeaderGuild)
+		guildRefreshButton:SetPoint("LEFT", guildHeader, "RIGHT", 5, 0)
+		guildRefreshButton:Show()
+
+		mainPanel.CloseButton:RegisterEvent("PLAYER_LEAVING_WORLD") -- Hide when changing zone
+		mainPanel.CloseButton:RegisterEvent("CHALLENGE_MODE_START") -- Hide when starting Mythic+
+		mainPanel.CloseButton:RegisterEvent("PLAYER_REGEN_DISABLED") -- Hide when you enter combat
+
+		LibSpec.RequestGuildSpecialization()
+		LibKeystoneRequest("PARTY")
+		BigWigsLoader.CTimerAfter(0.2, function() LibKeystoneRequest("GUILD") end)
+	end)
+
+	-- Tab 2 (Teleports)
+	tab2 = CreateFrame("Button", nil, mainPanel, "PanelTabButtonTemplate")
+	tab2:SetSize(50, 26)
+	tab2:SetPoint("LEFT", tab1, "RIGHT", 4, 0)
+	tab2:SetClampedToScreen(true)
+	tab2.Text:SetText(L.keystoneTabTeleports)
+	tab2:UnregisterAllEvents() -- Remove events registered by the template
+	tab2:RegisterEvent("CHALLENGE_MODE_RESET")
+	-- Tab 2 Event Handler (Used for handling the initial countdown)
+	do
+		local GetActiveKeystoneInfo, GetActiveChallengeMapID = C_ChallengeMode.GetActiveKeystoneInfo, C_ChallengeMode.GetActiveChallengeMapID
+		tab2:SetScript("OnEvent", function(self, event)
+			if event == "CHALLENGE_MODE_START" then
+				local keyLevel = GetActiveKeystoneInfo()
+				local challengeMapID = GetActiveChallengeMapID()
+				local challengeMapName, _, _, icon = GetMapUIInfo(challengeMapID)
+				BigWigsLoader:SendMessage("BigWigs_StartCountdown", self, nil, "mythicplus", 9, nil, db.profile.countVoice, 9, nil, db.profile.countBegin)
+				if keyLevel and keyLevel > 0 then
+					local msg = L.keystoneStartBar:format(dungeonNamesTrimmed[challengeMapID] or challengeMapID, keyLevel)
+					BigWigsLoader:SendMessage("BigWigs_StartBar", nil, nil, msg, 9, icon)
+					BigWigsLoader:SendMessage("BigWigs_Timer", nil, nil, 9, 9, msg, 0, icon, false, true)
+				else
+					BigWigsLoader:SendMessage("BigWigs_StartBar", nil, nil, L.keystoneModuleName, 9, icon)
+					BigWigsLoader:SendMessage("BigWigs_Timer", nil, nil, 9, 9, L.keystoneModuleName, 0, icon, false, true)
+				end
+				BigWigsLoader.CTimerAfter(9, function()
+					BigWigsLoader:SendMessage("BigWigs_Message", self, nil, L.keystoneStartBar:format(challengeMapName, keyLevel), "cyan", icon)
+					BigWigsLoader.Print(L.keystoneStartMessage:format(challengeMapName, keyLevel))
+					local soundName = db.profile.countEndSound
+					if soundName ~= "None" then
+						local sound = LibSharedMedia:Fetch("sound", soundName, true)
+						if sound then
+							BigWigsLoader.PlaySoundFile(sound, "Master")
+						end
+					end
+				end)
+				BigWigsLoader:SendMessage("BigWigs_Message", self, nil, BigWigsAPI:GetLocale("BigWigs: Common").custom_sec:format(L.keystoneStartBar:format(dungeonNamesTrimmed[challengeMapID] or challengeMapID, keyLevel), 9), "cyan", icon)
+				local soundName = db.profile.countStartSound
+				if soundName ~= "None" then
+					local sound = LibSharedMedia:Fetch("sound", soundName, true)
+					if sound then
+						BigWigsLoader.PlaySoundFile(sound, "Master")
+					end
+				end
+			else -- CHALLENGE_MODE_RESET
+				local _, _, diffID = BigWigsLoader.GetInstanceInfo()
+				if diffID == 8 or diffID == 23 then -- Mythic+, Mythic
+					TimerTracker:UnregisterEvent("START_TIMER")
+					BigWigsLoader.CTimerAfter(5, function()
+						TimerTracker:RegisterEvent("START_TIMER")
+						self:UnregisterEvent("CHALLENGE_MODE_START")
+					end)
+					self:RegisterEvent("CHALLENGE_MODE_START")
+				end
+			end
+		end)
+	end
+	-- Tab 2 Click Handler
+	do
+		local UnitCastingInfo = UnitCastingInfo
+		local function OnUpdate()
+			local _, _, _, startTimeMs, endTimeMs, _, _, _, spellId = UnitCastingInfo("player")
+			if spellId then
+				for expansionIndex = 1, #teleportButtons do
+					local list = teleportButtons[expansionIndex]
+					for i = 1, #list do
+						local button = list[i]
+						if spellId == button.spellID then
+							local startTimeSec = startTimeMs / 1000
+							local endTimeSec = endTimeMs / 1000
+							local castDuration = endTimeSec - startTimeSec
+							if castDuration > 0 then
+								local percentage = (GetTime() - startTimeSec) / castDuration
+								if percentage > 1 then percentage = 1 elseif percentage < 0 then percentage = 0 end
+								button.cdbar:SetColorTexture(0, 0, 1, 0.6)
+								button.cdbar:Show()
+								button.cdbar:SetWidth(percentage * button:GetWidth())
+							else
+								button.cdbar:Hide()
+							end
+						end
+					end
+				end
+			else
+				for expansionIndex = 1, #teleportButtons do
+					local list = teleportButtons[expansionIndex]
+					for i = 1, #list do
+						local button = list[i]
+						local cd = BigWigsLoader.GetSpellCooldown(button.spellID)
+						if cd and cd.startTime > 0 and cd.duration > 2 and BigWigsLoader.IsSpellKnownOrInSpellBook(button.spellID) then
+							local remaining = (cd.startTime + cd.duration) - GetTime()
+							local percentage = remaining / cd.duration
+							button.cdbar:SetColorTexture(1, 0, 0, 0.6)
+							button.cdbar:Show()
+							button.cdbar:SetWidth(percentage * button:GetWidth())
+						else
+							button.cdbar:Hide()
+						end
+					end
+				end
+			end
+		end
+		tab2:SetScript("OnClick", function(self)
+			SelectTab(self)
+			DeselectTab(tab1)
+			DeselectTab(tab3)
+			DeselectTab(tab4)
+
+			local currentSeasonHeader = CreateHeader()
+			currentSeasonHeader:SetText(L.littleWigsExtras.LittleWigs_CurrentSeason)
+			currentSeasonHeader:SetPoint("TOP", scrollChild, "TOP", 0, -0)
+
+			teleportButtons[1][1]:ClearAllPoints()
+			teleportButtons[1][1]:SetPoint("TOPRIGHT", scrollChild, "TOP", 0, -40)
+			self:SetScript("OnUpdate", OnUpdate)
+
+			local numExpansions = #L.expansionNames
+			for expansionIndex = 1, #teleportButtons do
+				if expansionIndex > 1 then
+					local expansionNameHeader = CreateHeader()
+					expansionNameHeader:SetText(L.expansionNames[numExpansions - (expansionIndex - 2)])
+					local distanceBetween = currentSeasonHeader:GetBottom() - teleportButtons[expansionIndex][1]:GetTop()
+					expansionNameHeader:SetPoint("TOP", scrollChild, "TOP", 0, -(distanceBetween - 10))
+				end
+				local list = teleportButtons[expansionIndex]
+				for i = 1, #list do
+					local button = list[i]
+					button:Show()
+					button.cdbar:Hide()
+					if not BigWigsLoader.IsSpellKnownOrInSpellBook(button.spellID) then
+						button.icon:SetTexture(136813)
+					else
+						local texture = BigWigsLoader.GetSpellTexture(button.spellID)
+						button.icon:SetTexture(texture)
+					end
+				end
+			end
+
+			-- Calculate scroll height
+			local contentsHeight = currentSeasonHeader:GetTop() - teleportButtons[#teleportButtons][#teleportButtons[#teleportButtons]]:GetBottom() -- The bottom of the last teleport button
+			local newHeight = 10 + contentsHeight + 10 -- 10 top padding + content + 10 bottom padding
+			scrollChild:SetHeight(newHeight)
+		end)
+	end
+
+	-- Tab 3 (Alts)
+	tab3 = CreateFrame("Button", nil, mainPanel, "PanelTabButtonTemplate")
+	tab3:SetSize(50, 26)
+	tab3:SetPoint("LEFT", tab2, "RIGHT", 4, 0)
+	tab3:SetClampedToScreen(true)
+	tab3.Text:SetText(L.keystoneTabAlts)
+	tab3:UnregisterAllEvents() -- Remove events registered by the template
+	tab3:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+	-- Tab 3 Event Handler (Used for automatically showing the window when the dungeon ends)
+	do
+		local RequestMapInfo = C_MythicPlus.RequestMapInfo
+		local function Open()
+			-- Force update the run history in case we decide to click the history tab
+			RequestMapInfo()
+
+			if not db.profile.showViewerDungeonEnd or BigWigsLoader.isTestBuild then return end
+
+			if InCombatLockdown() then
+				tab3:RegisterEvent("PLAYER_REGEN_ENABLED")
+				return
+			end
+
+			local _, _, diffID = BigWigsLoader.GetInstanceInfo()
+			if diffID == 8 then -- Mythic+
+				mainPanel:Show()
+				tab1:Click()
+			end
+		end
+		tab3:SetScript("OnEvent", function(self, event)
+			if event == "PLAYER_REGEN_ENABLED" then
+				self:UnregisterEvent(event)
+				Open()
+			else -- CHALLENGE_MODE_COMPLETED
+				BigWigsLoader.CTimerAfter(7, Open)
+			end
+		end)
+	end
+	-- Tab 3 Click Handler
+	do
+		local function SortTableByLevelThenRatingThenName(a, b)
+			if a.level > b.level then
+				return true
+			elseif a.level == b.level then
+				if a.rating ~= b.rating then -- If both levels are equal then sort by rating first, then sort by name
+					return a.rating > b.rating
+				else
+					return a.name < b.name
+				end
+			end
+		end
+		tab3:SetScript("OnClick", function(self)
+			SelectTab(self)
+			DeselectTab(tab1)
+			DeselectTab(tab2)
+			DeselectTab(tab4)
+
+			local myCharactersHeader = CreateHeader()
+			myCharactersHeader:SetText(L.keystoneHeaderMyCharacters)
+			myCharactersHeader:SetPoint("TOP", scrollChild, "TOP", 0, -0)
+
+			-- Begin Display of alts
+			UpdateMyKeystone()
+
+			if BigWigs3DB.myKeystones then
+				local sortedplayerList = {}
+				for _, pData in next, BigWigs3DB.myKeystones do
+					local decoratedName = nil
+					local nameTooltip = pData.name .. " [" .. pData.realm .. "]"
+					local specID = pData.specId
+					if specID > 0 then
+						local _, specName, _, specIcon, role, classFile, className = GetSpecializationInfoByID(specID)
+						local color = C_ClassColor.GetClassColor(classFile):GenerateHexColor()
+						decoratedName = ("|T%s:16:16:0:0:64:64:4:60:4:60|t%s|c%s%s|r"):format(specIcon, roleIcons[role] or "", color, pData.name)
+						nameTooltip = ("|c%s%s|r [%s] |A:classicon-%s:16:16|a%s |T%s:16:16:0:0:64:64:4:60:4:60|t%s %s%s"):format(color, pData.name, pData.realm, classFile, className, specIcon, specName, roleIcons[role] or "", roleIcons[role] and _G[role] or "")
+					end
+					local challengeMapName, _, _, _, _, mapID = GetMapUIInfo(pData.keyMap)
+					sortedplayerList[#sortedplayerList+1] = {
+						name = pData.name, decoratedName = decoratedName, nameTooltip = nameTooltip,
+						level = pData.keyLevel, levelTooltip = L.keystoneLevelTooltip:format(pData.keyLevel),
+						map = dungeonNamesTiny[pData.keyMap] or pData.keyMap > 0 and pData.keyMap or "-", mapTooltip = L.keystoneMapTooltip:format(challengeMapName or "-"), mapID = mapID,
+						rating = pData.playerRating, ratingTooltip = L.keystoneRatingTooltip:format(pData.playerRating),
+					}
+				end
+				table.sort(sortedplayerList, SortTableByLevelThenRatingThenName)
+
+				local prevName, prevLevel, prevMap, prevRating = nil, nil, nil, nil
+				local tableSize = #sortedplayerList
+				for i = 1, tableSize do
+					local cellName, cellLevel, cellMap, cellRating = CreateCell(), CreateCell(), CreateCell(), CreateCell()
+					if i == 1 then
+						cellName:SetPoint("RIGHT", cellLevel, "LEFT", -6, 0)
+						cellLevel:SetPoint("TOPLEFT", myCharactersHeader, "CENTER", 3, -12)
+						cellMap:SetPoint("LEFT", cellLevel, "RIGHT", 6, 0)
+						cellRating:SetPoint("LEFT", cellMap, "RIGHT", 6, 0)
+					else
+						cellName:SetPoint("TOP", prevName, "BOTTOM", 0, -6)
+						cellLevel:SetPoint("TOP", prevLevel, "BOTTOM", 0, -6)
+						cellMap:SetPoint("TOP", prevMap, "BOTTOM", 0, -6)
+						cellRating:SetPoint("TOP", prevRating, "BOTTOM", 0, -6)
+					end
+					cellName:SetWidth(WIDTH_NAME)
+					cellName.text:SetText(sortedplayerList[i].decoratedName or sortedplayerList[i].name)
+					cellName.tooltip = sortedplayerList[i].nameTooltip
+					cellLevel:SetWidth(WIDTH_LEVEL)
+					cellLevel.text:SetText(sortedplayerList[i].level == -1 and hiddenIcon or sortedplayerList[i].level)
+					cellLevel.tooltip = sortedplayerList[i].levelTooltip
+					cellMap:SetWidth(WIDTH_MAP)
+					cellMap.text:SetText(sortedplayerList[i].map)
+					cellMap.tooltip = sortedplayerList[i].mapTooltip
+					cellRating:SetWidth(WIDTH_RATING)
+					cellRating.text:SetText(sortedplayerList[i].rating == -1 and "|A:timerunning-glues-icon:14:14|a" or sortedplayerList[i].rating) -- XXX temp Lemix
+					cellRating.tooltip = sortedplayerList[i].rating == -1 and L.keystoneTimerunner or sortedplayerList[i].ratingTooltip -- XXX temp Lemix
+					prevName, prevLevel, prevMap, prevRating = cellName, cellLevel, cellMap, cellRating
+
+					if i == tableSize then
+						-- Calculate scroll height
+						local contentsHeight = myCharactersHeader:GetTop() - prevName:GetBottom()
+						local newHeight = 10 + contentsHeight + 10 -- 10 top padding + content + 10 bottom padding
+						scrollChild:SetHeight(newHeight)
+					end
+				end
+			end
+		end)
+	end
+
+	-- Tab 4 (History)
+	tab4 = CreateFrame("Button", nil, mainPanel, "PanelTabButtonTemplate")
+	tab4:SetSize(50, 26)
+	tab4:SetPoint("LEFT", tab3, "RIGHT", 4, 0)
+	tab4:SetClampedToScreen(true)
+	tab4.Text:SetText(L.keystoneTabHistory)
+	tab4:UnregisterAllEvents() -- Remove events registered by the template
+	-- Tab 4 Click Handler
+	tab4:SetScript("OnClick", function(self)
+		SelectTab(self)
+		DeselectTab(tab1)
+		DeselectTab(tab2)
+		DeselectTab(tab3)
+
+		local thisWeekHeader = CreateHeader()
+		thisWeekHeader:SetText(L.keystoneHeaderThisWeek)
+		thisWeekHeader:SetPoint("TOP", scrollChild, "TOP", 0, -0)
+		local olderHeader = CreateHeader()
+		olderHeader:SetText(L.keystoneHeaderOlder)
+		olderHeader:SetPoint("TOP", thisWeekHeader, "BOTTOM", 0, -50) -- Make sure the header shows even with no runs
+
+		-- Begin Display of history
+		local runs = C_MythicPlus.GetRunHistory(true, true, true)
+		local tableSize = #runs
+		local runsThisWeek, olderRuns = 0, 0
+		local scoreThisWeek, olderScore = 0, 0
+		local highestScoreByMap = {}
+		for i = 1, tableSize do
+			if not highestScoreByMap[runs[i].mapChallengeModeID] then
+				highestScoreByMap[runs[i].mapChallengeModeID] = 0
+			end
+			if runs[i].runScore > highestScoreByMap[runs[i].mapChallengeModeID] then
+				local diff = runs[i].runScore - highestScoreByMap[runs[i].mapChallengeModeID]
+				highestScoreByMap[runs[i].mapChallengeModeID] = runs[i].runScore
+				runs[i].gained = diff
+				if runs[i].thisWeek then
+					runsThisWeek = runsThisWeek + 1
+					scoreThisWeek = scoreThisWeek + diff
+				else
+					olderRuns = olderRuns + 1
+					olderScore = olderScore + diff
+				end
+			else
+				runs[i].gained = 0
+				if runs[i].thisWeek then
+					runsThisWeek = runsThisWeek + 1
+				else
+					olderRuns = olderRuns + 1
+				end
+			end
+		end
+
+		local cellRunsThisWeek, cellScoreThisWeek = CreateCell(), CreateCell()
+		cellRunsThisWeek:SetPoint("RIGHT", cellScoreThisWeek, "LEFT", -6, 0)
+		cellScoreThisWeek:SetPoint("TOPLEFT", thisWeekHeader, "CENTER", 3, -12)
+		cellRunsThisWeek:SetWidth(135)
+		cellRunsThisWeek.text:SetText(L.keystoneHistoryRuns:format(runsThisWeek))
+		cellRunsThisWeek.tooltip = L.keystoneHistoryRunsThisWeekTooltip:format(runsThisWeek)
+		cellScoreThisWeek:SetWidth(135)
+		cellScoreThisWeek.text:SetText(L.keystoneHistoryScore:format(scoreThisWeek))
+		cellScoreThisWeek.tooltip = L.keystoneHistoryScoreThisWeekTooltip:format(scoreThisWeek)
+
+		local cellRunsOlder, cellScoreOlder = CreateCell(), CreateCell()
+		cellRunsOlder:SetPoint("RIGHT", cellScoreOlder, "LEFT", -6, 0)
+		cellScoreOlder:SetPoint("TOPLEFT", olderHeader, "CENTER", 3, -12)
+		cellRunsOlder:SetWidth(135)
+		cellRunsOlder.text:SetText(L.keystoneHistoryRuns:format(olderRuns))
+		cellRunsOlder.tooltip = L.keystoneHistoryRunsOlderTooltip:format(olderRuns)
+		cellScoreOlder:SetWidth(135)
+		cellScoreOlder.text:SetText(L.keystoneHistoryScore:format(olderScore))
+		cellScoreOlder.tooltip = L.keystoneHistoryScoreOlderTooltip:format(olderScore)
+
+		local firstOldRun = false
+		local prevDate, prevMapName, prevLevel, prevGainedScore, prevInTime = nil, nil, nil, nil, nil
+		for i = tableSize, 1, -1 do
+			local cellDate, cellMapName, cellLevel, cellGainedScore, cellInTime = CreateCell(), CreateCell(), CreateCell(), CreateCell(), CreateCell()
+			if runs[i].thisWeek then
+				if i == tableSize then
+					cellDate:SetPoint("TOPLEFT", cellRunsThisWeek, "BOTTOMLEFT", 0, -12)
+					cellMapName:SetPoint("LEFT", cellDate, "RIGHT", 6, 0)
+					cellLevel:SetPoint("LEFT", cellMapName, "RIGHT", 6, 0)
+					cellGainedScore:SetPoint("LEFT", cellLevel, "RIGHT", 6, 0)
+					cellInTime:SetPoint("LEFT", cellGainedScore, "RIGHT", 6, 0)
+				else
+					cellDate:SetPoint("TOP", prevDate, "BOTTOM", 0, -6)
+					cellMapName:SetPoint("TOP", prevMapName, "BOTTOM", 0, -6)
+					cellLevel:SetPoint("TOP", prevLevel, "BOTTOM", 0, -6)
+					cellGainedScore:SetPoint("TOP", prevGainedScore, "BOTTOM", 0, -6)
+					cellInTime:SetPoint("TOP", prevInTime, "BOTTOM", 0, -6)
+				end
+			else
+				if not firstOldRun then
+					firstOldRun = true
+					if runsThisWeek == 0 then
+						olderHeader:SetPoint("TOP", thisWeekHeader, "BOTTOM", 0, -50)
+					else
+						local y = 50 + runsThisWeek*26
+						olderHeader:SetPoint("TOP", thisWeekHeader, "BOTTOM", 0, -y)
+					end
+					cellDate:SetPoint("TOPLEFT", cellRunsOlder, "BOTTOMLEFT", 0, -12)
+					cellMapName:SetPoint("LEFT", cellDate, "RIGHT", 6, 0)
+					cellLevel:SetPoint("LEFT", cellMapName, "RIGHT", 6, 0)
+					cellGainedScore:SetPoint("LEFT", cellLevel, "RIGHT", 6, 0)
+					cellInTime:SetPoint("LEFT", cellGainedScore, "RIGHT", 6, 0)
+				else
+					cellDate:SetPoint("TOP", prevDate, "BOTTOM", 0, -6)
+					cellMapName:SetPoint("TOP", prevMapName, "BOTTOM", 0, -6)
+					cellLevel:SetPoint("TOP", prevLevel, "BOTTOM", 0, -6)
+					cellGainedScore:SetPoint("TOP", prevGainedScore, "BOTTOM", 0, -6)
+					cellInTime:SetPoint("TOP", prevInTime, "BOTTOM", 0, -6)
+				end
+			end
+			if not firstOldRun then -- There are 0 older runs, fix the header
+				local y = 50 + runsThisWeek*26
+				olderHeader:SetPoint("TOP", thisWeekHeader, "BOTTOM", 0, -y)
+			end
+
+			local challengeMapName, _, timeLimit = GetMapUIInfo(runs[i].mapChallengeModeID)
+			cellDate:SetWidth(WIDTH_RATING+13)
+			local dateTbl = runs[i].completionDate
+			cellDate.text:SetText(L.dayNamesShort[dateTbl.weekday])
+			cellDate.tooltip = L.dateFormat:format(L.dayNames[dateTbl.weekday], dateTbl.monthDay, L.monthNames[dateTbl.month], dateTbl.year)
+			cellMapName:SetWidth(WIDTH_MAP)
+			cellMapName.text:SetText(dungeonNamesTiny[runs[i].mapChallengeModeID] or runs[i].mapChallengeModeID)
+			cellMapName.tooltip = L.keystoneMapTooltip:format(challengeMapName or "-")
+			cellLevel:SetWidth(WIDTH_LEVEL)
+			cellLevel.text:SetText(runs[i].level)
+			cellLevel.tooltip = L.keystoneLevelTooltip:format(runs[i].level)
+			cellGainedScore:SetWidth(WIDTH_RATING)
+			cellGainedScore.text:SetFormattedText("+%d", runs[i].gained)
+			cellGainedScore.tooltip = L.keystoneScoreGainedTooltip:format(runs[i].gained, runs[i].runScore)
+			cellInTime:SetWidth(WIDTH_RATING+15)
+			if runs[i].completed then
+				if runs[i].durationSec > timeLimit then -- Was the time limit changed in a hotfix?
+					cellInTime.text:SetFormattedText(L.keystoneTimeUnder, 0, 0)
+				else
+					local diff = timeLimit - runs[i].durationSec
+					local minutesUnder = math.floor(diff / 60)
+					local secondsUnder = math.floor(diff - (minutesUnder*60))
+					cellInTime.text:SetFormattedText(L.keystoneTimeUnder, minutesUnder, secondsUnder)
+				end
+				local minutesTotal = math.floor(runs[i].durationSec / 60)
+				local secondsTotal = math.floor(runs[i].durationSec - (minutesTotal*60))
+				local minutesTimeLimit = math.floor(timeLimit / 60)
+				local secondsTimeLimit = math.floor(timeLimit - (minutesTimeLimit*60))
+				cellInTime.tooltip = (L.keystoneCompletedTooltip):format(minutesTotal, secondsTotal, minutesTimeLimit, secondsTimeLimit)
+			else
+				if runs[i].durationSec < timeLimit then -- Was the time limit changed in a hotfix?
+					cellInTime.text:SetFormattedText(L.keystoneTimeOver, 0, 0)
+				else
+					local diff = runs[i].durationSec - timeLimit
+					local minutesOver = math.floor(diff / 60)
+					local secondsOver = math.floor(diff - (minutesOver*60))
+					cellInTime.text:SetFormattedText(L.keystoneTimeOver, minutesOver, secondsOver)
+				end
+				local minutesTotal = math.floor(runs[i].durationSec / 60)
+				local secondsTotal = math.floor(runs[i].durationSec - (minutesTotal*60))
+				local minutesTimeLimit = math.floor(timeLimit / 60)
+				local secondsTimeLimit = math.floor(timeLimit - (minutesTimeLimit*60))
+				cellInTime.tooltip = (L.keystoneFailedTooltip):format(minutesTotal, secondsTotal, minutesTimeLimit, secondsTimeLimit)
+			end
+			prevDate, prevMapName, prevLevel, prevGainedScore, prevInTime = cellDate, cellMapName, cellLevel, cellGainedScore, cellInTime
+
+			if i == 1 then
+				-- Calculate scroll height
+				local contentsHeight = thisWeekHeader:GetTop() - prevMapName:GetBottom()
+				local newHeight = 10 + contentsHeight + 10 -- 10 top padding + content + 10 bottom padding
+				scrollChild:SetHeight(newHeight)
+			end
+		end
+	end)
+end
+
+do
+	local function GetTeleportTextForSpellID(spellID)
+		if spellID == 0 then
+			return ""
+		else
+			if not BigWigsLoader.IsSpellKnownOrInSpellBook(spellID) then
+				return L.keystoneClickToTeleportNotLearned
+			else
+				local cd = BigWigsLoader.GetSpellCooldown(spellID)
+				if cd.startTime > 0 and cd.duration > 0 then
+					return L.keystoneClickToTeleportCooldown
+				else
+					return L.keystoneClickToTeleportNow
+				end
+			end
+		end
+	end
+
+	local function SortTableByLevelThenRatingThenName(a, b)
+		local firstLevel = a.level == -1 and 1 or a.level
+		local secondLevel = b.level == -1 and 1 or b.level
+		if firstLevel > secondLevel then
+			return true
+		elseif firstLevel == secondLevel then
+			if a.rating ~= b.rating then -- If both levels are equal then sort by rating first, then sort by name
+				return a.rating > b.rating
+			else
+				return a.name < b.name
+			end
+		end
+	end
+
+	local ClickTeleportButton
+	do
+		local UnitCastingInfo = UnitCastingInfo
+		local function OnUpdateCheckTeleportCastStatus(self)
+			local _, _, _, startTimeMs, endTimeMs, _, _, _, spellId = UnitCastingInfo("player")
+			if spellId then
+				local teleportSpellID = self:GetAttribute("spell")
+				if spellId == teleportSpellID and mainPanel.teleportBar:GetParent() == self then
+					local startTimeSec = startTimeMs / 1000
+					local endTimeSec = endTimeMs / 1000
+					local castDuration = endTimeSec - startTimeSec
+					if castDuration > 0 then
+						local percentage = (GetTime() - startTimeSec) / castDuration
+						if percentage > 1 then percentage = 1 elseif percentage < 0 then percentage = 0 end
+						mainPanel.teleportBar:SetColorTexture(0, 0, 1, 0.6)
+						mainPanel.teleportBar:Show()
+						mainPanel.teleportBar:SetWidth(percentage * self:GetWidth())
+					end
+				end
+			elseif mainPanel.teleportBar:GetParent() == self then
+				mainPanel.teleportBar:Hide()
+			end
+		end
+
+		function ClickTeleportButton(self)
+			if not InCombatLockdown() then
+				mainPanel.teleportBar:ClearAllPoints()
+				mainPanel.teleportBar:SetParent(self)
+				mainPanel.teleportBar:SetPoint("TOPLEFT")
+				mainPanel.teleportBar:SetPoint("BOTTOMLEFT")
+				mainPanel.teleportBar:Hide()
+				mainPanel.teleportBar.name = self.playerName
+				self:SetScript("OnUpdate", OnUpdateCheckTeleportCastStatus)
+				if db.global.showViewerTeleportTip then
+					db.global.showViewerTeleportTip = false
+					mainPanel.tip:Hide()
+				end
+			end
+		end
+	end
+
+	local guildCellsCurrentlyShowing = {}
+	local tempLemixDungeonsDeleteMe = { -- XXX temp Lemix
+		[199] = true,
+		[210] = true,
+		[198] = true,
+		[197] = true,
+		[200] = true,
+		[208] = true,
+		[206] = true,
+		[209] = true,
+		[207] = true,
+	}
+	local InMyParty
+	do
+		local UnitInParty = UnitInParty
+		function InMyParty(playerName)
+			if playerName == BigWigsLoader.UnitName("player") then
+				return true
+			else
+				return UnitInParty(playerName)
+			end
+		end
+	end
+	local function UpdateCellsForOnlineTab(playerList, isGuildList)
+		local sortedplayerList = {}
+		for pName, pData in next, playerList do
+			if (not isGuildList and InMyParty(pName)) or (isGuildList and not InMyParty(pName)) then
+				local decoratedName = nil
+				local nameTooltip = pName
+				local specID = BigWigsAPI.GetSpecializationID(pName)
+				if specID then
+					local _, specName, _, specIcon, role, classFile, className = GetSpecializationInfoByID(specID)
+					local color = C_ClassColor.GetClassColor(classFile):GenerateHexColor()
+					decoratedName = ("|T%s:16:16:0:0:64:64:4:60:4:60|t%s|c%s%s|r"):format(specIcon, roleIcons[role] or "", color, pName:gsub("%-.+", "*"))
+					nameTooltip = ("|c%s%s|r |A:classicon-%s:16:16|a%s |T%s:16:16:0:0:64:64:4:60:4:60|t%s %s%s\n%s"):format(color, pName, classFile, className, specIcon, specName, roleIcons[role] or "", roleIcons[role] and _G[role] or "", L.keystoneClickToWhisper)
+				end
+				local challengeMapName, _, _, _, _, mapID = GetMapUIInfo(pData[2])
+				local teleportSpellID = mapID and teleportList[1][mapID] or 0
+				sortedplayerList[#sortedplayerList+1] = {
+					name = pName, decoratedName = decoratedName, nameTooltip = nameTooltip,
+					level = pData[1], levelTooltip = L.keystoneLevelTooltip:format(pData[1] == -1 and L.keystoneHiddenTooltip or pData[1]),
+					map = pData[2] == -1 and hiddenIcon or dungeonNamesTiny[pData[2]] or (pData[2] > 0 and pData[2] or "-"),
+					mapTooltip = L.keystoneMapTooltip:format(pData[2] == -1 and L.keystoneHiddenTooltip or challengeMapName or "-") .. GetTeleportTextForSpellID(teleportSpellID),
+					mapID = mapID,
+					challengeMapID = pData[2], -- XXX temp Lemix
+					rating = pData[3], ratingTooltip = L.keystoneRatingTooltip:format(pData[3]),
+				}
+			end
+		end
+		if #sortedplayerList == 0 then return end -- The guild list can be empty
+
+		-- Sort list by level descending, or by name if equal level
+		table.sort(sortedplayerList, SortTableByLevelThenRatingThenName)
+
+		local prevName, prevLevel, prevMap, prevRating = nil, nil, nil, nil
+		local tableSize = #sortedplayerList
+		for i = 1, tableSize do
+			local cellName, cellLevel, cellMap, cellRating = CreateCell(), CreateCell(), CreateCell(), CreateCell()
+			if i == 1 then
+				cellName:SetPoint("RIGHT", cellLevel, "LEFT", -6, 0)
+				cellLevel:SetPoint("TOPLEFT", isGuildList and headersCurrentlyShowing[2] or headersCurrentlyShowing[1], "CENTER", 3, -12)
+				cellMap:SetPoint("LEFT", cellLevel, "RIGHT", 6, 0)
+				cellRating:SetPoint("LEFT", cellMap, "RIGHT", 6, 0)
+			else
+				cellName:SetPoint("TOP", prevName, "BOTTOM", 0, -6)
+				cellLevel:SetPoint("TOP", prevLevel, "BOTTOM", 0, -6)
+				cellMap:SetPoint("TOP", prevMap, "BOTTOM", 0, -6)
+				cellRating:SetPoint("TOP", prevRating, "BOTTOM", 0, -6)
+			end
+			cellName:SetWidth(WIDTH_NAME)
+			local playerName = sortedplayerList[i].name
+			cellName.text:SetText(sortedplayerList[i].decoratedName or playerName)
+			cellName.tooltip = sortedplayerList[i].nameTooltip
+			cellName:SetAttribute("type", "macro")
+			cellName:SetAttribute("macrotext", "/run ChatFrameUtil.SendTell(\"".. playerName .."\")")
+			cellLevel:SetWidth(WIDTH_LEVEL)
+			cellLevel.text:SetText(sortedplayerList[i].level == -1 and hiddenIcon or sortedplayerList[i].level)
+			cellLevel.tooltip = sortedplayerList[i].levelTooltip
+			cellMap:SetWidth(WIDTH_MAP)
+			local teleportSpellID = teleportList[1][sortedplayerList[i].mapID]
+			if teleportSpellID and BigWigsLoader.IsSpellKnownOrInSpellBook(teleportSpellID) then
+				cellMap:SetAttribute("type", "spell")
+				cellMap:SetAttribute("spell", teleportSpellID)
+				cellMap.playerName = playerName
+				cellMap:SetScript("PostClick", ClickTeleportButton)
+				if mainPanel.teleportBar.name == playerName then
+					ClickTeleportButton(cellMap)
+				end
+			end
+			cellMap.text:SetText(sortedplayerList[i].map)
+			cellMap.tooltip = sortedplayerList[i].mapTooltip
+			cellRating:SetWidth(WIDTH_RATING)
+			cellRating.text:SetText(tempLemixDungeonsDeleteMe[sortedplayerList[i].challengeMapID] and "|A:timerunning-glues-icon:14:14|a" or sortedplayerList[i].rating) -- XXX temp Lemix
+			cellRating.tooltip = tempLemixDungeonsDeleteMe[sortedplayerList[i].challengeMapID] and L.keystoneTimerunner or sortedplayerList[i].ratingTooltip -- XXX temp Lemix
+			prevName, prevLevel, prevMap, prevRating = cellName, cellLevel, cellMap, cellRating
+			if isGuildList then
+				local num = #guildCellsCurrentlyShowing
+				guildCellsCurrentlyShowing[num+1] = cellName
+				guildCellsCurrentlyShowing[num+2] = cellLevel
+				guildCellsCurrentlyShowing[num+3] = cellMap
+				guildCellsCurrentlyShowing[num+4] = cellRating
+			end
+		end
+
+		-- Calculate scroll height
+		local contentsHeight = headersCurrentlyShowing[1]:GetTop() - prevName:GetBottom()
+		local newHeight = 10 + contentsHeight + 10 -- 10 top padding + content + 10 bottom padding
+		scrollChild:SetHeight(newHeight)
+
+		if not isGuildList then
+			local y = 24 + tableSize*26
+			headersCurrentlyShowing[2]:SetPoint("TOP", headersCurrentlyShowing[1], "BOTTOM", 0, -y)
+		end
+	end
+
+	local function WipeGuildCells()
+		for i = 1, #guildCellsCurrentlyShowing do
+			local cell = guildCellsCurrentlyShowing[i]
+			cell:Hide()
+			cell:ClearAttributes()
+			cell:SetScript("PostClick", nil)
+			cell:SetScript("OnUpdate", nil)
+			cell.tooltip = nil
+			cell.playerName = nil
+			cell:ClearAllPoints()
+			cellsCurrentlyShowing[cell] = nil
+			cellsAvailable[#cellsAvailable+1] = cell
+		end
+	end
+
+	local RequestGuildSpecializationThrottled
+	do
+		local prev = 0
+		function RequestGuildSpecializationThrottled()
+			-- LibSpec already implements a small throttle
+			-- But since we're only doing this for badly coded 3rd party addons that don't request LibSpec guild prior to LibKeystone guild, we use a big throttle, for safety
+			if GetTime()-prev > 10 then
+				prev = GetTime()
+				LibSpec.RequestGuildSpecialization()
+			end
+		end
+	end
+
+	local function LibKeystoneFunction(keyLevel, keyMap, playerRating, playerName, channel)
+		if channel == "PARTY" then
+			if not partyList[playerName] or playerName == BigWigsLoader.UnitName("player") or partyList[playerName][1] ~= keyLevel or partyList[playerName][2] ~= keyMap or partyList[playerName][3] ~= playerRating then
+				partyList[playerName] = {keyLevel, keyMap, playerRating}
+
+				if not tab1:IsEnabled() then -- Only if tab 1 (online) is showing
+					WipeCells()
+					guildCellsCurrentlyShowing = {}
+					UpdateCellsForOnlineTab(partyList)
+					UpdateCellsForOnlineTab(guildList, true)
+				end
+			end
+		elseif channel == "GUILD" then
+			if not BigWigsAPI.GetSpecializationID(playerName) then
+				-- We received guild key info, but we don't have spec info? Likely some other addon requested key info and not spec info, so we now request spec info.
+				RequestGuildSpecializationThrottled()
+			end
+			if not guildList[playerName] or guildList[playerName][1] ~= keyLevel or guildList[playerName][2] ~= keyMap or guildList[playerName][3] ~= playerRating then
+				guildList[playerName] = {keyLevel, keyMap, playerRating}
+
+				if not tab1:IsEnabled() then -- Only if tab 1 (online) is showing
+					WipeGuildCells()
+					guildCellsCurrentlyShowing = {}
+					UpdateCellsForOnlineTab(guildList, true)
+				end
+			end
+		end
+	end
+	LibKeystoneRegister({}, LibKeystoneFunction)
+end
+
+--------------------------------------------------------------------------------
+-- Challenges UI Clickable Teleports & Decoration
+--
+
+do
+	local challengesTeleportButton = CreateFrame("Button", nil, nil, "InsecureActionButtonTemplate")
+	challengesTeleportButton:RegisterForClicks("AnyDown", "AnyUp")
+	challengesTeleportButton:SetPropagateMouseMotion(true)
+	challengesTeleportButton:SetAttribute("type", "spell")
+	local backupRatings = {}
+	local unitTbl = {"party1", "party2", "party3", "party4"}
+	local OnEnter
+	do
+		local CL = BigWigsAPI:GetLocale("BigWigs: Common")
+		local function SortTableByScoreThenName(a, b)
+			if a[1] > b[1] then -- Dungeon score
+				return true
+			elseif a[1] == b[1] then
+				return a[2] < b[2] -- Player name
+			end
+		end
+		function OnEnter(self)
+			local _, _, timeLimit, _, _, mapID = GetMapUIInfo(self.mapID) -- The challenges frame icon .mapID is actually the challengeMapID, convert into mapID (instance ID)
+			if IsInGroup() then
+				GameTooltip:AddLine(" ")
+				GameTooltip:AddLine(L.partyRatingHeader)
+				local linesToAdd = {}
+				for partyIterator = 1, 4 do
+					local unit = unitTbl[partyIterator]
+					if UnitExists(unit) then
+						local pName = BigWigsLoader.UnitName(unit) or "?"
+						local ratingTbl = C_PlayerInfo.GetPlayerMythicPlusRatingSummary(unit)
+						local classColorHex = "FF808080"
+						local _, classFile = UnitClass(unit)
+						if classFile then
+							local colorTbl = C_ClassColor.GetClassColor(classFile)
+							if colorTbl then
+								classColorHex = colorTbl:GenerateHexColor()
+							end
+						end
+						if not ratingTbl then
+							ratingTbl = backupRatings[pName]
+						else
+							backupRatings[pName] = ratingTbl
+						end
+						if not ratingTbl then
+							local scoreColorHex = HIGHLIGHT_FONT_COLOR:GenerateHexColor()
+							GameTooltip:AddLine()
+							linesToAdd[#linesToAdd+1] = {-1, pName, L.dungeonScoreNoDataString:format(classColorHex, pName)}
+						else
+							for runsIterator = 1, 8 do
+								local run = ratingTbl.runs[runsIterator]
+								if run and run.challengeModeID == self.mapID then
+									local duration = run.bestRunDurationMS / 1000
+									local minutes = math.floor(duration / 60)
+									local seconds = math.floor(duration - (minutes*60))
+									local scoreColorTable = C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor(run.mapScore or 0) or HIGHLIGHT_FONT_COLOR
+									local scoreColorHex = scoreColorTable:GenerateHexColor()
+									linesToAdd[#linesToAdd+1] = {run.mapScore, pName, L.dungeonScoreString:format(
+										scoreColorHex, run.mapScore, -- Dungeon score
+										run.bestRunLevel, -- Dungeon level
+										duration > timeLimit and "FF4411" or "33FF99", minutes, seconds, -- Dungeon duration
+										classColorHex, pName -- Player name
+									)}
+									break
+								elseif runsIterator == 8 then
+									local scoreColorTable = C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor(0)
+									local scoreColorHex = scoreColorTable:GenerateHexColor()
+									linesToAdd[#linesToAdd+1] = {0, pName, L.dungeonScoreString:format(
+										scoreColorHex, 0, -- Dungeon score
+										0, -- Dungeon level
+										"FFFFFF", 0, 0, -- Dungeon duration
+										classColorHex, pName -- Player name
+									)}
+								end
+							end
+						end
+					end
+				end
+				table.sort(linesToAdd, SortTableByScoreThenName)
+				for i = 1, #linesToAdd do
+					GameTooltip:AddLine(linesToAdd[i][3])
+				end
+			end
+			GameTooltip:AddLine(" ")
+			GameTooltip:AddLine(L.dungeonTeleportHeader)
+
+			if InCombatLockdown() then
+				challengesTeleportButton:EnableMouse(false)
+			else
+				challengesTeleportButton:EnableMouse(true)
+				challengesTeleportButton:ClearAllPoints()
+				challengesTeleportButton:SetParent(self)
+				challengesTeleportButton:SetAllPoints(self)
+				challengesTeleportButton:SetAttribute("spell", nil)
+			end
+
+			for instanceID, spellID in next, teleportList[1] do
+				if instanceID == mapID then
+					local spellName = ("|cFF33FF99%s|r"):format(BigWigsLoader.GetSpellName(spellID) or "?")
+					if InCombatLockdown() then
+						GameTooltip:AddLine(spellName)
+						GameTooltip:AddLine(L.unavailableWhilstInCombat, 1, 1, 1)
+					else
+						if not BigWigsLoader.IsSpellKnownOrInSpellBook(spellID) then
+							GameTooltip:AddLine(spellName .. L.keystoneClickToTeleportNotLearned, 1, 1, 1)
+						else
+							challengesTeleportButton:SetAttribute("spell", spellID)
+							local cd = BigWigsLoader.GetSpellCooldown(spellID)
+							if cd.startTime > 0 and cd.duration > 0 then
+								local remainingSeconds = (cd.startTime + cd.duration) - GetTime()
+								local hours = math.floor(remainingSeconds / 3600)
+								remainingSeconds = remainingSeconds % 3600
+								local minutes = math.floor(remainingSeconds / 60)
+								local seconds = math.floor(remainingSeconds - (minutes*60))
+								GameTooltip:AddLine(spellName .. CL.extra:format(L.keystoneClickToTeleportCooldown, ("%02d:%02d:%02d"):format(hours, minutes, seconds)), 1, 1, 1)
+							else
+								GameTooltip:AddLine(spellName .. L.keystoneClickToTeleportNow, 1, 1, 1)
+							end
+						end
+					end
+					break
+				end
+			end
+			GameTooltip:Show()
+		end
+	end
+
+
+	local function UpdateRatings()
+		for partyIterator = 1, 4 do
+			local unit = unitTbl[partyIterator]
+			if UnitExists(unit) then
+				local pName = BigWigsLoader.UnitName(unit)
+				if pName then
+					local ratingTbl = C_PlayerInfo.GetPlayerMythicPlusRatingSummary(unit)
+					if ratingTbl then
+						backupRatings[pName] = ratingTbl
+					end
+				end
+			end
+		end
+	end
+	local hookedIcons = {}
+	local function OnShow(self)
+		UpdateRatings()
+		if self.DungeonIcons then
+			for i = 1, #self.DungeonIcons do
+				local icon = self.DungeonIcons[i]
+				if not hookedIcons[icon] then
+					local scoreFontstring = icon:CreateFontString(nil, nil, "SystemFont_Huge1_Outline")
+					scoreFontstring:SetJustifyH("CENTER")
+					scoreFontstring:SetPoint("BOTTOM", 0, 4)
+					scoreFontstring:SetShadowOffset(1, -1)
+					scoreFontstring:SetShadowColor(0, 0, 0)
+					scoreFontstring:Show()
+					local dungeonNameFontstring = icon:CreateFontString(nil, nil, "SystemFont_Shadow_Med1_Outline")
+					dungeonNameFontstring:SetJustifyH("CENTER")
+					dungeonNameFontstring:SetPoint("BOTTOMLEFT", icon, "TOPLEFT", 1, 1)
+					dungeonNameFontstring:SetPoint("BOTTOMRIGHT", icon, "TOPRIGHT", -1, 1)
+					dungeonNameFontstring:SetTextColor(1, 1, 1)
+					dungeonNameFontstring:SetWordWrap(false)
+					dungeonNameFontstring:Show()
+					hookedIcons[icon] = {scoreFontstring, dungeonNameFontstring}
+					icon:HookScript("OnEnter", OnEnter)
+				end
+
+				hookedIcons[icon][1]:ClearText()
+				hookedIcons[icon][2]:ClearText()
+
+				-- Dungeon names as header text
+				hookedIcons[icon][2]:SetText(dungeonNamesTiny[icon.mapID] or icon.mapID)
+				hookedIcons[icon][2]:SetTextScale(1)
+				while hookedIcons[icon][2]:IsTruncated() do -- For really long single words like "MOTHERLODE!!"
+					hookedIcons[icon][2]:SetTextScale(hookedIcons[icon][2]:GetTextScale() - 0.01)
+				end
+				-- Highest score text, mimic Blizz code for the highest level text
+				local _, overAllScore = C_MythicPlus.GetSeasonBestAffixScoreInfoForMap(icon.mapID)
+				local inTimeInfo, overtimeInfo = C_MythicPlus.GetSeasonBestForMap(icon.mapID)
+				if overAllScore and (inTimeInfo or overtimeInfo) then
+					local color
+					if overAllScore then
+						color = C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor(overAllScore)
+					end
+					if not color then
+						color = HIGHLIGHT_FONT_COLOR
+					end
+					hookedIcons[icon][1]:SetTextColor(color.r, color.g, color.b)
+					hookedIcons[icon][1]:SetText(overAllScore)
+				end
+			end
+		end
+		-- Kill off the "Season Best" text so we can display the dungeon names instead
+		if self.WeeklyInfo and self.WeeklyInfo.Child and self.WeeklyInfo.Child.SeasonBest then
+			self.WeeklyInfo.Child.SeasonBest:ClearText()
+			self.WeeklyInfo.Child.SeasonBest:Hide()
+		end
+	end
+	local frame = CreateFrame("Frame")
+	frame:SetScript("OnEvent", function(self, event, addonName)
+		if event == "ADDON_LOADED" and addonName == "Blizzard_ChallengesUI" then
+			self:UnregisterEvent(event)
+			self:SetScript("OnEvent", function() BigWigsLoader.CTimerAfter(8, UpdateRatings) end)
+			self.HookScript(ChallengesFrame, "OnShow", function(f)
+				OnShow(f)
+				BigWigsLoader.CTimerAfter(1, function() OnShow(f) end) -- Compensate for any data updates (that would move the icons) happening after the panel opens
+			end)
+		elseif event == "CHALLENGE_MODE_COMPLETED" then
+			BigWigsLoader.CTimerAfter(8, UpdateRatings)
+		end
+	end)
+	frame:RegisterEvent("ADDON_LOADED")
+	frame:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+end
+
+--------------------------------------------------------------------------------
+-- Who has a key?
+--
+
+local instanceKeysWidgets = {testing = false, nameList = {}, playerListText = {}}
+do
+	local main = CreateFrame("Frame", nil, UIParent)
+	main:SetSize(200, 40)
+	do
+		local point, relPoint = db.profile.instanceKeysPosition[1], db.profile.instanceKeysPosition[2]
+		local x, y = db.profile.instanceKeysPosition[3], db.profile.instanceKeysPosition[4]
+		main:SetPoint(point, UIParent, relPoint, x, y)
+	end
+	main:SetFrameStrata("MEDIUM")
+	main:SetFixedFrameStrata(true)
+	main:SetFrameLevel(9400)
+	main:SetFixedFrameLevel(true)
+	main:SetClampedToScreen(true)
+	main:EnableMouse(false)
+	main:SetMovable(false)
+	main:RegisterForDrag("LeftButton")
+	main:SetScript("OnDragStart", function(self)
+		if self:IsMovable() then
+			self:StartMoving()
+		end
+	end)
+	main:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		local point, _, relPoint, x, y = self:GetPoint()
+		x = math.floor(x+0.5)
+		y = math.floor(y+0.5)
+		db.profile.instanceKeysPosition[1] = point
+		db.profile.instanceKeysPosition[2] = relPoint
+		db.profile.instanceKeysPosition[3] = x
+		db.profile.instanceKeysPosition[4] = y
+	end)
+	instanceKeysWidgets.main = main
+
+	local bg = main:CreateTexture()
+	bg:SetAllPoints(main)
+	bg:SetColorTexture(0, 0, 0, 0.3)
+	bg:Hide()
+	instanceKeysWidgets.bg = bg
+
+	local header = main:CreateFontString()
+	header:SetPoint(db.profile.instanceKeysAlign, 0, 0)
+	header:SetJustifyH(db.profile.instanceKeysAlign)
+
+	local flags = nil
+	if db.profile.instanceKeysMonochrome and db.profile.instanceKeysOutline ~= "NONE" then
+		flags = "MONOCHROME," .. db.profile.instanceKeysOutline
+	elseif db.profile.instanceKeysMonochrome then
+		flags = "MONOCHROME"
+	elseif db.profile.instanceKeysOutline ~= "NONE" then
+		flags = db.profile.instanceKeysOutline
+	end
+	header:SetFont(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName), db.profile.instanceKeysFontSize, flags)
+	header:SetFormattedText("|TInterface\\AddOns\\BigWigs\\Media\\Icons\\minimap_raid:0:0|t%s", L.instanceKeysTitle)
+	header:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+	if db.profile.instanceKeysHideTitle then
+		header:Hide()
+	else
+		header:Show()
+	end
+	instanceKeysWidgets.header = header
+
+	for i = 1, 5 do
+		local playerListText = main:CreateFontString()
+		if db.profile.instanceKeysGrowUpwards then
+			playerListText:SetJustifyV("BOTTOM")
+			playerListText:SetPoint(
+				db.profile.instanceKeysAlign == "LEFT" and "BOTTOMLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "BOTTOMRIGHT" or "BOTTOM", i == 1 and header or instanceKeysWidgets.playerListText[i-1],
+				db.profile.instanceKeysAlign == "LEFT" and "TOPLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "TOPRIGHT" or "TOP", 0, 6
+			)
+		else
+			playerListText:SetJustifyV("TOP")
+			playerListText:SetPoint(
+				db.profile.instanceKeysAlign == "LEFT" and "TOPLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "TOPRIGHT" or "TOP", i == 1 and header or instanceKeysWidgets.playerListText[i-1],
+				db.profile.instanceKeysAlign == "LEFT" and "BOTTOMLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "BOTTOMRIGHT" or "BOTTOM", 0, -6
+			)
+		end
+		playerListText:SetJustifyH(db.profile.instanceKeysAlign)
+		playerListText:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+		playerListText:SetFont(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName), db.profile.instanceKeysFontSize, flags)
+		playerListText:SetText(" ")
+		instanceKeysWidgets.playerListText[i] = playerListText
+	end
+
+	main:Hide()
+
+	local function SortTableByLevelThenName(a, b)
+		local firstLevel = a.level == -1 and 1 or a.level
+		local secondLevel = b.level == -1 and 1 or b.level
+		if firstLevel < secondLevel then
+			return true
+		elseif firstLevel == secondLevel then
+			return a.name < b.name
+		end
+	end
+	local currentInstanceID = nil
+	local function ReceivePartyData(keyLevel, keyMap, _, playerName, channel)
+		if channel == "PARTY" and (not instanceKeysWidgets.nameList[playerName] or instanceKeysWidgets.nameList[playerName][1] ~= keyLevel or instanceKeysWidgets.nameList[playerName][2] ~= keyMap) then
+			local _, classFile = UnitClass(playerName)
+			local color = classFile and C_ClassColor.GetClassColor(classFile):GenerateHexColor() or "FFFFFFFF"
+			local decoratedName
+			local _, _, _, _, _, keyMapInstanceID = GetMapUIInfo(keyMap)
+			if keyMap ~= 0 and (dungeonMapWithMultipleKeys[keyMapInstanceID] or (db.profile.instanceKeysShowAllPlayers and keyMapInstanceID ~= currentInstanceID)) then
+				decoratedName = L.instanceKeysDisplayWithDungeon:format(color, playerName:gsub("%-.+", ""), keyLevel, dungeonNamesTrimmed[keyMap] or keyMap)
+			else
+				decoratedName = L.instanceKeysDisplay:format(color, playerName:gsub("%-.+", ""), keyLevel)
+			end
+			instanceKeysWidgets.nameList[playerName] = {keyLevel, keyMap, decoratedName}
+
+			local sortedPlayerList = {}
+			for pName, pData in next, instanceKeysWidgets.nameList do
+				if UnitInParty(pName) then -- Safety check, in case we're forming a group inside a dungeon and people keep leaving
+					local _, _, _, _, _, playerMapInstanceID = GetMapUIInfo(pData[2])
+					local inCurrentDungeon = playerMapInstanceID == currentInstanceID
+					if inCurrentDungeon or db.profile.instanceKeysShowAllPlayers then
+						main:RegisterEvent("PLAYER_LEAVING_WORLD") -- Hide when changing zone
+						main:RegisterEvent("CHALLENGE_MODE_START") -- Hide when starting Mythic+
+						main:RegisterEvent("ENCOUNTER_START") -- Hide when you enter combat with a boss
+						main:RegisterEvent("PLAYER_REGEN_DISABLED") -- Temporarily hide when you enter combat
+						main:Show()
+						sortedPlayerList[#sortedPlayerList+1] = {name = pName, decoratedName = pData[3], level = pData[1], inCurrentDungeon = inCurrentDungeon}
+					end
+				end
+			end
+
+			table.sort(sortedPlayerList, SortTableByLevelThenName)
+			local namesToShow, otherDungeons = {}, {false, false, false, false, false}
+			for i = 1, 5 do
+				local name = sortedPlayerList[i] and sortedPlayerList[i].decoratedName
+				if name then
+					namesToShow[#namesToShow+1] = name
+					if not sortedPlayerList[i].inCurrentDungeon then
+						otherDungeons[i] = true
+						if not instanceKeysWidgets.testing then
+							instanceKeysWidgets.playerListText[i]:SetTextColor(db.profile.instanceKeysOtherDungeonColor[1], db.profile.instanceKeysOtherDungeonColor[2], db.profile.instanceKeysOtherDungeonColor[3], db.profile.instanceKeysOtherDungeonColor[4])
+							instanceKeysWidgets.playerListText[i]:SetText(name)
+						end
+					elseif not instanceKeysWidgets.testing then
+						instanceKeysWidgets.playerListText[i]:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+						instanceKeysWidgets.playerListText[i]:SetText(name)
+					end
+				elseif not instanceKeysWidgets.testing then
+					instanceKeysWidgets.playerListText[i]:SetText(" ")
+				end
+			end
+			if namesToShow[1] then
+				instanceKeysWidgets.namesToShow = namesToShow
+				instanceKeysWidgets.otherDungeons = otherDungeons
+			else
+				instanceKeysWidgets.namesToShow = nil
+				instanceKeysWidgets.otherDungeons = nil
+				if not instanceKeysWidgets.testing then
+					instanceKeysWidgets.main:Hide()
+				end
+			end
+		end
+	end
+	local whosKeyTable = {}
+	local function RequestPartyData(instanceID)
+		instanceKeysWidgets.namesToShow = nil
+		instanceKeysWidgets.otherDungeons = nil
+		instanceKeysWidgets.nameList = {}
+		currentInstanceID = instanceID
+		local fontFlags = nil
+		if db.profile.instanceKeysMonochrome and db.profile.instanceKeysOutline ~= "NONE" then
+			fontFlags = "MONOCHROME," .. db.profile.instanceKeysOutline
+		elseif db.profile.instanceKeysMonochrome then
+			fontFlags = "MONOCHROME"
+		elseif db.profile.instanceKeysOutline ~= "NONE" then
+			fontFlags = db.profile.instanceKeysOutline
+		end
+		header:SetFont(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName), db.profile.instanceKeysFontSize, fontFlags)
+		for i = 1, 5 do
+			instanceKeysWidgets.playerListText[i]:SetFont(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName), db.profile.instanceKeysFontSize, fontFlags)
+		end
+		LibKeystoneRegister(whosKeyTable, ReceivePartyData)
+		LibKeystoneRequest("PARTY")
+		main:RegisterEvent("UNIT_CONNECTION")
+	end
+	local function DelayStartOfDungeon() -- Difficulty info isn't accurate until 1 frame after PEW
+		local _, _, diffID, _, _, _, _, instanceID = BigWigsLoader.GetInstanceInfo()
+		if diffID == 23 then -- Mythic
+			main:RegisterEvent("CHALLENGE_MODE_COMPLETED")
+			RequestPartyData(instanceID)
+		end
+	end
+	local function DelayEndOfDungeon()
+		local _, _, diffID, _, _, _, _, instanceID = BigWigsLoader.GetInstanceInfo()
+		if diffID == 8 then -- Mythic+
+			RequestPartyData(instanceID)
+		end
+	end
+	local combatHideCount, combatDelayTimer = 1, nil
+	main:SetScript("OnEvent", function(self, event, _, isConnected)
+		if instanceKeysWidgets.testing and event ~= "UNIT_CONNECTION" then
+			instanceKeysWidgets.testing = false
+			instanceKeysWidgets.main:Hide()
+			instanceKeysWidgets.main:EnableMouse(false)
+			instanceKeysWidgets.main:SetMovable(false)
+			instanceKeysWidgets.bg:Hide()
+		end
+		if event == "PLAYER_ENTERING_WORLD" then
+			self:UnregisterEvent("CHALLENGE_MODE_COMPLETED")
+			BigWigsLoader.CTimerAfter(0, DelayStartOfDungeon)
+		elseif event == "CHALLENGE_MODE_COMPLETED" then
+			if db.profile.instanceKeysShowDungeonEnd then
+				BigWigsLoader.CTimerAfter(5, DelayEndOfDungeon)
+			end
+		elseif event == "UNIT_CONNECTION" then -- Someone new joined the group, or they just logged on after being offline (maybe they were offline when you joined the group)
+			if isConnected then
+				BigWigsLoader.CTimerAfter(1, function() LibKeystoneRequest("PARTY") end)
+			end
+		elseif event == "PLAYER_REGEN_DISABLED" and combatHideCount < 4 then -- You can enter combat thrice and it will re-show, kill it after that
+			combatHideCount = combatHideCount + 1
+			self:Hide()
+			self:RegisterEvent("PLAYER_REGEN_ENABLED")
+			if combatDelayTimer then
+				combatDelayTimer:Cancel()
+				combatDelayTimer = nil
+			end
+		elseif event == "PLAYER_REGEN_ENABLED" then
+			self:UnregisterEvent(event)
+			if combatDelayTimer then combatDelayTimer:Cancel() end
+			combatDelayTimer = BigWigsLoader.CTimerNewTimer(10, function()
+				combatDelayTimer = nil
+				self:Show()
+			end)
+		else
+			combatHideCount = 1
+			LibKeystoneUnregister(whosKeyTable)
+			self:Hide()
+			if combatDelayTimer then
+				combatDelayTimer:Cancel()
+				combatDelayTimer = nil
+			end
+			instanceKeysWidgets.nameList = {}
+			instanceKeysWidgets.namesToShow = nil
+			instanceKeysWidgets.otherDungeons = nil
+			self:UnregisterEvent("PLAYER_LEAVING_WORLD")
+			self:UnregisterEvent("CHALLENGE_MODE_START")
+			self:UnregisterEvent("PLAYER_REGEN_DISABLED")
+			self:UnregisterEvent("PLAYER_REGEN_ENABLED")
+			self:UnregisterEvent("UNIT_CONNECTION")
+		end
+	end)
+	main:RegisterEvent("PLAYER_ENTERING_WORLD")
+end
+
+--------------------------------------------------------------------------------
+-- Progress %
+--
+
+local NamePlatePercentUtils = {testing = false, isActive = false}
+do
+	local totalEnemyForcesRaw = 0
+	local GetUnitCriteriaProgressValues = C_ScenarioInfo.GetUnitCriteriaProgressValues
+	do -- Tooltip
+		local function AddPercentLine(tooltip)
+			if db.profile.progressTooltip and NamePlatePercentUtils.isActive then
+				local value, _, percentString = GetUnitCriteriaProgressValues("mouseover")
+				if value then
+					tooltip:AddLine(L.progressPercentTooltipText[db.profile.progressTooltipFormat]:format(percentString, value, totalEnemyForcesRaw))
+				end
+			end
+
+		end
+		TooltipDataProcessor.AddTooltipPostCall(2, AddPercentLine) -- Enum.TooltipDataType.Unit
+	end
+
+	do -- Nameplates
+		local activeTexts, storedTexts = {}, {}
+		local GetTextObject
+		local GetNamePlateForUnit = C_NamePlate.GetNamePlateForUnit
+		do
+			local SetText, SetPoint
+			do
+				local UnitIsUnit = UnitIsUnit
+				function SetText(self, unit, ...)
+					if UnitIsUnit("target", unit) then
+						self.fontString:SetTextColor(db.profile.progressNameplateFontColorTarget[1], db.profile.progressNameplateFontColorTarget[2], db.profile.progressNameplateFontColorTarget[3], db.profile.progressNameplateFontColorTarget[4])
+						self.fontString:SetJustifyH(db.profile.progressNameplateTargetAlign)
+					else
+						self.fontString:SetTextColor(db.profile.progressNameplateFontColorOther[1], db.profile.progressNameplateFontColorOther[2], db.profile.progressNameplateFontColorOther[3], db.profile.progressNameplateFontColorOther[4])
+						self.fontString:SetJustifyH(db.profile.progressNameplateOtherAlign)
+					end
+					self.fontString:SetFormattedText(...)
+				end
+				function SetPoint(self, unit)
+					local nameplateFrame = GetNamePlateForUnit(unit)
+					if nameplateFrame then
+						activeTexts[unit] = self
+						self.fontString:Show()
+						if UnitIsUnit("target", unit) then
+							self.fontString:SetPoint("CENTER", nameplateFrame, "CENTER", db.profile.progressNameplateTargetOffsetX, db.profile.progressNameplateTargetOffsetY)
+						else
+							self.fontString:SetPoint("CENTER", nameplateFrame, "CENTER", db.profile.progressNameplateOtherOffsetX, db.profile.progressNameplateOtherOffsetY)
+						end
+						return true
+					end
+				end
+			end
+			local function Hide(self, unit)
+				self.fontString:Hide()
+				self.fontString:ClearText()
+				self.fontString:ClearAllPoints()
+				storedTexts[#storedTexts+1] = self
+				activeTexts[unit] = nil
+			end
+			local frame = CreateFrame("Frame", nil, UIParent)
+			frame:SetPoint("CENTER")
+			frame:SetFrameStrata("MEDIUM")
+			frame:SetFixedFrameStrata(true)
+			frame:SetFrameLevel(6200)
+			frame:SetFixedFrameLevel(true)
+			frame:Show()
+			function GetTextObject()
+				if next(storedTexts) then
+					return table.remove(storedTexts)
+				else
+					local fontString = frame:CreateFontString()
+					fontString:SetFont(LibSharedMedia:Fetch("font", db.profile.progressNameplateFontName), db.profile.progressNameplateFontSize, NamePlatePercentUtils.fontFlags)
+					fontString:SetSize(300, 20)
+					fontString:SetText(" ")
+					fontString:SetSmoothScaling(true)
+
+					local object = {SetText = SetText, Hide = Hide, SetPoint = SetPoint, fontString = fontString}
+					return object
+				end
+			end
+		end
+
+		do
+			NamePlatePercentUtils.RemoveAll = function()
+				for unit, text in next, activeTexts do
+					text:Hide(unit)
+				end
+			end
+			NamePlatePercentUtils.UpdateAll = function()
+				local progressNameplateFontFlags = nil
+				if db.profile.progressNameplateMonochrome and db.profile.progressNameplateOutline ~= "NONE" then
+					progressNameplateFontFlags = "MONOCHROME," .. db.profile.progressNameplateOutline
+				elseif db.profile.progressNameplateMonochrome then
+					progressNameplateFontFlags = "MONOCHROME"
+				elseif db.profile.progressNameplateOutline ~= "NONE" then
+					progressNameplateFontFlags = db.profile.progressNameplateOutline .. ""
+				end
+				if db.profile.progressNameplateSlugRendering then
+					if not progressNameplateFontFlags then
+						progressNameplateFontFlags = "SLUG"
+					else
+						progressNameplateFontFlags = progressNameplateFontFlags .. ",SLUG"
+					end
+				end
+				NamePlatePercentUtils.fontFlags = progressNameplateFontFlags
+
+				for unit, text in next, activeTexts do
+					text.fontString:SetFont(LibSharedMedia:Fetch("font", db.profile.progressNameplateFontName), db.profile.progressNameplateFontSize, NamePlatePercentUtils.fontFlags)
+					local value, _, percentString = GetUnitCriteriaProgressValues(unit)
+					if not percentString and NamePlatePercentUtils.testing then
+						local numString = unit:match("%d+")
+						if numString then
+							local num = tonumber(numString)
+							if num then
+								local decimal = num > 9 and (num / 100) or (num / 10)
+								local percent = 1 + decimal
+								percentString = tostring(percent)
+								value = num % 2 == 0 and 2 or 1
+							end
+						end
+					end
+					if percentString then
+						text.fontString:ClearText()
+						text.fontString:ClearAllPoints()
+						if text:SetPoint(unit) then
+							if db.profile.progressNameplateFormat == 1 then
+								text:SetText(unit, "%s%%", percentString)
+							elseif db.profile.progressNameplateFormat == 3 then
+								text:SetText(unit, "%d/%d", value, 500)
+							else
+								text:SetText(unit, "%d", value)
+							end
+						else
+							text:Hide(unit)
+						end
+					else
+						text:Hide(unit)
+					end
+				end
+			end
+
+			local UnitCanAttack = BigWigsLoader.UnitCanAttack
+			NamePlatePercentUtils.Test = function()
+				NamePlatePercentUtils.RemoveAll()
+				if NamePlatePercentUtils.testing then
+					BigWigsLoader.CTimerAfter(0.5, NamePlatePercentUtils.Test)
+					for i = 1, 20 do
+						local unit = "nameplate" .. i
+						if UnitCanAttack("player", unit) then
+							local nameplateFrame = GetNamePlateForUnit(unit)
+							if nameplateFrame then
+								local value, _, percentString = GetUnitCriteriaProgressValues(unit)
+								if not percentString then
+									local decimal = i > 9 and (i / 100) or (i / 10)
+									local percent = 1 + decimal
+									percentString = tostring(percent)
+									value = i % 2 == 0 and 2 or 1
+								end
+								local text = GetTextObject()
+								if text:SetPoint(unit) then
+									if db.profile.progressNameplateFormat == 1 then
+										text:SetText(unit, "%s%%", percentString)
+									elseif db.profile.progressNameplateFormat == 3 then
+										text:SetText(unit, "%d/%d", value, 500)
+									else
+										text:SetText(unit, "%d", value)
+									end
+								else
+									text:Hide(unit)
+								end
+							end
+						end
+					end
+				end
+			end
+			NamePlatePercentUtils.RestoreAll = function()
+				NamePlatePercentUtils.RemoveAll()
+				if db.profile.progressNameplate and NamePlatePercentUtils.isActive then
+					for i = 1, 20 do
+						local unit = "nameplate" .. i
+						if UnitCanAttack("player", unit) then
+							local nameplateFrame = GetNamePlateForUnit(unit)
+							if nameplateFrame then
+								local value, _, percentString = GetUnitCriteriaProgressValues(unit)
+								if percentString then
+									local text = GetTextObject()
+									if text:SetPoint(unit) then
+										if db.profile.progressNameplateFormat == 1 then
+											text:SetText(unit, "%s%%", percentString)
+										elseif db.profile.progressNameplateFormat == 3 then
+											text:SetText(unit, "%d/%d", value, totalEnemyForcesRaw)
+										else
+											text:SetText(unit, "%d", value)
+										end
+									else
+										text:Hide(unit)
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		local nameplateFrame = CreateFrame("Frame")
+		nameplateFrame:RegisterEvent("PLAYER_LEAVING_WORLD")
+		nameplateFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+		nameplateFrame:RegisterEvent("CHALLENGE_MODE_START")
+		local UpdateTotal
+		do
+			local GetStepInfo = C_Scenario.GetStepInfo
+			local GetCriteriaInfo = C_ScenarioInfo.GetCriteriaInfo
+			function UpdateTotal()
+				local _, _, stepCount = GetStepInfo()
+				for i = stepCount, 1, -1 do
+					local infoTable = GetCriteriaInfo(i)
+					if infoTable.totalQuantity and infoTable.isWeightedProgress then
+						totalEnemyForcesRaw = infoTable.totalQuantity
+						return
+					end
+				end
+			end
+		end
+		local prevUnit = nil
+		local function OnEvent(self, event, unit)
+			if event == "NAME_PLATE_UNIT_ADDED" then
+				local value, _, percentString = GetUnitCriteriaProgressValues(unit)
+				if percentString then
+					local text = GetTextObject()
+					if text:SetPoint(unit) then
+						if db.profile.progressNameplateFormat == 1 then
+							text:SetText(unit, "%s%%", percentString)
+						elseif db.profile.progressNameplateFormat == 3 then
+							text:SetText(unit, "%d/%d", value, totalEnemyForcesRaw)
+						else
+							text:SetText(unit, "%d", value)
+						end
+					else
+						text:Hide(unit)
+					end
+				end
+			elseif event == "NAME_PLATE_UNIT_REMOVED" then
+				local text = activeTexts[unit]
+				if text then
+					text:Hide(unit)
+				end
+				if unit == prevUnit then
+					prevUnit = nil
+				end
+			elseif event == "PLAYER_TARGET_CHANGED" then
+				if prevUnit then
+					local text = activeTexts[prevUnit]
+					if text then
+						text:Hide(prevUnit)
+					end
+					OnEvent(self, "NAME_PLATE_UNIT_ADDED", prevUnit)
+					prevUnit = nil
+				end
+
+				if UnitExists("target") then
+					local nameplate = GetNamePlateForUnit("target")
+					if nameplate then
+						local token = nameplate.unitToken
+						prevUnit = token
+						local text = activeTexts[token]
+						if text then
+							text:Hide(token)
+						end
+						OnEvent(self, "NAME_PLATE_UNIT_ADDED", token)
+					end
+				end
+			elseif event == "PLAYER_LEAVING_WORLD" then
+				prevUnit = nil
+				NamePlatePercentUtils.isActive = false
+				self:UnregisterEvent("NAME_PLATE_UNIT_ADDED")
+				self:UnregisterEvent("NAME_PLATE_UNIT_REMOVED")
+				self:UnregisterEvent("PLAYER_TARGET_CHANGED")
+				NamePlatePercentUtils.RemoveAll()
+			elseif event == "PLAYER_ENTERING_WORLD" then -- Only the first time it fires, to compensate for reloading UI in the middle of a M+
+				self:UnregisterEvent(event)
+				local _, _, diffID = BigWigsLoader.GetInstanceInfo()
+				if diffID == 8 and db.profile.progressNameplate then
+					NamePlatePercentUtils.isActive = true
+					self:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+					self:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+					self:RegisterEvent("PLAYER_TARGET_CHANGED")
+				end
+			elseif event == "CHALLENGE_MODE_START" then
+				totalEnemyForcesRaw = 0
+				NamePlatePercentUtils.isActive = true
+				if NamePlatePercentUtils.testing then
+					NamePlatePercentUtils.testing = false
+					NamePlatePercentUtils.RemoveAll()
+				end
+				if db.profile.progressNameplate then
+					self:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+					self:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+					self:RegisterEvent("PLAYER_TARGET_CHANGED")
+				end
+				BigWigsLoader.CTimerAfter(7, UpdateTotal)
+			end
+		end
+		nameplateFrame:SetScript("OnEvent", OnEvent)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Options Table
+--
+
+local UpdateWidgets
+do
+	local viewerKeybindFrame = CreateFrame("Button", "BWViewerKeybindFrame")
+	viewerKeybindFrame:SetSize(1, 1)
+	viewerKeybindFrame:Hide()
+
+	function UpdateWidgets()
+		LibKeystone.SetGuildHidden(db.profile.hideFromGuild)
+		mainPanel:ClearAllPoints()
+		do
+			local point, relPoint = db.profile.viewerPosition[1], db.profile.viewerPosition[2]
+			local x, y = db.profile.viewerPosition[3], db.profile.viewerPosition[4]
+			mainPanel:SetPoint(point, UIParent, relPoint, x, y)
+		end
+		mainPanel:SetSize(350, db.profile.windowHeight)
+
+		local fontFlags = nil
+		if db.profile.instanceKeysMonochrome and db.profile.instanceKeysOutline ~= "NONE" then
+			fontFlags = "MONOCHROME," .. db.profile.instanceKeysOutline
+		elseif db.profile.instanceKeysMonochrome then
+			fontFlags = "MONOCHROME"
+		elseif db.profile.instanceKeysOutline ~= "NONE" then
+			fontFlags = db.profile.instanceKeysOutline
+		end
+
+		instanceKeysWidgets.header:SetJustifyH(db.profile.instanceKeysAlign)
+		instanceKeysWidgets.header:ClearAllPoints()
+		instanceKeysWidgets.header:SetPoint(db.profile.instanceKeysAlign, 0, 0)
+		instanceKeysWidgets.header:SetFont(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName), db.profile.instanceKeysFontSize, fontFlags)
+		instanceKeysWidgets.header:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+		for i = 1, 5 do
+			instanceKeysWidgets.playerListText[i]:SetJustifyH(db.profile.instanceKeysAlign)
+			instanceKeysWidgets.playerListText[i]:ClearAllPoints()
+			if db.profile.instanceKeysGrowUpwards then
+				instanceKeysWidgets.playerListText[i]:SetJustifyV("BOTTOM")
+				instanceKeysWidgets.playerListText[i]:SetPoint(
+					db.profile.instanceKeysAlign == "LEFT" and "BOTTOMLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "BOTTOMRIGHT" or "BOTTOM", i == 1 and instanceKeysWidgets.header or instanceKeysWidgets.playerListText[i-1],
+					db.profile.instanceKeysAlign == "LEFT" and "TOPLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "TOPRIGHT" or "TOP", 0, 6
+				)
+			else
+				instanceKeysWidgets.playerListText[i]:SetJustifyV("TOP")
+				instanceKeysWidgets.playerListText[i]:SetPoint(
+					db.profile.instanceKeysAlign == "LEFT" and "TOPLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "TOPRIGHT" or "TOP", i == 1 and instanceKeysWidgets.header or instanceKeysWidgets.playerListText[i-1],
+					db.profile.instanceKeysAlign == "LEFT" and "BOTTOMLEFT" or db.profile.instanceKeysAlign == "RIGHT" and "BOTTOMRIGHT" or "BOTTOM", 0, -6
+				)
+			end
+			instanceKeysWidgets.playerListText[i]:SetFont(LibSharedMedia:Fetch("font", db.profile.instanceKeysFontName), db.profile.instanceKeysFontSize, fontFlags)
+			instanceKeysWidgets.playerListText[i]:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+			if not instanceKeysWidgets.testing and instanceKeysWidgets.namesToShow and instanceKeysWidgets.namesToShow[i] and instanceKeysWidgets.otherDungeons[i] then
+				instanceKeysWidgets.playerListText[i]:SetTextColor(db.profile.instanceKeysOtherDungeonColor[1], db.profile.instanceKeysOtherDungeonColor[2], db.profile.instanceKeysOtherDungeonColor[3], db.profile.instanceKeysOtherDungeonColor[4])
+			end
+		end
+		if db.profile.instanceKeysHideTitle then
+			instanceKeysWidgets.header:Hide()
+		else
+			instanceKeysWidgets.header:Show()
+		end
+
+		instanceKeysWidgets.main:ClearAllPoints()
+		do
+			local point, relPoint = db.profile.instanceKeysPosition[1], db.profile.instanceKeysPosition[2]
+			local x, y = db.profile.instanceKeysPosition[3], db.profile.instanceKeysPosition[4]
+			instanceKeysWidgets.main:SetPoint(point, UIParent, relPoint, x, y)
+		end
+
+		if instanceKeysWidgets.testing then
+			instanceKeysWidgets.playerListText[1]:SetText(L.instanceKeysTest8)
+			instanceKeysWidgets.playerListText[2]:SetText(L.instanceKeysTest10)
+			for i = 3, 5 do
+				instanceKeysWidgets.playerListText[i]:SetText("")
+			end
+		end
+
+		if not InCombatLockdown() then
+			ClearOverrideBindings(viewerKeybindFrame)
+			if db.profile.viewerKeybind ~= "" then
+				SetOverrideBindingClick(viewerKeybindFrame, true, db.profile.viewerKeybind, "BWViewerKeybindFrame")
+			end
+		else
+			viewerKeybindFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		end
+
+		local progressNameplateFontFlags = nil
+		if db.profile.progressNameplateMonochrome and db.profile.progressNameplateOutline ~= "NONE" then
+			progressNameplateFontFlags = "MONOCHROME," .. db.profile.progressNameplateOutline
+		elseif db.profile.progressNameplateMonochrome then
+			progressNameplateFontFlags = "MONOCHROME"
+		elseif db.profile.progressNameplateOutline ~= "NONE" then
+			progressNameplateFontFlags = db.profile.progressNameplateOutline .. ""
+		end
+		if db.profile.progressNameplateSlugRendering then
+			if not progressNameplateFontFlags then
+				progressNameplateFontFlags = "SLUG"
+			else
+				progressNameplateFontFlags = progressNameplateFontFlags .. ",SLUG"
+			end
+		end
+		NamePlatePercentUtils.fontFlags = progressNameplateFontFlags
+	end
+
+	local function voiceSorting()
+		local list = BigWigsAPI.GetCountdownList()
+		local sorted = {}
+		for k in next, list do
+			if k ~= "none" and k ~= "simple" then
+				sorted[#sorted + 1] = k
+			end
+		end
+		table.sort(sorted, function(a, b) return list[a] < list[b] end)
+		table.insert(sorted, 1, "none")
+		table.insert(sorted, 2, "simple")
+		return sorted
+	end
+
+	local function soundGet(info)
+		for i, v in next, LibSharedMedia:List("sound") do
+			if v == db.profile[info[#info]] then
+				return i
+			end
+		end
+	end
+	local function soundSet(info, value)
+		db.profile[info[#info]] = LibSharedMedia:List("sound")[value]
+	end
+
+	local function ShowViewer()
+		if not mainPanel:IsShown() then
+			mainPanel:Show()
+			tab1:Click()
+		else
+			mainPanel.CloseButton:Click()
+		end
+	end
+
+	BigWigsAPI.RegisterSlashCommand("/key", ShowViewer, true)
+	BigWigsAPI.RegisterSlashCommand("/bwkey", ShowViewer, true)
+	if db.global.slashKeys then
+		BigWigsAPI.RegisterSlashCommand("/keys", ShowViewer, true)
+	end
+	if db.global.slashKeystone then
+		BigWigsAPI.RegisterSlashCommand("/keystone", ShowViewer, true)
+	end
+
+	viewerKeybindFrame:SetScript("OnClick", ShowViewer)
+	if db.profile.viewerKeybind ~= "" then
+		SetOverrideBindingClick(viewerKeybindFrame, true, db.profile.viewerKeybind, "BWViewerKeybindFrame")
+	end
+	viewerKeybindFrame:SetScript("OnEvent", function(self, event)
+		self:UnregisterEvent(event)
+		ClearOverrideBindings(self)
+		if db.profile.viewerKeybind ~= "" then
+			SetOverrideBindingClick(self, true, db.profile.viewerKeybind, "BWViewerKeybindFrame")
+		end
+	end)
+
+	local function GetSettings(info)
+		return db.profile[info[#info]]
+	end
+	local function UpdateSettings(info, value)
+		local key = info[#info]
+		db.profile[key] = value
+	end
+	local function UpdateSettingsAndWidgets(info, value)
+		local key = info[#info]
+		db.profile[key] = value
+		UpdateWidgets()
+	end
+	local function GetColor(info)
+		local colorTable = db.profile[info[#info]]
+		return colorTable[1], colorTable[2], colorTable[3], colorTable[4]
+	end
+	local function UpdateColorAndWidgets(info, r, g, b, a)
+		local key = info[#info]
+		db.profile[key] = {r, g, b, a < 0.3 and 0.3 or a}
+		UpdateWidgets()
+	end
+	local function UpdateSettingsAndNameplates(info, value)
+		local key = info[#info]
+		db.profile[key] = value
+		NamePlatePercentUtils.UpdateAll()
+	end
+	local function DisabledWhenNameplatePercentDisabled()
+		return not db.profile.progressNameplate
+	end
+	BigWigsAPI.RegisterToolOptions("MythicPlus", {
+		type = "group",
+		childGroups = "tab",
+		name = L.keystoneModuleName,
+		order = 1,
+		get = GetSettings,
+		set = UpdateSettings,
+		args = {
+			explainer = {
+				type = "description",
+				name = L.keystoneExplainer,
+				order = 0,
+				width = "full",
+				fontSize = "large",
+			},
+			keys = {
+				type = "group",
+				name = L.keys,
+				order = 1,
+				childGroups = "tab",
+				get = GetSettings,
+				set = UpdateSettingsAndWidgets,
+				args = {
+					instanceKeys = {
+						type = "group",
+						name = L.instanceKeysTitle,
+						order = 1,
+						get = GetSettings,
+						set = UpdateSettingsAndWidgets,
+						args = {
+							explainInstanceKeys = {
+								type = "description",
+								name = L.instanceKeysDesc,
+								order = 1,
+								width = "full",
+							},
+							anchorsButton = {
+								type = "execute",
+								name = function()
+									if instanceKeysWidgets.testing then
+										return L.toggleAnchorsBtnHide
+									else
+										return L.toggleAnchorsBtnShow
+									end
+								end,
+								desc = function()
+									if instanceKeysWidgets.testing then
+										return L.toggleAnchorsBtnHide_desc
+									else
+										return L.toggleMessagesAnchorsBtnShow_desc
+									end
+								end,
+								func = function()
+									if instanceKeysWidgets.testing then
+										instanceKeysWidgets.testing = false
+										instanceKeysWidgets.main:EnableMouse(false)
+										instanceKeysWidgets.main:SetMovable(false)
+										instanceKeysWidgets.bg:Hide()
+										if instanceKeysWidgets.namesToShow then
+											for i = 1, 5 do
+												if i <= #instanceKeysWidgets.namesToShow then
+													instanceKeysWidgets.playerListText[i]:SetText(instanceKeysWidgets.namesToShow[i])
+													if instanceKeysWidgets.otherDungeons[i] then
+														instanceKeysWidgets.playerListText[i]:SetTextColor(db.profile.instanceKeysOtherDungeonColor[1], db.profile.instanceKeysOtherDungeonColor[2], db.profile.instanceKeysOtherDungeonColor[3], db.profile.instanceKeysOtherDungeonColor[4])
+													else
+														instanceKeysWidgets.playerListText[i]:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+													end
+												else
+													instanceKeysWidgets.playerListText[i]:SetText("")
+												end
+											end
+										else
+											instanceKeysWidgets.main:Hide()
+										end
+									else
+										instanceKeysWidgets.testing = true
+										instanceKeysWidgets.main:Show()
+										instanceKeysWidgets.main:EnableMouse(true)
+										instanceKeysWidgets.main:SetMovable(true)
+										instanceKeysWidgets.bg:Show()
+										instanceKeysWidgets.playerListText[1]:SetText(L.instanceKeysTest8)
+										instanceKeysWidgets.playerListText[1]:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+										instanceKeysWidgets.playerListText[2]:SetText(L.instanceKeysTest10)
+										instanceKeysWidgets.playerListText[2]:SetTextColor(db.profile.instanceKeysColor[1], db.profile.instanceKeysColor[2], db.profile.instanceKeysColor[3], db.profile.instanceKeysColor[4])
+										for i = 3, 5 do
+											instanceKeysWidgets.playerListText[i]:SetText("")
+										end
+									end
+								end,
+								width = 1.5,
+								order = 2,
+							},
+							instanceKeysFontName = {
+								type = "select",
+								name = L.font,
+								order = 3,
+								values = LibSharedMedia:List("font"),
+								itemControl = "DDI-Font",
+								get = function()
+									for i, v in next, LibSharedMedia:List("font") do
+										if v == db.profile.instanceKeysFontName then return i end
+									end
+								end,
+								set = function(_, value)
+									local list = LibSharedMedia:List("font")
+									db.profile.instanceKeysFontName = list[value]
+									UpdateWidgets()
+								end,
+								width = 2,
+							},
+							instanceKeysOutline = {
+								type = "select",
+								name = L.outline,
+								order = 4,
+								values = {
+									NONE = L.none,
+									OUTLINE = L.thin,
+									THICKOUTLINE = L.thick,
+								},
+							},
+							instanceKeysFontSize = {
+								type = "range",
+								name = L.fontSize,
+								desc = L.fontSizeDesc,
+								order = 5,
+								width = 2,
+								softMax = 100, max = 200, min = 14, step = 1,
+							},
+							instanceKeysMonochrome = {
+								type = "toggle",
+								name = L.monochrome,
+								desc = L.monochromeDesc,
+								order = 6,
+							},
+							instanceKeysAlign = {
+								type = "select",
+								name = L.align,
+								values = {
+									L.LEFT,
+									L.CENTER,
+									L.RIGHT,
+								},
+								style = "radio",
+								order = 7,
+								get = function() return db.profile.instanceKeysAlign == "LEFT" and 1 or db.profile.instanceKeysAlign == "RIGHT" and 3 or 2 end,
+								set = function(_, value)
+									db.profile.instanceKeysAlign = value == 1 and "LEFT" or value == 3 and "RIGHT" or "CENTER"
+									UpdateWidgets()
+								end,
+							},
+							instanceKeysColor = {
+								type = "color",
+								name = L.fontColor,
+								get = GetColor,
+								set = UpdateColorAndWidgets,
+								hasAlpha = true,
+								order = 8,
+							},
+							instanceKeysGrowUpwards = {
+								type = "toggle",
+								name = L.growingUpwards,
+								desc = L.growingUpwardsDesc,
+								order = 9,
+							},
+							extrasHeader = {
+								type = "header",
+								name = "",
+								order = 10,
+							},
+							instanceKeysShowAllPlayers = {
+								type = "toggle",
+								name = L.instanceKeysShowAll,
+								desc = L.instanceKeysShowAllDesc,
+								width = 2,
+								order = 11,
+								set = function(info, value)
+									local key = info[#info]
+									db.profile[key] = value
+									instanceKeysWidgets.nameList = {}
+									LibKeystoneRequest("PARTY")
+								end,
+								confirm = function(_, value)
+									if value then
+										return L.instanceKeysShowAllDesc
+									end
+								end,
+							},
+							instanceKeysOtherDungeonColor = {
+								type = "color",
+								name = L.instanceKeysOtherDungeonColor,
+								desc = L.instanceKeysOtherDungeonColorDesc,
+								get = GetColor,
+								set = UpdateColorAndWidgets,
+								hasAlpha = true,
+								order = 12,
+								disabled = function() return not db.profile.instanceKeysShowAllPlayers end,
+							},
+							instanceKeysShowDungeonEnd = {
+								type = "toggle",
+								name = L.keystoneAutoShowEndOfRun,
+								desc = L.instanceKeysEndOfRunDesc,
+								order = 13,
+								width = "full",
+							},
+							instanceKeysHideTitle = {
+								type = "toggle",
+								name = L.instanceKeysHideTitle,
+								desc = L.instanceKeysHideTitleDesc,
+								set = UpdateSettingsAndWidgets,
+								order = 14,
+								width = "full",
+							},
+							resetHeader = {
+								type = "header",
+								name = "",
+								order = 15,
+							},
+							reset = {
+								type = "execute",
+								name = L.reset,
+								desc = L.resetDesc,
+								func = function()
+									ProfileUtils.ResetInstanceKeys()
+									UpdateWidgets()
+									if not instanceKeysWidgets.testing then
+										instanceKeysWidgets.nameList = {}
+										LibKeystoneRequest("PARTY")
+									end
+								end,
+								order = 16,
+							},
+						},
+					},
+					keystoneViewer = {
+						type = "group",
+						name = L.keystoneViewerTitle,
+						order = 2,
+						args = {
+							explainViewer = {
+								type = "description",
+								name = L.keystoneViewerExplainer,
+								order = 1,
+								width = "full",
+							},
+							openViewer = {
+								type = "execute",
+								name = L.keystoneViewerOpen,
+								func = ShowViewer,
+								order = 2,
+								width = 1.5,
+							},
+							spacerViewer = {
+								type = "description",
+								name = "\n\n",
+								order = 3,
+								width = "full",
+							},
+							showViewerDungeonEnd = {
+								type = "toggle",
+								name = L.keystoneAutoShowEndOfRun,
+								desc = L.keystoneAutoShowEndOfRunDesc,
+								order = 4,
+								width = "full",
+							},
+							hideFromGuild = {
+								type = "toggle",
+								name = L.keystoneHideGuildTitle,
+								desc = L.keystoneHideGuildDesc,
+								order = 5,
+								width = "full",
+								set = function(info, value)
+									local key = info[#info]
+									db.profile[key] = value
+									LibKeystone.SetGuildHidden(value)
+								end,
+								confirm = function(_, value)
+									if value then
+										return L.keystoneHideGuildWarning
+									end
+								end,
+							},
+							explainViewerKeybinding = {
+								type = "description",
+								name = L.keystoneViewerKeybindingExplainer,
+								order = 6,
+								width = "full",
+							},
+							viewerKeybind = {
+								type = "keybinding",
+								name = L.keybinding,
+								desc = L.keystoneViewerKeybindingDesc,
+								order = 7,
+								set = UpdateSettingsAndWidgets,
+							},
+							slashDescription = {
+								type = "description",
+								name = "\n\n",
+								order = 8,
+								width = "full",
+							},
+							slashKeys = {
+								type = "toggle",
+								name = L.keystoneSlashKeys,
+								order = 9,
+								width = "full",
+								get = function() return db.global.slashKeys end,
+								set = function(info, value)
+									local key = info[#info]
+									db.global[key] = value
+									C_UI.Reload()
+								end,
+								confirm = function()
+									return L.reloadUIWarning
+								end,
+							},
+							slashKeystone = {
+								type = "toggle",
+								name = L.keystoneSlashKeystone,
+								order = 10,
+								width = "full",
+								get = function() return db.global.slashKeystone end,
+								set = function(info, value)
+									local key = info[#info]
+									db.global[key] = value
+									C_UI.Reload()
+								end,
+								confirm = function()
+									return L.reloadUIWarning
+								end,
+							},
+						},
+					},
+				},
+			},
+			progressPercent = {
+				type = "group",
+				name = L.progressPercent,
+				childGroups = "tab",
+				order = 2,
+				args = {
+					explainProgressPercent = {
+						type = "description",
+						name = L.progressPercentDesc,
+						order = 1,
+						width = "full",
+					},
+					tooltip = {
+						type = "group",
+						name = L.tooltip,
+						order = 2,
+						args = {
+							progressTooltip = {
+								type = "toggle",
+								name = L.progressPercentTooltip,
+								order = 1,
+								width = "full",
+							},
+							progressTooltipFormat = {
+								type = "select",
+								name = L.textFormat,
+								values = {
+									L.progressPercentTooltipText[1]:format(1.23),
+									L.progressPercentTooltipText[2]:format(1.23, 4),
+									L.progressPercentTooltipText[3]:format(1.23, 4, 500),
+								},
+								order = 2,
+								width = 2,
+								disabled = function() return not db.profile.progressTooltip end,
+							},
+						},
+					},
+					nameplates = {
+						type = "group",
+						name = L.nameplates,
+						order = 3,
+						args = {
+							progressNameplate = {
+								type = "toggle",
+								name = L.progressPercentNameplate,
+								order = 1,
+								width = "full",
+								set = function(_, value)
+									db.profile.progressNameplate = value
+									if value then
+										NamePlatePercentUtils.RestoreAll()
+									else
+										NamePlatePercentUtils.RemoveAll()
+										NamePlatePercentUtils.testing = false
+									end
+								end,
+							},
+							test = {
+								type = "execute",
+								name = function()
+									if NamePlatePercentUtils.testing then
+										return L.stopTest
+									else
+										return L.startTest
+									end
+								end,
+								func = function()
+									if NamePlatePercentUtils.testing then
+										NamePlatePercentUtils.testing = false
+										NamePlatePercentUtils.RestoreAll()
+									else
+										NamePlatePercentUtils.testing = true
+										NamePlatePercentUtils.Test()
+									end
+								end,
+								width = 1.5,
+								order = 2,
+								disabled = function() return NamePlatePercentUtils.isActive or not db.profile.progressNameplate end,
+							},
+							progressNameplateFormat = {
+								type = "select",
+								name = L.textFormat,
+								values = {
+									"1.23%",
+									"4",
+									"4/500",
+								},
+								order = 3,
+								width = 1.5,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							fontHeader = {
+								type = "header",
+								name = L.font,
+								order = 4,
+							},
+							progressNameplateFontName = {
+								type = "select",
+								name = L.font,
+								order = 5,
+								values = LibSharedMedia:List("font"),
+								itemControl = "DDI-Font",
+								get = function()
+									for i, v in next, LibSharedMedia:List("font") do
+										if v == db.profile.progressNameplateFontName then return i end
+									end
+								end,
+								set = function(_, value)
+									local list = LibSharedMedia:List("font")
+									db.profile.progressNameplateFontName = list[value]
+									NamePlatePercentUtils.UpdateAll()
+								end,
+								width = 2,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateOutline = {
+								type = "select",
+								name = L.outline,
+								order = 6,
+								values = {
+									NONE = L.none,
+									OUTLINE = L.thin,
+									THICKOUTLINE = L.thick,
+								},
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateFontSize = {
+								type = "range",
+								name = L.fontSize,
+								desc = L.fontSizeDesc,
+								order = 7,
+								softMax = 100, max = 200, min = 10, step = 1,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateMonochrome = {
+								type = "toggle",
+								name = L.monochrome,
+								desc = L.monochromeDesc,
+								order = 8,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateSlugRendering = {
+								type = "toggle",
+								name = L.slugRendering,
+								desc = L.slugRenderingDesc,
+								order = 9,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							currentTargetHeader = {
+								type = "header",
+								name = L.settingsForCurrentTarget,
+								order = 10,
+								width = "full",
+							},
+							progressNameplateFontColorTarget = {
+								type = "color",
+								name = L.fontColor,
+								hasAlpha = true,
+								get = function()
+									return db.profile.progressNameplateFontColorTarget[1], db.profile.progressNameplateFontColorTarget[2], db.profile.progressNameplateFontColorTarget[3], db.profile.progressNameplateFontColorTarget[4]
+								end,
+								set = function(_, r, g, b, a)
+									db.profile.progressNameplateFontColorTarget = {r, g, b, a < 0.3 and 0.3 or a}
+									NamePlatePercentUtils.UpdateAll()
+								end,
+								order = 11,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateTargetOffsetX = {
+								type = "range",
+								name = L.positionX,
+								desc = L.positionDesc,
+								order = 12,
+								max = 300,
+								min = -300,
+								step = 1,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateTargetOffsetY = {
+								type = "range",
+								name = L.positionY,
+								desc = L.positionDesc,
+								order = 13,
+								max = 100,
+								min = -100,
+								step = 1,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateTargetAlign = {
+								type = "select",
+								name = L.align,
+								values = {
+									L.LEFT,
+									L.CENTER,
+									L.RIGHT,
+								},
+								style = "radio",
+								order = 14,
+								get = function() return db.profile.progressNameplateTargetAlign == "LEFT" and 1 or db.profile.progressNameplateTargetAlign == "RIGHT" and 3 or 2 end,
+								set = function(_, value)
+									db.profile.progressNameplateTargetAlign = value == 1 and "LEFT" or value == 3 and "RIGHT" or "CENTER"
+									NamePlatePercentUtils.UpdateAll()
+								end,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							otherTargetsHeader = {
+								type = "header",
+								name = L.settingsForOtherTargets,
+								order = 15,
+							},
+							progressNameplateFontColorOther = {
+								type = "color",
+								name = L.fontColor,
+								hasAlpha = true,
+								get = function()
+									return db.profile.progressNameplateFontColorOther[1], db.profile.progressNameplateFontColorOther[2], db.profile.progressNameplateFontColorOther[3], db.profile.progressNameplateFontColorOther[4]
+								end,
+								set = function(_, r, g, b, a)
+									db.profile.progressNameplateFontColorOther = {r, g, b, a}
+									NamePlatePercentUtils.UpdateAll()
+								end,
+								order = 16,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateOtherOffsetX = {
+								type = "range",
+								name = L.positionX,
+								desc = L.positionDesc,
+								order = 17,
+								max = 300,
+								min = -300,
+								step = 1,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateOtherOffsetY = {
+								type = "range",
+								name = L.positionY,
+								desc = L.positionDesc,
+								order = 18,
+								max = 100,
+								min = -100,
+								step = 1,
+								set = UpdateSettingsAndNameplates,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							progressNameplateOtherAlign = {
+								type = "select",
+								name = L.align,
+								values = {
+									L.LEFT,
+									L.CENTER,
+									L.RIGHT,
+								},
+								style = "radio",
+								order = 19,
+								get = function() return db.profile.progressNameplateOtherAlign == "LEFT" and 1 or db.profile.progressNameplateOtherAlign == "RIGHT" and 3 or 2 end,
+								set = function(_, value)
+									db.profile.progressNameplateOtherAlign = value == 1 and "LEFT" or value == 3 and "RIGHT" or "CENTER"
+									NamePlatePercentUtils.UpdateAll()
+								end,
+								disabled = DisabledWhenNameplatePercentDisabled,
+							},
+							resetHeader = {
+								type = "header",
+								name = "",
+								order = 20,
+							},
+							reset = {
+								type = "execute",
+								name = L.reset,
+								desc = L.resetDesc,
+								func = function()
+									ProfileUtils.ResetNameplates()
+									NamePlatePercentUtils.UpdateAll()
+								end,
+								order = 21,
+							},
+						},
+					},
+					currentPull = {
+						type = "group",
+						name = L.progressCurrentPull,
+						order = 4,
+						args = {
+							explaincurrentPull = {
+								type = "description",
+								name = L.progressCurrentPullDesc,
+								order = 1,
+								width = "full",
+							},
+						},
+					},
+				},
+			},
+			countdown = {
+				type = "group",
+				name = L.countdown,
+				order = 3,
+				args = {
+					countdownExplainer = {
+						type = "description",
+						name = L.keystoneCountdownExplainer,
+						order = 1,
+						width = "full",
+					},
+					countBegin = {
+						name = L.countdownBegins,
+						desc = L.keystoneCountdownBeginsDesc,
+						type = "range", min = 3, max = 9, step = 1,
+						order = 2,
+						width = 1
+					},
+					countVoice = {
+						name = L.countdownVoice,
+						type = "select",
+						values = BigWigsAPI.GetCountdownList,
+						sorting = voiceSorting,
+						order = 3,
+						width = 2,
+					},
+					countStartSound = {
+						type = "select",
+						name = L.keystoneCountdownBeginsSound,
+						order = 4,
+						get = soundGet,
+						set = soundSet,
+						values = LibSharedMedia:List("sound"),
+						width = 2.5,
+						dialogControl = "BigWigsSharedDropdown",
+						itemControl = "DDI-Sound",
+					},
+					countEndSound = {
+						type = "select",
+						name = L.keystoneCountdownEndsSound,
+						order = 5,
+						get = soundGet,
+						set = soundSet,
+						values = LibSharedMedia:List("sound"),
+						width = 2.5,
+						dialogControl = "BigWigsSharedDropdown",
+						itemControl = "DDI-Sound",
+					},
+				},
+			},
+			qol = {
+				type = "group",
+				name = L.qualityOfLife,
+				order = 4,
+				args = {
+					autoSlotKeystone = {
+						type = "toggle",
+						name = L.keystoneAutoSlot,
+						desc = L.keystoneAutoSlotDesc,
+						order = 1,
+						width = "full",
+					},
+					spacer = {
+						type = "description",
+						name = "\n\n",
+						order = 2,
+						width = "full",
+					},
+				},
+			},
+		},
+	})
+end
+
+--------------------------------------------------------------------------------
+-- Login
+--
+
+do
+	local function UpdateProfile()
+		ProfileUtils.ValidateMainSettings()
+		ProfileUtils.ValidateMediaSettings()
+		UpdateWidgets()
+	end
+	local loginFrame = CreateFrame("Frame")
+	loginFrame:SetScript("OnEvent", function(self, event)
+		self:UnregisterEvent(event)
+		self:SetScript("OnEvent", nil)
+		UpdateProfile()
+		BigWigsLoader.RegisterMessage(loginFrame, "BigWigs_ProfileUpdate", UpdateProfile)
+	end)
+	loginFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+end

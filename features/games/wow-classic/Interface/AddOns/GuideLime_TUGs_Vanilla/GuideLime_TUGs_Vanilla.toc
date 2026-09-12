@@ -1,0 +1,88 @@
+## Title: Guidelime_TUGs
+## Author: TUGs | The Unprofessional Gamer
+## Version: 2.30
+## Interface: 11509
+## Dependencies: Guidelime
+## Notes: The Ultimate (Leveling) Guide
+
+TUGs\Alliance\1-6 Dwarf&Gnome.lua
+TUGs\Alliance\6-9 Dwarf&Gnome.lua
+TUGs\Alliance\1-6 Northshire.lua
+TUGs\Alliance\6-9 Elwynn Forest.lua
+TUGs\Alliance\1-10 Nightelf Starting Zone.lua
+TUGs\Alliance\9-11 Dun Morogh, Loch Modan.lua
+TUGs\Alliance\11-14 Darkshore.lua
+TUGs\Alliance\14-17 Loch Modan.lua
+TUGs\Alliance\17-19 Darkshore.lua
+TUGs\Alliance\19-21 Deadmines.lua
+TUGs\Alliance\19-21 Redridge Mountains.lua
+TUGs\Alliance\21-22 Ashenvale.lua
+TUGs\Alliance\22-23 Duskwood.lua
+TUGs\Alliance\23-24 Redridge Mountains.lua
+TUGs\Alliance\23-24 Stockades.lua
+TUGs\Alliance\24-25 Ashenvale.lua
+TUGs\Alliance\25-27 Wetlands.lua
+TUGs\Alliance\26-28 Ashenvale&Wetlands.lua
+TUGs\Alliance\29-31Duskwood,Hillsbrad.lua
+TUGs\Alliance\31-36STV,Desolace.lua
+TUGs\Alliance\36-37Arathi.lua
+TUGs\Alliance\38-39Dustwallow Marsh,STV.lua
+TUGs\Alliance\40-43Badlands,Uldaman.lua
+TUGs\Alliance\41-44Tanaris,STV.lua
+TUGs\Alliance\44-45Feralas.lua
+TUGs\Alliance\45-47Tanaris,Hinterlands.lua
+TUGs\Alliance\47-49Searing Gorge.lua
+TUGs\Alliance\49-51Un'Goro.lua
+TUGs\Alliance\52-53Felwood.lua
+TUGs\Alliance\55-56BS,WPL.lua
+TUGs\Alliance\56-60WPL,EPL,BS.lua
+
+TUGs\Horde\1-6Undead.lua
+TUGs\Horde\6-12Undead.lua
+TUGs\Horde\1-6Orc.lua
+TUGs\Horde\6-12Orc.lua
+TUGs\Horde\1-6Tauren.lua
+TUGs\Horde\6-12Tauren.lua
+TUGs\Horde\12-16The Barrens.lua
+TUGs\Horde\16-21The Barrens.lua
+TUGs\Horde\21-25 Part.lua
+TUGs\Horde\25-31 Part.lua
+TUGs\Horde\31-33 Part.lua
+TUGs\Horde\33-36 Part.lua
+TUGs\Horde\36-39 Part.lua
+TUGs\Horde\39-41 Part.lua
+TUGs\Horde\41-43 Part.lua
+TUGs\Horde\43-45 Part.lua
+TUGs\Horde\45-48 Part.lua
+TUGs\Horde\48-51 Part.lua
+TUGs\Horde\51-53 Part.lua
+TUGs\Horde\53-55 Part.lua
+TUGs\Horde\55-56 Part.lua
+TUGs\Horde\56-58 Part.lua
+TUGs\Horde\58-60 Part.lua
+
+TUGs\General.lua
+TUGs\Leveling ShoppingList.lua
+
+TUGs\Professions\Cooking.lua
+TUGs\Professions\Cooking Shopping List.lua
+
+TUGs\Professions\First Aid Shopping List.lua
+
+TUGs\Professions\Alchemy.lua
+TUGs\Professions\Alchemy Shopping List.lua
+
+TUGs\Professions\Blacksmithing.lua
+TUGs\Professions\Blacksmithing Shopping List.lua
+
+TUGs\Professions\Enchanting.lua
+TUGs\Professions\Enchanting Shopping List.lua
+
+TUGs\Professions\Engineering.lua
+TUGs\Professions\Engineering Shopping List.lua
+
+TUGs\Professions\Tailoring.lua
+TUGs\Professions\Tailoring Shopping List.lua
+
+TUGs\Professions\Leatherworking.lua
+TUGs\Professions\Leatherworking Shopping List.lua

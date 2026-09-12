@@ -1,0 +1,7 @@
+This addon is supported and distributed only at the following locations:
+  - https://www.wowinterface.com/downloads/info5108-Clique.html
+  - https://www.curseforge.com/wow/addons/clique
+  - https://addons.wago.io/addons/clique
+
+Do no distribute or post this software in other public locations, to ensure
+the author is able to provide quality support to the users.

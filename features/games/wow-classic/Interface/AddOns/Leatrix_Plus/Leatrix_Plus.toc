@@ -1,0 +1,25 @@
+## Interface: 11509
+
+## Title: Leatrix Plus
+## Notes: curseforge.com/wow/addons/leatrix-plus
+
+## Version: 1.15.154
+## Author: Leatrix
+## SavedVariables: LeaPlusDB
+## LoadSavedVariablesFirst: true
+
+## IconTexture: Interface\HELPFRAME\ReportLagIcon-Movement
+## X-Curse-Project-ID: 94855
+## OptionalDeps: ElvUI
+
+## Title-zhCN: Leatrix Plus [|cffeda55f功能百宝箱|r]
+## Title-zhTW: Leatrix Plus [|cffeda55f功能百寶箱|r]
+
+Leatrix_Plus_Library.lua
+Leatrix_Plus_Locale.lua
+Leatrix_Plus_Media.lua
+Leatrix_Plus_Flight_Alliance.lua
+Leatrix_Plus_Flight_Horde.lua
+Leatrix_Plus_Mute.lua
+Leatrix_Plus.xml
+Leatrix_Plus.lua

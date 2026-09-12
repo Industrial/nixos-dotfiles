@@ -1,0 +1,393 @@
+local _, addonTbl = ...
+local L = addonTbl.API:NewLocale("BigWigs: Common", "zhTW")
+if not L then return end
+
+-- Prototype.lua common words
+L.you = "你：%s"
+L.you_icon = "|T13700%2$d:0|t你：%1$s"
+L.underyou = "%s在你腳下"
+L.aboveyou = "%s在你面前"
+L.other = "%s：%s"
+L.onboss = "首領%s"
+L.buff_boss = "首領增益：%s"
+L.buff_other = "%s獲得增益：%s"
+L.magic_buff_boss = "首領魔法增益：%s" -- Magic buff on BOSS: SPELL_NAME
+L.magic_buff_other = "%s獲得魔法增益：%s" -- Magic buff on NPC_NAME: SPELL_NAME
+L.on = "%s：%s"
+L.stack = "%3$s：%1$d層%2$s" -- "5x SPELL_NAME on PLAYER_OR_NPC" showing how many stacks of a buff/debuff are on a player or NPC
+L.stackyou = "你：%d層%s" -- "5x SPELL_NAME on YOU" showing how many stacks of a buff/debuff are on you
+L.stackboss = "首領：%d層%s" -- "5x SPELL_NAME on BOSS" showing how many stacks of a buff/debuff are on the boss
+L.stack_gained = "獲得 %d層" -- "Gained 5x" for situations where we show how many stacks of a buff were gained since last time a message showed
+L.cast = "<施放：%s>"
+L.casting = "正在施放：%s"
+L.soon = "即將：%s"
+L.count = "%s（%d）"
+L.count_amount = "%s（%d/%d）"
+L.count_icon = "%s（%d|T13700%d:0|t）"
+L.count_rticon = "%s（%d{rt%d}）"
+L.rticon = "%s（{rt%d}）"
+L.near = "%s在你附近"
+L.on_group = "團隊：%s" -- spell on group
+L.boss = "首領"
+L.plus = "%s + %s" -- Spell 1 + Spell 2
+L.extra = "%s（%s）" -- SPELL_NAME (short spell name or extra information)
+
+L.phase = "階段%d"
+L.stage = "階段%d"
+L.wave = "第 %d 波" -- e.g. "Wave 1" (Waves of adds)
+L.wave_count = "第 %d/%d 波" -- Wave 1 of 3 (Usually waves of adds)
+L.normal = "普通模式"
+L.heroic = "英雄模式"
+L.mythic = "傳奇難度"
+L.hard = "困難模式"
+L.active = "開戰" -- When a boss becomes active, after speech finishes
+L.ready = "準備完成" -- When a player is ready to do something
+L.dead = "死亡" -- When a player is dead
+L.general = "通用" -- General settings, i.e. things that apply to normal, heroic and mythic mode.
+L.health = "生命值" -- The health of an NPC
+L.health_percent = "%d%% 生命值" -- "10% Health" The health percentage of an NPC
+L.energy = "能量"
+L.energy_percent = "%d%% 能量" -- "80% Energy" The energy percentage of an NPC
+L.door_open = "開門" -- 小的門 When a door is open, usually after a speech from an NPC
+L.gate_open = "開門" -- 大的門 When a gate is open, usually after a speech from an NPC
+L.threat = "威脅"
+
+L.remaining = "剩餘 %d" -- 5 remaining
+L.duration = "%s持續 %s 秒" -- Spell for 10 seconds
+L.over = "%s結束" -- Spell Over
+L.removed = "%s移除" -- Spell Removed
+L.removed_from = "%2$s已移除%1$s" -- Spell removed from Player 自玩家身上清除 語句不順 應該是 %2$s身上的%1$s已移除 或 %2$s的%1$s被清除
+L.removed_by = "%s被%s移除" -- Spell removed by Player 法術被玩家清除
+L.removed_after = "%s移除，用時 %.1f 秒" -- "Spell removed after 1.1s" (s = seconds)
+L.incoming = "即將：%s" -- Spell Incoming
+L.interrupted = "已打斷%s" -- Spell Interrupted
+L.interrupted_by = "%2$s已打斷%1$s" -- Spell interrupted by Player
+L.interruptible = "可打斷" -- when a spell is interruptible
+L.no = "缺少%s" -- No Spell
+L.intermission = "階段轉換"
+L.intermission_over = "轉階段結束" -- 階段轉換結束，五個字短一點
+L.percent = "%d%% - %s" -- 20% - Spell
+L.cancelled = "%s取消" -- Spell Cancelled
+L.you_die = "你將死亡" -- You will die
+L.you_die_sec = "你將在%d秒後死亡" -- "You die in 15 sec" (sec = seconds)
+L.next_ability = "下個技能" -- We don't know what ability will be next, we only know when it will happen (showing a bar)
+L.boss_landing = "%s即將著陸" -- "NPC_NAME is landing" Used when a flying NPC/dragon/boss is landing 即將著陸、正在降落
+L.landing = "著陸" -- Used when a flying NPC/dragon/boss is landing，沿用上一條
+L.flying_available = "可以飛行"
+L.bosses_too_close = "首領距離過近" -- 首領之間距離過近/首領彼此距離過近 When 2 or more bosses are too close to each other, buffing each other with a shield, extra damage, etc.
+L.keep_moving = "保持移動" -- An ability that forces you to keep moving or you will take damage
+L.stand_still = "站住別動" -- An ability that forces you to stand still or you will take damage 站住別動、禁止移動、不要移動，或乾脆兩個字，別動
+L.safe_to_stop = "停止移動" -- When an ability that forces you to keep moving fades from you, allowing you to stop moving
+L.safe_to_move = "可以移動" -- When an ability to forces you to stand still fades from you, allowing you to move again
+L.safe = "安全" -- You are safe from a bad ability
+L.unsafe = "危險" -- You are unsafe (in danger) of a bad ability
+
+-- Add related
+L.add_spawned = "增援出現" -- singular 小怪OR增援，開發者要求用增援
+L.adds_spawned = "增援出現" -- plural
+L.adds_spawned_count = "%d名增援出現" -- 1 add spawned / 2 adds spawned
+L.add_spawning = "增援出現" -- singular 小怪正在出現/小怪出現/小怪已出現，中文沒有英文那麼明確的時態和單複數之別
+L.adds_spawning = "增援出現" -- plural
+L.add_incoming = "增援到來" -- singular 增援來襲/增援到來
+L.adds_incoming = "增援到來" -- plural 增援來襲/增援到來
+L.spawned = "%s已重生"
+L.spawning = "%s出現"
+L.next_add = "下一波小怪"
+L.add_killed = "小怪已擊殺（%d/%d）"
+L.add_remaining = "小怪已擊殺，剩餘 %d"
+L.add = "增援"
+L.adds = "增援"
+L.big_add = "大型增援" -- singular
+L.big_adds = "大型增援" -- plural
+L.small_add = "小型增援" -- singular
+L.small_adds = "小型增援" -- plural
+L.eat_adds = "吃掉小怪" -- 吃掉小怪/吞噬小怪 When a boss is going to eat/consume any adds remaining to empower/heal itself. Usually this is a timer. You have to kill all adds in X seconds or they will be eaten.
+
+-- Mob related
+L.killed = "%s已擊殺"
+L.mob_killed = "%s已擊殺（%d/%d）"
+L.mob_remaining = "%s已擊殺，剩餘 %d"
+
+-- NPCs for follower dungeons
+L.garrick = "蓋瑞克船長" -- AI paladin tank (NPC 209057)
+L.garrick_short = "*蓋瑞克"
+L.meredy = "美芮迪‧漢茲威爾" -- AI mage dps (NPC 209059)
+L.meredy_short = "*美芮迪"
+L.shuja = "秀嘉‧嚴斧" -- AI shaman dps (NPC 214390)
+L.shuja_short = "*秀嘉"
+L.crenna = "『大地之女』克蘭娜" -- AI druid healer (NPC 209072)
+L.crenna_short = "*克蘭娜"
+L.austin = "奧斯汀‧哈克斯沃" -- AI hunter dps (NPC 209065)
+L.austin_short = "*奧斯汀"
+L.breka = "督軍布瑞卡‧嚴斧" -- AI warrior tank (NPC 215517)
+L.breka_short = "*布瑞卡"
+L.henry = "亨利‧蓋瑞克" -- AI priest healer (NPC 215011)
+L.henry_short = "*亨利"
+
+-- Localizers note:
+-- The default mod:Berserk(600) uses spell ID 26662 to get the Berserk name
+L.custom_start = "%1$s參戰 - %3$d分後%2$s"
+L.custom_start_s = "%1$s參戰 - %3$d秒後%2$s"
+L.custom_end = "%s - %s"
+L.custom_min = "%2$d分後%1$s"
+L.custom_sec = "%2$d秒後%1$s"
+
+L.focus_only = "|cffff0000只限專注目標。|r "
+L.trash = "小怪"
+L.affixes = "詞綴" -- Seasonal affixes for raids and mythic+ dungeons
+
+-- GUI boss dropdown for cast counters
+-- Cast counters are the numbers you see next to spell names that keep increasing e.g. "Bad Spell (3)" <-- that number
+-- This dropdown option will let you choose when that number should reset back to 1
+L.counter_reset_name = "%s施放計數" -- SPELL_NAME cast counter
+L.counter_reset_desc = "選擇計數重置的時機。"
+L.reset_casts = "施放 %d 次後重置"-- Reset every 3 casts
+L.reset_stages = "階段轉換時重置"
+L.reset_casts_and_stages = "施放 %d 次後重置，或階段轉換時重置"
+L.reset_never = "永不重置"
+
+-- Common raid marking locale
+L.marker = "%s標記"
+L.marker_player_desc = "將受到%s影響的玩家標記為%s，需要權限。" -- Mark players affected by 'SPELL_NAME' with SKULL_ICON
+L.marker_npc_desc = "標記%s為%s，需要權限。" -- Mark NPC_NAME with SKULL_ICON
+L.marker_npc_aura_desc = "將受到%s影響的 NPC 標記為%s，需要權限。" -- Mark NPCs affected by 'SPELL_NAME' with SKULL_ICON
+L.disabled = "被停用"
+L.none = "無"
+L.markers = "標記" -- Plural of marker
+
+-- Ability where two players have to move close to each other
+L.link = "連結"
+L.link_with = "與%s連結"
+L.link_with_icon = "與|T13700%d:0|t%s連結"
+L.link_with_rticon = "{rt%d}與%s連結"
+L.link_both = "%s和%s連結"
+L.link_both_icon = "|T13700%d:0|t%s和|T13700%d:0|t%s連結"
+L.link_removed = "連結移除"
+L.link_say_option_name = "重覆「連結」喊話"
+L.link_say_option_desc = "不停地喊話你和誰連結了。" -- 可能需要再改
+
+-- Abbreviated numbers
+L.amount_one = "%.2f億" -- Billions 1,000,000,000
+L.amount_two = "%.1f萬" -- Millions 1,000,000
+L.amount_three = "%d千" -- Thousands 1,000
+L.seconds = "%.1f秒" -- 1.1 seconds
+
+-- Directions
+L.top = "上"
+L.top_right = "右上"
+L.top_left = "左上"
+L.up = "向上"
+L.middle = "中"
+L.down = "向下"
+L.bottom = "下"
+L.bottom_right = "右下"
+L.bottom_left = "左下"
+L.left = "左"
+L.right = "右"
+L.north = "北方"
+L.north_east = "東北"
+L.east = "東方"
+L.south_east = "東南"
+L.south = "南方"
+L.south_west = "西南"
+L.west = "西方"
+L.north_west = "西北"
+
+-- Sizes
+L.small = "小"
+L.medium = "中"
+L.large = "大"
+
+-- Schools
+L.fire = "火焰"
+L.frost = "冰霜"
+L.shadow = "暗影"
+L.nature = "自然"
+L.arcane = "秘法"
+
+-- Autotalk
+L.autotalk = "自動與 NPC 對話"
+L.autotalk_boss_desc = "自動選擇開始首領戰鬥的對話選項。"
+L.autotalk_generic_desc = "自動選擇使地城進入下一階段的對話選項。"
+L.autotalk_notice = "自動與 NPC %s互動。"
+
+-- GUI notes
+L.intermissionOnly = "僅限階段轉換"
+L.stage1Only = "僅限第一階段"
+L.stage2Only = "僅限第二階段"
+L.stage3Only = "僅限第三階段"
+
+-- GUI notes for renames
+L.generalNote = "通用文本"
+L.timerNote = "計時條文本"
+L.castTimerNote = "施法計時條文本"
+L.messageCastOverNote = "施法結束的訊息文本"
+L.messageCastStartNote = "施法開始的訊息文本"
+L.messageBeforeCastStartNote = "施法即將開始的訊息文本"
+L.messageDuringCastNote = "施法期間顯示的訊息文本"
+L.messageNote = "訊息文本"
+L.messageOnYouNote = "中了技能的訊息文本"
+L.messageOnOtherNote = "別人中了技能的訊息文本"
+L.messageTauntNowNote = "你是坦克並且需要嘲諷時顯示的訊息文本"
+L.messageSpecificHealth = "首領生命值降至 %d%% 時顯示的訊息文本"
+L.timerOnYouNote = "中了技能的計時條文本"
+L.mythicOnlyNote = "只在傳奇難度使用的文本"
+L.otherDifficultiesNote = "其他難度使用的文本"
+
+-- GUI notes for debuffs
+L.debuffFailureNote = "失誤時受到的減益效果"
+L.debuffFailureMoveFromExplosionNote = "未遠離爆炸時，受到的減益效果"
+L.debuffFailureInterruptNote = "沒有打斷|cFFFFFFFF%s|r會受到的減益效果" -- This debuff will apply to you if you fail to interrupt the cast of SPELL_NAME
+L.debuffFailureMoveFromCastNote = "未躲開|cFFFFFFFF%s|r時受到的減益效果" -- This debuff will apply to you if you fail to move out of the SPELL_NAME cast
+L.debuffFailureGroupSoakNote = "團隊未成功分攤|cFFFFFFFF%s|r時受到的減益效果" -- This debuff will apply to you if your group fails to soak SPELL_NAME
+L.debuffFailureSafeZoneNote = "未進入安全區域時受到的減益效果"
+L.debuffHitByOtherPlayerNote = "被其他玩家的|cFFFFFFFF%s|r擊中時受到的減益效果" -- This debuff will apply to you if you are hit by another player's SPELL_NAME
+L.debuffTargetedNote = "被|cFFFFFFFF%s|r點名時受到的減益效果" -- This debuff will apply to you if you are being targeted for SPELL_NAME
+L.preDebuffNote = "主要效果生效前的前置減益效果"
+L.mainDebuffNote = "產生實際作用的主要減益效果"
+L.postDebuffNote = "|cFFFFFFFF%s|r消失後，受到的減益效果" -- This debuff will apply to you after OTHER_DEBUFF expires
+L.debuffUnderYouNote = "站在危險區域時，受到的減益效果" -- Usually when a player is standing in a pool of something bad, a debuff will apply to them
+L.debuffDotAfterCastNote = "|cFFFFFFFF%s|r施放後留下的持續傷害效果" -- This debuff is a damage over time effect after the SPELL_NAME cast
+L.debuffPossibleAfterCastNote = "|cFFFFFFFF%s|r施放後可能受到的減益效果" -- This debuff might apply to you after the SPELL_NAME cast
+L.debuffTankAfterCastNote = "|cFFFFFFFF%s|r施放後，坦克會受到的減益效果" -- This debuff will apply to the tank after the SPELL_NAME cast
+L.debuffGroupAfterCastNote = "|cFFFFFFFF%s|r施放後，全團會受到的減益效果" -- This debuff will apply to the entire group after the SPELL_NAME cast
+L.debuffWalkIntoObjectNote = "踩到|cFFFFFFFF%s|r會受到的減益效果" -- This debuff will apply to you if you purposely walk into the OBJECT_NAME (e.g. trap, mine, bomb)
+L.debuffHitByCastNote = "|cFFFFFFFF%s|r命中後，受到的減益效果" -- This debuff will apply to you if you are hit by the the SPELL_NAME cast
+L.debuffAddsCast = "|cFFFFFFFF%s|r對你施加的減益效果" -- This debuff is applied to you by NPC_NAME
+L.debuffPickupNote = "拾取|cFFFFFFFF%s|r後獲得的減益效果" -- This debuff will apply to you if you pick up the OBJECT_NAME
+
+-- Common ability name replacements
+L.laser = "雷射" -- Used for abilities that act like a laser. Usually from the boss to a player, or, from the boss to a specific area
+L.lasers = "雷射" -- Plural of L.lasers
+L.beam = "射線" -- Similar to "Laser" (a beam from boss to player/boss to area) but can be used to better describe certain abilities that don't look like a Laser
+L.beams = "射線" -- Plural of L.beam
+L.bomb = "炸彈" -- Used for debuffs that make players explode
+L.bombs = "炸彈" -- Plural of L.bomb
+L.explosion = "爆炸" -- When the explosion from a bomb-like ability will occur
+L.explosions = "爆炸" -- Plural of L.explosion
+L.knockback = "擊退" -- Used when an ability knocks players away from a certain point, like a "smash" type ability that knocks you back 10 meters
+L.knockbacks = "擊退" -- Plural of L.knockback
+L.pushback = "推開" -- Used when an ability slowly and continually pushes a player away, like winds gradually pushing you away over time
+L.traps = "陷阱" -- Used for abilities that act like traps on the floor e.g. move into it and something bad happens like you die, or are rooted, etc.
+L.meteor = "隕石" -- This one will probably only ever be used for actual meteors
+L.teleport = "傳送" -- A boss/add/etc teleported somewhere
+L.breath = "吐息" -- When a boss breathes fire/frost/etc on to a player or the raid e.g. a Dragon breathing fire on everyone
+L.roar = "咆哮" -- When a boss opens their mouth to let out a loud roar, sometimes used to inflict damage on the raid
+L.leap = "跳躍" -- When a boss leaps through the air from one location to another location, or from a location to a player, etc
+L.charge = "衝鋒" -- When a boss select a new target and charges at it quickly, in the same way someone playing a warrior can charge at a target
+L.full_energy = "滿能量" -- When a boss reaches full/maximum energy, usually the boss will cast something big and powerful when this happens
+L.weakened = "虛弱" -- When a boss becomes weakened and sometimes takes extra damage, usually the "hit all your cooldowns" part of the fight
+L.immune = "免疫" -- When a boss becomes immune to all damage and you can no longer hurt it
+L.stunned = "昏迷" -- When a boss becomes stunned and cannot cast abilities or move
+L.pool = "水池" -- A pool or puddle on the ground, usually something bad that you should avoid standing in
+L.pools = "水池" -- Plural of L.pool
+L.totem = "圖騰" -- A totem, usually summoned by a boss, the same thing that shamans summon
+L.totems = "圖騰" -- Plural of L.totem
+L.portal = "傳送" -- A portal somewhere, usually leading to a different location
+L.portals = "傳送" -- Plural of L.portal
+L.rift = "裂隙" -- Can be used in a similar way as a portal e.g. "Time Rift" but can also be used as a debuff/pool underneath you that you need to run through to remove/despawn it e.g. "Dread Rift"
+L.rifts = "裂隙" -- Plural of L.rift
+L.orb = "寶珠" -- A ball/sphere object usually moving and you need to avoid it
+L.orbs = "寶珠" -- Plural for L.orb
+L.spirit = "靈魂" -- Sometimes a boss will summon spirits, similar to ghosts, but not exactly, although you might have the same word for both. e.g. "Spirits of X" or "Wild Spirits"
+L.spirits = "靈魂" -- Plural of L.spirit
+L.tornado = "旋風" -- 'A tornado is a violently rotating column of air that is in contact with both the surface of the Earth and a cloud' - Wikipedia
+L.tornadoes = "旋風" -- Plural of L.tornado
+L.mark = "標記" -- Short name for abilites with "Mark" in the name, for example "Mark of Death" or "Toxic Mark" or "Mark of Frost" etc.
+L.marks = "標記" -- Plural of L.marks
+L.mind_control = "心控" -- Any kind of Mind Control ability, where a player loses control of their character
+L.mind_control_short = "心控" -- Short version of Mind Control, mainly for bars
+L.spell_reflection = "反射" -- Any ability that reflects spells
+L.rooted = "定身" -- Any ability that roots you in place, preventing you from moving
+
+-- Common ability name replacements A-Z
+L.arrow = "箭矢" -- Any type of ability that looks like an arrow, or has "arrow" in the name. Like an archer's arrow.
+L.arrows = "箭矢" -- Plural of L.arrow
+L.ball = "球" -- A ball, like a football, basketball, etc 球，可能還有寶珠
+L.balls = "球" -- Plural of L.ball
+L.blind = "致盲" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.bouncing_ball = "接球" -- 彈跳球/傳接球 A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
+L.bouncing_balls = "接球" -- Plural of L.bouncing_ball
+L.chakram = "飛刀" -- 通俗點來說，飛來飛去砍人的玩意都叫飛刀 Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)
+L.dodge = "躲開" -- 躲開/躲避/閃避/躲圈? When you need to continually run around to dodge abilities, like missiles landing on the ground under you
+L.enrage = "狂怒" -- Any enrage buff that can be removed by players using abilities like Soothe (Druid), Tranquilizing Shot (Hunter) and Shiv (Rogue)
+L.fear = "恐懼" -- Similar to a warlock or priest ability, when a boss casts a fear on a player or multiple players, that makes them run around out of control
+L.fixate = "鎖定" -- Used when a boss or add is chasing/fixated on a player
+L.fixates = "鎖定" -- Plural of L.fixate
+L.frontal = "躲正面" -- Usually a bad Area-of-Effect ability cast by the boss in front of them
+L.frontal_cone = "正面技能" -- 正面衝擊 Usually a bad Area-of-Effect ability cast by the boss in a cone/triangle/pizza shape in front of them, don't stand in front of the boss!
+L.grip = "拉拽" -- When a boss grapples a player towards them. We use "Grip" because of the Death Knight ability "Death Grip" (49576) but you can use "Grapple" if it makes more sense
+L.grips = "拉拽" -- Plural of L.grip
+L.group_damage = "團隊傷害" -- Any ability that causes damage to every player in the 5 player group 五人本中每個人都會受到的傷害，那還是團隊傷害啊？
+L.health_drain = "吸血" -- Any ability that drains health from the player 吸血類的技能，就是術士的吸取生命那種直接吸血的法術
+L.madness = "瘋狂" -- Any ability that contains the word "Madness" in it e.g. "Rift Madness" (1264756) or "Burning Madness" (307013)
+L.miasma = "瘴氣" -- Any ability that contains the word "Miasma" in it e.g. "Consuming Miasma" (1257087) or "Black Miasma" (1275059)
+L.missile = "飛彈" -- Short for any ability with the name "Missile" in it e.g. "Fey Missile" (188046) or "Water Missile" (68250)
+L.missiles = "飛彈" -- Plural of L.missile
+L.parasite = "寄生" -- Any ability where a parasite is involved e.g. "Parasitic Infection", "Parasitic Growth", etc
+L.parasites = "寄生" -- Plural of L.parasite
+L.pull_in = "拉扯" -- An ability that pulls you in towards the boss against your will
+L.quills = "羽刺" -- Short for any ability with the name "Quills" in it e.g. "Searing Quills" (159382) or "Infused Quills" (1242260)
+L.raid_damage = "團隊傷害" -- Any ability that causes damage to every player in the raid 團隊傷害
+L.silence = "沉默" -- Any ability that silences a player, preventing their spells being cast
+L.smash = "重擊" -- Short for any ability with the name "smash" in it e.g. "Darkrift Smash" or "Seismic Smash" or "Arcing Smash"
+L.soak = "分攤" -- Abilities you have to stand in on purpose to soak the damage, like a sponge soaks water. Commonly for abilities that split damage between everyone standing in them.
+L.soaks = "分攤" -- Plural of L.soak
+L.spike = "尖刺" -- Short for any ability with the name "spike" in it e.g. "Glacial Spike" or "Fel Spike" or "Volatile Spike"
+L.spikes = "尖刺" -- Plural of L.spike
+L.spread = "分散" -- An ability that forces you to spread out away from other players, or you might damage them
+L.stomp = "踐踏" -- Short for any ability with the name "Stomp" in it e.g. "Cryostomp" (1261847) or "Powerful Stomp" (296691)
+L.tentacle = "觸手" -- Used for bosses that summon tentacles
+L.tentacles = "觸手" -- Plural of L.tentacle
+L.vines = "藤蔓" -- Short for any ability with the name "Vines" in it e.g. "Festering Vines" (1222088) or "Choking Vines" (238593)
+L.waves = "波浪" -- Multiple waves of a bad ability coming from a boss, like waves in the ocean
+L.winds = "風" -- Short for any ability with the name "Winds" in it e.g. "Winds of Change" (381517)
+L.whelp = "幼龍" -- Short for Whelpling, a baby dragonkin (Dragon Whelp)
+L.whelps = "幼龍" -- Plural of L.whelp
+
+-- Absorb / Shield related spell renames
+L.absorb = "吸收" -- Used for shield-like abilities that absorb damage or healing
+L.heal_absorb = "治療吸收盾" -- Used for shield-like abilities that absorb healing only
+L.heal_absorbs = "治療吸收盾" -- Plural of L.heal_absorb
+L.break_shield = "破盾" -- When you need to do something to break an absorb shield on the boss.
+L.break_shields = "破盾" -- Plural of L.break_shield
+L.shield = "護盾" -- Abilities that absorb damage/healing creating a "shield" around the boss/player e.g. "Shield on boss" or "Shield remaining"
+
+-- Debuff-related spell renames
+L.debuff = "減益"
+L.debuffs = "減益" -- 減益效果 Plural of L.debuff
+L.fire_debuffs = "火焰減益" -- 火傷?暫時沒有更好的
+
+-- Dispel-related spell renames
+L.curse = "詛咒" -- Any curse-type dispellable debuff, or debuffs called "Curse of XYZ", etc.
+L.curses = "詛咒" -- Plural of L.curse
+L.disease = "疾病" -- Any disease-type dispellable debuff, or debuffs called "Disease of XYZ", etc.
+L.dispel = "驅散" -- General term for any debuff that is dispellable
+L.dispels = "驅散" -- Plural of L.dispel
+L.dispel_boss = "驅散首領" -- When the boss gains a buff (magic or enrage) that you need to dispel
+L.poison = "毒" -- Any poison-type dispellable debuff, or debuffs called "Poison of XYZ", etc.
+L.bleed = "流血" -- Any bleed-type debuff
+L.bleeds = "流血" -- Plural of L.bleed
+
+-- Clearing-related spell renames (when you get a buff that allows you to clear/cleanse/remove other objects in the world, like pools on the ground, traps, or bombs)
+L.clear_bombs = "拆彈" -- 清除炸彈
+L.clear_pools = "消水" -- 消除水池
+
+-- Interrupt-related spell renames
+L.interrupts = "打斷" -- General term used when a player needs to interrupt a spell being cast
+L.kick = "打斷" -- General term used when a player needs to interrupt a spell being cast, named after spell "Kick" (1766) from the Rogue class
+L.kicks = "打斷" -- Plural of L.kick
+
+-- Tank-related spell renames
+L.tank_bomb = "坦克炸彈" -- Similar to L.bomb but only applies to tanks
+L.tank_combo = "坦克連擊" -- Used for tank swap mechanics where the boss casts a sequence of tank buster attacks
+L.tank_debuff = "坦克減益" -- Used for debuffs that only apply to tanks, usually an indicator that you need to taunt
+L.tank_frontal = "坦克正面" -- Similar to L.frontal_cone but only applies to tanks
+L.tank_hit = "坦克尖刺" -- An attack that will only target the tank, usually a spell that does a lot of heavy damage to the tank
+L.tank_knockback = "坦克擊退" -- Similar to L.knockback but only applies to tanks"
+L.tank_soak = "坦克分攤" -- Similar to L.soak but only applies to tanks
+L.tank_grip = "坦克被抓" -- 坦克被抓/被拉 When a boss grapples the tank towards them. We use "Grip" because of the Death Knight ability "Death Grip" (49576) but you can use "Grapple" if it makes more sense
+
+-- Aura Sections
+L.important = "重要" -- High priority debuffs
+L.achievement = "成就：「%s」" -- Debuff related to an achievement

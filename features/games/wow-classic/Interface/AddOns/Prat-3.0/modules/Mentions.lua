@@ -1,0 +1,118 @@
+---------------------------------------------------------------------------------
+--
+-- Prat - A framework for World of Warcraft chat mods
+--
+-- Copyright (C) 2006-2020  Prat Development Team
+--
+-- This program is free software; you can redistribute it and/or
+-- modify it under the terms of the GNU General Public License
+-- as published by the Free Software Foundation; either version 2
+-- of the License, or (at your option) any later version.
+--
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+--
+-- You should have received a copy of the GNU General Public License
+-- along with this program; if not, write to:
+--
+-- Free Software Foundation, Inc.,
+-- 51 Franklin Street, Fifth Floor,
+-- Boston, MA  02110-1301, USA.
+--
+--
+-------------------------------------------------------------------------------
+
+local SendChatMessage = C_ChatInfo.SendChatMessage or SendChatMessage
+
+Prat:AddModuleToLoad(function()
+	local module = Prat:NewModule("Mentions", "AceHook-3.0")
+	local PL = module.PL
+
+	Prat:SetModuleDefaults(module.name, {
+		profile = {
+			on = false,
+		}
+	})
+
+	Prat:SetModuleOptions(module.name, {
+		name = PL.module_name,
+		desc = PL.module_desc,
+		type = "group",
+		args = {
+			info = {
+				name = PL.module_info,
+				type = "description",
+			}
+		}
+	})
+
+	local function handleMention(match, m)
+		if Prat.IsRetail and InCombatLockdown() then
+			return
+		end
+		if m == nil then
+			return
+		end
+
+		local name = match:sub(2)
+		local event = "CHAT_MSG_" .. m.CTYPE
+		local from = "(in " .. _G[event] .. ") "
+		SendChatMessage(from .. m.MESSAGE, "WHISPER", GetDefaultLanguage("player"), name);
+	end
+
+	Prat:SetModulePatterns(module, {
+		{ pattern = "@%S+", matchfunc = handleMention, priority = 47, type = "OUTBOUND" }
+	})
+
+	function module:OnModuleEnable()
+		self:RegisterTabComplete()
+	end
+
+	function module:RegisterTabComplete()
+		local CLR = Prat.CLR
+		local AceTab = LibStub("AceTab-3.0")
+		local tabcompleteName = "mentions-tab-complete"
+		local servernames = Prat:GetModule("ServerNames")
+		local playernames = Prat:GetModule("PlayerNames")
+
+		if not AceTab:IsTabCompletionRegistered(tabcompleteName) then
+			AceTab:RegisterTabCompletion(tabcompleteName, "@",
+				function(t)
+					for name in pairs(playernames.Classes) do
+						table.insert(t, name)
+					end
+				end,
+				function(_, cands)
+					local candcount = #cands
+					if candcount <= playernames.db.profile.tabcompletelimit then
+						local text
+						for key, cand in pairs(cands) do
+							if servernames then
+								local plr, svr = key:match("([^%-]+)%-?(.*)")
+
+								cand = CLR:Player(cand, plr, playernames:getClass(key))
+
+								if svr then
+									svr = servernames:FormatServer(nil, servernames:GetServerKey(svr))
+									cand = cand .. (svr and ("-" .. svr) or "")
+								end
+							else
+								cand = CLR:Player(cand, cand, playernames:getClass(cand))
+							end
+
+							text = text and (text .. ", " .. cand) or cand
+						end
+						return "   " .. text
+					else
+						return "   " .. ("Too many matches (%d possible)"):format(candcount)
+					end
+				end,
+				nil,
+				function(name)
+					return name:gsub(Prat.MULTIBYTE_FIRST_CHAR, string.upper, 1):match("^[^%-]+")
+				end)
+		end
+	end
+end)

@@ -1,0 +1,31 @@
+## Interface: 120007, 120100, 50500, 40402, 11507
+
+## Title: BetterBags - Teleports
+## Author: Sauravisus (Xirastrasza - Argent Dawn EU, Horde)
+## Notes: Puts all your hearthstones, and teleport items in one category.
+## Version: 3.1.4
+## X-Date: 2026-07-22T14:54:30Z
+## X-Category: Bags & Inventory
+## X-Curse-Project-ID: 956341
+## Dependencies: BetterBags
+## SavedVariables: BetterBags_TeleportersDB
+## IconTexture: Interface\Icons\inv_misc_bag_24_netherweave_imbued
+
+## Category-enUS: Inventory
+## Category-deDE: Inventar
+## Category-esES: Inventario
+## Category-esMX: Inventario
+## Category-frFR: Inventaire
+## Category-itIT: Inventario
+## Category-koKR: 소지품
+## Category-ptBR: Inventário
+## Category-ruRU: Предметы
+## Category-zhCN: 物品栏
+## Category-zhTW: 物品欄
+
+## Group: BetterBags
+
+
+data.lua
+main.lua
+

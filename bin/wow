@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# World of Warcraft Classic management script
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_ROOT="$(dirname "$SCRIPT_DIR")"
+
+case "${1:-link}" in
+  link)
+    cd "$DOTFILES_ROOT"
+    exec features/games/wow-classic/bin/link-wow-classic
+    ;;
+  *)
+    echo "Usage: wow [link]"
+    echo ""
+    echo "Commands:"
+    echo "  link    Create symlinks from dotfiles to WoW installation (default)"
+    exit 1
+    ;;
+esac

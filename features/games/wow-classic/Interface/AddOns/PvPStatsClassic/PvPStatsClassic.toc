@@ -1,0 +1,44 @@
+## Interface: 11508, 20505, 20506
+## Version: 4.6
+## Title: PvP Stats Classic
+## Author: Severussnipe & Hkfarmer <Redridge Police>
+## Notes: Tracks PvP history and provides detailed statistics.
+## IconTexture: Interface\AddOns\PvPStatsClassic\img\RedridgePoliceLogo.blp
+## SavedVariables: PSC_DB
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\AceComm-3.0\AceComm-3.0.xml
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+
+ConfigUI.lua
+DataHelpers.lua
+DataStorage.lua
+DataMigration.lua
+DeathTracking.lua
+DebugTools.lua
+EventHandlers.lua
+FrameManager.lua
+KillMilestones.lua
+PlayerDetailFrame.lua
+KillsListFrameFilters.lua
+KillsListFrame.lua
+NetworkHandler.lua
+LeaderboardFrame.lua
+KillsTracking.lua
+Killstreaks.lua
+KillStreakPopup.lua
+MinimapButton.lua
+SlashCommands.lua
+Achievements.lua
+AchievementDefinitionsClassic.lua
+AchievementDefinitionsTBC.lua
+AchievementDefinitions.lua
+AchievementFrame.lua
+AchievementPopup.lua
+StatisticsFrame.lua
+Utils.lua
+UtilsTest.lua
+TestData.lua
+PvPStatsClassic.lua

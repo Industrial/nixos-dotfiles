@@ -1,0 +1,612 @@
+---@diagnostic disable: duplicate-set-field,duplicate-doc-field
+local addonName = ... ---@type string
+
+---@class BetterBags: AceAddon
+local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+-- Create the bank slots module.
+---@class BankSlots: AceModule
+local BankSlots = addon:NewModule('BankSlots')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+---@class GridFrame: AceModule
+local grid = addon:GetModule('Grid')
+
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+local buttonCount = 0
+
+-- BankSlotButton represents a single bank tab slot button in the panel.
+-- Each slot has two sub-buttons inside a container frame:
+--   viewButton    – a plain Button, shown when the slot is purchased (select tab / open config)
+--   purchaseButton – a BankPanelPurchaseButtonScriptTemplate Button, shown when unpurchased
+-- Only one sub-button is visible at a time; Update() switches between them.
+---@class BankSlotButton
+---@field frame Frame The container frame holding both sub-buttons
+---@field viewButton Button Plain button shown when the slot is purchased
+---@field purchaseButton Button Template button shown when the slot is unpurchased
+---@field bagIndex number The Enum.BagIndex value for this tab slot
+---@field bankType BankType Whether this is a Character or Account bank tab
+---@field purchased boolean Whether this tab slot has been purchased
+---@field isSelected boolean Whether this tab slot is currently selected
+---@field iconTexture Texture The icon texture (shown when purchased, child of viewButton)
+---@field selectedHighlight Texture The highlight shown when selected (child of viewButton)
+---@field plusText Texture The green '+' atlas icon shown for unpurchased slots (child of purchaseButton)
+local bankSlotButtonProto = {}
+
+-- Update refreshes the button's visual state based on current tab data.
+---@param charTabData table<number, BankTabData>
+---@param accountTabData table<number, BankTabData>
+function bankSlotButtonProto:Update(charTabData, accountTabData)
+  local tabData
+  if self.bankType == Enum.BankType.Character then
+    tabData = charTabData[self.bagIndex]
+  else
+    tabData = accountTabData[self.bagIndex]
+  end
+
+  if tabData then
+    -- Purchased slot: show the view button with the configured icon
+    self.purchased = true
+    self.iconTexture:SetTexture(tabData.icon)
+    self.iconTexture:Show()
+    self.plusText:Hide()
+    self.viewButton:Show()
+    self.purchaseButton:Hide()
+  else
+    -- Unpurchased slot: show the purchase button with the green '+'
+    self.purchased = false
+    self.iconTexture:SetTexture(nil)
+    self.iconTexture:Hide()
+    self.plusText:Show()
+    self.viewButton:Hide()
+    self.purchaseButton:Show()
+  end
+
+  -- Update selected highlight (only relevant when the slot is purchased)
+  if self.isSelected then
+    self.selectedHighlight:Show()
+  else
+    self.selectedHighlight:Hide()
+  end
+end
+
+---@param selected boolean
+function bankSlotButtonProto:SetSelected(selected)
+  self.isSelected = selected
+  if selected then
+    self.selectedHighlight:Show()
+  else
+    self.selectedHighlight:Hide()
+  end
+end
+
+-- bankSlotsPanel is the slide-out panel showing all possible bank tab slots.
+---@class bankSlotsPanel
+---@field frame Frame
+---@field content Grid
+---@field fadeInGroup AnimationGroup
+---@field fadeOutGroup AnimationGroup
+---@field buttons BankSlotButton[]
+---@field selectedBagIndex number?
+---@field bagFrame Frame The parent bag frame this panel is attached to
+---@field tabsWereShown boolean Whether group tabs were visible before panel opened
+BankSlots.bankSlotsPanelProto = {}
+
+-- Draw refreshes all button visuals from the current C_Bank tab data.
+---@param ctx Context
+function BankSlots.bankSlotsPanelProto:Draw(ctx)
+  local _ = ctx
+  debug:Log('BankSlots', "Bank Slots Draw called")
+
+  -- Fetch purchased tab data from the Blizzard bank API
+  local charTabData = {}
+  local accountTabData = {}
+  if C_Bank and C_Bank.FetchPurchasedBankTabData then
+    local charTabs = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
+    if charTabs then
+      for _, tab in ipairs(charTabs) do
+        charTabData[tab.ID] = tab
+      end
+    end
+    local accountTabs = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+    if accountTabs then
+      for _, tab in ipairs(accountTabs) do
+        accountTabData[tab.ID] = tab
+      end
+    end
+  end
+
+  -- Update all slot buttons
+  for _, btn in ipairs(self.buttons) do
+    btn:Update(charTabData, accountTabData)
+  end
+
+  -- Layout the grid and size the panel to fit
+  local w, h = self.content:Draw({
+    cells = self.content.cells,
+    maxWidthPerRow = 1024,
+  })
+  self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
+
+  local headerHeight = themes:GetFlatHeaderHeight(self.frame)
+  local topInset = headerHeight > 0 and headerHeight or 12
+
+  self.content:GetContainer():ClearAllPoints()
+  self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -topInset)
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
+
+  -- Height = content height + top inset + bottom inset (12).
+  self.frame:SetHeight(h + topInset + 12)
+
+  -- Enforce minimum bag frame width so the main bank window is never
+  -- narrower than the bank tab panel anchored below it.
+  local panelWidth = self.frame:GetWidth()
+  if self.bagFrame:GetWidth() < panelWidth then
+    self.bagFrame:SetWidth(panelWidth)
+  end
+end
+
+function BankSlots.bankSlotsPanelProto:SetShown(shown)
+  if shown then
+    self:Show()
+  else
+    self:Hide()
+  end
+end
+
+---@param callback? fun()
+function BankSlots.bankSlotsPanelProto:Show(callback)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeInGroup.callback = function()
+      self.fadeInGroup.callback = nil
+      callback()
+    end
+  end
+  -- Reanchor the bank slots panel to the bottom of the bank window, occupying
+  -- the space where the group tabs normally sit.
+  self.frame:ClearAllPoints()
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
+  -- Completely hide the group tabs and remember whether they were visible so
+  -- they can be restored correctly when the bank slots panel is closed.
+  local bankBag = addon.Bags and addon.Bags.Bank
+  if bankBag and bankBag.tabs then
+    if not self:IsShown() then
+      self.tabsWereShown = bankBag.tabs.frame:IsShown()
+    end
+    bankBag.tabs.frame:Hide()
+  else
+    if not self:IsShown() then
+      self.tabsWereShown = false
+    end
+  end
+  self.fadeInGroup:Play()
+end
+
+---@param callback? fun()
+function BankSlots.bankSlotsPanelProto:Hide(callback)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeOutGroup.callback = function()
+      self.fadeOutGroup.callback = nil
+      callback()
+    end
+  end
+  self.fadeOutGroup:Play()
+end
+
+function BankSlots.bankSlotsPanelProto:IsShown()
+  return self.frame:IsShown()
+end
+
+-- SelectTab selects the given bank tab slot and triggers a filtered bank
+-- refresh so only items from that specific Blizzard tab are shown.
+---@param ctx Context
+---@param bagIndex number
+function BankSlots.bankSlotsPanelProto:SelectTab(ctx, bagIndex)
+  -- Deselect all, then select the target button
+  for _, btn in ipairs(self.buttons) do
+    btn:SetSelected(btn.bagIndex == bagIndex)
+  end
+  self.selectedBagIndex = bagIndex
+
+  -- Delegate to the bank behavior which sets blizzardBankTab and triggers refresh
+  if addon.Bags and addon.Bags.Bank and addon.Bags.Bank.behavior then
+    addon.Bags.Bank.behavior:SwitchToBlizzardTab(ctx, bagIndex)
+  end
+end
+
+-- SelectFirstTab auto-selects the first bank tab slot when the panel opens.
+---@param ctx Context
+function BankSlots.bankSlotsPanelProto:SelectFirstTab(ctx)
+  if #self.buttons > 0 then
+    local firstBagIndex = self.buttons[1].bagIndex
+    -- Skip if the first tab is already selected. OnShow pre-configures
+    -- selectedBagIndex and blizzardBankTab so that the initial Bank:Draw()
+    -- renders with the correct filter from the start. Calling SelectTab here
+    -- would trigger a redundant full re-render for no visual change.
+    if self.selectedBagIndex == firstBagIndex then
+      return
+    end
+    self:SelectTab(ctx, firstBagIndex)
+  end
+end
+
+-- OnClose cleans up the bank slots panel state and restores normal view
+---@param ctx Context
+function BankSlots.bankSlotsPanelProto:OnClose(ctx)
+  -- Deselect all buttons
+  for _, btn in ipairs(self.buttons) do
+    btn:SetSelected(false)
+  end
+  self.selectedBagIndex = nil
+  -- Clear the single-tab filter and refresh the bank cache
+  if addon.Bags and addon.Bags.Bank then
+    addon.Bags.Bank.blizzardBankTab = nil
+    items:ClearBankCache(ctx)
+  end
+  -- Restore panel anchor to above the bag frame (original position).
+  self.frame:ClearAllPoints()
+  self.frame:SetPoint("BOTTOMLEFT", self.bagFrame, "TOPLEFT", 0, 14)
+  -- Restore group tabs visibility to what it was before the panel opened.
+  local bankBag = addon.Bags and addon.Bags.Bank
+  if (self.tabsWereShown or database:GetGroupsEnabled(const.BAG_KIND.BANK)) and bankBag and bankBag.tabs then
+    bankBag.tabs.frame:Show()
+  end
+  self.tabsWereShown = false
+end
+
+-- OpenTabConfig opens the Blizzard tab configuration dialog for the given
+-- bank tab. Uses BankPanel.TabSettingsMenu for character bank tabs and
+-- AccountBankPanel.TabSettingsMenu for account/warbank tabs.
+---@param bagIndex number
+function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
+  local bagFrame = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.frame
+
+  -- Determine bank type: account bank tabs start at AccountBankTab_1
+  local isAccountTab = Enum.BagIndex.AccountBankTab_1 and bagIndex >= Enum.BagIndex.AccountBankTab_1
+
+  -- Re-connect the icon selector callback so that clicking an icon in the grid
+  -- updates the selected-icon preview.  After reparenting and Update() calls the
+  -- callback set in OnLoad can become stale; explicitly re-setting it here ensures
+  -- icon selection always works.
+  ---@param menu table The TabSettingsMenu frame
+  local function reconnectIconCallback(menu)
+    if not (menu.IconSelector and menu.BorderBox and menu.BorderBox.SelectedIconArea) then return end
+    local previewButton = menu.BorderBox.SelectedIconArea.SelectedIconButton
+    local descText = menu.BorderBox.SelectedIconArea.SelectedIconText
+      and menu.BorderBox.SelectedIconArea.SelectedIconText.SelectedIconDescription
+    if previewButton and menu.IconSelector.SetSelectedCallback then
+      menu.IconSelector:SetSelectedCallback(function(_, icon)
+        previewButton:SetIconTexture(icon)
+        if descText then
+          if ICON_SELECTION_CLICK then
+            descText:SetText(ICON_SELECTION_CLICK)
+          end
+          descText:SetFontObject(GameFontHighlightSmall)
+        end
+      end)
+    end
+  end
+
+  -- Populate selectedTabData directly from C_Bank API so Update() can run even
+  -- when BankPanel.purchasedBankTabData has not yet been populated (e.g. the first
+  -- time the bank is opened and BankPanel was hidden during BANKFRAME_OPENED).
+  ---@param menu table The TabSettingsMenu frame
+  ---@param bankType BankType Enum.BankType value for the tab
+  ---@param id number bagIndex to look up
+  local function ensureSelectedTabData(menu, bankType, id)
+    -- Reset so SetSelectedTab always performs a fresh lookup (bypasses the
+    -- "alreadySelected" early-exit which could skip the data refresh).
+    menu.selectedTabData = nil
+    menu:SetSelectedTab(id)
+    -- Fallback: if BankPanel.purchasedBankTabData was empty, fetch directly.
+    if not menu.selectedTabData and C_Bank and C_Bank.FetchPurchasedBankTabData then
+      local tabList = C_Bank.FetchPurchasedBankTabData(bankType)
+      if tabList then
+        for _, tab in ipairs(tabList) do
+          if tab.ID == id then
+            menu.selectedTabData = tab
+            break
+          end
+        end
+      end
+    end
+  end
+
+  local bankPanel = BankFrame and BankFrame.BankPanel or BankPanel
+  local accountBankPanel = BankFrame and BankFrame.AccountBankPanel or AccountBankPanel
+
+  if isAccountTab then
+    -- Account/warbank tab: use AccountBankPanel.TabSettingsMenu or unified bankPanel.TabSettingsMenu
+    local menu = (accountBankPanel and accountBankPanel.TabSettingsMenu) or (bankPanel and bankPanel.TabSettingsMenu)
+    if menu then
+      if bagFrame then
+        menu:SetParent(bagFrame)
+        menu:ClearAllPoints()
+        menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
+        -- Keep GetBankFrame override so the menu can look up tab data via the
+        -- real AccountBankPanel hierarchy when needed (for legacy frames).
+        menu.GetBankFrame = function()
+          return {
+            GetTabData = function(_, id)
+              if C_Bank and C_Bank.FetchPurchasedBankTabData then
+                local tabs = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+                if tabs then
+                  for _, tab in ipairs(tabs) do
+                    if tab.ID == id then return tab end
+                  end
+                end
+              end
+              return nil
+            end,
+          }
+        end
+      end
+      ensureSelectedTabData(menu, Enum.BankType.Account, bagIndex)
+      menu:Show()
+      if menu.Update then menu:Update() end
+      reconnectIconCallback(menu)
+    end
+  else
+    -- Character bank tab: use bankPanel.TabSettingsMenu (added in The War Within)
+    local menu = bankPanel and bankPanel.TabSettingsMenu
+    if menu then
+      if bagFrame then
+        menu:SetParent(bagFrame)
+        menu:ClearAllPoints()
+        menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
+      end
+      ensureSelectedTabData(menu, Enum.BankType.Character, bagIndex)
+      menu:Show()
+      if menu.Update then menu:Update() end
+      reconnectIconCallback(menu)
+    end
+  end
+end
+
+-- CreatePanel creates the bank tab slots panel, attaches it above the given
+-- bag frame, and returns it. Returns nil on non-retail clients.
+---@param ctx Context
+---@param bagFrame Frame
+---@return bankSlotsPanel?
+function BankSlots:CreatePanel(ctx, bagFrame)
+  if not addon.isRetail then
+    return nil
+  end
+  local _ = ctx
+
+  ---@class bankSlotsPanel
+  local b = {}
+  setmetatable(b, {__index = BankSlots.bankSlotsPanelProto})
+
+  ---@class Frame: BackdropTemplate
+  local f = CreateFrame("Frame", "BetterBagsBankSlots", bagFrame)
+  b.frame = f
+  b.bagFrame = bagFrame
+
+  -- Register with an empty title so no title text is rendered in the window
+  -- decoration across any theme. The panel has no title bar text by design.
+  themes:RegisterFlatWindow(f, "")
+
+  b.content = grid:Create(b.frame)
+  -- Use the same inset on top and bottom so the slot icons are vertically
+  -- centred. The -30 used by other flat panels reserves space for a title bar;
+  -- this panel has no title, so we match the 12 px bottom gap.
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
+  b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
+  -- Allow all 11 slots on one row
+  b.content.maxCellWidth = 11
+  b.content:HideScrollBar()
+  -- Bank tab slots grid is not scrollable; disable mouse wheel so scroll
+  -- events pass through to the outer scrollable bag container.
+  b.content:EnableMouseWheelScroll(false)
+  b.content:Show()
+
+  b.buttons = {}
+  b.selectedBagIndex = nil
+  b.tabsWereShown = false
+
+  -- All possible bank tab slots in order:
+  --   6 character bank tabs (CharacterBankTab_1 through _6)
+  --   5 account/warbank tabs (AccountBankTab_1 through _5)
+  local allTabSlots = {
+    {bagIndex = Enum.BagIndex.CharacterBankTab_1, bankType = Enum.BankType.Character},
+    {bagIndex = Enum.BagIndex.CharacterBankTab_2, bankType = Enum.BankType.Character},
+    {bagIndex = Enum.BagIndex.CharacterBankTab_3, bankType = Enum.BankType.Character},
+    {bagIndex = Enum.BagIndex.CharacterBankTab_4, bankType = Enum.BankType.Character},
+    {bagIndex = Enum.BagIndex.CharacterBankTab_5, bankType = Enum.BankType.Character},
+    {bagIndex = Enum.BagIndex.CharacterBankTab_6, bankType = Enum.BankType.Character},
+    {bagIndex = Enum.BagIndex.AccountBankTab_1, bankType = Enum.BankType.Account},
+    {bagIndex = Enum.BagIndex.AccountBankTab_2, bankType = Enum.BankType.Account},
+    {bagIndex = Enum.BagIndex.AccountBankTab_3, bankType = Enum.BankType.Account},
+    {bagIndex = Enum.BagIndex.AccountBankTab_4, bankType = Enum.BankType.Account},
+    {bagIndex = Enum.BagIndex.AccountBankTab_5, bankType = Enum.BankType.Account},
+  }
+
+  for i, slotInfo in ipairs(allTabSlots) do
+    ---@type BankSlotButton
+    local btn = {}
+    setmetatable(btn, {__index = bankSlotButtonProto})
+    btn.bagIndex = slotInfo.bagIndex
+    btn.bankType = slotInfo.bankType
+    btn.purchased = false
+    btn.isSelected = false
+
+    -- Container frame holds both sub-buttons; only one is visible at a time.
+    local container = CreateFrame("Frame", nil, b.frame)
+    container:SetSize(37, 37)
+    btn.frame = container
+
+    -- View button: plain Button shown when the slot is purchased.
+    -- Handles left-click (select tab) and right-click (open tab config).
+    buttonCount = buttonCount + 1
+    local viewButton = CreateFrame("Button", format("BetterBagsBankSlotButton%d", buttonCount), container)
+    viewButton:SetAllPoints()
+    viewButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    viewButton:Hide()
+    btn.viewButton = viewButton
+
+    -- Purchase button: shown when the slot is unpurchased.
+    -- Created with BankPanelPurchaseButtonScriptTemplate so its OnClick natively
+    -- opens the Blizzard bank tab purchase dialog. The overrideBankType attribute
+    -- tells the mixin whether to purchase a Character or Account bank tab.
+    buttonCount = buttonCount + 1
+    local purchaseButton = CreateFrame("Button", format("BetterBagsBankSlotButton%d", buttonCount), container, "BankPanelPurchaseButtonScriptTemplate")
+    purchaseButton:SetAllPoints()
+    if slotInfo.bankType == Enum.BankType.Character then
+      purchaseButton:SetAttribute("overrideBankType", Enum.BankType.Character)
+    else
+      purchaseButton:SetAttribute("overrideBankType", Enum.BankType.Account)
+    end
+    purchaseButton:Hide()
+    btn.purchaseButton = purchaseButton
+
+    -- Icon texture on the view button (shown when purchased)
+    local iconTex = viewButton:CreateTexture(nil, "ARTWORK")
+    iconTex:SetAllPoints()
+    iconTex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    iconTex:Hide()
+    btn.iconTexture = iconTex
+
+    -- Selection highlight on the view button
+    local selectedHL = viewButton:CreateTexture(nil, "OVERLAY")
+    selectedHL:SetAllPoints()
+    selectedHL:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+    selectedHL:SetBlendMode("ADD")
+    selectedHL:Hide()
+    btn.selectedHighlight = selectedHL
+
+    -- Plus atlas icon on the purchase button (shown when unpurchased).
+    -- Use explicit SetPoint + SetSize BEFORE SetAtlas so the rendered size is
+    -- controlled by us, not by the atlas metadata (SetAtlas ignores SetAllPoints).
+    local plusIcon = purchaseButton:CreateTexture(nil, "ARTWORK")
+    plusIcon:SetPoint("CENTER", purchaseButton, "CENTER", 0, 0)
+    plusIcon:SetSize(37, 37)
+    plusIcon:SetAtlas("Garr_Building-AddFollowerPlus")
+    plusIcon:Hide()
+    btn.plusText = plusIcon
+
+    -- Capture loop variables for use in closures below
+    local capturedBtn = btn
+    local capturedPanel = b
+    local capturedSlotInfo = slotInfo
+
+    -- Click handler on the view button only.
+    -- The purchase button's clicks are handled entirely by the template.
+    viewButton:SetScript("OnClick", function(_, mouseButton)
+      if mouseButton == "RightButton" then
+        -- Right-click: open Blizzard tab configuration
+        capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
+      else
+        -- Left-click: select this tab and filter bank to its items
+        local ectx = context:New('BankSlotSelect')
+        capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
+      end
+    end)
+
+    -- Shared tooltip builder used by both sub-buttons.
+    local function showSlotTooltip(anchorFrame)
+      GameTooltip:SetOwner(anchorFrame, "ANCHOR_LEFT")
+      local tabData
+      if C_Bank and C_Bank.FetchPurchasedBankTabData then
+        local tabs = C_Bank.FetchPurchasedBankTabData(capturedSlotInfo.bankType)
+        if tabs then
+          for _, tab in ipairs(tabs) do
+            if tab.ID == capturedSlotInfo.bagIndex then
+              tabData = tab
+              break
+            end
+          end
+        end
+      end
+      if tabData then
+        GameTooltip:SetText(tabData.name, 1, 1, 1, 1, true)
+        if capturedSlotInfo.bankType == Enum.BankType.Character then
+          GameTooltip:AddLine(L:G("Bank"), 0.6, 0.8, 1.0, true)
+        else
+          GameTooltip:AddLine(L:G("Warbank"), 1.0, 0.85, 0.1, true)
+        end
+        GameTooltip:AddLine(L:G("Left-click to view this tab"), 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L:G("Right-click to configure this tab"), 0.8, 0.8, 0.8, true)
+      elseif capturedSlotInfo.bankType == Enum.BankType.Character then
+        GameTooltip:SetText(L:G("Unpurchased Bank Tab"), 1, 1, 1, 1, true)
+        GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
+      else
+        GameTooltip:SetText(L:G("Unpurchased Warbank Tab"), 1, 1, 1, 1, true)
+        GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
+      end
+      GameTooltip:Show()
+    end
+
+    viewButton:SetScript("OnEnter", showSlotTooltip)
+    viewButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    purchaseButton:SetScript("OnEnter", showSlotTooltip)
+    purchaseButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    b.content:AddCell(tostring(i), btn)
+    table.insert(b.buttons, btn)
+  end
+
+  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
+
+  -- When fade-in finishes, auto-select the first bank tab
+  addon.HookScript(b.fadeInGroup, "OnFinished", function(ectx)
+    b:SelectFirstTab(ectx)
+  end)
+
+  -- When fade-out finishes, clear the blizzardBankTab filter and restore normal view
+  addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
+    b:OnClose(ectx)
+    events:SendMessage(ectx, 'bags/RefreshBank')
+  end)
+
+  -- Redraw when tab settings are updated (name/icon changed)
+  events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function(ectx)
+    if b:IsShown() then
+      b:Draw(ectx)
+    end
+  end)
+
+  -- Redraw when a bank tab is purchased
+  events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function(ectx)
+    if b:IsShown() then
+      b:Draw(ectx)
+    end
+  end)
+
+  events:RegisterEvent('BANK_TABS_CHANGED', function(ectx)
+    if b:IsShown() then
+      b:Draw(ectx)
+    end
+  end)
+
+  b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 8)
+  b.frame:Hide()
+  return b
+end

@@ -1,0 +1,206 @@
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("The Hoardmonger", 2825, 2776)
+if not mod then return end
+mod:SetEncounterID(3207)
+mod:SetRespawnTime(30)
+
+--------------------------------------------------------------------------------
+-- Locals
+--
+
+local ravenousBellowCount = 1
+local earthshatterSlamCount = 1
+local spoiledSuppliesCount = 1
+local activeBars = {}
+local activeBarBySpellId = {}
+local backupBars = {}
+
+--------------------------------------------------------------------------------
+-- Renames
+--
+
+mod:SetRenames({
+	[1235118] = {1235118}, -- Ravenous Bellow
+	[1253268] = {1253268}, -- Earthshatter Slam
+	[1234233] = {1234233}, -- Spoiled Supplies
+})
+
+--------------------------------------------------------------------------------
+-- Auras
+--
+
+mod:SetAuraData({
+	{1234846, duration = 12, dispel = "poison", soundOnApplied = "info", soundOnAppliedDose = "info", tip = CL.debuffWalkIntoObjectNote:format(mod:SpellName(-32665))}, -- Toxic Spores
+	{1234681, duration = 10, tip = CL.debuffGroupAfterCastNote:format(mod:SpellName(1235118))}, -- Ravenous Bellow
+	{1235125, duration = 10, tip = CL.debuffGroupAfterCastNote:format(mod:SpellName(1235125))}, -- Hearty Bellow
+	{1235405, soundOnApplied = "underyou", tip = CL.debuffUnderYouNote}, -- Bonespiked
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+
+function mod:GetOptions()
+	return {
+		1235118, -- Ravenous Bellow
+		1253268, -- Earthshatter Slam
+		1234233, -- Spoiled Supplies
+	}
+end
+
+mod:UseCustomTimers(true)
+function mod:OnEncounterStart()
+	earthshatterSlamCount = 1
+	ravenousBellowCount = 1
+	spoiledSuppliesCount = 1
+	activeBars = {}
+	activeBarBySpellId = {}
+	backupBars = {}
+	if self:ShouldShowBars() then
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_REMOVED")
+	end
+end
+
+function mod:OnWin()
+	activeBars = {}
+	activeBarBySpellId = {}
+end
+
+function mod:OnBossDisable()
+	for eventID in next, backupBars do
+		self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Event Handlers
+--
+
+function mod:ENCOUNTER_TIMELINE_EVENT_ADDED(_, eventInfo)
+	if eventInfo.source ~= 0 then return end -- Enum.EncounterTimelineEventSource.Encounter
+	local duration = self:RoundNumber(eventInfo.duration, 0)
+	local barInfo
+	if duration > 60 then return end -- filter placeholder bars
+	if duration == 6 then -- Ravenous Bellow
+		barInfo = self:RavenousBellowTimeline(eventInfo)
+	elseif duration == 16 then -- Earthshatter Slam
+		barInfo = self:EarthshatterSlamTimeline(eventInfo)
+	elseif not self:IsWiping() and duration == 30 then -- Spoiled Supplies
+		barInfo = self:SpoiledSuppliesTimeline(eventInfo)
+	elseif not self:IsWiping() then
+		self:ErrorForTimelineEvent(eventInfo)
+		backupBars[eventInfo.id] = true
+		self:SendMessage("BigWigs_StartBar", nil, nil, ("[B] %s"):format(eventInfo.spellName), eventInfo.duration, eventInfo.iconFileID, eventInfo.maxQueueDuration, nil, eventInfo.id, eventInfo.id)
+		local state = C_EncounterTimeline.GetEventState(eventInfo.id)
+		if state == 1 then -- Enum.EncounterTimelineEventState.Paused = 1
+			self:SendMessage("BigWigs_PauseBar", nil, nil, eventInfo.id)
+		end
+	end
+	if barInfo then
+		barInfo.createdAt = GetTime()
+		activeBars[eventInfo.id] = barInfo
+		activeBarBySpellId[barInfo.key] = eventInfo.id
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		local state = C_EncounterTimeline.GetEventState(eventID)
+		if state == 0 then -- Active
+			self:ResumeBar(barInfo.key, barInfo.msg)
+		elseif state == 1 then -- Paused
+			self:PauseBar(barInfo.key, barInfo.msg)
+		elseif state == 2 then -- Finished
+			self:StopBar(barInfo.msg)
+			if barInfo.callback then
+				barInfo.callback()
+			end
+			activeBars[eventID] = nil
+			if activeBarBySpellId[barInfo.key] == eventID then
+				activeBarBySpellId[barInfo.key] = nil
+			end
+		elseif state == 3 then -- Canceled
+			self:StopBar(barInfo.msg)
+			activeBars[eventID] = nil
+			if activeBarBySpellId[barInfo.key] == eventID then
+				activeBarBySpellId[barInfo.key] = nil
+			end
+		end
+	elseif backupBars[eventID] then
+		local newState = C_EncounterTimeline.GetEventState(eventID)
+		if newState == 0 then -- Enum.EncounterTimelineEventState.Active
+			self:SendMessage("BigWigs_ResumeBar", nil, nil, eventID)
+		elseif newState == 1 then -- Enum.EncounterTimelineEventState.Paused
+			self:SendMessage("BigWigs_PauseBar", nil, nil, eventID)
+		else -- Canceled / Finished
+			self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+		end
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_REMOVED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		self:StopBar(barInfo.msg)
+		activeBars[eventID] = nil
+		if activeBarBySpellId[barInfo.key] == eventID then
+			activeBarBySpellId[barInfo.key] = nil
+		end
+	elseif backupBars[eventID] then
+		backupBars[eventID] = nil
+		self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Ability Handlers
+--
+
+function mod:RavenousBellowTimeline(eventInfo) -- Ravenous Bellow
+	local barText = CL.count:format(self:GetRename(1235118), ravenousBellowCount)
+	self:CDBar(1235118, eventInfo.duration, barText, nil, eventInfo.id)
+	ravenousBellowCount = ravenousBellowCount + 1
+	return {
+		msg = barText,
+		key = 1235118,
+		callback = function()
+			self:Message(1235118, "red", barText)
+			self:PlaySound(1235118, "alert")
+		end
+	}
+end
+
+function mod:EarthshatterSlamTimeline(eventInfo) -- Earthshatter Slam
+	local barText = CL.count:format(self:GetRename(1253268), earthshatterSlamCount)
+	self:CDBar(1253268, eventInfo.duration, barText, nil, eventInfo.id)
+	earthshatterSlamCount = earthshatterSlamCount + 1
+	return {
+		msg = barText,
+		key = 1253268,
+		callback = function()
+			self:Message(1253268, "orange", barText)
+			self:PlaySound(1253268, "alarm")
+		end
+	}
+end
+
+function mod:SpoiledSuppliesTimeline(eventInfo) -- Spoiled Supplies
+	local barText = CL.count:format(self:GetRename(1234233), spoiledSuppliesCount)
+	self:CDBar(1234233, eventInfo.duration, barText, nil, eventInfo.id)
+	spoiledSuppliesCount = spoiledSuppliesCount + 1
+	return {
+		msg = barText,
+		key = 1234233,
+		callback = function()
+			self:StopBlizzMessages(1)
+			self:Message(1234233, "yellow", barText)
+			self:PlaySound(1234233, "long")
+		end
+	}
+end

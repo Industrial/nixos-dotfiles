@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -e
+
+echo "features > games > wow-classic > link-wow-classic"
+
+# Paths
+currentDirectoryPath=$(pwd)
+wowGamePath="/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_"
+wtfSourcePath="${currentDirectoryPath}/features/games/wow-classic/WTF"
+interfaceSourcePath="${currentDirectoryPath}/features/games/wow-classic/Interface"
+wtfTargetPath="${wowGamePath}/WTF"
+interfaceTargetPath="${wowGamePath}/Interface"
+
+# Check if WoW installation exists
+if [ ! -d "${wowGamePath}" ]; then
+  echo "WARNING: WoW Classic installation not found at ${wowGamePath}"
+  echo "Skipping symlink creation"
+  exit 0
+fi
+
+# Create symlinks
+echo "Creating symlinks for WoW Classic configuration..."
+
+# Remove existing directories if they exist and aren't symlinks
+if [ -e "${wtfTargetPath}" ] && [ ! -L "${wtfTargetPath}" ]; then
+  echo "Removing existing WTF directory..."
+  rm -rf "${wtfTargetPath}"
+fi
+
+if [ -e "${interfaceTargetPath}" ] && [ ! -L "${interfaceTargetPath}" ]; then
+  echo "Removing existing Interface directory..."
+  rm -rf "${interfaceTargetPath}"
+fi
+
+# Create symlinks
+echo "Linking WTF directory..."
+ln -sf "${wtfSourcePath}" "${wtfTargetPath}"
+
+echo "Linking Interface directory..."
+ln -sf "${interfaceSourcePath}" "${interfaceTargetPath}"
+
+echo "WoW Classic configuration linked successfully!"
+echo "  WTF: ${wtfTargetPath} -> ${wtfSourcePath}"
+echo "  Interface: ${interfaceTargetPath} -> ${interfaceSourcePath}"

@@ -1,0 +1,2479 @@
+
+local BigWigs = BigWigs
+local options = {}
+
+local C = BigWigs.C
+local loader = BigWigsLoader
+local API = BigWigsAPI
+
+local L = API:GetLocale("BigWigs")
+local CL = API:GetLocale("BigWigs: Common")
+
+local ldbi = LibStub("LibDBIcon-1.0")
+local acr = LibStub("AceConfigRegistry-3.0")
+local acd = LibStub("AceConfigDialog-3.0")
+local AceGUI = LibStub("AceGUI-3.0")
+local adbo = LibStub("AceDBOptions-3.0")
+local lds = LibStub("LibDualSpec-1.0", true)
+local LibSharedMedia = LibStub("LibSharedMedia-3.0")
+
+options.SendMessage = loader.SendMessage
+
+local optionsTooltip = CreateFrame("GameTooltip", "BigWigsOptionsTooltip", UIParent, "GameTooltipTemplate")
+optionsTooltip:SetScript("OnUpdate", function(self, elapsed)
+	-- basically GameTooltip_OnUpdate
+	self.updateTooltipTimer = (self.updateTooltipTimer or 0.2) - elapsed
+	if self.updateTooltipTimer > 0 then return end
+	self.updateTooltipTimer = 0.2
+
+	local owner = self:GetOwner()
+	local widget = owner and owner.obj
+	if widget and widget:GetUserData("updateTooltip") then
+		widget:Fire("OnEnter")
+	elseif self.shouldRefreshData then -- TOOLTIP_DATA_UPDATE
+		self:RefreshData()
+	end
+end)
+local function optionsTooltip_Hide()
+	-- common OnLeave handler
+	optionsTooltip:Hide()
+end
+
+local colorModule
+local soundModule
+local configFrame
+
+local showToggleOptions, getAdvancedToggleOption = nil, nil
+local toggleOptionsStatusTable, lastOptionsTab = {}, nil
+local lastTabSelected, lastTreeGroupSelected, lastBossModuleGroup = nil, nil, nil
+
+local C_EncounterJournal_GetSectionInfo = loader.isClassic and function(key)
+	local info = (loader.isCata or loader.isMists) and C_EncounterJournal.GetSectionInfo(key)
+	if info then
+		-- Cataclysm only has section info for Cataclysm content, return it if found
+		-- Mists has all dungeon content, but is missing pre-Cata raids
+		return info
+	end
+	info = API:GetLocale("BigWigs: Encounter Info")[key]
+	if info then
+		-- Options uses a few more fields, so copy the entry and include them
+		local tbl = {}
+		for k,v in next, info do
+			tbl[k] = v
+		end
+		tbl.spellID = 0
+		tbl.link = ("|cff66bbff|Hjournal:2:%d:1|h[%s]|h|r"):format(key, tbl.title)
+		return tbl
+	end
+end or C_EncounterJournal.GetSectionInfo
+
+local aceConfigTableMainBigWigsTab = {
+	type = "group",
+	name = "BigWigs",
+	get = function(info)
+		return loader.db.profile[info[#info]]
+	end,
+	set = function(info, value)
+		local key = info[#info]
+		loader.db.profile[key] = value
+	end,
+	args = {
+		general = {
+			order = 0,
+			type = "group",
+			name = "BigWigs",
+			args = {
+				introduction = {
+					type = "description",
+					name = L.introduction,
+					order = 12,
+					fontSize = "medium",
+					width = "full",
+				},
+				minimap = {
+					type = "toggle",
+					name = L.minimapIcon,
+					desc = L.minimapToggle,
+					order = 13,
+					get = function() return not BigWigsIconDB.hide end,
+					set = function(_, v)
+						if v then
+							BigWigsIconDB.hide = nil
+							ldbi:Show("BigWigs")
+						else
+							BigWigsIconDB.hide = true
+							ldbi:Hide("BigWigs")
+						end
+					end,
+					width = 1.5,
+				},
+				compartment = {
+					type = "toggle",
+					name = L.compartmentMenu,
+					desc = L.compartmentMenu_desc,
+					order = 14,
+					get = function() return not ldbi:IsButtonInCompartment("BigWigs") end,
+					set = function(_, v)
+						if v then
+							ldbi:RemoveButtonFromCompartment("BigWigs")
+						else
+							ldbi:AddButtonToCompartment("BigWigs")
+						end
+					end,
+					hidden = not ldbi:IsButtonCompartmentAvailable(),
+				},
+				separator3 = {
+					type = "description",
+					name = " ",
+					order = 30,
+					width = "full",
+				},
+				showZoneMessages = {
+					type = "toggle",
+					name = L.zoneMessages,
+					desc = L.zoneMessagesDesc,
+					order = 32,
+					width = "full",
+				},
+				fakeDBMVersion = {
+					type = "toggle",
+					name = L.dbmFaker,
+					desc = L.dbmFakerDesc,
+					order = 33,
+					width = "full",
+				},
+				separator4 = {
+					type = "description",
+					name = " ",
+					order = 40,
+					width = "full",
+				},
+				englishSayMessages = {
+					type = "toggle",
+					name = L.englishSayMessages,
+					desc = L.englishSayMessagesDesc,
+					order = 41,
+					width = "full",
+					disabled = function()
+						local myLocale = GetLocale()
+						return myLocale == "enUS" or myLocale == "enGB"
+					end,
+				},
+				slashDescTitle = {
+					type = "description",
+					name = "\n".. L.slashDescTitle,
+					fontSize = "large",
+					order = 43,
+					width = "full",
+				},
+				slashDescPull = {
+					type = "description",
+					name = "  ".. L.slashDescPull,
+					fontSize = "medium",
+					order = 44,
+					width = "full",
+				},
+				slashDescBreak = {
+					type = "description",
+					name = "  ".. L.slashDescBreak,
+					fontSize = "medium",
+					order = 45,
+					width = "full",
+				},
+				slashDescBar = {
+					type = "description",
+					name = "  ".. L.slashDescRaidBar,
+					fontSize = "medium",
+					order = 46,
+					width = "full",
+				},
+				slashDescLocalBar = {
+					type = "description",
+					name = "  ".. L.slashDescLocalBar,
+					fontSize = "medium",
+					order = 47,
+					width = "full",
+				},
+				slashDescRange = {
+					type = "description",
+					name = "  ".. L.slashDescRange,
+					fontSize = "medium",
+					order = 48,
+					width = "full",
+				},
+				slashDescVersion = {
+					type = "description",
+					name = "  ".. L.slashDescVersion,
+					fontSize = "medium",
+					order = 49,
+					width = "full",
+				},
+				slashDescConfig = {
+					type = "description",
+					name = "  ".. L.slashDescConfig,
+					fontSize = "medium",
+					order = 50,
+					width = "full",
+				},
+				gitHubDesc = {
+					type = "description",
+					name = "\n".. L.gitHubDesc .."\n",
+					fontSize = "medium",
+					order = 51,
+					width = "full",
+				},
+				discord = {
+					type = "input",
+					get = function() return "discord.gg/jGveg85" end,
+					set = function() end,
+					name = "Discord",
+					order = 52,
+					width = 0.75,
+				},
+				github = {
+					type = "input",
+					get = function() return "github.com/BigWigsMods" end,
+					set = function() end,
+					name = "GitHub",
+					order = 53,
+					width = 0.95,
+				},
+				curseforge = {
+					type = "input",
+					get = function() return "curseforge.com/wow/addons/big-wigs" end,
+					set = function() end,
+					name = "CurseForge",
+					order = 54,
+					width = 1.32,
+				},
+			},
+		},
+	},
+}
+
+local ConstructMainBigWigsTab
+do
+	local ConstructToolsTab
+	do
+		local aceConfigTableToolsTab = {
+			type = "group",
+			name = L.tools,
+			get = function(info)
+				return loader.db.profile[info[#info]]
+			end,
+			set = function(info, value)
+				local key = info[#info]
+				loader.db.profile[key] = value
+			end,
+			args = {
+				tools = {
+					order = 1,
+					type = "group",
+					name = L.tools,
+					args = {
+						toolsDesc = {
+							type = "description",
+							name = L.toolsDesc,
+							fontSize = "large",
+							order = 0,
+							width = "full",
+						},
+					},
+				},
+			},
+		}
+		function ConstructToolsTab()
+			for key, optionsTable in next, API.GetToolOptions() do
+				aceConfigTableToolsTab.args.tools.args[key] = optionsTable
+			end
+			return aceConfigTableToolsTab
+		end
+	end
+
+	local addonName, addonTable = ...
+	local f = CreateFrame("Frame")
+	f:RegisterEvent("ADDON_LOADED")
+	local function Initialize(_, _, addon)
+		if addon ~= addonName then return end
+		f:UnregisterEvent("ADDON_LOADED")
+
+		aceConfigTableMainBigWigsTab.args.general.args.profileOptions = {
+			type = "group",
+			childGroups = "tab",
+			order = 100,
+			args = {
+				profile = adbo:GetOptionsTable(loader.db),
+				import = addonTable.sharingOptions.importSection,
+				exportCore = addonTable.sharingOptions.exportCoreSection,
+				exportBosses = addonTable.sharingOptions.exportBossSection,
+			},
+		}
+		aceConfigTableMainBigWigsTab.args.general.args.profileOptions.name = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Profile:20|t " .. aceConfigTableMainBigWigsTab.args.general.args.profileOptions.args.profile.name
+		aceConfigTableMainBigWigsTab.args.general.args.profileOptions.args.profile.order = 1
+
+		if lds then
+			lds:EnhanceOptions(aceConfigTableMainBigWigsTab.args.general.args.profileOptions.args.profile, loader.db)
+		end
+
+		acr:RegisterOptionsTable("BigWigs", ConstructMainBigWigsTab, true)
+		acr:RegisterOptionsTable("BigWigsTools", ConstructToolsTab, true)
+		acd:SetDefaultSize("BigWigs", 858, 660)
+		acd:SetDefaultSize("BigWigsTools", 858, 660)
+
+		colorModule = BigWigs:GetPlugin("Colors")
+		soundModule = BigWigs:GetPlugin("Sounds")
+		acr:RegisterOptionsTable("BigWigs: Colors Override", colorModule:SetColorOptions("dummy", "dummy"), true)
+		acr:RegisterOptionsTable("BigWigs: Sounds Override", soundModule:SetSoundOptions("dummy", "dummy"), true)
+
+		loader.RegisterMessage(options, "BigWigs_PluginOptionsReady")
+		local pluginOptions = BigWigs:GetPluginOptions()
+		for pluginName, optionsTbl in next, pluginOptions do
+			options:BigWigs_PluginOptionsReady(nil, pluginName, optionsTbl[1], optionsTbl[2])
+		end
+
+		-- Wait with nilling, we don't know how many addons will load during this same execution.
+		loader.CTimerAfter(5, function() f:SetScript("OnEvent", nil) end)
+	end
+	f:SetScript("OnEvent", Initialize)
+end
+
+local spellDescriptionUpdater = CreateFrame("Frame")
+local visibleSpellDescriptionWidgets = {}
+spellDescriptionUpdater:SetScript("OnEvent", function(_, _, spellId)
+	local scrollFrame = nil
+	for widget, widgetDescription in next, visibleSpellDescriptionWidgets do
+		local module, bossOption = widget:GetUserData("module"), widget:GetUserData("option")
+		local _, _, desc = BigWigs:GetBossOptionDetails(module, bossOption)
+		if desc ~= widgetDescription then
+			widget:SetDescription(desc)
+			visibleSpellDescriptionWidgets[widget] = desc
+			scrollFrame = widget:GetUserData("scrollFrame")
+		end
+	end
+	if scrollFrame then
+		scrollFrame:PerformLayout()
+	end
+end)
+
+local creatureNameUpdater = CreateFrame("Frame")
+local visibleCreatureNameWidgets = {}
+local GetTooltipHyperlink = C_TooltipInfo and C_TooltipInfo.GetHyperlink
+creatureNameUpdater:SetScript("OnEvent", function()
+	local scrollFrame = nil
+	for headerWidget, widgetCreatureID in next, visibleCreatureNameWidgets do
+		local data = GetTooltipHyperlink("unit:Creature-0-0-0-0-" .. widgetCreatureID)
+		if data and data.lines and data.lines[1] then
+			scrollFrame = headerWidget:GetUserData("scrollFrame")
+			headerWidget:SetText(L.parenthesesID:format(data.lines[1].leftText, widgetCreatureID))
+		end
+	end
+	if scrollFrame then
+		scrollFrame:PerformLayout()
+	end
+end)
+
+local OpenConfig = nil
+function options:Open(specificPanel)
+	if not configFrame then
+		OpenConfig(specificPanel)
+	end
+end
+
+function options:Close()
+	if configFrame then
+		configFrame:Hide()
+	end
+end
+
+function options:IsOpen()
+	return configFrame and true or false
+end
+
+-------------------------------------------------------------------------------
+-- Plugin options
+--
+
+local function getMasterOption(self)
+	local key = self:GetUserData("key")
+	local module = self:GetUserData("module")
+	if type(key) == "string" and key:find("^custom_") then
+		return module.db.profile.toggles[key]
+	end
+	if type(module.db.profile.toggles[key]) ~= "number" then
+		module.db.profile.toggles[key] = module.toggleDefaults[key]
+	end
+	if module.db.profile.toggles[key] == 0 then
+		return false -- nothing go away
+	end
+	if bit.band(module.db.profile.toggles[key], module.toggleDefaults[key]) == module.toggleDefaults[key] then
+		return true -- all default baby
+	end
+	return nil -- some options set
+end
+
+local notNumberError = "The option %q for module %q either has a mismatched current value (%q) or target value (%q)."
+local function getSlaveOption(self)
+	local key = self:GetUserData("key")
+	local module = self:GetUserData("module")
+	local flag = self:GetUserData("flag")
+	local current = module.db.profile.toggles[key]
+	if type(current) ~= "number" or type(flag) ~= "number" then
+		error(notNumberError:format(tostring(key), tostring(module.moduleName), tostring(current), tostring(flag)))
+	end
+	return bit.band(current, flag) == flag
+end
+
+local function masterOptionToggled(self, event, value)
+	if value == nil then self:SetValue(false) end -- toggling the master toggles all (we just pretend to be a tristate)
+	local key = self:GetUserData("key")
+	local module = self:GetUserData("module")
+	local keyIsString = type(key) == "string"
+	if keyIsString and key:find("custom_select", nil, true) then
+		module.db.profile.toggles[key] = value or 1
+	elseif keyIsString and key:find("custom_", nil, true) then
+		module.db.profile.toggles[key] = value or false
+	else
+		if value then
+			-- If an option is disabled by default using the "OFF" toggle flag, then when we turn it on, we want all the default flags on also
+			module.db.profile.toggles[key] = module.toggleDisabled and module.toggleDisabled[key] or module.toggleDefaults[key]
+		else
+			module.db.profile.toggles[key] = 0
+		end
+		local dropdown = self:GetUserData("dropdown")
+		-- This data ONLY exists if we're looking at the advanced options tab,
+		-- we force a refresh of all checkboxes when enabling/disabling the master option.
+		if dropdown then
+			local scrollFrame = self:GetUserData("scrollFrame")
+			local bossOption = self:GetUserData("option")
+			visibleSpellDescriptionWidgets = {}
+			visibleCreatureNameWidgets = {}
+			scrollFrame:ReleaseChildren()
+			scrollFrame:AddChildren(getAdvancedToggleOption(scrollFrame, dropdown, module, bossOption))
+			scrollFrame:PerformLayout()
+		end
+	end
+
+	-- After :SetValue so it's not overwritten
+	self.text:SetTextColor(1, 0.82, 0)
+end
+
+local function slaveOptionToggled(self, event, value)
+	local key = self:GetUserData("key")
+	local module = self:GetUserData("module")
+	local flag = self:GetUserData("flag")
+	local master = self:GetUserData("master")
+	if value then
+		module.db.profile.toggles[key] = module.db.profile.toggles[key] + flag
+	else
+		module.db.profile.toggles[key] = module.db.profile.toggles[key] - flag
+	end
+	master:SetValue(getMasterOption(master))
+
+	-- After :SetValue so it's not overwritten
+	master.text:SetTextColor(1, 0.82, 0)
+	self.text:SetTextColor(1, 0.82, 0)
+end
+
+local function slaveOptionMouseOver(self, event, value)
+	optionsTooltip:SetOwner(self.frame, "ANCHOR_TOP")
+	if self:GetUserData("label") then
+		optionsTooltip:AddLine(self:GetUserData("label"))
+	end
+	optionsTooltip:AddLine(self:GetUserData("desc"), 1, 1, 1, true)
+	optionsTooltip:Show()
+end
+
+local function getSlaveToggle(label, desc, key, module, flag, master, width, icon, ...)
+	local toggle = AceGUI:Create("CheckBox")
+	toggle:SetLabel(label)
+	toggle:SetRelativeWidth(width)
+	toggle:SetHeight(30)
+
+	if icon then
+		if ... then
+			toggle:SetImage(icon, ...)
+		else
+			if type(icon) == "string" then
+				toggle:SetImage(icon) -- custom icon
+				toggle:SetUserData("label", "|T"..icon..":20|t "..label)
+			else
+				toggle:SetImage(icon, 0.07, 0.93, 0.07, 0.93)
+			end
+		end
+	end
+	toggle:SetUserData("key", key)
+	toggle:SetUserData("desc", desc)
+	toggle:SetUserData("module", module)
+	toggle:SetUserData("flag", flag)
+	toggle:SetUserData("master", master)
+	toggle:SetCallback("OnValueChanged", slaveOptionToggled)
+	toggle:SetCallback("OnEnter", slaveOptionMouseOver)
+	toggle:SetCallback("OnLeave", optionsTooltip_Hide)
+	toggle:SetValue(getSlaveOption(toggle))
+	toggle.text:SetTextColor(1, 0.82, 0) -- After :SetValue so it's not overwritten
+	return toggle
+end
+
+local function hasOptionFlag(dbKey, module, key)
+	-- Check the actual option table instead of using toggleDefaults
+	for _, opTbl in next, module.toggleOptions do
+		if type(opTbl) == "table" and opTbl[1] == dbKey then
+			for i = 2, #opTbl do
+				if opTbl[i] == key then
+					return true
+				end
+			end
+		end
+	end
+end
+
+local function advancedToggles(dbKey, module, check)
+	local dbv = module.toggleDisabled and module.toggleDisabled[dbKey] or module.toggleDefaults[dbKey]
+	local advOpts = {}
+
+	local isPrivateAura = hasOptionFlag(dbKey, module, "PRIVATE")
+
+	if dbKey ~= "altpower" and dbKey ~= "infobox" then
+		-- Emphasize
+		if not isPrivateAura or hasOptionFlag(dbKey, module, "ME_ONLY_EMPHASIZE") then
+			advOpts[#advOpts+1] = getSlaveToggle(L.EMPHASIZE, L.EMPHASIZE_desc, dbKey, module, C.EMPHASIZE, check, 0.3, module:GetMenuIcon("EMPHASIZE"))
+			advOpts[#advOpts+1] = getSlaveToggle(L.ME_ONLY_EMPHASIZE, L.ME_ONLY_EMPHASIZE_desc, dbKey, module, C.ME_ONLY_EMPHASIZE, check, 0.5, module:GetMenuIcon("ME_ONLY_EMPHASIZE"))
+		else
+			advOpts[#advOpts+1] = getSlaveToggle(L.EMPHASIZE, L.EMPHASIZE_desc, dbKey, module, C.EMPHASIZE, check, 0.8, module:GetMenuIcon("EMPHASIZE"))
+		end
+		--
+
+		-- Bar & Countdown
+		advOpts[#advOpts+1] = getSlaveToggle(L.BAR, L.BAR_desc, dbKey, module, C.BAR, check, 0.3, module:GetMenuIcon("BAR"))
+		advOpts[#advOpts+1] = getSlaveToggle(L.COUNTDOWN, L.COUNTDOWN_desc, dbKey, module, C.COUNTDOWN, check, 0.5, module:GetMenuIcon("COUNTDOWN"))
+		--
+
+		-- Cast Bars & Cast Countdowns
+		if hasOptionFlag(dbKey, module, "CASTBAR") then
+			advOpts[#advOpts+1] = getSlaveToggle(L.CASTBAR, L.CASTBAR_desc, dbKey, module, C.CASTBAR, check, 0.3, module:GetMenuIcon("CASTBAR"))
+			advOpts[#advOpts+1] = getSlaveToggle(L.CASTBAR_COUNTDOWN, L.CASTBAR_COUNTDOWN_desc, dbKey, module, C.CASTBAR_COUNTDOWN, check, 0.5, module:GetMenuIcon("CASTBAR_COUNTDOWN"))
+		end
+		--
+
+		-- Messages & Sound
+		if not isPrivateAura or hasOptionFlag(dbKey, module, "ME_ONLY") then
+			advOpts[#advOpts+1] = getSlaveToggle(L.MESSAGE, L.MESSAGE_desc, dbKey, module, C.MESSAGE, check, 0.3, module:GetMenuIcon("MESSAGE"))
+			advOpts[#advOpts+1] = getSlaveToggle(L.ME_ONLY, L.ME_ONLY_desc, dbKey, module, C.ME_ONLY, check, 0.4, module:GetMenuIcon("ME_ONLY"))
+			advOpts[#advOpts+1] = getSlaveToggle(L.SOUND, L.SOUND_desc, dbKey, module, C.SOUND, check, 0.3, module:GetMenuIcon("SOUND"))
+		else
+			advOpts[#advOpts+1] = getSlaveToggle(L.MESSAGE, L.MESSAGE_desc, dbKey, module, C.MESSAGE, check, 0.3, module:GetMenuIcon("MESSAGE"))
+			advOpts[#advOpts+1] = getSlaveToggle(L.SOUND, L.SOUND_desc, dbKey, module, C.SOUND, check, 0.5, module:GetMenuIcon("SOUND"))
+		end
+		--
+	end
+
+	if hasOptionFlag(dbKey, module, "NAMEPLATE") then
+		advOpts[#advOpts+1] = getSlaveToggle(L.NAMEPLATE, L.NAMEPLATE_desc, dbKey, module, C.NAMEPLATE, check, 0.3, module:GetMenuIcon("NAMEPLATE"))
+	end
+
+	-- Flash & Pulse
+	if bit.band(dbv, C.FLASH) == C.FLASH and hasOptionFlag(dbKey, module, "FLASH") then
+		advOpts[#advOpts+1] = getSlaveToggle(L.FLASH, L.FLASH_desc, dbKey, module, C.FLASH, check, 0.3, module:GetMenuIcon("FLASH"))
+		advOpts[#advOpts+1] = getSlaveToggle(L.PULSE, L.PULSE_desc, dbKey, module, C.PULSE, check, 0.5, module:GetMenuIcon("PULSE"))
+	end
+	--
+
+	if dbKey ~= "altpower" and dbKey ~= "infobox" then
+		if API:HasVoicePack() then
+			advOpts[#advOpts+1] = getSlaveToggle(L.VOICE, L.VOICE_desc, dbKey, module, C.VOICE, check, 0.3, module:GetMenuIcon("VOICE"))
+		end
+	end
+
+	for i, key in next, BigWigs:GetOptions() do
+		local flag = C[key]
+		if bit.band(dbv, flag) == flag then
+			local name, desc = BigWigs:GetOptionDetails(key)
+			-- All on by default, check if we should add a GUI widget
+			if key == "ICON" or key == "SAY" or key == "SAY_COUNTDOWN" or key == "PROXIMITY" or key == "ALTPOWER" or key == "INFOBOX" then
+				if hasOptionFlag(dbKey, module, key) then
+					advOpts[#advOpts+1] = getSlaveToggle(name, desc, dbKey, module, flag, check, 0.3, module:GetMenuIcon(key))
+				end
+			elseif key ~= "MESSAGE" and key ~= "BAR" and key ~= "FLASH" and key ~= "VOICE" then
+				advOpts[#advOpts+1] = getSlaveToggle(name, desc, dbKey, module, flag, check, 0.3)
+			end
+		end
+	end
+
+	return unpack(advOpts)
+end
+
+do
+	local lastAdvancedOptionsTab = nil
+
+	local function setRenameValue(widget, _, value)
+		local module = widget:GetUserData("module")
+		local key = widget:GetUserData("key")
+		local position = widget:GetUserData("position")
+		module.db.profile.renames[key][position] = value
+
+		-- refresh
+		local master = widget:GetUserData("master")
+		local dropdown = master:GetUserData("dropdown")
+		local scrollFrame = master:GetUserData("scrollFrame")
+		local bossOption = master:GetUserData("option")
+		visibleSpellDescriptionWidgets = {}
+		visibleCreatureNameWidgets = {}
+		lastAdvancedOptionsTab = "renames"
+		scrollFrame:ReleaseChildren()
+		scrollFrame:AddChildren(getAdvancedToggleOption(scrollFrame, dropdown, module, bossOption))
+		scrollFrame:PerformLayout()
+	end
+
+	local function resetRenameValue(widget)
+		local name = widget:GetUserData("default")
+		local editbox = widget:GetUserData("editbox")
+		editbox:Fire("OnEnterPressed", name)
+	end
+
+	local function getRenameOptions(widget) -- widget = TabGroup
+		local module = widget:GetUserData("module")
+		local optionKey = widget:GetUserData("key")
+
+		local widgets = {}
+
+		local header = AceGUI:Create("Label")
+		header:SetText(L.renameHeader)
+		header:SetFullWidth(true)
+		widgets[#widgets + 1] = header
+
+		for position = 1, module:GetRenameCount(optionKey) do
+			local default = module:GetRenameDefault(optionKey, position)
+			local name = module:GetRename(optionKey, position)
+			local label = module:GetRenameNote(optionKey, position)
+			local original = module:GetRenameOriginal(optionKey, position)
+
+			local customName = AceGUI:Create("EditBox")
+			if label then
+				customName:SetLabel(label)
+			end
+			customName:SetText(name)
+			customName:SetUserData("module", module)
+			customName:SetUserData("key", optionKey)
+			customName:SetUserData("position", position)
+			customName:SetUserData("master", widget:GetUserData("master"))
+			customName:SetCallback("OnEnterPressed", setRenameValue)
+			customName:SetRelativeWidth(0.6)
+			widgets[#widgets + 1] = customName
+
+			local customReset = AceGUI:Create("Button")
+			customReset:SetText(L.reset)
+			customReset:SetDisabled(module:IsRenameDefault(optionKey, position))
+			customReset:SetUserData("default", default)
+			customReset:SetUserData("editbox", customName)
+			customReset:SetCallback("OnClick", resetRenameValue)
+			customReset:SetRelativeWidth(original and 0.2 or 0.4)
+			widgets[#widgets + 1] = customReset
+
+			if original then
+				local customOriginal = AceGUI:Create("Button")
+				customOriginal:SetText(L.spellName)
+				customOriginal:SetDisabled(module:IsRenameOriginal(optionKey, position))
+				customOriginal:SetUserData("default", original)
+				customOriginal:SetUserData("editbox", customName)
+				customOriginal:SetCallback("OnClick", resetRenameValue)
+				customOriginal:SetUserData("desc", L.spellNameResetDesc)
+				customOriginal:SetCallback("OnEnter", slaveOptionMouseOver)
+				customOriginal:SetCallback("OnLeave", optionsTooltip_Hide)
+				customOriginal:SetRelativeWidth(0.2)
+				widgets[#widgets + 1] = customOriginal
+			end
+		end
+
+		return unpack(widgets)
+	end
+
+	local function advancedTabSelect(widget, callback, tab)
+		lastAdvancedOptionsTab = nil
+		if widget:GetUserData("tab") == tab then return end
+		widget:SetUserData("tab", tab)
+		visibleSpellDescriptionWidgets = {}
+		visibleCreatureNameWidgets = {}
+		widget:PauseLayout()
+		widget:ReleaseChildren()
+		local module = widget:GetUserData("module")
+		local key = widget:GetUserData("key")
+		local master = widget:GetUserData("master")
+
+		if tab == "options" then
+			widget:AddChildren(advancedToggles(key, module, master))
+		elseif tab == "sounds" then
+			local group = AceGUI:Create("SimpleGroup")
+			group:SetFullWidth(true)
+			widget:AddChild(group)
+			soundModule:SetSoundOptions(module.name, key, module.db.profile.toggles[key])
+			acd:Open("BigWigs: Sounds Override", group)
+		elseif tab == "colors" then
+			local group = AceGUI:Create("SimpleGroup")
+			group:SetFullWidth(true)
+			widget:AddChild(group)
+			colorModule:SetColorOptions(module.name, key, module.toggleDefaults[key])
+			acd:Open("BigWigs: Colors Override", group)
+		elseif tab == "renames" then
+			if not module:HasRenames() then
+				local label = AceGUI:Create("Label")
+				label:SetText(L.notYetImplemented)
+				label:SetFontObject(GameFontHighlight)
+				label:SetFullWidth(true)
+				widget:AddChild(label)
+			else
+				widget:AddChildren(getRenameOptions(widget))
+			end
+		end
+		widget:ResumeLayout()
+		widget:GetUserData("scrollFrame"):PerformLayout()
+		widget:PerformLayout()
+	end
+
+	function getAdvancedToggleOption(scrollFrame, dropdown, module, bossOption)
+		local dbKey, name, desc, icon, note = BigWigs:GetBossOptionDetails(module, bossOption)
+		local widgets = {}
+
+		local back = AceGUI:Create("Button")
+		back:SetText(L.back)
+		back:SetFullWidth(true)
+		back:SetCallback("OnClick", function()
+			showToggleOptions(dropdown, nil, dropdown:GetUserData("bossIndex"), true)
+		end)
+		widgets[#widgets + 1] = back
+
+		-- Add a small text label to the top right displaying the spell ID or key
+		local idLabel = AceGUI:Create("Label")
+		if type(dbKey) == "number" then
+			idLabel.label:SetFormattedText(L.optionsKey, dbKey)
+		else
+			idLabel.label:SetFormattedText(L.optionsKey, "\""..dbKey.."\"")
+		end
+		idLabel:SetColor(0.65, 0.65, 0.65)
+		idLabel:SetFullWidth(true)
+		idLabel.label:SetJustifyH("RIGHT")
+		widgets[#widgets + 1] = idLabel
+
+		local abilityLabel = name
+		if module:IsRenameAvailable(dbKey) then
+			local rename = module:GetRename(dbKey)
+			if rename ~= name then
+				abilityLabel = L.renameLabel:format(abilityLabel, rename)
+			end
+		end
+		if note then
+			abilityLabel = L.noteLabel:format(abilityLabel, note)
+		end
+
+		local check = AceGUI:Create("CheckBox")
+		check:SetLabel(abilityLabel)
+		check:SetTriState(true)
+		check:SetFullWidth(true)
+		check:SetDescription(desc)
+		check:SetUserData("key", dbKey)
+		check:SetUserData("scrollFrame", scrollFrame)
+		check:SetUserData("dropdown", dropdown)
+		check:SetUserData("module", module)
+		check:SetUserData("option", bossOption)
+		check:SetCallback("OnValueChanged", masterOptionToggled)
+		check:SetValue(getMasterOption(check))
+		check.text:SetTextColor(1, 0.82, 0) -- After :SetValue so it's not overwritten
+		if icon then
+			check:SetImage(icon, 0.07, 0.93, 0.07, 0.93)
+		end
+		widgets[#widgets + 1] = check
+
+		-- Create role-specific secondary checkbox
+		for i, key in next, BigWigs:GetRoleOptions() do
+			local flag = C[key]
+			local dbv = module.toggleDisabled and module.toggleDisabled[dbKey] or module.toggleDefaults[dbKey]
+			if bit.band(dbv, flag) == flag then
+				local roleName, roleDesc = BigWigs:GetOptionDetails(key)
+				local roleRestrictionCheckbox
+				if key == "TANK" or key == "HEALER" or key == "DISPEL" then
+					roleRestrictionCheckbox = getSlaveToggle(roleName, roleDesc, dbKey, module, flag, check, 0.3, module:GetMenuIcon(key))
+				else
+					roleRestrictionCheckbox = getSlaveToggle(roleName, roleDesc, dbKey, module, flag, check, 0.3) -- No icon
+				end
+				roleRestrictionCheckbox:SetDescription(roleDesc)
+				roleRestrictionCheckbox:SetFullWidth(true)
+				roleRestrictionCheckbox:SetUserData("desc", nil) -- Remove tooltip set by getSlaveToggle() function
+				widgets[#widgets + 1] = roleRestrictionCheckbox
+			end
+		end
+
+		if hasOptionFlag(dbKey, module, "PRIVATE") then
+			local privateAuraText = AceGUI:Create("Label")
+			privateAuraText:SetText(L.PRIVATE_desc)
+			privateAuraText:SetColor(1, 0.75, 0.79)
+			privateAuraText:SetImage(module:GetMenuIcon("PRIVATE"))
+			privateAuraText:SetFullWidth(true)
+			privateAuraText:SetHeight(30)
+			widgets[#widgets + 1] = privateAuraText
+		end
+
+		local tabs = AceGUI:Create("TabGroup")
+		tabs:SetLayout("Flow")
+		tabs:SetTabs({
+			{
+				text = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Sliders:20|t ".. L.advanced_options,
+				value = "options",
+			},
+			{
+				text = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Colors:20|t ".. L.colors,
+				value = "colors",
+			},
+			{
+				text = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Sounds:20|t ".. L.sound,
+				value = "sounds",
+			},
+			{
+				text = L.renames,
+				value = "renames",
+				disabled = module:HasRenames() and not module:IsRenameAvailable(dbKey),
+			},
+		})
+		tabs:SetFullWidth(true)
+		tabs:SetCallback("OnGroupSelected", advancedTabSelect)
+		tabs:SetUserData("tab", "")
+		tabs:SetUserData("key", dbKey)
+		tabs:SetUserData("module", module)
+		tabs:SetUserData("master", check)
+		tabs:SetUserData("scrollFrame", scrollFrame)
+		tabs:SelectTab(lastAdvancedOptionsTab or "options")
+		widgets[#widgets + 1] = tabs
+
+		return unpack(widgets)
+	end
+end
+
+local function buttonClicked(widget)
+	visibleSpellDescriptionWidgets = {}
+	visibleCreatureNameWidgets = {}
+	-- save scroll bar position
+	toggleOptionsStatusTable.restore_scrollvalue = toggleOptionsStatusTable.scrollvalue
+	toggleOptionsStatusTable.restore_offset = toggleOptionsStatusTable.offset
+
+	local scrollFrame = widget:GetUserData("scrollFrame")
+	local dropdown = widget:GetUserData("dropdown")
+	local module = widget:GetUserData("module")
+	local bossOption = widget:GetUserData("bossOption")
+	scrollFrame:ReleaseChildren()
+	scrollFrame:SetScroll(0)
+	scrollFrame:AddChildren(getAdvancedToggleOption(scrollFrame, dropdown, module, bossOption))
+	scrollFrame:PerformLayout()
+end
+
+local function flagOnEnter(widget)
+	optionsTooltip:SetOwner(widget.frame, "ANCHOR_TOPRIGHT")
+	optionsTooltip:AddLine(widget:GetUserData("tooltipText"), 1, 1, 1, true)
+	optionsTooltip:Show()
+end
+
+local function customDropdownValueChanged(widget, _, value)
+	local key = widget:GetUserData("key")
+	local module = widget:GetUserData("module")
+	module.db.profile.toggles[key] = value or 1
+end
+
+local function getDefaultToggleOption(scrollFrame, dropdown, module, bossOption)
+	local dbKey, name, desc, icon, note = BigWigs:GetBossOptionDetails(module, bossOption)
+
+	if type(dbKey) == "string" and dbKey:find("^custom_select_") then
+		local moduleLocale = module:GetLocale()
+		local values = {}
+		local i = 1
+		local value = moduleLocale[dbKey.."_value"..i]
+		repeat
+			values[i] = value
+			i = i + 1
+			value = moduleLocale[dbKey.."_value"..i]
+		until not value
+
+		local customDropdown = AceGUI:Create("Dropdown")
+		if desc then
+			-- The label will truncate at ~74 chars, be careful
+			customDropdown:SetLabel(("%s: |cffffffff%s|r"):format(name, desc))
+		else
+			customDropdown:SetLabel(name)
+		end
+		customDropdown:SetMultiselect(false)
+		customDropdown:SetList(values)
+		customDropdown:SetUserData("key", dbKey)
+		customDropdown:SetUserData("module", module)
+		customDropdown:SetCallback("OnValueChanged", customDropdownValueChanged)
+		customDropdown:SetValue(module.db.profile.toggles[dbKey] or 1)
+
+		if icon then
+			local iconWidget = AceGUI:Create("Icon")
+			iconWidget:SetImage(icon, 0.07, 0.93, 0.07, 0.93)
+			iconWidget:SetImageSize(20, 20)
+			iconWidget:SetRelativeWidth(0.05)
+			customDropdown:SetRelativeWidth(0.88)
+			return iconWidget, customDropdown
+		else
+			customDropdown:SetFullWidth(true)
+			return customDropdown
+		end
+	end
+
+	local abilityLabel = name
+	if module:IsRenameAvailable(dbKey) then
+		local rename = module:GetRename(dbKey)
+		if rename == name then rename = nil end
+		-- add counts for extra strings
+		local count = module:GetRenameCount(dbKey)
+		if module:GetRenameOriginal(dbKey) == false then
+			rename = ("+%d"):format(count)
+		elseif count > 1 then
+			if rename then
+				rename = ("%s, +%d"):format(rename, count - 1)
+			else
+				rename = ("+%d"):format(count)
+			end
+		end
+		if rename then
+			abilityLabel = L.renameLabel:format(abilityLabel, rename)
+		end
+	end
+	if note then
+		abilityLabel = L.noteLabel:format(abilityLabel, note)
+	end
+
+	local check = AceGUI:Create("CheckBox")
+	check:SetLabel(abilityLabel)
+	check:SetTriState(true)
+	check:SetRelativeWidth(0.85)
+	check:SetUserData("key", dbKey)
+	check:SetUserData("module", module)
+	check:SetUserData("option", bossOption)
+	check:SetUserData("scrollFrame", scrollFrame)
+	check:SetDescription(desc)
+	check:SetCallback("OnValueChanged", masterOptionToggled)
+	check.frame:SetHitRectInsets(0, 250, 0, 0) -- Reduce checkbox "hit" area
+	check:SetCallback("OnRelease", function(widget) widget.frame:SetHitRectInsets(0, 0, 0, 0) end) -- Reset hit area to default
+	check:SetValue(getMasterOption(check))
+	check.text:SetTextColor(1, 0.82, 0) -- After :SetValue so it's not overwritten
+	if icon then check:SetImage(icon, 0.07, 0.93, 0.07, 0.93) end
+
+	visibleSpellDescriptionWidgets[check] = desc
+
+	if type(dbKey) == "string" and dbKey:find("^custom_") then
+		return check
+	end
+
+	local flagIcons = {}
+	local showFlags = {
+		"TANK_HEALER", "TANK", "HEALER", "DISPEL",
+		"EMPHASIZE", "ME_ONLY", "ME_ONLY_EMPHASIZE", "COUNTDOWN", "CASTBAR_COUNTDOWN", "FLASH", "ICON", "SAY", "SAY_COUNTDOWN",
+		"PROXIMITY", "INFOBOX", "ALTPOWER", "NAMEPLATE", "PRIVATE",
+	}
+	for i = 1, #showFlags do
+		local key = showFlags[i]
+		if hasOptionFlag(dbKey, module, key) then
+			local iconWidget = AceGUI:Create("Icon")
+			iconWidget:SetWidth(16)
+			iconWidget:SetImageSize(16, 16)
+			iconWidget:SetUserData("tooltipText", L[key])
+			iconWidget:SetCallback("OnEnter", flagOnEnter)
+			iconWidget:SetCallback("OnLeave", optionsTooltip_Hide)
+
+			if key == "TANK_HEALER" then
+				-- add both "TANK" and "HEALER" icons
+				local icon1 = AceGUI:Create("Icon")
+				icon1:SetWidth(16)
+				icon1:SetImage(module:GetMenuIcon("TANK"))
+				icon1:SetImageSize(16, 16)
+				icon1:SetUserData("tooltipText", L[key])
+				icon1:SetCallback("OnEnter", flagOnEnter)
+				icon1:SetCallback("OnLeave", optionsTooltip_Hide)
+				icon1.frame:SetParent(check.frame)
+				icon1.frame:Show()
+				flagIcons[#flagIcons+1] = icon1
+				-- first icon, don't bother with SetPoint
+
+				iconWidget:SetImage(module:GetMenuIcon("HEALER"))
+			else
+				iconWidget:SetImage(module:GetMenuIcon(key))
+			end
+
+			iconWidget.frame:SetParent(check.frame)
+			iconWidget.frame:Show()
+
+			flagIcons[#flagIcons+1] = iconWidget
+			if #flagIcons > 1 then
+				iconWidget:SetPoint("LEFT", flagIcons[#flagIcons-1].frame, "RIGHT", 1, 0)
+			end
+		end
+	end
+
+	if #flagIcons > 0 then
+		-- flagIcons[1]:SetPoint("LEFT", check.text, "RIGHT", -(#flagIcons * (16+1)) - 30, 0)
+		flagIcons[1]:SetPoint("LEFT", check.text, "LEFT", check.text:GetStringWidth() + 5, 0)
+
+		-- need to clean these up since they are not added to a container
+		check:SetUserData("icons", flagIcons)
+		check:SetCallback("OnRelease", function(widget)
+			for _, iconWidget in next, widget:GetUserData("icons") do
+				iconWidget:Release()
+			end
+			widget.frame:SetHitRectInsets(0, 0, 0, 0) -- Reset hit area to default, set this again as it will overwrite the OnRelease above
+		end)
+	end
+
+	local button = AceGUI:Create("Button")
+	button:SetText(">>")
+	button:SetRelativeWidth(0.15)
+	button:SetUserData("scrollFrame", scrollFrame)
+	button:SetUserData("dropdown", dropdown)
+	button:SetUserData("module", module)
+	button:SetUserData("bossOption", bossOption)
+	button:SetCallback("OnClick", buttonClicked)
+
+	return check, button
+end
+
+local listAbilitiesInChat
+do
+	local SendChatMessage = loader.SendChatMessage
+	local function output(channel, ...)
+		if channel then
+			SendChatMessage(strjoin(" ", ...), channel)
+		else
+			print(...)
+		end
+	end
+
+	local function printList(channel, header, list)
+		if #list == 0 then return end
+		if header then
+			output(channel, header, unpack(list))
+		else
+			output(channel, unpack(list))
+		end
+	end
+
+	function listAbilitiesInChat(widget)
+		local module = widget:GetUserData("module")
+		local channel = IsInGroup(2) and "INSTANCE_CHAT" or IsInRaid() and "RAID" or IsInGroup() and "PARTY"
+		local abilities = {}
+		local header = nil
+		output(channel, "BigWigs: ", module.displayName or module.moduleName or module.name)
+		local currentSize = 0
+		for i, option in next, module.toggleOptions do
+			local o = type(option) == "table" and option[1] or option
+
+			if module.optionHeaders and module.optionHeaders[o] then
+				-- print what we have so far
+				printList(channel, header, abilities)
+				abilities = {}
+				header = module.optionHeaders[o]
+				currentSize = #header
+			end
+
+			local link
+			if type(o) == "number" then
+				if o > 0 then
+					local spellLink = loader.GetSpellLink(o)
+					if type(spellLink) == "string" and spellLink:find("Hspell", nil, true) then
+						link = spellLink -- Use Blizz link if valid...
+					else -- ...or make our own
+						local spellName = loader.GetSpellName(o)
+						link = ("\124cff71d5ff\124Hspell:%d:0\124h[%s]\124h\124r"):format(o, spellName)
+						--BigWigs:Error(("Failed to fetch the link for spell id %d, tell the authors."):format(o))
+					end
+				else
+					local tbl = C_EncounterJournal_GetSectionInfo(-o)
+					if not tbl or not tbl.link then
+						BigWigs:Error(("Failed to fetch the link for journal id (-)%d, tell the authors."):format(-o))
+					else
+						link = tbl.link
+					end
+				end
+			elseif type(o) == "string" then -- Attempt to build links for strings that are just basic spell renaming
+				local moduleLocale = module:GetLocale()
+				if moduleLocale then
+					local name, desc, icon = moduleLocale[o], moduleLocale[o.."_desc"], moduleLocale[o.."_icon"]
+					if name and type(desc) == "number" and desc == icon then
+						if desc > 0 then
+							local spellName = loader.GetSpellName(desc)
+							link = ("\124cff71d5ff\124Hspell:%d:0\124h[%s]\124h\124r"):format(desc, spellName)
+						end
+					end
+				end
+			end
+
+			if link then
+				if currentSize + #link + 1 > 255 then
+					printList(channel, header, abilities)
+					abilities = {}
+					currentSize = 0
+				end
+				abilities[#abilities + 1] = link
+				currentSize = currentSize + #link + 1
+			end
+		end
+		printList(channel, header, abilities)
+	end
+end
+
+local function SecondsToTime(time)
+	local m = math.floor(time/60)
+	local s = time % 60
+	return ("%d:%02d"):format(m, s)
+end
+
+local function auraOnEnter(widget)
+	local spellId = widget:GetUserData("spellId")
+	local secondarySpellIds = widget:GetUserData("secondarySpellIds")
+	local dispel = widget:GetUserData("dispel")
+	local mechanic = widget:GetUserData("mechanic")
+	optionsTooltip:SetOwner(widget.frame, "ANCHOR_RIGHT")
+	optionsTooltip:SetSpellByID(spellId)
+	optionsTooltip:AddLine(" ")
+	optionsTooltip:AddLine(L.primary_aura_spellId:format(spellId), 1, 1, 0.6, true)
+	if secondarySpellIds then
+		optionsTooltip:AddLine(L.secondary_aura_spellIds:format(table.concat(secondarySpellIds, L.comma)), 1, 1, 0.6, true)
+	end
+	if dispel then
+		optionsTooltip:AddLine(L.auraDispelType:format(L["auraDispel_"..dispel]), 1, 1, 0.6, true)
+	end
+	if mechanic then
+		optionsTooltip:AddLine(L.auraMechanic:format(L["auraMechanic_"..mechanic]), 1, 1, 0.6, true)
+	end
+	optionsTooltip:Show()
+end
+
+local function AuraSoundDropdownValueChanged(widget, _, value)
+	local key = widget:GetUserData("key")
+	local triggerType = widget:GetUserData("triggerType")
+	local module = widget:GetUserData("module")
+	local soundList = LibSharedMedia:List("sound")
+	if triggerType ~= "countdown" then
+		value = soundList[value]
+	else
+		if value then value = "Amy" else value = nil end
+	end
+
+	local auraDB = module.db.profile.auras
+	auraDB[key] = auraDB[key] or {}
+	auraDB[key][triggerType] = value
+	options:SendMessage("BigWigs_RefreshAuraSounds", module)
+end
+
+local function dispelIconOnEnter(widget)
+	optionsTooltip:SetOwner(widget.frame, "ANCHOR_RIGHT")
+	optionsTooltip:AddLine(L.auraDispelType:format(L["auraDispel_"..widget:GetUserData("dispel")]), 1, 1, 0.6, true)
+	optionsTooltip:Show()
+end
+
+local function difficultyIconOnEnter(widget)
+	optionsTooltip:SetOwner(widget.frame, "ANCHOR_RIGHT")
+	optionsTooltip:AddLine(L[widget:GetUserData("difficulty")], 1, 1, 0.6, true)
+	optionsTooltip:Show()
+end
+
+local function headerIconOnRelease(widget) -- restore default positioning
+	widget.image:ClearAllPoints()
+	widget.image:SetPoint("TOP", 0, -5)
+end
+
+local dispelIcons = {
+	magic = "RaidFrame-Icon-DebuffMagic",
+	curse = "RaidFrame-Icon-DebuffCurse",
+	disease = "RaidFrame-Icon-DebuffDisease",
+	poison = "RaidFrame-Icon-DebuffPoison",
+	bleed = "RaidFrame-Icon-DebuffBleed",
+}
+local difficultyIcons = {
+	heroic = "Interface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Heroic",
+	mythic = "Interface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Mythic",
+}
+
+local function getAuraOptions(module, spellID)
+	local key = spellID
+	local soundList = LibSharedMedia:List("sound")
+
+	local dispel = module:GetAuraDispelType(spellID)
+	local difficulty = module:GetAuraDifficulty(spellID)
+	local name = module:SpellName(spellID)
+	local note = module:GetAuraNote(spellID)
+	local mechanic = module:GetAuraMechanic(spellID)
+	local tip = module:GetAuraTip(spellID)
+	local texture = module:SpellTexture(spellID)
+	local defaultDoseSound = module:GetAuraAppliedDoseSoundDefault(spellID)
+	local hasDuration = module:GetAuraDuration(spellID)
+
+	local nameText = name
+	if note then
+		nameText = L.noteLabel:format(nameText, note)
+	end
+	if mechanic then
+		nameText = nameText.." |cff999999["..L["auraMechanic_"..mechanic].."]|r"
+	end
+
+	local auraWidgets = {}
+	local dispelAtlas = dispel and dispelIcons[dispel]
+	if dispelAtlas then
+		local dispelIcon = AceGUI:Create("Icon")
+		dispelIcon:SetImageByAtlas(dispelAtlas)
+		dispelIcon:SetImageSize(16, 16)
+		dispelIcon:SetWidth(18)
+		dispelIcon:SetHeight(16)
+		dispelIcon.image:ClearAllPoints()
+		dispelIcon.image:SetPoint("LEFT", 0, 0)
+		dispelIcon:SetCallback("OnRelease", headerIconOnRelease)
+		dispelIcon:SetUserData("dispel", dispel)
+		dispelIcon:SetCallback("OnEnter", dispelIconOnEnter)
+		dispelIcon:SetCallback("OnLeave", optionsTooltip_Hide)
+		auraWidgets[#auraWidgets+1] = dispelIcon
+	elseif dispel then -- fallback in case there is no icon for this dispel type
+		nameText = "|cff999999["..L["auraDispel_"..dispel].."]|r "..nameText
+	end
+	local difficultyTexture = difficulty and difficultyIcons[difficulty]
+	if difficultyTexture then
+		local difficultyIcon = AceGUI:Create("Icon")
+		difficultyIcon:SetImage(difficultyTexture)
+		difficultyIcon:SetImageSize(16, 16)
+		difficultyIcon:SetWidth(18)
+		difficultyIcon:SetHeight(16)
+		difficultyIcon.image:ClearAllPoints()
+		difficultyIcon.image:SetPoint("LEFT", 0, 0)
+		difficultyIcon:SetCallback("OnRelease", headerIconOnRelease)
+		difficultyIcon:SetUserData("difficulty", difficulty)
+		difficultyIcon:SetCallback("OnEnter", difficultyIconOnEnter)
+		difficultyIcon:SetCallback("OnLeave", optionsTooltip_Hide)
+		auraWidgets[#auraWidgets+1] = difficultyIcon
+	end
+	local auraLabel = AceGUI:Create("Label")
+	auraLabel:SetText(nameText)
+	auraLabel:SetColor(1, 0.82, 0)
+	auraLabel:SetFontObject(GameFontNormal)
+	if dispelAtlas and difficultyTexture then
+		auraLabel:SetRelativeWidth(0.93)
+	elseif dispelAtlas or difficultyTexture then
+		auraLabel:SetRelativeWidth(0.96)
+	else
+		auraLabel:SetFullWidth(true)
+	end
+	auraWidgets[#auraWidgets+1] = auraLabel
+
+	if tip then
+		local tipLabel = AceGUI:Create("Label")
+		tipLabel:SetText(tip)
+		tipLabel:SetColor(1, 1, 1)
+		tipLabel:SetFontObject(GameFontHighlightSmall)
+		tipLabel:SetFullWidth(true)
+		auraWidgets[#auraWidgets+1] = tipLabel
+	end
+
+	local icon = AceGUI:Create("Icon")
+	icon:SetImage(texture, 0.07, 0.93, 0.07, 0.93)
+	icon:SetImageSize(40, 40)
+	icon:SetRelativeWidth(0.1)
+	icon:SetUserData("spellId", spellID)
+	icon:SetUserData("secondarySpellIds", module:GetAuraSecondarySpellIDBySpellID(spellID))
+	icon:SetUserData("dispel", dispel)
+	icon:SetUserData("mechanic", mechanic)
+	icon:SetUserData("updateTooltip", true)
+	icon:SetCallback("OnEnter", auraOnEnter)
+	icon:SetCallback("OnLeave", optionsTooltip_Hide)
+	auraWidgets[#auraWidgets+1] = icon
+
+	local appliedDropdown = AceGUI:Create("BigWigsSharedDropdown")
+	appliedDropdown:SetLabel(L.onApplied)
+	appliedDropdown:SetList(soundList, nil, "DDI-Sound")
+	appliedDropdown:SetRelativeWidth(defaultDoseSound and 0.29 or hasDuration and 0.42 or 0.44)
+	appliedDropdown:SetUserData("key", key)
+	appliedDropdown:SetUserData("module", module)
+	appliedDropdown:SetUserData("triggerType", "soundOnApplied")
+	appliedDropdown:SetCallback("OnValueChanged", AuraSoundDropdownValueChanged)
+
+	local appliedValue = module:GetAuraAppliedSound(spellID)
+	if not appliedValue then
+		appliedValue = module:GetAuraAppliedSoundDefault(spellID)
+	end
+	for i, v in next, soundList do
+		if v == appliedValue then
+			appliedDropdown:SetValue(i)
+			break
+		end
+	end
+	auraWidgets[#auraWidgets+1] = appliedDropdown
+
+	if defaultDoseSound then
+		local doseDropdown = AceGUI:Create("BigWigsSharedDropdown")
+		doseDropdown:SetLabel(L.onDose)
+		doseDropdown:SetList(soundList, nil, "DDI-Sound")
+		doseDropdown:SetRelativeWidth(0.3)
+		doseDropdown:SetUserData("key", key)
+		doseDropdown:SetUserData("module", module)
+		doseDropdown:SetUserData("triggerType", "soundOnAppliedDose")
+		doseDropdown:SetCallback("OnValueChanged", AuraSoundDropdownValueChanged)
+
+		local doseValue = module:GetAuraAppliedDoseSound(spellID) or defaultDoseSound
+		for i, v in next, soundList do
+			if v == doseValue then
+				doseDropdown:SetValue(i)
+				break
+			end
+		end
+		auraWidgets[#auraWidgets+1] = doseDropdown
+	end
+
+	local removedDropdown = AceGUI:Create("BigWigsSharedDropdown")
+	removedDropdown:SetLabel(L.onRemoved)
+	removedDropdown:SetList(soundList, nil, "DDI-Sound")
+	removedDropdown:SetRelativeWidth(defaultDoseSound and 0.29 or hasDuration and 0.42 or 0.44)
+	removedDropdown:SetUserData("key", key)
+	removedDropdown:SetUserData("module", module)
+	removedDropdown:SetUserData("triggerType", "soundOnRemoved")
+	removedDropdown:SetCallback("OnValueChanged", AuraSoundDropdownValueChanged)
+
+	local removedValue = module:GetAuraRemovedSound(spellID)
+	if not removedValue then
+		removedValue = module:GetAuraRemovedSoundDefault(spellID)
+	end
+	for i, v in next, soundList do
+		if v == removedValue then
+			removedDropdown:SetValue(i)
+			break
+		end
+	end
+	auraWidgets[#auraWidgets+1] = removedDropdown
+
+	if hasDuration and not defaultDoseSound then -- hide duration option for auras that stack
+		local durationCheck = AceGUI:Create("CheckBox")
+		durationCheck:SetLabel("")
+		durationCheck:SetWidth(24)
+		durationCheck:SetUserData("key", key)
+		durationCheck:SetUserData("module", module)
+		durationCheck:SetUserData("triggerType", "countdown")
+		durationCheck:SetCallback("OnValueChanged", AuraSoundDropdownValueChanged)
+		durationCheck:SetUserData("label", L.countdown)
+		durationCheck:SetUserData("desc", L.auraCountdownDesc)
+		durationCheck:SetCallback("OnEnter", slaveOptionMouseOver)
+		durationCheck:SetCallback("OnLeave", optionsTooltip_Hide)
+
+		durationCheck:SetValue(module.db.profile.auras[key] and module.db.profile.auras[key].countdown and true)
+		auraWidgets[#auraWidgets+1] = durationCheck
+	end
+
+	return unpack(auraWidgets)
+end
+
+do
+	local populateToggleOptions
+	do
+		local bwTooltip = API.GetTooltip()
+		local function HideTooltip()
+			bwTooltip:Hide()
+		end
+
+		local function statsDefeatLabelOnEnter(self)
+			bwTooltip:SetOwner(self.frame, "ANCHOR_TOP")
+			bwTooltip:AddLine(L.defeat_desc, 1, 1, 1)
+			bwTooltip:Show()
+		end
+
+		local function statsVictoryLabelOnEnter(self)
+			bwTooltip:SetOwner(self.frame, "ANCHOR_TOP")
+			bwTooltip:AddLine(L.victory_desc, 1, 1, 1)
+			bwTooltip:Show()
+		end
+
+		local function statsFastestLabelOnEnter(self)
+			bwTooltip:SetOwner(self.frame, "ANCHOR_TOP")
+			bwTooltip:AddLine(L.fastest_desc, 1, 1, 1)
+			bwTooltip:Show()
+		end
+
+		local function statsFirstLabelOnEnter(self)
+			bwTooltip:SetOwner(self.frame, "ANCHOR_TOP")
+			bwTooltip:AddLine(L.first_desc, 1, 1, 1)
+			bwTooltip:Show()
+		end
+
+		local function toggleOptionsTabSelected(widget, callback, tab)
+			visibleSpellDescriptionWidgets = {}
+			visibleCreatureNameWidgets = {}
+			widget:PauseLayout()
+			widget:ReleaseChildren()
+
+			local module = widget:GetUserData("module")
+			local scrollFrame = widget:GetUserData("scrollFrame")
+			local dropdown = widget:GetUserData("dropdown")
+			local tabOptions = widget:GetUserData("tabOptions")
+
+			if tab == "auras" then
+				local hasAuraData = module:HasAuraData()
+				if hasAuraData then
+					for i = 1, module:GetAuraCount() do
+						local spellID = module:GetAuraPrimarySpellIDByIndex(i)
+						local header = module:GetAuraHeader(spellID)
+						if header then
+							local headerWidget = AceGUI:Create("Heading")
+							if type(header) == "number" then
+								local data = GetTooltipHyperlink("unit:Creature-0-0-0-0-" .. header)
+								if data and data.lines and data.lines[1] then
+									headerWidget:SetText(L.parenthesesID:format(data.lines[1].leftText, header))
+								else
+									visibleCreatureNameWidgets[headerWidget] = header
+								end
+							else
+								headerWidget:SetText(header)
+							end
+							headerWidget:SetFullWidth(true)
+							widget:AddChild(headerWidget)
+						end
+						widget:AddChildren(getAuraOptions(module, spellID))
+					end
+				end
+
+				local reset = AceGUI:Create("Button")
+				reset:SetFullWidth(true)
+				reset:SetText(L.reset)
+				reset:SetUserData("label", L.reset)
+				reset:SetUserData("desc", L.resetSoundDesc)
+				reset:SetCallback("OnEnter", slaveOptionMouseOver)
+				reset:SetCallback("OnLeave", optionsTooltip_Hide)
+				reset:SetCallback("OnClick", function()
+					if hasAuraData then
+						for i = 1, module:GetAuraCount() do
+							local spellID = module:GetAuraPrimarySpellIDByIndex(i)
+							module.db.profile.auras[spellID] = {}
+						end
+						options:SendMessage("BigWigs_RefreshAuraSounds", module)
+					end
+					toggleOptionsTabSelected(widget, nil, "auras")
+				end)
+				widget:AddChild(reset)
+			else
+				for i, option in next, tabOptions[tab] do
+					local o = option
+					if type(o) == "table" then o = option[1] end
+					if module.optionHeaders and module.optionHeaders[o] then
+						local header = AceGUI:Create("Heading")
+						header:SetText(module.optionHeaders[o])
+						header:SetFullWidth(true)
+						widget:AddChild(header)
+					end
+					widget:AddChildren(getDefaultToggleOption(scrollFrame, dropdown, module, option))
+				end
+			end
+
+			widget:ResumeLayout()
+			if lastOptionsTab ~= tab then
+				-- scrollFrame gets squished if layouted after the tab group is calculated?
+				scrollFrame:PerformLayout()
+			end
+			widget:PerformLayout()
+
+			-- Store last active tab
+			lastOptionsTab = tab
+		end
+
+		function populateToggleOptions(widget, module)
+			visibleSpellDescriptionWidgets = {}
+			visibleCreatureNameWidgets = {}
+			local scrollFrame = widget:GetUserData("parent")
+			scrollFrame:ReleaseChildren()
+			scrollFrame:PauseLayout()
+
+			-- Add a small text label to the top right displaying the boss encounter ID
+			local encounterID, multiple = module:GetEncounterID()
+			if encounterID then
+				local idLabel = AceGUI:Create("Label")
+				idLabel:SetText(format(L.optionsKey, multiple and module:TableToString({module:GetEncounterID()}) or encounterID))
+				idLabel:SetColor(0.65, 0.65, 0.65)
+				idLabel:SetFullWidth(true)
+				idLabel:SetJustifyH("RIGHT")
+				scrollFrame:AddChild(idLabel)
+			end
+
+			local sDB = BigWigsStatsDB
+			local journalID = module:GetJournalID()
+			if not journalID and module:GetAllowWin() and encounterID then
+				journalID = -(encounterID) -- Fallback to show stats for modules with no journal ID, but set to allow win
+			end
+			local instanceID = module:GetZoneID()
+			if journalID and instanceID and instanceID > 0 and sDB and sDB[instanceID] and sDB[instanceID][journalID] then
+				sDB = sDB[instanceID][journalID]
+
+				if next(sDB) then -- Create statistics table
+					local statGroup = AceGUI:Create("InlineGroup")
+					statGroup:SetTitle(L.statistics)
+					statGroup:SetLayout("Flow")
+					statGroup:SetFullWidth(true)
+					scrollFrame:AddChild(statGroup)
+
+					local emptyFirstColumnLabel = AceGUI:Create("Label")
+					emptyFirstColumnLabel:SetWidth(110)
+					emptyFirstColumnLabel:SetText("")
+					statGroup:AddChild(emptyFirstColumnLabel)
+
+					local defeatColumnLabel = AceGUI:Create("InteractiveLabel")
+					defeatColumnLabel:SetWidth(83)
+					defeatColumnLabel:SetText(L.defeat)
+					defeatColumnLabel:SetCallback("OnEnter", statsDefeatLabelOnEnter)
+					defeatColumnLabel:SetCallback("OnLeave", HideTooltip)
+					statGroup:AddChild(defeatColumnLabel)
+
+					local victoryColumnLabel = AceGUI:Create("InteractiveLabel")
+					victoryColumnLabel:SetWidth(83)
+					victoryColumnLabel:SetText(L.victory)
+					victoryColumnLabel:SetCallback("OnEnter", statsVictoryLabelOnEnter)
+					victoryColumnLabel:SetCallback("OnLeave", HideTooltip)
+					statGroup:AddChild(victoryColumnLabel)
+
+					local fastestColumnLabel = AceGUI:Create("InteractiveLabel")
+					fastestColumnLabel:SetWidth(130)
+					fastestColumnLabel:SetText(L.fastest)
+					fastestColumnLabel:SetCallback("OnEnter", statsFastestLabelOnEnter)
+					fastestColumnLabel:SetCallback("OnLeave", HideTooltip)
+					statGroup:AddChild(fastestColumnLabel)
+
+					local firstColumnLabel = AceGUI:Create("InteractiveLabel")
+					firstColumnLabel:SetWidth(140)
+					firstColumnLabel:SetText(L.first)
+					firstColumnLabel:SetCallback("OnEnter", statsFirstLabelOnEnter)
+					firstColumnLabel:SetCallback("OnLeave", HideTooltip)
+					statGroup:AddChild(firstColumnLabel)
+
+					-- Headers
+					local displayOrder = {
+						"story", "timewalk", "LFR", "LFR_timerun", "world", "normal", "normal_timerun", "heroic", "heroic_timerun", "mythic", "mythic_timerun", "mythic_flex",
+						"N10", "N25", "H10", "H25",
+						"SOD", "level1", "level2", "level3", "hardcore",
+						"solotier8", "solotier11",
+					}
+					for diff, tbl in next, sDB do -- Unknown Stats
+						local found = false
+						for i = 1, #displayOrder do
+							if displayOrder[i] == diff then
+								found = true
+								break
+							end
+						end
+						if not found then
+							local difficultyText = AceGUI:Create("Label")
+							difficultyText:SetWidth(110)
+							difficultyText:SetText(L.unknown)
+							statGroup:AddChild(difficultyText)
+
+							local defeatsLabel = AceGUI:Create("InteractiveLabel")
+							defeatsLabel:SetWidth(83)
+							defeatsLabel:SetText(tbl.wipes or (not tbl.kills and "-" or "0"))
+							defeatsLabel:SetCallback("OnEnter", statsDefeatLabelOnEnter)
+							defeatsLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(defeatsLabel)
+
+							local victoriesLabel = AceGUI:Create("InteractiveLabel")
+							victoriesLabel:SetWidth(83)
+							victoriesLabel:SetText(tbl.kills or "-")
+							victoriesLabel:SetCallback("OnEnter", statsVictoryLabelOnEnter)
+							victoriesLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(victoriesLabel)
+
+							local fastestVictoryLabel = AceGUI:Create("InteractiveLabel")
+							fastestVictoryLabel:SetWidth(130)
+							local value = tbl.best and SecondsToTime(tbl.best)
+							local bestDate = tbl.bestDate
+							if not value then
+								fastestVictoryLabel:SetText("-")
+							elseif value and bestDate then
+								fastestVictoryLabel:SetText(("%s (%s)"):format(value, bestDate))
+							elseif value then
+								fastestVictoryLabel:SetText(value)
+							end
+							fastestVictoryLabel:SetCallback("OnEnter", statsFastestLabelOnEnter)
+							fastestVictoryLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(fastestVictoryLabel)
+
+							local firstKillDataLabel = AceGUI:Create("InteractiveLabel")
+							firstKillDataLabel:SetWidth(140)
+							if not tbl.fkDate then
+								firstKillDataLabel:SetText("-")
+							else
+								local text = table.concat({tbl.fkWipes or "0", SecondsToTime(tbl.fkDuration), tbl.fkDate}, " - ")
+								firstKillDataLabel:SetText(text)
+							end
+							firstKillDataLabel:SetCallback("OnEnter", statsFirstLabelOnEnter)
+							firstKillDataLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(firstKillDataLabel)
+						end
+					end
+
+					for i = 1, #displayOrder do -- Known Stats
+						local diff = displayOrder[i]
+						local tbl = sDB[diff]
+						if tbl then
+							local difficultyText = AceGUI:Create("Label")
+							difficultyText:SetWidth(110)
+							difficultyText:SetText(L[diff] or "?")
+							statGroup:AddChild(difficultyText)
+
+							local defeatsLabel = AceGUI:Create("InteractiveLabel")
+							defeatsLabel:SetWidth(83)
+							defeatsLabel:SetText(tbl.wipes or (not tbl.kills and "-" or "0"))
+							defeatsLabel:SetCallback("OnEnter", statsDefeatLabelOnEnter)
+							defeatsLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(defeatsLabel)
+
+							local victoriesLabel = AceGUI:Create("InteractiveLabel")
+							victoriesLabel:SetWidth(83)
+							victoriesLabel:SetText(tbl.kills or "-")
+							victoriesLabel:SetCallback("OnEnter", statsVictoryLabelOnEnter)
+							victoriesLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(victoriesLabel)
+
+							local fastestVictoryLabel = AceGUI:Create("InteractiveLabel")
+							fastestVictoryLabel:SetWidth(130)
+							local value = tbl.best and SecondsToTime(tbl.best)
+							local bestDate = tbl.bestDate
+							if not value then
+								fastestVictoryLabel:SetText("-")
+							elseif value and bestDate then
+								fastestVictoryLabel:SetText(("%s (%s)"):format(value, bestDate))
+							elseif value then
+								fastestVictoryLabel:SetText(value)
+							end
+							fastestVictoryLabel:SetCallback("OnEnter", statsFastestLabelOnEnter)
+							fastestVictoryLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(fastestVictoryLabel)
+
+							local firstKillDataLabel = AceGUI:Create("InteractiveLabel")
+							firstKillDataLabel:SetWidth(140)
+							if not tbl.fkDate then
+								firstKillDataLabel:SetText("-")
+							else
+								local text = table.concat({tbl.fkWipes or "0", SecondsToTime(tbl.fkDuration), tbl.fkDate}, " - ")
+								firstKillDataLabel:SetText(text)
+							end
+							firstKillDataLabel:SetCallback("OnEnter", statsFirstLabelOnEnter)
+							firstKillDataLabel:SetCallback("OnLeave", HideTooltip)
+							statGroup:AddChild(firstKillDataLabel)
+						end
+					end
+				end -- End statistics table
+			end
+
+			local tabs = {}
+			if module.optionHeaders then
+				for _, optionHeader in next, module.optionHeaders do
+					if type(optionHeader) == "table" and optionHeader.tabName then
+						table.insert(tabs, optionHeader)
+					end
+				end
+			end
+
+			local showAurasTab = module:HasAuraData()
+			local showTabs = showAurasTab or #tabs > 0
+
+			if showTabs then -- tabs!
+				local generalTabExists = nil
+				local tabbedOptions = {}
+				local tabInfo, tabOptions = {}, {}
+				for _, tab in next, tabs do
+					local text = tab.tabName
+					if text == "general" or text == CL.general then
+						generalTabExists = text
+					end
+					local tabData = tab[1]
+					table.insert(tabInfo, { text = text, value = text })
+					tabOptions[text] = tabData
+					for _, option in next, tabData do
+						tabbedOptions[option] = true
+					end
+				end
+
+				for _, option in next, module.toggleOptions do
+					local o = option
+					if type(o) == "table" then o = option[1] end
+					if not tabbedOptions[o] then -- Any options that are not assigned will go to the general tab
+						if not generalTabExists then
+							local value = "general"
+							table.insert(tabInfo, 1, { text = CL.general, value = value })
+							generalTabExists = value
+						end
+						tabOptions[generalTabExists] = tabOptions[generalTabExists] or {}
+						table.insert(tabOptions[generalTabExists], option)
+					end
+				end
+
+				if showAurasTab then
+					local iconText = "|TInterface\\AddOns\\BigWigs\\Media\\Icons\\Menus\\Flash:16:16:-2:-2|t"
+					table.insert(tabInfo, { text = iconText .. L.auras, value = "auras" })
+				end
+
+				local tabsWidget = AceGUI:Create("TabGroup")
+				tabsWidget:SetLayout("Flow")
+				tabsWidget:SetTabs(tabInfo)
+				tabsWidget:SetFullWidth(true)
+				tabsWidget:SetCallback("OnGroupSelected", toggleOptionsTabSelected)
+				tabsWidget:SetUserData("module", module)
+				tabsWidget:SetUserData("scrollFrame", scrollFrame)
+				tabsWidget:SetUserData("dropdown", widget)
+				tabsWidget:SetUserData("tabOptions", tabOptions)
+				tabsWidget:SelectTab(lastOptionsTab and lastOptionsTab or tabInfo[1].value)
+
+				scrollFrame:AddChild(tabsWidget)
+			else -- no tabs
+				for i, option in next, module.toggleOptions do
+					local o = option
+					if type(o) == "table" then o = option[1] end
+					if module.optionHeaders and module.optionHeaders[o] then
+						local header = AceGUI:Create("Heading")
+						header:SetText(module.optionHeaders[o])
+						header:SetFullWidth(true)
+						scrollFrame:AddChild(header)
+					end
+					scrollFrame:AddChildren(getDefaultToggleOption(scrollFrame, widget, module, option))
+				end
+			end
+
+			local list = AceGUI:Create("Button")
+			list:SetFullWidth(true)
+			list:SetText(L.listAbilities)
+			list:SetUserData("module", module)
+			list:SetCallback("OnClick", listAbilitiesInChat)
+			scrollFrame:AddChild(list)
+
+			scrollFrame:ResumeLayout()
+			scrollFrame:PerformLayout()
+		end
+	end
+
+	function showToggleOptions(widget, event, group, noScrollReset)
+		lastBossModuleGroup = group
+		widget:SetUserData("bossIndex", group)
+		-- reset scroll bar if not hitting the back button
+		if not noScrollReset then
+			toggleOptionsStatusTable.restore_offset = nil
+			toggleOptionsStatusTable.restore_scrollvalue = nil
+			lastOptionsTab = nil
+		end
+		toggleOptionsStatusTable.offset = toggleOptionsStatusTable.restore_offset
+		toggleOptionsStatusTable.scrollvalue = toggleOptionsStatusTable.restore_scrollvalue
+
+		populateToggleOptions(widget, BigWigs:GetBossModule(group, true))
+	end
+end
+
+local function onZoneShow(treeWidget, instanceIdOrMapId)
+	-- Make sure all the bosses for this zone are loaded.
+	loader:LoadZone(instanceIdOrMapId)
+
+	-- Grab the module list from this zone
+	local moduleList = loader:GetZoneMenus()[instanceIdOrMapId]
+	if type(moduleList) ~= "table" then return end -- No modules registered
+
+	local zoneList, zoneSort = {}, {}
+	for i = 1, #moduleList do
+		local module = moduleList[i]
+		zoneList[module.moduleName] = module.displayName
+		zoneSort[i] = {name = module.moduleName, order = module:GetSortOrder(), index = i}
+	end
+	-- sort according to sortOrder, ties sort by registration order
+	table.sort(zoneSort, function(a, b)
+		return a.order < b.order or (a.order == b.order and a.index < b.index)
+	end)
+	for i = 1, #zoneSort do
+		zoneSort[i] = zoneSort[i].name
+	end
+
+	local outerContainer = AceGUI:Create("SimpleGroup")
+	outerContainer:PauseLayout() -- Stop drawing (improves performance) until we've added everything
+	outerContainer:SetLayout("Fill")
+	outerContainer:SetFullWidth(true)
+	treeWidget:AddChild(outerContainer)
+
+	local innerContainer = AceGUI:Create("BossDropdownGroup") -- Adds extra share buttons
+	innerContainer:SetTitle(L.selectEncounter)
+	innerContainer:SetLayout("Flow")
+	innerContainer:SetCallback("OnGroupSelected", showToggleOptions)
+	innerContainer:SetUserData("zone", instanceIdOrMapId)
+	innerContainer:SetUserData("moduleList", moduleList)
+	innerContainer:SetGroupList(zoneList, zoneSort)
+
+	-- scroll is where we actually put stuff in case things
+	-- overflow vertically
+	local scroll = AceGUI:Create("ScrollFrame")
+	scroll:SetLayout("Flow")
+	scroll:SetFullWidth(true)
+	scroll:SetFullHeight(true)
+	scroll:SetStatusTable(toggleOptionsStatusTable)
+	innerContainer:SetUserData("parent", scroll)
+	innerContainer:AddChild(scroll)
+
+	outerContainer:AddChild(innerContainer)
+
+	outerContainer:ResumeLayout()
+	outerContainer:PerformLayout() -- Everything added, gogo
+
+	-- Find the last opened module or the first enabled module and select that in the dropdown if possible.
+	local index = 1
+	local bossFound = false
+	if lastBossModuleGroup then
+		for i = 1, #zoneSort do
+			if zoneSort[i] == lastBossModuleGroup then
+				index = i
+				bossFound = true
+				break
+			end
+		end
+	end
+
+	if not bossFound then
+		for i = 1, #zoneSort do
+			local name = zoneSort[i]
+			local m = BigWigs:GetBossModule(name, true)
+			if m and m:IsEnabled() and m:GetJournalID() then
+				index = i
+				break
+			end
+		end
+	end
+	innerContainer:SetGroup(zoneSort[index])
+	innerContainer:DoLayout() -- One last refresh to adjust height
+end
+
+local AddToDirectOpens
+do
+	local expansionHeader
+	if loader.isVanilla then
+		expansionHeader = {
+			"Classic",
+		}
+	elseif loader.isTBC then
+		expansionHeader = {
+			"Classic",
+			"BurningCrusade",
+		}
+	elseif loader.isWrath then
+		expansionHeader = {
+			"Classic",
+			"BurningCrusade",
+			"WrathOfTheLichKing",
+		}
+	elseif loader.isCata then
+		expansionHeader = {
+			"Classic",
+			"BurningCrusade",
+			"WrathOfTheLichKing",
+			"Cataclysm",
+		}
+	elseif loader.isMists then
+		expansionHeader = {
+			"Classic",
+			"BurningCrusade",
+			"WrathOfTheLichKing",
+			"Cataclysm",
+			"MistsOfPandaria",
+		}
+	elseif loader.isBeta then
+		expansionHeader = {
+			"Classic",
+			"BurningCrusade",
+			"WrathOfTheLichKing",
+			"Cataclysm",
+			"MistsOfPandaria",
+			"WarlordsOfDraenor",
+			"Legion",
+			"BattleForAzeroth",
+			"Shadowlands",
+			"Dragonflight",
+			"TheWarWithin",
+			"Midnight",
+		}
+	else
+		expansionHeader = {
+			"Classic",
+			"BurningCrusade",
+			"WrathOfTheLichKing",
+			"Cataclysm",
+			"MistsOfPandaria",
+			"WarlordsOfDraenor",
+			"Legion",
+			"BattleForAzeroth",
+			"Shadowlands",
+			"Dragonflight",
+			"TheWarWithin",
+			"Midnight",
+		}
+	end
+
+	local statusTable = {}
+	local GetBestMapForUnit = loader.GetBestMapForUnit
+	local GetMapInfo = loader.GetMapInfo
+	local remappedZones = loader.remappedZones
+
+	local function onTreeGroupSelected(widget, event, value)
+		lastTreeGroupSelected = value
+		visibleSpellDescriptionWidgets = {}
+		visibleCreatureNameWidgets = {}
+		widget:ReleaseChildren()
+		local instanceIdOrMapId = value:match("\001(-?%d+)$")
+		local bigwigsContent = value:match("(BigWigs_%a+)$")
+		if instanceIdOrMapId then
+			onZoneShow(widget, tonumber(instanceIdOrMapId))
+		elseif bigwigsContent and not loader.currentExpansion.bigWigsBundled[value] then -- Any BigWigs content except bundled expansion headers
+			local addonState = loader:GetAddOnState(bigwigsContent)
+			local disabled = not loader:IsAddOnEnabled(bigwigsContent)
+			local string = addonState == "MISSING" and L.missingAddOnPopup or disabled and L.disabledAddOn
+			if string then
+				local container = AceGUI:Create("SimpleGroup")
+				container:SetFullWidth(true)
+				widget:AddChild(container)
+
+				local missing = AceGUI:Create("Label")
+				missing:SetText(string:format(bigwigsContent))
+				missing:SetFontObject(GameFontHighlight)
+				missing:SetFullWidth(true)
+				container:AddChild(missing)
+
+				if disabled and addonState ~= "MISSING" then
+					local reload = AceGUI:Create("Button")
+					reload:SetText(L.enable)
+					reload:SetAutoWidth(true)
+					reload:SetUserData("addonName", bigwigsContent)
+					reload:SetCallback("OnClick", function(reloadWidget)
+						loader.EnableAddOn(reloadWidget:GetUserData("addonName"))
+						C_UI.Reload()
+					end)
+					container:AddChild(reload)
+				end
+			end
+		elseif value:match("^LittleWigs_") then -- All LittleWigs content addons, all come from 1 zip
+			if loader.currentExpansion.littleWigsBundled[value] then -- bundled content is included in LittleWigs
+				value = "LittleWigs"
+			end
+			local addonState = loader:GetAddOnState(value)
+			local disabled = not loader:IsAddOnEnabled(value)
+			local string = addonState == "MISSING" and L.missingAddOnPopup or disabled and L.disabledAddOn
+			if not loader.usingLittleWigsRepo and string then
+				local container = AceGUI:Create("SimpleGroup")
+				container:SetFullWidth(true)
+				widget:AddChild(container)
+
+				local missing = AceGUI:Create("Label")
+				missing:SetText(string:format(value))
+				missing:SetFontObject(GameFontHighlight)
+				missing:SetFullWidth(true)
+				container:AddChild(missing)
+
+				if disabled then
+					local reload = AceGUI:Create("Button")
+					reload:SetText(L.enable)
+					reload:SetAutoWidth(true)
+					reload:SetUserData("addonName", value)
+					reload:SetCallback("OnClick", function(reloadWidget)
+						loader.EnableAddOn(reloadWidget:GetUserData("addonName"))
+						C_UI.Reload()
+					end)
+					container:AddChild(reload)
+				end
+			end
+		else
+			statusTable.groups[value] = true
+			widget:RefreshTree()
+		end
+	end
+
+	local function addModuleToOptions(zoneAddon, treeTbl, addonNameToHeader, value, zoneName)
+		local parent = zoneAddon and addonNameToHeader[zoneAddon] -- Get expansion number for this zone
+		local treeParent = treeTbl[parent] -- Grab appropriate expansion name
+		if treeParent and treeParent.enabled then -- third-party plugins can add empty zones if you don't have the expansion addon enabled
+			if not treeParent.children then treeParent.children = {} end -- Create sub menu table
+			tinsert(treeParent.children, { -- Add new instance/zone sub menu
+				value = value,
+				text = zoneName,
+			})
+		end
+	end
+
+	local function getLittleWigsStatusText()
+		if loader.usingLittleWigsRepo then
+			return L.littlewigsSourceCheckout
+		end
+		local version = loader.littlewigsVersion
+		if not version then
+			return L.missingAddOnPopup:format("LittleWigs")
+		end
+		return (string.find(version, "-", nil, true) and L.littlewigsAlphaRelease or L.littlewigsOfficialRelease):format(version)
+	end
+
+	local currentlyOpenContainer, openPath
+	local function onTabGroupSelected(widget, event, value)
+		visibleSpellDescriptionWidgets = {}
+		visibleCreatureNameWidgets = {}
+		widget:ReleaseChildren()
+
+		if value ~= lastTabSelected then
+			lastTabSelected = value
+			lastTreeGroupSelected, lastBossModuleGroup = nil, nil
+		end
+
+		if value == "options" then
+			configFrame:SetTitle("BigWigs")
+			configFrame:SetStatusText(" "..loader:GetReleaseString())
+			-- Embed the AceConfig options in our AceGUI frame
+			local container = AceGUI:Create("SimpleGroup")
+			container.type = "BigWigsOptions" -- We want ACD to create a ScrollFrame, so we change the type to bypass it's group control check
+			container:SetFullHeight(true)
+			container:SetFullWidth(true)
+
+			-- Have to use :Open instead of just :FeedGroup because some widget types (range, color) call :Open to refresh on change
+			currentlyOpenContainer = container
+			acd:Open("BigWigs", container)
+
+			if openPath then
+				container.children[1]:SelectByPath(unpack(openPath))
+				openPath = nil
+			end
+
+			widget:AddChild(container)
+		elseif value == "tools" then
+			configFrame:SetTitle("BigWigs")
+			configFrame:SetStatusText(" "..loader:GetReleaseString())
+			-- Embed the AceConfig options in our AceGUI frame
+			local container = AceGUI:Create("SimpleGroup")
+			container.type = "BigWigsOptions" -- We want ACD to create a ScrollFrame, so we change the type to bypass it's group control check
+			container:SetFullHeight(true)
+			container:SetFullWidth(true)
+
+			-- Have to use :Open instead of just :FeedGroup because some widget types (range, color) call :Open to refresh on change
+			currentlyOpenContainer = container
+			acd:Open("BigWigsTools", container)
+
+			if openPath then
+				container.children[1]:SelectByPath(unpack(openPath))
+				openPath = nil
+			end
+
+			widget:AddChild(container)
+		else
+			currentlyOpenContainer = nil
+			local treeTbl = {}
+			local addonNameToHeader = {}
+			local defaultHeader
+			if value == "bigwigs" then
+				configFrame:SetTitle("BigWigs")
+				configFrame:SetStatusText(" "..loader:GetReleaseString())
+				defaultHeader = loader.currentExpansion.name
+				for i = 1, #expansionHeader do
+					local addonName = "BigWigs_" .. expansionHeader[i]
+					treeTbl[i] = {
+						text = L.expansionNames[i],
+						value = addonName,
+						enabled = true,
+					}
+					addonNameToHeader[addonName] = i
+				end
+			elseif value == "littlewigs" then
+				configFrame:SetTitle("LittleWigs")
+				configFrame:SetStatusText(" "..getLittleWigsStatusText())
+				defaultHeader = loader.currentExpansion.littleWigsDefault
+				-- add an entry for each expansion
+				for i = 1, #expansionHeader do
+					local addonName = "LittleWigs_" .. expansionHeader[i]
+					treeTbl[i] = {
+						text = L.expansionNames[i],
+						value = addonName,
+						enabled = true,
+					}
+					addonNameToHeader[addonName] = i
+				end
+				-- add any extra LittleWigs menus
+				if loader.currentExpansion.littleWigsExtras then
+					for i = 1, #loader.currentExpansion.littleWigsExtras do
+						local addonName = loader.currentExpansion.littleWigsExtras[i]
+						treeTbl[#treeTbl + 1] = {
+							text = L.littleWigsExtras[addonName],
+							value = addonName,
+							enabled = true,
+						}
+						addonNameToHeader[addonName] = #treeTbl
+					end
+				end
+			end
+
+			do
+				local zoneToId, alphabeticalZoneList = {}, {}
+				for k in next, loader:GetZoneMenus() do
+					local zoneName
+					if k < 0 then
+						local tbl = GetMapInfo(-k)
+						if tbl then
+							zoneName = tbl.name
+						else
+							zoneName = tostring(k)
+						end
+					else
+						zoneName = GetRealZoneText(k)
+						if zoneName == "" then
+							-- if GetRealZoneText returns an empty string it's probably due to having a module enabled for a zone that doesn't exist.
+							-- use the zone key as the menu name in that case instead of the empty string.
+							zoneName = tostring(k)
+						end
+					end
+					if zoneName then
+						if zoneToId[zoneName] then
+							zoneName = zoneName .. "1" -- When instances exist more than once (Karazhan)
+						end
+						zoneToId[zoneName] = k
+						alphabeticalZoneList[#alphabeticalZoneList+1] = zoneName
+					end
+				end
+
+				for k, v in next, loader.currentExpansion.zones do -- Parse current content zones
+					local zoneName = GetRealZoneText(k)
+					if zoneName == "" then
+						BigWigs:Error(("Zone ID %q has no name."):format(k))
+					elseif not zoneToId[zoneName] and not loader.usingBigWigsRepo then -- If we have no registered menus for current content, and not using the Git repo
+						alphabeticalZoneList[#alphabeticalZoneList+1] = zoneName -- We want to create sub menus in the GUI for disabled/missing BigWigs current content addons
+						zoneToId[zoneName] = {k, v}
+					end
+				end
+
+				sort(alphabeticalZoneList) -- Make alphabetical
+				for i = 1, #alphabeticalZoneList do
+					local zoneName = alphabeticalZoneList[i]
+					local entry = zoneToId[zoneName]
+					local name, id
+					if type(entry) == "table" then
+						id = entry[1]
+						name = entry[2]
+					else
+						id = entry
+					end
+
+					-- add zones to options
+					addModuleToOptions(loader.zoneTbl[id], treeTbl, addonNameToHeader, name or id, zoneName)
+					if loader.currentExpansion.currentSeason[id] then
+						addModuleToOptions(loader.currentExpansion.currentSeason[id], treeTbl, addonNameToHeader, name or id, zoneName)
+					end
+				end
+			end
+
+			local tree = AceGUI:Create("TreeGroup")
+			tree:EnableButtonTooltips(false)
+			tree:SetFullWidth(true)
+			tree:SetFullHeight(true)
+			tree:SetStatusTable(statusTable)
+			tree:SetTree(treeTbl)
+			tree:SetLayout("Fill")
+			tree:SetCallback("OnGroupSelected", onTreeGroupSelected)
+
+			-- Do we have content for the zone we're in? Then open straight to that zone.
+			local _, instanceType, _, _, _, _, _, id = loader.GetInstanceInfo()
+			if remappedZones[id] then
+				id = remappedZones[id]
+			end
+			local zoneAddon = loader.currentExpansion.currentSeason[id] or loader.zoneTbl[id]
+			local parent = zoneAddon and addonNameToHeader[zoneAddon]
+			if instanceType == "none" then
+				local mapId = GetBestMapForUnit("player")
+				if mapId then
+					id = loader.zoneTblWorld[-mapId]
+					parent = zoneAddon and addonNameToHeader[zoneAddon]
+				end
+			end
+
+			if parent then
+				local moduleList = id and loader:GetZoneMenus()[id]
+				local current = treeTbl[parent].value
+				tree:SelectByValue(moduleList and ("%s\001%d"):format(current, id) or current)
+			else
+				tree:SelectByValue(lastTreeGroupSelected or defaultHeader)
+			end
+
+			widget:AddChild(tree)
+		end
+	end
+
+	function options:ConfigTableChange(_, appName)
+		if (appName == "BigWigs" or appName == "BigWigsTools") and currentlyOpenContainer then
+			acd:Open(appName, currentlyOpenContainer)
+		end
+	end
+	acr.RegisterCallback(options, "ConfigTableChange")
+
+	local allowedDirectOpens = {
+		["Auras"] = {tab = "options", path = {"general", "Auras"}},
+	}
+	function AddToDirectOpens(name, key)
+		if allowedDirectOpens[name] then
+			error(format("Panel %q with key %q already exists in allowedDirectOpens.", tostring(name), tostring(key)))
+			return
+		end
+		allowedDirectOpens[name] = {tab = "options", path = {key}}
+	end
+	function OpenConfig(specificPanel)
+		if allowedDirectOpens[specificPanel] then
+			lastTabSelected = allowedDirectOpens[specificPanel].tab
+			openPath = allowedDirectOpens[specificPanel].path
+		elseif specificPanel then
+			return
+		end
+		spellDescriptionUpdater:RegisterEvent("SPELL_TEXT_UPDATE")
+		creatureNameUpdater:RegisterEvent("TOOLTIP_DATA_UPDATE")
+
+		local bw = AceGUI:Create("Frame")
+		configFrame = bw
+		bw:SetTitle("BigWigs")
+		bw:SetStatusText(" "..loader:GetReleaseString())
+		bw:SetWidth(858)
+		bw:SetHeight(660)
+		bw:EnableResize(false)
+		bw:SetLayout("Flow")
+		bw:SetCallback("OnClose", function(widget)
+			visibleSpellDescriptionWidgets = {}
+			visibleCreatureNameWidgets = {}
+			statusTable = {}
+			currentlyOpenContainer = nil
+			configFrame = nil
+			spellDescriptionUpdater:UnregisterEvent("SPELL_TEXT_UPDATE")
+			creatureNameUpdater:UnregisterEvent("TOOLTIP_DATA_UPDATE")
+			widget:ReleaseChildren()
+			AceGUI:Release(widget)
+			options:SendMessage("BigWigs_CloseGUI")
+		end)
+
+		local tabs = AceGUI:Create("TabGroup")
+		tabs:SetLayout("Flow")
+		tabs:SetFullWidth(true)
+		tabs:SetFullHeight(true)
+		tabs:SetTabs({
+			{ text = L.options, value = "options" },
+			{ text = L.tools, value = "tools" },
+			{ text = L.raidBosses, value = "bigwigs" },
+			{ text = L.dungeonBosses, value = "littlewigs" },
+		})
+		tabs:SetCallback("OnGroupSelected", onTabGroupSelected)
+		tabs:SelectTab(lastTabSelected or "options")
+		bw:AddChild(tabs)
+		bw.tabs = tabs
+
+		bw:Show()
+		options:SendMessage("BigWigs_OpenGUI")
+	end
+end
+
+do
+	local registered, subPanelRegistry = {}, {}
+	function options:BigWigs_PluginOptionsReady(_, pluginName, pluginOptions, subPanelOptions)
+		if not registered[pluginName] then
+			if type(pluginOptions) == "table" then
+				registered[pluginName] = true
+				aceConfigTableMainBigWigsTab.args.general.args[pluginName] = pluginOptions
+			elseif type(subPanelOptions) == "table" then
+				registered[pluginName] = true
+				local key = subPanelOptions.key
+				local opts = subPanelOptions.options
+				AddToDirectOpens(subPanelOptions.name, subPanelOptions.key)
+				if type(opts) == "function" then
+					subPanelRegistry[key] = opts
+				else
+					aceConfigTableMainBigWigsTab.args[key] = opts
+				end
+			end
+		end
+	end
+
+	function ConstructMainBigWigsTab()
+		for key, optionsTableFunction in next, subPanelRegistry do
+			local optionsTable = securecallfunction(optionsTableFunction)
+			if type(optionsTable) == "table" and xpcall(acr.ValidateOptionsTable, CallErrorHandler, acr, optionsTable, optionsTable.name) then
+				aceConfigTableMainBigWigsTab.args[key] = optionsTable
+			end
+		end
+		for key, optionsTable in next, API.GetPluginOptions() do
+			aceConfigTableMainBigWigsTab.args[key] = optionsTable
+		end
+		for pluginName, dataTable in next, API.GetPluginOptionsCustomTabs() do
+			if registered[pluginName] then
+				local tabTableKey, settingsTable = dataTable[1], dataTable[2]
+				aceConfigTableMainBigWigsTab.args.general.args[pluginName].args[tabTableKey] = settingsTable
+			end
+		end
+		return aceConfigTableMainBigWigsTab
+	end
+end
+
+do
+	local popup = CreateFrame("Frame", nil, UIParent)
+	popup:Hide()
+	popup:SetPoint("CENTER", UIParent, "CENTER")
+	popup:SetSize(400, 72)
+	popup:EnableMouse(true) -- Do not allow click-through on the frame
+	popup:SetFrameStrata("TOOLTIP")
+	popup:SetFrameLevel(110) -- Lots of room to draw under it
+	popup:SetFixedFrameStrata(true)
+	popup:SetFixedFrameLevel(true)
+
+	local border = CreateFrame("Frame", nil, popup, "DialogBorderOpaqueTemplate")
+	border:SetAllPoints(popup)
+
+	local textFrame = popup:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+	textFrame:SetSize(370, 0)
+	textFrame:SetPoint("TOP", 0, -16)
+
+	local function newButton(newText)
+		local button = CreateFrame("Button", nil, popup)
+		button:SetSize(128, 21)
+		button:SetNormalFontObject(GameFontNormal)
+		button:SetHighlightFontObject(GameFontHighlight)
+		button:SetNormalTexture(130763) -- "Interface\\Buttons\\UI-DialogBox-Button-Up"
+		button:GetNormalTexture():SetTexCoord(0.0, 1.0, 0.0, 0.71875)
+		button:SetPushedTexture(130761) -- "Interface\\Buttons\\UI-DialogBox-Button-Down"
+		button:GetPushedTexture():SetTexCoord(0.0, 1.0, 0.0, 0.71875)
+		button:SetHighlightTexture(130762) -- "Interface\\Buttons\\UI-DialogBox-Button-Highlight"
+		button:GetHighlightTexture():SetTexCoord(0.0, 1.0, 0.0, 0.71875)
+		button:SetText(newText)
+		return button
+	end
+
+	local acceptButton = newButton(L.accept)
+	acceptButton:SetPoint("BOTTOMRIGHT", popup, "BOTTOM", -6, 16)
+	local cancelButton = newButton(L.cancel)
+	cancelButton:SetPoint("LEFT", acceptButton, "RIGHT", 13, 0)
+	popup:SetScript("OnKeyDown", function(_, key)
+		if key == "ESCAPE" then
+			cancelButton:Click()
+		end
+	end)
+
+	local _, addonTable = ...
+
+	-- A verify check for API usages
+	function options.VerifyAddOnProfileString(profileString)
+		if type(profileString) ~= "string" then return end
+		local versionPlain, importData = profileString:match("^(%w+):(.+)$")
+		if versionPlain ~= addonTable.sharingVersion and versionPlain ~= addonTable.bossSharingVersion then return end
+		local decodedForPrint = C_EncodingUtil.DecodeBase64(importData)
+		if not decodedForPrint then return end
+		local decompressed = C_EncodingUtil.DecompressString(decodedForPrint, 0) -- Enum.CompressionMethod.Deflate = 0
+		if not decompressed then return end
+		local data = C_EncodingUtil.DeserializeCBOR(decompressed)
+		if not data then return end
+		local expectedVersion = data.bossExport and addonTable.bossSharingVersion or addonTable.sharingVersion
+		if versionPlain ~= expectedVersion then return end -- encoded version prefix does not match expected version
+		local instances = {}
+		if data.bossExport then
+			for key in next, data.exportTable do
+				instances[key] = true
+			end
+		end
+		return true, data.bossExport, instances
+	end
+
+	local strlenutf8 = strlenutf8
+
+	-- DO NOT USE THIS DIRECTLY. This code may not be loaded
+	-- Use BigWigsAPI.RegisterProfile(addonName, profileString, optionalCustomProfileName, optionalCallbackFunction)
+	function options.SaveImportStringDataFromAddOn(addonName, profileString, optionalCustomProfileName, optionalCallbackFunction)
+		if type(addonName) ~= "string" or strlenutf8(addonName) < 3 or addonName:find("^ +$") then error("Invalid addon name for profile import.") return end
+		if type(profileString) ~= "string" or #profileString < 10 then error("Invalid profile string for profile import.") return end
+		local stringOK, bossImport, instances = options.VerifyAddOnProfileString(profileString)
+		if not stringOK then error("Invalid profile string for profile import.") return end
+		if optionalCustomProfileName and (type(optionalCustomProfileName) ~= "string" or strlenutf8(optionalCustomProfileName) < 2 or strlenutf8(optionalCustomProfileName) > 50 or optionalCustomProfileName:find("^ +$")) then error("Invalid custom profile name for the string you want to import.") return end
+		if optionalCallbackFunction and type(optionalCallbackFunction) ~= "function" then error("Invalid custom callback function for the string you want to import.") return end
+		-- All AceConfigDialog code, go there for original
+		popup:Show()
+		local profileName = loader.db:GetCurrentProfile()
+		local instanceNamesString = ""
+		if bossImport then
+			local instanceNames = {}
+			for instanceId in next, instances do
+				local instanceName = GetRealZoneText(instanceId)
+				if instanceName == "" then
+					error("Wrong instanceID in import string")
+				end
+				table.insert(instanceNames, instanceName)
+			end
+			table.sort(instanceNames)
+			instanceNamesString = table.concat(instanceNames, "\n")
+		end
+		if not optionalCustomProfileName or profileName == optionalCustomProfileName then
+			optionalCustomProfileName = nil
+			if bossImport then
+				textFrame:SetText(L.confirm_import_addon_boss_settings:format(addonName, instanceNamesString, profileName))
+			else
+				textFrame:SetText(L.confirm_import_addon:format(addonName, profileName))
+			end
+		else
+			local profiles = loader.db:GetProfiles()
+			local found = false
+			for i = 1, #profiles do
+				local name = profiles[i]
+				if name == optionalCustomProfileName then
+					found = true
+					break
+				end
+			end
+			if found then
+				textFrame:SetText(L.confirm_import_addon_edit_profile:format(addonName, optionalCustomProfileName))
+			else
+				textFrame:SetText(L.confirm_import_addon_new_profile:format(addonName, optionalCustomProfileName))
+			end
+		end
+		local height = 70 + textFrame:GetHeight()
+		popup:SetHeight(height)
+
+		acceptButton:ClearAllPoints()
+		acceptButton:SetPoint("BOTTOMRIGHT", popup, "BOTTOM", -6, 16)
+
+		acceptButton:SetScript("OnClick", function()
+			popup:Hide()
+			acceptButton:SetScript("OnClick", nil)
+			cancelButton:SetScript("OnClick", nil)
+			if optionalCustomProfileName then
+				loader.db:SetProfile(optionalCustomProfileName)
+			end
+			addonTable.SaveImportStringDataFromAddOn(profileString, optionalCallbackFunction)
+		end)
+		cancelButton:SetScript("OnClick", function()
+			popup:Hide()
+			cancelButton:SetScript("OnClick", nil)
+			acceptButton:SetScript("OnClick", nil)
+			if optionalCallbackFunction then
+				optionalCallbackFunction(false)
+			end
+		end)
+	end
+	-- DO NOT USE THIS DIRECTLY. This code may not be loaded
+	-- Use BigWigsAPI.RequestProfile(addonName, profileName, callbackFunction, includeRaids, includeSeasonalDungeons, includeExpansionDungeons)
+	function options.RequestProfile(addonName, profileName, callbackFunction, includeRaids, includeSeasonalDungeons, includeExpansionDungeons)
+		if type(addonName) ~= "string" or #addonName < 3 then error("Invalid addon name for profile request.") return end
+		if type(profileName) ~= "string" then error("Invalid profile name for profile request.") return end
+		if type(callbackFunction) ~= "function" then error("Invalid callback function for profile request.") return end
+		if includeRaids ~= nil and type(includeRaids) ~= "boolean" then error("Invalid raid export flag for profile request.") return end
+		if includeSeasonalDungeons ~= nil and type(includeSeasonalDungeons) ~= "boolean" then error("Invalid seasonal dungeon export flag for profile request.") return end
+		if includeExpansionDungeons ~= nil and type(includeExpansionDungeons) ~= "boolean" then error("Invalid expansion dungeon export flag for profile request.") return end
+		if not API.IsValidProfile(profileName) then error("The profile being requested doesn't exist.") return end
+
+		local includeBossOptions = includeRaids == true or includeSeasonalDungeons == true or includeExpansionDungeons == true
+		local function exportProfileAndBoss(onDone)
+			local profileString = addonTable.GetExportString(true)
+			if not includeBossOptions then
+				onDone(profileString, nil)
+				return
+			end
+			addonTable.RequestEncounterExportString(includeRaids, includeSeasonalDungeons, includeExpansionDungeons, function(bossString)
+				onDone(profileString, bossString)
+			end)
+		end
+		local currentProfileName = API.GetProfileName()
+		if currentProfileName == profileName then
+			exportProfileAndBoss(callbackFunction)
+		else
+			loader.db:SetProfile(profileName)
+			exportProfileAndBoss(function(profileString, bossString)
+				loader.db:SetProfile(currentProfileName)
+				callbackFunction(profileString, bossString)
+			end)
+		end
+	end
+end
+
+BigWigsOptions = options -- Set global

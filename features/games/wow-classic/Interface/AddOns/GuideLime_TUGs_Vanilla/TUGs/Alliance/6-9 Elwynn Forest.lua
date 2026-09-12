@@ -1,0 +1,92 @@
+Guidelime.registerGuide(
+[[
+[GA Alliance]
+[N6-9 Elwynn Forest]
+[NX9-11 Dun Morogh, Loch Modan]
+[D This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV]
+This guide was written by TUGs and is totally free, but if you want to support my work use: https://www.youtube.com/user/HydroxXTV
+Accept: [QA60]
+Set your [S] to Elwynn Forest at [G43.8,65.8Elwynn Forest]
+TurnIn: [QT2158]
+TurnIn: [QT54]
+Accept: [QA62]
+Accept: [QA47]
+Kill all Boars(especially good on the fields you will go to) for 4x Chunk of Boar Meat
+Accept: [QA106]
+Well be crossing the Kobold mine 4 times now->Kill 2-3 Kobolds each time you do, to get some quest items already.
+Accept: [QA88]
+Accept: [QA85]
+TurnIn: [QT106]
+Accept: [QA111]
+TurnIn: [QT111]
+Accept: [QA107]
+TurnIn: [QT85]
+Accept: [QA86]
+TurnIn: [QT86]
+Accept: [QA84]
+TurnIn: [QT84]
+Accept: [QA87]
+Do [QC62- ][QC47- ][QC60- ][QC87]
+Die and rezz at Ghosthealer
+TurnIn: [QT62]
+Accept: [QA76]
+Run to [G41.5,65.8Elwynn Forest][A Warrior,Paladin]
+Buy: [CI2488,1 Gladius] [A Warrior]Buy a Gladius from Corina Steele[A Warrior]
+Buy: [CI2493,1 Wooden Mallet] [A Paladin] Buy a Wooden Mallet from Corina Steele[A Paladin]
+[T] Get your Level 6 skills at your trainer.[A Warrior,Paladin]
+TurnIn: [QT47]
+Accept: [QA40]
+TurnIn: [QT40]
+Accept: [QA35]
+TurnIn: [QT107]
+Accept: [QA112]
+TurnIn: [QT60]
+Accept: [QA61]
+[T] Get your Level 6 skills at your trainer.[A Warlock,Mage,Priest,Rogue]
+[A Paladin,Mage,Warlock] Buy 20 Milk and as many 6 Slot Bags as you can.
+[A Warrior,Rogue] Buy 20 Food(lvl5) and as many 6 Slot Bags as you can.
+Do: [QC112]
+Do: [QC76]
+Die on the Campfire nearby[G64.5,56.6Elwynn Forest] and rezz at Ghosthealer.
+Run to [G83.3, 66.1Elwynn Forest]
+Repair your gear and sell grey items.
+Accept: [QA5545]
+TurnIn: [QT35]
+Accept: [QA37]
+Accept: [QA52]
+TurnIn: [QT37]
+Accept: [QA45]
+Do [QC5545- ][QC52]
+TurnIn: [QT45]
+Accept: [QA71]
+TurnIn: [QT5545]
+TurnIn: [QT52]
+TurnIn: [QT71]
+Accept: [QA39]
+Do(this is an optional quest!): [QC88]
+This can be done solo by most classes by so called "Fence hopping". You Attack/Frostbolt/Shadowbolt, you jump the fence and repeat. Its pretty hard and you can lern it by killing defias/bears/boars first. Doing it vs Princes and her 2 escorts is even harder,MOST PEOPLE wont be able to do this!!! Otherwise: skip it as mentioned.
+Run to [G84.4, 76.5Elwynn Forest]
+Run to [G9.8, 75.6Redridge Mountains]
+Die to the spiders and rezz up in Redridge.
+Run to [G25.1,57.0Redridge Mountains]
+Get the [P] flightpath at: [G30.6, 59.4Redridge Mountains]
+Use your [H] Hearthstone.
+[T] Get your Level 8 skills at your trainer.[A Mage,Warlock,Priest,Rogue]
+TurnIn: [QT112]
+Accept: [QA114]
+TurnIn: [QT76]
+TurnIn: [QT39]
+The next quest "Elmore's Task" is shown in Redridge Mountains. Just enter the Blacksmith in Goldshire. It's there instead.
+Accept: [QA1097]
+[T] Get your Level 8 skills at your trainer.[A Paladin,Warrior]
+TurnIn: [QT114]
+TurnIn: [QT88]
+TurnIn: [QT87]
+TurnIn: [QT61]
+TurnIn: [QT1097]
+Accept: [QA353]
+Take the Tram to Ironforge
+Get the [P] flightpath at: [G55.5,47.8Ironforge]
+Set your [S] to Ironforge at [G18.2, 51.4Ironforge]
+Thanks for using my guide. If it helped you and you "want to give back a little": There is a Paypal-Link on curseforge. Thanks <3
+]], "TUGs The Ultimate (Leveling) Guides")

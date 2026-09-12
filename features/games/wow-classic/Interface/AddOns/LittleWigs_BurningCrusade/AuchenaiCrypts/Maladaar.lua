@@ -1,0 +1,65 @@
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("Exarch Maladaar", 558, 524)
+if not mod then return end
+mod:RegisterEnableMob(18373)
+--mod.engageId = 1889 -- no boss frames
+--mod.respawnTime = 0 -- resets, doesn't respawn
+
+--------------------------------------------------------------------------------
+-- Localization
+--
+
+local L = mod:SetDefaultLocale({
+	avatar = -5046, -- Avatar of the Martyred
+	avatar_desc = -5045, -- EJ entry of the summoning spell, has better description than that of the actual spell
+	avatar_icon = -5045,
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+
+function mod:GetOptions()
+	return {
+		32346, -- Stolen Soul
+		"avatar", -- Avatar of the Martyred
+	}
+end
+
+function mod:OnBossEnable()
+	self:Log("SPELL_AURA_APPLIED", "StolenSoul", 32346)
+	self:Log("SPELL_CAST_SUCCESS", "SummonAvatar", 32424)
+
+	self:CheckForEngage()
+	self:Death("Win", 18373)
+end
+
+function mod:OnEngage()
+	self:CheckForWipe()
+	self:RegisterEvent("UNIT_HEALTH")
+end
+
+--------------------------------------------------------------------------------
+-- Event Handlers
+--
+
+function mod:StolenSoul(args)
+	self:TargetMessage(args.spellId, "orange", args.destName)
+end
+
+function mod:SummonAvatar(args)
+	self:Message("avatar", "red", CL.spawned:format(self:SpellName(L.avatar)), args.spellId)
+	self:PlaySound("avatar", "info")
+end
+
+function mod:UNIT_HEALTH(event, unit)
+	if self:MobId(self:UnitGUID(unit)) ~= 18373 then return end
+	local hp = self:GetHealth(unit)
+	if hp < 30 then
+		self:UnregisterEvent(event)
+		self:Message("avatar", "yellow", CL.soon:format(self:SpellName(32424)), false) -- Summon Avatar soon
+	end
+end

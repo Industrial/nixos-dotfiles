@@ -24,27 +24,9 @@ The module creates out-of-store symlinks from your dotfiles to the WoW installat
 
 ## Initial Setup
 
-### 1. Copy Existing Configuration (First Time Only)
+### 1. Enable the Feature
 
-If you already have WoW Classic installed with settings and AddOns:
-
-```bash
-# Copy WTF directory (settings, saved variables)
-cp -r "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF" \
-      ~/.dotfiles/features/games/wow-classic/
-
-# Copy Interface directory (AddOns)
-cp -r "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface" \
-      ~/.dotfiles/features/games/wow-classic/
-
-# Remove originals (will be replaced by symlinks on next rebuild)
-rm -rf "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF"
-rm -rf "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface"
-```
-
-### 2. Enable the Feature
-
-Add to your host configuration or user imports:
+Add to your host configuration (e.g., in `profiles/gaming.nix`):
 
 ```nix
 imports = [
@@ -52,15 +34,52 @@ imports = [
 ];
 ```
 
-### 3. Rebuild
+### 2. Rebuild System
 
 ```bash
 bin/deploy fleet <hostname>
 # or
-home-manager switch
+nixos-rebuild switch
 ```
 
-The symlinks will be created automatically.
+This installs the `link-wow-classic` command.
+
+### 3. Copy Existing Configuration (First Time Only)
+
+If you already have WoW Classic installed with settings and AddOns:
+
+```bash
+# From dotfiles root directory
+cd ~/.dotfiles
+
+# Copy WTF directory (settings, saved variables)
+cp -r "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF" \
+      features/games/wow-classic/
+
+# Copy Interface directory (AddOns)
+cp -r "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface" \
+      features/games/wow-classic/
+
+# Commit to git
+git add features/games/wow-classic/
+git commit -m "feat(wow): add existing WoW Classic configuration"
+```
+
+### 4. Create Symlinks
+
+Run the linking script to symlink dotfiles to WoW installation:
+
+```bash
+# From dotfiles root directory
+bin/wow link
+# or use the system command directly:
+link-wow-classic
+```
+
+This will:
+- Remove existing WTF and Interface directories in the WoW installation
+- Create symlinks pointing to your dotfiles
+- Display confirmation of symlink creation
 
 ## Workflow
 
@@ -97,9 +116,10 @@ git commit -m "chore(wow): update settings"
 
 On a new machine with the same dotfiles:
 1. Install WoW Classic via Lutris
-2. Enable this feature module
-3. Rebuild with `bin/deploy` or `home-manager switch`
-4. All settings and AddOns are automatically linked
+2. Enable this feature module in your host config
+3. Rebuild with `bin/deploy fleet <hostname>`
+4. Run `bin/wow link` to create symlinks
+5. All settings and AddOns are now linked!
 
 ## Important Directories in WTF/
 
