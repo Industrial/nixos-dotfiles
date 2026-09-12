@@ -99,6 +99,17 @@ This will:
 2. Extract to `~/.dotfiles/features/games/wow-classic/Interface/AddOns/<AddonName>/`
 3. Commit to git
 
+**⚠️ Important: Addon Dependencies**
+
+Some addons require library dependencies (e.g., Memento requires ArcaneWizardLibrary). When manually copying addons:
+- **Recommended**: Use WowUp or CurseForge client - they automatically download dependencies
+- **Manual approach**: If you see errors like "missing dependency", either:
+  - Install via addon manager which handles dependencies
+  - Manually download and add the required library
+  - Remove the addon if you don't need it
+
+Dependencies are usually listed in the addon's `.toc` file under `## Dependencies:` or `## RequiredDeps:`.
+
 ### Settings Changes
 
 Settings are automatically saved to `WTF/` when you:

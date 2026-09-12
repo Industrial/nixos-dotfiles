@@ -1,0 +1,38 @@
+VER 3 0000000000000027 "AutoDrink" "INV_Misc_QuestionMark"
+#showtooltip
+/use  Sweet Nectar
+END
+VER 3 0000000000000026 "AutoFood" "INV_Misc_QuestionMark"
+#showtooltip
+/use  Mulgore Spice Bread
+END
+VER 3 0000000000000025 "AutoHeal" "INV_Misc_QuestionMark"
+#showtooltip
+END
+VER 3 0000000000000024 "AutoMana" "INV_Misc_QuestionMark"
+#showtooltip
+END
+VER 3 000000000000001D "nekkid" "132089"
+/script local t={1,3,5,6,7,8,9,10,16,17,18}; for k,v in pairs(t) do PickupInventoryItem(v); PutItemInBackpack(); end
+END
+VER 3 0000000000000001 "pet" "132101"
+/petattack [@pettarget,noexists]
+/petfollow [@pettarget,exists]
+END
+VER 3 0000000000000014 "RL" "136032"
+/reload
+END
+VER 3 0000000000000028 "tar" "134400"
+/tar Rok'Alim
+END
+VER 3 0000000000000009 "WC" "INV_MISC_QUESTIONMARK"
+#showtooltip Wing Clip
+/stopcasting
+/use Counterattack
+/use Wing Clip
+/use Wing Clip(Rank 2)
+/use Wing Clip(Rank 1)
+/use Mongoose Bite
+/use Raptor Strike
+/startattack
+END
