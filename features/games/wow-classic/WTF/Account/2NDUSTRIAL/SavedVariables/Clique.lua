@@ -8,10 +8,10 @@ CliqueDB3 = {
 ["Derpnschmerp - Skullflame"] = {
 ["bindings"] = {
 {
+["type"] = "target",
 ["sets"] = {
 ["default"] = true,
 },
-["type"] = "target",
 ["key"] = "BUTTON1",
 ["unit"] = "mouseover",
 },

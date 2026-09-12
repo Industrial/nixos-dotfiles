@@ -1,7 +1,6 @@
 
 Blizzard_Console_SavedVars = {
 ["version"] = 3,
-["height"] = 300,
 ["messageHistory"] = {
 {
 "Multithreaded rendering enabled.",
@@ -1379,9 +1378,30 @@ Blizzard_Console_SavedVars = {
 "AddOn [Memento] Failed to load missing dependency [ArcaneWizardLibrary]",
 3,
 },
+{
+"-------------------------------------------------- Previous Session --------------------------------------------------",
+0,
 },
-["isShown"] = false,
+{
+"LimitedLuaResources: Reset Timer",
+0,
+},
+{
+"LimitedLuaResources: Reset All",
+0,
+},
+{
+"AddOn [ArcaneWizardLibrary] failure to load: missing",
+3,
+},
+{
+"AddOn [Memento] Failed to load missing dependency [ArcaneWizardLibrary]",
+3,
+},
+},
+["height"] = 300,
 ["fontHeight"] = 14,
+["isShown"] = false,
 ["commandHistory"] = {
 },
 }

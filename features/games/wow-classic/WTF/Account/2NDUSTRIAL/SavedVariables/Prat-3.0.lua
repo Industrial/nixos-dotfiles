@@ -4,8 +4,8 @@ Prat3DB = {
 ["Prat_Frames"] = {
 ["profiles"] = {
 ["Default"] = {
-["minchatwidthdefault"] = 296,
 ["initialized"] = true,
+["minchatwidthdefault"] = 296,
 ["maxchatheightdefault"] = 400.0000305175781,
 ["maxchatwidthdefault"] = 608,
 ["minchatheightdefault"] = 120.0000076293945,
@@ -20,7 +20,7 @@ Prat3DB = {
 ["Default"] = {
 ["modules"] = {
 ["EventNames"] = 3,
-["ChatLog"] = 2,
+["Alias"] = 2,
 ["Mentions"] = 2,
 ["PopupMessage"] = 2,
 ["AltNames"] = 2,
@@ -28,7 +28,7 @@ Prat3DB = {
 ["Paragraph"] = 2,
 ["KeyBindings"] = 2,
 ["LinkInfoIcons"] = 2,
-["Alias"] = 2,
+["ChatLog"] = 2,
 ["OriginalButtons"] = 2,
 },
 },

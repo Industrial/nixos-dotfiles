@@ -49,37 +49,37 @@ AUCTIONATOR_CONFIG = {
 },
 ["selling_confirm_low_price"] = true,
 ["cancel_undercut_shortcut"] = "SPACE",
-["historical_prices"] = {
-},
-["gear_vendor_price_multiplier"] = 0,
+["selling_prev_shortcut"] = "BACKSPACE",
+["selling_ignore_item_suffix"] = false,
 ["columns_selling_search_3"] = {
 },
 ["save_last_duration_as_default"] = false,
 ["columns_shopping"] = {
 },
 ["auction_mean_tooltips"] = false,
-["crafting_info_show_cost"] = true,
+["columns_cancelling"] = {
+},
 ["show_selling_bid_price"] = false,
 ["prospect_tooltips"] = false,
 ["columns_shopping_historical_prices"] = {
 },
-["starting_price_percentage_2"] = 95,
-["auction_duration"] = 24,
+["selling_auto_select_next"] = false,
+["crafting_info_show_profit"] = true,
 ["auto_list_search"] = false,
-["selling_post_stack_remainder"] = false,
+["selling_bag_collapsed"] = false,
 ["auction_chat_log"] = true,
 ["mailbox_tooltips"] = true,
 ["default_list_2"] = "",
-["selling_bag_collapsed"] = false,
-["crafting_info_show_profit"] = true,
-["selling_auto_select_next"] = false,
+["selling_post_stack_remainder"] = false,
+["auction_duration"] = 24,
+["starting_price_percentage_2"] = 95,
 ["auction_sales_preference"] = "static",
-["columns_cancelling"] = {
-},
+["crafting_info_show_cost"] = true,
 ["splash_screen_version"] = "anything",
 ["crafting_info_show"] = true,
-["selling_ignore_item_suffix"] = false,
-["selling_prev_shortcut"] = "BACKSPACE",
+["gear_vendor_price_multiplier"] = 0,
+["historical_prices"] = {
+},
 }
 AUCTIONATOR_SAVEDVARS = {
 }
@@ -100,9 +100,9 @@ AUCTIONATOR_RECENT_SEARCHES = {
 AUCTIONATOR_SELLING_GROUPS = {
 ["CustomGroups"] = {
 {
-["hidden"] = false,
-["type"] = 1,
 ["name"] = "FAVOURITES",
+["type"] = 1,
+["hidden"] = false,
 ["list"] = {
 },
 },
