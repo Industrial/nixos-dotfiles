@@ -44,6 +44,9 @@
   programs = {
     nixvim = {
       enable = true;
+      # Explicitly set nixpkgs source to match our flake's nixpkgs
+      # This silences the warning about follows affecting default value
+      nixpkgs.source = inputs.nixpkgs;
       globals = {
         # Disable NetRW
         loaded_netrw = 1;

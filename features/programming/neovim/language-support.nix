@@ -110,10 +110,9 @@
 
         -- Helper function to safely setup LSP servers
         local function setup_lsp_server(server_name, config)
-          -- Temporarily disable LSP setup to test if this resolves startup errors
-          -- if lspconfig and lspconfig[server_name] and lspconfig[server_name].setup then
-          --   lspconfig[server_name].setup(config)
-          -- end
+          if lspconfig and lspconfig[server_name] and lspconfig[server_name].setup then
+            lspconfig[server_name].setup(config)
+          end
         end
 
         cmp.setup({
@@ -158,11 +157,11 @@
           silent = true
         })
 
-        -- -- Bash
-        -- setup_lsp_server('bashls', {
-        --   capabilities = capabilities,
-        --   flags = flags
-        -- })
+        -- Bash
+        setup_lsp_server('bashls', {
+          capabilities = capabilities,
+          flags = flags
+        })
 
         -- CSS
         setup_lsp_server('cssls', {
@@ -400,11 +399,11 @@
           }
         })
 
-        -- -- TypeScript
-        -- setup_lsp_server('ts_ls', {
-        --   capabilities = capabilities,
-        --   flags = flags
-        -- })
+        -- TypeScript
+        setup_lsp_server('ts_ls', {
+          capabilities = capabilities,
+          flags = flags
+        })
 
         -- Vim Language Server
         setup_lsp_server('vimls', {
@@ -442,26 +441,26 @@
           }
         })
 
-        -- -- YAML
-        -- setup_lsp_server('yamlls', {
-        --   capabilities = capabilities,
-        --   flags = flags,
-        --   cmd = {
-        --     "yaml-language-server",
-        --     "--stdio"
-        --   },
-        --   filetypes = {
-        --     "yaml"
-        --   },
-        --   init_options = {
-        --     validate = true,
-        --     hover = true,
-        --     completion = true,
-        --     format = {
-        --       enable = true
-        --     }
-        --   }
-        -- })
+        -- YAML
+        setup_lsp_server('yamlls', {
+          capabilities = capabilities,
+          flags = flags,
+          cmd = {
+            "yaml-language-server",
+            "--stdio"
+          },
+          filetypes = {
+            "yaml"
+          },
+          init_options = {
+            validate = true,
+            hover = true,
+            completion = true,
+            format = {
+              enable = true
+            }
+          }
+        })
 
         whichKey.add({
           { "<leader>l", group = "LSP" },

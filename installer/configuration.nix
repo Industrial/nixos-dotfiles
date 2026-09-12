@@ -30,7 +30,15 @@
   };
 
   # Set a default root password for the live environment (change after install!)
-  users.users.root.initialPassword = "nixos";
+  users.users.root = {
+    # Use initialPassword only; avoid multiple password option conflicts
+    initialPassword = "nixos";
+    # Explicitly null out other password options to prevent warnings
+    password = lib.mkForce null;
+    hashedPassword = lib.mkForce null;
+    hashedPasswordFile = lib.mkForce null;
+    initialHashedPassword = lib.mkForce null;
+  };
 
   # Auto-login to console for convenience
   services.getty.autologinUser = lib.mkForce "root";
@@ -100,6 +108,9 @@
       experimental-features = nix-command flakes
     '';
   };
+
+  # Silence ZFS warning (installer doesn't use ZFS but module is loaded)
+  boot.zfs.forceImportRoot = false;
 
   system.stateVersion = "24.11";
 }

@@ -124,9 +124,15 @@
 
   # Cap journal size so a runaway user unit cannot fill /var/log/journal and
   # break dbus-broker reload during nixos-rebuild switch.
-  services.journald.settings.Journal = {
-    SystemMaxUse = "1G";
-    RuntimeMaxUse = "256M";
-    MaxFileSec = "1week";
+  services = {
+    journald = {
+      settings = {
+        Journal = {
+          SystemMaxUse = "1G";
+          RuntimeMaxUse = "256M";
+          MaxFileSec = "1week";
+        };
+      };
+    };
   };
 }

@@ -1,4 +1,8 @@
-{settings, ...}: {
+{
+  settings,
+  lib,
+  ...
+}: {
   nix = {
     settings = {
       allowed-users = ["@wheel"];
@@ -20,7 +24,7 @@
     users = {
       "root" = {
         # Initial password is "test" - make sure to change it on first login!
-        initialHashedPassword = "$6$jne0QlJa/oBzEapq$4/gnXjNpggz.R45ND4QYwzqOyIz9CeblnqKzfnN7njIuKZSEfweNISngx87xy6VA0bEmncyyTmiNa5Q5GXDj5/";
+        initialHashedPassword = lib.mkForce "$6$jne0QlJa/oBzEapq$4/gnXjNpggz.R45ND4QYwzqOyIz9CeblnqKzfnN7njIuKZSEfweNISngx87xy6VA0bEmncyyTmiNa5Q5GXDj5/";
       };
 
       "${settings.username}" = {
@@ -36,7 +40,7 @@
           "games"
         ];
         # Initial password is "test" - make sure to change it on first login!
-        initialHashedPassword = "$6$jne0QlJa/oBzEapq$4/gnXjNpggz.R45ND4QYwzqOyIz9CeblnqKzfnN7njIuKZSEfweNISngx87xy6VA0bEmncyyTmiNa5Q5GXDj5/";
+        initialHashedPassword = lib.mkForce "$6$jne0QlJa/oBzEapq$4/gnXjNpggz.R45ND4QYwzqOyIz9CeblnqKzfnN7njIuKZSEfweNISngx87xy6VA0bEmncyyTmiNa5Q5GXDj5/";
       };
     };
   };

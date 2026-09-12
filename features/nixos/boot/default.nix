@@ -121,5 +121,17 @@
     #   "can"
     #   "atm"
     # ];
+
+    # ZFS root pool import behavior
+    # Setting this explicitly to adopt the safer 26.11+ default.
+    # - false (26.11+ default, RECOMMENDED): Requires manual intervention if pool was last imported elsewhere
+    #   → Safer: Prevents accidental corruption from dual-imports
+    # - true (old default): Force-imports ZFS root pool even if previously mounted elsewhere
+    #   → Risk: Can cause data corruption if pool was active on another machine
+    # Note: Currently no fleet hosts use ZFS (all use btrfs), but setting this proactively
+    # ensures safety if ZFS is added later. Use kernel param `zfs_force=1` on unclean shutdowns.
+    zfs = {
+      forceImportRoot = false;
+    };
   };
 }
