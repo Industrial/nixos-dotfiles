@@ -14,6 +14,7 @@
     ../features/games/exiled-exchange-2
     ../features/games/lutris
     ../features/games/path-of-building
-    # ../features/games/wowup
+    ../features/games/wow-classic
+    ../features/games/wowup
   ];
 }

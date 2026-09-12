@@ -1,0 +1,11 @@
+# Cache and temporary files
+WTF/Cache/
+*.bak
+*.old
+
+# Logs
+*.log
+
+# Temporary files
+*~
+.DS_Store
