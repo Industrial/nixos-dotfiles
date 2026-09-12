@@ -122,6 +122,9 @@
       # TOML
       extensions.vscode-marketplace.tamasfe.even-better-toml
 
+      # MoonScript
+      extensions.vscode-marketplace.vgalaktionov.moonscript
+
       # # Astro
       # extensions.vscode-marketplace.astro-build.astro-vscode
 

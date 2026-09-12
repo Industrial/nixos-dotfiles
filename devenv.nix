@@ -83,15 +83,15 @@ in {
   };
 
   scripts = {
-    format.exec = "treefmt";
+    format.exec = "moon run dotfiles:format";
     # Dotfiles-appropriate targets for git-hooks-prek entry points.
     pre-push.exec = ''
       unset GIT_INDEX_FILE GIT_PREFIX || true
-      assay run .
+      moon run dotfiles:test
     '';
     pre-commit.exec = ''
       unset GIT_INDEX_FILE GIT_PREFIX || true
-      assay run .
+      moon run dotfiles:test --affected
     '';
   };
 
@@ -109,11 +109,11 @@ in {
     moon-test = {
       enable = true;
       stages = ["pre-commit"];
-      name = "moon test (assay)";
-      description = "Run moon :test (assay across the repo)";
+      name = "moon test (affected)";
+      description = "Run moon :test --affected on changed files";
       pass_filenames = false;
       always_run = true;
-      entry = "devenv shell -- assay run .";
+      entry = "devenv shell -- moon run dotfiles:test --affected";
     };
     moon-coverage = {
       enable = false;

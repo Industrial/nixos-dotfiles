@@ -17,6 +17,7 @@
               enable = true;
             };
           };
+          grammarPackages = pkgs.vimPlugins.nvim-treesitter.allGrammars;
         };
         treesitter-context = {
           enable = true;
@@ -498,6 +499,9 @@
 
     # Lua Static Analyzer
     luaPackages.luacheck
+
+    # MoonScript
+    luaPackages.moonscript
 
     # Nix Language Server
     nixd
