@@ -1,5 +1,10 @@
 # Seerr is a request management and media discovery tool for Plex, Sonarr, and Radarr. Port = 5055.
-{config, lib, pkgs, ...}: let
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
   name = "seerr";
   directoryPath = "/data/services/${name}";
 in {

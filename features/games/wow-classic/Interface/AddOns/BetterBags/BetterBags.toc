@@ -1,7 +1,6 @@
-## Interface: 120007
+## Interface: 11508
 
 ## Title: BetterBags
-## Category: Inventory
 ## Notes: Better Bags for everyone!
 ## Author: Cidan
 ## Version: v0.4.10
@@ -10,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics, GW2_UI, ElvUI, DevTool
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, ElvUI
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -27,7 +26,8 @@ libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 libs/WagoAnalytics/Shim.lua
 
-templates\container.xml
+templates\era\container.xml
+templates\era\debug.xml
 templates\debug.xml
 
 core\boot.lua
@@ -48,6 +48,7 @@ core\localization.lua
 core\translations.lua
 core\overrides.lua
 core\constants.lua
+core\era\constants.lua
 core\database.lua
 core\hooks.lua
 core\async.lua
@@ -91,14 +92,18 @@ frames\groupdialog.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua
-frames\contextmenu.lua
+frames\era\money.lua
+frames\era\contextmenu.lua
 frames\grid.lua
 frames\item.lua
+frames\era\item.lua
 frames\itemrow.lua
+frames\era\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua
+frames\era\bagbutton.lua
 frames\bagslots.lua
-frames\bankslots.lua
+frames\era\bagslots.lua
 frames\currency.lua
 frames\list.lua
 frames\themeconfig.lua
@@ -112,9 +117,12 @@ views\gridview.lua
 views\bagview.lua
 
 bags\backpack.lua
+bags\era\backpack.lua
 bags\bank.lua
+bags\era\bank.lua
 
 frames\bag.lua
+frames\era\bag.lua
 
 themes\default.lua
 themes\simpledark.lua
@@ -124,6 +132,7 @@ themes\elvui.lua
 config\categorypane.lua
 config\themepane.lua
 config\currencypane.lua
+config\era\currencypane.lua
 config\itemcolorpane.lua
 config\config.lua
 config\plugin.lua
@@ -135,3 +144,4 @@ integrations\simpleitemlevel.lua
 integrations\quickfind.lua
 
 core\init.lua
+core\era\init.lua

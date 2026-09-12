@@ -93,7 +93,13 @@ AUCTIONATOR_POSTING_HISTORY = {
 ["__dbversion"] = 1,
 }
 AUCTIONATOR_VENDOR_PRICE_CACHE = {
+["159"] = 5,
+["2516"] = 0.05,
+["2947"] = 0.075,
+["3111"] = 0.075,
+["4540"] = 5,
 ["__dbversion"] = 1,
+["2512"] = 0.05,
 }
 AUCTIONATOR_RECENT_SEARCHES = {
 }

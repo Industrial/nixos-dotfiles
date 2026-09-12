@@ -14,6 +14,7 @@ Prat3DB = {
 },
 },
 ["profileKeys"] = {
+["Schneeblewob - Skullflame"] = "Default",
 ["Derpnschmerp - Skullflame"] = "Default",
 },
 ["profiles"] = {

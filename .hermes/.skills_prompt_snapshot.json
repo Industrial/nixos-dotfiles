@@ -1,10 +1,7 @@
 {
   "version": 1,
   "manifest": {
-    "hermes-enable-mcp-servers/SKILL.md": [
-      1787083868387978229,
-      578
-    ]
+    "hermes-enable-mcp-servers/SKILL.md": [1787083868387978229, 578]
   },
   "skills": [
     {

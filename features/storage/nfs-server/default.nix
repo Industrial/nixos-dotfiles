@@ -1,8 +1,5 @@
 # NFS server for fleet bulk storage (Mimir /data).
-{
-  lib,
-  ...
-}: let
+{lib, ...}: let
   # Tailscale IPv4 of Drakkar and Huginn — clients for /data exports.
   clientHosts = [
     "100.69.213.35/32" # drakkar

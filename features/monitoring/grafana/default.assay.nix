@@ -36,17 +36,20 @@ in
     fleetDashboardValidJson = assay.eq fleet.title "Fleet Overview";
     fleetDashboardHasFixedUid = assay.eq fleet.uid "fleet-overview";
     fleetDashboardRefreshes = assay.eq fleet.refresh "10s";
-    fleetQueriesUseLiveDatasourceUid = assay.eq
+    fleetQueriesUseLiveDatasourceUid =
+      assay.eq
       (builtins.all (t: t.datasource.uid == liveDsUid)
         (builtins.concatMap (p: p.targets or [])
           (builtins.filter (p: p.type != "row") fleet.panels)))
       true;
-    fleetCoversEssentials = assay.eq
+    fleetCoversEssentials =
+      assay.eq
       (builtins.all
         (t: builtins.elem t panelTitles)
         ["Hosts up" "Load average (1m)" "Memory used" "CPU busy" "Root filesystem used" "Network in" "Network out"])
       true;
-    legendsByHostLabel = assay.eq
+    legendsByHostLabel =
+      assay.eq
       (builtins.all (t: t.legendFormat == "{{host}}" || t.legendFormat == "{{host}} {{device}}")
         (builtins.concatMap (p: p.targets or [])
           (builtins.filter (p: p.type != "row") fleet.panels)))

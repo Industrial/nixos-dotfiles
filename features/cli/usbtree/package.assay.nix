@@ -21,7 +21,13 @@ let
       srcRev = src.rev;
     };
   };
-  fetchFromGitHub = args@{owner, repo, rev, hash ? null, ...}: {
+  fetchFromGitHub = args @ {
+    owner,
+    repo,
+    rev,
+    hash ? null,
+    ...
+  }: {
     inherit owner repo rev;
     inherit (args) hash;
   };
@@ -35,12 +41,17 @@ in
     isBuildRustPackage = assay.eq drv.isBuildRustPackage true;
     pname = assay.eq drv.pname "usbtree";
     version = assay.eq drv.version "0.1.1";
-    fetchedFromUpstream = assay.eq
-      (drv.src.owner == "gnomeria" && drv.src.repo == "usbtree"
+    fetchedFromUpstream =
+      assay.eq
+      (drv.src.owner
+        == "gnomeria"
+        && drv.src.repo == "usbtree"
         && drv.src.rev == "v0.1.1")
       true;
-    fetcherPinned = assay.eq
-      (builtins.stringLength drv.src.hash > 10
+    fetcherPinned =
+      assay.eq
+      (builtins.stringLength drv.src.hash
+        > 10
         && builtins.stringLength drv.cargoHash > 10)
       true;
     mainProgram = assay.eq drv.meta.mainProgram "usbtree";

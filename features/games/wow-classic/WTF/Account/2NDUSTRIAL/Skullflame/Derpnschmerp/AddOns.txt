@@ -55,3 +55,4 @@ Blizzard_ObjectiveTracker: enabled
 Blizzard_CompactRaidFrames: enabled
 OPie_Classic: disabled
 Blizzard_CombatText: enabled
+idAutomation: enabled

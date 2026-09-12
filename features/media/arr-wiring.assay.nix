@@ -12,7 +12,8 @@ let
     writers.writePython3 = fakeWriter;
   };
   lib' = {
-    inherit (builtins)
+    inherit
+      (builtins)
       attrNames
       concatStringsSep
       mapAttrs
@@ -33,7 +34,8 @@ let
   syncEnv = svc.prowlarr-sync.environment;
 
   # Each app must appear as "<app> <its declared key>" in the seed script.
-  seedLinesCorrect = builtins.all
+  seedLinesCorrect =
+    builtins.all
     (a: builtins.match ".*${a} ${keys.${a}}.*" seedText != null)
     apps;
   targets = builtins.fromJSON syncEnv.TARGETS;
@@ -43,24 +45,30 @@ in
       assay.eq (builtins.attrNames svc) ["arr-api-key-seed" "prowlarr-sync"];
     seedWantedByBoot =
       assay.eq svc."arr-api-key-seed".wantedBy ["multi-user.target"];
-    seedOrderedAfterArrUnits = assay.eq
+    seedOrderedAfterArrUnits =
+      assay.eq
       (builtins.all
         (u: builtins.elem u svc."arr-api-key-seed".after)
         (map (a: "${a}.service") apps))
       true;
     seedScriptPairsKeysWithApps = assay.eq seedLinesCorrect true;
-    seedScriptIdempotentSkip = assay.eq
+    seedScriptIdempotentSkip =
+      assay.eq
       (builtins.match ".*already match.*" seedText != null)
       true;
-    syncOrderedAfterSeed = assay.eq
+    syncOrderedAfterSeed =
+      assay.eq
       (builtins.elem "arr-api-key-seed.service" svc.prowlarr-sync.after)
       true;
     syncIsOneshot = assay.eq svc.prowlarr-sync.serviceConfig.Type "oneshot";
-    syncTargetsUseDeclaredKeys = assay.eq
+    syncTargetsUseDeclaredKeys =
+      assay.eq
       (targets.radarr.key == keys.radarr && targets.sonarr.key == keys.sonarr)
       true;
-    syncTargetPortsMatchRegistry = assay.eq
-      (targets.radarr.url == "http://127.0.0.1:7878"
+    syncTargetPortsMatchRegistry =
+      assay.eq
+      (targets.radarr.url
+        == "http://127.0.0.1:7878"
         && !targets ? prowlarr)
       true;
   }

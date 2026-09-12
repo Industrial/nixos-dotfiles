@@ -18,10 +18,12 @@ in
     evaluatesToAttrset = assay.eq (builtins.isAttrs generated) true;
     exposesRootCrate = assay.eq (has "rootCrate") true;
     exposesWorkspaceMembers = assay.eq (has "workspaceMembers") true;
-    rootCrateIsOomkiller = assay.eq
+    rootCrateIsOomkiller =
+      assay.eq
       (generated.rootCrate.packageId or "")
       "oomkiller";
-    singleWorkspaceMember = assay.eq
+    singleWorkspaceMember =
+      assay.eq
       (builtins.attrNames generated.workspaceMembers)
       ["oomkiller"];
   }

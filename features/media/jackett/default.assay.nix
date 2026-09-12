@@ -17,7 +17,8 @@ in
   assay.suite "jackett" {
     enabled = assay.eq opts.services.jackett.enable true;
     port9117 = assay.eq opts.services.jackett.port 9117;
-    dataDirOnNfsVolume = assay.eq
+    dataDirOnNfsVolume =
+      assay.eq
       opts.services.jackett.dataDir "/data/services/jackett";
     groupDataForNfs = assay.eq opts.services.jackett.group "data";
   }

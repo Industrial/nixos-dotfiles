@@ -1,6 +1,7 @@
 
 TipTac_Config = {
 ["profileKeys"] = {
+["Schneeblewob - Skullflame"] = "Default",
 ["Derpnschmerp - Skullflame"] = "Default",
 },
 ["profiles"] = {

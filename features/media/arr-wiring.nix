@@ -28,39 +28,39 @@
   keyLines = lib.concatStringsSep "\n" (map (n: "${n} ${apiKeys.${n}}") appList);
 
   seedScript = pkgs.writeShellScript "arr-api-key-seed" ''
-    set -eu
-    todo=""
-    while read -r app want; do
-      case "''${app:-}" in "") continue ;; esac
-      cfg="/data/services/$app/config.xml"
-      [[ -f "$cfg" ]] || { echo "skip $app (not initialised yet)"; continue; }
-      if grep -q '<ApiKey>' "$cfg"; then
-        cur="$(sed -n 's@.*<ApiKey>\([^<]*\)</ApiKey>.*@\1@p' "$cfg")"
-        [[ "$cur" == "$want" ]] && continue
-        sed -i "s@<ApiKey>[^<]*</ApiKey>@<ApiKey>$want</ApiKey>@" "$cfg"
-      else
-        # First-run file without an ApiKey element: insert one.
-        grep -q '</Config>' "$cfg" || { echo "skip $app (unrecognised xml)"; continue; }
-        sed -i "s@</Config>@  <ApiKey>$want</ApiKey>\n</Config>@" "$cfg"
-      fi
-      echo "seeded api key: $app"
-      todo="$todo $app"
-    done <<EOF
-${keyLines}
-EOF
-    if [[ -n "$todo" ]]; then
-      # Stop -> seed happened above -> start, so apps never persist their
-      # old in-memory key back over the file.
-      for app in ${lib.concatStringsSep " " appList}; do
-        [[ " $todo " == *" $app "* ]] && systemctl stop "$app.service" 2>/dev/null || true
-      done
-      sleep 2
-      for app in ${lib.concatStringsSep " " appList}; do
-        [[ " $todo " == *" $app "* ]] && systemctl start "$app.service" 2>/dev/null || true
-      done
-    else
-      echo "all api keys already match"
-    fi
+        set -eu
+        todo=""
+        while read -r app want; do
+          case "''${app:-}" in "") continue ;; esac
+          cfg="/data/services/$app/config.xml"
+          [[ -f "$cfg" ]] || { echo "skip $app (not initialised yet)"; continue; }
+          if grep -q '<ApiKey>' "$cfg"; then
+            cur="$(sed -n 's@.*<ApiKey>\([^<]*\)</ApiKey>.*@\1@p' "$cfg")"
+            [[ "$cur" == "$want" ]] && continue
+            sed -i "s@<ApiKey>[^<]*</ApiKey>@<ApiKey>$want</ApiKey>@" "$cfg"
+          else
+            # First-run file without an ApiKey element: insert one.
+            grep -q '</Config>' "$cfg" || { echo "skip $app (unrecognised xml)"; continue; }
+            sed -i "s@</Config>@  <ApiKey>$want</ApiKey>\n</Config>@" "$cfg"
+          fi
+          echo "seeded api key: $app"
+          todo="$todo $app"
+        done <<EOF
+    ${keyLines}
+    EOF
+        if [[ -n "$todo" ]]; then
+          # Stop -> seed happened above -> start, so apps never persist their
+          # old in-memory key back over the file.
+          for app in ${lib.concatStringsSep " " appList}; do
+            [[ " $todo " == *" $app "* ]] && systemctl stop "$app.service" 2>/dev/null || true
+          done
+          sleep 2
+          for app in ${lib.concatStringsSep " " appList}; do
+            [[ " $todo " == *" $app "* ]] && systemctl start "$app.service" 2>/dev/null || true
+          done
+        else
+          echo "all api keys already match"
+        fi
   '';
 
   prowlarrSync = pkgs.writers.writePython3 "prowlarr-sync" {} ''
@@ -205,7 +205,8 @@ in {
 
   systemd.services.prowlarr-sync = {
     description = "Register *arr apps in Prowlarr and trigger indexer sync";
-    after = ["arr-api-key-seed.service" "prowlarr.service"]
+    after =
+      ["arr-api-key-seed.service" "prowlarr.service"]
       ++ map (a: "${a}.service") (builtins.attrNames (removeAttrs apps ["prowlarr"]));
     wants = ["prowlarr.service"];
     wantedBy = ["multi-user.target"];

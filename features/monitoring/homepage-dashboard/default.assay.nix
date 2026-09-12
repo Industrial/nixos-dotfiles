@@ -31,18 +31,26 @@ in
       assay.eq (builtins.elemAt search 1).Invidious.icon
       "https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/svg/invidious.svg";
     # arr stack replaced by Jackett/FlexGet/Transmission (2026-08).
-    jackettTile = assay.eq
+    jackettTile =
+      assay.eq
       (builtins.elemAt media 0).Jackett.href "http://mimir:9117";
-    flexgetTile = assay.eq
+    flexgetTile =
+      assay.eq
       (builtins.elemAt media 1).FlexGet.href "http://mimir:5050";
-    transmissionTile = assay.eq
+    transmissionTile =
+      assay.eq
       (builtins.elemAt media 2).Transmission.href "http://mimir:9091";
     noArrTiles =
       assay.eq
       (builtins.all
-        (s:
-          !(s ? "Lidarr" || s ? "Radarr" || s ? "Readarr"
-            || s ? "Prowlarr" || s ? "Sonarr" || s ? "Whisparr")
+        (
+          s:
+            !(s ? "Lidarr"
+              || s ? "Radarr"
+              || s ? "Readarr"
+              || s ? "Prowlarr"
+              || s ? "Sonarr"
+              || s ? "Whisparr")
         )
         hp.services)
       true;

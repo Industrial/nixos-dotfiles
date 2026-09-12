@@ -95,6 +95,9 @@ PawnCommon = {
 ["ClassID"] = 3,
 ["LocalizedName"] = "Hunter: Marksmanship",
 ["PerCharacterOptions"] = {
+["Schneeblewob-Skullflame"] = {
+["Visible"] = true,
+},
 },
 ["DoNotShow1HUpgrades"] = false,
 ["Role"] = "DAMAGER",
@@ -173,6 +176,9 @@ PawnCommon = {
 ["ClassID"] = 3,
 ["LocalizedName"] = "Hunter: Survival",
 ["PerCharacterOptions"] = {
+["Schneeblewob-Skullflame"] = {
+["Visible"] = true,
+},
 },
 ["DoNotShow1HUpgrades"] = false,
 ["Role"] = "DAMAGER",
@@ -186,6 +192,9 @@ PawnCommon = {
 ["ClassID"] = 3,
 ["LocalizedName"] = "Hunter: Beast Mastery",
 ["PerCharacterOptions"] = {
+["Schneeblewob-Skullflame"] = {
+["Visible"] = true,
+},
 },
 ["DoNotShow1HUpgrades"] = false,
 ["Role"] = "DAMAGER",

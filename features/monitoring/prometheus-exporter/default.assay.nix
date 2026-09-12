@@ -7,7 +7,12 @@ let
     pkgs = {};
   };
   node = mod.services.prometheus.exporters.node;
-  toSet = cs: builtins.listToAttrs (map (c: {name = c; value = true;}) cs);
+  toSet = cs:
+    builtins.listToAttrs (map (c: {
+        name = c;
+        value = true;
+      })
+      cs);
   enabledSet = toSet node.enabledCollectors;
   disabledSet = toSet node.disabledCollectors;
   # Collectors listed on both sides would silently win whichever way the
@@ -25,7 +30,8 @@ in
       netdev = true;
     };
     enabledDisabledDisjoint = assay.eq overlap [];
-    disabledSetsNonEmpty = assay.eq
+    disabledSetsNonEmpty =
+      assay.eq
       (builtins.length node.disabledCollectors > 0)
       true;
   }

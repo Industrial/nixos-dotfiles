@@ -23,23 +23,23 @@ mapfile -t hosts < <(if [[ $# -gt 0 ]]; then printf '%s\n' "$@"; else nix eval -
 
 fail=0
 for host in "${hosts[@]}"; do
-  echo "== $host =="
-  json="$(nix eval --json ".#nixosConfigurations.$host" --apply "$APPLY")" || { fail=1; continue; }
+    echo "== $host =="
+    json="$(nix eval --json ".#nixosConfigurations.$host" --apply "$APPLY")" || { fail=1; continue; }
 
-  dup_en="$(jq -r '.enabled[]' <<<"$json" | sort | uniq -d)"
-  dup_dis="$(jq -r '.disabled[]' <<<"$json" | sort | uniq -d)"
-  overlap="$(comm -12 <(jq -r '.enabled[]' <<<"$json" | sort -u) <(jq -r '.disabled[]' <<<"$json" | sort -u))"
-  echo "  enabled=$(jq '.enabled|length' <<<"$json") disabled=$(jq '.disabled|length' <<<"$json")" \
-       "dup_enabled=${dup_en:-none} dup_disabled=${dup_dis:-none} overlap=${overlap:-none}"
-  [[ -z "$dup_en$dup_dis$overlap" ]] || fail=1
+    dup_en="$(jq -r '.enabled[]' <<<"$json" | sort | uniq -d)"
+    dup_dis="$(jq -r '.disabled[]' <<<"$json" | sort | uniq -d)"
+    overlap="$(comm -12 <(jq -r '.enabled[]' <<<"$json" | sort -u) <(jq -r '.disabled[]' <<<"$json" | sort -u))"
+    echo "  enabled=$(jq '.enabled|length' <<<"$json") disabled=$(jq '.disabled|length' <<<"$json")" \
+        "dup_enabled=${dup_en:-none} dup_disabled=${dup_dis:-none} overlap=${overlap:-none}"
+    [[ -z "$dup_en$dup_dis$overlap" ]] || fail=1
 
-  unit_text="$(jq -r '.unit // ""' <<<"$json")"
-  if [[ -z "$unit_text" ]]; then
-    echo "  unit $UNIT not generated"; fail=1; continue
-  fi
-  dup_flags="$(grep -oE "$FLAG_RE" <<<"$unit_text" | sed -E 's/^--(no-)?collector\.//' | sort | uniq -d)"
-  echo "  unit ExecStart flags=$(grep -oE "$FLAG_RE" <<<"$unit_text" | wc -l) repeated=${dup_flags:-none}"
-  [[ -z "$dup_flags" ]] || fail=1
+    unit_text="$(jq -r '.unit // ""' <<<"$json")"
+    if [[ -z "$unit_text" ]]; then
+        echo "  unit $UNIT not generated"; fail=1; continue
+    fi
+    dup_flags="$(grep -oE "$FLAG_RE" <<<"$unit_text" | sed -E 's/^--(no-)?collector\.//' | sort | uniq -d)"
+    echo "  unit ExecStart flags=$(grep -oE "$FLAG_RE" <<<"$unit_text" | wc -l) repeated=${dup_flags:-none}"
+    [[ -z "$dup_flags" ]] || fail=1
 done
 
 echo "RESULT: $([[ $fail -eq 0 ]] && echo PASS || echo FAIL)"

@@ -12,7 +12,8 @@ in
     exactAppSet = assay.eq (builtins.attrNames keys) expectedApps;
     allKeysWellFormed =
       assay.eq (builtins.all plausibleKey (builtins.attrValues keys)) true;
-    noPlaceholderValues = assay.eq
+    noPlaceholderValues =
+      assay.eq
       (builtins.all (v: v != "changeme" && v != "") (builtins.attrValues keys))
       true;
   }

@@ -1,9 +1,14 @@
 # Node exporter agent for fleet-wide host monitoring (single source of truth
 # for services.prometheus.exporters.node)
-{config, lib, pkgs, ...}: {
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}: {
   services.prometheus.exporters.node = {
     enable = true;
-    port = 9002;  # Keep consistent with existing prometheus config
+    port = 9002; # Keep consistent with existing prometheus config
     enabledCollectors = [
       "systemd"
       "tcpstat"

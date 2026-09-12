@@ -15,12 +15,12 @@ fail=0
 echo "== eval: mimir merged config =="
 json="$(nix eval --json .#nixosConfigurations.mimir --apply 'cfg: let u = cfg.config.systemd.units; names = ["jellyfin" "lidarr" "sonarr" "radarr" "prowlarr" "readarr" "seerr" "invidious" "qbittorrent-nox"]; in { pg = cfg.config.services.postgresql.settings.port or null; hba = cfg.config.services.postgresql.authentication; present = builtins.listToAttrs (map (n: { name = n; value = builtins.hasAttr (n + ".service") u; }) names); homarr = builtins.hasAttr "homarr.service" u; }' 2>/dev/null | tail -1)"
 if [[ -z "$json" ]]; then echo "  EVAL FAILED (no json)"; fail=1; else
-  pg="$(jq -r '.pg' <<<"$json")"
-  hba_trust="$(jq -r '.hba' <<<"$json" | grep -c 'host invidious invidious 127.0.0.1/32 trust')"
-  missing="$(jq -r '.present | to_entries[] | select(.value == false) | .key' <<<"$json")"
-  homarr="$(jq -r '.homarr' <<<"$json")"
-  echo "  pg_port=$pg invidious_hba_trust=$hba_trust homarr_present=$homarr missing_units=${missing:-none}"
-  [[ "$pg" == "5434" && "$hba_trust" -ge 1 && "$homarr" == "false" && -z "$missing" ]] || fail=1
+    pg="$(jq -r '.pg' <<<"$json")"
+    hba_trust="$(jq -r '.hba' <<<"$json" | grep -c 'host invidious invidious 127.0.0.1/32 trust')"
+    missing="$(jq -r '.present | to_entries[] | select(.value == false) | .key' <<<"$json")"
+    homarr="$(jq -r '.homarr' <<<"$json")"
+    echo "  pg_port=$pg invidious_hba_trust=$hba_trust homarr_present=$homarr missing_units=${missing:-none}"
+    [[ "$pg" == "5434" && "$hba_trust" -ge 1 && "$homarr" == "false" && -z "$missing" ]] || fail=1
 fi
 
 echo "== runtime: mimir live checks =="

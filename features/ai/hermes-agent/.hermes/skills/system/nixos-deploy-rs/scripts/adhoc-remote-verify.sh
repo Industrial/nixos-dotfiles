@@ -23,21 +23,21 @@ bad() { echo "FAIL $1"; fail=$((fail+1)); }
 
 # Local: config/eval shape check without heavyweight gates
 if grep -q 'PATTERN-YOU-EXPECT' ./path/to/changed/file 2>/dev/null; then
-  ok "local-shape"
+    ok "local-shape"
 else
-  bad "local-shape"
+    bad "local-shape"
 fi
 
 # Remote: unit state + port probe, single round trip
 if [ -n "$host" ] && [ -f "$probe" ]; then
-  live=$(ssh "$host" 'bash -s' < "$probe" 2>/dev/null | tr -d '\n')
-  echo "LIVE $live"
-  case "$live" in
-    *active*) ok "remote-unit-active" ;;
-    *)        bad "remote-unit-active" ;;
-  esac
+    live=$(ssh "$host" 'bash -s' < "$probe" 2>/dev/null | tr -d '\n')
+    echo "LIVE $live"
+    case "$live" in
+        *active*) ok "remote-unit-active" ;;
+        *)        bad "remote-unit-active" ;;
+    esac
 elif [ -n "$host" ]; then
-  bad "remote-probe-missing-file"
+    bad "remote-probe-missing-file"
 fi
 
 # --------------------------------------------------------------------------

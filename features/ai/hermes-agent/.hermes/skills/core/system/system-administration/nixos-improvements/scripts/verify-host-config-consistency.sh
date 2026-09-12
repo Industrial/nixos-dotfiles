@@ -24,16 +24,16 @@ extract_feature_keys() {
         echo "Error: Flake file not found: $flake_path" >&2
         return 1
     fi
-    
+
     # Extract lines between modules = [ and ];
     awk '/modules = \[/,/];/' "$flake_path" | \
-    # Remove the brackets lines
+        # Remove the brackets lines
     sed '1d;$d' | \
-    # Process each line: strip whitespace, remove leading # and whitespace after
+        # Process each line: strip whitespace, remove leading # and whitespace after
     sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | \
-    # Remove empty lines and comments-only lines
+        # Remove empty lines and comments-only lines
     grep -v '^$' | sed 's/^#//' | \
-    # Remove leading whitespace that might remain after comment removal
+        # Remove leading whitespace that might remain after comment removal
     sed 's/^[[:space:]]*//'
 }
 
@@ -63,15 +63,15 @@ for host in "${HOSTS[@]}"; do
         echo "✓ $host: Reference host"
         continue
     fi
-    
+
     HOST_KEYS=$(extract_feature_keys "$HOSTS_DIR/$host/flake.nix")
     HOST_EXIT_CODE=$?
-    
+
     if [ $HOST_EXIT_CODE -ne 0 ]; then
         ALL_PASS=false
         continue
     fi
-    
+
     if [ "$REFERENCE_KEYS" = "$HOST_KEYS" ]; then
         echo "✓ $host: Feature lists match"
     else

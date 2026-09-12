@@ -1,11 +1,17 @@
 
 PlaterDB = {
 ["captured_spells"] = {
-[22888] = {
-["source"] = "Overlord Runthak",
-["type"] = "BUFF",
+[6751] = {
+["type"] = "DEBUFF",
+["source"] = "Scorpid Worker",
 ["event"] = "SPELL_AURA_APPLIED",
-["npcID"] = 173758,
+["npcID"] = 3124,
+},
+[11918] = {
+["type"] = "DEBUFF",
+["source"] = "Sarkoth",
+["event"] = "SPELL_AURA_APPLIED",
+["npcID"] = 3281,
 },
 [16609] = {
 ["source"] = "Thrall",
@@ -13,8 +19,15 @@ PlaterDB = {
 ["event"] = "SPELL_AURA_APPLIED",
 ["npcID"] = 4949,
 },
+[22888] = {
+["source"] = "Overlord Runthak",
+["type"] = "BUFF",
+["event"] = "SPELL_AURA_APPLIED",
+["npcID"] = 173758,
+},
 },
 ["profileKeys"] = {
+["Schneeblewob - Skullflame"] = "Default",
 ["Derpnschmerp - Skullflame"] = "Default",
 },
 ["captured_casts"] = {
@@ -3990,14 +4003,14 @@ PlaterDB = {
 ["Explosion Affix M+"] = 14,
 ["Cast - Shield Interrupt"] = 2,
 ["Aura - Debuff Alert"] = 12,
-["Add - Important [P]"] = 4,
+["Cast - Ultra Important"] = 14,
 ["Add - Warning [P]"] = 5,
 ["Cast - Castbar is Timer [P]"] = 2,
-["Cast - Ultra Important"] = 14,
+["Aura While Casting [P]"] = 1,
 ["Cast - Big Alert"] = 14,
 ["Add - Explode on Die [P]"] = 1,
 ["Cast - Small Alert"] = 12,
-["Cast - Quick Flash"] = 2,
+["Add - Important [P]"] = 4,
 ["Cast - Stop Casting"] = 4,
 ["Auto Set Skull"] = 11,
 ["Countdown"] = 12,
@@ -4009,7 +4022,7 @@ PlaterDB = {
 ["Spiteful Affix"] = 3,
 ["Fixate"] = 11,
 ["Cast - Glowing [P]"] = 10,
-["Aura While Casting [P]"] = 1,
+["Cast - Quick Flash"] = 2,
 ["Cast - Alert + Timer [P]"] = 4,
 ["Fixate On You"] = 12,
 },
@@ -4028,7 +4041,7 @@ PlaterDB = {
 ["Hide Neutral Units"] = 1,
 },
 ["aura2_x_offset"] = 0,
-["login_counter"] = 4,
+["login_counter"] = 16,
 ["plate_config"] = {
 ["global_health_height"] = 12,
 ["global_health_width"] = 112,
@@ -4799,6 +4812,18 @@ PlaterLanguage = {
 }
 PlaterLogs = {
 ["_general_logs"] = {
+"2026-09-13 00:53:54 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:52:58 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:52:41 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:52:19 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:51:27 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:44:49 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:36:02 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:35:44 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:34:08 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Schneeblewob",
+"2026-09-13 00:32:00 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Derpnschmerp",
+"2026-09-13 00:31:31 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Derpnschmerp",
+"2026-09-13 00:06:27 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Derpnschmerp",
 "2026-09-13 00:01:59 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Derpnschmerp",
 "2026-09-13 00:01:49 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Derpnschmerp",
 "2026-09-13 00:00:25 | INIT | Plater-v654-Vanilla | Framework v755 | 1.15.9 | enUS | Derpnschmerp",

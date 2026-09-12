@@ -1,8 +1,6 @@
 
 PawnOptions = {
 ["LastVersion"] = 2.1315,
-["LastPlayerFullName"] = "Derpnschmerp-Skullflame",
-["AutoSelectScales"] = false,
 ["ItemLevels"] = {
 [5] = {
 ["ID"] = 6139,
@@ -20,6 +18,8 @@ PawnOptions = {
 ["Link"] = "|cff9d9d9d|Hitem:6124::::::::1::::::::::|h[Novice's Pants]|h|r",
 },
 },
+["AutoSelectScales"] = false,
+["LastPlayerFullName"] = "Derpnschmerp-Skullflame",
 }
 PawnMrRobotScaleProviderOptions = nil
 PawnClassicScaleProviderOptions = {

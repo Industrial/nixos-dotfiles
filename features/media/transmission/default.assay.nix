@@ -31,11 +31,13 @@ in
     homeOnNfsVolume = assay.eq opts.services.transmission.home directoryPath;
     groupDataForNfs = assay.eq opts.services.transmission.group "data";
     rpcPort9091Default = assay.eq (s ? "rpc-port") false;
-    whitelistsOff = assay.eq
+    whitelistsOff =
+      assay.eq
       (s.rpc-host-whitelist-enabled == false && s.rpc-whitelist-enabled == false)
       true;
     bindAllInterfaces = assay.eq s.rpc-bind-address "0.0.0.0";
-    downloadsUnderServiceVolume = assay.eq
+    downloadsUnderServiceVolume =
+      assay.eq
       s.download-dir "${directoryPath}/downloads";
     peerPort51413Default = assay.eq opts.services.transmission.openPeerPorts true;
   }

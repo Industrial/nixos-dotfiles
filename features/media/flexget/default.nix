@@ -3,7 +3,11 @@
 # Uses the native services.flexget module; the YAML below is embedded into
 # the Nix store at eval time and installed by the unit's ExecStartPre, so
 # the repo stays the single source of truth with no host-clone dependency.
-{pkgs, lib, ...}: let
+{
+  pkgs,
+  lib,
+  ...
+}: let
   directoryPath = "/data/services/flexget";
   # nixpkgs' flexget omits the 'cryptography' dependency that upstream's
   # utils/waf module imports during daemon startup (crashes with
@@ -16,10 +20,12 @@
     # nixpkgs builds from the GitHub tarball where ui/v2/dist is only a
     # "build it yourself" stub page; the PyPI wheel ships the prebuilt
     # bundle. Replace the stub with the real UI.
-    postInstall = (old.postInstall or "") + ''
-      rm -rf "$out/${py.sitePackages}/flexget/ui/v2"
-      cp -r "${webui}/share/webui" "$out/${py.sitePackages}/flexget/ui/v2"
-    '';
+    postInstall =
+      (old.postInstall or "")
+      + ''
+        rm -rf "$out/${py.sitePackages}/flexget/ui/v2"
+        cp -r "${webui}/share/webui" "$out/${py.sitePackages}/flexget/ui/v2"
+      '';
   });
 in {
   services.flexget = {

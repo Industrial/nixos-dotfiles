@@ -16,7 +16,8 @@ let
     then builtins.readFile ./config/config.xml
     else "";
   declaredKey = (import ../api-keys.nix).readarr;
-  liveKey = builtins.head
+  liveKey =
+    builtins.head
     (builtins.match ".*<ApiKey>([^<]*)</ApiKey>.*" configSrc);
 in
   assay.suite "readarr" {
@@ -24,20 +25,25 @@ in
     systemUser = assay.eq mod.users.users.readarr.isSystemUser true;
     activationScriptDeclared =
       assay.eq (mod.system.activationScripts ? readarrConfig) true;
-    linksDeclarativeConfig = assay.eq
+    linksDeclarativeConfig =
+      assay.eq
       (builtins.match ".*/data/dotfiles/features/media/readarr/config/config.xml.*" activation != null)
       true;
-    symlinksIdempotently = assay.eq
+    symlinksIdempotently =
+      assay.eq
       (builtins.match ".*ln -sfn .*" activation != null)
       true;
-    backsUpDivergentLiveFile = assay.eq
+    backsUpDivergentLiveFile =
+      assay.eq
       (builtins.match ".*cmp -s.*target.*source.*" activation != null)
       true;
-    degradesWithoutRepoClone = assay.eq
+    degradesWithoutRepoClone =
+      assay.eq
       (builtins.match ".*keeping existing config.*" activation != null)
       true;
     repoConfigPresent = assay.eq configExists true;
-    repoConfigHasPort = assay.eq
+    repoConfigHasPort =
+      assay.eq
       (builtins.match ".*<Port>8787</Port>.*" configSrc != null)
       true;
     repoConfigKeyMatchesApiKeys = assay.eq liveKey declaredKey;
