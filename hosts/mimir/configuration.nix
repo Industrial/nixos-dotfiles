@@ -13,7 +13,6 @@
     ../../profiles/desktop.nix
     ../../profiles/development.nix
     #../../profiles/gaming.nix
-    #../../profiles/learning.nix
 
     ../../features/fleet/nix-remote-builder-client.nix
     ../../features/fleet/remote-access.nix

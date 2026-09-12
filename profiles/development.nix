@@ -10,7 +10,7 @@
 }: {
   imports = [
     ../features/finance/tws
-    ../features/finance/ib-gateway
+    # ../features/finance/ib-gateway
     # ../features/programming/meld
     ../features/programming/neovim
     # ../features/programming/terraform
