@@ -5,7 +5,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-HOSTS=(drakkar huginn mimir)
+HOSTS=(drakkar huginn mimir muninn)
 
 deploy_cmd() {
   nix run --accept-flake-config github:serokell/deploy-rs -- "$@"
