@@ -20,6 +20,8 @@
   '';
 
   # TODO: We need a way to manage the MCP servers. Add the JSON file to the .config/Cursor/mcp.json and link it correctly.
+  emeraldVscodeExtension = import ../emerald/vscode-extension.nix {inherit inputs pkgs;};
+
   # Override license for unfree extensions to allow evaluation
   allowUnfreeExtension = drv:
     drv.overrideAttrs (prev: {
@@ -124,6 +126,9 @@
 
       # MoonScript
       extensions.vscode-marketplace.vgalaktionov.moonscript
+
+      # Emerald (built from source — not on any marketplace)
+      emeraldVscodeExtension
 
       # # Astro
       # extensions.vscode-marketplace.astro-build.astro-vscode

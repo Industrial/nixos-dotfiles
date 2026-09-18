@@ -51,6 +51,11 @@
 
     assay.url = "github:Industrial/assay";
 
+    emerald = {
+      url = "github:Industrial/emerald";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     deploy-rs = {
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";

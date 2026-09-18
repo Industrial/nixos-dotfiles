@@ -57,6 +57,12 @@ walk = "git"
 [formatter.deadnix]
 command = "deadnix"
 includes = ["*.nix"]
+# See treefmt.toml's identical exclude on [formatter.nix] below for why.
+excludes = [
+  "**/parse-fail-*.nix",
+  "**/eval-fail-*.nix",
+  "**/skills/**/templates/*.nix",
+]
 priority = 0
 
 [formatter.nix]
@@ -67,6 +73,10 @@ excludes = [
   "**/parse-fail-*.nix",
   "**/eval-fail-*.nix",
   "**/parse-okay-crlf.nix", # Contains intentional CRLF line endings
+  # Hermes agent skill "templates/*.nix" files are markdown recipes with
+  # embedded Nix fragments, not standalone valid Nix -- see treefmt.toml's
+  # identical exclude for the full explanation.
+  "**/skills/**/templates/*.nix",
 ]
 priority = 1
 

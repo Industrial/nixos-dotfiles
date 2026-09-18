@@ -57,6 +57,13 @@ walk = "git"
 [formatter.deadnix]
 command = "deadnix"
 includes = ["*.nix"]
+# Same exclude list as [formatter.nix] below -- see that block's own
+# comment on the hermes-skill-templates entry.
+excludes = [
+  "**/parse-fail-*.nix",
+  "**/eval-fail-*.nix",
+  "**/skills/**/templates/*.nix",
+]
 priority = 0
 
 [formatter.nix]
@@ -67,6 +74,17 @@ excludes = [
   "**/parse-fail-*.nix",
   "**/eval-fail-*.nix",
   "**/parse-okay-crlf.nix", # Contains intentional CRLF line endings
+  # Agent-skill "templates/*.nix" files (found in two copies --
+  # features/ai/hermes-agent/.hermes/skills/... and .cursor/.claude/
+  # skills/...) are markdown recipes with embedded Nix code *fragments*
+  # (partial let-bindings, <svc>/<Svc> placeholder tokens) meant to be
+  # copy-pasted elsewhere, not standalone valid Nix -- alejandra can't
+  # parse them (found via arr-declarative-config.nix: "unexpected
+  # TOKEN_ERROR"). Real bug is the `.nix` extension on what's actually
+  # markdown; least-risk fix here is excluding the pattern rather than
+  # renaming files several other skill docs already reference by this
+  # exact path.
+  "**/skills/**/templates/*.nix",
 ]
 priority = 1
 
