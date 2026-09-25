@@ -13,9 +13,6 @@ local events = addon:GetModule('Events')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')
 
@@ -38,7 +35,7 @@ function item.itemRowProto:Lock()
 end
 
 function item.itemRowProto:GetItemData()
-  return self.button:GetItemData()
+  return self.currentData
 end
 
 ---@param ctx Context
@@ -48,16 +45,10 @@ function item.itemRowProto:SetStaticItemFromData(ctx, data)
 end
 
 ---@param ctx Context
----@param slotkey string
-function item.itemRowProto:SetItem(ctx, slotkey)
-  local data = items:GetItemDataFromSlotKey(slotkey)
-  self:SetItemFromData(ctx, data)
-end
-
----@param ctx Context
 ---@param data ItemData
 ---@param static? boolean
 function item.itemRowProto:SetItemFromData(ctx, data, static)
+  self.currentData = data
   self.slotkey = data.slotkey
   self.button:SetSize(ctx, 20, 20)
   if static then
@@ -77,7 +68,7 @@ function item.itemRowProto:SetItemFromData(ctx, data, static)
     return
   end
 
-  self.rowButton:SetHasItem(data.itemInfo.itemIcon)
+  if self.rowButton.SetHasItem then self.rowButton:SetHasItem(data.itemInfo.itemIcon) end
 
   local quality = data.itemInfo.itemQuality
   if quality == nil then
@@ -124,6 +115,7 @@ function item.itemRowProto:ClearItem(ctx)
   events:SendMessage(ctx, 'item/ClearingRow', self)
   self.button:ClearItem(ctx)
 
+  self.currentData = nil
   self.rowButton:SetID(0)
   self.frame:SetID(0)
   self.frame:Hide()
@@ -137,20 +129,14 @@ function item.itemRowProto:ClearItem(ctx)
   self.slotkey = ""
 end
 
----@return string
+---@return string?
 function item.itemRowProto:GetCategory()
-  return self.button:GetItemData().itemInfo.category
+  return self.currentData and self.currentData.itemInfo and self.currentData.itemInfo.category or nil
 end
 
----@param ctx Context
----@return boolean
-function item.itemRowProto:IsNewItem(ctx)
-  return self.button:IsNewItem(ctx)
-end
-
----@return string
+---@return string?
 function item.itemRowProto:GetGUID()
-  return self.button:GetItemData().itemInfo.itemGUID
+  return self.currentData and self.currentData.itemInfo and self.currentData.itemInfo.itemGUID or nil
 end
 
 ---@param ctx Context
@@ -163,13 +149,14 @@ function item.itemRowProto:UpdateSearch(text)
 end
 
 ---@param ctx Context
-function item.itemRowProto:UpdateCooldown(ctx)
-  self.button:UpdateCooldown(ctx)
+---@param data ItemData
+function item.itemRowProto:UpdateCooldown(ctx, data)
+  self.button:UpdateCooldown(ctx, data)
 end
 
 local buttonCount = 0
 
-function item:OnInitialize()
+function item:Init()
   self._pool = pool:Create(self._DoCreate, self._DoReset)
 end
 
@@ -183,13 +170,6 @@ end
 ---@return ItemRow
 function item:_DoCreate(ctx)
   local i = setmetatable({}, { __index = item.itemRowProto })
-
-  -- Backwards compatibility for item data.
-  i.data = setmetatable({}, { __index = function(_, key)
-    local d = i.button:GetItemData()
-    if d == nil then return nil end
-    return i.button:GetItemData()[key]
-  end})
 
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.

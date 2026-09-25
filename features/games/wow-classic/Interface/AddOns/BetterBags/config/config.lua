@@ -138,7 +138,18 @@ function config:CreateConfig()
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
-    items = {'None', 'BetterBags'},
+    itemsFunction = function()
+      local list = {'None', 'BetterBags'}
+      local itemsModule = addon:GetModule('Items')
+      if itemsModule and itemsModule.upgradeProviders then
+        for provider in pairs(itemsModule.upgradeProviders) do
+          if provider ~= 'BetterBags' then
+            table.insert(list, provider)
+          end
+        end
+      end
+      return list
+    end,
     getValue = function(_, value)
       return value == db:GetUpgradeIconProvider()
     end,
@@ -486,6 +497,18 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetShowAllFreeSpace(bagType.kind, value)
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
+      end
+    })
+
+    f:AddCheckbox({
+      title = 'Preserve Empty Slots as Gaps',
+      description = 'When an item is used, sold, moved, or removed, keep an empty gap in its place until you close the ' .. string.lower(bagType.name) .. ' or sort it. New items appear elsewhere and never fill the gap.',
+      getValue = function(_)
+        return db:GetPreserveItemGaps(bagType.kind)
+      end,
+      setValue = function(ctx, value)
+        db:SetPreserveItemGaps(bagType.kind, value)
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
     })

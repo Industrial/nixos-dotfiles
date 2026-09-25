@@ -28,6 +28,8 @@ local stacks = addon:GetModule('Stacks')
 ---@field removedItems table<string, ItemData> A list of items that were removed since the last refresh.
 ---@field updatedItems table<string, ItemData> A list of items that were updated since the last refresh.
 ---@field emptySlotsSorted ItemData[] A sorted list of empty slots by bag and then slot.
+---@field freeSlotKeysByBag table<number, string> The first empty slot key per bag ID.
+---@field emptySlotsByBag table<number, { name: string, count: number }> The free slot count per bag ID.
 ---@field stacks Stack A stack object to manage item stacks.
 local SlotInfo = {}
 
@@ -35,6 +37,8 @@ function items:NewSlotInfo()
   return setmetatable({
       emptySlots = {},
       freeSlotKeys = {},
+      freeSlotKeysByBag = {},
+      emptySlotsByBag = {},
       totalItems = 0,
       emptySlotByBagAndSlot = {},
       dirtyItems = {},
@@ -45,7 +49,8 @@ function items:NewSlotInfo()
       updatedItems = {},
       emptySlotsSorted = {},
       deferDelete = false,
-      stacks = stacks:Create()
+      stacks = stacks:Create(),
+      visibleItemsBySlotKey = {}
     }, {__index = SlotInfo})
 end
 
@@ -89,6 +94,8 @@ function SlotInfo:StoreIfEmptySlot(name, item)
     self.emptySlotByBagAndSlot[item.bagid] = self.emptySlotByBagAndSlot[item.bagid] or {}
     self.emptySlotByBagAndSlot[item.bagid][item.slotid] = item
     self.freeSlotKeys[name] = item.slotkey
+    self.freeSlotKeysByBag = self.freeSlotKeysByBag or {}
+    self.freeSlotKeysByBag[item.bagid] = item.slotkey
     table.insert(self.emptySlotsSorted, item)
   end
 end
@@ -115,6 +122,11 @@ function SlotInfo:GetCurrentItems()
 end
 
 ---@return table<string, ItemData>
+function SlotInfo:GetVisibleItems()
+  return self.visibleItemsBySlotKey or self.itemsBySlotKey
+end
+
+---@return table<string, ItemData>
 function SlotInfo:GetPreviousItems()
   return self.previousItemsBySlotKey
 end
@@ -136,6 +148,8 @@ function SlotInfo:Update(ctx, newItems)
   self.totalItems = 0
   self.emptySlots = {}
   self.freeSlotKeys = {}
+  self.freeSlotKeysByBag = {}
+  self.emptySlotsByBag = {}
   self.addedItems = {}
   self.removedItems = {}
   self.updatedItems = {}
@@ -143,11 +157,14 @@ function SlotInfo:Update(ctx, newItems)
   self.dirtyItems = {}
   self.emptySlotsSorted = {}
   self.deferDelete = false
+  self.visibleItemsBySlotKey = {}
 end
 
 function SlotInfo:Wipe()
   self.emptySlots = {}
   self.freeSlotKeys = {}
+  self.freeSlotKeysByBag = {}
+  self.emptySlotsByBag = {}
   self.totalItems = 0
   self.previousTotalItems = 0
   self.emptySlotByBagAndSlot = {}
@@ -159,5 +176,6 @@ function SlotInfo:Wipe()
   self.updatedItems = {}
   self.emptySlotsSorted = {}
   self.deferDelete = false
+  self.visibleItemsBySlotKey = {}
   self.stacks:Clear()
 end

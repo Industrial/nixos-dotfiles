@@ -61,7 +61,14 @@ end
 function gridProto:AddCellToLastColumn(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
-  assert(cell.frame, 'the added cell must have a frame')
+  if not cell.isGap then
+    assert(cell.frame, 'the added cell must have a frame')
+  end
+  for _, existingCell in ipairs(self.cells) do
+    if existingCell == cell then
+      error("Duplicate cell detected: Cell is already in the grid under a different ID")
+    end
+  end
   local position = 0
   for i, _ in ipairs(self.cells) do
     if i % self.maxCellWidth == self.maxCellWidth - 1 then
@@ -79,8 +86,15 @@ end
 function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
-  assert(cell.frame, 'the added cell must have a frame')
+  if not cell.isGap then
+    assert(cell.frame, 'the added cell must have a frame')
+  end
   if self.idToCell[id] ~= nil then return end
+  for _, existingCell in ipairs(self.cells) do
+    if existingCell == cell then
+      error("Duplicate cell detected: Cell is already in the grid under a different ID")
+    end
+  end
   table.insert(self.cells, cell)
   self.idToCell[id] = cell
   self.cellToID[cell] = id
@@ -140,6 +154,7 @@ function gridProto:GetScrollView()
 end
 
 function gridProto:HideScrollBar()
+  if not self.scrollable then return end
   self.bar:Hide()
   self.bar:SetAlpha(0)
   self.bar:SetAttribute("nodeignore", true)
@@ -150,6 +165,7 @@ end
 -- so mouse wheel events fall through to the outer scrollable bag container.
 ---@param enabled boolean
 function gridProto:EnableMouseWheelScroll(enabled)
+  if not self.scrollable then return end
   self.frame:EnableMouseWheel(enabled)
 end
 
@@ -162,6 +178,7 @@ function gridProto:SortHorizontal()
 end
 
 function gridProto:ShowScrollBar()
+  if not self.scrollable then return end
   self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
   self.bar:Show()
@@ -176,7 +193,7 @@ end
 -- will be setpoint relative to the bottomright of the cell above this cell.
 function gridProto:DislocateCell(id)
   local cell = self.idToCell[id]
-  if not cell then return end
+  if not cell or cell.isGap then return end
   -- First, loop all the cells and figure out what cell is to the left, and to the right
   -- of this cell.
   ---@type Cell?
@@ -223,13 +240,13 @@ end
 -- with the given id.
 function gridProto:DislocateAllCellsWithID(id)
   local targetCell = self.idToCell[id]
-  if not targetCell then return end
+  if not targetCell or targetCell.isGap then return end
   local parentTop, parentLeft = self.inner:GetTop(), self.inner:GetLeft()
   if parentTop == nil or parentLeft == nil then return end
   ---@type {x: number, y: number, cell: Cell}[]
   local positions = {}
   for _, cell in pairs(self.cells) do
-    if cell.frame:IsShown() then
+    if not cell.isGap and cell.frame:IsShown() then
       -- Get the top left point of the cell.
       local x, y = cell.frame:GetLeft(), cell.frame:GetTop()
       if x and y then
@@ -243,17 +260,6 @@ function gridProto:DislocateAllCellsWithID(id)
   end
   targetCell.frame:Hide()
   targetCell.frame:ClearAllPoints()
-end
-
--- Sort will sort the cells in this grid using the given function.
----@param fn fun(a: `T`, b: `T`):boolean
-function gridProto:Sort(fn)
-  -- Guard against invalid sort functions from external addons modifying saved variables.
-  -- Use a no-op comparison function as a safe default to prevent crashes.
-  if type(fn) ~= "function" then
-    fn = function() return false end
-  end
-  table.sort(self.cells, fn)
 end
 
 ---@return number, number
@@ -299,20 +305,23 @@ function gridProto:calculateColumns(options)
   local maxCellHeight = 0
   ---@type Cell[][]
   for i, cell in ipairs(maskedCells) do
+    local cellWidth = cell.isGap and (cell.width or 37) or cell.frame:GetWidth()
+    local cellHeight = cell.isGap and (cell.height or 37) or cell.frame:GetHeight()
+
     if i ~= 1 then
-      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
-        rowWidth = cell.frame:GetWidth()
+      if rowWidth + cellWidth > options.maxWidthPerRow then
+        totalHeight = totalHeight + cellHeight + self.spacing
+        rowWidth = cellWidth
       else
-        rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+        rowWidth = rowWidth + cellWidth + self.spacing
       end
     else
-      totalHeight = cell.frame:GetHeight()
-      rowWidth = cell.frame:GetWidth()
+      totalHeight = cellHeight
+      rowWidth = cellWidth
     end
 
-    if cell.frame:GetHeight() > maxCellHeight then
-      maxCellHeight = math.ceil(cell.frame:GetHeight())
+    if cellHeight > maxCellHeight then
+      maxCellHeight = math.ceil(cellHeight)
     end
   end
 
@@ -329,21 +338,24 @@ function gridProto:calculateColumns(options)
     algorithmAttempt = algorithmAttempt + 1
 
     for i, cell in ipairs(maskedCells) do
+      local cellWidth = cell.isGap and (cell.width or 37) or cell.frame:GetWidth()
+      local cellHeight = cell.isGap and (cell.height or 37) or cell.frame:GetHeight()
+
       if i ~= 1 then
-        if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-          if currentHeight + cell.frame:GetHeight() > splitAt then
+        if rowWidth + cellWidth > options.maxWidthPerRow then
+          if currentHeight + cellHeight > splitAt then
             currentColumn = currentColumn + 1
-            currentHeight = cell.frame:GetHeight()
+            currentHeight = cellHeight
           else
-            currentHeight = currentHeight + cell.frame:GetHeight() + self.spacing
+            currentHeight = currentHeight + cellHeight + self.spacing
           end
-          rowWidth = cell.frame:GetWidth()
+          rowWidth = cellWidth
         else
-          rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+          rowWidth = rowWidth + cellWidth + self.spacing
         end
       else
-        currentHeight = cell.frame:GetHeight()
-        rowWidth = cell.frame:GetWidth()
+        currentHeight = cellHeight
+        rowWidth = cellWidth
       end
 
       if not columns[currentColumn] then
@@ -352,7 +364,7 @@ function gridProto:calculateColumns(options)
       table.insert(columns[currentColumn], cell)
 
       if currentColumn > options.columns then
-        overshoot = overshoot + cell.frame:GetHeight()
+        overshoot = overshoot + cellHeight
       end
     end
 
@@ -380,43 +392,52 @@ function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
   local w = 0
   local rowWidth = 0
   local h = 0
-  local rowStart = cells[1]
+  local currentX, currentY
+  local rowHeight = 0
+
   for i, cell in ipairs(cells) do
-    cell.frame:SetParent(self.inner)
-    cell.frame:ClearAllPoints()
-    local relativeToFrame = self.inner
-    local relativeToPoint = "TOPLEFT"
-    local spacingX = 0
-    local spacingY = 0
+    local cellWidth = cell.isGap and (cell.width or 37) or cell.frame:GetWidth()
+    local cellHeight = cell.isGap and (cell.height or 37) or cell.frame:GetHeight()
+
     if i ~= 1 then
-      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        -- Get the first cell in the previous row.
-        relativeToFrame = rowStart.frame
-        h = h + cell.frame:GetHeight() + self.spacing
-        rowWidth = cell.frame:GetWidth()
+      if rowWidth + cellWidth > options.maxWidthPerRow then
+        -- Wrap to new row
+        h = h + rowHeight + self.spacing
+        currentY = topOffset - h
+        currentX = currentOffset
+        rowWidth = cellWidth
+        rowHeight = cellHeight
         w = math.max(w, rowWidth)
-        relativeToPoint = "BOTTOMLEFT"
-        rowStart = cell
-        spacingY = -self.spacing
       else
-        local previousCell = cells[i - 1]
-        relativeToFrame = previousCell.frame
-        relativeToPoint = "TOPRIGHT"
-        spacingX = self.spacing
-        rowWidth = rowWidth + cell.frame:GetWidth() + spacingX
+        -- Same row, next cell
+        currentX = currentOffset + rowWidth + self.spacing
+        rowWidth = rowWidth + cellWidth + self.spacing
+        rowHeight = math.max(rowHeight, cellHeight)
         w = math.max(w, rowWidth)
       end
     else
-      h = h + cell.frame:GetHeight()
-      rowWidth = cell.frame:GetWidth()
+      -- First cell in column
+      h = 0
+      currentY = topOffset
+      currentX = currentOffset
+      rowWidth = cellWidth
+      rowHeight = cellHeight
       w = rowWidth
-      rowStart = cell
-      spacingX = currentOffset
-      spacingY = topOffset
     end
-    cell.frame:SetPoint("TOPLEFT", relativeToFrame, relativeToPoint, spacingX, spacingY)
-    cell.frame:Show()
+
+    if not cell.isGap then
+      cell.frame:SetParent(self.inner)
+      cell.frame:ClearAllPoints()
+      cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", currentX, currentY)
+      cell.frame:Show()
+    end
   end
+
+  -- Add the last row's height to the total column height
+  if #cells > 0 then
+    h = h + rowHeight
+  end
+
   return w, h
 end
 
@@ -487,6 +508,8 @@ function gridProto:stage(options)
     w = w - 4 ---@type number
   end
   self.inner:SetSize(w, h)
+  self.contentWidth = w
+  self.contentHeight = h
   return w, h
 end
 
@@ -537,6 +560,7 @@ function grid:CreateScrollFrame(g, parent, child)
   g.bar = bar
   g.box = box
   g.view = view
+  g.scrollBox = box
   ScrollUtil.InitScrollBoxWithScrollBar(box, bar, view)
   scrollFrameCounter = scrollFrameCounter + 1
   return box
@@ -544,17 +568,25 @@ end
 
 -- Create will create a new grid frame.
 ---@param parent Frame
+---@param isScrollable? boolean
 ---@return Grid
-function grid:Create(parent)
+function grid:Create(parent, isScrollable)
   local g = setmetatable({}, { __index = gridProto })
   ---@class Frame
-  local c = CreateFrame("Frame")
+  local c = CreateFrame("Frame", nil, parent)
 
-  ---@class WowScrollBox
-  local f = grid:CreateScrollFrame(g, parent, c)
+  if isScrollable == false then
+    g.frame = c
+    g.inner = c
+    g.scrollable = false
+  else
+    ---@class WowScrollBox
+    local f = grid:CreateScrollFrame(g, parent, c)
+    g.frame = f
+    g.inner = c
+    g.scrollable = true
+  end
 
-  g.frame = f
-  g.inner = c
   g.cells = {}
   g.idToCell = {}
   g.cellToID = {}
@@ -566,7 +598,9 @@ function grid:Create(parent)
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.spacing = 4
   g:SortHorizontal()
-  g.bar:Show()
+  if g.scrollable then
+    g.bar:Show()
+  end
   -- Fixes a bug where the frame is not visble when anchored to the parent.
   g.frame:SetSize(1,1)
   return g

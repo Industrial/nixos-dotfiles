@@ -57,7 +57,7 @@ local themes = addon:NewModule('Themes')
 -- Initialize this bare as we will be adding themes from bare files.
 themes.themes = {}
 
-function themes:OnInitialize()
+function themes:Init()
   self.windows = {
     [const.WINDOW_KIND.PORTRAIT] = {},
     [const.WINDOW_KIND.SIMPLE] = {},
@@ -291,7 +291,11 @@ function themes:resetCloseButton(button)
 end
 
 function themes:SetTitle(frame, title)
-  local theme = self.themes[db:GetTheme()]
+  -- Use GetCurrentTheme so an unregistered or unavailable saved theme falls back
+  -- to Default instead of indexing a nil theme. SetTitle can run during
+  -- OnInitialize (ADDON_LOADED), before themes:OnEnable resolves the fallback
+  -- and before a third-party theme's addon has loaded (issue #1076).
+  local theme = self:GetCurrentTheme()
   theme.SetTitle(frame, title)
   self.titles[frame:GetName()] = title
 end
@@ -415,6 +419,16 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   if not button.IconQuestTexture then
     button.IconQuestTexture = _G[buttonName.."Decoration"..theme.."IconQuestTexture"]
   end
+  if button.GetNormalTexture and button:GetNormalTexture() then
+    button:GetNormalTexture():SetTexture("")
+    button:GetNormalTexture():Hide()
+  end
+  if button.GetPushedTexture and button:GetPushedTexture() then
+    button:GetPushedTexture():SetTexture("")
+    button:GetPushedTexture():Hide()
+  end
+  if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
+  if button.NewItemTexture then button.NewItemTexture:Hide() end
   button:Show()
   return button
 end
@@ -526,10 +540,10 @@ function themes.SetupBagButton(bag, decoration)
       if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
         if bag.bankTab <= Enum.BagIndex.CharacterBankTab_6 then
           C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
-          C_Container.SortBankBags()
+          events:SendMessage(ctx, "bags/SortBank")
         else
           C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
-          C_Container.SortAccountBankBags()
+          events:SendMessage(ctx, "bags/SortWarbank")
         end
       else
         bag:Sort(ctx)

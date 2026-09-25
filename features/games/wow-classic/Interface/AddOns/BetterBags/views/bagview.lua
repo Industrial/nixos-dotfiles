@@ -1,7 +1,14 @@
+---@diagnostic disable: duplicate-set-field,duplicate-doc-field
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
 
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
@@ -9,118 +16,39 @@ local grid = addon:GetModule('Grid')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
 
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
----@class Sort: AceModule
-local sort = addon:GetModule('Sort')
-
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@param view View
 ---@param ctx Context
 local function Wipe(view, ctx)
+  debug:Log("Wipe", "Bag View Wipe")
   view.content:Wipe()
+  if view.freeSlot ~= nil then
+    view.freeSlot:Release(ctx)
+    view.freeSlot = nil
+  end
+  if view.freeReagentSlot ~= nil then
+    view.freeReagentSlot:Release(ctx)
+    view.freeReagentSlot = nil
+  end
   view.itemCount = 0
-  for _, section in pairs(view.sections) do
+  local k, section = next(view.sections)
+  while k do
+    view.sections[k] = nil
     section:ReleaseAllCells(ctx)
     section:Release(ctx)
+    k, section = next(view.sections)
   end
-  wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
+  view.sortRequired = true
+  view.isNew = true
 end
 
----@param bagid number
----@return string
-local function GetBagName(bagid)
-  local isBackpack = const.BACKPACK_BAGS[bagid] ~= nil
-  if isBackpack then
-    local bagname = bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(bagid)
-    local displayid = bagid == Enum.BagIndex.Keyring and 6 or bagid+1
-    return format("#%d: %s", displayid, bagname or "Unknown")
-  end
 
-    local id = bagid
-    if id == -1 then
-      return format("#%d: %s", 1, L:G('Bank'))
-    elseif id == -3 then
-      return format("#%d: %s", 1, L:G('Reagent Bank'))
-    else
-      return format("#%d: %s", id - 4, C_Container.GetBagName(id))
-    end
-
-end
-
--- ClearButton clears a button and makes it empty while preserving the slot,
--- but does not release it, while also adding it to the deferred items list.
----@param ctx Context
----@param view View
----@param item ItemData
-local function ClearButton(ctx, view, item)
-  local cell = view.itemsByBagAndSlot[item.slotkey]
-  local bagid, slotid = view:ParseSlotKey(item.slotkey)
-  cell:SetFreeSlots(ctx, bagid, slotid, -1)
-  view:AddDeferredItem(item.slotkey)
-  addon:GetBagFromBagID(bagid).drawOnClose = true
-end
-
--- CreateButton creates a button for an item and adds it to the view.
----@param ctx Context
----@param view View
----@param item ItemData
-local function CreateButton(ctx, view, item)
-  debug:Log("CreateButton", "Creating button for item", item.slotkey)
-  view:RemoveDeferredItem(item.slotkey)
-  local oldSection = view:GetSlotSection(item.slotkey)
-  if oldSection then
-    oldSection:RemoveCell(item.slotkey)
-  end
-  local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-  itemButton:SetItem(ctx, item.slotkey)
-  local section = view:GetOrCreateSection(ctx, GetBagName(item.bagid))
-  section:AddCell(itemButton:GetItemData().slotkey, itemButton)
-  view:SetSlotSection(itemButton:GetItemData().slotkey, section)
-end
-
----@param ctx Context
----@param view View
----@param slotkey string
-local function UpdateButton(ctx, view, slotkey)
-  view:RemoveDeferredItem(slotkey)
-  local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
-  itemButton:SetItem(ctx, slotkey)
-end
-
----@param ctx Context
----@param view View
----@param newSlotKey string
-local function AddSlot(ctx, view, newSlotKey)
-  local itemButton = view:GetOrCreateItemButton(ctx, newSlotKey)
-  local newBagid = view:ParseSlotKey(newSlotKey)
-  local newSection = view:GetOrCreateSection(ctx, GetBagName(newBagid))
-  newSection:AddCell(newSlotKey, itemButton)
-  itemButton:SetItem(ctx, newSlotKey)
-end
-
----@param view View
-local function UpdateViewSize(view)
-  local parent = view.content:GetContainer():GetParent()
-  if database:GetInBagSearch() then
-    view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
-  else
-    view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-  end
-end
 
 ---@param view View
 ---@param ctx Context
@@ -128,134 +56,168 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 local function BagView(view, ctx, bag, slotInfo, callback)
-  if ctx:GetBool('wipe') then
-    view:Wipe(ctx)
-  end
-  -- Use the section grid sizing for this view type.
-  local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
+  view:Wipe(ctx)
+  view.isNew = false
 
-  local added, removed, changed = slotInfo:GetChangeset()
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
-  for _, item in pairs(removed) do
-    ClearButton(ctx, view, item)
-  end
+  -- Draw empty slots depending on the bag view
+  local tabData = slotInfo.tabs and slotInfo.tabs[view.tabID] or {
+    items = {},
+    categories = {},
+  }
 
-  for _, item in pairs(added) do
-    CreateButton(ctx, view, item)
-  end
-
-  for _, item in pairs(changed) do
-    UpdateButton(ctx, view, item.slotkey)
+  -- Pre-create only the active sections in their precise pre-sorted order
+  for _, catData in ipairs(tabData.categories) do
+    view:GetOrCreateSection(ctx, catData.name)
   end
 
-  for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
-    for slotid, data in pairs(emptyBagData) do
-      local slotkey = view:GetSlotKey(data)
-      if C_Container.GetBagName(bagid) ~= nil then
-        local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-        if itemButton == nil then
-          itemButton = itemFrame:Create(ctx)
-          view.itemsByBagAndSlot[slotkey] = itemButton
-        end
-        itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
-        local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
-        section:AddCell(slotkey, itemButton)
+  for _, item in ipairs(tabData.items) do
+    local slotkey = item.slotkey
+    if item.isItemGap then
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      local section = view:GetOrCreateSection(ctx, category)
+      local gapCell = { isGap = true, width = 37, height = 37 }
+      section:AddCell(slotkey, gapCell)
+      view:SetSlotSection(slotkey, section)
+    elseif item.isFreeSlot then
+      local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+      itemButton:SetFreeSlots(ctx, item, -1)
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      local section = view:GetOrCreateSection(ctx, category)
+      section:AddCell(slotkey, itemButton)
+      view:SetSlotSection(slotkey, section)
+    else
+      local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+      itemButton:SetItemFromData(ctx, item)
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      local section = view:GetOrCreateSection(ctx, category)
+      section:AddCell(slotkey, itemButton)
+      view:SetSlotSection(slotkey, section)
+    end
+  end
+
+  -- Draw active sections (with sorting bypassed, since they are pre-sorted)
+  for sectionName, section in pairs(view:GetAllSections()) do
+    section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+    local layout = slotInfo.sectionLayouts and slotInfo.sectionLayouts[sectionName]
+    if layout then
+      if layout.hideHeader then
+        section:RemoveHeader()
       end
     end
+    section:Draw(bag.kind, database:GetBagView(bag.kind), false, true)
   end
 
-  for _, item in pairs(view.itemsByBagAndSlot) do
-    item:UpdateCount(ctx)
-  end
-
-  for sectionName, section in pairs(view:GetAllSections()) do
-    if section:GetCellCount() == 0 then
-      debug:Log("RemoveSection", "Removed because empty", sectionName)
-      view:RemoveSection(sectionName)
-      section:ReleaseAllCells(ctx)
-      section:Release(ctx)
+  -- Handle empty group frame
+  if view.emptyGroupFrame and view.tabID and view.tabID > 1 then
+    if #tabData.categories == 0 then
+      view.emptyGroupFrame:Show()
     else
-      debug:Log("KeepSection", "Section kept because not empty", sectionName)
-      section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-      section:Draw(bag.kind, database:GetBagView(bag.kind), true)
+      view.emptyGroupFrame:Hide()
     end
+  elseif view.emptyGroupFrame then
+    view.emptyGroupFrame:Hide()
   end
+
+  -- Sort sections if required
   view.content.maxCellWidth = sizeInfo.columnCount
-  -- Sort the sections.
-  view.content:Sort(function(a, b)
-    return sort.SortSectionsAlphabetically(view.kind, a, b)
-  end)
-  debug:StartProfile('Content Draw Stage')
-  local w, h = view.content:Draw({
+  view.sortRequired = false
+
+  -- Pass 1: Draw layout
+  for _, section in ipairs(view.content.cells) do
+    section.shouldShrinkWhenCollapsed = false
+  end
+
+  view.content:Draw({
     cells = view.content.cells,
     maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
     columns = sizeInfo.columnCount,
   })
-  debug:EndProfile('Content Draw Stage')
-  -- Reposition the content frame if the recent items section is empty.
-  if w < 160 then
-    w = 160
-  end
-  if bag.tabs and w < bag.tabs.width then
-    w = bag.tabs.width
-  end
-  -- When the bank tab slots panel is visible it is anchored to the bottom-left
-  -- of the bag frame and may be wider than the item grid.  Compute the minimum
-  -- content width so that bagWidth (w + insets + scrollbar) exactly equals the
-  -- panel frame width, preventing the panel from overflowing past the right edge.
-  if bag.slots and bag.slots:IsShown() then
-    local minW = bag.slots.frame:GetWidth()
-      - const.OFFSETS.BAG_LEFT_INSET
-      + const.OFFSETS.BAG_RIGHT_INSET
-      - const.OFFSETS.SCROLLBAR_WIDTH
-    if w < minW then
-      w = minW
+
+  -- Pass 2: Row collapse shrink optimization
+  local maxRowWidth = ((37 + 4) * sizeInfo.itemsPerRow) + 16
+  local spacing = 4
+  local rowSections = {}
+  local currentRowWidth = 0
+  local currentRow = 1
+  local needsRedraw = false
+
+  for _, section in ipairs(view.content.cells) do
+    if section.frame and section.frame:IsShown() then
+      local sectionWidth = section.frame:GetWidth()
+      if currentRowWidth > 0 and currentRowWidth + sectionWidth > maxRowWidth then
+        currentRow = currentRow + 1
+        currentRowWidth = sectionWidth
+      else
+        if currentRowWidth > 0 then
+          currentRowWidth = currentRowWidth + sectionWidth + spacing
+        else
+          currentRowWidth = sectionWidth
+        end
+      end
+
+      if not rowSections[currentRow] then
+        rowSections[currentRow] = {}
+      end
+      table.insert(rowSections[currentRow], section)
     end
   end
-  if h == 0 then
-    h = 40
-  end
-  if database:GetInBagSearch() then
-    h = h + 20
-  end
 
-  local bagHeight = h +
-  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-
-  local maxHeight = UIParent:GetHeight() * 0.90
-  local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH
-  if bagHeight > maxHeight then
-    bagHeight = maxHeight
-    view.content:ShowScrollBar()
-  else
-    view.content:HideScrollBar()
+  for _, sectionsInRow in pairs(rowSections) do
+    local allCollapsed = true
+    for _, section in ipairs(sectionsInRow) do
+      if not section:IsCollapsed() then
+        allCollapsed = false
+        break
+      end
+    end
+    for _, section in ipairs(sectionsInRow) do
+      if section.shouldShrinkWhenCollapsed ~= allCollapsed then
+        section.shouldShrinkWhenCollapsed = allCollapsed
+        needsRedraw = true
+      end
+    end
   end
 
-  bag.frame:SetWidth(bagWidth)
-  bag.frame:SetHeight(bagHeight)
-  UpdateViewSize(view)
+  if needsRedraw then
+    for _, section in ipairs(view.content.cells) do
+      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+    end
+    view.content:Draw({
+      cells = view.content.cells,
+      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+      columns = sizeInfo.columnCount,
+    })
+  end
+
+  for _, section in pairs(view.sections) do
+    debug:WalkAndFixAnchorGraph(section.frame)
+  end
+
+  view.itemCount = slotInfo.totalItems
   callback()
 end
 
 ---@param parent Frame
 ---@param kind BagKind
+---@param tabID? number
 ---@return View
-function views:NewBagView(parent, kind)
+function views:NewBagView(parent, kind, tabID)
   local view = views:NewBlankView()
   view.itemFrames = {}
   view.itemCount = 0
   view.bagview = const.BAG_VIEW.SECTION_ALL_BAGS
   view.kind = kind
-  view.content = grid:Create(parent)
+  view.tabID = tabID or 1
+  view.content = grid:Create(parent, false)
   view.content:GetContainer():ClearAllPoints()
-  view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-  view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+  view.content:GetContainer():SetAllPoints(parent)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = BagView
   view.WipeHandler = Wipe
-  view.AddSlot = AddSlot
+  view.isNew = true
 
   return view
 end

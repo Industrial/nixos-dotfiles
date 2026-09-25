@@ -17,6 +17,9 @@ local const = addon:GetModule("Constants")
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
 
+---@class Items: AceModule
+local items = addon:GetModule("Items")
+
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
@@ -90,7 +93,7 @@ function backpack.proto:OnHide(ctx)
 		-- Set up callback to handle post-hide logic
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			self.bag.searchFrame:Hide()
+			if self.bag.searchFrame then self.bag.searchFrame:Hide() end
 			if self.bag.drawOnClose then
 				debug:Log("draw", "Drawing bag on close")
 				self.bag.drawOnClose = false
@@ -101,7 +104,7 @@ function backpack.proto:OnHide(ctx)
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
-		self.bag.searchFrame:Hide()
+		if self.bag.searchFrame then self.bag.searchFrame:Hide() end
 		if self.bag.drawOnClose then
 			debug:Log("draw", "Drawing bag on close")
 			self.bag.drawOnClose = false
@@ -363,8 +366,10 @@ function backpack.proto:SwitchToGroup(ctx, groupID)
 
 	debug:Log("groups", "Switched to group: %s (ID: %d)", group.name, groupID)
 
-	-- Trigger a refresh to filter sections by group
-	events:SendMessage(ctx, "bags/RefreshBackpack")
+	self.bag.currentItemCount = -1
+	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
+	self.bag:Draw(ctx, slotInfo, function() end)
+	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 -- ShowCreateGroupDialog shows a dialog to create a new group.

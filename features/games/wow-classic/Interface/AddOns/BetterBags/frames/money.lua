@@ -94,6 +94,14 @@ function money:Create(warbank)
   events:RegisterEvent("PLAYER_MONEY", function()
     m:Update()
   end)
+  -- The frame is built during ADDON_LOADED (core/init.lua -> BagFrame:Create),
+  -- when GetMoney() still returns 0 because player data has not loaded yet.
+  -- PLAYER_MONEY does not fire on login (the amount did not change), so without
+  -- this the frame would display a stale 0 until money next changes. Refresh once
+  -- the world finishes loading (login and /reload) so the real amount is shown.
+  events:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+    m:Update()
+  end)
   return m
 end
 
@@ -110,13 +118,28 @@ function money:CreateButton(kind, parent)
   else
     b:SetPoint("RIGHT", parent, "LEFT", -4, 0)
   end
-  b:SetNormalAtlas("coin-" .. kind)
+  if addon.isRetail then
+    b:SetNormalAtlas("coin-" .. kind)
+  else
+    b:SetNormalTexture("Interface\\MONEYFRAME\\UI-MoneyIcons")
+    if kind == "copper" then
+      b:GetNormalTexture():SetTexCoord(0.5, 0.75, 0, 1)
+    elseif kind == "silver" then
+      b:GetNormalTexture():SetTexCoord(0.25, 0.5, 0, 1)
+    else
+      b:GetNormalTexture():SetTexCoord(0, 0.25, 0, 1)
+    end
+  end
   b:GetNormalTexture():ClearAllPoints()
   b:GetNormalTexture():SetPoint("RIGHT", 0, 0)
   b:GetNormalTexture():SetSize(13, 13)
   local fs = b:CreateFontString(nil, "OVERLAY")
   b:SetFontString(fs)
-  b:SetNormalFontObject("Number12Font")
+  if addon.isRetail then
+    b:SetNormalFontObject("Number12Font")
+  else
+    b:SetNormalFontObject("NumberFontNormalRight")
+  end
   fs:SetPoint("RIGHT", -13, 0)
   b:Show()
   return b

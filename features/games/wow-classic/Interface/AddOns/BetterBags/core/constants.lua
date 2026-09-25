@@ -243,9 +243,7 @@ const.WINDOW_KIND = {
 ---@enum BagView
 const.BAG_VIEW = {
   UNDEFINED = 0,
-  ONE_BAG = 1,
   SECTION_GRID = 2,
-  LIST = 3,
   SECTION_ALL_BAGS = 4,
 }
 
@@ -629,6 +627,10 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
     },
+    preserveItemGaps = {
+      [const.BAG_KIND.BACKPACK] = true,
+      [const.BAG_KIND.BANK] = true,
+    },
     extraGlowyButtons = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
@@ -699,29 +701,21 @@ const.DATABASE_DEFAULTS = {
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
-        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
-        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
       },
       [const.BAG_KIND.BANK] = {
-        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
-        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
       },
     },
     itemSort = {
       [const.BAG_KIND.BACKPACK] = {
-        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
       [const.BAG_KIND.BANK] = {
-        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
     },
@@ -740,24 +734,6 @@ const.DATABASE_DEFAULTS = {
     },
     size = {
       ---@type SizeInfo[]
-      [const.BAG_VIEW.ONE_BAG] = {
-        [const.BAG_KIND.BACKPACK] = {
-          columnCount = 15,
-          itemsPerRow = 15,
-          scale = 100,
-          width = 700,
-          height = 500,
-          opacity = 89,
-        },
-        [const.BAG_KIND.BANK] = {
-          columnCount = 1,
-          itemsPerRow = 15,
-          scale = 100,
-          width = 700,
-          height = 500,
-          opacity = 89,
-        },
-      },
       [const.BAG_VIEW.SECTION_GRID] = {
         [const.BAG_KIND.BACKPACK] = {
           columnCount = 2,
@@ -770,24 +746,6 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_KIND.BANK] = {
           columnCount = 2,
           itemsPerRow = 7,
-          scale = 100,
-          width = 700,
-          height = 500,
-          opacity = 89,
-        },
-      },
-      [const.BAG_VIEW.LIST] = {
-        [const.BAG_KIND.BACKPACK] = {
-          columnCount = 1,
-          itemsPerRow = 15,
-          scale = 100,
-          width = 700,
-          height = 500,
-          opacity = 89,
-        },
-        [const.BAG_KIND.BANK] = {
-          columnCount = 5,
-          itemsPerRow = 5,
           scale = 100,
           width = 700,
           height = 500,
@@ -872,10 +830,13 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = 1,
       [const.BAG_KIND.BANK] = 0,
     },
-    ---@type table<BagKind, table<string, number>>
+    ---@type table<BagKind, table<string, number>|table<number, table<string, number>>>
     categoryToGroup = {
       [const.BAG_KIND.BACKPACK] = {},
-      [const.BAG_KIND.BANK] = {},
+      [const.BAG_KIND.BANK] = addon.isRetail and {
+        [Enum.BankType and Enum.BankType.Character or 0] = {},
+        [Enum.BankType and Enum.BankType.Account or 2] = {},
+      } or {},
     },
     ---@type table<BagKind, number>
     activeGroup = {
@@ -889,6 +850,10 @@ const.DATABASE_DEFAULTS = {
     },
     -- Profile system migration flag
     __profileSystemMigrated = false,
+    -- Bank categories scoped by bankType migration flag
+    __bankCategoriesScopedByBankType = false,
+    -- Saved backpack dump for testing and debugging
+    debugBackpackDump = {},
   },
   char = {}
 }

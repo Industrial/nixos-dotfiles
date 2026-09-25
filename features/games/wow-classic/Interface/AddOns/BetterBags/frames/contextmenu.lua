@@ -41,7 +41,7 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field keepShownOnClick? boolean
 ---@field tooltipOnButton? boolean
 
-function contextMenu:OnInitialize()
+function contextMenu:Init()
 	self.sabt = {}
 	--self:CreateContext()
 end
@@ -108,7 +108,7 @@ function contextMenu:CreateContextMenu(bag)
 		text = addonName .. " Dev Mode",
 		--@end-debug@]==]
 		--@non-debug@
-		text = addonName..' v0.4.10',
+		text = addonName..' v0.5.4',
 		--@end-non-debug@
 		isTitle = true,
 		notCheckable = true,
@@ -221,20 +221,24 @@ function contextMenu:CreateContextMenu(bag)
 			tooltipText = L:G("Click to sort the bank."),
 			func = function()
 				PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-				C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
-				C_Container.SortBankBags()
+				if addon.isRetail and C_Bank and C_Bank.AutoDepositItemsIntoBank then
+					C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
+				end
+				events:SendMessage(context:New("SortBank"), "bags/SortBank")
 			end,
 		})
-		table.insert(menuList, {
-			text = L:G("Clean Up Warbank"),
-			notCheckable = true,
-			tooltipTitle = L:G("Clean Up Warbank"),
-			tooltipText = L:G("Click to clean up your Warbanks and resort items into correct tabs."),
-			func = function()
-				PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-				C_Container.SortAccountBankBags()
-			end,
-		})
+		if addon.isRetail and C_Container.SortAccountBankBags then
+			table.insert(menuList, {
+				text = L:G("Clean Up Warbank"),
+				notCheckable = true,
+				tooltipTitle = L:G("Clean Up Warbank"),
+				tooltipText = L:G("Click to clean up your Warbanks and resort items into correct tabs."),
+				func = function()
+					PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
+					events:SendMessage(context:New("SortWarbank"), "bags/SortWarbank")
+				end,
+			})
+		end
 	end
 
 	-- Show bag slot toggle (only if slots are available).
@@ -265,13 +269,18 @@ function contextMenu:CreateContextMenu(bag)
 					if isBank then
 						database:SetShowBankTabs(false)
 					end
+					database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
 					bag.slots:Hide()
+					events:SendMessage(ctx, 'bags/FullRefreshAll')
 				elseif bag.slots then
 					if isBank then
 						database:SetShowBankTabs(true)
 					end
+						database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
+						database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
 					bag.slots:Draw(ctx)
 					bag.slots:Show()
+					events:SendMessage(ctx, 'bags/FullRefreshAll')
 				end
 			end,
 		})

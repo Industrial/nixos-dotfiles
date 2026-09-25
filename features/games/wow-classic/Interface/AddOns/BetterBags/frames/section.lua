@@ -16,9 +16,6 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Sort: AceModule
-local sort = addon:GetModule('Sort')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -82,11 +79,10 @@ local sectionProto = {}
 ---@param kind BagKind
 ---@param view BagView
 ---@param freeSpaceShown boolean
----@param nosort? boolean
 ---@return number width
 ---@return number height
-function sectionProto:Draw(kind, view, freeSpaceShown, nosort)
-  return self:Grid(kind, view, freeSpaceShown, nosort)
+function sectionProto:Draw(kind, view, freeSpaceShown)
+  return self:Grid(kind, view, freeSpaceShown)
 end
 
 -- SetTitle will set the title of the section.
@@ -180,7 +176,11 @@ end
 ---@param ctx Context
 function sectionProto:ReleaseAllCells(ctx)
   for _, cell in pairs(self.content.cells) do
-    cell:Release(ctx)
+    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
+    -- no Release method; they must be skipped or the wipe path errors.
+    if not cell.isGap then
+      cell:Release(ctx)
+    end
   end
 end
 
@@ -194,6 +194,8 @@ function sectionProto:Wipe()
   self.frame:SetAlpha(1)
   self.collapsed = false
   self.shouldShrinkWhenCollapsed = true
+  self.removeHeader = false
+  self.title:Show()
   -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
   -- Note: We don't restore the color here because SetTitle always explicitly sets it,
   -- ensuring pooled sections don't bleed custom colors to other categories.
@@ -215,6 +217,10 @@ end
 
 function sectionProto:EnableHeader()
   self.headerDisabled = false
+end
+
+function sectionProto:RemoveHeader()
+  self.removeHeader = true
 end
 
 ---@param item Item|ItemRow
@@ -261,21 +267,12 @@ end
 
 -- Grid will render the section as a grid of icons.
 ---@param kind BagKind
----@param view BagView
----@param freeSpaceShown boolean
----@param nosort? boolean
+---@param _view BagView
+---@param _freeSpaceShown boolean
 ---@return number width
 ---@return number height
-function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
+function sectionProto:Grid(kind, _view, _freeSpaceShown)
   self.kind = kind
-
-  if not nosort then
-    if freeSpaceShown then
-      self.content:Sort(sort.GetItemSortBySlot)
-    else
-      self.content:Sort(sort:GetItemSortFunction(kind, view))
-    end
-  end
 
   local w, h = self.content:Draw({
     cells = self.content.cells,
@@ -292,9 +289,16 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   end
 
   local fullWidth = w + 12
-  local fullHeight = h + self.title:GetHeight() + 6
-
-  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  local fullHeight
+  if self.removeHeader then
+    self.title:Hide()
+    fullHeight = h
+    self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 6, 0)
+  else
+    self.title:Show()
+    fullHeight = h + self.title:GetHeight() + 6
+    self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  end
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
 
   -- If collapsed, hide content and optionally shrink frame
@@ -312,7 +316,7 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
     end
     -- Only shrink if we're allowed to (no other expanded sections in our row)
     if self.shouldShrinkWhenCollapsed then
-      local collapsedHeight = self.title:GetHeight() + 6
+      local collapsedHeight = self.removeHeader and 0 or (self.title:GetHeight() + 6)
       self.frame:SetSize(fullWidth, collapsedHeight)
     else
       -- Keep full height but hide content
@@ -333,14 +337,14 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   end
 
   self.frame:Show()
-  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.title:GetHeight() + 6) or fullHeight
+  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.removeHeader and 0 or (self.title:GetHeight() + 6)) or fullHeight
 end
 
 -------
 --- Section Frame
 -------
 
-function sectionFrame:OnInitialize()
+function sectionFrame:Init()
   self._pool = pool:Create(self._DoCreate, self._DoReset)
   events:RegisterEvent('MODIFIER_STATE_CHANGED', function()
     if self.currentTooltip then
@@ -446,12 +450,14 @@ function sectionFrame:PerformDrop()
   if not kind then return end
 
   local dropCtx = context:New("CategoryDropOnTab")
+  local group = groups:GetGroup(kind, tabID)
+  local bankType = group and group.bankType
   if groups:IsDefaultGroup(kind, tabID) then
     -- Dropping on default tabs removes group assignment
-    groups:RemoveCategoryFromGroup(dropCtx, kind, category)
+    groups:RemoveCategoryFromGroup(dropCtx, kind, category, bankType)
   else
     -- Dropping on other group assigns to that group
-    groups:AssignCategoryToGroup(dropCtx, kind, category, tabID)
+    groups:AssignCategoryToGroup(dropCtx, kind, category, tabID, bankType)
   end
 
   local eventsModule = addon:GetModule("Events")

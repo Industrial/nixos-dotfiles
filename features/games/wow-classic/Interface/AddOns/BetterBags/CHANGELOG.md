@@ -1,35 +1,54 @@
 # BetterBags
 
-## [v0.4.10](https://github.com/Cidan/BetterBags/tree/v0.4.10) (2026-07-03)
-[Full Changelog](https://github.com/Cidan/BetterBags/compare/v0.4.9...v0.4.10) [Previous Releases](https://github.com/Cidan/BetterBags/releases)
+## [v0.5.4](https://github.com/Cidan/BetterBags/tree/v0.5.4) (2026-09-14)
+[Full Changelog](https://github.com/Cidan/BetterBags/compare/v0.5.3...v0.5.4) [Previous Releases](https://github.com/Cidan/BetterBags/releases)
 
-- fix(views): bypass custom group-filtering when bank slots panel is active (#988)  
-    * fix(views): bypass custom group-filtering when bank slots panel is active  
-    - What changed: Modified views/gridview.lua to skip custom section/category group-filtering when the bank slots panel is active (bag.kind == const.BAG\_KIND.BANK and database:GetShowBankTabs() is true).  
-    - Why: When the bank slots panel is active, custom BetterBags group tabs at the bottom are hidden, but custom group-filtering remained active. This filtered out all categories that did not belong to the hidden active group, hiding most items from the view and leaving the player with no way to change the group.  
-    - Tests: Added a comprehensive unit test file spec/views/gridview\_spec.lua to reproduce and verify the fix. Also updated spec/views/bagview\_spec.lua to ensure its stubs are compatible when running the spec suite in bulk.  
-    * Revert "fix(views): bypass custom group-filtering when bank slots panel is active"  
-    * fix(views): bypass custom group-filtering when bank slots panel is active  
-    - What changed: Modified views/gridview.lua to skip custom section/category group-filtering when the bank slots panel is active (bag.kind == const.BAG\_KIND.BANK and database:GetShowBankTabs() is true).  
-    - Why: When the bank slots panel is active on Retail, custom BetterBags group tabs at the bottom are hidden, but custom group-filtering remained active. This filtered out all categories/items that did not belong to the hidden active custom group, causing different/wrong/missing items to be shown in different tabs and leaving the player with no way to change the active group.  
-    - Tests: Added a clean, isolated unit test file spec/views/gridview\_spec.lua to reproduce and verify the fix.  
-    * test(views): resolve global test state pollution and module stub collisions  
-    - Fix global test state pollution and duplicate module registration errors by updating 'ResetModuleStub' in 'spec/helpers/addon\_loader.lua' to safely reset 'loadedModules[filePath]' and making 'filePath' optional.  
-    - Update 'spec/views/bagview\_spec.lua' to align SectionFrame's mock prototype with gridview\_spec, preventing views.lua GetOrCreateSection from crashing on a nil SetTitle call when run in bulk.  
-    - Prepend LoadBetterBagsModule calls with ResetModuleStub across spec files (bankslots\_spec, money\_spec, section\_spec, groups\_spec, movementflow\_spec, sort\_spec, themes\_spec) to guarantee clean reloading and isolate mock mutations.  
-    - Convert themes\_spec's 'after\_each' reset logic to 'teardown' to avoid prematurely wiping the real Themes module from the addon during active tests.  
-    - Verify 100% of the test suite (865 successes) passes without regressions.  
-- fix: count free bank slots per selected Blizzard tab in Retail (#987)  
-    - Restrict free slot counting to the currently selected bank/warbank tab (blizzardBankTab) in items:UpdateFreeSlots when Show Bank Tabs is enabled on Retail WoW.  
-    - Previously, UpdateFreeSlots summed free slots across all character bank bags or all warbank bags irrespective of the selected tab, resulting in identical free slot counts displayed across all tabs.  
-    - Added comprehensive unit tests in spec/items\_spec.lua to verify the slot-filtering behavior, ensuring it is restricted on Retail and falls back to normal sum/classic behavior when appropriate.  
-    - Confirmed passing tests under Lua 5.1 and verified code quality using luacheck.  
-- fix(items): defensively handle secret and incomplete client-side items (Issue #984)  
-    - Add defensive fallbacks and guards across items module entry points to handle nil/incomplete return values from WoW APIs (GetItemInfo, GetDetailedItemLevelInfo, etc.)  
-    - Safely populate defaults for itemInfo, containerInfo, questInfo, and transmogInfo to prevent lua index/nil errors.  
-    - Ensure items:GetCategory and items:GenerateItemHash fall back gracefully without indexing or formatting crashes.  
-    - Add robust unit tests in spec/items\_spec.lua validating no crashes and proper fallback state under mock nil WoW API environments.  
-- fix: restore group tabs on slots panel close if groups are enabled (#985)  
-    On fresh load, early GenerateGroupTabs pre-hides the group tabs. When the slot panel is shown immediately after, it captures self.tabsWereShown = false. When toggling 'Show Bags' off, OnClose sees false and never shows them again.  
-    This fix introduces a database-driven fallback check in bankslots.lua, bagslots.lua, and era/bagslots.lua so that when closing the slots panel, if self.tabsWereShown is false but groups are enabled, the group tabs frame is correctly restored.  
-    We also added a TDD unit test to verify this fallback behavior.  
+- fix: bank/warbank cross-merge + bag-bar highlight; repo/packaging cleanup (#1083)  
+    * fix: stop bank/warbank cross-merge; keep bag-bar highlight in sync on X/ESC  
+    Two independent bag-visibility bugs.  
+    1) Cross bank-type virtual stacking (issue: "items merge across tabs and  
+       across bank types" with Unmerge on Interactions off).  
+       The virtual stack is keyed only by item.itemHash. On Retail the bank sweep  
+       loads the Character Bank (BANK\_BAGS/base bank) and the Warbank  
+       (ACCOUNT\_BANK\_BAGS) into one unified itemData and only partitions them into  
+       tabs downstream, but Phase7\_ApplyVirtualStacks runs before that partition.  
+       With no location component in the hash, an identical item in the Character  
+       Bank and in the Warbank collided into one stack: only the root survived in  
+       visibleItemsBySlotKey and the other physical pile vanished, so the item  
+       appeared to merge across bank types/tabs.  
+       Fix: items:GenerateItemHash appends a bank-scope discriminator ("W" when  
+       const.ACCOUNT\_BANK\_BAGS[data.bagid], else ""). Character-Bank bags keep the  
+       empty scope and still stack together; all Warbank tabs share "W" and still  
+       stack together; the two groups can never share a hash. Guarded on  
+       const.ACCOUNT\_BANK\_BAGS (Retail-only), so the backpack and non-retail hashes  
+       are byte-for-byte unchanged. Scoping by bank type (not tab) is sufficient  
+       because within a bank type an item's tab is a function of its category and  
+       identical items share a category/tab.  
+    2) Bag-bar button highlight stuck lit after closing via the "X" button or ESC.  
+       addon:UpdateButtonHighlight was only called from addon.OnUpdate, i.e. only  
+       when the backpack was toggled through addon:ToggleAllBags. The theme "X"  
+       button calls frame.Owner:Hide directly, and ESC hides the frame widget  
+       directly (UISpecialFrames), so neither cleared the Blizzard bag-bar  
+       SlotHighlightTexture.  
+       Fix: hook the backpack frame's own OnShow/OnHide in OnInitialize to call  
+       UpdateButtonHighlight, so the highlight tracks every show/hide path (toggle,  
+       X, ESC, direct Hide, fade OnFinished). Hooking our own insecure frame and  
+       toggling an insecure texture is taint-free and idempotent with OnUpdate.  
+    Tests: new "bank/warbank virtual stacking isolation" cases and a  
+    "clears the bag-bar highlight when the backpack frame hides (X / ESC path)"  
+    case; init/backpack-button mocks now expose a real bag frame. Full suite  
+    946 passing, luacheck clean. Rules documented in virtual-stacks.md (§6) and  
+    initialization.md (§6).  
+    * chore: remove committed PR-draft junk and stop shipping dev files  
+    - Delete 18 stray pr\_*/pr\_description*/pr\_message.txt PR-body drafts and the  
+      leftover ask/plans/start/plan.md agent plan. None are referenced by code,  
+      tests, or tooling, and all were being bundled into the packaged addon.  
+    - Tighten .pkgmeta ignore so dev-only files no longer ship to users: add  
+      .context, .vscode, docs, test.lua, .luacheckrc, .luacov, .luarc.json,  
+      CLAUDE.md, GEMINI.md, AGENTS.md. test.lua in particular is a multi-thousand  
+      line SavedVariables dump used only by the spec harness.  
+    - Fix a stale ignore entry: the list had `.roo`, but the tracked file is  
+      `.roomodes`; correct it so it actually excludes.  
+    test.lua is retained in the repo (spec/debug\_dump\_harness\_spec.lua and  
+    spec/bank\_tab\_category\_routing\_spec.lua dofile it) but no longer packaged.  
+    Full suite still 946 passing.  

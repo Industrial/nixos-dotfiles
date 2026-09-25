@@ -66,6 +66,9 @@ local quickfind = addon:GetModule('QuickFind')
 ---@class Refresh: AceModule
 local refresh = addon:GetModule('Refresh')
 
+---@class ItemLoader: AceModule
+local itemLoader = addon:GetModule('ItemLoader')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
@@ -128,14 +131,79 @@ local function CheckKeyBindings()
   end
 end
 
+local function applyCompat()
+  C_Timer.After(5, function()
+    if C_AddOns.IsAddOnLoaded("BetterBagsElvUISkin") then
+      question:Alert("Disable ElvUI Plugin", "The ElvUI BetterBags plugin you have installed is not compatible with BetterBags. It has been disabled -- please reload your UI to apply the changes.")
+      C_AddOns.DisableAddOn("BetterBagsElvUISkin")
+    end
+  end)
+
+  -- PatchWerk breaks every WoW addon by patching functions globally, even addons
+  -- it is not configured to patch. Detect it early and force the user to disable it.
+  C_Timer.After(2, function()
+    if C_AddOns.IsAddOnLoaded("PatchWerk") then
+      StaticPopupDialogs["BETTERBAGS_PATCHWERK_CONFLICT"] = {
+        text = "BetterBags has detected that the addon |cFFFF4400PatchWerk|r is loaded.\n\nPatchWerk breaks every WoW addon, even addons it is not configured to patch. You must disable PatchWerk entirely for BetterBags and other addons to work correctly.\n\nClick 'Disable & Reload' to disable PatchWerk and reload your UI.",
+        button1 = "Disable & Reload",
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = false,
+        preferredIndex = 3,
+        OnAccept = function()
+          C_AddOns.DisableAddOn("PatchWerk")
+          ReloadUI()
+        end,
+      }
+      StaticPopup_Show("BETTERBAGS_PATCHWERK_CONFLICT")
+    end
+  end)
+end
+
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
-  -- Disable the bag tutorial screens, as Better Bags does not match
-  -- the base UI/UX these screens refer to.
-  if addon.isRetail then
-		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
-		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
-	end
+  -- 1. Core and Utilities
+  events:Init()
+  debug:Init()
+  async:Init()
+  addon:GetModule('Bucket'):Init()
+
+  -- 2. Database (DB must be initialized before other data/UI modules read config)
+  database:Init()
+
+  -- 3. Data Models and Scanners
+  addon:GetModule('TooltipScanner'):Init()
+  itemLoader:Init()
+  categories:Init()
+  addon:GetModule('Groups'):Init()
+  addon:GetModule('EquipmentSets'):Init()
+  search:Init()
+  items:Init()
+  refresh:Init()
+
+  -- 4. Themes and Presentation Frames
+  themes:Init()
+  itemFrame:Init()
+  sectionFrame:Init()
+  contextMenu:Init()
+  addon:GetModule('BagButton'):Init()
+  addon:GetModule('ItemRowFrame'):Init()
+
+  -- 5. Integrations
+  consoleport:Init()
+
+  applyCompat()
+  self:HideBlizzardBags()
+  local rootctx = context:New('addon_initialize')
+  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+
+  -- Establish the bag-button bindings and the highlight-button list before any
+  -- of the fallible frame/theme/bank creation below. AceAddon runs
+  -- OnInitialize inside a safecall (xpcall): if a later step throws, the addon
+  -- still proceeds to OnEnable and hooks ToggleAllBags, so UpdateButtonHighlight
+  -- would iterate a nil addon._buttons on every bag toggle (issue #1076). Keep
+  -- this immediately after the Backpack frame exists (UpdateButtonHighlight
+  -- reads addon.Bags.Backpack) and before everything that can fail.
   addon._bindingFrame = addon._bindingFrame or CreateFrame("Frame")
   addon._bindingFrame:RegisterEvent("PLAYER_LOGIN")
   addon._bindingFrame:RegisterEvent("UPDATE_BINDINGS")
@@ -153,12 +221,59 @@ function addon:OnInitialize()
     table.insert(addon._buttons, CharacterReagentBag0Slot)
   end
 
+  -- Hook OnClick on the Blizzard bag-bar buttons so clicking them toggles
+  -- BetterBags. Use the native frame HookScript (a post-hook): the AceHook
+  -- dot-call form -- addon.HookScript(button, ...) -- passes the frame as
+  -- `self` and the script name as the object, so AceHook throws and, because
+  -- this loop runs mid-OnInitialize, aborts the rest of init (bank, themes,
+  -- SetTitle, UISpecialFrames). Skip the main backpack button: HideBlizzardBags
+  -- replaces its OnClick outright with a ToggleAllBags override, so hooking it
+  -- here too would toggle twice (open then close) on a single click.
   for _, button in pairs(addon._buttons) do
-    addon.HookScript(button, "OnClick",
-    function(ctx)
-      addon:ToggleAllBags(ctx)
-    end)
+    if button ~= MainMenuBarBackpackButton then
+      button:HookScript("OnClick", function()
+        local ctx = context:New('BagButton_OnClick')
+        addon:ToggleAllBags(ctx)
+      end)
+    end
   end
+
+  -- Keep the Blizzard bag-bar highlight in sync with the backpack window on EVERY
+  -- show/hide path, not just addon:ToggleAllBags. The "X" close button
+  -- (frame.Owner:Hide) and ESC (UISpecialFrames hides the frame widget directly) both
+  -- bypass addon.OnUpdate, the only caller of UpdateButtonHighlight, so without these
+  -- hooks the bag-bar buttons stay lit after closing the bag by those paths. Hooking
+  -- our own insecure frame's OnShow/OnHide is taint-free and idempotent with OnUpdate.
+  addon.Bags.Backpack.frame:HookScript("OnShow", function()
+    addon:UpdateButtonHighlight()
+  end)
+  addon.Bags.Backpack.frame:HookScript("OnHide", function()
+    addon:UpdateButtonHighlight()
+  end)
+
+  -- Only create the bank bag if the setting is enabled
+  if database:GetEnableBankBag() then
+    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+  end
+
+  -- Apply themes globally -- do not instantiate new windows after this call.
+  themes:Enable()
+
+  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
+
+  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
+
+  -- Only add bank to UISpecialFrames if it was created
+  if addon.Bags.Bank then
+    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+  end
+
+  -- Disable the bag tutorial screens, as Better Bags does not match
+  -- the base UI/UX these screens refer to.
+  if addon.isRetail then
+		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
+		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
+	end
 end
 
 
@@ -241,38 +356,8 @@ function addon:UpdateButtonHighlight()
   end
 end
 
-local function applyCompat()
-  C_Timer.After(5, function()
-    if C_AddOns.IsAddOnLoaded("BetterBagsElvUISkin") then
-      question:Alert("Disable ElvUI Plugin", "The ElvUI BetterBags plugin you have installed is not compatible with BetterBags. It has been disabled -- please reload your UI to apply the changes.")
-      C_AddOns.DisableAddOn("BetterBagsElvUISkin")
-    end
-  end)
-
-  -- PatchWerk breaks every WoW addon by patching functions globally, even addons
-  -- it is not configured to patch. Detect it early and force the user to disable it.
-  C_Timer.After(2, function()
-    if C_AddOns.IsAddOnLoaded("PatchWerk") then
-      StaticPopupDialogs["BETTERBAGS_PATCHWERK_CONFLICT"] = {
-        text = "BetterBags has detected that the addon |cFFFF4400PatchWerk|r is loaded.\n\nPatchWerk breaks every WoW addon, even addons it is not configured to patch. You must disable PatchWerk entirely for BetterBags and other addons to work correctly.\n\nClick 'Disable & Reload' to disable PatchWerk and reload your UI.",
-        button1 = "Disable & Reload",
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = false,
-        preferredIndex = 3,
-        OnAccept = function()
-          C_AddOns.DisableAddOn("PatchWerk")
-          ReloadUI()
-        end,
-      }
-      StaticPopup_Show("BETTERBAGS_PATCHWERK_CONFLICT")
-    end
-  end)
-end
-
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  applyCompat()
   debug:Enable()
   masque:Enable()
   itemFrame:Enable()
@@ -286,32 +371,12 @@ function addon:OnEnable()
   search:Enable()
   pawn:Enable()
   question:Enable()
+  itemLoader:Enable()
   refresh:Enable()
   views:Enable()
   searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
-
-  self:HideBlizzardBags()
-  local rootctx = context:New('addon_enable')
-  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-
-  -- Only create the bank bag if the setting is enabled
-  if database:GetEnableBankBag() then
-    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-  end
-
-  -- Apply themes globally -- do not instantiate new windows after this call.
-  themes:Enable()
-
-  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
-
-  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-
-  -- Only add bank to UISpecialFrames if it was created
-  if addon.Bags.Bank then
-    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-  end
 
   consoleport:Enable()
   quickfind:Enable()
