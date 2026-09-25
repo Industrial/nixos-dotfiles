@@ -6,3 +6,10 @@ X: 16
 Y: 58
 W: 365
 H: 200
+Frame: BetterBagsBagBackpack
+FrameLevel: 500
+Anchor: TOP
+X: -644
+Y: -126
+W: 616
+H: 445

@@ -1,6 +1,6 @@
 Auctionator: enabled
 BadBoy: enabled
-Bartender4: enabled
+Bartender4: disabled
 BetterBags: enabled
 BetterBags_Hearthstones: enabled
 BetterBags_Legendary: enabled

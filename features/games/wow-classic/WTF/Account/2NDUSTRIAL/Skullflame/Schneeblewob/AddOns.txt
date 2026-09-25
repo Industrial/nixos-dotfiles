@@ -1,6 +1,6 @@
 Auctionator: enabled
 BadBoy: enabled
-Bartender4: enabled
+Bartender4: disabled
 BetterBags: enabled
 BetterBags_Hearthstones: enabled
 BetterBags_Legendary: enabled
@@ -8,9 +8,9 @@ BetterBags_Tabards: enabled
 BetterBags-Teleports: enabled
 BigWigs: disabled
 BigWigs_Classic: disabled
-BigWigs_Core: disabled
-BigWigs_Options: disabled
-BigWigs_Plugins: disabled
+BigWigs_Core: enabled
+BigWigs_Options: enabled
+BigWigs_Plugins: enabled
 Clique: disabled
 Details: disabled
 Details_Compare2: disabled
@@ -22,7 +22,7 @@ Details_TinyThreat: disabled
 Details_Vanguard: disabled
 Guidelime: disabled
 GuideLime_TUGs_Vanilla: disabled
-HandyNotes: disabled
+HandyNotes: enabled
 Leatrix_Maps: disabled
 Leatrix_Plus: disabled
 LittleWigs: disabled
@@ -31,7 +31,7 @@ Memento: enabled
 OPie: enabled
 Pawn: enabled
 Plater: enabled
-Prat-3.0: enabled
+Prat-3.0: disabled
 PvPStatsClassic: disabled
 Questie: disabled
 RatingBuster: enabled
@@ -55,3 +55,5 @@ Blizzard_ObjectiveTracker: enabled
 Blizzard_CompactRaidFrames: enabled
 OPie_Classic: disabled
 Blizzard_CombatText: enabled
+ShadowedUnitFrames: disabled
+idAutomation: enabled

@@ -1,3 +1,11 @@
+VER 3 0000000000000029 "AS" "134400"
+#showtooltip Aimed Shot
+/cleartarget [dead]
+/targetenemy [noharm]
+/startattack
+/petattack [@mouseover,harm,nodead][]
+/castsequence reset=target/combat/9 [@mouseover,harm,nodead][] Hunter's Mark, Serpent Sting, Aimed Shot, Arcane Shot, Aimed Shot, Multi-Sh
+END
 VER 3 0000000000000027 "AutoDrink" "INV_Misc_QuestionMark"
 #showtooltip
 /use  Sweet Nectar
@@ -11,6 +19,13 @@ VER 3 0000000000000025 "AutoHeal" "INV_Misc_QuestionMark"
 END
 VER 3 0000000000000024 "AutoMana" "INV_Misc_QuestionMark"
 #showtooltip
+END
+VER 3 000000000000002A "HM" "134400"
+#showtooltip Hunter's Mark
+/cleartarget [dead]
+/targetenemy [noharm]
+/petattack [@mouseover,harm,nodead][]
+/use [@mouseover,harm,nodead][] Hunter's Mark
 END
 VER 3 000000000000001D "nekkid" "132089"
 /script local t={1,3,5,6,7,8,9,10,16,17,18}; for k,v in pairs(t) do PickupInventoryItem(v); PutItemInBackpack(); end
@@ -35,4 +50,7 @@ VER 3 0000000000000009 "WC" "INV_MISC_QUESTIONMARK"
 /use Mongoose Bite
 /use Raptor Strike
 /startattack
+END
+VER 3 000000000000002B "XP" "132327"
+/run local c,m=UnitXP("player"),UnitXPMax("player") print(c.." / "..m.." XP ("..math.floor(c/m*100).."%)")
 END

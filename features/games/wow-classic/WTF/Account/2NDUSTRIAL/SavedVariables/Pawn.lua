@@ -11,6 +11,12 @@ PawnCommon = {
 ["ShowTooltipIcons"] = true,
 ["ShowUpgradesOnTooltips"] = true,
 ["ShowSocketingAdvisor"] = true,
+["ShowSpecIcons"] = true,
+["LastVersion"] = 2.1316,
+["ButtonPosition"] = 2,
+["Digits"] = 1,
+["ShowQuestUpgradeAdvisor"] = true,
+["IgnoreGemsWhileLeveling"] = true,
 ["Scales"] = {
 ["\"Classic\":WARRIOR2"] = {
 ["Color"] = "c79c6e",
@@ -98,6 +104,9 @@ PawnCommon = {
 ["Schneeblewob-Skullflame"] = {
 ["Visible"] = true,
 },
+["Itwasntafart-Skullflame"] = {
+["Visible"] = true,
+},
 },
 ["DoNotShow1HUpgrades"] = false,
 ["Role"] = "DAMAGER",
@@ -179,6 +188,9 @@ PawnCommon = {
 ["Schneeblewob-Skullflame"] = {
 ["Visible"] = true,
 },
+["Itwasntafart-Skullflame"] = {
+["Visible"] = true,
+},
 },
 ["DoNotShow1HUpgrades"] = false,
 ["Role"] = "DAMAGER",
@@ -193,6 +205,9 @@ PawnCommon = {
 ["LocalizedName"] = "Hunter: Beast Mastery",
 ["PerCharacterOptions"] = {
 ["Schneeblewob-Skullflame"] = {
+["Visible"] = true,
+},
+["Itwasntafart-Skullflame"] = {
 ["Visible"] = true,
 },
 },
@@ -409,10 +424,4 @@ PawnCommon = {
 ["UnenchantedColor"] = "bfbfbf",
 },
 },
-["LastVersion"] = 2.1315,
-["ButtonPosition"] = 2,
-["Digits"] = 1,
-["ShowQuestUpgradeAdvisor"] = true,
-["IgnoreGemsWhileLeveling"] = true,
-["ShowSpecIcons"] = true,
 }

@@ -1,0 +1,48 @@
+VER 3 0100000000000008 "AotC" "134400"
+#showtooltip
+/use Aspect of the Cheetah
+END
+VER 3 0100000000000001 "AotH" "134400"
+#showtooltip
+/use Aspect of the Hawk
+END
+VER 3 0100000000000002 "AotM" "134400"
+#showtooltip
+/use Aspect of the Monkey
+END
+VER 3 0100000000000004 "AS" "134400"
+#showtooltip
+/use Arcane Shot
+END
+VER 3 0100000000000009 "DG" "134400"
+#showtooltip
+/use Disengage
+END
+VER 3 0100000000000005 "DS" "134400"
+#showtooltip
+/use Distracting Shot
+END
+VER 3 010000000000000B "FT" "134400"
+#showtooltip
+/use Freezing Trap
+END
+VER 3 010000000000000A "IT" "134400"
+#showtooltip
+/use Immolation Trap
+END
+VER 3 0100000000000003 "MP" "134400"
+#showtooltip
+/use Mend Pet
+END
+VER 3 0100000000000006 "MS" "134400"
+#showtooltip
+/use Multi-Shot
+END
+VER 3 0100000000000007 "SS" "134400"
+#showtooltip
+/use Serpent Sting
+END
+VER 3 010000000000000C "SS" "134400"
+#showtooltip
+/use Scorpid Sting
+END

@@ -1,8 +1,9 @@
 
 TomTomDB = {
 ["profileKeys"] = {
-["Derpnschmerp - Skullflame"] = "Default",
+["Itwasntafart - Skullflame"] = "Default",
 ["Schneeblewob - Skullflame"] = "Default",
+["Derpnschmerp - Skullflame"] = "Default",
 },
 ["profiles"] = {
 ["Default"] = {
@@ -31,13 +32,16 @@ nil,
 TomTomWaypoints = nil
 TomTomWaypointsM = {
 ["profileKeys"] = {
-["Derpnschmerp - Skullflame"] = "Derpnschmerp - Skullflame",
+["Itwasntafart - Skullflame"] = "Itwasntafart - Skullflame",
 ["Schneeblewob - Skullflame"] = "Schneeblewob - Skullflame",
+["Derpnschmerp - Skullflame"] = "Derpnschmerp - Skullflame",
 },
 ["profiles"] = {
-["Derpnschmerp - Skullflame"] = {
+["Itwasntafart - Skullflame"] = {
 },
 ["Schneeblewob - Skullflame"] = {
+},
+["Derpnschmerp - Skullflame"] = {
 },
 },
 }

@@ -4,8 +4,8 @@ Prat3DB = {
 ["Prat_Frames"] = {
 ["profiles"] = {
 ["Default"] = {
-["initialized"] = true,
 ["minchatwidthdefault"] = 296,
+["initialized"] = true,
 ["maxchatheightdefault"] = 400.0000305175781,
 ["maxchatwidthdefault"] = 608,
 ["minchatheightdefault"] = 120.0000076293945,
@@ -14,6 +14,7 @@ Prat3DB = {
 },
 },
 ["profileKeys"] = {
+["Itwasntafart - Skullflame"] = "Default",
 ["Schneeblewob - Skullflame"] = "Default",
 ["Derpnschmerp - Skullflame"] = "Default",
 },
