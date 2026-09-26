@@ -4,3 +4,6 @@
 [submodule "features/games/wow-classic/Interface/AddOns/idAutomation"]
 	path = features/games/wow-classic/Interface/AddOns/idAutomation
 	url = git@github.com:Industrial/idAutomation.git
+[submodule ".claude-setup"]
+	path = .claude-setup
+	url = https://github.com/Industrial/claude-setup
