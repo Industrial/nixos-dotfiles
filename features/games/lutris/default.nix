@@ -22,6 +22,7 @@
     # heroic
     lutris
     protonup-qt
+    vulkan-tools
   ];
 
   programs = {
