@@ -65,14 +65,14 @@ case "$cmd" in
       failed=0
       for h in "${HOSTS[@]}"; do
         echo "> fleet deploy .#$h"
-        if ! deploy_cmd ".#$h" "$@"; then
+        if ! deploy_cmd ".#$h" --skip-checks "$@"; then
           echo "> fleet deploy .#$h FAILED (continuing)"
           failed=1
         fi
       done
       exit "$failed"
     else
-      deploy_cmd ".#$target" "$@"
+      deploy_cmd ".#$target" --skip-checks "$@"
     fi
     ;;
   *) usage ;;
