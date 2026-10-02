@@ -27,6 +27,18 @@
     in
       body
   );
+  # Random wallpaper switcher (compatible with NixOS - no env bash)
+  awwwRandom = pkgs.writeShellScriptBin "awww-random" (
+    let
+      raw = builtins.readFile ./awww-random.sh;
+      # Drop shebang; writeShellScriptBin supplies one.
+      body =
+        if lib.hasPrefix "#!" raw
+        then lib.concatStringsSep "\n" (lib.drop 1 (lib.splitString "\n" raw))
+        else raw;
+    in
+      body
+  );
   # Nested Hyprland session for testing ashell bar
   nestedAshellLauncher = pkgs.writeShellScriptBin "nested-ashell-hyprland" ''
     set -euo pipefail
@@ -183,6 +195,7 @@ in
         gnome-keyring
 
         monitorProfile
+        awwwRandom
 
         # ashell bar + hyprlauncher
         ashell
@@ -215,7 +228,7 @@ in
       description = "Random wallpaper switcher";
       serviceConfig = {
         Type = "oneshot";
-        ExecStart = "${dotfilesHyprDir}/awww-random.sh";
+        ExecStart = "${awwwRandom}/bin/awww-random";
       };
     };
 
