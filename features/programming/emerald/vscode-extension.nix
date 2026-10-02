@@ -11,11 +11,20 @@ pkgs.buildNpmPackage {
   version = "0.1.0";
   src = "${inputs.emerald}/editors/vscode";
 
+  nativeBuildInputs = with pkgs; [
+    pkg-config
+    python3
+  ];
+
+  buildInputs = with pkgs; [
+    libsecret
+  ];
+
   # Real hash, from a real build of this exact source in a throwaway
   # sandbox. If editors/vscode/package.json or package-lock.json ever
   # change, this will need updating the usual way: bump it to anything,
   # let the build fail with "got: sha256-...", paste that in.
-  npmDepsHash = "sha256-oTdZlSIZGU1nErAYuiryifZprZHQrJuzGEHR5DJC0T8=";
+  npmDepsHash = "sha256-yySxi9z6n4xdGuE54cdM58Yt/tKGo4gCwhgl559V/8Q=";
 
   dontNpmBuild = false;
   npmBuildScript = "build";
