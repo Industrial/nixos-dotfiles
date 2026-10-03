@@ -11,8 +11,9 @@
       # Enable root slice for proactive memory management
       enableRootSlice = true;
 
-      # Enable user slices for proactive memory management
-      enableUserSlices = true;
+      # Disable user slices - was killing login sessions at 80% memory pressure
+      # Custom oomkiller service handles user-level OOM instead
+      enableUserSlices = false;
 
       # Note: enableUserServices was renamed to enableUserSlices in newer NixOS
       # Both are enabled via enableUserSlices above
