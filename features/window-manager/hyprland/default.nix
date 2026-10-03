@@ -150,6 +150,9 @@ in
         QT_QPA_PLATFORM = "wayland";
         GDK_BACKEND = "wayland";
         WLR_NO_HARDWARE_CURSORS = "1";
+        # Force Aquamarine to use discrete GPU (RX 6950 XT) as primary
+        # card1 = 03:00.0 discrete GPU, card0 = 7b:00.0 integrated GPU
+        AQ_DRM_DEVICES = "/dev/dri/card1";
       };
 
       systemPackages = with pkgs; [
