@@ -35,6 +35,8 @@
           "audio"
           "networkmanager"
           "plugdev"
+          "render"
+          "video"
           "wheel"
           "data"
           "games"
