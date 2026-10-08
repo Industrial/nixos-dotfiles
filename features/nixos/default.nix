@@ -3,6 +3,16 @@
   settings,
   ...
 }: {
+  # Locale configuration - ensures locales are pre-generated at system level
+  # (prevents pressure-vessel/steamrt from regenerating on every game launch)
+  i18n = {
+    defaultLocale = "en_US.UTF-8";
+    supportedLocales = [
+      "en_US.UTF-8/UTF-8"
+      "C.UTF-8/UTF-8"
+    ];
+  };
+
   system = {
     stateVersion = settings.stateVersion;
   };

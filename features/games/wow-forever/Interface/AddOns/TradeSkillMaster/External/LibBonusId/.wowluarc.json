@@ -1,0 +1,16 @@
+{
+    "diagnostics": {
+        "enable": [
+            "need-check-nil",
+            "nil-index",
+            "invalid-op",
+            "redundant-or",
+            "redundant-and",
+            "redundant-condition"
+        ]
+    },
+    "ignore": [
+        "Test.lua"
+    ],
+    "framexml": false
+}

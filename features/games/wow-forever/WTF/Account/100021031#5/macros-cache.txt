@@ -1,0 +1,4 @@
+VER 3 0000000000000001 "Debug" "134400"
+/run if idDebug_RunStep then idDebug_RunStep() end
+/reload
+END

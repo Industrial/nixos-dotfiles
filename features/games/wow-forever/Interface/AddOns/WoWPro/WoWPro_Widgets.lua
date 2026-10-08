@@ -1,0 +1,643 @@
+-- luacheck: globals tonumber tostring type WoWPro _G.WoWProDB
+---@diagnostic disable-next-line: undefined-field
+local WoWPro= _G.WoWPro
+
+----------------------------------
+--      WoWPro_Widgets.lua      --
+----------------------------------
+
+local texture_prefix = "Interface\\AddOns\\WoWPro\\Textures\\"
+WoWPro.UI_CheckBox_Up = texture_prefix .. "UI-CheckBox-Up" -- 130755 ?
+WoWPro.UI_CheckBox_Down = texture_prefix .. "UI-CheckBox-Down" -- 130752
+WoWPro.UI_CheckBox_Highlight = texture_prefix .. "UI-CheckBox-Highlight" -- 130753 ?
+WoWPro.UI_CheckBox_Check_Disabled = texture_prefix .. "UI-CheckBox-Check-Disabled" -- 130750 ?
+WoWPro.UI_CheckBox_Check = texture_prefix .. "UI-CheckBox-Check" -- 130751?
+
+
+local function SetBlank(self)
+    self:SetChecked(false)
+    self:SetCheckedTexture(WoWPro.UI_CheckBox_Check)
+end
+
+local function SetGold(self)
+    self:SetBlank()
+    self:SetChecked(true)
+end
+
+local function SetSilver(self)
+    self:SetChecked(false)
+    self:SetCheckedTexture(WoWPro.UI_CheckBox_Check_Disabled)
+    self:SetChecked(true)
+end
+
+function WoWPro:CreateCheck(parent)
+    local check = _G.CreateFrame("CheckButton", nil, parent)
+    check:RegisterForClicks("anyDown")
+    check:SetPoint("TOPLEFT")
+    check:SetWidth(16)
+    check:SetHeight(16)
+    check:SetNormalTexture(WoWPro.UI_CheckBox_Up)
+    check:SetPushedTexture(WoWPro.UI_CheckBox_Down)
+    check:SetHighlightTexture(WoWPro.UI_CheckBox_Highlight)
+    check:SetDisabledCheckedTexture(WoWPro.UI_CheckBox_Check_Disabled)
+    check:SetCheckedTexture(WoWPro.UI_CheckBox_Check)
+    check:Hide()
+    check.SetBlank = SetBlank
+    check.SetGold = SetGold
+    check.SetSilver = SetSilver
+    return check
+end
+
+function WoWPro:CreateIcon(parent, anchor)
+    local frame = _G.CreateFrame("Frame", nil, parent)
+    frame:SetPoint("LEFT", anchor, "RIGHT", 3, 0)
+    frame:SetWidth(16)
+    frame:SetHeight(16)
+    frame:EnableMouse(true)
+
+    local action = frame:CreateTexture()
+    action.frame = frame
+    action:SetAllPoints()
+
+    action.tooltip = { text = "" }
+
+    frame:SetScript("OnEnter", function()
+        local text = action.tooltip and action.tooltip.text
+        if text and text ~= "" then
+            local gt = _G.GameTooltip
+            local backdrop = {
+                bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+                edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+                tile = true, tileSize = 16, edgeSize = 16,
+                insets = { left = 4, right = 3, top = 4, bottom = 3 }
+            }
+            if gt.SetBackdrop then
+                gt:SetBackdrop(backdrop)
+            end
+            if gt.SetBackdropColor then
+                gt:SetBackdropColor(0, 0, 0, 0.95)
+            end
+            gt:SetOwner(frame, "ANCHOR_RIGHT")
+            gt:SetText(text, nil, nil, nil, nil, true)
+            gt:Show()
+        end
+    end)
+    frame:SetScript("OnLeave", function()
+        _G.GameTooltip:Hide()
+    end)
+
+    return action
+end
+
+function WoWPro:CreateStep(parent, anchor)
+    local step = parent:CreateFontString(nil, nil, "GameFontHighlight")
+    step:SetPoint("LEFT", anchor, "RIGHT", 3, 0)
+    step:SetPoint("RIGHT")
+    step:SetJustifyH("LEFT")
+
+    return step
+end
+
+function WoWPro:CreateNote(parent, anchor1)
+    local note = parent:CreateFontString(nil, nil, "GameFontNormalSmall")
+    note:SetPoint("TOPLEFT", anchor1, "BOTTOMLEFT", 0, -3)
+    note:SetPoint("RIGHT")
+    note:SetJustifyH("LEFT")
+    note:SetJustifyV("TOP")
+
+    return note
+end
+
+function WoWPro:CreateTrack(parent, anchor1)
+    local track = parent:CreateFontString(nil, nil, "GameFontNormalSmall")
+    track:SetPoint("TOPLEFT", anchor1, "BOTTOMLEFT", 0, -3)
+    track:SetPoint("RIGHT")
+    track:SetJustifyH("LEFT")
+    track:SetJustifyV("TOP")
+
+    return track
+end
+
+function WoWPro:CreateProgressBar(parent, anchor1)
+    local progressBar = _G.CreateFrame("StatusBar", nil, parent, _G.BackdropTemplateMixin and "BackdropTemplate")
+    progressBar:SetPoint("TOPLEFT", anchor1, "BOTTOMLEFT", 0, -3)
+    progressBar:SetSize(100, 17)
+
+    progressBar:SetStatusBarTexture("Interface/TargetingFrame/UI-StatusBar")
+    progressBar:SetBackdrop( {
+        bgFile = [[Interface\CHARACTERFRAME\UI-Party-Background]],
+        edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+        tile = true, tileSize = 16, edgeSize = 5,
+        insets = { left = 0,  right = 0,  top = 0,  bottom = 0 }
+    })
+    progressBar:SetBackdropBorderColor(1, 1, 1, 1)
+    progressBar:SetBackdropColor(.8, .8, .8, 1)
+
+    progressBar:SetStatusBarColor(0, 1, 0)
+    progressBar:SetMinMaxValues(0, 100)
+    progressBar:SetValue(0)
+    return progressBar
+end
+
+function WoWPro:CreateItemButton(parent, id, positionParent)
+    positionParent = positionParent or parent
+    local itembutton = _G.CreateFrame("Button", "WoWPro_itembutton"..id, parent, "InsecureActionButtonTemplate")
+    itembutton:SetAttribute("type", "item")
+    itembutton:SetFrameStrata("LOW")
+    itembutton:SetHeight(32)
+    itembutton:SetWidth(32)
+    if _G.WoWProDB.profile.leftside then
+        itembutton:SetPoint("TOPLEFT", positionParent, "TOPRIGHT", 10, -7)
+    else
+        itembutton:SetPoint("TOPRIGHT", positionParent, "TOPLEFT", -10, -7)
+    end
+
+    local itemcooldown = _G.CreateFrame("Cooldown", nil, itembutton, "CooldownFrameTemplate")
+    itemcooldown:SetAllPoints(itembutton)
+
+    local itemicon = itembutton:CreateTexture(nil, "ARTWORK")
+    itemicon:SetWidth(36)
+    itemicon:SetHeight(36)
+    itemicon:SetTexture("Interface\\Icons\\INV_Misc_Bag_08")
+    itemicon:SetAllPoints(itembutton)
+
+    itembutton:Hide()
+
+    return itembutton, itemicon, itemcooldown
+end
+
+function WoWPro:CreateJumpButton(parent, id, positionParent)
+    positionParent = positionParent or parent
+    local jumpbutton = _G.CreateFrame("Button", "WoWPro_jumpbutton"..id, parent, "InsecureActionButtonTemplate")
+    jumpbutton:SetAttribute("type", "jump")
+    jumpbutton:SetFrameStrata("LOW")
+    jumpbutton:SetHeight(24)
+    jumpbutton:SetWidth(24)
+    if _G.WoWProDB.profile.leftside then
+        jumpbutton:SetPoint("TOPLEFT", positionParent, "TOPRIGHT", 10, -7)
+    else
+        jumpbutton:SetPoint("TOPRIGHT", positionParent, "TOPLEFT", -10, -7)
+    end
+
+    local jumpicon = jumpbutton:CreateTexture(nil, "ARTWORK")
+    jumpicon:SetWidth(24)
+    jumpicon:SetHeight(24)
+	if WoWPro.RETAIL then
+		jumpicon:SetTexture("Interface\\Icons\\Inv_7xp_inscription_talenttome02")
+	else
+		jumpicon:SetTexture("Interface\\Icons\\inv_misc_book_12")
+	end
+    jumpicon:SetAllPoints(jumpbutton)
+    jumpbutton:RegisterForClicks("anyDown")
+    jumpbutton:Hide()
+
+    return jumpbutton, jumpicon
+end
+
+function WoWPro:CreateTargetButton(parent, id, positionParent)
+    positionParent = positionParent or parent
+    local targetbutton = _G.CreateFrame("Button", "WoWPro_targetbutton"..id, parent, "InsecureActionButtonTemplate")
+    targetbutton:SetAttribute("type", "macro")
+    targetbutton:SetFrameStrata("LOW")
+    targetbutton:SetHeight(32)
+    targetbutton:SetWidth(32)
+    targetbutton.Position = function (use_active)
+        if use_active then
+            -- WoWPro:dbp("CTBλPosition: use_active=%s, leftside=%s", tostring(use_active), tostring(leftside))
+            if _G.WoWProDB.profile.leftside then
+                targetbutton:SetPoint("TOPLEFT", positionParent, "TOPRIGHT", 46, -7)
+                -- WoWPro:dbp("CTBλPosition:A")
+            else
+                targetbutton:SetPoint("TOPRIGHT", positionParent, "TOPLEFT", -46, -7)
+                -- WoWPro:dbp("CTBλPosition:B")
+            end
+        else
+            if _G.WoWProDB.profile.leftside then
+                targetbutton:SetPoint("TOPLEFT", positionParent, "TOPRIGHT", 10, -7)
+                -- WoWPro:dbp("CTBλPosition:C")
+            else
+                targetbutton:SetPoint("TOPRIGHT", positionParent, "TOPLEFT", -10, -7)
+                -- WoWPro:dbp("CTBλPosition:D")
+            end
+        end
+    end
+    targetbutton.Position(true)
+
+
+    local targeticon = targetbutton:CreateTexture(nil, "ARTWORK")
+    targeticon:SetWidth(36)
+    targeticon:SetHeight(36)
+    targeticon:SetTexture("Interface\\Icons\\Ability_Marksmanship")
+    targeticon:SetAllPoints(targetbutton)
+
+    targetbutton:RegisterForClicks("anyDown")
+    targetbutton.SetTarget = function () targetbutton:SetTexture("Interface\\Icons\\Ability_Marksmanship"); end
+    targetbutton.SetMacro = function () targetbutton:SetTexture("Interface\\Icons\\INV_Misc_Book_11"); end
+    targetbutton.SetEmote = function () targetbutton:SetTexture("Interface\\Icons\\INV_Misc_Toy_07"); end
+    targetbutton:Hide()
+
+    return targetbutton, targeticon
+end
+
+function WoWPro:CreateEAButton(parent, id, positionParent)
+    positionParent = positionParent or parent
+    local eabutton = _G.CreateFrame("Button", "WoWPro_eabutton"..id, parent, "InsecureActionButtonTemplate")
+    eabutton:SetAttribute("type", "ea")
+    eabutton:SetFrameStrata("LOW")
+    eabutton:SetHeight(32)
+    eabutton:SetWidth(32)
+    if _G.WoWProDB.profile.leftside then
+        eabutton:SetPoint("TOPLEFT", positionParent, "TOPRIGHT", 10, -7)
+    else
+        eabutton:SetPoint("TOPRIGHT", positionParent, "TOPLEFT", -10, -7)
+    end
+
+    local cooldown = _G.CreateFrame("Cooldown", nil, eabutton, "CooldownFrameTemplate")
+    cooldown:SetAllPoints(eabutton)
+
+    local eaicon = eabutton:CreateTexture(nil, "ARTWORK")
+    eaicon:SetWidth(36)
+    eaicon:SetHeight(36)
+    eaicon:SetTexture("Interface\\Icons\\INV_Misc_Bag_08")
+    eaicon:SetAllPoints(eabutton)
+    eabutton:RegisterForClicks("anyDown")
+    eabutton:Hide()
+
+    return eabutton, eaicon, cooldown
+end
+
+function WoWPro:CreateEAButtonSecured(id)
+    local eabutton = _G.CreateFrame("Button", "WoWPro_eabuttonSecure"..id, _G.UIParent, "SecureActionButtonTemplate")
+    eabutton:SetAttribute("type", "macro")
+    eabutton:SetFrameStrata("HIGH")
+    eabutton:SetHeight(32)
+    eabutton:SetWidth(32)
+    eabutton:Hide()
+	eabutton:RegisterForClicks("AnyDown", "AnyUp")
+    return eabutton
+end
+
+function WoWPro:CreateTargetButtonSecured(id)
+    local targetbutton = _G.CreateFrame("Button", "WoWPro_targetbuttonSecure"..id, _G.UIParent, "SecureActionButtonTemplate")
+    targetbutton:SetAttribute("type", "macro")
+    targetbutton:SetFrameStrata("HIGH")
+    targetbutton:SetHeight(32)
+    targetbutton:SetWidth(32)
+    targetbutton:Hide()
+    targetbutton:RegisterForClicks("AnyDown", "AnyUp")
+    return targetbutton
+end
+
+function WoWPro:CreateItemButtonSecured(id)
+    local itembutton = _G.CreateFrame("Button", "WoWPro_itembuttonSecure"..id, _G.UIParent, "SecureActionButtonTemplate")
+    itembutton:SetAttribute("type", "item")
+    itembutton:SetFrameStrata("HIGH")
+    itembutton:SetHeight(32)
+    itembutton:SetWidth(32)
+    itembutton:Hide()
+	itembutton:RegisterForClicks("AnyDown", "AnyUp")
+    return itembutton
+end
+
+function WoWPro:CreateLootsButton(parent, id, buttonIndex, positionParent)
+    positionParent = positionParent or parent
+    buttonIndex = buttonIndex or 1
+    local lootsbutton = _G.CreateFrame("Button", "WoWPro_looticon"..id.."_"..buttonIndex, parent)
+    lootsbutton:SetFrameStrata("MEDIUM")
+    lootsbutton:SetHeight(24)
+    lootsbutton:SetWidth(24)
+    -- Position based on buttonIndex: 0 pixels for first, -26 for second, -52 for third, etc.
+    local xOffset = -(buttonIndex - 1) * 26
+    lootsbutton:SetPoint("TOPRIGHT", positionParent, "TOPRIGHT", xOffset, 0)
+    lootsbutton.ID = nil
+    lootsbutton:SetScript("OnEnter", function(this)
+        _G.GameTooltip:SetOwner(this, 'ANCHOR_LEFT')
+        if this.ID and this.ID:len() > 1 and this.ID:sub(1,1) == "$" then
+            _G.GameTooltip:SetCurrencyByID(tonumber(this.ID:sub(2)))
+            _G.GameTooltip:Show()
+        elseif tonumber(this.ID) then
+            _G.GameTooltip:SetItemByID(tonumber(this.ID))
+            _G.GameTooltip:Show()
+        end
+    end)
+    lootsbutton:SetScript("OnLeave", function(this)
+        if this.ID then
+            _G.GameTooltip:Hide()
+        end
+    end)
+
+
+    local lootsicon = lootsbutton:CreateTexture(nil, "ARTWORK")
+    lootsbutton.lootsicon = lootsicon
+    lootsicon:SetWidth(24)
+    lootsicon:SetHeight(24)
+    lootsicon:SetTexture("Interface\\Icons\\Ability_Marksmanship")
+    lootsicon:SetAllPoints(lootsbutton)
+
+    function lootsbutton:SetItemByID(ID)
+        self.ID = ID
+        local name, texture, _
+        if ID and ID:len() > 1 and ID:sub(1,1) == "$" then
+            local result = _G.C_CurrencyInfo.GetCurrencyInfo(tonumber(ID:sub(2)))
+            if result then
+                name = result['name']
+                texture = result['iconFileID']
+            end
+        elseif tonumber(ID) then
+            name, _, _, _, _, _, _, _, _, texture = _G.WoWPro.C_Item_GetItemInfo(tonumber(ID))
+        end
+        if texture then
+            self.lootsicon:SetTexture(texture)
+            return name
+        else
+            self.lootsicon:SetTexture("Interface\\ICONS\\INV_Misc_QuestionMark")
+            return ("Unknown item [%s]"):format(tostring(ID))
+        end
+    end
+
+    lootsbutton:Hide()
+
+    return lootsbutton, lootsicon
+end
+
+function WoWPro:CreateHeading(parent, text, subtext)
+    local title = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+    title:SetPoint("TOPLEFT", 16, -16)
+    title:SetText(text)
+
+    local subtitle = parent:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    subtitle:SetHeight(32)
+    subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -8)
+    subtitle:SetPoint("RIGHT", parent, -32, 0)
+    subtitle:SetNonSpaceWrap(true)
+    subtitle:SetJustifyH("LEFT")
+    subtitle:SetJustifyV("TOP")
+    subtitle:SetText(subtext)
+
+    return title, subtitle
+end
+
+function WoWPro:CreateBG(parent)
+    local bg = {
+        bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 16,
+        insets = { left = 5, right = 5, top = 5, bottom = 5 }
+    }
+    local box = _G.CreateFrame('Frame', nil, parent, _G.BackdropTemplateMixin and "BackdropTemplate" or nil)
+    box:SetBackdrop(bg)
+    box:SetBackdropBorderColor(1, 1, 1)
+    box:SetBackdropColor(0.2, 0.2, 0.2, 1)
+
+    return box
+end
+
+
+function WoWPro:CreateTab(name, parent)
+    local tab = _G.CreateFrame('Button', nil, parent, _G.BackdropTemplateMixin and "BackdropTemplate" or nil)
+    tab:RegisterForClicks("anyDown")
+
+    -- Modern tab styling
+    tab:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 0 }
+    })
+    tab:SetBackdropColor(0.2, 0.2, 0.2, 0.8)  -- Dark background
+    tab:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)  -- Gray border
+
+    -- Text styling
+    local text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    text:SetPoint("CENTER")
+    text:SetText(name)
+    text:SetTextColor(1, 1, 1, 1)  -- White text
+    tab.Text = text  -- Keep compatibility with existing code
+
+    -- Hover effects
+    tab:SetScript("OnEnter", function(button)
+        button:SetBackdropColor(0.4, 0.4, 0.4, 0.9)  -- Lighter on hover
+    end)
+    tab:SetScript("OnLeave", function(button)
+        if button:GetID() ~= (parent.selectedTab or 1) then
+            button:SetBackdropColor(0.2, 0.2, 0.2, 0.8)
+            button:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+        end
+    end)
+
+    -- Selected tab appearance
+    local function updateTabAppearance(tabButton, isSelected)
+        if isSelected then
+            tabButton:SetBackdropColor(0.4, 0.4, 0.4, 1)  -- Lighter gray for selected
+            tabButton:SetBackdropBorderColor(0.8, 0.8, 0.8, 1)  -- Light border
+            tabButton.Text:SetTextColor(1, 1, 1, 1)  -- White text
+        else
+            tabButton:SetBackdropColor(0.2, 0.2, 0.2, 0.8)  -- Dark for unselected
+            tabButton:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)  -- Gray border
+            tabButton.Text:SetTextColor(0.8, 0.8, 0.8, 1)  -- Light gray text
+        end
+    end
+    tab.updateTabAppearance = updateTabAppearance
+
+    -- Size the tab based on text
+    local textWidth = text:GetStringWidth()
+    tab:SetSize(textWidth + 20, 25)
+
+    return tab
+end
+
+-- Creates a scrollbar
+-- Parent is required, offset and step are optional
+function WoWPro:CreateScrollbar(parent, offset, step, where)
+    local bg = {
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true,
+        tileSize = 16,
+        edgeSize = 12,
+        insets = { left = 0, right = 0, top = 5, bottom = 5 }
+    }
+
+    local slider = _G.CreateFrame("Slider", nil, parent)
+    slider:SetWidth(16)
+
+    local offsetX, offsetY = offset, offset
+    if type(offset) == "table" then
+        offsetX = offset[1]
+        offsetY = offset[2]
+    end
+
+    if not where then
+        slider:SetPoint("TOPRIGHT", 0 - (offsetX or 0), -16 - (offsetY or 0))
+        slider:SetPoint("BOTTOMRIGHT", 0 - (offsetX or 0), 16 + (offsetY or 0))
+    elseif where == "Outside" then
+        slider:SetPoint("TOPLEFT",parent,"TOPRIGHT",0 - (offsetX or 0), -16 - (offsetY or 0))
+        slider:SetPoint("BOTTOMLEFT", parent,"BOTTOMRIGHT",0 - (offsetX or 0), 16 + (offsetY or 0))
+    end
+
+    local up = _G.CreateFrame("Button", nil, slider)
+    up:SetPoint("BOTTOM", slider, "TOP")
+    up:SetWidth(16) up:SetHeight(16)
+    up:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up")
+    up:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Down")
+    up:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Disabled")
+    up:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Highlight")
+
+    up:GetNormalTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    up:GetPushedTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    up:GetDisabledTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    up:GetHighlightTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    up:GetHighlightTexture():SetBlendMode("ADD")
+
+    up:SetScript("OnClick", function(this)
+        slider:SetValue(slider:GetValue() - (step or slider:GetHeight()/2))
+        _G.PlaySound(_G.SOUNDKIT.U_CHAT_SCROLL_BUTTON)
+    end)
+
+    local down = _G.CreateFrame("Button", nil, slider)
+    down:SetPoint("TOP", slider, "BOTTOM")
+    down:SetWidth(16) down:SetHeight(16)
+    down:SetNormalTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up")
+    down:SetPushedTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Down")
+    down:SetDisabledTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Disabled")
+    down:SetHighlightTexture("Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Highlight")
+
+    down:GetNormalTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    down:GetPushedTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    down:GetDisabledTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    down:GetHighlightTexture():SetTexCoord(1/4, 3/4, 1/4, 3/4)
+    down:GetHighlightTexture():SetBlendMode("ADD")
+
+    down:SetScript("OnClick", function(this)
+        slider:SetValue(slider:GetValue() + (step or slider:GetHeight()/2))
+        _G.PlaySound(_G.SOUNDKIT.U_CHAT_SCROLL_BUTTON)
+    end)
+
+    slider:SetThumbTexture("Interface\\Buttons\\UI-ScrollBar-Knob")
+    local thumb = slider:GetThumbTexture()
+    thumb:SetWidth(16) thumb:SetHeight(24)
+    thumb:SetTexCoord(1/4, 3/4, 1/8, 7/8)
+
+    slider:SetScript("OnValueChanged", function(this, value)
+        local min, max = this:GetMinMaxValues()
+        if value == min then up:Disable() else up:Enable() end
+        if value == max then down:Disable() else down:Enable() end
+    end)
+
+    local border = _G.CreateFrame("Frame", nil, slider, _G.BackdropTemplateMixin and "BackdropTemplate" or nil)
+    border:SetPoint("TOPLEFT", up, -5, 5)
+    border:SetPoint("BOTTOMRIGHT", down, 5, -3)
+    border:SetBackdrop(bg)
+    border:SetBackdropBorderColor(_G.TOOLTIP_DEFAULT_COLOR.r, _G.TOOLTIP_DEFAULT_COLOR.g, _G.TOOLTIP_DEFAULT_COLOR.b, 0.5)
+
+    return slider, up, down, border
+end
+
+do
+    local tooltip = _G.CreateFrame("Frame", nil, WoWPro.MainFrame, _G.BackdropTemplateMixin and "BackdropTemplate" or nil)
+    tooltip:SetBackdrop( {
+        bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+        edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4,  right = 3,  top = 4,  bottom = 3 }
+    })
+    tooltip:SetBackdropColor(0, 0, 0, 0.7)
+    tooltip:SetHeight(125)
+    tooltip:SetWidth(512)
+    tooltip:SetFrameStrata("FULLSCREEN_DIALOG")
+    tooltip:SetFrameLevel(100)
+
+    tooltip:Hide()
+
+    local tooltiptext = tooltip:CreateFontString(nil, nil, "GameFontNormal")
+    tooltiptext:SetPoint("TOPLEFT", 10, -10)
+    tooltiptext:SetPoint("RIGHT", -10, 0)
+    tooltiptext:SetJustifyH("LEFT")
+    tooltiptext:SetJustifyV("TOP")
+    tooltiptext:SetWidth(512-20)
+    tooltiptext:SetAlpha(1)
+    tooltiptext:SetText("")
+    tooltip.tooltiptext = tooltiptext
+    WoWPro.GuideRowTooltip = tooltip
+end
+
+function WoWPro:CreateGuideRow(parent, rowHeight)
+    local row = _G.CreateFrame("Frame", nil, parent, _G.BackdropTemplateMixin and "BackdropTemplate" or nil)
+    row:SetPoint("LEFT", 12, 0)
+    row:SetHeight(rowHeight or 25)
+
+    row.check = WoWPro:CreateCheck(row)
+    row.iconTexture = WoWPro:CreateIcon(row, row.check)
+--- row.iconTexture.frame:RegisterForClicks("AnyUp")
+--- row.iconTexture.frame:SetScript("OnClick", function(self, button, down)
+---     WoWPro.PickQuestline(WoWPro.QID[row.index], WoWPro.step[row.index])
+--- end)
+
+    row.step = WoWPro:CreateStep(row, row.iconTexture)
+    row.note = WoWPro:CreateNote(row, row.iconTexture)
+    return row
+end
+
+local ErrorLog = nil
+-- Creates a Scrolling Text Window for Error Logs
+-- Parent is required, offset and step are optional
+function WoWPro:CreateErrorLog(title)
+    if ErrorLog then return ErrorLog end
+
+    ErrorLog = _G.CreateFrame("Frame", "WoWProErrorLog", _G.UIParent, _G.BackdropTemplateMixin and "BackdropTemplate" or nil)
+    ErrorLog:Hide()
+    ErrorLog:SetPoint("CENTER", "UIParent", "CENTER")
+    ErrorLog:SetFrameStrata("TOOLTIP")
+    ErrorLog:SetHeight(512)
+    ErrorLog:SetWidth(768)
+    ErrorLog:SetBackdrop({
+        bgFile = "Interface/Tooltips/ChatBubble-Background",
+        edgeFile = "Interface/Tooltips/ChatBubble-BackDrop",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 32, right = 32, top = 32, bottom = 32 }
+    })
+    ErrorLog:SetBackdropColor(0,0,0, 1)
+    ErrorLog:SetMovable(true)
+    ErrorLog:SetClampedToScreen(true)
+
+    ErrorLog.Drag = _G.CreateFrame("Button", nil, ErrorLog)
+    ErrorLog.Drag:SetPoint("TOPLEFT", ErrorLog, "TOPLEFT", 10,-5)
+    ErrorLog.Drag:SetPoint("TOPRIGHT", ErrorLog, "TOPRIGHT", -10,-5)
+    ErrorLog.Drag:SetHeight(8)
+    ErrorLog.Drag:SetHighlightTexture("Interface\\FriendsFrame\\UI-FriendsFrame-HighlightBar")
+
+    ErrorLog.Drag:SetScript("OnMouseDown", function() ErrorLog:StartMoving() end)
+    ErrorLog.Drag:SetScript("OnMouseUp", function() ErrorLog:StopMovingOrSizing() end)
+
+    ErrorLog.Mesg = ErrorLog:CreateFontString("", "OVERLAY", "GameFontNormalSmall")
+    ErrorLog.Mesg:SetJustifyH("CENTER")
+    ErrorLog.Mesg:SetPoint("BOTTOMLEFT",ErrorLog, "BOTTOMLEFT", -10, 0)
+    ErrorLog.Mesg:SetPoint("RIGHT", ErrorLog, "RIGHT", 15, 0)
+    ErrorLog.Mesg:SetHeight(20)
+    ErrorLog.Mesg:SetText("Select All and Copy the above error message to report this log. Hit ESC to close.")
+
+    ErrorLog.Title = ErrorLog:CreateFontString("", "OVERLAY", "GameFontNormal")
+    ErrorLog.Title:SetJustifyH("CENTER")
+    ErrorLog.Title:SetPoint("TOPLEFT",ErrorLog, "TOPLEFT", -10, 0)
+    ErrorLog.Title:SetPoint("RIGHT", ErrorLog, "RIGHT", 15, 0)
+    ErrorLog.Title:SetHeight(20)
+    ErrorLog.Title:SetText(title)
+
+    ErrorLog.Scroll = _G.CreateFrame("ScrollFrame", "WoWProErrorLogScroll", ErrorLog, "UIPanelScrollFrameTemplate")
+    ErrorLog.Scroll:SetPoint("TOPLEFT", ErrorLog, "TOPLEFT", 20, -20)
+    ErrorLog.Scroll:SetPoint("RIGHT", ErrorLog, "RIGHT", -30, 0)
+    ErrorLog.Scroll:SetPoint("BOTTOM", ErrorLog, "BOTTOM", 0, 20)
+
+    ErrorLog.Box = _G.CreateFrame("EditBox", "WoWProErrorLogEditBox", ErrorLog.Scroll)
+    ErrorLog.Box:SetHeight(512)
+    ErrorLog.Box:SetWidth(768)
+    ErrorLog.Box:SetMultiLine(true)
+    ErrorLog.Box:SetFontObject(_G.GameFontHighlight)
+    ErrorLog.Box:SetScript("OnEscapePressed", function () ErrorLog:Hide() end)
+    ErrorLog.Box:SetScript("OnEditFocusGained", function () ErrorLog.Box:HighlightText() end)
+
+    ErrorLog.Scroll:SetScrollChild(ErrorLog.Box)
+
+    return ErrorLog
+end

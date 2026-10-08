@@ -1,0 +1,203 @@
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("Vordaza", 2874, 2811)
+if not mod then return end
+mod:SetEncounterID(3213)
+mod:SetRespawnTime(30)
+mod:SetStage(1)
+
+--------------------------------------------------------------------------------
+-- Locals
+--
+
+local drainSoulCount = 1
+local wrestPhantomsCount = 1
+local unmakeCount = 1
+local necroticConvergenceCount = 1
+local count33_5 = 1
+local activeBars = {}
+
+--------------------------------------------------------------------------------
+-- Renames
+--
+
+mod:SetRenames({
+	[1251554] = {CL.tank_hit}, -- Drain Soul (Tank Hit)
+	[1251204] = {CL.adds}, -- Wrest Phantoms (Adds)
+	[1252054] = {CL.frontal}, -- Unmake (Frontal)
+	[1250708] = {CL.shield, CL.onboss:format(CL.shield), notes = {CL.timerNote, CL.messageNote}, original = {1250708, CL.onboss:format(mod:SpellName(1250708))}}, -- Necrotic Convergence (Shield)
+	[1251775] = {CL.you:format(CL.fixate), notes = {CL.messageOnYouNote}, original = {CL.you:format(mod:SpellName(1251775))}}, -- Final Pursuit (Fixate)
+})
+
+--------------------------------------------------------------------------------
+-- Auras
+--
+
+mod:SetAuraData({
+	{1251568}, -- Drain Soul
+	{1251775, soundOnApplied = "warning", note = CL.fixate, tip = CL.debuffAddsCast:format(CL.extra:format(mod:SpellName(-33734), CL.add))}, -- Final Pursuit
+	{1251833, soundOnApplied = "underyou", tip = CL.debuffUnderYouNote}, -- Soulrot
+	{1252130, soundOnApplied = "underyou", tip = CL.debuffUnderYouNote}, -- Unmake
+	{1266706, duration = 20, soundOnApplied = "warning", soundOnAppliedDose = "none", tip = CL.debuffWalkIntoObjectNote:format(CL.extra:format(mod:SpellName(-33734), CL.add))}, -- Haunting Remains
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+
+function mod:GetOptions()
+	return {
+		1251554, -- Drain Soul
+		1251204, -- Wrest Phantoms
+		1252054, -- Unmake
+		1250708, -- Necrotic Convergence
+		{1251775, "ME_ONLY_EMPHASIZE"}, -- Final Pursuit
+	}
+end
+
+mod:UseCustomTimers(true)
+function mod:OnEncounterStart()
+	drainSoulCount = 1
+	wrestPhantomsCount = 1
+	unmakeCount = 1
+	necroticConvergenceCount = 1
+	count33_5 = 1
+	activeBars = {}
+	self:SetStage(1)
+	if self:ShouldShowBars() then
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_REMOVED")
+	end
+end
+
+function mod:OnWin()
+	activeBars = {}
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Event Handlers
+--
+
+function mod:ENCOUNTER_TIMELINE_EVENT_ADDED(_, eventInfo)
+	if eventInfo.source ~= 0 then return end -- Enum.EncounterTimelineEventSource.Encounter
+	local duration = self:RoundNumber(eventInfo.duration, 2)
+	local barInfo
+	if duration == 3 or (duration == 33.5 and count33_5 % 3 == 1) then -- Drain Soul
+		barInfo = self:DrainSoulTimeline(eventInfo)
+	elseif duration == 14.17 or (duration == 33.5 and count33_5 % 3 == 2) then -- Wrest Phantoms
+		barInfo = self:WrestPhantomsTimeline(eventInfo)
+	elseif duration == 25.33 or (duration == 33.5 and count33_5 % 3 == 0) then -- Unmake
+		barInfo = self:UnmakeTimeline(eventInfo)
+	elseif duration == 70 then -- Necrotic Convergence
+		barInfo = self:NecroticConvergenceTimeline(eventInfo)
+	elseif not self:IsWiping() then
+		self:ErrorForTimelineEvent(eventInfo)
+	end
+	if duration == 33.5 then
+		count33_5 = count33_5 + 1
+	end
+	if barInfo then
+		activeBars[eventInfo.id] = barInfo
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		local state = C_EncounterTimeline.GetEventState(eventID)
+		if state == 0 then -- Active
+			self:ResumeBar(barInfo.key, barInfo.msg)
+		elseif state == 1 then -- Paused
+			self:PauseBar(barInfo.key, barInfo.msg)
+		elseif state == 2 then -- Finished
+			self:StopBar(barInfo.msg)
+			if barInfo.callback then
+				barInfo.callback()
+			end
+			activeBars[eventID] = nil
+		elseif state == 3 then -- Canceled
+			self:StopBar(barInfo.msg)
+			if not self:IsWiping() and barInfo.cancelCallback then
+				barInfo.cancelCallback()
+			end
+			activeBars[eventID] = nil
+		end
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_REMOVED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		self:StopBar(barInfo.msg)
+		activeBars[eventID] = nil
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Ability Handlers
+--
+
+function mod:DrainSoulTimeline(eventInfo) -- Tank Hit
+	local barText = CL.count:format(self:GetRename(1251554), drainSoulCount)
+	self:CDBar(1251554, eventInfo.duration, barText, nil, eventInfo.id)
+	drainSoulCount = drainSoulCount + 1
+	return {
+		msg = barText,
+		key = 1251554,
+		callback = function()
+			self:Message(1251554, "purple", barText)
+			self:PlaySound(1251554, "alert")
+		end
+	}
+end
+
+function mod:WrestPhantomsTimeline(eventInfo) -- Adds
+	local barText = CL.count:format(self:GetRename(1251204), wrestPhantomsCount)
+	self:CDBar(1251204, eventInfo.duration, barText, nil, eventInfo.id)
+	wrestPhantomsCount = wrestPhantomsCount + 1
+	return {
+		msg = barText,
+		key = 1251204,
+		callback = function()
+			self:PersonalMessageFromBlizzMessage(1251775, 9, false, self:GetRename(1251775)) -- Final Pursuit (Fixate)
+			self:Message(1251204, "cyan", barText)
+			self:PlaySound(1251204, "info")
+		end
+	}
+end
+
+function mod:UnmakeTimeline(eventInfo) -- Frontal
+	local barText = CL.count:format(self:GetRename(1252054), unmakeCount)
+	self:CDBar(1252054, eventInfo.duration, barText, nil, eventInfo.id)
+	unmakeCount = unmakeCount + 1
+	return {
+		msg = barText,
+		key = 1252054,
+		callback = function()
+			self:Message(1252054, "orange", barText)
+			self:PlaySound(1252054, "alarm")
+		end
+	}
+end
+
+function mod:NecroticConvergenceTimeline(eventInfo) -- Shield
+	if self:GetStage() ~= 1 then
+		self:SetStage(1)
+	end
+	local barText = CL.count:format(self:GetRename(1250708), necroticConvergenceCount)
+	local messageText = CL.count:format(self:GetRename(1250708, 2), necroticConvergenceCount)
+	self:CDBar(1250708, eventInfo.duration, barText, nil, eventInfo.id)
+	necroticConvergenceCount = necroticConvergenceCount + 1
+	return {
+		msg = barText,
+		key = 1250708,
+		cancelCallback = function()
+			self:SetStage(2)
+			self:Message(1250708, "yellow", messageText)
+			self:PlaySound(1250708, "long")
+		end
+	}
+end

@@ -1,0 +1,72 @@
+
+BetterBagsDB = {
+["profileKeys"] = {
+["Skelf Onyourshelf"] = "Default",
+},
+["profiles"] = {
+["Default"] = {
+["__bankCategoriesScopedByBankType"] = true,
+["__profileSystemMigrated"] = true,
+["groups"] = {
+{
+{
+["bankType"] = 0,
+["name"] = "Bank",
+["id"] = 1,
+["kind"] = 1,
+["isDefault"] = true,
+["order"] = 1,
+},
+},
+},
+["ephemeralCategoryFilters"] = {
+["Low iLvl"] = {
+["enabled"] = {
+true,
+[0] = true,
+},
+["itemList"] = {
+},
+["name"] = "Low iLvl",
+},
+["Teleporters"] = {
+["enabled"] = {
+true,
+[0] = true,
+},
+["itemList"] = {
+},
+["name"] = "Teleporters",
+},
+},
+["__groupsScopedByKind"] = true,
+["__bankDefaultTabsFixed"] = true,
+["customCategoryFilters"] = {
+["Low iLvl"] = {
+["enabled"] = {
+true,
+[0] = true,
+},
+["save"] = true,
+["name"] = "Low iLvl",
+["itemList"] = {
+},
+},
+},
+["categoryOptions"] = {
+["Teleporters"] = {
+["shown"] = true,
+},
+["Consumable"] = {
+["shown"] = true,
+},
+["Low iLvl"] = {
+["shown"] = true,
+},
+},
+["groupCounter"] = {
+1,
+},
+},
+},
+}

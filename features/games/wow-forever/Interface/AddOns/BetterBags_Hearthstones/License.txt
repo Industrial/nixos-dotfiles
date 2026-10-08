@@ -1,0 +1,9 @@
+Copyright © 2024-2026 Paul Vandersypen, All Rights Reserved
+
+1. This software may not be copied, modified, changed, altered or otherwise be different than what the author has created without express written permission.
+
+2. This software may only be distributed on wowinterface.com or curseforge.com or wago.io or their respective authorized member websites.
+
+3. This software is provided "as is" and as such does not provide a warranty. Any unintended or intended behaviour that may or may not cause damage, loss or other negative attribute shall not be covered by this software. The author is not liable in any way, shape or form.
+
+4. This license must be included in every copy and every iteration of the software.

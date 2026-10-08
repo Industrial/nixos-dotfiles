@@ -1,0 +1,48 @@
+## Interface: 120100, 50504, 20506, 11509
+## Title: BetterBags - Hearthstones
+## Notes: Adds various hearthing items to BetterBags virtual groups
+## Notes-deDE: L["Adds various hearthing items to BetterBags virtual groups"] = "Fügt mehrere Ruhestein ähnliche items zu BetterBags Gruppen hinzu."
+
+## Notes-esES: L["Adds various hearthing items to BetterBags virtual groups"] = "Añadir objetos de teletransporte a los grupos virtuales de BetterBags"
+
+## Notes-esMX: L["Adds various hearthing items to BetterBags virtual groups"] = "Añadir objetos de teletransporte a los grupos virtuales de BetterBags"
+
+## Notes-frFR: L["Adds various hearthing items to BetterBags virtual groups"] = "Ajoute différents objets de type Pierre de foyer aux groupes virtuels du BetterBags"
+
+## Notes-itIT: L["Adds various hearthing items to BetterBags virtual groups"] = "Aggiungi oggetti di teletrasporto ai gruppi virtuali di BetterBags"
+
+## Notes-koKR: L["Adds various hearthing items to BetterBags virtual groups"] = "여러 순간이동 아이템을BetterBags 가상 그룹에 추가합니다"
+
+## Notes-ptBR: L["Adds various hearthing items to BetterBags virtual groups"] = "Adiciona um grupo ao BetterBags que contém vários itens como a Pedra de Regresso."
+
+## Notes-ruRU: L["Adds various hearthing items to BetterBags virtual groups"] = "Добавляет различные предметы для разогрева в виртуальные группы BetterBags."
+
+## Notes-zhCN: L["Adds various hearthing items to BetterBags virtual groups"] = "增加各种传送物品到BetterBags的虚拟类别"
+
+## Notes-zhTW: L["Adds various hearthing items to BetterBags virtual groups"] = "增加各種傳送物品到BetterBags的虛擬類別"
+
+## IconTexture: Interface\ICONS\Inv_misc_rune_01
+
+## Version: 1.33
+## Author: Sygon of Lightbringer-US (Crimson Embers, Alliance)
+## X-Date: 2026-08-12T23:49:25Z
+## X-License: Copyright (c) 2024-2026 Paul Vandersypen. All Rights Reserved
+## Category: Inventory
+## Category-deDE: Inventar
+## Category-esES: Inventario
+## Category-esMX: Inventario
+## Category-frFR: Inventaire
+## Category-itIT: Inventario
+## Category-koKR: 소지품
+## Category-ptBR: Inventário
+## Category-ruRU: Инвентарь
+## Category-zhCN: 物品栏
+## Category-zhTW: 物品欄
+## Dependencies: BetterBags
+## Group: BetterBags
+## X-Curse-Project-ID: 973173
+## X-WoWI-ID: 26689
+## X-Wago-ID: QKywxnN7
+
+Database.lua
+Core.lua

@@ -1,0 +1,206 @@
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("Restless Heart", 2805, 2658)
+if not mod then return end
+mod:SetEncounterID(3059)
+mod:SetRespawnTime(30)
+
+--------------------------------------------------------------------------------
+-- Locals
+--
+
+local arrowRainCount = 1
+local tempestSlashCount = 1
+local gustShotCount = 1
+local bullseyeWindblastCount = 1
+local boltGaleCount = 1
+local activeBars = {}
+
+--------------------------------------------------------------------------------
+-- Renames
+--
+
+mod:SetRenames({
+	[472556] = {472556}, -- Arrow Rain
+	[472662] = {CL.tank_knockback}, -- Tempest Slash (Tank Knockback)
+	[1253986] = {CL.clear_pools}, -- Gust Shot
+	[468429] = {CL.leap}, -- Bullseye Windblast
+	[474528] = {CL.frontal_cone, CL.you:format(CL.frontal_cone), notes = {CL.generalNote, CL.messageOnYouNote}, original = {474528, CL.you:format(mod:SpellName(474528))}}, -- Bolt Gale (Frontal Cone)
+})
+
+--------------------------------------------------------------------------------
+-- Auras
+--
+
+mod:SetAuraData({
+	{468442, duration = 4, mechanic = "stunned", soundOnApplied = "warning", note = CL.leap, tip = CL.debuffFailureNote}, -- Billowing Wind
+	{472662, duration = 10, soundOnApplied = "alarm", soundOnAppliedDose = "none", note = CL.tank_knockback}, -- Tempest Slash
+	{474528, duration = 5, soundOnApplied = "warning", note = CL.frontal_cone, tip = CL.mainDebuffNote}, -- Bolt Gale
+	{1282911, duration = 60, soundOnApplied = "warning", note = CL.frontal_cone, tip = CL.preDebuffNote}, -- Bolt Gale
+	{1216042, soundOnApplied = "alert"}, -- Squall Leap
+	{1253979, duration = 6, soundOnApplied = "warning", note = CL.clear_pools}, -- Gust Shot
+	{1282955, soundOnApplied = "underyou", tip = CL.debuffUnderYouNote}, -- Storming Soulfont
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+
+function mod:GetOptions()
+	return {
+		472556, -- Arrow Rain
+		472662, -- Tempest Slash
+		1253986, -- Gust Shot
+		468429, -- Bullseye Windblast
+		{474528, "ME_ONLY_EMPHASIZE"}, -- Bolt Gale
+	}
+end
+
+mod:UseCustomTimers(true)
+function mod:OnEncounterStart()
+	arrowRainCount = 1
+	tempestSlashCount = 1
+	gustShotCount = 1
+	bullseyeWindblastCount = 1
+	boltGaleCount = 1
+	activeBars = {}
+	if self:ShouldShowBars() then
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED")
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_REMOVED")
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Event Handlers
+--
+
+function mod:ENCOUNTER_TIMELINE_EVENT_ADDED(_, eventInfo)
+	if eventInfo.source ~= 0 then return end -- Enum.EncounterTimelineEventSource.Encounter
+	local duration = self:RoundNumber(eventInfo.duration, 1)
+	local barInfo
+	if duration == 9 or duration == 11 then -- Arrow Rain
+		barInfo = self:ArrowRainTimeline(eventInfo)
+	elseif duration == 21 then -- Tempest Slash
+		barInfo = self:TempestSlashTimeline(eventInfo)
+	elseif duration == 23.5 then -- Gust Shot
+		barInfo = self:GustShotTimeline(eventInfo)
+	elseif duration == 24 or duration == 53 then -- Bullseye Windblast
+		barInfo = self:BullseyeWindblastTimeline(eventInfo)
+	elseif duration == 39 then -- Bolt Gale
+		barInfo = self:BoltGaleTimeline(eventInfo)
+	elseif not self:IsWiping() then
+		self:ErrorForTimelineEvent(eventInfo)
+	end
+	if barInfo then
+		activeBars[eventInfo.id] = barInfo
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		local state = C_EncounterTimeline.GetEventState(eventID)
+		if state == 0 then -- Active
+			self:ResumeBar(barInfo.key, barInfo.msg)
+		elseif state == 1 then -- Paused
+			self:PauseBar(barInfo.key, barInfo.msg)
+		elseif state == 2 then -- Finished
+			self:StopBar(barInfo.msg)
+			if barInfo.callback then
+				barInfo.callback()
+			end
+			activeBars[eventID] = nil
+		elseif state == 3 then -- Canceled
+			self:StopBar(barInfo.msg)
+			activeBars[eventID] = nil
+		end
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_REMOVED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		self:StopBar(barInfo.msg)
+		activeBars[eventID] = nil
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Ability Handlers
+--
+
+function mod:ArrowRainTimeline(eventInfo) -- Arrow Rain / Arrows
+	local barText = CL.count:format(self:GetRename(472556), arrowRainCount)
+	self:CDBar(472556, eventInfo.duration, barText, nil, eventInfo.id)
+	arrowRainCount = arrowRainCount + 1
+	return {
+		msg = barText,
+		key = 472556,
+		callback = function()
+			self:Message(472556, "cyan", barText)
+			self:PlaySound(472556, "info")
+		end
+	}
+end
+
+function mod:TempestSlashTimeline(eventInfo) -- Tank Knockback
+	local barText = CL.count:format(self:GetRename(472662), tempestSlashCount)
+	self:CDBar(472662, eventInfo.duration, barText, nil, eventInfo.id)
+	tempestSlashCount = tempestSlashCount + 1
+	return {
+		msg = barText,
+		key = 472662,
+		callback = function()
+			self:Message(472662, "purple", barText)
+			self:PlaySound(472662, "alert")
+		end
+	}
+end
+
+function mod:GustShotTimeline(eventInfo) -- Spread / Clear floor patches
+	local barText = CL.count:format(self:GetRename(1253986), gustShotCount)
+	self:CDBar(1253986, eventInfo.duration, barText, nil, eventInfo.id)
+	gustShotCount = gustShotCount + 1
+	return {
+		msg = barText,
+		key = 1253986,
+		callback = function()
+			self:StopBlizzMessages(1.2) -- Has some travel time
+			self:Message(1253986, "orange", barText)
+			--self:PlaySound(1253986, "warning") -- PA sound
+		end
+	}
+end
+
+function mod:BullseyeWindblastTimeline(eventInfo) -- Leap / Incoming wave
+	local barText = CL.count:format(self:GetRename(468429), bullseyeWindblastCount)
+	self:CDBar(468429, eventInfo.duration, barText, nil, eventInfo.id)
+	bullseyeWindblastCount = bullseyeWindblastCount + 1
+	return {
+		msg = barText,
+		key = 468429,
+		callback = function()
+			self:StopBlizzMessages(1)
+			self:Message(468429, "yellow", barText)
+			self:PlaySound(468429, "long")
+		end
+	}
+end
+
+function mod:BoltGaleTimeline(eventInfo) -- Frontal Cone / Pushback
+	local barText = CL.count:format(self:GetRename(474528), boltGaleCount)
+	self:CDBar(474528, eventInfo.duration, barText, nil, eventInfo.id)
+	boltGaleCount = boltGaleCount + 1
+	return {
+		msg = barText,
+		key = 474528,
+		callback = function()
+			self:PersonalMessageFromBlizzMessage(474528, 1, false, self:GetRename(474528, 2))
+			self:Message(474528, "red", barText)
+			--self:PlaySound(474528, "warning") -- PA sound
+		end
+	}
+end

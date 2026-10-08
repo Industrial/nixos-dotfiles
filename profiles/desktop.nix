@@ -9,6 +9,7 @@
   ...
 }: {
   imports = [
+    ../features/desktop/claude-desktop
     ../features/nixos/window-manager
     ../features/window-manager/alacritty
     ../features/window-manager/gnome

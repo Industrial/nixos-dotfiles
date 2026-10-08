@@ -1,0 +1,20 @@
+Copyright (c) 2006-2026 James N Whitehead II
+
+All rights reserved.
+
+This source code and associated files are the proprietary and confidential
+property of the copyright holder.
+
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, or sell copies of the Software, in whole or in part, without
+prior written permission from the copyright holder.
+
+This repository is provided for viewing and reference purposes only.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING
+FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.

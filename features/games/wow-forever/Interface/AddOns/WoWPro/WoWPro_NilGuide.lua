@@ -1,0 +1,37 @@
+-------------------------------
+--      WoWPro_NilGuide      --
+-------------------------------
+
+function WoWPro:LoadNilGuide()
+    WoWPro.step = { "No Guide Loaded" }
+    WoWPro.action = { "Interface\\Icons\\INV_Misc_Note_01" }
+    WoWPro.stepcount = 1
+
+    WoWPro.TitleText:SetText("No Guide Loaded")
+    WoWPro.StickyFrame:Hide()
+    WoWPro.StickyFrame:SetHeight(1)
+
+    -- Getting the image and text for the step --
+    WoWPro.rows[1].check:Hide()
+    WoWPro.rows[1].targetbutton:Hide()
+    WoWPro.rows[1].itembutton:Hide()
+    WoWPro.rows[1].note:SetText('To select a guide, click the horn icon in the top bar')
+    WoWPro.rows[1].track:SetText(nil)
+
+    for i=2,15 do
+        WoWPro.rows[i]:Hide()
+        WoWPro.rows[i].check:Hide()
+        WoWPro.rows[i].targetbutton:Hide()
+        WoWPro.rows[i].itembutton:Hide()
+        WoWPro.rows[i].step:SetText(nil)
+        WoWPro.rows[i].note:SetText(nil)
+        if WoWPro.rows[i].iconTexture then
+            WoWPro.rows[i].iconTexture:SetTexture(nil)
+        end
+        WoWPro.rows[i].track:SetText(nil)
+    end
+
+    WoWPro.RowColorSet()
+    WoWPro.RowSizeSet()
+    WoWPro.PaddingSet()
+end

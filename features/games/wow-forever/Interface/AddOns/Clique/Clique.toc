@@ -1,0 +1,73 @@
+## Interface: 120007, 120100
+
+## Title: Clique
+## Author: Cladhaire
+## Version: v5.0.14-release
+## Notes: Simply powerful click-casting interface
+## Notes-ruRU: Простой и мощный интерфейс для привязки заклинаний к щелчку мыши.
+## IconTexture: Interface\AddOns\Clique\images\icon_square_64.tga
+## SavedVariables: CliqueDB, CliqueDB3
+## X-Curse-Project-ID: 15564
+## X-WoWI-ID: 5108
+## X-Wago-ID: Mj6jLxGR
+
+## X-Localizations: enUS, enGB, ruRU, zhCN, zhTW
+## X-CompatibleLocales: enUS, enGB, deDE, frFR, esES, esMX, zhCN, zhTW, koKR, ruRU
+
+AddonCore.lua
+i18n\Localization.enUS.lua
+i18n\Localization.koKR.lua
+i18n\Localization.ruRU.lua
+i18n\Localization.zhCN.lua
+i18n\Localization.zhTW.lua
+
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+libs\AceDB-3.0\AceDB-3.0.xml
+libs\LibDeflate\LibDeflate.lua
+libs\LibSerialize\LibSerialize.lua
+libs\LibDropDown\embed.xml
+
+core/core.lua
+core/database.lua
+core/changelog.lua
+core/frame_registry.lua
+core/proxy_frames.lua
+core/bindings.lua
+core/attributes.lua
+core/talents.lua
+core/utils.lua
+core/import_export.lua
+core/dialogs.lua
+
+ClickCastTemplate.xml
+Clique.xml
+
+catalog/LibCatalog.lua
+catalog/ActionCatalog.lua
+catalog/MacroCatalog.lua
+catalog/SpellbookCatalog.lua
+catalog/PetCatalog.lua
+
+config/BindingConfig.lua
+config/BrowsePage.lua
+config/EditPage.lua
+config/EditMacroPage.lua
+config/ActionCatalogWindow.lua
+config/Utils.lua
+config/BlizzFramesConfigPage.lua
+config/DenylistPage.lua
+config/GeneralOptionsPage.lua
+config/ProfilePage.lua
+config/ChangelogPage.lua
+
+options\OptionsPanel.lua
+options\BlizzardFramesConfig.lua
+options\DenylistConfig.lua
+
+modules\blizzard.lua
+modules\binding_tooltip.lua
+
+#tests\HeaderTest.xml
+#tests\HeaderTest.lua
+#tests\TestSuite.lua

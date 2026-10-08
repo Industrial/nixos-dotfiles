@@ -1,0 +1,460 @@
+local addonName = ... ---@type string
+
+---@class BetterBags: AceAddon
+local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Sort: AceModule
+local sort = addon:NewModule('Sort')
+
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+local function invalidData(aData, bData)
+  if not aData or not bData
+  or not aData.itemInfo or not bData.itemInfo
+  or not aData.itemInfo.itemQuality or not bData.itemInfo.itemQuality
+  or not aData.itemInfo.currentItemCount or not bData.itemInfo.currentItemCount
+  or not aData.itemInfo.itemGUID or not bData.itemInfo.itemGUID
+  or not aData.itemInfo.itemName or not bData.itemInfo.itemName then
+    return true
+  end
+  return false
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetSectionSortFunction(kind, view)
+  local sortType = database:GetSectionSortType(kind, view)
+  if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
+    return function(a, b)
+      return self.SortSectionsAlphabetically(kind, a, b)
+    end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
+    return function(a, b)
+      return self.SortSectionsBySizeAscending(kind, a, b)
+    end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
+    return function(a, b)
+      return self.SortSectionsBySizeDescending(kind, a, b)
+    end
+  end
+  -- Return the default alphabetical sort in case of an unknown sort type.
+  -- This can happen if external addons modify the saved variables.
+  return function(a, b)
+    return self.SortSectionsAlphabetically(kind, a, b)
+  end
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetItemSortFunction(kind, view)
+  if kind == const.BAG_KIND.UNDEFINED then
+    return function() return false end
+  end
+  local sortType = database:GetItemSortType(kind, view)
+  if sortType == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY then
+    return self.SortItemsByAlphaThenQuality
+  elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
+    return self.SortItemsByQualityThenAlpha
+  elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
+    return self.SortItemsByItemLevel
+  elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
+    return self.SortItemsByExpansion
+  end
+  assert(false, "Unknown sort type: " .. sortType)
+  return function() end
+end
+
+---@param kind BagKind
+---@param a Section
+---@param b Section
+---@return boolean, boolean
+function sort.SortSectionsByPriority(kind, a, b)
+  if not a or not b then return false, false end
+  local aTitle, bTitle = a.title:GetText(), b.title:GetText()
+  local pinnedItems = database:GetCustomSectionSort(kind)
+  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
+  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
+  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
+
+  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
+end
+
+---@param kind BagKind
+---@param a Section
+---@param b Section
+---@return boolean
+function sort.SortSectionsAlphabetically(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.title:GetText() == L:G("Recent Items") then return true end
+  if b.title:GetText() == L:G("Recent Items") then return false end
+
+  if a:GetFillWidth() then return false end
+  if b:GetFillWidth() then return true end
+
+  if a.title:GetText() == L:G("Free Space") then return false end
+  if b.title:GetText() == L:G("Free Space") then return true end
+  return a.title:GetText() < b.title:GetText()
+end
+
+---@param kind BagKind
+---@param a Section
+---@param b Section
+---@return boolean
+function sort.SortSectionsBySizeDescending(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.title:GetText() == L:G("Recent Items") then return true end
+  if b.title:GetText() == L:G("Recent Items") then return false end
+
+  if a:GetFillWidth() then return false end
+  if b:GetFillWidth() then return true end
+
+  if a.title:GetText() == L:G("Free Space") then return false end
+  if b.title:GetText() == L:G("Free Space") then return true end
+  local aSize, bSize = a:GetCellCount(), b:GetCellCount()
+  if aSize ~= bSize then
+    return aSize > bSize
+  end
+  return a.title:GetText() < b.title:GetText()
+end
+
+---@param kind BagKind
+---@param a Section
+---@param b Section
+---@return boolean
+function sort.SortSectionsBySizeAscending(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.title:GetText() == L:G("Recent Items") then return true end
+  if b.title:GetText() == L:G("Recent Items") then return false end
+
+  if a:GetFillWidth() then return false end
+  if b:GetFillWidth() then return true end
+
+  if a.title:GetText() == L:G("Free Space") then return false end
+  if b.title:GetText() == L:G("Free Space") then return true end
+  local aSize, bSize = a:GetCellCount(), b:GetCellCount()
+  if aSize ~= bSize then
+    return aSize < bSize
+  end
+  return a.title:GetText() < b.title:GetText()
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByQualityThenAlpha(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByAlphaThenQuality(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByItemLevel(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
+    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByExpansion(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+
+  -- Get expansion IDs, defaulting to 0 (Classic) if missing
+  local aExpacID = aData.itemInfo.expacID or 0
+  local bExpacID = bData.itemInfo.expacID or 0
+
+  -- Sort by expansion (chronological order)
+  if aExpacID ~= bExpacID then
+    return aExpacID < bExpacID
+  -- If same expansion, fall back to alphabetical
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  -- If same name, fall back to item count
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  -- Finally, fall back to GUID for stable sort
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.GetItemSortBySlot(a, b)
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if not aData then return false end
+  if not bData then return true end
+  return aData.slotid < bData.slotid
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByQualityThenAlpha(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByAlphaThenQuality(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByItemLevel(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
+    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByExpansion(aData, bData)
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
+  if invalidData(aData, bData) then return false end
+
+  local aExpacID = aData.itemInfo.expacID or 0
+  local bExpacID = bData.itemInfo.expacID or 0
+
+  if aExpacID ~= bExpacID then
+    return aExpacID < bExpacID
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataBySlot(aData, bData)
+  if not aData then return false end
+  if not bData then return true end
+  if aData.bagid ~= bData.bagid then
+    return aData.bagid < bData.bagid
+  end
+  return aData.slotid < bData.slotid
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetItemDataSortFunction(kind, view)
+  if kind == const.BAG_KIND.UNDEFINED then
+    return function() return false end
+  end
+  local sortType = database:GetItemSortType(kind, view)
+  if sortType == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY then
+    return self.SortItemDataByAlphaThenQuality
+  elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
+    return self.SortItemDataByQualityThenAlpha
+  elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
+    return self.SortItemDataByItemLevel
+  elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
+    return self.SortItemDataByExpansion
+  end
+  assert(false, "Unknown sort type: " .. sortType)
+  return function() end
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean, boolean
+function sort.SortCategoryDataByPriority(kind, a, b)
+  if not a or not b then return false, false end
+  local aTitle, bTitle = a.name, b.name
+  local pinnedItems = database:GetCustomSectionSort(kind)
+  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
+  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
+  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
+
+  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean
+function sort.SortCategoryDataAlphabetically(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortCategoryDataByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.name == L:G("Recent Items") then return true end
+  if b.name == L:G("Recent Items") then return false end
+
+  if a.fillWidth then return false end
+  if b.fillWidth then return true end
+
+  if a.name == L:G("Free Space") then return false end
+  if b.name == L:G("Free Space") then return true end
+  return a.name < b.name
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean
+function sort.SortCategoryDataBySizeDescending(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortCategoryDataByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.name == L:G("Recent Items") then return true end
+  if b.name == L:G("Recent Items") then return false end
+
+  if a.fillWidth then return false end
+  if b.fillWidth then return true end
+
+  if a.name == L:G("Free Space") then return false end
+  if b.name == L:G("Free Space") then return true end
+  local aSize, bSize = a.count, b.count
+  if aSize ~= bSize then
+    return aSize > bSize
+  end
+  return a.name < b.name
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean
+function sort.SortCategoryDataBySizeAscending(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortCategoryDataByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.name == L:G("Recent Items") then return true end
+  if b.name == L:G("Recent Items") then return false end
+
+  if a.fillWidth then return false end
+  if b.fillWidth then return true end
+
+  if a.name == L:G("Free Space") then return false end
+  if b.name == L:G("Free Space") then return true end
+  local aSize, bSize = a.count, b.count
+  if aSize ~= bSize then
+    return aSize < bSize
+  end
+  return a.name < b.name
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetCategoryDataSortFunction(kind, view)
+  local sortType = database:GetSectionSortType(kind, view)
+  if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
+    return function(a, b)
+      return self.SortCategoryDataAlphabetically(kind, a, b)
+    end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
+    return function(a, b)
+      return self.SortCategoryDataBySizeAscending(kind, a, b)
+    end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
+    return function(a, b)
+      return self.SortCategoryDataBySizeDescending(kind, a, b)
+    end
+  end
+  return function(a, b)
+    return self.SortCategoryDataAlphabetically(kind, a, b)
+  end
+end

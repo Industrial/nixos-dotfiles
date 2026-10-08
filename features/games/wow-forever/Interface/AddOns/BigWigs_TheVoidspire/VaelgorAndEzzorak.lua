@@ -1,0 +1,986 @@
+
+-- TODO:
+-- Look at breath 3/4 around 1min into the encounter, any ways to cover blizzard?
+
+--------------------------------------------------------------------------------
+-- Module Declaration
+--
+
+local mod, CL = BigWigs:NewBoss("Vaelgor & Ezzorak", 2912, 2735)
+if not mod then return end
+mod:RegisterEnableMob(242056, 244552) -- Vaelgor, Ezzorak
+mod:SetEncounterID(3178)
+mod:SetRespawnTime(30)
+mod:SetStage(1)
+mod:SetPrivateAuraSounds({
+	{1262656, 1262676, 1262999, sound = "alarm"}, -- Nullbeam
+	{1244672, sound = "underyou"}, -- Nullzone
+	{1252157, sound = "none"}, -- Nullzone Implosion
+	{1255612, sound = "warning"}, -- Dread Breath (Targetted)
+	{1264467, sound = "underyou"}, -- Tail Lash
+	{1245554, sound = "alert"},-- Gloomtouched
+	{1270852, sound = "none"}, -- Diminish
+	{1245421, sound = "underyou"}, -- Gloomfield
+	{1245059, sound = "alarm"}, -- Void Howl
+	{1245175, sound = "none"}, -- Voidbolt
+	-- {1280355, sound = "none"}, -- Rakfang
+	{1265152, sound = "warning"}, -- Impale
+	{1249595, sound = "none"}, -- Radiant Barrier
+	{1270497, sound = "warning"}, -- Shadowmark
+})
+mod:UseCustomTimers(true)
+
+--------------------------------------------------------------------------------
+-- Locals
+--
+
+local timelineEventCount = 0
+local storedTimelineEvents = {}
+local scheduleBackups = nil
+local activeBars = {}
+local backupBars = {}
+local countForDuration = {}
+local lastStaged = 0
+local nextRadiantBarrier = 0
+local mythicBreathOrRakfang = {}
+local mythicRakfangHasPassed = false
+
+local midnightFlamesCount = 1
+local nullbeamCount = 1
+local dreadBreathCount = 1
+local vaelwingCount = 1
+local gloomCount = 1
+local voidHowlCount = 1
+local rakfangCount = 1
+local radiantBarrierCount = 1
+local grapplingMawCount = 1
+local mythicMessageCounter = 0
+local breathAboutToCast = false
+
+--------------------------------------------------------------------------------
+-- Localization
+--
+
+local L = mod:SetDefaultLocale({ -- SetOption:skip-locale
+	nullzone = "Tethers",
+	custom_select_gloom_reset = CL.counter_reset_name:format(mod:SpellName(1245391)),
+	custom_select_gloom_reset_desc = CL.counter_reset_desc,
+	custom_select_gloom_reset_icon = 1245391,
+	custom_select_gloom_reset_value1 = CL.reset_casts_and_stages:format(2),
+	custom_select_gloom_reset_value2 = CL.reset_stages,
+	custom_select_gloom_reset_value3 = CL.reset_never,
+})
+
+--------------------------------------------------------------------------------
+-- Renames
+--
+
+mod:SetRenames({
+	["stages"] = {CL.intermission, CL.stage:format(2), CL.stage:format(3), original = false, notes = {CL.intermission, CL.stage:format(2), CL.stage:format(3)}}, -- Stages
+	[1249748] = {CL.raid_damage}, -- Midnight Flames (Raid Damage)
+	[1280458] = {CL.tank_grip}, -- Grappling Maw (Tank Grip)
+	-- Vaelgor
+	[1262623] = {1262623}, -- Nullbeam
+	[1244672] = {L.nullzone}, -- Nullzone
+	[1244221] = {CL.breath, CL.you:format(CL.breath), notes = {CL.generalNote, CL.messageOnYouNote}, original = {1244221, CL.you:format(mod:SpellName(1244221))}}, -- Dread Breath (Breath)
+	[1265131] = {1265131}, -- Vaelwing
+	-- Ezzorak
+	[1245391] = {1245391}, -- Gloom
+	[1244917] = {CL.orbs}, -- Void Howl (Orbs)
+	[1245645] = {1245645}, -- Rakfang
+})
+
+--------------------------------------------------------------------------------
+-- Initialization
+--
+function mod:GetOptions()
+	return {
+		"stages",
+		1249748, -- Midnight Flames
+		{1280458, "TANK"}, -- Grappling Maw
+		-- Vaelgor
+		{1262623, "TANK"}, -- Nullbeam
+		1244672, -- Nullzone
+		{1244221, "ME_ONLY_EMPHASIZE"}, -- Dread Breath
+		{1265131, "TANK"}, -- Vaelwing
+		-- Ezzorak
+		1245391, -- Gloom
+		"custom_select_gloom_reset",
+		1244917, -- Void Howl
+		{1245645, "TANK"}, -- Rakfang
+	},{
+		["stages"] = "general",
+		[1262623] = -33241, -- Vaelgor
+		[1245391] = -33255, -- Ezzorak
+	}
+end
+
+function mod:OnBossEnable()
+	backupBars = {}
+	if self:Mythic() then
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED", "TimersMythic")
+	elseif self:Heroic() then
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED", "TimersHeroic")
+	else
+		self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_ADDED", "TimerOther")
+	end
+	self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED")
+	self:RegisterEvent("ENCOUNTER_TIMELINE_EVENT_REMOVED")
+end
+
+function mod:OnEncounterStart()
+	self:SetStage(1)
+	countForDuration = {}
+	timelineEventCount = 0
+	activeBars = {}
+	storedTimelineEvents = {}
+	scheduleBackups = nil
+
+	midnightFlamesCount = 1
+	nullbeamCount = 1
+	dreadBreathCount = 1
+	vaelwingCount = 1
+	gloomCount = 1
+	voidHowlCount = 1
+	rakfangCount = 1
+	radiantBarrierCount = 1
+	grapplingMawCount = 1
+	mythicBreathOrRakfang = {}
+	mythicRakfangHasPassed = false
+	mythicMessageCounter = 0
+	breathAboutToCast = false
+
+	-- Radiant barrier didnt always start on pull, we start this as fallback which will get overwritten if a real one starts.
+	local firstRadiantBarrierCD = self:Mythic() and 120 or self:Heroic() and 105 or 111
+	nextRadiantBarrier = GetTime() + firstRadiantBarrierCD
+	if self:ShouldShowBars() then
+		self:Bar("stages", firstRadiantBarrierCD, CL.count:format(self:GetRename("stages", 1), radiantBarrierCount), 1248847) -- Radiant Barrier icon
+		if self:Mythic() then
+			self:SendMessage("BigWigs_BlockBlizzMessages")
+			self:RegisterEvent("ENCOUNTER_WARNING")
+		end
+	end
+end
+
+function mod:OnBossDisable()
+	if self:Mythic() then
+		self:SendMessage("BigWigs_AllowBlizzMessages")
+	end
+	for eventID in next, backupBars do
+		self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Timeline Event Handlers
+--
+
+function mod:IsIntermission()
+	local stage = self:GetStage()
+	return stage ~= self:RoundNumber(stage, 0)
+end
+
+function mod:StartBackupBar(eventInfo, timerAdjustment)
+	if not eventInfo then return end -- if we started our own bar this will be nil
+	if not self:IsBeforeRadiantBarrier(eventInfo.duration, eventInfo.customBuffer) then return end
+
+	if UnitExists("boss2") then -- Prevent debug info when one of the dragons die
+		self:ErrorForTimelineEvent(eventInfo)
+	end
+	backupBars[eventInfo.id] = true
+	local timer = eventInfo.duration
+	if timerAdjustment then
+		timer = timer - (GetTime() - eventInfo.timestamp)
+	end
+	self:SendMessage("BigWigs_StartBar", nil, nil, ("[B] %s"):format(eventInfo.spellName), timer, eventInfo.iconFileID, eventInfo.maxQueueDuration, nil, eventInfo.id, eventInfo.id)
+
+	local state = C_EncounterTimeline.GetEventState(eventInfo.id)
+	if state == 1 then -- Enum.EncounterTimelineEventState.Paused = 1
+		self:SendMessage("BigWigs_PauseBar", nil, nil, eventInfo.id)
+	end
+end
+
+-- Allowing a custom buffer so it can be tweaked per ability.
+function mod:IsBeforeRadiantBarrier(duration, customBuffer)
+	local buffer = customBuffer or 0
+	if (GetTime() + duration) > (nextRadiantBarrier + buffer) then -- Don't show timers which won't happen, small buffer incase of a delay
+		return false
+	end
+	return true
+end
+
+function mod:TimersMythic(_, eventInfo)
+	if eventInfo.source ~= 0 then return end
+	timelineEventCount = timelineEventCount + 1
+	local duration = eventInfo.duration
+	local durationRounded = self:RoundNumber(duration, 0)
+	eventInfo.durationRounded = durationRounded
+	local barInfo
+	local stage = self:GetStage()
+	local time = GetTime()
+
+	if durationRounded == 8 and time - 5 > lastStaged and not self:IsIntermission() and stage < 3 then -- Midnight Flames Cast
+		lastStaged = time
+		mythicMessageCounter = 0
+		if self:ShouldShowBars() then
+			self:Message("stages", "cyan", self:GetRename("stages", 1), false) -- Intermission
+			self:PlaySound("stages", "long")
+			self:Bar("stages", 40, self:GetRename("stages", stage + 1), 1249748)
+			--self:StopBlizzMessages(1) -- Radiant Barrier Message (Already blocked on Mythic)
+		end
+		stage = stage + 0.5
+		self:SetStage(stage)
+		dreadBreathCount = 1
+		nullbeamCount = 1
+		if self:GetOption("custom_select_gloom_reset") < 3 then
+			gloomCount = 1
+		end
+	elseif time - 5 > lastStaged and self:IsIntermission() then
+		stage = math.floor(stage) + 1
+		self:SetStage(stage)
+		lastStaged = time
+		if self:ShouldShowBars() then
+			self:Message("stages", "cyan", self:GetRename("stages", stage), false)
+			self:PlaySound("stages", "long")
+		end
+		timelineEventCount = 1
+		countForDuration = {}
+
+		nullbeamCount = 1
+		dreadBreathCount = 1
+		vaelwingCount = 1
+		voidHowlCount = 1
+		rakfangCount = 1
+		grapplingMawCount = 1
+	end
+
+	if not self:IsIntermission() then -- 1, 2, 3+
+		local initialTimers = stage == 2 and 8 or 7
+		if timelineEventCount <= initialTimers then -- Initial timers
+			if stage == 1 then -- Initial Pull Timers
+				if durationRounded == 6 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 12 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 7 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 30 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 35 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 10 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 120 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			elseif stage == 2 then -- Round 2
+				if durationRounded == 19 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 18 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 25 then -- Dread Breath or Rakfang
+					countForDuration[durationRounded] = (countForDuration[durationRounded] or 0) + 1
+					if countForDuration[durationRounded] == 1 then
+						eventInfo.duration = eventInfo.duration + 6.5 -- extend this, always delayed
+						barInfo = self:DreadBreath(eventInfo)
+					elseif countForDuration[durationRounded] == 2 then
+						barInfo = self:Rakfang(eventInfo)
+					end
+					mythicBreathOrRakfang[eventInfo.id] = barInfo
+					mythicRakfangHasPassed = false
+				elseif durationRounded == 48 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 43 or durationRounded == 8 then -- Void Howl (2x timers)
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 128 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			elseif stage == 3 then -- Round 3
+				if durationRounded == 21 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 45 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 32 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 27 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 25 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 40 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 125 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			end
+		else
+			-- Dread breath does not work well with the stored timeline events
+			-- it has unique enough timers to capture it always
+			if durationRounded == 65 or durationRounded == 57 then -- Dread Breath
+				if self:IsBeforeRadiantBarrier(eventInfo.duration, 5) then -- Breath buffer
+					barInfo = self:DreadBreath(eventInfo)
+				else -- not happening
+					return
+				end
+			-- Vaelwing also gets lost, so we re-capture that where we can
+			elseif durationRounded == 17 or durationRounded == 24 then -- Vaelwing
+				if self:IsBeforeRadiantBarrier(eventInfo.duration) then -- Breath buffer
+					barInfo = self:Vaelwing(eventInfo)
+				else -- not happening
+					return
+				end
+			else
+				eventInfo.timestamp = GetTime()
+				storedTimelineEvents[#storedTimelineEvents+1] = eventInfo
+				if scheduleBackups then
+					self:CancelTimer(scheduleBackups)
+					scheduleBackups = nil
+				end
+				local delayedTimer = 0.5
+				scheduleBackups = self:ScheduleTimer(function()
+					scheduleBackups = nil
+					if self:ShouldShowBars() and not self:IsWiping() then
+						for i = 1, #storedTimelineEvents do
+							local storedEventInfo = storedTimelineEvents[i]
+							local adjustedDuration = storedEventInfo.duration - delayedTimer -- adjust for scheduled timer
+							local isPossibleVaelwingBackup = storedEventInfo.durationRounded >= 15 and storedEventInfo.durationRounded <= 25
+							if self:IsBeforeRadiantBarrier(adjustedDuration) and isPossibleVaelwingBackup then
+								storedEventInfo.duration = adjustedDuration
+								barInfo = self:Vaelwing(storedEventInfo)
+								activeBars[storedEventInfo.id] = barInfo
+							else
+								self:StartBackupBar(storedEventInfo, true)
+							end
+						end
+					end
+					storedTimelineEvents = {}
+				end, delayedTimer)
+				return
+			end
+		end
+	else -- Intermissions
+		if durationRounded == 8 then -- Midnight Flames
+			barInfo = self:MidnightFlames(eventInfo)
+			-- this bar is the last one started so we can start all our own now.
+			if self:ShouldShowBars() and not self:IsWiping() then
+				local stageFloor = math.floor(stage)
+				for i = 1, #storedTimelineEvents do
+					local event = storedTimelineEvents[i]
+					if stageFloor == 1 then -- Stage 1.5, start our own timers
+						if event.durationRounded == 13 or event.durationRounded == 23 then -- Dread Breath
+							if event.durationRounded == 23 then
+								event.duration = 25 -- Correct blizzard timer
+							end
+							activeBars[event.id] = self:DreadBreath(event)
+						elseif event.durationRounded == 18 then -- Nullbeam
+							activeBars[event.id] = self:Nullbeam(event)
+							-- Start our own timer
+							self:Bar(1244672, event.duration + 9.5, CL.count:format(self:GetRename(1244672), 1), nil, event.id) -- Nullzone icon(s)
+						else
+							self:StartBackupBar(event, true)
+						end
+					elseif stageFloor == 2 then -- Stage 2.5
+						if event.durationRounded == 13 then -- Void Howl
+							activeBars[event.id] = self:VoidHowl(event)
+						elseif event.durationRounded == 18 then -- Gloom
+							activeBars[event.id] = self:Gloom(event)
+						elseif event.durationRounded == 23 then -- Dread Breath
+							event.duration = 25 -- Correct blizzard timer
+							activeBars[event.id] = self:DreadBreath(event)
+						else
+							self:StartBackupBar(event, true)
+						end
+					end
+				end
+			end
+			storedTimelineEvents = {}
+		end
+	end
+
+	if barInfo then
+		activeBars[eventInfo.id] = barInfo
+	elseif self:ShouldShowBars() and not self:IsWiping() then
+		self:StartBackupBar(eventInfo)
+	end
+end
+
+function mod:TimersHeroic(_, eventInfo)
+	if eventInfo.source ~= 0 then return end
+	timelineEventCount = timelineEventCount + 1
+	local duration = eventInfo.duration
+	local durationRounded = self:RoundNumber(duration, 0)
+	eventInfo.durationRounded = durationRounded
+	local barInfo
+	local stage = self:GetStage()
+	local time = GetTime()
+
+	if not self:IsIntermission() and durationRounded == 8 and time - 5 > lastStaged and stage < 3 then -- Midnight Flames Cast
+		lastStaged = time
+		if self:ShouldShowBars() then
+			self:Message("stages", "cyan", self:GetRename("stages", 1), false) -- Intermission
+			self:PlaySound("stages", "long")
+			self:Bar("stages", 25, self:GetRename("stages", stage + 1), 1249748)
+			self:StopBlizzMessages(1) -- Radiant Barrier Message
+		end
+		stage = stage + 0.5
+		self:SetStage(stage)
+	elseif time - 5 > lastStaged and self:IsIntermission() then
+		stage = math.floor(stage) + 1
+		self:SetStage(stage)
+		lastStaged = time
+		if self:ShouldShowBars() then
+			self:Message("stages", "cyan", self:GetRename("stages", stage), false)
+			self:PlaySound("stages", "long")
+		end
+		timelineEventCount = 1
+		countForDuration = {}
+
+		nullbeamCount = 1
+		dreadBreathCount = 1
+		vaelwingCount = 1
+		voidHowlCount = 1
+		rakfangCount = 1
+		grapplingMawCount = 1
+		if self:GetOption("custom_select_gloom_reset") < 3 then
+			gloomCount = 1
+		end
+	end
+
+	if not self:IsIntermission() then -- 1, 2, 3+
+		local initialTimers = stage == 3 and 7 or 8
+		if timelineEventCount <= initialTimers then -- Initial timers
+			if stage == 1 then -- Initial Pull Timers
+				if durationRounded == 6 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 12 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 27 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 10 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 30 and not self:IsWiping() then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 18 then -- Grappling Maw
+					barInfo = self:GrapplingMaw(eventInfo)
+				elseif durationRounded == 50 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 105 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			elseif stage == 2 then -- Round 2
+				if durationRounded == 18 then -- Grappling Maw
+					barInfo = self:GrapplingMaw(eventInfo)
+				elseif durationRounded == 45 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 27 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 6 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 12 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 10 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 15 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 105 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			elseif stage >= 3 then -- Round 3+
+				if durationRounded == 8 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 13 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 65 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 15 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 50 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 25 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 225 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			end
+		else -- handle next events
+			eventInfo.timestamp = GetTime()
+			storedTimelineEvents[#storedTimelineEvents+1] = eventInfo
+			if scheduleBackups then
+				self:CancelTimer(scheduleBackups)
+				scheduleBackups = nil
+			end
+			local delayedTimer = 1.5 -- Long capture to grab delayed cancels. Still fails sometimes.
+			scheduleBackups = self:ScheduleTimer(function()
+				scheduleBackups = nil
+				if self:ShouldShowBars() and not self:IsWiping() then
+					for i = 1, #storedTimelineEvents do
+						local storedEventInfo = storedTimelineEvents[i]
+						local adjustedDuration = storedEventInfo.duration - delayedTimer -- adjust for scheduled timer
+						local isPossibleRakfangBackup = storedEventInfo.durationRounded == 25 or storedEventInfo.durationRounded == 31
+						if self:IsBeforeRadiantBarrier(adjustedDuration) and isPossibleRakfangBackup then -- Rakfang backup
+							storedEventInfo.duration = adjustedDuration
+							barInfo = self:Rakfang(storedEventInfo)
+							activeBars[storedEventInfo.id] = barInfo
+						else
+							self:StartBackupBar(storedEventInfo, true)
+						end
+					end
+				end
+				storedTimelineEvents = {}
+			end, delayedTimer)
+			return
+		end
+	else -- Intermissions
+		if durationRounded == 8 then -- Midnight Flames
+			barInfo = self:MidnightFlames(eventInfo)
+		end
+	end
+
+	if barInfo then
+		activeBars[eventInfo.id] = barInfo
+	elseif self:ShouldShowBars() and not self:IsWiping() then
+		self:StartBackupBar(eventInfo)
+	end
+end
+
+function mod:TimerOther(_, eventInfo)
+	if eventInfo.source ~= 0 then return end
+	timelineEventCount = timelineEventCount + 1
+	local duration = eventInfo.duration
+	local durationRounded = self:RoundNumber(duration, 0)
+	eventInfo.durationRounded = durationRounded
+	local barInfo
+	local stage = self:GetStage()
+	local time = GetTime()
+
+	if not self:IsIntermission() and durationRounded == 8 and time - 5 > lastStaged and stage < 3 then -- Midnight Flames Cast
+		lastStaged = time
+		if self:ShouldShowBars() then
+			self:Message("stages", "cyan", self:GetRename("stages", 1), false) -- Intermission
+			self:PlaySound("stages", "long")
+			self:Bar("stages", 26.5, self:GetRename("stages", stage + 1), 1249748)
+			self:StopBlizzMessages(1) -- Radiant Barrier Message
+		end
+		stage = stage + 0.5
+		self:SetStage(stage)
+	elseif time - 5 > lastStaged and self:IsIntermission() then
+		stage = math.floor(stage) + 1
+		self:SetStage(stage)
+		lastStaged = time
+		if self:ShouldShowBars() then
+			self:Message("stages", "cyan", self:GetRename("stages", stage), false)
+			self:PlaySound("stages", "long")
+		end
+		timelineEventCount = 1
+		countForDuration = {}
+
+		nullbeamCount = 1
+		dreadBreathCount = 1
+		vaelwingCount = 1
+		voidHowlCount = 1
+		rakfangCount = 1
+		grapplingMawCount = 1
+		if self:GetOption("custom_select_gloom_reset") < 3 then
+			gloomCount = 1
+		end
+	end
+
+	if not self:IsIntermission() then -- 1, 2, 3+
+		local initialTimers = stage == 3 and 7 or 8
+		if timelineEventCount <= initialTimers then -- Initial timers
+			if stage == 1 then -- Initial Pull Timers
+				if durationRounded == 6 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 13 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 28 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 11 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 32 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 19 then -- Grappling Maw
+					barInfo = self:GrapplingMaw(eventInfo)
+				elseif durationRounded == 53 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 111 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			elseif stage == 2 then -- Round 2
+				if durationRounded == 19 then -- Grappling Maw
+					barInfo = self:GrapplingMaw(eventInfo)
+				elseif durationRounded == 47 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 28 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 6 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 13 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 11 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 16 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 111 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			elseif stage >= 3 then -- Round 3+
+				if durationRounded == 8 then -- Vaelwing
+					barInfo = self:Vaelwing(eventInfo)
+				elseif durationRounded == 13 then -- Nullbeam
+					barInfo = self:Nullbeam(eventInfo)
+				elseif durationRounded == 65 then -- Dread Breath
+					barInfo = self:DreadBreath(eventInfo)
+				elseif durationRounded == 15 then -- Rakfang
+					barInfo = self:Rakfang(eventInfo)
+				elseif durationRounded == 50 then -- Gloom
+					barInfo = self:Gloom(eventInfo)
+				elseif durationRounded == 25 then -- Void Howl
+					barInfo = self:VoidHowl(eventInfo)
+				elseif durationRounded == 225 then -- Radiant Barrier
+					barInfo = self:RadiantBarrier(eventInfo)
+				end
+			end
+		else
+			eventInfo.timestamp = GetTime()
+			storedTimelineEvents[#storedTimelineEvents+1] = eventInfo
+			if scheduleBackups then
+				self:CancelTimer(scheduleBackups)
+				scheduleBackups = nil
+			end
+			scheduleBackups = self:ScheduleTimer(function()
+				scheduleBackups = nil
+				if self:ShouldShowBars() and not self:IsWiping() then
+					for i = 1, #storedTimelineEvents do
+						self:StartBackupBar(storedTimelineEvents[i], true)
+					end
+				end
+				storedTimelineEvents = {}
+			end, 3) -- breaths can take a while to trigger.
+			return
+		end
+	else -- Intermissions
+		if durationRounded == 8 then -- Midnight Flames
+			barInfo = self:MidnightFlames(eventInfo)
+		end
+	end
+
+	if barInfo then
+		activeBars[eventInfo.id] = barInfo
+	elseif self:ShouldShowBars() and not self:IsWiping() then
+		self:StartBackupBar(eventInfo)
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
+	local newState = C_EncounterTimeline.GetEventState(eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		if newState == 2 or newState == 3 then
+			-- START: After entering stage 2 on mythic, Blizz wrongly starts a Rakfang and Breath timer with the same durations. Rakfang is correct, but the Breath happens later.
+			if mythicBreathOrRakfang[eventID] then
+				if not mythicRakfangHasPassed then -- When Rakfang is cast we stop the bar like normal, when the Breath is cast we return, as we stop that in the :DreadBreath function
+					mythicRakfangHasPassed = true
+					for id, info in next, mythicBreathOrRakfang do
+						activeBars[id] = nil
+						if info.this == self.Rakfang then
+							self:StopBar(info.msg)
+							info.onFinished()
+						end
+					end
+				end
+				return
+			end
+			-- END
+
+			self:StopBar(barInfo.msg)
+			if newState == 2 then -- Finished
+				if barInfo.onFinished then
+					barInfo.onFinished()
+				end
+				local storedEventInfo = table.remove(storedTimelineEvents, 1)
+				if storedEventInfo and storedEventInfo.duration then
+					if self:IsBeforeRadiantBarrier(storedEventInfo.duration, storedEventInfo.customBuffer) then
+						activeBars[storedEventInfo.id] = barInfo.this(self, storedEventInfo)
+					end
+				end
+			elseif newState == 3 then -- Canceled
+				if barInfo.onCanceled then
+					barInfo.onCanceled()
+				end
+			end
+			activeBars[eventID] = nil
+		end
+	elseif backupBars[eventID] then
+		if newState == 0 then -- Enum.EncounterTimelineEventState.Active
+			self:SendMessage("BigWigs_ResumeBar", nil, nil, eventID)
+		elseif newState == 1 then -- Enum.EncounterTimelineEventState.Paused
+			self:SendMessage("BigWigs_PauseBar", nil, nil, eventID)
+		elseif newState == 3 then -- Enum.EncounterTimelineEventState.Canceled
+			self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+		elseif newState == 2 then -- Enum.EncounterTimelineEventState.Finished
+			self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+		end
+	end
+end
+
+function mod:ENCOUNTER_TIMELINE_EVENT_REMOVED(_, eventID)
+	local barInfo = activeBars[eventID]
+	if barInfo then
+		self:StopBar(barInfo.msg)
+		activeBars[eventID] = nil
+	elseif backupBars[eventID] then
+		backupBars[eventID] = nil
+		self:SendMessage("BigWigs_StopBar", nil, nil, eventID)
+	end
+end
+
+--------------------------------------------------------------------------------
+-- Event Handlers
+--
+
+function mod:ENCOUNTER_WARNING(_, info)
+	if info.duration == 3.5 then
+		if info.shouldPlaySound then
+			if self:IsIntermission() or breathAboutToCast then
+				self:PersonalMessage(1244221, false, self:GetRename(1244221, 2)) -- Breath
+			end
+		else
+			if info.targetGUID == nil then return end
+			breathAboutToCast = false
+			self:SecretTargetMessage(1244221, "orange", info)
+		end
+	else
+		mythicMessageCounter = mythicMessageCounter + 1
+		local stage = self:GetStage()
+		if stage > 1 and stage < 2 then -- Intermission 1
+			-- 1: Radiant Barrier
+			-- 2: Midnight Flames
+			-- Breath handled above
+			-- 3: Nullbeam
+			-- Breath handled above
+			if mythicMessageCounter == 3 then -- Nullbeam
+				self:Message(1262623, "yellow", CL.count:format(self:GetRename(1262623), nullbeamCount))
+				self:PlaySound(1262623, "alert")
+			end
+		elseif stage > 2 and stage < 3 then -- Intermission 2
+			-- 1: Radiant Barrier
+			-- 2: Midnight Flames
+			-- 3: Gloom
+			-- Breath handled above
+			if mythicMessageCounter == 3 then -- Gloom
+				self:Message(1245391, "orange", CL.count:format(self:GetRename(1245391), gloomCount))
+				self:PlaySound(1245391, "alert") -- possibly soak
+			end
+		end
+	end
+end
+
+function mod:MidnightFlames(eventInfo)
+	local barText = CL.count:format(self:GetRename(1249748), midnightFlamesCount)
+	if self:ShouldShowBars() then
+		self:CDBar(1249748, eventInfo.duration, barText, nil, eventInfo.id)
+	end
+	midnightFlamesCount = midnightFlamesCount + 1
+	return {
+		msg = barText,
+		onFinished = function()
+			self:Message(1249748, "yellow", barText)
+			if not self:Mythic() then
+				self:StopBlizzMessages(0.5)
+			end
+			self:PlaySound(1249748, "alert")
+		end,
+		this = self.MidnightFlames
+	}
+end
+
+function mod:GrapplingMaw(eventInfo)
+	local barText = CL.count:format(self:GetRename(1280458), grapplingMawCount)
+	if self:ShouldShowBars() then
+		self:CDBar(1280458, eventInfo.duration, barText, nil, eventInfo.id)
+	end
+	grapplingMawCount = grapplingMawCount + 1
+	return {
+		msg = barText,
+		onFinished = function()
+			self:Message(1280458, "purple", barText)
+			-- Sound needed?
+		end,
+		this = self.GrapplingMaw
+	}
+end
+
+-- Vaelgor
+do
+	local nullzoneAfter = 9.5
+	function mod:Nullbeam(eventInfo)
+		local barText = CL.count:format(self:GetRename(1262623), self:IsIntermission() and 1 or nullbeamCount)
+		if self:ShouldShowBars() then
+			self:CDBar(1262623, eventInfo.duration, barText, nil, eventInfo.id)
+			if not self:IsIntermission() then -- Timer in the intermission is unreliable
+				self:Bar(1244672, eventInfo.duration + nullzoneAfter, CL.count:format(self:GetRename(1244672), nullbeamCount), nil, eventInfo.id) -- Nullzone
+			end
+		end
+		if not self:IsIntermission() then -- only increment outside of intermissions
+			nullbeamCount = nullbeamCount + 1
+		end
+		return {
+			msg = barText,
+			onFinished = function()
+				self:Message(1262623, "yellow", barText)
+				if not self:Mythic() then
+					self:StopBlizzMessages(0.5)
+				end
+				if not self:IsIntermission() then -- Timers arn't that trustworthy, let's not give fake info
+					self:Bar(1244672, {nullzoneAfter, eventInfo.duration + nullzoneAfter}, CL.count:format(self:GetRename(1244672), nullbeamCount - 1), nil, eventInfo.id) -- Nullzone
+				end
+				self:PlaySound(1262623, "alert")
+			end,
+			this = self.Nullbeam,
+			onCanceled = function()
+				local count = nullbeamCount - 1
+				self:StopBar(CL.count:format(self:GetRename(1244672), count)) -- Nullzone
+			end
+		}
+	end
+end
+
+do
+	local function EnableBreathCheck()
+		breathAboutToCast = true
+	end
+	function mod:DreadBreath(eventInfo)
+		local count = dreadBreathCount
+		if self:IsIntermission() then -- It starts multiple breath bars at the same time, so we have to tweak the counts a bit incase of a wrong event order
+			count = 1
+			if math.floor(self:GetStage()) == 1 and eventInfo.durationRounded == 23 then -- Adjust this one
+				count = 2
+			end
+		elseif mythicRakfangHasPassed then -- We need to manually cancel the first Breath after the first Intermission on Mythic
+			mythicRakfangHasPassed = false
+			mythicBreathOrRakfang = {}
+			self:StopBar(CL.count:format(self:GetRename(1244221), count-1))
+		end
+		local barText = CL.count:format(self:GetRename(1244221), count)
+		if self:ShouldShowBars() then
+			self:CDBar(1244221, eventInfo.duration, barText, nil, eventInfo.id)
+			if self:Mythic() and not self:IsIntermission() then
+				self:ScheduleTimer(EnableBreathCheck, eventInfo.duration-3)
+			end
+		end
+		dreadBreathCount = dreadBreathCount + 1
+		return {
+			customBuffer = 5,
+			msg = barText,
+			onFinished = function()
+				if not self:Mythic() then
+					self:TargetMessageFromBlizzMessage(1244221, 1, "orange", barText)
+					-- PA Sounds
+				end
+			end,
+			this = self.DreadBreath
+		}
+	end
+end
+
+function mod:Vaelwing(eventInfo)
+	local barText = CL.count:format(self:GetRename(1265131), vaelwingCount)
+	if self:ShouldShowBars() then
+		self:CDBar(1265131, eventInfo.duration, barText, nil, eventInfo.id)
+	end
+	vaelwingCount = vaelwingCount + 1
+	return {
+		msg = barText,
+		onFinished = function()
+			self:Message(1265131, "purple", barText)
+			if self:ThreatTarget("player", "boss1") then -- this assumed Vaelgor boss1
+				self:PlaySound(1265131, "alarm")
+			end
+		end,
+		this = self.Vaelwing
+	}
+end
+
+-- Ezzorak
+function mod:Gloom(eventInfo)
+	local barText = CL.count:format(self:GetRename(1245391), gloomCount)
+	if self:ShouldShowBars() then
+		self:CDBar(1245391, eventInfo.duration, barText, nil, eventInfo.id)
+	end
+	gloomCount = gloomCount + 1
+	if gloomCount == 3 and self:GetOption("custom_select_gloom_reset") == 1 then gloomCount = 1 end -- 1, 2, 1, 2...
+	return {
+		msg = barText,
+		onFinished = function()
+			self:Message(1245391, "orange", barText)
+			if not self:Mythic() then
+				self:StopBlizzMessages(0.5)
+			end
+			self:PlaySound(1245391, "alert") -- possibly soak
+		end,
+		this = self.Gloom
+	}
+end
+
+function mod:VoidHowl(eventInfo)
+	local count = voidHowlCount
+	local stage = self:GetStage()
+	if count <= 2 and stage == 2 then -- tweak some counts as it starts multibars at the same time
+		if eventInfo.durationRounded == 43 then
+			count = 2
+		elseif eventInfo.durationRounded == 8 then
+			count = 1
+		end
+	elseif stage == 1 and count == 3 then
+		return -- this one never happens.
+	end
+	local barText = CL.count:format(self:GetRename(1244917), count)
+	local tbl = {
+		msg = barText,
+		onFinished = function()
+			self:Message(1244917, "orange", barText)
+			self:PlaySound(1244917, "alarm") -- spread
+		end,
+		this = self.VoidHowl
+	}
+	if self:ShouldShowBars() then
+		self:CDBar(1244917, eventInfo.duration, barText, nil, eventInfo.id)
+		if self:Mythic() and self:IsIntermission() then -- 2nd Intermission, OnFinished never triggers
+			self:ScheduleTimer(tbl.onFinished, eventInfo.duration)
+		end
+	end
+	voidHowlCount = voidHowlCount + 1
+	return tbl
+end
+
+function mod:Rakfang(eventInfo)
+	local barText = CL.count:format(self:GetRename(1245645), rakfangCount)
+	if self:ShouldShowBars() then
+		self:CDBar(1245645, eventInfo.duration, barText, nil, eventInfo.id)
+	end
+	rakfangCount = rakfangCount + 1
+	return {
+		msg = barText,
+		onFinished = function()
+			self:Message(1245645, "purple", barText)
+			-- if self:ThreatTarget("player", "boss2") then -- this assumed Ezzorak boss2
+			-- 	self:PlaySound(1245645, "alarm")
+			-- end
+		end,
+		this = self.Rakfang
+	}
+end
+
+-- Lightbound Vanguard
+function mod:RadiantBarrier(eventInfo)
+	local barText = CL.count:format(self:GetRename("stages", 1), radiantBarrierCount)
+	if self:ShouldShowBars() then
+		self:CDBar("stages", eventInfo.duration, barText, 1248847, eventInfo.id) -- Radiant Barrier icon
+	end
+	nextRadiantBarrier = GetTime() + eventInfo.duration
+	radiantBarrierCount = radiantBarrierCount + 1
+	return {
+		msg = barText,
+		this = self.RadiantBarrier
+	}
+end
