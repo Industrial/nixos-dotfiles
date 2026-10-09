@@ -14,21 +14,12 @@ BetterBagsDB = {
 ["name"] = "Bank",
 ["id"] = 1,
 ["kind"] = 1,
-["isDefault"] = true,
 ["order"] = 1,
+["isDefault"] = true,
 },
 },
 },
 ["ephemeralCategoryFilters"] = {
-["Low iLvl"] = {
-["enabled"] = {
-true,
-[0] = true,
-},
-["itemList"] = {
-},
-["name"] = "Low iLvl",
-},
 ["Teleporters"] = {
 ["enabled"] = {
 true,
@@ -37,6 +28,15 @@ true,
 ["itemList"] = {
 },
 ["name"] = "Teleporters",
+},
+["Low iLvl"] = {
+["enabled"] = {
+true,
+[0] = true,
+},
+["itemList"] = {
+},
+["name"] = "Low iLvl",
 },
 },
 ["showBagButton"] = false,
@@ -78,7 +78,7 @@ true,
 ["#2: Apprentice's Skinning Satchel"] = {
 ["shown"] = true,
 },
-["Quest"] = {
+["Junk"] = {
 ["shown"] = true,
 },
 ["#1: Backpack"] = {
@@ -87,7 +87,7 @@ true,
 ["Recent Items"] = {
 ["shown"] = true,
 },
-["Junk"] = {
+["Quest"] = {
 ["shown"] = true,
 },
 ["Low iLvl"] = {
