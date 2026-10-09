@@ -30,13 +30,16 @@ Bartender4DB = {
 ["Skelf Onyourshelf"] = {
 ["actionbars"] = {
 {
+["skin"] = {
+["Zoom"] = true,
+},
 ["version"] = 3,
 ["position"] = {
-["y"] = 51,
-["x"] = -595.5,
+["y"] = 48,
+["x"] = -279.5,
 ["point"] = "BOTTOM",
 },
-["padding"] = 1.9,
+["padding"] = 1,
 ["WoW10Layout"] = true,
 },
 {
@@ -51,18 +54,22 @@ Bartender4DB = {
 },
 {
 ["flyoutDirection"] = "LEFT",
-["rows"] = 12,
+["skin"] = {
+["Zoom"] = true,
+},
 ["version"] = 3,
 ["position"] = {
-["y"] = 200,
-["x"] = -96,
-["point"] = "RIGHT",
+["y"] = 186,
+["x"] = -279.5,
+["point"] = "BOTTOM",
 },
+["padding"] = 1,
 ["WoW10Layout"] = true,
 },
 {
 ["flyoutDirection"] = "LEFT",
 ["rows"] = 12,
+["enabled"] = false,
 ["version"] = 3,
 ["position"] = {
 ["y"] = 200,
@@ -72,21 +79,29 @@ Bartender4DB = {
 ["WoW10Layout"] = true,
 },
 {
+["skin"] = {
+["Zoom"] = true,
+},
 ["version"] = 3,
 ["position"] = {
-["y"] = 118,
-["x"] = 4,
+["y"] = 140,
+["x"] = -279.5,
 ["point"] = "BOTTOM",
 },
+["padding"] = 1,
 ["WoW10Layout"] = true,
 },
 {
+["skin"] = {
+["Zoom"] = true,
+},
 ["version"] = 3,
 ["position"] = {
-["y"] = 118,
-["x"] = -570,
+["y"] = 94,
+["x"] = -279.5,
 ["point"] = "BOTTOM",
 },
+["padding"] = 1,
 ["WoW10Layout"] = true,
 },
 {
@@ -117,6 +132,7 @@ Bartender4DB = {
 ["ExtraActionBar"] = {
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
+["enabled"] = false,
 ["position"] = {
 ["y"] = 286.9999694824219,
 ["x"] = -63.50048828125,
@@ -129,14 +145,13 @@ Bartender4DB = {
 ["MicroMenu"] = {
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
-["enabled"] = false,
 ["position"] = {
-["y"] = 48,
-["x"] = -24,
+["y"] = 39,
+["x"] = 272,
 ["point"] = "BOTTOM",
 },
 ["version"] = 3,
-["padding"] = 3,
+["padding"] = 2,
 },
 },
 },
@@ -182,10 +197,13 @@ Bartender4DB = {
 ["PetBar"] = {
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
+["skin"] = {
+["Zoom"] = true,
+},
 ["version"] = 3,
 ["position"] = {
-["y"] = 150,
-["x"] = -529,
+["y"] = 217,
+["x"] = -163,
 ["point"] = "BOTTOM",
 },
 },
@@ -211,6 +229,7 @@ Bartender4DB = {
 ["Skelf Onyourshelf"] = {
 ["blizzardVehicle"] = true,
 ["focuscastmodifier"] = false,
+["buttonlock"] = false,
 ["outofrange"] = "hotkey",
 },
 },

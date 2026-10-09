@@ -1,0 +1,10 @@
+VER 3 0100000000000002 "MF" "134400"
+#showtooltip
+/use Moonfire
+/startattack
+END
+VER 3 0100000000000001 "WR" "134400"
+#showtooltip
+/use Wrath
+/startattack
+END

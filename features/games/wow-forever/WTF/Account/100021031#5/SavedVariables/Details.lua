@@ -35,7 +35,7 @@ _detalhes_global = {
 ["boss_wipe_min_time"] = 20,
 ["plater"] = {
 ["realtime_dps_enabled"] = false,
-["damage_taken_shadow"] = true,
+["realtime_dps_size"] = 12,
 ["realtime_dps_player_shadow"] = true,
 ["damage_taken_enabled"] = false,
 ["realtime_dps_player_size"] = 12,
@@ -51,12 +51,12 @@ _detalhes_global = {
 ["x"] = 0,
 ["side"] = 7,
 },
+["damage_taken_shadow"] = true,
 ["damage_taken_anchor"] = {
 ["y"] = 0,
 ["x"] = 0,
 ["side"] = 7,
 },
-["realtime_dps_size"] = 12,
 ["damage_taken_color"] = {
 1,
 1,
@@ -236,7 +236,7 @@ _detalhes_global = {
 ["slashk_dnd"] = false,
 ["encounter_journal_cache"] = {
 },
-["combat_id_global"] = 0,
+["combat_id_global"] = 177,
 ["displays_by_spec"] = {
 },
 ["damage_scroll_position"] = {
@@ -315,51 +315,6 @@ _detalhes_global = {
 ["energy_resources"] = false,
 },
 ["auto_open_news_window"] = true,
-["spell_category_latest_save"] = 0,
-["got_first_run"] = true,
-["aura_tracker_frame"] = {
-["scaletable"] = {
-["scale"] = 1,
-},
-["position"] = {
-},
-},
-["third_party"] = {
-["openraid_notecache"] = {
-["showheader"] = true,
-["showbansenderbutton"] = true,
-["banlist"] = {
-},
-["leftclickthrough"] = false,
-["screenpos"] = {
-["scale"] = 1,
-["position"] = {
-},
-},
-["fontsize"] = 12,
-["framecolor"] = {
-0.1215,
-0.1176,
-0.1294,
-},
-["rightclickthrough"] = false,
-["enabled"] = true,
-["notes"] = {
-},
-["showclosebutton"] = true,
-["framepos"] = {
-["scale"] = 1,
-["position"] = {
-},
-},
-["showrightclicktoclose"] = true,
-["transparency"] = 0.02,
-["showresizebutton"] = true,
-["showoptionsbutton"] = true,
-["printtochat"] = false,
-["tutorial1"] = false,
-},
-},
 ["breakdown_general"] = {
 ["font_size"] = 11,
 ["font_color"] = {
@@ -372,35 +327,52 @@ _detalhes_global = {
 ["font_outline"] = "NONE",
 ["bar_texture"] = "You Are the Best!",
 },
+["got_first_run"] = true,
+["slash_me_used"] = false,
+["item_level_pool"] = {
+},
+["show_warning_id1"] = true,
 ["keystone_alts_cache"] = {
 },
-["tutorial"] = {
-["unlock_button"] = 0,
-["main_help_button"] = 3,
-["logons"] = 3,
-["version_announce"] = 0,
-["ctrl_click_close_tutorial"] = false,
-["alert_frames"] = {
-false,
-false,
-false,
-false,
-false,
-false,
+["aura_tracker_frame"] = {
+["scaletable"] = {
+["scale"] = 1,
 },
-["bookmark_tutorial"] = false,
+["position"] = {
+},
 },
 ["all_switch_config"] = {
 ["scale"] = 1,
 ["font_size"] = 10,
 },
-["data_wipes_exp"] = {
-["9"] = false,
-["14"] = false,
-["13"] = false,
-["12"] = false,
-["11"] = false,
-["10"] = false,
+["switchSaved"] = {
+["slots"] = 6,
+["table"] = {
+{
+["atributo"] = 1,
+["sub_atributo"] = 1,
+},
+{
+["atributo"] = 2,
+["sub_atributo"] = 1,
+},
+{
+["atributo"] = 4,
+["sub_atributo"] = 3,
+},
+{
+["atributo"] = 4,
+["sub_atributo"] = 4,
+},
+{
+["atributo"] = 1,
+["sub_atributo"] = 3,
+},
+{
+["atributo"] = 2,
+["sub_atributo"] = 3,
+},
+},
 },
 ["__profiles"] = {
 ["Skelf-Classic Beta PvE 2"] = {
@@ -732,14 +704,14 @@ false,
 },
 ["grouping_horizontal_gap"] = 0,
 ["data_broker_text"] = "",
-["disable_stretch_from_toolbar"] = false,
+["numerical_system_symbols"] = "auto",
 ["trash_concatenate"] = false,
 ["color_by_arena_team"] = true,
+["class_icons_small"] = "Interface\\AddOns\\Details\\images\\classes_small",
 ["disable_lock_ungroup_buttons"] = false,
-["numerical_system_symbols"] = "auto",
 ["animation_speed"] = 33,
 ["report_schema"] = 1,
-["standard_skin"] = false,
+["disable_stretch_from_toolbar"] = false,
 ["realtime_dps_meter"] = {
 ["enabled"] = false,
 ["font_color"] = {
@@ -796,12 +768,28 @@ false,
 },
 ["animation_speed_maxtravel"] = 3,
 ["overall_flag"] = 16,
+["use_scroll"] = false,
+["font_faces"] = {
+["menus"] = "Friz Quadrata TT",
+},
+["windows_fade_out"] = {
+"out",
+0.2,
+},
+["capture_real"] = {
+["heal"] = true,
+["spellcast"] = true,
+["miscdata"] = true,
+["aura"] = true,
+["energy"] = true,
+["damage"] = true,
+},
 ["instances"] = {
 {
 ["__pos"] = {
 ["normal"] = {
 ["y"] = -443.7969970703125,
-["x"] = 1927.44384765625,
+["x"] = 1927.443603515625,
 ["w"] = 309.9999694824219,
 ["h"] = 158,
 },
@@ -882,9 +870,9 @@ false,
 ["size"] = 12,
 },
 ["faction_icon_size_offset"] = -10,
-["playername_alignment_auto"] = true,
-["textL_custom_text"] = "{data1}. {data3}{data2}",
 ["textL_enable_custom_text"] = false,
+["textL_custom_text"] = "{data1}. {data3}{data2}",
+["playername_alignment_auto"] = true,
 ["models"] = {
 ["upper_model"] = "Spells\\AcidBreath_SuperGreen.M2",
 ["lower_model"] = "World\\EXPANSION02\\DOODADS\\Coldarra\\COLDARRALOCUS.m2",
@@ -1234,7 +1222,7 @@ false,
 },
 ["skin"] = "Minimalistic",
 ["window_scale"] = 1,
-["source_type"] = 0,
+["source_type"] = 1,
 ["menu_anchor_down"] = {
 16,
 -3,
@@ -1403,7 +1391,7 @@ false,
 ["posicao"] = {
 ["normal"] = {
 ["y"] = -443.7969970703125,
-["x"] = 1927.44384765625,
+["x"] = 1927.443603515625,
 ["w"] = 309.9999694824219,
 ["h"] = 158,
 },
@@ -1433,47 +1421,31 @@ false,
 },
 },
 },
-["font_faces"] = {
-["menus"] = "Friz Quadrata TT",
-},
-["use_scroll"] = false,
-["windows_fade_out"] = {
-"out",
-0.2,
-},
-["capture_real"] = {
-["heal"] = true,
-["spellcast"] = true,
-["miscdata"] = true,
-["aura"] = true,
-["energy"] = true,
-["damage"] = true,
-},
 ["segments_amount"] = 25,
 ["overall_clear_pvp"] = true,
-["default_bg_color"] = 0.0941,
 ["deny_score_messages"] = false,
+["overall_clear_logout"] = false,
 ["skin"] = "Minimalistic",
 ["override_spellids"] = true,
+["font_sizes"] = {
+["menus"] = 10,
+},
+["minimum_combat_time"] = 5,
+["new_window_size"] = {
+["height"] = 158,
+["width"] = 310,
+},
+["memory_threshold"] = 3,
 ["realtimedps_always_arena"] = false,
+["segments_amount_to_save"] = 15,
+["cloud_capture"] = true,
+["damage_taken_everything"] = false,
+["scroll_speed"] = 2,
 ["window_clamp"] = {
 -8,
 0,
 21,
 -14,
-},
-["memory_threshold"] = 3,
-["font_sizes"] = {
-["menus"] = 10,
-},
-["minimum_combat_time"] = 5,
-["segments_amount_to_save"] = 15,
-["cloud_capture"] = true,
-["damage_taken_everything"] = false,
-["scroll_speed"] = 2,
-["new_window_size"] = {
-["height"] = 158,
-["width"] = 310,
 },
 ["chat_tab_embed"] = {
 ["enabled"] = false,
@@ -1483,7 +1455,9 @@ false,
 ["single_window"] = false,
 },
 ["deadlog_events"] = 32,
-["trash_auto_remove"] = false,
+["hotcorner_topleft"] = {
+["hide"] = false,
+},
 ["close_shields"] = false,
 ["class_coords"] = {
 ["HUNTER"] = {
@@ -1609,9 +1583,7 @@ false,
 },
 ["animation_speed_triggertravel"] = 5,
 ["disable_alldisplays_window"] = false,
-["hotcorner_topleft"] = {
-["hide"] = false,
-},
+["total_abbreviation"] = 2,
 ["segments_boss_wipes_keep_best_performance"] = true,
 ["class_colors"] = {
 ["HUNTER"] = {
@@ -1624,10 +1596,10 @@ false,
 0.61,
 0.43,
 },
-["PALADIN"] = {
+["ROGUE"] = {
+1,
 0.96,
-0.55,
-0.73,
+0.41,
 },
 ["MAGE"] = {
 0.41,
@@ -1659,20 +1631,20 @@ false,
 0.12,
 0.23,
 },
-["SHAMAN"] = {
-0,
-0.44,
-0.87,
+["PALADIN"] = {
+0.96,
+0.55,
+0.73,
 },
 ["PET"] = {
 0.3,
 0.4,
 0.5,
 },
-["ROGUE"] = {
-1,
-0.96,
-0.41,
+["SHAMAN"] = {
+0,
+0.44,
+0.87,
 },
 ["UNKNOW"] = {
 0.2,
@@ -1731,7 +1703,7 @@ false,
 ["damage"] = "red",
 },
 ["clear_graphic"] = true,
-["total_abbreviation"] = 2,
+["trash_auto_remove"] = false,
 ["segments_auto_erase"] = 1,
 ["options_group_edit"] = true,
 ["broadcaster_enabled"] = false,
@@ -1759,9 +1731,9 @@ false,
 },
 ["only_pvp_frags"] = false,
 ["disable_stretch_button"] = false,
-["overall_clear_logout"] = false,
-["death_tooltip_width"] = 350,
 ["report_lines"] = 5,
+["default_bg_color"] = 0.0941,
+["death_tooltip_width"] = 350,
 ["segments_panic_mode"] = false,
 ["realtimedps_order_bars"] = false,
 ["damage_meter_position"] = {
@@ -1889,7 +1861,7 @@ false,
 ["show_border_shadow"] = true,
 },
 ["force_activity_time_pvp"] = true,
-["class_icons_small"] = "Interface\\AddOns\\Details\\images\\classes_small",
+["standard_skin"] = false,
 ["death_tooltip_texture"] = "Details Serenity",
 ["disable_reset_button"] = false,
 ["animate_scroll"] = false,
@@ -1901,8 +1873,41 @@ false,
 },
 },
 ["immersion_special_units"] = true,
-["transcriptor_frame"] = {
+["third_party"] = {
+["openraid_notecache"] = {
+["showheader"] = true,
+["showbansenderbutton"] = true,
+["banlist"] = {
+},
+["leftclickthrough"] = false,
+["screenpos"] = {
 ["scale"] = 1,
+["position"] = {
+},
+},
+["fontsize"] = 12,
+["framecolor"] = {
+0.1215,
+0.1176,
+0.1294,
+},
+["rightclickthrough"] = false,
+["enabled"] = true,
+["notes"] = {
+},
+["showclosebutton"] = true,
+["framepos"] = {
+["scale"] = 1,
+["position"] = {
+},
+},
+["showrightclicktoclose"] = true,
+["transparency"] = 0.02,
+["showresizebutton"] = true,
+["showoptionsbutton"] = true,
+["printtochat"] = false,
+["tutorial1"] = false,
+},
 },
 ["boss_mods_timers"] = {
 ["encounter_timers_bw"] = {
@@ -1923,11 +1928,26 @@ false,
 ["realm_sync"] = true,
 ["class_time_played"] = {
 [0] = {
-["DRUID"] = 268.460999999952,
+["DRUID"] = 12193.48599999992,
 },
 },
-["auto_change_to_standard"] = true,
-["slash_me_used"] = false,
+["spell_category_latest_save"] = 0,
+["tutorial"] = {
+["unlock_button"] = 0,
+["main_help_button"] = 7,
+["logons"] = 7,
+["version_announce"] = 0,
+["ctrl_click_close_tutorial"] = false,
+["alert_frames"] = {
+false,
+false,
+false,
+false,
+false,
+false,
+},
+["bookmark_tutorial"] = false,
+},
 ["exit_errors"] = {
 },
 ["debug_options_panel"] = {
@@ -1937,7 +1957,7 @@ false,
 ["scale"] = 1,
 },
 },
-["show_warning_id1"] = true,
+["auto_change_to_standard"] = true,
 ["mythic_plus"] = {
 ["make_overall_boss_only"] = false,
 ["mythicrun_chart_frame"] = {
@@ -1979,40 +1999,20 @@ false,
 },
 ["createauraframe"] = {
 },
-["switchSaved"] = {
-["slots"] = 6,
-["table"] = {
-{
-["atributo"] = 1,
-["sub_atributo"] = 1,
+["data_wipes_exp"] = {
+["9"] = false,
+["14"] = false,
+["13"] = false,
+["12"] = false,
+["11"] = false,
+["10"] = false,
 },
-{
-["atributo"] = 2,
-["sub_atributo"] = 1,
-},
-{
-["atributo"] = 4,
-["sub_atributo"] = 3,
-},
-{
-["atributo"] = 4,
-["sub_atributo"] = 4,
-},
-{
-["atributo"] = 1,
-["sub_atributo"] = 3,
-},
-{
-["atributo"] = 2,
-["sub_atributo"] = 3,
-},
-},
-},
-["show_totalhitdamage_on_overkill"] = false,
 ["spell_category_latest_query"] = 0,
-["last_10days_cache_cleanup"] = 1792360029,
-["item_level_pool"] = {
+["transcriptor_frame"] = {
+["scale"] = 1,
 },
+["last_10days_cache_cleanup"] = 1792360029,
+["show_totalhitdamage_on_overkill"] = false,
 ["switch_post_apoc"] = true,
 ["merge_pet_abilities"] = false,
 ["shield_spellid_cache"] = {
@@ -2129,11 +2129,11 @@ false,
 ["damage_scroll_auto_open"] = true,
 }
 __details_backup = {
+["_instance_backup"] = {
+},
 ["_general_logs"] = {
 },
 ["_exit_error"] = {
-},
-["_instance_backup"] = {
 },
 }
 __details_debug = {

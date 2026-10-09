@@ -1,7 +1,7 @@
 
 idAutomationDB = {
 ["_meta"] = {
-["last_updated"] = 1791496177,
+["last_updated"] = 1791575331,
 ["schema_version"] = 1,
 },
 ["character"] = {
@@ -604,7 +604,10 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
+["GetAuraDataByAuraInstanceID"] = true,
 ["GetUnitAuras"] = true,
+["GetAuraDataByIndex"] = true,
+["GetAuraDuration"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -612,9 +615,6 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
-["GetAuraDataByIndex"] = true,
-["GetAuraDuration"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
 },
 ["_keys"] = {
 "api:table",
@@ -1154,10 +1154,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
-["GetUnitAuras"] = true,
-["GetAuraDataByIndex"] = true,
-["GetAuraDuration"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -1165,6 +1161,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
+["GetAuraDataByIndex"] = true,
+["GetAuraDuration"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "nil",
@@ -1386,10 +1386,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
-["GetUnitAuras"] = true,
-["GetAuraDataByIndex"] = true,
-["GetAuraDuration"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -1397,6 +1393,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
+["GetAuraDataByIndex"] = true,
+["GetAuraDuration"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "nil",
@@ -1822,10 +1822,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
-["GetUnitAuras"] = true,
-["GetAuraDataByIndex"] = true,
-["GetAuraDuration"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -1833,6 +1829,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
+["GetAuraDataByIndex"] = true,
+["GetAuraDuration"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "string",
@@ -1986,10 +1986,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
-["GetUnitAuras"] = true,
-["GetAuraDataByIndex"] = true,
-["GetAuraDuration"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -1997,6 +1993,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
+["GetAuraDataByIndex"] = true,
+["GetAuraDuration"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "string",
@@ -5396,6 +5396,10 @@ idAutomationDB = {
 },
 },
 },
+},
+["savedCVars"] = {
+["showTimestamps"] = "None",
+["cameraDistanceMaxZoomFactor"] = "2.6",
 },
 ["profileBinding"] = {
 ["Classic Beta PvE 2.Seryan"] = "Default",

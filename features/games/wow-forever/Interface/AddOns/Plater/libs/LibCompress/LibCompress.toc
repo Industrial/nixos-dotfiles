@@ -1,0 +1,15 @@
+## Interface: 11509, 20506, 120100
+
+## Title: Lib: Compress
+## Notes: Compression and Decompression library
+## Author: Galmok at Stormrage-EU (Horde); JJSheets (former author)
+## Version: r87-release
+## X-Website: https://www.curseforge.com/wow/addons/libcompress
+## X-Curse-Project-ID: 14273
+## X-Category: Library
+## X-eMail: galmok AT gmail DOT com, sheets DOT jeff AT gmail DOT com
+## X-License: GPL v2
+## LoadOnDemand: 1
+
+Libs\LibStub\LibStub.lua
+lib.xml
