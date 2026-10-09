@@ -31,9 +31,8 @@ _detalhes_database = {
 ["_ActorTable"] = {
 },
 },
-["raid_roster"] = {
-},
-["CombatStartedAt"] = 563044.91,
+["boss_hp"] = 1,
+["CombatStartedAt"] = 564334.8690000001,
 ["tempo_start"] = 551253.483,
 ["last_events_tables"] = {
 },
@@ -44,8 +43,7 @@ _detalhes_database = {
 ["cleu_events"] = {
 ["n"] = 1,
 },
-["playerTalents"] = {
-},
+["playing_solo"] = true,
 ["totals"] = {
 0,
 0,
@@ -103,8 +101,8 @@ _detalhes_database = {
 ["enemy"] = "Unknown",
 ["trinketProcs"] = {
 },
-["TotalElapsedCombatTime"] = 15.58699999994133,
-["CombatEndedAt"] = 563060.497,
+["TotalElapsedCombatTime"] = 21.17199999990407,
+["CombatEndedAt"] = 564356.041,
 ["aura_timeline"] = {
 },
 ["compressed_charts"] = {
@@ -118,7 +116,8 @@ _detalhes_database = {
 ["is_challenge"] = false,
 ["spells_cast_timeline"] = {
 },
-["boss_hp"] = 1,
+["raid_roster"] = {
+},
 ["combat_counter"] = 18,
 ["player_last_events"] = {
 },
@@ -143,19 +142,20 @@ _detalhes_database = {
 ["start_time"] = 0,
 ["TimeData"] = {
 },
-["playing_solo"] = true,
+["playerTalents"] = {
+},
 },
 },
 },
 ["apocalypse_savedsegments"] = {
 },
 ["ocd_tracker"] = {
-["show_title"] = true,
+["enabled"] = false,
 ["current_cooldowns"] = {
 },
 ["lines_per_column"] = 12,
 ["group_frames"] = true,
-["show_options"] = false,
+["width"] = 120,
 ["frames"] = {
 ["defensive-raid"] = {
 },
@@ -170,11 +170,12 @@ _detalhes_database = {
 ["defensive-personal"] = {
 },
 },
-["width"] = 120,
+["show_options"] = false,
 ["ignored_cooldowns"] = {
 },
+["cooldowns"] = {
+},
 ["height"] = 18,
-["framme_locked"] = false,
 ["own_frame"] = {
 ["defensive-raid"] = false,
 ["ofensive"] = false,
@@ -182,13 +183,12 @@ _detalhes_database = {
 ["utility"] = false,
 ["defensive-personal"] = false,
 },
-["cooldowns"] = {
-},
+["framme_locked"] = false,
 ["show_conditions"] = {
 ["only_inside_instance"] = true,
 ["only_in_group"] = true,
 },
-["enabled"] = false,
+["show_title"] = true,
 ["filters"] = {
 ["itemutil"] = false,
 ["itempower"] = false,
@@ -209,6 +209,11 @@ _detalhes_database = {
 },
 ["arena_data_compressed"] = {
 },
+["nick_tag_cache"] = {
+["nextreset"] = 1792791895,
+["last_version"] = 16,
+},
+["arena_data_index_selected"] = 1,
 ["damage_meter_sessions"] = {
 [121] = {
 ["playerCasts"] = {
@@ -218,13 +223,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:59:26",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572350,
 ["endTime"] = 560145.087,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:59:10",
 ["startTime"] = 560129.133,
-["alreadyAdded"] = false,
+["endDate"] = "20:59:26",
 ["detailsId"] = "Galestrider121",
 },
 [122] = {
@@ -235,13 +240,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:00:27",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572411,
 ["endTime"] = 560205.7660000001,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:00:11",
 ["startTime"] = 560189.979,
-["alreadyAdded"] = false,
+["endDate"] = "21:00:27",
 ["detailsId"] = "Galestrider122",
 },
 [123] = {
@@ -252,13 +257,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:00:53",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572441,
 ["endTime"] = 560232.155,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:00:41",
 ["startTime"] = 560219.836,
-["alreadyAdded"] = false,
+["endDate"] = "21:00:53",
 ["detailsId"] = "Galestrider123",
 },
 [124] = {
@@ -269,13 +274,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:01:26",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572466,
 ["endTime"] = 560264.894,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:01:06",
 ["startTime"] = 560245.208,
-["alreadyAdded"] = false,
+["endDate"] = "21:01:26",
 ["detailsId"] = "Galestrider124",
 },
 [125] = {
@@ -286,13 +291,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:01:52",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572498,
 ["endTime"] = 560290.801,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:01:38",
 ["startTime"] = 560277.4990000001,
-["alreadyAdded"] = false,
+["endDate"] = "21:01:52",
 ["detailsId"] = "Prideclaw125",
 },
 [126] = {
@@ -303,13 +308,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:02:13",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572517,
 ["endTime"] = 560311.9450000001,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:01:57",
 ["startTime"] = 560295.602,
-["alreadyAdded"] = false,
+["endDate"] = "21:02:13",
 ["detailsId"] = "Galestrider126",
 },
 [127] = {
@@ -320,13 +325,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:03:03",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572568,
 ["endTime"] = 560362.5160000001,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:02:48",
 ["startTime"] = 560346.5970000001,
-["alreadyAdded"] = false,
+["endDate"] = "21:03:03",
 ["detailsId"] = "Galestrider127",
 },
 [128] = {
@@ -337,13 +342,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:03:47",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572607,
 ["endTime"] = 560406.1410000001,
 ["sessionName"] = "Vuldren",
 ["startDate"] = "21:03:27",
 ["startTime"] = 560386.039,
-["alreadyAdded"] = false,
+["endDate"] = "21:03:47",
 ["detailsId"] = "Vuldren128",
 },
 [130] = {
@@ -354,13 +359,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:05:08",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572696,
 ["endTime"] = 560486.777,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:04:56",
 ["startTime"] = 560474.555,
-["alreadyAdded"] = false,
+["endDate"] = "21:05:08",
 ["detailsId"] = "Prideclaw130",
 },
 [134] = {
@@ -371,13 +376,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:22:03",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791573716,
 ["endTime"] = 561501.827,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:21:56",
 ["startTime"] = 561495.526,
-["alreadyAdded"] = false,
+["endDate"] = "21:22:03",
 ["detailsId"] = "Prideclaw134",
 },
 [136] = {
@@ -388,13 +393,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:22:41",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791573756,
 ["endTime"] = 561539.985,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:22:36",
 ["startTime"] = 561534.785,
-["alreadyAdded"] = false,
+["endDate"] = "21:22:41",
 ["detailsId"] = "Prideclaw136",
 },
 [138] = {
@@ -405,13 +410,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:29:30",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574154,
 ["endTime"] = 561948.9400000001,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:29:14",
 ["startTime"] = 561933.17,
-["alreadyAdded"] = false,
+["endDate"] = "21:29:30",
 ["detailsId"] = "Prideclaw138",
 },
 [140] = {
@@ -422,13 +427,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:31:05",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574242,
 ["endTime"] = 562043.726,
 ["sessionName"] = "Vulgara the Insatiable",
 ["startDate"] = "21:30:42",
 ["startTime"] = 562020.506,
-["alreadyAdded"] = false,
+["endDate"] = "21:31:05",
 ["detailsId"] = "Vulgara the Insatiable140",
 },
 [142] = {
@@ -439,13 +444,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:32:06",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574313,
 ["endTime"] = 562104.6410000001,
 ["sessionName"] = "Vuldren",
 ["startDate"] = "21:31:53",
 ["startTime"] = 562092.188,
-["alreadyAdded"] = false,
+["endDate"] = "21:32:06",
 ["detailsId"] = "Vuldren142",
 },
 [144] = {
@@ -456,13 +461,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:37:01",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574611,
 ["endTime"] = 562399.787,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:36:51",
 ["startTime"] = 562389.702,
-["alreadyAdded"] = false,
+["endDate"] = "21:37:01",
 ["detailsId"] = "Hippogryph Youth144",
 },
 [146] = {
@@ -473,13 +478,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:37:48",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574652,
 ["endTime"] = 562447.147,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:37:32",
 ["startTime"] = 562431.361,
-["alreadyAdded"] = false,
+["endDate"] = "21:37:48",
 ["detailsId"] = "Hippogryph Youth146",
 },
 [148] = {
@@ -490,13 +495,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:39:13",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574742,
 ["endTime"] = 562531.7660000001,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:39:02",
 ["startTime"] = 562520.514,
-["alreadyAdded"] = false,
+["endDate"] = "21:39:13",
 ["detailsId"] = "Hippogryph Youth148",
 },
 [150] = {
@@ -507,13 +512,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:40:26",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574807,
 ["endTime"] = 562605.432,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:40:07",
 ["startTime"] = 562585.708,
-["alreadyAdded"] = false,
+["endDate"] = "21:40:26",
 ["detailsId"] = "Hippogryph Youth150",
 },
 [152] = {
@@ -524,13 +529,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:42:19",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574927,
 ["endTime"] = 562718.4230000001,
 ["sessionName"] = "Cloudrunner",
 ["startDate"] = "21:42:07",
 ["startTime"] = 562706.304,
-["alreadyAdded"] = false,
+["endDate"] = "21:42:19",
 ["detailsId"] = "Cloudrunner152",
 },
 [154] = {
@@ -541,13 +546,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:43:53",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575024,
 ["endTime"] = 562811.893,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:43:44",
 ["startTime"] = 562803.158,
-["alreadyAdded"] = false,
+["endDate"] = "21:43:53",
 ["detailsId"] = "Hippogryph Protector154",
 },
 [156] = {
@@ -558,13 +563,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:44:44",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575071,
 ["endTime"] = 562863.321,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:44:31",
 ["startTime"] = 562849.916,
-["alreadyAdded"] = false,
+["endDate"] = "21:44:44",
 ["detailsId"] = "Hippogryph Protector156",
 },
 [158] = {
@@ -575,13 +580,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:45:40",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575122,
 ["endTime"] = 562919.4990000001,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:45:22",
 ["startTime"] = 562901.3960000001,
-["alreadyAdded"] = false,
+["endDate"] = "21:45:40",
 ["detailsId"] = "Hippogryph Protector158",
 },
 [160] = {
@@ -592,14 +597,31 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:47:36",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575243,
 ["endTime"] = 563034.9230000001,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:47:23",
 ["startTime"] = 563022.255,
-["alreadyAdded"] = false,
+["endDate"] = "21:47:36",
 ["detailsId"] = "Hippogryph Protector160",
+},
+[162] = {
+["playerCasts"] = {
+},
+["endUnixTime"] = 1791576577,
+["sessionId"] = 162,
+["added"] = false,
+["playerAuras"] = {
+},
+["endDate"] = "22:09:37",
+["startUnixTime"] = 1791576557,
+["endTime"] = 564356.341,
+["sessionName"] = "Vuldren",
+["startDate"] = "22:09:17",
+["startTime"] = 564336.253,
+["alreadyAdded"] = false,
+["detailsId"] = "Vuldren162",
 },
 [129] = {
 ["playerCasts"] = {
@@ -609,13 +631,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:04:41",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572665,
 ["endTime"] = 560459.704,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:04:25",
 ["startTime"] = 560443.667,
-["alreadyAdded"] = false,
+["endDate"] = "21:04:41",
 ["detailsId"] = "Prideclaw129",
 },
 [131] = {
@@ -626,13 +648,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:05:41",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572723,
 ["endTime"] = 560520.368,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:05:23",
 ["startTime"] = 560502.081,
-["alreadyAdded"] = false,
+["endDate"] = "21:05:41",
 ["detailsId"] = "Galestrider131",
 },
 [133] = {
@@ -643,13 +665,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:21:33",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791573680,
 ["endTime"] = 561472.404,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:21:20",
 ["startTime"] = 561458.602,
-["alreadyAdded"] = false,
+["endDate"] = "21:21:33",
 ["detailsId"] = "Galestrider133",
 },
 [135] = {
@@ -660,13 +682,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:22:23",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791573733,
 ["endTime"] = 561522.149,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "21:22:13",
 ["startTime"] = 561512.246,
-["alreadyAdded"] = false,
+["endDate"] = "21:22:23",
 ["detailsId"] = "Galestrider135",
 },
 [137] = {
@@ -677,13 +699,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:28:53",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574121,
 ["endTime"] = 561912.0650000001,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "21:28:41",
 ["startTime"] = 561900.447,
-["alreadyAdded"] = false,
+["endDate"] = "21:28:53",
 ["detailsId"] = "Prideclaw137",
 },
 [139] = {
@@ -694,13 +716,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:30:35",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574225,
 ["endTime"] = 562014.071,
 ["sessionName"] = "Vuldren",
 ["startDate"] = "21:30:25",
 ["startTime"] = 562004.1190000001,
-["alreadyAdded"] = false,
+["endDate"] = "21:30:35",
 ["detailsId"] = "Vuldren139",
 },
 [141] = {
@@ -711,13 +733,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:31:42",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574277,
 ["endTime"] = 562081.088,
 ["sessionName"] = "Vuldren",
 ["startDate"] = "21:31:17",
 ["startTime"] = 562055.7980000001,
-["alreadyAdded"] = false,
+["endDate"] = "21:31:42",
 ["detailsId"] = "Vuldren141",
 },
 [143] = {
@@ -728,13 +750,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:36:24",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574569,
 ["endTime"] = 562362.863,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:36:09",
 ["startTime"] = 562347.627,
-["alreadyAdded"] = false,
+["endDate"] = "21:36:24",
 ["detailsId"] = "Hippogryph Youth143",
 },
 [145] = {
@@ -745,13 +767,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:37:22",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574630,
 ["endTime"] = 562421.191,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:37:10",
 ["startTime"] = 562408.589,
-["alreadyAdded"] = false,
+["endDate"] = "21:37:22",
 ["detailsId"] = "Hippogryph Youth145",
 },
 [147] = {
@@ -762,13 +784,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:38:42",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574710,
 ["endTime"] = 562501.009,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:38:30",
 ["startTime"] = 562488.936,
-["alreadyAdded"] = false,
+["endDate"] = "21:38:42",
 ["detailsId"] = "Hippogryph Youth147",
 },
 [149] = {
@@ -779,13 +801,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:39:57",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574784,
 ["endTime"] = 562575.909,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:39:44",
 ["startTime"] = 562563.4400000001,
-["alreadyAdded"] = false,
+["endDate"] = "21:39:57",
 ["detailsId"] = "Hippogryph Youth149",
 },
 [151] = {
@@ -796,13 +818,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:40:53",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574841,
 ["endTime"] = 562632.154,
 ["sessionName"] = "Hippogryph Youth",
 ["startDate"] = "21:40:41",
 ["startTime"] = 562619.685,
-["alreadyAdded"] = false,
+["endDate"] = "21:40:53",
 ["detailsId"] = "Hippogryph Youth151",
 },
 [153] = {
@@ -813,13 +835,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:43:03",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791574970,
 ["endTime"] = 562761.682,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:42:50",
 ["startTime"] = 562749.23,
-["alreadyAdded"] = false,
+["endDate"] = "21:43:03",
 ["detailsId"] = "Hippogryph Protector153",
 },
 [155] = {
@@ -830,13 +852,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:44:21",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575049,
 ["endTime"] = 562840.2000000001,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:44:09",
 ["startTime"] = 562827.997,
-["alreadyAdded"] = false,
+["endDate"] = "21:44:21",
 ["detailsId"] = "Hippogryph Protector155",
 },
 [157] = {
@@ -847,13 +869,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:45:17",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575093,
 ["endTime"] = 562896.436,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:44:53",
 ["startTime"] = 562871.589,
-["alreadyAdded"] = false,
+["endDate"] = "21:45:17",
 ["detailsId"] = "Hippogryph Protector157",
 },
 [159] = {
@@ -864,13 +886,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:46:18",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575161,
 ["endTime"] = 562957.225,
 ["sessionName"] = "Hippogryph Protector",
 ["startDate"] = "21:46:01",
 ["startTime"] = 562940.004,
-["alreadyAdded"] = false,
+["endDate"] = "21:46:18",
 ["detailsId"] = "Hippogryph Protector159",
 },
 [161] = {
@@ -881,13 +903,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "21:48:02",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791575267,
 ["endTime"] = 563060.813,
 ["sessionName"] = "Hippogryph Matriarch",
 ["startDate"] = "21:47:47",
 ["startTime"] = 563046.06,
-["alreadyAdded"] = false,
+["endDate"] = "21:48:02",
 ["detailsId"] = "Hippogryph Matriarch161",
 },
 [83] = {
@@ -898,13 +920,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:39:27",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571132,
 ["endTime"] = 558946.295,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:38:52",
 ["startTime"] = 558911.456,
-["alreadyAdded"] = false,
+["endDate"] = "20:39:27",
 ["detailsId"] = "Highlands Bandit83",
 },
 [84] = {
@@ -915,13 +937,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:40:55",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571232,
 ["endTime"] = 559033.747,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:40:32",
 ["startTime"] = 559011.21,
-["alreadyAdded"] = false,
+["endDate"] = "20:40:55",
 ["detailsId"] = "Highlands Bandit84",
 },
 [85] = {
@@ -932,13 +954,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:41:51",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571270,
 ["endTime"] = 559089.626,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:41:10",
 ["startTime"] = 559049.184,
-["alreadyAdded"] = false,
+["endDate"] = "20:41:51",
 ["detailsId"] = "Highlands Bandit85",
 },
 [86] = {
@@ -949,13 +971,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:42:51",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571356,
 ["endTime"] = 559149.922,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:42:36",
 ["startTime"] = 559135.319,
-["alreadyAdded"] = false,
+["endDate"] = "20:42:51",
 ["detailsId"] = "Highlands Bandit86",
 },
 [87] = {
@@ -966,13 +988,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:43:03",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571374,
 ["endTime"] = 559162.025,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:42:54",
 ["startTime"] = 559153.3910000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:43:03",
 ["detailsId"] = "Highlands Bandit87",
 },
 [88] = {
@@ -983,13 +1005,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:43:43",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571414,
 ["endTime"] = 559202.517,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:43:34",
 ["startTime"] = 559192.9990000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:43:43",
 ["detailsId"] = "Highlands Bandit88",
 },
 [89] = {
@@ -1000,13 +1022,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:43:57",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571427,
 ["endTime"] = 559216.187,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:43:47",
 ["startTime"] = 559206.485,
-["alreadyAdded"] = false,
+["endDate"] = "20:43:57",
 ["detailsId"] = "Highlands Bandit89",
 },
 [90] = {
@@ -1017,13 +1039,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:44:09",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571440,
 ["endTime"] = 559227.956,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:44:00",
 ["startTime"] = 559219.085,
-["alreadyAdded"] = false,
+["endDate"] = "20:44:09",
 ["detailsId"] = "Highlands Bandit90",
 },
 [91] = {
@@ -1034,13 +1056,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:44:39",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571454,
 ["endTime"] = 559257.912,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:44:14",
 ["startTime"] = 559233.458,
-["alreadyAdded"] = false,
+["endDate"] = "20:44:39",
 ["detailsId"] = "Highlands Bandit91",
 },
 [92] = {
@@ -1051,13 +1073,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:45:05",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571490,
 ["endTime"] = 559284.561,
 ["sessionName"] = "\"Badwind\" Bennic",
 ["startDate"] = "20:44:50",
 ["startTime"] = 559269.247,
-["alreadyAdded"] = false,
+["endDate"] = "20:45:05",
 ["detailsId"] = "\"Badwind\" Bennic92",
 },
 [93] = {
@@ -1068,13 +1090,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:45:23",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571510,
 ["endTime"] = 559301.9890000001,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:45:10",
 ["startTime"] = 559288.7000000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:45:23",
 ["detailsId"] = "Highlands Bandit93",
 },
 [94] = {
@@ -1085,13 +1107,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:45:46",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571534,
 ["endTime"] = 559325.461,
 ["sessionName"] = "Highlands Bandit",
 ["startDate"] = "20:45:34",
 ["startTime"] = 559313.326,
-["alreadyAdded"] = false,
+["endDate"] = "20:45:46",
 ["detailsId"] = "Highlands Bandit94",
 },
 [95] = {
@@ -1102,13 +1124,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:46:55",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571593,
 ["endTime"] = 559393.827,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:46:33",
 ["startTime"] = 559371.7710000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:46:55",
 ["detailsId"] = "Galestrider95",
 },
 [96] = {
@@ -1119,13 +1141,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:47:15",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571623,
 ["endTime"] = 559414.046,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:47:03",
 ["startTime"] = 559401.594,
-["alreadyAdded"] = false,
+["endDate"] = "20:47:15",
 ["detailsId"] = "Galestrider96",
 },
 [97] = {
@@ -1136,13 +1158,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:47:53",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571653,
 ["endTime"] = 559451.688,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:47:33",
 ["startTime"] = 559432.35,
-["alreadyAdded"] = false,
+["endDate"] = "20:47:53",
 ["detailsId"] = "Galestrider97",
 },
 [98] = {
@@ -1153,13 +1175,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:49:01",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571679,
 ["endTime"] = 559520.402,
 ["sessionName"] = "High Order Apprentice",
 ["startDate"] = "20:47:59",
 ["startTime"] = 559457.889,
-["alreadyAdded"] = false,
+["endDate"] = "20:49:01",
 ["detailsId"] = "High Order Apprentice98",
 },
 [99] = {
@@ -1170,13 +1192,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:49:25",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571749,
 ["endTime"] = 559544.3420000001,
 ["sessionName"] = "High Order Apprentice",
 ["startDate"] = "20:49:09",
 ["startTime"] = 559528.2220000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:49:25",
 ["detailsId"] = "High Order Apprentice99",
 },
 [100] = {
@@ -1187,13 +1209,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:49:41",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571770,
 ["endTime"] = 559559.728,
 ["sessionName"] = "High Order Apprentice",
 ["startDate"] = "20:49:30",
 ["startTime"] = 559548.659,
-["alreadyAdded"] = false,
+["endDate"] = "20:49:41",
 ["detailsId"] = "High Order Apprentice100",
 },
 [101] = {
@@ -1204,13 +1226,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:50:11",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571798,
 ["endTime"] = 559590.2880000001,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:49:58",
 ["startTime"] = 559576.5970000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:50:11",
 ["detailsId"] = "Prideclaw101",
 },
 [102] = {
@@ -1221,13 +1243,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:50:47",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571828,
 ["endTime"] = 559625.742,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:50:28",
 ["startTime"] = 559607.174,
-["alreadyAdded"] = false,
+["endDate"] = "20:50:47",
 ["detailsId"] = "Galestrider102",
 },
 [103] = {
@@ -1238,13 +1260,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:51:06",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571854,
 ["endTime"] = 559644.746,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:50:54",
 ["startTime"] = 559633.477,
-["alreadyAdded"] = false,
+["endDate"] = "20:51:06",
 ["detailsId"] = "Galestrider103",
 },
 [104] = {
@@ -1255,13 +1277,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:51:30",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571872,
 ["endTime"] = 559668.974,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:51:12",
 ["startTime"] = 559650.697,
-["alreadyAdded"] = false,
+["endDate"] = "20:51:30",
 ["detailsId"] = "Galestrider104",
 },
 [105] = {
@@ -1272,13 +1294,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:52:03",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571910,
 ["endTime"] = 559702.209,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:51:50",
 ["startTime"] = 559688.7390000001,
-["alreadyAdded"] = false,
+["endDate"] = "20:52:03",
 ["detailsId"] = "Prideclaw105",
 },
 [106] = {
@@ -1289,13 +1311,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:52:34",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571939,
 ["endTime"] = 559732.932,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:52:19",
 ["startTime"] = 559718.212,
-["alreadyAdded"] = false,
+["endDate"] = "20:52:34",
 ["detailsId"] = "Prideclaw106",
 },
 [107] = {
@@ -1306,13 +1328,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:52:49",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571959,
 ["endTime"] = 559748.302,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:52:39",
 ["startTime"] = 559738,
-["alreadyAdded"] = false,
+["endDate"] = "20:52:49",
 ["detailsId"] = "Prideclaw107",
 },
 [108] = {
@@ -1323,13 +1345,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:53:22",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791571987,
 ["endTime"] = 559781.508,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:53:07",
 ["startTime"] = 559765.572,
-["alreadyAdded"] = false,
+["endDate"] = "20:53:22",
 ["detailsId"] = "Prideclaw108",
 },
 [109] = {
@@ -1340,13 +1362,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:53:51",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572018,
 ["endTime"] = 559810.164,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:53:38",
 ["startTime"] = 559797.479,
-["alreadyAdded"] = false,
+["endDate"] = "20:53:51",
 ["detailsId"] = "Prideclaw109",
 },
 [110] = {
@@ -1357,13 +1379,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:54:10",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572039,
 ["endTime"] = 559828.801,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:53:59",
 ["startTime"] = 559817.783,
-["alreadyAdded"] = false,
+["endDate"] = "20:54:10",
 ["detailsId"] = "Galestrider110",
 },
 [111] = {
@@ -1374,13 +1396,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:54:44",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572073,
 ["endTime"] = 559863.178,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:54:33",
 ["startTime"] = 559851.741,
-["alreadyAdded"] = false,
+["endDate"] = "20:54:44",
 ["detailsId"] = "Galestrider111",
 },
 [112] = {
@@ -1391,13 +1413,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:55:07",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572095,
 ["endTime"] = 559885.914,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:54:55",
 ["startTime"] = 559873.795,
-["alreadyAdded"] = false,
+["endDate"] = "20:55:07",
 ["detailsId"] = "Galestrider112",
 },
 [113] = {
@@ -1408,13 +1430,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:55:32",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572121,
 ["endTime"] = 559911.42,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:55:21",
 ["startTime"] = 559900.317,
-["alreadyAdded"] = false,
+["endDate"] = "20:55:32",
 ["detailsId"] = "Prideclaw113",
 },
 [114] = {
@@ -1425,13 +1447,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:56:01",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572142,
 ["endTime"] = 559939.754,
 ["sessionName"] = "Vuldren",
 ["startDate"] = "20:55:42",
 ["startTime"] = 559921.321,
-["alreadyAdded"] = false,
+["endDate"] = "20:56:01",
 ["detailsId"] = "Vuldren114",
 },
 [115] = {
@@ -1442,13 +1464,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:56:19",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572170,
 ["endTime"] = 559957.98,
 ["sessionName"] = "Galestrider",
 ["startDate"] = "20:56:10",
 ["startTime"] = 559948.761,
-["alreadyAdded"] = false,
+["endDate"] = "20:56:19",
 ["detailsId"] = "Galestrider115",
 },
 [116] = {
@@ -1459,13 +1481,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:56:52",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572200,
 ["endTime"] = 559990.685,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:56:40",
 ["startTime"] = 559979.384,
-["alreadyAdded"] = false,
+["endDate"] = "20:56:52",
 ["detailsId"] = "Prideclaw116",
 },
 [117] = {
@@ -1476,13 +1498,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:57:35",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572234,
 ["endTime"] = 560033.6950000001,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:57:14",
 ["startTime"] = 560012.725,
-["alreadyAdded"] = false,
+["endDate"] = "20:57:35",
 ["detailsId"] = "Prideclaw117",
 },
 [118] = {
@@ -1493,13 +1515,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:57:56",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572264,
 ["endTime"] = 560055.099,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:57:44",
 ["startTime"] = 560042.865,
-["alreadyAdded"] = false,
+["endDate"] = "20:57:56",
 ["detailsId"] = "Prideclaw118",
 },
 [119] = {
@@ -1510,13 +1532,13 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:58:37",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572303,
 ["endTime"] = 560096.076,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:58:23",
 ["startTime"] = 560081.606,
-["alreadyAdded"] = false,
+["endDate"] = "20:58:37",
 ["detailsId"] = "Prideclaw119",
 },
 [120] = {
@@ -1527,23 +1549,53 @@ _detalhes_database = {
 ["added"] = false,
 ["playerAuras"] = {
 },
-["endDate"] = "20:59:01",
+["alreadyAdded"] = false,
 ["startUnixTime"] = 1791572330,
 ["endTime"] = 560120.399,
 ["sessionName"] = "Prideclaw",
 ["startDate"] = "20:58:50",
 ["startTime"] = 560109.496,
-["alreadyAdded"] = false,
+["endDate"] = "20:59:01",
 ["detailsId"] = "Prideclaw120",
 },
 },
-["arena_data_index_selected"] = 1,
-["character_data"] = {
-["logons"] = 6,
-},
 ["on_death_menu"] = false,
-["damage_meter_session_info"] = {
+["auto_combatlog"] = false,
+["character_data"] = {
+["logons"] = 7,
 },
+["announce_firsthit"] = {
+["enabled"] = true,
+["channel"] = "SELF",
+},
+["last_instance_id"] = 0,
+["data_harvest_for_charsts"] = {
+["players"] = {
+{
+["name"] = "Damage of Each Individual Player",
+["playerOnly"] = true,
+["playerKey"] = "total",
+["combatObjectContainer"] = 1,
+},
+},
+["totals"] = {
+{
+["combatObjectSubTableKey"] = 1,
+["name"] = "Damage of All Player Combined",
+["combatObjectSubTableName"] = "totals",
+},
+},
+},
+["announce_interrupts"] = {
+["enabled"] = false,
+["whisper"] = "",
+["channel"] = "SAY",
+["custom"] = "",
+["next"] = "",
+},
+["last_instance_time"] = 0,
+["active_profile"] = "Skelf-Classic Beta PvE 2",
+["last_day"] = "09",
 ["local_instances_config"] = {
 {
 ["modo"] = 2,
@@ -1578,69 +1630,37 @@ _detalhes_database = {
 },
 },
 },
-["announce_firsthit"] = {
-["enabled"] = true,
-["channel"] = "SELF",
-},
-["last_instance_id"] = 0,
-["data_harvest_for_charsts"] = {
-["players"] = {
-{
-["playerKey"] = "total",
-["combatObjectContainer"] = 1,
-["name"] = "Damage of Each Individual Player",
-["playerOnly"] = true,
-},
-},
-["totals"] = {
-{
-["combatObjectSubTableKey"] = 1,
-["name"] = "Damage of All Player Combined",
-["combatObjectSubTableName"] = "totals",
-},
-},
-},
-["announce_interrupts"] = {
-["enabled"] = false,
-["whisper"] = "",
-["channel"] = "SAY",
-["custom"] = "",
-["next"] = "",
-},
-["last_instance_time"] = 0,
-["active_profile"] = "Skelf-Classic Beta PvE 2",
-["last_day"] = "09",
-["cached_talents"] = {
-},
 ["benchmark_db"] = {
 ["frame"] = {
 },
 },
-["ignore_nicktag"] = false,
-["arena_data_headers"] = {
+["last_realversion"] = 172,
+["apocalypes_info"] = {
 },
 ["combat_log"] = {
 ["inverse_deathlog_overalldata"] = false,
-["merge_gemstones_1007"] = false,
 ["track_hunter_frenzy"] = false,
+["merge_gemstones_1007"] = false,
 ["merge_critical_heals"] = false,
 ["inverse_deathlog_raid"] = false,
 ["calc_evoker_damage"] = true,
 ["evoker_show_realtimedps"] = false,
 ["inverse_deathlog_mplus"] = false,
 },
-["announce_damagerecord"] = {
-["enabled"] = true,
-["channel"] = "SELF",
+["coach"] = {
+["enabled"] = false,
+["welcome_panel_pos"] = {
+},
+["last_coach_name"] = false,
 },
 ["plugin_database"] = {
 ["DETAILS_PLUGIN_TINY_THREAT"] = {
 ["enabled"] = true,
 ["only_my_group"] = false,
 ["animate"] = false,
-["useclasscolors"] = false,
+["updatespeed"] = 1,
 ["hide_pull_bar"] = false,
-["author"] = "Terciob",
+["useclasscolors"] = false,
 ["playercolor"] = {
 1,
 1,
@@ -1654,7 +1674,7 @@ _detalhes_database = {
 ["absolute_mode"] = false,
 ["show_party_pets"] = false,
 ["playSoundFile"] = "Details Threat Warning Volume 3",
-["updatespeed"] = 1,
+["author"] = "Terciob",
 },
 ["DETAILS_PLUGIN_COMPARETWO_WINDOW"] = {
 ["enabled"] = true,
@@ -1676,15 +1696,15 @@ _detalhes_database = {
 ["tank_block_size"] = 150,
 ["bar_height"] = 24,
 ["tank_block_texture"] = "Details Serenity",
-["show_inc_bars"] = true,
-["tank_block_powerbar_size_height"] = 10,
-["tank_block_height"] = 40,
 ["tank_block_color"] = {
 0.074509,
 0.035294,
 0.035294,
 0.832845,
 },
+["tank_block_height"] = 40,
+["tank_block_powerbar_size_height"] = 10,
+["show_inc_bars"] = true,
 },
 ["DETAILS_PLUGIN_ENCOUNTER_DETAILS"] = {
 ["enabled"] = true,
@@ -1694,11 +1714,11 @@ _detalhes_database = {
 ["last_section_selected"] = "main",
 ["author"] = "Terciob",
 ["window_scale"] = 1,
-["encounter_timers_dbm"] = {
-},
+["hide_on_combat"] = false,
 ["show_icon"] = 5,
 ["opened"] = 0,
-["hide_on_combat"] = false,
+["encounter_timers_dbm"] = {
+},
 },
 ["DETAILS_PLUGIN_STREAM_OVERLAY"] = {
 ["use_square_mode"] = false,
@@ -1709,42 +1729,32 @@ _detalhes_database = {
 1,
 0.5,
 },
+["scale"] = 1,
 ["main_frame_size"] = {
 299.9999694824219,
 500,
 },
-["arrow_anchor_y"] = 0,
 ["minimap"] = {
 ["minimapPos"] = 160,
 ["radius"] = 160,
 ["hide"] = false,
 },
-["main_frame_locked"] = false,
+["row_height"] = 20,
 ["arrow_anchor_x"] = 0,
-["author"] = "Terciob",
+["font_color"] = {
+1,
+1,
+1,
+1,
+},
 ["row_texture"] = "Details Serenity",
 ["square_grow_direction"] = "right",
-["y"] = 0,
-["row_color"] = {
-0.1,
-0.1,
-0.1,
-0.4,
-},
+["point"] = "CENTER",
+["main_frame_strata"] = "LOW",
 ["square_amount"] = 5,
 ["enabled"] = false,
 ["arrow_size"] = 10,
-["per_second"] = {
-["enabled"] = false,
-["point"] = "CENTER",
-["scale"] = 1,
-["font_shadow"] = true,
-["y"] = -3.0517578125e-05,
-["x"] = -0.000732421875,
-["attribute_type"] = 1,
-["update_speed"] = 0.05,
-["size"] = 32,
-},
+["use_spark"] = true,
 ["row_spacement"] = 21,
 ["main_frame_color"] = {
 0,
@@ -1752,45 +1762,41 @@ _detalhes_database = {
 0,
 0.2,
 },
-["main_frame_strata"] = "LOW",
+["author"] = "Terciob",
 ["arrow_texture"] = "Interface\\CHATFRAME\\ChatFrameExpandArrow",
-["use_spark"] = true,
 ["font_size"] = 10,
+["y"] = 0,
 ["x"] = -0.00018310546875,
 ["font_face"] = "Friz Quadrata TT",
 ["square_size"] = 32,
+["per_second"] = {
+["enabled"] = false,
 ["point"] = "CENTER",
-["font_color"] = {
-1,
-1,
-1,
-1,
-},
-["row_height"] = 20,
 ["scale"] = 1,
+["font_shadow"] = true,
+["y"] = -3.0517578125e-05,
+["x"] = -0.000732421875,
+["size"] = 32,
+["update_speed"] = 0.05,
+["attribute_type"] = 1,
 },
+["row_color"] = {
+0.1,
+0.1,
+0.1,
+0.4,
+},
+["main_frame_locked"] = false,
+["arrow_anchor_y"] = 0,
+},
+},
+["announce_damagerecord"] = {
+["enabled"] = true,
+["channel"] = "SELF",
 },
 ["data_harvested_for_charts"] = {
 },
-["mythic_plus_log"] = {
-},
-["announce_prepots"] = {
-["enabled"] = false,
-["channel"] = "SELF",
-["reverse"] = false,
-},
-["nick_tag_cache"] = {
-["nextreset"] = 1792791895,
-["last_version"] = 16,
-},
-["apocalypse_hashes"] = {
-},
-["SoloTablesSaved"] = {
-["Mode"] = 1,
-},
-["last_version"] = "1.60.1 15326",
-["combat_id"] = 0,
-["savedStyles"] = {
+["cached_roles"] = {
 },
 ["mythic_dungeon_currentsaved"] = {
 ["dungeon_name"] = "",
@@ -1803,7 +1809,21 @@ _detalhes_database = {
 ["dungeon_zone_id"] = 0,
 ["previous_boss_killed_at"] = 0,
 },
-["cached_roles"] = {
+["apocalypse_hashes"] = {
+},
+["SoloTablesSaved"] = {
+["Mode"] = 1,
+},
+["last_version"] = "1.60.1 15326",
+["combat_id"] = 0,
+["savedStyles"] = {
+},
+["announce_prepots"] = {
+["enabled"] = false,
+["channel"] = "SELF",
+["reverse"] = false,
+},
+["mythic_plus_log"] = {
 },
 ["announce_deaths"] = {
 ["enabled"] = false,
@@ -1845,9 +1865,7 @@ _detalhes_database = {
 },
 ["bossTimers"] = {
 },
-["cleu_events"] = {
-["n"] = 1,
-},
+["combat_counter"] = 17,
 ["playerTalents"] = {
 },
 ["totals"] = {
@@ -1873,28 +1891,6 @@ _detalhes_database = {
 ["frags_total"] = 0,
 ["voidzone_damage"] = 0,
 },
-["player_last_events"] = {
-},
-["frags_need_refresh"] = false,
-["overall_refreshed"] = true,
-["amountCasts"] = {
-},
-["instance_type"] = "none",
-["zoneName"] = "Zephras Isle",
-["data_fim"] = "18:42:08",
-["cleu_timeline"] = {
-},
-["trinketProcs"] = {
-},
-["aura_timeline"] = {
-},
-["compressed_charts"] = {
-},
-["data_inicio"] = 0,
-["end_time"] = 551907.131,
-["mapId"] = 2991,
-["raid_roster"] = {
-},
 ["totals_grupo"] = {
 0,
 0,
@@ -1916,12 +1912,42 @@ _detalhes_database = {
 ["dead"] = 0,
 },
 },
-["is_challenge"] = false,
-["spells_cast_timeline"] = {
+["frags_need_refresh"] = false,
+["overall_refreshed"] = true,
+["amountCasts"] = {
 },
-["combat_counter"] = 17,
-["overall_enemy_name"] = "Unknown",
+["instance_type"] = "none",
+["zoneName"] = "Zephras Isle",
+["data_fim"] = "18:42:08",
+["cleu_timeline"] = {
+},
+["trinketProcs"] = {
+},
+["aura_timeline"] = {
+},
+["compressed_charts"] = {
+},
+["data_inicio"] = 0,
+["end_time"] = 551907.131,
+["mapId"] = 2991,
+["raid_roster"] = {
+},
 ["frags"] = {
+},
+["is_challenge"] = false,
+["segments_added"] = {
+{
+["elapsed"] = 551907.131,
+["type"] = 0,
+["name"] = "Unknown",
+["clock"] = 0,
+},
+},
+["cleu_events"] = {
+["n"] = 1,
+},
+["overall_enemy_name"] = "Unknown",
+["player_last_events"] = {
 },
 ["PhaseData"] = {
 {
@@ -1940,28 +1966,18 @@ _detalhes_database = {
 ["start_time"] = 0,
 ["TimeData"] = {
 },
-["segments_added"] = {
-{
-["elapsed"] = 551907.131,
-["type"] = 0,
-["name"] = "Unknown",
-["clock"] = 0,
+["spells_cast_timeline"] = {
 },
 },
+["ignore_nicktag"] = false,
+["arena_data_headers"] = {
 },
-["coach"] = {
-["enabled"] = false,
-["welcome_panel_pos"] = {
+["cached_talents"] = {
 },
-["last_coach_name"] = false,
-},
-["apocalypes_info"] = {
-},
-["last_realversion"] = 172,
 ["announce_cooldowns"] = {
+["enabled"] = false,
 ["ignored_cooldowns"] = {
 },
-["enabled"] = false,
 ["custom"] = "",
 ["channel"] = "RAID",
 },
@@ -1969,7 +1985,8 @@ _detalhes_database = {
 ["last_difficulty"] = 15,
 ["last_raid"] = "",
 },
-["auto_combatlog"] = false,
+["damage_meter_session_info"] = {
+},
 ["cached_specs"] = {
 ["Player-4620-015E58BF"] = 1484,
 },
