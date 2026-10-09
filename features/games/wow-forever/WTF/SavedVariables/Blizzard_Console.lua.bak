@@ -1,204 +1,7 @@
 
 Blizzard_Console_SavedVars = {
 ["version"] = 3,
-["height"] = 299.9999389648438,
 ["messageHistory"] = {
-{
-"Account item collection data received for character selection collectionListType=\"7\" itemCount=\"0\" wasWaiting=\"false\"",
-0,
-},
-{
-"Character selection updating character list success=\"true\" isRegionwideData=\"true\" isDeletedCharacters=\"false\" count=\"2\"",
-0,
-},
-{
-"-------------------------------------------------- Previous Session --------------------------------------------------",
-0,
-},
-{
-"Suspend()",
-0,
-},
-{
-"LimitedLuaResources: Reset Timer",
-0,
-},
-{
-"Attempted to register existing command: SetDifficulty",
-0,
-},
-{
-"Connecting to sourceRealmAddress=\"70-1-4\" connection=\"000000005792e660\" serial=\"129\" protocol=\"(enum)0\"",
-0,
-},
-{
-"Opening network connection connectionIndex=\"(enum)3\" connection=\"000000005792e660\" protocol=\"(enum)0\" directAddressCount=\"1\" bleepProxyCount=\"0\"",
-0,
-},
-{
-"Resuming communications connectionIndex=\"(enum)3\"",
-0,
-},
-{
-"Proficiency in item class 4 set to 0x0000000100",
-0,
-},
-{
-"Proficiency in item class 4 set to 0x0000000121",
-0,
-},
-{
-"Proficiency in item class 2 set to 0x0000004000",
-0,
-},
-{
-"Proficiency in item class 4 set to 0x0000000125",
-0,
-},
-{
-"Proficiency in item class 2 set to 0x0000004010",
-0,
-},
-{
-"Proficiency in item class 2 set to 0x0000004030",
-0,
-},
-{
-"Proficiency in item class 4 set to 0x0000000127",
-0,
-},
-{
-"Proficiency in item class 2 set to 0x0000004430",
-0,
-},
-{
-"Proficiency in item class 2 set to 0x000000c430",
-0,
-},
-{
-"Proficiency in item class 2 set to 0x000000c430",
-0,
-},
-{
-"Proficiency in item class 4 set to 0x0000000127",
-0,
-},
-{
-"Weather changed to 0, intensity 0.000000\n",
-0,
-},
-{
-"Time set to 10/7/2026 (Wed) 12:26",
-0,
-},
-{
-"Gamespeed set from 0.017 to 0.017",
-0,
-},
-{
-"Connecting to sourceRealmAddress=\"70-1-4\" connection=\"00000000578ee500\" serial=\"155\" protocol=\"(enum)0\"",
-0,
-},
-{
-"Opening network connection connectionIndex=\"(enum)3\" connection=\"00000000578ee500\" protocol=\"(enum)0\" directAddressCount=\"1\" bleepProxyCount=\"0\"",
-0,
-},
-{
-"Resuming communications connectionIndex=\"(enum)3\"",
-0,
-},
-{
-"Killing connection connection=\"000000005792e660\" state=\"(enum)6\"",
-0,
-},
-{
-"Weather changed to 0, intensity 0.000000\n",
-0,
-},
-{
-"Sending ping results from timeout timeoutNs=\"389011279721600\" nowNs=\"389011926608200\"",
-0,
-},
-{
-"Logout response received result=\"0\" instant=\"0\"",
-0,
-},
-{
-"-------------------------------------------------- Previous Session --------------------------------------------------",
-0,
-},
-{
-"Linear: 1. 0- disabled (live), 1- linear",
-0,
-},
-{
-"Multithreaded rendering enabled.",
-0,
-},
-{
-"Multithreaded BeginDraw enabled.",
-0,
-},
-{
-"Multithread shadows changed to 1.",
-0,
-},
-{
-"Multithreaded prepass enabled.",
-0,
-},
-{
-"Multithreaded opaque pass enabled.",
-0,
-},
-{
-"Multithreaded opaque pass enabled.",
-0,
-},
-{
-"Multithreaded alpha M2 pass enabled.",
-0,
-},
-{
-"Multithreaded opaque WMO pass enabled.",
-0,
-},
-{
-"Multithreaded terrain pass enabled.",
-0,
-},
-{
-"Multithreaded volumetric fog enabled.",
-0,
-},
-{
-"Multithreaded Refraction Pass enabled.",
-0,
-},
-{
-"Multithreaded miscellaneous passes enabled.",
-0,
-},
-{
-"Multithreaded decal passes disabled.",
-0,
-},
-{
-"Multithreaded outline passes enabled.",
-0,
-},
-{
-"Multithreaded lightshaft passes enabled.",
-0,
-},
-{
-"Use trigger on BeginDrawComplete enabled.",
-4,
-},
-{
-"Multithreaded alpha pass enabled.",
-0,
-},
 {
 "Multithreaded daynight update enabled.",
 0,
@@ -4199,9 +4002,198 @@ Blizzard_Console_SavedVars = {
 "Lua Error: MultiBarRight:SetScale(): Scale must be > 0\nNo Lua Taint\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeSystemTemplates.lua]:120: in function 'SetScale' with args (self=MultiBarRight <MultiActionBars.xml:134>, newScale=-0.211744)\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:619: in function 'UpdateRightActionBarPositions' with args (self=EditModeManagerFrame <EditModeManager.xml:4>)\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:589: in function 'UpdateActionBarLayout' with args (self=EditModeManagerFrame <EditModeManager.xml:4>, systemFrame=MultiBarRight <MultiActionBars.xml:134>)\n[Interface/AddOns/Blizzard_ActionBar/Shared/ActionBar.lua]:373: in function 'UpdateVisibility' with args (self=MultiBarRight <MultiActionBars.xml:134>)\n[Interface/AddOns/Blizzard_ActionBar/Shared/ActionBar.lua]:325: in function 'ShowOverride' with args (self=MultiBarRight <MultiActionBars.xml:134>)\n[Interface/AddOns/Blizzard_ActionBar/Shared/ActionBar.lua]:315: in function 'SetShown' with args (self=MultiBarRight <MultiActionBars.xml:134>, shown=true)\n[Interface/AddOns/Blizzard_ActionBar/Shared/MultiActionBars.lua]:87: in function <...AddOns/Blizzard_ActionBar/Shared/MultiActionBars.lua:80> with args (frame=MultiBarRight <MultiActionBars.xml:134>, var=true, pageVar=3)\n[Interface/AddOns/Blizzard_ActionBar/Shared/MultiActionBars.lua]:99: in function 'MultiActionBar_Update'\n[Interface/AddOns/Blizzard_ActionBarController/ActionBarController.lua]:240: in function 'ValidateActionBarTransition'\n[Interface/AddOns/Blizzard_ActionBarController/ActionBarController.lua]:181: in function <...Blizzard_ActionBarController/ActionBarController.lua:145> with args (force=nil)\n[C]: in function 'ActionBarController_UpdateAll'\n[Interface/AddOns/Blizzard_ActionBarController/ActionBarController.lua]:68: in function <...Blizzard_ActionBarController/ActionBarController.lua:55> with args (self=ActionBarController <ActionBarController.xml:3>, event=\"UPDATE_OVERRIDE_ACTIONBAR\")\n",
 3,
 },
+{
+"-------------------------------------------------- Previous Session --------------------------------------------------",
+0,
 },
-["isShown"] = false,
+{
+"GameUI::Shutdown invalidated load generation initCounter=\"3\" isClosingClient=\"false\"",
+0,
+},
+{
+"LimitedLuaResources: Reset Timer",
+0,
+},
+{
+"AccountData_CancelRequestLoad type=\"0\" pending=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"AccountData_CancelRequestLoad type=\"1\" pending=\"false\" hasCallback=\"true\" param=\"131104\"",
+0,
+},
+{
+"GameUI::Shutdown canceled CVar account-data loads initCounter=\"3\" pendingMask=\"0\"",
+0,
+},
+{
+"LimitedLuaResources: Reset All",
+0,
+},
+{
+"PreLoadGameCVars initialized pending mask pendingMask=\"32\" initCounter=\"3\" characterlessLogin=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"2\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"327681\" newParam=\"458753\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"2\" pending=\"false\" hasCallback=\"true\" param=\"458753\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"2\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"2\" pendingBefore=\"false\" hasCallback=\"true\" param=\"458753\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"3\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"327682\" newParam=\"458754\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"3\" pending=\"false\" hasCallback=\"true\" param=\"458754\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"3\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"3\" pendingBefore=\"false\" hasCallback=\"true\" param=\"458754\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"6\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"0\" newParam=\"0\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"6\" pending=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"6\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"6\" pendingBefore=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"11\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"0\" newParam=\"0\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"11\" pending=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"11\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"11\" pendingBefore=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"LoadGameCVars request dispatch initCounter=\"3\" pendingMask=\"32\" characterlessLogin=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"1\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"131104\" newParam=\"196640\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"1\" pending=\"false\" hasCallback=\"true\" param=\"196640\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"1\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"1\" pendingBefore=\"false\" hasCallback=\"true\" param=\"196640\"",
+0,
+},
+{
+"LoadGameCVarsCallback received callbackInitCounter=\"3\" currentInitCounter=\"3\" mask=\"32\" buffsize=\"1053\" pendingMaskBefore=\"32\"",
+0,
+},
+{
+"LoadGameCVarsCallback applied response mask=\"32\" pendingMaskAfter=\"0\"",
+0,
+},
+{
+"LoadGameCVarsCheckDone areCVarsLoaded=\"true\" pendingMask=\"0\"",
+0,
+},
+{
+"LoadGameCVarsCheckDone signaled variables loaded pendingMask=\"0\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"4\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"65539\" newParam=\"65541\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"4\" pending=\"false\" hasCallback=\"true\" param=\"65541\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"4\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"4\" pendingBefore=\"false\" hasCallback=\"true\" param=\"65541\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"5\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"131075\" newParam=\"131077\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"5\" pending=\"false\" hasCallback=\"true\" param=\"131077\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"5\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"5\" pendingBefore=\"false\" hasCallback=\"true\" param=\"131077\"",
+0,
+},
+{
+"AccountData_RequestLoad type=\"7\" fromAuth=\"false\" pending=\"false\" existingHasCallback=\"true\" newHasCallback=\"true\" existingParam=\"0\" newParam=\"0\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"AccountData_RequestLoad updated callback state type=\"7\" pending=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"AccountData_RequestLoad forcing local file load type=\"7\" isReloadingUI=\"true\" loadOnDemandOnly=\"false\"",
+0,
+},
+{
+"LoadAccountDataFromFile type=\"7\" pendingBefore=\"false\" hasCallback=\"true\" param=\"0\"",
+0,
+},
+{
+"Logout abort acknowledged",
+0,
+},
+{
+"Logout response received result=\"0\" instant=\"0\"",
+0,
+},
+},
+["height"] = 299.9999389648438,
 ["fontHeight"] = 14,
+["isShown"] = false,
 ["commandHistory"] = {
 },
 }
