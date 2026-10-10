@@ -1,0 +1,89 @@
+## Interface: 16001
+
+## Title: LittleWigs
+## Notes: Boss warnings for 5-man dungeons & scenarios.
+## Notes-deDE: Boss Warnungen für 5-Spieler Dungeons & Szenarien.
+## Notes-esES: Boss warnings for 5-man dungeons & scenarios.
+## Notes-esMX: Boss warnings for 5-man dungeons & scenarios.
+## Notes-frFR: Boss warnings for 5-man dungeons & scenarios.
+## Notes-itIT: Avvisi per i boss delle spedizioni & scenari
+## Notes-koKR: 5인 던전 & 시나리오의 우두머리 경보입니다.
+## Notes-ptBR: Boss warnings for 5-man dungeons & scenarios.
+## Notes-ruRU: Предупреждения о боссах для подземелий на 5 игроков и сценариев.
+## Notes-zhCN: 5人地下城和场景战役首领警报。
+## Notes-zhTW: 5人地城和情境地圖首領警報。
+## Author: Funkeh, Delk
+## IconTexture: Interface\AddOns\BigWigs\Media\Icons\minimap_party.tga
+## X-Category: Party
+## X-Credits: Ulic, Oppzippy, Zirael
+## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
+## X-Curse-Project-ID: 4383
+## X-WoWI-ID: 9577
+## X-Wago-ID: 5bGolnN0
+
+## Dependencies: BigWigs
+## LoadOnDemand: 1
+## Version: v12.1.19
+
+## X-BigWigs-Minimum: 426
+## X-BigWigs-LoadOn-InstanceId: 2805,2811,2813,2825,2859,2874,2915,2923,2993, 2933,2952,2953,2961,2962,2963,2964,2965,2966,2979,3003,3038,3077,3079 [AllowLoadGameType standard]
+
+Midnight\!Locales\[TextLocale].lua [AllowLoadGameType standard][AllowLoadTextLocale deDE, esES, esMX, frFR, itIT, koKR, ptBR, ruRU, zhCN, zhTW]
+Midnight\AltarOfFangs\Ravi.lua [AllowLoadGameType standard]
+Midnight\AltarOfFangs\TheWrithingCoil.lua [AllowLoadGameType standard]
+Midnight\AltarOfFangs\Zuljan.lua [AllowLoadGameType standard]
+Midnight\AltarOfFangs\Trash.lua [AllowLoadGameType standard]
+Midnight\Delves\AtalAman\SpiritflayerJinma.lua [AllowLoadGameType standard]
+Midnight\Delves\CollegiateCalamity\Hydrangea.lua [AllowLoadGameType standard]
+Midnight\Delves\CollegiateCalamity\InfiltratorGarand.lua [AllowLoadGameType standard]
+Midnight\Delves\CollegiateCalamity\VoidscornedVagrant.lua [AllowLoadGameType standard]
+Midnight\Delves\ParhelionPlaza\GladiusSlaurna.lua [AllowLoadGameType standard]
+Midnight\Delves\ShadowguardPoint\ChiefArcanistPatram.lua [AllowLoadGameType standard]
+Midnight\Delves\SunkillerSanctum\Esuritus.lua [AllowLoadGameType standard]
+Midnight\Delves\TheDarkway\InfiltratorGulkat.lua [AllowLoadGameType standard]
+Midnight\Delves\TheGrudgePit\Brightthorn.lua [AllowLoadGameType standard]
+Midnight\Delves\TheGrudgePit\Gyrospore.lua [AllowLoadGameType standard]
+Midnight\Delves\TheGrudgePit\Mycomight.lua [AllowLoadGameType standard]
+Midnight\Delves\TheGulfOfMemory\Lumenia.lua [AllowLoadGameType standard]
+Midnight\Delves\TheGulfOfMemory\Multhaul.lua [AllowLoadGameType standard]
+Midnight\Delves\TheShadowEnclave\Antenorian.lua [AllowLoadGameType standard]
+Midnight\Delves\TormentsRise\Nullaeus.lua [AllowLoadGameType standard]
+Midnight\Delves\TwilightCrypts\BlademasterDarza.lua [AllowLoadGameType standard]
+Midnight\Delves\VenomfallDeeps\Aztarec.lua [AllowLoadGameType standard]
+Midnight\Delves\Trash.lua [AllowLoadGameType standard]
+Midnight\DenOfNalorakk\TheHoardmonger.lua [AllowLoadGameType standard]
+Midnight\DenOfNalorakk\SentinelOfWinter.lua [AllowLoadGameType standard]
+Midnight\DenOfNalorakk\Nalorakk.lua [AllowLoadGameType standard]
+Midnight\DenOfNalorakk\Trash.lua [AllowLoadGameType standard]
+Midnight\MagistersTerrace\ArcanotronCustos.lua [AllowLoadGameType standard]
+Midnight\MagistersTerrace\SeranelSunlash.lua [AllowLoadGameType standard]
+Midnight\MagistersTerrace\Gemellus.lua [AllowLoadGameType standard]
+Midnight\MagistersTerrace\Degentrius.lua [AllowLoadGameType standard]
+Midnight\MaisaraCaverns\MurojinAndNekraxx.lua [AllowLoadGameType standard]
+Midnight\MaisaraCaverns\Vordaza.lua [AllowLoadGameType standard]
+Midnight\MaisaraCaverns\Raktul.lua [AllowLoadGameType standard]
+Midnight\MaisaraCaverns\Trash.lua [AllowLoadGameType standard]
+Midnight\MurderRow\KystiaManaheart.lua [AllowLoadGameType standard]
+Midnight\MurderRow\ZaenBladesorrow.lua [AllowLoadGameType standard]
+Midnight\MurderRow\XathuuxTheAnnihilator.lua [AllowLoadGameType standard]
+Midnight\MurderRow\LithielCinderfury.lua [AllowLoadGameType standard]
+Midnight\MurderRow\Trash.lua [AllowLoadGameType standard]
+Midnight\NexusPointXenas\Kasreth.lua [AllowLoadGameType standard]
+Midnight\NexusPointXenas\Nysarra.lua [AllowLoadGameType standard]
+Midnight\NexusPointXenas\Lothraxion.lua [AllowLoadGameType standard]
+Midnight\NexusPointXenas\Trash.lua [AllowLoadGameType standard]
+Midnight\TheBlindingVale\LightblossomTrinity.lua [AllowLoadGameType standard]
+Midnight\TheBlindingVale\IkuzzTheLightHunter.lua [AllowLoadGameType standard]
+Midnight\TheBlindingVale\LightwardenRuia.lua [AllowLoadGameType standard]
+Midnight\TheBlindingVale\Ziekket.lua [AllowLoadGameType standard]
+Midnight\TheBlindingVale\Trash.lua [AllowLoadGameType standard]
+Midnight\VoidscarArena\TazRah.lua [AllowLoadGameType standard]
+Midnight\VoidscarArena\Atroxus.lua [AllowLoadGameType standard]
+Midnight\VoidscarArena\Charonus.lua [AllowLoadGameType standard]
+Midnight\VoidscarArena\Trash.lua [AllowLoadGameType standard]
+Midnight\WindrunnerSpire\Emberdawn.lua [AllowLoadGameType standard]
+Midnight\WindrunnerSpire\DerelictDuo.lua [AllowLoadGameType standard]
+Midnight\WindrunnerSpire\CommanderKroluk.lua [AllowLoadGameType standard]
+Midnight\WindrunnerSpire\RestlessHeart.lua [AllowLoadGameType standard]
+Midnight\Trash.lua [AllowLoadGameType standard]
+Midnight\!Options.lua [AllowLoadGameType standard]

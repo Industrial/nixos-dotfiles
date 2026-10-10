@@ -1,0 +1,23 @@
+## Interface: 16001
+## Title: HandyNotes: DungeonLocations
+## Version: 3.0.0
+## Notes: Shows locations of old and new world dungeon and raid entrances
+## Notes-esES: Muestra las ubicaciones de las entradas de bandas y mazmorras del viejo y nuevo mundo.
+## Notes-esMX: Muestra las ubicaciones de las entradas de bandas y mazmorras del viejo y nuevo mundo.
+## Notes-ptBR: Mostra locais de masmorras do velho e do novo mundo e entradas de raid
+## Notes-zhTW: 顯示新舊世界地下城和副本入口的位置
+## Notes-zhCN: 显示新旧世界地下城和副本入口的位置
+## Notes-deDE: Zeigt die Standorte der Dungeon- und Raid-Eingänge der alten und neuen Welt
+## Notes-ruRU: Показывает местоположение входов в подземелья и рейды
+## Notes-koKR: 구세계와 신세계 던전 및 공격대 입구의 위치를 ​​표시합니다
+## Notes-itIT: Mostra le posizioni dei dungeon del vecchio e del nuovo mondo e gli ingressi delle incursioni
+## Notes-frFR: Affiche les emplacements des entrées des donjons et des raids de l'ancien et du nouveau monde
+## Author: Caliaha of Cairne & BadBoyBarny
+## X-Updated-By: BadBoyBarny
+## RequiredDeps: HandyNotes
+## X-Curse-Project-ID: 102768
+## IconTexture: Interface\AddOns\HandyNotes_DungeonLocations\Images\HN_DL_Logo
+## SavedVariables: HandyNotes_DungeonLocationsDB
+
+locales\Locales.xml
+HandyNotes_DungeonLocations.lua

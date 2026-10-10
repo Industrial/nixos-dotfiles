@@ -1,0 +1,10 @@
+## Interface: 16001
+## Title: BetterBags - Guardians of the Dream
+## Author: Zazou
+## Version: v1.4
+## Notes: Category for all Guardians of the Dream Items.
+## Dependencies: BetterBags
+## X-Curse-Project-ID: 957175
+## IconTexture: Interface\Icons\inv_farm_pumpkinseed_purple
+
+main.lua

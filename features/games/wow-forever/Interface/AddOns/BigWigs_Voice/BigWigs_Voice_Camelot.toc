@@ -1,0 +1,29 @@
+## Interface: 16001
+## AllowLoadGameType: standard
+
+## Title: BigWigs |cffff0000+|r|cffffffffVoice|r
+## Version: v12.1.0.3
+## Notes: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-zhCN: BigWigs附加模块，为团队首领技能播放语音合成（TTS）提示。
+## Notes-zhTW: BigWigs附加模組，為團隊首領技能播放語音合成（TTS）提示。
+## Notes-deDE: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-frFR: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-itIT: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-koKR: 우두머리 능력에 대하여 텍스트 음성 변환 소리를 재생하는 BigWigs 플러그인입니다.
+## Notes-ruRU: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-ptBR: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-esES: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Notes-esMX: A plugin for BigWigs that will play Text-To-Speech sounds for boss abilities.
+## Author: Funkeh, Sehra
+
+## X-BigWigs-LoadOn-CoreEnabled: 1
+## Dependencies: BigWigs
+## LoadOnDemand: 1
+## IconTexture: Interface\AddOns\BigWigs\Media\Icons\core-enabled
+
+## X-Category: Raid
+## X-License: All Rights Reserved: You are free to fork and modify on GitHub, please ask us about anything else.
+## X-Curse-Project-ID: 87513
+## X-WoWI-ID: 24218
+
+Core.lua
