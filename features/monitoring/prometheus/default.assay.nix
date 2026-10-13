@@ -3,9 +3,7 @@ let
   assay = import ./../../../common/assay/default.nix;
   src = builtins.readFile ./default.nix;
   mod = import ./default.nix {
-    config = {};
-    lib = {};
-    pkgs = {};
+    settings = {hostname = "test-host";};
   };
   scrape = builtins.head mod.services.prometheus.scrapeConfigs;
 in
@@ -16,5 +14,5 @@ in
     allHostsLabeled =
       assay.eq
       (map (c: c.labels.host) scrape.static_configs)
-      ["mimir" "drakkar" "huginn"];
+      ["test-host" "mimir" "drakkar" "huginn" "muninn"];
   }
