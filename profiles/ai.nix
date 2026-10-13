@@ -1,5 +1,5 @@
 # AI Profile
-# Desktop/local AI apps + hermes-agent (system).
+# Desktop/local AI apps. (hermes-agent was retired 2026-10-13.)
 #
 # claude-code is system-wide: it owns ~/.claude and imports the MCP server
 # features its .claude/mcp.json declares (lean-ctx, roam-code, maestro,
@@ -17,7 +17,6 @@
   imports = [
     # ../features/ai/anythingllm-desktop
     ../features/ai/claude-code
-    #../features/ai/hermes-agent
     # ../features/ai/litellm
     # ../features/ai/lmstudio
     # ../features/ai/n8n

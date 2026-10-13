@@ -1,7 +1,7 @@
 # Claude Code - Agentic coding tool from Anthropic.
 #
 # System-wide harness. ~/.claude is a symlink to ./.claude (bin/link-files-nixos),
-# mirroring how features/ai/hermes-agent owns ~/.hermes. The payload carries the
+# mirroring the layout this repo uses for agent harnesses. The payload carries the
 # settings, the MCP server declarations, the command and skill rosters, and the
 # id-workflow plugin marketplace under .claude/harness.
 #

@@ -25,7 +25,6 @@ in {
   cursor.features.program-maestro.enable = true;
   cursor.features.program-context7.enable = true;
   cursor.features.program-omniroute.enable = true;
-  cursor.features.program-hermes.enable = true;
   cursor.features.program-assay.enable = true;
   cursor.features.packages-base.enable = true;
   cursor.features.packages-formatters.enable = true;
