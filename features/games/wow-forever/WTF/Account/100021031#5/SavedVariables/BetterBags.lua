@@ -1,5 +1,25 @@
 
 BetterBagsDB = {
+["categories"] = {
+["|cff1DDB7FRemix: Reputation|r"] = true,
+["|cffa5a5ffFeast of Winter Veil|r"] = true,
+["|cffa5a5ffBrewfest|r"] = true,
+["|cff1DDB7FRemix: Buff|r"] = true,
+["|cffa5a5ffLove is in the Air|r"] = true,
+["|cff1DDB7FRemix|r"] = true,
+["|cffa5a5ffMidsummer Fire Festival|r"] = true,
+["|cffa5a5ffDarkmoon Faire|r"] = true,
+["|cffa5a5ffLunar Festival|r"] = true,
+["|cffa5a5ffRadiant Echoes|r"] = true,
+["|cffa5a5ffA Greedy Emissary|r"] = true,
+["|cffa5a5ffNoblegarden|r"] = true,
+["|cff1DDB7FRemix: Artifact|r"] = true,
+["|cffa5a5ffWinds of Mysterious Fortune|r"] = true,
+["|cff1DDB7FRemix: Cache|r"] = true,
+["|cffa5a5ffHallow's End|r"] = true,
+["|cff1dc7db20th Anniversary|r"] = true,
+["|cffa5a5ffDastardly Duos|r"] = true,
+},
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Default",
 },
@@ -14,12 +34,21 @@ BetterBagsDB = {
 ["name"] = "Bank",
 ["id"] = 1,
 ["kind"] = 1,
-["order"] = 1,
 ["isDefault"] = true,
+["order"] = 1,
 },
 },
 },
 ["ephemeralCategoryFilters"] = {
+["Hearthstones"] = {
+["enabled"] = {
+true,
+[0] = true,
+},
+["itemList"] = {
+},
+["name"] = "Hearthstones",
+},
 ["Teleporters"] = {
 ["enabled"] = {
 true,
@@ -28,6 +57,15 @@ true,
 ["itemList"] = {
 },
 ["name"] = "Teleporters",
+},
+["|cff00ff00Mog - Learnable|r"] = {
+["enabled"] = {
+true,
+[0] = true,
+},
+["itemList"] = {
+},
+["name"] = "|cff00ff00Mog - Learnable|r",
 },
 ["Low iLvl"] = {
 ["enabled"] = {
@@ -60,25 +98,16 @@ true,
 ["#4: Simple Leather Satchel"] = {
 ["shown"] = true,
 },
-["#3: Small Green Pouch"] = {
+["Finger"] = {
 ["shown"] = true,
 },
-["Teleporters"] = {
+["One-Hand"] = {
 ["shown"] = true,
 },
 ["Trade Goods"] = {
 ["shown"] = true,
 },
 ["Recipe"] = {
-["shown"] = true,
-},
-["Consumable"] = {
-["shown"] = true,
-},
-["#2: Apprentice's Skinning Satchel"] = {
-["shown"] = true,
-},
-["Junk"] = {
 ["shown"] = true,
 },
 ["#1: Backpack"] = {
@@ -88,6 +117,36 @@ true,
 ["shown"] = true,
 },
 ["Quest"] = {
+["shown"] = true,
+},
+["#3: Small Green Pouch"] = {
+["shown"] = true,
+},
+["Two-Hand"] = {
+["shown"] = true,
+},
+["Teleporters"] = {
+["shown"] = true,
+},
+["Miscellaneous"] = {
+["shown"] = true,
+},
+["Chest"] = {
+["shown"] = true,
+},
+["Consumable"] = {
+["shown"] = true,
+},
+["|cff00ff00Mog - Learnable|r"] = {
+["shown"] = true,
+},
+["Hearthstones"] = {
+["shown"] = true,
+},
+["#2: Apprentice's Skinning Satchel"] = {
+["shown"] = true,
+},
+["Junk"] = {
 ["shown"] = true,
 },
 ["Low iLvl"] = {

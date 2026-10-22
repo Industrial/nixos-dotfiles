@@ -1,0 +1,41 @@
+-----------------------------------------------------------------------
+-- AddOn namespace.
+-----------------------------------------------------------------------
+local LibStub = _G.LibStub
+local ADDON_NAME, private = ...
+
+-- Locales
+local AL = LibStub("AceLocale-3.0"):GetLocale("RareScanner");
+local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+
+---============================================================================
+-- Addon compartiment
+---============================================================================
+
+local tooltip
+
+function RareScanner_OnAddonCompartmentClick(addonName, button)
+	if (not InCombatLockdown()) then
+		if (button == "LeftButton") then
+			RSExplorerFrame:Show()
+		elseif (button == "RightButton") then
+			Settings.OpenToCategory(AceConfigDialog.BlizOptionsIDMap["RareScanner"])
+		end
+	end
+end
+
+function RareScanner_OnAddonCompartmentEnter(addonName, button)
+	if (not tooltip) then
+		tooltip = CreateFrame("GameTooltip", "RareScanner_AddonCompartimentTooltip", UIParent, "GameTooltipTemplate")
+	end
+	
+    tooltip:SetOwner(button, "ANCHOR_LEFT");
+	tooltip:SetText("RareScanner")
+	tooltip:AddLine(AL["MINIMAP_ICON_TOOLTIP1"], 1, 1, 1)
+	tooltip:AddLine(AL["MINIMAP_ICON_TOOLTIP2"], 1, 1, 1)
+	tooltip:Show()
+end
+
+function RareScanner_OnAddonCompartmentLeave(addonName, button)
+	tooltip:Hide()
+end

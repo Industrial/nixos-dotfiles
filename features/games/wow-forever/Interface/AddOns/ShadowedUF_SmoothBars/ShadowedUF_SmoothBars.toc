@@ -1,0 +1,24 @@
+## Interface: 60200
+## Title: Shadowed UF |cff7fff7fSmoothBars|r
+## Notes: Smoothly animates bars on Shadowed Unit Frame
+## Author: Szabolcs Czinege
+## Version: v1.2.2
+## Dependencies: ShadowedUnitFrames
+## OptionalDeps: LibSmoothStatusBar-1.0
+## X-Website: http://www.curse.com/addons/wow/shadoweduf-smoothbars
+## X-Feedback: http://wow.curseforge.com/addons/shadoweduf-smoothbars
+## X-Date: 2015-07-04T14:14:32Z
+## X-Category: UnitFrame
+## X-Curse-Packaged-Version: v1.2.2
+## X-Curse-Project-Name: ShadowedUF SmoothBars
+## X-Curse-Project-ID: shadoweduf-smoothbars
+## X-Curse-Repository-ID: wow/shadoweduf-smoothbars/mainline
+
+#@no-lib-strip@
+libs\LibSmoothStatusBar-1.0\LibSmoothStatusBar-1.0.lua
+#@end-no-lib-strip@
+
+localization\enUS.lua
+localization\deDE.lua
+
+ShadowedUF_SmoothBars.lua

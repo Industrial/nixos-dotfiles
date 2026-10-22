@@ -4,10 +4,11 @@ Bartender4DB = {
 ["StatusTrackingBar"] = {
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
+["enabled"] = true,
 ["position"] = {
-["y"] = 82,
-["x"] = -601,
-["point"] = "BOTTOM",
+["y"] = 14,
+["x"] = -600,
+["point"] = "TOP",
 },
 ["version"] = 3,
 },
@@ -30,17 +31,26 @@ Bartender4DB = {
 ["Skelf Onyourshelf"] = {
 ["actionbars"] = {
 {
+["rows"] = 2,
 ["skin"] = {
 ["Zoom"] = true,
 },
 ["version"] = 3,
 ["position"] = {
-["y"] = 48,
+["y"] = 94,
 ["x"] = -279.5,
 ["point"] = "BOTTOM",
 },
 ["padding"] = 1,
 ["WoW10Layout"] = true,
+["states"] = {
+["stance"] = {
+["DRUID"] = {
+["moonkin"] = 9,
+["bear"] = 4,
+},
+},
+},
 },
 {
 ["enabled"] = false,
@@ -54,13 +64,14 @@ Bartender4DB = {
 },
 {
 ["flyoutDirection"] = "LEFT",
+["rows"] = 2,
 ["skin"] = {
 ["Zoom"] = true,
 },
 ["version"] = 3,
 ["position"] = {
 ["y"] = 186,
-["x"] = -279.5,
+["x"] = -4,
 ["point"] = "BOTTOM",
 },
 ["padding"] = 1,
@@ -79,30 +90,43 @@ Bartender4DB = {
 ["WoW10Layout"] = true,
 },
 {
-["skin"] = {
-["Zoom"] = true,
-},
-["version"] = 3,
-["position"] = {
-["y"] = 140,
-["x"] = -279.5,
-["point"] = "BOTTOM",
-},
-["padding"] = 1,
-["WoW10Layout"] = true,
-},
-{
+["rows"] = 2,
 ["skin"] = {
 ["Zoom"] = true,
 },
 ["version"] = 3,
 ["position"] = {
 ["y"] = 94,
+["x"] = -4,
+["point"] = "BOTTOM",
+},
+["padding"] = 1,
+["WoW10Layout"] = true,
+},
+{
+["rows"] = 2,
+["skin"] = {
+["Zoom"] = true,
+},
+["version"] = 3,
+["position"] = {
+["y"] = 186,
 ["x"] = -279.5,
 ["point"] = "BOTTOM",
 },
 ["padding"] = 1,
 ["WoW10Layout"] = true,
+["states"] = {
+["enabled"] = true,
+["stance"] = {
+["DRUID"] = {
+["prowl"] = 14,
+["moonkin"] = 15,
+["cat"] = 13,
+["bear"] = 10,
+},
+},
+},
 },
 {
 ["WoW10Layout"] = true,
@@ -185,6 +209,7 @@ Bartender4DB = {
 ["StanceBar"] = {
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
+["enabled"] = false,
 ["version"] = 3,
 ["position"] = {
 ["y"] = -15,

@@ -1,0 +1,28 @@
+
+CliqueDB = nil
+CliqueDB3 = {
+["profileKeys"] = {
+["Skelf Onyourshelf"] = "Skelf Onyourshelf",
+},
+["profiles"] = {
+["Skelf Onyourshelf"] = {
+["bindings"] = {
+{
+["type"] = "target",
+["sets"] = {
+["default"] = true,
+},
+["key"] = "BUTTON1",
+["unit"] = "mouseover",
+},
+{
+["type"] = "menu",
+["key"] = "BUTTON2",
+["sets"] = {
+["default"] = true,
+},
+},
+},
+},
+},
+}

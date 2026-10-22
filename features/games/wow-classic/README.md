@@ -17,8 +17,8 @@ features/games/wow-classic/
 
 The module creates out-of-store symlinks from your dotfiles to the WoW installation:
 
-- `~/.dotfiles/features/games/wow-classic/WTF/` → `/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF/`
-- `~/.dotfiles/features/games/wow-classic/Interface/` → `/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface/`
+- `~/.dotfiles/features/games/wow-classic/WTF/` → `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF/`
+- `~/.dotfiles/features/games/wow-classic/Interface/` → `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface/`
 
 **Out-of-store symlinks** mean the game can write to these files, and changes are immediately reflected in your dotfiles repo.
 
@@ -53,11 +53,11 @@ If you already have WoW Classic installed with settings and AddOns:
 cd ~/.dotfiles
 
 # Copy WTF directory (settings, saved variables)
-cp -r "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF" \
+cp -r "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF" \
       features/games/wow-classic/
 
 # Copy Interface directory (AddOns)
-cp -r "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface" \
+cp -r "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface" \
       features/games/wow-classic/
 
 # Commit to git
@@ -174,14 +174,14 @@ WTF/Cache/
 The module only creates symlinks if the WoW path exists:
 ```bash
 # Check if path exists
-ls -la "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/"
+ls -la "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/"
 ```
 
 ### Permission Issues
 
 Ensure the Wine prefix is writable:
 ```bash
-ls -la "/data/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/"
+ls -la "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/"
 # Should show 'tom' as owner
 ```
 

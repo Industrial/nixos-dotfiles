@@ -1,2 +1,0 @@
-
-OPie_SavedDataPC = nil

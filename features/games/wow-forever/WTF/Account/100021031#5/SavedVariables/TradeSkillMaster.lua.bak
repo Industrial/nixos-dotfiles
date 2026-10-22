@@ -1,0 +1,3 @@
+
+TradeSkillMasterDB = nil
+TSMItemInfoDB = nil

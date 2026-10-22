@@ -1,0 +1,50 @@
+
+WoWProCharDB = {
+["EnableGrailQuestline"] = false,
+["AutoHideInsideInstances"] = true,
+["QID2Guide"] = {
+},
+["Trades"] = {
+},
+["EnableGrailBreadcrumbs"] = false,
+["Guide"] = {
+},
+["completedQIDs"] = {
+},
+["AutoHideInsideInstancesNotify"] = true,
+["AutoHideInCombat"] = false,
+["skippedQIDs"] = {
+},
+["Rank"] = {
+},
+["DebugLevel"] = 0,
+["ShowBOP"] = true,
+["EnableGrailQuestLevel"] = false,
+["EnablePetBattles"] = true,
+["EnableGrailCheckPrereq"] = false,
+["IgnoreProf"] = false,
+["EnableGrailQuestName"] = false,
+["GuideStack"] = {
+},
+["EnableGrailQuestObsolete"] = false,
+["EnableDungeons"] = true,
+["AutoTurnin"] = true,
+["Enabled"] = true,
+["Taxi"] = {
+},
+["BuildingLocations"] = {
+},
+["EnableTreasures"] = true,
+["NoTomTom"] = false,
+["EnableRares"] = true,
+["AutoSelect"] = true,
+["GuideVersion"] = {
+},
+["AutoAccept"] = true,
+["EnableFlight"] = true,
+["completedQIDsWarband"] = {
+},
+["disabledAddons"] = {
+},
+["ProfessionalfOffset"] = 100,
+}
