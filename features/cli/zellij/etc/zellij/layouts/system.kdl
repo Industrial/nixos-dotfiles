@@ -76,14 +76,26 @@ layout {
   }
 
   tab name="dsk" {
-    pane split_direction="horizontal" {
-      pane {
-        cwd "/home/tom"
-        command "broot"
+    pane split_direction="vertical" {
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "broot"
+        }
+        pane {
+          cwd "/home/tom"
+          command "ranger"
+        }
       }
-      pane {
-        cwd "/home/tom"
-        command "ranger"
+      pane split_direction="horizontal" {
+        pane {
+          cwd "/home/tom"
+          command "dust"
+        }
+        pane {
+          cwd "/home/tom"
+          command "leaves"
+        }
       }
     }
   }
