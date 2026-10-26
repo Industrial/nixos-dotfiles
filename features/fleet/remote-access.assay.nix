@@ -1,4 +1,8 @@
-# Assay: fleet remote access disables comin
+# Assay: fleet remote access.
+#
+# comin itself moved to features/fleet/comin.nix and is enabled there per host
+# (ADR-0002). The noCominEnable claim below is still load-bearing: activation
+# semantics must not be smuggled into an access module.
 let
   assay = import ../../common/assay/default.nix;
   src = builtins.readFile ./remote-access.nix;

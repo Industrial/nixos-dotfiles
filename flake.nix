@@ -70,6 +70,12 @@
       url = "github:poeck/claude-desktop-nix-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Pull-based convergence; not packaged in nixpkgs. See ADR-0002.
+    comin = {
+      url = "github:nlewo/comin";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   nixConfig = {
