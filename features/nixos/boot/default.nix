@@ -89,15 +89,6 @@
       # "module.sig_enforce=1"
     ];
 
-    # Configure initrd for performance and security
-    initrd = {
-      # Enable early microcode loading
-      systemd.enable = true;
-
-      # Optimize initrd size
-      verbose = false;
-    };
-
     # Disable unnecessary kernel modules (commented out)
     # blacklistedKernelModules = [
     #   # Disable potentially dangerous modules
