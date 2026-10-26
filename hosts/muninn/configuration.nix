@@ -7,7 +7,7 @@
     ./filesystems.nix
     ./hardware.nix
 
-    # ../../profiles/ai.nix
+    ../../profiles/ai.nix
     ../../profiles/base.nix
     ../../profiles/communication.nix
     #../../profiles/creative.nix
