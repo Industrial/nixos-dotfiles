@@ -1,16 +1,14 @@
 {
-    "diagnostics": {
-        "enable": [
-            "need-check-nil",
-            "nil-index",
-            "invalid-op",
-            "redundant-or",
-            "redundant-and",
-            "redundant-condition"
-        ]
-    },
-    "ignore": [
-        "Test.lua"
-    ],
-    "framexml": false
+  "diagnostics": {
+    "enable": [
+      "need-check-nil",
+      "nil-index",
+      "invalid-op",
+      "redundant-or",
+      "redundant-and",
+      "redundant-condition"
+    ]
+  },
+  "ignore": ["Test.lua"],
+  "framexml": false
 }
