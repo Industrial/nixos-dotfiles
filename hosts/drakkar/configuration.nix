@@ -14,6 +14,7 @@
     ../../profiles/development.nix
     ../../profiles/gaming.nix
 
+    ../../features/fleet/comin.nix
     ../../features/fleet/nix-remote-builder-server.nix
     ../../features/fleet/remote-access.nix
     ../../features/monitoring/prometheus-exporter/default.nix
