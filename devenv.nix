@@ -22,6 +22,7 @@ in {
   cursor.features.program-lean-ctx.enable = true;
   cursor.features.program-roam-code.enable = false;
   cursor.features.program-roam-code-pypi.enable = true;
+  cursor.features.program-claude-code.enable = true;
   cursor.features.program-maestro.enable = true;
   cursor.features.program-context7.enable = true;
   cursor.features.program-omniroute.enable = true;

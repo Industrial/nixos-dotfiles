@@ -2,6 +2,10 @@
 # Project-only flake inputs stay here.
 imports:
   - ./.cursor/nix
+# claude-code is unfree; permit it explicitly (cursor.features.program-claude-code).
+nixpkgs:
+  permittedUnfreePackages:
+    - claude-code
 inputs:
   assay:
     url: github:Industrial/assay
