@@ -24,6 +24,28 @@
 
   launcherTemplate = ./tws-launcher.sh.in;
 
+  # Build-time FHS for the Install4J installer. steam-run unconditionally binds
+  # /etc/zoneinfo, which does not exist in the Nix build sandbox; the generic
+  # buildFHSEnv only links /etc entries that exist.
+  installerFhs = pkgs.buildFHSEnv {
+    name = "ib-tws-installer-fhs";
+    targetPkgs = p:
+      with p; [
+        alsa-lib
+        fontconfig
+        freetype
+        glib
+        gtk3
+        libx11
+        libxext
+        libxi
+        libxrender
+        libxtst
+        zlib
+      ];
+    runScript = "";
+  };
+
   ib-tws = stdenv.mkDerivation {
     pname = "ib-tws-stable-standalone";
     version = "stable";
@@ -35,7 +57,7 @@
 
     dontUnpack = true;
 
-    nativeBuildInputs = [steam-run];
+    nativeBuildInputs = [installerFhs];
 
     installPhase = ''
       runHook preInstall
@@ -51,7 +73,7 @@
       cp "$src" "$installer"
       chmod +x "$installer"
       # Run the script itself (not `bash $src`) so Install4j can open $0 for the embedded payload.
-      ${steam-run}/bin/steam-run "$installer" -q -dir "$out/opt/ib-tws"
+      ${installerFhs}/bin/ib-tws-installer-fhs "$installer" -q -dir "$out/opt/ib-tws"
 
       sed \
         -e "s#@shell@#${stdenv.shell}#g" \
