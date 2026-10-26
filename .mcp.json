@@ -1,0 +1,98 @@
+{
+	"mcpServers": {
+		"context7": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@upstash/context7-mcp@latest"],
+			"disabled": false
+		},
+		"mcp-debugger": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"@debugmcp/mcp-debugger",
+				"stdio",
+				"--log-level",
+				"debug",
+				"--log-file",
+				".tmp/debug-mcp-server.log"
+			],
+			"disabled": false,
+			"autoApprove": ["create_debug_session", "set_breakpoint", "get_variables"]
+		},
+		"lean-ctx": {
+			"type": "stdio",
+			"command": "./scripts/lean-ctx-mcp-wrapper.sh",
+			"args": [],
+			"disabled": false,
+			"description": "lean-ctx MCP (context compression; https://github.com/yvgude/lean-ctx)"
+		},
+		"roam-code": {
+			"type": "stdio",
+			"command": "./scripts/roam-mcp-wrapper.sh",
+			"args": [],
+			"disabled": false,
+			"description": "roam-code MCP via devenv (`roam mcp` + fastmcp)"
+		},
+		"playwright": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@playwright/mcp@latest"],
+			"disabled": true,
+			"description": "Browser automation — no web surface in this repo; enable on demand."
+		},
+		"filesystem": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-filesystem@latest"],
+			"disabled": true,
+			"description": "Superseded by lean-ctx (ctx_read/ctx_search/ctx_tree/ctx_patch)."
+		},
+		"memory": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-memory@latest"],
+			"disabled": true,
+			"description": "Superseded by ctx_session / ctx_knowledge and .maestro/ state."
+		},
+		"sequential-thinking": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"],
+			"disabled": true,
+			"description": "Redundant with native extended thinking."
+		},
+		"fetch": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": ["mcp-server-fetch"],
+			"disabled": false
+		},
+		"git": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": ["mcp-server-git"],
+			"disabled": false
+		},
+		"time": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": ["mcp-server-time"],
+			"disabled": false
+		},
+		"github": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@modelcontextprotocol/server-github@latest"],
+			"disabled": false
+		},
+		"chrome-devtools": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "chrome-devtools-mcp@latest"],
+			"disabled": true,
+			"description": "Browser devtools — no web surface in this repo; enable on demand."
+		}
+	}
+}
