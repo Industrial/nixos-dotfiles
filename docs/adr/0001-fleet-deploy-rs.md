@@ -1,6 +1,6 @@
 # ADR-0001: Fleet push-deploy with deploy-rs
 
-**Status:** Accepted  
+**Status:** Accepted — **clause 3 superseded by [ADR-0002](./0002-comin-pull-convergence.md)** (2026-10-26)  
 **Date:** 2026-08-19  
 **Mission:** `pln-mt0fxitc-f74sm9`
 
@@ -12,7 +12,7 @@ Three NixOS hosts (drakkar, huginn, mimir) were managed via per-host flakes and 
 
 1. **Unified root flake** at repository root with `nixosConfigurations` for all hosts.
 2. **deploy-rs only** for remote activation (`magicRollback`, `activate.nixos`).
-3. **Disable comin** on all hosts while push-deploy is primary.
+3. ~~**Disable comin** on all hosts while push-deploy is primary.~~ — reversed by ADR-0002: push-only left unreachable hosts permanently unconverged and unreported.
 4. **Operator access** via OpenSSH (key-only) and Tailscale mesh; `bin/fleet` wraps deploy-rs.
 5. **Hermes and Colmena are non-goals** for this mission.
 6. **Per-host modules preserved** — `hosts/<name>/disko.nix`, `hardware.nix`, `filesystems.nix` unchanged in location.
@@ -45,8 +45,8 @@ Three NixOS hosts (drakkar, huginn, mimir) were managed via per-host flakes and 
 | Threat | Mitigation |
 |--------|------------|
 | Operator SSH key compromise | Ed25519 keys, no passwords, Tailscale ACLs, rotate keys |
-| Generation race (comin + deploy) | comin disabled; assay asserts |
-| Failed activate bricks SSH | magicRollback; `--dry-activate` first; keep local rebuild path |
+| Generation race (comin + deploy) | ~~comin disabled~~ → ADR-0002: contained by push-before-deploy ordering plus the `testing-<hostname>` branch |
+| Failed activate bricks SSH | `--dry-activate` first; keep local rebuild path. **NB:** `magicRollback` and `autoRollback` are both set to `false` in `flake.nix`, so this mitigation is weaker than originally written — there is no automatic rollback |
 | magicRollback partition full | Monitor `/nix/store`; GC policy in base profile |
 | Untrusted network SSH | Tailscale preferred; firewall closed on public iface |
 
