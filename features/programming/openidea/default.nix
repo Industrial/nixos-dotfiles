@@ -15,7 +15,25 @@
   appimageContents = pkgs.appimageTools.extractType2 {inherit pname version src;};
   openidea = pkgs.appimageTools.wrapType2 {
     inherit pname version src;
-    extraPkgs = _pkgs: [];
+    # Libraries the bundled .so files need but the AppImage does not ship.
+    extraPkgs = p:
+      with p; [
+        e2fsprogs # libcom_err
+        expat
+        fontconfig
+        freetype
+        fribidi
+        gmp
+        harfbuzz
+        libdrm
+        libgbm
+        libGL
+        libgpg-error
+        wayland
+        libx11
+        libxcb
+        zlib
+      ];
     extraInstallCommands = ''
       if [ -d ${appimageContents}/usr/share/icons ]; then
         mkdir -p $out/share
