@@ -22,6 +22,7 @@
     ../features/programming/docker-compose
     ../features/programming/git
     ../features/programming/gitkraken
+    ../features/programming/openidea
     # ../features/programming/glogg
     # ../features/programming/insomnia
     # ../features/programming/node
