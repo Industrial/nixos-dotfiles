@@ -19,12 +19,20 @@
   '';
 in [
   (spec "V-268078" "the built-in firewall is active" ''
-    # The check greps the nixos-fw chain and the panic helpers, both of which only exist on a
-    # running system with the firewall enabled.
+    # The substantive half of the check: the nixos-fw refuse chain is live.
     machine.wait_for_unit("firewall.service")
     machine.succeed("iptables -L | grep -q nixos-fw-log-refuse")
-    machine.succeed("command -v firewall-panic")
-    machine.succeed("command -v firewall-panic-off")
+
+    # The published check also requires `which firewall-panic` and `firewall-panic-off`.
+    # Those binaries NO LONGER EXIST in nixpkgs — grepping nixos/modules for "firewall-panic"
+    # returns nothing, and firewall-iptables.nix now installs pkgs.nixos-firewall-tool
+    # instead, which carries the same capability as `nixos-firewall-tool panic`.
+    #
+    # So that half of the check cannot pass on a current NixOS no matter how the host is
+    # configured. Assert the successor tool and record the rename, rather than failing a
+    # control over a binary the distribution removed.
+    machine.succeed("command -v nixos-firewall-tool")
+    machine.fail("command -v firewall-panic")
   '')
 
   (spec "V-268141" "IPv4 TCP syncookies are enabled" (sysctlIs "net.ipv4.tcp_syncookies" "1"))
@@ -69,21 +77,25 @@ in [
   '')
 
   (spec "V-268154" "substituted store paths must be signed" ''
-    # nix.conf is the authority the daemon reads.
+    # /etc/nix/nix.conf is what the daemon reads, and is the authority here.
+    #
+    # `nix config show require-sigs` is NOT used: the nix CLI needs the nix-command
+    # experimental feature enabled for the invoking user, which is not guaranteed inside a
+    # test VM, so it fails for a reason unrelated to the control.
     conf = machine.succeed("cat /etc/nix/nix.conf")
+    print("nix.conf:\n" + conf)
     import re
     m = re.search(r"(?mi)^\s*require-sigs\s*=\s*(\S+)", conf)
-    # Absent means the built-in default, which is true; present must not be false.
-    if m:
-        assert m.group(1).lower() in ["true", "1"], f"require-sigs is {m.group(1)}"
-    machine.succeed("nix config show require-sigs | grep -qx true")
+    assert m, f"require-sigs is not declared in nix.conf:\n{conf}"
+    assert m.group(1).lower() in ["true", "1"], f"require-sigs is {m.group(1)}, expected true"
   '')
 
   (spec "V-268156" "sudo requires a password" ''
     sudoers = machine.succeed("cat /etc/sudoers")
     print("sudoers:\n" + sudoers)
     # No NOPASSWD for the wheel group. A NOPASSWD rule anywhere for wheel defeats the control.
-    import re
+    # (No `import re` here: the test driver type-checks the script and rejects an unused
+    # import outright, which is how this spec failed to build the first time.)
     offenders = [
         line for line in sudoers.splitlines()
         if "NOPASSWD" in line and not line.strip().startswith("#") and "%wheel" in line

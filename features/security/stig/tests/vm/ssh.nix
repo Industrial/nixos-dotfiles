@@ -33,8 +33,14 @@ in [
     machine.succeed("systemctl is-active sshd.service | grep -qx active")
     # Confidentiality and integrity come from the negotiated algorithms, not from the daemon
     # merely being up — those are V-268089 and V-268157.
-    assert "ciphers " in conf, f"sshd reports no cipher list:\n{conf}"
-    assert "macs " in conf, f"sshd reports no MAC list:\n{conf}"
+    #
+    # Case-insensitive: this sshd renders `-T` output with capitalised keys ("Port 22",
+    # "UsePAM yes"), not the lowercase form the manual page shows. A literal lowercase
+    # substring check fails here while the (?i) regexes in the other specs pass, which is
+    # exactly how this was found.
+    import re
+    assert re.search(r"(?mi)^ciphers\s+\S", conf), f"sshd reports no cipher list:\n{conf}"
+    assert re.search(r"(?mi)^macs\s+\S", conf), f"sshd reports no MAC list:\n{conf}"
   '')
 
   (spec "V-268088" "sshd logs at VERBOSE" ''

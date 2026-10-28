@@ -31,17 +31,34 @@
   # single-control failure instead of "the audit subsystem is down".
   auditReady = ''
     machine.wait_for_unit("auditd.service")
-    machine.succeed("systemctl is-active audit-rules-nixos.service || true")
-    rules_status = machine.execute("systemctl is-active audit-rules-nixos.service")[1].strip()
+
+    # The readiness invariant is that the LOADER SUCCEEDED, not that some rules exist.
+    #
+    # Two earlier versions of this check were too weak, and each let a real defect through:
+    #
+    #   1. `auditctl -l | grep -q .` — `auditctl -l` prints the literal text "No rules" when
+    #      none are loaded, so this succeeded on exactly the failure case.
+    #   2. asserting "No rules" is absent — auditctl loads rules sequentially and aborts on
+    #      the first bad one, so the rules BEFORE it are live and the ones AFTER are missing.
+    #      A partial load looks like success to any check that only asks "are there rules?",
+    #      while controls whose rules sit later in the file fail for a reason that has
+    #      nothing to do with them.
+    #
+    # audit-rules-nixos.service's exit status is the only honest signal: non-zero means the
+    # rule set is partial and no control in this group can be trusted.
+    rules_unit = machine.execute("systemctl is-active audit-rules-nixos.service")[1].strip()
     loaded = machine.succeed("auditctl -l")
-    assert "No rules" not in loaded, (
-        "the audit rule set failed to load, so no control in this group can be verified. "
-        f"audit-rules-nixos.service is '{rules_status}'. "
-        "auditctl aborts the entire file on one unloadable rule -- usually a -w watch on a "
-        "path that does not exist. Journal:\n"
-        + machine.execute("journalctl -u audit-rules-nixos --no-pager | tail -40")[1]
-    )
-    machine.wait_until_succeeds("auditctl -l | grep -qE '^-[aw] '")
+    if rules_unit not in ["active", "inactive"] or "No rules" in loaded:
+        journal = machine.execute("journalctl -u audit-rules-nixos --no-pager | tail -40")[1]
+        raise Exception(
+            "the audit rule set did not load cleanly, so no control in this group can be "
+            f"verified. audit-rules-nixos.service is '{rules_unit}'.\n"
+            "auditctl aborts the file on the first unloadable rule and leaves everything "
+            "after it missing -- usually a -w watch on a path that does not exist.\n"
+            f"Loaded rules:\n{loaded}\nJournal:\n{journal}"
+        )
+    machine.succeed("systemctl show -p Result audit-rules-nixos.service | grep -qx 'Result=success'")
+    print("loaded audit rules:\n" + loaded)
   '';
 
   # One spec per control, all against the composed profile.
@@ -106,8 +123,12 @@ in [
     # Match on the key, not on a leading syscall name. auditctl maps syscall names to numbers
     # per architecture and re-renders the list in numeric order, so the b32 and b64 forms of
     # the same rule list the syscalls in DIFFERENT orders — `grep '-S rename'` finds one and
-    # misses the other. The key is stable.
-    rules = machine.succeed("auditctl -l | grep -w -- '-k delete'")
+    # misses the other.
+    #
+    # The key is stable, but its RENDERING is not: auditctl echoes a syscall rule's `-k X` as
+    # `-F key=X`, while a watch rule keeps `-k X`. Accept either, or this passes for watch
+    # controls and fails for syscall ones for purely cosmetic reasons.
+    rules = machine.succeed("auditctl -l | grep -E -- '(-k delete|key=delete)'")
     for syscall in ["rename", "unlink", "rmdir", "renameat", "unlinkat"]:
         assert syscall in rules, f"{syscall} missing from the delete rule:\n{rules}"
     for arch in ["b32", "b64"]:
@@ -285,7 +306,9 @@ in [
   '')
 
   (ruleSpec "V-268163" "extended-attribute changes are audited for users and root" ''
-    rules = machine.succeed("auditctl -l | grep -w -- '-S setxattr'")
+    # Not `-S setxattr`: the syscall list is re-rendered in per-architecture numeric order,
+    # so setxattr is not reliably first.
+    rules = machine.succeed("auditctl -l | grep setxattr")
     for syscall in ["setxattr", "fsetxattr", "lsetxattr", "removexattr", "fremovexattr", "lremovexattr"]:
         assert syscall in rules, f"{syscall} missing from the xattr rule"
     # The root-side rules are the easy ones to lose, and losing them means a root-performed
@@ -295,8 +318,11 @@ in [
   '')
 
   (ruleSpec "V-268164" "usermod execution is audited" ''
-    rules = machine.succeed("auditctl -l | grep -w -- '-S all' || auditctl -l | grep usermod")
-    assert "usermod" in rules, "usermod is not watched"
+    rules = machine.succeed("auditctl -l | grep usermod")
+    assert "usermod" in rules, f"usermod is not watched:\n{rules}"
+    # A path-based execution rule, on the NixOS profile path rather than the FHS one — on
+    # NixOS /usr/sbin/usermod does not exist and the rule would never fire.
+    assert "/run/current-system/sw/bin/usermod" in rules, f"wrong usermod path:\n{rules}"
   '')
 
   (ruleSpec "V-268165" "chage execution is audited" ''
