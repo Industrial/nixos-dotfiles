@@ -1,0 +1,15 @@
+name: 'STIG'
+description: 'Build the Anduril NixOS STIG compliance reports and fail on a CAT I regression'
+inputs:
+  vm-tests:
+    description: 'Also boot a VM per control (slow; main only)'
+    required: false
+    default: 'false'
+runs:
+  using: 'composite'
+  steps:
+    - name: STIG compliance gate
+      shell: bash
+      env:
+        STIG_VM: ${{ inputs.vm-tests == 'true' && '1' || '0' }}
+      run: ./bin/ci/stig

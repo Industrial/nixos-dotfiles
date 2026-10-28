@@ -49,6 +49,17 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Assay
         uses: ./.github/actions/assay
+  stig:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      # Reports plus the CAT I gate. VM tests are left to the main workflow: 68 booted
+      # machines per pull request is not a reasonable default.
+      - name: STIG compliance
+        uses: ./.github/actions/stig
   cargo-clippy:
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# CI gate for the Anduril NixOS STIG baseline.
+#
+# Three things, in increasing cost:
+#
+#   1. Build the per-host compliance report. This also exercises the drift guard: if a new
+#      STIG release changes the control set, lib/manifest.nix mismatches the parsed benchmark
+#      and evaluation throws here rather than on a host.
+#   2. Fail on a CAT I regression. Any high-severity control that is neither compliant nor
+#      carrying a written justification fails the build, named by id.
+#   3. Run the VM tests, which boot a machine per control. Skipped unless STIG_VM=1, because
+#      68 VM boots do not belong in every PR run; main schedules it.
+#
+# Usage:
+#   bin/ci/stig            reports + CAT I gate
+#   STIG_VM=1 bin/ci/stig  the above, plus every VM test
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+HOSTS=(drakkar huginn mimir muninn)
+SYSTEM="$(nix eval --raw --impure --expr 'builtins.currentSystem')"
+
+status=0
+
+echo "=== STIG compliance reports ==="
+for host in "${HOSTS[@]}"; do
+  out="$(nix build --no-link --print-out-paths ".#stigReport.${host}")"
+  summary="$(cat "${out}/summary.txt")"
+  echo "  ${summary}"
+
+  # CAT I is the line that decides whether a host can be fielded. A high-severity control
+  # that is not compliant and not justified is a build failure, not a note in a report
+  # nobody reads.
+  open_cat_one="$(jq -r '.summary.catOneOpen | join(" ")' "${out}/report.json")"
+  if [ -n "${open_cat_one}" ]; then
+    # Separate "deliberately not carried by this profile" from "regressed".
+    unjustified=""
+    for id in ${open_cat_one}; do
+      st="$(jq -r --arg id "$id" '.controls[] | select(.id == $id) | .status' "${out}/report.json")"
+      case "${st}" in
+        "Not Implemented" | "Not Applicable") ;; # a documented decision, not a regression
+        *) unjustified="${unjustified} ${id} (${st})" ;;
+      esac
+    done
+    if [ -n "${unjustified}" ]; then
+      echo "  FAIL ${host}: CAT I control(s) regressed:${unjustified}" >&2
+      status=1
+    else
+      echo "    CAT I not carried by this profile (expected): ${open_cat_one}"
+    fi
+  fi
+done
+
+if [ "${STIG_VM:-0}" = "1" ]; then
+  echo
+  echo "=== STIG VM tests (one booted machine per control) ==="
+  if ! ./bin/stig-vm-test; then
+    status=1
+  fi
+else
+  echo
+  echo "=== STIG VM tests: skipped (set STIG_VM=1) ==="
+  # --json, not --raw: count is an integer and --raw refuses non-string values.
+  echo "    ${SYSTEM}: $(nix eval --json '.#stigVmTests.passthru.count' 2>/dev/null || echo '?') controls have VM coverage"
+fi
+
+if [ "${status}" -ne 0 ]; then
+  echo
+  echo "bin/ci/stig: FAILED" >&2
+  exit 1
+fi
+
+echo
+echo "bin/ci/stig: OK"
