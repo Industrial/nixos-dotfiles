@@ -68,6 +68,90 @@
       '';
     };
 
+    pkiCaBundle = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        Trust anchor bundle for PKI-based authentication (V-268124).
+
+        No default, deliberately. The published fix text fetches it at build time:
+
+          pkgs.fetchzip {
+            url = "https://dl.dod.cyber.mil/wp-content/uploads/pki-pke/zip/unclass-certificates_pkcs7_v5-6_DoW.zip";
+            sha256 = "sha256-iwwJRXCnONk/LFddQlwy8KX9e9kVXW/QWDnX5qZFZjc=";
+          }
+
+        and that is not wired in here, because a build that reaches dl.dod.cyber.mil fails on
+        any network that cannot (including CI), taking the whole system closure with it. An
+        operator who wants the published bundle can vendor it and point this option at the
+        result; the hash above is recorded so it can be verified.
+      '';
+    };
+
+    aideMailTo = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "security@example.com";
+      description = ''
+        Address that receives AIDE integrity-check results (V-268153).
+
+        No default: the fix text's own example is "root@notareal.email", which is a
+        placeholder that would silently discard every integrity report.
+      '';
+    };
+
+    sssdConfig = lib.mkOption {
+      type = lib.types.nullOr lib.types.lines;
+      default = null;
+      description = ''
+        Full sssd.conf contents, for the controls that require SSSD (V-268124, V-268178).
+
+        The fix text for V-268178 says "the entire sssd.conf must be entered in this option",
+        and there is no way to guess a site's domain, LDAP URI or cache policy. The controls
+        assert this is set rather than shipping a configuration that cannot work.
+      '';
+    };
+
+    remoteLogging = {
+      url = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        example = "https://logs.example.com:19532";
+        description = ''
+          Remote journal endpoint for off-loading audit records (V-268108, V-268109).
+
+          Deliberately has NO default. There is no safe guess for a site's log collector, and
+          a plausible-looking placeholder would produce a host that believes it is shipping
+          audit records to somewhere that does not exist — worse than one that refuses to
+          build. The controls assert this is set.
+        '';
+      };
+
+      serverCertificateFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = "Client certificate presented to the remote journal server (V-268108).";
+      };
+
+      serverKeyFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = "Private key for serverCertificateFile (V-268108).";
+      };
+
+      trustedCertificateFile = lib.mkOption {
+        type = lib.types.nullOr lib.types.path;
+        default = null;
+        description = ''
+          CA bundle used to AUTHENTICATE the remote log server (V-268109).
+
+          This is the control's entire point: without it, journald will upload audit records
+          to whatever answers the URL. V-268109 exists precisely because unauthenticated
+          off-load is a finding.
+        '';
+      };
+    };
+
     satisfiedExternally = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = {};
