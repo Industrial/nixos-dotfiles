@@ -134,6 +134,15 @@
     # Run all: moon run stig-vm-test     One: nix build .#checks.<system>.stig-V-268140
     stigVmTests = import ./features/security/stig/tests/vm {inherit pkgs lib;};
 
+    # Per-host compliance report — the artifact an assessor asks for. This benchmark ships no
+    # OVAL/SCAP content (all 103 checks are manual), so nothing off the shelf can produce it.
+    #   nix build .#stigReport.muninn && cat result/report.md
+    stigReport = lib.genAttrs hosts (hostname:
+      import ./features/security/stig/lib/report.nix {
+        inherit pkgs lib;
+        inherit (nixosConfigurations.${hostname}) config;
+      });
+
     checks.${system} =
       deployLib.deployChecks self.deploy
       // (builtins.removeAttrs self.stigVmTests ["passthru"]);

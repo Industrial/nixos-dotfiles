@@ -10,10 +10,16 @@
 #
 # Growing in groups, each gated on `assay run features/security/stig` plus a four-host eval.
 # Group 1 (landed): network, kernel, time, AppArmor, telnet absence.
-{...}: {
-  imports = [
-    ../default.nix
-
+{...}: let
+  # The control modules this profile carries. Declared once, used twice: as the module
+  # `imports` and as `security.stig.implemented`, which lib/report.nix reads to know which
+  # controls are in play on a host.
+  #
+  # One list, so the report cannot disagree with reality. Deriving the id list from the
+  # imports rather than maintaining a parallel roster is the whole point — a second hand-kept
+  # list of 68 ids would drift, and the report would then claim controls the host does not
+  # carry.
+  controlModules = [
     # Group 1 — network, kernel, time, AppArmor, telnet absence.
     ../controls/V-268078.nix # built-in firewall enabled
     ../controls/V-268131.nix # telnet absent (CAT I, assertion)
@@ -97,9 +103,46 @@
     ../controls/V-268175.nix # stored hashes are SHA-512 (deferred)
   ];
 
+  idOf = path: builtins.head (builtins.match "(V-[0-9]+)\\.nix" (builtins.baseNameOf (toString path)));
+in {
+  imports = [../default.nix] ++ controlModules;
+
   security.stig = {
     enable = true;
     profile = "base-safe";
+
+    # Derived from controlModules above, never hand-listed.
+    implemented = map idOf controlModules;
+
+    # Controls met by something other than a STIG control module, with the evidence.
+    #
+    # V-268144 is CAT I and is genuinely satisfied on this fleet, but by the DISK LAYOUT
+    # rather than by any NixOS option: every hosts/<name>/disko.nix puts the root filesystem
+    # inside a LUKS container with no keyfile in the store, and each hosts/<name>/disko.assay.nix
+    # asserts exactly that. There is nothing for a control module to declare.
+    #
+    # Reporting it as "Not Implemented" would understate a CAT I control that is in fact met,
+    # which misleads as badly as overstating one. The citation names files that assert the
+    # property, so the claim is checkable rather than asserted.
+    satisfiedExternally = {
+      "V-268144" = "The root filesystem is inside a LUKS container with no keyfile in the Nix store, declared per host in hosts/<name>/disko.nix (type = \"luks\", name = \"cryptroot\") and asserted by hosts/<name>/disko.assay.nix for all four hosts. The ESP cannot be encrypted, so it is mounted umask=0077 instead.";
+    };
+
+    # Controls that are configured correctly but cannot take effect until the host reboots,
+    # mapped to the reason.
+    #
+    # Discovered on muninn, not in a VM: comin switched the host to the new generation and
+    # these two still reported findings. `switch-to-configuration switch` cannot change a
+    # running kernel's command line, so `/proc/cmdline` kept the old generation's parameters
+    # while `/run/current-system/kernel-params` carried the new ones.
+    #
+    # The report must distinguish this from compliant. A host that will be compliant after a
+    # reboot is not compliant now, and saying otherwise is the exact failure mode this
+    # baseline exists to prevent.
+    requiresReboot = {
+      "V-268092" = "adds audit=1 to the kernel command line; the running kernel keeps the parameters it booted with until the host reboots.";
+      "V-268093" = "adds audit_backlog_limit=8192 to the kernel command line; same reboot requirement as V-268092.";
+    };
 
     # Controls whose requirement cannot be observed by evaluating the configuration — runtime
     # state only. Each is proven instead by a VM test in ../tests/vm/deferred.nix, all seven

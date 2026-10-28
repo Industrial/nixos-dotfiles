@@ -55,6 +55,63 @@
       '';
     };
 
+    implemented = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [];
+      description = ''
+        The control ids this host actually carries, derived by each stig profile from its own
+        module import list rather than hand-maintained.
+
+        `lib/report.nix` reads this to know what to score. Keeping a second roster of 68 ids
+        by hand would drift from the imports, and the report would then claim controls the
+        host does not have — which is worse than no report.
+      '';
+    };
+
+    satisfiedExternally = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = {};
+      example = lib.literalExpression ''
+        {
+          "V-268144" = "Root filesystem sits inside a LUKS container; see hosts/*/disko.nix.";
+        }
+      '';
+      description = ''
+        Controls satisfied by something outside this module set, mapped to the evidence.
+
+        Not every requirement is a NixOS option. V-268144 ("protect the confidentiality and
+        integrity of all information at rest", CAT I) is decided by the disk layout: every
+        host's `hosts/<name>/disko.nix` puts the root filesystem inside a LUKS container, and
+        each `disko.assay.nix` asserts it. There is nothing for a control module to declare,
+        yet the requirement is genuinely met.
+
+        Without this, the report would call such a control "Not Implemented" — understating a
+        CAT I control that is in fact satisfied, which is as misleading as overstating one.
+        The value must cite checkable evidence (a file that asserts the property), not merely
+        claim the control is fine.
+      '';
+    };
+
+    requiresReboot = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = {};
+      example = lib.literalExpression ''
+        {
+          "V-268092" = "adds audit=1 to the kernel command line.";
+        }
+      '';
+      description = ''
+        Controls that are configured correctly but cannot take effect until the host reboots,
+        mapped to the reason.
+
+        Kernel command line parameters are the usual case: `switch-to-configuration switch`
+        activates a new generation without changing the running kernel's cmdline, so
+        /proc/cmdline keeps the booted generation's parameters. The report renders these as
+        "Configured (pending reboot)" — NOT compliant, because a host that will comply after a
+        reboot does not comply now.
+      '';
+    };
+
     deferredVerification = lib.mkOption {
       type = lib.types.attrsOf lib.types.str;
       default = {};
