@@ -4,3 +4,11 @@
 .deepsec/flake.nix
 **/Cargo.nix
 features/ai/hermes-agent/.hermes/skills/**/templates/**
+
+# Skill templates are example material, not configuration this repo evaluates — same
+# rationale as the hermes templates above.
+**/.claude/skills/**/templates/**
+
+# idAutomation is a git submodule with its own repository and its own test suite; files
+# inside it are not this repo's code to cover.
+features/games/wow-classic/Interface/AddOns/idAutomation/**
