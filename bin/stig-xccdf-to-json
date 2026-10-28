@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# Regenerate the machine-readable projection of the vendored Anduril NixOS STIG XCCDF.
+#
+# Nix has no XML parser and the module eval path must stay IFD-free, so the XCCDF is
+# projected to JSON here and committed next to it. The XML stays the audit source of truth;
+# this JSON is derived data, and features/security/stig/lib/parse-xccdf.nix asserts the
+# recorded sha256 so a stale or hand-edited projection fails eval.
+#
+# Usage: bin/stig-xccdf-to-json [--check]
+#   (no args)  rewrite the .controls.json projection
+#   --check    regenerate into a temp file and fail if it differs from the committed one
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+DATA="features/security/stig/data"
+XML="$DATA/Anduril_NixOS_STIG-V1R3.xccdf.xml"
+OUT="$DATA/Anduril_NixOS_STIG-V1R3.controls.json"
+
+MODE="write"
+if [ "${1:-}" = "--check" ]; then
+  MODE="check"
+elif [ $# -gt 0 ]; then
+  echo "stig-xccdf-to-json: unknown argument: $1" >&2
+  exit 2
+fi
+
+if [ ! -f "$XML" ]; then
+  echo "stig-xccdf-to-json: missing $XML" >&2
+  exit 1
+fi
+
+TARGET="$OUT"
+if [ "$MODE" = "check" ]; then
+  TARGET="$(mktemp)"
+  trap 'rm -f "$TARGET"' EXIT
+fi
+
+python3 - "$XML" "$TARGET" <<'PY'
+import hashlib
+import json
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+xml_path, out_path = sys.argv[1], sys.argv[2]
+NS = {"x": "http://checklists.nist.gov/xccdf/1.1"}
+
+raw = open(xml_path, "rb").read()
+source_sha256 = hashlib.sha256(raw).hexdigest()
+root = ET.fromstring(raw)
+
+
+def text(node):
+    return (node.text or "").strip() if node is not None else ""
+
+
+release_info = ""
+for pt in root.findall("x:plain-text", NS):
+    if pt.get("id") == "release-info":
+        release_info = text(pt)
+
+m = re.search(r"Release:\s*(\S+)\s+Benchmark Date:\s*(.+?)\s*$", release_info)
+if not m:
+    sys.exit(f"could not parse release-info: {release_info!r}")
+
+controls = {}
+for group in root.findall("x:Group", NS):
+    gid = group.get("id")
+    rule = group.find("x:Rule", NS)
+    if rule is None:
+        sys.exit(f"group {gid} has no Rule")
+
+    check = rule.find("x:check", NS)
+    ref = check.find("x:check-content-ref", NS) if check is not None else None
+
+    controls[gid] = {
+        "ruleId": rule.get("id"),
+        "ruleVersion": text(rule.find("x:version", NS)),
+        "severity": rule.get("severity"),
+        "title": text(rule.find("x:title", NS)),
+        "cci": sorted(
+            text(i)
+            for i in rule.findall("x:ident", NS)
+            if (i.get("system") or "").endswith("cci")
+        ),
+        "fixtext": text(rule.find("x:fixtext", NS)),
+        "checkContent": text(check.find("x:check-content", NS)) if check is not None else "",
+        # name="M" is DISA's marker for a manual check. Every rule in this STIG is manual —
+        # there is no OVAL content — so this must stay true for all 103.
+        "checkManual": ref is not None and ref.get("name") == "M",
+    }
+
+missing = sorted(k for k, v in controls.items() if not v["fixtext"] or not v["checkContent"])
+if missing:
+    sys.exit(f"controls missing fixtext or check content: {missing}")
+
+severities = {}
+for c in controls.values():
+    severities[c["severity"]] = severities.get(c["severity"], 0) + 1
+
+doc = {
+    "benchmark": {
+        "title": text(root.find("x:title", NS)),
+        "version": text(root.find("x:version", NS)),
+        "release": m.group(1),
+        "benchmarkDate": m.group(2),
+        "sourceFile": xml_path.rsplit("/", 1)[-1],
+        "sourceSha256": source_sha256,
+        "controlCount": len(controls),
+        "severityCounts": severities,
+        "allChecksManual": all(c["checkManual"] for c in controls.values()),
+    },
+    "controls": controls,
+}
+
+with open(out_path, "w") as fh:
+    json.dump(doc, fh, indent=2, sort_keys=True)
+    fh.write("\n")
+
+print(
+    f"{len(controls)} controls, severities {severities}, "
+    f"release {m.group(1)} ({m.group(2)}), all-manual={doc['benchmark']['allChecksManual']}"
+)
+PY
+
+if [ "$MODE" = "check" ]; then
+  if ! diff -q "$OUT" "$TARGET" >/dev/null 2>&1; then
+    echo "stig-xccdf-to-json: $OUT is stale — run bin/stig-xccdf-to-json" >&2
+    diff -u "$OUT" "$TARGET" | head -40 >&2 || true
+    exit 1
+  fi
+  echo "stig-xccdf-to-json: $OUT is current"
+fi

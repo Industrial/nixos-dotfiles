@@ -1,0 +1,1347 @@
+{
+  "benchmark": {
+    "allChecksManual": true,
+    "benchmarkDate": "30 Sep 2026",
+    "controlCount": 103,
+    "release": "3",
+    "severityCounts": {
+      "high": 11,
+      "low": 1,
+      "medium": 91
+    },
+    "sourceFile": "Anduril_NixOS_STIG-V1R3.xccdf.xml",
+    "sourceSha256": "722d29bd47377ef6272a24bcdfd2610d4b3c5facc0c050815de8ea74fb5c9dac",
+    "title": "Anduril NixOS Security Technical Implementation Guide",
+    "version": "1"
+  },
+  "controls": {
+    "V-268078": {
+      "cci": [
+        "CCI-000366",
+        "CCI-000382",
+        "CCI-002314",
+        "CCI-002322"
+      ],
+      "checkContent": "Verify NixOS has the network firewall enabled with the following command:\n\n$ sudo iptables -L | grep nixos-fw-log-refuse\n\nnixos-fw-log-refuse  all  --  anywhere             anywhere\n\nVerify the firewall panic tools are present:\n$ which firewall-panic\n/run/current-system/sw/bin/firewall-panic\n\n$ which firewall-panic-off\n/run/current-system/sw/bin/firewall-panic-off\n\nIf the \"nixos-fw-log-refuse  all  --  anywhere  anywhere\" firewall rule is not present and the firewall panic commands are not found, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Update the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix, to enforce firewall rules by adding the following configuration settings:\n\n networking.firewall.enable = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268078r1130947_rule",
+      "ruleVersion": "ANIX-00-000010",
+      "severity": "medium",
+      "title": "NixOS must enable the built-in firewall."
+    },
+    "V-268079": {
+      "cci": [
+        "CCI-000016",
+        "CCI-001682"
+      ],
+      "checkContent": "Verify that emergency or temporary accounts have been provisioned with an expiration date of 72 hours.\n\nFor every existing emergency or temporary account, run the following command to obtain its account expiration information.\n\n$ sudo chage -l system_account_name\n\nIf any emergency or temporary accounts have no expiration date set or do not expire within 72 hours, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the system to terminate emergency or temporary accounts after a 72-hour time period with the following command. Substitute \"system_account_name\" with the account to be created.\n\n$ sudo chage -E \"date -d \"+3 days\" +%Y-%m-%d\" system_account_name",
+      "ruleId": "SV-268079r1268212_rule",
+      "ruleVersion": "ANIX-00-000020",
+      "severity": "medium",
+      "title": "NixOS emergency or temporary user accounts must be provisioned with an expiration time of 72 hours or less."
+    },
+    "V-268080": {
+      "cci": [
+        "CCI-000018",
+        "CCI-001464",
+        "CCI-001858",
+        "CCI-001875",
+        "CCI-001876",
+        "CCI-001877",
+        "CCI-001878",
+        "CCI-001879",
+        "CCI-001880",
+        "CCI-001881",
+        "CCI-001882",
+        "CCI-001889"
+      ],
+      "checkContent": "Verify NixOS has the audit service configured with the following commands:\n\n$ systemctl is-active audit.service\nactive\n\n$ systemctl is-active auditd.service\nactive\n\nIf auditd and audit services are not active, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enable the audit service by updating the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.auditd.enable = true;\n security.audit.enable = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268080r1130951_rule",
+      "ruleVersion": "ANIX-00-000030",
+      "severity": "medium",
+      "title": "NixOS must enable the audit daemon."
+    },
+    "V-268081": {
+      "cci": [
+        "CCI-000044",
+        "CCI-000172",
+        "CCI-002238"
+      ],
+      "checkContent": "Verify that NixOS locks an account after three unsuccessful logon attempts within 15 minutes with the following commands:\n\n$ cat /etc/pam.d/login\n\nauth required pam_faillock.so preauth deny=3 even_deny_root fail_interval=900 unlock_time=0 dir=/var/log/faillock\n\nIf the \"fail_interval\" option is not set to \"900\" or less (but not \"0\") on the \"preauth\" lines with the \"pam_faillock\" module, or is missing from this line, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to lock an account when three unsuccessful logon attempts occur within 15 minutes. \n\nUpdate the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix, to include the following lines:\n\n security.pam.services = let pamfile = ''\n  auth required pam_faillock.so preauth silent audit deny=3 fail_interval=900 unlock_time=0\n  auth sufficient pam_unix.so nullok try_first_pass\n  auth [default=die] pam_faillock.so authfail audit deny=3 fail_interval=900 unlock_time=0\n  auth sufficient pam_faillock.so authsucc\n\n  account required pam_faillock.so\n '';\n in {\n  login.text = pkgs.lib.mkDefault pamfile;\n  sshd.text = pkgs.lib.mkDefault pamfile;\n };\n\nNote that the entire pam file must be entered as this pamfile string.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268081r1130954_rule",
+      "ruleVersion": "ANIX-00-000040",
+      "severity": "medium",
+      "title": "NixOS must enforce the limit of three consecutive invalid logon attempts by a user during a 15-minute time period."
+    },
+    "V-268082": {
+      "cci": [
+        "CCI-000048"
+      ],
+      "checkContent": "Verify that NixOS displays the Standard Mandatory DoW Notice and Consent Banner before granting access to the system via a command line user logon with the following command:\n\n$ tail -n+3 /etc/issue\n\n You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\n By using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n -The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n -At any time, the USG may inspect and seize data stored on this IS.\n\n -Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n -This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n -Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.\n\nIf the /etc/issue does not contain a banner, or the banner does not match the Standard Mandatory DoW Notice and Consent Banner, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to display the Standard Mandatory DoW Notice and Consent Banner before granting access to the system via a command line.\n\nUpdate the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.getty.helpLine = ''\n You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\n By using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n -The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n -At any time, the USG may inspect and seize data stored on this IS.\n\n -Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n -This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n -Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268082r1268215_rule",
+      "ruleVersion": "ANIX-00-000050",
+      "severity": "medium",
+      "title": "NixOS must be configured to display the Standard Mandatory DoW Notice and Consent Banner before granting local or remote access to the system via a command line user logon."
+    },
+    "V-268083": {
+      "cci": [
+        "CCI-000048"
+      ],
+      "checkContent": "Verify the operating system displays the Standard Mandatory DoW Notice and Consent Banner before granting access to the system via a ssh logon with the following commands:\n\n$ grep Banner /etc/ssh/sshd_config\n$ cat /nix/store/<hash>-ssh_banner\n\n You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\n By using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n -The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n -At any time, the USG may inspect and seize data stored on this IS.\n\n -Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n -This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n -Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.\n\nIf the \"Banner\" is not configured in the sshd_config, or the banner does not match the Standard Mandatory DoW Notice and Consent Banner, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to display the Standard Mandatory DoW Notice and Consent Banner before granting access to the system via openssh.\n\nUpdate the NixOS config, typically stored either in \"/etc/nixos/configuration.nix\" or \"/etc/nixos/flake.nix\":\n\nservices.openssh.banner = ''\n You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\n By using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n -The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n -At any time, the USG may inspect and seize data stored on this IS.\n\n -Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n -This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n -Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268083r1268215_rule",
+      "ruleVersion": "ANIX-00-000060",
+      "severity": "medium",
+      "title": "NixOS must be configured to display the Standard Mandatory DoW Notice and Consent Banner before granting local or remote access to the system via an SSH logon."
+    },
+    "V-268084": {
+      "cci": [
+        "CCI-000048",
+        "CCI-001384",
+        "CCI-001385",
+        "CCI-001386",
+        "CCI-001387",
+        "CCI-001388"
+      ],
+      "checkContent": "Verify NixOS displays the Standard Mandatory DoW Notice and Consent Banner before granting access to the system via the graphical user logon with the following command:\n\n$ DCONF_PROFILE=gdm dconf read \"/org/gnome/login-screen/banner-message-text\"\n\nYou are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only.\n\nBy using this IS (which includes any device attached to this IS), you consent to the following conditions:\n\n-The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\n\n-At any time, the USG may inspect and seize data stored on this IS.\n\n-Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\n\n-This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\n\n-Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.\n\nIf the dconf tool does not return a banner, or the banner does not match the Standard Mandatory DoW Notice and Consent Banner, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to display the Standard Mandatory DoW Notice and Consent Banner before granting access to the system via a graphical user logon.\n\nUpdate the NixOS config, typically stored either in \"/etc/nixos/configuration.nix\" or \"/etc/nixos/flake.nix\":\n\nservices.xserver.displayManager.gdm.banner = \"You are accessing a U.S. Government (USG) Information System (IS) that is provided for USG-authorized use only. By using this IS (which includes any device attached to this IS), you consent to the following conditions:\\n-The USG routinely intercepts and monitors communications on this IS for purposes including, but not limited to, penetration testing, COMSEC monitoring, network operations and defense, personnel misconduct (PM), law enforcement (LE), and counterintelligence (CI) investigations.\\n-At any time, the USG may inspect and seize data stored on this IS.\\n-Communications using, or data stored on, this IS are not private, are subject to routine monitoring, interception, and search, and may be disclosed or used for any USG-authorized purpose.\\n-This IS includes security measures (e.g., authentication and access controls) to protect USG interests--not for your personal benefit or privacy.\\n-Notwithstanding the above, using this IS does not constitute consent to PM, LE or CI investigative searching or monitoring of the content of privileged communications, or work product, related to personal representation or services by attorneys, psychotherapists, or clergy, and their assistants. Such communications and work product are private and confidential. See User Agreement for details.\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268084r1268215_rule",
+      "ruleVersion": "ANIX-00-000070",
+      "severity": "medium",
+      "title": "NixOS must be configured to display the Standard Mandatory DoW Notice and Consent Banner before granting local or remote access to the system via a graphical user logon."
+    },
+    "V-268085": {
+      "cci": [
+        "CCI-000054"
+      ],
+      "checkContent": "Verify NixOS limits the number of concurrent sessions to 10 for all accounts and/or account types.\n\nCheck the pam configuration files and confirm a conf file with maxlogins configured:\n\n$ grep \"limits.conf\" /etc/pam.d/login\n> session required /nix/store/sl3fa5zh61xxl03m64if2wqzbvrb6zly-linux-pam-1.6.1/lib/security/pam_limits.so conf=/nix/store/aq8ni1qh3pdygl9cn3qfb8v583ask67m-limits.conf # limits (order 12200)\n\n$ cat /nix/store/aq8ni1qh3pdygl9cn3qfb8v583ask67m-limits.conf\n\n* hard maxlogins 10\n@pipewire - rtprio 95\n@pipewire - nice -19\n@pipewire - memlock 4194304\n\nIf the \"maxlogins\" item is missing or commented out, or the value is set greater than \"10\" and is not documented with the information system security officer (ISSO) as an operational requirement, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to limit the number of concurrent sessions to 10 for all accounts and/or account types.\n\nUpdate the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.pam.loginLimits = [\n {\n  domain = \"*\";\n  item = \"maxlogins\";\n  type = \"hard\";\n  value = \"10\";\n }\n];\n\nNote: Security.pam.loginLimits can be set as a global domain (with the * wildcard) but may be set differently for multiple domains.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268085r1130966_rule",
+      "ruleVersion": "ANIX-00-000090",
+      "severity": "low",
+      "title": "NixOS must be configured to limit the number of concurrent sessions to 10 for all accounts and/or account types."
+    },
+    "V-268086": {
+      "cci": [
+        "CCI-000057"
+      ],
+      "checkContent": "Verify NixOS initiates a session lock after a 10-minute period of inactivity for graphical user logon with the following command: \n\n$ sudo gsettings get org.gnome.desktop.session idle-delay\n\nuint32 600\n\n$ grep \"IdleAction\" /etc/systemd/logind.conf\n\n IdleAction = lock\n IdleActionSec = 600\n\n$ systemctl --user status xautolock.service\n xautolock.service - xautolock service\n     Loaded: loaded (/etc/systemd/user/xautolock.service; enabled; preset: ignored)\n     Active: active (running) since Wed 2025-03-19 22:56:13 UTC; 6min ago\n Invocation: 836d5b6b79444c62aa3c5285e3c8d92e\n   Main PID: 3233 (xautolock)\n      Tasks: 1 (limit: 38062)\n     Memory: 712K (peak: 2.4M)\n        CPU: 75ms\n     CGroup: /user.slice/user-1000.slice/user@1000.service/app.slice/xautolock.service\n             +-3233 /nix/store/4chq53fkkiimbx1qzdbxxs44diiqgj54-xautolock-2.2-7-ga23dd5c/bin/xautolock -noclose -time 10 -locker \"/nix/store/w9qcpyhjrxsqrps91wkz8r4mqvg9zrxc-systemd-256.10/bin/loginctl lock-session\"\n\nMar 19 22:56:13 gcs-generic-5-3 systemd[3136]: Started xautolock service.\n\nIf \"idle-delay\" is set to \"0\" or a value greater than \"600\", this is a finding.\n\nIf \"IdleAction\" is not \"lock\" and \"IdleActionSec\" is not \"600\", this is a finding.\n\nIf the xautolock service is not present or the process line does not contain \"-time 10\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to initiate a session lock after a 10-minute period of inactivity for graphical user logon.\n\nUpdate the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n  programs.dconf.profiles.user.databases = with lib.gvariant; lib.mkBefore [\n   {\n     settings.\"org/gnome/desktop/session\".idle-delay = (mkUint32 600);\n     locks = [ \"org/gnome/desktop/session/idle-delay\" ];\n   }];\n services.logind.extraConfig = ''\n   IdleAction = lock\n   IdleActionSec = 600\n '';\n services.xserver = {\n   displayManager.gdm.wayland = true;\n   xautolock = {\n     enable = true;\n     time = 10;\n     locker = \"${lib.getExe' config.systemd.package \"loginctl\"} lock-session\";\n   };\n  };\n };\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268086r1130969_rule",
+      "ruleVersion": "ANIX-00-000110",
+      "severity": "medium",
+      "title": "NixOS must initiate a session lock after a 10-minute period of inactivity for graphical user logon."
+    },
+    "V-268087": {
+      "cci": [
+        "CCI-000056",
+        "CCI-000057",
+        "CCI-000060"
+      ],
+      "checkContent": "Verify the NixOS operating system has the \"vlock\" package installed by running the following command: \n\n$ which vlock\n/run/current-system/sw/bin/vlock\n\nIf the \"vlock\" package is not installed, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to have a package that allows user to lock session.\n\nUpdate the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n environment.systemPackages = [\n  pkgs.vlock\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268087r1130972_rule",
+      "ruleVersion": "ANIX-00-000120",
+      "severity": "medium",
+      "title": "NixOS must provide the capability for users to directly initiate a session lock for all connection types."
+    },
+    "V-268088": {
+      "cci": [
+        "CCI-000067"
+      ],
+      "checkContent": "Confirm the NixOS monitors remote access methods with the following command:\n\n$ grep \"LogLevel\" /etc/ssh/sshd_config\nLogLevel VERBOSE\n\nIf \"LogLevel\" does not equal \"VERBOSE\", is missing, or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to monitor remote access methods by adding the following configuration to the /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.openssh.logLevel = \"VERBOSE\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268088r1268219_rule",
+      "ruleVersion": "ANIX-00-000140",
+      "severity": "medium",
+      "title": "NixOS must monitor remote access methods."
+    },
+    "V-268089": {
+      "cci": [
+        "CCI-000068",
+        "CCI-001453",
+        "CCI-003123"
+      ],
+      "checkContent": "Verify NixOS is configured to only use ciphers employing FIPS 140-3 approved algorithms with the following command:\n\n$ grep Ciphers /etc/ssh/sshd_config\nCiphers aes256-ctr,aes192-ctr,aes128-ctr\n   \nIf the cipher entries in the \"sshd_config\" file have any ciphers other than \"aes256-ctr,aes192-ctr,aes128-ctr\", the order differs from the example above, or they are missing or commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to use only ciphers employing FIPS 140-3 approved algorithms.\n\nTo configure OpenSSH, add the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n services.openssh.setting.Ciphers = [\n  \"aes256-ctr\"\n  \"aes192-ctr\"\n  \"aes128-ctr\"   \n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268089r1268222_rule",
+      "ruleVersion": "ANIX-00-000150",
+      "severity": "high",
+      "title": "NixOS must implement DoW-approved encryption to protect the confidentiality of remote access sessions."
+    },
+    "V-268090": {
+      "cci": [
+        "CCI-000130",
+        "CCI-000131",
+        "CCI-000132",
+        "CCI-000133",
+        "CCI-000134",
+        "CCI-000135",
+        "CCI-000158",
+        "CCI-000159",
+        "CCI-000163",
+        "CCI-000164",
+        "CCI-001403",
+        "CCI-001404",
+        "CCI-001405",
+        "CCI-001487",
+        "CCI-002130",
+        "CCI-002234"
+      ],
+      "checkContent": "Verify that NixOS has the audit service installed with the following command:\n\n$ systemctl is-active audit\nactive\n\nIf the \"audit\" service is not active, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to have the audit service package.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n environment.systemPackages = [\n  audit\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268090r1130981_rule",
+      "ruleVersion": "ANIX-00-000160",
+      "severity": "medium",
+      "title": "The NixOS audit package must be installed."
+    },
+    "V-268091": {
+      "cci": [
+        "CCI-000135",
+        "CCI-000169",
+        "CCI-000172",
+        "CCI-002884",
+        "CCI-003938",
+        "CCI-004188"
+      ],
+      "checkContent": "Verify NixOS generates audit records for all execution of privileged functions with the following command:\n\n$ sudo auditctl -l | grep execve\n\n-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k execpriv\n-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -k execpriv\n-a always,exit -F arch=b32 -S execve -C gid!=egid -F egid=0 -k execpriv \n-a always,exit -F arch=b64 -S execve -C gid!=egid -F egid=0 -k execpriv \n\nIf the command does not return the example output, this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records for all execution of privileged functions.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k execpriv\"\n  \"-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -k execpriv\"\n  \"-a always,exit -F arch=b32 -S execve -C gid!=egid -F egid=0 -k execpriv \"\n  \"-a always,exit -F arch=b64 -S execve -C gid!=egid -F egid=0 -k execpriv \"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268091r1130983_rule",
+      "ruleVersion": "ANIX-00-000210",
+      "severity": "medium",
+      "title": "NixOS must generate audit records for all usage of privileged commands."
+    },
+    "V-268092": {
+      "cci": [
+        "CCI-000135"
+      ],
+      "checkContent": "Verify NixOS enables auditing of processes that start prior to the audit daemon with the following command:\n\n$ grep audit=1 /proc/cmdline\n\nBOOT_IMAGE=(hd0,msdos1)/nix/store/glc0midc78caq9sc7pzciymx4c3in7kn-linux-6.1.64/bzImage init=/nix/store/grl4baymr9q60mbcz3sidm4agckn3bx5-nixos-system-nixos-23.1.1.20231129.057f9ae/init audit=1 loglevel=4\n\nIf the \"audit\" entry does not equal \"1\" or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to audit processes that start prior to the audit daemon.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n boot.kernelParams = [\n  \"audit=1\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268092r1267998_rule",
+      "ruleVersion": "ANIX-00-000250",
+      "severity": "medium",
+      "title": "NixOS must enable auditing of processes that start prior to the audit daemon."
+    },
+    "V-268093": {
+      "cci": [
+        "CCI-000135",
+        "CCI-001849"
+      ],
+      "checkContent": "Verify NixOS allocates a sufficient audit_backlog_limit to capture processes that start prior to the audit daemon with the following command:\n\n$ sudo auditctl -s | grep backlog_limit\n\nbacklog_limit 8192 \n\nIf the \"backlog_limit\" entry does not equal \"8192\" or greater or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to allocate sufficient audit_backlog_limit to capture processes that start prior to the audit daemon.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n boot.kernelParams = [\n  \"audit_backlog_limit=8192\"\n ];\nsecurity.audit.backlogLimit = 8192;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268093r1130988_rule",
+      "ruleVersion": "ANIX-00-000260",
+      "severity": "medium",
+      "title": "NixOS must allocate an audit_backlog_limit of sufficient size to capture processes that start prior to the audit daemon."
+    },
+    "V-268094": {
+      "cci": [
+        "CCI-000135"
+      ],
+      "checkContent": "Verify NixOS generates an audit record for any successful/unsuccessful use of the \"mount\" syscall with the following command:\n\n$ sudo auditctl -l | grep -w \"\\-S mount\"\n\n-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=-1 -k privileged-mount\n-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=-1 -k privileged-mount\n\nIf the command does not return the example output, this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records for any successful/unsuccessful use of the \"mount\" syscall.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k privileged-mount\"\n  \"-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k privileged-mount\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268094r1130990_rule",
+      "ruleVersion": "ANIX-00-000270",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the mount syscall in NixOS must generate an audit record."
+    },
+    "V-268095": {
+      "cci": [
+        "CCI-000135"
+      ],
+      "checkContent": "Verify NixOS generates an audit record upon successful/unsuccessful attempts to use the \"rename\", \"unlink\", \"rmdir\", \"renameat\", and \"unlinkat\" system calls with the following command:\n\n$ sudo auditctl -l | grep -w 'rename\\|unlink\\|rmdir'\n\n-a always,exit -F arch=b32 -S rename,unlink,rmdir,renameat,unlinkat -F auid>=1000 -F auid!=-1 -k delete\n-a always,exit -F arch=b64 -S rename,unlink,rmdir,renameat,unlinkat -F auid>=1000 -F auid!=-1 -k delete\n\nIf the command does not return an audit rule for \"rename\", \"unlink\", \"rmdir\", \"renameat\", and \"unlinkat\", this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records for any successful/unsuccessful attempts to use the \"rename\", \"unlink\", \"rmdir\", \"renameat\", and \"unlinkat\" system calls.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S rename,unlink,rmdir,renameat,unlinkat -F auid>=1000 -F auid!=unset -k delete\"\n  \"-a always,exit -F arch=b64 -S rename,unlink,rmdir,renameat,unlinkat -F auid>=1000 -F auid!=unset -k delete\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268095r1130992_rule",
+      "ruleVersion": "ANIX-00-000280",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the rename, unlink, rmdir, renameat, and unlinkat system calls in NixOS must generate an audit record."
+    },
+    "V-268096": {
+      "cci": [
+        "CCI-000135",
+        "CCI-000172"
+      ],
+      "checkContent": "Verify NixOS generates an audit record upon successful/unsuccessful attempts to use the \"init_module\", \"finit_module\", and \"delete_module\" system calls.\n\nCheck the auditing rules currently loaded into the audit daemon with the following command:\n\n$ sudo auditctl -l | grep -w init_module\n\n-a always,exit -F arch=b32 -S init_module,finit_module,delete_module -F auid>=1000 -F auid!=-1 -k module_chng\n-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -F auid>=1000 -F auid!=-1 -k module_chng\n\nIf the command does not return an audit rule for \"init_module\", \"finit_module\", and \"delete_module\", this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure /etc/nixos/configuration.nix to log successful/unsuccessful attempts to use the \"init_module\", \"finit_module\", and \"delete_module\" system calls.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S init_module,finit_module,delete_module -F auid>=1000 -F auid!=unset -k module_chng\"\n  \"-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -F auid>=1000 -F auid!=unset -k module_chng\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268096r1130994_rule",
+      "ruleVersion": "ANIX-00-000290",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the init_module, finit_module, and delete_module system calls in NixOS must generate an audit record."
+    },
+    "V-268097": {
+      "cci": [
+        "CCI-000135"
+      ],
+      "checkContent": "Verify NixOS generates an audit record when successful/unsuccessful attempts to modify the cron configuration.\n\nCheck the auditing rules currently loaded into the audit daemon with the following command:\n\n$ sudo auditctl -l | grep -w cron\n\n-w /var/cron/tabs/ -p wa -k services\n-w /var/cron/cron.allow -p wa -k services\n-w /var/cron/cron.deny -p wa -k services\n\nIf the command does not return the example output, this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records when successful/unsuccessful attempts to modify the cron configuration occur.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-w /var/cron/tabs/ -p wa -k services\"\n  \"-w /var/cron/cron.allow -p wa -k services\"\n  \"-w /var/cron/cron.deny -p wa -k services\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268097r1130996_rule",
+      "ruleVersion": "ANIX-00-000300",
+      "severity": "medium",
+      "title": "NixOS must generate an audit record for successful/unsuccessful modifications to the cron configuration."
+    },
+    "V-268098": {
+      "cci": [
+        "CCI-000135",
+        "CCI-000172"
+      ],
+      "checkContent": "Verify NixOS generates an audit record upon unsuccessful attempts to use the \"truncate\", \"ftruncate\", \"creat\", \"open\", \"openat\", and \"open_by_handle_at\" system calls.\n\nCheck the auditing rules currently loaded into the audit daemon with the following command:\n\n$ sudo auditctl -l | grep 'open\\|truncate\\|creat'\n\n-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access\n-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access\n-a always,exit -F arch=b64 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=-1 -F key=access\n-a always,exit -F arch=b64 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=-1 -F key=access\n\nIf the command does not return an audit rule for \"truncate\", \"ftruncate\", \"creat\", \"open\", \"openat\", and \"open_by_handle_at\", this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records for any unsuccessful attempts to use the \"truncate\", \"ftruncate\", \"creat\", \"open\", \"openat\", and \"open_by_handle_at\" system calls.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=access\"\n  \"-a always,exit -F arch=b32 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=access\"\n  \"-a always,exit -F arch=b64 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EACCES -F auid>=1000 -F auid!=unset -F key=access\"\n  \"-a always,exit -F arch=b64 -S open,creat,truncate,ftruncate,openat,open_by_handle_at -F exit=-EPERM -F auid>=1000 -F auid!=unset -F key=access\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268098r1130998_rule",
+      "ruleVersion": "ANIX-00-000310",
+      "severity": "medium",
+      "title": "NixOS must generate an audit record for successful/unsuccessful uses of the truncate, ftruncate, creat, open, openat, and open_by_handle_at system calls."
+    },
+    "V-268099": {
+      "cci": [
+        "CCI-000135"
+      ],
+      "checkContent": "Verify NixOS generates an audit record upon attempts to use the \"chown\", \"fchown\", \"fchownat\", and \"lchown\" system calls.\n\nCheck the auditing rules currently loaded into the audit daemon with the following command:\n\n$ sudo auditctl -l | grep chown\n\n-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod\n-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=-1 -F key=perm_mod\n\nIf the command does not return an audit rule for \"chown\", \"fchown\", \"fchownat\", and \"lchown\", this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records for any attempts to use the \"chown\", \"fchown\", \"fchownat\", and \"lchown\" system calls.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod\"\n  \"-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268099r1131000_rule",
+      "ruleVersion": "ANIX-00-000360",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the chown, fchown, fchownat, and lchown system calls in NixOS must generate an audit record."
+    },
+    "V-268100": {
+      "cci": [
+        "CCI-000135",
+        "CCI-000172"
+      ],
+      "checkContent": "Verify NixOS generates an audit record upon attempts to use the \"chmod\", \"fchmod\", and \"fchmodat\" system calls.\n\nCheck the auditing rules currently loaded into the audit daemon with the following command:\n\n$ sudo auditctl -l | grep chmod\n\n-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -k perm_mod\n-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=-1 -k perm_mod\n\nIf the command does not return an audit rule for \"chmod\", \"fchmod\", and \"fchmodat, this is a finding.\n\nNote: The \"-k\" allows for specifying an arbitrary identifier. The string following \"-k\" does not need to match the example output above.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit records for any attempts to use the \"chmod\", \"fchmod\", and \"fchmodat\" system calls.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod\"\n  \"-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -k perm_mod\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268100r1131002_rule",
+      "ruleVersion": "ANIX-00-000380",
+      "severity": "medium",
+      "title": "Successful/unsuccessful uses of the chmod, fchmod, and fchmodat system calls in NixOS must generate an audit record."
+    },
+    "V-268101": {
+      "cci": [
+        "CCI-000139",
+        "CCI-001855"
+      ],
+      "checkContent": "Verify NixOS notifies the SA and ISSO (at a minimum) when allocated audit record storage volume reaches 75 percent of the repository maximum audit record storage capacity with the following command:\n\n$ sudo grep -w space_left_action /etc/audit/auditd.conf\n\nspace_left_action = syslog\n\nIf the \"space_left_action\" parameter is missing, commented out, or set to blanks, this is a finding.\n\nIf the \"space_left_action\" is set to \"syslog\", the system logs the event, but does not generate a notification, this is a finding.\n\nIf the \"space_left_action\" is set to \"exec\", the system executes a designated script. If this script does not inform the SA of the event, this is a finding.\n\nIf the \"space_left_action\" is set to \"email\" check the value of the \"action_mail_acct\" parameter with the following command:\n\n$ sudo grep action_mail_acct /etc/audit/auditd.conf\n\naction_mail_acct root@localhost\n\nThe \"action_mail_acct\" parameter, if missing, defaults to \"root\". If the \"action_mail_acct\" parameter is not set to the email address of the SA and/or ISSO, this is a finding. \n\nNote: If the email address of the SA is on a remote system, a mail package must be available.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to initiate an action to notify the SA and ISSO (at a minimum) when allocated audit record storage volume reaches 75 percent of the repository maximum audit record storage capacity.\n\nIf the space_left_action parameter is set to \"syslog\", make sure the event being logged generates a notification to the SA and ISSO.\n\nIf the space_left_action parameter is set to \"exec\", make sure the command being executed notifies the SA and ISSO.\n\nIf the space_left_action parameter is set to \"email\", set the action_mail_acct parameter to an email address for the SA and ISSO.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n  space_left_action = syslog\n\nFor example, an updated configuration of 'environment.etc.\"audit/auditd.conf\".text' would look like the following ('...' denoting that the 'environment.etc.\"audit/auditd.conf\".text' configuration may have other options configured):\n\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   ...\n   space_left_action = syslog\n   ...\n  ''\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268101r1131004_rule",
+      "ruleVersion": "ANIX-00-000400",
+      "severity": "medium",
+      "title": "NixOS must notify the system administrator (SA) and information system security officer (ISSO) (at a minimum) when allocated audit record storage volume reaches 75 percent utilization."
+    },
+    "V-268102": {
+      "cci": [
+        "CCI-000139"
+      ],
+      "checkContent": "Verify NixOS notifies the SA and ISSO (at a minimum) when allocated audit record storage volume reaches 90 percent of the repository maximum audit record storage capacity with the following command:\n\n$ sudo grep -w admin_space_left_action /etc/audit/auditd.conf\n\nadmin_space_left_action = syslog\n\nIf the \"admin_space_left_action\" parameter is missing, commented out, or set to blanks, this is a finding.\n\nIf the \"admin_space_left_action\" is set to \"syslog\", the system logs the event, but does not generate a notification, this is a finding.\n\nIf the \"admin_space_left_action\" is set to \"exec\", the system executes a designated script. If this script does not inform the SA of the event, this is a finding.\n\nIf the \"admin_space_left_action\" is set to \"email\" check the value of the \"action_mail_acct\" parameter with the following command:\n\n$ sudo grep action_mail_acct /etc/audit/auditd.conf\n\naction_mail_acct root@localhost\n\nThe \"action_mail_acct\" parameter, if missing, defaults to \"root\". If the \"action_mail_acct\" parameter is not set to the email address of the SA and/or ISSO, this is a finding. \n\nNote: If the email address of the SA is on a remote system, a mail package must be available.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to initiate an action to notify the SA and ISSO (at a minimum) when allocated audit record storage volume reaches 90 percent of the repository maximum audit record storage capacity.\n\nIf the space_left_action parameter is set to \"syslog\", make sure the event being logged generates a notification to the SA and ISSO.\n\nIf the space_left_action parameter is set to \"exec\", make sure the command being execute notifies the SA and ISSO.\n\nIf the space_left_action parameter is set to \"email\", set the action_mail_acct parameter to an email address for the SA and ISSO.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n  admin_space_left_action = syslog\n\nFor example, an updated configuration of 'environment.etc.\"audit/auditd.conf\".text' would look like the following ('...' denoting that the 'environment.etc.\"audit/auditd.conf\".text' configuration may have other options configured):\n\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   ...\n   admin_space_left_action = syslog\n   ...\n  \n ''\n];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268102r1131006_rule",
+      "ruleVersion": "ANIX-00-000410",
+      "severity": "medium",
+      "title": "NixOS must notify the system administrator (SA) and information system security officer (ISSO) (at a minimum) when allocated audit record storage volume reaches 90 percent utilization."
+    },
+    "V-268103": {
+      "cci": [
+        "CCI-000139"
+      ],
+      "checkContent": "Verify NixOS takes action when allocated audit record storage volume reaches 75 percent of the repository maximum audit record storage capacity with the following commands:\n\n$ sudo grep -w space_left /etc/audit/auditd.conf\n\nspace_left = 25%\n\nIf the value of the \"space_left\" keyword is not set to \"25%\" or if the line is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the operating system to initiate an action to notify the system administrator (SA) and information system security officer (ISSO) (at a minimum) when allocated audit record storage volume reaches 75 percent of the repository maximum audit record storage.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   space_left = 25%\n  ''\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268103r1131008_rule",
+      "ruleVersion": "ANIX-00-000420",
+      "severity": "medium",
+      "title": "NixOS must take action when allocated audit record storage volume reaches 75 percent of the repository maximum audit record storage capacity."
+    },
+    "V-268104": {
+      "cci": [
+        "CCI-000139"
+      ],
+      "checkContent": "Verify NixOS takes action when allocated audit record storage volume reaches 90 percent of the repository maximum audit record storage capacity with the following commands:\n\n$ sudo grep -w admin_space_left /etc/audit/auditd.conf\n\nadmin_space_left = 10%\n\nIf the value of the \"admin_space_left\" keyword is not set to \"10%\" or if the line is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the operating system to initiate an action to notify the system administrator (SA) and information system security officer (ISSO) (at a minimum) when allocated audit record storage volume reaches 90 percent of the repository maximum audit record storage capacity.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   admin_space_left = 10%\n  ''\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268104r1131010_rule",
+      "ruleVersion": "ANIX-00-000430",
+      "severity": "medium",
+      "title": "NixOS must take action when allocated audit record storage volume reaches 90 percent of the repository maximum audit record storage capacity."
+    },
+    "V-268105": {
+      "cci": [
+        "CCI-000140"
+      ],
+      "checkContent": "Verify NixOS takes the appropriate action when the audit storage volume is full. \n\nCheck that NixOS takes the appropriate action when the audit storage volume is full using the following command:\n\n$ sudo grep disk_full_action /etc/audit/auditd.conf\n\ndisk_full_action = HALT\n\nIf the value of the \"disk_full_action\" option is not \"SYSLOG\", \"SINGLE\", or \"HALT\", or the line is commented out, ask the system administrator (SA) to indicate how the system takes appropriate action when an audit storage volume is full. If there is no evidence of appropriate action, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to shut down by default upon audit failure (unless availability is an overriding concern).\n\nIf availability has been determined to be more important, and this decision is documented with the information system security officer (ISSO), configure the operating system to notify SA staff and information system security officer (ISSO) staff in the event of an audit processing failure by setting the \"disk_full_action\" to \"SYSLOG\".\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix: (depending on configuration, \"disk_full_action\" can be set to \"SYSLOG\" or \"SINGLE\")\n\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   disk_full_action = HALT\n  ''\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268105r1131012_rule",
+      "ruleVersion": "ANIX-00-000440",
+      "severity": "medium",
+      "title": "The NixOS audit system must take appropriate action when the audit storage volume is full."
+    },
+    "V-268106": {
+      "cci": [
+        "CCI-000140"
+      ],
+      "checkContent": "Verify NixOS takes the appropriate action when an audit processing failure occurs.\n\nCheck that NixOS takes the appropriate action when an audit processing failure occurs with the following command:\n\n$ sudo grep disk_error_action /etc/audit/auditd.conf\n\ndisk_error_action = HALT\n\nIf the value of the \"disk_error_action\" option is not \"SYSLOG\", \"SINGLE\", or \"HALT\", or the line is commented out, ask the system administrator (SA) to indicate how the system takes appropriate action when an audit process failure occurs. If there is no evidence of appropriate action, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to shut down by default upon audit failure (unless availability is an overriding concern).\n\nIf availability has been determined to be more important, and this decision is documented with the information system security officer (ISSO), configure the operating system to notify SA staff and ISSO staff in the event of an audit processing failure by setting the \"disk_error_action\" to \"SYSLOG\".\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix: (depending on configuration, \"disk_error_action\" can be set to \"SYSLOG\" or \"SINGLE\"):\n\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   disk_error_action = HALT\n  ''\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268106r1131014_rule",
+      "ruleVersion": "ANIX-00-000450",
+      "severity": "medium",
+      "title": "The NixOS audit system must take appropriate action when an audit processing failure occurs."
+    },
+    "V-268107": {
+      "cci": [
+        "CCI-000154",
+        "CCI-001665"
+      ],
+      "checkContent": "Verify that the systemd-journald service is running with the following command:\n\n$ systemctl status systemd-journald.service\n\n    systemd-journald.service - Journal Service\n     Loaded: loaded (/etc/systemd/system/systemd-journald.service; enabled; preset: ignored)\n    Drop-In: /nix/store/z8klzmxqgpmn8ganwrsqizy3qdxnirr8-system-units/systemd-journald.service.d\n             +-overrides.conf\n     Active: active (running) since Mon 2025-03-10 10:41:08 PDT; 1 day 2h ago\n\nIf the systemd-journald.service is not \"active\" and \"running\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the operating system to off-load audit logs.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n services.journald.audit = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268107r1131017_rule",
+      "ruleVersion": "ANIX-00-000460",
+      "severity": "medium",
+      "title": "NixOS must have the packages required for offloading audit logs installed and running."
+    },
+    "V-268108": {
+      "cci": [
+        "CCI-000154"
+      ],
+      "checkContent": "Verify the audit system off-loads audit records onto a different system or media from the system being audited.\n\nList the configured destinations with the following command:\n\n$ grep -i \"Url\" /etc/systemd/journal-upload.conf\"\n\nIf no URL is configured, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the operating system to off-load audit records onto a different system or media from the system being audited by specifying a remote destination in the systemd-journald configuration.\n\nOn the client, modify /etc/nixos/configuration.nix or /etc/nixos/flake.nix to include the following lines:\n\nservices.journald.upload = {\n  enable = true;\n  Upload = {\n     ServerKeyFile = $PATH_TO_CLIENT_PEM_SSL_KEY;\n     URL = $URL_OF_REMOTE_SERVER;\n     ServerCertificateFile = $PATH_TO_SSL_CERT;\n     TrustedCertificateFile = $PATH_TO_SERVER_CERT;\n   };\n  };\n}\n\nOn the server, modify /etc/nixos/configuration.nix or /etc/nixos/flake.nix to include the following lines:\nservices.journald.remote = {\n  enable = true;\n  listen = \"https\";\n  URL = $URL_OF_REMOTE_SERVER;\n  ServerKeyFile = $PATH_TO_SERVER_PEM_SSL_KEY;\n  ServerCertificateFile = $PATH_TO_SSL_CERT;\n  };\n};",
+      "ruleId": "SV-268108r1131020_rule",
+      "ruleVersion": "ANIX-00-000480",
+      "severity": "medium",
+      "title": "The NixOS audit records must be off-loaded onto a different system or storage media from the system being audited."
+    },
+    "V-268109": {
+      "cci": [
+        "CCI-000154",
+        "CCI-001851"
+      ],
+      "checkContent": "Verify the operating system authenticates the remote logging server for off-loading audit logs.\n\nList the configured destinations with the following command:\n\n$ grep -i \"TrustedCertificateFile\" /etc/systemd/journal-upload.conf\"\n\nIf no TrustedCertificateFile is configured or is set to \"all\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the operating system to authenticate the remote logging server for off-loading audit logs.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n  destination d_network {\n   syslog(\n    \"<remote-logging-server>\" port(<port>)\n    transport(tls)\n    tls(\n     cert-file(\"/var/syslog-ng/certs.d/certificate.crt\")\n     key-file(\"/var/syslog-ng/certs.d/certificate.key\")\n     ca-file(\"/var/syslog-ng/certs.d/cert-bundle.crt\")\n     peer-verify(yes)\n    )\n   );\n  };\n\n  log { source(s_local); destination(d_local); destination(d_network); };\n\nFor example, an updated configuration of 'services.rsyslogd.extraConfig' would look like the following in /etc/nixos/configuration.nix ('...' denoting that the 'services.rsyslogd.extraConfig' configuration may have other options configured):\n\n services.rsyslogd.extraConfig = ''\n   ...\n   destination d_network {\n    syslog(\n     \"<remote-logging-server>\" port(<port>)\n     transport(tls)\n     tls(\n      cert-file(\"/var/syslog-ng/certs.d/certificate.crt\")\n      key-file(\"/var/syslog-ng/certs.d/certificate.key\")\n      ca-file(\"/var/syslog-ng/certs.d/cert-bundle.crt\")\n      peer-verify(yes)\n     )\n    );\n   };\n\n   log { source(s_local); destination(d_local); destination(d_network); };\n   ...\n  '';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268109r1131023_rule",
+      "ruleVersion": "ANIX-00-000490",
+      "severity": "medium",
+      "title": "NixOS must authenticate the remote logging server for off-loading audit logs."
+    },
+    "V-268110": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001314"
+      ],
+      "checkContent": "Verify the audit daemon is configured to generate logs that are group-owned by root with the following command:\n\n$ sudo grep log_group /etc/audit/auditd.conf\n\nlog_group = root\n\nIf the audit daemon is not configured to generate logs that are group-owned by \"root\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit daemon to generate logs that are group-owned by root.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n environment.etc.\"audit/auditd.conf\".text = [\n  ''\n   log_group = root\n  ''\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268110r1131025_rule",
+      "ruleVersion": "ANIX-00-000520",
+      "severity": "medium",
+      "title": "NixOS audit daemon must generate logs that are group-owned by root."
+    },
+    "V-268111": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001314"
+      ],
+      "checkContent": "Verify the audit directory and logs are owned by \"root\". First, determine where the audit logs are stored with the following command:\n\n$ sudo grep log_file /etc/audit/auditd.conf\n\nlog_file = /var/log/audit/audit.log\n\nUsing the location of the audit log file (if not specified, the default location is \"/var/log/audit/audit.log\"), determine if the audit log is owned by \"root\" using the following command:\n\n$ sudo find /var/log/audit -exec stat -c \"%U %n\" {} \\;\n\nroot /var/log/audit\nroot /var/log/audit/audit.log\n\nIf the audit directory and logs are not owned by \"root\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit directory and logs to be protected from unauthorized read access, by setting the correct owner as \"root\".\n\nUsing the path of the directory containing the audit logs (if not specified, the default location is \"/var/log/audit/audit.log\"), configure the audit directory and log files to be owned by \"root\" by using the following command:\n\n$ sudo chown -R root /var/log/audit",
+      "ruleId": "SV-268111r1039221_rule",
+      "ruleVersion": "ANIX-00-000530",
+      "severity": "medium",
+      "title": "NixOS audit directory and logs must be owned by root to prevent unauthorized read access."
+    },
+    "V-268112": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001314"
+      ],
+      "checkContent": "Verify the audit directory and logs are group-owned by \"root\". First, determine where the audit logs are stored with the following command:\n\n$ sudo grep log_file /etc/audit/auditd.conf\n\nlog_file = /var/log/audit/audit.log\n\nUsing the location of the audit log file (if not specified, the default location is \"/var/log/audit/audit.log\"), determine if the audit log is group-owned by \"root\" using the following command:\n\n$ sudo find /var/log/audit -exec stat -c \"%G %n\" {} \\;\n\nroot /var/log/audit\nroot /var/log/audit/audit.log\n\nIf the audit directory and logs are not group-owned by \"root\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit directory and logs to be protected from unauthorized read access, by setting the correct group-owner as \"root\".\n\nUsing the path of the directory containing the audit logs (if not specified, the default location is \"/var/log/audit/audit.log\"), configure the audit directory and log files to be group-owned by \"root\" by using the following command:\n\n$ sudo chown -R :root /var/log/audit",
+      "ruleId": "SV-268112r1039224_rule",
+      "ruleVersion": "ANIX-00-000540",
+      "severity": "medium",
+      "title": "NixOS audit directory and logs must be group-owned by root to prevent unauthorized read access."
+    },
+    "V-268113": {
+      "cci": [
+        "CCI-000162"
+      ],
+      "checkContent": "Verify that the audit log directory has a mode of \"0700\" or less permissive.\n\nFirst, determine where the audit logs are stored with the following command:\n\n$ sudo grep log_file /etc/audit/auditd.conf\nlog_file = /var/log/audit/audit.log\n\nUsing the path of the directory containing the audit logs, check if the audit log directory has a mode of \"0700\" or less by using the following command:\n\n$ sudo find /var/log/audit -type d -exec stat -c \"%a %n\" {} \\;\n700 /var/log/audit\n\nIf the audit log directory (or any subfolders) has a mode more permissive than \"0700\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit log directory to have a mode of \"0700\" or less permissive.\n\nUsing the path of the directory containing the audit logs, configure the audit log directory to have a mode of \"0700\" or less permissive by using the following command:\n\n$ sudo chmod 0700 /var/log/audit",
+      "ruleId": "SV-268113r1039227_rule",
+      "ruleVersion": "ANIX-00-000550",
+      "severity": "medium",
+      "title": "NixOS audit log directory must have a mode of 0700 or less permissive."
+    },
+    "V-268114": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001314"
+      ],
+      "checkContent": "Verify that the audit log files have a mode of \"0600\" or less permissive.\n\nFirst, determine where the audit logs are stored with the following command:\n\n$ sudo grep log_file /etc/audit/auditd.conf\n\nlog_file = /var/log/audit/audit.log\n\nUsing the path of the directory containing the audit logs, check if the audit log files have a mode of \"0600\" or less by using the following command:\n\n$ sudo find /var/log/audit -type f -exec stat -c \"%a %n\" {} \\;\n\n600 /var/log/audit/audit.log\n\nIf the audit log files have a mode more permissive than \"0600\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Verify that the audit log files have a mode of \"0600\" or less permissive.\n\nUsing the path of the directory containing the audit logs, configure the audit log files have a mode of \"0600\" or less by using the following command:\n\n$ sudo chmod 0600 /var/log/audit/audit.log",
+      "ruleId": "SV-268114r1039230_rule",
+      "ruleVersion": "ANIX-00-000560",
+      "severity": "medium",
+      "title": "NixOS audit logs must have a mode of 0600 or less permissive."
+    },
+    "V-268115": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001314"
+      ],
+      "checkContent": "Verify the journald directories and logs are owned by \"root\" by executing the following command:\n\n$ sudo find /var/log/journal -printf \"%p %u\\n\"\n\n/var/log/journal root\n/var/log/journal/8960867736094c2089638a86c43fd755 root\n\nIf any occurrences of owner are not \"root\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "The systemd-journald logs are by design stored with root:systemd-journald owner and group respectively.\n\nIf any files are found with different ownership, run the following command to correct them:\n\n$ sudo chown -R root:systemd-journald /var/log/journald",
+      "ruleId": "SV-268115r1131028_rule",
+      "ruleVersion": "ANIX-00-000570",
+      "severity": "medium",
+      "title": "NixOS journald directory and logs must be owned by root to prevent unauthorized read access."
+    },
+    "V-268116": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001314"
+      ],
+      "checkContent": "Verify the journald directories and logs are group-owned by \"systemd-journald\" by executing the following command:\n\n$ sudo find /var/log/journal -not -group systemd-journal\n\nIf any directories or files are returned, this is a finding.",
+      "checkManual": true,
+      "fixtext": "The systemd-journald logs are by design stored with root:systemd-journald owner and group respectively.\n\nIf any files are found with different ownership, run the following command to correct them:\n\n$ sudo chown -R root:systemd-journald /var/log/journald",
+      "ruleId": "SV-268116r1131031_rule",
+      "ruleVersion": "ANIX-00-000580",
+      "severity": "medium",
+      "title": "NixOS journald directory and logs must be group-owned by systemd-journald to prevent unauthorized read access."
+    },
+    "V-268117": {
+      "cci": [
+        "CCI-000162"
+      ],
+      "checkContent": "Verify NixOS protects log information from unauthorized read access by implementing a mode of 2755 or less on the creation of log directories with the following command: \n\n$ sudo find /var/log/journal -type d -perm -2755 -not -perm 2755 -printf \"%p %m\\n\"\n\nIf any directories have a permission of greater than 2755, this is a finding.",
+      "checkManual": true,
+      "fixtext": "The systemd-journald directories are by design set to 2755 mode.\n\nIf any directories are found with incorrect perms, correct them with the following command:\n\n$ sudo find /var/log/journal -type d -exec chmod 2755 {} \\;",
+      "ruleId": "SV-268117r1131034_rule",
+      "ruleVersion": "ANIX-00-000590",
+      "severity": "medium",
+      "title": "NixOS systemd-journald directory must have a mode of 2755 or less permissive."
+    },
+    "V-268118": {
+      "cci": [
+        "CCI-000162",
+        "CCI-001312"
+      ],
+      "checkContent": "Verify NixOS protects log information from unauthorized read access by implementing a mode of 0640 or less on the creation of log files with the following command: \n\n$ sudo find /var/log/journal -type f -perm -640 -not -perm 640 -printf \"%p %m\\n\"\n\nIf any log files have a permission of greater than 0640, this is a finding.",
+      "checkManual": true,
+      "fixtext": "The systemd-journald files are by design set to 0640 mode.\n\nIf any files are found with incorrect perms, correct them with the following command:\n\n$ sudo find /var/log/journal -type f -exec chmod 0640 {} \\;",
+      "ruleId": "SV-268118r1131037_rule",
+      "ruleVersion": "ANIX-00-000600",
+      "severity": "medium",
+      "title": "NixOS systemd-journald logs must have a mode of 0640 or less permissive."
+    },
+    "V-268119": {
+      "cci": [
+        "CCI-000163",
+        "CCI-000164"
+      ],
+      "checkContent": "Verify the audit system prevents unauthorized changes to logon UIDs with the following command:\n\n$ sudo auditctl -s | grep -i immutable\n\nloginuid_immutable 1 locked\n\nIf the command does not return \"loginuid_immutable 1 locked\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to prevent unauthorized changes to logon UIDs.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"--loginuid-immutable\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268119r1131040_rule",
+      "ruleVersion": "ANIX-00-000610",
+      "severity": "medium",
+      "title": "NixOS audit system must protect logon UIDs from unauthorized change."
+    },
+    "V-268120": {
+      "cci": [
+        "CCI-000171"
+      ],
+      "checkContent": "Verify that the NixOS audit configuration and service files have a mode of 444 or less permissive with the following commands:\n\n$ sudo find -L /etc/audit -type f -exec stat -L -c \"%a %n\" {} \\;\n$ sudo find -L /etc/systemd/system -iname \"audit*\" -type f -exec stat -L -c \"%a %n\" {} \\;\n$ stat -c '%a %n' $(realpath /etc/systemd/system/audit*.service)\n\n444 /etc/audit/auditd.conf\n444 /etc/systemd/system/audit.service\n444 /etc/systemd/system/auditd.service\n444 /etc/systemd/system/basic.target.wants/audit.service\n444 /etc/systemd/system/sysinit.target.wants/audit.service\n444 /nix/store/dr3i90b3n1fb06fr1gw12jfg9wb8dkrc-unit-auditd.service/auditd.service\n444 /nix/store/dc6s6z7ykbmq70i5z8cff0agwsmp9jhm-unit-audit.service/audit.service\n\nIf the audit configuration files have a mode more permissive than 444, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS audit configuration and service files to have a mode of 444 or less permissive with the following command:\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268120r1131043_rule",
+      "ruleVersion": "ANIX-00-000660",
+      "severity": "medium",
+      "title": "NixOS audit configuration files must have a mode of 444 or less permissive."
+    },
+    "V-268121": {
+      "cci": [
+        "CCI-000171"
+      ],
+      "checkContent": "Verify that the NixOS audit configuration directories have a mode of \"755\" or less permissive with the following commands:\n\n$ sudo find -L /etc/audit -type d -exec stat -L -c \"%a %n\" {} \\;\n\n755 /etc/audit\n\nIf the audit configuration files have a mode more permissive than \"755\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Update the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix, to use a mode of 755 or less for directories under /etc/audit.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268121r1131046_rule",
+      "ruleVersion": "ANIX-00-000670",
+      "severity": "medium",
+      "title": "NixOS system configuration file directories must have a mode of \"0755\" or less permissive."
+    },
+    "V-268122": {
+      "cci": [
+        "CCI-000171"
+      ],
+      "checkContent": "Verify that the NixOS audit configuration files and directories are owned by root with the following command:\n\n$ sudo find /etc/audit -exec stat -L -c \"%U %n\" {} \\;\n$ sudo find /etc/systemd/system -follow -iname \"audit*service\" -exec stat -c \"%U %n\" {} \\;\n\nroot /etc/audit\nroot /etc/audit/auditd.conf\nroot /etc/systemd/system/audit.service\nroot /etc/systemd/system/auditd.service\nroot /etc/systemd/system/basic.target.wants/audit.service\nroot /etc/systemd/system/sysinit.target.wants/auditd.service\n\nIf the audit configuration files and directories are not owned by root, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Update the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix, to only use the root user for files under /etc/audit.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268122r1131049_rule",
+      "ruleVersion": "ANIX-00-000680",
+      "severity": "medium",
+      "title": "NixOS system configuration files and directories must be owned by root."
+    },
+    "V-268123": {
+      "cci": [
+        "CCI-000171"
+      ],
+      "checkContent": "Verify that the NixOS audit configuration files and directories are group-owned by root with the following commands:\n\n$ sudo find /etc/audit -exec stat -L -c \"%G %n\" {} \\;\n$ sudo find /etc/systemd/system -follow -iname \"audit*service\" -exec stat -c \"%G %n\" {} \\;\n\nroot /etc/audit\nroot /etc/audit/auditd.conf\nroot /etc/systemd/system/audit.service\nroot /etc/systemd/system/auditd.service\nroot /etc/systemd/system/basic.target.wants/audit.service\nroot /etc/systemd/system/sysinit.target.wants/auditd.service\n\nIf the system configuration files and directories are not group-owned by root or other privileged group (such as shadow), this is a finding.",
+      "checkManual": true,
+      "fixtext": "Update the NixOS config, typically stored either in /etc/nixos/configuration.nix or /etc/nixos/flake.nix, to only use the root group for files under /etc/audit.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268123r1131052_rule",
+      "ruleVersion": "ANIX-00-000690",
+      "severity": "medium",
+      "title": "NixOS system configuration files and directories must be group-owned by root."
+    },
+    "V-268124": {
+      "cci": [
+        "CCI-000185",
+        "CCI-002470",
+        "CCI-004909"
+      ],
+      "checkContent": "Verify NixOS only allows the use of DoW PKI-established certificate authorities by running the following:\n\n$ openssl x509 -text -in /etc/sssd/pki/sssd_auth_ca_db.pem\nCertificate:\nData:\nVersion: 3 (0x2)\nSerial Number: 1 (0x1)\nSignature Algorithm: sha256WithRSAEncryption\nIssuer: C = US, O = U.S. Government, OU = DoW, OU = PKI, CN = DOD Root CA 3\nValidity\nNot Before: Mar 20 18:46:41 2012 GMT\nNot After : Dec 30 18:46:41 2029 GMT\nSubject: C = US, O = U.S. Government, OU = DoW, OU = PKI, CN = DOD Root CA 3\nSubject Public Key Info:\nPublic Key Algorithm: rsaEncryption\n\nIf the root CA file is not a DoW-issued certificate with a valid date and installed in the /etc/sssd/pki/sssd_auth_ca_db.pem location, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to authenticate using DoW's root CA.\n\nAdd the following Nix code to the NixOS Configuration, usually located in \"/etc/nixos/configuration.nix\" or \"/etc/nixos/flake.nix\":\n\n services.sssd.enable = true;\n environment.etc.\"sssd/pki/sssd_auth_ca_db.pem\".source = let\n  certzip = pkgs.fetchzip {\n   url = \"https://dl.dod.cyber.mil/wp-content/uploads/pki-pke/zip/unclass-certificates_pkcs7_v5-6_DoW.zip\";\n   sha256 = \"sha256-iwwJRXCnONk/LFddQlwy8KX9e9kVXW/QWDnX5qZFZjc=\";\n  };\n in \"${certzip}/DoW_PKE_CA_chain.pem\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268124r1268001_rule",
+      "ruleVersion": "ANIX-00-000710",
+      "severity": "medium",
+      "title": "NixOS, for PKI-based authentication, must validate certificates by constructing a certification path (which includes status information) to an accepted trust anchor."
+    },
+    "V-268125": {
+      "cci": [
+        "CCI-000186"
+      ],
+      "checkContent": "Verify the SSH private key files have a passcode.\n\nFor each private key stored on the system, use the following command:\n\n$ sudo ssh-keygen -y -f /path/to/file\n\nIf the contents of the key are displayed, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Create new private/public key pairs that use a passcode using the following command:\n\n$ sudo ssh-keygen -n [passphrase]",
+      "ruleId": "SV-268125r1039263_rule",
+      "ruleVersion": "ANIX-00-000720",
+      "severity": "medium",
+      "title": "NixOS must enforce authorized access to the corresponding private key for PKI-based authentication."
+    },
+    "V-268126": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces password complexity by requiring at least one uppercase character with the following command:\n\n$ grep ucredit /etc/security/pwquality.conf\n\n ucredit=-1\n\nIf the value of \"ucredit\" is a positive number or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce password complexity. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\nucredit=-1\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268126r1131057_rule",
+      "ruleVersion": "ANIX-00-000730",
+      "severity": "medium",
+      "title": "NixOS must enforce password complexity by requiring that at least one uppercase character be used."
+    },
+    "V-268127": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces password complexity by requiring at least one lowercase character with the following command:\n\n$ grep lcredit /etc/security/pwquality.conf\n\n lcredit=-1\n\nIf the value of \"lcredit\" is a positive number or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce password complexity. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\nlcredit=-1\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268127r1131059_rule",
+      "ruleVersion": "ANIX-00-000740",
+      "severity": "medium",
+      "title": "NixOS must enforce password complexity by requiring that at least one lowercase character be used."
+    },
+    "V-268128": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces password complexity by requiring at least one numeric character with the following command:\n\n$ grep dcredit /etc/security/pwquality.conf\n\n dcredit=-1\n\nIf the value of \"dcredit\" is a positive number or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce password complexity. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\ndcredit=-1\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268128r1131061_rule",
+      "ruleVersion": "ANIX-00-000750",
+      "severity": "medium",
+      "title": "NixOS must enforce password complexity by requiring that at least one numeric character be used."
+    },
+    "V-268129": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces password complexity by requiring that at least 50 percent of the characters are changed with the following command:\n\n$ grep difok /etc/security/pwquality.conf\n\n difok=8\n\nIf the value of \"difok\" is set to less than \"8\", or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce password complexity. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\ndifok=8\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268129r1131063_rule",
+      "ruleVersion": "ANIX-00-000760",
+      "severity": "medium",
+      "title": "NixOS must require the change of at least 50 percent of the total number of characters when passwords are changed."
+    },
+    "V-268130": {
+      "cci": [
+        "CCI-004062"
+      ],
+      "checkContent": "Verify NixOS stores only encrypted representations of passwords with the following command: \n\n$ grep ENCRYPT_METHOD /etc/login.defs\n\nENCRYPT_METHOD SHA512\n\nIf \"ENCRYPT_METHOD\" does not equal SHA512 or greater, is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to store only encrypted representations of passwords. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.loginDefs.settings.ENCRYPT_METHOD = \"SHA512\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268130r1131065_rule",
+      "ruleVersion": "ANIX-00-000770",
+      "severity": "high",
+      "title": "NixOS must store only encrypted representations of passwords."
+    },
+    "V-268131": {
+      "cci": [
+        "CCI-000197"
+      ],
+      "checkContent": "Ensure the telnet package is not installed and available with the following command:\n\n$ whereis telnet\n\ntelnet:\n\nIf there is a path, and the output looks like \"telnet: /nix/store/sqiphymcpky1yysgdc1aj4lr9jg9n53a-inetutils-2.2/bin/telnet\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Edit the NixOS Configuration file /etc/nixos/configuration.nix or /etc/nixos/flake.nix and remove any references to pkgs.libtelnet, pkgs.busybox, or pkgs.inetutils from the environment.systemPackages list.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268131r1131067_rule",
+      "ruleVersion": "ANIX-00-000780",
+      "severity": "high",
+      "title": "NixOS must not have the telnet package installed."
+    },
+    "V-268132": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces 24 hours/one day as the minimum password lifetime with the following command: \n\n$ grep PASS_MIN_DAYS /etc/login.defs \n\nPASS_MIN_DAYS 1\n\nIf PASS_MIN_DAYS_1 is not present, is commented out, or is a value different from 1, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS operating system to enforce 24 hours/one day as the minimum password lifetime. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.loginDefs.settings.PASS_MIN_DAYS = \"1\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268132r1131069_rule",
+      "ruleVersion": "ANIX-00-000790",
+      "severity": "medium",
+      "title": "NixOS must enforce 24 hours/one day as the minimum password lifetime."
+    },
+    "V-268133": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces a 180-day maximum password lifetime for new user accounts by running the following command:\n\n$ grep PASS_MAX_DAYS /etc/login.defs\n\nPASS_MAX_DAYS 180\n\nIf the \"PASS_MAX_DAYS\" parameter value is less than 180 or commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS operating system to enforce a 180-day maximum password lifetime.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.loginDefs.settings.PASS_MAX_DAYS = \"180\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268133r1268211_rule",
+      "ruleVersion": "ANIX-00-000800",
+      "severity": "medium",
+      "title": "NixOS must enforce a 180-day maximum password lifetime restriction."
+    },
+    "V-268134": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces a minimum 15-character password length with the following command:\n\n$ grep minlen /etc/security/pwquality.conf\n\n minlen=15\n\nIf the value of \"minlen\" is set to less than \"15\", or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce password complexity. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\nminlen=15\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268134r1131073_rule",
+      "ruleVersion": "ANIX-00-000810",
+      "severity": "medium",
+      "title": "NixOS must enforce a minimum 15-character password length."
+    },
+    "V-268135": {
+      "cci": [
+        "CCI-000764",
+        "CCI-000804"
+      ],
+      "checkContent": "Verify the NixOS operating system contains no duplicate User IDs (UIDs) for interactive users with the following command: \n \n$ awk -F \":\" 'list[$3]++{print $1, $3}' /etc/passwd \n \nIf output is produced and the accounts listed are interactive user accounts, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the NixOS to uniquely identify and authenticate nonorganizational users by editing the file \"/etc/passwd\" and provide each interactive user account that has a duplicate UID with a unique UID.",
+      "ruleId": "SV-268135r1039293_rule",
+      "ruleVersion": "ANIX-00-000840",
+      "severity": "medium",
+      "title": "NixOS must uniquely identify and must authenticate organizational users (or processes acting on behalf of organizational users)."
+    },
+    "V-268136": {
+      "cci": [
+        "CCI-000765",
+        "CCI-000766"
+      ],
+      "checkContent": "Verify NixOS has the packages required for multifactor authentication installed with the following command:\n\n$ which p11sak\n\n/run/current-system/sw/bin/p11sak\n\nIf the \"p11sak\" program is not found in PATH, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to have a package that enforces multifactor authentication installed.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n environment.systemPackages = [\n  pkgs.opencryptoki\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268136r1268228_rule",
+      "ruleVersion": "ANIX-00-000850",
+      "severity": "medium",
+      "title": "NixOS must use multifactor authentication for network access to privileged accounts."
+    },
+    "V-268137": {
+      "cci": [
+        "CCI-004045"
+      ],
+      "checkContent": "Verify the NixOS configuration disallows directly logging into the root account via SSH with the following command:\n\n$ grep PermitRootLogin /etc/ssh/sshd_config\n\nPermitRootLogin no\n\nIf the value is anything other than \"no\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to ensure the root user login via SSH is disabled.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.openssh.permitRootLogin = \"no\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268137r1131078_rule",
+      "ruleVersion": "ANIX-00-000890",
+      "severity": "medium",
+      "title": "NixOS must not allow direct login to the root account via SSH."
+    },
+    "V-268138": {
+      "cci": [
+        "CCI-004045"
+      ],
+      "checkContent": "Verify the NixOS operating system prevents directly logging in to the root account with the following command:\n\n$ sudo passwd -S root\n\nroot L 01/02/1970 -1 -1 -1 -1\n\nIf the second field in the output is not \"L\" or \"NP\", then the root account is not locked and has a password configured, and this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to ensure the root user is locked.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nusers.mutableUsers = false;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268138r1131081_rule",
+      "ruleVersion": "ANIX-00-000900",
+      "severity": "medium",
+      "title": "NixOS must not allow direct login to the root account."
+    },
+    "V-268139": {
+      "cci": [
+        "CCI-000778",
+        "CCI-001958",
+        "CCI-003959"
+      ],
+      "checkContent": "Verify NixOS had enabled the use of the USBGuard with the following command:\n\n$ systemctl status usbguard\n\n usbguard.service - USBGuard daemon\nLoaded: loaded (/etc/systemd/system/usbguard.service; enabled; present: enabled)\nActive: active (running) since Sat 2022-06-04 02:51:43 UTC; 13min ago\n\nIf the usbguard.service is not \"active\" and \"running\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enable USBGuard and generate a USBGuard ruleset.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n services.usbguard.enable = true;\n\nRebuild the system configuration by running the following command:\n\n$ sudo nixos-rebuild switch\n\nAs root, generate a usbguard configuration. Using the \"usbguard\" command, use \"usbguard list-devices\" to list connected USB devices, \"usbguard block-device\" to block a device, and \"usbguard allow-device\" to allow a device. Note that the default behavior is to block devices.\n\nWhen all connected USB devices have been permitted, generate a ruleset by running the following command as root:\n\n# usbguard generate-policy\n\nEdit the NixOS config to add the policy:\n\n services.usbguard.rules = ''\n  allow id 1d6b:0001 serial \"0000:00:01.2\" name \"UHCI Host Controller\" hash \"FRDEjz7OhdJbNjmJ8zityiNX/LuO+ovKC07I0bOFjao=\" parent-hash \"9+Zsfvo9IR/AEQ/Fn4mzdoPGk0rqpjku6uErfS09K4c=\" with-interface 09:00:00 with-connect-type \"\"\n\n  allow id 0627:0001 serial \"28754-0000:00:01.2-1\" name \"QEMU USB Tablet\" hash \"5TyVK8wyL5GmiIbZV2Sf/ehIRMCP83miy4kOzG6O+2M=\" parent-hash \"FRDEjz7OhdJbNjmJ8zityiNX/LuO+ovKC07I0bOFjao=\" with-interface 03:00:00 with-connect-type \"unknown\"\n '';\n\nNote: This ruleset is only an example; generate a policy using the process described above.\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268139r1131083_rule",
+      "ruleVersion": "ANIX-00-000930",
+      "severity": "medium",
+      "title": "NixOS must enable USBguard."
+    },
+    "V-268140": {
+      "cci": [
+        "CCI-001090"
+      ],
+      "checkContent": "Verify NixOS is configured with the sticky bit on world-writable directories with the following command:\n\n$ sudo find / -type d \\( -perm -0002 -a ! -perm -1000 \\) -print 2>/dev/null\n\nIf any of the returned directories are world-writable and do not have the sticky bit set, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure all public directories to have the sticky bit set to prevent unauthorized and unintended information transferred via shared system resources. \n \nSet the sticky bit on all public directories using the following command, replacing \"[Public Directory]\" with any directory path missing the sticky bit: \n \n$ sudo chmod +t [Public Directory]",
+      "ruleId": "SV-268140r1268233_rule",
+      "ruleVersion": "ANIX-00-000970",
+      "severity": "medium",
+      "title": "A sticky bit must be set on all NixOS public directories to prevent unauthorized and unintended information transferred via shared system resources."
+    },
+    "V-268141": {
+      "cci": [
+        "CCI-001095"
+      ],
+      "checkContent": "Verify NixOS is configured to use IPv4 TCP syncookies with the following command:\n\n$ sudo sysctl net.ipv4.tcp_syncookies\n\nnet.ipv4.tcp_syncookies = 1\n\nIf the network parameter \"ipv4.tcp_syncookies\" is not equal to \"1\" or nothing is returned, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit service to use IPv4 TCP syncookies.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nboot.kernel.sysctl = { \n\"net.ipv4.tcp_syncookies\"=1;\n};\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268141r1131085_rule",
+      "ruleVersion": "ANIX-00-000980",
+      "severity": "medium",
+      "title": "NixOS must manage excess capacity, bandwidth, or other redundancy to limit the effects of information flooding types of denial-of-service (DoS) attacks."
+    },
+    "V-268142": {
+      "cci": [
+        "CCI-001133",
+        "CCI-002361",
+        "CCI-002891"
+      ],
+      "checkContent": "Verify that all network connections associated with SSH traffic are automatically terminated after 10 minutes of becoming unresponsive with the following command:\n\n$ grep -i clientaliveinterval /etc/ssh/sshd_config\n\nClientAliveInterval 600\n\nIf \"ClientAliveInterval\" does not have a value of \"600\" or less, is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to automatically terminate all network connections associated with SSH traffic after being unresponsive for 10 minutes. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.openssh.extraConfig = ''\n ClientAliveInterval 600\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268142r1131087_rule",
+      "ruleVersion": "ANIX-00-000990",
+      "severity": "medium",
+      "title": "NixOS must terminate all SSH connections after 10 minutes of becoming unresponsive."
+    },
+    "V-268143": {
+      "cci": [
+        "CCI-001133"
+      ],
+      "checkContent": "Verify that all network connections associated with SSH traffic are automatically terminated after becoming unresponsive with the following command:\n\n$ grep -i clientalivecount /etc/ssh/sshd_config\n\nClientAliveCountMax 1\n\nIf \"ClientAliveCountMax\" is not set to \"1\", is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to automatically terminate all network connections associated with SSH traffic after being unresponsive. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.openssh.extraConfig = ''\n ClientAliveCountMax 1\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268143r1131089_rule",
+      "ruleVersion": "ANIX-00-001000",
+      "severity": "medium",
+      "title": "NixOS must terminate all SSH connections after becoming unresponsive."
+    },
+    "V-268144": {
+      "cci": [
+        "CCI-001199",
+        "CCI-002475",
+        "CCI-002476",
+        "CCI-004910"
+      ],
+      "checkContent": "Verify NixOS prevents unauthorized disclosure or modification of all information requiring at-rest protection by using disk encryption. \n\nVerify all system partitions are encrypted with the following command:\n\n$ sudo blkid\n\n/dev/sda1: LABEL=\"nixos\" UUID=\"67b7d7fe-de60-6fd0-befb-e6748cf97743\" TYPE=\"crypto_LUKS\"\n\nEvery persistent disk partition present must be of type \"crypto_LUKS\". If any partitions other than the boot partition or pseudo file systems (such as /proc or /sys) are not type \"crypto_LUKS\", ask the administrator to indicate how the partitions are encrypted. If there is no evidence that these partitions are encrypted, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to prevent unauthorized modification of all information at rest by using disk encryption. \n\nEncrypting a partition in an already installed system is more difficult, because existing partitions will need to be resized and changed. To encrypt an entire partition, dedicate a partition for encryption in the partition layout.\n\nRefer to the NixOS manual Section 8.1 \"LUKS-Encrypted File Systems\" for further details.\n\nNixOS Wiki: https://nixos.wiki/wiki/Full_Disk_Encryption",
+      "ruleId": "SV-268144r1039320_rule",
+      "ruleVersion": "ANIX-00-001010",
+      "severity": "high",
+      "title": "NixOS must protect the confidentiality and integrity of all information at rest."
+    },
+    "V-268145": {
+      "cci": [
+        "CCI-004066"
+      ],
+      "checkContent": "Verify NixOS enforces the use of at least one special character in passwords with the following command:\n\n$ grep minlen /etc/security/pwquality.conf\n\n ocredit=-1\n\nIf the value of \"ocredit\" is a positive number or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce password complexity.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\nocredit=-1\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268145r1131091_rule",
+      "ruleVersion": "ANIX-00-001160",
+      "severity": "medium",
+      "title": "NixOS must enforce password complexity by requiring that at least one special character be used."
+    },
+    "V-268146": {
+      "cci": [
+        "CCI-001444",
+        "CCI-002418"
+      ],
+      "checkContent": "Verify NixOS disables wireless adapters by running the following command: \n\n$ grep -R networking.wireless /etc/nixos/\n\n /etc/nixos/configuratino.nix:networking.wireless.enable = false;\n\nIf \" networking.wireless.enable\", does not equal false, is missing, or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit service to disable wireless interfaces.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n networking.wireless.enable = false;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268146r1131093_rule",
+      "ruleVersion": "ANIX-00-001250",
+      "severity": "high",
+      "title": "NixOS must protect wireless access to and from the system using encryption."
+    },
+    "V-268147": {
+      "cci": [
+        "CCI-001443"
+      ],
+      "checkContent": "Verify NixOS disables Bluetooth adapters by running the following command: \n\n$ grep -R hardware.bluetooth /etc/nixos/\n\n/etc/nixos/configuration.nix:hardware.bluetooth.enable = false;\n\nIf \"hardware.bluetooth.enable\", does not equal false, is missing, or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit service to disable Bluetooth adapters.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n hardware.bluetooth.enable = false;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268147r1131095_rule",
+      "ruleVersion": "ANIX-00-001260",
+      "severity": "medium",
+      "title": "NixOS must protect wireless access to the system using authentication of users and/or devices."
+    },
+    "V-268148": {
+      "cci": [
+        "CCI-002233"
+      ],
+      "checkContent": "Verify NixOS audits and provides alerts of audit failures by running the following command: \n\n$grep A -15 security.auditd /etc/nixos/configuration.nix\n\n /etc/nixos/configuration.nix: \n\n security.auditd.enable = true;\n security.audit.enable = true;\n security.audit.rules = [\n  ''\n  <audit_rules>\n  ''\n ]; security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -k execpriv\"\n  \"-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k execpriv\"\n  \"-a always,exit -F arch=b32 -S execve -C gid!=egid -F egid=0 -k execpriv\"\n  \"-a always,exit -F arch=b64 -S execve -C gid!=egid -F egid=0 -k execpriv\"\n ];\n\nIf \"security.auditd\", \"security.audit\" and the additional modifications do not equal true, are missing, or are commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the audit service to produce audit records.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.auditd.enable = true;\n security.audit.enable = true;\n\nAdd the following audit rules:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S execve -C uid!=euid -F euid=0 -k execpriv\"\n  \"-a always,exit -F arch=b64 -S execve -C uid!=euid -F euid=0 -k execpriv\"\n  \"-a always,exit -F arch=b32 -S execve -C gid!=egid -F egid=0 -k execpriv\"\n  \"-a always,exit -F arch=b64 -S execve -C gid!=egid -F egid=0 -k execpriv\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268148r1131097_rule",
+      "ruleVersion": "ANIX-00-001280",
+      "severity": "medium",
+      "title": "NixOS must prevent all software from executing at higher privilege levels than users executing the software."
+    },
+    "V-268149": {
+      "cci": [
+        "CCI-001890",
+        "CCI-004922",
+        "CCI-004923"
+      ],
+      "checkContent": "Verify NixOS is configured with an approved time server with the following command:\n\n$ timedatectl show-timesync | grep NTPServers\n\nSystemNTPServers=tick.usnogps.navy.mil\nFallbackNTPServers=tock.usnogps.navy.mil\n\nIf the output of the command does not list authorized time servers, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to use approved timeservers.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n networking.timeServers = [\n  \"tick.usnogps.navy.mil\"\n  \"tock.usnogps.navy.mil\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268149r1268007_rule",
+      "ruleVersion": "ANIX-00-001420",
+      "severity": "medium",
+      "title": "NixOS must, for networked systems, compare internal information system clocks at least every 24 hours with a server which is synchronized to one of the redundant United States Naval Observatory (USNO) time servers, or a time server designated for the appropriate DoW network (NIPRNet/SIPRNet), and/or the Global Positioning System (GPS)."
+    },
+    "V-268150": {
+      "cci": [
+        "CCI-004926"
+      ],
+      "checkContent": "Verify NixOS synchronizes internal information system clocks to the authoritative time source when the time difference is greater than one second with the following command:\n\n$ grep -iR pollinterval /etc/nixos/\n\nservices.timesyncd.extraConfig = \"PollIntervalMaxSec=60\";\n\nIf \"PollIntervalMaxSec\" is greater than \"60\", is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to regularly synchronize the system clock.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.timesyncd.extraConfig = ''\nPollIntervalMaxSec=60\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268150r1131101_rule",
+      "ruleVersion": "ANIX-00-001430",
+      "severity": "medium",
+      "title": "NixOS must synchronize internal information system clocks to the authoritative time source when the time difference is greater than one second."
+    },
+    "V-268151": {
+      "cci": [
+        "CCI-004926"
+      ],
+      "checkContent": "Verify NixOS synchronizes internal information system clocks to the authoritative time source when the time difference is greater than one second with the following command:\n\n$ grep -iR timesyncd.enable /etc/nixos/\n\nservices.timesyncd.enable = true;\n\nIf \"services.timesyncd.enable\" is not set to \"true\", is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to regularly synchronize the system clock.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n services.timesyncd.enable = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268151r1131103_rule",
+      "ruleVersion": "ANIX-00-001440",
+      "severity": "medium",
+      "title": "NixOS must have time synchronization enabled."
+    },
+    "V-268152": {
+      "cci": [
+        "CCI-003980"
+      ],
+      "checkContent": "Verify NixOS prevents unauthorized users from using nix with the following command:\n\n$ grep -R allowed-users /etc/nixos/\n\n/etc/nixos/configuration.nix:nix.settings.allowed-users = [ \"root\" \"@wheel\" ];\n\nIf any other groups or users are included in \"nix.settings.allowed-users\" other than \"root\" and \"wheel\", or the configuration setting does not exist, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to prevent unauthorized users from using nix.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n nix.settings.allowed-users = [ \"root\" \"@wheel\" ];\n\nNote: Extra usergroups may be permitted by adding them with the format \"@group\" (e.g.: \"@users\").\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268152r1131105_rule",
+      "ruleVersion": "ANIX-00-001450",
+      "severity": "medium",
+      "title": "NixOS must prohibit user installation of system software without explicit privileged status."
+    },
+    "V-268153": {
+      "cci": [
+        "CCI-001744",
+        "CCI-002696",
+        "CCI-002699",
+        "CCI-002702"
+      ],
+      "checkContent": "Verify NixOS notifies if baseline configurations are changed with Advanced Intrusion Detection Environment with the following commands:\n\n$ systemctl is-active aide.service\n\nactive\n\nIf aide is not active and is not configured to alert on file system changes, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to notify when baseline configuration changes.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nnixpkgs.overlays = [\n  (final: prev: {\n    aide = prev.aide.overrideAttrs (old: {\n      configureFlags = (old.configureFlags or [ ]) ++ [ \"--sysconfdir=/etc\" ];\n     });\n  })\n];\n\nenvironment.systemPackages = [\n  pkgs.aide\n ];\nenvironment.etc = {\n    # Creates /etc/aide.conf\n    \"aide.conf\" = {\n      text = ''\n      <CONFIG_TEXT>\n      '';\n      mode = \"0444\";\n    };\n};\nservices.cron = {\n  enable = true;\n  systemCronJobs = [\n   \"00 0 * * 0\\troot\\taide -c /etc/aide.conf --check | /bin/mail -s \"aide integrity check run for ${config.networking.hostName}\" root@notareal.email\"\n  ];\n};\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268153r1131108_rule",
+      "ruleVersion": "ANIX-00-001460",
+      "severity": "medium",
+      "title": "NixOS must notify designated personnel if baseline configurations are changed in an unauthorized manner."
+    },
+    "V-268154": {
+      "cci": [
+        "CCI-003992"
+      ],
+      "checkContent": "Verify NixOS prevents installations that have not been digitally signed with the following command:\n \n$ grep -R require-sigs /etc/nix/nix.conf\n\nrequire-sigs = true\n\nIf \"require-sigs\" is not set to \"true\" or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to require signatures.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nnix.settings.require-sigs = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268154r1268241_rule",
+      "ruleVersion": "ANIX-00-001480",
+      "severity": "high",
+      "title": "NixOS must prevent the installation of patches, service packs, device drivers, or operating system components without verification they have been digitally signed using a certificate that is recognized and approved by the organization."
+    },
+    "V-268155": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify NixOS enforces reauthentication with sudo with the following command:\n\n$ sudo grep timestamp_timeout /etc/sudoers\n\n Defaults timestamp_timeout=0\n\nIf \"timestamp_timeout\" is greater than 0, is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce reauthentication with sudo.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.sudo.extraConfig = ''\nDefaults timestamp_timeout=0\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268155r1268251_rule",
+      "ruleVersion": "ANIX-00-001500",
+      "severity": "medium",
+      "title": "NixOS must require users to reauthenticate for privilege escalation."
+    },
+    "V-268156": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify NixOS requires users to reauthenticate when changing roles with the following command:\n\n$ grep -iR \"%wheel\" /etc/sudoers\n\n%wheel     ALL=(ALL:ALL)     SETENV:  ALL\n\nIf the returned line contains \"NOPASSWD\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to require reauthentication for sudo.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.sudo.wheelNeedsPassword = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268156r1268251_rule",
+      "ruleVersion": "ANIX-00-001510",
+      "severity": "medium",
+      "title": "NixOS must require users to reauthenticate when changing roles."
+    },
+    "V-268157": {
+      "cci": [
+        "CCI-002890"
+      ],
+      "checkContent": "Verify NixOS uses the following FIPS 140-3 approved MAC codes in openssh with the following command:\n\n$ grep Mac /etc/ssh/sshd_config\n\nMacs hmac-sha2-512  hmac-sha2-256\n\nIf \"Macs\" contains any ciphers other than \"hmac-sha2-512\" or \"hmac-sha2-256\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure /etc/nixos/configuration.nix to use the following FIPS 140-3 approved MAC codes in openssh.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n services.openssh.macs = [\n  \"hmac-sha2-512\"\n  \"hmac-sha2-256\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268157r1131119_rule",
+      "ruleVersion": "ANIX-00-001550",
+      "severity": "high",
+      "title": "NixOS must implement cryptographic mechanisms to protect the integrity of nonlocal maintenance and diagnostic communications, when used for nonlocal maintenance sessions."
+    },
+    "V-268158": {
+      "cci": [
+        "CCI-002385"
+      ],
+      "checkContent": "Verify NixOS firewall enforces rate limits using the hashlimit module.\n\n$ sudo iptables -L | grep limit\n\nnixos-fw-refuse tcp -- anywhere   anywhere   tcp dpt:ssh limit: above 1000000b/s mode srcip\nnixos-fw-refuse tcp -- anywhere   anywhere   tcp dpt:http limit: above 1000/min burst 5 mode srcip\nnixos-fw-refuse tcp -- anywhere   anywhere   tcp dpt:https limit: above 1000/min burst 5  mode srcip\n\nIf the command does not produce any rate limiting rules, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the NixOS firewall to enforce rate limits using the hashlimit module.\n\nFor example, to limit SSH to 1 MB/s and to limit HTTP to 1000 connections / minute per IP, add the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n networking.firewall.enable = true;\n networking.firewall.extraCommands = ''\n  ip46tables --append INPUT --protocol tcp --dport 22 --match hashlimit --hashlimit-name stig_byte_limit --hashlimit-mode srcip --hashlimit-above 1000000b/second --jump nixos-fw-refuse\n  ip46tables --append INPUT --protocol tcp --dport 80 --match hashlimit --hashlimit-name stig_conn_limit --hashlimit-mode srcip --hashlimit-above 1000/minute --jump nixos-fw-refuse\n  ip46tables --append INPUT --protocol tcp --dport 443 --match hashlimit --hashlimit-name stig_conn_limit --hashlimit-mode srcip --hashlimit-above 1000/minute --jump nixos-fw-refuse\n '';\n\nNote: NixOS provides the helper script \"ip46tables\" to add rules using both \"iptables\" and \"ip6tables\".\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268158r1131121_rule",
+      "ruleVersion": "ANIX-00-001610",
+      "severity": "medium",
+      "title": "NixOS must protect against or limit the effects of denial-of-service (DoS) attacks by ensuring the operating system is implementing rate-limiting measures on impacted network interfaces."
+    },
+    "V-268159": {
+      "cci": [
+        "CCI-001941",
+        "CCI-002418",
+        "CCI-002420",
+        "CCI-002421",
+        "CCI-002422"
+      ],
+      "checkContent": "Verify NixOS enables sshd for remote access with the following command:\n\n$ systemctl status sshd\n\n sshd.service - SSH daemon\nLoaded: loaded (/etc/systemd/system/sshd.service; enabled; present: enabled)\nActive: active (running) since Sat 2022-06-04 02:51:43 UTC; 13min ago\n\nIf the sshd.service is not \"active\" and \"running\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enable sshd for remote access.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.sshd.enable = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268159r1131124_rule",
+      "ruleVersion": "ANIX-00-001620",
+      "severity": "high",
+      "title": "NixOS must protect the confidentiality and integrity of transmitted information."
+    },
+    "V-268160": {
+      "cci": [
+        "CCI-001082",
+        "CCI-002824"
+      ],
+      "checkContent": "Verify NixOS prevents internal kernel addresses from being leaked with the following command:\n\n$ sudo sysctl kernel.kptr_restrict\n\n kernel.kptr_restrict = 1\n\nIf \"kernel.kptr_restrict\" does not have a value of \"1\" or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to prevent internal kernel addresses from being leaked.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n boot.kernel.sysctl = {\n\"kernel.kptr_restrict\" = 1;\n};\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268160r1131126_rule",
+      "ruleVersion": "ANIX-00-001660",
+      "severity": "medium",
+      "title": "NixOS must implement nonexecutable data to protect its memory from unauthorized code execution."
+    },
+    "V-268161": {
+      "cci": [
+        "CCI-002824"
+      ],
+      "checkContent": "Verify NixOS enables address space layout randomization with the following command:\n\n$ sudo sysctl kernel.randomize_va_space\n\nkernel.randomize_va_space = 2\n\nIf \"kernel.randomize_va_space\" does not have a value of \"2\" or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure /etc/nixos/configuration.nix to enable ASLR.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n boot.kernel.sysctl = {\n\"kernel.randomize_va_space\" = 2;\n};\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268161r1131128_rule",
+      "ruleVersion": "ANIX-00-001670",
+      "severity": "medium",
+      "title": "NixOS must implement address space layout randomization to protect its memory from unauthorized code execution."
+    },
+    "V-268163": {
+      "cci": [
+        "CCI-000135",
+        "CCI-000172"
+      ],
+      "checkContent": "Verify the NixOS generates audit records when successful/unsuccessful attempts to modify security objects occur with the following command:\n\n$ sudo auditctl -l | grep xattr\n\n-a always,exit -F arch=b32 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=-1 -k perm_mod\n-a always,exit -F arch=b32 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid=0 -k perm_mod\n-a always,exit -F arch=b64 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=-1 -k perm_mod\n-a always,exit -F arch=b64 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid=0 -k perm_mod\n\nIf the command does not return an audit rule for \"setxattr\", \"fsetxattr\", \"lsetxattr\", \"removexattr\", \"fremovexattr\", and \"lremovexattr\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to log attempts to modify security objects.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F arch=b32 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=-1 -k perm_mod\"\n  \"-a always,exit -F arch=b32 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid=0 -k perm_mod\"\n  \"-a always,exit -F arch=b64 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid>=1000 -F auid!=-1 -k perm_mod\"\n  \"-a always,exit -F arch=b64 -S setxattr,fsetxattr,lsetxattr,removexattr,fremovexattr,lremovexattr -F auid=0 -k perm_mod\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268163r1131131_rule",
+      "ruleVersion": "ANIX-00-001720",
+      "severity": "medium",
+      "title": "NixOS must generate audit records when successful/unsuccessful attempts to modify security objects occur."
+    },
+    "V-268164": {
+      "cci": [
+        "CCI-000172"
+      ],
+      "checkContent": "Verify NixOS generates audit records when attempts to delete privileges occur with the following command:\n\n$ sudo auditctl -l | grep usermod\n\n-a always,exit -S all -F path=/run/current-system/sw/bin/usermod -F perm=x -F auid>=1000 -F auid!=-1 -k privileged-usermod\n\nIf the command does not return an audit rule for \"usermod\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to record attempts to delete privileges.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F path=/run/current-system/sw/bin/usermod -F perm=x -F auid>=1000 -F auid!=unset -k privileged-usermod\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268164r1131133_rule",
+      "ruleVersion": "ANIX-00-001730",
+      "severity": "medium",
+      "title": "NixOS must generate audit records when successful/unsuccessful attempts to delete privileges occur."
+    },
+    "V-268165": {
+      "cci": [
+        "CCI-000172"
+      ],
+      "checkContent": "Verify that NixOS generates audit records when successful/unsuccessful attempts to delete security objects occur with the following command:\n\n $ sudo auditctl -l | grep /bin/ch\n\n-a always,exit -S all -F path=/run/current-system/sw/bin/chage -F perm=x -F auid>=1000 -F auid!=-1 -k privileged-chage\n-a always,exit -S all -F path=/run/current-system/sw/bin/chcon -F perm=x -F auid>=1000 -F auid!=-1 -k perm_mod\n\n\nIf the command does not return an audit rule for \"chage\" and \"chcon\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to audit attempts to delete security objects.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-a always,exit -F path=/run/current-system/sw/bin/chage -F perm=x -F auid>=1000 -F auid!=unset -k privileged-chage\"\n  \"-a always,exit -F path=/run/current-system/sw/bin/chcon -F perm=x -F auid>=1000 -F auid!=unset -k perm_mod\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268165r1131135_rule",
+      "ruleVersion": "ANIX-00-001740",
+      "severity": "medium",
+      "title": "NixOS must generate audit records when successful/unsuccessful attempts to delete security objects occur."
+    },
+    "V-268166": {
+      "cci": [
+        "CCI-000135",
+        "CCI-000172"
+      ],
+      "checkContent": "Verify NixOS is configured to generate audit records with the following command:\n\n$ sudo auditctl -l | grep -w lastlog\n\n-w /var/log/lastlog -p wa -k logins\n\nIf the command does not return a watch for the lastlog file, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit logs on account creations and modifications.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n   \"-w /var/log/lastlog -p wa -k logins\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268166r1131137_rule",
+      "ruleVersion": "ANIX-00-001790",
+      "severity": "medium",
+      "title": "NixOS must generate audit records when concurrent logons to the same account occur from different sources."
+    },
+    "V-268167": {
+      "cci": [
+        "CCI-000015",
+        "CCI-000135",
+        "CCI-000172"
+      ],
+      "checkContent": "Verify NixOS is configured to generate audit records on account events with the following command:\n\n$ sudo auditctl -l | grep /etc\n\n-w /etc/sudoers -p wa -k identity\n-w /etc/passwd -p wa -k identity\n-w /etc/shadow -p wa -k identity\n-w /etc/gshadow -p wa -k identity\n-w /etc/group -p wa -k identity\n-w /etc/security/opasswd -p wa -k identity\n\nIf the output from the command does not include the example output, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to generate audit logs on account creations and modifications.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.audit.rules = [\n  \"-w /etc/sudoers -p wa -k identity\"\n  \"-w /etc/passwd -p wa -k identity\"\n  \"-w /etc/shadow -p wa -k identity\"\n  \"-w /etc/gshadow -p wa -k identity\"\n  \"-w /etc/group -p wa -k identity\"\n  \"-w /etc/security/opasswd -p wa -k identity\"\n ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268167r1131139_rule",
+      "ruleVersion": "ANIX-00-001820",
+      "severity": "medium",
+      "title": "NixOS must generate audit records for all account creations, modifications, disabling, and termination events."
+    },
+    "V-268168": {
+      "cci": [
+        "CCI-002450"
+      ],
+      "checkContent": "Verify NixOS is configured to operate in FIPS mode with the following command:\n\n$ grep fips /proc/cmdline\n\nBOOT_IMAGE=(hd0,msdos1)/nix/store/glc0midc78caq9sc7pzciymx4c3in7kn-linux-6.1.64/bzImage init=/nix/store/grl4baymr9q60mbcz3sidm4agckn3bx5-nixos-system-nixos-23.1.1.20231129.057f9ae/init audit=1 audit_backlog_limit=8192 fips=1 loglevel=4\n\nIf the \"fips\" entry does not equal \"1\" or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to run in FIPS mode.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n boot.kernelParams = [ \"fips=1\" ];\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch\n\nA reboot is required for the changes to take effect.",
+      "ruleId": "SV-268168r1137699_rule",
+      "ruleVersion": "ANIX-00-001840",
+      "severity": "high",
+      "title": "NixOS must implement NIST FIPS-validated cryptography for the following: to provision digital signatures, to generate cryptographic hashes, and to protect unclassified information requiring confidentiality and cryptographic protection in accordance with applicable federal laws, Executive Orders, directives, policies, regulations, and standards."
+    },
+    "V-268169": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify NixOS prevents the use of dictionary words for passwords with the following command:\n\n$ grep dictcheck /etc/security/pwquality.conf\n\n dictcheck=1\n\nIf the value of \"ocredit\" is a positive number or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to check password change attempts against a dictionary.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nenvironment.etc.\"/security/pwquality.conf\".text = ''\ndictcheck=1\n'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268169r1131144_rule",
+      "ruleVersion": "ANIX-00-001860",
+      "severity": "medium",
+      "title": "NixOS must prevent the use of dictionary words for passwords."
+    },
+    "V-268170": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify NixOS prevents the use of dictionary words for passwords with the following command:\n\n$ grep -i pam_pwquality /etc/pam.d/passwd /etc/pam.d/chpasswd /etc/pam.d/sudo\n\n/etc/pam.d/passwd:password requisite /nix/store/db96zr26w71dzx0bzf47d88kw19fr0l7-libpwquality-1.4.5.-lib/lib/security/pam_pwquality.so\n/etc/pam.d/chpasswd:password requisite /nix/store/db96zr26w71dzx0bzf47d88kw19fr0l7-libpwquality-1.4.5.-lib/lib/security/pam_pwquality.so\n/etc/pam.d/sudo:password requisite /nix/store/db96zr26w71dzx0bzf47d88kw19fr0l7-libpwquality-1.4.5.-lib/lib/security/pam_pwquality.so\n\nIf the pam_pwquality.so module is not present in the passwd, chpasswd, and sudo pam files, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to check password change attempts against a dictionary.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.pam.services.passwd.text = pkgs.lib.mkDefault (pkgs.lib.mkBefore \"password requisite ${pkgs.libpwquality.lib}/lib/security/pam_pwquality.so\");\nsecurity.pam.services.chpasswd.text = pkgs.lib.mkDefault (pkgs.lib.mkBefore \"password requisite ${pkgs.libpwquality.lib}/lib/security/pam_pwquality.so\");\nsecurity.pam.services.sudo.text = pkgs.lib.mkDefault (pkgs.lib.mkBefore \"password requisite ${pkgs.libpwquality.lib}/lib/security/pam_pwquality.so\");\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268170r1268251_rule",
+      "ruleVersion": "ANIX-00-001861",
+      "severity": "medium",
+      "title": "NixOS must enable the use of pwquality."
+    },
+    "V-268171": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify NixOS enforces a four-second delay between logon attempts with the following command:\n \n$ grep -I delay /etc/login.defs\n\nFAIL_DELAY 4\n\nIf \"FAIL_DELAY\" is not set to \"4\" or greater, is commented out, or is missing, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to enforce a four-second delay between logon attempts.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.loginDefs.settings.\"FAIL_DELAY\" = \"4\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268171r1134782_rule",
+      "ruleVersion": "ANIX-00-001870",
+      "severity": "medium",
+      "title": "NixOS must enforce a delay of at least four seconds between logon prompts following a failed logon attempt."
+    },
+    "V-268172": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify NixOS does not allow an unattended or automatic logon to the system via the console with the following command:\n\n$ grep -iR autologon.user /etc/nixos\n\nIf \"services.xserver.displayManager.autologon.user\" is defined and is not \"null\", this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to not allow an unattended or automatic logon to the system via the console.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nservices.xserver.displayManager.autologon.user = null;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch\n\nA reboot is required for the changes to take effect.",
+      "ruleId": "SV-268172r1131152_rule",
+      "ruleVersion": "ANIX-00-001880",
+      "severity": "high",
+      "title": "NixOS must not allow an unattended or automatic logon to the system via the console."
+    },
+    "V-268173": {
+      "cci": [
+        "CCI-000366",
+        "CCI-001764"
+      ],
+      "checkContent": "Verify NixOS is configured to use AppArmor with the following command:\n\n$ sudo systemctl status apparmor.service\n\napparmor.service - Load AppArmor policies\n  Loaded: loaded (/etc/systemd/system/apparmor.service; enabled; present: enabled)\n  Active: active (running) since Sat 2022-06-04 02:51:43 UTC; 13min ago\n\n If the \"apparmor.service\" is not enabled and active, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to use AppArmor.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.apparmor.enable = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch\n\nA reboot is required for the changes to take effect.",
+      "ruleId": "SV-268173r1131154_rule",
+      "ruleVersion": "ANIX-00-001890",
+      "severity": "medium",
+      "title": "NixOS must be configured to use AppArmor."
+    },
+    "V-268174": {
+      "cci": [
+        "CCI-003627"
+      ],
+      "checkContent": "Verify NixOS disables account identifiers (individuals, groups, roles, and devices) after 35 days of inactivity with the following command:\n\n$ grep -i inactive /etc/default/useradd\n\n    INACTIVE=35\n\nIf INACTIVE is not set to 35 or less, or is missing or commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to disable inactive users.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nEnsure the lib functions are available:\n { config, lib, ... }:\n\n environment.etc.\"/default/useradd\".text = lib.mkForce\n   ''\n    INACTIVE=35\n   '';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268174r1131156_rule",
+      "ruleVersion": "ANIX-00-001930",
+      "severity": "medium",
+      "title": "NixOS must disable account identifiers (individuals, groups, roles, and devices) after 35 days of inactivity."
+    },
+    "V-268175": {
+      "cci": [
+        "CCI-000803"
+      ],
+      "checkContent": "Verify NixOS uses employs approved cryptographic hashing algorithms for all stored passwords with the following command:\n\n(Change <unique-username> to the desired user to verify.)\n\n$ sudo cat /etc/shadow | grep \"<unique-username>\" | cut -d'$' -f2\n\nIf the command does not return 6 for SHA512, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Lock all interactive user accounts not using SHA-512 hashing until the passwords can be regenerated with SHA-512.\n\n$ sudo usermod -L $USERNAME",
+      "ruleId": "SV-268175r1268232_rule",
+      "ruleVersion": "ANIX-00-001940",
+      "severity": "medium",
+      "title": "NixOS must employ approved cryptographic hashing algorithms for all stored passwords."
+    },
+    "V-268176": {
+      "cci": [
+        "CCI-000877"
+      ],
+      "checkContent": "Verify NixOS employs strong authentication in the establishment of nonlocal sessions with SSH by the following command:\n\n$ sudo /run/current-system/sw/bin/sshd -G | grep pam\n\nusepam yes\n\nIf usepam is not yes, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to use strong authentication when establishing nonlocal maintenance and diagnostic sessions.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nopenssh.settings.UsePAM = ''yes'';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268176r1131160_rule",
+      "ruleVersion": "ANIX-00-001960",
+      "severity": "high",
+      "title": "NixOS must employ strong authenticators in the establishment of nonlocal maintenance and diagnostic sessions."
+    },
+    "V-268177": {
+      "cci": [
+        "CCI-000187",
+        "CCI-001953",
+        "CCI-001954",
+        "CCI-004046",
+        "CCI-004047"
+      ],
+      "checkContent": "Verify NixOS provides authentication via the security and pam modules with the following command:\n\n$ cat /etc/nixos/configuration.nix | grep -A 1 security.pam.p11\n\nsecurity.pam.p11.enable = true;\n\nIf security.pam.p11.enable is not. \"true\", is not present or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to use strong authentication when establishing nonlocal maintenance and diagnostic sessions. \n \nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.pam.p11.enable = true;\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268177r1268242_rule",
+      "ruleVersion": "ANIX-00-002010",
+      "severity": "medium",
+      "title": "NixOS must implement multifactor authentication for remote access to privileged accounts in such a way that one of the factors is provided by a device separate from the system gaining access."
+    },
+    "V-268178": {
+      "cci": [
+        "CCI-002007"
+      ],
+      "checkContent": "Verify NixOS, for PKI-based authentication, only caches authenticators for one day with the following command:\n\n$ sudo grep expiration /etc/sssd/sssd.conf\n\noffline_credentials_expiration = 1\n\nIf the offline_credentials_expiration is not set to \"1\" or is commented out, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS to prohibit the use of cached credentials older than one day.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nNote: The entire sssd.conf must be entered in this option.\n\n services.sssd.config = ''\n  ...\n  [pam]\n  offline_credentials_expiration = 1\n  ...\n '';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268178r1131164_rule",
+      "ruleVersion": "ANIX-00-002050",
+      "severity": "medium",
+      "title": "NixOS must prohibit the use of cached authenticators after one day."
+    },
+    "V-268179": {
+      "cci": [
+        "CCI-004068"
+      ],
+      "checkContent": "Verify NixOS, for PKI-based authentication, uses local revocation data when unable to access the network to obtain it remotely with the following command:\n\n$ grep cert_policy /etc/pam_pkcs11/pam_pkcs11.conf\n\ncert_policy = ca,signature,ocsp_on, crl_auto;\n\nIf the cert_policy does not contain the options in the example output, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure NixOS, for PKI-based authentication, to use local revocation data when unable to access the network to obtain it remotely. \n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\n security.pam.p11.enable = true;\n environment.etc.\"pam_pkcs11/pam_pkcs11.conf\".text = ''\n    cert_policy = ca,signature,ocsp_on, crl_auto;\n   '';\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268179r1131166_rule",
+      "ruleVersion": "ANIX-00-002060",
+      "severity": "medium",
+      "title": "For PKI-based authentication, NixOS must implement a local cache of revocation data to support path discovery and validation in case of the inability to access revocation information via the network."
+    },
+    "V-268180": {
+      "cci": [
+        "CCI-002605"
+      ],
+      "checkContent": "Verify NixOS is running a supported version with the following command:\n\n$ nixos-version\n\n23.11.20231129.057f9ae  (Tapir)\n\nIf the NixOS is not running a supported version, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Update to a supported version of the operating system.",
+      "ruleId": "SV-268180r1149426_rule",
+      "ruleVersion": "ANIX-00-002160",
+      "severity": "medium",
+      "title": "NixOS must run a supported release of the operating system."
+    },
+    "V-268181": {
+      "cci": [
+        "CCI-000366"
+      ],
+      "checkContent": "Verify the NixOS operating system defines default file permissions so users may only modify their own files.\n\n$ grep \"UMASK\" /etc/login.defs\n\nUMASK 077\n\nIf the UMASK setting is not present, is commented out, or is less restrictive than 077, this is a finding.",
+      "checkManual": true,
+      "fixtext": "Configure the NixOS operating system to change default file permissions so users may only modify their own files.\n\nAdd the following Nix code to the NixOS Configuration, usually located in /etc/nixos/configuration.nix or /etc/nixos/flake.nix:\n\nsecurity.loginDefs.settings.UMASK = \"077\";\n\nRebuild and switch to the new NixOS configuration:\n$ sudo nixos-rebuild switch",
+      "ruleId": "SV-268181r1131169_rule",
+      "ruleVersion": "ANIX-00-002180",
+      "severity": "medium",
+      "title": "NixOS must define default permissions for all authenticated users in such a way that the user can only read and modify their own files."
+    }
+  }
+}

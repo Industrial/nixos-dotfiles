@@ -95,6 +95,10 @@
     ../features/security/veracrypt
     ../features/security/yubikey
 
+    # Anduril NixOS STIG V1R3 — the subset with no interactive cost.
+    # Classification: docs/security/stig-triage.md. Full baseline is VM-test only.
+    ../features/security/stig/profiles/base-safe.nix
+
     # Storage
     ../features/storage/qdirstat
 

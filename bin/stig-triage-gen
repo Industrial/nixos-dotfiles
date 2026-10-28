@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+"""Generate docs/security/stig-triage.md from the vendored projection + the hand classification.
+
+Rows, ids, severities and requirement text come from the projection (mechanical).
+class/target/note come from CLASSIFICATION below (hand-annotated, marked in the table).
+"""
+
+import json
+
+Z, D, N = "zero-cost", "disruptive", "n-a"
+BASE, FULL, EXCL = "base", "full", "excluded"
+
+# id -> (class, target, note). Hand-authored; every `disruptive` row must name the
+# concrete user-visible effect, every `n-a` row must carry a justification.
+CLASSIFICATION = {
+    # --- firewall / network ---
+    "V-268078": (Z, BASE, "`networking.firewall.enable = true` — already on via features/nixos/networking/firewall.nix"),
+    # Reclassified 2026-10-28 while implementing group 1: the fix text is not "firewall on",
+    # it is explicit hashlimit rules that REFUSE SSH traffic above 1 MB/s per source IP.
+    "V-268158": (D, FULL, "hashlimit rules refuse SSH above 1 MB/s per source IP — large scp/rsync transfers start getting dropped"),
+    # Reclassified 2026-10-28: the broad title says flooding/capacity, the fix and check are
+    # exactly `net.ipv4.tcp_syncookies = 1` and nothing else.
+    "V-268141": (Z, BASE, "`net.ipv4.tcp_syncookies = 1`; title says flooding/capacity, check tests only this sysctl"),
+    # --- accounts / policy ---
+    "V-268079": (N, EXCL, "No emergency or temporary accounts exist on any host. Justification must be re-asserted if one is ever created"),
+    "V-268180": (N, EXCL, "Procedural: satisfied by the flake's nixpkgs pin policy, not by a config option"),
+    # --- audit daemon + rules ---
+    "V-268080": (Z, BASE, "`security.auditd.enable` / `security.audit.enable`; cost is log volume only"),
+    "V-268090": (Z, BASE, "Installs the audit package"),
+    "V-268092": (Z, BASE, "`audit=1` kernel param so pre-daemon processes are captured"),
+    "V-268093": (Z, BASE, "`security.audit.backlogLimit = 8192`"),
+    "V-268091": (Z, BASE, "Audit rule: all privileged-command usage"),
+    "V-268094": (Z, BASE, "Audit rule: mount syscall"),
+    "V-268095": (Z, BASE, "Audit rule: rename/unlink/rmdir/renameat/unlinkat"),
+    "V-268096": (Z, BASE, "Audit rule: init_module/finit_module/delete_module"),
+    "V-268097": (Z, BASE, "Audit rule: cron configuration changes"),
+    "V-268098": (Z, BASE, "Audit rule: truncate/ftruncate/creat/open/openat/open_by_handle_at"),
+    "V-268099": (Z, BASE, "Audit rule: chown/fchown/fchownat/lchown"),
+    "V-268100": (Z, BASE, "Audit rule: chmod/fchmod/fchmodat"),
+    "V-268119": (Z, BASE, "Immutable loginuid"),
+    "V-268148": (Z, BASE, "Audit rule set covering privilege escalation"),
+    "V-268163": (Z, BASE, "Audit rule: security-object modification"),
+    "V-268164": (Z, BASE, "Audit rule: privilege deletion"),
+    "V-268165": (Z, BASE, "Audit rule: security-object deletion"),
+    "V-268166": (Z, BASE, "Audit rule: concurrent logons from different sources"),
+    "V-268167": (Z, BASE, "Audit rule: account create/modify/disable/terminate"),
+    "V-268103": (Z, BASE, "auditd `space_left_action` at 75%"),
+    "V-268104": (Z, BASE, "auditd `admin_space_left_action` at 90%"),
+    # Stays base-safe, but NOT at the fix text's value. The fix text says HALT, which powers
+    # the machine down when the audit volume fills — an unplanned shutdown mid-work. The CHECK
+    # text accepts "SYSLOG", "SINGLE", or "HALT", so SYSLOG is fully compliant and harmless.
+    "V-268105": (Z, BASE, "`disk_full_action = SYSLOG`; check accepts SYSLOG/SINGLE/HALT, so the fix text's HALT is avoidable"),
+    "V-268106": (Z, BASE, "`disk_error_action = SYSLOG`; check accepts SYSLOG/SINGLE/HALT, so the fix text's HALT is avoidable"),
+    # --- audit notification + offload (need site input) ---
+    "V-268101": (D, FULL, "Needs a real SA/ISSO mail destination; without one the 75% notification silently goes nowhere"),
+    "V-268102": (D, FULL, "Needs a real SA/ISSO mail destination for the 90% notification"),
+    "V-268107": (Z, BASE, "`services.journald.audit = true`"),
+    "V-268108": (D, FULL, "Requires a reachable remote journal endpoint plus client key/cert; journald upload fails loudly without them"),
+    "V-268109": (D, FULL, "Requires the remote logging server's CA; unauthenticated upload is a finding"),
+    # --- log file ownership and modes ---
+    "V-268110": (Z, BASE, "Audit logs group-owned by root"),
+    "V-268111": (Z, BASE, "Audit directory and logs owned by root"),
+    "V-268112": (Z, BASE, "Audit directory and logs group-owned by root"),
+    "V-268113": (Z, BASE, "Audit log directory mode 0700"),
+    "V-268114": (Z, BASE, "Audit logs mode 0600"),
+    "V-268115": (Z, BASE, "journald directory and logs owned by root"),
+    "V-268116": (Z, BASE, "journald logs group-owned by systemd-journald"),
+    "V-268117": (Z, BASE, "systemd-journald directory mode 2755"),
+    "V-268118": (Z, BASE, "systemd-journald logs mode 0640"),
+    "V-268120": (Z, BASE, "Audit config files mode 0444"),
+    "V-268121": (Z, BASE, "System config directories mode 0755"),
+    "V-268122": (Z, BASE, "System config files and directories owned by root"),
+    "V-268123": (Z, BASE, "System config files and directories group-owned by root"),
+    "V-268140": (Z, BASE, "Sticky bit on world-writable directories"),
+    # --- banners ---
+    "V-268082": (D, FULL, "Prints the full DoW consent banner before every console/CLI login"),
+    "V-268083": (D, FULL, "Prints the full DoW consent banner before every SSH login — hits fleet automation and scripted ssh"),
+    "V-268084": (D, FULL, "Prints the full DoW consent banner on the graphical greeter"),
+    # --- session lock / lockout ---
+    "V-268081": (D, FULL, "Three failed logons in 15 minutes locks the account — a mistyped password can lock you out of your own desktop"),
+    "V-268085": (Z, BASE, "`maxlogins` hard limit of 10; never reached in normal desktop use"),
+    "V-268086": (D, FULL, "Forces a 10-minute idle screen lock via dconf, and the fix text assumes GDM/GNOME — this repo runs Hyprland"),
+    "V-268087": (Z, BASE, "Only requires that a user-initiated lock exists"),
+    "V-268171": (Z, BASE, "`FAIL_DELAY = 4` — four-second pause after a failed logon"),
+    "V-268172": (D, FULL, "Disables autologin entirely; any host relying on greeter autologin starts requiring a password"),
+    "V-268174": (D, FULL, "Disables accounts after 35 days of inactivity — a seldom-used host locks its own account out"),
+    # --- ssh / transport crypto ---
+    "V-268088": (Z, BASE, "`services.openssh.logLevel = \"VERBOSE\"`"),
+    "V-268089": (Z, BASE, "Restricts SSH ciphers/MACs/KEX to the approved set; modern clients unaffected"),
+    "V-268137": (Z, BASE, "`services.openssh.permitRootLogin = \"no\"`"),
+    "V-268142": (Z, BASE, "ClientAliveInterval/CountMax so dead SSH sessions close after 10 minutes"),
+    "V-268143": (Z, BASE, "Terminates unresponsive SSH connections"),
+    "V-268157": (Z, BASE, "Approved crypto for remote maintenance sessions — same SSH crypto surface"),
+    "V-268159": (Z, BASE, "`services.sshd.enable` with approved transport crypto"),
+    "V-268176": (Z, BASE, "`openssh.settings.UsePAM = yes`"),
+    # --- password policy ---
+    "V-268126": (Z, BASE, "pwquality: at least one uppercase character; affects future password changes only"),
+    "V-268127": (Z, BASE, "pwquality: at least one lowercase character"),
+    "V-268128": (Z, BASE, "pwquality: at least one digit"),
+    "V-268145": (Z, BASE, "pwquality: at least one special character"),
+    "V-268169": (Z, BASE, "pwquality: reject dictionary words"),
+    # Reclassified 2026-10-28 while implementing: this is the one control in the password
+    # group that edits the PAM stack (pam_pwquality into passwd, chpasswd and sudo). A wrong
+    # PAM line breaks password changes, and the fix text's form assigns .text with mkBefore,
+    # which replaces rather than appends. Needs VM-test proof before it touches a daily driver.
+    # The six pwquality.conf settings stay in base-safe — their checks grep the file, not PAM.
+    "V-268170": (D, FULL, "wires pam_pwquality into the passwd/chpasswd/sudo PAM stacks — a bad PAM line breaks password changes, so this needs VM proof first"),
+    "V-268129": (Z, BASE, "Requires 50% of characters to change on password change"),
+    "V-268130": (Z, BASE, "`ENCRYPT_METHOD = SHA512` — already the NixOS default"),
+    "V-268175": (Z, BASE, "Approved hashing for stored passwords; same SHA512 surface"),
+    "V-268132": (D, FULL, "`PASS_MIN_DAYS = 1` blocks changing a password twice in one day — breaks the fix-a-typo-immediately workflow"),
+    "V-268133": (D, FULL, "`PASS_MAX_DAYS = 180` forces password expiry every 180 days on a personal machine"),
+    "V-268134": (D, FULL, "15-character minimum invalidates any shorter existing password at next change"),
+    "V-268178": (D, FULL, "Cached authenticators expire after one day — offline/suspended-laptop logins start failing"),
+    # --- root / sudo / users ---
+    "V-268138": (D, FULL, "`users.mutableUsers = false` — passwords must be declared in Nix; `passwd` stops working"),
+    "V-268155": (D, FULL, "Reauthentication required for privilege escalation; any NOPASSWD sudo rule has to go"),
+    # Reclassified 2026-10-28: evaluated drakkar and security.sudo.wheelNeedsPassword is
+    # already true on the fleet, so requiring it costs nothing.
+    "V-268156": (Z, BASE, "`security.sudo.wheelNeedsPassword = true` — already the evaluated value on all four hosts"),
+    # --- device / radio control ---
+    "V-268139": (D, FULL, "`services.usbguard.enable` blocks unknown USB devices until authorised — new keyboards, drives and YubiKeys are dead on insert"),
+    "V-268146": (D, FULL, "`networking.wireless.enable = false` disables Wi-Fi outright"),
+    "V-268147": (D, FULL, "`hardware.bluetooth.enable = false` kills Bluetooth audio and peripherals; conflicts with features/nixos/bluetooth"),
+    # --- PKI / MFA / directory (need infrastructure) ---
+    "V-268124": (D, FULL, "`services.sssd.enable` plus a trust anchor — requires directory infrastructure this fleet does not have"),
+    "V-268125": (D, FULL, "Private-key access enforcement for PKI auth; depends on the same PKI"),
+    "V-268135": (D, FULL, "Unique identification and authentication of organizational users — requires an identity source"),
+    "V-268136": (D, FULL, "MFA for network access to privileged accounts; features/security/yubikey is the plausible basis"),
+    "V-268177": (D, FULL, "`security.pam.p11.enable` — separate-device MFA for remote privileged access"),
+    "V-268179": (D, FULL, "Local CRL/OCSP cache for PKI path validation; needs the PKI first"),
+    # --- kernel / memory / crypto ---
+    "V-268160": (Z, BASE, "Non-executable data (NX/DEP)"),
+    "V-268161": (Z, BASE, "ASLR via `kernel.randomize_va_space = 2`"),
+    "V-268168": (D, FULL, "`boot.kernelParams = [ \"fips=1\" ]` — FIPS mode on NixOS is partial and breaks common crypto paths; highest-risk control in the set"),
+    "V-268144": (D, FULL, "Encryption at rest — depends on each host's disko layout; drakkar/huginn/mimir/muninn must be audited individually"),
+    # --- supply chain / software installation ---
+    "V-268152": (D, FULL, "`nix.settings.allowed-users = [ \"root\" \"@wheel\" ]` — any non-wheel user loses the nix daemon"),
+    "V-268154": (Z, BASE, "`nix.settings.require-sigs = true` — already the nixpkgs default"),
+    "V-268153": (D, FULL, "Notification on unauthorised baseline change; needs a destination and conflicts with comin's own change flow"),
+    # --- misc ---
+    "V-268131": (Z, BASE, "telnet package absent — nothing in this repo installs it"),
+    "V-268173": (Z, BASE, "`security.apparmor.enable` — already on via features/security/apparmor"),
+    # Reclassified 2026-10-28: the fix text pins networking.timeServers to
+    # tick.usnogps.navy.mil / tock.usnogps.navy.mil — DoD-network hosts that are unreachable
+    # from a home connection. Applying it would leave the fleet with no working time source,
+    # which breaks time sync rather than securing it.
+    "V-268149": (D, FULL, "pins timeServers to unreachable DoD hosts (tick/tock.usnogps.navy.mil) — the 24h-comparison requirement itself is met by V-268150 + V-268151; only the DoD server list is inapplicable here"),
+    "V-268150": (Z, BASE, "Step the clock when drift exceeds one second"),
+    "V-268151": (Z, BASE, "`services.timesyncd.enable = true`"),
+    "V-268181": (Z, BASE, "`UMASK = 077` — new files default to owner-only; shared-group workflows would notice, this fleet has none"),
+}
+
+SEV = {"high": "CAT I", "medium": "CAT II", "low": "CAT III"}
+
+d = json.load(open("features/security/stig/data/Anduril_NixOS_STIG-V1R3.controls.json"))
+bm = d["benchmark"]
+controls = d["controls"]
+
+unknown = sorted(set(CLASSIFICATION) - set(controls))
+unclassified = sorted(set(controls) - set(CLASSIFICATION))
+if unknown or unclassified:
+    raise SystemExit(f"classification drift: unknown={unknown} unclassified={unclassified}")
+
+counts = {"zero-cost": 0, "disruptive": 0, "n-a": 0}
+targets = {"base": 0, "full": 0, "excluded": 0}
+for cls, tgt, _ in CLASSIFICATION.values():
+    counts[cls] += 1
+    targets[tgt] += 1
+
+lines = [
+    "# Anduril NixOS STIG — control triage",
+    "",
+    f"{bm['title']} **V{bm['version']}R{bm['release']}** ({bm['benchmarkDate']}) — "
+    f"{bm['controlCount']} controls, {bm['severityCounts']['high']} CAT I / "
+    f"{bm['severityCounts']['medium']} CAT II / {bm['severityCounts']['low']} CAT III.",
+    "",
+    "Generated by `bin/stig-triage-gen` from",
+    "`features/security/stig/data/Anduril_NixOS_STIG-V1R3.controls.json`. Id, severity and",
+    "requirement text are mechanical. **Class, target and note are hand-annotated and are a",
+    "review proposal, not verified ground truth** — the `disruptive` judgements in particular",
+    "are read off each control's fix text, not from having applied it to a host.",
+    "",
+    "## Taxonomy",
+    "",
+    "| Class | Meaning | Target |",
+    "|---|---|---|",
+    "| `zero-cost` | No user-visible change on a desktop daily driver | `profiles/base-safe.nix` → `profiles/base.nix` |",
+    "| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` only — never the four desktops |",
+    "| `n-a` | Not applicable to this fleet; needs a written justification in the report | excluded via `security.stig.exclude` |",
+    "",
+    "## Distribution",
+    "",
+    "| | Count |",
+    "|---|---|",
+    f"| zero-cost → `base` | {counts['zero-cost']} |",
+    f"| disruptive → `full` | {counts['disruptive']} |",
+    f"| n-a → excluded | {counts['n-a']} |",
+    f"| **total** | **{sum(counts.values())}** |",
+    "",
+    f"So wave 1 lands **{targets['base']} of 103** controls with no interactive cost, and the",
+    f"remaining {targets['full'] + targets['excluded']} wait for `profiles/full.nix` or a written exclusion.",
+    "",
+    "## Controls",
+    "",
+    "| Control | Severity | Requirement | Class | Target | Note (hand-annotated) |",
+    "|---|---|---|---|---|---|",
+]
+
+for cid in sorted(controls):
+    c = controls[cid]
+    cls, tgt, note = CLASSIFICATION[cid]
+    title = c["title"].replace("|", "\\|")
+    lines.append(
+        f"| `{cid}` | {SEV[c['severity']]} | {title} | `{cls}` | `{tgt}` | {note} |"
+    )
+
+lines += [
+    "",
+    "## CAT I controls",
+    "",
+    "The 11 high-severity rows, called out because these are the ones that must never read",
+    "\"Open\" on a hardened target.",
+    "",
+    "| Control | Requirement | Class | Target |",
+    "|---|---|---|---|",
+]
+for cid in sorted(c for c in controls if controls[c]["severity"] == "high"):
+    cls, tgt, _ = CLASSIFICATION[cid]
+    lines.append(f"| `{cid}` | {controls[cid]['title']} | `{cls}` | `{tgt}` |")
+
+lines += [
+    "",
+    "## Known conflicts with this repo",
+    "",
+    "Found while classifying; each needs a decision before the relevant control is implemented.",
+    "",
+    "| Control | Conflicts with | Nature |",
+    "|---|---|---|",
+    "| `V-268147` | `features/nixos/bluetooth` (imported by `profiles/base.nix`) | STIG disables Bluetooth; the profile enables it |",
+    "| `V-268086` | Hyprland / `features/window-manager` | Fix text assumes GDM + GNOME dconf paths; this fleet has no GNOME session |",
+    "| `V-268139` | `features/security/yubikey` | usbguard blocks unknown USB devices, including the YubiKey it would authenticate with |",
+    "| `V-268153` | `features/fleet/comin` | Control wants notification on unauthorised baseline change; comin's whole job is applying baseline changes |",
+    "| `V-268152` | `features/cli/*` nix tooling | Restricting the nix daemon to `root` + `@wheel` breaks nix for any non-wheel user |",
+    "| `V-268168` | everything | FIPS mode on NixOS is partial; treat as the last control to attempt, if ever |",
+    "",
+    "## Open questions for review",
+    "",
+    "1. `V-268144` (encryption at rest, CAT I) needs a per-host answer — the four `hosts/*/disko.nix`",
+    "   layouts have not been audited for full-disk encryption yet.",
+    "2. The six PKI/MFA/directory controls (`V-268124`, `V-268125`, `V-268135`, `V-268136`,",
+    "   `V-268177`, `V-268179`) all presuppose identity infrastructure. `features/security/yubikey`",
+    "   is the only existing basis. Decide whether to build toward them or exclude them as a group.",
+    "3. `V-268101` / `V-268102` need a real notification destination before they mean anything.",
+    "4. Two controls are classified `n-a` (`V-268079`, `V-268180`). Both are procedural rather than",
+    "   configurable; confirm the justifications hold.",
+]
+
+with open("docs/security/stig-triage.md", "w") as fh:
+    fh.write("\n".join(lines) + "\n")
+
+print(f"rows={len(controls)} base={targets['base']} full={targets['full']} excluded={targets['excluded']}")
