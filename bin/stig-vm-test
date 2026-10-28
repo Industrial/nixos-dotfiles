@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Boot a VM per STIG control and verify the running system.
+#
+# All 103 checks in the Anduril NixOS STIG are manual shell commands against a booted
+# machine. The assay suites beside each control prove what the configuration declares; these
+# tests prove what the running system does. For the controls listed in
+# security.stig.deferredVerification a VM is the only possible evidence.
+#
+# Usage:
+#   bin/stig-vm-test                 run every STIG VM test
+#   bin/stig-vm-test V-268140 ...    run only the named controls
+#   bin/stig-vm-test --list          list the controls that have VM coverage
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+SYSTEM="$(nix eval --raw --impure --expr 'builtins.currentSystem')"
+
+list_ids() {
+  nix eval --raw ".#stigVmTests.passthru.ids" --apply 'ids: builtins.concatStringsSep "\n" ids'
+}
+
+if [ "${1:-}" = "--list" ]; then
+  list_ids
+  echo
+  exit 0
+fi
+
+if [ $# -gt 0 ]; then
+  ids=("$@")
+else
+  mapfile -t ids < <(list_ids)
+fi
+
+if [ ${#ids[@]} -eq 0 ]; then
+  echo "stig-vm-test: no VM tests are defined yet" >&2
+  exit 1
+fi
+
+echo "stig-vm-test: ${#ids[@]} control(s) on ${SYSTEM}"
+
+failed=()
+for id in "${ids[@]}"; do
+  [ -n "$id" ] || continue
+  printf '  %-12s ' "$id"
+  if nix build --no-link --print-build-logs ".#checks.${SYSTEM}.stig-${id}" >"/tmp/stig-vm-${id}.log" 2>&1; then
+    echo "PASS"
+  else
+    echo "FAIL"
+    failed+=("$id")
+  fi
+done
+
+if [ ${#failed[@]} -gt 0 ]; then
+  echo
+  echo "stig-vm-test: ${#failed[@]} control(s) FAILED: ${failed[*]}" >&2
+  for id in "${failed[@]}"; do
+    echo >&2
+    echo "--- ${id} (last 30 lines) ---" >&2
+    tail -30 "/tmp/stig-vm-${id}.log" >&2 || true
+  done
+  exit 1
+fi
+
+echo
+echo "stig-vm-test: all ${#ids[@]} control(s) verified on a booted system"

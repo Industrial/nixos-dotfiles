@@ -65,11 +65,23 @@
       '';
       description = ''
         Controls whose requirement cannot be observed by evaluating the configuration, mapped
-        to the reason. Their state is believed correct but is not proven until the wave 2 VM
-        test runs, so the report must render them as *unverified* rather than Compliant.
+        to the reason why. Journald file modes, etc-activation directory permissions and
+        stored password hashes are runtime state; no amount of static analysis can speak to
+        them.
 
         This exists so that "satisfied by systemd's defaults" cannot quietly become a
-        compliance claim with nothing behind it.
+        compliance claim with nothing behind it. Registration carries an obligation, enforced
+        from both sides:
+
+          - each listed control's colocated suite asserts it is registered here with a
+            written reason, so a control cannot be silently treated as proven; and
+          - `tests/vm/deferred.assay.nix` asserts every registered control has a VM test
+            spec that inspects a booted machine, so registration cannot become a parking
+            space for work nobody did.
+
+        A registered control is therefore verified by `moon run stig-vm-test`, not by
+        `moon run test`. The report should render it as compliant-by-VM-test and name the
+        test, rather than claiming it from configuration it cannot see.
       '';
     };
 

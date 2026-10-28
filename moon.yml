@@ -21,6 +21,19 @@ tasks:
     options:
       # Whole-repo discovery; do not treat as always-cacheable across env changes.
       cache: true
+  stig-vm-test:
+    description: 'Boot a VM per STIG control and verify the running system (Anduril NixOS STIG)'
+    command: 'devenv'
+    args:
+      - 'shell'
+      - '--'
+      - 'bin/stig-vm-test'
+    inputs:
+      - 'features/security/stig/**/*'
+      - 'bin/stig-vm-test'
+    options:
+      # VM tests boot real machines; never assume a cached pass across env changes.
+      cache: true
   nix-hash-test:
     description: 'nix-hash unit tests'
     command: 'devenv'

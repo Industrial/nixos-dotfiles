@@ -101,11 +101,14 @@
     enable = true;
     profile = "base-safe";
 
-    # Controls whose requirement cannot be observed by evaluating the configuration. Their
-    # state is believed correct, but believing is not proving, so the report renders these as
-    # unverified rather than Compliant until wave 2's VM tests run. Each control's colocated
-    # suite asserts its own presence here, so a deferred control cannot quietly go
-    # unregistered and read as compliant.
+    # Controls whose requirement cannot be observed by evaluating the configuration — runtime
+    # state only. Each is proven instead by a VM test in ../tests/vm/deferred.nix, all seven
+    # of which pass on a booted machine; `moon run stig-vm-test` is their gate, not
+    # `moon run test`.
+    #
+    # The obligation runs both ways: each control's colocated suite asserts its presence here,
+    # and tests/vm/deferred.assay.nix asserts every entry here has a VM spec. Neither a
+    # silently-unregistered control nor an unimplemented registration can survive the gate.
     deferredVerification = {
       "V-268115" = "journald log ownership under /var/log/journal is runtime state set by systemd-journald; only a booted machine can show it.";
       "V-268116" = "journald log group ownership is runtime state set by systemd-journald; only a booted machine can show it.";

@@ -128,7 +128,15 @@
       nodes = lib.genAttrs hosts mkDeployNode;
     };
 
-    checks.${system} = deployLib.deployChecks self.deploy;
+    # Anduril NixOS STIG VM tests — one derivation per verified control, named
+    # `stig-V-<id>`. Seven controls cannot be verified by evaluating configuration at all
+    # (see security.stig.deferredVerification); these are what prove them.
+    # Run all: moon run stig-vm-test     One: nix build .#checks.<system>.stig-V-268140
+    stigVmTests = import ./features/security/stig/tests/vm {inherit pkgs lib;};
+
+    checks.${system} =
+      deployLib.deployChecks self.deploy
+      // (builtins.removeAttrs self.stigVmTests ["passthru"]);
 
     formatter.${system} = pkgs.alejandra;
   };
