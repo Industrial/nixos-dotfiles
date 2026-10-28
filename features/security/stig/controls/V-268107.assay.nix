@@ -6,12 +6,15 @@ let
   config = fixture.evalWith [./V-268080.nix ./V-268107.nix];
 in
   assay.suite "stig-V-268107" {
-    journaldAudit = assay.eq mod.services.journald.audit true;
-    reachesEvaluatedConfig = assay.eq config.services.journald.audit true;
+    auditToJournal = assay.eq mod.services.journald.settings.Journal.Audit true;
 
-    # `services.journald.audit` is tri-state, not a bool: the nixpkgs default is "keep", which
-    # leaves the kernel's existing audit-forwarding state alone rather than asserting it. So
-    # setting `true` is a real change, and the control is not a no-op.
-    nixpkgsDefaultIsKeep = assay.eq (fixture.evalWith [./V-268080.nix]).services.journald.audit "keep";
-    differsFromDefault = assay.eq (mod.services.journald.audit == "keep") false;
+    # Declared through the current option name, not the renamed `services.journald.audit`
+    # the fix text uses.
+    doesNotUseRenamedOption = assay.eq (mod.services.journald ? audit) false;
+
+    reachesEvaluatedConfig = assay.eq config.services.journald.settings.Journal.Audit true;
+
+    # nixpkgs defaults this to "keep", which leaves the kernel's existing forwarding state
+    # alone rather than asserting it — so setting it is a real change, not a restatement.
+    nixpkgsDefaultIsKeep = assay.eq (fixture.evalWith [./V-268080.nix]).services.journald.settings.Journal.Audit "keep";
   }

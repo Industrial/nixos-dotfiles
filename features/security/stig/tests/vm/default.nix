@@ -12,6 +12,10 @@
 
   specGroups = [
     (import ./deferred.nix {inherit pkgs lib;})
+    (import ./audit.nix {inherit pkgs lib;})
+    (import ./ssh.nix {inherit pkgs lib;})
+    (import ./system.nix {inherit pkgs lib;})
+    (import ./password.nix {inherit pkgs lib;})
   ];
 
   specs = builtins.concatLists specGroups;

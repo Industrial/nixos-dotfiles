@@ -11,13 +11,21 @@ let
     lib = nixpkgsLib;
     pkgs = {};
   };
-  deferredSpecs = import ./deferred.nix {
+  args = {
     lib = nixpkgsLib;
     pkgs = {};
   };
 
+  specs =
+    import ./deferred.nix args
+    ++ import ./audit.nix args
+    ++ import ./ssh.nix args
+    ++ import ./system.nix args
+    ++ import ./password.nix args;
+
   manifest = import ./../../lib/manifest.nix;
-  ids = map (s: s.id) deferredSpecs;
+  ids = map (s: s.id) specs;
+  deferredSpecs = specs;
 in
   assay.suite "stig-vm-tests" {
     # The aggregator throws on a malformed spec rather than building a useless VM. Proven by
@@ -31,8 +39,24 @@ in
     # Test names are the stig-V-<id> form the flake's checks and the moon task expect.
     namesAreStigPrefixed = assay.eq (builtins.all (id: builtins.match "V-[0-9]+" id != null) ids) true;
 
-    # Wave 2 progress, asserted so the number in the runbook cannot drift from reality: 7 of
-    # 103 controls have VM coverage so far, and those 7 are the ones with no alternative.
-    vmCoverageSoFar = assay.eq (builtins.length ids) 7;
+    # Every control the host-wide profile carries has a VM test. That is the real exit
+    # criterion for runtime verification of wave 1, asserted rather than counted by hand.
+    vmCoverageSoFar = assay.eq (builtins.length ids) 68;
     totalControls = assay.eq manifest.count 103;
+
+    coversEveryBaseSafeControl = let
+      profileControls =
+        map (n: builtins.head (builtins.match "(V-[0-9]+)\\.nix" n))
+        (builtins.filter (n: builtins.match "V-[0-9]+\\.nix" n != null)
+          (map (p: builtins.baseNameOf (toString p)) (import ./../../profiles/base-safe.nix {}).imports));
+    in
+      assay.eq (builtins.filter (id: !builtins.elem id ids) profileControls) [];
+
+    # No control may appear in two spec groups — two tests named stig-V-<id> would collide
+    # in the flake's checks attrset and one would silently shadow the other.
+    noIdAppearsTwice = assay.eq (builtins.length ids) (builtins.length (builtins.attrNames (builtins.listToAttrs (map (id: {
+        name = id;
+        value = true;
+      })
+      ids))));
   }

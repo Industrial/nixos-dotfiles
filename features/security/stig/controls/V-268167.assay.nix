@@ -1,6 +1,7 @@
 # Colocated suite: V-268167 — identity databases watched.
 let
   assay = import ./../../../../common/assay/default.nix;
+  fixture = import ./../lib/fixture.nix;
   mod = import ./V-268167.nix {};
   rules = mod.security.audit.rules;
 in
@@ -22,4 +23,15 @@ in
     # shadow and gshadow are the two most important and the easiest to omit.
     watchesShadow = assay.eq (builtins.elem "-w /etc/shadow -p wa -k identity" rules) true;
     watchesGshadow = assay.eq (builtins.elem "-w /etc/gshadow -p wa -k identity" rules) true;
+
+    # /etc/security/opasswd does not exist until pam_pwhistory writes it, and auditctl fails
+    # the whole rules file on a missing watch target, so it must be provisioned.
+    provisionsOpasswd =
+      assay.eq (builtins.any (r: builtins.match "f /etc/security/opasswd .*" r != null) mod.systemd.tmpfiles.rules) true;
+    # It holds old password hashes once populated, so owner-only.
+    opasswdIsOwnerOnly =
+      assay.eq (builtins.elemAt (fixture.tmpfilesFields (builtins.head mod.systemd.tmpfiles.rules)) 2) "0600";
+    # `f`, not `F`: truncating it on every boot would destroy the password history.
+    createsWithoutTruncating =
+      assay.eq (builtins.elemAt (fixture.tmpfilesFields (builtins.head mod.systemd.tmpfiles.rules)) 0) "f";
   }

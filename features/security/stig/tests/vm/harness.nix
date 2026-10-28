@@ -34,6 +34,17 @@
     boot.loader.grub.enable = false;
     documentation.enable = false;
     system.stateVersion = "25.05";
+
+    # nixos/modules/testing/test-instrumentation.nix disables timesyncd in VMs, because a
+    # sandboxed guest has no usable time source. The base-safe profile requires it enabled
+    # (V-268151), so the two definitions conflict and every test importing the profile fails
+    # to evaluate.
+    #
+    # Override the instrumentation rather than the profile: the point of these tests is to
+    # boot the configuration we actually ship. The unit is enabled but will not reach a time
+    # server in the sandbox, which is why V-268151's assertion is about the unit being
+    # enabled and not about clock accuracy.
+    services.timesyncd.enable = lib.mkForce true;
   };
 in rec {
   # One spec -> one test derivation.

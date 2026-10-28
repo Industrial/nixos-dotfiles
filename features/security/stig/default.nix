@@ -101,12 +101,37 @@
     };
   };
 
-  config = lib.mkIf (config.security.stig.pwquality != {}) {
-    # Rendered without spaces around `=` to match the form the checks grep for
-    # (e.g. `grep ucredit /etc/security/pwquality.conf` expecting `ucredit=-1`).
-    environment.etc."security/pwquality.conf".text =
-      lib.concatStringsSep "\n"
-      (lib.mapAttrsToList (k: v: "${k}=${toString v}") config.security.stig.pwquality)
-      + "\n";
-  };
+  config = lib.mkMerge [
+    (lib.mkIf (config.security.stig.pwquality != {}) {
+      # Rendered without spaces around `=` to match the form the checks grep for
+      # (e.g. `grep ucredit /etc/security/pwquality.conf` expecting `ucredit=-1`).
+      environment.etc."security/pwquality.conf".text =
+        lib.concatStringsSep "\n"
+        (lib.mapAttrsToList (k: v: "${k}=${toString v}") config.security.stig.pwquality)
+        + "\n";
+    })
+
+    (lib.mkIf (config.security.audit.enable != false) {
+      # Ordering, and it is load-bearing.
+      #
+      # A watch rule (`-w <path>`) cannot be loaded if its target does not exist: auditctl
+      # reports "Error sending add rule data request (No such file or directory)" and ABORTS
+      # THE ENTIRE RULES FILE, so not one rule is loaded and the host runs unaudited.
+      #
+      # Two controls provision their watch targets with systemd-tmpfiles because the paths do
+      # not exist on a stock system — V-268166 (/var/log/lastlog) and V-268097
+      # (/var/cron/tabs) — and V-268167 does the same for /etc/security/opasswd. By default
+      # the rule loader races tmpfiles and usually wins, which is how this was found: the VM
+      # tests failed with the audit subsystem down and auditctl pointing at exactly those
+      # two lines.
+      #
+      # Ordering after systemd-tmpfiles-setup closes the race. Verified by
+      # tests/vm/audit.nix, whose readiness check now fails loudly if the rule set did not
+      # load rather than reporting a confusing single-control miss.
+      systemd.services.audit-rules-nixos = {
+        after = ["systemd-tmpfiles-setup.service"];
+        wants = ["systemd-tmpfiles-setup.service"];
+      };
+    })
+  ];
 }
