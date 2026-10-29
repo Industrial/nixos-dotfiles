@@ -5,4 +5,6 @@ let
 in
   assay.suite "openidea" {
     mentionsSystemPackages = assay.eq (builtins.match ".*systemPackages.*" src != null) true;
+    # `npx` must reach the login shell for the Agents panel's ACP adapters.
+    provisionsNodejs = assay.eq (builtins.match ".*pkgs\\.nodejs.*" src != null) true;
   }

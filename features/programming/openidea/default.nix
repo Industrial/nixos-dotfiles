@@ -56,5 +56,12 @@
 in {
   environment.systemPackages = lib.mkIf (pkgs.stdenv.hostPlatform.system == "x86_64-linux") [
     openidea
+    # The Agents panel spawns its ACP adapters through `npx` with a hardcoded
+    # version pin (e.g. `npx -y @agentclientprotocol/claude-agent-acp@0.97.0`)
+    # and reports "was not found on PATH" otherwise. OpenIDEA derives its env
+    # from `$SHELL -ilc` at startup, so the adapter has to be reachable from the
+    # login shell — a per-project devenv shell is not enough. Full `nodejs`, not
+    # `nodejs-slim`: the slim build ships no npm/npx.
+    pkgs.nodejs
   ];
 }
