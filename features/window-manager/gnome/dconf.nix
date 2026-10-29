@@ -35,7 +35,8 @@ in {
             # Productivity Powerhouses
             pkgs.gnomeExtensions.clipboard-indicator.extensionUuid
             pkgs.gnomeExtensions.gsconnect.extensionUuid
-            pkgs.gnomeExtensions.quick-settings-tweaker.extensionUuid
+            # quick-settings-tweaker is no longer packaged for any supported
+            # GNOME Shell; see features/window-manager/gnome/default.nix.
 
             # Advanced Features
             pkgs.gnomeExtensions.night-theme-switcher.extensionUuid

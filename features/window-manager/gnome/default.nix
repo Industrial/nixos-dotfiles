@@ -108,7 +108,9 @@
       # # Productivity Powerhouses
       gnomeExtensions.clipboard-indicator
       gnomeExtensions.gsconnect
-      gnomeExtensions.quick-settings-tweaker
+      # gnomeExtensions.quick-settings-tweaker is gone from nixpkgs — upstream
+      # stopped at GNOME 48, so it is absent from both supported extension sets
+      # (gnome49Extensions, gnome50Extensions).
 
       # Advanced Features
       gnomeExtensions.night-theme-switcher
