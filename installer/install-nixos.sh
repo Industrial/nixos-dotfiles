@@ -88,9 +88,15 @@ log_info "Running disko to partition and format disk..."
 log_info "You will be prompted for the LUKS encryption password"
 echo ""
 
-nix --experimental-features "nix-command flakes" run github:nix-community/disko/latest -- \
-    --mode destroy,format,mount \
-    "./hosts/$HOSTNAME/disko.nix" \
+# Run the host's own destroyFormatMount script rather than `disko --mode ... hosts/X/disko.nix`.
+# Two reasons:
+#   - It uses the disko version pinned in this repo's flake.lock, not whatever
+#     github:nix-community/disko/latest resolves to today. The layout and the tool that applies
+#     it then come from the same commit.
+#   - It evaluates the real host configuration, so a layout that depends on anything outside
+#     disko.nix is applied exactly as the installed system will expect it.
+nix --experimental-features "nix-command flakes" run \
+    ".#nixosConfigurations.$HOSTNAME.config.system.build.destroyFormatMount" -- \
     --yes-wipe-all-disks
 
 log_success "Disk partitioned and mounted"
@@ -106,6 +112,12 @@ cp -r "$DOTFILES_DIR" /mnt/home/tom/.dotfiles
 # Install NixOS
 log_info "Installing NixOS..."
 nixos-install --flake ".#$HOSTNAME" --no-root-passwd
+
+# The copy above ran as root in the live environment, so every file landed root-owned. Fix it
+# now that the installed system knows who tom is.
+log_info "Giving tom ownership of the copied dotfiles..."
+nixos-enter --root /mnt -c 'chown -R tom /home/tom' || \
+    log_warn "Could not chown /home/tom — run 'chown -R tom /home/tom' after first boot"
 
 log_success "Installation complete!"
 echo ""
