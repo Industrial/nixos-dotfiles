@@ -112,9 +112,14 @@ sync
 
 # dd reporting success is not proof: read it back. A write at memory speed to a regular file
 # would pass dd and fail here.
+#
+# Read exactly ISO_BYTES with iflag=count_bytes rather than trimming a longer read with
+# `head -c`. Under `set -o pipefail`, head closing the pipe early makes dd die of SIGPIPE,
+# which fails the whole pipeline and — with `set -e` — kills this script silently, before
+# either the success or the failure message can be printed.
 info "Verifying..."
-WRITTEN_SUM=$(sudo dd if="$TARGET" bs=1M count=$((ISO_BYTES / 1048576 + 1)) 2>/dev/null |
-    head -c "$ISO_BYTES" | sha256sum | cut -d' ' -f1)
+WRITTEN_SUM=$(sudo dd if="$TARGET" bs=1M iflag=count_bytes count="$ISO_BYTES" status=none |
+    sha256sum | cut -d' ' -f1)
 ISO_SUM=$(sha256sum "$ISO" | cut -d' ' -f1)
 
 [[ "$WRITTEN_SUM" == "$ISO_SUM" ]] ||
