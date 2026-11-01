@@ -121,12 +121,20 @@ nixos-enter --root /mnt -c 'chown -R tom /home/tom' || \
 
 log_success "Installation complete!"
 echo ""
+log_warn "SET A PASSWORD BEFORE YOU REBOOT."
+log_warn "No host declares a password, so both accounts are created locked, and no host"
+log_warn "enables console autologin. Rebooting without doing this leaves a login prompt"
+log_warn "nothing gets you past at the machine itself."
+echo ""
 log_info "Post-installation steps:"
 echo "  1. Set root password: nixos-enter --root /mnt -c 'passwd'"
 echo "  2. Set user password: nixos-enter --root /mnt -c 'passwd tom'"
 echo "  3. Reboot: reboot"
 echo ""
-log_info "Or just reboot and set passwords on first login"
+log_info "If you do reboot too early, it is recoverable but not from the console: SSH in as"
+log_info "tom from another fleet host (the key is already authorized, and tom has NOPASSWD"
+log_info "sudo) and run 'sudo passwd tom'. Otherwise boot this USB stick again and use"
+log_info "nixos-enter as above."
 echo ""
 
 read -p "Reboot now? (yes/no): " REBOOT

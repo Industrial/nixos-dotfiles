@@ -60,13 +60,24 @@ suspend-to-RAM alone drains the battery).
    apply the layout with the disko version pinned in this repo's `flake.lock`, then run
    `nixos-install`.
 
-5. Set passwords and reboot:
+5. Set passwords **before** rebooting, then reboot:
 
    ```bash
    nixos-enter --root /mnt -c 'passwd'
    nixos-enter --root /mnt -c 'passwd tom'
    reboot
    ```
+
+   This step is not optional. No host declares a password (`hashedPassword`,
+   `hashedPasswordFile` and `initialPassword` are all null) so both accounts are created
+   locked, and `services.getty.autologinUser` is null so there is no console autologin.
+   Rebooting without setting a password leaves a login prompt nothing gets you past at the
+   tablet itself.
+
+   It is recoverable, just not from the console: `tom`'s key from the other fleet hosts is
+   already in `authorized_keys` and `tom` has `NOPASSWD: ALL` sudo, so you can SSH in from
+   drakkar and run `sudo passwd tom`. Failing that, boot this stick again and use
+   `nixos-enter` as above.
 
 ## After first boot
 
