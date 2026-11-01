@@ -98,16 +98,36 @@ If `btrfs filesystem show` reports four separate single-device filesystems, the 
 created by an older revision of this config — that is the bug this layout fixes, and
 recovering means rebuilding the array (destructive).
 
-## Known gap: /data has no `nofail`
+## When a disk dies: /data is `nofail`, and NFS is gated on the real mount
 
-`fileSystems."/data"` is `LABEL=data` with `["compress=zstd" "defaults"]`. If the array is
-missing or degraded past mounting, the mount unit fails, `local-fs.target` fails, and a headless
-mimir drops to an emergency shell you cannot reach over SSH. A fresh install creates the array,
-so this does not bite the install path — but a failed disk later will.
+`fileSystems."/data"` is `LABEL=data` with `["compress=zstd" "defaults" "nofail"]`.
 
-Adding `nofail` trades that for the opposite risk: mimir boots, `/data` is an empty directory,
-and the NFS server happily exports it. Decide which failure you prefer before a disk dies, not
-after.
+RAID5 will not mount with a member missing unless you add `-o degraded`, so a dead disk means
+`/data` fails to mount. Without `nofail` that fails `local-fs.target` and drops this headless
+machine to an emergency shell nobody can reach — one failed disk would turn a degraded file
+server into an unreachable one. With `nofail`, mimir boots, SSH comes up, and you repair the
+array remotely.
+
+The cost of `nofail` is that an unmounted `/data` is just an empty directory on the root
+filesystem. That is closed on the NFS side: `nfs-server.service` carries
+`RequiresMountsFor=/data` (written to `nfs-server.service.d/overrides.conf`), so it requires
+`data.mount` and fails if the mount failed. The host stays reachable and NFS refuses to serve
+an empty export rather than letting clients mount — and write into — nothing.
+
+Nothing else active writes under `/data`: docker is disabled on this host and every
+`features/media` service is commented out of [`configuration.nix`](./configuration.nix). The
+four `systemd.tmpfiles` directories would be created on the root filesystem and are shadowed
+once the array mounts.
+
+**So `ls /data` succeeding is not proof the array is mounted.** Use `findmnt /data`.
+
+Repairing a degraded array:
+
+```bash
+sudo mount -o degraded,compress=zstd LABEL=data /data
+sudo btrfs replace start <missing-devid> /dev/sdX /data
+sudo systemctl start nfs-server          # once /data is really mounted
+```
 
 ## Troubleshooting
 
