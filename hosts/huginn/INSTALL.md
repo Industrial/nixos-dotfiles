@@ -33,11 +33,14 @@ suspend-to-RAM alone drains the battery).
 1. Build the installer ISO and write it to a USB stick, from a machine with the repo checked out:
 
    ```bash
-   nix build .#installer-iso
-   sudo dd if=result/iso/*.iso of=/dev/sdX bs=4M conv=fsync status=progress
+   bin/flash-installer --list        # show removable candidates
+   bin/flash-installer /dev/sdX      # build, confirm, write, verify
    ```
 
-   Replace `/dev/sdX` with the stick — confirm it with `lsblk` first, because `dd` will not ask.
+   Use the helper rather than raw `dd`. It refuses to write to anything that is not a present,
+   removable, whole USB disk, and it reads the stick back and compares checksums afterwards —
+   `dd` alone will report a happy multi-GB write to a *regular file* it just created if the
+   device has vanished or changed letter.
 
 2. Boot the tablet from the stick. Attach the keyboard; the installer is a console environment.
    On Star Labs firmware, hold `F7` (or `Esc` for the full menu) at power-on to pick the USB

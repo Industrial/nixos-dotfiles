@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Build the installer ISO and write it to a USB stick, refusing to write anywhere dangerous.
+#
+# This exists because `dd of=/dev/sdX` has two failure modes that are quiet and expensive:
+#
+#   1. If the device has vanished — unplugged, or re-enumerated under a different letter —
+#      dd happily CREATES A REGULAR FILE at that path. On /dev that silently eats RAM from
+#      devtmpfs, and you get a "successful" multi-GB write at memory speed to nothing.
+#   2. If the letter has shifted, /dev/sdb may now be a disk you care about.
+#
+# So: every check below aborts, and nothing is written until all of them pass.
+#
+# Usage:
+#   bin/flash-installer /dev/sdX          build the ISO and write it
+#   bin/flash-installer --list            show removable candidates and exit
+#   bin/flash-installer /dev/sdX --iso P  write an already-built ISO at path P
+
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+NC=$'\033[0m'
+
+info() { echo "${BLUE}[INFO]${NC} $1"; }
+ok() { echo "${GREEN}[OK]${NC} $1"; }
+warn() { echo "${YELLOW}[WARN]${NC} $1"; }
+die() {
+    echo "${RED}[ABORT]${NC} $1" >&2
+    exit 1
+}
+
+list_candidates() {
+    info "Removable block devices:"
+    lsblk -d -o NAME,SIZE,TYPE,TRAN,RM,MODEL,SERIAL |
+        awk 'NR==1 || $5=="1" || $4=="usb"'
+}
+
+if [[ "${1:-}" == "--list" ]]; then
+    list_candidates
+    exit 0
+fi
+
+TARGET="${1:-}"
+[[ -n "$TARGET" ]] || die "No target device. Try: bin/flash-installer --list"
+
+ISO=""
+if [[ "${2:-}" == "--iso" ]]; then
+    ISO="${3:-}"
+    [[ -n "$ISO" ]] || die "--iso needs a path"
+fi
+
+# ---- Refuse anything that is not a present, removable, whole block device ----------------
+
+[[ -e "$TARGET" ]] || die "$TARGET does not exist. Is the stick plugged in? (--list)"
+[[ -b "$TARGET" ]] || die "$TARGET is not a block device. Writing would create a regular file."
+
+TARGET_NAME=$(basename "$(realpath "$TARGET")")
+SYS="/sys/block/$TARGET_NAME"
+[[ -d "$SYS" ]] || die "$TARGET is a partition, not a whole disk. Pass the disk (e.g. /dev/sdb)."
+
+[[ "$(cat "$SYS/removable")" == "1" ]] ||
+    die "$TARGET is not removable. Refusing: this looks like a fixed disk."
+
+TRAN=$(lsblk -d -n -o TRAN "$TARGET")
+[[ "$TRAN" == "usb" ]] || die "$TARGET is on the '$TRAN' bus, not USB. Refusing."
+
+# A disk carrying a mounted filesystem is either in use or the wrong disk.
+MOUNTED=$(lsblk -n -o MOUNTPOINTS "$TARGET" | grep -v '^\s*$' || true)
+if [[ -n "$MOUNTED" ]]; then
+    warn "$TARGET has mounted filesystems:"
+    echo "$MOUNTED"
+    info "Unmounting them..."
+    for part in $(lsblk -n -l -o PATH "$TARGET" | tail -n +2); do
+        sudo umount "$part" 2>/dev/null || true
+    done
+    STILL=$(lsblk -n -o MOUNTPOINTS "$TARGET" | grep -v '^\s*$' || true)
+    [[ -z "$STILL" ]] || die "Could not unmount everything on $TARGET."
+fi
+
+# ---- Build the ISO ------------------------------------------------------------------------
+
+if [[ -z "$ISO" ]]; then
+    info "Building .#installer-iso ..."
+    cd "$REPO_ROOT"
+    nix build --print-out-paths .#installer-iso >/dev/null
+    ISO=$(echo "$REPO_ROOT"/result/iso/*.iso)
+fi
+[[ -f "$ISO" ]] || die "ISO not found at $ISO"
+
+ISO_BYTES=$(stat -c %s "$ISO")
+DEV_BYTES=$(lsblk -b -d -n -o SIZE "$TARGET")
+((DEV_BYTES >= ISO_BYTES)) ||
+    die "$TARGET is $DEV_BYTES bytes; the ISO needs $ISO_BYTES."
+
+# ---- Confirm, write, verify ---------------------------------------------------------------
+
+echo
+lsblk -d -o NAME,SIZE,TRAN,RM,MODEL,SERIAL "$TARGET"
+echo
+warn "Everything on $TARGET will be destroyed."
+info "ISO: $ISO ($ISO_BYTES bytes)"
+read -rp "Type 'yes' to write: " confirm
+[[ "$confirm" == "yes" ]] || die "Cancelled."
+
+info "Writing..."
+sudo dd if="$ISO" of="$TARGET" bs=4M conv=fsync status=progress
+sync
+
+# dd reporting success is not proof: read it back. A write at memory speed to a regular file
+# would pass dd and fail here.
+info "Verifying..."
+WRITTEN_SUM=$(sudo dd if="$TARGET" bs=1M count=$((ISO_BYTES / 1048576 + 1)) 2>/dev/null |
+    head -c "$ISO_BYTES" | sha256sum | cut -d' ' -f1)
+ISO_SUM=$(sha256sum "$ISO" | cut -d' ' -f1)
+
+[[ "$WRITTEN_SUM" == "$ISO_SUM" ]] ||
+    die "Verification FAILED: stick does not match the ISO. Do not boot it."
+
+ok "Verified: $TARGET matches the ISO byte-for-byte."
+lsblk -f "$TARGET"

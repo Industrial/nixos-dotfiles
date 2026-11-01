@@ -20,4 +20,12 @@ in
 
     # The ESP cannot be encrypted, so its permissions carry the weight instead.
     bootIsOwnerOnly = assay.eq (has ".*umask=0077.*") true;
+
+    # The btrfs filesystem under LUKS must have no top-level mountpoint. With one, disko mounts
+    # subvolid 5 at the mount root during install — it wins the attrset collision against the
+    # @root subvolume mount — so nixos-install writes `/` into the bare volume while the
+    # installed system boots with subvol=@root. The /data volume keeps its mountpoint: it
+    # declares no subvolumes, so there is no collision to lose.
+    rootMountedViaSubvolumeOnly =
+      assay.eq (has ".*type = \"btrfs\";[[:space:]]*mountpoint = \"/\";.*") false;
   }

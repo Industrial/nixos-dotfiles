@@ -32,7 +32,15 @@
                   keyFile = null;
                   content = {
                     type = "btrfs";
-                    mountpoint = "/";
+                    # No top-level mountpoint. With one set, disko mounts subvolid 5 at the
+                    # mount root during install — it wins the attrset collision against the
+                    # @root subvolume mount — so nixos-install writes `/` into the bare volume
+                    # while the installed system boots with subvol=@root. Harmless on a running
+                    # host (it only drops a duplicate "defaults" from the mount options), but
+                    # it silently misplaces `/` on the next reinstall.
+                    #
+                    # The /data volume below keeps its mountpoint: it declares no subvolumes,
+                    # so there is no collision to lose.
                     subvolumes = {
                       "@root" = {mountpoint = "/";};
                       "@nix" = {mountpoint = "/nix";};

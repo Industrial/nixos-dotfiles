@@ -20,4 +20,11 @@ in
     btrfsRootInsideLuks = assay.eq (has ".*type = \"btrfs\";.*") true;
     separatesNixAndHomeSubvolumes =
       assay.eq (has ".*\"@nix\".*" && has ".*\"@home\".*") true;
+
+    # The btrfs filesystem must have no top-level mountpoint. With one, disko mounts subvolid 5
+    # at the mount root during install — it wins the attrset collision against the @root
+    # subvolume mount — so nixos-install writes `/` into the bare volume while the installed
+    # system boots with subvol=@root.
+    rootMountedViaSubvolumeOnly =
+      assay.eq (has ".*type = \"btrfs\";[[:space:]]*mountpoint = \"/\";.*") false;
   }
