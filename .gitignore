@@ -34,3 +34,6 @@ yarn-error.log*
 
 # Moon workspace cache
 .moon/cache/
+
+# Claude Code atomic-write temp files
+features/ai/claude-code/claude.json.tmp.*
