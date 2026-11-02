@@ -33,6 +33,13 @@
         daemon.settings = {
           dns = ["1.1.1.1" "8.8.8.8"];
           registry-mirrors = ["https://mirror.gcr.io"];
+
+          # Images, layers and build cache live off the 2TB NVMe: a 746GB
+          # docker root had taken the SSD to 97% full. /data is the 16TB
+          # array, so the cache can grow without threatening root. The
+          # directory must exist and be owned by the rootless user.
+          # Trade-off: /data is spinning rust, so cold builds are slower.
+          data-root = "/data/docker-cache";
         };
       };
     };
