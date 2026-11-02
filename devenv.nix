@@ -6,12 +6,7 @@
   ...
 }: let
   system = pkgs.stdenv.hostPlatform.system;
-  pkgs-unstable = import inputs.nixpkgs-unstable {inherit system;};
   assayPkgs = inputs.assay.packages.${system};
-  nixHash = pkgs.callPackage ./rust/tools/nix-hash {
-    rustc = pkgs-unstable.rustc;
-    cargo = pkgs-unstable.cargo;
-  };
 in {
   imports = [./.cursor/nix];
 
@@ -44,7 +39,6 @@ in {
     assayPkgs.nixdrv
     assayPkgs.nixfetch
     assayPkgs.nixstore
-    nixHash
     nix-unit
     namaka
     nixt

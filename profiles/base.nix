@@ -43,7 +43,6 @@
     ../features/cli/lsusb
     ../features/cli/nettools
     ../features/cli/ngrok
-    ../features/cli/nix-hash
     ../features/cli/nix-tree
     ../features/cli/nixdrv
     ../features/cli/nixfetch

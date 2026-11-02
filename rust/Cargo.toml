@@ -5,7 +5,7 @@ resolver = "3"
 # Cargo.lock plus an empty [workspace] table so buildRustPackage vendors it
 # standalone. Adding it here would break that hashing — see
 # rust/tools/TESTING.md and the fleet-rust-tooling skill.
-members = ["tools/oomkiller", "tools/nix-hash"]
+members = ["tools/oomkiller"]
 
 [workspace.package]
 edition = "2024"
@@ -13,8 +13,9 @@ license = "MIT"
 authors = ["Industrial <tom.wieland@gmail.com>"]
 
 [workspace.dependencies]
-# id_effect is pinned in exactly one place on purpose: types from two different
-# id_effect versions do not unify, so every consumer in this workspace has to
-# resolve to the same one. Bump here, never in a member.
+# No consumer yet — nix-hash was the last one and is gone. Staged here for the
+# oomkiller / nixos-update-notifier adoption, because id_effect must be pinned
+# in exactly one place: types from two id_effect versions do not unify, so
+# every member has to resolve to the same one. Bump here, never in a member.
 id_effect = { version = "0.13", features = ["schema-serde"] }
 id_effect_cli = "0.13"
