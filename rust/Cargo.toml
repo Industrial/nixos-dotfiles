@@ -1,3 +1,20 @@
 [workspace]
 resolver = "3"
-members = ["tools/oomkiller", "tools/nix-hash", "tools/skjold"]
+
+# `tools/nixos-update-notifier` is deliberately absent: it carries its own
+# Cargo.lock plus an empty [workspace] table so buildRustPackage vendors it
+# standalone. Adding it here would break that hashing — see
+# rust/tools/TESTING.md and the fleet-rust-tooling skill.
+members = ["tools/oomkiller", "tools/nix-hash"]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+
+[workspace.dependencies]
+# id_effect is pinned in exactly one place on purpose: types from two different
+# id_effect versions do not unify, so every consumer in this workspace has to
+# resolve to the same one. Bump here, never in a member.
+id_effect = { version = "0.13", features = ["schema-serde"] }
+id_effect_cli = "0.13"
