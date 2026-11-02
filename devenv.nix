@@ -2,7 +2,6 @@
 {
   inputs,
   pkgs,
-  lib,
   ...
 }: let
   system = pkgs.stdenv.hostPlatform.system;
@@ -50,14 +49,6 @@ in {
     lazysql
 
     llvmPackages.llvm
-
-    # Wayland/Iced build deps for skjold dev workflow
-    pkg-config
-    wayland
-    libxkbcommon
-    vulkan-loader
-    libGL
-    libpulseaudio
   ];
 
   env = {
@@ -66,14 +57,6 @@ in {
     NIXPKGS_ALLOW_UNFREE = "1";
     LLVM_COV = "${pkgs.llvmPackages.llvm}/bin/llvm-cov";
     LLVM_PROFDATA = "${pkgs.llvmPackages.llvm}/bin/llvm-profdata";
-    # Linker paths for skjold (Wayland/PulseAudio)
-    LIBRARY_PATH = lib.makeLibraryPath [
-      pkgs.wayland
-      pkgs.libxkbcommon
-      pkgs.vulkan-loader
-      pkgs.libGL
-      pkgs.libpulseaudio
-    ];
   };
 
   scripts = {
