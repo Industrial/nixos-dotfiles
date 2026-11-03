@@ -95,9 +95,14 @@ in [
   '')
 
   (ruleSpec "V-268093" "the audit backlog limit is at least 8192" ''
-    machine.succeed("grep -qw 'audit_backlog_limit=8192' /proc/cmdline")
-    # And the running kernel actually took it. Tolerant of both auditctl -s output shapes.
+    # The STIG states a floor, and this fleet runs deliberate headroom above it (see
+    # controls/V-268093.nix), so parse the value off the command line rather than pinning it.
     import re
+    cmdline = machine.succeed("cat /proc/cmdline")
+    c = re.search(r"audit_backlog_limit=([0-9]+)", cmdline)
+    assert c, f"audit_backlog_limit absent from /proc/cmdline:\n{cmdline}"
+    assert int(c.group(1)) >= 8192, f"audit_backlog_limit is {c.group(1)}, expected at least 8192"
+    # And the running kernel actually took it. Tolerant of both auditctl -s output shapes.
     status = machine.succeed("auditctl -s")
     m = re.search(r"backlog_limit[ =]+([0-9]+)", status)
     assert m, f"could not find 'backlog_limit' in auditctl -s output:\n{status}"

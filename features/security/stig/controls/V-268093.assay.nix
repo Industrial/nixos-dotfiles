@@ -1,7 +1,14 @@
-# Colocated suite: V-268093 — audit backlog limit raised to 8192.
+# Colocated suite: V-268093 — audit backlog limit raised above the STIG floor.
+#
+# The STIG states a minimum ("of sufficient size"), so these claims assert a floor rather than
+# an exact value. Pinning the exact number would make this suite fail every time the fleet
+# raises headroom, which is the opposite of what the control protects.
 let
   assay = import ./../../../../common/assay/default.nix;
   mod = import ./V-268093.nix {};
+
+  stigFloor = 8192;
+  configured = mod.security.audit.backlogLimit;
 
   evaluated =
     (import <nixpkgs/nixos/lib/eval-config.nix> {
@@ -24,12 +31,18 @@ let
   params = evaluated.boot.kernelParams;
 in
   assay.suite "stig-V-268093" {
-    backlogLimit = assay.eq mod.security.audit.backlogLimit 8192;
+    # The requirement itself: at least the 8192 named in the fix text.
+    meetsStigFloor = assay.eq (configured >= stigFloor) true;
 
     # Higher than the nixpkgs default of 1024 — this control genuinely changes something.
-    exceedsNixpkgsDefault = assay.eq (mod.security.audit.backlogLimit > 1024) true;
+    exceedsNixpkgsDefault = assay.eq (configured > 1024) true;
 
-    # The option drives the kernel parameter, so setting both would duplicate it.
-    kernelParamDerived = assay.eq (builtins.elem "audit_backlog_limit=8192" params) true;
+    # Headroom above the floor is deliberate, not an accident: V-268095 audits every unlink,
+    # so bulk deletions overrun an 8192-entry backlog and stall userspace via backlog_wait_time.
+    hasBurstHeadroom = assay.eq (configured >= 65536) true;
+
+    # The option drives the kernel parameter, so setting both would duplicate it. Derived from
+    # the configured value rather than hardcoded, so the two can never drift apart.
+    kernelParamDerived = assay.eq (builtins.elem "audit_backlog_limit=${toString configured}" params) true;
     kernelParamAppearsOnce = assay.eq (builtins.length (builtins.filter (p: builtins.match "audit_backlog_limit=.*" p != null) params)) 1;
   }

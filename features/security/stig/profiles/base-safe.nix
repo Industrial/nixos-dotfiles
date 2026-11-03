@@ -48,7 +48,7 @@
     # Group 2b — audit package/kernel consequences, log ownership and modes.
     ../controls/V-268090.nix # audit package (via V-268080)
     ../controls/V-268092.nix # audit=1 kernel param (via V-268080)
-    ../controls/V-268093.nix # audit_backlog_limit raised to 8192
+    ../controls/V-268093.nix # audit_backlog_limit raised to 65536
     ../controls/V-268110.nix # auditd log_group = root
     ../controls/V-268111.nix # audit dir+log owned by root (via V-268113/114)
     ../controls/V-268112.nix # audit dir+log group root (via V-268113/114)
@@ -141,7 +141,7 @@ in {
     # baseline exists to prevent.
     requiresReboot = {
       "V-268092" = "adds audit=1 to the kernel command line; the running kernel keeps the parameters it booted with until the host reboots.";
-      "V-268093" = "adds audit_backlog_limit=8192 to the kernel command line; same reboot requirement as V-268092.";
+      "V-268093" = "adds audit_backlog_limit=65536 to the kernel command line; same reboot requirement as V-268092.";
     };
 
     # Controls whose requirement cannot be observed by evaluating the configuration — runtime
