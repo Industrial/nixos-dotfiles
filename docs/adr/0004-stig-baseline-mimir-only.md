@@ -101,12 +101,21 @@ than report an unhardened host, turning a finding into an error.
   six pwquality settings, `V-268130` (SHA-512), and `UMASK 077`. Several of those cost an
   interactive user nothing and were not the problem. This was the explicit instruction and
   is recorded as such rather than quietly narrowed to the audit set.
-  - Partial mitigation already in place: `features/security/apparmor`,
-    `features/nixos/networking/firewall.nix`, `features/nixos/security/sudo` and
-    `features/nixos/security/no-defaults` are imported by `profiles/base.nix` independently
-    of the STIG profile, so AppArmor, the firewall and sudo password policy survive on all
-    four hosts via their own features. SSH ciphers/MACs and the pwquality settings do not —
-    those were only in `base-safe`.
+  - Partial mitigation already in place, verified by evaluation rather than assumed:
+    `features/security/apparmor`, `features/nixos/networking/firewall.nix`,
+    `features/nixos/security/sudo` and `features/nixos/security/no-defaults` are imported by
+    `profiles/base.nix` independently of the STIG profile. On drakkar after this change,
+    `networking.firewall.enable`, `security.apparmor.enable` and
+    `security.sudo.wheelNeedsPassword` are all still `true` — so `V-268078`, `V-268173` and
+    `V-268156` remain *satisfied in substance* on all four hosts even though the report no
+    longer credits them. The pwquality settings and `UMASK 077` have no such backstop and are
+    genuinely gone from the three hosts.
+  - **The SSH crypto loss is conformance, not strength.** `V-268089` pins
+    `Ciphers = [aes256-ctr aes192-ctr aes128-ctr]`. Dropping it returns drakkar to the
+    nixpkgs default — `chacha20-poly1305@openssh.com`, `aes256-gcm`, `aes128-gcm`, then the
+    three CTR ciphers — which is a *stronger* set by current practice, since the STIG list
+    excludes the AEAD modes. The three hosts lose the ability to claim the control, not the
+    confidentiality it exists to protect. The same reasoning applies to `V-268157` (MACs).
 - The fleet now has two hardening postures to reason about instead of one.
 - If the fleet is ever assessed as a whole, three hosts will report `1/103` and the answer is
   this ADR, not a remediation sprint.
