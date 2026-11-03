@@ -12,6 +12,10 @@ in {
   name = "dotfiles";
 
   # Shared programs / packages from Industrial/cursor-setup (.cursor/nix).
+  # blaze is the default Rust build/check/run/test command (see moon.yml). It
+  # ships its own toolchain, so languages-rust and packages-rust-dev stay on:
+  # rust-analyzer, clippy, rustfmt and the cargo-* helpers are still cargo's.
+  cursor.features.program-blaze.enable = true;
   cursor.features.program-moon.enable = true;
   cursor.features.program-lean-ctx.enable = true;
   cursor.features.program-roam-code.enable = false;
