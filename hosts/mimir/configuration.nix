@@ -17,6 +17,7 @@
     ../../features/fleet/comin.nix
     ../../features/fleet/nix-remote-builder-client.nix
     ../../features/fleet/remote-access.nix
+    ../../features/fleet/remote-desktop-relay.nix
     ../../features/monitoring/grafana/default.nix
     ../../features/monitoring/homepage-dashboard
     ../../features/monitoring/prometheus-exporter/default.nix
