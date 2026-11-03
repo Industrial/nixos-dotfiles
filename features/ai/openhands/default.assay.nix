@@ -15,6 +15,7 @@ let
   pkgs = {
     stdenv.hostPlatform.system = "x86_64-linux";
     makeWrapper = "makeWrapper";
+    claude-code = "/CLAUDE";
     symlinkJoin = args: "wrapped(${builtins.concatStringsSep "," args.paths})";
   };
   inputs = {
@@ -43,6 +44,16 @@ in
     unsetsPythonPath = assay.eq (builtins.match ".*--unset PYTHONPATH.*" code != null) true;
     unsetsPythonHome = assay.eq (builtins.match ".*--unset PYTHONHOME.*" code != null) true;
     wrapsTheBinary = assay.eq (builtins.match ".*wrapProgram [$]out/bin/agent-canvas.*" code != null) true;
+
+    # The second NixOS-specific fix. The ACP bridge's bundled claude is a generic-linux ELF
+    # whose interpreter is nixpkgs' stub-ld, so it exits 127 and the bridge reports only
+    # "Internal error". Pointing it at the nixpkgs build is what makes a Claude Code
+    # conversation possible at all.
+    pointsAtNixpkgsClaude = assay.eq (builtins.match ".*--set-default CLAUDE_CODE_EXECUTABLE.*" code != null) true;
+    usesClaudeCodePackage = assay.eq (builtins.match ".*pkgs\\.claude-code.*" code != null) true;
+
+    # set-default, not set: overridable from the environment for a local Claude build.
+    claudeExecutableIsOverridable = assay.eq (builtins.match ".*--set CLAUDE_CODE_EXECUTABLE.*" code != null) false;
 
     # From the flake input, never from nixpkgs.
     comesFromTheFlakeInput = assay.eq (builtins.match ".*inputs\\.llm-agents\\.packages.*" code != null) true;

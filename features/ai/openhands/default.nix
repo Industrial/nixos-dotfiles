@@ -55,6 +55,38 @@
 #
 # Upstream's wrapper already pins uv and UV_PYTHON; `--unset PYTHONPATH` belongs there too
 # and is worth sending to numtide. Until then it lives here.
+#
+#
+# CLAUDE_CODE_EXECUTABLE MUST POINT AT THE NIXPKGS CLAUDE, for the second NixOS-specific
+# reason this module exists.
+#
+# With PYTHONPATH fixed, Canvas started and the ACP bridge connected, but every attempt to
+# open a Claude Code conversation failed with
+#
+#   ERROR Failed to start ACP server: Internal error   acp_agent.py:2319
+#   acp.exceptions.RequestError: Internal error
+#
+# which is JSON-RPC -32603 and says nothing. Driving the bridge directly over stdio gave the
+# real message:
+#
+#   Claude Code process exited with code 127. stderr: Could not start dynamically linked
+#   executable: ~/.npm/_npx/<hash>/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude
+#   NixOS cannot run dynamically linked executables intended for generic linux environments
+#
+# The bridge depends on @anthropic-ai/claude-agent-sdk, which ships its own prebuilt `claude`
+# for linux-x64 with interpreter /lib64/ld-linux-x86-64.so.2. That path exists here but is
+# nixpkgs' stub-ld, whose entire job is to fail with that message, so the child exits 127 and
+# the bridge reports a generic internal error. nixpkgs' own claude-code is the same program
+# correctly patched for this system, so the fix is to tell the SDK to use it instead of the
+# binary it downloaded.
+#
+# `--set-default`, not `--set`: a developer pointing at a local Claude build should be able to
+# override it from the environment without editing this file.
+#
+# This makes claude-code a hard runtime dependency of this feature, which is honest — Agent
+# Canvas without a working agent backend is a UI with nothing behind it. features/ai/claude-code
+# installs the same package for interactive use; referencing it here is what keeps it in
+# drakkar's closure even if that feature is ever disabled.
 {
   pkgs,
   inputs,
@@ -71,7 +103,8 @@
     postBuild = ''
       wrapProgram $out/bin/agent-canvas \
         --unset PYTHONPATH \
-        --unset PYTHONHOME
+        --unset PYTHONHOME \
+        --set-default CLAUDE_CODE_EXECUTABLE ${pkgs.claude-code}/bin/claude
     '';
   };
 in {
