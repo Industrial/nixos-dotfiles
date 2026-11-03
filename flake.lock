@@ -38,11 +38,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1787813190,
-        "narHash": "sha256-U1VQXB2Ck22DDdW1gRFpDlytPxx36AOBw3Wsy2LhyhM=",
+        "lastModified": 1793696299,
+        "narHash": "sha256-AOOj4HTJcurhm57kZoJnE5olE8dr3Z+1F4yhTvXYuvk=",
         "owner": "Industrial",
         "repo": "assay",
-        "rev": "6dfa1562a05c940a036c2425507537934743b159",
+        "rev": "fdb3db30a6877eef7b56e0ad67423357c1718dab",
         "type": "github"
       },
       "original": {
