@@ -32,12 +32,48 @@
 # opens a port or installs a service: this is the CLI, run on demand as `agent-canvas`.
 # Making it a systemd.user service is a separate decision and needs the state directory and
 # the session key thought through first.
+#
+# PYTHONPATH MUST BE UNSET, and this is the whole reason this module is not a one-liner.
+#
+# Observed on drakkar 2026-11-04: `agent-canvas` started, resolved the backend from PyPI,
+# then died with
+#
+#   ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'
+#
+# and no listener on any port. The agent-server runs from a uv venv on Python 3.14, but the
+# traceback showed `pydantic` being imported from
+# /nix/store/...-python3.13-pydantic-2.12.5/lib/python3.13/site-packages — a nixpkgs build
+# for 3.13. This repo's devenv shell exports a PYTHONPATH of ~130 python3.13 site-packages
+# entries (treefmt, commitizen, roam-code, fastmcp and their closures), PYTHONPATH precedes
+# a venv's own site-packages in sys.path, so the 3.13 pydantic shadowed the 3.14 one and its
+# compiled extension could not load under a 3.14 interpreter.
+#
+# Anything launched from a devenv shell inherits that, so the failure is not specific to
+# OpenHands — it will hit any uv/venv-based Python tool that is not itself on 3.13. Fixing
+# it at the wrapper rather than asking the operator to remember `env -u PYTHONPATH` is the
+# difference between a tool that works and one that works when you invoke it correctly.
+#
+# Upstream's wrapper already pins uv and UV_PYTHON; `--unset PYTHONPATH` belongs there too
+# and is worth sending to numtide. Until then it lives here.
 {
   pkgs,
   inputs,
   ...
-}: {
-  environment.systemPackages = [
-    inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.openhands-agent-canvas
-  ];
+}: let
+  upstream = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.openhands-agent-canvas;
+
+  # PYTHONHOME is not set by the devenv shell today, but it would break the venv the same
+  # way if it ever were, and unsetting a variable that is already absent costs nothing.
+  agent-canvas = pkgs.symlinkJoin {
+    name = "openhands-agent-canvas-wrapped";
+    paths = [upstream];
+    nativeBuildInputs = [pkgs.makeWrapper];
+    postBuild = ''
+      wrapProgram $out/bin/agent-canvas \
+        --unset PYTHONPATH \
+        --unset PYTHONHOME
+    '';
+  };
+in {
+  environment.systemPackages = [agent-canvas];
 }

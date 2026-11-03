@@ -10,7 +10,13 @@ let
   assay = import ./../../../common/assay/default.nix;
   src = builtins.readFile ./default.nix;
 
-  pkgs = {stdenv.hostPlatform.system = "x86_64-linux";};
+  # symlinkJoin is stubbed to report what it was handed, so the systemPackages claim below
+  # still proves the upstream package is what gets wrapped rather than something else.
+  pkgs = {
+    stdenv.hostPlatform.system = "x86_64-linux";
+    makeWrapper = "makeWrapper";
+    symlinkJoin = args: "wrapped(${builtins.concatStringsSep "," args.paths})";
+  };
   inputs = {
     llm-agents.packages.x86_64-linux.openhands-agent-canvas = "openhands-agent-canvas";
   };
@@ -26,7 +32,17 @@ let
       (builtins.filter builtins.isString (builtins.split "\n" src)));
 in
   assay.suite "openhands" {
-    systemPackages = assay.eq mod.environment.systemPackages ["openhands-agent-canvas"];
+    # Exactly one package, and it is the upstream one with a wrapper around it.
+    systemPackages = assay.eq mod.environment.systemPackages ["wrapped(openhands-agent-canvas)"];
+
+    # The load-bearing fix. A devenv shell exports ~130 python3.13 site-packages entries on
+    # PYTHONPATH, which shadow the uv venv's own 3.14 packages and killed the agent-server
+    # with `ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'` before it
+    # bound a port. Asserted so it cannot regress into a tool that only works when invoked
+    # with the right environment.
+    unsetsPythonPath = assay.eq (builtins.match ".*--unset PYTHONPATH.*" code != null) true;
+    unsetsPythonHome = assay.eq (builtins.match ".*--unset PYTHONHOME.*" code != null) true;
+    wrapsTheBinary = assay.eq (builtins.match ".*wrapProgram [$]out/bin/agent-canvas.*" code != null) true;
 
     # From the flake input, never from nixpkgs.
     comesFromTheFlakeInput = assay.eq (builtins.match ".*inputs\\.llm-agents\\.packages.*" code != null) true;
