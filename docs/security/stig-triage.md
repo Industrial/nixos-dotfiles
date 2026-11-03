@@ -12,8 +12,8 @@ are read off each control's fix text, not from having applied it to a host.
 
 | Class | Meaning | Target |
 |---|---|---|
-| `zero-cost` | No user-visible change on a desktop daily driver | `profiles/base-safe.nix` → `profiles/base.nix` |
-| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` only — never the four desktops |
+| `zero-cost` | No user-visible change on a desktop daily driver | `profiles/base-safe.nix` → `hosts/mimir` only (ADR-0004) |
+| `disruptive` | Changes interactive behaviour, or needs site infrastructure that does not exist yet | `profiles/full.nix` only — never a fielded host |
 | `n-a` | Not applicable to this fleet; needs a written justification in the report | excluded via `security.stig.exclude` |
 
 ## Distribution

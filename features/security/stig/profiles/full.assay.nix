@@ -8,13 +8,18 @@ let
   nixpkgsLib = (import <nixpkgs> {}).lib;
   mod = import ./full.nix {lib = nixpkgsLib;};
   baseSafe = import ./base-safe.nix {};
+  # Externally-satisfied controls come from their own module, not from base-safe: ADR-0004
+  # narrowed base-safe to mimir while the disk-layout evidence stayed fleet-wide, so the two
+  # are declared separately. The completeness proof below must read the same file
+  # profiles/base.nix imports, or it would prove coverage the hosts do not have.
+  externalEvidence = import ./external-evidence.nix {};
   manifest = import ./../lib/manifest.nix;
 
   stig = mod.security.stig;
   baseIds = baseSafe.security.stig.implemented;
   fullIds = stig.implemented;
   excluded = builtins.attrNames stig.exclude;
-  external = builtins.attrNames baseSafe.security.stig.satisfiedExternally;
+  external = builtins.attrNames externalEvidence.security.stig.satisfiedExternally;
 
   accountedFor = baseIds ++ fullIds ++ excluded ++ external;
 

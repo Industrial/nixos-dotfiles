@@ -1,9 +1,16 @@
 # Runbook: Anduril NixOS STIG compliance
 
-The fleet carries the [Anduril NixOS STIG](https://cyber.trackr.live/stig/Anduril_NixOS/1/3)
+**mimir** carries the [Anduril NixOS STIG](https://cyber.trackr.live/stig/Anduril_NixOS/1/3)
 V1R3 (103 controls, 11 CAT I / 91 CAT II / 1 CAT III) as its hardening baseline. It replaces
 nixpkgs' `profiles/hardened.nix`, removed in 26.05 for lacking "a consistent and transparent
 baseline or standard" — see [ADR-0003](../adr/0003-kernel-hardening-single-source.md).
+
+drakkar, huginn and muninn deliberately carry **no** controls:
+[ADR-0004](../adr/0004-stig-baseline-mimir-only.md) narrowed the baseline to the one host
+with no interactive user, because the audit set is not free on a machine somebody is typing
+at. They still build a report, and it reads `1/103`: `V-268144` (CAT I, confidentiality at
+rest) stays credited on every host, because LUKS is a property of the disk layout rather than
+of any control module.
 
 **This benchmark ships no OVAL/SCAP content.** All 103 checks are manual
 (`check-content-ref name="M"`), so no SCC or OpenSCAP run can grade a NixOS host against it.
@@ -51,12 +58,23 @@ audit rules — the report cannot see a failed `audit-rules-nixos.service`.
 
 | Profile | Controls | Where |
 |---|---|---|
-| `base-safe` | 68 — nothing a user would notice | `profiles/base.nix`, so every host |
-| `full` | all 103 | VM test targets only, **never** a workstation |
+| `base-safe` | 68 — nothing a user would notice | `hosts/mimir/configuration.nix`, that host only |
+| `full` | all 103 | VM test targets only, **never** a fielded host |
+| none | 0 — option surface only, so the host still reports | `profiles/base.nix`, so every host |
 
 Membership is decided by [`docs/security/stig-triage.md`](../security/stig-triage.md), and
 `base-safe.assay.nix` parses that table and asserts the profile carries exactly the controls
-classified `base`. A disruptive control cannot drift onto the four desktops.
+classified `base`. A disruptive control cannot drift onto a fielded host.
+
+**Only mimir carries controls.** drakkar, huginn and muninn import the option surface alone
+and therefore score `1/103` against profile `none`, with every control `Not Implemented`
+except `V-268144`, which `profiles/external-evidence.nix` credits on all four hosts.
+That is a deliberate posture decision, not a regression — see
+[ADR-0004](../adr/0004-stig-baseline-mimir-only.md). `bin/ci/stig` encodes the same
+distinction: a CAT I control whose status is `Not Implemented` is a documented decision and
+passes the gate, while any other non-compliant status on a CAT I control fails it. So the
+gate still catches a control that *breaks* on mimir, and no longer objects to the three hosts
+that deliberately carry none.
 
 ## Adding a justified exclusion
 

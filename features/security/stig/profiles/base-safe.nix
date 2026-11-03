@@ -1,8 +1,14 @@
 # STIG base-safe profile — the controls that cost nothing interactively.
 #
-# Imported by profiles/base.nix, so every host carries it. Membership is decided by
-# docs/security/stig-triage.md; a control belongs here only if it changes no login, lock,
-# device, radio or password-entry behaviour a user would notice.
+# Imported by hosts/mimir/configuration.nix, and by that host only. It was in
+# profiles/base.nix until ADR-0004: "no interactive cost" was measured against logins, locks
+# and password prompts, and the audit set passes that test while still generating a record
+# per chmod/chown/open/rename on a machine that builds and games. Mimir is the file server,
+# so it is the host where that cost is nobody's problem. profiles/base.nix keeps ../default.nix
+# fleet-wide so every host still reports.
+#
+# Membership is decided by docs/security/stig-triage.md; a control belongs here only if it
+# changes no login, lock, device, radio or password-entry behaviour a user would notice.
 #
 # Composition is by import. There is no enable flag gating the controls — the profile either
 # is imported or is not, like every other feature in this repo. `security.stig.*` below is
@@ -114,19 +120,12 @@ in {
     # Derived from controlModules above, never hand-listed.
     implemented = map idOf controlModules;
 
-    # Controls met by something other than a STIG control module, with the evidence.
-    #
-    # V-268144 is CAT I and is genuinely satisfied on this fleet, but by the DISK LAYOUT
-    # rather than by any NixOS option: every hosts/<name>/disko.nix puts the root filesystem
-    # inside a LUKS container with no keyfile in the store, and each hosts/<name>/disko.assay.nix
-    # asserts exactly that. There is nothing for a control module to declare.
-    #
-    # Reporting it as "Not Implemented" would understate a CAT I control that is in fact met,
-    # which misleads as badly as overstating one. The citation names files that assert the
-    # property, so the claim is checkable rather than asserted.
-    satisfiedExternally = {
-      "V-268144" = "The root filesystem is inside a LUKS container with no keyfile in the Nix store, declared per host in hosts/<name>/disko.nix (type = \"luks\", name = \"cryptroot\") and asserted by hosts/<name>/disko.assay.nix for all four hosts. The ESP cannot be encrypted, so it is mounted umask=0077 instead.";
-    };
+    # NOTE: `satisfiedExternally` is deliberately NOT set here. Its only entry, V-268144
+    # (CAT I, confidentiality at rest), is satisfied by the DISK LAYOUT rather than by any
+    # control module — and the disk layout is LUKS on all four hosts, not only on the one
+    # that carries this profile. Declaring it here would have scoped a fleet-wide fact to
+    # this profile, so ADR-0004 moved it to profiles/base.nix, which every host imports.
+    # Setting it in both places would be a conflicting definition of the same attribute.
 
     # Controls that are configured correctly but cannot take effect until the host reboots,
     # mapped to the reason.
