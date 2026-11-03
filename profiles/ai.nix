@@ -20,6 +20,11 @@
     # ../features/ai/litellm
     # ../features/ai/lmstudio
     # ../features/ai/n8n
+    # OpenHands Agent Canvas. Commented here and imported directly by
+    # hosts/drakkar/configuration.nix instead: muninn imports this profile too, and Canvas
+    # belongs on the desktop only — it is the host with the RAM and the Docker cache, and
+    # the one where somebody is sitting in front of the UI.
+    # ../features/ai/openhands
     # ../features/ai/ollama
     #../features/ai/opencode
     #../features/ai/paperclip

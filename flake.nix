@@ -76,6 +76,24 @@
       url = "github:nlewo/comin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # numtide's package set for coding agents — the source of openhands-agent-canvas
+    # (features/ai/openhands). OpenHands is absent from nixpkgs entirely: verified
+    # 2026-11-04 against this repo's pin, nixos-unstable and master, with no packaging PR
+    # open, so there is nothing to wait for here.
+    #
+    # Deliberately does NOT follow nixpkgs, unlike most inputs above. It pins its own
+    # nixpkgs (885ba4d0) and the package is a buildNpmPackage whose npm-deps hash and
+    # wrapper are fixed against that pin plus a specific uv and python3. Overriding nixpkgs
+    # would invalidate the FOD hash and discard the interpreter pin that keeps uvx from
+    # fetching an unsupported CPython at runtime. One extra nixpkgs in the lock is the
+    # cheaper trade.
+    #
+    # Builds from source here. The flake declares numtide's binary cache in nixConfig, but
+    # Nix ignores substituters from a non-root flake, so it is not in effect — adding it to
+    # the fleet's nix settings would be a separate trust decision, not a side effect of
+    # installing a package.
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   nixConfig = {

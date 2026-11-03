@@ -1,0 +1,49 @@
+# Colocated suite for features/ai/openhands/default.nix
+#
+# Two things worth asserting. The package must come from the llm-agents flake input rather
+# than from pkgs — OpenHands is not in nixpkgs, so a `pkgs.openhands` that silently appears
+# later would be a different, unvetted thing. And no credential may be set here: the whole
+# point of the ACP/Claude Code shape is that it reuses the host's subscription login, and an
+# ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in a NixOS module would land in the world-
+# readable Nix store.
+let
+  assay = import ./../../../common/assay/default.nix;
+  src = builtins.readFile ./default.nix;
+
+  pkgs = {stdenv.hostPlatform.system = "x86_64-linux";};
+  inputs = {
+    llm-agents.packages.x86_64-linux.openhands-agent-canvas = "openhands-agent-canvas";
+  };
+  mod = import ./default.nix {inherit pkgs inputs;};
+
+  # Negative claims read code, not prose: this module's header discusses the credential
+  # variables and the container image precisely so nobody re-derives the reasoning, which
+  # would falsify a claim matched against the raw file.
+  isCommentLine = l: builtins.match "[[:space:]]*#.*" l != null;
+  code =
+    builtins.concatStringsSep "\n"
+    (builtins.filter (l: !isCommentLine l)
+      (builtins.filter builtins.isString (builtins.split "\n" src)));
+in
+  assay.suite "openhands" {
+    systemPackages = assay.eq mod.environment.systemPackages ["openhands-agent-canvas"];
+
+    # From the flake input, never from nixpkgs.
+    comesFromTheFlakeInput = assay.eq (builtins.match ".*inputs\\.llm-agents\\.packages.*" code != null) true;
+    notFromNixpkgs = assay.eq (builtins.match ".*pkgs\\.openhands.*" code != null) false;
+
+    # No credential material in the module, in any of its spellings.
+    noApiKey = assay.eq (builtins.match ".*ANTHROPIC_API_KEY.*" code != null) false;
+    noOauthToken = assay.eq (builtins.match ".*CLAUDE_CODE_OAUTH_TOKEN.*" code != null) false;
+    noCredentialsPath = assay.eq (builtins.match ".*credentials\\.json.*" code != null) false;
+
+    # Installs a CLI; does not declare a service or open a port. Both are deliberate and
+    # both are decisions to revisit explicitly rather than drift into.
+    noSystemdUnit = assay.eq (builtins.match ".*systemd\\..*" code != null) false;
+    noFirewallOpening = assay.eq (builtins.match ".*allowedTCPPorts.*" code != null) false;
+
+    # The stripper must actually strip, or every negative claim above weakens to "not even
+    # mentioned in a comment" — and this module's header mentions all of them.
+    commentsAreStripped = assay.eq (builtins.stringLength code < builtins.stringLength src) true;
+    credentialsAreDiscussedInProse = assay.eq (builtins.match ".*CLAUDE_CODE_OAUTH_TOKEN.*" src != null) true;
+  }
