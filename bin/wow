@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# World of Warcraft Classic management script
+# World of Warcraft management script
 
 set -e
 
@@ -11,11 +11,22 @@ case "${1:-link}" in
     cd "$DOTFILES_ROOT"
     exec features/games/wow-classic/bin/link-wow-classic
     ;;
+  seed-character)
+    shift
+    cd "$DOTFILES_ROOT"
+    exec features/games/wow-classic/bin/seed-wow-character "$@"
+    ;;
   *)
-    echo "Usage: wow [link]"
+    echo "Usage: wow <command> [args]"
     echo ""
     echo "Commands:"
-    echo "  link    Create symlinks from dotfiles to WoW installation (default)"
+    echo "  link                       Symlink WTF and Interface into the WoW install (default)"
+    echo "  seed-character <Name>      Give a character an existing character's settings"
+    echo ""
+    echo "Examples:"
+    echo "  wow link"
+    echo "  wow seed-character \"Some Character\""
+    echo "  wow seed-character \"Some Character\" --from \"Other Character\""
     exit 1
     ;;
 esac

@@ -110,6 +110,45 @@ git add features/games/wow-classic/WTF/
 git commit -m "chore(wow): update settings"
 ```
 
+### Giving a new character your settings
+
+```bash
+bin/wow seed-character "Some Character"
+bin/wow seed-character "Some Character" --from "Other Character"
+```
+
+WoW keeps settings at three levels, and only the first two are usable by a
+character that has never logged in:
+
+| Level | Path | Covers |
+|---|---|---|
+| Client | `WTF/Config.wtf` | graphics, sound, cvars |
+| Account | `WTF/Account/<slot>/` | keybinds, macros, all addon config |
+| Character | `WTF/Account/<slot>/<realm>/<char>/` | action bars, UI layout |
+
+`seed-character` does three things:
+
+1. Copies the account-level payload into **every** account slot. The slot name
+   is client-assigned and not stable across installs, so a restore frequently
+   lands in a slot the current client never reads — covering all of them is what
+   makes keybinds, macros and addon config live on first login.
+2. Adds the character to the `profileKeys` table of every AceDB addon
+   (Bartender4, Plater, BigWigs, BetterBags, HandyNotes, TomTom, Clique,
+   ShadowedUnitFrames, WoWPro), pointing at the template's profile. Without this
+   the character silently gets a fresh default profile and comes up unconfigured.
+3. Copies the per-character directory into every realm directory present.
+
+Nothing is overwritten without `--force`, so it is safe to re-run — and you
+**should** re-run it after the first login, because the realm directory does not
+exist until the client creates it.
+
+Note that step 2 makes the character *share* the template's addon profiles, so
+later edits affect both. Use the addon's own "new profile → copy from" UI in game
+if you want them to diverge.
+
+Character directories replace the space in a two-part name with a hyphen:
+`Skelf Onyourshelf` → `Skelf-Onyourshelf`.
+
 ### Syncing to a new machine
 
 1. Install WoW

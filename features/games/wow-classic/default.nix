@@ -10,9 +10,14 @@
   linkWowClassic = pkgs.writeShellScriptBin "link-wow-classic" ''
     ${builtins.readFile ./bin/link-wow-classic}
   '';
+
+  seedWowCharacter = pkgs.writeShellScriptBin "seed-wow-character" ''
+    ${builtins.readFile ./bin/seed-wow-character}
+  '';
 in {
   environment.systemPackages = [
     linkWowClassic
+    seedWowCharacter
   ];
 
   # Note: Symlinks are created manually via `bin/wow link` script

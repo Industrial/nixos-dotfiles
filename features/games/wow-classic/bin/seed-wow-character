@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+# Seed a character's WoW settings from an existing character.
+#
+# WoW stores settings at three levels:
+#   WTF/Config.wtf                          -- client-wide (graphics, sound)
+#   WTF/Account/<slot>/...                  -- account-wide (keybinds, macros, addon config)
+#   WTF/Account/<slot>/<realm>/<char>/...   -- per character (action bars, layout)
+#
+# The account slot name and the realm directory are both assigned by the client
+# and are NOT stable across installs, so a settings restore from one install
+# usually lands in a slot the new client never reads. This seeds the account
+# level across every slot, maps AceDB profiles onto the new character so addons
+# come up configured on first login, and copies the per-character directory into
+# every realm directory that exists.
+#
+# Idempotent: re-run it after the first login to pick up a realm directory that
+# did not exist yet.
+set -euo pipefail
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: seed-wow-character <NewCharacterName> [--from <TemplateCharacterName>] [--force]
+
+  <NewCharacterName>  Display name as it appears in game, e.g. "Voelundr Industrial".
+                      Spaces map to hyphens in the WTF directory name.
+  --from              Character to copy settings from. Defaults to the character
+                      that AceDB profile keys already reference.
+  --force             Overwrite account-wide files and character directories that
+                      already exist. Off by default; nothing is clobbered.
+EOF
+  exit 1
+}
+
+newName=""
+templateName=""
+force=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --from) templateName="${2:?--from needs a name}"; shift 2 ;;
+    --force) force=1; shift ;;
+    -h|--help) usage ;;
+    -*) echo "ERROR: unknown option $1" >&2; usage ;;
+    *) [ -n "${newName}" ] && { echo "ERROR: unexpected argument $1" >&2; usage; }
+       newName="$1"; shift ;;
+  esac
+done
+
+[ -n "${newName}" ] || usage
+
+echo "features > games > wow-classic > seed-wow-character"
+
+featureRelativePath="features/games/wow-classic"
+if [ -n "${DOTFILES_ROOT:-}" ]; then
+  dotfilesRootPath="${DOTFILES_ROOT}"
+elif [ -d "${PWD}/${featureRelativePath}" ]; then
+  dotfilesRootPath="${PWD}"
+else
+  dotfilesRootPath="${HOME}/.dotfiles"
+fi
+
+wtfPath="${dotfilesRootPath}/${featureRelativePath}/WTF"
+accountPath="${wtfPath}/Account"
+
+if [ ! -d "${accountPath}" ]; then
+  echo "ERROR: no WTF/Account directory at ${accountPath}" >&2
+  exit 1
+fi
+
+# Directory name for a display name: WoW replaces the space in a two-part name
+# with a hyphen ("Skelf Onyourshelf" -> "Skelf-Onyourshelf").
+dirNameFor() { printf '%s' "${1// /-}"; }
+
+newDirName="$(dirNameFor "${newName}")"
+
+# Account slots are every directory under Account/ except the account-wide
+# SavedVariables directory that sits alongside them.
+slotPaths=()
+for candidatePath in "${accountPath}"/*/; do
+  candidateName="$(basename "${candidatePath}")"
+  [ "${candidateName}" = "SavedVariables" ] && continue
+  slotPaths+=("${candidatePath%/}")
+done
+
+if [ "${#slotPaths[@]}" -eq 0 ]; then
+  echo "ERROR: no account slot directories under ${accountPath}" >&2
+  exit 1
+fi
+
+# Infer the template character from existing AceDB profile keys when not given.
+if [ -z "${templateName}" ]; then
+  # Only keys inside a profileKeys block name a character; elsewhere in a
+  # SavedVariables file a bracket key is just addon data. These files are
+  # CRLF, so strip the carriage return before matching.
+  templateCandidates="$(
+    awk '
+      { line = $0; sub(/\r$/, "", line) }
+      index(line, "[\"profileKeys\"]") { inblock = 1; next }
+      inblock && line ~ /^[ \t]*\},?[ \t]*$/ { inblock = 0; next }
+      inblock && line ~ /\["[^"]+"\][ \t]*=[ \t]*"/ {
+        match(line, /\["[^"]+"\]/)
+        key = substr(line, RSTART + 2, RLENGTH - 4)
+        if (key != "global" && key != "Default") print key
+      }
+    ' "${accountPath}"/*/SavedVariables/*.lua 2>/dev/null \
+      | grep -vxF "${newName}" \
+      | sort | uniq -c | sort -rn | sed -E 's/^ *[0-9]+ //'
+  )" || true
+  if [ -z "${templateCandidates}" ]; then
+    echo "ERROR: could not infer a template character; pass --from <name>" >&2
+    exit 1
+  fi
+  inferred=1
+else
+  templateCandidates="${templateName}"
+  inferred=0
+  echo "Template character: ${templateName}"
+fi
+
+if [ "$(dirNameFor "${templateCandidates%%$'\n'*}")" = "${newDirName}" ] && [ "${inferred}" -eq 0 ]; then
+  echo "ERROR: new character and template are the same (${newName})" >&2
+  exit 1
+fi
+
+# Locate the template's slot and per-character directory. A previous run of this
+# command leaves the new character in the profile keys, so candidates are ranked
+# and the first one that actually owns a settings directory wins -- that keeps
+# the command re-runnable after a first login.
+templateName=""
+templateSlotPath=""
+templateCharPath=""
+while IFS= read -r candidateName; do
+  [ -n "${candidateName}" ] || continue
+  candidateDirName="$(dirNameFor "${candidateName}")"
+  [ "${candidateDirName}" = "${newDirName}" ] && continue
+  for slotPath in "${slotPaths[@]}"; do
+    for realmPath in "${slotPath}"/*/; do
+      [ -d "${realmPath}${candidateDirName}" ] || continue
+      templateName="${candidateName}"
+      templateSlotPath="${slotPath}"
+      templateCharPath="${realmPath}${candidateDirName}"
+      break 3
+    done
+  done
+done <<< "${templateCandidates}"
+
+if [ -z "${templateSlotPath}" ]; then
+  echo "ERROR: no settings directory found for any of:" >&2
+  printf '         %s\n' "${templateCandidates}" >&2
+  exit 1
+fi
+
+[ "${inferred}" -eq 1 ] && echo "Template character (inferred): ${templateName}"
+
+echo "Template slot:      $(basename "${templateSlotPath}")"
+echo "Template character: ${templateCharPath#"${wtfPath}"/}"
+echo "New character:      ${newName} -> ${newDirName}"
+echo
+
+# --- 1. account-wide payload ------------------------------------------------
+# Everything here applies to every character on the account, so it is what makes
+# a brand-new character usable on its very first login. Deliberately excluded:
+# config-cache.wtf, character-list-order.txt, cache.md5 and flagged-cache-* are
+# per-install or server-synced state owned by the client.
+accountWideFiles=(
+  bindings-cache.wtf
+  macros-cache.txt
+  edit-mode-cache-account.txt
+  chat-frontend-cache.txt
+  tts-cache-account.txt
+)
+
+echo "== account-wide settings =="
+for slotPath in "${slotPaths[@]}"; do
+  slotName="$(basename "${slotPath}")"
+  [ "${slotPath}" = "${templateSlotPath}" ] && { echo "  ${slotName}: template slot, skipped"; continue; }
+
+  copied=0
+  skipped=0
+
+  for fileName in "${accountWideFiles[@]}"; do
+    sourceFile="${templateSlotPath}/${fileName}"
+    [ -f "${sourceFile}" ] || continue
+    targetFile="${slotPath}/${fileName}"
+    if [ -e "${targetFile}" ] && [ "${force}" -eq 0 ]; then
+      skipped=$((skipped + 1))
+    else
+      cp -a -- "${sourceFile}" "${targetFile}"
+      copied=$((copied + 1))
+    fi
+  done
+
+  mkdir -p -- "${slotPath}/SavedVariables"
+  for sourceFile in "${templateSlotPath}"/SavedVariables/*.lua; do
+    [ -f "${sourceFile}" ] || continue
+    targetFile="${slotPath}/SavedVariables/$(basename "${sourceFile}")"
+    if [ -e "${targetFile}" ] && [ "${force}" -eq 0 ]; then
+      skipped=$((skipped + 1))
+    else
+      cp -a -- "${sourceFile}" "${targetFile}"
+      copied=$((copied + 1))
+    fi
+  done
+
+  echo "  ${slotName}: ${copied} copied, ${skipped} already present"
+done
+
+# --- 2. AceDB profile keys --------------------------------------------------
+# Addons built on AceDB map a character to a profile via a profileKeys table
+# keyed by character name. Without an entry the new character silently gets a
+# fresh default profile, so action bars and unit frames come up unconfigured.
+# Point the new character at whatever profile the template uses.
+echo
+echo "== addon profile mappings =="
+mappedFiles=0
+for slotPath in "${slotPaths[@]}"; do
+  for sourceFile in "${slotPath}"/SavedVariables/*.lua; do
+    [ -f "${sourceFile}" ] || continue
+    grep -q 'profileKeys' "${sourceFile}" || continue
+    grep -q "\\[\"${templateName}\"\\]" "${sourceFile}" || continue
+    if grep -q "\\[\"${newName}\"\\]" "${sourceFile}" && [ "${force}" -eq 0 ]; then
+      continue
+    fi
+
+    # These files are CRLF; preserve the line ending on every line, including
+    # the one inserted. The `= "` guard means only a quoted scalar is ever
+    # duplicated, so even if block tracking slipped into the adjacent
+    # ["profiles"] table it could not splice a `= {` and corrupt the Lua.
+    awk -v tpl="${templateName}" -v new="${newName}" '
+      {
+        line = $0
+        eol = ""
+        if (line ~ /\r$/) { sub(/\r$/, "", line); eol = "\r" }
+
+        if (index(line, "[\"profileKeys\"]")) { inblock = 1 }
+
+        print line eol
+
+        if (inblock && index(line, "[\"" tpl "\"]") && line ~ /=[ \t]*"/) {
+          value = line
+          sub(/^[^=]*=[ \t]*/, "", value)
+          sub(/,[ \t]*$/, "", value)
+          indent = line
+          sub(/[^ \t].*$/, "", indent)
+          print indent "[\"" new "\"] = " value "," eol
+          added = 1
+        }
+
+        if (inblock && line ~ /^[ \t]*\},?[ \t]*$/) { inblock = 0 }
+      }
+      END { if (!added) exit 3 }
+    ' "${sourceFile}" > "${sourceFile}.seed-tmp"
+
+    if [ -s "${sourceFile}.seed-tmp" ]; then
+      mv -- "${sourceFile}.seed-tmp" "${sourceFile}"
+      mappedFiles=$((mappedFiles + 1))
+      echo "  $(basename "${slotPath}")/$(basename "${sourceFile}")"
+    else
+      rm -f -- "${sourceFile}.seed-tmp"
+    fi
+  done
+done
+echo "  ${mappedFiles} addon config(s) now map ${newName}"
+
+# --- 3. per-character directory --------------------------------------------
+# The realm directory is created by the client, so before a first login there is
+# nowhere to put this. That is expected -- re-run after logging in once.
+echo
+echo "== per-character settings =="
+realmCount=0
+for slotPath in "${slotPaths[@]}"; do
+  for realmPath in "${slotPath}"/*/; do
+    realmName="$(basename "${realmPath}")"
+    [ "${realmName}" = "SavedVariables" ] && continue
+    [ -d "${realmPath}" ] || continue
+    realmCount=$((realmCount + 1))
+
+    targetCharPath="${realmPath}${newDirName}"
+    label="$(basename "${slotPath}")/${realmName}/${newDirName}"
+
+    if [ -e "${targetCharPath}" ] && [ "${force}" -eq 0 ]; then
+      echo "  ${label}: already present, left alone"
+      continue
+    fi
+
+    rm -rf -- "${targetCharPath}"
+    cp -a -- "${templateCharPath}" "${targetCharPath}"
+    echo "  ${label}: seeded from ${templateName}"
+  done
+done
+
+if [ "${realmCount}" -eq 0 ]; then
+  echo "  No realm directory exists yet -- the client creates it on first login."
+  echo "  Account-wide settings above already apply, so keybinds, macros and addon"
+  echo "  config are live immediately. Re-run this command after logging in once"
+  echo "  to seed the per-character action bars and UI layout."
+fi
+
+echo
+echo "Done. Review with: git diff --stat ${featureRelativePath}/WTF"
