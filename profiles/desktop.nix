@@ -19,6 +19,7 @@
     ../features/window-manager/xclip
     ../features/window-manager/xfce-screenshooter
     ../features/window-manager/xsel
+    ../profiles/cli-desktop.nix
     inputs.stylix.nixosModules.stylix
   ];
 }

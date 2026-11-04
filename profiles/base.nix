@@ -9,61 +9,9 @@
   ...
 }: {
   imports = [
-    # CLI Tools
-    ../features/cli/assay
-    ../features/cli/bandwhich
-    ../features/cli/bat
-    ../features/cli/bluetuith
-    ../features/cli/broot
-    ../features/cli/btop
-    ../features/cli/c
-    ../features/cli/calcurse
-    ../features/cli/cheatsheet
-    ../features/cli/create-ssh-key
-    ../features/cli/direnv
-    ../features/cli/du
-    ../features/cli/dust
-    ../features/cli/dysk
-    ../features/cli/eza
-    ../features/cli/fastfetch
-    ../features/cli/fd
-    ../features/cli/fish
-    ../features/cli/fzf
-    ../features/cli/g
-    ../features/cli/gix
-    ../features/cli/gpg
-    ../features/cli/gping
-    ../features/cli/jq
-    ../features/cli/killall
-    ../features/cli/l
-    ../features/cli/lazygit
-    ../features/cli/leaves
-    ../features/cli/ll
-    ../features/cli/lnav
-    ../features/cli/lsof
-    ../features/cli/lsusb
-    ../features/cli/nettools
-    ../features/cli/ngrok
-    ../features/cli/nix-tree
-    ../features/cli/nixdrv
-    ../features/cli/nixfetch
-    ../features/cli/nixos-update-notifier
-    ../features/cli/nixq
-    ../features/cli/nixstore
-    ../features/cli/nushell
-    ../features/cli/nvtop
-    ../features/cli/oomkiller
-    ../features/cli/p
-    ../features/cli/p7zip
-    ../features/cli/procs
-    ../features/cli/ranger
-    ../features/cli/ripgrep
-    ../features/cli/spotify-player
-    ../features/cli/starship
-    ../features/cli/unrar
-    ../features/cli/unzip
-    ../features/cli/usbtree
-    ../features/cli/zellij
+    # CLI Tools — the headless-safe set. The seat-bound rest is in profiles/cli-desktop.nix,
+    # imported by profiles/desktop.nix; see that file's header for the boundary.
+    ../profiles/cli-core.nix
 
     # Core NixOS Configuration
     ../features/nixos
