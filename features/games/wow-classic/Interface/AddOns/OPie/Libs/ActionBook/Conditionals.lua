@@ -2,8 +2,10 @@ local COMPAT, _, T = select(4, GetBuildInfo()), ...
 if T.SkipLocalActionBook then return end
 if T.TenEnv then T.TenEnv() end
 
-local MODERN, CI_ERA, CF_CATA, CF_MISTS = COMPAT >= 11e4 or nil, COMPAT < 2e4, COMPAT > 4e4 and COMPAT < 11e4, COMPAT > 5e4 and COMPAT < 11e4
-local SECRETS, NO_SECRETS = MODERN, not MODERN
+local MODERN, CI_ERA, CI_4E = COMPAT >= 11e4 or nil, COMPAT < 160e2, COMPAT > 160e2 and COMPAT < 2e4
+local CF_CATA, CF_MISTS = COMPAT > 4e4 and COMPAT < 11e4, COMPAT > 5e4 and COMPAT < 11e4
+local SECRETS = COMPAT > 12e4 or COMPAT > 160e2 and COMPAT < 2e4 or nil
+local NO_SECRETS = not SECRETS or nil
 local EV, WR = T.Evie, T.Ware
 local AB = T.ActionBook:compatible(2, 31)
 local KR = T.ActionBook:compatible("Kindred", 1,33)
@@ -443,7 +445,7 @@ securecall(function() -- race:token
 end)
 securecall(function() -- professions
 	KR:SetStateConditionalValue("prof", false)
-	local MODERN_PROFS = MODERN or CF_MISTS
+	local MODERN_PROFS = MODERN or CF_MISTS or CI_4E
 	local ct, ot, curProfState, syncProfInner = {}, {}, false
 	local map = MODERN_PROFS and {
 		[197]="tail", [165]="lw", [164]="bs",
@@ -721,8 +723,8 @@ securecall(function() -- imbuedmh, imbuedoh, imbuedrw
 	KR:SetStateConditionalValue("imbuedoh", false)
 	KR:SetStateConditionalValue("imbuedrw", false)
 	local weaponInfoOffset = {
-		imbuedmh = MODERN and 1,
-		imbuedoh = MODERN and 5,
+		imbuedmh = SECRETS and 1,
+		imbuedoh = SECRETS and 5,
 		imbuedrw = not MODERN and 9 or nil, -- BUG[Classic/2408]: SAHT ignores ranged weapon; Modern has no ranged slot
 	}
 	local function checkWeaponImbued(name, _args)
@@ -732,7 +734,7 @@ securecall(function() -- imbuedmh, imbuedoh, imbuedrw
 	for k in pairs(weaponInfoOffset) do
 		KR:SetNonSecureConditional(k, checkWeaponImbued)
 	end
-	if MODERN then
+	if SECRETS then
 		return
 	end
 	local h = CreateFrame("Frame", nil, nil, "SecureAuraHeaderTemplate")
@@ -1159,9 +1161,13 @@ securecall(function() -- Housing Return
 	if not MODERN then
 		return
 	end
+	local ov
 	local function syncReturn()
 		local v = not not C_HousingNeighborhood.CanReturnAfterVisitingHouse()
-		KR:SetStateConditionalValue("housereturn", v)
+		if v ~= ov then
+			ov = v
+			KR:SetStateConditionalValue("housereturn", v)
+		end
 	end
 	EV.PLAYER_ENTERING_WORLD = syncReturn
 	EV.UPDATE_UI_WIDGET = syncReturn

@@ -210,6 +210,11 @@ L.autotalk_boss_desc = "Automatically select the NPC dialog options that cause t
 L.autotalk_generic_desc = "Automatically select the NPC dialog options that cause you to progress to the next stage of the dungeon."
 L.autotalk_notice = "Automatically interacting with NPC %s."
 
+-- Auto Player Choice
+L.autoPlayerChoice = "Automatic Player Choice"
+L.autoPlayerChoice_delve_power_desc = "Automatically select player powerups when they are dropped by creatures in the Delve."
+L.autoPlayerChoice_notice = "Automatically selecting: %s"
+
 -- GUI notes
 L.intermissionOnly = "Intermission Only" -- A note to explain that a specific ability only happens during the intermission stage of a boss fight
 L.stage1Only = "Stage 1 Only" -- A note to explain that a specific ability only happens during stage 1 of a boss fight
@@ -305,6 +310,7 @@ L.arrows = "Arrows" -- Plural of L.arrow
 L.ball = "Ball" -- A ball, like a football, basketball, etc
 L.balls = "Balls" -- Plural of L.ball
 L.blind = "Blind" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "Blood" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 L.bouncing_ball = "Bouncing Ball" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 L.bouncing_balls = "Bouncing Balls" -- Plural of L.bouncing_ball
 L.chakram = "Chakram" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

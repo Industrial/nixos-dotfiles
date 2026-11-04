@@ -424,10 +424,8 @@ L["STRING_OPTIONS_ANIMATESCROLL_DESC"] = "当启用时，滚动计量条使用�
 L["STRING_OPTIONS_APPEARANCE"] = "外观"
 L["STRING_OPTIONS_ATTRIBUTE_TEXT"] = "标题文本设置"
 L["STRING_OPTIONS_ATTRIBUTE_TEXT_DESC"] = "这些选项控制窗口的标题文本。"
---[[Translation missing --]]
-L["STRING_OPTIONS_AUTO_COMBATLOG"] = "Auto Start Combatlog"
---[[Translation missing --]]
-L["STRING_OPTIONS_AUTO_COMBATLOG_DESC"] = "Automatically start and stop logging combat to the combatlog.txt file when you enter or leave a raid or dungeon."
+L["STRING_OPTIONS_AUTO_COMBATLOG"] = "自动开始战斗日志"
+L["STRING_OPTIONS_AUTO_COMBATLOG_DESC"] = "当你进入或离开团队副本或地下城时，自动开始和停止向 combatlog.txt 文件记录战斗日志。"
 L["STRING_OPTIONS_AUTO_SWITCH"] = "所有角色 |cFFFFAA00(战斗中)|r"
 L["STRING_OPTIONS_AUTO_SWITCH_COMBAT"] = "|cFFFFAA00(战斗中)|r"
 L["STRING_OPTIONS_AUTO_SWITCH_DAMAGER_DESC"] = "使用伤害输出专精时，窗口将自动显示此属性或插件。"
@@ -634,6 +632,144 @@ L["STRING_OPTIONS_DEATHLOG_MINHEALING"] = "死亡记录最低治疗量"
 L["STRING_OPTIONS_DEATHLOG_MINHEALING_DESC"] = "死亡记录不会显示低于该值的治疗量"
 L["STRING_OPTIONS_DESATURATE_MENU"] = "降低饱和度"
 L["STRING_OPTIONS_DESATURATE_MENU_DESC"] = "启用该选项，所有的工具栏上的菜单图标变成黑色和白色。"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ALIGN_COLUMNS"] = "Align Value Columns"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ALIGN_COLUMNS_DESC"] = "Draws the value columns in fixed columns instead of running them together into one formatted string. This is not a window setting, it changes every window at once."
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ARENA_ROLE_ICON_SIZE_OFFSET"] = "Arena Role Icon Size Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ARENA_TEAM_COLOR"] = "Arena Team Color"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BACKGROUND_BY_CLASS"] = "Background by Class"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BAR_ALPHA"] = "Opacity"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BAR_BORDER"] = "Show Bar Border"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BAR_START_AFTER_ICON"] = "Bar Starts After Icon"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BORDER_COLOR"] = "Border Color"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BORDER_THICKNESS"] = "Border Thickness"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_BUTTON_MODE"] = "Mode"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_COLOR_BY_CLASS"] = "Color by Class"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_DESATURATED_MENU"] = "Desaturated Buttons"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_FACTION_ICON_SIZE_OFFSET"] = "Faction Icon Size Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_HINT"] = "Click a part of the preview to edit it. Changes apply to the window selected at the top right."
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ICON_GRAYSCALE"] = "Grayscale Icons"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ICON_SET"] = "Icon Set"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ICON_SIZE_OFFSET"] = "Icon Size Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_MENU_ICON_SIZE"] = "Button Size"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_MENU_ICON_SPACING"] = "Button Spacing"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NAME_OFFSET"] = "Name Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NAME_SIZE_OFFSET"] = "Unit Name Size Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NAME_SIZE_OFFSET_DESC"] = "Give the unit name more or less room before it is cut short by the value columns."
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NAME_TEXT"] = "Unit Name"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NAME_TEXT_COLOR_DESC"] = [=[Change the text color of the unit name.
+
+Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NO_BRACKET"] = "no bracket"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_NO_SEPARATOR"] = "no separator"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARICONS"] = "Bar Icons"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARNAMETEXT"] = "Bar Unit Name"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARS"] = "Bars"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARTEXTS"] = "Bar Texts"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARVALUETEXT"] = "Bar Values"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_STATUSBAR"] = "Status Bar"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_TITLEBUTTONS"] = "Title Buttons"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_TITLETEXT"] = "Title Text"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OBJECT_WINDOW"] = "Window"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OVERLAY"] = "Overlay"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_OVERLAY_TEXTURE_DESC"] = "Texture which sits above the bar"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_PERCENT_OF_TOP"] = "Relative to Top Player"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_PERCENT_OF_TOTAL"] = "Relative to Total"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_PERCENT_TYPE"] = "Percent Type"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_PREVIEW"] = "Preview"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_PREVIEW_MISSING"] = "A preview window could not be created, so there is nothing to edit here."
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_REMOVE_CUSTOM_TEXTURE"] = "Remove Custom Texture"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ROUNDED_CORNERS"] = "Rounded Corners"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_ROW_AREA_ALPHA"] = "Row Area Opacity"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHADOW_OFFSET_X"] = "Shadow Offset X"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHADOW_OFFSET_Y"] = "Shadow Offset Y"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_ARENA_ROLE_ICON"] = "Show Arena Role Icon"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_ENCOUNTER_TIMER"] = "Show Encounter Timer"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_FACTION_ICON"] = "Show Faction Icon"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_FACTION_ICON_DESC"] = "When showing a player from the opposite faction, show the faction icon."
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_PERCENT_DESC"] = "Shows the percent column beside the value columns. Applies while the value columns are aligned; with the simple text format the columns are decided by that format instead."
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_RANK_NUMBER"] = "Show Rank Number"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_STATUSBAR"] = "Show Status Bar"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_SHOW_WINDOW_BORDER"] = "Show Border"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TEXT_OUTLINE"] = "Outline"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TEXT_X_OFFSET"] = "Horizontal Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TEXT_Y_OFFSET"] = "Vertical Offset"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TITLE_TEXT_ENABLED"] = "Show Title Text"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_ENABLED"] = "Custom Title Bar"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_ENABLED_DESC"] = [=[Use an alternative title bar instead of the title bar builtin in the Skin file.
+
+|cFFFFFF00Important|r: To disable the title bar from the Skin file, go to 'Window' and make the 'skin color' fully transparent.]=]
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_HEIGHT"] = "Height"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_VALUE_TEXT"] = "Value Columns"
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_VALUE_TEXT_COLOR_DESC"] = [=[Change the text color of the value columns.
+
+Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
+--[[Translation missing --]]
+L["STRING_OPTIONS_DESIGNER_WHICH_BUTTONS"] = "Buttons shown"
 L["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW"] = "禁用\"全部显示\"窗口"
 L["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW_DESC"] = "启用时，右键点击标题栏会显示书签内容。"
 L["STRING_OPTIONS_DISABLE_BARHIGHLIGHT"] = "禁用计量条高亮"
@@ -856,16 +992,11 @@ L["STRING_OPTIONS_PERFORMANCECAPTURES_DESC"] = "这些选项是负责分析和�
 L["STRING_OPTIONS_PERFORMANCEPROFILES_ANCHOR"] = "性能配置："
 L["STRING_OPTIONS_PICONS_DIRECTION"] = "插件图标方向"
 L["STRING_OPTIONS_PICONS_DIRECTION_DESC"] = "改变这些插件图标显示在工具栏上的方向。"
---[[Translation missing --]]
-L["STRING_OPTIONS_PLAYERNAME"] = "Player Name"
---[[Translation missing --]]
-L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT"] = "Auto Alignment"
---[[Translation missing --]]
-L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT_DESC"] = "Disable this only if you experience player name alignment issues."
---[[Translation missing --]]
-L["STRING_OPTIONS_PLAYERNAME_AUTO_WIDTH"] = "Length Auto"
---[[Translation missing --]]
-L["STRING_OPTIONS_PLAYERNAME_WIDTH"] = "Length"
+L["STRING_OPTIONS_PLAYERNAME"] = "玩家名称"
+L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT"] = "自动对齐"
+L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT_DESC"] = "仅当你遇到玩家名称对齐问题时才禁用此功能。"
+L["STRING_OPTIONS_PLAYERNAME_AUTO_WIDTH"] = "长度自动"
+L["STRING_OPTIONS_PLAYERNAME_WIDTH"] = "长度"
 L["STRING_OPTIONS_PLUGINS"] = "插件"
 L["STRING_OPTIONS_PLUGINS_AUTHOR"] = "作者"
 L["STRING_OPTIONS_PLUGINS_NAME"] = "名字"
@@ -1024,8 +1155,7 @@ L["STRING_OPTIONS_SCROLLBAR_DESC"] = [=[启用或禁用滚动条。
  |cFFFFFF00拉伸处理|r 超出了窗口键/菜单（关闭按钮左边）。]=]
 L["STRING_OPTIONS_SEGMENTSSAVE"] = "存储片段"
 L["STRING_OPTIONS_SEGMENTSSAVE_DESC"] = "这些选项控制你想要在游戏登录会话之间保存多少个片段。较高的值可能会增加角色注销时所需的时间。"
---[[Translation missing --]]
-L["STRING_OPTIONS_SELECT_TEMPLATE"] = "Select Template"
+L["STRING_OPTIONS_SELECT_TEMPLATE"] = "选择模版"
 L["STRING_OPTIONS_SENDFEEDBACK"] = "反馈"
 L["STRING_OPTIONS_SHOW_SIDEBARS"] = "显示边框"
 L["STRING_OPTIONS_SHOW_SIDEBARS_DESC"] = "显示或隐藏窗口边框。"
@@ -1111,10 +1241,8 @@ L["STRING_OPTIONS_TEXT_OUTLINE"] = "文本轮廓"
 L["STRING_OPTIONS_TEXT_RIGHT_ANCHOR"] = "右文本："
 L["STRING_OPTIONS_TEXT_ROUTILINE_DESC"] = "启用或禁用右边文字的下划线。"
 L["STRING_OPTIONS_TEXT_ROWICONS_ANCHOR"] = "图标："
---[[Translation missing --]]
-L["STRING_OPTIONS_TEXT_SHADOWCOLOR"] = "Shadow Color"
---[[Translation missing --]]
-L["STRING_OPTIONS_TEXT_SHADOWOFFSET"] = "Shadow Offset %s"
+L["STRING_OPTIONS_TEXT_SHADOWCOLOR"] = "阴影颜色"
+L["STRING_OPTIONS_TEXT_SHADOWOFFSET"] = "阴影偏移 %s"
 L["STRING_OPTIONS_TEXT_SHOW_BRACKET"] = "括号"
 L["STRING_OPTIONS_TEXT_SHOW_BRACKET_DESC"] = "选择哪个字符是用来打开和关闭每秒和百分比块。"
 L["STRING_OPTIONS_TEXT_SHOW_PERCENT"] = "显示百分比"
@@ -1185,10 +1313,8 @@ L["STRING_OPTIONS_TOOLTIPS_BACKGROUNDCOLOR_DESC"] = "选择背景上使用的颜
 L["STRING_OPTIONS_TOOLTIPS_BORDER_COLOR_DESC"] = "更改边框颜色"
 L["STRING_OPTIONS_TOOLTIPS_BORDER_SIZE_DESC"] = "更改边框大小"
 L["STRING_OPTIONS_TOOLTIPS_BORDER_TEXTURE_DESC"] = "修改边框纹理文件"
---[[Translation missing --]]
-L["STRING_OPTIONS_TOOLTIPS_DISABLE"] = "Disable Tooltips"
---[[Translation missing --]]
-L["STRING_OPTIONS_TOOLTIPS_DISABLE_DESC"] = "Disable tooltips for the selected window."
+L["STRING_OPTIONS_TOOLTIPS_DISABLE"] = "禁用鼠标提示"
+L["STRING_OPTIONS_TOOLTIPS_DISABLE_DESC"] = "禁用选定窗口的鼠标提示。"
 L["STRING_OPTIONS_TOOLTIPS_FONTCOLOR"] = "文字颜色"
 L["STRING_OPTIONS_TOOLTIPS_FONTCOLOR_DESC"] = "更改提示文本上使用的颜色"
 L["STRING_OPTIONS_TOOLTIPS_FONTFACE"] = "文字字体"
@@ -1308,6 +1434,8 @@ L["STRING_OPTIONSMENU_COMBAT"] = "战斗"
 L["STRING_OPTIONSMENU_DATACHART"] = "图表数据"
 L["STRING_OPTIONSMENU_DATACOLLECT"] = "数据采集"
 L["STRING_OPTIONSMENU_DATAFEED"] = "数据源"
+--[[Translation missing --]]
+L["STRING_OPTIONSMENU_DESIGNER"] = "Designer"
 L["STRING_OPTIONSMENU_DISPLAY"] = "展示"
 L["STRING_OPTIONSMENU_DISPLAY_DESC"] = "总体基本调整和快速的窗口控制。"
 L["STRING_OPTIONSMENU_LEFTMENU"] = "标题栏：按钮"
@@ -1329,8 +1457,7 @@ L["STRING_OPTIONSMENU_TOOLTIP"] = "提示"
 L["STRING_OPTIONSMENU_WALLPAPER"] = "壁纸"
 L["STRING_OPTIONSMENU_WINDOW"] = "窗口设置"
 L["STRING_OPTIONSMENU_WINDOWBODY"] = "视窗设定"
---[[Translation missing --]]
-L["STRING_OR"] = "Or"
+L["STRING_OR"] = "或"
 L["STRING_OVERALL"] = "总体"
 L["STRING_OVERHEAL"] = "过量治疗"
 L["STRING_OVERHEALED"] = "过量治疗的"

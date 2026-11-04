@@ -4,6 +4,7 @@ local api, iapi, configCache, vis = {}, {}, {}, {}
 local max, min, abs, floor, sin, cos = math.max, math.min, math.abs, math.floor, sin, cos
 local GetPartialHintRaw = PC.GetPartialHintRaw
 local MODERN, CI_ANNIVERSARY = COMPAT > 11e4, COMPAT > 2e4 and COMPAT < 3e4
+local SECRETS = COMPAT > 12e4 or COMPAT > 160e2 and COMPAT < 2e4 or nil
 local MIN_ANIMATION_FPS, LOCKED_FRAMERATE = 20, 60 do
 	local ticks = 0
 	local function unlockTick()
@@ -23,6 +24,15 @@ local PROF_QUALITY_ATLAS = {} do
 	PROF_QUALITY_ATLAS[6] = "Professions-ChatIcon-Quality-12-Tier1"
 	PROF_QUALITY_ATLAS[7] = "Professions-ChatIcon-Quality-12-Tier2"
 end
+local OVERLAY_ICON_INFO do
+	local o = CI_ANNIVERSARY and -32/256 or 0
+	local pingAtlas = C_Texture.GetAtlasInfo("Ping_Marker_Icon_Nonthreat") or ""
+	OVERLAY_ICON_INFO = {
+		{"Interface\\MINIMAP\\TRACKING\\OBJECTICONS", 21, 28, 40/256 + o, 64/256 + o, 32/64, 1},
+		{"Interface/Buttons/UI-GroupLoot-DE-Up", 20, 20},
+		{pingAtlas.file, 20, 20, pingAtlas.leftTexCoord, pingAtlas.rightTexCoord, pingAtlas.topTexCoord, pingAtlas.bottomTexCoord},
+	}
+end
 
 local Slices, GhostIndication, IndicatorFactories = {}, {}, {}
 local ActiveIndicatorFactory, LastRegisteredIndicatorFactory
@@ -39,7 +49,7 @@ local CreateQuadTexture do
 			end
 		end
 	end
-	local quadPoints, quadTemplate = {"BOTTOMRIGHT", "BOTTOMLEFT", "TOPLEFT", "TOPRIGHT"}, {__index={SetVertexColor=qf("SetVertexColor"), SetAlpha=qf("SetAlpha"), SetShown=qf("SetShown")}}
+	local quadPoints, quadTemplate = {"BOTTOMRIGHT", "BOTTOMLEFT", "TOPLEFT", "TOPRIGHT"}, {__index={SetVertexColor=qf("SetVertexColor"), SetAlpha=qf("SetAlpha"), SetShown=qf("SetShown"), SetAlphaFromBoolean=SECRETS and qf("SetAlphaFromBoolean")}}
 	function CreateQuadTexture(layer, size, file, parent, qparent)
 		local group, size = setmetatable({}, quadTemplate), size/2
 		for i=1,4 do
@@ -82,6 +92,8 @@ local CreateIndicator do
 end
 
 local gfxBase = ([[Interface\AddOns\%s\gfx\]]):format((...))
+local GFX_POINTER = gfxBase .. "pointer"
+
 local mainAnchor, proxyAnchor = CreateFrame("Frame"), CreateFrame("Frame")
 	for i=1,2 do
 		i = i == 1 and mainAnchor or proxyAnchor
@@ -102,30 +114,26 @@ local mainFrame = CreateFrame("Frame", nil, UIParent)
 local centerPointer = mainFrame:CreateTexture(nil, "ARTWORK")
 	centerPointer:SetSize(192,192)
 	centerPointer:SetPoint("CENTER")
-	centerPointer:SetTexture(gfxBase .. "pointer")
-local ringQuad, setRingRotationPeriod, centerCircle, centerGlow = {} do
-	local quadPoints, animations = {"BOTTOMRIGHT", "BOTTOMLEFT", "TOPLEFT", "TOPRIGHT"}, {}
+	centerPointer:SetTexture(GFX_POINTER)
+local ringQuad, setRingRotationPeriod, centerCircle, centerGlow, centerAnimGroup = {} do
+	local quadPoints = {"BOTTOMRIGHT", "BOTTOMLEFT", "TOPLEFT", "TOPRIGHT"}
+	centerAnimGroup = mainFrame:CreateAnimationGroup()
+	centerAnimGroup:SetLooping("REPEAT")
 	for i=1,4 do
 		local qf = CreateFrame("Frame", nil, mainFrame)
 		qf:SetSize(32,32)
 		qf:SetPoint(quadPoints[i], mainFrame, "CENTER")
+		local a = centerAnimGroup:CreateAnimation("Rotation")
+		a:SetOrigin(quadPoints[i], 0, 0)
+		a:SetDuration(4)
+		a:SetDegrees(-360)
+		a:SetTarget(qf)
 		ringQuad[i] = qf
 	end
 	centerCircle = CreateQuadTexture("ARTWORK", 64, gfxBase .. "circle", nil, ringQuad)
 	centerGlow = CreateQuadTexture("BACKGROUND", 128, gfxBase .. "glow", nil, ringQuad)
-	for i=1,4 do
-		local g, a = ringQuad[i]:CreateAnimationGroup()
-		g:SetLooping("REPEAT")
-		a = g:CreateAnimation("Rotation")
-		a:SetOrigin(quadPoints[i], 0, 0)
-		a:SetDuration(4)
-		a:SetDegrees(-360)
-		animations[i] = a
-		g:Play()
-	end
 	function setRingRotationPeriod(p)
-		local p = max(0.1, p)
-		for i=1,4 do animations[i]:SetDuration(p) end
+		centerAnimGroup:SetAnimationSpeedMultiplier(4/max(0.125, p))
 	end
 end
 local function setIndicationPosition(rel, ox, oy)
@@ -144,8 +152,9 @@ end
 local function setIndicationShown(shown)
 	mainFrame:SetShown(shown)
 	proxyFrame:SetShown(shown)
+	centerAnimGroup[shown and "Play" or "Stop"](centerAnimGroup)
 end
-if MODERN then
+if SECRETS then
 	local s = CreateFrame("StatusBar", nil, mainFrame)
 	s:SetPoint("CENTER")
 	s:SetSize(100, 1)
@@ -304,20 +313,21 @@ do -- GhostIndication
 end
 
 local SwitchIndicatorFactory, ValidateIndicator do
-	local CURRENT_API_LEVEL, REQ_API_LEVEL, CURRENT_API_LEVEL_OOD = 4, MODERN and 4 or 3, MODERN and 4 or 3
+	local CURRENT_API_LEVEL, REQ_API_LEVEL, CURRENT_API_LEVEL_OOD = 5, SECRETS and 4 or 3, SECRETS and 5 or 3
 	local RequiredIndicatorMethods = {
 		SetPoint=0, SetScale=0, GetScale=0, SetShown=0, SetParent=0,
 		SetIcon=0, SetIconTexCoord=0, SetIconAtlas=3, SetIconVertexColor=0, SetDominantColor=0,
 		SetOverlayIcon=0, SetOverlayIconVertexColor=1,
 		SetUsable=0, SetCount=0, SetBinding=0,
 		SetCooldown=0, SetCooldownTextShown="supportsCooldownNumbers", SetShortLabel="supportsShortLabels",
-		SetCooldownDuration=MODERN and 4 or nil, SetCooldownPH="supportsCooldownPH",
+		SetCooldownDuration=SECRETS and 4 or nil, SetCooldownPH="supportsCooldownPH",
 		SetEquipState=0, SetHighlighted=0, SetActive=0, SetOuterGlow=0,
 		SetQualityOverlay=2,
 	}
 	local SkipMethodOption = {
 		SetCooldownDuration="supportsCooldownPH",
 	}
+	local SecretTestMethods = {"SetActive", "SetHighlighted", "SetOuterGlow"}
 	function ValidateIndicator(apiLevel, reqAPILevel, info)
 		if apiLevel < REQ_API_LEVEL or (reqAPILevel or apiLevel) > CURRENT_API_LEVEL then
 			return false, "API level " .. apiLevel .. " is not supported (current is " .. CURRENT_API_LEVEL .. ")"
@@ -327,6 +337,12 @@ local SwitchIndicatorFactory, ValidateIndicator do
 			local tv, ao = type(v), SkipMethodOption[k]
 			if type(f[k]) ~= "function" and ((tv == "number" and apiLevel >= v) or (tv == "string" and info[v])) and not (ao and info[ao]) then
 				return false, ("Expected a function for indicator key %q, got %s."):format(k, type(f[k]))
+			end
+		end
+		local sfalse = SECRETS and secretwrap(false)
+		for i=1, SECRETS and apiLevel >= 5 and #SecretTestMethods or 0 do
+			if not pcall(f[SecretTestMethods[i]], f, sfalse) then
+				return false, ("Expected indicator method %q to accept secrets."):format(SecretTestMethods[i])
 			end
 		end
 		return {[f]=true}
@@ -523,7 +539,7 @@ local function updateCentralElements(_self, si, _, tok, usable, state, icon, cap
 	local sUsable = usable or (state and usable ~= false) or false
 	local cdDuration = sUsable and cdHintID and GetPartialHintRaw(cdHintID, "cooldownDuration")
 	local glowAlpha = cdDuration and C_CurveUtil.EvaluateColorValueFromBoolean(cdDuration:IsZero(), 0.75, 0) or sUsable and 0.75 or 0
-	if MODERN then
+	if SECRETS then
 		iapi.updateReadyGlowValue(glowAlpha)
 	else
 		local GLOW_FADE_TIME, gTarget, gEnd = 0.3, vis.glowTarget, vis.glowEnd
@@ -544,17 +560,18 @@ local function updateCentralElements(_self, si, _, tok, usable, state, icon, cap
 end
 local function updateSlice(self, originAngle, selected, tok, usable, state, icon, _, count, cd, cd2, _tf, _ta, ext, stext)
 	local isJump, origIcon, tokIcon, jumpOtherTok, isJumpIconOverlay, isAtlasIcon = false, icon, tokenIcon[tok]
-	state, usable, ext = state or 0, usable or (state and usable ~= false) or false, not tokenIcon[tok] and ext or nil
+	state, usable = state or 0, usable or (state and usable ~= false) or false
+	local hintExt = ext and state % 1073741824 >= 33554432
+	local icoext = not tokenIcon[tok] and not hintExt and ext or nil
 	if state % 8192 >= 4096 then
 		icon, jumpOtherTok, isJump, count = 188515, count, true, 0
 	end
 	icon = tokIcon or icon or "Interface/Icons/INV_Misc_QuestionMark"
 	isJumpIconOverlay, isAtlasIcon = isJump and icon == 188515, icon == origIcon and state % 524288 >= 262144 or tokIcon and icon == tokIcon and iconIsAtlas[icon]
 	local active, overlay, faded, isRecharge = state % 2 >= 1, state % 4 >= 2, not usable, state % 128 >= 64
-	local isInContainer, isInInventory, isQuestStartItem = state % 256 >= 128, state % 512 >= 256, tokenQuest[tok] or (state % 64 >= 32)
-	local isDisenchanting = state % 262144 >= 131072
-	local isPartiallyHinted = state % 1048576 >= 524288
-	local cdHintID, holdCount = isPartiallyHinted and cd == nil and cd2, isPartiallyHinted and state % 2097152 >= 1048576
+	local isInContainer, isInInventory = state % 256 >= 128, state % 512 >= 256
+	local isPartiallyHinted = hintExt or state % 1048576 >= 524288
+	local cdHintID = hintExt and (state % 67108864 >= 33554432) and ext or isPartiallyHinted and cd == nil and cd2
 	local onCooldown, noMana, noRange, qual = cd and cd > 0, state % 16 >= 8, state % 32 >= 16, state % qualMod
 	local usableCharge = usable or isRecharge
 	cd2 = cd and cd2 or nil
@@ -563,8 +580,8 @@ local function updateSlice(self, originAngle, selected, tok, usable, state, icon
 	if isAtlasIcon and state % 4194304 >= 2097152 then
 		self:SetIconTexCoord(4/64, 60/64, 4/64, 60/64)
 	end
-	if ext then securecall(applyExtIconCoord, self, ext) end
-	if not (ext and securecall(applyExtIconVertexColor, self, ext)) then
+	if icoext then securecall(applyExtIconCoord, self, icoext) end
+	if not (icoext and securecall(applyExtIconVertexColor, self, icoext)) then
 		self:SetIconVertexColor(1, 1, 1)
 	end
 	local dr, dg, db = getSliceColor(tok, isJumpIconOverlay and origIcon or icon, jumpOtherTok)
@@ -579,26 +596,33 @@ local function updateSlice(self, originAngle, selected, tok, usable, state, icon
 		x2,y2 = cx + cr*cos(a1+ 90), cy - cr*sin(a1+ 90)
 		x3,y3 = cx + cr*cos(a1+180), cy - cr*sin(a1+180)
 		x4,y4 = cx + cr*cos(a1+270), cy - cr*sin(a1+270)
-		self:SetOverlayIcon(gfxBase .. "pointer", 40, 40, x2,y2, x3,y3, x1,y1, x4,y4)
+		self:SetOverlayIcon(GFX_POINTER, 40, 40, x2,y2, x3,y3, x1,y1, x4,y4)
 		self:SetOverlayIconVertexColor(dr, dg, db)
-	elseif isDisenchanting then
-		self:SetOverlayIcon("Interface/Buttons/UI-GroupLoot-DE-Up", 20, 20)
-		self:SetOverlayIconVertexColor(1,1,1)
 	else
-		local o = CI_ANNIVERSARY and -32/256 or 0
-		self:SetOverlayIcon(isQuestStartItem and "Interface\\MINIMAP\\TRACKING\\OBJECTICONS", 21, 28, 40/256 + o, 64/256 + o, 32/64, 1)
-		self:SetOverlayIconVertexColor(1,1,1)
+		local overlayIcon = state % 33554432
+		if overlayIcon < 4194304 then
+			overlayIcon = OVERLAY_ICON_INFO[state % 262144 >= 131072 and 2 or (tokenQuest[tok] or (state % 64 >= 32)) and 1]
+		else
+			overlayIcon = OVERLAY_ICON_INFO[(overlayIcon - overlayIcon % 4194304) * (1/4194304)]
+		end
+		if overlayIcon then
+			self:SetOverlayIcon(unpack(overlayIcon))
+			self:SetOverlayIconVertexColor(1,1,1)
+		else
+			self:SetOverlayIcon(nil)
+		end
 	end
 	if ActiveIndicatorFactory.supportsShortLabels then
 		self:SetShortLabel(configCache.ShowShortLabels and (tokenLabel[tok] or stext) or "")
 	end
 	self:SetQualityOverlay(qual, PROF_QUALITY_ATLAS[qual])
 	local hideCount = configCache.ShowOneCount and 0 or 1
-	local showCount = MODERN and issecretvalue(count) or ((count or 0) > hideCount)
-	self:SetCount(showCount and count, holdCount)
+	local showCount = SECRETS and issecretvalue(count) or ((count or 0) > hideCount)
+	self:SetCount(showCount and count)
 	if not (cdHintID and not cd) then
 		self:SetCooldown(cd, cd2, usableCharge)
 	elseif ActiveIndicatorFactory.supportsCooldownPH then
+		local holdCount = state % 2097152 >= 1048576
 		self:SetCooldownPH(cdHintID, GetPartialHintRaw, holdCount)
 	elseif ActiveIndicatorFactory.apiLevel >= 4 then
 		local duration = GetPartialHintRaw(cdHintID, isRecharge and "chargeDuration" or "cooldownDuration")
@@ -611,6 +635,12 @@ local function updateSlice(self, originAngle, selected, tok, usable, state, icon
 		self:SetCooldown(0, 0, usableCharge)
 	end
 	self:SetEquipState(isInContainer, isInInventory)
+	if ActiveIndicatorFactory.apiLevel >= 5 and hintExt and state % 134217728 >= 67108864 then
+		local v = GetPartialHintRaw(ext, "active")
+		if v ~= nil then
+			active = v
+		end
+	end
 	self:SetActive(active)
 	self:SetHighlighted(selected and not faded)
 end
@@ -842,7 +872,7 @@ function iapi:Hide()
 	if mainFrame:IsVisible() then
 		setupTransitionAnimation("out", OnUpdate_ZoomOut)
 	else
-		mainFrame:Hide()
+		setIndicationShown(false)
 	end
 	GhostIndication:Deactivate()
 	if GameTooltip:IsOwned(proxyFrame) then
@@ -888,15 +918,10 @@ function api:RegisterIndicatorConstructor(key, info)
 	assert(type(reqAPILevel) == "number" or reqAPILevel == nil, 'RegisterIndicatorConstructor: info.reqAPILevel, if set, must be a number', 2)
 	assert(type(onPAC) == "function" or onPAC == nil, 'RegisterIndicatorConstructor: info.onParentAlphaChanged, if set, must be a function', 2)
 
-	if MODERN and key == "elvui" and apiLevel == 4 then
+	if SECRETS and key == "elvui" and apiLevel == 4 then
 		apiLevel = 3 -- Does not implement SetCooldownDuration; can't render cooldowns in combat
 	end
 	local mainPool, err = ValidateIndicator(apiLevel, reqAPILevel, info)
-	local fbKey = key == "elvui" and (MODERN and "fixedFrameBuffering" or COMPAT > 2e4 and "fixedFrameBufferingClassic" or "fixedFrameBufferingEra")
-	if fbKey and not info[fbKey] then
-		-- BUG[2408/11.0.2,1.15.4,4.4.1]: Showing buffered frames while a model frame is visible can crash to desktop with an assertion failure (test builds)/restart the renderer in a loop/crash the client
-		mainPool, err = nil, 'Disabled to avoid triggering a client crash (missing flag: ' .. fbKey .. ').'
-	end
 	LastRegisteredIndicatorFactory, IndicatorFactories[key] = mainPool and key or LastRegisteredIndicatorFactory, {
 		name = iname:gsub("|+", ""),
 		apiLevel = apiLevel,
@@ -923,7 +948,7 @@ for k,v in pairs({IndicatorFactory="_",
 end
 api:RegisterIndicatorConstructor("mirage", {
 	name="OPie",
-	apiLevel=4,
+	apiLevel=5,
 	CreateIndicator=CreateIndicator,
 
 	supportsCooldownNumbers=true,

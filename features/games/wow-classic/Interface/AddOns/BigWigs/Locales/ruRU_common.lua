@@ -211,6 +211,11 @@ L.autotalk_boss_desc = "Автоматический выбирать вариа
 L.autotalk_generic_desc = "Автоматический выбирать вариант диалога с НИП для продвижения по подземелью."
 L.autotalk_notice = "Произведено автоматическое взаидействовие с НИП %s."
 
+-- Auto Player Choice
+--L.autoPlayerChoice = "Automatic Player Choice"
+--L.autoPlayerChoice_delve_power_desc = "Automatically select player powerups when they are dropped by creatures in the Delve."
+--L.autoPlayerChoice_notice = "Automatically selecting: %s"
+
 -- GUI notes
 L.intermissionOnly = "Только Перерыв"
 L.stage1Only = "Только 1 этап"
@@ -306,6 +311,7 @@ L.arrows = "Стрелы" -- Plural of L.arrow
 L.ball = "Шар" -- A ball, like a football, basketball, etc
 L.balls = "Шары" -- Plural of L.ball
 L.blind = "Ослепление" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "Кровь" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 L.bouncing_ball = "Прыгающий Шар" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 L.bouncing_balls = "Прыгающие Шары" -- Plural of L.bouncing_ball
 L.chakram = "Шакрам" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

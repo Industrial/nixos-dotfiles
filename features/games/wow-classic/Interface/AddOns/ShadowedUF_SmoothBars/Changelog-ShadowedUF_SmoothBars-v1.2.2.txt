@@ -1,0 +1,12 @@
+tag v1.2.2
+cdf2477199252d290f210293c97f25a5df59a4b9
+Szabolcs Czinege <zenima7@gmail.com>
+2015-07-04 16:15:49 +0200
+
+Tagging as v1.2.2
+
+
+--------------------
+
+Szabolcs Czinege:
+	- Updated .toc for 6.2.

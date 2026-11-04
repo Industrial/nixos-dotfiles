@@ -151,11 +151,17 @@ function config:CreateConfig()
       return list
     end,
     getValue = function(_, value)
-      return value == db:GetUpgradeIconProvider()
+      -- Reflect the provider actually in effect (which may be an external
+      -- provider taking precedence when the user has not made an explicit
+      -- choice), so the highlighted option matches the arrows being drawn.
+      return value == addon:GetModule('Items'):GetActiveUpgradeProvider()
     end,
     setValue = function(ctx, value)
       db:SetUpgradeIconProvider(value)
-      events:SendMessage(ctx, 'bag/RedrawIcons')
+      -- A full refresh re-runs the data sweep so Phase6 re-resolves each item's
+      -- data.isUpgrade with the newly selected provider. bag/RedrawIcons only
+      -- re-reads the already-committed (stale) isUpgrade and would not update.
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end,
   })
 
@@ -513,14 +519,19 @@ function config:CreateConfig()
       end
     })
 
-    f:AddCheckbox({
-      title = 'Extra Glowy Item Buttons',
-      description = 'Item buttons will have an enhanced glow effect using the item quality color.',
+    f:AddSlider({
+      title = 'Quality Glow Intensity',
+      description = 'How strongly item buttons show their quality color, from 0 to 100. '
+        .. 'At 0 there is no border at all. Up to 60 it is a flat colored border that fades in. '
+        .. 'Above 60 the glowing halo alphas in, reaching a blinding maximum at 100.',
+      min = 0,
+      max = 100,
+      step = 1,
       getValue = function(_)
-        return db:GetExtraGlowyButtons(bagType.kind)
+        return db:GetGlowIntensity(bagType.kind)
       end,
       setValue = function(ctx, value)
-        db:SetExtraGlowyButtons(bagType.kind, value)
+        db:SetGlowIntensity(bagType.kind, value)
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
     })

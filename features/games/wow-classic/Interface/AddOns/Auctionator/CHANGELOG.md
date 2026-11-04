@@ -1,6 +1,8 @@
 # Auctionator
 
-## [335](https://github.com/TheMouseNest/Auctionator/tree/335) (2026-08-14)
-[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/334...335) 
+## [340](https://github.com/TheMouseNest/Auctionator/tree/340) (2026-10-02)
+[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/339...340) 
 
-- Retail: Introduce a delay to the auto-scan starting to mitigate favourites query  
+- Update libs  
+- Forever: Updated constant  
+- Forever: Separate PvE, PvP, HC and RP auction houses  

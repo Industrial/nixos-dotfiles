@@ -1,6 +1,6 @@
 # BetterBags - Teleports
 
-## [3.1.4](https://github.com/AlexHaible/BetterBags-Teleports/tree/3.1.4) (2026-07-22)
-[Full Changelog](https://github.com/AlexHaible/BetterBags-Teleports/compare/3.1.3...3.1.4) [Previous Releases](https://github.com/AlexHaible/BetterBags-Teleports/releases)
+## [4.0.2](https://github.com/AlexHaible/BetterBags-Teleports/tree/4.0.2) (2026-09-21)
+[Full Changelog](https://github.com/AlexHaible/BetterBags-Teleports/compare/4.0.1...4.0.2) [Previous Releases](https://github.com/AlexHaible/BetterBags-Teleports/releases)
 
-- Update BetterBags-Teleports.toc  
+- Hide Scepter of Celebras and Goblin Transponder on retail  

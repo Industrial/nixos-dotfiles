@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: BetterBags - World Events
+## Author: Zazou
+## Version: v3.4
+## Notes: Categories for all World Events Items
+## Dependencies: BetterBags
+## X-Curse-Project-ID: 996347
+## IconTexture: Interface\Icons\temp
+
+database.lua
+localization.lua
+main.lua

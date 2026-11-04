@@ -1,0 +1,39 @@
+## Interface: 120007, 120100
+
+## Title: BetterBags - BoE, WuE & BoA
+## Notes: Adds BoE, WuE & BoA filters to BetterBags.
+## Author: Avyiel
+## Version: v2.0.2
+## IconTexture: Interface\Icons\inv_misc_bag_15
+
+## Group: BetterBags
+## Category: Inventory
+## Category-deDE: Inventar
+## Category-esES: Inventario
+## Category-esMX: Inventario
+## Category-frFR: Inventaire
+## Category-itIT: Inventario
+## Category-koKR: 소지품
+## Category-ptBR: Inventário
+## Category-ruRU: Инвентарь
+## Category-zhCN: 物品栏
+## Category-zhTW: 物品欄
+
+## DefaultState: Enabled
+## SavedVariables: BetterBags_Bound_SavedVars
+## LoadSavedVariablesFirst: 1
+
+## Dependencies: BetterBags
+## OptionalDeps: BetterBags_Priority
+
+## X-Date: 2026-09-14T21:20:26Z
+## X-Category: Bags & Inventory
+## X-License: MIT
+
+## X-Curse-Project-ID: 960358
+## X-Wago-ID: ANz0qMK4
+
+main.lua
+filter.lua
+config.lua
+

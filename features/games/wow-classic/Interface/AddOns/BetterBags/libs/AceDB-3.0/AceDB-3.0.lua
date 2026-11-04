@@ -40,8 +40,8 @@
 -- end
 -- @class file
 -- @name AceDB-3.0.lua
--- @release $Id: AceDB-3.0.lua 1407 2026-09-03 15:26:34Z funkehdude $
-local ACEDB_MAJOR, ACEDB_MINOR = "AceDB-3.0", 35
+-- @release $Id: AceDB-3.0.lua 1419 2026-09-25 11:47:59Z nevcairiel $
+local ACEDB_MAJOR, ACEDB_MINOR = "AceDB-3.0", 39
 local AceDB = LibStub:NewLibrary(ACEDB_MAJOR, ACEDB_MINOR)
 
 if not AceDB then return end -- No upgrade needed
@@ -252,17 +252,43 @@ local preserve_keys = {
 	["children"] = true,
 }
 
-local realmKey = GetRealmName()
-local charKey = UnitName("player") .. " - " .. realmKey
-local _, classKey = UnitClass("player")
-local _, raceKey = UnitRace("player")
 local factionKey = UnitFactionGroup("player")
-local factionrealmKey = factionKey .. " - " .. realmKey
 local localeKey = GetLocale():lower()
+local charKey, realmKey, classKey, raceKey, factionrealmKey, factionrealmregionKey
+do
+	local _
+	_, classKey = UnitClass("player")
+	_, raceKey = UnitRace("player")
 
-local regionTable = { "US", "KR", "EU", "TW", "CN" }
-local regionKey = regionTable[GetCurrentRegion()] or GetCurrentRegionName() or "TR"
-local factionrealmregionKey = factionrealmKey .. " - " .. regionKey
+	if RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() then
+		if C_GameRules.IsGameRuleActive(Enum.GameRule.HardcoreRuleset) then
+			realmKey = "Hardcore"
+		elseif C_GameRules.IsGameRuleActive(Enum.GameRule.RPRuleset) then
+			realmKey = "RP"
+		elseif C_GameRules.IsGameRuleActive(Enum.GameRule.PvPRuleset) then
+			realmKey = "PvP"
+		else
+			realmKey = "PvE"
+		end
+		local name, surname = UnitNameUnmodified("player")
+		if surname then
+			charKey = name .. " " .. tostring(surname)
+		else
+			charKey = name
+		end
+	else
+		realmKey = GetRealmName()
+		charKey = UnitNameUnmodified("player") .. " - " .. realmKey
+	end
+
+	local regionTable = { "US", "KR", "EU", "TW", "CN" }
+	local regionName = GetCurrentRegionName()
+	if regionName and regionName == "" then regionName = nil end -- PTR/Beta tends to be ""
+	local regionKey = regionTable[GetCurrentRegion()] or regionName or "TR"
+
+	factionrealmKey = factionKey .. " - " .. realmKey
+	factionrealmregionKey = factionrealmKey .. " - " .. regionKey
+end
 
 -- Actual database initialization function
 local function initdb(sv, defaults, defaultProfile, olddb, parent)

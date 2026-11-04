@@ -1,11 +1,12 @@
-local MAJ, REV, COMPAT, _, T = 1, 16, select(4,GetBuildInfo()), ...
+local MAJ, REV, COMPAT, _, T = 1, 18, select(4,GetBuildInfo()), ...
 if T.SkipLocalActionBook then return end
 local _GG = _G
 if T.TenEnv then T.TenEnv() end
 
 local EV, AB, RW = T.Evie, T.ActionBook:compatible(2,34), T.ActionBook:compatible("Rewire", 1,27)
 assert(EV and AB and RW and 1, "Incompatible library bundle")
-local MODERN, CF_WRATH, CI_ERA = COMPAT >= 10e4, COMPAT < 10e4 and COMPAT >= 3e4, COMPAT < 2e4
+local MODERN, CF_WRATH = COMPAT >= 10e4, COMPAT < 10e4 and COMPAT >= 3e4
+local CI_ERA, CI_4E = COMPAT < 160e2, COMPAT > 160e2 and COMPAT < 2e4
 local IM, L, XU = {}, T.ActionBook.L, T.exUI
 
 local function assert(condition, text, level, ...)
@@ -80,8 +81,9 @@ local commandType, addCommandType = {["#show"]=0, ["#showtooltip"]=0, ["#imp"]=-
 	for n, ct in ("CAST:1 USE:1 CASTSEQUENCE:2 CASTRANDOM:3 USERANDOM:3"):gmatch("(%a+):(%d+)") do
 		addCommandType(n, ct+0)
 	end
-	if MODERN then
+	if MODERN or CI_4E then
 		addCommandType("PING", 4)
+		addCommandType("PING_SPELL", 5)
 	end
 end
 
@@ -152,16 +154,16 @@ local toMacroText, quantizeMacro, formatMacro, formatToken, setMountPreference d
 				until cend or not pos
 				if not pos then return end
 				local cval = args:sub(cend, vend)
-				if ctype < 2 then
-					cval = replaceFunc(ctype, args:sub(cend, vend))
-				else
-					local val, reset = args:sub(cend, vend)
+				if COMMA_LIST_COMMAND_TYPES[ctype] then
+					local val, reset = cval
 					if ctype == 2 then
 						local r, r2, v = val:match("^(%s*(reset=%S+)%s*)(.*)")
 						reset, val = r and (doRewrite and r2 .. " " or r), v or val
 					end
 					val = replaceAlternatives(ctype, val)
 					cval = val and ((reset or "") .. val) or nil
+				else
+					cval = replaceFunc(ctype, cval)
 				end
 				if cval or ctype == 0 then
 					local cond = cstart < cend and args:sub(cstart, cend-1)
@@ -302,14 +304,20 @@ local toMacroText, quantizeMacro, formatMacro, formatToken, setMountPreference d
 			return gmPref, fmPref, drPref
 		end
 	end
-	local pingTextMap, pingTokenMap = {}, {
-		assist=PING_TYPE_ASSIST,
-		attack=PING_TYPE_ATTACK,
-		onmyway=PING_TYPE_ON_MY_WAY,
-		warning=PING_TYPE_WARNING,
-	}
-	for k,v in pairs(pingTokenMap) do
-		pingTextMap[v:lower()], pingTextMap[k] = k, k
+	local pingTextMap, pingTokenMap, pingTokenCommand = {}, {}, {} do
+		local function addPing(token, text, altID)
+			text = type(text) == "string" and text or token
+			local locan = text:lower():gsub("%s+", "")
+			pingTextMap[text or locan], pingTextMap[locan] = token, token
+			pingTextMap[altID or locan] = token
+			pingTokenMap[token], pingTokenCommand[token] = text, altID or token
+		end
+		addPing("nothreat", PING_TYPE_NOT_THREAT, "5")
+		addPing("threat", PING_TYPE_THREAT, "6")
+		addPing("assist", PING_TYPE_ASSIST, "4")
+		addPing("attack", PING_TYPE_ATTACK, "1")
+		addPing("onmyway", PING_TYPE_ON_MY_WAY, "3")
+		addPing("warning", PING_TYPE_WARNING, "2")
 	end
 	toMacroText = genParser(function(ctype, value)
 		local varPrefix = parseVarPrefix(value, ctype)
@@ -319,7 +327,7 @@ local toMacroText, quantizeMacro, formatMacro, formatToken, setMountPreference d
 		elseif tkey == "mount" then
 			return restoreVarPrefix(varPrefix, replaceMountTag(ctype, tval, prefix))
 		elseif tkey == "ping" and ctype == 4 then
-			return restoreVarPrefix(varPrefix, pingTokenMap[tval] or value)
+			return restoreVarPrefix(varPrefix, pingTokenCommand[tval] or value)
 		elseif extTokenText[tw] ~= nil then
 			return restoreVarPrefix(varPrefix, extTokenText[tw] or nil)
 		elseif value:match('^%s*!?|Hiptok|h|h%s*$') then
@@ -343,9 +351,9 @@ local toMacroText, quantizeMacro, formatMacro, formatToken, setMountPreference d
 				local lowname = name:lower()
 				local sid, stok, peek, cnpos = spells[lowname], specialTokens[lowname] or extAbilityToken[lowname]
 				if ctype == 4 then
-					name = pingTextMap[lowname]
-					if name then
-						return restoreVarPrefix(varPrefix, pre .. "{{ping:" .. name.. "}}" .. tws)
+					local tok = pingTextMap[lowname] or pingTextMap[lowname:gsub("%s+", "")]
+					if tok then
+						return restoreVarPrefix(varPrefix, pre .. "{{ping:" .. tok .. "}}" .. tws)
 					end
 				elseif sid and noEscapes and RW:IsCastEscape(lowname, true) then
 					-- Don't tokenize escapes in contexts they wont't work in

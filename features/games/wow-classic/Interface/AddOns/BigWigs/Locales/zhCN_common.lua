@@ -211,6 +211,11 @@ L.autotalk_boss_desc = "自动选择NPC对话选项以开启首领战。"
 L.autotalk_generic_desc = "自动选择NPC对话选项以进入下一阶段。"
 L.autotalk_notice = "自动与NPC %s 交互。"
 
+-- Auto Player Choice
+L.autoPlayerChoice = "玩家自动选择"
+L.autoPlayerChoice_delve_power_desc = "当地下堡中的生物掉落玩家强化道具时，自动进行选择。"
+L.autoPlayerChoice_notice = "自动选择：%s"
+
 -- GUI notes
 L.intermissionOnly = "仅转阶段" -- A note to explain that a specific ability only happens during the intermission stage of a boss fight
 L.stage1Only = "仅第一阶段" -- A note to explain that a specific ability only happens during stage 1 of a boss fight 同步GlobalStrings-CN本地化翻译
@@ -306,6 +311,7 @@ L.arrows = "箭矢" -- Plural of L.arrow
 L.ball = "球" -- A ball, like a football, basketball, etc
 L.balls = "球" -- Plural of L.ball
 L.blind = "致盲" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "血" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 L.bouncing_ball = "弹跳球" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 L.bouncing_balls = "弹跳球" -- Plural of L.bouncing_ball
 L.chakram = "飞轮" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

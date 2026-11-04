@@ -87,10 +87,12 @@ function mod:GOSSIP_SHOW()
 			-- 135010:<Meditate on the sound of the flames.>
 			self:SelectGossipID(135010)
 		elseif self:GetGossipID(137694) then -- Warding Incense (Versatility buff)
-			-- 137694:<You light the incense, its aroma fortifying the resolve of nearby allies.>\r\n\r\n[Requires at least 25 skill in Midnight Alchemy or Druid Bear Form.]
-			self:SelectGossipID(137694)
-			self:Message(1271545, "green", self:GetRename(1271545))
-			self:PlaySound(1271545, "info")
+			if not UnitAffectingCombat("player") then -- can't be cast in combat
+				-- 137694:<You light the incense, its aroma fortifying the resolve of nearby allies.>\r\n\r\n[Requires at least 25 skill in Midnight Alchemy or Druid Bear Form.]
+				self:SelectGossipID(137694)
+				self:Message(1271545, "green", self:GetRename(1271545))
+				self:PlaySound(1271545, "info")
+			end
 		end
 	end
 end
@@ -99,8 +101,11 @@ end
 
 function mod:OfferingsAcquired(_, text)
 	-- [UPDATE_UI_WIDGET] widgetID:7092, widgetType:8, text:|TInterface\\ICONS\\inv_misc_coinbag09.blp:20|t Offerings Acquired: 1/6
-	local acquired = text:match("(%d+)/%d+")
-	if acquired and tonumber(acquired) > 0 then
+	local acquired = tonumber(text:match("(%d+)/%d+"))
+	if acquired and acquired > 0 then
+		if acquired == 6 then
+			self:StopBlizzMessages(1) -- suppress Blizzard's encounter warning for the final offering
+		end
 		self:Message("offerings_acquired", "green", text, false)
 		self:PlaySound("offerings_acquired", "info")
 	end

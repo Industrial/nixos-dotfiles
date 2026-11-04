@@ -2,7 +2,7 @@ local COMPAT, _, T = select(4,GetBuildInfo()), ...
 if T.SkipLocalActionBook then return end
 if T.TenEnv then T.TenEnv() end
 
-local MODERN, CF_WRATH, CF_CATA, CF_MISTS, CI_ERA = COMPAT > 10e4, COMPAT < 10e4 and COMPAT >= 3e4, COMPAT < 10e4 and COMPAT >= 4e4, COMPAT < 10e4 and COMPAT > 5e4, COMPAT < 2e4
+local MODERN, CF_WRATH, CF_CATA, CF_MISTS, CI_ERA = COMPAT > 10e4, COMPAT < 10e4 and COMPAT >= 3e4, COMPAT < 10e4 and COMPAT >= 4e4, COMPAT < 10e4 and COMPAT > 5e4, COMPAT < 160e2
 local MODERN_BATTLEPETS = MODERN or CF_MISTS
 local AB = T.ActionBook:compatible(2,21)
 local RW = T.ActionBook:compatible("Rewire", 1,27)

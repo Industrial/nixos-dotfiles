@@ -11,6 +11,7 @@ local context = addon:GetModule('Context')
 ---@class Callback
 ---@field cb fun(...)
 ---@field a any
+---@field raw? boolean Receives the AceEvent arguments directly; no Context is built per fire.
 
 ---@class EventArg
 ---@field eventName string
@@ -25,6 +26,7 @@ local context = addon:GetModule('Context')
 ---@field _eventQueue table<string, boolean>
 ---@field _eventArguments table<string, EventArg[]>
 ---@field _bucketCallbacks table<string, fun(...)[]>
+---@field _bucketFilters table<string, fun(eventName: string, ...): boolean>
 local events = addon:NewModule('Events')
 
 function events:Init()
@@ -34,6 +36,7 @@ function events:Init()
   self._bucketTimers = {}
   self._eventQueue = {}
   self._bucketCallbacks = {}
+  self._bucketFilters = {}
   self._eventArguments = {}
   LibStub:GetLibrary('AceEvent-3.0'):Embed(self._eventHandler)
 end
@@ -58,19 +61,32 @@ end
 ---@param event string
 ---@param callback fun(ctx: Context, ...)
 function events:RegisterEvent(event, callback)
+  self:addEventCallback(event, {cb = callback})
+end
+
+-- AceEvent keeps one handler per event for our embedded object, so every callback for
+-- an event is multiplexed through a single registered function.
+---@private
+---@param event string
+---@param entry Callback
+function events:addEventCallback(event, entry)
   if self._eventMap[event] == nil then
     self._eventMap[event] = {
       fn = function(...)
         for _, cb in pairs(self._eventMap[event].cbs) do
-          local ctx = context:New(event)
-          cb.cb(ctx, ...)
+          if cb.raw then
+            cb.cb(...)
+          else
+            local ctx = context:New(event)
+            cb.cb(ctx, ...)
+          end
         end
       end,
       cbs = {},
     }
     self._eventHandler:RegisterEvent(event, self._eventMap[event].fn)
   end
-  table.insert(self._eventMap[event].cbs, {cb = callback})
+  table.insert(self._eventMap[event].cbs, entry)
 end
 
 ---@param evts? table<string, fun()>
@@ -116,30 +132,47 @@ function events:CatchUntil(caughtEvent, finalEvent, callback)
   end)
 end
 
+-- BucketEvent batches an event into 0.2s windows: the first fire opens a window, later
+-- fires join it, and the callback runs once when the window closes. A continuous stream
+-- of fires therefore still flushes every 0.2s instead of being held off until it goes
+-- quiet. The callback receives the payloads of the window's fires as an EventArg[] (each
+-- entry `{ eventName = <event>, args = { <payload...> } }`); fires with no payload are not
+-- recorded. The optional filter runs first on every fire and drops it when it returns
+-- false, before anything is recorded or scheduled. Calling BucketEvent again for the same
+-- event replaces its callback and filter.
 ---@param event string
----@param callback fun(ctx: Context, ...)
-function events:BucketEvent(event, callback)
- --TODO(lobato): Refine this so that timers only run when an event is in the queue.
-  local bucketFunction = function()
+---@param callback fun(ctx: Context, events: EventArg[])
+---@param filter? fun(eventName: string, ...): boolean
+function events:BucketEvent(event, callback, filter)
+  local firstRegistration = self._bucketCallbacks[event] == nil
+  self._bucketCallbacks[event] = { callback }
+  self._bucketFilters[event] = filter
+  self._eventArguments[event] = {}
+  if not firstRegistration then return end
+
+  local flush = function()
+    local collected = self._eventArguments[event]
+    self._eventArguments[event] = {}
+    self._bucketTimers[event] = nil
     for _, cb in pairs(self._bucketCallbacks[event]) do
-      xpcall(function(...)
-        local ctx = context:New(event)
-        cb(ctx, ...)
+      -- Wrap in a closure: xpcall in Lua 5.1 (WoW's runtime) does not forward
+      -- extra args to the protected function, so pass `collected` via upvalue.
+      xpcall(function()
+        cb(context:New(event), collected)
       end, geterrorhandler())
     end
-    self._bucketTimers[event] = nil
-    self._bucketCallbacks[event] = {}
   end
 
-  self._bucketCallbacks[event] = {}
-  self:RegisterEvent(event, function()
-    if self._bucketTimers[event] then
-      self._bucketTimers[event]:Cancel()
+  self:addEventCallback(event, { raw = true, cb = function(eventName, ...)
+    local accept = self._bucketFilters[event]
+    if accept and not accept(eventName, ...) then return end
+    if select('#', ...) > 0 then
+      tinsert(self._eventArguments[event], { eventName = eventName, args = {...} })
     end
-    self._bucketTimers[event] = C_Timer.NewTimer(0.2, bucketFunction)
-  end)
-
-  table.insert(self._bucketCallbacks[event], callback)
+    if not self._bucketTimers[event] then
+      self._bucketTimers[event] = C_Timer.NewTimer(0.2, flush)
+    end
+  end })
 end
 
 -- GroupBucketEvent registers a callback for a group of events that will be

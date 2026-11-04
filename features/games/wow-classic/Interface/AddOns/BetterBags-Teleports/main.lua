@@ -29,29 +29,33 @@ local _, addon = ...
 
 local _, _, _, interfaceVersion = GetBuildInfo()
 
-local db
 local defaults = {
     profile = {}
 }
 local configOptions
 
 -- Get the game version
-addon.data.isRetail  = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+-- WoW: Forever (Camelot) reports WOW_PROJECT_MAINLINE, but its content is vanilla-based.
+-- It is flagged by data/forever.lua, which only BetterBags-Teleports_Camelot.toc loads.
+addon.data.isForever = addon.isForever == true
+addon.data.isRetail  = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE and not addon.data.isForever
 addon.data.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 addon.data.isTBC     = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addon.data.isWotLK   = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC
 addon.data.isCata    = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.data.isMists   = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 
--- “Or above” helpers for gating
-local isMistsOrAbove   = addon.data.isMists   or addon.data.isRetail
-local isCataOrAbove    = addon.data.isCata    or addon.data.isMists or addon.data.isRetail
-local isWotLKOrAbove   = addon.data.isWotLK   or addon.data.isCata  or addon.data.isMists or addon.data.isRetail
-local isTBCOrAbove     = addon.data.isTBC     or addon.data.isWotLK or addon.data.isCata  or addon.data.isMists or addon.data.isRetail
-local isClassicOrAbove = addon.data.isClassic or addon.data.isTBC   or addon.data.isWotLK or addon.data.isCata  or addon.data.isMists or addon.data.isRetail
+-- Every addon.data table, in load order. Each client's .toc decides which data files
+-- (and therefore which of these tables) exist; missing ones are skipped.
+local sections = {
+    "classic", "tbc", "wotlk", "cata", "mists", "wod", "legion",
+    "bfa", "sl", "df", "tww", "midnight", "forever",
+}
 
 -- Kill the category from different plugin.
-Categories:WipeCategory(Context:New('BBTeleporters_DeleteCategory'),TUTORIAL_TITLE31)
+if TUTORIAL_TITLE31 then
+    Categories:WipeCategory(Context:New('BBTeleporters_DeleteCategory'),TUTORIAL_TITLE31)
+end
 
 -- Make an empty table to store item data in...
 local teleporters = {}
@@ -64,7 +68,8 @@ local function refreshTeleports()
     Events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
-local isClassicEra = addon.data.isClassic or addon.data.isTBC or addon.data.isWotLK or addon.data.isCata
+-- Forever keeps the vanilla mage portal reagents, so it gets the same reagent option.
+local isClassicEra = addon.data.isClassic or addon.data.isTBC or addon.data.isWotLK or addon.data.isCata or addon.data.isForever
 
 if isClassicEra then
     defaults.profile = {
@@ -75,8 +80,8 @@ end
 local args = {
     forceRefreshTeleports = {
         type = "execute",
-        name = "Force Refresh",
-        desc = "This will forcibly refresh the Teleporters category.",
+        name = L:G("Force Refresh"),
+        desc = L:G("This will forcibly refresh the Teleporters category."),
         func = refreshTeleports,
     },
 }
@@ -84,8 +89,8 @@ local args = {
 if isClassicEra then
     args.addReagentsToCategory = {
         type = "toggle",
-        name = "Add Reagents",
-        desc = "This will add the mage reagents for portals to the Teleporters category.",
+        name = L:G("Add Reagents"),
+        desc = L:G("This will add the mage reagents for portals to the Teleporters category."),
         get = function()
             return Teleporters.db.profile.enablePortalReagents
         end,
@@ -133,70 +138,27 @@ function Teleporters:hydrateTeleportersTable()
     -- Clear the table of items if needed.
     table.wipe(teleporters)
 
-    -- Helper for batch insert
+    -- Helper for batch insert. Entries may carry:
+    --   condition    = function returning true when the item should be added
+    --   minInterface = lowest interface version the item exists in (for items patched in later)
     local function loadSet(data)
+        -- Each .toc only loads the data files its client needs, so tables can be missing.
+        if not data then return end
         for _, v in ipairs(data) do
-            if not v.condition or v.condition() then
+            if (not v.condition or v.condition())
+                and (not v.minInterface or interfaceVersion >= v.minInterface) then
                 table.insert(teleporters, v[1])
             end
         end
     end
 
-    if (isClassicEra) and db.enablePortalReagents then
+    if isClassicEra and Teleporters.db.profile.enablePortalReagents then
         -- Add the reagents for mage portals to the teleporters category.
         loadSet(addon.data.enablePortalReagents)
     end
 
-    -- Section Vanilla
-    if isClassicOrAbove then
-        loadSet(addon.data.classic)
-    end
-    -- Section TBC
-    if isTBCOrAbove then
-        loadSet(addon.data.tbc)
-    end
-    -- Section WotLK
-    if isWotLKOrAbove then
-        loadSet(addon.data.wotlk)
-    end
-    -- Section Cataclysm
-    if isCataOrAbove then
-        loadSet(addon.data.cata)
-    end
-    -- Section Mists
-    if isMistsOrAbove then
-        loadSet(addon.data.mists)
-    end
-    -- Section WoD
-    if addon.data.isRetail then
-        loadSet(addon.data.wod)
-    end
-    -- Section Legion
-    if addon.data.isRetail then
-        loadSet(addon.data.legion)
-    end
-    -- Section BFA
-    if addon.data.isRetail then
-        loadSet(addon.data.bfa)
-    end
-    -- Section Shadowlands
-    if addon.data.isRetail then
-        loadSet(addon.data.sl)
-    end
-    -- Section Dragonflight
-    if addon.data.isRetail then
-        loadSet(addon.data.df)
-    end
-    -- Section The War Within
-    if addon.data.isRetail then
-        loadSet(addon.data.tww)
-    end
-    -- Section Midnight
-    if addon.data.isRetail then
-        loadSet(addon.data.midnight)
-    end
-    if interfaceVersion >= 120002 then
-        loadSet(addon.data.patchContent)
+    for _, section in ipairs(sections) do
+        loadSet(addon.data[section])
     end
 end
 
@@ -213,7 +175,6 @@ end
 function Teleporters:OnInitialize()
     self.db = AceDB:New("BetterBags_TeleportersDB", defaults)
     self.db:SetProfile("global")
-    db = self.db.profile
 
     self:addTeleportersConfig()
     self:clearTeleportCategory()

@@ -31,7 +31,7 @@ local CL = BigWigsAPI:GetLocale("BigWigs: Common")
 local LibSpec = LibStub("LibSpecialization", true)
 local loader = BigWigsLoader
 local season = loader.season
-local isClassic, isRetail, isVanilla, isTBC, isWrath, isCata, isMists = loader.isClassic, loader.isRetail, loader.isVanilla, loader.isTBC, loader.isWrath, loader.isCata, loader.isMists
+local isClassic, isRetail, isForever, isVanilla, isTBC, isWrath, isCata, isMists = loader.isClassic, loader.isRetail, loader.isForever, loader.isVanilla, loader.isTBC, loader.isWrath, loader.isCata, loader.isMists
 local C_EncounterJournal_GetSectionInfo = (isCata or isMists) and function(key)
 	return C_EncounterJournal.GetSectionInfo(key) or BigWigsAPI:GetLocale("BigWigs: Encounter Info")[key]
 end or isRetail and C_EncounterJournal.GetSectionInfo or function(key)
@@ -39,6 +39,8 @@ end or isRetail and C_EncounterJournal.GetSectionInfo or function(key)
 end
 local UnitPosition, UnitIsConnected, UnitInPartyIsAI, UnitClass, UnitTokenFromGUID = UnitPosition, UnitIsConnected, UnitInPartyIsAI, UnitClass, loader.UnitTokenFromGUID
 local GetSpellName, GetSpellTexture, GetTime = loader.GetSpellName, loader.GetSpellTexture, GetTime
+local GetClassColor = C_ClassColor and C_ClassColor.GetClassColor -- XXX [Mainline:✓ MoP:✗ Wrath:✗ Vanilla:✗]
+local UnitSpellTargetName, UnitSpellTargetClass = UnitSpellTargetName, UnitSpellTargetClass
 local UnitGroupRolesAssigned = UnitGroupRolesAssigned
 local EJ_GetEncounterInfo = (isCata or isMists) and function(key)
 	return EJ_GetEncounterInfo(key) or BigWigsAPI:GetLocale("BigWigs: Encounters")[key]
@@ -285,7 +287,7 @@ local bossNames = setmetatable({}, {__index =
 --- Register the module to enable on mob id.
 -- @number ... Any number of mob ids
 function boss:RegisterEnableMob(...)
-	core:RegisterEnableMob(self.moduleName, ...)
+	self._enableMobsTemp = {...}
 end
 
 --- Check if a specific mob id would enable this module.
@@ -327,6 +329,23 @@ do
 	-- @return boolean
 	function boss:IsWorldModule()
 		return worldModuleList[self] or false
+	end
+end
+
+do
+	local rangeCheckModuleList = {}
+	--- Mark this module as using range checking API.
+	-- @bool isUsingRangeChecks If true, this module is marked as using range checking API
+	function boss:SetUsesRangeChecks(isUsingRangeChecks)
+		if isUsingRangeChecks then
+			rangeCheckModuleList[self] = true
+		end
+	end
+
+	--- Check if this is module is marked as using range checking API.
+	-- @return boolean
+	function boss:IsUsingRangeChecks()
+		return rangeCheckModuleList[self] or false
 	end
 end
 
@@ -671,6 +690,10 @@ function boss:Enable(isWipe)
 			petUtilityFrame:RegisterUnitEvent("UNIT_PET", "player")
 		end
 
+		if self:IsUsingRangeChecks() then
+			self:CacheItemsForRangeChecks()
+		end
+
 		if type(self.OnBossEnable) == "function" then self:OnBossEnable() end
 
 		if self:IsAnyEncounterInProgress() and not isWiping then -- Safety. ENCOUNTER_END might fire whilst IsEncounterInProgress is still true and engage a module.
@@ -939,6 +962,30 @@ do
 			moduleLocale[option.."_icon"] = self:GetMenuIcon("SAY")
 		else
 			core:Error("Invalid auto talk type: ".. tostring(talkType))
+		end
+		return option
+	end
+
+	--- Create a custom auto player choice option
+	-- @bool state Boolean value to represent default state
+	-- @string[opt] choiceType The type of description to use (e.g. "delve_power")
+	-- @string[opt] name A unique name the option should have if you want to create multiple options in one module
+	-- @return an option string to be used in conjunction with :GetOption
+	function boss:AddAutoPlayerChoiceOption(state, choiceType, name)
+		if name and type(name) ~= "string" then
+			core:Error("Invalid auto player choice name: ".. tostring(name))
+		elseif name then
+			name = "_".. name
+		end
+
+		local moduleLocale = moduleLocaleList[self] or self:GetLocale()
+		local option = format(state and "custom_on_autoplayerchoice%s" or "custom_off_autoplayerchoice%s", name or "")
+		if choiceType == "delve_power" then
+			moduleLocale[option] = CL.autoPlayerChoice
+			moduleLocale[option.."_desc"] = CL.autoPlayerChoice_delve_power_desc
+			--moduleLocale[option.."_icon"] = self:GetMenuIcon("SAY")
+		else
+			core:Error("Invalid auto player choice type: ".. tostring(choiceType))
 		end
 		return option
 	end
@@ -1217,6 +1264,18 @@ do
 
 		local soundName = moduleAurasList[self][index].soundOnRemoved
 		return soundName or "None"
+	end
+
+	--- Get the aura sound throttle in seconds, which controls how often the sounds for this aura can play.
+	-- @return number or nil
+	function boss:GetAuraSoundThrottle(spellID)
+		local index = moduleAurasList[self] and moduleAurasList[self].spellIDToIndex[spellID]
+		if not index then
+			error(("Module %q has no aura data for spell ID %q."):format(self.moduleName, tostring(spellID)))
+			return
+		end
+
+		return moduleAurasList[self][index].throttle
 	end
 
 	--- Get the aura duration.
@@ -2572,7 +2631,7 @@ do
 	-- @string GUID The globally unique identifier of the creature
 	-- @return creature ID
 	function boss:MobId(GUID)
-		if not GUID then return 1 end
+		if not GUID or self:IsSecret(GUID) then return 1 end
 		local creatureID = GetCreatureID(GUID)
 		return creatureID or 1
 	end
@@ -2701,31 +2760,80 @@ function boss:UnitGUID(unit)
 end
 
 do
-	local IsItemInRange = loader.IsItemInRange
-	local items = {
-		[5] = 8149, -- Voodoo Charm
-		[10] = 17626, -- Frostwolf Muzzle
-		[20] = 10645, -- Gnomish Death Ray
-		[25] = 13289, -- Egan's Blaster
-		[30] = 835, -- Large Rope Net
-		[35] = 18904, -- Zorbin's Ultra-Shrinker
-		[40] = 4945, -- Faintly Glowing Skull
-		[45] = 23836, -- Goblin Rocket Launcher (TBC+ only)
-		[60] = 32825, -- Soul Cannon (TBC+ only)
-		[100] = 5418, -- Weapon of Mass Destruction (test)
-	}
-	for _,v in next, items do
-		C_Item.RequestLoadItemDataByID(v)
+	local rangeToItemTable
+	do
+		local listOfAvailableRanges = {}
+		--- Get the minimum and maximum range of a unit
+		-- @string unit unit token or name
+		-- @return minRange the minimum range at which the unit is detected
+		-- @return maxRange the maximum range at which the unit is detected
+		function boss:GetUnitMinMaxRange(unit)
+			if not self:UnitGUID(unit) then
+				return 0, 0
+			end
+			local minRange = 0
+			for i = 1, #listOfAvailableRanges do
+				local range = listOfAvailableRanges[i]
+				if self:UnitWithinRange(unit, range) then
+					return minRange, range
+				end
+				minRange = range
+			end
+			return minRange, minRange
+		end
+
+		rangeToItemTable = {
+			[5] = 8149, -- Voodoo Charm
+			[10] = 17626, -- Frostwolf Muzzle
+			[15] = (isVanilla or isForever) and 4559 or 31129, -- CHU's QUEST ITEM (Vanilla & Forever), Blackwhelp Net (TBC+)
+			[20] = 10645, -- Gnomish Death Ray
+			[25] = 13289, -- Egan's Blaster
+			[30] = 835, -- Large Rope Net
+			[35] = 18904, -- Zorbin's Ultra-Shrinker
+			[40] = 4945, -- Faintly Glowing Skull
+			[45] = (isVanilla or isForever) and 221316 or 23836, -- Premo's Poise-Demanding Uniform (Vanilla & Forever), Goblin Rocket Launcher (TBC+)
+			[50] = isRetail and 116139 or nil, -- Haunting Memento (WoD+)
+			[55] = (isRetail or isMists) and 74637 or nil, -- Kiryn's Poison Vial (Mists+)
+			[60] = (isRetail or isTBC or isWrath or isCata or isMists) and 32825 or nil, -- Soul Cannon (TBC+)
+			--65
+			[70] = (isRetail or isWrath or isCata or isMists) and 41265 or nil, -- Eyesore Blaster (WotlK+)
+			[75] = isRetail and 185949 or nil, -- Korayn's Spear (Shadowlands+)
+			[80] = (isRetail or isTBC or isWrath or isCata or isMists) and 28131 or nil, -- Reaver Buster Launcher (TBC+)
+			--85
+			[90] = isRetail and 133925 or nil, -- Fel Lash (Legion+)
+			--95
+			[100] = (isVanilla or isTBC or isForever) and 23722 or 33119, -- Permanent R.O.I.D.S. (Vanilla, TBC, Forever), Malister's Frost Wand (WotlK+)
+		}
+
+		for i = 5, 100, 5 do
+			if rangeToItemTable[i] then
+				listOfAvailableRanges[#listOfAvailableRanges+1] = i
+			end
+		end
 	end
+
+	do
+		local IsItemDataCachedByID, RequestLoadItemDataByID = C_Item.IsItemDataCachedByID, C_Item.RequestLoadItemDataByID
+		function boss:CacheItemsForRangeChecks()
+			for _,itemID in next, rangeToItemTable do
+				if not IsItemDataCachedByID(itemID) then
+					RequestLoadItemDataByID(itemID)
+				end
+			end
+		end
+	end
+
+	local IsItemInRange = loader.IsItemInRange
 	--- Check whether a hostile unit is within a specific range, check is performed based on specific item ranges.
-	-- Available Ranges: 10, 20, 30, 35, 40, 100, (TBC+: 45, 60)
+	-- Available Ranges: 5, 10, 15, 20, 25, 30, 35, 40, 45, 50 (WoD+), 55 (Mists+), 60 (TBC+)
+	-- Available Ranges: 70 (WotlK+), 75 (Shadowlands+), 80 (TBC+), 90 (Legion+), 100
 	-- @string unit unit token or name
 	-- @number range the range to check
 	-- @return boolean
 	function boss:UnitWithinRange(unit, range)
-		local item = items[range]
-		if item then
-			local inRange = IsItemInRange(item, unit)
+		local itemID = rangeToItemTable[range]
+		if itemID then
+			local inRange = IsItemInRange(itemID, unit)
 			return inRange
 		end
 	end
@@ -2972,6 +3080,72 @@ do
 			core:Print(format(autotalk_notice, npc), self.isLittleWigs)
 		end
 		SelectOption(id, "", skipConfirmDialogBox) -- Don't think the text arg is something we will ever need
+	end
+end
+
+-------------------------------------------------------------------------------
+-- Player Choice API
+-- @section player_choice_api
+--
+
+do
+	local GetCurrentPlayerChoiceInfo = C_PlayerChoice and C_PlayerChoice.GetCurrentPlayerChoiceInfo -- XXX [Mainline:✓ MoP:✗ Wrath:✗ Vanilla:✗]
+	--- Request the currently available choice options
+	-- @return table All the choice info in a table
+	function boss:GetPlayerChoiceOptions()
+		local choiceInfo = GetCurrentPlayerChoiceInfo()
+		return choiceInfo
+	end
+end
+
+do
+	local SendPlayerChoiceResponse = C_PlayerChoice and C_PlayerChoice.SendPlayerChoiceResponse -- XXX [Mainline:✓ MoP:✗ Wrath:✗ Vanilla:✗]
+	local OnUIClosed = C_PlayerChoice and C_PlayerChoice.OnUIClosed
+	--- Select a specific player choice button
+	-- @param choiceInfo The table provided by :GetPlayerChoiceOptions()
+	-- @number choiceNumber The number of the specific choice you want
+	-- @number buttonNumber Which specific button (within the choice you want) should be selected
+	function boss:SelectPlayerChoiceButton(choiceInfo, choiceNumber, buttonNumber)
+		local button = choiceInfo and choiceInfo.options and choiceInfo.options[choiceNumber] and choiceInfo.options[choiceNumber].buttons and choiceInfo.options[choiceNumber].buttons[buttonNumber]
+		local buttonID = button and button.id
+		if buttonID then
+			local spellID = choiceInfo.options[choiceNumber].spellID
+			if spellID then
+				local spellLink = loader.GetSpellLink(spellID)
+				local linkToUse
+				if type(spellLink) == "string" and spellLink:find("Hspell", nil, true) then
+					linkToUse = spellLink -- Use Blizz link if valid...
+				else -- ...or make our own
+					local spellName = GetSpellName(spellID)
+					linkToUse = ("\124cff71d5ff\124Hspell:%d:0\124h[%s]\124h\124r"):format(spellID, spellName)
+				end
+				core:Print(format(CL.autoPlayerChoice_notice, linkToUse), self.isLittleWigs)
+			else
+				core:Print(format(CL.autoPlayerChoice_notice, choiceInfo.options[choiceNumber].header), self.isLittleWigs)
+			end
+			self:SendMessage("BigWigs_Message", self, nil, choiceInfo.options[choiceNumber].header, "cyan", choiceInfo.options[choiceNumber].choiceArtID, nil, 4)
+			SendPlayerChoiceResponse(buttonID)
+			OnUIClosed()
+		end
+	end
+end
+
+--- Get the current count of player choices
+-- @param choiceInfo The table provided by :GetPlayerChoiceOptions()
+-- @return number The amount of choices that are available to the user
+function boss:GetPlayerChoiceCount(choiceInfo)
+	if choiceInfo and choiceInfo.options then
+		return #choiceInfo.options
+	end
+end
+
+--- Get the current amount of buttons a specific choice has available
+-- @param choiceInfo The table provided by :GetPlayerChoiceOptions()
+-- @number choiceNumber The number of the specific choice you want
+-- @return number The amount of clickable buttons this specific choice has
+function boss:GetPlayerChoiceButtonCount(choiceInfo, choiceNumber)
+	if choiceInfo and choiceInfo.options and choiceInfo.options[choiceNumber] and choiceInfo.options[choiceNumber].buttons then
+		return #choiceInfo.options[choiceNumber].buttons
 	end
 end
 
@@ -3462,7 +3636,7 @@ end
 
 --- Show a background bar in an already open "Info Box".
 -- @param key the option key to check
--- @number line the line to update, 1-10
+-- @number line the line to update
 -- @number percentage width of the bar between 0 and 1
 -- @number[opt] r red part of rgb, 0-1
 -- @number[opt] g green part of rgb, 0-1
@@ -3471,6 +3645,22 @@ end
 function boss:SetInfoBar(key, line, percentage, r, g, b, a)
 	if checkFlag(self, key, C.INFOBOX) then
 		self:SendMessage("BigWigs_SetInfoBoxBar", self, line, percentage, r, g, b, a)
+	end
+end
+
+--- Start a timer bar in an already open "Info Box".
+-- @param key the option key to check
+-- @number line the line to place the bar on
+-- @number[opt] textLine which line the text depicting the time remaining shows on
+-- @number startTime the time the bar should start e.g. GetTime() if it should start now
+-- @number duration the duration of the bar
+-- @number[opt] r red part of rgb, 0-1
+-- @number[opt] g green part of rgb, 0-1
+-- @number[opt] b blue part of rgb, 0-1
+-- @number[opt] a alpha, 0-1
+function boss:SetInfoTimerBar(key, line, textLine, startTime, duration, r, g, b, a)
+	if checkFlag(self, key, C.INFOBOX) then
+		self:SendMessage("BigWigs_SetInfoBoxTimerBar", self, line, textLine, startTime, duration, r, g, b, a)
 	end
 end
 
@@ -3974,7 +4164,6 @@ end
 
 do
 	local GetPlayerInfoByGUID = GetPlayerInfoByGUID
-	local GetClassColor = C_ClassColor and C_ClassColor.GetClassColor -- XXX [Mainline:✓ MoP:✗ Wrath:✗ Vanilla:✗]
 	--- Temporarily replace the next Blizzard boss message with a TargetMessage
 	-- @param key the option key
 	-- @number duration the duration the block should last
@@ -4098,11 +4287,24 @@ end
 --- Show a message for a secret spellId.
 -- @param key the option key
 -- @string color the message color category
--- @number spellId the secret spellId from which the icon and text are derived.
-function boss:SecretMessage(key, color, spellId)
+-- @number spellId the secret spellId from which the icon and text are derived
+-- @param[opt] unit the casting unit, used to add its target to the message
+function boss:SecretMessage(key, color, spellId, unit)
 	local isEmphasized = self:CheckFlag(key, C.EMPHASIZE)
 	if self:CheckFlag(key, C.MESSAGE) or isEmphasized then
-		self:SendMessage("BigWigs_Message", self, key, GetSpellName(spellId), color, GetSpellTexture(spellId), isEmphasized)
+		local text = GetSpellName(spellId)
+		if unit then
+			local targetName = UnitSpellTargetName(unit)
+			if targetName then
+				local class = classColorMessages and UnitSpellTargetClass(unit)
+				local classColor = class and GetClassColor(class)
+				if classColor then
+					targetName = classColor:WrapTextInColorCode(targetName)
+				end
+				text = CL.other:format(text, targetName)
+			end
+		end
+		self:SendMessage("BigWigs_Message", self, key, text, color, GetSpellTexture(spellId), isEmphasized)
 	end
 end
 

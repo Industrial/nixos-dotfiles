@@ -680,19 +680,18 @@ function stackedLayout:addDropdownRetail(opts)
   container.dropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  ---@type string[]
-  local itemList = {}
-
-  if opts.items then
-    itemList = opts.items --[=[@as string[]]=]
-  elseif opts.itemsFunction then
-    local ctx = context:New('Dropdown_Items')
-    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
-  end
-
   container.dropdown:SetupMenu(function(_, root)
     root:SetScrollMode(20 * 20)
-    for _, item in ipairs(itemList) do
+    -- Resolve the item list lazily on every menu generation so entries that were
+    -- registered after this pane was built appear without rebuilding the form.
+    -- The upgrade-icon providers (Pawn/SimpleItemLevel) enable after Config in
+    -- core/init.lua, and may register even later via ADDON_LOADED, so a list
+    -- snapshotted at build time would silently drop them.
+    local itemList = opts.items --[=[@as string[]]=]
+    if not itemList and opts.itemsFunction then
+      itemList = opts.itemsFunction(context:New('Dropdown_Items')) --[=[@as string[]]=]
+    end
+    for _, item in ipairs(itemList or {}) do
       root:CreateCheckbox(item, function(value)
         local ctx = context:New('Dropdown_Get')
         return opts.getValue(ctx, value)
@@ -735,19 +734,15 @@ function stackedLayout:addDropdownClassic(opts)
   container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  ---@type string[]
-  local itemList = {}
-
-  if opts.items then
-    itemList = opts.items --[=[@as string[]]=]
-  elseif opts.itemsFunction then
-    local ctx = context:New('Dropdown_Items')
-    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
-  end
-
-   -- Create and bind the initialization function to the dropdown menu
+   -- Create and bind the initialization function to the dropdown menu. The item
+   -- list is resolved lazily each time the menu opens so entries registered after
+   -- the pane was built (e.g. the Pawn/SimpleItemLevel upgrade providers) appear.
   UIDropDownMenu_Initialize(container.classicDropdown, function(_, level, _)
-   for _, item in ipairs(itemList) do
+   local itemList = opts.items --[=[@as string[]]=]
+   if not itemList and opts.itemsFunction then
+     itemList = opts.itemsFunction(context:New('Dropdown_Items')) --[=[@as string[]]=]
+   end
+   for _, item in ipairs(itemList or {}) do
     local info = UIDropDownMenu_CreateInfo()
     info.text = item
     info.checked = function()
@@ -805,6 +800,7 @@ function stackedLayout:AddSlider(opts)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
 
   if addon.isRetail then
     container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]

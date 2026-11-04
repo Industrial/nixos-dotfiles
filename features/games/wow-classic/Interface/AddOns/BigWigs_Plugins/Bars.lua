@@ -201,8 +201,7 @@ do
 		end
 		activeFrameNormal = nil
 		if db.normalPosition[5] ~= plugin.defaultDB.normalPosition[5] then
-			local frame = _G[db.normalPosition[5]]
-			if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or frame:IsForbidden() then
+			if not BigWigsAPI.IsValidFrame(db.normalPosition[5]) then
 				db.normalPosition[1] = plugin.defaultDB.normalPosition[1]
 				db.normalPosition[2] = plugin.defaultDB.normalPosition[2]
 				db.normalPosition[3] = plugin.defaultDB.normalPosition[3]
@@ -210,22 +209,21 @@ do
 				db.normalPosition[5] = plugin.defaultDB.normalPosition[5]
 				db.normalCopyCustomAnchorWidth = plugin.defaultDB.normalCopyCustomAnchorWidth
 				db.normalWidth = plugin.defaultDB.normalWidth
-			else
-				if db.normalCopyCustomAnchorWidth and type(frame.GetWidth) == "function" and type(frame:GetWidth()) == "number" then
-					activeFrameNormal = frame
-					if not hookedFrameNormal[frame] then
-						hookedFrameNormal[frame] = true
-						normalAnchor.HookScript(frame, "OnSizeChanged", HookScriptNormal)
-					end
-
-					local width = frame:GetWidth()
-					if width < minBarWidth then
-						width = minBarWidth
-					elseif width > maxBarWidth then
-						width = maxBarWidth
-					end
-					db.normalWidth = width
+			elseif db.normalCopyCustomAnchorWidth then
+				local frame = _G[db.normalPosition[5]]
+				activeFrameNormal = frame
+				if not hookedFrameNormal[frame] then
+					hookedFrameNormal[frame] = true
+					normalAnchor.HookScript(frame, "OnSizeChanged", HookScriptNormal)
 				end
+
+				local width = frame:GetWidth()
+				if width < minBarWidth then
+					width = minBarWidth
+				elseif width > maxBarWidth then
+					width = maxBarWidth
+				end
+				db.normalWidth = width
 			end
 		else
 			if db.normalCopyCustomAnchorWidth then
@@ -255,8 +253,7 @@ do
 		end
 		activeFrameExp = nil
 		if db.expPosition[5] ~= plugin.defaultDB.expPosition[5] then
-			local frame = _G[db.expPosition[5]]
-			if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or frame:IsForbidden() then
+			if not BigWigsAPI.IsValidFrame(db.expPosition[5]) then
 				db.expPosition[1] = plugin.defaultDB.expPosition[1]
 				db.expPosition[2] = plugin.defaultDB.expPosition[2]
 				db.expPosition[3] = plugin.defaultDB.expPosition[3]
@@ -264,22 +261,21 @@ do
 				db.expPosition[5] = plugin.defaultDB.expPosition[5]
 				db.expCopyCustomAnchorWidth = plugin.defaultDB.expCopyCustomAnchorWidth
 				db.expWidth = plugin.defaultDB.expWidth
-			else
-				if db.expCopyCustomAnchorWidth and type(frame.GetWidth) == "function" and type(frame:GetWidth()) == "number" then
-					activeFrameExp = frame
-					if not hookedFrameExp[frame] then
-						hookedFrameExp[frame] = true
-						emphasizeAnchor.HookScript(frame, "OnSizeChanged", HookScriptExp)
-					end
-
-					local width = frame:GetWidth()
-					if width < minBarWidth then
-						width = minBarWidth
-					elseif width > maxBarWidth then
-						width = maxBarWidth
-					end
-					db.expWidth = width
+			elseif db.expCopyCustomAnchorWidth then
+				local frame = _G[db.expPosition[5]]
+				activeFrameExp = frame
+				if not hookedFrameExp[frame] then
+					hookedFrameExp[frame] = true
+					emphasizeAnchor.HookScript(frame, "OnSizeChanged", HookScriptExp)
 				end
+
+				local width = frame:GetWidth()
+				if width < minBarWidth then
+					width = minBarWidth
+				elseif width > maxBarWidth then
+					width = maxBarWidth
+				end
+				db.expWidth = width
 			end
 		else
 			if db.expCopyCustomAnchorWidth then
@@ -332,11 +328,7 @@ do
 			bar.candyBarLabel:SetJustifyH(db.alignText)
 			bar:SetTimeVisibility(db.time)
 			bar.candyBarDuration:SetJustifyH(db.alignTime)
-			if not db.icon then
-				bar:SetIcon(nil)
-			else
-				bar:SetIcon(bar:GetIcon() or "Interface\\AddOns\\BigWigs\\Media\\Icons\\minimap_raid.tga")
-			end
+			bar:SetIconVisibility(db.icon)
 			bar:SetIconPosition(db.iconPosition)
 			local indicatorFrame = bar:Get("bigwigs:indicatorFrame")
 			if indicatorFrame then
@@ -366,11 +358,7 @@ do
 				emphasizeAnchor.bars[bar] = nil
 				bar:Set("bigwigs:anchor", "normalPosition")
 			end
-			if not db.icon then
-				bar:SetIcon(nil)
-			else
-				bar:SetIcon(bar:GetIcon() or "Interface\\AddOns\\BigWigs\\Media\\Icons\\minimap_raid.tga")
-			end
+			bar:SetIconVisibility(db.icon)
 			bar:SetIconPosition(db.iconPosition)
 			local indicatorFrame = bar:Get("bigwigs:indicatorFrame")
 			if indicatorFrame then
@@ -999,12 +987,8 @@ do
 									end
 									updateProfile()
 								end,
-								validate = function(_, value)
-									local frame = _G[value]
-									if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or frame:IsForbidden() then
-										return false
-									end
-									return true
+								validate = function(_, frameName)
+									return BigWigsAPI.IsValidFrame(frameName)
 								end,
 								name = L.customAnchorPoint,
 								order = 5,
@@ -1145,12 +1129,8 @@ do
 									end
 									updateProfile()
 								end,
-								validate = function(_, value)
-									local frame = _G[value]
-									if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or frame:IsForbidden() then
-										return false
-									end
-									return true
+								validate = function(_, frameName)
+									return BigWigsAPI.IsValidFrame(frameName)
 								end,
 								name = L.customAnchorPoint,
 								order = 5,
@@ -1815,12 +1795,12 @@ do
 	end
 
 	local initial = true
-	function plugin:CreateBar(module, key, text, time, icon, isApprox, eventId, spellIndicators)
+	function plugin:CreateBar(module, key, text, time, icon, eventId, spellIndicators)
 		local width, height
 		width = db.normalWidth
 		height = db.normalHeight
 		local bar = candy:New(LibSharedMedia:Fetch(STATUSBAR, db.texture), width, height)
-		bar:SetDuration(time, not eventId and isApprox) -- isApprox is maxQueueDuration for timeline bars
+		bar:SetDuration(time)
 		local flags = nil
 		if db.monochrome and db.outline ~= "NONE" then
 			flags = "MONOCHROME," .. db.outline
@@ -1837,11 +1817,8 @@ do
 			bar:Set("bigwigs:eventId", eventId)
 		end
 		bar:Set("bigwigs:anchor", "normalPosition")
-		if db.icon then
-			bar:SetIcon(icon)
-		else
-			bar:SetIcon(nil)
-		end
+		bar:SetIconVisibility(db.icon)
+		bar:SetIcon(icon)
 		bar:SetColor(colors:GetColor("barColor", module, key))
 		bar:SetBackgroundColor(colors:GetColor("barBackground", module, key))
 		bar:SetTextColor(colors:GetColor("barText", module, key))
@@ -1903,21 +1880,21 @@ do
 		bwTooltip:Hide()
 	end
 
-	function plugin:BigWigs_StartBar(_, module, key, text, time, icon, isApprox, maxTime, eventId, spellIndicators)
+	function plugin:BigWigs_StartBar(_, module, key, text, time, icon, maxQueueDuration, maxTime, eventId, spellIndicators)
 		if not text then text = "" end
 		if not eventId and self:IsSecret(text) then
 			BigWigs:Error("Cannot start a bar with secrets when no eventId is specified.")
 			return
 		end
 		self:StopSpecificBar(nil, module, text, eventId)
-		local bar = self:CreateBar(module, key, text, time, icon, isApprox, eventId, spellIndicators)
+		local bar = self:CreateBar(module, key, text, time, icon, eventId, spellIndicators)
 		if db.iconTooltip and type(key) == "number" and key > 0 then
 			bar.candyBarIconFrame.bwID = key
 			bar:Set("bigwigs:tooltip", key)
 			bar.candyBarIconFrame:SetScript("OnEnter", OnEnterIcon)
 			bar.candyBarIconFrame:SetScript("OnLeave", OnLeaveIcon)
 		end
-		bar:SetPauseWhenDone(isApprox)
+		bar:SetPauseWhenDone(maxQueueDuration)
 		if db.emphasize and time < db.emphasizeTime then
 			if db.emphasizeRestart and maxTime and maxTime > db.emphasizeTime then
 				bar:Start(db.emphasizeTime)
@@ -1935,7 +1912,7 @@ do
 		local anchor = bar:Get("bigwigs:anchor") == "expPosition" and emphasizeAnchor or normalAnchor
 		rearrangeBars(anchor)
 		if isRetail then -- The following callbacks are now deprecated and will eventually be entirely removed
-			self:SendMessage("BigWigs_BarCreated", self, bar, module, key, text, time, icon, isApprox)
+			self:SendMessage("BigWigs_BarCreated", self, bar, module, key, text, time, icon, maxQueueDuration)
 			-- Check if :EmphasizeBar(bar) was run and trigger the callback.
 			-- Bit of a roundabout method to approaching this so that we purposely keep callbacks firing last.
 			if bar:Get("bigwigs:emphasized") then

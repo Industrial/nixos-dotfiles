@@ -9,8 +9,10 @@ function Auctionator.CraftingInfo.InitializeProfessionsFrame()
     addedFunctionality = true
 
     local craftingPageContainer = CreateFrame("Frame", "AuctionatorCraftingInfoProfessionsFrame", ProfessionsFrame.CraftingPage.SchematicForm, "AuctionatorCraftingInfoProfessionsFrameTemplate");
-    local ordersPageContainer = CreateFrame("Frame", "AuctionatorCraftingInfoProfessionsOrderFrame", ProfessionsFrame.OrdersPage.OrderView.OrderDetails.SchematicForm, "AuctionatorCraftingInfoProfessionsFrameTemplate");
-    ordersPageContainer:SetDoNotShowProfit()
+    if not Auctionator.Constants.IsForever then
+      local ordersPageContainer = CreateFrame("Frame", "AuctionatorCraftingInfoProfessionsOrderFrame", ProfessionsFrame.OrdersPage.OrderView.OrderDetails.SchematicForm, "AuctionatorCraftingInfoProfessionsFrameTemplate");
+      ordersPageContainer:SetDoNotShowProfit()
+    end
   end
 end
 

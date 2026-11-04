@@ -310,15 +310,21 @@ function DB:SetSectionSortType(kind, view, sort)
 end
 
 ---@param kind BagKind
----@return boolean
-function DB:GetExtraGlowyButtons(kind)
-  return DB.data.profile.extraGlowyButtons[kind]
+---@return number
+function DB:GetGlowIntensity(kind)
+  return DB.data.profile.glowIntensity[kind]
 end
 
 ---@param kind BagKind
----@param value boolean
-function DB:SetExtraGlowyButtons(kind, value)
-  DB.data.profile.extraGlowyButtons[kind] = value
+---@param value number
+function DB:SetGlowIntensity(kind, value)
+  value = math.floor((tonumber(value) or 0) + 0.5)
+  if value < 0 then
+    value = 0
+  elseif value > const.GLOW_INTENSITY_MAX then
+    value = const.GLOW_INTENSITY_MAX
+  end
+  DB.data.profile.glowIntensity[kind] = value
 end
 
 ---@param kind BagKind
@@ -381,6 +387,78 @@ function DB:DeleteItemCategory(category)
   end
   DB.data.profile.customCategoryFilters[category] = nil
   DB.data.profile.ephemeralCategoryFilters[category] = nil
+
+  -- Scrub every side-table reference so the category cannot linger as an
+  -- orphan. This mirrors RenameCategory; without it a leftover
+  -- customSectionSort ("Pinned") entry resurfaces the deleted category forever
+  -- as an undeletable "dynamic" category (see config's LoadPinnedItems /
+  -- UpdateDetailPanel). Also drops any grouped sub-categories ("Name - X").
+  local groupedPrefix = category .. " - "
+
+  DB.data.profile.categoryOptions[category] = nil
+  for name in pairs(DB.data.profile.categoryOptions) do
+    if name:sub(1, #groupedPrefix) == groupedPrefix then
+      DB.data.profile.categoryOptions[name] = nil
+    end
+  end
+
+  for name in pairs(DB.data.profile.ephemeralCategoryFilters) do
+    if name:sub(1, #groupedPrefix) == groupedPrefix then
+      DB.data.profile.ephemeralCategoryFilters[name] = nil
+    end
+  end
+
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.customSectionSort[kind] then
+      DB.data.profile.customSectionSort[kind][category] = nil
+      for name in pairs(DB.data.profile.customSectionSort[kind]) do
+        if name:sub(1, #groupedPrefix) == groupedPrefix then
+          DB.data.profile.customSectionSort[kind][name] = nil
+        end
+      end
+    end
+
+    if DB.data.profile.collapsedSections[kind] then
+      DB.data.profile.collapsedSections[kind][category] = nil
+      for name in pairs(DB.data.profile.collapsedSections[kind]) do
+        if name:sub(1, #groupedPrefix) == groupedPrefix then
+          DB.data.profile.collapsedSections[kind][name] = nil
+        end
+      end
+    end
+
+    if DB.data.profile.categoryToGroup[kind] then
+      DB.data.profile.categoryToGroup[kind][category] = nil
+      if addon.isRetail and kind == const.BAG_KIND.BANK then
+        for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
+          if type(tbl) == "table" then
+            tbl[category] = nil
+          end
+        end
+      end
+    end
+  end
+end
+
+-- PruneOrphanedSectionSort removes pinned-sort ("Pinned" list) entries whose
+-- category no longer exists in either the persistent (customCategoryFilters) or
+-- persisted-ephemeral (ephemeralCategoryFilters) stores. Such orphans were left
+-- behind by the old DeleteItemCategory (which did not scrub customSectionSort),
+-- and the config pane's LoadPinnedItems would resurface them forever as
+-- undeletable "dynamic" categories. Called once from Migrate to self-heal
+-- existing profiles; new deletes no longer create orphans.
+function DB:PruneOrphanedSectionSort()
+  for _, kind in pairs(const.BAG_KIND) do
+    local sort = DB.data.profile.customSectionSort[kind]
+    if sort then
+      for name in pairs(sort) do
+        if DB.data.profile.customCategoryFilters[name] == nil
+          and DB.data.profile.ephemeralCategoryFilters[name] == nil then
+          sort[name] = nil
+        end
+      end
+    end
+  end
 end
 
 ---@param category string
@@ -631,6 +709,14 @@ end
 ---@param value string
 function DB:SetUpgradeIconProvider(value)
   DB.data.profile.upgradeIconProvider = value
+  -- Record that the user made an explicit choice, so external-provider
+  -- precedence (see items:GetActiveUpgradeProvider) stops overriding it.
+  DB.data.profile.upgradeIconProviderUserSet = true
+end
+
+---@return boolean
+function DB:GetUpgradeIconProviderUserSet()
+  return DB.data.profile.upgradeIconProviderUserSet or false
 end
 
 ---@param kind BagKind
@@ -1212,6 +1298,26 @@ function DB:Migrate()
   end
 
 
+  -- ============================================================
+  -- "Extra Glowy" boolean -> glow intensity slider migration (Q3'27)
+  -- Do not remove before Q3'28
+  -- ============================================================
+  -- The retired per-kind boolean extraGlowyButtons is replaced by a 0-100
+  -- glowIntensity slider. Preserve the user's prior look: an enabled "Extra
+  -- Glowy" maps to the full blinding halo (100), a disabled one to the flat
+  -- colored border at the halo threshold (60). The old field is then dropped so
+  -- this runs exactly once.
+  if DB.data.profile.extraGlowyButtons ~= nil then
+    for _, kind in pairs(const.BAG_KIND) do
+      if DB.data.profile.glowIntensity[kind] ~= nil then
+        DB.data.profile.glowIntensity[kind] = DB.data.profile.extraGlowyButtons[kind]
+          and const.GLOW_INTENSITY_MAX
+          or const.GLOW_INTENSITY_DEFAULT
+      end
+    end
+    DB.data.profile.extraGlowyButtons = nil
+  end
+
   -- Migrate to kind-scoped groups, groupCounter, and categoryToGroup
   if not DB.data.profile.__groupsScopedByKind then
     local oldGroups = DB.data.profile.groups
@@ -1340,7 +1446,13 @@ function DB:Migrate()
     end
   end
 
-  if not hasWarbank and addon.isRetail then
+  -- Only seed the default Warbank group on clients that actually have a warbank.
+  -- WoW: Forever (Camelot) is retail-shaped but has no account bank, so it must
+  -- not get a Warbank group (which would otherwise create an empty account tab
+  -- section and drive the whole data-side warbank surface). `hasWarbank` here is
+  -- the local "profile already has a warbank group" flag; addon.hasWarbank is the
+  -- client capability.
+  if not hasWarbank and addon.hasWarbank then
     local newID = DB.data.profile.groupCounter[const.BAG_KIND.BANK] + 1
     DB.data.profile.groupCounter[const.BAG_KIND.BANK] = newID
     DB.data.profile.groups[const.BAG_KIND.BANK][newID] = {
@@ -1447,6 +1559,11 @@ function DB:Migrate()
     -- Mark migration complete
     DB.data.profile.__profileSystemMigrated = true
   end
+
+  -- Heal profiles corrupted by the old DeleteItemCategory, which left pinned
+  -- categories behind in customSectionSort so they resurfaced as undeletable
+  -- "dynamic" categories.
+  DB:PruneOrphanedSectionSort()
 end
 
 -- ============================================================

@@ -12,20 +12,20 @@ local strfind = string.find
 -- Generate our version variables
 --
 
-local BIGWIGS_VERSION = 424
+local BIGWIGS_VERSION = 426
 local CONTENT_PACK_VERSIONS = {
-	["LittleWigs"] = {12, 1, 12},
-	["BigWigs_Classic"] = {12, 1, 1},
-	["BigWigs_BurningCrusade"] = {12, 1, 9},
-	["BigWigs_WrathOfTheLichKing"] = {12, 0, 11},
-	["BigWigs_Cataclysm"] = {12, 0, 5},
-	["BigWigs_MistsOfPandaria"] = {12, 0, 9},
-	["BigWigs_WarlordsOfDraenor"] = {12, 0, 3},
-	["BigWigs_Legion"] = {12, 0, 3},
-	["BigWigs_BattleForAzeroth"] = {12, 0, 5},
-	["BigWigs_Shadowlands"] = {12, 0, 4},
-	["BigWigs_Dragonflight"] = {12, 0, 6},
-	["BigWigs_TheWarWithin"] = {12, 0, 4},
+	["LittleWigs"] = {12, 1, 19},
+	["BigWigs_Classic"] = {12, 1, 2},
+	["BigWigs_BurningCrusade"] = {12, 1, 11},
+	["BigWigs_WrathOfTheLichKing"] = {12, 1, 0},
+	["BigWigs_Cataclysm"] = {12, 1, 0},
+	["BigWigs_MistsOfPandaria"] = {12, 1, 0},
+	["BigWigs_WarlordsOfDraenor"] = {12, 1, 0},
+	["BigWigs_Legion"] = {12, 1, 0},
+	["BigWigs_BattleForAzeroth"] = {12, 1, 0},
+	["BigWigs_Shadowlands"] = {12, 1, 0},
+	["BigWigs_Dragonflight"] = {12, 1, 0},
+	["BigWigs_TheWarWithin"] = {12, 1, 0},
 }
 local BIGWIGS_RELEASE_STRING
 local versionQueryString, versionResponseString = "Q^%d^%s^%d^%s", "V^%d^%s^%d^%s"
@@ -41,6 +41,7 @@ do
 	tbl.loaderPrivate = mod
 	tbl.version = BIGWIGS_VERSION
 	public.isRetail = tbl.isRetail
+	public.isForever = tbl.isForever
 	public.isClassic = tbl.isClassic
 	public.isVanilla = tbl.isVanilla
 	public.season = tbl.season
@@ -56,7 +57,7 @@ do
 	local ALPHA = "ALPHA"
 
 	local releaseType
-	local myGitHash = "8177bf9" -- The ZIP packager will replace this with the Git hash.
+	local myGitHash = "45f911b" -- The ZIP packager will replace this with the Git hash.
 	local releaseString
 	--[=[@alpha@
 	-- The following code will only be present in alpha ZIPs.
@@ -243,7 +244,17 @@ do
 	local lw_delves = "LittleWigs_Delves"
 	local lw_cs = "LittleWigs_CurrentSeason"
 
-	if public.isVanilla then
+	if public.isForever then
+		public.currentExpansion = {
+			name = c,
+			bigWigsBundled = {},
+			littleWigsName = lw_c,
+			littleWigsDefault = lw_c,
+			littleWigsBundled = {},
+			currentSeason = {},
+			zones = {},
+		}
+	elseif public.isVanilla then
 		public.currentExpansion = {
 			name = c,
 			bigWigsBundled = {},
@@ -327,6 +338,7 @@ do
 				[1592] = "BigWigs_Sporefall",
 				[2987] = "BigWigs_MidnightLairs",
 				[3004] = "BigWigs_TheVenomousAbyss",
+				[3095] = public.isNext and "BigWigs_TheUnbindingOfKithix" or nil,
 			}
 		}
 	else -- Retail
@@ -363,6 +375,7 @@ do
 				[1592] = "BigWigs_Sporefall",
 				[2987] = "BigWigs_MidnightLairs",
 				[3004] = "BigWigs_TheVenomousAbyss",
+				[3095] = public.isNext and "BigWigs_TheUnbindingOfKithix" or nil,
 			}
 		}
 	end
@@ -462,6 +475,7 @@ do
 		[1592] = mn, -- Sporefall
 		[2987] = mn, -- The Tidebound Grotto
 		[3004] = mn, -- The Venomous Abyss
+		[3095] = public.isNext and mn or nil, -- The Unbinding of Kith'ix
 
 
 		--[[ LittleWigs: Classic ]]--
@@ -1182,12 +1196,12 @@ do
 end
 
 -- XXX 12.0.5
-if public.isRetail and not BW_FEAT_RENAMES then
-	BW_FEAT_RENAMES = true
-	if BigWigs3DB then -- No popup for fresh users
-		Popup(L.tempRenameFeat, true, 180)
-	end
-end
+--if public.isRetail and not BW_FEAT_RENAMES then
+--	BW_FEAT_RENAMES = true
+--	if BigWigs3DB then -- No popup for fresh users
+--		Popup(L.tempRenameFeat, true, 180)
+--	end
+--end
 
 -- XXX 12.0.0
 --if (public.isRetail or public.isMists or public.isWrath) and not BW_FEAT_SHARE2 then
@@ -1664,9 +1678,9 @@ end
 --
 
 do
-	local DBMdotRevision = "20260901210504" -- The changing version of the local client, changes with every new zip using the project-date-integer packager replacement.
-	local DBMdotDisplayVersion = "12.1.8" -- "N.N.N" for a release and "N.N.N alpha" for the alpha duration.
-	local DBMdotReleaseRevision = "20260901000000" -- Hardcoded time, manually changed every release, they use it to track the highest release version, a new DBM release is the only time it will change.
+	local DBMdotRevision = "20260929225800" -- The changing version of the local client, changes with every new zip using the project-date-integer packager replacement.
+	local DBMdotDisplayVersion = "12.1.11" -- "N.N.N" for a release and "N.N.N alpha" for the alpha duration.
+	local DBMdotReleaseRevision = "20260929000000" -- Hardcoded time, manually changed every release, they use it to track the highest release version, a new DBM release is the only time it will change.
 	local protocol = 3
 	local versionPrefix = "V"
 	local PForceDisable = 27

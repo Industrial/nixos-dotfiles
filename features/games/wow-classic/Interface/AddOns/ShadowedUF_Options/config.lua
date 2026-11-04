@@ -1,0 +1,9661 @@
+﻿local Config = {}
+local AceDialog, AceRegistry, AceGUI, SML, registered, options
+local playerClass = select(2, UnitClass("player"))
+local modifyUnits, globalConfig = {}, {}
+local L = ShadowUF.L
+
+ShadowUF.Config = Config
+
+local GetSpellName = C_Spell.GetSpellName
+local GetSpellTexture = C_Spell.GetSpellTexture
+
+-- Shared by the aura text position selects (per-frame tab and the General defaults)
+local auraTextAnchorValues = {
+	["TOPLEFT"] = L["Top Left"], ["TOP"] = L["Top"], ["TOPRIGHT"] = L["Top Right"],
+	["LEFT"] = L["Left"], ["CENTER"] = L["Center"], ["RIGHT"] = L["Right"],
+	["BOTTOMLEFT"] = L["Bottom Left"], ["BOTTOM"] = L["Bottom"], ["BOTTOMRIGHT"] = L["Bottom Right"],
+}
+
+-- Shown by the color pickers when a profile has no stored value yet
+local dispelPaletteDefaults = {
+	Magic = {r = 0.2, g = 0.6, b = 1},
+	Curse = {r = 0.6, g = 0, b = 1},
+	Disease = {r = 0.6, g = 0.4, b = 0},
+	Poison = {r = 0, g = 0.6, b = 0},
+	Bleed = {r = 0.8, g = 0, b = 0},
+	Enrage = {r = 1, g = 0.6, b = 0},
+}
+
+-- Sliders fire on every drag tick, coalesce layout reloads (~0.1s) and keep them scoped to the touched units so dragging stays smooth
+local pendingReloadUnits, pendingReloadAll, pendingReloadTimer = {}, false, nil
+local function queueLayoutReload(unit)
+	if( not unit or unit == "global" ) then
+		pendingReloadAll = true
+	else
+		pendingReloadUnits[unit] = true
+	end
+
+	if( pendingReloadTimer ) then return end
+	pendingReloadTimer = C_Timer.NewTimer(0.1, function()
+		pendingReloadTimer = nil
+		if( pendingReloadAll ) then
+			pendingReloadAll = false
+			table.wipe(pendingReloadUnits)
+			ShadowUF.Layout:Reload()
+		else
+			for pendingUnit in pairs(pendingReloadUnits) do
+				pendingReloadUnits[pendingUnit] = nil
+				ShadowUF.Layout:Reload(pendingUnit)
+			end
+		end
+	end)
+end
+Config.queueLayoutReload = queueLayoutReload
+
+-- While the color wheel is dragged the rebuild is held, and it fires the moment the mouse button is released
+local paletteWatcher
+local function applyPaletteReload()
+	ShadowUF.modules.auras:InvalidateDispelColorMap()
+	queueLayoutReload()
+end
+
+local function queuePaletteReload()
+	if( not IsMouseButtonDown("LeftButton") ) then
+		applyPaletteReload()
+		return
+	end
+
+	if( paletteWatcher ) then return end
+	paletteWatcher = C_Timer.NewTicker(0.05, function()
+		if( not IsMouseButtonDown("LeftButton") ) then
+			paletteWatcher:Cancel()
+			paletteWatcher = nil
+			applyPaletteReload()
+		end
+	end)
+end
+
+--[[
+	The part that makes configuration a pain when you actually try is it gets unwieldly when you're adding special code to deal with
+	showing help for certain cases, swapping tabs etc that makes it work smoothly.
+
+	I'm going to have to split it out into separate files for each type to clean everything up but that takes time and I have other things
+	I want to get done with first.
+
+	-- dated 2009
+
+	In reality, this will never be cleaned up because jesus christ, I am not refactoring 7,000 lines of configuration.
+
+	*** HERE BE DRAGONS ***
+]]
+
+local unitCategories = {
+	player = {"player", "pet"},
+	general = {"target", "targettarget", "targettargettarget", "focus", "focustarget", "pettarget"},
+	party = {"party", "partypet", "partytarget", "partytargettarget", "party"},
+	raid = {"raid", "raidpet"},
+	raidmisc = {"maintank", "maintanktarget", "maintanktargettarget", "mainassist", "mainassisttarget", "mainassisttargettarget"},
+	boss = {"boss", "bosstarget", "bosstargettarget"},
+	arena = {"arena", "arenapet", "arenatarget", "arenatargettarget"},
+	battleground = {"battleground", "battlegroundpet", "battlegroundtarget", "battlegroundtargettarget"}
+}
+
+local UNIT_DESC = {
+	["boss"] = L["Boss units are for only certain fights, such as Blood Princes or the Gunship battle, you will not see them for every boss fight."],
+	["mainassist"] = L["Main Assists's are set by the Blizzard Main Assist system or mods that use it."],
+	["maintank"] = L["Main Tank's are set through the Raid frames, or through selecting the Tank role."],
+	["battleground"] = L["Currently used in battlegrounds for showing flag carriers."],
+	["battlegroundpet"] = L["Current pet used by a battleground unit."],
+	["battlegroundtarget"] = L["Current target of a battleground unit."],
+	["battlegroundtargettarget"] = L["Current target of target of a battleground unit."]
+}
+
+local PAGE_DESC = {
+	["general"] = L["General configuration to all enabled units."],
+	["enableUnits"] = L["Various units can be enabled through this page, such as raid or party targets."],
+	["hideBlizzard"] = L["Hiding and showing various aspects of the default UI such as the player buff frames."],
+	["units"] = L["Configuration to specific unit frames."],
+	["visibility"] = L["Disabling unit modules in various instances."],
+	["tags"] = L["Advanced tag management, allows you to add your own custom tags."],
+	["filter"] = L["Simple aura filtering by whitelists and blacklists."],
+}
+local INDICATOR_NAMES = {["questBoss"] = L["Quest Boss"], ["leader"] = L["Leader / Assist"], ["lfdRole"] = L["Class Role"], ["masterLoot"] = L["Master Looter"], ["pvp"] = L["PvP Flag"], ["raidTarget"] = L["Raid Target"], ["ready"] = L["Ready Status"], ["role"] = L["Raid Role"], ["status"] = L["Combat Status"], ["class"] = L["Class Icon"], ["resurrect"] = L["Resurrect Status"], ["sumPending"] = L["Summon Pending"], ["phase"] = L["Other Party/Phase Status"], ["petBattle"] = L["Pet Battle"], ["arenaSpec"] = L["Arena Spec"], ["happiness"] = L["Pet Happiness"]}
+local AREA_NAMES = {["arena"] = L["Arenas"],["none"] = L["Everywhere else"], ["party"] = L["Party instances"], ["pvp"] = L["Battleground"], ["raid"] = L["Raid instances"], ["neighborhood"] = L["Neighborhood"]}
+local INDICATOR_DESC = {
+		["leader"] = L["Crown indicator for group leader or assistants."], ["lfdRole"] = L["Role the unit is playing."],
+		["masterLoot"] = L["Bag indicator for master looters."], ["pvp"] = L["PVP flag indicator, Horde for Horde flagged pvpers and Alliance for Alliance flagged pvpers."],
+		["raidTarget"] = L["Raid target indicator."], ["ready"] = L["Ready status of group members."], ["phase"] = L["Shows when a party member is in a different phase or another group."],
+		["questBoss"] = L["Shows that a NPC is a boss for a quest."], ["petBattle"] = L["Shows what kind of pet the unit is for pet battles."], ["happiness"] = L["Indicator for the current pet happiness."],
+		["role"] = L["Raid role indicator, adds a shield indicator for main tanks and a sword icon for main assists."], ["status"] = L["Status indicator, shows if the unit is currently in combat. For the player it will also show if you are rested."], ["class"] = L["Class icon for players."],
+		["arenaSpec"] = L["Talent spec of your arena opponents."]
+}
+local TAG_GROUPS = {["classification"] = L["Classifications"], ["health"] = L["Health"], ["misc"] = L["Miscellaneous"], ["playerthreat"] = L["Player threat"], ["power"] = L["Power"], ["status"] = L["Status"], ["threat"] = L["Threat"], --[==[["raid"] = L["Raid"],]==] ["classspec"] = L["Class Specific"], ["classtimer"] = L["Class Timer"]}
+
+local pointPositions = {["BOTTOM"] = L["Bottom"], ["TOP"] = L["Top"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["TOPLEFT"] = L["Top Left"], ["TOPRIGHT"] = L["Top Right"], ["BOTTOMLEFT"] = L["Bottom Left"], ["BOTTOMRIGHT"] = L["Bottom Right"], ["CENTER"] = L["Center"]}
+local positionList = {["C"] = L["Center"], ["RT"] = L["Right Top"], ["RC"] = L["Right Center"], ["RB"] = L["Right Bottom"], ["LT"] = L["Left Top"], ["LC"] = L["Left Center"], ["LB"] = L["Left Bottom"], ["BL"] = L["Bottom Left"], ["BC"] = L["Bottom Center"], ["BR"] = L["Bottom Right"], ["TR"] = L["Top Right"], ["TC"] = L["Top Center"], ["TL"] = L["Top Left"]}
+
+local unitOrder = {}
+for order, unit in pairs(ShadowUF.unitList) do unitOrder[unit] = order end
+local fullReload = {["bars"] = true, ["auras"] = true, ["backdrop"] = true, ["font"] = true, ["classColors"] = true, ["powerColors"] = true, ["healthColors"] = true, ["xpColors"] = true, ["omnicc"] = true, ["blizzardcc"] = true, ["castColors"] = true}
+local quickIDMap = {}
+
+-- Helper functions
+local function getPageDescription(info)
+	return PAGE_DESC[info[#(info)]]
+end
+
+local function getFrameName(unit)
+	if( unit == "raidpet" or unit == "raid" or unit == "party" or unit == "maintank" or unit == "mainassist" or unit == "boss" or unit == "arena" or unit == "battleground" ) then
+		return string.format("#SUFHeader%s", unit)
+	end
+
+	return string.format("#SUFUnit%s", unit)
+end
+
+local anchorList = {}
+local function getAnchorParents(info)
+	local unit = info[2]
+	for k in pairs(anchorList) do anchorList[k] = nil end
+
+	if( ShadowUF.Units.childUnits[unit] ) then
+		anchorList["$parent"] = string.format(L["%s member"], L.units[ShadowUF.Units.childUnits[unit]])
+		return anchorList
+	end
+
+	anchorList["UIParent"] = L["Screen"]
+
+	-- Don't let a frame anchor to a frame thats anchored to it already (Stop infinite loops-o-doom)
+	local currentName = getFrameName(unit)
+	for _, unitID in pairs(ShadowUF.unitList) do
+		if( unitID ~= unit and ShadowUF.db.profile.positions[unitID] and ShadowUF.db.profile.positions[unitID].anchorTo ~= currentName ) then
+			anchorList[getFrameName(unitID)] = string.format(L["%s frames"], L.units[unitID] or unitID)
+		end
+	end
+
+	return anchorList
+end
+
+local function selectDialogGroup(group, key)
+	AceDialog.Status.ShadowedUF.children[group].status.groups.selected = key
+	AceRegistry:NotifyChange("ShadowedUF")
+end
+
+local function selectTabGroup(group, subGroup, key)
+	AceDialog.Status.ShadowedUF.children[group].status.groups.selected = subGroup
+	AceDialog.Status.ShadowedUF.children[group].children[subGroup].status.groups.selected = key
+	AceRegistry:NotifyChange("ShadowedUF")
+end
+
+local function hideAdvancedOption(info)
+	return not ShadowUF.db.profile.advanced
+end
+
+local function hideBasicOption(info)
+	return ShadowUF.db.profile.advanced
+end
+
+local function isUnitDisabled(info)
+	local unit = info[#(info)]
+	if( not ShadowUF:IsUnitAvailable(unit) ) then return true end
+	local enabled = ShadowUF.db.profile.units[unit].enabled
+	for _, visibility in pairs(ShadowUF.db.profile.visibility) do
+		if( visibility[unit] ) then
+			enabled = visibility[unit]
+			break
+		end
+	end
+
+	return not enabled
+end
+
+local function mergeTables(parent, child)
+	for key, value in pairs(child) do
+		if( type(parent[key]) == "table" ) then
+			parent[key] = mergeTables(parent[key], value)
+		elseif( type(value) == "table" ) then
+			parent[key] = CopyTable(value)
+		elseif( parent[key] == nil ) then
+			parent[key] = value
+		end
+	end
+
+	return parent
+end
+
+local function getName(info)
+	local key = info[#(info)]
+	if( ShadowUF.modules[key] and ShadowUF.modules[key].moduleName ) then
+		return ShadowUF.modules[key].moduleName
+	end
+
+	return LOCALIZED_CLASS_NAMES_MALE[key] or INDICATOR_NAMES[key] or L.units[key] or TAG_GROUPS[key] or L[key] or "Unknown"
+end
+
+local function getUnitOrder(info)
+	return unitOrder[info[#(info)]]
+end
+
+local function isModifiersSet(info)
+	if( info[2] ~= "global" ) then return false end
+	for k in pairs(modifyUnits) do return false end
+	return true
+end
+
+-- These are for setting simple options like bars.texture = "Default" or locked = true
+local function set(info, value)
+	local cat, key = string.split(".", info.arg)
+	if( key == "$key" ) then key = info[#(info)] end
+
+	if( not key ) then
+		ShadowUF.db.profile[cat] = value
+	else
+		ShadowUF.db.profile[cat][key] = value
+	end
+
+	if( cat and fullReload[cat] ) then
+		ShadowUF.Layout:CheckMedia()
+		ShadowUF.Layout:Reload()
+	end
+end
+
+local function get(info)
+	local cat, key = string.split(".", info.arg)
+	if( key == "$key" ) then key = info[#(info)] end
+	if( not key ) then
+		return ShadowUF.db.profile[cat]
+	else
+		return ShadowUF.db.profile[cat][key]
+	end
+end
+
+local function setColor(info, r, g, b, a)
+	local color = get(info) or {}
+	color.r, color.g, color.b, color.a = r, g, b, a
+	set(info, color)
+end
+
+local function getColor(info)
+	local color = get(info) or {}
+	return color.r or 0, color.g or 0, color.b or 0, color.a or 1
+end
+
+-- These are for setting complex options like units.player.auras.buffs.enabled = true or units.player.portrait.enabled = true
+local function setVariable(unit, moduleKey, moduleSubKey, key, value)
+	local configTable = unit == "global" and globalConfig or ShadowUF.db.profile.units[unit]
+
+	-- For setting options like units.player.auras.buffs.enabled = true
+	if( moduleKey and moduleSubKey and configTable[moduleKey][moduleSubKey] ) then
+		configTable[moduleKey][moduleSubKey][key] = value
+		queueLayoutReload(unit)
+	-- For setting options like units.player.portrait.enabled = true
+	elseif( moduleKey and not moduleSubKey and configTable[moduleKey] ) then
+		configTable[moduleKey][key] = value
+		queueLayoutReload(unit)
+	-- For setting options like units.player.height = 50
+	elseif( not moduleKey and not moduleSubKey ) then
+		configTable[key] = value
+		queueLayoutReload(unit)
+	end
+end
+
+local function specialRestricted(unit, moduleKey, moduleSubKey, key)
+	if( ShadowUF.fakeUnits[unit] and ( key == "colorAggro" or key == "aggro" or key == "colorDispel" or moduleKey == "incHeal" or moduleKey == "healAbsorb" or moduleKey == "incAbsorb" or moduleKey == "castBar" ) ) then
+		return true
+	elseif( moduleKey == "healthBar" and unit == "player" and key == "reaction" ) then
+		return true
+	end
+end
+
+local function setDirectUnit(unit, moduleKey, moduleSubKey, key, value)
+	if( unit == "global" ) then
+		for globalUnit in pairs(modifyUnits) do
+			if( not specialRestricted(globalUnit, moduleKey, moduleSubKey, key) ) then
+				setVariable(globalUnit, moduleKey, moduleSubKey, key, value)
+			end
+		end
+
+		setVariable("global", moduleKey, moduleSubKey, key, value)
+	else
+		setVariable(unit, moduleKey, moduleSubKey, key, value)
+	end
+end
+
+local function setUnit(info, value)
+	local unit = info[2]
+	-- auras, buffs, enabled / text, 1, text / portrait, enabled
+	local moduleKey, moduleSubKey, key = string.split(".", info.arg)
+	if( not moduleSubKey ) then key = moduleKey moduleKey = nil end
+	if( moduleSubKey and not key ) then key = moduleSubKey moduleSubKey = nil end
+	if( moduleSubKey == "$parent" ) then moduleSubKey = info[#(info) - 1] end
+	if( moduleKey == "$parent" ) then moduleKey = info[#(info) - 1] end
+	if( moduleSubKey == "$parentparent" ) then moduleSubKey = info[#(info) - 2] end
+	if( moduleKey == "$parentparent" ) then moduleKey = info[#(info) - 2] end
+	if( tonumber(moduleSubKey) ) then moduleSubKey = tonumber(moduleSubKey) end
+
+	setDirectUnit(unit, moduleKey, moduleSubKey, key, value)
+end
+
+local function getVariable(unit, moduleKey, moduleSubKey, key)
+	local configTbl = unit == "global" and globalConfig or ShadowUF.db.profile.units[unit]
+	if( moduleKey and moduleSubKey ) then
+		return configTbl[moduleKey][moduleSubKey] and configTbl[moduleKey][moduleSubKey][key]
+	elseif( moduleKey and not moduleSubKey ) then
+		return configTbl[moduleKey] and configTbl[moduleKey][key]
+	end
+
+	return configTbl[key]
+end
+
+local function getUnit(info)
+	local moduleKey, moduleSubKey, key = string.split(".", info.arg)
+	if( not moduleSubKey ) then key = moduleKey moduleKey = nil end
+	if( moduleSubKey and not key ) then key = moduleSubKey moduleSubKey = nil end
+	if( moduleSubKey == "$parent" ) then moduleSubKey = info[#(info) - 1] end
+	if( moduleKey == "$parent" ) then moduleKey = info[#(info) - 1] end
+	if( moduleSubKey == "$parentparent" ) then moduleSubKey = info[#(info) - 2] end
+	if( moduleKey == "$parentparent" ) then moduleKey = info[#(info) - 2] end
+	if( tonumber(moduleSubKey) ) then moduleSubKey = tonumber(moduleSubKey) end
+
+	return getVariable(info[2], moduleKey, moduleSubKey, key)
+end
+
+-- Tag functions
+local function getTagName(info)
+	local tag = info[#(info)]
+	if( ShadowUF.db.profile.tags[tag] and ShadowUF.db.profile.tags[tag].name ) then
+		return ShadowUF.db.profile.tags[tag].name
+	end
+
+	return ShadowUF.Tags.defaultNames[tag] or tag
+end
+
+local function getTagHelp(info)
+	local tag = info[#(info)]
+	return ShadowUF.Tags.defaultHelp[tag] or ShadowUF.db.profile.tags[tag] and ShadowUF.db.profile.tags[tag].help
+end
+
+-- Module functions
+local function hideRestrictedOption(info)
+	local unit = type(info.arg) == "number" and info[#(info) - info.arg] or info[2]
+	local key = info[#(info)]
+	if( ShadowUF.modules[key] and not ShadowUF:IsModuleAvailable(ShadowUF.modules[key]) ) then
+		return true
+	elseif( ( key == "incHeal" and not ShadowUF.modules.incHeal ) or ( key == "incAbsorb" and not ShadowUF.modules.incAbsorb ) or ( key == "healAbsorb" and not ShadowUF.modules.healAbsorb ) )  then
+		return true
+	-- Non-standard units do not support color by aggro or incoming heal
+	elseif( key == "colorAggro" or key == "colorDispel" or key == "incHeal" or key == "incAbsorb" or key == "aggro" ) then
+		return string.match(unit, "%w+target" )
+	-- Fall back for indicators, no variable table so it shouldn't be shown
+	elseif( info[#(info) - 1] == "indicators" ) then
+		if( ( unit == "global" and not globalConfig.indicators[key] ) or ( unit ~= "global" and not ShadowUF.db.profile.units[unit].indicators[key] ) ) then
+			return true
+		end
+	-- Fall back, no variable table so it shouldn't be shown
+	elseif( ( unit == "global" and not globalConfig[key] ) or ( unit ~= "global" and not ShadowUF.db.profile.units[unit][key] ) ) then
+		return true
+	end
+
+	return false
+end
+
+local function getModuleOrder(info)
+	local key = info[#(info)]
+	return key == "healthBar" and 1 or key == "powerBar" and 2 or key == "castBar" and 3 or 4
+end
+
+-- Expose these for modules
+Config.getAnchorParents = getAnchorParents
+Config.hideAdvancedOption = hideAdvancedOption
+Config.isUnitDisabled = isUnitDisabled
+Config.selectDialogGroup = selectDialogGroup
+Config.selectTabGroup = selectTabGroup
+Config.getName = getName
+Config.getUnitOrder = getUnitOrder
+Config.isModifiersSet = isModifiersSet
+Config.set = set
+Config.get = get
+Config.setUnit = setUnit
+Config.setVariable = setVariable
+Config.getUnit = getUnit
+Config.getVariable = getVariable
+Config.hideRestrictedOption = hideRestrictedOption
+Config.hideBasicOption = hideBasicOption
+
+
+--------------------
+-- GENERAL CONFIGURATION
+---------------------
+
+local function writeTable(tbl)
+	local data = ""
+	for key, value in pairs(tbl) do
+		local valueType = type(value)
+
+		-- Wrap the key in brackets if it's a number
+		if( type(key) == "number" ) then
+			key = string.format("[%s]", key)
+		-- Wrap the string with quotes if it has a space in it
+		elseif( string.match(key, "[%p%s%c]") or string.match(key, "^[0-9]+$") ) then
+			key = string.format("['%s']", string.gsub(key, "'", "\\'"))
+		end
+
+		-- foo = {bar = 5}
+		if( valueType == "table" ) then
+			data = string.format("%s%s=%s;", data, key, writeTable(value))
+		-- foo = true / foo = 5
+		elseif( valueType == "number" or valueType == "boolean" ) then
+			data = string.format("%s%s=%s;", data, key, tostring(value))
+		-- foo = "bar"
+		else
+			value = tostring(value)
+			if value and string.match(value, "[\n]") then
+				local token = ""
+				while string.find(value, "%["..token.."%[") or string.find(value, "%]"..token.."%]") do
+					token = token .. "="
+				end
+				value = string.format("[%s[%s]%s]", token, value, token)
+			else
+				value = string.format("%q", value)
+			end
+			data = string.format("%s%s=%s;", data, key, value)
+		end
+	end
+
+	return "{" .. data .. "}"
+end
+
+local function loadGeneralOptions()
+	SML = SML or LibStub:GetLibrary("LibSharedMedia-3.0")
+
+	local MediaList = {}
+	local function getMediaData(info)
+		local mediaType = info[#(info)]
+
+		-- Optimization: return cached table if exists and populated
+		if( MediaList[mediaType] and next(MediaList[mediaType]) ) then
+			return MediaList[mediaType]
+		end
+
+		MediaList[mediaType] = MediaList[mediaType] or {}
+
+		-- Only rebuild if empty
+		for _, name in pairs(SML:List(mediaType)) do
+			MediaList[mediaType][name] = name
+		end
+
+		return MediaList[mediaType]
+	end
+
+
+	local barModules = {}
+	for	key, module in pairs(ShadowUF.modules) do
+		if( module.moduleHasBar ) then
+			barModules["$" .. key] = module.moduleName
+		end
+	end
+
+	local addTextParent = {
+		order = 4,
+		type = "group",
+		inline = true,
+		name = function(info) return barModules[info[#(info)]] or string.sub(info[#(info)], 2) end,
+		hidden = function(info)
+			for _, text in pairs(ShadowUF.db.profile.units.player.text) do
+				if( text.anchorTo == info[#(info)] ) then
+					return false
+				end
+			end
+
+			return true
+		end,
+		args = {},
+	}
+
+	local addTextLabel = {
+		order = function(info) return tonumber(string.match(info[#(info)], "(%d+)")) end,
+		type = "description",
+		width = "",
+		fontSize = "medium",
+		hidden = function(info)
+			local id = tonumber(string.match(info[#(info)], "(%d+)"))
+			if( not getVariable("player", "text", nil, id) ) then return true end
+			return getVariable("player", "text", id, "anchorTo") ~= info[#(info) - 1]
+		end,
+		name = function(info)
+			return getVariable("player", "text", tonumber(string.match(info[#(info)], "(%d+)")), "name")
+		end,
+	}
+
+	local addTextSep = {
+		order = function(info) return tonumber(string.match(info[#(info)], "(%d+)")) + 0.75 end,
+		type = "description",
+		width = "full",
+		hidden = function(info)
+			local id = tonumber(string.match(info[#(info)], "(%d+)"))
+			if( not getVariable("player", "text", nil, id) ) then return true end
+			return getVariable("player", "text", id, "anchorTo") ~= info[#(info) - 1]
+		end,
+		name = "",
+	}
+
+	local rebuildTextEntries
+	local ensureTextsReady
+
+	local addText = {
+		order = function(info) return info[#(info)] + 0.5 end,
+		type = "execute",
+		width = "half",
+		name = L["Delete"],
+		hidden = function(info)
+			local id = tonumber(info[#(info)])
+			if( not getVariable("player", "text", nil, id) ) then return true end
+			return getVariable("player", "text", id, "anchorTo") ~= info[#(info) - 1]
+		end,
+		disabled = function(info)
+			local id = tonumber(info[#(info)])
+			for _, unit in pairs(ShadowUF.unitList) do
+				if( ShadowUF.db.profile.units[unit].text[id] and ShadowUF.db.profile.units[unit].text[id].default ) then
+					return true
+				end
+			end
+
+			return false
+		end,
+		confirmText = L["Are you sure you want to delete this text? All settings for it will be deleted."],
+		confirm = true,
+		func = function(info)
+			local id = tonumber(info[#(info)])
+			ensureTextsReady()
+			for _, unit in pairs(ShadowUF.unitList) do
+				table.remove(ShadowUF.db.profile.units[unit].text, id)
+			end
+
+			rebuildTextEntries()
+			ShadowUF.Layout:Reload()
+		end,
+	}
+
+	-- Materializes all unit text tables so table.insert/table.remove work correctly.
+	-- Also cleans up orphaned entries from past buggy deletes that left text entries on some units but not on player.
+	local NUM_DEFAULT_TEXTS = 6
+	ensureTextsReady = function()
+		local playerText = ShadowUF.db.profile.units.player.text
+
+		for i = 1, NUM_DEFAULT_TEXTS do
+			local _ = playerText[i]
+		end
+
+		local playerCount = NUM_DEFAULT_TEXTS
+		while rawget(playerText, playerCount + 1) ~= nil do
+			playerCount = playerCount + 1
+		end
+
+		for _, unit in pairs(ShadowUF.unitList) do
+			local text = ShadowUF.db.profile.units[unit].text
+
+			for i = 1, NUM_DEFAULT_TEXTS do
+				local _ = text[i]
+			end
+
+			for i = NUM_DEFAULT_TEXTS + 1, playerCount do
+				local pEntry = rawget(playerText, i)
+				if pEntry then
+					if not rawget(text, i) then
+						-- Entry missing: create from player
+						text[i] = {
+							enabled = pEntry.enabled,
+							name = pEntry.name or "",
+							text = "",
+							anchorTo = pEntry.anchorTo or "",
+							anchorPoint = pEntry.anchorPoint or "C",
+							width = pEntry.width or 0.50,
+							size = pEntry.size or 0,
+							x = pEntry.x or 0,
+							y = pEntry.y or 0,
+						}
+					else
+						-- Entry exists but may have stale structural data from past index shifts. Force-sync name and anchor from player.
+						local uEntry = rawget(text, i)
+						uEntry.name = pEntry.name
+						uEntry.anchorTo = pEntry.anchorTo
+					end
+				end
+			end
+
+			-- Delete ALL orphaned entries, leftovers from past buggy deletes.
+			local j = playerCount + 1
+			while rawget(text, j) do
+				rawset(text, j, nil)
+				j = j + 1
+			end
+		end
+	end
+
+	-- Rebuilds all text management UI entries and tag wizard entries from current data.
+	rebuildTextEntries = function()
+		table.wipe(addTextParent.args)
+
+		-- Remove anchor parent groups from text management options
+		local keysToRemove = {}
+		for key in pairs(options.args.general.args.text.args) do
+			if type(key) == "string" and string.sub(key, 1, 1) == "$" then
+				keysToRemove[#keysToRemove + 1] = key
+			end
+		end
+		for _, key in ipairs(keysToRemove) do
+			options.args.general.args.text.args[key] = nil
+		end
+
+		-- Wipe
+		if Config.parentTable then
+			local savedHelp = Config.parentTable.args.help
+			table.wipe(Config.parentTable.args)
+			if savedHelp then
+				Config.parentTable.args.help = savedHelp
+			end
+		end
+
+		table.wipe(quickIDMap)
+
+		-- Rebuild from current data
+		for id, text in pairs(ShadowUF.db.profile.units.player.text) do
+			
+			if text.anchorTo ~= "" and not text.default then
+				addTextParent.args[id .. ":label"] = addTextLabel
+				addTextParent.args[tostring(id)] = addText
+				addTextParent.args[id .. ":sep"] = addTextSep
+				options.args.general.args.text.args[text.anchorTo] = addTextParent
+			end
+
+			if Config.parentTable and text.anchorTo and text.anchorTo ~= "" then
+				local parent = string.sub(text.anchorTo, 2)
+				local module = ShadowUF.modules[parent]
+				if( not module or ShadowUF:IsModuleAvailable(module) ) then
+					Config.tagWizard[parent] = Config.tagWizard[parent] or Config.parentTable
+					Config.tagWizard[parent].args[tostring(id)] = Config.tagTextTable
+					Config.tagWizard[parent].args[tostring(id) .. ":adv"] = Config.advanceTextTable
+					quickIDMap[tostring(id) .. ":adv"] = id
+				end
+			end
+		end
+	end
+
+	local function validateSpell(info, spell)
+		if( spell and spell ~= "" and not GetSpellName(spell) ) then
+			return string.format(L["Invalid spell \"%s\" entered."], spell or "")
+		end
+
+		return true
+	end
+
+	local function setRange(info, spell)
+		ShadowUF.db.profile.range[info[#(info)] .. playerClass] = spell and spell ~= "" and spell or nil
+		ShadowUF.Layout:Reload()
+	end
+
+	local function getRange(info)
+		return ShadowUF.db.profile.range[info[#(info)] .. playerClass]
+	end
+
+	local function rangeWithIcon(info)
+		local name = getRange(info)
+		local text = L["Spell Name"]
+		if( string.match(info[#(info)], "Alt") ) then
+			text = L["Alternate Spell Name"]
+		end
+
+		local icon = name and GetSpellTexture(name)
+		if( not icon ) then
+			icon = "Interface\\Icons\\Inv_misc_questionmark"
+		end
+
+		return "|T" .. icon .. ":18:18:0:0|t " .. text
+	end
+
+	local textData = {}
+
+	local layoutData = {positions = true, visibility = true, modules = false}
+	local layoutManager = {
+		type = "group",
+		order = 7,
+		name = L["Layout manager"],
+		childGroups = "tab",
+		hidden = hideAdvancedOption,
+		args = {
+			import = {
+				order = 1,
+				type = "group",
+				name = L["Import"],
+				hidden = false,
+				args = {
+					help = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = function(info) return layoutData.error and L["Error"] or L["Help"] end,
+						args = {
+							help = {
+								order = 1,
+								type = "description",
+								name = function(info)
+									if( ShadowUF.db:GetCurrentProfile() == "Import Backup" ) then
+										return L["Your active layout is the profile used for import backup, this cannot be overwritten by an import. Change your profiles to something else and try again."]
+									end
+
+									return layoutData.error or L["You can import another Shadowed Unit Frame users configuration by entering the export code they gave you below. This will backup your old layout to \"Import Backup\".|n|nIt will take 30-60 seconds for it to load your layout when you paste it in, please by patient."]
+								end
+							},
+						},
+					},
+					positions = {
+						order = 2,
+						type = "toggle",
+						name = L["Import unit frame positions"],
+						set = function(info, value) layoutData[info[#(info)]] = value end,
+						get = function(info) return layoutData[info[#(info)]] end,
+						width = "double",
+					},
+					visibility = {
+						order = 3,
+						type = "toggle",
+						name = L["Import visibility settings"],
+						set = function(info, value) layoutData[info[#(info)]] = value end,
+						get = function(info) return layoutData[info[#(info)]] end,
+						width = "double",
+					},
+					import = {
+						order = 5,
+						type = "input",
+						name = L["Code"],
+						multiline = true,
+						width = "full",
+						get = false,
+						disabled = function() return ShadowUF.db:GetCurrentProfile() == "Import Backup" end,
+						set = function(info, import)
+							local layout, err = loadstring(string.format([[return %s]], import))
+							if( err ) then
+								layoutData.error = string.format(L["Failed to import layout, error:|n|n%s"], err)
+								return
+							end
+
+							layout = layout()
+
+							-- Strip position settings
+							if( not layoutData.positions ) then
+								layout.positions = nil
+							end
+
+							-- Strip visibility settings
+							if( not layoutData.visibility ) then
+								layout.visibility = nil
+							end
+
+							-- Strip any units we don't have included by default
+							for unit in pairs(layout.units) do
+								if( not ShadowUF.defaults.profile.units[unit] ) then
+									layout.units[unit] = nil
+								end
+							end
+
+							-- Check if we need move over the visibility and positions info
+							layout.positions = layout.positions or CopyTable(ShadowUF.db.profile.positions)
+							layout.visibility = layout.visibility or CopyTable(ShadowUF.db.profile.positions)
+
+							-- Now backup the profile
+							local currentLayout = ShadowUF.db:GetCurrentProfile()
+							ShadowUF.layoutImporting = true
+							ShadowUF.db:SetProfile("Import Backup")
+							ShadowUF.db:CopyProfile(currentLayout)
+							ShadowUF.db:SetProfile(currentLayout)
+							ShadowUF.db:ResetProfile()
+							ShadowUF.layoutImporting = nil
+
+							-- Overwrite everything we did import
+							ShadowUF:LoadDefaultLayout()
+							for key, data in pairs(layout) do
+								if( type(data) == "table" ) then
+									ShadowUF.db.profile[key] = CopyTable(data)
+								else
+									ShadowUF.db.profile[key] = data
+								end
+							end
+
+							ShadowUF:ProfilesChanged()
+						end,
+					},
+				},
+			},
+			export = {
+				order = 2,
+				type = "group",
+				name = L["Export"],
+				hidden = false,
+				args = {
+					help = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						args = {
+							help = {
+								order = 1,
+								type = "description",
+								name = L["After you hit export, you can give the below code to other Shadowed Unit Frames users and they will get your exact layout."],
+							},
+						},
+					},
+					doExport = {
+						order = 2,
+						type = "execute",
+						name = L["Export"],
+						func = function(info)
+							layoutData.export = writeTable(ShadowUF.db.profile)
+						end,
+					},
+					export = {
+						order = 3,
+						type = "input",
+						name = L["Code"],
+						multiline = true,
+						width = "full",
+						set = false,
+						get = function(info) return layoutData[info[#(info)]] end,
+					},
+				},
+			},
+		},
+	}
+
+	options.args.general = {
+		type = "group",
+		childGroups = "tab",
+		name = L["General"],
+		args = {
+			general = {
+				type = "group",
+				order = 1,
+				name = L["General"],
+				set = set,
+				get = get,
+				args = {
+					general = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["General"],
+						args = {
+							locked = {
+								order = 1,
+								type = "toggle",
+								name = L["Lock frames"],
+								desc = L["Enables configuration mode, letting you move and giving you example frames to setup."],
+								set = function(info, value)
+									set(info, value)
+									ShadowUF.modules.movers:Update()
+								end,
+								arg = "locked",
+							},
+							advanced = {
+								order = 1.5,
+								type = "toggle",
+								name = L["Advanced"],
+								desc = L["Enabling advanced settings will give you access to more configuration options. This is meant for people who want to tweak every single thing, and should not be enabled by default as it increases the options."],
+								arg = "advanced",
+							},
+							sep = {
+								order = 2,
+								type = "description",
+								name = "",
+								width = "full",
+							},
+							hideCombat = {
+								order = 3,
+								type = "select",
+								name = L["Hide tooltips in combat"],
+								desc = L["Which tooltips to hide while in combat. Aura tooltips are shown natively by the game and can be kept visible."],
+								values = {[""] = L["Disabled"], ["all"] = L["All tooltips"], ["exceptAuras"] = L["All tooltips except auras"]},
+								get = function(info)
+									local value = ShadowUF.db.profile.tooltipCombat
+									if( value == true ) then return "all" end
+									if( type(value) ~= "string" ) then return "" end
+									return value
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.tooltipCombat = value ~= "" and value or false
+									ShadowUF.Layout:Reload()
+								end,
+								width = "double",
+							},
+							bossmodCastNames = {
+								order = 3.1,
+								type = "toggle",
+								name = L["Use Boss Mod Cast Name overrides"],
+								desc = L["Use spell name overrides provided by boss mods (BigWigs) on the cast bars."],
+								arg = "bossmodSpellRename",
+								width = "double",
+							},
+						},
+					},
+					backdrop = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["Background/border"],
+						args = {
+							backgroundColor = {
+								order = 1,
+								type = "color",
+								name = L["Background color"],
+								hasAlpha = true,
+								set = setColor,
+								get = getColor,
+								arg = "backdrop.backgroundColor",
+							},
+							borderColor = {
+								order = 2,
+								type = "color",
+								name = L["Border color"],
+								hasAlpha = true,
+								set = setColor,
+								get = getColor,
+								arg = "backdrop.borderColor",
+							},
+							sep = {
+								order = 3,
+								type = "description",
+								name = "",
+								width = "full",
+							},
+							background = {
+								order = 4,
+								type = "select",
+								name = L["Background"],
+								dialogControl = "LSM30_Background",
+								values = getMediaData,
+								arg = "backdrop.backgroundTexture",
+							},
+							border = {
+								order = 5,
+								type = "select",
+								name = L["Border"],
+								dialogControl = "LSM30_Border",
+								values = getMediaData,
+								arg = "backdrop.borderTexture",
+							},
+							inset = {
+								order = 5.5,
+								type = "range",
+								name = L["Inset"],
+								desc = L["How far the background should be from the unit frame border."],
+								min = -10, max = 10, step = 1,
+								hidden = hideAdvancedOption,
+								arg = "backdrop.inset",
+							},
+							sep2 = {
+								order = 6,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							edgeSize = {
+								order = 7,
+								type = "range",
+								name = L["Edge size"],
+								desc = L["How large the edges should be."],
+								hidden = hideAdvancedOption,
+								min = 0, max = 20, step = 1,
+								arg = "backdrop.edgeSize",
+							},
+							tileSize = {
+								order = 8,
+								type = "range",
+								name = L["Tile size"],
+								desc = L["How large the background should tile"],
+								hidden = hideAdvancedOption,
+								min = 0, max = 20, step = 1,
+								arg = "backdrop.tileSize",
+							},
+							clip = {
+								order = 9,
+								type = "range",
+								name = L["Clip"],
+								desc = L["How close the frame should clip with the border."],
+								hidden = hideAdvancedOption,
+								min = 0, max = 20, step = 1,
+								arg = "backdrop.clip",
+							},
+						},
+					},
+					font = {
+						order = 3,
+						type = "group",
+						inline = true,
+						name = L["Font"],
+						args = {
+							color = {
+								order = 1,
+								type = "color",
+								name = L["Default color"],
+								desc = L["Default font color, any color tags inside individual tag texts will override this."],
+								hasAlpha = true,
+								set = setColor,
+								get = getColor,
+								arg = "font.color",
+								hidden = hideAdvancedOption,
+							},
+							sep = {order = 2, type = "description", name = "", hidden = hideAdvancedOption},
+							font = {
+								order = 3,
+								type = "select",
+								name = L["Font"],
+								dialogControl = "LSM30_Font",
+								values = getMediaData,
+								arg = "font.name",
+							},
+							size = {
+								order = 4,
+								type = "range",
+								name = L["Size"],
+								min = 1, max = 50, step = 1, softMin = 1, softMax = 20,
+								arg = "font.size",
+							},
+							outline = {
+								order = 5,
+								type = "select",
+								name = L["Outline"],
+								values = {["OUTLINE"] = L["Thin outline"], ["THICKOUTLINE"] = L["Thick outline"], ["MONOCHROMEOUTLINE"] = L["Monochrome Outline"], [""] = L["None"]},
+								arg = "font.extra",
+								hidden = hideAdvancedOption,
+							},
+							shadowEnabled = {
+								order = 6,
+								type = "toggle",
+								name = L["Shadow"],
+								arg = "font.shadowEnabled",
+							},
+							shadowColor = {
+								order = 7,
+								type = "color",
+								name = L["Shadow color"],
+								hasAlpha = true,
+								set = setColor,
+								get = getColor,
+								arg = "font.shadowColor",
+								disabled = function(info) return not ShadowUF.db.profile.font.shadowEnabled end,
+							},
+							shadowX = {
+								order = 8,
+								type = "range",
+								name = L["Shadow X"],
+								min = -5, max = 5, step = 0.1,
+								arg = "font.shadowX",
+								disabled = function(info) return not ShadowUF.db.profile.font.shadowEnabled end,
+							},
+							shadowY = {
+								order = 9,
+								type = "range",
+								name = L["Shadow Y"],
+								min = -5, max = 5, step = 0.1,
+								arg = "font.shadowY",
+								disabled = function(info) return not ShadowUF.db.profile.font.shadowEnabled end,
+							},
+						},
+					},
+					cooldown = {
+						order = 3.5,
+						type = "group",
+						inline = true,
+						name = L["Auras"],
+						args = {
+							timerHeader = {
+								order = 6.5,
+								type = "header",
+								name = L["Timer font"],
+							},
+							color = {
+								order = 7,
+								type = "color",
+								name = L["Default color"],
+								desc = L["Default font color, any color tags inside individual tag texts will override this."],
+								hasAlpha = true,
+								set = setColor,
+								get = getColor,
+								arg = "font.cooldownColor",
+								hidden = hideAdvancedOption,
+							},
+							sep = {order = 8, type = "description", name = "", hidden = hideAdvancedOption},
+							font = {
+								order = 9,
+								type = "select",
+								name = L["Font"],
+								dialogControl = "LSM30_Font",
+								values = getMediaData,
+								get = function(info) return ShadowUF.db.profile.font.cooldownName or ShadowUF.db.profile.font.name end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownName = value
+									queueLayoutReload()
+								end,
+							},
+							size = {
+								order = 10,
+								type = "range",
+								name = L["Size"],
+								min = 1, max = 50, step = 1, softMin = 1, softMax = 20,
+								arg = "font.cooldownSize",
+							},
+							outline = {
+								order = 11,
+								type = "select",
+								name = L["Outline"],
+								values = {["OUTLINE"] = L["Thin outline"], ["THICKOUTLINE"] = L["Thick outline"], ["MONOCHROMEOUTLINE"] = L["Monochrome Outline"], [""] = L["None"]},
+								arg = "font.cooldownOutline",
+							},
+							cooldownShadowEnabled = {
+								order = 11.02,
+								type = "toggle",
+								name = L["Shadow"],
+								get = function(info) return ShadowUF.db.profile.font.cooldownShadowEnabled end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownShadowEnabled = value
+									queueLayoutReload()
+								end,
+							},
+							cooldownShadowColor = {
+								order = 11.04,
+								type = "color",
+								name = L["Shadow color"],
+								hasAlpha = true,
+								get = function(info)
+									local color = ShadowUF.db.profile.font.cooldownShadowColor
+									if( color ) then return color.r, color.g, color.b, color.a or 1 end
+									return 0, 0, 0, 1
+								end,
+								set = function(info, r, g, b, a)
+									ShadowUF.db.profile.font.cooldownShadowColor = {r = r, g = g, b = b, a = a}
+									queueLayoutReload()
+								end,
+								disabled = function(info) return not ShadowUF.db.profile.font.cooldownShadowEnabled end,
+							},
+							cooldownShadowX = {
+								order = 11.06,
+								type = "range",
+								name = L["Shadow X"],
+								min = -5, max = 5, step = 0.1,
+								get = function(info) return ShadowUF.db.profile.font.cooldownShadowX or 0.5 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownShadowX = value
+									queueLayoutReload()
+								end,
+								disabled = function(info) return not ShadowUF.db.profile.font.cooldownShadowEnabled end,
+							},
+							cooldownShadowY = {
+								order = 11.08,
+								type = "range",
+								name = L["Shadow Y"],
+								min = -5, max = 5, step = 0.1,
+								get = function(info) return ShadowUF.db.profile.font.cooldownShadowY or -0.5 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownShadowY = value
+									queueLayoutReload()
+								end,
+								disabled = function(info) return not ShadowUF.db.profile.font.cooldownShadowEnabled end,
+							},
+							cooldownAnchor = {
+								order = 11.2,
+								type = "select",
+								name = L["Anchor point"],
+								values = auraTextAnchorValues,
+								get = function(info) return ShadowUF.db.profile.font.cooldownAnchor or "CENTER" end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownAnchor = value
+									queueLayoutReload()
+								end,
+							},
+							cooldownX = {
+								order = 11.4,
+								type = "range",
+								name = L["X Offset"],
+								min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+								get = function(info) return ShadowUF.db.profile.font.cooldownX or 0 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownX = value ~= 0 and value or nil
+									queueLayoutReload()
+								end,
+							},
+							cooldownY = {
+								order = 11.6,
+								type = "range",
+								name = L["Y Offset"],
+								min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+								get = function(info) return ShadowUF.db.profile.font.cooldownY or 0 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.cooldownY = value ~= 0 and value or nil
+									queueLayoutReload()
+								end,
+							},
+							stacksHeader = {
+								order = 12,
+								type = "header",
+								name = L["Stacks font"],
+							},
+							stackName = {
+								order = 12.1,
+								type = "select",
+								name = L["Font"],
+								dialogControl = "LSM30_Font",
+								values = function()
+									local list = {}
+									for _, name in pairs(SML:List("font")) do list[name] = name end
+									return list
+								end,
+								get = function(info) return ShadowUF.db.profile.font.stackName or "Myriad Condensed Web" end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackName = value
+									queueLayoutReload()
+								end,
+							},
+							stackSize = {
+								order = 12.2,
+								type = "range",
+								name = L["Size"],
+								min = 1, max = 50, step = 1, softMin = 1, softMax = 20,
+								get = function(info) return ShadowUF.db.profile.font.stackSize or 10 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackSize = value
+									queueLayoutReload()
+								end,
+							},
+							stackOutline = {
+								order = 12.3,
+								type = "select",
+								name = L["Outline"],
+								values = {["OUTLINE"] = L["Thin outline"], ["THICKOUTLINE"] = L["Thick outline"], ["MONOCHROMEOUTLINE"] = L["Monochrome Outline"], [""] = L["None"]},
+								get = function(info)
+									local value = ShadowUF.db.profile.font.stackOutline
+									if( value == nil ) then value = "OUTLINE" end
+									return value
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackOutline = value
+									queueLayoutReload()
+								end,
+							},
+							stackColor = {
+								order = 12.4,
+								type = "color",
+								name = L["Default color"],
+								hasAlpha = true,
+								get = function(info)
+									local color = ShadowUF.db.profile.font.stackColor
+									if( color ) then return color.r, color.g, color.b, color.a or 1 end
+									return 1, 1, 1, 1
+								end,
+								set = function(info, r, g, b, a)
+									ShadowUF.db.profile.font.stackColor = {r = r, g = g, b = b, a = a}
+									queueLayoutReload()
+								end,
+							},
+							stackShadowEnabled = {
+								order = 12.5,
+								type = "toggle",
+								name = L["Shadow"],
+								get = function(info)
+									local value = ShadowUF.db.profile.font.stackShadowEnabled
+									if( value == nil ) then value = true end
+									return value
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackShadowEnabled = value
+									queueLayoutReload()
+								end,
+							},
+							stackShadowColor = {
+								order = 12.6,
+								type = "color",
+								name = L["Shadow color"],
+								hasAlpha = true,
+								get = function(info)
+									local color = ShadowUF.db.profile.font.stackShadowColor
+									if( color ) then return color.r, color.g, color.b, color.a or 1 end
+									return 0, 0, 0, 1
+								end,
+								set = function(info, r, g, b, a)
+									ShadowUF.db.profile.font.stackShadowColor = {r = r, g = g, b = b, a = a}
+									queueLayoutReload()
+								end,
+							},
+							stackShadowX = {
+								order = 12.7,
+								type = "range",
+								name = L["Shadow X"],
+								min = -5, max = 5, step = 0.1,
+								get = function(info) return ShadowUF.db.profile.font.stackShadowX or 0.5 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackShadowX = value
+									queueLayoutReload()
+								end,
+							},
+							stackShadowY = {
+								order = 12.8,
+								type = "range",
+								name = L["Shadow Y"],
+								min = -5, max = 5, step = 0.1,
+								get = function(info) return ShadowUF.db.profile.font.stackShadowY or -0.5 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackShadowY = value
+									queueLayoutReload()
+								end,
+							},
+							stackAnchor = {
+								order = 12.85,
+								type = "select",
+								name = L["Anchor point"],
+								values = auraTextAnchorValues,
+								get = function(info) return ShadowUF.db.profile.font.stackAnchor or "BOTTOMRIGHT" end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackAnchor = value
+									queueLayoutReload()
+								end,
+							},
+							stackX = {
+								order = 12.9,
+								type = "range",
+								name = L["X Offset"],
+								min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+								get = function(info) return ShadowUF.db.profile.font.stackX or 0 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackX = value ~= 0 and value or nil
+									queueLayoutReload()
+								end,
+							},
+							stackY = {
+								order = 12.95,
+								type = "range",
+								name = L["Y Offset"],
+								min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+								get = function(info) return ShadowUF.db.profile.font.stackY or 0 end,
+								set = function(info, value)
+									ShadowUF.db.profile.font.stackY = value ~= 0 and value or nil
+									queueLayoutReload()
+								end,
+							},
+							auraBorder = {
+								order = 1,
+								type = "select",
+								name = L["Aura border style"],
+								desc = L["Style of borders to show for all auras."],
+								values = {["dark"] = L["Dark"], ["light"] = L["Light"], ["blizzard"] = L["Blizzard"], [""] = L["None"]},
+								arg = "auras.borderType",
+							},
+							swipeAlpha = {
+								order = 2,
+								type = "range",
+								name = L["Cooldown swipe opacity"],
+								desc = L["Opacity of the dark overlay showing the remaining time on auras."],
+								min = 0, max = 1, step = 0.05, isPercent = true,
+								get = function(info)
+									return ShadowUF.db.profile.auras.cooldownSwipeAlpha or 0.8
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.auras.cooldownSwipeAlpha = value
+									queueLayoutReload()
+								end,
+							},
+							spacingH = {
+								order = 2.2,
+								type = "range",
+								name = L["Horizontal spacing"],
+								desc = L["Gap in pixels between aura icons on the same row, negative values overlap them."],
+								min = -10, max = 30, step = 1,
+								get = function(info)
+									return ShadowUF.db.profile.auras.spacingH or 2
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.auras.spacingH = value ~= 2 and value or nil
+									queueLayoutReload()
+								end,
+							},
+							spacingV = {
+								order = 2.4,
+								type = "range",
+								name = L["Vertical spacing"],
+								desc = L["Gap in pixels between aura rows, negative values overlap them."],
+								min = -10, max = 30, step = 1,
+								get = function(info)
+									return ShadowUF.db.profile.auras.spacingV or 2
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.auras.spacingV = value ~= 2 and value or nil
+									queueLayoutReload()
+								end,
+							},
+							pandemic = {
+								order = 3,
+								type = "toggle",
+								name = L["Pandemic overlay"],
+								desc = L["Pulses an overlay on your own auras inside their pandemic window, where refreshing them carries the remaining time over. Color and opacity are set in the Colors tab."],
+								width = "double",
+								get = function(info)
+									return ShadowUF.db.profile.auras.pandemic
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.auras.pandemic = value or nil
+									queueLayoutReload()
+								end,
+							},
+							blizzardcc = {
+								order = 4,
+								type = "toggle",
+								name = L["Disable Blizzard Cooldown Count"],
+								desc = L["Disables showing Cooldown Count timers in all Shadowed Unit Frame auras."],
+								arg = "blizzardcc",
+								width = "double",
+							},
+							disableStacks = {
+								order = 4.5,
+								type = "toggle",
+								name = L["Disable stack counts"],
+								desc = L["Hides the stack count text on all Shadowed Unit Frame auras."],
+								width = "double",
+								get = function(info)
+									return ShadowUF.db.profile.auras.disableStacks
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.auras.disableStacks = value
+									queueLayoutReload()
+								end,
+							},
+							auraSpellIDs = {
+								order = 5,
+								type = "toggle",
+								name = L["Show spell IDs in aura tooltips"],
+								desc = L["Adds the spell ID to aura tooltips, handy for filling the spell fields of custom filters and aura indicators."],
+								get = function(info)
+									return ShadowUF.db.profile.tooltipAuraSpellIDs
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.tooltipAuraSpellIDs = value
+									ShadowUF:ApplyAuraSpellIDsCVar()
+								end,
+								width = "double",
+							},
+							disableCancel = {
+								order = 5.5,
+								type = "toggle",
+								name = L["Disable right-click cancel"],
+								desc = L["Right-clicking your own buffs cancels them; enable this to turn that off."],
+								width = "double",
+								get = function(info)
+									return ShadowUF.db.profile.auras.disableCancel
+								end,
+								set = function(info, value)
+									ShadowUF.db.profile.auras.disableCancel = value
+									queueLayoutReload()
+								end,
+							},
+						},
+					},
+					bar = {
+						order = 1.5,
+						type = "group",
+						inline = true,
+						name = L["Bars"],
+						args = {
+							statusbar = {
+								order = -1,
+								type = "select",
+								name = L["Bar texture"],
+								dialogControl = "LSM30_Statusbar",
+								values = getMediaData,
+								arg = "bars.texture",
+							},
+							spacing = {
+								order = -0.5,
+								type = "range",
+								name = L["Bar spacing"],
+								desc = L["How much spacing should be provided between all of the bars inside a unit frame, negative values move them farther apart, positive values bring them closer together. 0 for no spacing."],
+								min = -10, max = 10, step = 0.05, softMin = -5, softMax = 5,
+								arg = "bars.spacing",
+								hidden = hideAdvancedOption,
+							},
+							override = {
+								order = 0,
+								type = "toggle",
+								name = L["Override color"],
+								desc = L["Forces a static color to be used for the background of all bars"],
+								set = function(info, value)
+									if( value and not ShadowUF.db.profile.bars.backgroundColor ) then
+										ShadowUF.db.profile.bars.backgroundColor = {r = 0, g = 0, b = 0}
+									elseif( not value ) then
+										ShadowUF.db.profile.bars.backgroundColor = nil
+									end
+
+									ShadowUF.Layout:Reload()
+								end,
+								get = function(info)
+									return ShadowUF.db.profile.bars.backgroundColor and true or false
+								end,
+								hidden = hideAdvancedOption,
+							},
+							color = {
+								order = 1,
+								type = "color",
+								name = L["Background color"],
+								desc = L["This will override all background colorings for bars including custom set ones."],
+								set = setColor,
+								get = function(info)
+									if( not ShadowUF.db.profile.bars.backgroundColor ) then
+										return 0, 0, 0
+									end
+
+									return getColor(info)
+								end,
+								disabled = function(info) return not ShadowUF.db.profile.bars.backgroundColor end,
+								arg = "bars.backgroundColor",
+								hidden = hideAdvancedOption,
+							},
+							sep = { order = 2, type = "description", name = "", width = "full", hidden = hideAdvancedOption},
+							barAlpha = {
+								order = 3,
+								type = "range",
+								name = L["Bar alpha"],
+								desc = L["Alpha to use for bar."],
+								arg = "bars.alpha",
+								min = 0, max = 1, step = 0.05,
+								isPercent = true,
+								hidden = hideAdvancedOption,
+							},
+							backgroundAlpha = {
+								order = 4,
+								type = "range",
+								name = L["Background alpha"],
+								desc = L["Alpha to use for bar backgrounds."],
+								arg = "bars.backgroundAlpha",
+								min = 0, max = 1, step = 0.05,
+								isPercent = true,
+								hidden = hideAdvancedOption,
+							},
+						},
+					},
+				},
+			},
+			color = {
+				order = 2,
+				type = "group",
+				name = L["Colors"],
+				args = {
+					health = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Health"],
+						set = setColor,
+						get = getColor,
+						args = {
+							green = {
+								order = 1,
+								type = "color",
+								name = L["High health"],
+								desc = L["Health bar color used as the transitional color for 100% -> 50% on players, as well as when your pet is happy."],
+								arg = "healthColors.green",
+							},
+							yellow = {
+								order = 2,
+								type = "color",
+								name = L["Half health"],
+								desc = L["Health bar color used as the transitional color for 100% -> 0% on players, as well as when your pet is mildly unhappy."],
+								arg = "healthColors.yellow",
+							},
+							red = {
+								order = 3,
+								type = "color",
+								name = L["Low health"],
+								desc = L["Health bar color used as the transitional color for 50% -> 0% on players, as well as when your pet is very unhappy."],
+								arg = "healthColors.red",
+							},
+							friendly = {
+								order = 4,
+								type = "color",
+								name = L["Friendly"],
+								desc = L["Health bar color for friendly units."],
+								arg = "healthColors.friendly",
+							},
+							neutral = {
+								order = 5,
+								type = "color",
+								name = L["Neutral"],
+								desc = L["Health bar color for neutral units."],
+								arg = "healthColors.neutral",
+							},
+							hostile = {
+								order = 6,
+								type = "color",
+								name = L["Hostile"],
+								desc = L["Health bar color for hostile units."],
+								arg = "healthColors.hostile",
+							},
+							aggro = {
+								order = 6.5,
+								type = "color",
+								name = L["Has Aggro"],
+								desc = L["Health bar color for units with aggro."],
+								arg = "healthColors.aggro",
+							},
+							static = {
+								order = 7,
+								type = "color",
+								name = L["Static"],
+								desc = L["Color to use for health bars that are set to be colored by a static color."],
+								arg = "healthColors.static",
+							},
+							inc = {
+								order = 8,
+								type = "color",
+								name = L["Incoming heal"],
+								desc = L["Bar color to use to show how much healing someone is about to receive."],
+								arg = "healthColors.inc",
+							},
+							incAbsorb = {
+								order = 9,
+								type = "color",
+								name = L["Incoming absorb"],
+								desc = L["Color to use to show how much damage will be absorbed."],
+								arg = "healthColors.incAbsorb",
+							},
+							healAbsorb = {
+								order = 10,
+								type = "color",
+								name = L["Heal absorb"],
+								desc = L["Color to use to show how much healing will e absorbed."],
+								arg = "healthColors.healAbsorb",
+							},
+							enemyUnattack = {
+								order = 11,
+								type = "color",
+								name = L["Unattackable hostile"],
+								desc = L["Health bar color to use for hostile units who you cannot attack, used for reaction coloring."],
+								hidden = hideAdvancedOption,
+								arg = "healthColors.enemyUnattack",
+							}
+						},
+					},
+					stagger = {
+						order = 1.5,
+						type = "group",
+						inline = true,
+						name = L["Stagger"],
+						set = setColor,
+						get = getColor,
+						hidden = function() return ShadowUF.isForever or select(2, UnitClass("player")) ~= "MONK" end,
+						args = {
+							STAGGER_GREEN = {
+								order = 0,
+								type = "color",
+								name = L["Green (<30% HP)"],
+								desc = L["Stagger bar color when the staggered amount is <30% of your HP."],
+								arg = "powerColors.STAGGER_GREEN"
+							},
+							STAGGER_YELLOW = {
+								order = 1,
+								type = "color",
+								name = L["Yellow (>30% HP)"],
+								desc = L["Stagger bar color when the staggered amount is >30% of your HP."],
+								arg = "powerColors.STAGGER_YELLOW"
+							},
+							STAGGER_RED = {
+								order = 2,
+								type = "color",
+								name = L["Red (>70% HP)"],
+								desc = L["Stagger bar color when the staggered amount is >70% of your HP."],
+								arg = "powerColors.STAGGER_RED"
+							}
+						}
+					},
+					power = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["Power"],
+						set = setColor,
+						get = getColor,
+						args = {
+							MANA = {
+								order = 0,
+								type = "color",
+								name = L["Mana"],
+								width = "half",
+								arg = "powerColors.MANA",
+							},
+							RAGE = {
+								order = 1,
+								type = "color",
+								name = L["Rage"],
+								width = "half",
+								arg = "powerColors.RAGE",
+							},
+							FOCUS = {
+								order = 2,
+								type = "color",
+								name = L["Focus"],
+								arg = "powerColors.FOCUS",
+								width = "half",
+							},
+							ENERGY = {
+								order = 3,
+								type = "color",
+								name = L["Energy"],
+								arg = "powerColors.ENERGY",
+								width = "half",
+							},
+							RUNIC_POWER = {
+								order = 6,
+								type = "color",
+								name = L["Runic Power"],
+								arg = "powerColors.RUNIC_POWER",
+								hidden = function() return ShadowUF.isForever end,
+							},
+							RUNES = {
+								order = 7,
+								type = "color",
+								name = L["Runes"],
+								arg = "powerColors.RUNES",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "DEATHKNIGHT" end,
+							},
+							AMMOSLOT = {
+								order = 9,
+								type = "color",
+								name = L["Ammo"],
+								arg = "powerColors.AMMOSLOT",
+								hidden = hideAdvancedOption,
+							},
+							FUEL = {
+								order = 10,
+								type = "color",
+								name = L["Fuel"],
+								arg = "powerColors.FUEL",
+								hidden = hideAdvancedOption,
+							},
+							COMBOPOINTS = {
+								order = 11,
+								type = "color",
+								name = L["Combo Points"],
+								arg = "powerColors.COMBOPOINTS",
+							},
+							AURAPOINTS = {
+								order = 11.5,
+								type = "color",
+								name = L["Aura Combo Points"],
+								arg = "powerColors.AURAPOINTS",
+								hidden = function() return not ShadowUF.modules.auraPoints end
+							},
+							INSANITY = {
+								order = 12,
+								type = "color",
+								name = L["Insanity"],
+								arg = "powerColors.INSANITY",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "PRIEST" end,
+							},
+							MAELSTROM = {
+								order = 12,
+								type = "color",
+								name = L["Maelstrom"],
+								arg = "powerColors.MAELSTROM",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "SHAMAN" end,
+							},
+							HOLYPOWER = {
+								order = 12,
+								type = "color",
+								name = L["Holy Power"],
+								arg = "powerColors.HOLYPOWER",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "PALADIN" end,
+							},
+							SOULSHARDS = {
+								order = 14,
+								type = "color",
+								name = L["Soul Shards"],
+								hasAlpha = true,
+								arg = "powerColors.SOULSHARDS",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "WARLOCK" end,
+							},
+							ARCANECHARGES = {
+								order = 15,
+								type = "color",
+								name = L["Arcane Charges"],
+								hasAlpha = true,
+								arg = "powerColors.ARCANECHARGES",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "MAGE" end,
+							},
+							CHI = {
+								order = 17,
+								type = "color",
+								name = L["Chi"],
+								arg = "powerColors.CHI",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "MONK" end,
+							},
+							FURY = {
+								order = 17,
+								type = "color",
+								name = L["Fury"],
+								arg = "powerColors.FURY",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "DEMONHUNTER" end,
+							},
+							PAIN = {
+								order = 17,
+								type = "color",
+								name = L["Pain"],
+								arg = "powerColors.PAIN",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "DEMONHUNTER" end,
+							},
+							LUNAR_POWER = {
+								order = 17,
+								type = "color",
+								name = L["Astral Power"],
+								arg = "powerColors.LUNAR_POWER",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "DRUID" end,
+							},
+							STATUE = {
+								order = 17,
+								type = "color",
+								name = L["Statue"],
+								arg = "powerColors.STATUE",
+								hidden = function(info) return ShadowUF.isForever or select(2, UnitClass("player")) ~= "MONK" end,
+							},
+							ALTERNATE = {
+								order = 19,
+								type = "color",
+								name = L["Alt. Power"],
+								desc = L["Alternate power is used for things like quests and dungeons."],
+								arg = "powerColors.ALTERNATE",
+								hidden = function() return ShadowUF.isForever end,
+							},
+						},
+					},
+					cast = {
+						order = 3,
+						type = "group",
+						inline = true,
+						name = L["Cast"],
+						set = setColor,
+						get = getColor,
+						args = {
+							cast = {
+								order = 0,
+								type = "color",
+								name = L["Casting"],
+								desc = L["Color used when an unit is casting a spell."],
+								arg = "castColors.cast",
+							},
+							channel = {
+								order = 1,
+								type = "color",
+								name = L["Channelling"],
+								desc = L["Color used when a cast is a channel."],
+								arg = "castColors.channel",
+							},
+							sep = {
+								order = 2,
+								type = "description",
+								name = "",
+								hidden = hideAdvancedOption,
+								width = "full",
+							},
+							finished = {
+								order = 3,
+								type = "color",
+								name = L["Finished cast"],
+								desc = L["Color used when a cast is successfully finished."],
+								hidden = hideAdvancedOption,
+								arg = "castColors.finished",
+							},
+							interrupted = {
+								order = 4,
+								type = "color",
+								name = L["Cast interrupted"],
+								desc = L["Color used when a cast is interrupted either by the caster themselves or by another unit."],
+								hidden = hideAdvancedOption,
+								arg = "castColors.interrupted",
+							},
+							uninterruptible = {
+								order = 5,
+								type = "color",
+								name = L["Cast uninterruptible"],
+								desc = L["Color used when a cast cannot be interrupted, this is only used for PvE mobs."],
+								arg = "castColors.uninterruptible",
+							},
+						},
+					},
+					auras = {
+						order = 3.5,
+						type = "group",
+						inline = true,
+						name = L["Aura borders"],
+						set = function(info, r, g, b)
+							local auraColors = ShadowUF.db.profile.auraColors
+							auraColors.dispel = auraColors.dispel or {}
+							auraColors.dispel[info[#(info)]] = {r = r, g = g, b = b}
+							queuePaletteReload()
+						end,
+						get = function(info)
+							local dispelType = info[#(info)]
+							local color = ShadowUF.db.profile.auraColors.dispel and ShadowUF.db.profile.auraColors.dispel[dispelType]
+							if( not color ) then
+								color = dispelPaletteDefaults[dispelType]
+							end
+							if( not color ) then return 1, 1, 1 end
+							return color.r or 1, color.g or 1, color.b or 1
+						end,
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["Colors used for dispel type coloring: aura borders, health bar tinting and dispel highlighting."],
+							},
+							removableColor = {
+								order = 0.5,
+								type = "color",
+								name = L["Stealable"],
+								desc = L["Border coloring of stealable buffs. Replaces the dispel type color on those auras."],
+								set = function(info, r, g, b)
+									local color = ShadowUF.db.profile.auraColors.removable or {}
+									color.r, color.g, color.b = r, g, b
+									ShadowUF.db.profile.auraColors.removable = color
+									queuePaletteReload()
+								end,
+								get = getColor,
+								arg = "auraColors.removable",
+							},
+							Magic = {order = 1, type = "color", name = L["Magic"]},
+							Curse = {order = 2, type = "color", name = L["Curse"]},
+							Disease = {order = 3, type = "color", name = L["Disease"]},
+							Poison = {order = 4, type = "color", name = L["Poison"]},
+							Bleed = {order = 5, type = "color", name = L["Bleed"], hidden = function() return ShadowUF.isForever end},
+							Enrage = {order = 6, type = "color", name = L["Enrage"]},
+							pandemicColor = {
+								order = 7,
+								type = "color",
+								name = L["Pandemic overlay"],
+								desc = L["Color and opacity of the overlay pulsing on your own auras inside their pandemic window. Enabled in the general aura settings."],
+								width = "double",
+								hasAlpha = true,
+								set = function(info, r, g, b, a)
+									local color = ShadowUF.db.profile.auraColors.pandemic or {}
+									color.r, color.g, color.b, color.a = r, g, b, a
+									ShadowUF.db.profile.auraColors.pandemic = color
+									queuePaletteReload()
+								end,
+								get = getColor,
+								arg = "auraColors.pandemic",
+							},
+							disableRemovable = {
+								order = 8,
+								type = "toggle",
+								name = L["Disable stealable coloring"],
+								desc = L["Stealable buffs are tinted by dispel type like the others."],
+								width = "double",
+								set = function(info, value)
+									ShadowUF.db.profile.auraColors.disableRemovable = value
+									ShadowUF.modules.auras:InvalidateDispelColorMap()
+									queueLayoutReload()
+								end,
+								get = function(info)
+									return ShadowUF.db.profile.auraColors.disableRemovable
+								end,
+							},
+							disableDispel = {
+								order = 9,
+								type = "toggle",
+								name = L["Disable dispel type borders"],
+								desc = L["Aura borders keep their neutral color instead of being tinted by dispel type. Has no effect with the Blizzard border style."],
+								width = "double",
+								set = function(info, value)
+									ShadowUF.db.profile.auraColors.disableDispel = value
+									queueLayoutReload()
+								end,
+								get = function(info)
+									return ShadowUF.db.profile.auraColors.disableDispel
+								end,
+							},
+						}
+					},
+					classColors = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Classes"],
+						set = setColor,
+						get = getColor,
+						args = {}
+					},
+				},
+			},
+			range = {
+				order = 5,
+				type = "group",
+				name = L["Range Checker"],
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["This will be set for your current class only.\nIf no custom spells are set, defaults appropriate for your class will be used."],
+							},
+						},
+					},
+					friendly = {
+						order = 1,
+						inline = true,
+						type = "group",
+						name = L["On Friendly Units"],
+						args = {
+							friendly = {
+								order = 1,
+								type = "input",
+								name = rangeWithIcon,
+								desc = L["Name of a friendly spell to check range."],
+								validate = validateSpell,
+								set = setRange,
+								get = getRange,
+							},
+							spacer = {
+								order = 2,
+								type = "description",
+								width = "normal",
+								name = ""
+							},
+							friendlyAlt = {
+								order = 3,
+								type = "input",
+								name = rangeWithIcon,
+								desc = L["Alternatively friendly spell to use to check range."],
+								hidden = hideAdvancedOption,
+								validate = validateSpell,
+								set = setRange,
+								get = getRange,
+							},
+						}
+					},
+					hostile = {
+						order = 2,
+						inline = true,
+						type = "group",
+						name = L["On Hostile Units"],
+						args = {
+							hostile = {
+								order = 1,
+								type = "input",
+								name = rangeWithIcon,
+								desc = L["Name of a hostile spell to check range."],
+								validate = validateSpell,
+								set = setRange,
+								get = getRange,
+							},
+							spacer = {
+								order = 2,
+								type = "description",
+								width = "normal",
+								name = ""
+							},
+							hostileAlt = {
+								order = 3,
+								type = "input",
+								name = rangeWithIcon,
+								desc = L["Alternative hostile spell to use to check range."],
+								hidden = hideAdvancedOption,
+								validate = validateSpell,
+								set = setRange,
+								get = getRange,
+							},
+						}
+					},
+				},
+			},
+			text = {
+				type = "group",
+				order = 6,
+				name = L["Text Management"],
+				hidden = false,
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["You can add additional text with tags enabled using this configuration, note that any additional text added (or removed) effects all units, removing text will reset their settings as well.|n|nKeep in mind, you cannot delete the default text included with the units."],
+							},
+						},
+					},
+					add = {
+						order = 1,
+						name = L["Add new text"],
+						inline = true,
+						type = "group",
+						set = function(info, value) textData[info[#(info)] ] = value end,
+						get = function(info, value) return textData[info[#(info)] ] end,
+						args = {
+							name = {
+								order = 0,
+								type = "input",
+								name = L["Text name"],
+								desc = L["Text name that you can use to identify this text from others when configuring."],
+							},
+							parent = {
+								order = 1,
+								type = "select",
+								name = L["Text parent"],
+								desc = L["Where inside the frame the text should be anchored to."],
+								values = barModules,
+							},
+							add = {
+								order = 2,
+								type = "execute",
+								name = L["Add"],
+								disabled = function() return not textData.name or textData.name == "" or not textData.parent end,
+								func = function(info)
+									-- Verify we entered a good name
+									textData.name = string.trim(textData.name)
+									textData.name = textData.name ~= "" and textData.name or nil
+
+									-- Ensure all units have their text tables materialized
+									ensureTextsReady()
+
+									-- Add the new entry
+									for _, unit in pairs(ShadowUF.unitList) do
+										table.insert(ShadowUF.db.profile.units[unit].text, {enabled = true, name = textData.name or "??", text = "", anchorTo = textData.parent, x = 0, y = 0, anchorPoint = "C", size = 0, width = 0.50})
+									end
+
+									rebuildTextEntries()
+
+									-- Reset
+									textData.name = nil
+									textData.parent = nil
+
+								end,
+							},
+						},
+					},
+				},
+			},
+			layout = layoutManager,
+		},
+	}
+
+	-- Sync all unit text tables on load (repairs any existing desyncs from past bugs)
+	ensureTextsReady()
+
+	-- Load text
+	for id, text in pairs(ShadowUF.db.profile.units.player.text) do
+		if( text.anchorTo ~= "" and not text.default ) then
+			addTextParent.args[id .. ":label"] = addTextLabel
+			addTextParent.args[tostring(id)] = addText
+			addTextParent.args[id .. ":sep"] = addTextSep
+			options.args.general.args.text.args[text.anchorTo] = addTextParent
+		end
+	end
+
+
+	Config.classTable = {
+		order = 0,
+		type = "color",
+		name = getName,
+		hasAlpha = true,
+		width = "half",
+		arg = "classColors.$key",
+	}
+
+	-- RAID_CLASS_COLORS lists every class the engine knows, CLASS_SORT_ORDER only the ones this game type ships
+	local shippedClasses = {}
+	for _, classToken in ipairs(CLASS_SORT_ORDER) do shippedClasses[classToken] = true end
+	for classToken in pairs(RAID_CLASS_COLORS) do
+		if ShadowUF.db.profile.classColors[classToken] and shippedClasses[classToken] then
+			options.args.general.args.color.args.classColors.args[classToken] = Config.classTable
+		end
+	end
+
+	options.args.general.args.color.args.classColors.args.PET = Config.classTable
+	options.args.general.args.color.args.classColors.args.VEHICLE = Config.classTable
+end
+
+---------------------
+-- HIDE BLIZZARD FRAMES CONFIGURATION
+---------------------
+local function loadHideOptions()
+	Config.hideTable = {
+		order = function(info) return info[#(info)] == "buffs" and 1 or 2 end,
+		type = "toggle",
+		name = function(info)
+			local key = info[#(info)]
+			if( key == "arena" ) then return string.format(L["Hide %s frames"], "arena/battleground") end
+			return L.units[key] and string.format(L["Hide %s frames"], string.lower(L.units[key])) or string.format(L["Hide %s"], key == "cast" and L["player cast bar"] or key == "playerPower" and L["player power frames"] or key == "buffs" and L["buff frames"] or key == "playerAltPower" and L["player alt. power"])
+		end,
+		set = function(info, value)
+			set(info, value)
+			if( value ) then ShadowUF:HideBlizzardFrames() end
+		end,
+		hidden = false,
+		get = get,
+		arg = "hidden.$key",
+	}
+
+	options.args.hideBlizzard = {
+		type = "group",
+		name = L["Hide Blizzard"],
+		desc = getPageDescription,
+		args = {
+			help = {
+				order = 0,
+				type = "group",
+				name = L["Help"],
+				inline = true,
+				args = {
+					description = {
+						type = "description",
+						name = L["You will need to do a /console reloadui before a hidden frame becomes visible again.|nPlayer and other unit frames are automatically hidden depending on if you enable the unit in Shadowed Unit Frames."],
+						width = "full",
+					},
+				},
+			},
+			hide = {
+				order = 1,
+				type = "group",
+				name = L["Frames"],
+				inline = true,
+				args = {
+					buffs = Config.hideTable,
+					cast = Config.hideTable,
+					playerPower = Config.hideTable,
+					party = Config.hideTable,
+                    raid = Config.hideTable,
+					player = Config.hideTable,
+					pet = Config.hideTable,
+					target = Config.hideTable,
+					focus = Config.hideTable,
+					boss = Config.hideTable,
+					arena = Config.hideTable,
+					playerAltPower = Config.hideTable,
+				},
+			},
+		}
+	}
+end
+
+---------------------
+-- UNIT CONFIGURATION
+---------------------
+local function loadUnitOptions()
+	-- This makes sure  we don't end up with any messed up positioning due to two different anchors being used
+	local function fixPositions(info)
+		local unit = info[2]
+		local key = info[#(info)]
+
+		if( key == "point" or key == "relativePoint" ) then
+			ShadowUF.db.profile.positions[unit].anchorPoint = ""
+			ShadowUF.db.profile.positions[unit].movedAnchor = nil
+		elseif( key == "anchorPoint" ) then
+			ShadowUF.db.profile.positions[unit].point = ""
+			ShadowUF.db.profile.positions[unit].relativePoint = ""
+		end
+
+		-- Reset offset if it was a manually positioned frame, and it got anchored
+		-- Why 100/-100 you ask? Because anything else requires some sort of logic applied to it
+		-- and this means the frames won't directly overlap too which is a nice bonus
+		if( key == "anchorTo" ) then
+			ShadowUF.db.profile.positions[unit].x = 100
+			ShadowUF.db.profile.positions[unit].y = -100
+		end
+	end
+
+	-- Hide raid option in party config
+	local function hideRaidOrAdvancedOption(info)
+		if( info[2] == "party" and ShadowUF.db.profile.advanced ) then return false end
+
+		return info[2] ~= "raid" and info[2] ~= "raidpet" and info[2] ~= "maintank" and info[2] ~= "mainassist"
+	end
+
+	local function hideRaidOption(info)
+		return info[2] ~= "raid" and info[2] ~= "raidpet" and info[2] ~= "maintank" and info[2] ~= "mainassist"
+	end
+
+	local function hideSplitOrRaidOption(info)
+		if( info[2] == "raid" and ShadowUF.db.profile.units.raid.frameSplit ) then
+			return true
+		end
+
+		return hideRaidOption(info)
+	end
+
+	-- Not every option should be changed via global settings
+	local function hideSpecialOptions(info)
+		local unit = info[2]
+		if( unit == "global" or unit == "partypet" ) then
+			return true
+		end
+
+		return hideAdvancedOption(info)
+	end
+
+	local function checkNumber(info, value)
+		return tonumber(value)
+	end
+
+	local function setPosition(info, value)
+		ShadowUF.db.profile.positions[info[2]][info[#(info)]] = value
+		fixPositions(info)
+
+		if( info[2] == "raid" or info[2] == "raidpet" or info[2] == "maintank" or info[2] == "mainassist" or info[2] == "party" or info[2] == "boss" or info[2] == "arena" or info[2] == "battleground" ) then
+			ShadowUF.Units:ReloadHeader(info[2])
+		else
+			ShadowUF.Layout:Reload(info[2])
+		end
+	end
+
+	local function getPosition(info)
+		return ShadowUF.db.profile.positions[info[2]][info[#(info)]]
+	end
+
+	local function setNumber(info, value)
+		local unit = info[2]
+		local key = info[#(info)]
+		local id = unit .. key
+
+		-- Apply effective scaling if it's anchored to UIParent
+		if( ShadowUF.db.profile.positions[unit].anchorTo == "UIParent" ) then
+			value = value * (ShadowUF.db.profile.units[unit].scale * UIParent:GetScale())
+		end
+
+		setPosition(info, tonumber(value))
+	end
+
+	local function getString(info)
+		local unit = info[2]
+		local key = info[#(info)]
+		local id = unit .. key
+		local coord = getPosition(info)
+
+		-- If the frame is created and it's anchored to UIParent, will return the number modified by scale
+		if( ShadowUF.db.profile.positions[unit].anchorTo == "UIParent" ) then
+			coord = coord / (ShadowUF.db.profile.units[unit].scale * UIParent:GetScale())
+		end
+
+		-- OCD, most definitely.
+		-- Pain to check coord == math.floor(coord) because floats are handled oddly with frames and return 0.99999999999435
+		return string.gsub(string.format("%.2f", coord), "%.00$", "")
+	end
+
+
+	-- TAG WIZARD
+	local tagWizard = {}
+	Config.tagWizard = tagWizard
+	do
+		-- Load tag list
+		Config.advanceTextTable = {
+			order = 1,
+			name = function(info) return getVariable(info[2], "text", quickIDMap[info[#(info)]], "name") end,
+			type = "group",
+			inline = true,
+			hidden = function(info)
+				if( not getVariable(info[2], "text", nil, quickIDMap[info[#(info)]]) ) then return true end
+				return string.sub(getVariable(info[2], "text", quickIDMap[info[#(info)]], "anchorTo"), 2) ~= info[#(info) - 1]
+			end,
+			set = function(info, value)
+				info.arg = string.format("text.%s.%s", quickIDMap[info[#(info) - 1]], info[#(info)])
+				setUnit(info, value)
+			end,
+			get = function(info)
+				info.arg = string.format("text.%s.%s", quickIDMap[info[#(info) - 1]], info[#(info)])
+				return getUnit(info)
+			end,
+			args = {
+				anchorPoint = {
+					order = 1,
+					type = "select",
+					name = L["Anchor point"],
+					values = {["LC"] = L["Left Center"], ["RT"] = L["Right Top"], ["RB"] = L["Right Bottom"], ["LT"] = L["Left Top"], ["LB"] = L["Left Bottom"], ["RC"] = L["Right Center"],["TRI"] = L["Inside Top Right"], ["TLI"] = L["Inside Top Left"], ["CLI"] = L["Inside Center Left"], ["C"] = L["Inside Center"], ["CRI"] = L["Inside Center Right"], ["TR"] = L["Top Right"], ["TL"] = L["Top Left"], ["BR"] = L["Bottom Right"], ["BL"] = L["Bottom Left"]},
+					hidden = hideAdvancedOption,
+				},
+				sep = {
+					order = 2,
+					type = "description",
+					name = "",
+					width = "full",
+					hidden = hideAdvancedOption,
+				},
+				width = {
+					order = 3,
+					name = L["Width weight"],
+					desc = L["How much weight this should use when figuring out the total text width."],
+					type = "range",
+					min = 0, max = 10, step = 0.1,
+					hidden = function(info)
+						return hideAdvancedOption(info) or getVariable(info[2], "text", quickIDMap[info[#(info) - 1]], "block")
+					end,
+				},
+				size = {
+					order = 4,
+					name = L["Size"],
+					desc = L["Let's you modify the base font size to either make it larger or smaller."],
+					type = "range",
+					min = -20, max = 20, step = 1, softMin = -5, softMax = 5,
+					hidden = false,
+				},
+				sep2 = {
+					order = 4.5,
+					type = "description",
+					name = "",
+					width = "full",
+					hidden = function(info)
+						return hideAdvancedOption(info) or not getVariable(info[2], "text", quickIDMap[info[#(info) - 1]], "block")
+					end
+				},
+				x = {
+					order = 5,
+					type = "range",
+					name = L["X Offset"],
+					min = -1000, max = 1000, step = 1, softMin = -100, softMax = 100,
+					hidden = false,
+				},
+				y = {
+					order = 6,
+					type = "range",
+					name = L["Y Offset"],
+					min = -1000, max = 1000, step = 1, softMin = -100, softMax = 100,
+					hidden = false,
+				},
+			},
+		}
+
+		Config.parentTable = {
+			order = 0,
+			type = "group",
+			name = function(info) return getName(info) or string.sub(info[#(info)], 1) end,
+			hidden = function(info) return not getVariable(info[2], info[#(info)], nil, "enabled") end,
+			args = {}
+		}
+
+		local function hideBlacklistedTag(info)
+			local unit = info[2]
+			local id = tonumber(info[#(info) - 2])
+			local tag = info[#(info)]
+			local cat = info[#(info) - 1]
+
+			if( unit == "global" ) then
+				for modUnit in pairs(modifyUnits) do
+					if( ShadowUF.Tags.unitRestrictions[tag] == modUnit ) then
+						return false
+					end
+				end
+			end
+
+			if( ShadowUF.Tags.unitRestrictions[tag] and ShadowUF.Tags.unitRestrictions[tag] ~= unit ) then
+				return true
+
+			elseif( ShadowUF.Tags.anchorRestriction[tag] ) then
+				if( ShadowUF.Tags.anchorRestriction[tag] ~= getVariable(unit, "text", id, "anchorTo") ) then
+					return true
+				else
+					return false
+				end
+			end
+
+			return false
+		end
+
+		local function hideBlacklistedGroup(info)
+			local unit = info[2]
+			local id = tonumber(info[#(info) - 1])
+			local tagGroup = info[#(info)]
+
+			if( unit ~= "global" ) then
+				if( ShadowUF.Tags.unitBlacklist[tagGroup] and string.match(unit, ShadowUF.Tags.unitBlacklist[tagGroup]) ) then
+					return true
+				end
+			else
+				-- If the only units that are in the global configuration have the tag filtered, then don't bother showing it
+				for modUnit in pairs(modifyUnits) do
+					if( not ShadowUF.Tags.unitBlacklist[tagGroup] or not string.match(modUnit, ShadowUF.Tags.unitBlacklist[tagGroup]) ) then
+						return false
+					end
+				end
+			end
+
+			local block = getVariable(unit, "text", id, "block")
+			if( ( block and tagGroup ~= "classtimer" ) or ( not block and tagGroup == "classtimer" ) ) then
+				return true
+			end
+
+			return false
+		end
+
+		local savedTagTexts = {}
+		local function selectTag(info, value)
+			local unit = info[2]
+			local id = tonumber(info[#(info) - 2])
+			local tag = info[#(info)]
+			local text = getVariable(unit, "text", id, "text")
+			local savedText
+
+			if( value ) then
+				if( unit == "global" ) then
+					table.wipe(savedTagTexts)
+
+					-- Set special tag texts based on the unit, so targettarget won't get a tag that will cause errors
+					local tagGroup = ShadowUF.Tags.defaultCategories[tag]
+					for modUnit in pairs(modifyUnits) do
+						savedTagTexts[modUnit] = getVariable(modUnit, "text", id, "text")
+						if( not ShadowUF.Tags.unitBlacklist[tagGroup] or not string.match(modUnit, ShadowUF.Tags.unitBlacklist[tagGroup]) ) then
+							if( not ShadowUF.Tags.unitRestrictions[tag] or ShadowUF.Tags.unitRestrictions[tag] == modUnit ) then
+								if( text == "" ) then
+									savedTagTexts[modUnit] = string.format("[%s]", tag)
+								else
+									savedTagTexts[modUnit] = string.format("%s[( )%s]", savedTagTexts[modUnit], tag)
+								end
+
+								savedTagTexts.global = savedTagTexts[modUnit]
+							end
+						end
+					end
+				else
+					if( text == "" ) then
+						text = string.format("[%s]", tag)
+					else
+						text = string.format("%s[( )%s]", text, tag)
+					end
+				end
+
+			-- Removing a tag from a single unit, super easy :<
+			else
+				-- Ugly, but it works
+				for matchedTag in string.gmatch(text, "%[(.-)%]") do
+					local safeTag = "[" .. matchedTag .. "]"
+					if( string.match(safeTag, "%[" .. tag .. "%]") or string.match(safeTag, "%)" .. tag .. "%]") or string.match(safeTag, "%[" .. tag .. "%(") or string.match(safeTag, "%)" .. tag .. "%(") ) then
+						text = string.gsub(text, "%[" .. string.gsub(string.gsub(matchedTag, "%)", "%%)"), "%(", "%%(") .. "%]", "")
+						text = string.gsub(text, "  ", "")
+						text = string.trim(text)
+						break
+					end
+				end
+			end
+
+			if( unit == "global" ) then
+				for modUnit in pairs(modifyUnits) do
+					if( savedTagTexts[modUnit] ) then
+						setVariable(modUnit, "text", id, "text", savedTagTexts[modUnit])
+					end
+				end
+
+				setVariable("global", "text", id, "text", savedTagTexts.global)
+			else
+				setVariable(unit, "text", id, "text", text)
+			end
+		end
+
+		local function getTag(info)
+			local text = getVariable(info[2], "text", tonumber(info[#(info) - 2]), "text")
+			local tag = info[#(info)]
+
+			-- FUN WITH PATTERN MATCHING
+			if( string.match(text, "%[" .. tag .. "%]") or string.match(text, "%)" .. tag .. "%]") or string.match(text, "%[" .. tag .. "%(") or string.match(text, "%)" .. tag .. "%(") ) then
+				return true
+			end
+
+			return false
+		end
+
+		Config.tagTextTable = {
+			type = "group",
+			name = function(info) return getVariable(info[2], "text", nil, tonumber(info[#(info)])) and getVariable(info[2], "text", tonumber(info[#(info)]), "name") or "" end,
+			hidden = function(info)
+				if( not getVariable(info[2], "text", nil, tonumber(info[#(info)])) ) then return true end
+				return string.sub(getVariable(info[2], "text", tonumber(info[#(info)]), "anchorTo"), 2) ~= info[#(info) - 1] end,
+			set = false,
+			get = false,
+			args = {
+				text = {
+					order = 0,
+					type = "input",
+					name = L["Text"],
+					width = "full",
+					hidden = false,
+					set = function(info, value) setUnit(info, string.gsub(value, "||", "|")) end,
+					get = function(info) return string.gsub(getUnit(info), "|", "||") end,
+					arg = "text.$parent.text",
+				},
+			},
+		}
+
+
+		local function getCategoryOrder(info)
+			return info[#(info)] == "health" and 1 or info[#(info)] == "power" and 2 or info[#(info)] == "misc" and 3 or 4
+		end
+
+		for _, cat in pairs(ShadowUF.Tags.defaultCategories) do
+			Config.tagTextTable.args[cat] = Config.tagTextTable.args[cat] or {
+				order = getCategoryOrder,
+				type = "group",
+				inline = true,
+				name = getName,
+				hidden = hideBlacklistedGroup,
+				set = selectTag,
+				get = getTag,
+				args = {},
+			}
+		end
+
+		Config.tagTable = {
+			order = 0,
+			type = "toggle",
+			hidden = hideBlacklistedTag,
+			name = getTagName,
+			desc = getTagHelp,
+		}
+
+		local tagList = {}
+		for tag in pairs(ShadowUF.Tags.defaultTags) do
+			local category = ShadowUF.Tags.defaultCategories[tag] or "misc"
+			Config.tagTextTable.args[category].args[tag] = Config.tagTable
+		end
+
+		for tag, data in pairs(ShadowUF.db.profile.tags) do
+			local category = data.category or "misc"
+			Config.tagTextTable.args[category].args[tag] = Config.tagTable
+		end
+
+		local parentList = {}
+		for id, text in pairs(ShadowUF.db.profile.units.player.text) do
+			parentList[text.anchorTo] = parentList[text.anchorTo] or {}
+			parentList[text.anchorTo][id] = text
+		end
+
+		local nagityNagNagTable = {
+			order = 0,
+			type = "group",
+			name = L["Help"],
+			inline = true,
+			hidden = false,
+			args = {
+				help = {
+					order = 0,
+					type = "description",
+					name = L["Selecting a tag text from the left panel to change tags. Truncating width, sizing, and offsets can be done in the current panel."],
+				},
+			},
+		}
+		
+		for parent, list in pairs(parentList) do
+			parent = string.sub(parent, 2)
+			
+			local module = ShadowUF.modules[parent]
+			if( not module or ShadowUF:IsModuleAvailable(module) ) then
+				tagWizard[parent] = Config.parentTable
+				Config.parentTable.args.help = nagityNagNagTable
+
+				for id in pairs(list) do
+					tagWizard[parent].args[tostring(id)] = Config.tagTextTable
+					tagWizard[parent].args[tostring(id) .. ":adv"] = Config.advanceTextTable
+
+					quickIDMap[tostring(id) .. ":adv"] = id
+				end
+			end
+		end
+	end
+
+	local function disableAnchoredTo(info)
+		local auras = getVariable(info[2], "auras", nil, info[#(info) - 2])
+
+		return auras.anchorOn or not auras.enabled
+	end
+
+	local function disableSameAnchor(info)
+		local buffs = getVariable(info[2], "auras", nil, "buffs")
+		local debuffs = getVariable(info[2], "auras", nil, "debuffs")
+		local anchor = buffs.enabled and buffs.prioritize and "buffs" or "debuffs"
+
+		if( not getVariable(info[2], "auras", info[#(info) - 2], "enabled") ) then
+			return true
+		end
+
+		if( ( info[#(info)] == "x" or info[#(info)] == "y" ) and ( info[#(info) - 2] == "buffs" and buffs.anchorOn or info[#(info) - 2] == "debuffs" and debuffs.anchorOn ) ) then
+			return true
+		end
+
+		if( anchor == info[#(info) - 2] or buffs.anchorOn or debuffs.anchorOn ) then
+			return false
+		end
+
+		return buffs.anchorPoint == debuffs.anchorPoint
+	end
+
+	local auraAnchorList = {
+		TOPLEFT = L["Top Left"], TOP = L["Top"], TOPRIGHT = L["Top Right"],
+		LEFT = L["Left"], CENTER = L["Center"], RIGHT = L["Right"],
+		BOTTOMLEFT = L["Bottom Left"], BOTTOM = L["Bottom"], BOTTOMRIGHT = L["Bottom Right"],
+	}
+	local playerAuraAnchorList = {
+		TOPLEFT = L["Top Left"], TOP = L["Top"], TOPRIGHT = L["Top Right"],
+		LEFT = L["Left"], CENTER = L["Center"], RIGHT = L["Right"],
+		BOTTOMLEFT = L["Bottom Left"], BOTTOM = L["Bottom"], BOTTOMRIGHT = L["Bottom Right"],
+		FREE = L["Free (screen)"],
+	}
+	local growHValues = {RIGHT = L["Right"], LEFT = L["Left"], CENTER = L["Center"]}
+	local growVValues = {TOP = L["Up"], BOTTOM = L["Down"]}
+
+	local function hideStealable(info)
+		if( not ShadowUF.db.profile.advanced ) then return true end
+		if( info[2] == "player" or info[2] == "pet" or info[#(info) - 2] == "debuffs" ) then return true end
+
+		return false
+	end
+
+	local function hideBuffOption(info)
+		return info[#(info) - 2] ~= "buffs"
+	end
+
+	local function hideDebuffOption(info)
+		return info[#(info) - 2] ~= "debuffs"
+	end
+
+	local function reloadUnitAuras(unit)
+		queueLayoutReload(unit)
+		-- Containers can't be fully rebuilt under combat restrictions (also M+/encounters out of lockdown), make sure the deferral is replayed and announced
+		local auras = ShadowUF.modules.auras
+		if( auras.QueueAllContainerRebuilds and (InCombatLockdown() or (auras.AurasAreSecret and auras.AurasAreSecret())) ) then
+			auras:QueueAllContainerRebuilds()
+		end
+	end
+
+	-- Filter edits are runtime-mutable on the containers (the refresh fast path pushes them in place, combat included)
+	-- Dispatching the aura refresh directly skips the geometry pass and the announced rebuild, the refresh's own gates queue a silent regen reconcile for whatever is frozen structurally
+	local function reloadUnitAurasFilters(unit)
+		local auras = ShadowUF.modules.auras
+		if( not (auras and auras.OnLayoutApplied) ) then
+			reloadUnitAuras(unit)
+			return
+		end
+
+		for frame in pairs(ShadowUF.Units.frameList) do
+			if( frame.visibility and frame.visibility.auras and (not unit or unit == "global" or frame.unitType == unit) ) then
+				local unitConfig = ShadowUF.db.profile.units[frame.unitType]
+				if( unitConfig ) then
+					auras:OnLayoutApplied(frame, unitConfig)
+				end
+			end
+		end
+	end
+
+	local aurasDisabled = function(info) return not getVariable(info[2], "auras", info[#(info) - 2], "enabled") end
+
+	-- 12.0: New multi-frame aura configuration
+	-- Supports up to 6 frames per type (buffs/debuffs) with filter dropdown
+	local filterDescriptions = {
+		buffs = {
+			["ALL"] = L["Shows all buffs on the unit without any filtering."],
+			["PLAYER"] = L["Only shows buffs you cast yourself."],
+			["RAID"] = L["Only shows buff types that your class can cast (e.g. a Priest sees Fortitude and Renew), regardless of who cast them."],
+			["PLAYER|RAID"] = L["Only shows your class buff types that you cast yourself."],
+			["BIG_DEFENSIVE"] = L["Only shows major defensive cooldowns (Shield Wall, Ice Block, Divine Shield, etc.). List maintained by Blizzard."],
+			["PLAYER|BIG_DEFENSIVE"] = L["Only shows major defensive cooldowns that you activated yourself."],
+			["EXTERNAL_DEFENSIVE"] = L["Only shows defensive buffs received from another player (Pain Suppression, Ironbark, Life Cocoon, etc.)."],
+			["PLAYER|EXTERNAL_DEFENSIVE"] = L["Only shows external defensives that you cast on someone."],
+			["RAID_PLAYER_DISPELLABLE"] = L["Only shows buffs that someone in your group can purge, steal or dispel."],
+			["DISPELLABLE"] = L["Only shows auras that have a dispel type, whether or not anyone in your group can dispel them."],
+			["RAID_IN_COMBAT"] = L["Buffs flagged by Blizzard to show on raid frames in combat, HoTs mostly."],
+			["PLAYER|RAID_IN_COMBAT"] = L["Your buffs flagged to show on raid frames in combat."],
+			["IMPORTANT"] = L["Only shows buffs marked as important by Blizzard. Server-maintained list."],
+		},
+		debuffs = {
+			["ALL"] = L["Shows all debuffs on the unit without any filtering."],
+			["PLAYER"] = L["Only shows debuffs you applied yourself."],
+			["RAID"] = L["Only shows debuffs that you can dispel."],
+			["RAID_PLAYER_DISPELLABLE"] = L["Only shows debuffs that someone in your group can dispel (you, when solo)."],
+			["DISPELLABLE"] = L["Only shows auras that have a dispel type, whether or not anyone in your group can dispel them."],
+			["CROWD_CONTROL"] = L["Only shows crowd control effects (Stun, Root, Silence, Fear, Polymorph, Cyclone, etc.)."],
+			["IMPORTANT"] = L["Only shows debuffs marked as important by Blizzard. Server-maintained list."],
+		}
+	}
+
+	local filterValues = {
+		buffs = {
+			["ALL"] = L["All Auras"],
+			["PLAYER"] = L["My Auras"],
+			["RAID"] = L["Class-filtered auras"],
+			["PLAYER|RAID"] = L["My class auras"],
+			["BIG_DEFENSIVE"] = L["Big defensive cooldowns"],
+			["PLAYER|BIG_DEFENSIVE"] = L["My big defensives"],
+			["EXTERNAL_DEFENSIVE"] = L["External defensives"],
+			["PLAYER|EXTERNAL_DEFENSIVE"] = L["My external defensives"],
+			["RAID_PLAYER_DISPELLABLE"] = L["Purgeable/Stealable"],
+			["DISPELLABLE"] = L["Any dispellable"],
+			["RAID_IN_COMBAT"] = L["HoTs & raid frames buffs"],
+			["PLAYER|RAID_IN_COMBAT"] = L["My HoTs & raid frames buffs"],
+			["IMPORTANT"] = L["Important auras"],
+		},
+		debuffs = {
+			["ALL"] = L["All Auras"],
+			["PLAYER"] = L["My Auras"],
+			["RAID"] = L["Dispellable by me"],
+			["RAID_PLAYER_DISPELLABLE"] = L["Dispellable by group"],
+			["DISPELLABLE"] = L["Any dispellable"],
+			["CROWD_CONTROL"] = L["Crowd control effects"],
+			["IMPORTANT"] = L["Important auras"],
+		}
+	}
+
+	-- Helper to get frame config (auras.buffs[1], auras.debuffs[2], etc.)
+	-- Global page reads use the globalConfig mirror, writes fan out to every unit ticked in modifyUnits plus the mirror (setDirectUnit model)
+	local function getAuraUnitConfig(unit)
+		return unit == "global" and globalConfig or ShadowUF.db.profile.units[unit]
+	end
+
+	local function forEachAuraUnit(unit, callback)
+		if( unit == "global" ) then
+			for modUnit in pairs(modifyUnits) do
+				callback(ShadowUF.db.profile.units[modUnit], modUnit)
+			end
+			callback(globalConfig, "global")
+		else
+			callback(ShadowUF.db.profile.units[unit], unit)
+		end
+	end
+
+	local function getAuraFrameConfig(unit, auraType, frameIndex)
+		local config = getAuraUnitConfig(unit)
+		if config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex] then
+			return config.auras[auraType][frameIndex]
+		end
+		return nil
+	end
+
+	local function setAuraFrameValue(unit, auraType, frameIndex, key, value)
+		forEachAuraUnit(unit, function(config)
+			if config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex] then
+				config.auras[auraType][frameIndex][key] = value
+			end
+		end)
+		if( key == "filter" or key == "hideOrigin" ) then
+			reloadUnitAurasFilters(unit)
+		else
+			reloadUnitAuras(unit)
+		end
+	end
+
+	-- Container-only options (sections, sorting)
+	local function hideWithoutContainers()
+		return not (ShadowUF.modules.auras and ShadowUF.modules.auras.hasContainers)
+	end
+
+	local sortMethodValues = {
+		[""] = L["Default"],
+		["BigDefensive"] = L["Big defensives first"],
+		["UnitFrameDebuff"] = L["Unit frame debuff order"],
+		["ImportantOnly"] = L["Important only"],
+		["Expiration"] = L["Expiration (yours first)"],
+		["ExpirationOnly"] = L["Expiration"],
+		["Name"] = L["Name (yours first)"],
+		["NameOnly"] = L["Name"],
+		["AuraInstanceIDOnly"] = L["Application order"],
+	}
+
+	-- Custom filters only make sense where Blizzard applies spell ID filters, buffs on assistable units and debuffs on hostile-capable ones (identity gate)
+	local friendlyOnlyUnits = {player = true, pet = true, party = true, partypet = true, raid = true, raidpet = true, maintank = true, mainassist = true}
+	-- "Hide" customs only make sense as a whole-list modifier, sections (includeOnly) don't offer them
+	local function appendCustomFilterValues(values, unit, auraType, includeOnly)
+		if( hideWithoutContainers() ) then return values end
+		if( friendlyOnlyUnits[unit] and auraType ~= "buffs" ) then return values end
+		for name, custom in pairs(ShadowUF.db.profile.customFilters or {}) do
+			if( not includeOnly or custom.mode ~= "exclude" ) then
+				values["CUSTOM:" .. name] = L["Custom"] .. ": " .. name
+			end
+		end
+		return values
+	end
+
+	local function getFilterValues(auraType, unit, includeOnly)
+		local values = {}
+		for key, label in pairs(filterValues[auraType] or filterValues.buffs) do
+			values[key] = label
+		end
+		return appendCustomFilterValues(values, unit, auraType, includeOnly)
+	end
+
+	local function getSectionConfig(unit, auraType, frameIndex, sectionIndex)
+		local cfg = getAuraFrameConfig(unit, auraType, frameIndex)
+		return cfg and cfg.sections and cfg.sections[sectionIndex]
+	end
+
+	local function setSectionValue(unit, auraType, frameIndex, sectionIndex, key, value)
+		forEachAuraUnit(unit, function(config)
+			local cfg = config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex]
+			if( cfg ) then
+				cfg.sections = cfg.sections or {}
+				cfg.sections[sectionIndex] = cfg.sections[sectionIndex] or {}
+				cfg.sections[sectionIndex][key] = value
+			end
+		end)
+		if( key == "filter" or key == "hideOrigin" ) then
+			reloadUnitAurasFilters(unit)
+		else
+			reloadUnitAuras(unit)
+		end
+	end
+
+	-- Create options for a single aura frame slot
+	local function createAuraFrameOptions(frameIndex)
+		-- Disabled frames show greyed out in the tree
+		local function frameName(info)
+			local cfg = getAuraFrameConfig(info[2], info[#(info) - 1], frameIndex)
+			local name = L["Frame"] .. " " .. frameIndex
+			if( cfg and not cfg.enabled ) then
+				return "|cff888888" .. name .. "|r"
+			end
+			return name
+		end
+		local frameArgs
+		frameArgs = {
+				enabled = {
+					order = 1,
+					type = "toggle",
+					name = L["Enable"],
+					width = "half",
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.enabled
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "enabled", value)
+					end,
+				},
+				temporary = {
+					order = 1.2,
+					type = "toggle",
+					name = L["Enable temporary enchants"],
+					desc = L["Adds temporary enchants to the buffs for the player."],
+					hidden = function(info)
+						local auraType = info[#(info) - 3]
+						return auraType ~= "buffs" or info[2] ~= "player"
+					end,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.temporary
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						-- Exclusivity: disable temporary on all other buffs frames
+						if value then
+							for i = 1, 6 do
+								if i ~= frameIndex then
+									setAuraFrameValue(info[2], auraType, i, "temporary", false)
+								end
+							end
+						end
+						setAuraFrameValue(info[2], auraType, frameIndex, "temporary", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				anchorOn = {
+					order = 1.5,
+					type = "toggle",
+					name = function(info)
+						local auraType = info[#(info) - 3]
+						if auraType == "buffs" then
+							return string.format(L["Anchor to debuffs %d"], frameIndex)
+						else
+							return string.format(L["Anchor to buffs %d"], frameIndex)
+						end
+					end,
+					desc = function(info)
+						local auraType = info[#(info) - 3]
+						if auraType == "buffs" then
+							return L["Anchors this buff frame to the corresponding debuff frame, positioning it after the last visible debuff."]
+						else
+							return L["Anchors this debuff frame to the corresponding buff frame, positioning it after the last visible buff."]
+						end
+					end,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.anchorOn
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						local otherType = auraType == "buffs" and "debuffs" or "buffs"
+						-- Disable anchorOn on the other type if we're enabling it here
+						if value then
+							setAuraFrameValue(info[2], otherType, frameIndex, "anchorOn", false)
+						end
+						setAuraFrameValue(info[2], auraType, frameIndex, "anchorOn", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local otherType = auraType == "buffs" and "debuffs" or "buffs"
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						local otherCfg = getAuraFrameConfig(info[2], otherType, frameIndex)
+						-- Disabled if this frame is not enabled, or if the other frame is not enabled, or if the other frame has anchorOn
+						return not (cfg and cfg.enabled) or not (otherCfg and otherCfg.enabled) or (otherCfg and otherCfg.anchorOn)
+					end,
+				},
+				anchorMode = {
+					order = 1.6,
+					type = "select",
+					name = L["Anchor mode"],
+					desc = L["Controls how the anchored aura frame is positioned relative to the parent frame."],
+					values = {["COLUMN"] = L["New row"], ["SEQUENTIAL"] = L["Sequential"]},
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.anchorMode or "COLUMN"
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "anchorMode", value)
+					end,
+					hidden = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.anchorOn)
+					end,
+				},
+				filter = {
+					order = 2,
+					type = "select",
+					name = L["Filter"],
+					width = "full",
+					desc = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						local currentFilter = cfg and cfg.filter or "ALL"
+						if( currentFilter:find("^CUSTOM:") ) then
+							return L["Blizzard only applies spell filters to buffs on friendly units and to debuffs on hostile units, plus any spell it flags as never secret."]
+						end
+						local descs = filterDescriptions[auraType] or filterDescriptions.buffs
+						return descs[currentFilter] or L["Which auras to show in this frame"]
+					end,
+					values = function(info)
+						local auraType = info[#(info) - 3]
+						local base = filterValues[auraType] or filterValues.buffs
+						local filtered = {}
+						for k, v in pairs(base) do
+							filtered[k] = v
+						end
+						filtered = appendCustomFilterValues(filtered, info[2], auraType)
+						-- No duplicate choices, drop filters already used by the sections and keep the current value
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						if( cfg and cfg.sections ) then
+							local own = cfg.filter or "ALL"
+							for _, section in pairs(cfg.sections) do
+								if( type(section) == "table" and section.filter and section.filter ~= own ) then
+									filtered[section.filter] = nil
+								end
+							end
+						end
+						return filtered
+					end,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.filter or "ALL"
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						-- Disable enlarge.PLAYER when switching to PLAYER filter
+						if value == "PLAYER" then
+							local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+							if cfg and cfg.enlarge then
+								cfg.enlarge.PLAYER = false
+							end
+						end
+						setAuraFrameValue(info[2], auraType, frameIndex, "filter", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				hideOrigin = {
+					order = 2.05,
+					type = "select",
+					name = L["Hide auras applied by"],
+					desc = L["Applies per section, pets count as players. Sated after Bloodlust is applied by a player for example."],
+					hidden = hideWithoutContainers,
+					width = "full",
+					values = {["none"] = L["Nobody"], ["players"] = L["Players"], ["npcs"] = L["NPCs"]},
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.hideOrigin or "none"
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "hideOrigin", value ~= "none" and value or nil)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				sortMethod = {
+					order = 2.1,
+					type = "select",
+					name = L["Sort method"],
+					desc = L["How auras in this frame are ordered. Sorting is per section."],
+					hidden = hideWithoutContainers,
+					width = "full",
+					values = sortMethodValues,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.sortMethod or ""
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "sortMethod", value ~= "" and value or nil)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				posHeader = {
+					order = 2.5,
+					type = "header",
+					name = "",
+				},
+				anchorPoint = {
+					order = 3,
+					type = "select",
+					name = L["Position"],
+					values = function(info) return (info[2] == "player") and playerAuraAnchorList or auraAnchorList end,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						local anchor = cfg and cfg.anchorPoint or "TOPLEFT"
+						-- Update x/y slider ranges based on anchor type
+						local isFree = (anchor == "FREE")
+						local halfW = isFree and math.floor(GetScreenWidth() / 2) or 100
+						local halfH = isFree and math.floor(GetScreenHeight() / 2) or 100
+						frameArgs.x.softMin = -halfW
+						frameArgs.x.softMax = halfW
+						frameArgs.y.softMin = -halfH
+						frameArgs.y.softMax = halfH
+						return anchor
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						local isFree = (value == "FREE")
+						local halfW = isFree and math.floor(GetScreenWidth() / 2) or 100
+						local halfH = isFree and math.floor(GetScreenHeight() / 2) or 100
+						frameArgs.x.softMin = -halfW
+						frameArgs.x.softMax = halfW
+						frameArgs.y.softMin = -halfH
+						frameArgs.y.softMax = halfH
+						setAuraFrameValue(info[2], auraType, frameIndex, "anchorPoint", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled) or (cfg and cfg.anchorOn)
+					end,
+				},
+				growH = {
+					order = 3.1,
+					type = "select",
+					name = L["Row growth"],
+					desc = L["Direction aura icons fill within a row."],
+					values = growHValues,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.growH or "RIGHT"
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "growH", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled) or (cfg and cfg.anchorOn)
+					end,
+				},
+				growV = {
+					order = 3.2,
+					type = "select",
+					name = L["Column growth"],
+					desc = L["Direction new rows of auras stack."],
+					values = growVValues,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.growV or "BOTTOM"
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "growV", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled) or (cfg and cfg.anchorOn)
+					end,
+				},
+				size = {
+					order = 4,
+					type = "range",
+					name = L["Icon Size"],
+					min = 8, max = 50, step = 1,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.size or 16
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "size", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				perRow = {
+					order = 5,
+					type = "range",
+					name = L["Per row"],
+					min = 1, max = 20, step = 1,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.perRow or 10
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "perRow", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				maxRows = {
+					order = 6,
+					type = "range",
+					name = L["Max rows"],
+					min = 1, max = 10, step = 1,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.maxRows or 4
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "maxRows", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				x = {
+					order = 7,
+					type = "range",
+					name = L["X Offset"],
+					min = -1000, max = 1000, step = 1, softMin = -100, softMax = 100,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.x or 0
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "x", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				y = {
+					order = 8,
+					type = "range",
+					name = L["Y Offset"],
+					min = -1000, max = 1000, step = 1, softMin = -100, softMax = 100,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.y or 0
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "y", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				enlargePlayer = {
+					order = 9,
+					type = "toggle",
+					name = L["Enlarge my auras"],
+					desc = L["Scale up auras that were cast by the player to make them more visible."],
+					hidden = function(info)
+						-- Hide when filter is PLAYER since all auras are already player auras
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.filter == "PLAYER"
+					end,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.enlarge and cfg.enlarge.PLAYER
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						local config = ShadowUF.db.profile.units[info[2]]
+						if config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex] then
+							config.auras[auraType][frameIndex].enlarge = config.auras[auraType][frameIndex].enlarge or {}
+							config.auras[auraType][frameIndex].enlarge.PLAYER = value
+							reloadUnitAuras()
+						end
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled)
+					end,
+				},
+				selfScale = {
+					order = 10,
+					type = "range",
+					name = L["Enlarged scale"],
+					desc = L["Scale multiplier applied to player auras when enlargement is enabled."],
+					min = 1.0, max = 2.0, step = 0.05,
+					hidden = function(info)
+						-- Hide when filter is PLAYER since all auras are already player auras
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.filter == "PLAYER"
+					end,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.selfScale or 1.30
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "selfScale", value)
+					end,
+					disabled = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return not (cfg and cfg.enabled) or not (cfg and cfg.enlarge and cfg.enlarge.PLAYER)
+					end,
+				},
+			}
+
+		frameArgs.sectionsHeader = {
+			order = 20.4,
+			type = "header",
+			name = "",
+			hidden = function(info)
+				if( hideWithoutContainers() ) then return true end
+				local auraType = info[#(info) - 3]
+				local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+				return not (cfg and cfg.enabled)
+			end,
+		}
+
+		frameArgs.sectionsHelp = {
+			order = 20.5,
+			type = "description",
+			width = "full",
+			name = L["Sections add extra filters to this frame, shown after the main filter. Auras already shown by a previous section are removed automatically. Each section has its own icon size, sorting and icon cap."],
+			hidden = function(info)
+				if( hideWithoutContainers() ) then return true end
+				local auraType = info[#(info) - 3]
+				local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+				return not (cfg and cfg.enabled)
+			end,
+		}
+
+		frameArgs.addSection = {
+			order = 24,
+			type = "execute",
+			name = L["Add section"],
+			desc = L["Adds another filter to this frame, shown after the previous sections. Overlaps are removed automatically."],
+			hidden = function(info)
+				if( hideWithoutContainers() ) then return true end
+				local auraType = info[#(info) - 3]
+				local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+				return cfg and cfg.sections and #cfg.sections >= 5
+			end,
+			disabled = function(info)
+				local auraType = info[#(info) - 3]
+				local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+				return not (cfg and cfg.enabled)
+			end,
+			func = function(info)
+				local auraType = info[#(info) - 3]
+				forEachAuraUnit(info[2], function(config, unit)
+					local cfg = config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex]
+					if( not cfg ) then return end
+					cfg.sections = cfg.sections or {}
+
+					-- Default to a filter the frame and its sections don't use yet
+					local used = { [cfg.filter or "ALL"] = true }
+					for _, section in pairs(cfg.sections) do
+						if( type(section) == "table" and section.filter ) then
+							used[section.filter] = true
+						end
+					end
+					local values = getFilterValues(auraType, unit, true)
+					local pick
+					if( values.ALL and not used.ALL ) then
+						pick = "ALL"
+					else
+						local keys = {}
+						for key in pairs(values) do
+							if( not used[key] ) then table.insert(keys, key) end
+						end
+						table.sort(keys)
+						pick = keys[1]
+					end
+
+					table.insert(cfg.sections, { filter = pick or "ALL" })
+				end)
+				reloadUnitAuras(info[2])
+			end,
+		}
+
+		for sectionIndex = 1, 5 do
+			local function sectionDisabled(info)
+				local auraType = info[#(info) - 4]
+				local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+				return not (cfg and cfg.enabled)
+			end
+
+			frameArgs["section" .. sectionIndex] = {
+				order = 20 + sectionIndex,
+				type = "group",
+				inline = true,
+				name = L["Section"] .. " " .. (sectionIndex + 1),
+				hidden = function(info)
+					if( hideWithoutContainers() ) then return true end
+					local auraType = info[#(info) - 3]
+					return not getSectionConfig(info[2], auraType, frameIndex, sectionIndex)
+				end,
+				args = {
+					filter = {
+						order = 1,
+						type = "select",
+						hidden = false,
+						name = L["Filter"],
+						values = function(info)
+							local auraType = info[#(info) - 4]
+							local values = getFilterValues(auraType, info[2], true)
+							-- No duplicate choices, drop the main filter and other sections' filters, keep this section's current value
+							local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+							if( cfg ) then
+								local own = cfg.sections and cfg.sections[sectionIndex] and cfg.sections[sectionIndex].filter
+								if( cfg.filter and cfg.filter ~= own ) then
+									values[cfg.filter] = nil
+								end
+								if( cfg.sections ) then
+									for otherIndex, other in pairs(cfg.sections) do
+										if( otherIndex ~= sectionIndex and type(other) == "table" and other.filter and other.filter ~= own ) then
+											values[other.filter] = nil
+										end
+									end
+								end
+							end
+							return values
+						end,
+						get = function(info)
+							local auraType = info[#(info) - 4]
+							local section = getSectionConfig(info[2], auraType, frameIndex, sectionIndex)
+							return section and section.filter or "ALL"
+						end,
+						set = function(info, value)
+							local auraType = info[#(info) - 4]
+							setSectionValue(info[2], auraType, frameIndex, sectionIndex, "filter", value)
+						end,
+						disabled = sectionDisabled,
+					},
+					size = {
+						order = 2,
+						type = "range",
+						hidden = false,
+						name = L["Icon Size"],
+						min = 8, max = 64, step = 1,
+						get = function(info)
+							local auraType = info[#(info) - 4]
+							local section = getSectionConfig(info[2], auraType, frameIndex, sectionIndex)
+							if( section and section.size ) then return section.size end
+							local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+							return cfg and cfg.size or 16
+						end,
+						set = function(info, value)
+							local auraType = info[#(info) - 4]
+							setSectionValue(info[2], auraType, frameIndex, sectionIndex, "size", value)
+						end,
+						disabled = sectionDisabled,
+					},
+					hideOrigin = {
+						order = 3,
+						type = "select",
+						hidden = false,
+						name = L["Hide auras applied by"],
+						desc = L["Applies per section, pets count as players. Sated after Bloodlust is applied by a player for example."],
+						values = {["none"] = L["Nobody"], ["players"] = L["Players"], ["npcs"] = L["NPCs"]},
+						get = function(info)
+							local auraType = info[#(info) - 4]
+							local section = getSectionConfig(info[2], auraType, frameIndex, sectionIndex)
+							return section and section.hideOrigin or "none"
+						end,
+						set = function(info, value)
+							local auraType = info[#(info) - 4]
+							setSectionValue(info[2], auraType, frameIndex, sectionIndex, "hideOrigin", value ~= "none" and value or nil)
+						end,
+						disabled = sectionDisabled,
+					},
+					sortMethod = {
+						order = 1.5,
+						type = "select",
+						hidden = false,
+						name = L["Sort method"],
+						values = sortMethodValues,
+						get = function(info)
+							local auraType = info[#(info) - 4]
+							local section = getSectionConfig(info[2], auraType, frameIndex, sectionIndex)
+							return section and section.sortMethod or ""
+						end,
+						set = function(info, value)
+							local auraType = info[#(info) - 4]
+							setSectionValue(info[2], auraType, frameIndex, sectionIndex, "sortMethod", value ~= "" and value or nil)
+						end,
+						disabled = sectionDisabled,
+					},
+					maxCount = {
+						order = 4,
+						type = "range",
+						hidden = false,
+						name = L["Max icons"],
+						desc = L["0 removes the cap (uses the frame's rows and icons per row)."],
+						min = 0, max = 40, step = 1,
+						get = function(info)
+							local auraType = info[#(info) - 4]
+							local section = getSectionConfig(info[2], auraType, frameIndex, sectionIndex)
+							return section and section.maxCount or 0
+						end,
+						set = function(info, value)
+							local auraType = info[#(info) - 4]
+							setSectionValue(info[2], auraType, frameIndex, sectionIndex, "maxCount", value > 0 and value or nil)
+						end,
+						disabled = sectionDisabled,
+					},
+					moveUp = {
+						order = 6,
+						type = "execute",
+						name = L["Move up"],
+						width = "half",
+						hidden = function() return sectionIndex == 1 end,
+						func = function(info)
+							local auraType = info[#(info) - 4]
+							forEachAuraUnit(info[2], function(config)
+								local cfg = config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex]
+								if( cfg and cfg.sections and cfg.sections[sectionIndex] ) then
+									cfg.sections[sectionIndex - 1], cfg.sections[sectionIndex] = cfg.sections[sectionIndex], cfg.sections[sectionIndex - 1]
+								end
+							end)
+							reloadUnitAuras(info[2])
+						end,
+					},
+					moveDown = {
+						order = 7,
+						type = "execute",
+						name = L["Move down"],
+						width = "half",
+						hidden = function(info)
+							local auraType = info[#(info) - 4]
+							return not getSectionConfig(info[2], auraType, frameIndex, sectionIndex + 1)
+						end,
+						func = function(info)
+							local auraType = info[#(info) - 4]
+							forEachAuraUnit(info[2], function(config)
+								local cfg = config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex]
+								if( cfg and cfg.sections and cfg.sections[sectionIndex + 1] ) then
+									cfg.sections[sectionIndex], cfg.sections[sectionIndex + 1] = cfg.sections[sectionIndex + 1], cfg.sections[sectionIndex]
+								end
+							end)
+							reloadUnitAuras(info[2])
+						end,
+					},
+					delete = {
+						order = 8,
+						type = "execute",
+						hidden = false,
+						name = L["Delete"],
+						width = "half",
+						func = function(info)
+							local auraType = info[#(info) - 4]
+							forEachAuraUnit(info[2], function(config)
+								local cfg = config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex]
+								if( cfg and cfg.sections ) then
+									table.remove(cfg.sections, sectionIndex)
+								end
+							end)
+							reloadUnitAuras(info[2])
+						end,
+					},
+				},
+			}
+		end
+
+		local function textFieldGet(info)
+			local auraType = info[#(info) - 3]
+			local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+			return cfg and cfg[info[#(info)]]
+		end
+		local function textFieldSet(info, value)
+			local auraType = info[#(info) - 3]
+			setAuraFrameValue(info[2], auraType, frameIndex, info[#(info)], value)
+		end
+		local function frameDisabled(info)
+			local auraType = info[#(info) - 3]
+			local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+			return not (cfg and cfg.enabled)
+		end
+		local function textFieldDisabled(info)
+			local auraType = info[#(info) - 3]
+			local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+			return not (cfg and cfg.enabled and cfg.textOverride)
+		end
+		local function textAnchorGet(info)
+			local timer = info[#(info)] == "timerAnchor"
+			local globalKey = timer and "cooldownAnchor" or "stackAnchor"
+			return textFieldGet(info) or ShadowUF.db.profile.font[globalKey] or (timer and "CENTER" or "BOTTOMRIGHT")
+		end
+		local textArgs = {
+				textOverride = {
+					order = 0,
+					type = "toggle",
+					name = L["Override General text settings"],
+					desc = L["Use the text settings below instead of the ones from the General tab."],
+					width = "full",
+					get = function(info) return textFieldGet(info) and true or false end,
+					set = textFieldSet,
+					disabled = frameDisabled,
+				},
+				timerHeader = {
+					order = 0.1,
+					type = "header",
+					name = L["Timer"],
+				},
+				disableBlizzardCC = {
+					order = 0.5,
+					type = "toggle",
+					name = L["Disable Blizzard Cooldown Count"],
+					desc = L["Disables showing Cooldown Count timers in all Shadowed Unit Frame auras."],
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						if cfg and cfg.disableBlizzardCC ~= nil then return cfg.disableBlizzardCC end
+						return ShadowUF.db.profile.blizzardcc
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "disableBlizzardCC", value)
+					end,
+					disabled = textFieldDisabled,
+				},
+				cooldownFontSize = {
+					order = 2,
+					type = "range",
+					name = L["Size"],
+					min = 1, max = 50, step = 1, softMin = 1, softMax = 20,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						return cfg and cfg.cooldownFontSize or ShadowUF.db.profile.font.cooldownSize or ShadowUF.db.profile.font.size
+					end,
+					set = function(info, value)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "cooldownFontSize", value)
+					end,
+					disabled = textFieldDisabled,
+				},
+				cooldownFontColor = {
+					order = 4,
+					type = "color",
+					name = L["Default color"],
+					hasAlpha = true,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						local color = (cfg and cfg.cooldownFontColor) or ShadowUF.db.profile.font.cooldownColor
+						if color then
+							return color.r, color.g, color.b, color.a or 1
+						end
+						return 1, 1, 1, 1
+					end,
+					set = function(info, r, g, b, a)
+						local auraType = info[#(info) - 3]
+						local config = ShadowUF.db.profile.units[info[2]]
+						if config and config.auras and config.auras[auraType] and config.auras[auraType][frameIndex] then
+							config.auras[auraType][frameIndex].cooldownFontColor = {r = r, g = g, b = b, a = a}
+							reloadUnitAuras()
+						end
+					end,
+					disabled = textFieldDisabled,
+				},
+				timerAnchor = {
+					order = 5,
+					type = "select",
+					name = L["Anchor point"],
+					values = auraTextAnchorValues,
+					get = textAnchorGet,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				timerX = {
+					order = 6,
+					type = "range",
+					name = L["X Offset"],
+					min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+					get = function(info) return textFieldGet(info) or ShadowUF.db.profile.font.cooldownX or 0 end,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				timerY = {
+					order = 7,
+					type = "range",
+					name = L["Y Offset"],
+					min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+					get = function(info) return textFieldGet(info) or ShadowUF.db.profile.font.cooldownY or 0 end,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				stacksHeader = {
+					order = 8,
+					type = "header",
+					name = L["Stacks"],
+				},
+				disableStacks = {
+					order = 8.5,
+					type = "toggle",
+					name = L["Disable stack counts"],
+					desc = L["Hides the stack count text on all Shadowed Unit Frame auras."],
+					width = "full",
+					get = function(info)
+						local value = textFieldGet(info)
+						if( value == nil ) then value = ShadowUF.db.profile.auras.disableStacks end
+						return value
+					end,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				stackFontSize = {
+					order = 10,
+					type = "range",
+					name = L["Size"],
+					min = 1, max = 50, step = 1, softMin = 1, softMax = 20,
+					get = function(info) return textFieldGet(info) or ShadowUF.db.profile.font.stackSize or 10 end,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				stackFontColor = {
+					order = 12,
+					type = "color",
+					name = L["Default color"],
+					hasAlpha = true,
+					get = function(info)
+						local auraType = info[#(info) - 3]
+						local cfg = getAuraFrameConfig(info[2], auraType, frameIndex)
+						local color = (cfg and cfg.stackFontColor) or ShadowUF.db.profile.font.stackColor
+						if( color ) then return color.r, color.g, color.b, color.a or 1 end
+						return 1, 1, 1, 1
+					end,
+					set = function(info, r, g, b, a)
+						local auraType = info[#(info) - 3]
+						setAuraFrameValue(info[2], auraType, frameIndex, "stackFontColor", {r = r, g = g, b = b, a = a})
+					end,
+					disabled = textFieldDisabled,
+				},
+				stackAnchor = {
+					order = 17,
+					type = "select",
+					name = L["Anchor point"],
+					values = auraTextAnchorValues,
+					get = textAnchorGet,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				stackX = {
+					order = 18,
+					type = "range",
+					name = L["X Offset"],
+					min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+					get = function(info) return textFieldGet(info) or ShadowUF.db.profile.font.stackX or 0 end,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+				stackY = {
+					order = 19,
+					type = "range",
+					name = L["Y Offset"],
+					min = -100, max = 100, step = 1, softMin = -20, softMax = 20,
+					get = function(info) return textFieldGet(info) or ShadowUF.db.profile.font.stackY or 0 end,
+					set = textFieldSet,
+					disabled = textFieldDisabled,
+				},
+		}
+
+		return {type = "group", name = frameName, order = frameIndex, childGroups = "tab", args = {
+			general = {order = 1, type = "group", name = L["General"], args = frameArgs},
+			text = {order = 2, type = "group", name = L["Text"], args = textArgs},
+		}}
+	end
+
+	Config.auraTable = {
+		type = "group",
+		hidden = false,
+		name = function(info) return info[#(info)] == "buffs" and L["Buffs"] or L["Debuffs"] end,
+		order = function(info) return info[#(info)] == "buffs" and 1 or 2 end,
+		disabled = false,
+		args = {
+			frame1 = createAuraFrameOptions(1),
+			frame2 = createAuraFrameOptions(2),
+			frame3 = createAuraFrameOptions(3),
+			frame4 = createAuraFrameOptions(4),
+			frame5 = createAuraFrameOptions(5),
+			frame6 = createAuraFrameOptions(6),
+		}
+	}
+
+	-- Boss Debuffs (Private Auras) configuration
+	-- Uses Blizzard's secure AddPrivateAuraAnchor API for friendly units
+	local function getBossDebuffsCfg(info)
+		local unitCfg = ShadowUF.db.profile.units[info[2]]
+		return unitCfg and unitCfg.auras and unitCfg.auras.bossDebuffs
+	end
+
+	Config.bossDebuffsTable = {
+		type = "group",
+		name = L["Boss Debuffs"],
+		order = 3,
+		hidden = function(info)
+			-- Private auras only work with stable unit tokens (player, party, raid, maintank, mainassist)
+			local unit = info[2]
+			return unit ~= "player" and unit ~= "party" and unit ~= "raid" and unit ~= "maintank" and unit ~= "mainassist"
+		end,
+		args = {
+			description = {
+				order = 0,
+				type = "description",
+				name = L["Private auras from bosses and encounters displayed using Blizzard's secure API."],
+			},
+			enabled = {
+				order = 1,
+				type = "toggle",
+				name = L["Enable"],
+				width = "half",
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.enabled
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.enabled = value; ShadowUF.Layout:Reload() end
+				end,
+			},
+			anchorPoint = {
+				order = 2,
+				type = "select",
+				name = L["Position"],
+				values = function(info) return (info[2] == "player") and playerAuraAnchorList or auraAnchorList end,
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					local anchor = cfg and cfg.anchorPoint or "CENTER"
+					local isFree = (anchor == "FREE")
+					local halfW = isFree and math.floor(GetScreenWidth() / 2) or 100
+					local halfH = isFree and math.floor(GetScreenHeight() / 2) or 100
+					local args = Config.bossDebuffsTable.args
+					args.x.softMin = -halfW
+					args.x.softMax = halfW
+					args.y.softMin = -halfH
+					args.y.softMax = halfH
+					return anchor
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.anchorPoint = value; ShadowUF.Layout:Reload() end
+					local isFree = (value == "FREE")
+					local halfW = isFree and math.floor(GetScreenWidth() / 2) or 100
+					local halfH = isFree and math.floor(GetScreenHeight() / 2) or 100
+					local args = Config.bossDebuffsTable.args
+					args.x.softMin = -halfW
+					args.x.softMax = halfW
+					args.y.softMin = -halfH
+					args.y.softMax = halfH
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			size = {
+				order = 3,
+				type = "range",
+				name = L["Icon Size"],
+				min = 16, max = 64, step = 1,
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.size or 32
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.size = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			perRow = {
+				order = 4,
+				type = "range",
+				name = L["Per row"],
+				min = 1, max = 10, step = 1,
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.perRow or 3
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.perRow = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			maxRows = {
+				order = 5,
+				type = "range",
+				name = L["Max rows"],
+				min = 1, max = 5, step = 1,
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.maxRows or 1
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.maxRows = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			x = {
+				order = 6,
+				type = "range",
+				name = L["X Offset"],
+				min = -1000, max = 1000, step = 1, softMin = -100, softMax = 100,
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.x or 0
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.x = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			y = {
+				order = 7,
+				type = "range",
+				name = L["Y Offset"],
+				min = -1000, max = 1000, step = 1, softMin = -100, softMax = 100,
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.y or 0
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.y = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			showCooldown = {
+				order = 8,
+				type = "toggle",
+				name = L["Show cooldown"],
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.showCooldown ~= false
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.showCooldown = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+			showCooldownNumbers = {
+				order = 9,
+				type = "toggle",
+				name = L["Show cooldown numbers"],
+				get = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return cfg and cfg.showCooldownNumbers ~= false
+				end,
+				set = function(info, value)
+					local cfg = getBossDebuffsCfg(info)
+					if cfg then cfg.showCooldownNumbers = value; ShadowUF.Layout:Reload() end
+				end,
+				disabled = function(info)
+					local cfg = getBossDebuffsCfg(info)
+					return not (cfg and cfg.enabled)
+				end,
+			},
+		},
+	}
+
+	local function hideBarOption(info)
+		local module = info[#(info) - 1]
+		if( ShadowUF.modules[module].moduleHasBar or getVariable(info[2], module, nil, "isBar") ) then
+			return false
+		end
+
+		return true
+	end
+
+	local function disableIfCastName(info)
+		return not getVariable(info[2], "castBar", "name", "enabled")
+	end
+
+
+	Config.barTable = {
+		order = getModuleOrder,
+		name = getName,
+		type = "group",
+		inline = false,
+		hidden = function(info) return hideRestrictedOption(info) or not getVariable(info[2], info[#(info)], nil, "enabled") end,
+		args = {
+			enableBar = {
+				order = 1,
+				type = "toggle",
+				name = L["Show as bar"],
+				desc = L["Turns this widget into a bar that can be resized and ordered just like health and power bars."],
+				hidden = function(info) return ShadowUF.modules[info[#(info) - 1]].moduleHasBar end,
+				arg = "$parent.isBar",
+			},
+			sep1 = {order = 1.25, type = "description", name = "", hidden = function(info) return (info[#(info) - 1] ~= "burningEmbersBar" or not getVariable(info[2], info[#(info) - 1], nil, "backgroundColor") or not getVariable(info[2], info[#(info) - 1], nil, "background")) end},
+			background = {
+				order = 1.5,
+				type = "toggle",
+				name = L["Show background"],
+				desc = L["Show a background behind the bars with the same texture/color but faded out."],
+				hidden = hideBarOption,
+				arg = "$parent.background",
+			},
+			sep2 = {order = 1.55, type = "description", name = "", hidden = function(info) return not (not ShadowUF.modules[info[#(info) - 1]] or not ShadowUF.db.profile.advanced or ShadowUF.modules[info[#(info) - 1]].isComboPoints) end},
+			overrideBackground = {
+				order = 1.6,
+				type = "toggle",
+				name = L["Override background"],
+				desc = L["Show a background behind the bars with the same texture/color but faded out."],
+				disabled = function(info) return not getVariable(info[2], info[#(info) - 1], nil, "background") end,
+				hidden = function(info) return info[#(info) - 1] ~= "burningEmbersBar" end,
+				set = function(info, toggle)
+					if( toggle ) then
+						setVariable(info[2], info[#(info) - 1], nil, "backgroundColor", {r = 0, g = 0, b = 0, a = 0.70})
+					else
+						setVariable(info[2], info[#(info) - 1], nil, "backgroundColor", nil)
+					end
+				end,
+				get = function(info)
+					return not not getVariable(info[2], info[#(info) - 1], nil, "backgroundColor")
+				end
+			},
+			overrideColor = {
+				order = 1.65,
+				type = "color",
+				hasAlpha = true,
+				name = L["Background color"],
+				hidden = function(info) return info[#(info) - 1] ~= "burningEmbersBar" or not getVariable(info[2], info[#(info) - 1], nil, "backgroundColor") or not getVariable(info[2], info[#(info) - 1], nil, "background") end,
+				set = function(info, r, g, b, a)
+					local color = getUnit(info) or {}
+					color.r = r
+					color.g = g
+					color.b = b
+					color.a = a
+
+					setUnit(info, color)
+				end,
+				get = function(info)
+					local color = getUnit(info)
+					if( not color ) then
+						return 0, 0, 0, 1
+					end
+
+					return color.r, color.g, color.b, color.a
+
+				end,
+				arg = "$parent.backgroundColor",
+			},
+			vertical = {
+				order = 1.70,
+				type = "toggle",
+				name = L["Vertical growth"],
+				desc = L["Rather than bars filling from left -> right, they will fill from bottom -> top."],
+				arg = "$parent.vertical",
+				hidden = function(info) return not ShadowUF.db.profile.advanced or ShadowUF.modules[info[#(info) - 1]].isComboPoints end,
+			},
+			reverse = {
+				order = 1.71,
+				type = "toggle",
+				name = L["Reverse fill"],
+				desc = L["Will fill right -> left when using horizontal growth, or top -> bottom when using vertical growth."],
+				arg = "$parent.reverse",
+				hidden = function(info) return not ShadowUF.db.profile.advanced or ShadowUF.modules[info[#(info) - 1]].isComboPoints end,
+			},
+			invert = {
+				order = 2,
+				type = "toggle",
+				name = L["Invert colors"],
+				desc = L["Flips coloring so the bar color is shown as the background color and the background as the bar"],
+				hidden = function(info) return not ShadowUF.modules[info[#(info) - 1]] or not ShadowUF.db.profile.advanced or ShadowUF.modules[info[#(info) - 1]].isComboPoints end,
+				arg = "$parent.invert",
+			},
+			sep3 = {order = 3, type = "description", name = "", hidden = function(info) return not ShadowUF.modules[info[#(info) - 1]] or not ShadowUF.db.profile.advanced or ShadowUF.modules[info[#(info) - 1]].isComboPoints end,},
+			order = {
+				order = 4,
+				type = "range",
+				name = L["Order"],
+				min = 0, max = 100, step = 5,
+				hidden = hideBarOption,
+				arg = "$parent.order",
+			},
+			height = {
+				order = 5,
+				type = "range",
+				name = L["Height"],
+				desc = L["How much of the frames total height this bar should get, this is a weighted value, the higher it is the more it gets."],
+				min = 0, max = 10, step = 0.1,
+				hidden = hideBarOption,
+				arg = "$parent.height",
+			}
+		},
+	}
+
+	Config.indicatorTable = {
+		order = 0,
+		name = function(info)
+			if( info[#(info)] == "status" and info[2] == "player" ) then
+				return L["Combat/resting status"]
+			end
+
+			return getName(info)
+		end,
+		desc = function(info) return INDICATOR_DESC[info[#(info)]] end,
+		type = "group",
+		hidden = hideRestrictedOption,
+		args = {
+			enabled = {
+				order = 0,
+				type = "toggle",
+				name = L["Enable indicator"],
+				hidden = false,
+				arg = "indicators.$parent.enabled",
+			},
+			sep1 = {
+				order = 1,
+				type = "description",
+				name = "",
+				width = "full",
+				hidden = function() return not ShadowUF.db.profile.advanced end,
+			},
+			anchorPoint = {
+				order = 2,
+				type = "select",
+				name = L["Anchor point"],
+				values = positionList,
+				hidden = false,
+				arg = "indicators.$parent.anchorPoint",
+			},
+			size = {
+				order = 4,
+				type = "range",
+				name = L["Size"],
+				min = 1, max = 40, step = 1,
+				hidden = hideAdvancedOption,
+				arg = "indicators.$parent.size",
+			},
+			x = {
+				order = 5,
+				type = "range",
+				name = L["X Offset"],
+				min = -100, max = 100, step = 1, softMin = -50, softMax = 50,
+				hidden = false,
+				arg = "indicators.$parent.x",
+			},
+			y = {
+				order = 6,
+				type = "range",
+				name = L["Y Offset"],
+				min = -100, max = 100, step = 1, softMin = -50, softMax = 50,
+				hidden = false,
+				arg = "indicators.$parent.y",
+			},
+		},
+	}
+
+	Config.unitTable = {
+		type = "group",
+		childGroups = "tab",
+		order = getUnitOrder,
+		name = getName,
+		hidden = isUnitDisabled,
+		args = {
+			testMode = {
+				order = 0,
+				type = "toggle",
+				name = L["Test mode"],
+				desc = L["Shows placeholder auras on this unit's frames to preview positioning."],
+				width = "half",
+				hidden = isModifiersSet,
+				get = function(info)
+					local cfg = getAuraUnitConfig(info[2])
+					return cfg and cfg.auras and cfg.auras.testMode
+				end,
+				set = function(info, value)
+					-- Test mode swaps unit attributes on the frames, protected in combat
+					if( InCombatLockdown() ) then
+						ShadowUF:Print(L["Test mode cannot be toggled while in combat."])
+						return
+					end
+					forEachAuraUnit(info[2], function(cfg, unitType)
+						if( cfg and cfg.auras ) then
+							cfg.auras.testMode = value
+						end
+						if( unitType ~= "global" ) then
+							if( value ) then
+								ShadowUF.modules.movers:EnableTestMode(unitType)
+							else
+								ShadowUF.modules.movers:DisableTestMode(unitType)
+							end
+						end
+					end)
+				end,
+			},
+			general = {
+				order = 1,
+				name = L["General"],
+				type = "group",
+				hidden = isModifiersSet,
+				set = setUnit,
+				get = getUnit,
+				args = {
+					vehicle = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Vehicles"],
+						hidden = function(info) return info[2] ~= "player" and info[2] ~= "party" or not ShadowUF.db.profile.advanced end,
+						args = {
+							disable = {
+								order = 0,
+								type = "toggle",
+								name = L["Disable vehicle swap"],
+								desc = L["Disables the unit frame from turning into a vehicle when the player enters one."],
+								set = function(info, value)
+									setUnit(info, value)
+									local unit = info[2]
+									if( unit == "player" ) then
+										if( ShadowUF.Units.unitFrames.pet ) then
+											ShadowUF.Units.unitFrames.pet:SetAttribute("disableVehicleSwap", ShadowUF.db.profile.units[unit].disableVehicle)
+										end
+
+										if( ShadowUF.Units.unitFrames.player ) then
+											ShadowUF.Units:CheckVehicleStatus(ShadowUF.Units.unitFrames.player)
+										end
+									elseif( unit == "party" ) then
+										for frame in pairs(ShadowUF.Units.unitFrames) do
+											if( frame.unitType == "partypet" ) then
+												frame:SetAttribute("disableVehicleSwap", ShadowUF.db.profile.units[unit].disableVehicle)
+											elseif( frame.unitType == "party" ) then
+												ShadowUF.Units:CheckVehicleStatus(frame)
+											end
+										end
+									end
+								end,
+								arg = "disableVehicle",
+							},
+						},
+					},
+					portrait = {
+						order = 2,
+						type = "group",
+						inline = true,
+						hidden = false,
+						name = L["Portrait"],
+						args = {
+							portrait = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Portrait"]),
+								arg = "portrait.enabled",
+							},
+							portraitType = {
+								order = 1,
+								type = "select",
+								name = L["Portrait type"],
+								values = {["class"] = L["Class icon"], ["2D"] = L["2D"], ["3D"] = L["3D"]},
+								arg = "portrait.type",
+							},
+							alignment = {
+								order = 2,
+								type = "select",
+								name = L["Position"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								arg = "portrait.alignment",
+							},
+						},
+					},
+					fader = {
+						order = 3,
+						type = "group",
+						inline = true,
+						name = L["Combat fader"],
+						hidden = hideRestrictedOption,
+						args = {
+							fader = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Combat fader"]),
+								desc = L["Combat fader will fade out all your frames while they are inactive and fade them back in once you are in combat or active."],
+								hidden = false,
+								arg = "fader.enabled"
+							},
+							combatAlpha = {
+								order = 1,
+								type = "range",
+								name = L["Combat alpha"],
+								desc = L["Frame alpha while this unit is in combat."],
+								min = 0, max = 1.0, step = 0.1,
+								arg = "fader.combatAlpha",
+								hidden = false,
+								isPercent = true,
+							},
+							inactiveAlpha = {
+								order = 2,
+								type = "range",
+								name = L["Inactive alpha"],
+								desc = L["Frame alpha when you are out of combat while having no target and 100% mana or energy."],
+								min = 0, max = 1.0, step = 0.1,
+								arg = "fader.inactiveAlpha",
+								hidden = false,
+								isPercent = true,
+							},
+						}
+					},
+					range = {
+						order = 3,
+						type = "group",
+						inline = true,
+						name = L["Range indicator"],
+						hidden = hideRestrictedOption,
+						args = {
+							fader = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Range indicator"]),
+								desc = L["Fades out the unit frames of people who are not within range of you."],
+								arg = "range.enabled",
+								hidden = false,
+							},
+							inAlpha = {
+								order = 1,
+								type = "range",
+								name = L["In range alpha"],
+								desc = L["Frame alpha while this unit is in combat."],
+								min = 0, max = 1.0, step = 0.05,
+								arg = "range.inAlpha",
+								hidden = false,
+								isPercent = true,
+							},
+							oorAlpha = {
+								order = 2,
+								type = "range",
+								name = L["Out of range alpha"],
+								min = 0, max = 1.0, step = 0.05,
+								arg = "range.oorAlpha",
+								hidden = false,
+								isPercent = true,
+							},
+						}
+					},
+					highlight = {
+						order = 3.5,
+						type = "group",
+						inline = true,
+						name = L["Border highlighting"],
+						hidden = hideRestrictedOption,
+						args = {
+							mouseover = {
+								order = 3,
+								type = "toggle",
+								name = L["On mouseover"],
+								desc = L["Highlight units when you mouse over them."],
+								arg = "highlight.mouseover",
+								hidden = false,
+							},
+							attention = {
+								order = 4,
+								type = "toggle",
+								name = L["For target/focus"],
+								desc = L["Highlight units that you are targeting or have focused."],
+								arg = "highlight.attention",
+								hidden = function(info) return string.find(info[2], "target") or info[2] == "focus" end,
+							},
+							aggro = {
+								order = 5,
+								type = "toggle",
+								name = L["On aggro"],
+								desc = L["Highlight units that have aggro on any mob."],
+								arg = "highlight.aggro",
+								hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or info[2] == "battlegroundpet" or info[2] == "arenapet" or ShadowUF.fakeUnits[info[2]] end,
+							},
+							debuff = {
+								order = 6,
+								type = "select",
+								name = L["On curable debuff"],
+								desc = L["Highlight units that are debuffed with something you can cure."],
+								values = {[""] = L["Disabled"], ["PLAYER_DISPELLABLE"] = L["Dispellable by me"], ["RAID_PLAYER_DISPELLABLE"] = L["Dispellable by my group"], ["DISPELLABLE"] = L["Any dispellable"]},
+								arg = "highlight.debuff",
+								get = function(info)
+									local value = getUnit(info)
+									return type(value) == "string" and value or ""
+								end,
+								set = function(info, value)
+									setUnit(info, value ~= "" and value or false)
+								end,
+								hidden = function(info) return info[2] ~= "boss" and ( ShadowUF.Units.zoneUnits[info[2]] or info[2] == "battlegroundpet" or info[2] == "arenapet" or (ShadowUF.fakeUnits[info[2]] and info[2] ~= "targettarget") ) end,
+							},
+							raremob = {
+								order = 6.10,
+								type = "toggle",
+								name = L["On rare mobs"],
+								desc = L["Highlight units that are rare."],
+								arg = "highlight.rareMob",
+								hidden = function(info) return not (info[2] == "target" or info[2] == "focus" or info[2] == "targettarget" or info[3] == "focustarget") end,
+							},
+							elitemob = {
+								order = 6.15,
+								type = "toggle",
+								name = L["On elite mobs"],
+								desc = L["Highlight units that are "],
+								arg = "highlight.eliteMob",
+								hidden = function(info) return not (info[2] == "target" or info[2] == "focus" or info[2] == "targettarget" or info[3] == "focustarget") end,
+							},
+							sep = {
+								order = 6.5,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = function(info) return not (ShadowUF.Units.zoneUnits[info[2]] or info[2] == "battlegroundpet" or info[2] == "arenapet" or ShadowUF.fakeUnits[info[2]]) and not (info[2] == "target" or info[2] == "focus" or info[2] == "targettarget" or info[3] == "focustarget") end,
+							},
+							alpha = {
+								order = 7,
+								type = "range",
+								name = L["Border alpha"],
+								min = 0, max = 1, step = 0.05,
+								isPercent = true,
+								hidden = false,
+								arg = "highlight.alpha",
+							},
+							size = {
+								order = 8,
+								type = "range",
+								name = L["Border thickness"],
+								min = 0, max = 50, step = 1,
+								arg = "highlight.size",
+								hidden = false,
+							},
+						},
+					},
+					-- SOUL SHARDS
+					barSouls = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Soul Shards"],
+						hidden = function(info) return playerClass ~= "WARLOCK" or not getVariable(info[2], "soulShards", nil, "isBar") or not getVariable(info[2], nil, nil, "soulShards") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Soul Shards"]),
+								hidden = false,
+								arg = "soulShards.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "soulShards.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "soulShards.showAlways",
+							},
+						},
+					},
+					soulShards = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Soul Shards"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "soulShards", nil, "isBar") ) then return true end return hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Soul Shards"]),
+								hidden = false,
+								arg = "soulShards.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "soulShards.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "soulShards.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "soulShards.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "soulShards.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "soulShards.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "soulShards.y",
+							},
+						},
+					},
+					-- ARCANE CHARGES
+					barArcane = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Arcane Charges"],
+						hidden = function(info) return playerClass ~= "MAGE" or not getVariable(info[2], "arcaneCharges", nil, "isBar") or not getVariable(info[2], nil, nil, "arcaneCharges") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Arcane Charges"]),
+								hidden = false,
+								arg = "arcaneCharges.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "arcaneCharges.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "arcaneCharges.showAlways",
+							},
+						},
+					},
+					arcaneCharges = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Arcane Charges"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "arcaneCharges", nil, "isBar") ) then return true end return hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Arcane Charges"]),
+								hidden = false,
+								arg = "arcaneCharges.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "arcaneCharges.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "arcaneCharges.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "arcaneCharges.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "arcaneCharges.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "arcaneCharges.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "arcaneCharges.y",
+							},
+						},
+					},
+					-- HOLY POWER
+					barHolyPower = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Holy Power"],
+						hidden = function(info) return playerClass ~= "PALADIN" or not getVariable(info[2], "holyPower", nil, "isBar") or not getVariable(info[2], nil, nil, "holyPower") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Holy Power"]),
+								hidden = false,
+								arg = "holyPower.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "holyPower.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "holyPower.showAlways",
+							},
+						},
+					},
+					holyPower = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Holy Power"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "holyPower", nil, "isBar") ) then return true end return hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Holy Power"]),
+								hidden = false,
+								arg = "holyPower.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "holyPower.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "holyPower.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "holyPower.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "holyPower.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "holyPower.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "holyPower.y",
+							},
+						},
+					},
+					-- SHADOW ORBS
+					barShadowOrbs = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Shadow Orbs"],
+						hidden = function(info) return playerClass ~= "PRIEST" or not getVariable(info[2], "shadowOrbs", nil, "isBar") or not getVariable(info[2], nil, nil, "shadowOrbs") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Shadow Orbs"]),
+								hidden = false,
+								arg = "shadowOrbs.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "shadowOrbs.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "shadowOrbs.showAlways",
+							},
+						},
+					},
+					shadowOrbs = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Holy Power"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "shadowOrbs", nil, "isBar") ) then return true end return hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Shadow Orbs"]),
+								hidden = false,
+								arg = "shadowOrbs.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "shadowOrbs.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "shadowOrbs.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "shadowOrbs.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "shadowOrbs.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "shadowOrbs.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "shadowOrbs.y",
+							},
+						},
+					},
+					-- Chi
+					barChi = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Chi"],
+						hidden = function(info) return playerClass ~= "MONK" or not getVariable(info[2], "chi", nil, "isBar") or not getVariable(info[2], nil, nil, "chi") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Chi"]),
+								hidden = false,
+								arg = "chi.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "chi.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "chi.showAlways",
+							},
+						},
+					},
+					chi = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Chi"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "chi", nil, "isBar") ) then return true end return hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Chi"]),
+								hidden = false,
+								arg = "chi.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "chi.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "chi.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "chi.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "chi.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "chi.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "chi.y",
+							},
+						},
+					},
+					-- COMBO POINTS
+					barComboPoints = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Combo points"],
+						hidden = function(info) return not getVariable(info[2], "comboPoints", nil, "isBar") or not getVariable(info[2], nil, nil, "comboPoints") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Combo points"]),
+								hidden = false,
+								arg = "comboPoints.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "comboPoints.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "comboPoints.showAlways",
+							},
+						},
+					},
+					comboPoints = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Combo points"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "comboPoints", nil, "isBar") ) then return true end return hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Combo points"]),
+								hidden = false,
+								arg = "comboPoints.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "comboPoints.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "comboPoints.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "comboPoints.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "comboPoints.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "comboPoints.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "comboPoints.y",
+							},
+						},
+					},
+					-- COMBO POINTS
+					barAuraPoints = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Aura Combo Points"],
+						hidden = function(info) return not ShadowUF.modules.auraPoints or not getVariable(info[2], "auraPoints", nil, "isBar") or not getVariable(info[2], nil, nil, "auraPoints") end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Aura Combo Points"]),
+								hidden = false,
+								arg = "auraPoints.enabled",
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"]},
+								hidden = false,
+								arg = "auraPoints.growth",
+							},
+							showAlways = {
+								order = 3,
+								type = "toggle",
+								name = L["Don't hide when empty"],
+								hidden = false,
+								arg = "auraPoints.showAlways",
+							},
+						},
+					},
+					auraPoints = {
+						order = 4,
+						type = "group",
+						inline = true,
+						name = L["Aura Combo Points"],
+						hidden = function(info) if( info[2] == "global" or getVariable(info[2], "auraPoints", nil, "isBar") ) then return true end return not ShadowUF.modules.auraPoints or hideRestrictedOption(info) end,
+						args = {
+							enabled = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Aura Combo Points"]),
+								hidden = false,
+								arg = "auraPoints.enabled",
+							},
+							sep1 = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							growth = {
+								order = 2,
+								type = "select",
+								name = L["Growth"],
+								values = {["UP"] = L["Up"], ["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["DOWN"] = L["Down"]},
+								hidden = false,
+								arg = "auraPoints.growth",
+							},
+							size = {
+								order = 2,
+								type = "range",
+								name = L["Size"],
+								min = 0, max = 50, step = 1, softMin = 0, softMax = 20,
+								hidden = hideAdvancedOption,
+								arg = "auraPoints.size",
+							},
+							spacing = {
+								order = 3,
+								type = "range",
+								name = L["Spacing"],
+								min = -30, max = 30, step = 1, softMin = -15, softMax = 15,
+								hidden = hideAdvancedOption,
+								arg = "auraPoints.spacing",
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								arg = "auraPoints.anchorPoint",
+							},
+							x = {
+								order = 6,
+								type = "range",
+								name = L["X Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "auraPoints.x",
+							},
+							y = {
+								order = 7,
+								type = "range",
+								name = L["Y Offset"],
+								min = -30, max = 30, step = 1,
+								hidden = false,
+								arg = "auraPoints.y",
+							},
+						},
+					},
+					combatText = {
+						order = 5,
+						type = "group",
+						inline = true,
+						name = L["Combat text"],
+						hidden = hideRestrictedOption,
+						args = {
+							combatText = {
+								order = 0,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Combat text"]),
+								desc = L["Shows combat feedback, last healing the unit received, last hit did it miss, resist, dodged and so on."],
+								arg = "combatText.enabled",
+								hidden = false,
+							},
+							sep = {
+								order = 1,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = hideAdvancedOption,
+							},
+							anchorPoint = {
+								order = 3,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								arg = "combatText.anchorPoint",
+								hidden = hideAdvancedOption,
+							},
+							x = {
+								order = 4,
+								type = "range",
+								name = L["X Offset"],
+								min = -50, max = 50, step = 1,
+								arg = "combatText.x",
+								hidden = hideAdvancedOption,
+							},
+							y = {
+								order = 5,
+								type = "range",
+								name = L["Y Offset"],
+								min = -50, max = 50, step = 1,
+								arg = "combatText.y",
+								hidden = hideAdvancedOption,
+							},
+						},
+					},
+				},
+			},
+			attributes = {
+				order = 1.5,
+				type = "group",
+				name = function(info)
+					return L.shortUnits[info[#(info) - 1]] or L.units[info[#(info) - 1]]
+				end,
+				hidden = function(info)
+					local unit = info[#(info) - 1]
+					return unit ~= "raid" and unit ~= "raidpet" and unit ~= "party" and unit ~= "mainassist" and unit ~= "maintank" and not ShadowUF.Units.zoneUnits[unit]
+				end,
+				set = function(info, value)
+					setUnit(info, value)
+
+					ShadowUF.Units:ReloadHeader(info[2])
+					ShadowUF.modules.movers:Update()
+				end,
+				get = getUnit,
+				args = {
+					show = {
+						order = 0.5,
+						type = "group",
+						inline = true,
+						name = L["Visibility"],
+						hidden = function(info) return info[2] ~= "party" and info[2] ~= "raid" end,
+						args = {
+							showPlayer = {
+								order = 0,
+								type = "toggle",
+								name = L["Show player in party"],
+								desc = L["The player frame will not be hidden regardless, you will have to manually disable it either entirely or per zone type."],
+								hidden = function(info) return info[2] ~= "party" end,
+								arg = "showPlayer",
+							},
+							hideSemiRaidParty = {
+								order = 1,
+								type = "toggle",
+								name = L["Hide in >5-man raids"],
+								desc = L["Party frames are hidden while in a raid group with more than 5 people inside."],
+								hidden = function(info) return info[2] ~= "party" end,
+								set = function(info, value)
+									if( value ) then
+										setVariable(info[2], nil, nil, "hideAnyRaid", false)
+									end
+
+									setVariable(info[2], nil, nil, "hideSemiRaid", value)
+									ShadowUF.Units:ReloadHeader(info[#(info) - 3])
+								end,
+								arg = "hideSemiRaid",
+							},
+							hideRaid = {
+								order = 2,
+								type = "toggle",
+								name = L["Hide in any raid"],
+								desc = L["Party frames are hidden while in any sort of raid no matter how many people."],
+								hidden = function(info) return info[2] ~= "party" end,
+								set = function(info, value)
+									if( value ) then
+										setVariable(info[2], nil, nil, "hideSemiRaid", false)
+									end
+
+									setVariable(info[2], nil, nil, "hideAnyRaid", value)
+									ShadowUF.Units:ReloadHeader(info[#(info) - 3])
+								end,
+								arg = "hideAnyRaid",
+							},
+							separateFrames = {
+								order = 3,
+								type = "toggle",
+								name = L["Separate raid frames"],
+								desc = L["Splits raid frames into individual frames for each raid group instead of one single frame.|nNOTE! You cannot drag each group frame individualy, but how they grow is set through the column and row growth options."],
+								hidden = function(info) return info[2] ~= "raid" end,
+								arg = "frameSplit",
+							},
+							hideSemiRaidRaid = {
+								order = 3.5,
+								type = "toggle",
+								name = L["Hide in <=5-man raids"],
+								desc = L["Raid frames are hidden while in a raid group with 5 or less people inside."],
+								hidden = function(info) return info[2] ~= "raid" end,
+								set = function(info, value)
+									setVariable(info[2], nil, nil, "hideSemiRaid", value)
+									ShadowUF.Units:ReloadHeader(info[#(info) - 3])
+								end,
+								arg = "hideSemiRaid"
+							},
+							showInRaid = {
+								order = 4,
+								type = "toggle",
+								name = L["Show party as raid"],
+								hidden = hideRaidOption,
+								set = function(info, value)
+									setUnit(info, value)
+
+									ShadowUF.Units:ReloadHeader("party")
+									ShadowUF.Units:ReloadHeader("raid")
+									ShadowUF.modules.movers:Update()
+								end,
+								arg = "showParty",
+							},
+						},
+					},
+					general = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["General"],
+						hidden = false,
+						args = {
+							offset = {
+								order = 2,
+								type = "range",
+								name = L["Row offset"],
+								desc = L["Spacing between each row"],
+								min = -10, max = 100, step = 1,
+								arg = "offset",
+							},
+							attribPoint = {
+								order = 3,
+								type = "select",
+								name = L["Row growth"],
+								desc = L["How the rows should grow when new group members are added."],
+								values = {["TOP"] = L["Down"], ["BOTTOM"] = L["Up"], ["LEFT"] = L["Right"], ["RIGHT"] = L["Left"]},
+								arg = "attribPoint",
+								set = function(info, value)
+									-- If you set the frames to grow left, the columns have to grow down or up as well
+									local attribAnchorPoint = getVariable(info[2], nil, nil, "attribAnchorPoint")
+									if( ( value == "LEFT" or value == "RIGHT" ) and attribAnchorPoint ~= "BOTTOM" and attribAnchorPoint ~= "TOP" ) then
+										ShadowUF.db.profile.units[info[2]].attribAnchorPoint = "BOTTOM"
+									elseif( ( value == "TOP" or value == "BOTTOM" ) and attribAnchorPoint ~= "LEFT" and attribAnchorPoint ~= "RIGHT" ) then
+										ShadowUF.db.profile.units[info[2]].attribAnchorPoint = "RIGHT"
+									end
+
+									setUnit(info, value)
+
+									local position = ShadowUF.db.profile.positions[info[2]]
+									if( position.top and position.bottom ) then
+										local point = ShadowUF.db.profile.units[info[2]].attribAnchorPoint == "RIGHT" and "RIGHT" or "LEFT"
+										position.point = (ShadowUF.db.profile.units[info[2]].attribPoint == "BOTTOM" and "BOTTOM" or "TOP") .. point
+										position.y = ShadowUF.db.profile.units[info[2]].attribPoint == "BOTTOM" and position.bottom or position.top
+									end
+
+									ShadowUF.Units:ReloadHeader(info[2])
+									ShadowUF.modules.movers:Update()
+								end,
+							},
+							sep2 = {
+								order = 4,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = false,
+							},
+							columnSpacing = {
+								order = 5,
+								type = "range",
+								name = L["Column spacing"],
+								min = -30, max = 100, step = 1,
+								hidden = hideRaidOrAdvancedOption,
+								arg = "columnSpacing",
+							},
+							attribAnchorPoint = {
+								order = 6,
+								type = "select",
+								name = L["Column growth"],
+								desc = L["How the frames should grow when a new column is added."],
+								values = function(info)
+									local attribPoint = getVariable(info[2], nil, nil, "attribPoint")
+									if( attribPoint == "LEFT" or attribPoint == "RIGHT" ) then
+										return {["TOP"] = L["Down"], ["BOTTOM"] = L["Up"]}
+									end
+
+									return {["LEFT"] = L["Right"], ["RIGHT"] = L["Left"]}
+								end,
+								hidden = hideRaidOrAdvancedOption,
+								set = function(info, value)
+									-- If you set the frames to grow left, the columns have to grow down or up as well
+									local attribPoint = getVariable(info[2], nil, nil, "attribPoint")
+									if( ( value == "LEFT" or value == "RIGHT" ) and attribPoint ~= "BOTTOM" and attribPoint ~= "TOP" ) then
+										ShadowUF.db.profile.units[info[2]].attribPoint = "BOTTOM"
+									end
+
+									setUnit(info, value)
+
+									ShadowUF.Units:ReloadHeader(info[2])
+									ShadowUF.modules.movers:Update()
+								end,
+								arg = "attribAnchorPoint",
+							},
+							sep3 = {
+								order = 7,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = false,
+							},
+							maxColumns = {
+								order = 8,
+								type = "range",
+								name = L["Max columns"],
+								min = 1, max = 20, step = 1,
+								arg = "maxColumns",
+								hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or hideSplitOrRaidOption(info) end,
+							},
+							unitsPerColumn = {
+								order = 8,
+								type = "range",
+								name = L["Units per column"],
+								min = 1, max = 40, step = 1,
+								arg = "unitsPerColumn",
+								hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or hideSplitOrRaidOption(info) end,
+							},
+							partyPerColumn = {
+								order = 9,
+								type = "range",
+								name = L["Units per column"],
+								min = 1, max = 5, step = 1,
+								arg = "unitsPerColumn",
+								hidden = function(info) return info[2] ~= "party" or not ShadowUF.db.profile.advanced end,
+							},
+							groupsPerRow = {
+								order = 8,
+								type = "range",
+								name = L["Groups per row"],
+								desc = L["How many groups should be shown per row."],
+								min = 1, max = 8, step = 1,
+								arg = "groupsPerRow",
+								hidden = function(info) return info[2] ~= "raid" or not ShadowUF.db.profile.units.raid.frameSplit end,
+							},
+							groupSpacing = {
+								order = 9,
+								type = "range",
+								name = L["Group row spacing"],
+								desc = L["How much spacing should be between each new row of groups."],
+								min = -50, max = 50, step = 1,
+								arg = "groupSpacing",
+								hidden = function(info) return info[2] ~= "raid" or not ShadowUF.db.profile.units.raid.frameSplit end,
+							},
+						},
+					},
+					sort = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["Sorting"],
+						hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or ( info[2] ~= "raid" and not ShadowUF.db.profile.advanced ) end,
+						args = {
+							sortMethod = {
+								order = 2,
+								type = "select",
+								name = L["Sort method"],
+								values = {["INDEX"] = L["Index"], ["NAME"] = L["Name"]},
+								arg = "sortMethod",
+								hidden = false,
+							},
+							sortOrder = {
+								order = 2,
+								type = "select",
+								name = L["Sort order"],
+								values = {["ASC"] = L["Ascending"], ["DESC"] = L["Descending"]},
+								arg = "sortOrder",
+								hidden = false,
+							},
+						},
+					},
+					raid = {
+						order = 3,
+						type = "group",
+						inline = true,
+						name = L["Groups"],
+						hidden = hideRaidOption,
+						args = {
+							groupBy = {
+								order = 4,
+								type = "select",
+								name = L["Group by"],
+								values = {["GROUP"] = L["Group number"], ["CLASS"] = L["Class"], ["ASSIGNEDROLE"] = L["Assigned Role (DPS/Tank/etc)"]},
+								arg = "groupBy",
+								hidden = hideSplitOrRaidOption,
+							},
+							selectedGroups = {
+								order = 7,
+								type = "multiselect",
+								name = L["Groups to show"],
+								values = {string.format(L["Group %d"], 1), string.format(L["Group %d"], 2), string.format(L["Group %d"], 3), string.format(L["Group %d"], 4), string.format(L["Group %d"], 5), string.format(L["Group %d"], 6), string.format(L["Group %d"], 7), string.format(L["Group %d"], 8)},
+								set = function(info, key, value)
+									local tbl = getVariable(info[2], nil, nil, "filters")
+									tbl[key] = value
+
+									setVariable(info[2], "filters", nil, tbl)
+									ShadowUF.Units:ReloadHeader(info[2])
+									ShadowUF.modules.movers:Update()
+								end,
+								get = function(info, key)
+									return getVariable(info[2], nil, nil, "filters")[key]
+								end,
+								hidden = function(info) return info[2] ~= "raid" and info[2] ~= "raidpet" end,
+							},
+						},
+					},
+				},
+			},
+			frame = {
+				order = 2,
+				name = L["Frame"],
+				type = "group",
+				hidden = isModifiersSet,
+				set = setUnit,
+				get = getUnit,
+				args = {
+					size = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Size"],
+						hidden = false,
+						set = function(info, value)
+							setUnit(info, value)
+							ShadowUF.modules.movers:Update()
+						end,
+						args = {
+							scale = {
+								order = 0,
+								type = "range",
+								name = L["Scale"],
+								min = 0.25, max = 2, step = 0.01,
+								isPercent = true,
+								arg = "scale",
+							},
+							height = {
+								order = 1,
+								type = "range",
+								name = L["Height"],
+								min = 0, softMax = 100, step = 1,
+								arg = "height",
+							},
+							width = {
+								order = 2,
+								type = "range",
+								name = L["Width"],
+								min = 0, softMax = 300, step = 1,
+								arg = "width",
+							},
+						},
+					},
+					anchor = {
+						order = 1,
+						type = "group",
+						inline = true,
+						hidden = function(info) return info[2] == "global" end,
+						name = L["Anchor to another frame"],
+						set = setPosition,
+						get = getPosition,
+						args = {
+							anchorPoint = {
+								order = 0.50,
+								type = "select",
+								name = L["Anchor point"],
+								values = positionList,
+								hidden = false,
+								get = function(info)
+									local position = ShadowUF.db.profile.positions[info[2]]
+									if( ShadowUF.db.profile.advanced ) then
+										return position[info[#(info)]]
+									end
+
+
+									return position.movedAnchor or position[info[#(info)]]
+								end,
+							},
+							anchorTo = {
+								order = 1,
+								type = "select",
+								name = L["Anchor to"],
+								values = getAnchorParents,
+								hidden = false,
+							},
+							sep = {
+								order = 2,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = false,
+							},
+							x = {
+								order = 3,
+								type = "input",
+								name = L["X Offset"],
+								validate = checkNumber,
+								set = setNumber,
+								get = getString,
+								hidden = false,
+							},
+							y = {
+								order = 4,
+								type = "input",
+								name = L["Y Offset"],
+								validate = checkNumber,
+								set = setNumber,
+								get = getString,
+								hidden = false,
+							},
+						},
+					},
+					orHeader = {
+						order = 1.5,
+						type = "header",
+						name = L["Or you can set a position manually"],
+						hidden = function(info) if( info[2] == "global" or hideAdvancedOption() ) then return true else return false end end,
+					},
+					position = {
+						order = 2,
+						type = "group",
+						hidden = function(info) if( info[2] == "global" or hideAdvancedOption() ) then return true else return false end end,
+						inline = true,
+						name = L["Manual position"],
+						set = setPosition,
+						get = getPosition,
+						args = {
+							point = {
+								order = 0,
+								type = "select",
+								name = L["Point"],
+								values = pointPositions,
+								hidden = false,
+							},
+							anchorTo = {
+								order = 0.50,
+								type = "select",
+								name = L["Anchor to"],
+								values = getAnchorParents,
+								hidden = false,
+							},
+							relativePoint = {
+								order = 1,
+								type = "select",
+								name = L["Relative point"],
+								values = pointPositions,
+								hidden = false,
+							},
+							sep = {
+								order = 2,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = false,
+							},
+							x = {
+								order = 3,
+								type = "input",
+								name = L["X Offset"],
+								validate = checkNumber,
+								set = setNumber,
+								get = getString,
+								hidden = false,
+							},
+							y = {
+								order = 4,
+								type = "input",
+								name = L["Y Offset"],
+								validate = checkNumber,
+								set = setNumber,
+								get = getString,
+								hidden = false,
+							},
+						},
+					},
+				},
+			},
+			bars = {
+				order = 3,
+				name = L["Bars"],
+				type = "group",
+				hidden = isModifiersSet,
+				set = setUnit,
+				get = getUnit,
+				args = {
+					powerbar = {
+						order = 1,
+						type = "group",
+						inline = false,
+						name = L["Power bar"],
+						hidden = false,
+						args = {
+							powerBar = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Power bar"]),
+								arg = "powerBar.enabled",
+							},
+							altPowerBar = {
+								order = 3,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Alt. Power bar"]),
+								desc = L["Shows a bar for alternate power info (used in some encounters)"],
+								hidden = function(info) return ShadowUF.fakeUnits[info[2]] or hideRestrictedOption(info) end,
+								arg = "altPowerBar.enabled",
+							},
+							colorType = {
+								order = 5,
+								type = "select",
+								name = L["Color power by"],
+								desc = L["Primary means of coloring the power bar. Coloring by class only applies to players, for non-players it will default to the power type."],
+								values = {["class"] = L["Class"], ["type"] = L["Power Type"]},
+								arg = "powerBar.colorType",
+							},
+							onlyMana = {
+								order = 6,
+								type = "toggle",
+								name = L["Only show when mana"],
+								desc = L["Hides the power bar unless the class has mana."],
+								hidden = function(info) return not ShadowUF.Units.headerUnits[info[2]] end,
+								arg = "powerBar.onlyMana",
+							}
+						},
+					},
+					classmiscbars = {
+						order = 2,
+						type = "group",
+						inline = false,
+						name = L["Class/misc bars"],
+						hidden = function(info)
+							local unit = info[2]
+							if( unit == "global" ) then
+								return not globalConfig.runeBar and not globalConfig.totemBar and not globalConfig.druidBar and not globalConfig.priestBar and not globalConfig.shamanBar and not globalConfig.xpBar and not globalConfig.staggerBar and not globalConfig.essence
+							else
+								return unit ~= "player" and unit ~= "pet"
+							end
+						end,
+						args = {
+							runeBar = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Rune bar"]),
+								desc = L["Adds rune bars and timers before runes refresh to the player frame."],
+								hidden = hideRestrictedOption,
+								arg = "runeBar.enabled",
+							},
+							essence = {
+								order = 1.1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Essence"]),
+								desc = L["Adds an Essence bar for Evokers."],
+								hidden = hideRestrictedOption,
+								arg = "essence.enabled",
+							},
+							staggerBar = {
+								order = 1.25,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Stagger bar"]),
+								desc = L["Adds a Stagger bar for Brewmaster Monks."],
+								hidden = hideRestrictedOption,
+								arg = "staggerBar.enabled",
+							},
+							druidBar = {
+								order = 3,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Druid mana bar"]),
+								desc = L["Adds another mana bar to the player frame when you are in Bear or Cat form showing you how much mana you have."],
+								hidden = hideRestrictedOption,
+								arg = "druidBar.enabled",
+							},
+							priestBar = {
+								order = 3,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Priest mana bar"]),
+								desc = L["Adds a mana bar to the player frame for shadow priests."],
+								hidden = hideRestrictedOption,
+								arg = "priestBar.enabled",
+							},
+							shamanBar = {
+								order = 3,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Shaman mana bar"]),
+								desc = L["Adds a mana bar to the player frame for elemental and enhancement shamans."],
+								hidden = hideRestrictedOption,
+								arg = "shamanBar.enabled",
+							},
+							xpBar = {
+								order = 4,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["XP/Rep bar"]),
+								desc = L["This bar will automatically hide when you are at the level cap, or you do not have any reputations tracked."],
+								hidden = hideRestrictedOption,
+								arg = "xpBar.enabled",
+							},
+						},
+					},
+					healthBar = {
+						order = 2,
+						type = "group",
+						inline = false,
+						name = L["Health bar"],
+						hidden = false,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Health bar"]),
+								arg = "healthBar.enabled"
+							},
+							sep = {
+								order = 3.5,
+								type = "description",
+								name = "",
+								hidden = function(info) return not (info[2] == "player" or info[2] == "pet") end,
+							},
+							colorAggro = {
+								order = 4,
+								type = "toggle",
+								name = L["Color on aggro"],
+								desc = L["Changes the health bar to the set hostile color (Red by default) when the unit takes aggro."],
+								arg = "healthBar.colorAggro",
+								hidden = hideRestrictedOption,
+							},
+							colorDispel = {
+								order = 5,
+								type = "select",
+								name = L["Color on curable debuff"],
+								desc = L["Changes the health bar to the color of any curable debuff."],
+								values = {[""] = L["Disabled"], ["PLAYER_DISPELLABLE"] = L["Dispellable by me"], ["RAID_PLAYER_DISPELLABLE"] = L["Dispellable by my group"], ["DISPELLABLE"] = L["Any dispellable"]},
+								arg = "healthBar.colorDispel",
+								get = function(info)
+									local value = getUnit(info)
+									return type(value) == "string" and value or ""
+								end,
+								set = function(info, value)
+									setUnit(info, value ~= "" and value or false)
+								end,
+								hidden = hideRestrictedOption,
+								width = "full",
+							},
+							healthColor = {
+								order = 6,
+								type = "select",
+								name = L["Color health by"],
+								desc = L["Primary means of coloring the health bar, color on aggro and color by reaction will override this if necessary."],
+								values = function(info)
+											if info[2] == "pet" or info[2] == "partypet" or info[2] == "raidpet" or info[2] == "arenapet" then
+												return {["class"] = L["Class"], ["static"] = L["Static"], ["percent"] = L["Health percent"], ["playerclass"] = L["Player Class"]}
+											else
+												return {["class"] = L["Class"], ["static"] = L["Static"], ["percent"] = L["Health percent"]}
+											end
+										end,
+								arg = "healthBar.colorType",
+							},
+							reaction = {
+								order = 7,
+								type = "select",
+								name = L["Color by reaction on"],
+								desc = L["When to color the health bar by the units reaction, overriding the color health by option."],
+								arg = "healthBar.reactionType",
+								values = {["none"] = L["Never (Disabled)"], ["player"] = L["Players only"], ["npc"] = L["NPCs only"], ["both"] = L["Both"]},
+								hidden = function(info) return info[2] == "player" or info[2] == "pet" end,
+							}
+						},
+					},
+					healAbsorb = {
+						order = 2.5,
+						type = "group",
+						inline = false,
+						name = L["Heal absorbs"],
+						hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or hideRestrictedOption(info) end,
+						disabled = function(info) return not getVariable(info[2], "healthBar", nil, "enabled") end,
+						args = {
+								heals = {
+									order = 1,
+									type = "toggle",
+									name = L["Show Heal Absorbs"],
+									desc = L["Adds a bar inside the health bar indicating how much healing will be absorbed and not applied to the player."],
+									arg = "healAbsorb.enabled",
+									hidden = false,
+									set = function(info, value)
+										setUnit(info, value)
+										setDirectUnit(info[2], "healAbsorb", nil, "enabled", getVariable(info[2], "healAbsorb", nil, "enabled"))
+									end
+								},
+								anchorMode = {
+									order = 2,
+									type = "select",
+									name = L["Anchor mode"],
+									width = "full",
+									desc = function(info)
+										local mode = getVariable(info[2], "healAbsorb", nil, "anchorMode") or "healthBar"
+										local descs = {
+											healthBar = L["Bar anchored to the end of the health bar, growing outward (uses overflow limit)."],
+											frame = L["Bar anchored to the frame edge, growing inward with reverse fill."],
+											overlay = L["Bar overlaid on the health bar with reverse fill, growing inward from the health fill edge."],
+											healthBarOverflow = L["Bar fills missing health then overflows as reverse overlay on the health bar."],
+										}
+										return descs[mode] or ""
+									end,
+									values = {["healthBar"] = L["Health bar"], ["frame"] = L["Frame"], ["overlay"] = L["Health fill (reverse)"], ["healthBarOverflow"] = L["Health bar (fill + reverse overlay)"]},
+									arg = "healAbsorb.anchorMode",
+									hidden = false,
+								},
+								frameEdge = {
+									order = 2.5,
+									type = "select",
+									name = L["Bar anchor"],
+									values = function(info)
+										if( getVariable(info[2], "healthBar", nil, "vertical") ) then
+											return {["END"] = L["Top"], ["START"] = L["Bottom"]}
+										else
+											return {["END"] = L["Right"], ["START"] = L["Left"]}
+										end
+									end,
+									arg = "healAbsorb.frameEdge",
+									hidden = function(info) return getVariable(info[2], "healAbsorb", nil, "anchorMode") ~= "frame" end,
+								},
+								cap = {
+									order = 3,
+									type = "range",
+									name = L["Outside bar limit"],
+									desc = L["Percentage value of how far outside the unit frame the absorbed health bar can go. 130% means it will go 30% outside the frame, 100% means it will not go outside."],
+									min = 1, max = 1.50, step = 0.05, isPercent = true,
+									arg = "healAbsorb.cap",
+									hidden = function(info) return getVariable(info[2], "healAbsorb", nil, "anchorMode") ~= "healthBar" end,
+								},
+								barSize = {
+									order = 4,
+									type = "range",
+									name = L["Bar thickness"],
+									desc = L["Relative size of the bar perpendicular to the fill direction. 100% matches the health bar exactly."],
+									min = 0.1, max = 1.0, step = 0.05, isPercent = true,
+									arg = "healAbsorb.barSize",
+									hidden = false,
+								},
+								barAlign = {
+									order = 5,
+									type = "select",
+									name = L["Bar alignment"],
+									desc = L["Position of the bar when thickness is less than 100%."],
+									values = function(info)
+										if( getVariable(info[2], "healthBar", nil, "vertical") ) then
+											return {["START"] = L["Left"], ["CENTER"] = L["Center"], ["END"] = L["Right"]}
+										else
+											return {["START"] = L["Top"], ["CENTER"] = L["Center"], ["END"] = L["Bottom"]}
+										end
+									end,
+									arg = "healAbsorb.barAlign",
+									hidden = function(info) return (getVariable(info[2], "healAbsorb", nil, "barSize") or 1.0) >= 1.0 end,
+								},
+						},
+					},
+					incHeal = {
+						order = 3,
+						type = "group",
+						inline = false,
+						name = L["Incoming heals"],
+						hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or hideRestrictedOption(info) end,
+						disabled = function(info) return not getVariable(info[2], "healthBar", nil, "enabled") end,
+						args = {
+							heals = {
+								order = 1,
+								type = "toggle",
+								name = L["Show incoming heals"],
+								desc = L["Adds a bar inside the health bar indicating how much healing someone will receive."],
+								arg = "incHeal.enabled",
+								hidden = false,
+								set = function(info, value)
+									setUnit(info, value)
+									setDirectUnit(info[2], "incHeal", nil, "enabled", getVariable(info[2], "incHeal", nil, "enabled"))
+								end
+							},
+							anchorMode = {
+								order = 2,
+								type = "select",
+								name = L["Anchor mode"],
+								width = "full",
+								desc = function(info)
+									local mode = getVariable(info[2], "incHeal", nil, "anchorMode") or "healthBar"
+									local descs = {
+										healthBar = L["Bar anchored to the end of the health bar, growing outward (uses overflow limit)."],
+										frame = L["Bar anchored to the frame edge, growing inward with reverse fill."],
+										overlay = L["Bar overlaid on the health bar with reverse fill, growing inward from the health fill edge."],
+										healthBarOverflow = L["Bar fills missing health then overflows as reverse overlay on the health bar."],
+									}
+									return descs[mode] or ""
+								end,
+								values = {["healthBar"] = L["Health bar"], ["frame"] = L["Frame"], ["overlay"] = L["Health fill (reverse)"], ["healthBarOverflow"] = L["Health bar (fill + reverse overlay)"]},
+								arg = "incHeal.anchorMode",
+								hidden = false,
+							},
+							frameEdge = {
+								order = 2.5,
+								type = "select",
+								name = L["Bar anchor"],
+								values = function(info)
+									if( getVariable(info[2], "healthBar", nil, "vertical") ) then
+										return {["END"] = L["Top"], ["START"] = L["Bottom"]}
+									else
+										return {["END"] = L["Right"], ["START"] = L["Left"]}
+									end
+								end,
+								arg = "incHeal.frameEdge",
+								hidden = function(info) return getVariable(info[2], "incHeal", nil, "anchorMode") ~= "frame" end,
+							},
+							cap = {
+								order = 3,
+								type = "range",
+								name = L["Outside bar limit"],
+								desc = L["Percentage value of how far outside the unit frame the incoming heal bar can go. 130% means it will go 30% outside the frame, 100% means it will not go outside."],
+								min = 1, max = 1.50, step = 0.05, isPercent = true,
+								arg = "incHeal.cap",
+								hidden = function(info) return getVariable(info[2], "incHeal", nil, "anchorMode") ~= "healthBar" end,
+							},
+							barSize = {
+								order = 4,
+								type = "range",
+								name = L["Bar thickness"],
+								desc = L["Relative size of the bar perpendicular to the fill direction. 100% matches the health bar exactly."],
+								min = 0.1, max = 1.0, step = 0.05, isPercent = true,
+								arg = "incHeal.barSize",
+								hidden = false,
+							},
+							barAlign = {
+								order = 5,
+								type = "select",
+								name = L["Bar alignment"],
+								desc = L["Position of the bar when thickness is less than 100%."],
+								values = function(info)
+									if( getVariable(info[2], "healthBar", nil, "vertical") ) then
+										return {["START"] = L["Left"], ["CENTER"] = L["Center"], ["END"] = L["Right"]}
+									else
+										return {["START"] = L["Top"], ["CENTER"] = L["Center"], ["END"] = L["Bottom"]}
+									end
+								end,
+								arg = "incHeal.barAlign",
+								hidden = function(info) return (getVariable(info[2], "incHeal", nil, "barSize") or 1.0) >= 1.0 end,
+							},
+						},
+					},
+					incAbsorb = {
+						order = 3.5,
+						type = "group",
+						inline = false,
+						name = L["Incoming absorbs"],
+						hidden = function(info) return ShadowUF.Units.zoneUnits[info[2]] or hideRestrictedOption(info) end,
+						disabled = function(info) return not getVariable(info[2], "healthBar", nil, "enabled") end,
+						args = {
+							heals = {
+								order = 1,
+								type = "toggle",
+								name = L["Show incoming absorbs"],
+								desc = L["Adds a bar inside the health bar indicating how much damage will be absorbed."],
+								arg = "incAbsorb.enabled",
+								hidden = false,
+								set = function(info, value)
+									setUnit(info, value)
+									setDirectUnit(info[2], "incAbsorb", nil, "enabled", getVariable(info[2], "incAbsorb", nil, "enabled"))
+								end
+							},
+							anchorMode = {
+								order = 2,
+								type = "select",
+								name = L["Anchor mode"],
+								width = "full",
+								desc = function(info)
+									local mode = getVariable(info[2], "incAbsorb", nil, "anchorMode") or "healthBar"
+									local descs = {
+										healthBar = L["Bar anchored to the end of the health bar, growing outward (uses overflow limit)."],
+										frame = L["Bar anchored to the frame edge, growing inward with reverse fill."],
+										overlay = L["Bar overlaid on the health bar with reverse fill, growing inward from the health fill edge."],
+										healthBarOverflow = L["Bar fills missing health then overflows as reverse overlay on the health bar."],
+									}
+									return descs[mode] or ""
+								end,
+								values = {["healthBar"] = L["Health bar"], ["frame"] = L["Frame"], ["overlay"] = L["Health fill (reverse)"], ["healthBarOverflow"] = L["Health bar (fill + reverse overlay)"]},
+								arg = "incAbsorb.anchorMode",
+								hidden = false,
+							},
+							frameEdge = {
+								order = 2.5,
+								type = "select",
+								name = L["Bar anchor"],
+								values = function(info)
+									if( getVariable(info[2], "healthBar", nil, "vertical") ) then
+										return {["END"] = L["Top"], ["START"] = L["Bottom"]}
+									else
+										return {["END"] = L["Right"], ["START"] = L["Left"]}
+									end
+								end,
+								arg = "incAbsorb.frameEdge",
+								hidden = function(info) return getVariable(info[2], "incAbsorb", nil, "anchorMode") ~= "frame" end,
+							},
+							cap = {
+								order = 3,
+								type = "range",
+								name = L["Outside bar limit"],
+								desc = L["Percentage value of how far outside the unit frame the incoming absorb bar can go. 130% means it will go 30% outside the frame, 100% means it will not go outside."],
+								min = 1, max = 1.50, step = 0.05, isPercent = true,
+								arg = "incAbsorb.cap",
+								hidden = function(info) return getVariable(info[2], "incAbsorb", nil, "anchorMode") ~= "healthBar" end,
+							},
+							barSize = {
+								order = 4,
+								type = "range",
+								name = L["Bar thickness"],
+								desc = L["Relative size of the bar perpendicular to the fill direction. 100% matches the health bar exactly."],
+								min = 0.1, max = 1.0, step = 0.05, isPercent = true,
+								arg = "incAbsorb.barSize",
+								hidden = false,
+							},
+							barAlign = {
+								order = 5,
+								type = "select",
+								name = L["Bar alignment"],
+								desc = L["Position of the bar when thickness is less than 100%."],
+								values = function(info)
+									if( getVariable(info[2], "healthBar", nil, "vertical") ) then
+										return {["START"] = L["Left"], ["CENTER"] = L["Center"], ["END"] = L["Right"]}
+									else
+										return {["START"] = L["Top"], ["CENTER"] = L["Center"], ["END"] = L["Bottom"]}
+									end
+								end,
+								arg = "incAbsorb.barAlign",
+								hidden = function(info) return (getVariable(info[2], "incAbsorb", nil, "barSize") or 1.0) >= 1.0 end,
+							},
+						},
+					},
+					totemBar = {
+						order = 3.6,
+						type = "group",
+						inline = false,
+						name = ShadowUF.modules.totemBar and ShadowUF.modules.totemBar.moduleName or "",
+						hidden = function(info)
+							if( not ShadowUF.modules.totemBar ) then return true end
+							local unit = info[2]
+							if( unit == "global" ) then
+								return not globalConfig.totemBar
+							else
+								return unit ~= "player" and unit ~= "pet"
+							end
+						end,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], ShadowUF.modules.totemBar and ShadowUF.modules.totemBar.moduleName or ""),
+								desc = function(info)
+									return select(2, UnitClass("player")) == "SHAMAN" and L["Adds totem bars with timers before they expire to the player frame."] or L["Adds a bar indicating how much time is left on your statue."]
+								end,
+								arg = "totemBar.enabled",
+							},
+							icon = {
+								order = 2,
+								type = "toggle",
+								name = L["Show icon durations"],
+								desc = L["Uses the icon of the totem being shown instead of a status bar."],
+								arg = "totemBar.icon",
+							},
+							secure = {
+								order = 3,
+								type = "toggle",
+								name = L["Dismissable Totem bars"],
+								hidden = function()
+									return not ShadowUF.modules.totemBar:SecureLockable()
+								end,
+								desc = function(info)
+									return L["Allows you to disable the totem by right clicking it.|n|nWarning: Inner bars for this unit will not resize in combat if you enable this."]
+								end,
+								arg = "totemBar.secure",
+							}
+						},
+					},
+					emptyBar = {
+						order = 4,
+						type = "group",
+						inline = false,
+						name = L["Empty bar"],
+						hidden = false,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Empty bar"]),
+								desc = L["Adds an empty bar that you can put text into as a way of uncluttering other bars."],
+								arg = "emptyBar.enabled",
+								width = "full"
+							},
+							overrideColor = {
+								order = 4,
+								type = "color",
+								name = L["Background color"],
+								disabled = function(info)
+									local emptyBar = getVariable(info[2], nil, nil, "emptyBar")
+									return emptyBar.class and emptyBar.reaciton
+								end,
+								set = function(info, r, g, b)
+									local color = getUnit(info) or {}
+									color.r = r
+									color.g = g
+									color.b = b
+
+									setUnit(info, color)
+								end,
+								get = function(info)
+									local color = getUnit(info)
+									if( not color ) then
+										return 0, 0, 0
+									end
+
+									return color.r, color.g, color.b
+
+								end,
+								arg = "emptyBar.backgroundColor",
+								width = "full"
+							},
+							reaction = {
+								order = 2,
+								type = "select",
+								name = L["Color by reaction on"],
+								desc = L["When to color the empty bar by reaction, overriding the default color by option."],
+								arg = "emptyBar.reactionType",
+								values = {["none"] = L["Never (Disabled)"], ["player"] = L["Players only"], ["npc"] = L["NPCs only"], ["both"] = L["Both"]},
+							},
+							colorType = {
+								order = 3,
+								type = "toggle",
+								name = L["Color by class"],
+								desc = L["Players will be colored by class."],
+								arg = "emptyBar.class",
+							},
+						},
+					},
+					castBar = {
+						order = 5,
+						type = "group",
+						inline = false,
+						name = L["Cast bar"],
+						hidden = hideRestrictedOption,
+						args = {
+							enabled = {
+								order = 1,
+								type = "toggle",
+								name = string.format(L["Enable %s"], L["Cast bar"]),
+								desc = function(info) return ShadowUF.fakeUnits[info[2]] and string.format(L["Due to the nature of fake units, cast bars for %s are not super efficient and can take at most 0.10 seconds to notice a change in cast."], L.units[info[2]] or info[2]) end,
+								hidden = false,
+								arg = "castBar.enabled",
+								width = "full"
+							},
+							autoHide = {
+								order = 2,
+								type = "toggle",
+								name = L["Hide bar when empty"],
+								desc = L["Hides the cast bar if there is no cast active."],
+								hidden = false,
+								arg = "castBar.autoHide",
+							},
+							castIcon = {
+								order = 2.5,
+								type = "select",
+								name = L["Cast icon"],
+								arg = "castBar.icon",
+								values = {["LEFT"] = L["Left"], ["RIGHT"] = L["Right"], ["HIDE"] = L["Disabled"]},
+								hidden = false,
+							},
+							castName = {
+								order = 3,
+								type = "header",
+								name = L["Cast name"],
+								hidden = hideAdvancedOption,
+							},
+							nameEnabled = {
+								order = 4,
+								type = "toggle",
+								name = L["Show cast name"],
+								arg = "castBar.name.enabled",
+								hidden = hideAdvancedOption,
+							},
+							nameAnchor = {
+								order = 5,
+								type = "select",
+								name = L["Anchor point"],
+								desc = L["Where to anchor the cast name text."],
+								values = {["CLI"] = L["Inside Center Left"], ["CRI"] = L["Inside Center Right"]},
+								hidden = hideAdvancedOption,
+								arg = "castBar.name.anchorPoint",
+							},
+							nameSize = {
+								order = 7,
+								type = "range",
+								name = L["Size"],
+								desc = L["Let's you modify the base font size to either make it larger or smaller."],
+								min = -10, max = 10, step = 1, softMin = -5, softMax = 5,
+								hidden = hideAdvancedOption,
+								arg = "castBar.name.size",
+							},
+							nameX = {
+								order = 8,
+								type = "range",
+								name = L["X Offset"],
+								min = -20, max = 20, step = 1,
+								hidden = hideAdvancedOption,
+								arg = "castBar.name.x",
+							},
+							nameY = {
+								order = 9,
+								type = "range",
+								name = L["Y Offset"],
+								min = -20, max = 20, step = 1,
+								hidden = hideAdvancedOption,
+								arg = "castBar.name.y",
+							},
+							castTime = {
+								order = 10,
+								type = "header",
+								name = L["Cast time"],
+								hidden = hideAdvancedOption,
+							},
+							timeEnabled = {
+								order = 11,
+								type = "toggle",
+								name = L["Show cast time"],
+								arg = "castBar.time.enabled",
+								hidden = hideAdvancedOption,
+								width = "full"
+							},
+							timeAnchor = {
+								order = 12,
+								type = "select",
+								name = L["Anchor point"],
+								desc = L["Where to anchor the cast time text."],
+								values = {["CLI"] = L["Inside Center Left"], ["CRI"] = L["Inside Center Right"]},
+								hidden = hideAdvancedOption,
+								arg = "castBar.time.anchorPoint",
+							},
+							timeSize = {
+								order = 14,
+								type = "range",
+								name = L["Size"],
+								desc = L["Let's you modify the base font size to either make it larger or smaller."],
+								min = -10, max = 10, step = 1, softMin = -5, softMax = 5,
+								hidden = hideAdvancedOption,
+								arg = "castBar.time.size",
+							},
+							timeX = {
+								order = 15,
+								type = "range",
+								name = L["X Offset"],
+								min = -20, max = 20, step = 1,
+								hidden = hideAdvancedOption,
+								arg = "castBar.time.x",
+							},
+							timeY = {
+								order = 16,
+								type = "range",
+								name = L["Y Offset"],
+								min = -20, max = 20, step = 1,
+								hidden = hideAdvancedOption,
+								arg = "castBar.time.y",
+							},
+						},
+					},
+				},
+			},
+			widgetSize = {
+				order = 4,
+				name = L["Widget Size"],
+				type = "group",
+				hidden = isModifiersSet,
+				set = setUnit,
+				get = getUnit,
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						name = L["Help"],
+						inline = true,
+						hidden = false,
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["Bars with an order higher or lower than the full size options will use the entire unit frame width.|n|nBar orders between those two numbers are shown next to the portrait."],
+							},
+						},
+					},
+					portrait = {
+						order = 0.5,
+						type = "group",
+						name = L["Portrait"],
+						inline = false,
+						hidden = false,
+						args = {
+							enableBar = {
+								order = 1,
+								type = "toggle",
+								name = L["Show as bar"],
+								desc = L["Changes this widget into a bar, you will be able to change the height and ordering like you can change health and power bars."],
+								arg = "$parent.isBar",
+							},
+							sep = {
+								order = 1.5,
+								type = "description",
+								name = "",
+								width = "full",
+								hidden = function(info) return getVariable(info[2], "portrait", nil, "isBar") end,
+							},
+							width = {
+								order = 2,
+								type = "range",
+								name = L["Width percent"],
+								desc = L["Percentage of width the portrait should use."],
+								min = 0, max = 1.0, step = 0.01, isPercent = true,
+								hidden = function(info) return getVariable(info[2], "portrait", nil, "isBar") end,
+								arg = "$parent.width",
+							},
+							before = {
+								order = 3,
+								type = "range",
+								name = L["Full size before"],
+								min = 0, max = 100, step = 5,
+								hidden = function(info) return getVariable(info[2], "portrait", nil, "isBar") end,
+								arg = "$parent.fullBefore",
+							},
+							after = {
+								order = 4,
+								type = "range",
+								name = L["Full size after"],
+								min = 0, max = 100, step = 5,
+								hidden = function(info) return getVariable(info[2], "portrait", nil, "isBar") end,
+								arg = "$parent.fullAfter",
+							},
+							order = {
+								order = 3,
+								type = "range",
+								name = L["Order"],
+								min = 0, max = 100, step = 5,
+								hidden = hideBarOption,
+								arg = "portrait.order",
+							},
+							height = {
+								order = 4,
+								type = "range",
+								name = L["Height"],
+								desc = L["How much of the frames total height this bar should get, this is a weighted value, the higher it is the more it gets."],
+								min = 0, max = 10, step = 0.1,
+								hidden = hideBarOption,
+								arg = "portrait.height",
+							},
+						},
+					},
+				},
+			},
+			auras = {
+				order = 5,
+				name = L["Auras"],
+				type = "group",
+				hidden = function(info)
+					if( isModifiersSet(info) ) then return true end
+					-- 12.0: Aura APIs block compound unit tokens (boss1target, party1target, etc.)
+					-- targettarget and focustarget are not compound
+					local unit = info[2]
+					if( unit ~= "global" and ShadowUF.fakeUnits[unit] and unit ~= "targettarget" and unit ~= "focustarget" ) then return true end
+					return false
+				end,
+				set = setUnit,
+				get = getUnit,
+				childGroups = "tree",
+				args = {
+					buffs = Config.auraTable,
+					debuffs = Config.auraTable,
+					bossDebuffs = Config.bossDebuffsTable,
+				},
+			},
+			indicators = {
+				order = 5.5,
+				type = "group",
+				name = L["Indicators"],
+				hidden = isModifiersSet,
+				childGroups = "tree",
+				set = setUnit,
+				get = getUnit,
+				args = {
+				},
+			},
+			tag = {
+				order = 7,
+				name = L["Text/Tags"],
+				type = "group",
+				hidden = isModifiersSet,
+				childGroups = "tree",
+				args = tagWizard,
+			},
+		},
+	}
+
+	for _, indicator in pairs(ShadowUF.modules.indicators.list) do
+		Config.unitTable.args.indicators.args[indicator] = Config.indicatorTable
+	end
+
+	-- Check for unit conflicts
+	local function hideZoneConflict()
+		for _, zone in pairs(ShadowUF.db.profile.visibility) do
+			for unit, status in pairs(zone) do
+				if( L.units[unit] and ( not status and ShadowUF.db.profile.units[unit].enabled or status and not ShadowUF.db.profile.units[unit].enabled ) ) then
+					return nil
+				end
+			end
+		end
+
+		return true
+	end
+
+	options.args.profile = LibStub("AceDBOptions-3.0"):GetOptionsTable(ShadowUF.db, true)
+	local LibDualSpec = LibStub("LibDualSpec-1.0", true)
+	if LibDualSpec then LibDualSpec:EnhanceOptions(options.args.profile, ShadowUF.db) end
+
+	options.args.enableUnits = {
+		type = "group",
+		name = L["Enabled Units"],
+		desc = getPageDescription,
+		args = {
+			help = {
+				order = 1,
+				type = "group",
+				inline = true,
+				name = L["Help"],
+				hidden = function()
+					if( not hideZoneConflict() or hideBasicOption() ) then
+						return true
+					end
+
+					return nil
+				end,
+				args = {
+					help = {
+						order = 0,
+						type = "description",
+						name = L["The check boxes below will allow you to enable or disable units.|n|n|cffff2020Warning!|r Target of Target units have a higher performance cost compared to other units. If you have performance issues, please disable those units or reduce the features enabled for those units."],
+					},
+				},
+			},
+			zoneenabled = {
+				order = 1.5,
+				type = "group",
+				inline = true,
+				name = L["Zone configuration units"],
+				hidden = hideZoneConflict,
+				args = {
+					help = {
+						order = 1,
+						type = "description",
+						name = L["|cffff2020Warning!|r Some units have overrides set in zone configuration, and may show (or not show up) in certain zone. Regardless of the settings below."]
+					},
+					sep = {
+						order = 2,
+						type = "header",
+						name = "",
+					},
+					units = {
+						order = 3,
+						type = "description",
+						name = function()
+							local text = {}
+
+							for zoneType, zone in pairs(ShadowUF.db.profile.visibility) do
+								local errors = {}
+								for unit, status in pairs(zone) do
+									if( L.units[unit] ) then
+										if ( not status and ShadowUF.db.profile.units[unit].enabled ) then
+											table.insert(errors, string.format(L["|cffff2020%s|r units disabled"], L.units[unit]))
+										elseif( status and not ShadowUF.db.profile.units[unit].enabled ) then
+											table.insert(errors, string.format(L["|cff20ff20%s|r units enabled"], L.units[unit]))
+										end
+									end
+								end
+
+								if( #(errors) > 1 ) then
+									table.insert(text, string.format("|cfffed000%s|r have the following overrides: %s", AREA_NAMES[zoneType], table.concat(errors, ", ")))
+								elseif( #(errors) == 1 ) then
+									table.insert(text, string.format("|cfffed000%s|r has the override: %s", AREA_NAMES[zoneType], errors[1]))
+								end
+							end
+
+							return #(text) > 0 and table.concat(text, "|n") or ""
+						end,
+					},
+				},
+			},
+			enabled = {
+				order = 2,
+				type = "group",
+				inline = true,
+				name = L["Enable units"],
+				args = {},
+			},
+		},
+	}
+
+	local sort_units = function(a, b)
+		return a < b
+	end
+
+	options.args.units = {
+		type = "group",
+		name = L["Unit Configuration"],
+		desc = getPageDescription,
+		args = {
+			help = {
+				order = 1,
+				type = "group",
+				inline = true,
+				name = L["Help"],
+				args = {
+					help = {
+						order = 0,
+						type = "description",
+						name = L["Wondering what all of the tabs for the unit configuration mean? Here's some information:|n|n|cfffed000General:|r Portrait, range checker, combat fader, border highlighting|n|cfffed000Frame:|r Unit positioning and frame anchoring|n|cfffed000Bars:|r Health, power, empty and cast bar, and combo point configuration|n|cfffed000Widget size:|r All bar and portrait sizing and ordering options|n|cfffed000Auras:|r All aura configuration for enabling/disabling/enlarging self/etc|n|cfffed000Indicators:|r All indicator configuration|n|cfffed000Text/Tags:|r Tag management as well as text positioning and width settings.|n|n|n*** Frequently looked for options ***|n|n|cfffed000Raid frames by group|r - Unit configuration -> Raid -> Raid -> Separate raid frames|n|cfffed000Class coloring:|r Bars -> Color health by|n|cfffed000Timers on auras:|r You need OmniCC for that|n|cfffed000Showing/Hiding default buff frames:|r Hide Blizzard -> Hide buff frames|n|cfffed000Percentage HP/MP text:|r Tags/Text tab, use the [percenthp] or [percentpp] tags|n|cfffed000Hiding party based on raid|r - Unit configuration -> Party -> Party -> Hide in 6-man raid/Hide in any raid"],
+						fontSize = "medium",
+					},
+				},
+			},
+			global = {
+				type = "group",
+				childGroups = "tab",
+				order = 0,
+				name = L["Global"],
+				args = {
+					test = {
+						order = 0,
+						type = "group",
+						name = L["Currently modifying"],
+						inline = true,
+						hidden = function()
+							for k in pairs(modifyUnits) do return false end
+							return true
+						end,
+						args = {
+							info = {
+								order = 0,
+								type = "description",
+								name = function()
+									local units = {};
+									for unit, enabled in pairs(modifyUnits) do
+										if( enabled ) then
+											table.insert(units, L.units[unit])
+										end
+									end
+
+									table.sort(units, sort_units)
+									return table.concat(units, ", ")
+								end,
+							}
+						}
+					},
+					units = {
+						order = 1,
+						type = "group",
+						name = L["Units"],
+						set = function(info, value)
+							if( IsShiftKeyDown() ) then
+								for _, unit in pairs(ShadowUF.unitList) do
+									if( ShadowUF.db.profile.units[unit].enabled ) then
+										modifyUnits[unit] = value and true or nil
+
+										if( value ) then
+											globalConfig = mergeTables(globalConfig, ShadowUF.db.profile.units[unit])
+										end
+									end
+								end
+							else
+								local unit = info[#(info)]
+								modifyUnits[unit] = value and true or nil
+
+								if( value ) then
+									globalConfig = mergeTables(globalConfig, ShadowUF.db.profile.units[unit])
+								end
+							end
+
+							-- Check if we have nothing else selected, if so wipe it
+							local hasUnit
+							for k in pairs(modifyUnits) do hasUnit = true break end
+							if( not hasUnit ) then
+								globalConfig = {}
+							end
+
+							AceRegistry:NotifyChange("ShadowedUF")
+						end,
+						get = function(info) return modifyUnits[info[#(info)]] end,
+						args = {
+							help = {
+								order = 0,
+								type = "group",
+								name = L["Help"],
+								inline = true,
+								args = {
+									help = {
+										order = 0,
+										type = "description",
+										name = L["Select the units that you want to modify, any settings changed will change every unit you selected. If you want to anchor or change raid/party unit specific settings you will need to do that through their options.|n|nShift click a unit to select all/unselect all."],
+									},
+								},
+							},
+							units = {
+								order = 1,
+								type = "group",
+								name = L["Units"],
+								inline = true,
+								args = {},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	-- Load modules into the unit table
+	for key, module in pairs(ShadowUF.modules) do
+		local canHaveBar = module.moduleHasBar
+		for _, data in pairs(ShadowUF.defaults.profile.units) do
+			if( data[key] and data[key].isBar ~= nil ) then
+				canHaveBar = true
+				break
+			end
+		end
+
+		if( canHaveBar ) then
+			Config.unitTable.args.widgetSize.args[key] = Config.barTable
+		end
+	end
+
+	-- Load global unit
+	for k, v in pairs(Config.unitTable.args) do
+		options.args.units.args.global.args[k] = v
+	end
+
+	-- Load all of the per unit settings
+	local perUnitList = {
+		order = getUnitOrder,
+		type = "toggle",
+		name = getName,
+		hidden = isUnitDisabled,
+		desc = function(info)
+			return string.format(L["Adds %s to the list of units to be modified when you change values in this tab."], L.units[info[#(info)]])
+		end,
+	}
+
+	-- Enabled units list
+	local unitCatOrder = {}
+	local unitApplyQueued
+	local enabledUnits = {
+		order = function(info) return unitCatOrder[info[#(info)]] + getUnitOrder(info) end,
+		type = "toggle",
+		hidden = function(info) return not ShadowUF:IsUnitAvailable(info[#(info)]) end,
+		name = getName,
+		set = function(info, value)
+			local unit = info[#(info)]
+			for child, parent in pairs(ShadowUF.Units.childUnits) do
+				if( unit == parent and not value ) then
+					ShadowUF.db.profile.units[child].enabled = false
+				end
+			end
+			ShadowUF.db.profile.units[unit].enabled = value
+
+			-- Loading units goes through protected calls (RegisterUnitWatch, header attributes)
+			local function apply()
+				ShadowUF:LoadUnits()
+
+				-- Raid enablement drives party frame visibility
+				if( ShadowUF.Units.headerFrames.party ) then
+					ShadowUF.Units:SetHeaderAttributes(ShadowUF.Units.headerFrames.party, "party")
+				end
+
+				ShadowUF.modules.movers:Update()
+			end
+			if( InCombatLockdown() ) then
+				ShadowUF:DeferUntilRegen("loadUnits", apply, L["Unit changes will be applied after combat."])
+			elseif( not unitApplyQueued ) then
+				-- The click handler and the options tree rebuild share one CPU budget, give the heavy part its own
+				unitApplyQueued = true
+				C_Timer.After(0, function()
+					unitApplyQueued = nil
+					apply()
+				end)
+			end
+		end,
+		get = function(info)
+			return ShadowUF.db.profile.units[info[#(info)]].enabled
+		end,
+		desc = function(info)
+			local unit = info[#(info)]
+			local unitDesc = UNIT_DESC[unit] or ""
+
+			if( ShadowUF.db.profile.units[unit].enabled and ShadowUF.Units.childUnits[unit] ) then
+				if( unitDesc ~= "" ) then unitDesc = unitDesc .. "\n\n" end
+				return unitDesc .. string.format(L["This unit depends on another to work, disabling %s will disable %s."], L.units[ShadowUF.Units.childUnits[unit]], L.units[unit])
+			elseif( not ShadowUF.db.profile.units[unit].enabled ) then
+				for child, parent in pairs(ShadowUF.Units.childUnits) do
+					if( parent == unit ) then
+						if( unitDesc ~= "" ) then unitDesc = unitDesc .. "\n\n" end
+						return unitDesc .. L["This unit has child units that depend on it, you need to enable this unit before you can enable its children."]
+					end
+				end
+			end
+
+			return unitDesc ~= "" and unitDesc
+		end,
+		disabled = function(info)
+			local unit = info[#(info)]
+			if( ShadowUF.Units.childUnits[unit] ) then
+				return not ShadowUF.db.profile.units[ShadowUF.Units.childUnits[unit]].enabled
+			end
+
+			return false
+		end,
+	}
+
+	local unitCategory = {
+		order = function(info)
+			local cat = info[#(info)]
+			return cat == "playercat" and 50 or cat == "generalcat" and 100 or cat == "partycat" and 200 or cat == "raidcat" and 300 or cat == "raidmisccat" and 400 or cat == "bosscat" and 500 or cat == "arenacat" and 600 or 700
+		end,
+		type = "header",
+		hidden = function(info) return ShadowUF.isForever and info[#(info)] == "arenacat" end,
+		name = function(info)
+			local cat = info[#(info)]
+			return cat == "playercat" and L["Player"] or cat == "generalcat" and L["General"] or cat == "raidcat" and L["Raid"] or cat == "partycat" and L["Party"] or cat == "arenacat" and L["Arena"] or cat == "battlegroundcat" and L["Battlegrounds"] or cat == "raidmisccat" and L["Raid Misc"] or cat == "bosscat" and L["Boss"]
+		end,
+		width = "full",
+	}
+
+	for cat, list in pairs(unitCategories) do
+		options.args.enableUnits.args.enabled.args[cat .. "cat"] = unitCategory
+
+		for _, unit in pairs(list) do
+			unitCatOrder[unit] = cat == "player" and 50 or cat == "general" and 100 or cat == "party" and 200 or cat == "raid" and 300 or cat == "raidmisc" and 400 or cat == "boss" and 500 or cat == "arena" and 600 or 700
+		end
+	end
+
+	for order, unit in pairs(ShadowUF.unitList) do
+		options.args.enableUnits.args.enabled.args[unit] = enabledUnits
+		options.args.units.args.global.args.units.args.units.args[unit] = perUnitList
+		options.args.units.args[unit] = Config.unitTable
+
+		unitCatOrder[unit] = unitCatOrder[unit] or 100
+	end
+end
+
+---------------------
+-- FILTER CONFIGURATION
+---------------------
+-- Accepts a numeric ID, a pasted spell link or an exact spell name
+local function resolveSpellInput(value)
+	local spellID = tonumber(value)
+	if( spellID ) then return spellID end
+	spellID = value and value:match("|Hspell:(%d+)")
+	if( spellID ) then return tonumber(spellID) end
+	if( value and value ~= "" and C_Spell and C_Spell.GetSpellInfo ) then
+		local info = C_Spell.GetSpellInfo(value)
+		if( info and info.spellID ) then return info.spellID end
+	end
+	return nil
+end
+
+-- EditBox that also accepts a spell dragged from the spellbook
+local spellEditBoxRegistered
+local function registerSpellEditBox()
+	if( spellEditBoxRegistered ) then return end
+	spellEditBoxRegistered = true
+
+	AceGUI = AceGUI or LibStub("AceGUI-3.0")
+	local function Constructor()
+		local widget = AceGUI:Create("EditBox")
+		widget.type = "ShadowUF_SpellEditBox"
+
+		local function receiveSpell()
+			local kind, _, _, spellID = GetCursorInfo()
+			if( kind == "spell" and spellID ) then
+				ClearCursor()
+				widget:SetText(tostring(spellID))
+				widget:Fire("OnEnterPressed", tostring(spellID))
+			end
+		end
+		widget.editbox:HookScript("OnReceiveDrag", receiveSpell)
+		widget.editbox:HookScript("OnMouseDown", receiveSpell)
+		return widget
+	end
+	AceGUI:RegisterWidgetType("ShadowUF_SpellEditBox", Constructor, 1)
+end
+Config.RegisterSpellEditBox = registerSpellEditBox
+
+local function loadFilterOptions()
+	local hasWhitelist, hasBlacklist, rebuildFilters
+	local filterMap = {}
+
+	local function reloadUnitAuras()
+		for _, frame in pairs(ShadowUF.Units.unitFrames) do
+			if( UnitExists(frame.unitSUF) ) then
+				ShadowUF.modules.auras:UpdateFilter(frame)
+				frame:FullUpdate()
+			end
+		end
+	end
+
+	-- Lists live in the unified custom filters, this tab only assigns them to unit frames per zone type
+	local function isExcludeFilter(name)
+		local filter = name and ShadowUF.db.profile.customFilters[name]
+		return filter and filter.mode == "exclude"
+	end
+
+	local globalSettings = {}
+	local zoneList = {"none", "pvp", "arena", "party", "raid"}
+	local filterTable = {
+		order = function(info) return info[#(info)] == "global" and 1 or info[#(info)] == "none" and 2 or 3 end,
+		type = "group",
+		inline = true,
+		hidden = function() return not hasWhitelist and not hasBlacklist end,
+		name = function(info) return AREA_NAMES[info[#(info)]] or L["Global"] end,
+		set = function(info, value)
+			local filter = filterMap[info[#(info)]]
+			local zone = info[#(info) - 1]
+			local unit = info[#(info) - 2]
+			local filterKey = isExcludeFilter(filter) and "zoneblack" or "zonewhite"
+
+			for _, zoneConfig in pairs(zoneList) do
+				if( zone == "global" or zoneConfig == zone ) then
+					if( unit == "global" ) then
+						globalSettings[zoneConfig .. filterKey] = value and filter or false
+						for _, unitEntry in pairs(ShadowUF.unitList) do
+							ShadowUF.db.profile.filters[filterKey][zoneConfig .. unitEntry] = value and filter or nil
+						end
+					else
+						ShadowUF.db.profile.filters[filterKey][zoneConfig .. unit] = value and filter or nil
+					end
+				end
+			end
+
+			if( zone == "global" ) then
+				globalSettings[zone .. unit .. filterKey] = value and filter or false
+			end
+
+			reloadUnitAuras()
+		end,
+		get = function(info)
+			local filter = filterMap[info[#(info)]]
+			local zone = info[#(info) - 1]
+			local unit = info[#(info) - 2]
+
+			if( unit == "global" or zone == "global" ) then
+				local id = zone == "global" and zone .. unit or zone
+				local filterKey = isExcludeFilter(filter) and "zoneblack" or "zonewhite"
+
+				if( info[#(info)] == "nofilter" ) then
+					return globalSettings[id .. "zonewhite"] == false and globalSettings[id .. "zoneblack"] == false
+				end
+
+				return globalSettings[id .. filterKey] == filter
+			end
+
+			if( info[#(info)] == "nofilter" ) then
+				return not ShadowUF.db.profile.filters.zonewhite[zone .. unit] and not ShadowUF.db.profile.filters.zoneblack[zone .. unit]
+			end
+
+			return ShadowUF.db.profile.filters.zonewhite[zone .. unit] == filter or ShadowUF.db.profile.filters.zoneblack[zone .. unit] == filter
+		end,
+		args = {
+			nofilter = {
+				order = 0,
+				type = "toggle",
+				name = L["Don't use a filter"],
+				hidden = false,
+				set = function(info, value)
+					local filter = filterMap[info[#(info)]]
+					local zone = info[#(info) - 1]
+					local unit = info[#(info) - 2]
+
+					for _, zoneConfig in pairs(zoneList) do
+						if( zone == "global" or zoneConfig == zone ) then
+							if( unit == "global" ) then
+								globalSettings[zoneConfig .. "zonewhite"] = false
+								globalSettings[zoneConfig .. "zoneblack"] = false
+								for _, unitEntry in pairs(ShadowUF.unitList) do
+									ShadowUF.db.profile.filters.zonewhite[zoneConfig .. unitEntry] = nil
+									ShadowUF.db.profile.filters.zoneblack[zoneConfig .. unitEntry] = nil
+								end
+							else
+								ShadowUF.db.profile.filters.zonewhite[zoneConfig .. unit] = nil
+								ShadowUF.db.profile.filters.zoneblack[zoneConfig .. unit] = nil
+							end
+						end
+					end
+
+					if( zone == "global" ) then
+						globalSettings[zone .. unit .. "zonewhite"] = false
+						globalSettings[zone .. unit .. "zoneblack"] = false
+					end
+
+					reloadUnitAuras()
+				end,
+			},
+			white = {
+				order = 1,
+				type = "header",
+				name = "|cffffffff" .. L["Whitelists"] .. "|r",
+				hidden = function(info) return not hasWhitelist end
+			},
+			black = {
+				order = 3,
+				type = "header",
+				name = L["Blacklists"],
+				hidden = function(info) return not hasBlacklist end
+			},
+		},
+	}
+
+	local filterToggle = {
+		order = function(info) return isExcludeFilter(filterMap[info[#(info)]]) and 4 or 2 end,
+		type = "toggle",
+		name = function(info) return filterMap[info[#(info)]] end,
+		desc = function(info)
+			return isExcludeFilter(filterMap[info[#(info)]]) and L["Hide matching spells"] or L["Show only matching spells"]
+		end,
+	}
+
+	local unitFilterSelection = {
+		order = function(info) return info[#(info)] == "global" and 1 or (getUnitOrder(info) + 1) end,
+		type = "group",
+		name = function(info) return info[#(info)] == "global" and L["Global"] or getName(info) end,
+		disabled = function(info)
+			if( info[#(info)] == "global" ) then
+				return false
+			end
+
+			return not hasWhitelist and not hasBlacklist
+		end,
+		args = {
+			help = {
+				order = 0,
+				type = "group",
+				inline = true,
+				name = L["Help"],
+				hidden = function() return hasWhitelist or hasBlacklist end,
+				args = {
+					help = {
+						type = "description",
+						name = L["You will need to create a filter in the Custom filters tab before you can assign it here."],
+						width = "full",
+					}
+				},
+			},
+			header = {
+				order = 0,
+				type = "header",
+				name = function(info) return (info[#(info) - 1] == "global" and L["Global"] or L.units[info[#(info) - 1]]) end,
+				hidden = function() return not hasWhitelist and not hasBlacklist end,
+			},
+			global = filterTable,
+			none = filterTable,
+			pvp = filterTable,
+			arena = filterTable,
+			party = filterTable,
+			raid = filterTable,
+		}
+	}
+
+	rebuildFilters = function()
+		for id in pairs(filterMap) do filterTable.args[id] = nil end
+		table.wipe(filterMap)
+		hasWhitelist, hasBlacklist = nil, nil
+
+		local filterID = 0
+		for name, filter in pairs(ShadowUF.db.profile.customFilters) do
+			filterID = filterID + 1
+			filterMap[tostring(filterID)] = name
+			filterTable.args[tostring(filterID)] = filterToggle
+
+			if( filter.mode == "exclude" ) then
+				hasBlacklist = true
+			else
+				hasWhitelist = true
+			end
+		end
+	end
+
+	-- The custom filters tab owns list creation/deletion, it refreshes this tab through here
+	Config.RebuildZoneFilters = function()
+		rebuildFilters()
+		reloadUnitAuras()
+	end
+
+	options.args.filter = {
+		type = "group",
+		name = L["Zone Filters"],
+		childGroups = "tab",
+		desc = getPageDescription,
+		args = {
+			groups = {
+				order = 1,
+				type = "group",
+				name = L["Set Filter Zones"],
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						args = {
+							help = {
+								type = "description",
+								name = L["Assign a filter to each unit frame per zone type. Filters are created and edited in the Custom filters tab."] .. "|n|n" .. string.format(L["The \"%s\" option is ignored for zone assignments; select the filter directly in a unit's Auras tab to use it."], L["Only show self cast auras"]),
+								width = "full",
+							}
+						},
+					},
+				}
+			},
+		},
+	}
+
+	options.args.filter.args.groups.args.global = unitFilterSelection
+	for _, unit in pairs(ShadowUF.unitList) do
+		options.args.filter.args.groups.args[unit] = unitFilterSelection
+	end
+
+	rebuildFilters()
+end
+
+---------------------
+-- CUSTOM FILTER CONFIGURATION
+---------------------
+local function loadCustomFilterOptions()
+	local rebuildCustomFilters
+
+	local function reloadUnitAuras()
+		for _, frame in pairs(ShadowUF.Units.unitFrames) do
+			if( UnitExists(frame.unitSUF) ) then
+				ShadowUF.modules.auras:UpdateFilter(frame)
+				frame:FullUpdate()
+			end
+		end
+	end
+
+	local function createFilterGroup(name)
+		local function getFilter()
+			return ShadowUF.db.profile.customFilters[name]
+		end
+
+		local group = {
+			order = 10,
+			type = "group",
+			name = name,
+			args = {
+				general = {
+					order = 0,
+					type = "group",
+					inline = true,
+					name = name,
+					args = {
+						mode = {
+							order = 0,
+							type = "select",
+							width = 1.8,
+							name = L["Mode"],
+							values = {
+								["include"] = L["Show only matching spells"],
+								["exclude"] = L["Hide matching spells"],
+							},
+							get = function()
+								local filter = getFilter()
+								return filter and filter.mode or "include"
+							end,
+							set = function(info, value)
+								local filter = getFilter()
+								if( filter ) then
+									filter.mode = value
+										-- Zone assignments are mode-typed, follow the change
+									local fromKey = value == "exclude" and "zonewhite" or "zoneblack"
+									local toKey = value == "exclude" and "zoneblack" or "zonewhite"
+									for slot, assigned in pairs(ShadowUF.db.profile.filters[fromKey]) do
+										if( assigned == name ) then
+											ShadowUF.db.profile.filters[fromKey][slot] = nil
+											ShadowUF.db.profile.filters[toKey][slot] = name
+										end
+									end
+									if( Config.RebuildZoneFilters ) then
+										Config.RebuildZoneFilters()
+									end
+									-- The token cascade depends on the mode, full rebuild
+									ShadowUF.Layout:Reload()
+								end
+							end,
+						},
+						player = {
+							order = 0.5,
+							type = "toggle",
+							name = L["Only show self cast auras"],
+							desc = L["Only auras you specifically cast will be shown."],
+							get = function()
+								local filter = getFilter()
+								return filter and filter.player
+							end,
+							set = function(info, value)
+								local filter = getFilter()
+								if( filter ) then
+									filter.player = value or nil
+									-- The flag shapes the section filter strings, same rebuild as a mode change
+									ShadowUF.Layout:Reload()
+								end
+							end,
+						},
+						addSpell = {
+							order = 1,
+							type = "input",
+							width = "full",
+							dialogControl = "ShadowUF_SpellEditBox",
+							name = L["Add spell"],
+							desc = L["Accepts a spell ID, a spell link (shift-click a spell) or an exact spell name. You can also drag a spell from the spellbook onto this field. Spell names only resolve for spells your character currently knows; use the spell ID for anything else."] .. "|n" .. L["Blizzard only applies spell filters to buffs on friendly units and to debuffs on hostile units, plus any spell it flags as never secret."],
+							validate = function(info, value)
+								if( not resolveSpellInput(value) ) then return L["Unknown spell. Enter a spell ID, a spell link or an exact spell name."] end
+								return true
+							end,
+							get = function() return "" end,
+							set = function(info, value)
+								local filter = getFilter()
+								if( filter ) then
+									local spellID = resolveSpellInput(value)
+									filter.spells[spellID] = true
+									ShadowUF:Print(string.format(L["Added %s (#%d)."], GetSpellName(spellID) or L["Unknown"], spellID))
+									rebuildCustomFilters()
+									reloadUnitAuras()
+								end
+							end,
+						},
+					},
+				},
+				spells = {
+					order = 1,
+					type = "group",
+					inline = true,
+					name = L["Auras"],
+					args = {},
+				},
+				deleteGroup = {
+					order = 2,
+					type = "group",
+					inline = true,
+					name = L["Delete filter"],
+					args = {
+						delete = {
+							order = 0,
+							type = "execute",
+							name = L["Delete"],
+							confirm = true,
+							confirmText = L["Are you sure you want to delete this filter?"],
+							func = function()
+								ShadowUF.db.profile.customFilters[name] = nil
+								for slot, assigned in pairs(ShadowUF.db.profile.filters.zonewhite) do
+									if( assigned == name ) then ShadowUF.db.profile.filters.zonewhite[slot] = nil end
+								end
+								for slot, assigned in pairs(ShadowUF.db.profile.filters.zoneblack) do
+									if( assigned == name ) then ShadowUF.db.profile.filters.zoneblack[slot] = nil end
+								end
+								rebuildCustomFilters()
+								ShadowUF.Layout:Reload()
+							end,
+						},
+					},
+				},
+			},
+		}
+
+		local sorted = {}
+		for spellID in pairs(getFilter().spells) do
+			sorted[#sorted + 1] = spellID
+		end
+		table.sort(sorted)
+
+		if( #sorted == 0 ) then
+			group.args.spells.args.none = {
+				order = 0,
+				type = "description",
+				name = L["This filter has no auras in it, you will have to add some using the dialog above."],
+			}
+		else
+			for i, spellID in ipairs(sorted) do
+				group.args.spells.args["spell" .. i] = {
+					order = i,
+					type = "description",
+					width = "double",
+					fontSize = "medium",
+					name = function()
+						local spellName = GetSpellName(spellID)
+						local icon = GetSpellTexture(spellID)
+						return string.format("|T%s:14:14:0:0|t %s (#%d)", icon or "Interface\\Icons\\Inv_misc_questionmark", spellName or L["Unknown"], spellID)
+					end,
+				}
+				group.args.spells.args["remove" .. i] = {
+					order = i + 0.5,
+					type = "execute",
+					name = L["Delete"],
+					func = function()
+						local filter = getFilter()
+						if( filter ) then
+							filter.spells[spellID] = nil
+							rebuildCustomFilters()
+							reloadUnitAuras()
+						end
+					end,
+				}
+			end
+		end
+
+		return group
+	end
+
+	rebuildCustomFilters = function()
+		local args = options.args.customFilters.args
+		for key in pairs(args) do
+			if( key:find("^f_") ) then args[key] = nil end
+		end
+		for name in pairs(ShadowUF.db.profile.customFilters) do
+			args["f_" .. name] = createFilterGroup(name)
+		end
+
+		-- Lists are also assignable per zone, keep that tab in sync
+		if( Config.RebuildZoneFilters ) then
+			Config.RebuildZoneFilters()
+		end
+	end
+	-- The filter list is enumerated at build time, a profile switch refreshes it through Config:ProfilesChanged
+	Config.RebuildCustomFilters = rebuildCustomFilters
+
+	options.args.customFilters = {
+		type = "group",
+		name = L["Custom filters"],
+		args = {
+			help = {
+				order = 0,
+				type = "group",
+				inline = true,
+				name = L["Help"],
+				args = {
+					help = {
+						order = 0,
+						type = "description",
+						name = L["Custom filters let you build aura filters from a spell's name or spell ID. Pick a mode when creating one: \"Show only matching spells\" or \"Hide matching spells\"."] .. "|n|n" .. L["You can then use these filters in the Auras tab of the player, target, raid, etc. modules, or assign them per zone type in the Zone Filters tab."] .. "|n|n" .. L["In combat, Blizzard only applies spell filters to buffs on friendly units and debuffs on hostile units, plus spells it flags as never secret."],
+						width = "full",
+					},
+				},
+			},
+			create = {
+				order = 1,
+				type = "input",
+				name = L["Create filter"],
+				validate = function(info, value)
+					if( value == "" ) then return L["You must enter a name."] end
+					if( ShadowUF.db.profile.customFilters[value] ) then return L["A filter with this name already exists."] end
+					return true
+				end,
+				get = function() return "" end,
+				set = function(info, value)
+					ShadowUF.db.profile.customFilters[value] = { mode = "include", spells = {} }
+					rebuildCustomFilters()
+				end,
+			},
+		},
+	}
+
+	rebuildCustomFilters()
+end
+
+---------------------
+-- TAG CONFIGURATION
+---------------------
+local function loadTagOptions()
+	local tagData = {search = ""}
+	local function set(info, value, key)
+		key = key or info[#(info)]
+		if( ShadowUF.Tags.defaultHelp[tagData.name] ) then
+			return
+		end
+
+		-- Reset loaded function + reload tags
+		if( key == "funct" ) then
+			ShadowUF.tagFunc[tagData.name] = nil
+			ShadowUF.Tags:Reload()
+		elseif( key == "category" ) then
+			local cat = ShadowUF.db.profile.tags[tagData.name][key]
+			if( cat and cat ~= value ) then
+				Config.tagTextTable.args[cat].args[tagData.name] = nil
+				Config.tagTextTable.args[value].args[tagData.name] = Config.tagTable
+			end
+		end
+
+		ShadowUF.db.profile.tags[tagData.name][key] = value
+	end
+
+	local function stripCode(text)
+		if( not text ) then
+			return ""
+		end
+
+		return string.gsub(string.gsub(text, "|", "||"), "\t", "")
+	end
+
+	local function get(info, key)
+		key = key or info[#(info)]
+
+		if( key == "help" and ShadowUF.Tags.defaultHelp[tagData.name] ) then
+			return ShadowUF.Tags.defaultHelp[tagData.name] or ""
+		elseif( key == "events" and ShadowUF.Tags.defaultEvents[tagData.name] ) then
+			return ShadowUF.Tags.defaultEvents[tagData.name] or ""
+		elseif( key == "frequency" and ShadowUF.Tags.defaultFrequents[tagData.name] ) then
+			return ShadowUF.Tags.defaultFrequents[tagData.name] or ""
+		elseif( key == "category" and ShadowUF.Tags.defaultCategories[tagData.name] ) then
+			return ShadowUF.Tags.defaultCategories[tagData.name] or ""
+		elseif( key == "name" and ShadowUF.Tags.defaultNames[tagData.name] ) then
+			return ShadowUF.Tags.defaultNames[tagData.name] or ""
+		elseif( key == "funct" and ShadowUF.Tags.defaultTags[tagData.name] ) then
+			return ShadowUF.Tags.defaultTags[tagData.name] or ""
+		end
+
+		return ShadowUF.db.profile.tags[tagData.name] and ShadowUF.db.profile.tags[tagData.name][key] or ""
+	end
+
+	local function isSearchHidden(info)
+		return tagData.search ~= "" and not string.match(info[#(info)], tagData.search) or false
+	end
+
+	local function editTag(info)
+		tagData.name = info[#(info)]
+
+		if( ShadowUF.Tags.defaultHelp[tagData.name] ) then
+			tagData.error = L["You cannot edit this tag because it is one of the default ones included in this mod. This function is here to provide an example for your own custom tags."]
+		else
+			tagData.error = nil
+		end
+
+		selectDialogGroup("tags", "edit")
+	end
+
+	-- Create all of the tag editor options, if it's a default tag will show it after any custom ones
+	local tagTable = {
+		type = "execute",
+		order = function(info) return ShadowUF.Tags.defaultTags[info[#(info)]] and 100 or 1 end,
+		name = getTagName,
+		desc = getTagHelp,
+		hidden = isSearchHidden,
+		func = editTag,
+	}
+
+	local tagCategories = {}
+	local function getTagCategories(info)
+		for k in pairs(tagCategories) do tagCategories[k] = nil end
+
+		for _, cat in pairs(ShadowUF.Tags.defaultCategories) do
+			tagCategories[cat] = TAG_GROUPS[cat]
+		end
+
+		return tagCategories
+	end
+
+	-- Tag configuration
+	options.args.tags = {
+		type = "group",
+		childGroups = "tab",
+		name = L["Add Tags"],
+		desc = getPageDescription,
+		hidden = hideAdvancedOption,
+		args = {
+			general = {
+				order = 0,
+				type = "group",
+				name = L["Tag list"],
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						hidden = function() return ShadowUF.db.profile.advanced end,
+						args = {
+							description = {
+								order = 0,
+								type = "description",
+								name = L["You can add new custom tags through this page, if you're looking to change what tags are used in text look under the Text tab for an Units configuration."],
+							},
+						},
+					},
+					search = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Search"],
+						args = {
+							search = {
+								order = 1,
+								type = "input",
+								name = L["Search tags"],
+								set = function(info, text) tagData.search = text end,
+								get = function(info) return tagData.search end,
+							},
+						},
+					},
+					list = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["Tags"],
+						args = {},
+					},
+				},
+			},
+			add = {
+				order = 1,
+				type = "group",
+				name = L["Add new tag"],
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["You can find more information on creating your own custom tags in the \"Help\" tab above."],
+							},
+						},
+					},
+					add = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = L["Add new tag"],
+						args = {
+							error = {
+								order = 0,
+								type = "description",
+								name = function() return tagData.addError or "" end,
+								hidden = function() return not tagData.addError end,
+							},
+							errorHeader = {
+								order = 0.50,
+								type = "header",
+								name = "",
+								hidden = function() return not tagData.addError end,
+							},
+							tag = {
+								order = 1,
+								type = "input",
+								name = L["Tag name"],
+								desc = L["Tag that you will use to access this code, do not wrap it in brackets or parenthesis it's automatically done. For example, you would enter \"foobar\" and then access it with [foobar]."],
+								validate = function(info, text)
+									if( text == "" ) then
+										tagData.addError = L["You must enter a tag name."]
+									elseif( string.match(text, "[%[%]%(%)]") ) then
+										tagData.addError = string.format(L["You cannot name a tag \"%s\", tag names should contain no brackets or parenthesis."], text)
+									elseif( ShadowUF.tagFunc[text] ) then
+										tagData.addError = string.format(L["The tag \"%s\" already exists."], text)
+									else
+										tagData.addError = nil
+									end
+
+									AceRegistry:NotifyChange("ShadowedUF")
+									return tagData.addError and "" or true
+								end,
+								set = function(info, tag)
+									tagData.name = tag
+									tagData.error = nil
+									tagData.addError = nil
+
+									ShadowUF.db.profile.tags[tag] = {func = "function(unit, unitOwner)\n\nend", category = "misc"}
+									options.args.tags.args.general.args.list.args[tag] = tagTable
+									Config.tagTextTable.args.misc.args[tag] = Config.tagTable
+
+									selectDialogGroup("tags", "edit")
+								end,
+							},
+						},
+					},
+				},
+			},
+			edit = {
+				order = 2,
+				type = "group",
+				name = L["Edit tag"],
+				hidden = function() return not tagData.name end,
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						inline = true,
+						name = L["Help"],
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["You can find more information on creating your own custom tags in the \"Help\" tab above.|nSUF will attempt to automatically detect what events your tag will need, so you do not generally need to fill out the events field."],
+							},
+						},
+					},
+					tag = {
+						order = 1,
+						type = "group",
+						inline = true,
+						name = function() return string.format(L["Editing %s"], tagData.name or "") end,
+						args = {
+							error = {
+								order = 0,
+								type = "description",
+								name = function()
+									if( tagData.error ) then
+										return "|cffff0000" .. tagData.error .. "|r"
+									end
+									return ""
+								end,
+								hidden = function() return not tagData.error end,
+							},
+							errorHeader = {
+								order = 1,
+								type = "header",
+								name = "",
+								hidden = function() return not tagData.error end,
+							},
+							discovery = {
+								order = 1,
+								type = "toggle",
+								name = L["Disable event discovery"],
+								desc = L["This will disable the automatic detection of what events this tag will need, you should leave this unchecked unless you know what you are doing."],
+								set = function(info, value) tagData.discovery = value end,
+								get = function() return tagData.discovery end,
+								width = "full",
+							},
+							frequencyEnable = {
+								order = 1.10,
+								type = "toggle",
+								name = L["Enable frequent updates"],
+								desc = L["Flags the tag for frequent updating, it will update the tag on a timer regardless of any events firing."],
+								set = function(info, value)
+									tagData.frequency = value and 5 or nil
+									set(info, tagData.frequency, "frequency")
+								end,
+								get = function(info) return get(info, "frequency") ~= "" and true or false end,
+								width = "full",
+							},
+							frequency = {
+								order = 1.20,
+								type = "input",
+								name = L["Update interval"],
+								desc = L["How many seconds between updates.|n[WARNING] By setting the frequency to 0 it will update every single frame redraw, if you want to disable frequent updating uncheck it don't set this to 0."],
+								disabled = function(info) return get(info) == "" end,
+								validate = function(info, value)
+									value = tonumber(value)
+									if( not value ) then
+										tagData.error = L["Invalid interval entered, must be a number."]
+									elseif( value < 0 ) then
+										tagData.error = L["You must enter a number that is 0 or higher, negative numbers are not allowed."]
+									else
+										tagData.error = nil
+									end
+
+									if( tagData.error ) then
+										AceRegistry:NotifyChange("ShadowedUF")
+										return ""
+									end
+
+									return true
+								end,
+								set = function(info, value)
+									tagData.frequency = tonumber(value)
+									tagData.frequency = tagData.frequency < 0 and 0 or tagData.frequency
+
+									set(info, tagData.frequency)
+								end,
+								get = function(info) return tostring(get(info) or "") end,
+								width = "half",
+							},
+							name = {
+								order = 2,
+								type = "input",
+								name = L["Tag name"],
+								set = set,
+								get = get,
+							},
+							category = {
+								order = 2.5,
+								type = "select",
+								name = L["Category"],
+								values = getTagCategories,
+								set = set,
+								get = get,
+							},
+
+							sep = {
+								order = 2.75,
+								type = "description",
+								name = "",
+								width = "full",
+							},
+							events = {
+								order = 3,
+								type = "input",
+								name = L["Events"],
+								desc = L["Events that should be used to trigger an update of this tag. Separate each event with a single space."],
+								width = "full",
+								validate = function(info, text)
+									if( ShadowUF.Tags.defaultTags[tagData.name] ) then
+										return true
+									end
+
+									if( text == "" or string.match(text, "[^_%a%s]") ) then
+										tagData.error = L["You have to set the events to fire, you can only enter letters and underscores, \"FOO_BAR\" for example is valid, \"APPLE_5_ORANGE\" is not because it contains a number."]
+										tagData.eventError = text
+										AceRegistry:NotifyChange("ShadowedUF")
+										return ""
+									end
+
+									tagData.eventError = text
+									tagData.error = nil
+									return true
+								end,
+								set = set,
+								get = function(info)
+									if( tagData.eventError ) then
+										return tagData.eventError
+									end
+
+									return get(info)
+								end,
+							},
+							func = {
+								order = 4,
+								type = "input",
+								multiline = true,
+								name = L["Code"],
+								desc = L["Your code must be wrapped in a function, for example, if you were to make a tag to return the units name you would do:|n|nfunction(unit, unitOwner)|nreturn UnitName(unitOwner)|nend"],
+								width = "full",
+								validate = function(info, text)
+									if( ShadowUF.Tags.defaultTags[tagData.name] ) then
+										return true
+									end
+
+									local funct, msg = loadstring("return " .. text)
+									if( not string.match(text, "function") ) then
+										tagData.error = L["You must wrap your code in a function."]
+										tagData.funcError = text
+									elseif( not funct and msg ) then
+										tagData.error = string.format(L["Failed to save tag, error:|n %s"], msg)
+										tagData.funcError = text
+									else
+										tagData.error = nil
+										tagData.funcError = nil
+									end
+
+									AceRegistry:NotifyChange("ShadowedUF")
+									return tagData.error and "" or true
+								end,
+								set = function(info, value)
+									value = string.gsub(value, "||", "|")
+									set(info, value)
+
+									-- Try and automatically identify the events this tag is going to want to use
+									if( not tagData.discovery ) then
+										tagData.eventError = nil
+										ShadowUF.db.profile.tags[tagData.name].events = ShadowUF.Tags:IdentifyEvents(value) or ""
+									end
+
+									ShadowUF.Tags:Reload(tagData.name)
+								end,
+								get = function(info)
+									if( tagData.funcError ) then
+										return stripCode(tagData.funcError)
+									end
+									return stripCode(ShadowUF.Tags.defaultTags[tagData.name] or ( ShadowUF.db.profile.tags[tagData.name] and ShadowUF.db.profile.tags[tagData.name].func))
+								end,
+							},
+							delete = {
+								order = 5,
+								type = "execute",
+								name = L["Delete"],
+								hidden = function() return ShadowUF.Tags.defaultTags[tagData.name] end,
+								confirm = true,
+								confirmText = L["Are you sure you want to delete this tag?"],
+								func = function(info)
+									local category = ShadowUF.db.profile.tags[tagData.name].category
+									if( category ) then
+										Config.tagTextTable.args[category].args[tagData.name] = nil
+									end
+
+									options.args.tags.args.general.args.list.args[tagData.name] = nil
+
+									ShadowUF.db.profile.tags[tagData.name] = nil
+									ShadowUF.tagFunc[tagData.name] = nil
+									ShadowUF.Tags:Reload(tagData.name)
+
+									tagData.name = nil
+									tagData.error = nil
+									selectDialogGroup("tags", "general")
+								end,
+							},
+						},
+					},
+				},
+			},
+			help = {
+				order = 3,
+				type = "group",
+				name = L["Help"],
+				args = {
+					general = {
+						order = 0,
+						type = "group",
+						name = L["General"],
+						inline = true,
+						args = {
+							general = {
+								order = 0,
+								type = "description",
+								name = L["See the documentation below for information and examples on creating tags, if you just want basic Lua or WoW API information then see the Programming in Lua and WoW Programming links."],
+							},
+						},
+					},
+					documentation = {
+						order = 1,
+						type = "group",
+						name = L["Documentation"],
+						inline = true,
+						args = {
+							doc = {
+								order = 0,
+								type = "input",
+								name = L["Documentation"],
+								set = false,
+								get = function() return "http://wiki.github.com/Shadowed/ShadowedUnitFrames/tag-documentation" end,
+								width = "full",
+							},
+						},
+					},
+					resources = {
+						order = 2,
+						type = "group",
+						inline = true,
+						name = L["Resources"],
+						args = {
+							lua = {
+								order = 0,
+								type = "input",
+								name = L["Programming in Lua"],
+								desc = L["This is a good guide on how to get started with programming in Lua, while you do not need to read the entire thing it is a helpful for understanding the basics of Lua syntax and API's."],
+								set = false,
+								get = function() return "http://www.lua.org/pil/" end,
+								width = "full",
+							},
+							wow = {
+								order = 1,
+								type = "input",
+								name = L["WoW Programming"],
+								desc = L["WoW Programming is a good resource for finding out what difference API's do and how to call them."],
+								set = false,
+								get = function() return "http://wowprogramming.com/docs" end,
+								width = "full",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	-- Load the initial tag list
+	for tag in pairs(ShadowUF.Tags.defaultTags) do
+		options.args.tags.args.general.args.list.args[tag] = tagTable
+	end
+
+	for tag, data in pairs(ShadowUF.db.profile.tags) do
+		options.args.tags.args.general.args.list.args[tag] = tagTable
+	end
+end
+
+---------------------
+-- VISIBILITY OPTIONS
+---------------------
+local function loadVisibilityOptions()
+	-- As zone units are only enabled in a certain zone... it's pointless to provide visibility options for them
+	local unitBlacklist = {}
+	for unit in pairs(ShadowUF.Units.zoneUnits) do unitBlacklist[unit] = true end
+	for unit, parent in pairs(ShadowUF.Units.childUnits) do
+		if( ShadowUF.Units.zoneUnits[parent] ) then
+			unitBlacklist[unit] = true
+		end
+	end
+
+	local globalVisibility = {}
+	local function set(info, value)
+		local key = info[#(info)]
+		local unit = info[#(info) - 1]
+		local area = info[#(info) - 2]
+
+		if( key == "enabled" ) then
+			key = ""
+		end
+
+		if( value == nil ) then
+			value = false
+		elseif( value == false ) then
+			value = nil
+		end
+
+		for _, configUnit in pairs(ShadowUF.unitList) do
+			if( ( configUnit == unit or unit == "global" ) and not unitBlacklist[configUnit] ) then
+				ShadowUF.db.profile.visibility[area][configUnit .. key] = value
+			end
+		end
+
+		-- Annoying yes, but only way that works
+		ShadowUF.Units:CheckPlayerZone(true)
+
+		if( unit == "global" ) then
+			globalVisibility[area .. key] = value
+		end
+	end
+
+	local function get(info)
+		local key = info[#(info)]
+		local unit = info[#(info) - 1]
+		local area = info[#(info) - 2]
+
+		if( key == "enabled" ) then
+			key = ""
+		end
+
+		if( unit == "global" ) then
+			if( globalVisibility[area .. key] == false ) then
+				return nil
+			elseif( globalVisibility[area .. key] == nil ) then
+				return false
+			end
+
+			return globalVisibility[area .. key]
+		elseif( ShadowUF.db.profile.visibility[area][unit .. key] == false ) then
+			return nil
+		elseif( ShadowUF.db.profile.visibility[area][unit .. key] == nil ) then
+			return false
+		end
+
+		return ShadowUF.db.profile.visibility[area][unit .. key]
+	end
+
+	local function getHelp(info)
+		local unit = info[#(info) - 1]
+		local area  = info[#(info) - 2]
+		local key = info[#(info)]
+		if( key == "enabled" ) then
+			key = ""
+		end
+
+		local current
+		if( unit == "global" ) then
+			current = globalVisibility[area .. key]
+		else
+			current = ShadowUF.db.profile.visibility[area][unit .. key]
+		end
+
+		if( current == false ) then
+			return string.format(L["Disabled in %s"], AREA_NAMES[area])
+		elseif( current == true ) then
+			return string.format(L["Enabled in %s"], AREA_NAMES[area])
+		end
+
+		return L["Using unit settings"]
+	end
+
+	local areaTable = {
+		type = "group",
+		order = function(info) return info[#(info)] == "none" and 2 or 1 end,
+		childGroups = "tree",
+		name = function(info)
+			return AREA_NAMES[info[#(info)]]
+		end,
+		get = get,
+		set = set,
+		args = {},
+	}
+
+	Config.visibilityTable = {
+		type = "group",
+		order = function(info) return info[#(info)] == "global" and 1 or (getUnitOrder(info) + 1) end,
+		name = function(info) return info[#(info)] == "global" and L["Global"] or getName(info) end,
+		args = {
+			help = {
+				order = 0,
+				type = "group",
+				name = L["Help"],
+				inline = true,
+				hidden = hideBasicOption,
+				args = {
+					help = {
+						order = 0,
+						type = "description",
+						name = function(info)
+							return string.format(L["Disabling a module on this page disables it while inside %s. Do not disable a module here if you do not want this to happen!."], string.lower(AREA_NAMES[info[2]]))
+						end,
+					},
+				},
+			},
+			enabled = {
+				order = 0.25,
+				type = "toggle",
+				name = function(info)
+					local unit = info[#(info) - 1]
+					if( unit == "global" ) then return "" end
+					return string.format(L["%s frames"], L.units[unit])
+				end,
+				hidden = function(info) return info[#(info) - 1] == "global" end,
+				desc = getHelp,
+				tristate = true,
+				width = "double",
+			},
+			sep = {
+				order = 0.5,
+				type = "description",
+				name = "",
+				width = "full",
+				hidden = function(info) return info[#(info) - 1] == "global" end,
+			},
+		}
+	}
+
+	local moduleTable = {
+		order = 1,
+		type = "toggle",
+		name = getName,
+		desc = getHelp,
+		tristate = true,
+		hidden = function(info)
+			if( info[#(info) - 1] == "global" ) then return false end
+			return hideRestrictedOption(info)
+		end,
+		arg = 1,
+	}
+
+	for key, module in pairs(ShadowUF.modules) do
+		if( module.moduleName ) then
+			Config.visibilityTable.args[key] = moduleTable
+		end
+	end
+
+	areaTable.args.global = Config.visibilityTable
+	for _, unit in pairs(ShadowUF.unitList) do
+		if( not unitBlacklist[unit] ) then
+			areaTable.args[unit] = Config.visibilityTable
+		end
+	end
+
+	options.args.visibility = {
+		type = "group",
+		childGroups = "tab",
+		name = L["Zone Configuration"],
+		desc = getPageDescription,
+		args = {
+			start = {
+				order = 0,
+				type = "group",
+				name = L["Help"],
+				inline = true,
+				hidden = hideBasicOption,
+				args = {
+					help = {
+						order = 0,
+						type = "description",
+						name = L["Gold checkmark - Enabled in this zone / Grey checkmark - Disabled in this zone / No checkmark - Use the default unit settings"],
+					},
+				},
+			},
+			pvp = areaTable,
+			arena = areaTable,
+			party = areaTable,
+			raid = areaTable,
+			neighborhood = areaTable,
+		},
+	}
+end
+
+---------------------
+-- AURA INDICATORS OPTIONS
+---------------------
+local function loadAuraIndicatorsOptions()
+	local Indicators = ShadowUF.modules.auraIndicators
+	local auraFilters = Indicators.auraFilters
+
+	local unitTable
+
+	local groupAliases = {
+		["pvpflags"] = L["PvP Flags"],
+		["food"] = L["Food"],
+		["miscellaneous"] = L["Miscellaneous"]
+	}
+
+	for token, name in pairs(LOCALIZED_CLASS_NAMES_MALE) do
+		groupAliases[string.lower(token)] = name
+	end
+
+	local groupList = {}
+	local function getAuraGroup(info)
+		for k in pairs(groupList) do groupList[k] = nil end
+		for name in pairs(ShadowUF.db.profile.auraIndicators.auras) do
+			local aura = Indicators.auraConfig[name]
+			groupList[aura.group] = aura.group
+		end
+
+		return groupList
+	end
+
+	local auraList = {}
+	local function getAuraList(info)
+		for k in pairs(auraList) do auraList[k] = nil end
+		for name in pairs(ShadowUF.db.profile.auraIndicators.auras) do
+			if( tonumber(name) ) then
+				local spellID = name
+				name = GetSpellName(name) or L["Unknown"]
+				auraList[name] = string.format("%s (#%i)", name, spellID)
+			else
+				auraList[name] = name
+			end
+		end
+
+		return auraList
+	end
+
+	local indicatorList = {}
+	local function getIndicatorList(info)
+		for k in pairs(indicatorList) do indicatorList[k] = nil end
+		indicatorList[""] = L["None (Disabled)"]
+		for key, indicator in pairs(ShadowUF.db.profile.auraIndicators.indicators) do
+			indicatorList[key] = indicator.name
+		end
+
+		return indicatorList
+	end
+
+	local function writeAuraTable(name)
+		ShadowUF.db.profile.auraIndicators.auras[name] = writeTable(Indicators.auraConfig[name])
+		Indicators.auraConfig[name] = nil
+
+		local spellID = tonumber(name)
+		if( spellID ) then
+			Indicators.auraConfig[spellID] = nil
+		end
+	end
+
+	local groupMap, auraMap, linkMap = {}, {}, {}
+	local groupID, auraID, linkID = 0, 0, 0
+
+	local reverseClassMap = {}
+	for token, text in pairs(LOCALIZED_CLASS_NAMES_MALE) do
+		reverseClassMap[text] = token
+	end
+
+	local function groupName(name)
+		if not name then return "" end
+		local converted = string.lower(string.gsub(name, " ", ""))
+		return groupAliases[converted] or name
+	end
+
+	-- Actual aura configuration
+	local auraGroupTable = {
+		order = function(info)
+			return reverseClassMap[groupName(groupMap[info[#(info)]])] and 1 or 2
+		end,
+		type = "group",
+		name = function(info)
+			local name = groupName(groupMap[info[#(info)]])
+
+			local token = reverseClassMap[name]
+			if( not token ) then return name end
+
+			return ShadowUF:Hex(ShadowUF.db.profile.classColors[token]) .. name .. "|r"
+		end,
+		desc = function(info)
+			local group = groupMap[info[#(info)]]
+			local totalInGroup = 0
+			for _, aura in pairs(Indicators.auraConfig) do
+				if( type(aura) == "table" and aura.group == group ) then
+					totalInGroup = totalInGroup + 1
+				end
+			end
+
+			return string.format(L["%d auras in group"], totalInGroup)
+		end,
+		args = {},
+	}
+
+	local auraConfigTable = {
+		order = 0,
+		type = "group",
+		icon = function(info)
+			local aura = auraMap[info[#(info)]]
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
+		end,
+		name = function(info)
+			local aura = auraMap[info[#(info)]]
+			return tonumber(aura) and string.format("%s (#%i)", GetSpellName(aura) or "Unknown", aura) or aura
+		end,
+		hidden = function(info)
+			local group = groupMap[info[#(info) - 1]]
+			local aura = Indicators.auraConfig[auraMap[info[#(info)]]]
+			return aura.group ~= group
+		end,
+		set = function(info, value, g, b, a)
+			local aura = auraMap[info[#(info) - 1]]
+			local key = info[#(info)]
+
+			-- So I don't have to load every aura to see if it only triggers if it's missing
+			if( key == "missing" ) then
+				ShadowUF.db.profile.auraIndicators.missing[aura] = value and true or nil
+			-- Changing the color
+			elseif( key == "color" ) then
+				Indicators.auraConfig[aura].r = value
+				Indicators.auraConfig[aura].g = g
+				Indicators.auraConfig[aura].b = b
+				Indicators.auraConfig[aura].alpha = a
+
+				writeAuraTable(aura)
+				ShadowUF.Layout:Reload()
+				return
+			elseif( key == "selfColor" ) then
+				Indicators.auraConfig[aura].selfColor = Indicators.auraConfig[aura].selfColor or {}
+				Indicators.auraConfig[aura].selfColor.r = value
+				Indicators.auraConfig[aura].selfColor.g = g
+				Indicators.auraConfig[aura].selfColor.b = b
+				Indicators.auraConfig[aura].selfColor.alpha = a
+
+				writeAuraTable(aura)
+				ShadowUF.Layout:Reload()
+				return
+			end
+
+			Indicators.auraConfig[aura][key] = value
+			writeAuraTable(aura)
+			ShadowUF.Layout:Reload()
+		end,
+		get = function(info)
+			local aura = auraMap[info[#(info) - 1]]
+			local key = info[#(info)]
+			local config = Indicators.auraConfig[aura]
+			if( key == "color" ) then
+				return config.r, config.g, config.b, config.alpha
+			elseif( key == "selfColor" ) then
+				if( not config.selfColor ) then return 0, 0, 0, 1 end
+				return config.selfColor.r, config.selfColor.g, config.selfColor.b, config.selfColor.alpha
+			end
+
+			return config[key]
+		end,
+		args = {
+			indicator = {
+				order = 1,
+				type = "select",
+				name = L["Show inside"],
+				desc = L["Indicator this aura should be displayed in."],
+				values = getIndicatorList,
+				hidden = false,
+			},
+			priority = {
+				order = 2,
+				type = "range",
+				name = L["Priority"],
+				desc = L["If multiple auras are shown in the same indicator, the higher priority one is shown first."],
+				min = 0, max = 100, step = 1,
+				hidden = false,
+			},
+			sep1 = {
+				order = 3,
+				type = "description",
+				name = "",
+				width = "full",
+				hidden = false,
+			},
+			color = {
+				order = 4,
+				type = "color",
+				name = L["Indicator color"],
+				desc = L["Solid color to use in the indicator, only used if you do not have use aura icon enabled."],
+				disabled = function(info) return Indicators.auraConfig[auraMap[info[#(info) - 1]]].icon end,
+				hidden = false,
+				hasAlpha = true,
+			},
+			selfColor = {
+				order = 4.5,
+				type = "color",
+				name = L["Your aura color"],
+				desc = L["This color will be used if the indicator shown is your own, only applies if icons are not used.\nHandy if you want to know if a target has a Rejuvenation on them, but you also want to know if you were the one who casted the Rejuvenation."],
+				hidden = false,
+				disabled = function(info)
+					if( Indicators.auraConfig[auraMap[info[#(info) - 1]]].icon ) then return true end
+					return Indicators.auraConfig[auraMap[info[#(info) - 1]]].player
+				end,
+				hasAlpha = true,
+			},
+			sep2 = {
+				order = 5,
+				type = "description",
+				name = "",
+				width = "full",
+				hidden = false,
+			},
+			icon = {
+				order = 6,
+				type = "toggle",
+				name = L["Show aura icon"],
+				desc = L["Instead of showing a solid color inside the indicator, the icon of the aura will be shown."],
+				hidden = false,
+			},
+			duration = {
+				order = 7,
+				type = "toggle",
+				name = L["Show aura duration"],
+				desc = L["Shows a cooldown wheel on the indicator with how much time is left on the aura."],
+				hidden = false,
+			},
+			player = {
+				order = 8,
+				type = "toggle",
+				name = L["Only show self cast auras"],
+				desc = L["Only auras you specifically cast will be shown."],
+				hidden = false,
+			},
+			missing = {
+				order = 9,
+				type = "toggle",
+				name = L["Only show if missing"],
+				desc = L["Only active this aura inside an indicator if the group member does not have the aura."],
+				-- Detecting an ABSENT aura needs a point query, which only returns data for whitelisted (never secret) spells
+				-- Stays visible when already enabled so it can be turned off
+				hidden = function(info)
+					local aura = auraMap[info[#(info) - 1]]
+					if( not aura or ShadowUF.db.profile.auraIndicators.missing[aura] ) then return false end
+					if( not (C_Secrets and C_Secrets.GetSpellAuraSecrecy and Enum.SecrecyLevel) ) then return false end
+					local ok, secrecy = pcall(C_Secrets.GetSpellAuraSecrecy, tonumber(aura) or aura)
+					return ok and secrecy ~= Enum.SecrecyLevel.NeverSecret
+				end,
+			},
+			delete = {
+				order = 10,
+				type = "execute",
+				name = L["Delete"],
+				hidden = function(info)
+					return ShadowUF.db.defaults.profile.auraIndicators.auras[auraMap[info[#(info) - 1]]]
+				end,
+				confirm = true,
+				confirmText = L["Are you sure you want to delete this aura?"],
+				func = function(info)
+					local key = info[#(info) - 1]
+					local aura = auraMap[key]
+
+					auraGroupTable.args[key] = nil
+					ShadowUF.db.profile.auraIndicators.auras[aura] = nil
+					ShadowUF.db.profile.auraIndicators.missing[aura] = nil
+					Indicators.auraConfig[aura] = nil
+
+					-- Check if the group should disappear
+					local groupList = getAuraGroup(info)
+					for groupID, name in pairs(groupMap) do
+						if( not groupList[name] ) then
+							unitTable.args.groups.args[tostring(groupID)] = nil
+							options.args.auraIndicators.args.units.args.global.args.groups.args[tostring(groupID)] = nil
+							options.args.auraIndicators.args.auras.args.groups.args[tostring(groupID)] = nil
+							groupMap[groupID] = nil
+						end
+					end
+
+					ShadowUF.Layout:Reload()
+				end,
+			},
+		},
+	}
+
+	local auraFilterConfigTable = {
+		order = 0,
+		type = "group",
+		hidden = false,
+		name = function(info)
+			return ShadowUF.db.profile.auraIndicators.indicators[info[#(info)]].name
+		end,
+		set = function(info, value)
+			local key = info[#(info)]
+			local indicator = info[#(info) - 2]
+			local filter = info[#(info) - 1]
+			ShadowUF.db.profile.auraIndicators.filters[indicator][filter][key] = value
+			ShadowUF.Layout:Reload()
+		end,
+		get = function(info)
+			local key = info[#(info)]
+			local indicator = info[#(info) - 2]
+			local filter = info[#(info) - 1]
+			if( not ShadowUF.db.profile.auraIndicators.filters[indicator][filter] ) then
+				ShadowUF.db.profile.auraIndicators.filters[indicator][filter] = {}
+			end
+
+			return ShadowUF.db.profile.auraIndicators.filters[indicator][filter][key]
+		end,
+		args = {
+			help = {
+				order = 0,
+				type = "group",
+				name = L["Help"],
+				inline = true,
+				args = {
+					help = {
+						type = "description",
+						name = L["Auras matching a criteria will automatically show up in the indicator when enabled."]
+					}
+				}
+			},
+			curable = {
+				order = 2,
+				type = "group",
+				name = L["Curable Auras"],
+				inline = true,
+				args = {
+					enabled = {
+						order = 1,
+						type = "toggle",
+						name = L["Show curable debuffs"],
+						desc = L["Shows debuffs that you can cure."]
+					},
+					duration = {
+						order = 2,
+						type = "toggle",
+						name = L["Show aura duration"],
+						desc = L["Shows a cooldown wheel on the indicator with how much time is left on the aura."]
+					},
+					priority = {
+						order = 3,
+						type = "range",
+						name = L["Priority"],
+						desc = L["If multiple auras are shown in the same indicator, the higher priority one is shown first."],
+						min = 0, max = 100, step = 1
+					}
+				}
+			}
+		}
+	}
+
+	local indicatorTable = {
+		order = 1,
+		type = "group",
+		name = function(info) return ShadowUF.db.profile.auraIndicators.indicators[info[#(info)]].name end,
+		args = {
+			config = {
+				order = 0,
+				type = "group",
+				inline = true,
+				name = function(info) return ShadowUF.db.profile.auraIndicators.indicators[info[#(info) - 1]].name end,
+				set = function(info, value)
+					local indicator = info[#(info) - 2]
+					local key = info[#(info)]
+
+					ShadowUF.db.profile.auraIndicators.indicators[indicator][key] = value
+					ShadowUF.Layout:Reload()
+				end,
+				get = function(info)
+					local indicator = info[#(info) - 2]
+					local key = info[#(info)]
+					return ShadowUF.db.profile.auraIndicators.indicators[indicator][key]
+				end,
+				args = {
+					showStack = {
+						order = 1,
+						type = "toggle",
+						name = L["Show auras stack"],
+						desc = L["Any auras shown in this indicator will have their total stack displayed."],
+						width = "full",
+					},
+					friendly = {
+						order = 2,
+						type = "toggle",
+						name = L["Enable for friendlies"],
+						desc = L["Checking this will show the indicator on friendly units."],
+					},
+					hostile = {
+						order = 3,
+						type = "toggle",
+						name = L["Enable for hostiles"],
+						desc = L["Checking this will show the indciator on hostile units."],
+					},
+					anchorPoint = {
+						order = 4,
+						type = "select",
+						name = L["Anchor point"],
+						values = {["BRI"] = L["Inside Bottom Right"], ["BLI"] = L["Inside Bottom Left"], ["TRI"] = L["Inside Top Right"], ["TLI"] = L["Inside Top Left"], ["CLI"] = L["Inside Center Left"], ["C"] = L["Center"], ["CRI"] = L["Inside Center Right"]},
+					},
+					size = {
+						order = 5,
+						name = L["Size"],
+						type = "range",
+						min = 0, max = 50, step = 1,
+						set = function(info, value)
+							local indicator = info[#(info) - 2]
+							ShadowUF.db.profile.auraIndicators.indicators[indicator].height = value
+							ShadowUF.db.profile.auraIndicators.indicators[indicator].width = value
+							ShadowUF.Layout:Reload()
+						end,
+						get = function(info)
+							local indicator = info[#(info) - 2]
+							return ShadowUF.db.profile.auraIndicators.indicators[indicator].height
+						end,
+					},
+					x = {
+						order = 6,
+						type = "range",
+						name = L["X Offset"],
+						min = -50, max = 50, step = 1,
+					},
+					y = {
+						order = 7,
+						type = "range",
+						name = L["Y Offset"],
+						min = -50, max = 50, step = 1,
+					},
+					delete = {
+						order = 8,
+						type = "execute",
+						name = L["Delete"],
+						confirm = true,
+						confirmText = L["Are you sure you want to delete this indicator?"],
+						func = function(info)
+							local indicator = info[#(info) - 2]
+
+							options.args.auraIndicators.args.indicators.args[indicator] = nil
+							options.args.auraIndicators.args.auras.args.filters.args[indicator] = nil
+
+							ShadowUF.db.profile.auraIndicators.indicators[indicator] = nil
+							ShadowUF.db.profile.auraIndicators.filters[indicator] = nil
+
+							-- Any aura that was set to us should be swapped back to none
+							for name in pairs(ShadowUF.db.profile.auraIndicators.auras) do
+								local aura = Indicators.auraConfig[name]
+								if( aura.indicator == indicator ) then
+									aura.indicator = ""
+									writeAuraTable(name)
+								end
+							end
+
+							ShadowUF.Layout:Reload()
+						end,
+					},
+				},
+			},
+		},
+	}
+
+	local parentLinkTable = {
+		order = 3,
+		type = "group",
+		icon = function(info)
+			local aura = auraMap[info[#(info)]]
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
+		end,
+		name = function(info)
+			local aura = linkMap[info[#(info)]]
+			return tonumber(aura) and string.format("%s (#%i)", GetSpellName(aura) or "Unknown", aura) or aura
+		end,
+		args = {},
+	}
+
+	local childLinkTable = {
+		order = 1,
+		icon = function(info)
+			local aura = auraMap[info[#(info)]]
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
+		end,
+		name = function(info)
+			local aura = linkMap[info[#(info)]]
+			return tonumber(aura) and string.format("%s (#%i)", GetSpellName(aura) or "Unknown", aura) or aura
+		end,
+		hidden = function(info)
+			local aura = linkMap[info[#(info)]]
+			local parent = linkMap[info[#(info) - 1]]
+
+			return ShadowUF.db.profile.auraIndicators.linked[aura] ~= parent
+		end,
+		type = "group",
+		inline = true,
+		args = {
+			delete = {
+				type = "execute",
+				name = L["Delete link"],
+				hidden = false,
+				func = function(info)
+					local auraID = info[#(info) - 1]
+					local aura = linkMap[auraID]
+					local parent = ShadowUF.db.profile.auraIndicators.linked[aura]
+					ShadowUF.db.profile.auraIndicators.linked[aura] = nil
+					parentLinkTable.args[auraID] = nil
+
+					local found
+					for _, to in pairs(ShadowUF.db.profile.auraIndicators.linked) do
+						if( to == parent ) then
+							found = true
+							break
+						end
+					end
+
+					if( not found ) then
+						for id, name in pairs(linkMap) do
+							if( name == parent ) then
+								options.args.auraIndicators.args.linked.args[tostring(id)] = nil
+								linkMap[id] = nil
+							end
+						end
+					end
+
+					ShadowUF.Layout:Reload()
+				end,
+			},
+		},
+	}
+
+	local addAura, addLink, setGlobalUnits, globalConfig = {}, {}, {}, {}
+
+	-- Per unit enabled status
+	unitTable = {
+		order = ShadowUF.Config.getUnitOrder or 1,
+		type = "group",
+		name = function(info) return L.units[info[3]] end,
+		hidden = function(info) return not ShadowUF.db.profile.units[info[3]].enabled end,
+		desc = function(info)
+			local totalDisabled = 0
+			for key, enabled in pairs(ShadowUF.db.profile.units[info[3]].auraIndicators) do
+				if( key ~= "enabled" and enabled ) then
+					totalDisabled = totalDisabled + 1
+				end
+			end
+
+			if( totalDisabled == 1 ) then return L["1 aura group disabled"] end
+			return totalDisabled > 0 and string.format(L["%s aura groups disabled"], totalDisabled) or L["All aura groups enabled for unit."]
+		end,
+		args = {
+			enabled = {
+				order = 1,
+				inline = true,
+				type = "group",
+				name = function(info) return string.format(L["On %s units"], L.units[info[3]]) end,
+				args = {
+					enabled = {
+						order = 1,
+						type = "toggle",
+						name = L["Enable Indicators"],
+						desc = function(info) return string.format(L["Unchecking this will completely disable aura indicators for %s."], L.units[info[3]]) end,
+						set = function(info, value) ShadowUF.db.profile.units[info[3]].auraIndicators.enabled = value; ShadowUF.Layout:Reload() end,
+						get = function(info) return ShadowUF.db.profile.units[info[3]].auraIndicators.enabled end,
+					},
+				},
+			},
+			filters = {
+				order = 2,
+				inline = true,
+				type = "group",
+				name = L["Aura Filters"],
+				disabled = function(info) return not ShadowUF.db.profile.units[info[3]].auraIndicators.enabled end,
+				args = {},
+			},
+			groups = {
+				order = 3,
+				inline = true,
+				type = "group",
+				name = L["Aura Groups"],
+				disabled = function(info) return not ShadowUF.db.profile.units[info[3]].auraIndicators.enabled end,
+				args = {},
+			},
+		}
+	}
+
+	local unitFilterTable = {
+		order = 1,
+		type = "toggle",
+		name = L["Curable Auras"],
+		desc = function(info)
+			local auraIndicators = ShadowUF.db.profile.units[info[3]].auraIndicators
+			return auraIndicators["filter-" .. info[#(info)]] and string.format(L["Disabled for %s."], L.units[info[3]]) or string.format(L["Enabled for %s."], L.units[info[3]])
+		end,
+		set = function(info, value) ShadowUF.db.profile.units[info[3]].auraIndicators["filter-" .. info[#(info)]] = not value and true or nil end,
+		get = function(info, value) return not ShadowUF.db.profile.units[info[3]].auraIndicators["filter-" .. info[#(info)]] end
+	}
+
+	local globalUnitFilterTable = {
+		order = 1,
+		type = "toggle",
+		name = L["Curable Auras"],
+		disabled = function(info) for unit in pairs(setGlobalUnits) do return false end return true end,
+		set = function(info, value)
+			local key = "filter-" .. info[#(info)]
+			globalConfig[key] = not value and true or nil
+
+			for unit in pairs(setGlobalUnits) do
+				ShadowUF.db.profile.units[unit].auraIndicators[key] = globalConfig[key]
+			end
+		end,
+		get = function(info, value) return not globalConfig["filter-" .. info[#(info)]] end
+	}
+
+	local unitGroupTable = {
+		order = function(info)
+			return reverseClassMap[groupName(groupMap[info[#(info)]])] and 1 or 2
+		end,
+		type = "toggle",
+		name = function(info)
+			local name = groupName(groupMap[info[#(info)]])
+			local token = reverseClassMap[name]
+			if( not token ) then return name end
+			return ShadowUF:Hex(ShadowUF.db.profile.classColors[token]) .. name .. "|r"
+		end,
+		desc = function(info)
+			local auraIndicators = ShadowUF.db.profile.units[info[3]].auraIndicators
+			local group = groupName(groupMap[info[#(info)]])
+
+			return auraIndicators[group] and string.format(L["Disabled for %s."], L.units[info[3]]) or string.format(L["Enabled for %s."], L.units[info[3]])
+		end,
+		set = function(info, value) ShadowUF.db.profile.units[info[3]].auraIndicators[groupMap[info[#(info)]]] = not value and true or nil end,
+		get = function(info, value) return not ShadowUF.db.profile.units[info[3]].auraIndicators[groupMap[info[#(info)]]] end
+	}
+
+	local globalUnitGroupTable = {
+		type = "toggle",
+		order = function(info)
+			return reverseClassMap[groupName(groupMap[info[#(info)]])] and 1 or 2
+		end,
+		name = function(info)
+			local name = groupName(groupMap[info[#(info)]])
+			local token = reverseClassMap[name]
+			if( not token ) then return name end
+			return ShadowUF:Hex(ShadowUF.db.profile.classColors[token]) .. name .. "|r"
+		end,
+		disabled = function(info) for unit in pairs(setGlobalUnits) do return false end return true end,
+		set = function(info, value)
+			local auraGroup = groupMap[info[#(info)]]
+			globalConfig[auraGroup] = not value and true or nil
+
+			for unit in pairs(setGlobalUnits) do
+				ShadowUF.db.profile.units[unit].auraIndicators[auraGroup] = globalConfig[auraGroup]
+			end
+		end,
+		get = function(info, value) return not globalConfig[groupMap[info[#(info)]]] end
+	}
+
+	local enabledUnits = {}
+	local function getEnabledUnits()
+		table.wipe(enabledUnits)
+		for unit, config in pairs(ShadowUF.db.profile.units) do
+			if( config.enabled and config.auraIndicators and config.auraIndicators.enabled ) then
+				enabledUnits[unit] = L.units[unit]
+			end
+		end
+
+		return enabledUnits
+	end
+
+	local widthReset
+
+	-- Shared by the whitelist dropdown and the free spell input
+	local function addIndicatorAura(spellID, group)
+		local whitelistInfo = Indicators.whitelistedSpells[tonumber(spellID)]
+		group = group or (whitelistInfo and whitelistInfo.group) or L["Miscellaneous"]
+
+		if( not ShadowUF.db.profile.auraIndicators.auras[spellID] ) then
+			Indicators.auraConfig[spellID] = {indicator = "", group = group, iconTexture = GetSpellTexture(tonumber(spellID)), priority = 0, r = 0, g = 0, b = 0}
+			writeAuraTable(spellID)
+
+			auraID = auraID + 1
+			auraMap[tostring(auraID)] = spellID
+			auraGroupTable.args[tostring(auraID)] = auraConfigTable
+		end
+
+		-- Check if the group exists
+		local gID
+		for id, name in pairs(groupMap) do
+			if( name == group ) then
+				gID = id
+				break
+			end
+		end
+
+		if( not gID ) then
+			groupID = groupID + 1
+			groupMap[tostring(groupID)] = group
+
+			unitTable.args.groups.args[tostring(groupID)] = unitGroupTable
+			options.args.auraIndicators.args.units.args.global.args.groups.args[tostring(groupID)] = globalUnitGroupTable
+			options.args.auraIndicators.args.auras.args.groups.args[tostring(groupID)] = auraGroupTable
+		end
+
+		-- Shunt the user to the this groups page
+		AceDialog.Status.ShadowedUF.children.auraIndicators.children.auras.status.groups.selected = tostring(gID or groupID)
+		AceRegistry:NotifyChange("ShadowedUF")
+
+		ShadowUF.Layout:Reload()
+	end
+
+	-- Actual tab view thing
+	options.args.auraIndicators = {
+		order = 4.5,
+		type = "group",
+		name = L["Aura Indicators"],
+		desc = L["For configuring aura indicators on unit frames."],
+		childGroups = "tab",
+		hidden = false,
+		args = {
+			indicators = {
+				order = 1,
+				type = "group",
+				name = L["Indicators"],
+				childGroups = "tree",
+				args = {
+					add = {
+						order = 0,
+						type = "group",
+						name = L["Add Indicator"],
+						args = {
+							add = {
+								order = 0,
+								type = "group",
+								inline = true,
+								name = L["Add new indicator"],
+								args = {
+									name = {
+										order = 0,
+										type = "input",
+										name = L["Indicator name"],
+										width = "full",
+										set = function(info, value)
+											local id = string.format("%d", GetTime() + math.random(100))
+											ShadowUF.db.profile.auraIndicators.indicators[id] = {enabled = true, friendly = true, hostile = true, name = value, anchorPoint = "C", anchorTo = "$parent", height = 10, width = 10, alpha = 1.0, x = 0, y = 0}
+											ShadowUF.db.profile.auraIndicators.filters[id] = {curable = {}}
+
+											options.args.auraIndicators.args.indicators.args[id] = indicatorTable
+											options.args.auraIndicators.args.auras.args.filters.args[id] = auraFilterConfigTable
+
+											AceDialog.Status.ShadowedUF.children.auraIndicators.children.indicators.status.groups.selected = id
+											AceRegistry:NotifyChange("ShadowedUF")
+										end,
+										get = function() return "" end,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			auras = {
+				order = 2,
+				type = "group",
+				name = L["Auras"],
+				hidden = function(info)
+					if( not widthReset and AceDialog.Status.ShadowedUF.children.auraIndicators ) then
+						if( AceDialog.Status.ShadowedUF.children.auraIndicators.children.auras ) then
+							widthReset = true
+
+							AceDialog.Status.ShadowedUF.children.auraIndicators.children.auras.status.groups.treewidth = 230
+
+							AceDialog.Status.ShadowedUF.children.auraIndicators.children.auras.status.groups.groups = {}
+							AceDialog.Status.ShadowedUF.children.auraIndicators.children.auras.status.groups.groups.filters = true
+							AceDialog.Status.ShadowedUF.children.auraIndicators.children.auras.status.groups.groups.groups = true
+
+							AceRegistry:NotifyChange("ShadowedUF")
+						end
+					end
+
+					return false
+				end,
+				args = {
+					add = {
+						order = 0,
+						type = "group",
+						name = L["Add Aura"],
+						set = function(info, value) addAura[info[#(info)]] = value end,
+						get = function(info) return addAura[info[#(info)]] end,
+						args = {
+							name = {
+								order = 0,
+								type = "select",
+								width = "full",
+								name = L["Spell"],
+								desc = L["Curated list of class and healer spells. Combat display works for buffs on friendly units; the missing option requires a Blizzard-whitelisted spell."],
+								hidden = function() return ShadowUF.isForever end,
+								values = function()
+									local vals = {}
+									for spellID, info in pairs(Indicators.whitelistedSpells) do
+										if( not ShadowUF.db.profile.auraIndicators.auras[tostring(spellID)] ) then
+											local icon = GetSpellTexture(spellID)
+												local iconStr = icon and string.format("|T%s:14:14:0:0|t ", icon) or ""
+												vals[tostring(spellID)] = string.format("%s[%s] %s (%d)", iconStr, info.group, GetSpellName(spellID) or info.name, spellID)
+										end
+									end
+									return vals
+								end,
+								get = function() return addAura.pick end,
+								set = function(info, value)
+									addAura.pick = value
+									addAura.spell = value
+									addAura.customText = nil
+									local wl = Indicators.whitelistedSpells[tonumber(value)]
+									if( wl ) then addAura.group = wl.group end
+								end,
+							},
+							custom = {
+								order = 0.5,
+								type = "input",
+								width = "full",
+								name = L["Add spell"],
+								desc = L["Accepts a spell ID, a spell link (shift-click a spell) or an exact spell name. You can also drag a spell from the spellbook onto this field. Spell names only resolve for spells your character currently knows; use the spell ID for anything else."],
+								dialogControl = "ShadowUF_SpellEditBox",
+								validate = function(info, value)
+									if( not resolveSpellInput(value) ) then return L["Unknown spell. Enter a spell ID, a spell link or an exact spell name."] end
+									return true
+								end,
+								get = function() return addAura.customText or "" end,
+								set = function(info, value)
+									local spellID = resolveSpellInput(value)
+									if( not spellID ) then return end
+									addAura.customText = value
+									addAura.spell = tostring(spellID)
+									addAura.pick = nil
+								end,
+							},
+							found = {
+								order = 0.6,
+								type = "description",
+								fontSize = "medium",
+								name = function(info)
+									local spellID = tonumber(addAura.spell)
+									if( not spellID ) then return "" end
+									local icon = GetSpellTexture(spellID)
+									local iconStr = icon and string.format("|T%s:24:24:0:0|t ", icon) or ""
+									return string.format("%s%s (#%d)", iconStr, GetSpellName(spellID) or L["Unknown"], spellID)
+								end,
+								hidden = function(info) return not addAura.spell end,
+							},
+							group = {
+								order = 0.75,
+								type = "select",
+								name = L["Group"],
+								desc = L["Group this aura will be listed under. Both a spell and a group are required to add an aura."],
+								values = function()
+									local vals = {}
+									if( not ShadowUF.isForever ) then
+										for _, info in pairs(Indicators.whitelistedSpells) do
+											vals[info.group] = info.group
+										end
+									end
+									for key in pairs(ShadowUF.db.profile.auraIndicators.auras) do
+										local config = Indicators.auraConfig[key]
+										if( config and config.group ) then
+											vals[config.group] = config.group
+										end
+									end
+									vals[L["Miscellaneous"]] = L["Miscellaneous"]
+									return vals
+								end,
+							},
+							customGroup = {
+								order = 0.8,
+								type = "input",
+								name = L["New aura group"],
+								desc = L["Allows you to enter a new aura group."],
+							},
+							create = {
+								order = 1,
+								type = "execute",
+								name = L["Add Aura"],
+								disabled = function(info)
+									local customGroup = addAura.customGroup and string.trim(addAura.customGroup) or ""
+									return not (addAura.spell and (addAura.group or customGroup ~= ""))
+								end,
+								func = function(info)
+									local spellID = tonumber(addAura.spell)
+									-- A typed group wins over the dropdown, same as the War Within behavior
+									local group = addAura.customGroup and string.trim(addAura.customGroup) or ""
+									if( group == "" ) then group = addAura.group end
+									addIndicatorAura(addAura.spell, group)
+									ShadowUF:Print(string.format(L["Added %s (#%d)."], spellID and GetSpellName(spellID) or L["Unknown"], spellID or 0))
+									addAura.spell = nil
+									addAura.pick = nil
+									addAura.customText = nil
+									addAura.group = nil
+									addAura.customGroup = nil
+								end,
+							},
+						},
+					},
+					filters = {
+						order = 1,
+						type = "group",
+						name = L["Automatic Auras"],
+						args = {}
+					},
+					groups = {
+						order = 2,
+						type = "group",
+						name = L["Groups"],
+						args = {}
+					},
+				},
+			},
+			linked = {
+				order = 3,
+				type = "group",
+				name = L["Linked spells"],
+				childGroups = "tree",
+				hidden = true,
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						name = L["Help"],
+						inline = true,
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["You can link auras together using this, for example you can link Mark of the Wild to Gift of the Wild so if the player has Mark of the Wild but not Gift of the Wild, it will still show Mark of the Wild as if they had Gift of the Wild."],
+								width = "full",
+							},
+						},
+					},
+					add = {
+						order = 1,
+						type = "group",
+						name = L["Add link"],
+						inline = true,
+						set = function(info, value)
+							addLink[info[#(info)] ] = value
+						end,
+						get = function(info) return addLink[info[#(info)] ] end,
+						args = {
+							from = {
+								order = 0,
+								type = "input",
+								name = L["Link from"],
+								desc = L["Spell you want to link to a primary aura, the casing must be exact."],
+							},
+							to = {
+								order = 1,
+								type = "select",
+								name = L["Link to"],
+								values = getAuraList,
+							},
+							link = {
+								order = 3,
+								type = "execute",
+								name = L["Link"],
+								disabled = function() return not addLink.from or not addLink.to or addLink.from == "" end,
+								func = function(info)
+									local lID, pID
+									for id, name in pairs(linkMap) do
+										if( name == addLink.from ) then
+											lID = id
+										elseif( name == addLink.to ) then
+											pID = id
+										end
+									end
+
+									if( not pID ) then
+										linkID = linkID + 1
+										pID = linkID
+										linkMap[tostring(linkID)] = addLink.to
+									end
+
+									if( not lID ) then
+										linkID = linkID + 1
+										lID = linkID
+										linkMap[tostring(linkID)] = addLink.from
+									end
+
+									ShadowUF.db.profile.auraIndicators.linked[addLink.from] = addLink.to
+									options.args.auraIndicators.args.linked.args[tostring(pID)] = parentLinkTable
+									parentLinkTable.args[tostring(lID)] = childLinkTable
+
+									addLink.from = nil
+									addLink.to = nil
+
+									ShadowUF.Layout:Reload()
+								end,
+							},
+						},
+					},
+				},
+			},
+			units = {
+				order = 4,
+				type = "group",
+				name = L["Enable Indicators"],
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						name = L["Help"],
+						inline = true,
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["You can disable aura filters and groups for units here. For example, you could set an aura group that shows DPS debuffs to only show on the target."],
+								width = "full",
+							},
+						},
+					},
+					global = {
+						order = 0,
+						type = "group",
+						name = L["Global"],
+						desc = L["Global configurating will let you mass enable or disable aura groups for multiple units at once."],
+						args = {
+							units = {
+								order = 0,
+								type = "multiselect",
+								name = L["Units to change"],
+								desc = L["Units that should have the aura groups settings changed below."],
+								values = getEnabledUnits,
+								set = function(info, unit, enabled) setGlobalUnits[unit] = enabled or nil end,
+								get = function(info, unit) return setGlobalUnits[unit] end,
+							},
+							filters = {
+								order = 1,
+								type = "group",
+								inline = true,
+								name = L["Aura filters"],
+								args = {}
+							},
+							groups = {
+								order = 2,
+								type = "group",
+								inline = true,
+								name = L["Aura groups"],
+								args = {}
+							},
+						},
+					},
+				},
+			},
+			classes = {
+				order = 5,
+				type = "group",
+				name = L["Disable Auras by Class"],
+				childGroups = "tree",
+				args = {
+					help = {
+						order = 0,
+						type = "group",
+						name = L["Help"],
+						inline = true,
+						args = {
+							help = {
+								order = 0,
+								type = "description",
+								name = L["You can override what aura is enabled on a per-class basis, note that if the aura is disabled through the main listing, then your class settings here will not matter."],
+								width = "full",
+							},
+						},
+					}
+				},
+			},
+		},
+	}
+
+	local classTable = {
+		order = 1,
+		type = "group",
+		name = function(info)
+			local classToken = info[#(info)]
+			local color = ShadowUF.db.profile.classColors[classToken] or RAID_CLASS_COLORS[classToken]
+			return ShadowUF:Hex(color) .. (LOCALIZED_CLASS_NAMES_MALE[classToken] or classToken) .. "|r"
+		end,
+		args = {},
+	}
+
+	local classAuraTable = {
+		order = 1,
+		type = "toggle",
+		icon = function(info)
+			local aura = auraMap[info[#(info)]]
+			return tonumber(aura) and (GetSpellTexture(aura)) or nil
+		end,
+		name = function(info)
+			local aura = tonumber(auraMap[info[#(info)]])
+			if( not aura ) then	return auraMap[info[#(info)]] end
+
+			local name = GetSpellName(aura)
+			local icon = GetSpellTexture(aura)
+			if( not name ) then return name end
+
+			return "|T" .. icon .. ":18:18:0:0|t " .. name
+		end,
+		desc = function(info)
+			local aura = auraMap[info[#(info)]]
+			if( tonumber(aura) ) then
+				return string.format(L["Spell ID %s"], aura)
+			else
+				return aura
+			end
+		end,
+		set = function(info, value)
+			local aura = auraMap[info[#(info)]]
+			local class = info[#(info) - 1]
+			value = not value
+
+			if( value == false ) then value = nil end
+			ShadowUF.db.profile.auraIndicators.disabled[class][aura] = value
+			ShadowUF.Layout:Reload()
+		end,
+		get = function(info)
+			local aura = auraMap[info[#(info)]]
+			local class = info[#(info) - 1]
+
+			return not ShadowUF.db.profile.auraIndicators.disabled[class][aura]
+		end,
+	}
+
+	-- The trees below enumerate profile data, a profile switch rebuilds them through Config:ProfilesChanged
+	local function buildAuraTrees()
+		-- Build links
+		local addedFrom = {}
+		for from, to in pairs(ShadowUF.db.profile.auraIndicators.linked) do
+			local pID = addedFrom[to]
+			if( not pID ) then
+				linkID = linkID + 1
+				pID = linkID
+
+				addedFrom[to] = pID
+			end
+
+			linkID = linkID + 1
+
+			ShadowUF.db.profile.auraIndicators.linked[from] = to
+			options.args.auraIndicators.args.linked.args[tostring(pID)] = parentLinkTable
+			parentLinkTable.args[tostring(linkID)] = childLinkTable
+
+			linkMap[tostring(linkID)] = from
+			linkMap[tostring(pID)] = to
+		end
+
+		-- Build the aura configuration
+		local groups = {}
+		for name in pairs(ShadowUF.db.profile.auraIndicators.auras) do
+			local aura = Indicators.auraConfig[name]
+			if( aura.group ) then
+				auraMap[tostring(auraID)] = name
+				auraGroupTable.args[tostring(auraID)] = auraConfigTable
+				classTable.args[tostring(auraID)] = classAuraTable
+				auraID = auraID + 1
+
+				groups[aura.group] = true
+			end
+		end
+
+		-- Now create all of the parent stuff
+		for group in pairs(groups) do
+			groupMap[tostring(groupID)] = group
+			unitTable.args.groups.args[tostring(groupID)] = unitGroupTable
+
+			options.args.auraIndicators.args.units.args.global.args.groups.args[tostring(groupID)] = globalUnitGroupTable
+			options.args.auraIndicators.args.auras.args.groups.args[tostring(groupID)] = auraGroupTable
+
+			groupID = groupID + 1
+		end
+
+		for _, type in pairs(auraFilters) do
+			unitTable.args.filters.args[type] = unitFilterTable
+			options.args.auraIndicators.args.units.args.global.args.filters.args[type] = globalUnitFilterTable
+		end
+
+		-- Aura status by unit; compound unit tokens have no auraIndicators table (the aura APIs reject them)
+		for unit, config in pairs(ShadowUF.db.profile.units) do
+			if( config.auraIndicators ) then
+				options.args.auraIndicators.args.units.args[unit] = unitTable
+			end
+		end
+
+		-- Build class status thing
+		for classToken in pairs(RAID_CLASS_COLORS) do
+			if ShadowUF.db.profile.classColors[classToken] then
+				options.args.auraIndicators.args.classes.args[classToken] = classTable
+			end
+		end
+
+		-- Quickly build the indicator one
+		for key in pairs(ShadowUF.db.profile.auraIndicators.indicators) do
+			options.args.auraIndicators.args.indicators.args[key] = indicatorTable
+			options.args.auraIndicators.args.auras.args.filters.args[key] = auraFilterConfigTable
+		end
+	end
+
+	-- Numbered args and name-keyed entries from the previous profile go away, static keys just get re-assigned by the build
+	local function clearAuraTrees()
+		for id in pairs(auraMap) do
+			auraGroupTable.args[id] = nil
+			classTable.args[id] = nil
+			auraMap[id] = nil
+		end
+		for id in pairs(groupMap) do
+			unitTable.args.groups.args[id] = nil
+			options.args.auraIndicators.args.units.args.global.args.groups.args[id] = nil
+			options.args.auraIndicators.args.auras.args.groups.args[id] = nil
+			groupMap[id] = nil
+		end
+		for id in pairs(linkMap) do
+			options.args.auraIndicators.args.linked.args[id] = nil
+			parentLinkTable.args[id] = nil
+			linkMap[id] = nil
+		end
+		local indicatorArgs = options.args.auraIndicators.args.indicators.args
+		for key, value in pairs(indicatorArgs) do
+			if( value == indicatorTable ) then indicatorArgs[key] = nil end
+		end
+		local filterArgs = options.args.auraIndicators.args.auras.args.filters.args
+		for key, value in pairs(filterArgs) do
+			if( value == auraFilterConfigTable ) then filterArgs[key] = nil end
+		end
+	end
+
+	buildAuraTrees()
+
+	Config.RebuildAuraIndicators = function()
+		clearAuraTrees()
+		buildAuraTrees()
+	end
+
+	-- Automatically unlock the advanced text configuration for raid frames, regardless of advanced being enabled
+	local advanceTextTable = ShadowUF.Config.advanceTextTable
+	local originalHidden = advanceTextTable.args.sep.hidden
+	local function unlockRaidText(info)
+		if( info[2] == "raid" ) then return false end
+		return originalHidden(info)
+	end
+
+	advanceTextTable.args.anchorPoint.hidden = unlockRaidText
+	advanceTextTable.args.sep.hidden = unlockRaidText
+	advanceTextTable.args.x.hidden = unlockRaidText
+	advanceTextTable.args.y.hidden = unlockRaidText
+end
+
+local function loadPerformanceOptions()
+	local L = ShadowUF.L
+	local Perf = ShadowUF.Performance
+
+	local rateSliders = {}
+	local sliderDefs = {
+		{key = "rangeCheck",       order = 1, name = L["Range check interval"],  desc = L["How often to check if units are in range (seconds)."]},
+		{key = "tagMonitorFast",   order = 2, name = L["Fast tag refresh"],      desc = L["Refresh rate for rapidly changing tags like health/power percent (seconds)."]},
+		{key = "tagMonitorNormal", order = 3, name = L["Normal tag refresh"],    desc = L["Refresh rate for standard dynamic tags (seconds)."]},
+		{key = "tagMonitorSlow",   order = 4, name = L["Slow tag refresh"],      desc = L["Refresh rate for slowly changing tags like AFK timers (seconds)."]},
+		{key = "fakeCastMonitor",  order = 5, name = L["Fake cast monitor"],     desc = L["Polling rate for cast bars on non-event units like focus target (seconds)."]},
+		{key = "combatIndicator",  order = 6, name = L["Combat indicator"],      desc = L["How often to poll NPC combat status for the combat indicator (seconds)."]},
+	}
+
+	for _, def in ipairs(sliderDefs) do
+		local rateDef = Perf:GetRateDefinition(def.key)
+		rateSliders[def.key] = {
+			order = def.order,
+			type = "range",
+			name = def.name,
+			desc = def.desc,
+			min = rateDef.min,
+			max = rateDef.max,
+			step = 0.05,
+			get = function() return ShadowUF.db.profile.performance[def.key] end,
+			set = function(info, value)
+				ShadowUF.db.profile.performance[def.key] = value
+				Perf:FireCallback(def.key)
+			end,
+		}
+	end
+
+	rateSliders.help = {
+		order = 0,
+		type = "description",
+		name = L["Adjust polling and refresh rates for various addon subsystems. Lower values = more responsive but higher CPU usage. Higher values = less CPU but slower updates."],
+		fontSize = "medium",
+	}
+
+	rateSliders.reset = {
+		order = 8,
+		type = "execute",
+		name = L["Reset to defaults"],
+		desc = L["Reset all performance settings to their default values."],
+		func = function()
+			for _, key in ipairs(Perf:GetAllRateKeys()) do
+				local rateDef = Perf:GetRateDefinition(key)
+				ShadowUF.db.profile.performance[key] = rateDef.default
+				Perf:FireCallback(key)
+			end
+		end,
+	}
+
+	options.args.performance = {
+		type = "group",
+		name = L["Performance"],
+		desc = L["Performance settings"],
+		args = rateSliders,
+	}
+end
+
+local function loadOptions()
+	options = {
+		type = "group",
+		name = "Shadowed UF",
+		args = {}
+	}
+
+	loadGeneralOptions()
+	loadUnitOptions()
+	loadHideOptions()
+	loadTagOptions()
+	loadFilterOptions()
+	loadCustomFilterOptions()
+	loadVisibilityOptions()
+	loadAuraIndicatorsOptions()
+	loadPerformanceOptions()
+
+	-- Ordering
+	options.args.general.order = 1
+	options.args.profile.order = 1.5
+	options.args.enableUnits.order = 2
+	options.args.units.order = 3
+	options.args.filter.order = 4
+	options.args.customFilters.order = 4.2
+	options.args.auraIndicators.order = 4.5
+	options.args.hideBlizzard.order = 5
+	options.args.visibility.order = 6
+	options.args.tags.order = 7
+	options.args.performance.order = 7.5
+
+	-- So modules can access it easier/debug
+	Config.options = options
+
+	-- Options finished loading, fire callback for any non-default modules that want to be included
+	ShadowUF:FireModuleEvent("OnConfigurationLoad")
+end
+
+-- The aura indicator and custom filter trees snapshot profile data when built, everything else reads live through dynamic getters
+function Config:ProfilesChanged()
+	if( not options ) then return end
+	if( Config.RebuildAuraIndicators ) then Config.RebuildAuraIndicators() end
+	if( Config.RebuildCustomFilters ) then Config.RebuildCustomFilters() end
+end
+
+local defaultToggles
+function Config:Open()
+	AceDialog = AceDialog or LibStub("AceConfigDialog-3.0")
+	AceRegistry = AceRegistry or LibStub("AceConfigRegistry-3.0")
+	registerSpellEditBox()
+
+	if( not registered ) then
+		loadOptions()
+
+		AceRegistry:RegisterOptionsTable("ShadowedUF", options, true)
+		AceDialog:SetDefaultSize("ShadowedUF", 895, 570)
+		registered = true
+	end
+
+	AceDialog:Open("ShadowedUF")
+
+	-- Clear aura test mode on all units when config window is closed
+	local aceFrame = AceDialog.OpenFrames["ShadowedUF"]
+	if( aceFrame and aceFrame.frame and not aceFrame.frame.suf_hooked ) then
+		aceFrame.frame.suf_hooked = true
+		aceFrame.frame:HookScript("OnHide", function()
+			-- Copy keys first since DisableTestMode modifies the table
+			local units = {}
+			for unitType in pairs(ShadowUF.modules.movers.testModeUnits) do
+				units[unitType] = true
+			end
+			for unitType in pairs(units) do
+				local cfg = ShadowUF.db.profile.units[unitType]
+				if( cfg and cfg.auras ) then cfg.auras.testMode = nil end
+				ShadowUF.modules.movers:DisableTestMode(unitType)
+			end
+		end)
+	end
+
+	if( not defaultToggles ) then
+		defaultToggles = true
+
+		AceDialog.Status.ShadowedUF.status.groups.groups.units = true
+		AceRegistry:NotifyChange("ShadowedUF")
+	end
+end

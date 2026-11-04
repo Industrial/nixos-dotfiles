@@ -17,6 +17,33 @@ oy, t = oy - 32, frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 t:SetPoint("TOP", 0, oy)
 t:SetText("|cffb0b0b0" .. GAME_VERSION_LABEL .. "|r " .. frame.version:GetText())
 
+local hlink = {} do
+	local isLinkCursorSet
+	local function onHyperLinkClick(_, link, text)
+		local url = link == "url" and text:match("|h(.-)|h") or link:match("^url:.-(%w+://.+)")
+		if url then
+			TS:ShowCopyOverlay(frame, BROWSER_COPY_LINK, " ", url, L"Copy the URL shown above and visit it using a web browser.", OKAY, 1)
+		end
+	end
+	local function onHyperLinkEnter()
+		isLinkCursorSet = 1
+		SetCursor("Interface/Cursor/Interact")
+	end
+	local function clearLinkCursor()
+		if isLinkCursorSet then
+			isLinkCursorSet = nil
+			SetCursor(nil)
+		end
+	end
+	function hlink:ApplyToFrame(f)
+		f:SetScript("OnHyperLinkClick", onHyperLinkClick)
+		f:SetScript("OnHyperLinkEnter", onHyperLinkEnter)
+		f:SetScript("OnHyperLinkLeave", clearLinkCursor)
+		f:HookScript("OnHide", clearLinkCursor)
+		f:SetHyperlinksEnabled(true)
+	end
+end
+
 local navView = CreateFrame("Frame", nil, frame) do
 	navView:SetHeight(100) -- going to overflow; it's fine
 	navView:SetPoint("TOPLEFT", 0, oy - 32)
@@ -81,9 +108,9 @@ local navView = CreateFrame("Frame", nil, frame) do
 	makeNav(5, L"Ring Bindings", L"Customize OPie ring and in-ring key bindings.")
 	makeNav(6, L"Custom Rings", L"Edit existing rings, or create your own custom OPie rings.")
 	local svWarning = CreateFrame("Button", nil, navView) do
-		oy = oy - 60
+		oy = oy - 80
 		svWarning:SetSize(300, 18)
-		svWarning:SetPoint("TOPLEFT", 18, oy)
+		svWarning:SetPoint("TOPLEFT", 18, 18+oy)
 		svWarning:SetNormalFontObject(GameFontRed)
 		svWarning:SetHighlightFontObject(GameFontHighlight)
 		svWarning:SetScript("OnClick", function() config.checkSVState(frame, true) end)
@@ -98,32 +125,32 @@ local navView = CreateFrame("Frame", nil, frame) do
 		fs:SetPoint("LEFT")
 		svWarning:SetWidth(math.max(300, fs:GetStringWidth()))
 	end
+	if C_AddOns.GetAddOnInterfaceVersion(ADDON) ~= select(4, GetBuildInfo()) then
+		oy = oy - 40
+		local tw = CreateFrame("Frame", nil, navView)
+		tw:SetHeight(36)
+		tw:SetPoint("TOPLEFT", 18, 38+oy)
+		tw:SetPoint("TOPRIGHT", -18, 38+oy)
+		local ico = tw:CreateTexture(nil, "ARTWORK")
+		ico:SetTexture("Interface/EncounterJournal/UI-EJ-WarningTextIcon")
+		ico:SetSize(16, 16)
+		ico:SetPoint("TOPLEFT", 4, 0)
+		local fs = tw:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		fs:SetPoint("TOPLEFT", 28, 0)
+		fs:SetPoint("TOPRIGHT", -8, 0)
+		fs:SetJustifyH("LEFT")
+		fs:SetSpacing(2)
+		fs:SetText(L"This version of OPie is not flagged as compatible with this World of Warcraft patch."
+		 .. "\n" .. (L"If you encounter problems, please [check whether an OPie update is available]."):gsub("%[(.-)%]", "|cff00a0ff|Hurl:https://www.townlong-yak.com/addons/opie/|h%1|h|r"))
+		hlink:ApplyToFrame(tw)
+	end
 end
 local logView, clipBar = CreateFrame("Frame", nil, frame) do
 	logView:SetHeight(100) -- going to overflow; it's fine
 	logView:SetPoint("TOPLEFT", 0, oy - 32)
 	logView:SetPoint("TOPRIGHT", 0, oy - 32)
 	logView:Hide()
-	logView:SetScript("OnHyperLinkClick", function(_, link, text)
-		local url = link == "url" and text:match("|h(.-)|h") or link:match("^url:.-(%w+://.+)")
-		if url then
-			TS:ShowCopyOverlay(frame, BROWSER_COPY_LINK, " ", url, L"Copy the URL shown above and visit it using a web browser.", OKAY, 1)
-		end
-	end)
-	local isLinkCursorSet
-	local function clearLinkCursor()
-		if isLinkCursorSet then
-			isLinkCursorSet = nil
-			SetCursor(nil)
-		end
-	end
-	logView:SetScript("OnHyperlinkEnter", function()
-		isLinkCursorSet = 1
-		SetCursor("Interface/Cursor/Interact")
-	end)
-	logView:SetScript("OnHyperlinkLeave", clearLinkCursor)
-	logView:SetScript("OnHide", clearLinkCursor)
-	logView:SetHyperlinksEnabled(true)
+	hlink:ApplyToFrame(logView)
 
 	local oy, t = 0, logView:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	t:SetPoint("TOPLEFT", 20, oy)
@@ -136,7 +163,7 @@ local logView, clipBar = CreateFrame("Frame", nil, frame) do
 	t:SetPoint("TOPLEFT", 20, oy)
 	t:SetPoint("TOPRIGHT", -20, oy)
 	t:SetJustifyH("LEFT")
-	local link = "|cff00a0ff|Hurl|hhttps://townlong-yak.com/addons/opie/release|h|r"
+	local link = "|cff00a0ff|Hurl|hhttps://www.townlong-yak.com/addons/opie/release|h|r"
 	local intro = (L"Selected highlights from recent updates to OPie are summarized below. For full release notes, please visit %s"):format(link)
 	local MARK_TEXTURE = "Interface/AddOns/" .. ADDON .. "/gfx/mark.png"
 	local uvMark = "|T" .. MARK_TEXTURE .. ":0:0:0:-4:2:1:1:2:0:1:221:102:0|t"
@@ -224,13 +251,13 @@ function H.ShowWhatsNew()
 end
 function H.ShowReportIssuePrompt()
 	local text = L"If something in OPie does not behave correctly (or if you'd like it to behave differently), create an issue by visiting:"
-	local url = "https://townlong-yak.com/addons/opie/issues"
+	local url = "https://www.townlong-yak.com/addons/opie/issues"
 	local hint = L"Copy the URL shown above and visit it using a web browser."
 	TS:ShowCopyOverlay(frame, L"Report an Issue", text, url, hint, OKAY, 0.85)
 end
 function H.ShowTranslatePrompt()
 	local text = L"You can help translate OPie by visiting:"
-	local url = "https://townlong-yak.com/addons/opie/localization"
+	local url = "https://www.townlong-yak.com/addons/opie/localization"
 	local hint = L"Copy the URL shown above and visit it using a web browser."
 	TS:ShowCopyOverlay(frame, L"Translate OPie", text, url, hint, OKAY, 0.85)
 end

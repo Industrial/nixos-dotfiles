@@ -1,0 +1,30 @@
+## Interface: 120100, 120105
+
+## Title: BetterBags - Appearances
+## Author: Sauravisus (Xirastrasza - Argent Dawn EU, Horde)
+## Notes: Categories to help transmog farming.
+## Version: 2.5.6
+## X-Date: 2026-09-21T10:57:41Z
+## X-Category: Bags & Inventory
+## X-Curse-Project-ID: 956133
+## Dependencies: BetterBags
+## SavedVariables: BetterBags_AppearancesDB
+## IconTexture: Interface\Icons\inv_misc_bag_24_netherweave_imbued
+
+## Category-enUS: Inventory
+## Category-deDE: Inventar
+## Category-esES: Inventario
+## Category-esMX: Inventario
+## Category-frFR: Inventaire
+## Category-itIT: Inventario
+## Category-koKR: 소지품
+## Category-ptBR: Inventário
+## Category-ruRU: Предметы
+## Category-zhCN: 物品栏
+## Category-zhTW: 物品欄
+
+## Group: BetterBags
+
+
+main.lua
+

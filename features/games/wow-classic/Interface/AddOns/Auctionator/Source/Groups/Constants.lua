@@ -1,10 +1,13 @@
+local build = select(4, GetBuildInfo())
+
 Auctionator.Groups.Constants = {
   IsWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC,
   IsMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC,
   IsCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC,
   IsBC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC,
   IsVanilla = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC,
-  IsRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE,
+  IsForever = build >= 16000 and build < 20000,
+  IsRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE and build >= 120000,
 }
 
 Auctionator.Groups.Constants.Events = {
@@ -24,10 +27,10 @@ Auctionator.Groups.Constants.Events = {
 if Auctionator.Groups.Constants.IsVanilla or Auctionator.Groups.Constants.IsBC then
   -- Note that -2 is the keyring bag, which only exists in classic era
   Auctionator.Groups.Constants.BagIDs = {-2, 0, 1, 2, 3, 4}
-elseif not Auctionator.Groups.Constants.IsRetail then
-  Auctionator.Groups.Constants.BagIDs = {0, 1, 2, 3, 4}
-elseif Auctionator.Groups.Constants.IsRetail then
+elseif Auctionator.Groups.Constants.IsRetail or Auctionator.Groups.Constants.IsForever then
   Auctionator.Groups.Constants.BagIDs = {0, 1, 2, 3, 4, 5}
+else
+  Auctionator.Groups.Constants.BagIDs = {0, 1, 2, 3, 4}
 end
 
 if Auctionator.Groups.Constants.IsRetail then
@@ -116,7 +119,7 @@ elseif Auctionator.Groups.Constants.IsBC then
     Enum.ItemClass.Questitem,
     Enum.ItemClass.Key,
   }
-elseif Auctionator.Groups.Constants.IsVanilla then
+elseif Auctionator.Groups.Constants.IsVanilla or Auctionator.Groups.Constants.IsForever then
   Auctionator.Groups.Constants.ValidItemClassIDs = {
     Enum.ItemClass.Weapon,
     Enum.ItemClass.Armor,

@@ -10,9 +10,6 @@ local _, Bartender4 = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("Bartender4")
 local Bar = Bartender4.Bar.prototype
 
-local WoW11 = select(4, GetBuildInfo()) >= 110000
-if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then return end
-
 local PresetsMod = Bartender4:NewModule("Presets")
 local ActionBarsMod = Bartender4:GetModule("ActionBars")
 
@@ -160,7 +157,6 @@ local function BuildDoubleProfile()
 		config.enabled = true
 		config.scale = 1
 		config.width = 1032
-		config.twentySections = true
 		Bartender4:GetModule("StatusTrackingBar"):Enable()
 		SetBarLocation( config, "BOTTOM", -520, 68)
 	end
@@ -225,9 +221,9 @@ local function BuildClassicBlizzardProfile()
 	SetBarLocation( config, "BOTTOM", 345, 38.5 )
 
 	config = Bartender4.db:GetNamespace("MicroMenu").profile
-	config.position.scale = WoW11 and 1.15 or 1.5
+	config.position.scale =  1.15
 	config.padding = -1
-	SetBarLocation( config, "BOTTOM", WoW11 and 33 or 32, WoW11 and 46 or 41.75 )
+	SetBarLocation( config, "BOTTOM", 33, 46 )
 
 	config = Bartender4.db:GetNamespace("QueueStatus").profile
 	config.position.scale = 1.0
@@ -241,7 +237,6 @@ local function BuildClassicBlizzardProfile()
 		config.enabled = true
 		config.scale = 1
 		config.width = 1032
-		config.twentySections = true
 		Bartender4:GetModule("StatusTrackingBar"):Enable()
 		SetBarLocation( config, "BOTTOM", -520, 68)
 	end
@@ -305,19 +300,15 @@ local function BuildBlizzardProfile()
 	config = Bartender4.db:GetNamespace("MicroMenu").profile
 	config.position.scale = 1.0
 	config.padding = 1
-	if WoW11 then
-		SetBarLocation( config, "BOTTOMRIGHT", -284, 42 )
-	else
-		SetBarLocation( config, "BOTTOMRIGHT", -229, 34 )
-	end
+	SetBarLocation( config, "BOTTOMRIGHT", -284, 42 )
 
 	config = Bartender4.db:GetNamespace("QueueStatus").profile
 	config.position.scale = 1.0
-	SetBarLocation( config, "BOTTOMRIGHT", WoW11 and -324 or -271, 40.5 )
+	SetBarLocation( config, "BOTTOMRIGHT", -324, 40.5 )
 
 	config = Bartender4.db:GetNamespace("BagBar").profile
 	config.onebag = false
-	SetBarLocation( config, "BOTTOMRIGHT", -212, WoW11 and 80 or 74 )
+	SetBarLocation( config, "BOTTOMRIGHT", -212, 80 )
 
 	config = Bartender4.db:GetNamespace("Vehicle").profile
 	SetBarLocation( config, "BOTTOM", -337, 153 )
@@ -389,9 +380,9 @@ local function BuildModernArtClassicProfile()
 	SetBarLocation( config, "BOTTOM", 300, 36 )
 
 	config = Bartender4.db:GetNamespace("MicroMenu").profile
-	config.position.scale = WoW11 and 1.1 or 1.4
+	config.position.scale = 1.05
 	config.padding = -1
-	SetBarLocation( config, "BOTTOM", WoW11 and 2 or 7, WoW11 and 47 or 41 )
+	SetBarLocation( config, "BOTTOM", -3, 45 )
 
 	config = Bartender4.db:GetNamespace("QueueStatus").profile
 	config.position.scale = 1.0
@@ -405,7 +396,6 @@ local function BuildModernArtClassicProfile()
 		config.enabled = true
 		config.scale = 1
 		config.width = 1032
-		config.twentySections = true
 		Bartender4:GetModule("StatusTrackingBar"):Enable()
 		SetBarLocation( config, "BOTTOM", -517, 68)
 	end
@@ -446,7 +436,7 @@ function PresetsMod:ResetProfile(type)
 	UpdateGlobalProfileSettings()
 
 	-- load the preset
-	if type == "BLIZZARD" then
+	if type == "BLIZZARD" or type == "DEFAULT" then
 		BuildBlizzardProfile()
 	elseif type == "MODERN_ART_CLASSIC" then
 		BuildModernArtClassicProfile()
@@ -465,7 +455,7 @@ end
 function PresetsMod:OnEnable()
 	Bartender4.finishedLoading = true
 	if self.applyBlizzardOnEnable then
-		self:ResetProfile("BLIZZARD")
+		self:ResetProfile("DEFAULT")
 		self.applyBlizzardOnEnable = nil
 	end
 end
@@ -522,7 +512,7 @@ function PresetsMod:SetupOptions()
 				name = L["Status Tracking Bar (XP/Rep/...)"],
 				get = function() return PresetsMod.showStatusBar end,
 				set = function(info, val) PresetsMod.showStatusBar = val end,
-				disabled = function() return PresetsMod.defaultType == "RESET" end,
+				disabled = function() return PresetsMod.defaultType == "ZRESET" end,
 			},
 			nl2 = {
 				order = 36,
@@ -533,7 +523,7 @@ function PresetsMod:SetupOptions()
 				order = 40,
 				type = "execute",
 				name = L["Apply Preset"],
-				func = function() PresetsMod.ResetProfile() end,
+				func = function() PresetsMod:ResetProfile() end,
 			}
 		}
 		self.optionobject = Bartender4:NewOptionObject( otbl )

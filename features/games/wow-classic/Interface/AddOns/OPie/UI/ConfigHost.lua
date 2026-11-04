@@ -1,5 +1,5 @@
 local COMPAT, ADDON, T = select(4,GetBuildInfo()), ...
-local CI_ERA = COMPAT < 2e4
+local CI_ERA = COMPAT < 160e2
 local config, L, TS, XU, PC, GameTooltip = {}, T.L, T.TenSettings, T.exUI, T.OPieCore, T.NotGameTooltip or GameTooltip
 T.config = config
 
@@ -90,7 +90,7 @@ do -- config.bind
 			GameTooltip:SetPoint("TOP", self, "BOTTOM")
 			GameTooltip:AddLine(L"Conditional Bindings", NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 			GameTooltip:AddLine(L"The binding will update to reflect the value of this macro options expression.", HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1)
-			GameTooltip:AddLine((L"You may use extended conditionals; see %s for details."):format("|cff33DDFFhttps://townlong-yak.com/addons/opie/extended-conditionals|r"), HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1)
+			GameTooltip:AddLine((L"You may use extended conditionals; see %s for details."):format("|cff33DDFFhttps://www.townlong-yak.com/addons/opie/extended-conditionals|r"), HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1)
 			GameTooltip:AddLine((L"Example: %s."):format(GREEN_FONT_COLOR_CODE .. "[combat] ALT-C; [nomounted] CTRL-F|r"), NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b)
 			GameTooltip:Show()
 		end)

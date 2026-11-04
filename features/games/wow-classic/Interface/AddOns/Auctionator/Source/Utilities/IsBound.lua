@@ -6,5 +6,5 @@ local unboundConstants = {
 function Auctionator.Utilities.IsBound(itemInfo)
   local bindType = itemInfo[Auctionator.Constants.ITEM_INFO.BIND_TYPE]
 
-  return tIndexOf(unboundConstants, bindType) == nil
+  return tIndexOf(unboundConstants, bindType) == nil or (C_Item.IsItemBindToAccountUntilEquip and C_Item.IsItemBindToAccountUntilEquip(itemInfo[2]))
 end

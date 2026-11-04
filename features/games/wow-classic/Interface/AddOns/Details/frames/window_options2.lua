@@ -10,6 +10,16 @@ local Loc = _G.LibStub("AceLocale-3.0"):GetLocale("Details")
 --options panel namespace
 Details222.OptionsPanel = {}
 
+--options catalog namespace
+--the catalog exposes the option definitions details! builds for its own options window so another addon can
+--render the same options in its own panel; see Details222.OptionsCatalog.GetSectionOptions in
+--frames\window_options2_sections.lua
+Details222.OptionsCatalog = {}
+
+--the section holding the designer, a live preview window beside an object editor, built in
+--frames\window_designer\designer_frame.lua
+Details222.OptionsPanel.DESIGNER_SECTION_ID = 21
+
 --local tinsert = _G.tinsert
 local unpack = _G.unpack
 local CreateFrame = _G.CreateFrame
@@ -33,6 +43,45 @@ local section_menu_button_height = 20
 
 local startX = 160
 
+---the name of every options section, keyed by section id
+---@return table sectionNames
+function Details222.OptionsCatalog.GetSectionNames()
+    return { --section names
+        [1] = Loc ["STRING_OPTIONSMENU_DISPLAY"],
+        [3] = Loc ["STRING_OPTIONSMENU_ROWSETTINGS"],
+        [4] = Loc ["STRING_OPTIONSMENU_ROWTEXTS"],
+
+        [5] = Loc ["STRING_OPTIONSMENU_TITLEBAR"], --titlebar
+        [6] = Loc ["STRING_OPTIONSMENU_WINDOWBODY"], --window body
+        [7] = Loc ["STRING_OPTIONS_INSTANCE_STATUSBAR_ANCHOR"], --statusbar
+        [12] = Loc ["STRING_OPTIONSMENU_WALLPAPER"],
+        [13] = Loc ["STRING_OPTIONSMENU_AUTOMATIC"],
+
+        [9] = Loc ["STRING_OPTIONSMENU_PROFILES"],
+        [2] = Loc ["STRING_OPTIONSMENU_SKIN"],
+        [8] = Loc ["STRING_OPTIONSMENU_PLUGINS"],
+        [10] = Loc ["STRING_OPTIONSMENU_TOOLTIP"],
+        [11] = Loc ["STRING_OPTIONSMENU_DATAFEED"],
+
+        [14] = Loc ["STRING_OPTIONSMENU_RAIDTOOLS"],
+        [15] = "Broadcaster Tools",
+        [16] = Loc ["STRING_OPTIONSMENU_SPELLS"],
+        [17] = Loc ["STRING_OPTIONSMENU_DATACHART"],
+        [18] = "Mythic Dungeon",
+        [19] = "Search Results",
+        [20] = "Combat Log",
+        [21] = Loc ["STRING_OPTIONSMENU_DESIGNER"],
+    }
+end
+
+---the order the sections are shown in the options window, an empty string is a separator
+---@return table sectionOrder
+function Details222.OptionsCatalog.GetSectionOrder()
+    return {
+        21, "", 1, 20, "", 3, 4, "", 5, 6, 7, 12, 13, "", 9, 2, 8, 10, 11, 18, "", 14, 15, 16, 17, "", 19
+    }
+end
+
 --build the options window
 function Details:InitializeOptionsWindow(instance)
     return Details222.OptionsPanel.InitializeOptionsWindow(instance)
@@ -43,9 +92,10 @@ end
 --end)
 
 function Details222.OptionsPanel.InitializeOptionsWindow(instance)
-	local DetailsOptionsWindow = detailsFramework:NewPanel(UIParent, _, "DetailsOptionsWindow", _, 897, 592)
+	local DetailsOptionsWindow = detailsFramework:NewPanel(UIParent, _, "DetailsOptionsWindow", _, 997, 592)
     local optionsFrame = DetailsOptionsWindow.frame
     optionsFrame:Hide()
+    optionsFrame:SetFrameStrata("HIGH")
 
     DetailsOptionsWindow:SetBackdrop({})
     detailsFramework:AddRoundedCornersToFrame(optionsFrame, Details.PlayerBreakdown.RoundedCornerPreset)
@@ -254,8 +304,13 @@ function Details222.OptionsPanel.InitializeOptionsWindow(instance)
                     local sectionFrame = allSectionFrames[i]
                     local sectionOptionsTable = sectionFrame.sectionOptions
 
-                    allSectionNames[#allSectionNames+1] = sectionFrame.name
-                    allSectionOptions[#allSectionOptions+1] = sectionOptionsTable
+                    --a section without option definitions, the search results section itself for example,
+                    --must not push a name either or the two arrays stop lining up and the results get
+                    --grouped under the wrong section header
+                    if (sectionOptionsTable) then
+                        allSectionNames[#allSectionNames+1] = sectionFrame.name
+                        allSectionOptions[#allSectionOptions+1] = sectionOptionsTable
+                    end
                 end
 
                 --this table will hold all options
@@ -303,8 +358,9 @@ function Details222.OptionsPanel.InitializeOptionsWindow(instance)
                     end
                 end
 
+                --same start as the other sections so the results sit below the top buttons
                 local startX = 200
-                local startY = -60
+                local startY = -95
 
                 detailsFramework:BuildMenuVolatile(searchSection, options, startX, startY, 560, true, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template, globalCallback)
 
@@ -313,35 +369,8 @@ function Details222.OptionsPanel.InitializeOptionsWindow(instance)
             end
         end)
 
-    local sectionsName = { --section names
-        [1] = Loc ["STRING_OPTIONSMENU_DISPLAY"],
-        [3] = Loc ["STRING_OPTIONSMENU_ROWSETTINGS"],
-        [4] = Loc ["STRING_OPTIONSMENU_ROWTEXTS"],
-
-        [5] = Loc ["STRING_OPTIONSMENU_TITLEBAR"], --titlebar
-        [6] = Loc ["STRING_OPTIONSMENU_WINDOWBODY"], --window body
-        [7] = Loc ["STRING_OPTIONS_INSTANCE_STATUSBAR_ANCHOR"], --statusbar
-        [12] = Loc ["STRING_OPTIONSMENU_WALLPAPER"],
-        [13] = Loc ["STRING_OPTIONSMENU_AUTOMATIC"],
-
-        [9] = Loc ["STRING_OPTIONSMENU_PROFILES"],
-        [2] = Loc ["STRING_OPTIONSMENU_SKIN"],
-        [8] = Loc ["STRING_OPTIONSMENU_PLUGINS"],
-        [10] = Loc ["STRING_OPTIONSMENU_TOOLTIP"],
-        [11] = Loc ["STRING_OPTIONSMENU_DATAFEED"],
-
-        [14] = Loc ["STRING_OPTIONSMENU_RAIDTOOLS"],
-        [15] = "Broadcaster Tools",
-        [16] = Loc ["STRING_OPTIONSMENU_SPELLS"],
-        [17] = Loc ["STRING_OPTIONSMENU_DATACHART"],
-        [18] = "Mythic Dungeon",
-        [19] = "Search Results",
-        [20] = "Combat Log",
-    }
-
-    local optionsSectionsOrder = {
-        1, 20, "", 3, 4, "", 5, 6, 7, 12, 13, "", 9, 2, 8, 10, 11, 18, "", 14, 15, 16, 17, "", 19
-    }
+    local sectionsName = Details222.OptionsCatalog.GetSectionNames()
+    local optionsSectionsOrder = Details222.OptionsCatalog.GetSectionOrder()
 
     local maxSectionIds = 0
     for k in pairs(sectionsName) do
@@ -351,6 +380,13 @@ function Details222.OptionsPanel.InitializeOptionsWindow(instance)
     Details222.OptionsPanel.maxSectionIds = maxSectionIds
 
     local buttonYPosition = -40
+
+    --the section selected when the window opens: the designer, or the display section on a game version whose
+    --toc does not load the designer, where the designer has no button to highlight
+    local defaultSectionId = 1
+    if (Details.optionsSection[Details222.OptionsPanel.DESIGNER_SECTION_ID]) then
+        defaultSectionId = Details222.OptionsPanel.DESIGNER_SECTION_ID
+    end
 
     function Details222.OptionsPanel.SelectOptionsSection(sectionId)
         for i = 1, maxSectionIds do
@@ -398,12 +434,12 @@ function Details222.OptionsPanel.InitializeOptionsWindow(instance)
                 if (sectionId == 19) then --search results
                     sectionButton:Disable()
 
-                elseif (sectionId == 1) then
+                elseif (sectionId == defaultSectionId) then
                     sectionButton:SetIcon({1, 1, 0}, 4, section_menu_button_height -4, "overlay")
                 end
             end
         else
-            buttonYPosition = buttonYPosition - 15
+            buttonYPosition = buttonYPosition - 11
         end
     end
 
@@ -426,7 +462,7 @@ function Details222.OptionsPanel.InitializeOptionsWindow(instance)
         end
     end
 
-    Details222.OptionsPanel.SelectOptionsSection(1)
+    Details222.OptionsPanel.SelectOptionsSection(defaultSectionId)
 end
 
 -- ~options

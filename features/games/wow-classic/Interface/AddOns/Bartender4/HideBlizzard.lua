@@ -4,8 +4,6 @@
 ]]
 local _, Bartender4 = ...
 
-local WoWClassic = (WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE)
-
 local function hideActionBarFrame(frame, clearEvents)
 	if frame then
 		if clearEvents then
@@ -36,7 +34,7 @@ local function hideActionButton(button)
 	button:SetAttribute("statehidden", true)
 
 	-- on classic severing the link for some reason causes more events to fire, and the client to stall a bit
-	if not WoWClassic then
+	if not Bartender4.GameType.Classic then
 		button.bar = nil
 	end
 end
@@ -77,6 +75,12 @@ function Bartender4:HideBlizzard()
 	hideActionBarFrame(StatusTrackingBarManager, false)
 	hideActionBarFrame(BagsBar, true)
 	hideActionBarFrame(MicroMenu, true)
+	hideActionBarFrame(MicroMenuContainer, true)
+
+	if MicroMenu and MicroMenu.BorderArt and MicroMenu.BackgroundArt then
+		MicroMenu.BorderArt:Hide()
+		MicroMenu.BackgroundArt:Hide()
+	end
 
 	-- these events drive visibility, we want the MainMenuBar to remain invisible
 	if MainMenuBar then -- <= 11.2.5

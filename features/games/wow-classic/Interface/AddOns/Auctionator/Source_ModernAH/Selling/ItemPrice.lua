@@ -27,11 +27,13 @@ function Auctionator.Selling.CalculateItemPriceFromPrice(basePrice)
     Auctionator.Debug.Message("Static value calculation", basePrice, getSetAmount(), value)
   end
 
+  if Auctionator.Constants.IsForever or Auctionator.Constants.IsClassic then
+    if value < 1 then 
+      value = 1
+    end
   --Ensure the value is at least 1s
-  if value < 100 and Auctionator.Constants.IsRetail then
+  elseif value < 100 and Auctionator.Constants.IsRetail then
     value = 100
-  elseif value < 1 then
-    value = 1
   end
 
   return value

@@ -99,13 +99,72 @@ function items:RegisterUpgradeProvider(name, func)
   self.upgradeProviders[name] = func
 end
 
+-- GetActiveUpgradeProvider resolves which registered provider actually drives
+-- upgrade arrows. When the user has explicitly chosen a provider we honor that
+-- choice exactly. Otherwise (the legacy default, where the setting was never
+-- touched) an available external provider takes precedence over the built-in
+-- 'None'/'BetterBags' values, restoring the pre-#1036 behavior where Pawn (or
+-- SimpleItemLevel) drew arrows automatically without any dropdown selection.
+-- Pawn wins over SimpleItemLevel when both are present.
+---@return string
+function items:GetActiveUpgradeProvider()
+  local selected = database:GetUpgradeIconProvider()
+  if database:GetUpgradeIconProviderUserSet() then
+    return selected
+  end
+  self.upgradeProviders = self.upgradeProviders or {}
+  if self.upgradeProviders["Pawn"] then
+    return "Pawn"
+  end
+  if self.upgradeProviders["SimpleItemLevel"] then
+    return "SimpleItemLevel"
+  end
+  return selected
+end
+
+-- IsNonPreferredArmorType returns true when the item is one of the four
+-- wearable armor types (Cloth/Leather/Mail/Plate) but not the armor type the
+-- current character prefers, per Blizzard's IsItemPreferredArmorType (the same
+-- check that drives the "not your best armor type" bind warning). Shields,
+-- cloaks (armor subclass Cloth but universally wearable), cosmetic and generic
+-- armor, and all non-armor items are never gated. Returns false when the API
+-- is unavailable (non-retail), so those clients keep the naive comparison.
+---@param data ItemData
+---@return boolean
+function items:IsNonPreferredArmorType(data)
+  if not _G.IsItemPreferredArmorType or not _G.ItemLocation then
+    return false
+  end
+  local info = data and data.itemInfo
+  if not info or not Enum or not Enum.ItemClass or not Enum.ItemArmorSubclass then
+    return false
+  end
+  if info.classID ~= Enum.ItemClass.Armor then
+    return false
+  end
+  local sub = info.subclassID
+  local armor = Enum.ItemArmorSubclass
+  if sub ~= armor.Cloth and sub ~= armor.Leather and sub ~= armor.Mail and sub ~= armor.Plate then
+    return false
+  end
+  -- Cloaks are armor subclass Cloth but wearable by every class; never gate.
+  if info.itemEquipLoc == "INVTYPE_CLOAK" then
+    return false
+  end
+  local loc = _G.ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
+  if not (loc and loc.IsValid and loc:IsValid()) then
+    return false
+  end
+  return not _G.IsItemPreferredArmorType(loc)
+end
+
 ---@param data ItemData
 ---@return boolean
 function items:ResolveUpgrade(data)
   if not data or data.isItemEmpty then
     return false
   end
-  local provider = database:GetUpgradeIconProvider()
+  local provider = self:GetActiveUpgradeProvider()
   if provider == "None" then
     return false
   end
@@ -187,6 +246,23 @@ function items:Init()
   self.upgradeProviders = {}
   self:RegisterUpgradeProvider("BetterBags", function(data)
     if not data.inventorySlots or not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+      return false
+    end
+
+    -- Suppress arrows for items this character cannot use at all (class /
+    -- proficiency), e.g. a staff for a warrior. C_PlayerInfo.CanUseItem is
+    -- available on retail (10.0.5+) and Classic; when absent the provider
+    -- degrades to the naive item-level comparison below.
+    if _G.C_PlayerInfo and _G.C_PlayerInfo.CanUseItem and data.itemInfo.itemID then
+      if not _G.C_PlayerInfo.CanUseItem(data.itemInfo.itemID) then
+        return false
+      end
+    end
+
+    -- Suppress arrows for wearable armor that is not the character's preferred
+    -- armor type (e.g. cloth on a plate wearer), mirroring Blizzard's own
+    -- "not your best armor type" bind-on-equip warning.
+    if self:IsNonPreferredArmorType(data) then
       return false
     end
 
@@ -288,7 +364,8 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
   local emptySlotsByBag = {}
 
   for bagid in pairs(baglist) do
-    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid) or 0
+    local freeSlots, bagFamily = C_Container.GetContainerNumFreeSlots(bagid)
+    freeSlots = freeSlots or 0
     local name
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
@@ -302,9 +379,15 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
       freeSlots = freeSlots - 4
     end
     if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
+      -- The retail reagent bag reports family 0 (it is identified by bag id, not a family
+      -- bit), so key it by the symbolic reagent key; classic profession bags keep their bits.
+      local family = bagFamily or 0
+      if family == 0 and const.BACKPACK_ONLY_REAGENT_BAGS and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+        family = const.REAGENT_BAG_FAMILY_KEY
+      end
       emptySlots[name] = emptySlots[name] or 0
       emptySlots[name] = emptySlots[name] + freeSlots
-      emptySlotsByBag[bagid] = { name = name, count = freeSlots }
+      emptySlotsByBag[bagid] = { name = name, count = freeSlots, family = family }
     end
   end
 
@@ -355,7 +438,9 @@ end
 local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   if not item then return false end
   if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
-    if kind == const.BAG_KIND.BANK then
+    -- Retail's bank Show Bags view is one Blizzard bank tab at a time (tab ID == bag ID).
+    -- Classic/Era has no bank tabs, so every bank container renders, like the backpack.
+    if kind == const.BAG_KIND.BANK and addon.isRetail then
       return item.bagid == tabID
     end
     return true
@@ -546,7 +631,7 @@ function items:Phase2_Harvest(kind, bagList)
   return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
 end
 
-function items:Phase6_EnrichData(ctx, kind, itemData)
+function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
   local emptySlotByBagAndSlot = {}
   local freeSlotKeys = {}
   local freeSlotKeysByBag = {}
@@ -572,6 +657,8 @@ function items:Phase6_EnrichData(ctx, kind, itemData)
     if currentItem.isItemEmpty then
       currentItem.itemInfo = currentItem.itemInfo or {}
       currentItem.itemInfo.emptySlotName = name
+      local bagFamily = emptySlotsByBag and emptySlotsByBag[bagid] and emptySlotsByBag[bagid].family
+      currentItem.itemInfo.emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(bagFamily)
       local quality
       if baglink ~= nil and invid ~= nil then
         local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink))
@@ -779,7 +866,11 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
   end
 
   local searchBox = addon:GetModule("SearchBox", true)
-  local searchQuery = searchBox and searchBox.GetText and searchBox:GetText()
+  -- Resolve the active query for THIS kind: with in-bag search on (default) the
+  -- live filter is driven by the per-kind in-bag box, not the overlay box that
+  -- GetText() reads. Reading the wrong box reset isSearchResult to nil on every
+  -- redraw, clearing the visible filter (e.g. right-clicking an item to bank it).
+  local searchQuery = searchBox and searchBox.GetSearchText and searchBox:GetSearchText(kind)
   local searchResults = nil
   if searchQuery and searchQuery ~= "" and search and search.Search then
     searchResults = search:Search(searchQuery)
@@ -980,7 +1071,8 @@ function items:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
               currentItemCount = 0,
               itemGUID = "",
               currentItemLevel = 0,
-              expacID = 0
+              expacID = 0,
+              emptySlotFamilyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon,
             }
           }
           table.insert(sortedItems, dummy)
@@ -1054,7 +1146,7 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     if emptySlotsByBag then
       for bagid, info in pairs(emptySlotsByBag) do
         if IncludeBagInFreeSpace(kind, bagid, tabID) then
-          tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
+          tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count, family = info.family }
           tabs[tabID].emptySlots[info.name] = (tabs[tabID].emptySlots[info.name] or 0) + info.count
         end
       end
@@ -1076,8 +1168,12 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     else
       local aggregatedCounts = {}
       local firstSlotKeyForSubclass = {}
+      local familyForSubclass = {}
       for bagid, info in pairs(tabs[tabID].emptySlotsByBag) do
         aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
+        if familyForSubclass[info.name] == nil then
+          familyForSubclass[info.name] = info.family
+        end
         if not firstSlotKeyForSubclass[info.name] and freeSlotKeysByBag and freeSlotKeysByBag[bagid] then
           firstSlotKeyForSubclass[info.name] = freeSlotKeysByBag[bagid]
         end
@@ -1095,7 +1191,6 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
-            local originalItem = itemData[slotKey]
             table.insert(tabs[tabID].freeSpace.buttons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
@@ -1103,9 +1198,12 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
               count = freeSlotCount,
               isIndividual = false,
               key = name,
-              itemInfo = originalItem and originalItem.itemInfo or {
+              -- The aggregated "stack" button is a counter, not a real item slot, so it carries
+              -- no itemQuality (nil => no quality border). Reusing the harvested slot's itemInfo
+              -- would leak the bag's quality (e.g. the reagent bag's) and paint a colored border.
+              itemInfo = {
                 emptySlotName = name,
-                itemQuality = const.ITEM_QUALITY.Common,
+                emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(familyForSubclass[name]),
               },
             })
           end
@@ -1296,7 +1394,7 @@ function items:RunRefresh(ectx, kind)
 
   local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
 
-  local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData)
+  local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData, emptySlotsByBag)
 
   local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
   local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
@@ -1671,6 +1769,20 @@ function items:GetBagTypeFromBagID(bagid)
   end
 end
 
+-- GetEmptySlotFamilyIcon returns the small centered overlay icon for an empty slot that
+-- belongs to a specialized bag, keyed by the bag's family bit value (see
+-- const.ITEM_BAG_FAMILY). Generic bags (family 0 or nil) return nil, meaning no overlay.
+-- A specialized family with no per-family override falls back to the shared default glyph.
+---@param family number|nil
+---@return string|nil
+function items:GetEmptySlotFamilyIcon(family)
+  if not family or family == 0 then
+    return nil
+  end
+  local overrides = const.EMPTY_SLOT_FAMILY_ICON
+  return (overrides and overrides[family]) or const.EMPTY_SLOT_FAMILY_ICON_DEFAULT
+end
+
 -- HasReagentBag returns true if the player has a reagent bag slotted in their inventory.
 ---@return boolean
 function items:HasReagentBag()
@@ -1820,6 +1932,22 @@ function items:AttachItemInfo(data, kind)
   expacID = expacID or 0
   setID = setID or 0
   isCraftingReagent = not not isCraftingReagent
+
+  -- The categorization-relevant fields (type, subtype, equip location, class, subclass)
+  -- are sourced from C_Item.GetItemInfoInstant, which never issues a server query and
+  -- always returns for a valid item -- unlike C_Item.GetItemInfo above, which returns nil
+  -- for these while the item cache is cold. On login with very full bags that cold read
+  -- coerced itemType/itemSubType to "" and dumped every affected item into "Everything"
+  -- until a /reload warmed the cache (issue #1090). Instant info keeps categorization
+  -- correct regardless of cache warmth; GetItemInfo still supplies name/level/price/bind/
+  -- expac, which have no instant equivalent and heal on the next warm sweep.
+  local _, instType, instSubType, instEquipLoc, _, instClassID, instSubclassID =
+    C_Item.GetItemInfoInstant(itemID)
+  itemType = instType or itemType
+  itemSubType = instSubType or itemSubType
+  itemEquipLoc = instEquipLoc or itemEquipLoc
+  classID = instClassID or classID
+  subclassID = instSubclassID or subclassID
 
   bindType = self:GetBindTypeFromLink(itemLink) or bindType --link overrides itemID if set
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]

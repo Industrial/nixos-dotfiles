@@ -4,11 +4,81 @@ if not L then return end
 --------------------------------------------------------------------------------------------------------------------------------------------
 L = L or {}
 
+L["STRING_OPTIONS_WINDOW_SCALE_DESC"] = [=[Adjust the scale of the window.
+
+|cFFFFFF00Tip|r: right click to type the value.]=]
+L["STRING_OPTIONS_TOTALBAR_ANCHOR"] = "Total Bar"
+L["STRING_OPTIONS_DESIGNER_WHICH_BUTTONS"] = "Buttons shown"
+L["STRING_OPTIONS_DESIGNER_NAME_SIZE_OFFSET"] = "Unit Name Size Offset"
+L["STRING_OPTIONS_DESIGNER_SHOW_FACTION_ICON"] = "Show Faction Icon"
+L["STRING_OPTIONS_DESIGNER_SHOW_FACTION_ICON_DESC"] = "When showing a player from the opposite faction, show the faction icon."
+L["STRING_OPTIONS_DESIGNER_FACTION_ICON_SIZE_OFFSET"] = "Faction Icon Size Offset"
+L["STRING_OPTIONS_DESIGNER_NO_SEPARATOR"] = "no separator"
+L["STRING_OPTIONS_DESIGNER_NO_BRACKET"] = "no bracket"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARNAMETEXT"] = "Bar Unit Name"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARVALUETEXT"] = "Bar Values"
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_ENABLED_DESC"] = "Use an alternative title bar instead of the title bar builtin in the Skin file.\n\n|cFFFFFF00Important|r: To disable the title bar from the Skin file, go to 'Window' and make the 'skin color' fully transparent."
+L["STRING_OPTIONS_DESIGNER_NAME_TEXT_COLOR_DESC"] = [=[Change the text color of the unit name.
+
+Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
+L["STRING_OPTIONS_DESIGNER_VALUE_TEXT_COLOR_DESC"] = [=[Change the text color of the value columns.
+
+Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
+L["STRING_OPTIONS_DESIGNER_NAME_SIZE_OFFSET_DESC"] = "Give the unit name more or less room before it is cut short by the value columns."
+L["STRING_OPTIONS_DESIGNER_OVERLAY"] = "Overlay"
+L["STRING_OPTIONS_DESIGNER_OVERLAY_TEXTURE_DESC"] = "Texture which sits above the bar"
+L["STRING_OPTIONS_DESIGNER_ARENA_TEAM_COLOR"] = "Arena Team Color"
+L["STRING_OPTIONS_DESIGNER_SHOW_ARENA_ROLE_ICON"] = "Show Arena Role Icon"
+L["STRING_OPTIONS_DESIGNER_ARENA_ROLE_ICON_SIZE_OFFSET"] = "Arena Role Icon Size Offset"
+L["STRING_OPTIONS_DESIGNER_REMOVE_CUSTOM_TEXTURE"] = "Remove Custom Texture"
+L["STRING_OPTIONS_DESIGNER_ICON_SET"] = "Icon Set"
+
+L["STRING_OPTIONSMENU_DESIGNER"] = "Designer"
+L["STRING_OPTIONS_DESIGNER_PREVIEW"] = "Preview"
+L["STRING_OPTIONS_DESIGNER_HINT"] = "Click a part of the preview to edit it. Changes apply to the window selected at the top right."
+L["STRING_OPTIONS_DESIGNER_PREVIEW_MISSING"] = "A preview window could not be created, so there is nothing to edit here."
+L["STRING_OPTIONS_DESIGNER_OBJECT_WINDOW"] = "Window"
+L["STRING_OPTIONS_DESIGNER_OBJECT_TITLETEXT"] = "Title Text"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARS"] = "Bars"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARICONS"] = "Bar Icons"
+L["STRING_OPTIONS_DESIGNER_OBJECT_STATUSBAR"] = "Status Bar"
+L["STRING_OPTIONS_DESIGNER_ROW_AREA_ALPHA"] = "Row Area Opacity"
+L["STRING_OPTIONS_DESIGNER_ROUNDED_CORNERS"] = "Rounded Corners"
+L["STRING_OPTIONS_DESIGNER_SHOW_WINDOW_BORDER"] = "Show Border"
+L["STRING_OPTIONS_DESIGNER_BORDER_COLOR"] = "Border Color"
+L["STRING_OPTIONS_DESIGNER_BORDER_THICKNESS"] = "Border Thickness"
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_ENABLED"] = "Custom Title Bar"
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_HEIGHT"] = "Height"
+L["STRING_OPTIONS_DESIGNER_DESATURATED_MENU"] = "Desaturated Buttons"
+L["STRING_OPTIONS_DESIGNER_MENU_ICON_SIZE"] = "Button Size"
+L["STRING_OPTIONS_DESIGNER_MENU_ICON_SPACING"] = "Button Spacing"
+L["STRING_OPTIONS_DESIGNER_SHOW_ENCOUNTER_TIMER"] = "Show Encounter Timer"
+L["STRING_OPTIONS_DESIGNER_BUTTON_MODE"] = "Mode"
+L["STRING_OPTIONS_DESIGNER_TITLE_TEXT_ENABLED"] = "Show Title Text"
+L["STRING_OPTIONS_DESIGNER_TEXT_X_OFFSET"] = "Horizontal Offset"
+L["STRING_OPTIONS_DESIGNER_TEXT_Y_OFFSET"] = "Vertical Offset"
+L["STRING_OPTIONS_DESIGNER_COLOR_BY_CLASS"] = "Color by Class"
+L["STRING_OPTIONS_DESIGNER_BAR_ALPHA"] = "Opacity"
+L["STRING_OPTIONS_DESIGNER_BACKGROUND_BY_CLASS"] = "Background by Class"
+L["STRING_OPTIONS_DESIGNER_BAR_BORDER"] = "Show Bar Border"
+L["STRING_OPTIONS_DESIGNER_NAME_OFFSET"] = "Name Offset"
+L["STRING_OPTIONS_DESIGNER_SHOW_RANK_NUMBER"] = "Show Rank Number"
+L["STRING_OPTIONS_DESIGNER_PERCENT_TYPE"] = "Percent Type"
+L["STRING_OPTIONS_DESIGNER_PERCENT_OF_TOTAL"] = "Relative to Total"
+L["STRING_OPTIONS_DESIGNER_PERCENT_OF_TOP"] = "Relative to Top Player"
+L["STRING_OPTIONS_DESIGNER_TEXT_OUTLINE"] = "Outline"
+L["STRING_OPTIONS_DESIGNER_SHADOW_OFFSET_X"] = "Shadow Offset X"
+L["STRING_OPTIONS_DESIGNER_SHADOW_OFFSET_Y"] = "Shadow Offset Y"
+L["STRING_OPTIONS_DESIGNER_ALIGN_COLUMNS"] = "Align Value Columns"
+L["STRING_OPTIONS_DESIGNER_ALIGN_COLUMNS_DESC"] = "Draws the value columns in fixed columns instead of running them together into one formatted string. This is not a window setting, it changes every window at once."
+L["STRING_OPTIONS_DESIGNER_SHOW_PERCENT_DESC"] = "Shows the percent column beside the value columns. Applies while the value columns are aligned; with the simple text format the columns are decided by that format instead."
+L["STRING_OPTIONS_DESIGNER_ICON_SIZE_OFFSET"] = "Icon Size Offset"
+L["STRING_OPTIONS_DESIGNER_BAR_START_AFTER_ICON"] = "Bar Starts After Icon"
+L["STRING_OPTIONS_DESIGNER_ICON_GRAYSCALE"] = "Grayscale Icons"
+L["STRING_OPTIONS_DESIGNER_SHOW_STATUSBAR"] = "Show Status Bar"
+
 L["STRING_OPTIONS_AUTO_COMBATLOG"] = "Auto Start Combatlog"
 L["STRING_OPTIONS_AUTO_COMBATLOG_DESC"] = "Automatically start and stop logging combat to the combatlog.txt file when you enter a raid or dungeon."
-
-L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT"] = "Auto Alignment"
-L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT_DESC"] = "Disable this only if you experience player name alignment issues."
 
 L["LE_EXPANSION_CLASSIC"] = "Classic"
 L["LE_EXPANSION_BURNING_CRUSADE"] = "The Burning Crusade"
@@ -23,12 +93,9 @@ L["LE_EXPANSION_DRAGONFLIGHT"] = "Dragonflight"
 L["LE_EXPANSION_WAR_WITHIN"] = "The War Within"
 L["LE_EXPANSION_MIDNIGHT"] = "Midnight"
 
-L["STRING_OR"] = "Or"
 L["STRING_OPTIONS_SELECT_TEMPLATE"] = "Select Template"
 L["STRING_OPTIONS_TEXT_SHADOWCOLOR"] = "Shadow Color"
-L["STRING_OPTIONS_TEXT_SHADOWOFFSET"] = "Shadow Offset %s"
 L["STRING_OPTIONS_PLAYERNAME"] = "Player Name"
-L["STRING_OPTIONS_PLAYERNAME_AUTO_WIDTH"] = "Length Auto"
 L["STRING_OPTIONS_PLAYERNAME_WIDTH"] = "Length"
 L["STRING_ATTRIBUTE_HEAL_POTIONS"] = "Potions"
 L["STRING_SIMPLE_TEXT_FORMAT_TITLE"] = "Midnight Right Text: Simple or Aligned"
@@ -37,8 +104,6 @@ L["STRING_SIMPLE_TEXT_FORMAT_DESC"] = "Enable the use of the three rules below."
 L["STRING_SIMPLE_TEXT_FORMAT_TYPE3"] = "When the line has information\nabout the total, per second and percent.\n|cFFAAAAAA%s order: total, per second, percent."
 L["STRING_SIMPLE_TEXT_FORMAT_TYPE2"] = "When the line has information\nabout the total and per second.\n|cFFAAAAAA%s order: total, per second."
 L["STRING_SIMPLE_TEXT_FORMAT_TYPE1"] = "When the line has information\nabout the total and percent.\n|cFFAAAAAA%s order: total, percent."
-L["STRING_SIMPLE_TEXT_FORMAT_ASLIGNED"] = "Use Aligned Text"
-L["STRING_SIMPLE_TEXT_FORMAT_ASLIGNED_DESC"] = "The text is aligned in columns, setup the spacing between columns."
 L["STRING_SIMPLE_TEXT_FORMAT_ASLIGNED_SPACE_BETWEEN"] = "Columns Gap"
 L["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE2"] = "Don't Show Percent"
 L["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE3"] = "Only Show Total"
@@ -472,7 +537,6 @@ L["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_AUTOALIGN_DESC"] = "The alignment is done
 L["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_DESC"] = "Disable brackets and separators and align bars texts in vertical columns"
 L["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET"] = "Text %d Offset"
 L["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET_DESC"] = "Offset from right border"
-L["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_WARNING"] = "is enabled, separators and brackets aren't used"
 L["STRING_OPTIONS_ALPHAMOD_ANCHOR"] = "Auto Hide:"
 L["STRING_OPTIONS_ALWAYS_USE"] = "Use On All Characters"
 L["STRING_OPTIONS_ALWAYS_USE_DESC"] = "The same profile is used on all characters. You may override this on any character by just selecting another existing profile."
@@ -499,7 +563,6 @@ L["STRING_OPTIONS_AUTO_SWITCH_WIPE_DESC"] = "After a fail attempt or defeat in a
 L["STRING_OPTIONS_AVATAR"] = "Choose Avatar"
 L["STRING_OPTIONS_AVATAR_ANCHOR"] = "Identity:"
 L["STRING_OPTIONS_AVATAR_DESC"] = "Avatars are also sent to guild members and shown on the top of tooltips and at the player details window."
-L["STRING_OPTIONS_BAR_BACKDROP_ANCHOR"] = "Border:"
 L["STRING_OPTIONS_BAR_BACKDROP_COLOR_DESC"] = "Changes the border color."
 L["STRING_OPTIONS_BAR_BACKDROP_ENABLED_DESC"] = "Enable or disable row borders."
 L["STRING_OPTIONS_BAR_BACKDROP_SIZE_DESC"] = "Adjust the border size."
@@ -567,7 +630,6 @@ L["STRING_OPTIONS_BARS_CUSTOM_TEXTURE"] = "Custom Texture File"
 L["STRING_OPTIONS_BARS_DESC"] = "These options control the bar appearance."
 L["STRING_OPTIONS_BARSORT"] = "Bar Rank Sort Order"
 L["STRING_OPTIONS_BARSORT_DESC"] = "Sort bars on descending or ascending order."
-L["STRING_OPTIONS_BARSTART"] = "Bar Start After Icon"
 L["STRING_OPTIONS_BARSTART_DESC"] = [=[When disabled the top texture starts at the icon left side instead of the right
 
 This is useful when using an icon pack with transparent areas.]=]
@@ -729,7 +791,6 @@ L["STRING_OPTIONS_DEATHLOG_MINHEALING"] = "DeathLog Min Healing"
 L["STRING_OPTIONS_DEATHLOG_MINHEALING_DESC"] = [=[Death log won't show heals below this threshold.
 
 |cFFFFFF00Tip|r: right click to manually enter the value.]=]
-L["STRING_OPTIONS_DESATURATE_MENU"] = "Desaturated"
 L["STRING_OPTIONS_DESATURATE_MENU_DESC"] = "Enabling this option, all menu icons on toolbar become black and white."
 L["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW"] = "Disable 'All Displays' Menu"
 L["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW_DESC"] = "If enabled, right clicking on title bar shows your bookmark instead."
@@ -808,7 +869,6 @@ Your game screen may reload during the erase process.]=]
 L["STRING_OPTIONS_INSTANCE_SKIN"] = "Skin"
 L["STRING_OPTIONS_INSTANCE_SKIN_DESC"] = "Modify window appearance based on a skin theme."
 L["STRING_OPTIONS_INSTANCE_STATUSBAR_ANCHOR"] = "Statusbar"
-L["STRING_OPTIONS_INSTANCE_STATUSBARCOLOR"] = "Color and Transparency"
 L["STRING_OPTIONS_INSTANCE_STATUSBARCOLOR_DESC"] = [=[Select the color used by the statusbar.
 
 |cFFFFFF00Important|r: this option overwrites the color and transparency chosen over Window Color.]=]
@@ -842,12 +902,9 @@ L["STRING_OPTIONS_MENU_ALPHALEAVE_DESC"] = "When you don't have the mouse over t
 L["STRING_OPTIONS_MENU_ALPHAWARNING"] = "Mouse Interaction is enabled, alpha may not be affected."
 L["STRING_OPTIONS_MENU_ANCHOR"] = "Buttons Attach on Right"
 L["STRING_OPTIONS_MENU_ANCHOR_DESC"] = "When checked, buttons are attached to the right side of the window."
-L["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORX"] = "Position X"
 L["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORX_DESC"] = "Adjust the attribute text location on the X axis."
-L["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORY"] = "Position Y"
 L["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORY_DESC"] = "Adjust the attribute text location on the Y axis."
 L["STRING_OPTIONS_MENU_ATTRIBUTE_ENABLED_DESC"] = "Active shows the display name currently shown in the window."
-L["STRING_OPTIONS_MENU_ATTRIBUTE_ENCOUNTERTIMER"] = "Encounter Timer"
 L["STRING_OPTIONS_MENU_ATTRIBUTE_ENCOUNTERTIMER_DESC"] = "When enabled, a stopwatch is shown on the left side of the text."
 --[[Translation missing --]]
 L["STRING_OPTIONS_MENU_ATTRIBUTE_FONT"] = ""
@@ -870,7 +927,6 @@ L["STRING_OPTIONS_MENU_FONT_SIZE"] = "Menus Text Size"
 L["STRING_OPTIONS_MENU_FONT_SIZE_DESC"] = "Modify the font size on all menus."
 L["STRING_OPTIONS_MENU_IGNOREBARS"] = "Ignore Bars"
 L["STRING_OPTIONS_MENU_IGNOREBARS_DESC"] = "When enabled, all rows on this window aren't affected by this mechanism."
-L["STRING_OPTIONS_MENU_SHOWBUTTONS"] = "Show Buttons"
 L["STRING_OPTIONS_MENU_SHOWBUTTONS_DESC"] = "Choose which buttons are shown on title bar."
 L["STRING_OPTIONS_MENU_X"] = "Position X"
 L["STRING_OPTIONS_MENU_X_DESC"] = "Changes the X axis position."
@@ -878,7 +934,6 @@ L["STRING_OPTIONS_MENU_Y"] = "Position Y"
 L["STRING_OPTIONS_MENU_Y_DESC"] = "Changes the Y axis position"
 L["STRING_OPTIONS_MENUS_SHADOW"] = "Shadow"
 L["STRING_OPTIONS_MENUS_SHADOW_DESC"] = "Adds a thin shadow border on all buttons."
-L["STRING_OPTIONS_MENUS_SPACEMENT"] = "Spacing"
 L["STRING_OPTIONS_MENUS_SPACEMENT_DESC"] = "Controls how much distance the buttons have between each other."
 L["STRING_OPTIONS_MICRODISPLAY_ANCHOR"] = "Micro Displays:"
 L["STRING_OPTIONS_MICRODISPLAY_LOCK"] = "Lock Micro Displays"
@@ -943,7 +998,6 @@ L["STRING_OPTIONS_PANIMODE_DESC"] = "When enabled and you get dropped from the g
 L["STRING_OPTIONS_PDW_ANCHOR"] = "Panels:"
 L["STRING_OPTIONS_PDW_SKIN_DESC"] = [=[Skin to be used on Player Detail Window, Report Window and Options Panel.
 Some changes require /reload.]=]
-L["STRING_OPTIONS_PERCENT_TYPE"] = "Percentage Type"
 L["STRING_OPTIONS_PERCENT_TYPE_DESC"] = [=[Changes the percentage method:
 
 |cFFFFFF00Relative Total|r: the percentage shows the active fraction of the total amount made by all raid members.
@@ -1152,7 +1206,6 @@ High values may increase the time your character takes to logoff.]=]
 L["STRING_OPTIONS_SENDFEEDBACK"] = "Feedback"
 L["STRING_OPTIONS_SHOW_SIDEBARS"] = "Show Skin Border"
 L["STRING_OPTIONS_SHOW_SIDEBARS_DESC"] = "Show the border of the window from the skin file, use the same color as the 'Window Color'."
-L["STRING_OPTIONS_SHOW_STATUSBAR"] = "Show Statusbar"
 L["STRING_OPTIONS_SHOW_STATUSBAR_DESC"] = "Show or hide the bottom statusbar."
 L["STRING_OPTIONS_SHOW_TOTALBAR_COLOR_DESC"] = "Select the color. The transparency value follows the row alpha value."
 L["STRING_OPTIONS_SHOW_TOTALBAR_DESC"] = "Show or hide the total bar."
@@ -1160,7 +1213,6 @@ L["STRING_OPTIONS_SHOW_TOTALBAR_ICON"] = "Icon"
 L["STRING_OPTIONS_SHOW_TOTALBAR_ICON_DESC"] = "Select the icon shown on the total bar."
 L["STRING_OPTIONS_SHOW_TOTALBAR_INGROUP"] = "Only in Group"
 L["STRING_OPTIONS_SHOW_TOTALBAR_INGROUP_DESC"] = "Total bar isn't shown if you aren't in a group."
-L["STRING_OPTIONS_SIZE"] = "Size"
 L["STRING_OPTIONS_SKIN_A"] = "Skin Settings"
 L["STRING_OPTIONS_SKIN_A_DESC"] = "These options allow you to change the skin."
 L["STRING_OPTIONS_SKIN_ELVUI_BUTTON1"] = "Align Within Right Chat"
@@ -1219,23 +1271,18 @@ L["STRING_OPTIONS_TESTBARS"] = "Create Test Bars"
 L["STRING_OPTIONS_TEXT"] = "Bar Text Settings"
 L["STRING_OPTIONS_TEXT_DESC"] = "These options control the appearance of the window row texts."
 L["STRING_OPTIONS_TEXT_FIXEDCOLOR"] = "Text Color"
-L["STRING_OPTIONS_TEXT_FIXEDCOLOR_DESC"] = [=[Change the text color of both left and right texts.
-
-Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
 L["STRING_OPTIONS_TEXT_FONT"] = "Text Font"
 L["STRING_OPTIONS_TEXT_FONT_DESC"] = "Change the font of both left and right texts."
 L["STRING_OPTIONS_TEXT_LCLASSCOLOR_DESC"] = "When enabled, the text always uses the color of the player class."
 L["STRING_OPTIONS_TEXT_LEFT_ANCHOR"] = "Left Text:"
 L["STRING_OPTIONS_TEXT_LOUTILINE"] = "Text Shadow"
 L["STRING_OPTIONS_TEXT_LOUTILINE_DESC"] = "Enable or disable the outline for left text."
-L["STRING_OPTIONS_TEXT_LPOSITION"] = "Show Number"
 L["STRING_OPTIONS_TEXT_LPOSITION_DESC"] = "Show position number on the player's name left side."
 L["STRING_OPTIONS_TEXT_LTRANSLIT"] = "Translit"
 L["STRING_OPTIONS_TEXT_LTRANSLIT_DESC"] = "Make those russian letters that no one understand to be presented as western letters."
 L["STRING_OPTIONS_TEXT_OUTLINE"] = "Text Outline"
 L["STRING_OPTIONS_TEXT_RIGHT_ANCHOR"] = "Right Text:"
 L["STRING_OPTIONS_TEXT_ROUTILINE_DESC"] = "Enable or disable the outline for right text."
-L["STRING_OPTIONS_TEXT_ROWICONS_ANCHOR"] = "Icons:"
 L["STRING_OPTIONS_TEXT_SHOW_BRACKET"] = "Bracket"
 L["STRING_OPTIONS_TEXT_SHOW_BRACKET_DESC"] = "Choose which character is used to open and close the per second and percent block."
 L["STRING_OPTIONS_TEXT_SHOW_PERCENT"] = "Show Percent"
@@ -1252,8 +1299,6 @@ L["STRING_OPTIONS_TEXT_SHOW_TOTAL_DESC"] = [=[Show the total done by the actor.
 For example: total damage, total heal received.]=]
 L["STRING_OPTIONS_TEXT_SIZE"] = "Text Size"
 L["STRING_OPTIONS_TEXT_SIZE_DESC"] = "Change the size of both left and right texts."
-L["STRING_OPTIONS_TEXT_TEXTUREL_ANCHOR"] = "Background:"
-L["STRING_OPTIONS_TEXT_TEXTUREU_ANCHOR"] = "Appearance:"
 L["STRING_OPTIONS_TEXTEDITOR_CANCEL"] = "Cancel"
 L["STRING_OPTIONS_TEXTEDITOR_CANCEL_TOOLTIP"] = "Finish the editing and ignore any change in the code."
 L["STRING_OPTIONS_TEXTEDITOR_COLOR_TOOLTIP"] = "Select the text and then click on the color button to change selected text color."
@@ -1354,7 +1399,6 @@ L["STRING_OPTIONS_TOOLTIPS_SHOWAMT"] = "Show Amount"
 L["STRING_OPTIONS_TOOLTIPS_SHOWAMT_DESC"] = "Shows a number indicating how many spells, targets and pets have in the tooltip."
 L["STRING_OPTIONS_TOOLTIPS_TITLE"] = "Tooltips"
 L["STRING_OPTIONS_TOOLTIPS_TITLE_DESC"] = "These options controls the appearance of tooltips."
-L["STRING_OPTIONS_TOTALBAR_ANCHOR"] = "Total Bar:"
 L["STRING_OPTIONS_TRASH_SUPPRESSION"] = "Trash Suppression"
 L["STRING_OPTIONS_TRASH_SUPPRESSION_DESC"] = "For |cFFFFFF00X|r seconds, suppress auto switching to show trash segments (|cFFFFFF00only after defeating a boss encounter|r)."
 L["STRING_OPTIONS_WALLPAPER_ALPHA"] = "Alpha:"
@@ -1413,11 +1457,6 @@ L["STRING_OPTIONS_WINDOW_IGNOREMASSTOGGLE_DESC"] = "When enabled, this window is
 L["STRING_OPTIONS_WINDOW_ROWAREA_COLOR"] = "\"Row's Area Color\""
 L["STRING_OPTIONS_WINDOW_ROWAREA_COLOR_DESC"] = "Set the background color of the area when the rows are shown."
 L["STRING_OPTIONS_WINDOW_SCALE"] = "Scale"
-L["STRING_OPTIONS_WINDOW_SCALE_DESC"] = [=[Adjust the scale of the window.
-
-|cFFFFFF00Tip|r: right click to type the value.
-
-|cFFFFFF00Current|r: %s]=]
 L["STRING_OPTIONS_WINDOW_SKIN_COLOR"] = "Skin Color"
 L["STRING_OPTIONS_WINDOW_SKIN_COLOR_DESC"] = [=[Modifies the color of the skin applied into this window.
 
@@ -2479,6 +2518,78 @@ L["STRING_OPTIONS_DEATHLOG_MINHEALING_DESC"] = [=[Death log won't show heals bel
 |cFFFFFF00Tip|r: right click to manually enter the value.]=]
 L["STRING_OPTIONS_DESATURATE_MENU"] = "Desaturated"
 L["STRING_OPTIONS_DESATURATE_MENU_DESC"] = "Enabling this option, all menu icons on toolbar become black and white."
+L["STRING_OPTIONS_DESIGNER_ALIGN_COLUMNS"] = "Align Value Columns"
+L["STRING_OPTIONS_DESIGNER_ALIGN_COLUMNS_DESC"] = "Draws the value columns in fixed columns instead of running them together into one formatted string. This is not a window setting, it changes every window at once."
+L["STRING_OPTIONS_DESIGNER_ARENA_ROLE_ICON_SIZE_OFFSET"] = "Arena Role Icon Size Offset"
+L["STRING_OPTIONS_DESIGNER_ARENA_TEAM_COLOR"] = "Arena Team Color"
+L["STRING_OPTIONS_DESIGNER_BACKGROUND_BY_CLASS"] = "Background by Class"
+L["STRING_OPTIONS_DESIGNER_BAR_ALPHA"] = "Opacity"
+L["STRING_OPTIONS_DESIGNER_BAR_BORDER"] = "Show Bar Border"
+L["STRING_OPTIONS_DESIGNER_BAR_START_AFTER_ICON"] = "Bar Starts After Icon"
+L["STRING_OPTIONS_DESIGNER_BORDER_COLOR"] = "Border Color"
+L["STRING_OPTIONS_DESIGNER_BORDER_THICKNESS"] = "Border Thickness"
+L["STRING_OPTIONS_DESIGNER_BUTTON_MODE"] = "Mode"
+L["STRING_OPTIONS_DESIGNER_COLOR_BY_CLASS"] = "Color by Class"
+L["STRING_OPTIONS_DESIGNER_DESATURATED_MENU"] = "Desaturated Buttons"
+L["STRING_OPTIONS_DESIGNER_FACTION_ICON_SIZE_OFFSET"] = "Faction Icon Size Offset"
+L["STRING_OPTIONS_DESIGNER_HINT"] = "Click a part of the preview to edit it. Changes apply to the window selected at the top right."
+L["STRING_OPTIONS_DESIGNER_ICON_GRAYSCALE"] = "Grayscale Icons"
+L["STRING_OPTIONS_DESIGNER_ICON_SET"] = "Icon Set"
+L["STRING_OPTIONS_DESIGNER_ICON_SIZE_OFFSET"] = "Icon Size Offset"
+L["STRING_OPTIONS_DESIGNER_MENU_ICON_SIZE"] = "Button Size"
+L["STRING_OPTIONS_DESIGNER_MENU_ICON_SPACING"] = "Button Spacing"
+L["STRING_OPTIONS_DESIGNER_NAME_OFFSET"] = "Name Offset"
+L["STRING_OPTIONS_DESIGNER_NAME_SIZE_OFFSET"] = "Unit Name Size Offset"
+L["STRING_OPTIONS_DESIGNER_NAME_SIZE_OFFSET_DESC"] = "Give the unit name more or less room before it is cut short by the value columns."
+L["STRING_OPTIONS_DESIGNER_NAME_TEXT"] = "Unit Name"
+L["STRING_OPTIONS_DESIGNER_NAME_TEXT_COLOR_DESC"] = [=[Change the text color of the unit name.
+
+Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
+L["STRING_OPTIONS_DESIGNER_NO_BRACKET"] = "no bracket"
+L["STRING_OPTIONS_DESIGNER_NO_SEPARATOR"] = "no separator"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARICONS"] = "Bar Icons"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARNAMETEXT"] = "Bar Unit Name"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARS"] = "Bars"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARTEXTS"] = "Bar Texts"
+L["STRING_OPTIONS_DESIGNER_OBJECT_BARVALUETEXT"] = "Bar Values"
+L["STRING_OPTIONS_DESIGNER_OBJECT_STATUSBAR"] = "Status Bar"
+L["STRING_OPTIONS_DESIGNER_OBJECT_TITLEBUTTONS"] = "Title Buttons"
+L["STRING_OPTIONS_DESIGNER_OBJECT_TITLETEXT"] = "Title Text"
+L["STRING_OPTIONS_DESIGNER_OBJECT_WINDOW"] = "Window"
+L["STRING_OPTIONS_DESIGNER_OVERLAY"] = "Overlay"
+L["STRING_OPTIONS_DESIGNER_OVERLAY_TEXTURE_DESC"] = "Texture which sits above the bar"
+L["STRING_OPTIONS_DESIGNER_PERCENT_OF_TOP"] = "Relative to Top Player"
+L["STRING_OPTIONS_DESIGNER_PERCENT_OF_TOTAL"] = "Relative to Total"
+L["STRING_OPTIONS_DESIGNER_PERCENT_TYPE"] = "Percent Type"
+L["STRING_OPTIONS_DESIGNER_PREVIEW"] = "Preview"
+L["STRING_OPTIONS_DESIGNER_PREVIEW_MISSING"] = "A preview window could not be created, so there is nothing to edit here."
+L["STRING_OPTIONS_DESIGNER_REMOVE_CUSTOM_TEXTURE"] = "Remove Custom Texture"
+L["STRING_OPTIONS_DESIGNER_ROUNDED_CORNERS"] = "Rounded Corners"
+L["STRING_OPTIONS_DESIGNER_ROW_AREA_ALPHA"] = "Row Area Opacity"
+L["STRING_OPTIONS_DESIGNER_SHADOW_OFFSET_X"] = "Shadow Offset X"
+L["STRING_OPTIONS_DESIGNER_SHADOW_OFFSET_Y"] = "Shadow Offset Y"
+L["STRING_OPTIONS_DESIGNER_SHOW_ARENA_ROLE_ICON"] = "Show Arena Role Icon"
+L["STRING_OPTIONS_DESIGNER_SHOW_ENCOUNTER_TIMER"] = "Show Encounter Timer"
+L["STRING_OPTIONS_DESIGNER_SHOW_FACTION_ICON"] = "Show Faction Icon"
+L["STRING_OPTIONS_DESIGNER_SHOW_FACTION_ICON_DESC"] = "When showing a player from the opposite faction, show the faction icon."
+L["STRING_OPTIONS_DESIGNER_SHOW_PERCENT_DESC"] = "Shows the percent column beside the value columns. Applies while the value columns are aligned; with the simple text format the columns are decided by that format instead."
+L["STRING_OPTIONS_DESIGNER_SHOW_RANK_NUMBER"] = "Show Rank Number"
+L["STRING_OPTIONS_DESIGNER_SHOW_STATUSBAR"] = "Show Status Bar"
+L["STRING_OPTIONS_DESIGNER_SHOW_WINDOW_BORDER"] = "Show Border"
+L["STRING_OPTIONS_DESIGNER_TEXT_OUTLINE"] = "Outline"
+L["STRING_OPTIONS_DESIGNER_TEXT_X_OFFSET"] = "Horizontal Offset"
+L["STRING_OPTIONS_DESIGNER_TEXT_Y_OFFSET"] = "Vertical Offset"
+L["STRING_OPTIONS_DESIGNER_TITLE_TEXT_ENABLED"] = "Show Title Text"
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_ENABLED"] = "Custom Title Bar"
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_ENABLED_DESC"] = [=[Use an alternative title bar instead of the title bar builtin in the Skin file.
+
+|cFFFFFF00Important|r: To disable the title bar from the Skin file, go to 'Window' and make the 'skin color' fully transparent.]=]
+L["STRING_OPTIONS_DESIGNER_TITLEBAR_HEIGHT"] = "Height"
+L["STRING_OPTIONS_DESIGNER_VALUE_TEXT"] = "Value Columns"
+L["STRING_OPTIONS_DESIGNER_VALUE_TEXT_COLOR_DESC"] = [=[Change the text color of the value columns.
+
+Ignored if |cFFFFFFFFcolor by class|r is enabled.]=]
+L["STRING_OPTIONS_DESIGNER_WHICH_BUTTONS"] = "Buttons shown"
 L["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW"] = "Disable 'All Displays' Menu"
 L["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW_DESC"] = "If enabled, right clicking on title bar shows your bookmark instead."
 L["STRING_OPTIONS_DISABLE_BARHIGHLIGHT"] = "Disable Bar Highlight"
@@ -3110,7 +3221,7 @@ L["STRING_OPTIONS_TOOLTIPS_SHOWAMT"] = "Show Amount"
 L["STRING_OPTIONS_TOOLTIPS_SHOWAMT_DESC"] = "Shows a number indicating how many spells, targets and pets have in the tooltip."
 L["STRING_OPTIONS_TOOLTIPS_TITLE"] = "Tooltips"
 L["STRING_OPTIONS_TOOLTIPS_TITLE_DESC"] = "These options controls the appearance of tooltips."
-L["STRING_OPTIONS_TOTALBAR_ANCHOR"] = "Total Bar:"
+L["STRING_OPTIONS_TOTALBAR_ANCHOR"] = "Total Bar"
 L["STRING_OPTIONS_TRASH_SUPPRESSION"] = "Trash Suppression"
 L["STRING_OPTIONS_TRASH_SUPPRESSION_DESC"] = "For |cFFFFFF00X|r seconds, suppress auto switching to show trash segments (|cFFFFFF00only after defeating a boss encounter|r)."
 L["STRING_OPTIONS_WALLPAPER_ALPHA"] = "Alpha:"
@@ -3171,9 +3282,7 @@ L["STRING_OPTIONS_WINDOW_ROWAREA_COLOR_DESC"] = "Set the background color of the
 L["STRING_OPTIONS_WINDOW_SCALE"] = "Scale"
 L["STRING_OPTIONS_WINDOW_SCALE_DESC"] = [=[Adjust the scale of the window.
 
-|cFFFFFF00Tip|r: right click to type the value.
-
-|cFFFFFF00Current|r: %s]=]
+|cFFFFFF00Tip|r: right click to type the value.]=]
 L["STRING_OPTIONS_WINDOW_SKIN_COLOR"] = "Skin Color"
 L["STRING_OPTIONS_WINDOW_SKIN_COLOR_DESC"] = [=[Modifies the color of the skin applied into this window.
 
@@ -3216,6 +3325,7 @@ L["STRING_OPTIONSMENU_COMBAT"] = "PvE PvP"
 L["STRING_OPTIONSMENU_DATACHART"] = "Data for Charts"
 L["STRING_OPTIONSMENU_DATACOLLECT"] = "Data Collector"
 L["STRING_OPTIONSMENU_DATAFEED"] = "Data Feed"
+L["STRING_OPTIONSMENU_DESIGNER"] = "Designer"
 L["STRING_OPTIONSMENU_DISPLAY"] = "Display"
 L["STRING_OPTIONSMENU_DISPLAY_DESC"] = "Overall basic adjustments and quick window control."
 L["STRING_OPTIONSMENU_LEFTMENU"] = "Title Bar"

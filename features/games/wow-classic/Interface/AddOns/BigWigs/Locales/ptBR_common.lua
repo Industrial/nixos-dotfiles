@@ -211,6 +211,11 @@ L.autotalk_boss_desc = "Seleciona automaticamente as opções de diálogo do NPC
 L.autotalk_generic_desc = "Seleciona automaticamente as opções de diálogo do NPC que permitem você progredir para o próximo estágio da masmorra."
 L.autotalk_notice = "Interagindo automaticamente com NPC %s."
 
+-- Auto Player Choice
+--L.autoPlayerChoice = "Automatic Player Choice"
+--L.autoPlayerChoice_delve_power_desc = "Automatically select player powerups when they are dropped by creatures in the Delve."
+--L.autoPlayerChoice_notice = "Automatically selecting: %s"
+
 -- GUI notes
 L.intermissionOnly = "Somente no Intervalo"
 L.stage1Only = "Somente no Estágio 1"
@@ -306,6 +311,7 @@ L.arrows = "Flechas" -- Plural of L.arrow
 L.ball = "Bola" -- A ball, like a football, basketball, etc
 L.balls = "Bolas" -- Plural of L.ball
 L.blind = "Cegar" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "Sangue" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 --L.bouncing_ball = "Bouncing Ball" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 --L.bouncing_balls = "Bouncing Balls" -- Plural of L.bouncing_ball
 L.chakram = "Chakram" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

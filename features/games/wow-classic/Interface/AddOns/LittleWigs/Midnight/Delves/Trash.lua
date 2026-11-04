@@ -27,15 +27,30 @@ mod:SetTrashModule(true)
 --
 
 local autotalk = mod:AddAutoTalkOption(false)
+local autochoice = mod:AddAutoPlayerChoiceOption(true, "delve_power")
 function mod:GetOptions()
 	return {
 		autotalk,
+		autochoice,
 	}
 end
 
 function mod:OnBossEnable()
 	-- Autotalk
 	self:RegisterEvent("GOSSIP_SHOW")
+	-- Auto power select
+	local frames = {GetFramesRegisteredForEvent("PLAYER_CHOICE_UPDATE")}
+	for i = 1, #frames do
+		if frames[i].UnregisterEvent then
+			frames[i]:UnregisterEvent("PLAYER_CHOICE_UPDATE")
+		end
+	end
+	self:RegisterEvent("PLAYER_CHOICE_UPDATE")
+	for i = 1, #frames do
+		if frames[i].RegisterEvent then
+			frames[i]:RegisterEvent("PLAYER_CHOICE_UPDATE")
+		end
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -46,7 +61,10 @@ end
 
 function mod:GOSSIP_SHOW()
 	if self:GetOption(autotalk) then
-		if self:GetGossipID(136318) then -- Atal'Aman, start Delve (Fleek)
+		if self:GetGossipID(140123) then -- All Delves, make abundant (Dundun)
+			-- 140123:Make my delve Abundantly Bountiful!
+			self:SelectGossipID(140123)
+		elseif self:GetGossipID(136318) then -- Atal'Aman, start Delve (Fleek)
 			-- 136318:|cFF0000FF(Delve)|r I will save them!
 			self:SelectGossipID(136318)
 		elseif self:GetGossipID(136385) then -- Atal'Aman, start Delve (Kasha)
@@ -73,6 +91,9 @@ function mod:GOSSIP_SHOW()
 		elseif self:GetGossipID(139585) then -- Gnarldor Isle, start Delve (Minchi)
 			-- 139585:|cFF0000FF(Delve)|r Education is important. Let's go.
 			self:SelectGossipID(139585)
+		elseif self:GetGossipID(139462) then -- Gnarldor Isle, start Delve (Tormunda)
+			-- 139462:Rescue the elderly and grab supplies. On it!
+			self:SelectGossipID(139462)
 		elseif self:GetGossipID(136477) then -- Parhelion Plaza, start Delve (Grand Artificer Romuul)
 			-- 136477:|cFF0000FF(Delve)|r I will break that shield and eliminate the units inside.
 			self:SelectGossipID(136477)
@@ -103,6 +124,9 @@ function mod:GOSSIP_SHOW()
 		elseif self:GetGossipID(136141) then -- The Darkway, start Delve (Technician Mireille)
 			-- 136141:I'll help you restore the ley lines... and show these cultists a thing or two!
 			self:SelectGossipID(136141)
+		elseif self:GetGossipID(141485) then -- The Darkway, start Delve (Technician Mireille)
+			-- 141485:Clear the pylons and destroy the eggs before they hatch. Got it.
+			self:SelectGossipID(141485)
 		elseif self:GetGossipID(137248) then -- The Gulf of Memory, start Delve (Ashayo)
 			-- 137248:Release the moths near Lightbloom patches on the ground and they'll eat it. Seems easy enough.
 			self:SelectGossipID(137248)
@@ -127,6 +151,23 @@ function mod:GOSSIP_SHOW()
 		elseif self:GetGossipID(135811) then -- Twilight Crypts, start Delve (Scout Lok'aemon)
 			-- 135811:|cFF0000FF(Delve)|r Drink this if the Bound Loa gets close? But what's it taste like?
 			self:SelectGossipID(135811)
+		end
+	end
+end
+
+-- Auto power select
+
+function mod:PLAYER_CHOICE_UPDATE()
+	if self:GetOption(autochoice) then
+		local choiceInfo = self:GetPlayerChoiceOptions()
+		if choiceInfo then
+			local numChoices = self:GetPlayerChoiceCount(choiceInfo)
+			if numChoices == 1 then
+				local numButtons = self:GetPlayerChoiceButtonCount(choiceInfo, numChoices)
+				if numButtons == 1 then
+					self:SelectPlayerChoiceButton(choiceInfo, numChoices, numButtons)
+				end
+			end
 		end
 	end
 end

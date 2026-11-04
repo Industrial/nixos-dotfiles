@@ -61,6 +61,8 @@ function detailsFramework:CreateEditor(parent, name, options)
 | `width` | number | `400` | Editor frame width. |
 | `height` | number | `548` | Editor frame height. |
 | `options_width` | number | `340` | Width of the center panel (the build-menu canvas). |
+| `options_label_width` | number | `150` | Width of the label column in the center panel; the widget column starts right after it. |
+| `options_widget_width` | number | `180` | Width of each widget in the center panel. Keep `options_label_width + options_widget_width + 7 <= options_width`, or the row highlight and the rightmost swatches are clipped. |
 | `create_object_list` | boolean | `true` | If false, the left panel is omitted; the editor becomes a single-pane form. |
 | `object_list_width` | number | `200` | Left-panel width. |
 | `object_list_height` | number | `420` | Left-panel height. |
@@ -70,6 +72,7 @@ function detailsFramework:CreateEditor(parent, name, options)
 | `switch_template` | template | OPTIONS_CHECKBOX_TEMPLATE | Visual style for toggles. |
 | `button_template` | template | OPTIONS_BUTTON_TEMPLATE | Visual style for buttons (incl. the Undo/Redo toolbar buttons). |
 | `slider_template` | template | OPTIONS_SLIDER_TEMPLATE | Visual style for sliders. |
+| `color_template` | template? | nil | Visual style for color pickers, width and height included (e.g. DESIGNER_COLORPICK_TEMPLATE, 36x18). nil keeps them 18x18 drawn with `switch_template`. |
 | `text_template` | template | OPTIONS_FONT_TEMPLATE | Visual style for label text in the build-menu. |
 | `no_anchor_points` | boolean | `false` | If true, suppresses the anchor-point selection UI for the anchor option. |
 | `start_editing_callback` | function? | nil | `function(editorFrame, registeredObjectInfo)` called at the end of every `EditObject`. |
@@ -322,6 +325,8 @@ Recognized fields in any attribute (built-in or extra):
 | `step` | number | Slider increment. |
 | `usedecimals` | boolean | If true, slider stores fractional values (color alphas, scales, rotations). Otherwise the value is `math.floor`-ed. |
 | `subkey` | string | Reserved for nested addressing within compound widgets. Most widgets don't use this. |
+| `childrenids` / `children_follow_enabled` / `children_follow_reverse` | table / boolean / boolean | Forwarded to BuildMenu. On a toggle, `children_follow_enabled = true` enables the widgets listed in `childrenids` while it is on and disables them while it is off (`children_follow_reverse` inverts that). The ids are the children's `key`s. |
+| `disableif` | function? | Forwarded to BuildMenu. Returns true to disable the widget; checked on menu build. It should read the live profile, not a widget. After an edit that changes it, call `editor:RefreshDisabledOptions()` (not RefreshOptions, whose get() returns build-time values). |
 
 ---
 

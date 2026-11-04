@@ -678,7 +678,7 @@ sliceDetail = CreateFrame("Frame", nil, ringContainer) do
 			GameTooltip:SetOwner(self, "ANCHOR_TOP")
 			GameTooltip:AddLine(((L"Visibility conditional:"):gsub("%s*:%s*$", "")))
 			GameTooltip:AddLine((L"If this macro options expression evaluates to %s, or if none of its clauses apply, this slice will be hidden."):format(GREEN_FONT_COLOR_CODE .. "hide" .. "|r"), HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1)
-			GameTooltip:AddLine((L"You may use extended conditionals; see %s for details."):format("|cff33DDFFhttps://townlong-yak.com/addons/opie/extended-conditionals|r"), HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1)
+			GameTooltip:AddLine((L"You may use extended conditionals; see %s for details."):format("|cff33DDFFhttps://www.townlong-yak.com/addons/opie/extended-conditionals|r"), HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b, 1)
 			local isHorde, _, class = UnitFactionGroup("player") == "Horde", UnitClass("player")
 			local ex1, ex2 = isHorde and "horde" or "alliance", class and ",me:" .. class:lower() or ",mod"
 			local c = "[combat] hide; [" .. ex1 .. ex2 .. "] show";
@@ -809,7 +809,7 @@ sliceDetail = CreateFrame("Frame", nil, ringContainer) do
 			if self:IsSearchPossible() then
 				GameTooltip:AddLine((L"Press %s to search"):format(HIGHLIGHT_FONT_COLOR_CODE .. GetBindingText("ALT-ENTER") .. "|r"), nc.r, nc.g, nc.b, 1)
 			else
-				local at = HIGHLIGHT_FONT_COLOR_CODE .. "IconFileNames |cff606060<|cff40a0ffhttps://townlong-yak.com/addons/iconfilenames|r>|r|r"
+				local at = HIGHLIGHT_FONT_COLOR_CODE .. "IconFileNames |cff606060<|cff40a0ffhttps://www.townlong-yak.com/addons/iconfilenames|r>|r|r"
 				GameTooltip:AddLine((L"Install and enable %s to search by file name."):format(at), nc.r, nc.g, nc.b, 1)
 			end
 			GameTooltip:Show()

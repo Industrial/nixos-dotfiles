@@ -8,6 +8,7 @@ if not mod then return end
 mod:RegisterEnableMob(258557, 258556) -- Breath of Ula'tek, Blood of Ula'tek
 mod:SetEncounterID(3445)
 mod:SetRespawnTime(30)
+mod:SetUsesRangeChecks(true)
 mod:UseCustomTimers(true)
 mod:SetStage(1)
 
@@ -19,7 +20,8 @@ local activeBars = {}
 local backupBars = {}
 
 local durationEventCount = {}
-local isIntermission = nil
+local isIntermission = false
+local infoBoxTimer = nil
 local berserkCD = 0
 local nextStasis = 0
 
@@ -74,6 +76,7 @@ mod:SetAuraData({
 function mod:GetOptions()
 	return {
 		1284588, -- Vitriolic Stasis
+		"infobox",
 		"berserk",
 
 		-- Vashnik the Malignant (Mythic)
@@ -110,7 +113,8 @@ function mod:OnEncounterStart()
 	activeBars = {}
 	self:SetStage(1)
 	durationEventCount = {}
-	isIntermission = nil
+	isIntermission = false
+	infoBoxTimer = nil
 
 	dropletsCount = 1
 	coagulationCount = 1
@@ -119,6 +123,9 @@ function mod:OnEncounterStart()
 	bloodCount = 1
 	injectionCount = 1
 	protovenomCount = 1
+
+	local t = GetTime()
+	self:SimpleTimer(function() self:OpenMarkInfoBox(t) end, 0.5)
 
 	local stasisCD = 46
 	self:Bar(1284588, stasisCD, CL.count:format(self:GetRename(1284588), 1)) -- Vitriolic Stasis
@@ -159,9 +166,11 @@ function mod:ENCOUNTER_TIMELINE_EVENT_ADDED(_, eventInfo)
 		self:Message(1284588, "green", self:GetRename(1284588, 2), false)
 		self:PlaySound(1284588, "long")
 
-		isIntermission = nil
+		isIntermission = false
 		stage = stage + 1
 		self:SetStage(stage)
+
+		self:OpenMarkInfoBox(GetTime())
 
 		local stasisCD = 91
 		nextStasis = self.stageTime + stasisCD
@@ -378,6 +387,12 @@ function mod:VitriolicStasis(duration)
 			injectionCount = 1
 			protovenomCount = 1
 
+			if infoBoxTimer then
+				self:CancelTimer(infoBoxTimer)
+				infoBoxTimer = nil
+			end
+			self:CloseInfo("infobox")
+
 			self:StopBlizzMessages(6) -- The Golems of Ula'tek infect players with [Helical Toxins]!
 			self:Message(1284588, "cyan", barText)
 			self:PlaySound(1284588, "long")
@@ -500,4 +515,52 @@ function mod:BloodvenomInjection()
 			end
 		end,
 	}
+end
+
+--------------------------------------------------------------------------------
+-- Info Box
+--
+
+do
+	local function UpdateInfoBoxList()
+		if mod:IsEngaged() and not isIntermission then
+			mod:SimpleTimer(UpdateInfoBoxList, 0.5)
+
+			local minRange, maxRange = mod:GetUnitMinMaxRange("boss2")
+			if minRange < 40 then
+				if minRange == 0 and maxRange == 0 then -- Change text when one of the bosses dies
+					mod:SetInfo("infobox", 3, CL.boss)
+					mod:SetInfo("infobox", 5, "")
+					mod:SetInfo("infobox", 6, "")
+				else
+					mod:SetInfo("infobox", 6, ("%d - %d"):format(minRange, maxRange), 1, 0.1, 0.1)
+				end
+			else
+				mod:SetInfo("infobox", 6, ("%d - %d"):format(minRange, maxRange), 0.1, 1, 0.1)
+			end
+
+			minRange, maxRange = mod:GetUnitMinMaxRange("boss1")
+			if minRange < 40 then
+				mod:SetInfo("infobox", 4, ("%d - %d"):format(minRange, maxRange), 1, 0.1, 0.1)
+			else
+				mod:SetInfo("infobox", 4, ("%d - %d"):format(minRange, maxRange), 0.1, 1, 0.1)
+			end
+		end
+	end
+
+	local MARK_INTERVAL = 5
+	function mod:OpenMarkInfoBox(startTime)
+		if self:CheckOption("infobox", "INFOBOX") then
+			self:OpenInfo("infobox", CL.marks)
+			self:SetInfo("infobox", 1, CL.debuff)
+			self:SetInfo("infobox", 3, CL.breath) -- Breath of Ula
+			self:SetInfo("infobox", 5, CL.blood) -- Blood of Ula'tek
+			UpdateInfoBoxList()
+			self:SetInfoTimerBar("infobox", 1, 2, startTime, MARK_INTERVAL, 0.1, 0.1, 1, 0.6)
+			infoBoxTimer = self:ScheduleRepeatingTimer(function()
+				startTime = startTime + MARK_INTERVAL
+				self:SetInfoTimerBar("infobox", 1, 2, startTime, MARK_INTERVAL, 0.1, 0.1, 1, 0.6)
+			end, MARK_INTERVAL)
+		end
+	end
 end

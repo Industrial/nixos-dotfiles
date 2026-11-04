@@ -1,6 +1,6 @@
 local M, I, COMPAT, _, T = {}, {}, select(4, GetBuildInfo()), ...
 local EV, XU, noop = T.Evie, T.exUI, function() end
-local MODERN = COMPAT > 10e4
+local MODERN, CI_4E = COMPAT > 10e4, COMPAT > 160e2 and COMPAT < 2e4
 T.TenSettings = M
 
 do -- EscapeCallback
@@ -203,7 +203,7 @@ do -- TenSettingsFrame
 		r.Middle:SetAtlas("Options_Tab_Middle", true)
 		r.Right:SetAtlas("Options_Tab_Right", true)
 		r.NormalBG:SetPoint("TOPRIGHT", -2, -15)
-		r.HighlightBG:SetColorTexture(1,1,1,1)
+		r.HighlightBG:SetColorTexture(CI_4E and 0.75 or 1, CI_4E and 0.64 or 1, CI_4E and 0.50 or 1,1)
 		r.SelectedBG:SetColorTexture(0,0,0,0)
 		self:SetNormalFontObject(GameFontNormalSmall)
 	end
@@ -216,7 +216,7 @@ do -- TenSettingsFrame
 		r.Right:SetAtlas("Options_Tab_Active_Right", true)
 		r.NormalBG:SetPoint("TOPRIGHT", -2, -12)
 		r.HighlightBG:SetColorTexture(0,0,0,0)
-		r.SelectedBG:SetColorTexture(1,1,1,1)
+		r.SelectedBG:SetColorTexture(CI_4E and 0.75 or 1, CI_4E and 0.64 or 1, CI_4E and 0.50 or 1,1)
 		self:SetNormalFontObject(GameFontHighlightSmall)
 	end
 	local function minitab_new(parent, text)
@@ -682,7 +682,7 @@ do -- M:ShowFrameOverlay(self, overlayFrame)
 		corner:SetTexture("Interface\\DialogFrame\\UI-DialogBox-Corner")
 		corner:SetSize(30,30) corner:SetPoint("TOPRIGHT", -5, -6)
 		local close = CreateFrame("Button", nil, container, "UIPanelCloseButton")
-		close:SetPoint("TOPRIGHT", MODERN and -5 or 0, MODERN and -5 or 0)
+		close:SetPoint("TOPRIGHT", (MODERN or CI_4E) and -5 or 0, (MODERN or CI_4E) and -5 or 0)
 		close:SetScript("OnClick", function() container:Hide() end)
 		XU:Create("Backdrop", container, {edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", edgeSize=32, bgFile="Interface\\FrameGeneral\\UI-Background-Rock", tile=true, tileSize=256, insets={left=10,right=10,top=10,bottom=10}, bgColor=0x4c667f, subLevel=-5})
 		watcher:SetScript("OnHide", function()

@@ -212,6 +212,11 @@ L.autotalk_boss_desc = "Sélectionne automatiquement le dialogue avec le PNJ qui
 L.autotalk_generic_desc = "Sélectionne automatiquement le dialogue avec le PNJ qui vous fait progresser à la prochaine étape du donjon."
 L.autotalk_notice = "Interaction automatique avec le PNJ %s."
 
+-- Auto Player Choice
+--L.autoPlayerChoice = "Automatic Player Choice"
+--L.autoPlayerChoice_delve_power_desc = "Automatically select player powerups when they are dropped by creatures in the Delve."
+--L.autoPlayerChoice_notice = "Automatically selecting: %s"
+
 -- GUI notes
 L.intermissionOnly = "Seulement l'intervalle"
 L.stage1Only = "Seulement la phase 1"
@@ -307,6 +312,7 @@ L.arrows = "Flèches" -- Plural of L.arrow
 L.ball = "Boule" -- A ball, like a football, basketball, etc
 L.balls = "Boules" -- Plural of L.ball
 L.blind = "Cécité" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "Sang" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 L.bouncing_ball = "Balle rebondissante" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 L.bouncing_balls = "Balles rebondissantes" -- Plural of L.bouncing_ball
 L.chakram = "Chakram" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

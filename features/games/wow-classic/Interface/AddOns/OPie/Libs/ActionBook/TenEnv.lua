@@ -1,5 +1,5 @@
 local COMPAT, _, T = select(4, GetBuildInfo()), ...
-if COMPAT < 11e4 then return end
+if COMPAT < 11e4 and (COMPAT < 160e2 or COMPAT > 2e4) then return end
 local env = {}
 
 function env.GetSpellTabInfo(idx)

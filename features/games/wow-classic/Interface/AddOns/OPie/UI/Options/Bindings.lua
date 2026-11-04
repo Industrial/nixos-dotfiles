@@ -118,8 +118,8 @@ function ringBindings:shiftClick()
 end
 
 local subBindings = { name=L"In-Ring Bindings",
-	options={"ScrollNestedRingUpButton", "ScrollNestedRingDownButton", "OpenNestedRingButton", "SelectedSliceBind", "SelectedCloseBind", "CloseRingBind"},
-	optionNames={L"Scroll nested ring (up)", L"Scroll nested ring (down)", L"Open nested ring", L"Selected slice (keep ring open)", L"Selected slice (close ring)", L"Close ring"},
+	options={"ScrollNestedRingDownButton", "ScrollNestedRingUpButton", "OpenNestedRingButton", "SelectedSliceBind", "SelectedCloseBind", "CloseRingBind"},
+	optionNames={L"Rotate nested ring" .. " |TInterface/Buttons/UI-RefreshButton:0|t", L"Rotate nested ring" .. " |TInterface/Buttons/UI-RefreshButton:0:0:0:0:1:1:1:0:0:1|t", L"Open nested ring", L"Selected slice (keep ring open)", L"Selected slice (close ring)", L"Close ring"},
 	count=0, t={}
 }
 local function adjustBindingID(scope, id)

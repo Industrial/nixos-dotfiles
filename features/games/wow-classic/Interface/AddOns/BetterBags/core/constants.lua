@@ -14,13 +14,34 @@ local const = addon:NewModule('Constants')
 ---@field shown boolean
 ---@field staticPoint? string
 
+-- WoW: Forever (codename Camelot) is a mainline retail fork and runs the retail code
+-- paths. Builds before 1.60.1 (70170) report WOW_PROJECT_MAINLINE. From 70170 on,
+-- Blizzard_ProjectConstants/Camelot/ProjectConstants.lua sets WOW_PROJECT_ID to
+-- WOW_PROJECT_CAMELOT (18), a global that only exists on the camelot game type.
+local isCamelotProject = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
+
 -- Constants for detecting WoW version.
-addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE or isCamelotProject
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 addon.isBCC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.isMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 addon.isAnniversary = WOW_PROJECT_ID == 5
+
+-- addon.isForever is set by core/forever.lua, which is listed only in
+-- BetterBags_Camelot.toc and loads before this file; that is the only signal on
+-- pre-70170 builds, where the project ID is indistinguishable from live retail. The
+-- Camelot project ID is also honored. Normalize to a boolean here so every downstream
+-- consumer can treat it as a plain flag.
+addon.isForever = addon.isForever == true or isCamelotProject
+
+-- Whether the client has an Account bank (Warbank / Warband bank). It exists on
+-- live retail but NOT on WoW: Forever (Camelot), which is a retail fork that
+-- ships no warbank even though its Enum.BagIndex still declares AccountBankTab_N
+-- members. Every warbank-specific path gates on this predicate; the account bag
+-- tables below are also built only when it is true, so table-driven warbank sites
+-- (data sweep, tab slots panel, quickfind) go inert on Forever with no per-site branch.
+addon.hasWarbank = addon.isRetail and not addon.isForever
 
 -- Get the interface/TOC version for patch-specific feature gating
 -- Format: 110207 for patch 11.0.207, 120000 for 12.0.0 (Midnight), etc.
@@ -37,23 +58,35 @@ const.BAG_KIND = {
   BANK = 1,
 }
 
+-- enumerateBagIndices walks contiguous Enum.BagIndex members named
+-- "<prefix>1", "<prefix>2", ... and returns their values in order, stopping at
+-- the first missing index. Live retail exposes CharacterBankTab_1..6 and
+-- AccountBankTab_1..5; WoW: Forever (codename Camelot) exposes _1..9 for both.
+-- Probing the enum keeps every derived bank table correctly sized on any client
+-- without hard-coding the tab count, so the retail bank paths adapt to Camelot's
+-- 9+9 tabs automatically (and to any future tab additions on either client).
+local function enumerateBagIndices(prefix)
+  local ids = {}
+  local n = 1
+  while Enum.BagIndex[prefix .. n] ~= nil do
+    ids[#ids + 1] = Enum.BagIndex[prefix .. n]
+    n = n + 1
+  end
+  return ids
+end
+
 if addon.isRetail then
   -- BankTab is an enum for the different bank tabs.
   ---@enum BankTab
   const.BANK_TAB = {
     [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
-    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
-    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
-    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
-    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
-    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
-    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
   }
+  for _, id in ipairs(enumerateBagIndices("CharacterBankTab_")) do
+    const.BANK_TAB[id] = id
+  end
+  for _, id in ipairs(enumerateBagIndices("AccountBankTab_")) do
+    const.BANK_TAB[id] = id
+  end
   -- Named aliases used as context markers by UpdateFreeSlots to distinguish
   -- character bank from account bank (warbank) mode. The retail BANK_TAB table
   -- uses integer enum keys only, so these named keys are required for the
@@ -116,31 +149,18 @@ const.BINDING_MAP = {
 }
 
 if addon.isRetail then
+  -- BANK_BAGS carries the main Characterbanktab container plus every character
+  -- bank tab; BANK_ONLY_BAGS / _LIST are the tabs alone (see enumerateBagIndices).
   const.BANK_BAGS = {
     [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
-    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
   }
-  const.BANK_ONLY_BAGS = {
-    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
-  }
-  const.BANK_ONLY_BAGS_LIST = {
-    Enum.BagIndex.CharacterBankTab_1,
-    Enum.BagIndex.CharacterBankTab_2,
-    Enum.BagIndex.CharacterBankTab_3,
-    Enum.BagIndex.CharacterBankTab_4,
-    Enum.BagIndex.CharacterBankTab_5,
-    Enum.BagIndex.CharacterBankTab_6,
-  }
+  const.BANK_ONLY_BAGS = {}
+  const.BANK_ONLY_BAGS_LIST = {}
+  for _, id in ipairs(enumerateBagIndices("CharacterBankTab_")) do
+    const.BANK_BAGS[id] = id
+    const.BANK_ONLY_BAGS[id] = id
+    const.BANK_ONLY_BAGS_LIST[#const.BANK_ONLY_BAGS_LIST + 1] = id
+  end
 else
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
@@ -174,14 +194,25 @@ else
   }
 end
 
-if addon.isRetail then
-  const.ACCOUNT_BANK_BAGS = {
-    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
-    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
-    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
-    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
-    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
-  }
+if addon.hasWarbank then
+  -- ACCOUNT_BANK_BAGS is the account (warband) bank tabs, sized off the enum so
+  -- Camelot's extra tabs are included automatically (see enumerateBagIndices).
+  -- ACCOUNT_BANK_BAGS_LIST is the same tabs in tab-index order, the account-bank
+  -- counterpart to BANK_ONLY_BAGS_LIST (consumed by the bank tab slots panel).
+  const.ACCOUNT_BANK_BAGS = {}
+  const.ACCOUNT_BANK_BAGS_LIST = {}
+  for _, id in ipairs(enumerateBagIndices("AccountBankTab_")) do
+    const.ACCOUNT_BANK_BAGS[id] = id
+    const.ACCOUNT_BANK_BAGS_LIST[#const.ACCOUNT_BANK_BAGS_LIST + 1] = id
+  end
+elseif addon.isRetail then
+  -- Retail-shaped client with no warbank (WoW: Forever / Camelot). Keep the tables
+  -- present but empty so every table-driven warbank site iterates/tests nothing and
+  -- goes inert, without needing an addon.isForever branch of its own. Enum.BagIndex
+  -- still declares AccountBankTab_N here, so this must be explicit — the enum probe
+  -- above would otherwise populate 9 phantom account tabs.
+  const.ACCOUNT_BANK_BAGS = {}
+  const.ACCOUNT_BANK_BAGS_LIST = {}
 end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
@@ -231,6 +262,26 @@ const.ITEM_BAG_FAMILY = {
   [512] = L:G("Gem Bag"),
   [1024] = L:G("Mining Bag"),
 }
+
+-- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the small glyph drawn, centered and semi-transparent,
+-- in the empty slots of any specialized (non-zero bag family) bag: reagent bags, quivers,
+-- soul/herb/enchanting bags, etc. Values in this system are texture ATLAS names (drawn via
+-- Texture:SetAtlas), not file paths. Mobile-Herbalism is present on both retail and classic
+-- clients, so it is a safe cross-version default.
+const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
+
+-- On retail the dedicated Reagent Bag (bag id 5) is identified by id, not by a bag-family bit
+-- (C_Container.GetContainerNumFreeSlots reports family 0 for it), so it is keyed in
+-- EMPTY_SLOT_FAMILY_ICON by this symbolic key instead of a numeric family. Classic profession
+-- bags keep their real numeric family bits.
+const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
+
+-- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value (see ITEM_BAG_FAMILY), or the symbolic
+-- REAGENT_BAG_FAMILY_KEY, to a distinct overlay atlas name. Families with no explicit entry
+-- fall back to EMPTY_SLOT_FAMILY_ICON_DEFAULT (resolved by items:GetEmptySlotFamilyIcon).
+-- Empty by default — every specialized bag shares the default glyph for now; add per-family
+-- atlases here to differentiate them.
+const.EMPTY_SLOT_FAMILY_ICON = {}
 
 ---@enum WindowKind
 const.WINDOW_KIND = {
@@ -399,6 +450,16 @@ const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY5_DESC)] = const.ITEM_QUALIT
 const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY6_DESC)] = const.ITEM_QUALITY.Artifact
 const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY7_DESC)] = const.ITEM_QUALITY.Heirloom
 const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY8_DESC)] = const.ITEM_QUALITY.WoWToken
+
+-- Quality glow intensity slider (0-100). At or below this threshold the item
+-- button draws a flat colored quality border (alpha scaled by intensity/threshold);
+-- above it, the additive "glowing halo" fades in. See frames/item.lua:DrawQualityGlow.
+const.GLOW_INTENSITY_HALO_THRESHOLD = 60
+-- The "on" and "off" states of the retired boolean "Extra Glowy" option map onto
+-- these intensities during migration (on -> full blinding halo, off -> flat border
+-- at the halo threshold). Do not remove: DB:Migrate references them.
+const.GLOW_INTENSITY_MAX = 100
+const.GLOW_INTENSITY_DEFAULT = const.GLOW_INTENSITY_HALO_THRESHOLD
 
 const.ITEM_QUALITY_COLOR = {
   [const.ITEM_QUALITY.Poor] = {0.62, 0.62, 0.62, 1},
@@ -618,6 +679,10 @@ const.DATABASE_DEFAULTS = {
     showKeybindWarning = true,
     enterToMakeCategory = true,
     upgradeIconProvider = 'None',
+    -- False until the user explicitly picks a provider in the config dropdown.
+    -- While false, an available external provider (Pawn/SimpleItemLevel) takes
+    -- precedence so upgrade arrows keep working automatically for existing users.
+    upgradeIconProviderUserSet = false,
     theme = 'Default',
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,
@@ -631,9 +696,9 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = true,
       [const.BAG_KIND.BANK] = true,
     },
-    extraGlowyButtons = {
-      [const.BAG_KIND.BACKPACK] = false,
-      [const.BAG_KIND.BANK] = false,
+    glowIntensity = {
+      [const.BAG_KIND.BACKPACK] = 60,
+      [const.BAG_KIND.BANK] = 60,
     },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {

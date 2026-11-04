@@ -6,6 +6,7 @@ AB, KR = AB and AB:compatible(2, 14), AB and AB:compatible("Kindred", 1, 34)
 assert(ORI and EV and L and PC and XU and config and AB and KR, "Incompatible library bundle")
 local COMPAT = select(4,GetBuildInfo())
 local MODERN, CF_WRATH = COMPAT >= 10e4, COMPAT < 10e4 and COMPAT >= 3e4
+local MODERN_QL = MODERN or (COMPAT > 160e2 and COMPAT < 2e4)
 local GameTooltip = T.NotGameTooltip or GameTooltip
 
 local exclude, questItems = PC:RegisterPVar("AutoQuestExclude", {}), {}
@@ -16,7 +17,7 @@ local function getContainerItemQuestInfo(bag, slot)
 		return iqi.isQuestItem, iqi.questID, iqi.isActive
 	end
 end
-if MODERN or CF_WRATH then
+if MODERN_QL or CF_WRATH then
 	questItems[30148] = {72986, 72985}
 	local include, filtered do
 		local PREY_STATE
@@ -343,7 +344,7 @@ local addSlice, sortQICollection do
 	end
 end
 local function scanQuests(i)
-	for i=i or 1, (MODERN and C_QuestLog.GetNumQuestLogEntries or GetNumQuestLogEntries)() do
+	for i=i or 1, (MODERN_QL and C_QuestLog.GetNumQuestLogEntries or GetNumQuestLogEntries)() do
 		local _, _, _, isHeader, isCollapsed, isComplete, _, qid = GetQuestLogTitle(i)
 		if isHeader and isCollapsed then
 			ExpandQuestHeader(i)
@@ -355,7 +356,7 @@ local function scanQuests(i)
 					break
 				end
 			end
-		elseif MODERN then
+		elseif MODERN_QL then
 			local link, _, _, showWhenComplete = GetQuestLogSpecialItemInfo(i)
 			if link and (showWhenComplete or not isComplete) then
 				local iid = tonumber((link:match("item:(%d+)")))

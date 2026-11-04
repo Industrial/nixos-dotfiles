@@ -260,7 +260,18 @@ function refresh:OnEnable()
     self:RequestUpdate({ bank = true })
   end)
   events:RegisterMessage('bags/SortBackpack', function()
-    self:RequestUpdate({ sort = true })
+    -- Sorting the backpack while the bank is open also sorts the open bank, so a
+    -- single right-click cleans up everything on screen (restores the classic
+    -- "sort inventory also sorts the bank" behavior). Both bank sorts ride the
+    -- same serialized refresh unit as the backpack sort.
+    local request = { sort = true }
+    if addon.atBank then
+      request.sortBank = true
+      if addon.hasWarbank then
+        request.sortWarbank = true
+      end
+    end
+    self:RequestUpdate(request)
   end)
   events:RegisterMessage('bags/SortBank', function()
     self:RequestUpdate({ sortBank = true })
@@ -303,7 +314,19 @@ function refresh:OnEnable()
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
       self:RequestUpdate({ bank = true, bags = { [-1] = true } })
     end)
+  elseif addon.isForever then
+    -- A bag placed in or removed from a bank tab's bag socket resizes that tab's
+    -- container, so sweep every bank bag. Bag -1 is the keyring on Forever.
+    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      self:RequestUpdate({ bank = true })
+    end)
   end
 
-  self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  -- Route the initial login sweep through the ItemLoader's ContinuableContainer, exactly
+  -- like a BAG_UPDATE, so the first harvest only runs once the item cache is primed.
+  -- Harvesting a cold cache here reads nil type/subtype from C_Item.GetItemInfo and dumps
+  -- items into "Everything" until a /reload. The loader's callback (registered above) fans
+  -- this out to RequestUpdate, and RunRefresh forces a wipe on each kind's first sweep, so
+  -- no explicit wipe is needed here.
+  itemLoader:LoadAllBagsAndUpdate()
 end

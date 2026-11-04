@@ -230,7 +230,12 @@ platerInternal.Auras = {
 }
 Plater.SpellCaches = platerInternal.Auras.spellCaches
 
-local spellBlacklist = {} -- some spells just crash PTR clients... add them here
+local spellBlacklist = { -- some spells just crash PTR/beta clients... add them here
+	[255616] = true,
+	[1249911] = true,
+	[1251678] = true,
+	[1251535] = true,
+}
 
 -- Spell Caches
 local expandAuraCaches
@@ -986,9 +991,9 @@ local function getAuraFilters(frameName, actorType, force)
 	end
 
 	local filters = {}
-	local allCandidates = getCandidateFilters(frameName, force)
 
 	for _, type in pairs({"debuffs", "buffs"}) do
+		local allCandidates = getCandidateFilters(frameName, force) -- fetch a fresh copy
 
 		local pFilters = {}
 		local nFilters = {}
@@ -1078,11 +1083,16 @@ local function getAuraFilters(frameName, actorType, force)
 				allCandidates.additionalInclude.excludeDispelTypes = allCandidates.additionalInclude.excludeDispelTypes or {}
 				candidate.includeDispelTypes["Enrage"] = true
 				table.insert(filters, {
-					filterString = "HELPFUL" .. (DB_SHOW_PURGE_IN_EXTRA_ICONS and "|!RAID_PLAYER_DISPELLABLE" or "") .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
+					filterString = "HELPFUL" .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
 					candidateFilters = candidate,
 				})
 
-				-- remaining exclude magic
+				-- remaining exclude enrage
+				allCandidates.mainFilter.excludeDispelTypes["Enrage"] = true
+				allCandidates.additionalInclude.excludeDispelTypes["Enrage"] = true
+			elseif DB_SHOW_ENRAGE_IN_EXTRA_ICONS and not canAssist then
+				allCandidates.mainFilter.excludeDispelTypes = allCandidates.mainFilter.excludeDispelTypes or {}
+				allCandidates.additionalInclude.excludeDispelTypes = allCandidates.additionalInclude.excludeDispelTypes or {}
 				allCandidates.mainFilter.excludeDispelTypes["Enrage"] = true
 				allCandidates.additionalInclude.excludeDispelTypes["Enrage"] = true
 			end
@@ -1095,17 +1105,22 @@ local function getAuraFilters(frameName, actorType, force)
 				allCandidates.additionalInclude.excludeDispelTypes = allCandidates.additionalInclude.excludeDispelTypes or {}
 				candidate.includeDispelTypes["Magic"] = true
 				table.insert(filters, {
-					filterString = "HELPFUL" .. (DB_SHOW_PURGE_IN_EXTRA_ICONS and "|!RAID_PLAYER_DISPELLABLE" or "") .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
+					filterString = "HELPFUL" .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
 					candidateFilters = candidate,
 				})
 
 				-- remaining exclude magic
 				allCandidates.mainFilter.excludeDispelTypes["Magic"] = true
 				allCandidates.additionalInclude.excludeDispelTypes["Magic"] = true
+			elseif DB_SHOW_MAGIC_IN_EXTRA_ICONS and not canAssist then
+				allCandidates.mainFilter.excludeDispelTypes = allCandidates.mainFilter.excludeDispelTypes or {}
+				allCandidates.additionalInclude.excludeDispelTypes = allCandidates.additionalInclude.excludeDispelTypes or {}
+				allCandidates.mainFilter.excludeDispelTypes["Magic"] = true
+				allCandidates.additionalInclude.excludeDispelTypes["Magic"] = true
 			end
 
 			if Plater.db.profile.aura_show_defensive_cd and not Plater.db.profile.extra_icon_show_defensive  then
-				if isPlayer then
+				if isPlayer or canAssist then
 					table.insert(pFilters, "BIG_DEFENSIVE")
 					table.insert(pFilters, "EXTERNAL_DEFENSIVE")
 				end
@@ -1208,11 +1223,11 @@ local function getAuraFilters(frameName, actorType, force)
 				allCandidates.additionalInclude.excludeDispelTypes = allCandidates.additionalInclude.excludeDispelTypes or {}
 				candidate.includeDispelTypes["Enrage"] = true
 				table.insert(filters, {
-					filterString = "HELPFUL" .. (DB_SHOW_PURGE_IN_EXTRA_ICONS and "|!RAID_PLAYER_DISPELLABLE" or "") .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
+					filterString = "HELPFUL" .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
 					candidateFilters = candidate,
 				})
 
-				-- remaining exclude magic
+				-- remaining exclude enrage
 				allCandidates.mainFilter.excludeDispelTypes["Enrage"] = true
 				allCandidates.additionalInclude.excludeDispelTypes["Enrage"] = true
 			end
@@ -1225,7 +1240,7 @@ local function getAuraFilters(frameName, actorType, force)
 				allCandidates.additionalInclude.excludeDispelTypes = allCandidates.additionalInclude.excludeDispelTypes or {}
 				candidate.includeDispelTypes["Magic"] = true
 				table.insert(filters, {
-					filterString = "HELPFUL" .. (DB_SHOW_PURGE_IN_EXTRA_ICONS and "|!RAID_PLAYER_DISPELLABLE" or "") .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
+					filterString = "HELPFUL" .. (Plater.db.profile.extra_icon_show_defensive and "|!BIG_DEFENSIVE|!EXTERNAL_DEFENSIVE" or ""),
 					candidateFilters = candidate,
 				})
 
@@ -1473,7 +1488,7 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 		DF:SetFontSize(auraButton.Desc, Plater.db.profile.extra_icon_caster_size)
 		DF:SetFontFace(auraButton.Desc, Plater.db.profile.extra_icon_caster_font)
 		DF:SetFontOutline(auraButton.Desc, "SLUG")
-		auraButton.SetCasterName(auraButton.Desc, false, true)
+		auraButton:SetCasterName(auraButton.Desc, {showRealmName = false, useClassColors = true})
 	end
 
 
@@ -1588,7 +1603,11 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 			}
 		}
 		--C_AuraContainerUtil.ProcessCustomAuraButtonDispelTypeTextureOptions(borderOptions)
-		auraButton:SetAuraBorder(auraButton.Border, borderOptions)
+		if auraButton.SetAuraBorder then
+			auraButton:SetAuraBorder(auraButton.Border, borderOptions)
+		else
+			auraButton:AddDispelTypeTexture(auraButton.Border, borderOptions)
+		end
 	end
 
 
@@ -1756,9 +1775,18 @@ function reSkinAuraButtons(auraButtons, options)
     	auraButton.Border:SetVertexColor(defaultColor[1], defaultColor[2], defaultColor[3], defaultColor[4])
 
 		if frameName ~= "ExtraIconFrame" and Plater.db.profile.aura_border_colors_by_type or frameName == "ExtraIconFrame" and Plater.db.profile.extra_icon_aura_border_colors_by_type then
-			auraButton:SetAuraBorder(auraButton.Border, options.borderOptions)
+			if auraButton.SetAuraBorder then
+				auraButton:SetAuraBorder(auraButton.Border, options.borderOptions)
+			else
+				auraButton:ClearDispelTypeTextures()
+				auraButton:AddDispelTypeTexture(auraButton.Border, options.borderOptions)
+			end
 		else
-			auraButton:ClearAuraBorder()
+			if auraButton.ClearAuraBorder then
+				auraButton:ClearAuraBorder()
+			else
+				auraButton:ClearDispelTypeTextures()
+			end
 		end
 
 		auraButton.Cooldown:SetEdgeTexture (profile.aura_cooldown_edge_texture)
@@ -2066,17 +2094,18 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 		end
 
 		-- update
+		local auraActorType = unitFrame.ActorType == "friendlyplayer" and "friendlynpc" or unitFrame.ActorType -- shared friendly filters
 		for _, frameInfo in pairs (auraFramesSetup) do
 			local auraContainer = unitFrame[frameInfo.key]
 			if DB_AURA_ENABLED and unit then
-				local options = getFullAuraOptions(frameInfo.name, frameInfo.key, auraContainer, unitFrame.ActorType, forceFull)
 				if forceFull then
 					forceLayout = true
 					forceFilters = true
 				end
 				--if force or auraContainer.activeUnit ~= unit or (auraContainer.activeOptionsType ~= unitFrame.ActorType) or (auraContainer.activeOptionsIndex ~= options.optionsIndex) then
-				local shouldUpdate = (auraContainer.activeOptionsType ~= unitFrame.ActorType) or (auraContainer.activeOptionsIndex ~= options.optionsIndex)
+				local shouldUpdate = (auraContainer.activeOptionsType ~= auraActorType) or (auraContainer.activeOptionsIndex ~= containerConfigCache.containerFullOptionIndex)
 				if forceFilters or shouldUpdate or forceLayout then
+					local options = getFullAuraOptions(frameInfo.name, frameInfo.key, auraContainer, auraActorType, forceFull) -- only build when needed
 					--if DevTool then DevTool:AddData({stack = debugstack(), force = force, shouldUpdate = shouldUpdate, forceLayout = forceLayout, forceFull = forceFull, active = auraContainer.activeOptionsType, current = unitFrame.ActorType, activeIndex = auraContainer.activeOptionsIndex, currentIndex = options.optionsIndex, options = options}, "Updating: " .. unit .. " - " .. frameInfo.key) end
 					if shouldUpdate or forceLayout then
 						Plater.StartLogPerformanceCore("Plater-Core", "Update", "CreateOrUpdateAuraContainers - updatelayout")
@@ -2131,8 +2160,8 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 						auraContainer.configIndex = containerConfigCache.containerConfigIndex
 					end
 
-					if unitFrame.ActorType then
-						auraContainer.activeOptionsType = unitFrame.ActorType
+					if auraActorType then
+						auraContainer.activeOptionsType = auraActorType
 						auraContainer.activeOptions = options
 						auraContainer.activeOptionsIndex = options.optionsIndex
 						auraContainer.activeUnit = unit

@@ -8,7 +8,9 @@ local SALE_ITEM_EVENTS = {
 local function NormalizePrice(price)
   local normalizedPrice = price
 
-  if Auctionator.Constants.IsRetail then
+  if Auctionator.Constants.IsForever then
+    return normalizedPrice
+  elseif Auctionator.Constants.IsRetail then
     -- Round up
     if normalizedPrice % 100 ~= 0 then
       normalizedPrice = normalizedPrice + (100 - normalizedPrice % 100)
@@ -365,11 +367,6 @@ function AuctionatorSaleItemMixin:UpdateForNoItem()
   self.TotalPrice:SetText(GetMoneyString(100, true))
 end
 
-local DURATIONS_TO_TIME = {
-  [1] = 12,
-  [2] = 24,
-  [3] = 48,
-}
 function AuctionatorSaleItemMixin:SetDuration()
   local duration = Auctionator.Config.Get(Auctionator.Config.Options.AUCTION_DURATION)
 

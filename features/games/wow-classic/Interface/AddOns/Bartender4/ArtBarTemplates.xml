@@ -7,17 +7,10 @@
 		</KeyValues>
 	</Frame>
 
-	<Frame name="BT4ArtBarBackgroundTemplate" inherits="NineSliceCodeTemplate" virtual="true">
-		<KeyValues>
-			<KeyValue key="layoutType" value="UniqueCornersLayout" type="string"/>
-			<KeyValue key="layoutTextureKit" value="ui-hud-actionbar-frame-background" type="string"/>
-			<KeyValue key="layoutTextureLayer" value="BACKGROUND" type="string"/>
-		</KeyValues>
-	</Frame>
-
 	<Frame name="BT4ArtBarButtonRightDivider" inherits="NineSliceCodeTemplate" virtual="true">
 		<Size x="12"/>
 		<KeyValues>
+			<KeyValue key="ignoreInLayout" value="true" type="boolean" />
 			<KeyValue key="layoutType" value="ThreeSliceVerticalLayout" type="string"/>
 			<KeyValue key="layoutTextureKit" value="ui-hud-actionbar-frame-divider" type="string"/>
 		</KeyValues>

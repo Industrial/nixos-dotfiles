@@ -67,8 +67,67 @@ function Details222.OptionsPanel.SetCurrentInstance(instance)
     currentInstance = instance
 end
 
+--the option definitions built below do not read 'currentInstance' directly, they call the getter they were
+--built with. details' own options window builds them with this getter, an external consumer passes its own,
+--which is what allows the same definition to drive a window details! is not editing
+local defaultGetInstance = function()
+    return currentInstance
+end
+
+--details' own options window; nil when the option definitions are being rendered by another addon
+local getOptionsWindow = function()
+    return _G.DetailsOptionsWindow
+end
+
+--closes details' own options window, used by options which open another window on top of it
+--does nothing when the option is being rendered somewhere else, since there is nothing to close
+local hideOptionsWindow = function()
+    local optionsWindow = getOptionsWindow()
+    if (optionsWindow and optionsWindow:IsShown()) then
+        optionsWindow:Hide()
+    end
+end
+
+--a few options apply themselves by refreshing every registered window instead of only the window being
+--edited. a window which was never registered, a detached window hosted by another addon for example, is
+--not reachable by those broadcasts, so the three helpers below do the same work on that window alone.
+--when the option is editing one of the user's own windows the broadcast is used exactly as before.
+
+--replaces Details:RefreshMainWindow(-1, true)
+local refreshWindowsAfterOptionChange = function(instanceObject)
+    if (instanceObject and instanceObject:IsDetached()) then
+        Details:RefreshInstanceWindow(instanceObject, true)
+    else
+        Details:RefreshMainWindow(-1, true)
+    end
+end
+
+--replaces Details:InstanceCallDetailsFunc(func, ...)
+local callDetailsFuncAfterOptionChange = function(instanceObject, func, ...)
+    if (instanceObject and instanceObject:IsDetached()) then
+        func(nil, instanceObject, ...)
+    else
+        Details:InstanceCallDetailsFunc(func, ...)
+    end
+end
+
+--replaces Details:InstanceCallMethod(funcName, ...)
+local callMethodAfterOptionChange = function(instanceObject, funcName, ...)
+    if (instanceObject and instanceObject:IsDetached()) then
+        instanceObject[funcName](instanceObject, ...)
+    else
+        Details:InstanceCallMethod(funcName, ...)
+    end
+end
+
 function Details222.OptionsPanel.SetCurrentInstanceAndRefresh(instance)
     currentInstance = instance
+
+    --nothing to refresh while details' own options window has never been built
+    if (not _G.DetailsOptionsWindow) then
+        return
+    end
+
     _G.DetailsOptionsWindow.instance = instance
 
     --get all the frames created and update the options
@@ -81,8 +140,19 @@ function Details222.OptionsPanel.SetCurrentInstanceAndRefresh(instance)
     Details222.OptionsPanel.UpdateAutoHideSettings(instance)
 end
 
-function Details222.OptionsPanel.UpdateAutoHideSettings(instance)
-    for contextId, line in ipairs(_G.DetailsOptionsWindowTab13.AutoHideOptions) do --tab13 = automation settings
+---refreshes the auto hide grid of the automation section
+---@param instance instance
+---@param sectionFrame table|nil the frame the section was built into, details' own tab 13 when omitted
+function Details222.OptionsPanel.UpdateAutoHideSettings(instance, sectionFrame)
+    --the grid belongs to the frame the section was built into; looking it up by global name only works for
+    --details' own options window, a section built anywhere else carries its grid on its own frame
+    sectionFrame = sectionFrame or _G.DetailsOptionsWindowTab13
+
+    if (not sectionFrame or not sectionFrame.AutoHideOptions) then
+        return
+    end
+
+    for contextId, line in ipairs(sectionFrame.AutoHideOptions) do --tab13 = automation settings
         line.enabledCheckbox:SetValue(instance.hide_on_context[contextId].enabled)
         line.reverseCheckbox:SetValue(instance.hide_on_context[contextId].inverse)
         line.alphaSlider:SetValue(instance.hide_on_context[contextId].value)
@@ -149,7 +219,8 @@ end
 
 -- ~01 - display
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         --abbreviation options
             local icon = [[Interface\COMMON\mini-hourglass]]
@@ -159,7 +230,7 @@ do
             local onSelectTimeAbbreviation = function(_, _, abbreviationtype)
                 Details.ps_abbreviation = abbreviationtype
                 Details:UpdateToKFunctions()
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local abbreviationOptions = {
@@ -203,8 +274,8 @@ do
             local onSelectTimeType = function(_, _, timetype)
                 Details.time_type = timetype
                 Details.time_type_original = timetype
-                Details:RefreshMainWindow(-1, true)
-                afterUpdate()
+                refreshWindowsAfterOptionChange(getInstance())
+                afterUpdate(getInstance())
             end
 
             local timetypeOptions = {
@@ -220,7 +291,7 @@ do
         --auto erase | erase data
             local onSelectEraseData = function(_, _, eraseType)
                 Details.segments_auto_erase = eraseType
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local eraseDataOptions = {
@@ -239,7 +310,7 @@ do
                 get = function() return Details.use_row_animations end,
                 set = function(self, fixedparam, value)
                     Details:SetUseAnimations(value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_ANIMATEBARS"],
                 desc = Loc ["STRING_OPTIONS_ANIMATEBARS_DESC"],
@@ -292,7 +363,7 @@ do
                 get = function() return Details.update_speed end,
                 set = function(self, fixedparam, value)
                     Details:SetWindowUpdateSpeed(value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 0.05,
                 max = 3,
@@ -384,7 +455,7 @@ do
                 get = function() return Details.segments_amount end,
                 set = function(self, fixedparam, value)
                     Details.segments_amount = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 1,
                 max = 40,
@@ -398,7 +469,7 @@ do
                 get = function() return Details.segments_amount_to_save end,
                 set = function(self, fixedparam, value)
                     Details.segments_amount_to_save = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 1,
                 max = 40,
@@ -412,7 +483,7 @@ do
                 get = function() return Details.segments_amount_boss_wipes end,
                 set = function(self, fixedparam, value)
                     Details.segments_amount_boss_wipes = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 1,
                 max = 40,
@@ -439,7 +510,7 @@ do
                 get = function() return Details.overall_clear_newboss end,
                 set = function(self, fixedparam, value)
                     Details:SetOverallResetOptions(value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_OVERALL_NEWBOSS"],
                 desc = Loc ["STRING_OPTIONS_OVERALL_NEWBOSS_DESC"],
@@ -450,7 +521,7 @@ do
                 get = function() return Details.overall_clear_newchallenge end,
                 set = function(self, fixedparam, value)
                     Details:SetOverallResetOptions(nil, value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_OVERALL_MYTHICPLUS"],
                 desc = Loc ["STRING_OPTIONS_OVERALL_MYTHICPLUS_DESC"],
@@ -461,7 +532,7 @@ do
                 get = function() return Details.overall_clear_pvp end,
                 set = function(self, fixedparam, value)
                     Details:SetOverallResetOptions(nil, nil, nil, value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Clear On Start PVP", --localize-me
                 desc = "When enabled, overall data is automatically wiped when a new arena or battleground starts.", --localize-me
@@ -472,7 +543,7 @@ do
                 get = function() return Details.overall_clear_logout end,
                 set = function(self, fixedparam, value)
                     Details:SetOverallResetOptions(nil, nil, value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_OVERALL_LOGOFF"],
                 desc = Loc ["STRING_OPTIONS_OVERALL_LOGOFF_DESC"],
@@ -483,7 +554,7 @@ do
                 get = function() return Details.auto_swap_to_dynamic_overall end,
                 set = function(self, fixedparam, value)
                     Details.auto_swap_to_dynamic_overall = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Use Dynamic Overall Damage",
                 desc = "When showing Damage Done Overall, swap to Dynamic Overall Damage on entering combat.",
@@ -497,7 +568,7 @@ do
             {--lock instance
                 type = "execute",
                 func = function(self)
-                    local instanceLockButton = currentInstance.baseframe.lock_button
+                    local instanceLockButton = getInstance().baseframe.lock_button
                     Details.lock_instance_function(instanceLockButton, "leftclick", true, true)
                 end,
                 icontexture = [[Interface\PetBattles\PetBattle-LockIcon]],
@@ -508,7 +579,7 @@ do
             {--ungroup instance
                 type = "execute",
                 func = function(self)
-                    currentInstance:UngroupInstance()
+                    getInstance():UngroupInstance()
                 end,
                 icontexture = [[Interface\AddOns\Details\images\icons]],
                 icontexcoords = {160/512, 179/512, 142/512, 162/512},
@@ -518,7 +589,7 @@ do
             {--close instance close window
                 type = "execute",
                 func = function(self)
-                    currentInstance:Shutdown()
+                    getInstance():Shutdown()
                 end,
                 icontexture = [[Interface\Buttons\UI-Panel-MinimizeButton-Up]],
                 icontexcoords = {0.143125, 0.8653125, 0.1446875, 0.8653125},
@@ -567,7 +638,7 @@ do
                 get = function() return Details.immersion_pets_on_solo_play end,
                 set = function(self, fixedparam, value)
                     Details.immersion_pets_on_solo_play = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show pets when solo", --localize-me
                 desc = "Show pets when solo",
@@ -579,7 +650,7 @@ do
                 get = function() return Details.all_players_are_group end,
                 set = function(self, fixedparam, value)
                     Details.all_players_are_group = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_ALWAYSSHOWPLAYERS"],
                 desc = Loc ["STRING_OPTIONS_ALWAYSSHOWPLAYERS_DESC"],
@@ -596,9 +667,9 @@ do
                     local accepted, errortext = Details:SetNickname(text)
                     if (not accepted) then
                         Details:ResetPlayerPersona()
-                        Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
+                        Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_NICKNAME"],
                 desc = Loc ["STRING_OPTIONS_NICKNAME"],
@@ -607,7 +678,7 @@ do
                 type = "execute",
                 func = function(self)
                     Details:ResetPlayerPersona()
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
                 end,
                 icontexture = [[Interface\GLUES\LOGIN\Glues-CheckBox-Check]],
                 --icontexcoords = {160/512, 179/512, 142/512, 162/512},
@@ -619,7 +690,7 @@ do
                 get = function() return Details.ignore_nicktag end,
                 set = function(self, fixedparam, value)
                     Details.ignore_nicktag = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_IGNORENICKNAME"],
                 desc = Loc ["STRING_OPTIONS_IGNORENICKNAME_DESC"],
@@ -631,7 +702,7 @@ do
                 get = function() return Details.remove_realm_from_name end,
                 set = function(self, fixedparam, value)
                     Details.remove_realm_from_name = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_REALMNAME"],
                 desc = Loc ["STRING_OPTIONS_REALMNAME_DESC"],
@@ -646,7 +717,7 @@ do
                 get = function() return Details.use_self_color end,
                 set = function(self, fixedparam, value)
                     Details.use_self_color = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Use Different Color for You",
                 desc = "Use a different color on your own bar",
@@ -663,7 +734,7 @@ do
                     Details.class_colors.SELF[1] = r
                     Details.class_colors.SELF[2] = g
                     Details.class_colors.SELF[3] = b
-                    afterUpdate()
+                    afterUpdate(getInstance())
 				end,
 				name = "Your Bar Color",
 				desc = "Your Bar Color",
@@ -688,7 +759,7 @@ do
                 get = function() return Details.trash_auto_remove end,
                 set = function(self, fixedparam, value)
                     Details.trash_auto_remove = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_CLEANUP"],
                 desc = Loc ["STRING_OPTIONS_CLEANUP_DESC"],
@@ -699,7 +770,7 @@ do
                 get = function() return Details.world_combat_is_trash end,
                 set = function(self, fixedparam, value)
                     Details.world_combat_is_trash = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_PERFORMANCE_ERASEWORLD"],
                 desc = Loc ["STRING_OPTIONS_PERFORMANCE_ERASEWORLD_DESC"],
@@ -710,7 +781,7 @@ do
                 get = function() return Details.clear_graphic end,
                 set = function(self, fixedparam, value)
                     Details.clear_graphic = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_ERASECHARTDATA"],
                 desc = Loc ["STRING_OPTIONS_ERASECHARTDATA_DESC"],
@@ -729,7 +800,8 @@ end
 
 -- ~02 - skins
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
             function Details:OptionPanelOnChangeSkin(skinName)
                 self:ChangeSkin(skinName)
@@ -742,11 +814,11 @@ do
         --skin selection
             local onSelectSkin = function(_, _, skinName)
                 if (isGroupEditing()) then
-                    Details:InstanceGroupCall(currentInstance, "OptionPanelOnChangeSkin", skinName)
+                    Details:InstanceGroupCall(getInstance(), "OptionPanelOnChangeSkin", skinName)
                 else
-                    currentInstance:OptionPanelOnChangeSkin(skinName)
+                    getInstance():OptionPanelOnChangeSkin(skinName)
                 end
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local buildSkinMenu = function()
@@ -772,7 +844,7 @@ do
                     name = skinName,
                 }
 
-                for key, value in pairs(currentInstance) do
+                for key, value in pairs(getInstance()) do
                     if (Details.instance_defaults[key] ~= nil) then
                         if (type(value) == "table") then
                             savedObject[key] = Details.CopyTable(value)
@@ -835,8 +907,8 @@ do
                         --add the new skin
                         Details.savedStyles [#Details.savedStyles+1] = dataTable
                         Details:Msg(Loc ["STRING_OPTIONS_SAVELOAD_IMPORT_OKEY"])
-                        Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                        afterUpdate()
+                        Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                        afterUpdate(getInstance())
                     else
                         Details:Msg(Loc ["STRING_CUSTOM_IMPORT_ERROR"])
                     end
@@ -849,7 +921,7 @@ do
 
             {--skin selection
                 type = "select",
-                get = function() return currentInstance.skin end,
+                get = function() return getInstance().skin end,
                 values = function()
                     return buildSkinMenu()
                 end,
@@ -859,11 +931,11 @@ do
 
             {--custom skin file
                 type = "textentry",
-                get = function() return currentInstance.skin_custom or "" end,
+                get = function() return getInstance().skin_custom or "" end,
                 func = function(self, _, text)
                     local fileName = text or ""
-                    Details:InstanceGroupCall(currentInstance, "SetUserCustomSkinFile", fileName)
-                    afterUpdate()
+                    Details:InstanceGroupCall(getInstance(), "SetUserCustomSkinFile", fileName)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_CUSTOM_SKIN_TEXTURE"],
                 desc = Loc ["STRING_CUSTOM_SKIN_TEXTURE_DESC"],
@@ -872,9 +944,9 @@ do
             {--remove custom skin file
                 type = "execute",
                 func = function(self)
-                    Details:InstanceGroupCall(currentInstance, "SetUserCustomSkinFile", "")
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                    afterUpdate()
+                    Details:InstanceGroupCall(getInstance(), "SetUserCustomSkinFile", "")
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 icontexture = [[Interface\GLUES\LOGIN\Glues-CheckBox-Check]],
                 --icontexcoords = {160/512, 179/512, 142/512, 162/512},
@@ -887,9 +959,9 @@ do
                 get = function() return "" end,
                 set = function(self, _, text)
                     saveAsSkin(text)
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
                     Details:Msg(Loc ["STRING_OPTIONS_SAVELOAD_SKINCREATED"])
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_SAVELOAD_SAVE"],
                 desc = Loc ["STRING_OPTIONS_SAVELOAD_CREATE_DESC"],
@@ -901,7 +973,7 @@ do
                     local tempPreset = saveAsSkin("temp", true)
 
                     for instanceId, instance in Details:ListInstances() do
-                        if (instance ~= currentInstance) then
+                        if (instance ~= getInstance()) then
                             if (not instance:IsStarted()) then
                                 instance:RestoreWindow()
                                 loadSkin(instance, tempPreset)
@@ -914,8 +986,8 @@ do
                     end
 
                     Details:Msg(Loc ["STRING_OPTIONS_SAVELOAD_APPLYALL"])
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                    afterUpdate()
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 icontexture = [[Interface\Buttons\UI-HomeButton]],
                 icontexcoords = {1/16, 14/16, 0, 1},
@@ -934,7 +1006,7 @@ do
                 values = function()
                     local loadtable = {}
                     for index, _table in ipairs(Details.savedStyles) do
-                        tinsert(loadtable, {value = index, label = _table.name, onclick = function() loadSkin(currentInstance, _table) end,
+                        tinsert(loadtable, {value = index, label = _table.name, onclick = function() loadSkin(getInstance(), _table) end,
                         icon = "Interface\\GossipFrame\\TabardGossipIcon", iconcolor = {.7, .7, .5, 1}})
                     end
                     return loadtable
@@ -953,8 +1025,8 @@ do
                     for index, _table in ipairs(Details.savedStyles) do
                         tinsert(loadtable, {value = index, label = _table.name, onclick = function(_, _, index)
                             table.remove (Details.savedStyles, index)
-                            Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                            afterUpdate()
+                            Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                            afterUpdate(getInstance())
                             Details:Msg(Loc ["STRING_OPTIONS_SKIN_REMOVED"])
                         end,
                         icon = [[Interface\Glues\LOGIN\Glues-CheckBox-Check]], color = {1, 1, 1}, iconcolor = {1, .9, .9, 0.8}})
@@ -980,8 +1052,8 @@ do
                             else
                                 Details:Msg("failed to export skin.") --localize-me
                             end
-                            Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                            afterUpdate()
+                            Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                            afterUpdate(getInstance())
                         end,
                         icon = [[Interface\Buttons\UI-GuildButton-MOTD-Up]], color = {1, 1, 1}, iconcolor = {1, .9, .9, 0.8}, texcoord = {1, 0, 0, 1}})
                     end
@@ -1010,8 +1082,8 @@ do
                 get = function() return Details.chat_tab_embed.enabled end,
                 set = function(self, fixedparam, value)
                     Details.chat_embed:SetTabSettings(nil, value)
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                    afterUpdate()
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = Loc ["STRING_OPTIONS_TABEMB_ENABLED_DESC"],
@@ -1032,8 +1104,8 @@ do
                 get = function() return Details.chat_tab_embed.single_window end,
                 set = function(self, fixedparam, value)
                     Details.chat_embed:SetTabSettings (nil, nil, value)
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                    afterUpdate()
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TABEMB_SINGLE"],
                 desc = Loc ["STRING_OPTIONS_TABEMB_SINGLE_DESC"],
@@ -1047,7 +1119,7 @@ do
                     if (Details.chat_embed.enabled) then
                         Details.chat_embed:DoEmbed()
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = -100,
                 max = 100,
@@ -1064,7 +1136,7 @@ do
                     if (Details.chat_embed.enabled) then
                         Details.chat_embed:DoEmbed()
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = -100,
                 max = 100,
@@ -1084,612 +1156,53 @@ end
 
 -- ~03 - bars general
 do
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
-    --bar grow direction
-    local set_bar_grow_direction = function(_, instance, value)
-        editInstanceSetting(currentInstance, "SetBarGrowDirection", value)
-        afterUpdate()
-    end
+        --these helpers close over 'getInstance', so they have to be built per section build; they used
+        --to live outside the builder, where they closed over the single instance the options window was
+        --editing and could not be pointed at any other window
 
-    local grow_icon_size = {14, 14}
-    local orientation_icon_size = {14, 14}
+        local orientation_icon_size = {14, 14}
 
-    local grow_options = {
-        {value = 1, label = Loc ["STRING_TOP_TO_BOTTOM"], iconsize = orientation_icon_size, onclick = set_bar_grow_direction, icon = [[Interface\Calendar\MoreArrow]], texcoord = {0, 1, 0, 0.7}},
-        {value = 2, label = Loc ["STRING_BOTTOM_TO_TOP"], iconsize = orientation_icon_size, onclick = set_bar_grow_direction, icon = [[Interface\Calendar\MoreArrow]], texcoord = {0, 1, 0.7, 0}}
-    }
-    local growMenu = function()
-        return grow_options
-    end
-
-    --bar orientation
-    local set_bar_orientation = function(_, instance, value)
-        editInstanceSetting(currentInstance, "SetBarOrientationDirection", value)
-        afterUpdate()
-    end
-
-    local orientation_options = {
-        {value = false, label = Loc ["STRING_LEFT_TO_RIGHT"], iconsize = orientation_icon_size, onclick = set_bar_orientation, icon = [[Interface\CHATFRAME\ChatFrameExpandArrow]]},
-        {value = true, label = Loc ["STRING_RIGHT_TO_LEFT"], iconsize = orientation_icon_size, onclick = set_bar_orientation, icon = [[Interface\CHATFRAME\ChatFrameExpandArrow]], texcoord = {1, 0, 0, 1}}
-    }
-    local orientation_menu = function()
-        return orientation_options
-    end
-
-    --sort direction
-    local set_bar_sorting = function(_, instance, value)
-        editInstanceSetting(currentInstance, "bars_sort_direction", value)
-        Details:RefreshMainWindow(-1, true)
-        afterUpdate()
-    end
-
-    local sorting_options = {
-        {value = 1, label = Loc ["STRING_DESCENDING"], iconsize ={14, 14}, onclick = set_bar_sorting, icon = [[Interface\Calendar\MoreArrow]], texcoord = {0, 1, 0, 0.7}},
-        {value = 2, label = Loc ["STRING_ASCENDING"], iconsize = {14, 14}, onclick = set_bar_sorting, icon = [[Interface\Calendar\MoreArrow]], texcoord = {0, 1, 0.7, 0}}
-    }
-    local sorting_menu = function()
-        return sorting_options
-    end
-
-    --select texture
-    local texture_icon = [[Interface\TARGETINGFRAME\UI-PhasingIcon]]
-    local texture_icon = [[Interface\AddOns\Details\images\icons]]
-    local texture_icon_size = {14, 14}
-    local texture_texcoord = {469/512, 505/512, 249/512, 284/512}
-
-    local onSelectTexture = function(_, instance, textureName)
-        editInstanceSetting(currentInstance, "SetBarSettings", nil, textureName)
-        afterUpdate()
-    end
-
-    local buildTextureMenu = function()
-        local textures = SharedMedia:HashTable("statusbar")
-        local texTable = {}
-        for name, texturePath in pairs(textures) do
-            texTable[#texTable+1] = {value = name, label = name, iconsize = texture_icon_size, statusbar = texturePath,  onclick = onSelectTexture, icon = texture_icon, texcoord = texture_texcoord}
+        --bar orientation
+        local set_bar_orientation = function(_, instance, value)
+            editInstanceSetting(getInstance(), "SetBarOrientationDirection", value)
+            afterUpdate(getInstance())
         end
-        table.sort (texTable, function(t1, t2) return t1.label < t2.label end)
-        return texTable
-    end
 
-    --select background texture
-    local onSelectTextureBackground = function(_, instance, textureName)
-        editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, textureName)
-        afterUpdate()
-    end
-
-    local buildTextureMenu2 = function()
-        local textures2 = SharedMedia:HashTable ("statusbar")
-        local texTable2 = {}
-        for name, texturePath in pairs(textures2) do
-            texTable2[#texTable2+1] = {value = name, label = name, iconsize = texture_icon_size, statusbar = texturePath,  onclick = onSelectTextureBackground, icon = texture_icon, texcoord = texture_texcoord}
+        local orientation_options = {
+            {value = false, label = Loc ["STRING_LEFT_TO_RIGHT"], iconsize = orientation_icon_size, onclick = set_bar_orientation, icon = [[Interface\CHATFRAME\ChatFrameExpandArrow]]},
+            {value = true, label = Loc ["STRING_RIGHT_TO_LEFT"], iconsize = orientation_icon_size, onclick = set_bar_orientation, icon = [[Interface\CHATFRAME\ChatFrameExpandArrow]], texcoord = {1, 0, 0, 1}}
+        }
+        local orientation_menu = function()
+            return orientation_options
         end
-        table.sort (texTable2, function(t1, t2) return t1.label < t2.label end)
-        return texTable2
-    end
 
-    --select icon file from dropdown
-    local OnSelectIconFileSpec = function(_, _, iconpath)
-        editInstanceSetting(currentInstance, "SetBarSpecIconSettings", true, iconpath, true)
-        afterUpdate()
-    end
-
-    local OnSelectIconFile = function(_, _, iconpath)
-        editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, iconpath)
-        if (currentInstance.row_info.use_spec_icons) then
-            editInstanceSetting(currentInstance, "SetBarSpecIconSettings", false)
-        end
-        afterUpdate()
-    end
-
-    local onSelectBarTextureOverlay =  function(_, instance, textureName)
-        editInstanceSetting(currentInstance, "SetBarOverlaySettings", textureName)
-    end
-
-    local buildTextureOverlayMenu = function()
-        local textures2 = SharedMedia:HashTable("statusbar")
-        local texTable2 = {}
-        for name, texturePath in pairs(textures2) do
-            texTable2[#texTable2+1] = {value = name, label = name, iconsize = texture_icon_size, statusbar = texturePath,  onclick = onSelectBarTextureOverlay, icon = texture_icon, texcoord = texture_texcoord}
-        end
-        table.sort(texTable2, function(t1, t2) return t1.label < t2.label end)
-        return texTable2
-    end
-
-    local builtIconList = function()
-		for k,v in ipairs(Details222.BarIconSetList) do
-            if v.isSpec then
-                v.onclick = OnSelectIconFileSpec
-            else
-                v.onclick = OnSelectIconFile
-            end
-        end
-        return Details222.BarIconSetList
-    end
-
-    local buildSection = function(sectionFrame)
+        --bar height, spacing, the top, custom, background and overlay textures and colors, the bar border, the
+        --total bar, the bar highlight, always show me, the grow direction, the sort order, the arena team colors
+        --and the icon set, bar start, icon size, faction icon and arena role icon options live in the designer
+        --section
         local sectionOptions = {
-            {--line height
-                type = "range",
-                get = function() return tonumber(currentInstance.row_info.height) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarSettings", value)
-                    afterUpdate()
-                end,
-                min = 10,
-                max = 30,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_BAR_HEIGHT"],
-                desc = Loc ["STRING_OPTIONS_BAR_HEIGHT_DESC"],
-            },
-
-            {--padding
-                type = "range",
-                get = function() return tonumber(currentInstance.row_info.space.between) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                min = -2,
-                max = 10,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_BAR_SPACING"],
-                desc = Loc ["STRING_OPTIONS_BAR_SPACING_DESC"],
-            },
-
-            {--disable highlight
-                type = "toggle",
-                get = function() return Details.instances_disable_bar_highlight end,
-                set = function(self, fixedparam, value)
-                    Details.instances_disable_bar_highlight = value
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_DISABLE_BARHIGHLIGHT"],
-                desc = Loc ["STRING_OPTIONS_DISABLE_BARHIGHLIGHT_DESC"],
-            },
-
             {--fast dps updates
                 type = "toggle",
-                get = function() return currentInstance.row_info.fast_ps_update end,
+                get = function() return getInstance().row_info.fast_ps_update end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "row_info", "fast_ps_update", value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "row_info", "fast_ps_update", value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_BARUR_ANCHOR"],
                 desc = Loc ["STRING_OPTIONS_BARUR_DESC"],
             },
 
-            {--always show me
-                type = "toggle",
-                get = function() return currentInstance.following.enabled end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "following", "enabled", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_FOLLOWING"],
-                desc = Loc ["STRING_OPTIONS_BAR_FOLLOWING_DESC"],
-            },
-
-            {--grow direction
-                type = "select",
-                get = function() return currentInstance.bars_grow_direction end,
-                values = function()
-                    return growMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_GROW"],
-                desc = Loc ["STRING_OPTIONS_BAR_GROW_DESC"],
-            },
-
             {--bar orientation
                 type = "select",
-                get = function() return currentInstance.bars_inverted and 2 or 1 end,
+                get = function() return getInstance().bars_inverted and 2 or 1 end,
                 values = function()
                     return orientation_menu()
                 end,
                 name = Loc ["STRING_OPTIONS_BARORIENTATION"],
                 desc = Loc ["STRING_OPTIONS_BARORIENTATION_DESC"],
-            },
-
-            {--bar sort direction
-                type = "select",
-                get = function() return currentInstance.bars_sort_direction end,
-                values = function()
-                    return sorting_menu()
-                end,
-                name = Loc ["STRING_OPTIONS_BARSORT"],
-                desc = Loc ["STRING_OPTIONS_BARSORT_DESC"],
-            },
-
-            {type = "blank"},
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_TEXT_TEXTUREU_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-            {--select texture
-                type = "select",
-                get = function() return currentInstance.row_info.texture end,
-                values = function()
-                    return buildTextureMenu()
-                end,
-                name = Loc ["STRING_TEXTURE"],
-                desc = Loc ["STRING_OPTIONS_BAR_TEXTURE_DESC"],
-            },
-
-            {--custom texture
-                type = "textentry",
-                get = function() return currentInstance.row_info.texture_custom end,
-                func = function(self, _, text)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, text)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BARS_CUSTOM_TEXTURE"],
-                desc = Loc ["STRING_CUSTOM_TEXTURE_GUIDE"]
-            },
-
-            {--remove custom texture
-                type = "execute",
-                func = function(self)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "")
-                    afterUpdate()
-                end,
-                icontexture = [[Interface\Buttons\UI-GroupLoot-Pass-Down]],
-                --icontexcoords = {160/512, 179/512, 142/512, 162/512},
-                name = "Remove Custom Texture", --localize-me
-                desc = "Remove Custom Texture",
-            },
-
-			{--bar color
-				type = "color",
-                get = function()
-                    local r, g, b = unpack(currentInstance.row_info.fixed_texture_color)
-                    local alpha = currentInstance.row_info.alpha
-                    return {r, g, b, alpha}
-				end,
-				set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, {r, g, b})
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, a)
-                    afterUpdate()
-				end,
-				name = Loc ["STRING_COLOR"],
-				desc = Loc ["STRING_OPTIONS_BAR_COLOR_DESC"],
-            },
-
-            {--color by player class
-                type = "toggle",
-                get = function() return currentInstance.row_info.texture_class_colors end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS"],
-                desc = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS_DESC"],
-            },
-
-            {type = "blank"},
-            {type = "label", get = function() return "Overlay:" end, text_template = subSectionTitleTextTemplate},
-            {--overlay texture
-                type = "select",
-                get = function() return currentInstance.row_info.overlay_texture end,
-                values = function()
-                    return buildTextureOverlayMenu()
-                end,
-                name = Loc ["STRING_TEXTURE"],
-                desc = "Texture which sits above the bar",
-            },
-
-			{--overlay color
-				type = "color",
-                get = function()
-                    local r, g, b, a = unpack(currentInstance.row_info.overlay_color)
-                    return {r, g, b, a}
-				end,
-				set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarOverlaySettings", nil, {r, g, b, a})
-                    afterUpdate()
-				end,
-				name = Loc ["STRING_COLOR"],
-				desc = Loc ["STRING_COLOR"],
-            },
-
-            {type = "blank"},
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_TEXT_TEXTUREL_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-            {--select background texture
-                type = "select",
-                get = function() return currentInstance.row_info.texture_background end,
-                values = function()
-                    return buildTextureMenu2()
-                end,
-                name = Loc ["STRING_TEXTURE"],
-                desc = Loc ["STRING_OPTIONS_BAR_BTEXTURE_DESC"],
-            },
-
-			{--background color
-                type = "color",
-                get = function()
-                    local r, g, b, a = unpack(currentInstance.row_info.fixed_texture_background_color)
-                    return {r, g, b, a}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, {r, g, b, a})
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_COLOR"],
-                desc = Loc ["STRING_OPTIONS_BAR_COLOR_DESC"],
-            },
-
-            {--background uses class colors
-                type = "toggle",
-                get = function() return currentInstance.row_info.texture_background_class_color end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS"],
-                desc = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS_DESC"],
-            },
-
-            {type = "breakline"},
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_TEXT_ROWICONS_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-            {--select icon file
-                type = "select",
-                get = function(self)
-                    local default
-                    if (currentInstance.row_info.use_spec_icons) then
-                        default = currentInstance.row_info.spec_file
-                    else
-                        default = currentInstance.row_info.icon_file
-                    end
-                    return default
-                end,
-                values = function()
-                    return builtIconList()
-                end,
-                name = Loc ["STRING_TEXTURE"],
-                desc = Loc ["STRING_OPTIONS_BAR_ICONFILE_DESC2"],
-            },
-
-            {--custom icon path
-                type = "textentry",
-                get = function()
-                    local default
-                    if (currentInstance.row_info.use_spec_icons) then
-                        default = currentInstance.row_info.spec_file
-                    else
-                        default = currentInstance.row_info.icon_file
-                    end
-                    return default
-                end,
-                func = function(self, _, text)
-                    if (text:find("spec_")) then
-                        editInstanceSetting(currentInstance, "SetBarSpecIconSettings", true, text, true)
-                    else
-                        if (currentInstance.row_info.use_spec_icons) then
-                            editInstanceSetting(currentInstance, "SetBarSpecIconSettings", false)
-                        end
-                        editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, text)
-                    end
-
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BARS_CUSTOM_TEXTURE"],
-                desc = Loc ["STRING_CUSTOM_TEXTURE_GUIDE"],
-            },
-
-            {--bar start after icon
-                type = "toggle",
-                get = function() return currentInstance.row_info.start_after_icon end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BARSTART"],
-                desc = Loc ["STRING_OPTIONS_BARSTART_DESC"],
-            },
-
-            {--icon size offset
-                type = "range",
-                get = function() return tonumber(currentInstance.row_info.icon_size_offset) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                min = -20,
-                max = 20,
-                usedecimals = true,
-                step = 0.5,
-                name = "Icon Size Offset", --localize-me
-                desc = "Icon Size Offset",
-                thumbscale = 2.2,
-            },
-
-            {type = "blank"},
-
-            {--show faction icon
-                type = "toggle",
-                get = function() return currentInstance.row_info.show_faction_icon end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarFactionIconSettings", value)
-                    afterUpdate()
-                end,
-                name = "Show Faction Icon", --localize-me
-                desc = "When showing a player from the opposite faction, show the faction icon.",
-            },
-
-            {--faction icon size offset
-                type = "range",
-                get = function() return tonumber(currentInstance.row_info.faction_icon_size_offset) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarFactionIconSettings", nil, value)
-                    afterUpdate()
-                end,
-                min = -20,
-                max = 20,
-                usedecimals = true,
-                step = 0.5,
-                name = "Faction Icon Size Offset", --localize-me
-                desc = "Faction Icon Size Offset",
-                thumbscale = 2.2,
-            },
-
-            {type = "blank"},
-
-            {--show role icon
-                type = "toggle",
-                get = function() return currentInstance.row_info.show_arena_role_icon end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarArenaRoleIconSettings", value)
-                    afterUpdate()
-                end,
-                name = "Show Arena Role Icon", --localize-me
-                desc = "When showing a player from arena, show the role icon.",
-            },
-
-            {--role icon size offset
-                type = "range",
-                get = function() return tonumber(currentInstance.row_info.arena_role_icon_size_offset) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarArenaRoleIconSettings", nil, value)
-                    afterUpdate()
-                end,
-                min = -20,
-                max = 20,
-                usedecimals = true,
-                step = 0.5,
-                name = "Arena Role Icon Size Offset", --localize-me
-                desc = "Arena Role Icon Size Offset",
-                thumbscale = 2.2,
-            },
-
-
-            --{type = "breakline"},
-
-
-            {type = "breakline"},
-
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_TOTALBAR_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-            {--total bar enabled
-                type = "toggle",
-                get = function() return currentInstance.total_bar.enabled end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "total_bar", "enabled", value)
-                    afterUpdate()
-                    Details222.OptionsPanel.RefreshInstances(currentInstance)
-                end,
-                name = Loc ["STRING_ENABLED"],
-                desc = Loc ["STRING_OPTIONS_SHOW_TOTALBAR_DESC"],
-            },
-            {--only in group
-                type = "toggle",
-                get = function() return currentInstance.total_bar.only_in_group end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "total_bar", "only_in_group", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_SHOW_TOTALBAR_INGROUP"],
-                desc = Loc ["STRING_OPTIONS_SHOW_TOTALBAR_INGROUP_DESC"],
-            },
-			{--color
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(currentInstance.total_bar.color)
-                    return {r, g, b, 1}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "total_bar", "color", {r, g, b, 1})
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_COLOR"],
-                desc = Loc ["STRING_OPTIONS_SHOW_TOTALBAR_COLOR_DESC"],
-            },
-
-            {type = "blank"},
-            {type = "label", get = function() return "Arena Team Color" end, text_template = subSectionTitleTextTemplate}, --localize-me
-			{--team 1 color
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(Details.class_colors.ARENA_GREEN)
-                    return {r, g, b, 1}
-                end,
-                set = function(self, r, g, b, a)
-                    Details.class_colors.ARENA_GREEN[1] = r
-                    Details.class_colors.ARENA_GREEN[2] = g
-                    Details.class_colors.ARENA_GREEN[3] = b
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_COLOR"],
-                desc = "Arena team color", --localize-me
-            },
-			{--team 2 color
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(Details.class_colors.ARENA_YELLOW)
-                    return {r, g, b, 1}
-                end,
-                set = function(self, r, g, b, a)
-                    Details.class_colors.ARENA_YELLOW[1] = r
-                    Details.class_colors.ARENA_YELLOW[2] = g
-                    Details.class_colors.ARENA_YELLOW[3] = b
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_COLOR"],
-                desc = "Arena team color", --localize-me
-            },
-
-            {type = "blank"},
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_BAR_BACKDROP_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-            {--border enabled
-                type = "toggle",
-                get = function() return currentInstance.row_info.backdrop.enabled end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarBackdropSettings", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_ENABLED"],
-                desc = Loc ["STRING_OPTIONS_BAR_BACKDROP_ENABLED_DESC"],
-            },
-
-			{--border color
-                type = "color",
-                get = function()
-                    local r, g, b, a = unpack(currentInstance.row_info.backdrop.color)
-                    return {r, g, b, a}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarBackdropSettings", nil, nil, {r, g, b, a})
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_COLOR"],
-                desc = Loc ["STRING_OPTIONS_BAR_BACKDROP_COLOR_DESC"],
-            },
-
-            {--border size
-                type = "range",
-                get = function() return tonumber(currentInstance.row_info.backdrop.size) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarBackdropSettings", nil, value)
-                    afterUpdate()
-                end,
-                min = 0,
-                max = 10,
-                step = 1,
-                usedecimals = true,
-                name = Loc ["STRING_OPTIONS_SIZE"],
-                desc = Loc ["STRING_OPTIONS_BAR_BACKDROP_SIZE_DESC"],
-                thumbscale = 1.5,
-            },
-
-            {--border uses class colors
-                type = "toggle",
-                get = function() return currentInstance.row_info.backdrop.use_class_colors end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarBackdropSettings", nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS"],
-                desc = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS_DESC"],
             },
         }
 
@@ -1706,273 +1219,51 @@ end
 
 -- ~04 bars texts
 do
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
-    --text font selection
-        local onSelectFont = function(_, instance, fontName)
-            editInstanceSetting(currentInstance, "SetBarTextFontFace", fontName)
-            afterUpdate()
-        end
+        --these helpers close over 'getInstance', so they have to be built per section build; they used
+        --to live outside the builder, where they closed over the single instance the options window was
+        --editing and could not be pointed at any other window
 
-        local buildFontMenu = function()
-            local fontObjects = SharedMedia:HashTable("font")
-            local fontTable = {}
-            for name, fontPath in pairs(fontObjects) do
-                fontTable[#fontTable+1] = {value = name, label = name, icon = font_select_icon, texcoord = font_select_texcoord, onclick = onSelectFont, font = fontPath, descfont = name, desc = Loc ["STRING_MUSIC_DETAILS_ROBERTOCARLOS"]}
+            local onSelectRightTextTemplate = function(self, instance, value)
+                local profileTable = Details.righttext_simple_formatting
+                profileTable.format_tsp = value[1]
+                profileTable.format_ts = value[2]
+                profileTable.format_tp = value[3]
+                refreshWindowsAfterOptionChange(getInstance())
+                afterUpdate(getInstance())
+                self:GetParent():GetParent():RefreshOptions()
             end
-            table.sort (fontTable, function(t1, t2) return t1.label < t2.label end)
-            return fontTable
-        end
 
-	--percent type
-        local onSelectPercent = function(_, instance, percentType)
-            editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, percentType)
-            afterUpdate()
-        end
+            local rightTextTemplates = {
+                {value = {"Select a template"}, label = Loc["STRING_OPTIONS_SELECT_TEMPLATE"], onclick = function()end, icon = ""},
 
-        local buildPercentMenu = function()
-            local percentTable = {
-                {value = 1, label = "Relative to Total", onclick = onSelectPercent, icon = [[Interface\GROUPFRAME\UI-GROUP-MAINTANKICON]]},
-                {value = 2, label = "Relative to Top Player", onclick = onSelectPercent, icon = [[Interface\GROUPFRAME\UI-Group-LeaderIcon]]}
+                {value = {"%s (%s, %s)", "%s (%s)", "%s (%s)"}, label = Loc["STRING_OPTIONS_RESET_TO_DEFAULT"], onclick = onSelectRightTextTemplate, icon = ""},
+                {value = {"%s (%s)", "%s (%s)", "%s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE2"], onclick = onSelectRightTextTemplate, icon = ""},
+                {value = {"%s", "%s", "%s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE3"], onclick = onSelectRightTextTemplate, icon = ""},
+                {value = {"%s | %s | %s", "%s | %s", "%s | %s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE4"], onclick = onSelectRightTextTemplate, icon = ""},
+                {value = {"%s [%s, %s]", "%s [%s]", "%s [%s]"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE5"], onclick = onSelectRightTextTemplate, icon = ""},
+                {value = {"%s (%s) %s", "%s (%s)", "%s %s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE6"], onclick = onSelectRightTextTemplate, icon = ""},
+                --{value = {"%s (%s) %s", "%s (%s)", "%s %s"}, label = "Total (DPS) Percent", onclick = onSelectRightTextTemplate, icon = ""},
             }
-            return percentTable
-        end
 
-    --brackets
-        local onSelectBracket = function(_, instance, value)
-            editInstanceSetting(currentInstance, "SetBarRightTextSettings", nil, nil, nil, value)
-            afterUpdate()
-		end
+            local buildRightTextTemplateMenu = function()
+                return rightTextTemplates
+            end
 
-		local BracketTable = {
-			{value = "(", label = "(", onclick = onSelectBracket, icon = ""},
-			{value = "{", label = "{", onclick = onSelectBracket, icon = ""},
-			{value = "[", label = "[", onclick = onSelectBracket, icon = ""},
-			{value = "<", label = "<", onclick = onSelectBracket, icon = ""},
-			{value = "NONE", label = "no bracket", onclick = onSelectBracket, icon = [[Interface\Glues\LOGIN\Glues-CheckBox-Check]]},
-		}
-		local buildBracketMenu = function()
-			return BracketTable
-        end
-
-    --separators
-        local onSelectSeparator = function(_, instance, value)
-            editInstanceSetting(currentInstance, "SetBarRightTextSettings", nil, nil, nil, nil, value)
-            afterUpdate()
-		end
-
-		local separatorTable = {
-			{value = ",", label = ",", onclick = onSelectSeparator, icon = ""},
-			{value = ".", label = ".", onclick = onSelectSeparator, icon = ""},
-			{value = ";", label = ";", onclick = onSelectSeparator, icon = ""},
-			{value = "-", label = "-", onclick = onSelectSeparator, icon = ""},
-			{value = "|", label = "|", onclick = onSelectSeparator, icon = ""},
-			{value = "/", label = "/", onclick = onSelectSeparator, icon = ""},
-			{value = "\\", label = "\\", onclick = onSelectSeparator, icon = ""},
-			{value = "~", label = "~", onclick = onSelectSeparator, icon = ""},
-			{value = "NONE", label = "no separator", onclick = onSelectSeparator, icon = [[Interface\Glues\LOGIN\Glues-CheckBox-Check]]},
-		}
-		local buildSeparatorMenu = function()
-			return separatorTable
-		end
-
-        local onSelectRightTextTemplate = function(self, instance, value)
-            local profileTable = Details.righttext_simple_formatting
-            profileTable.format_tsp = value[1]
-            profileTable.format_ts = value[2]
-            profileTable.format_tp = value[3]
-            Details:RefreshMainWindow(-1, true)
-            afterUpdate()
-            self:GetParent():GetParent():RefreshOptions()
-        end
-
-        local rightTextTemplates = {
-            {value = {"Select a template"}, label = Loc["STRING_OPTIONS_SELECT_TEMPLATE"], onclick = function()end, icon = ""},
-
-            {value = {"%s (%s, %s)", "%s (%s)", "%s (%s)"}, label = Loc["STRING_OPTIONS_RESET_TO_DEFAULT"], onclick = onSelectRightTextTemplate, icon = ""},
-            {value = {"%s (%s)", "%s (%s)", "%s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE2"], onclick = onSelectRightTextTemplate, icon = ""},
-            {value = {"%s", "%s", "%s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE3"], onclick = onSelectRightTextTemplate, icon = ""},
-            {value = {"%s | %s | %s", "%s | %s", "%s | %s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE4"], onclick = onSelectRightTextTemplate, icon = ""},
-            {value = {"%s [%s, %s]", "%s [%s]", "%s [%s]"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE5"], onclick = onSelectRightTextTemplate, icon = ""},
-            {value = {"%s (%s) %s", "%s (%s)", "%s %s"}, label = Loc["STRING_SIMPLE_TEXT_FORMAT_TEMPLATE6"], onclick = onSelectRightTextTemplate, icon = ""},
-            --{value = {"%s (%s) %s", "%s (%s)", "%s %s"}, label = "Total (DPS) Percent", onclick = onSelectRightTextTemplate, icon = ""},
-        }
-
-        local buildRightTextTemplateMenu = function()
-            return rightTextTemplates
-        end
-
-    local buildSection = function(sectionFrame)
+        --the text color, size, font, offsets, percent type, class colors, outlines and shadows, and on the
+        --classic versions the translit, right text and aligned text columns options, live in the designer section
         local sectionOptions = {
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_GENERAL_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-			{--text color 1
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(currentInstance.row_info.fixed_text_color)
-                    return {r, g, b, 1}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarTextFixedColor", {r, g, b, 1})
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_FIXEDCOLOR"],
-                desc = Loc ["STRING_OPTIONS_TEXT_FIXEDCOLOR_DESC"],
-            },
-            {--text size 2
-                type = "range",
-                get = function() return currentInstance.row_info.font_size end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextFontSize", value)
-                    afterUpdate()
-                end,
-                min = 5,
-                max = 32,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_TEXT_SIZE"],
-                desc = Loc ["STRING_OPTIONS_TEXT_SIZE_DESC"],
-            },
-            {--text yoffset
-                type = "range",
-                get = function() return currentInstance.row_info.text_yoffset end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextYOffset", value)
-                    afterUpdate()
-                end,
-                min = -10,
-                max = 10,
-                step = 1,
-                name = "Text Y Offset", -- Loc ["STRING_OPTIONS_TEXT_YOFFSET"]
-                desc = "Change the vertical offset for both left and right texts.", -- Loc ["STRING_OPTIONS_TEXT_YOFFSET_DESC"]
-            },
-            {--text font 3
-                type = "select",
-                get = function() return currentInstance.row_info.font_face end,
-                values = function()
-                    return buildFontMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_FONT"],
-                desc = Loc ["STRING_OPTIONS_TEXT_FONT_DESC"],
-            },
-            {--percent type 4
-                type = "select",
-                get = function() return currentInstance.row_info.percent_type end,
-                values = function()
-                    return buildPercentMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_PERCENT_TYPE"],
-                desc = Loc ["STRING_OPTIONS_PERCENT_TYPE_DESC"],
-            },
-
-
-            {type = "blank"}, --5
             --left text options 6
             {type = "label", get = function() return Loc ["STRING_OPTIONS_TEXT_LEFT_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
 
-            {--position number 11
-                type = "toggle",
-                get = function() return currentInstance.row_info.textL_show_number end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_LPOSITION"],
-                desc = Loc ["STRING_OPTIONS_TEXT_LPOSITION_DESC"],
-            },
-
-            {--translit text 12
-                type = "toggle",
-                get = function() return currentInstance.row_info.textL_translit_text end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_LTRANSLIT"],
-                desc = Loc ["STRING_OPTIONS_TEXT_LTRANSLIT_DESC"],
-            },
-
-            {--use class colors 7
-                type = "toggle",
-                get = function() return Details222.RowTexts.Get(currentInstance, 1, "color.byClass") end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextClassColor", "left", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS"],
-                desc = Loc ["STRING_OPTIONS_TEXT_LCLASSCOLOR_DESC"],
-            },
-
-            {--text offset
-                type = "range",
-                get = function() return currentInstance.row_info.textL_offset end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextNameOffset", value)
-                    afterUpdate()
-                end,
-                min = -10,
-                max = 50,
-                step = 1,
-                name = "Offset", -- Loc ["STRING_OPTIONS_TEXT_LOFFSET"]
-                desc = "Change the horizontal offset.", -- Loc ["STRING_OPTIONS_TEXT_LOFFSET_DESC"]
-            },
-
-            {type = "blank"},
-            {--outline mode
-                type = "selectoutline",
-                get = function() return Details222.RowTexts.Get(currentInstance, 1, "font.outline") end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextOutline", "left", value)
-                    afterUpdate()
-                end,
-                name = Loc["STRING_OPTIONS_TEXT_OUTLINE"],
-                desc = Loc["STRING_OPTIONS_TEXT_OUTLINE"],
-            },
-			{--shadow color
-                type = "color",
-                get = function()
-                    local r, g, b, a = unpack(Details222.RowTexts.Get(currentInstance, 1, "shadow.color"))
-                    return {r, g, b, a}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarTextShadowColor", "left", {r, g, b, a})
-                    afterUpdate()
-                end,
-                name = Loc["STRING_OPTIONS_TEXT_SHADOWCOLOR"],
-                desc = Loc["STRING_OPTIONS_TEXT_SHADOWCOLOR"],
-            },
-            {--shadow offset x
-                type = "range",
-                get = function() return Details222.RowTexts.Get(currentInstance, 1, "shadow.offset")[1] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextShadowOffset", "left", value, nil)
-                    afterUpdate()
-                end,
-                min = -5,
-                max = 5,
-                step = 1,
-                name = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "X"),
-                desc = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "X"),
-            },
-            {--shadow offset y
-                type = "range",
-                get = function() return Details222.RowTexts.Get(currentInstance, 1, "shadow.offset")[2] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextShadowOffset", "left", nil, value)
-                    afterUpdate()
-                end,
-                min = -5,
-                max = 5,
-                step = 1,
-                name = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "Y"),
-                desc = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "Y"),
-            },
-
-
             {--outline 8
                 type = "toggle",
-                get = function() return currentInstance.row_info.textL_outline end,
+                get = function() return getInstance().row_info.textL_outline end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TEXT_LOUTILINE"],
                 desc = Loc ["STRING_OPTIONS_TEXT_LOUTILINE_DESC"],
@@ -1980,10 +1271,10 @@ do
             },
             {--outline small 9
                 type = "toggle",
-                get = function() return currentInstance.row_info.textL_outline_small end,
+                get = function() return getInstance().row_info.textL_outline_small end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = "Outline", --localize-me
                 desc = "Text Outline",
@@ -1992,12 +1283,12 @@ do
 			{--outline small color 10
                 type = "color",
                 get = function()
-                    local r, g, b, a = unpack(currentInstance.row_info.textL_outline_small_color)
+                    local r, g, b, a = unpack(getInstance().row_info.textL_outline_small_color)
                     return {r, g, b, a}
                 end,
                 set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, {r, g, b, a})
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, {r, g, b, a})
+                    afterUpdate(getInstance())
                 end,
                 name = "Outline Color",
                 desc = "Outline Color",
@@ -2009,10 +1300,10 @@ do
 
             {--custom left text 14
                 type = "toggle",
-                get = function() return currentInstance.row_info.textL_enable_custom_text end,
+                get = function() return getInstance().row_info.textL_enable_custom_text end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_BARLEFTTEXTCUSTOM"],
                 desc = Loc ["STRING_OPTIONS_BARLEFTTEXTCUSTOM_DESC"],
@@ -2023,10 +1314,10 @@ do
                     local callback = function(text)
                         text = text:gsub("||", "|")
                         text = DF:Trim(text)
-                        editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, text)
-                        afterUpdate()
+                        editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, text)
+                        afterUpdate(getInstance())
                     end
-                    _G.DetailsWindowOptionsBarTextEditor:Open (currentInstance.row_info.textL_custom_text, callback, _G.DetailsOptionsWindow, Details.instance_defaults.row_info.textL_custom_text)
+                    _G.DetailsWindowOptionsBarTextEditor:Open (getInstance().row_info.textL_custom_text, callback, getOptionsWindow() or _G.UIParent, Details.instance_defaults.row_info.textL_custom_text)
                 end,
                 icontexture = [[Interface\GLUES\LOGIN\Glues-CheckBox-Check]],
                 --icontexcoords = {160/512, 179/512, 142/512, 162/512},
@@ -2035,79 +1326,16 @@ do
             },
 
             {type = "breakline"}, --16
-            --right text options 17
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_TEXT_RIGHT_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-            {--use class colors 18
-                type = "toggle",
-                get = function() return Details222.RowTexts.Get(currentInstance, 2, "color.byClass") end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextClassColor", "right", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_BAR_COLORBYCLASS"],
-                desc = Loc ["STRING_OPTIONS_TEXT_LCLASSCOLOR_DESC"],
-            },
-
-
-            {type = "blank"},
-            {--outline mode
-                type = "selectoutline",
-                get = function() return Details222.RowTexts.Get(currentInstance, 2, "font.outline") end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextOutline", "right", value)
-                    afterUpdate()
-                end,
-                name = Loc["STRING_OPTIONS_TEXT_OUTLINE"],
-                desc = Loc["STRING_OPTIONS_TEXT_OUTLINE"],
-            },
-			{--shadow color
-                type = "color",
-                get = function()
-                    local r, g, b, a = unpack(Details222.RowTexts.Get(currentInstance, 2, "shadow.color"))
-                    return {r, g, b, a}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarTextShadowColor", "right", {r, g, b, a})
-                    afterUpdate()
-                end,
-                name = Loc["STRING_OPTIONS_TEXT_SHADOWCOLOR"],
-                desc = Loc["STRING_OPTIONS_TEXT_SHADOWCOLOR"],
-            },
-            {--shadow offset x
-                type = "range",
-                get = function() return Details222.RowTexts.Get(currentInstance, 2, "shadow.offset")[1] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextShadowOffset", "right", value, nil)
-                    afterUpdate()
-                end,
-                min = -5,
-                max = 5,
-                step = 1,
-                name = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "X"),
-                desc = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "X"),
-            },
-            {--shadow offset y
-                type = "range",
-                get = function() return Details222.RowTexts.Get(currentInstance, 2, "shadow.offset")[2] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextShadowOffset", "right", nil, value)
-                    afterUpdate()
-                end,
-                min = -5,
-                max = 5,
-                step = 1,
-                name = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "Y"),
-                desc = format(Loc["STRING_OPTIONS_TEXT_SHADOWOFFSET"], "Y"),
-            },
-
+            --right text options 17, only the classic versions have any left here
+            {type = "label", get = function() return Loc ["STRING_OPTIONS_TEXT_RIGHT_ANCHOR"] end, text_template = subSectionTitleTextTemplate,
+            hidden = detailsFramework.IsAddonApocalypseWow()},
 
             {--outline 19
                 type = "toggle",
-                get = function() return currentInstance.row_info.textR_outline end,
+                get = function() return getInstance().row_info.textR_outline end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TEXT_LOUTILINE"],
                 desc = Loc ["STRING_OPTIONS_TEXT_LOUTILINE_DESC"],
@@ -2115,10 +1343,10 @@ do
             },
             {--outline small 20
                 type = "toggle",
-                get = function() return currentInstance.row_info.textR_outline_small end,
+                get = function() return getInstance().row_info.textR_outline_small end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = "Outline", --localize-me
                 desc = "Text Outline",
@@ -2127,55 +1355,28 @@ do
 			{--outline small color 21
                 type = "color",
                 get = function()
-                    local r, g, b, a = unpack(currentInstance.row_info.textR_outline_small_color)
+                    local r, g, b, a = unpack(getInstance().row_info.textR_outline_small_color)
                     return {r, g, b, a}
                 end,
                 set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, {r, g, b, a})
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, {r, g, b, a})
+                    afterUpdate(getInstance())
                 end,
                 name = "Outline Color",
                 desc = "Outline Color",
                 hidden = true,
             },
 
-            {type = "blank"}, --22
             {type = "label", get = function() return Loc ["STRING_OPTIONS_PLAYERNAME"] end, text_template = subSectionTitleTextTemplate,
             hidden = not detailsFramework.IsAddonApocalypseWow()},
 
-            {--automatic player name length | length auto
-                type = "toggle",
-                get = function() return currentInstance.row_info.playername_size_auto end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "row_info", "playername_size_auto", value)
-                    afterUpdate()
-                    Details:RefreshMainWindow(-1, true)
-                end,
-                name = Loc ["STRING_OPTIONS_PLAYERNAME_AUTO_WIDTH"],
-                desc = Loc ["STRING_OPTIONS_PLAYERNAME_AUTO_WIDTH"],
-                hidden = not detailsFramework.IsAddonApocalypseWow(),
-            },
-
-            {--automatic player name alignment | alignment auto
-                type = "toggle",
-                get = function() return currentInstance.row_info.playername_alignment_auto end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "row_info", "playername_alignment_auto", value)
-                    afterUpdate()
-                    Details:RefreshMainWindow(-1, true)
-                end,
-                name = "Auto Alignment", --L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT"] = "Auto Alignment"
-                desc = "Disable this only if you experience player name alignment issues.", --L["STRING_OPTIONS_PLAYERNAME_AUTO_ALIGNMENT_DESC"] = "Disable this only if you experience player name alignment issues."
-                hidden = not detailsFramework.IsAddonApocalypseWow(),
-            },
-
             {--player name length
                 type = "range",
-                get = function() return currentInstance.row_info.playername_size end,
+                get = function() return getInstance().row_info.playername_size end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "row_info", "playername_size", value)
-                    afterUpdate()
-                    Details:RefreshMainWindow(-1, true)
+                    editInstanceSetting(getInstance(), "row_info", "playername_size", value)
+                    afterUpdate(getInstance())
+                    refreshWindowsAfterOptionChange(getInstance())
                 end,
                 min = 50,
                 max = 130,
@@ -2185,78 +1386,12 @@ do
                 hidden = not detailsFramework.IsAddonApocalypseWow(),
             },
 
-            {type = "blank", hidden = detailsFramework.IsAddonApocalypseWow()},
-
-            {--show total --23
-                type = "toggle",
-                get = function() return currentInstance.row_info.textR_show_data[1] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarRightTextSettings", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_SHOW_TOTAL"],
-                desc = Loc ["STRING_OPTIONS_TEXT_SHOW_TOTAL_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-            },
-            {--show per second 24
-                type = "toggle",
-                get = function() return currentInstance.row_info.textR_show_data[2] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarRightTextSettings", nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_SHOW_PS"],
-                desc = Loc ["STRING_OPTIONS_TEXT_SHOW_PS_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-            },
-            {--show percent 25
-                type = "toggle",
-                get = function() return currentInstance.row_info.textR_show_data[3] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarRightTextSettings", nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_SHOW_PERCENT"],
-                desc = Loc ["STRING_OPTIONS_TEXT_SHOW_PERCENT_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-            },
-
-            {type = "blank"}, --26
-
-            {--separator 27
-                type = "select",
-                get = function() return currentInstance.row_info.textR_separator end,
-                values = function()
-                    return buildSeparatorMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_SHOW_SEPARATOR"],
-                desc = Loc ["STRING_OPTIONS_TEXT_SHOW_SEPARATOR_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "text_separator_select",
-            },
-            {--brackets 28
-                type = "select",
-                get = function() return currentInstance.row_info.textR_bracket end,
-                values = function()
-                    return buildBracketMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_SHOW_BRACKET"],
-                desc = Loc ["STRING_OPTIONS_TEXT_SHOW_BRACKET_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "text_bracket_select",
-            },
-
-            {type = "label", get = function() return Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS"] .. " (".. Loc["STRING_OPTIONSMENU_ROWSETTINGS"] ..")\n" .. Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_WARNING"] end, text_template = subSectionTitleTextTemplate,
-        hidden = detailsFramework.IsAddonApocalypseWow(), id = "inline_text_warning_label"},
-
-            {type = "blank"}, --30
-
             {--custom right text 31
                 type = "toggle",
-                get = function() return currentInstance.row_info.textR_enable_custom_text end,
+                get = function() return getInstance().row_info.textR_enable_custom_text end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_BARLEFTTEXTCUSTOM"],
                 desc = Loc ["STRING_OPTIONS_BARLEFTTEXTCUSTOM_DESC"],
@@ -2268,10 +1403,10 @@ do
                     local callback = function(text)
                         text = text:gsub("||", "|")
                         text = DF:Trim(text)
-                        editInstanceSetting(currentInstance, "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, text)
-                        afterUpdate()
+                        editInstanceSetting(getInstance(), "SetBarTextSettings", nil, nil, nil, nil, nil, nil, nil, nil, text)
+                        afterUpdate(getInstance())
                     end
-                    _G.DetailsWindowOptionsBarTextEditor:Open (currentInstance.row_info.textR_custom_text, callback, _G.DetailsOptionsWindow, Details.instance_defaults.row_info.textL_custom_text)
+                    _G.DetailsWindowOptionsBarTextEditor:Open (getInstance().row_info.textR_custom_text, callback, getOptionsWindow() or _G.UIParent, Details.instance_defaults.row_info.textL_custom_text)
                 end,
                 icontexture = [[Interface\GLUES\LOGIN\Glues-CheckBox-Check]],
                 --icontexcoords = {160/512, 179/512, 142/512, 162/512},
@@ -2281,122 +1416,6 @@ do
             },
 
             {type = "breakline"},
-
-            {type = "label", get = function() return Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS"] end, text_template = subSectionTitleTextTemplate,
-            hidden = detailsFramework.IsAddonApocalypseWow()},
-
-            {--inline text enabled
-                type = "toggle",
-                get = function() return currentInstance.use_multi_fontstrings end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "use_multi_fontstrings", value)
-                    --chaining only applies to in line texts, so this decides the layout mode too
-                    editInstanceSetting(currentInstance, "AdjustInLineTextPadding")
-                    editInstanceSetting(currentInstance, "InstanceRefreshRows")
-                    if (sectionFrame.UpdateColumnOffsetSliders) then
-                        sectionFrame.UpdateColumnOffsetSliders()
-                    end
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_ENABLED"],
-                desc = Loc ["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "inline_text_toggle",
-            },
-
-            {--inline auto align enabled
-                type = "toggle",
-                get = function() return currentInstance.use_auto_align_multi_fontstrings end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "use_auto_align_multi_fontstrings", value)
-                    --switches the value columns between chaining onto each other and each sitting
-                    --at its own distance from the statusbar, so it has to re-anchor
-                    editInstanceSetting(currentInstance, "AdjustInLineTextPadding")
-                    editInstanceSetting(currentInstance, "InstanceRefreshRows")
-                    if (sectionFrame.UpdateColumnOffsetSliders) then
-                        sectionFrame.UpdateColumnOffsetSliders()
-                    end
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_AUTOALIGN"],
-                desc = Loc ["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_AUTOALIGN_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "auto_align_toggle",
-            },
-
-
-            {--name size offset
-                type = "range",
-                get = function() return tonumber(currentInstance.fontstrings_text_limit_offset) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "fontstrings_text_limit_offset", value)
-                    editInstanceSetting(currentInstance, "InstanceRefreshRows")
-                    Details222.OptionsPanel.RefreshInstances(currentInstance)
-                    afterUpdate()
-                end,
-                min = -30,
-                max = 30,
-                step = 1,
-                name = "Unit Name Size Offset",
-                desc = "Unit Name Size Offset",
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-            },
-
-            --with auto align on, texts 2 and 3 chain onto their right hand neighbour and these
-            --sliders drive the gap between the columns; with it off they drive each column's own
-            --distance from the statusbar's right edge. text 4 is always the chain anchor.
-            --UpdateColumnOffsetSliders below swaps the ranges when the mode changes.
-            {--lineText2 (left, usuali is the 'done' amount)
-                type = "range",
-                get = function() return currentInstance:GetBarTextAnchorOffset(2) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextAnchorOffset", 2, value)
-                    afterUpdate()
-                end,
-                min = -10,
-                max = 125,
-                step = 1,
-                name = string.format(Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET"], 1),
-                desc = Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "column_offset_2_range",
-            },
-
-            {--lineText3 (in the middle)
-                type = "range",
-                get = function() return currentInstance:GetBarTextAnchorOffset(3) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextAnchorOffset", 3, value)
-                    afterUpdate()
-                end,
-                min = -10,
-                max = 75,
-                step = 1,
-                name = string.format(Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET"], 2),
-                desc = Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "column_offset_3_range",
-            },
-
-            {--lineText4 (closest to the right)
-                type = "range",
-                get = function() return currentInstance:GetBarTextAnchorOffset(4) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetBarTextAnchorOffset", 4, value)
-                    afterUpdate()
-                end,
-                min = -10,
-                max = 50,
-                step = 1,
-                name = string.format(Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET"], 3),
-                desc = Loc["STRING_OPTIONS_ALIGNED_TEXT_COLUMNS_OFFSET_DESC"],
-                hidden = detailsFramework.IsAddonApocalypseWow(),
-                id = "column_offset_4_range",
-            },
-
-            {type = "blank", hidden = detailsFramework.IsAddonApocalypseWow()},
 
             {type = "label", get = function() return Loc["STRING_SIMPLE_TEXT_FORMAT_TITLE"] end, text_template = subSectionTitleTextTemplate},
 
@@ -2428,11 +1447,11 @@ do
                 set = function(self, fixedparam, value)
                     Details.righttext_simple_formatting.use_alignment = not value
                     Details.righttext_simple_formatting.enabled = value
-                    Details:InstanceCallDetailsFunc(Details.InstanceClearTexts)
-                    Details:InstanceCallDetailsFunc(Details.InstanceRefreshRows)
+                    callDetailsFuncAfterOptionChange(getInstance(), Details.InstanceClearTexts)
+                    callDetailsFuncAfterOptionChange(getInstance(), Details.InstanceRefreshRows)
                     sectionFrame.UpdateRightTextOption()
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
+                    refreshWindowsAfterOptionChange(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 name = Loc["STRING_SIMPLE_TEXT_FORMAT"],
                 desc = Loc["STRING_SIMPLE_TEXT_FORMAT_DESC"],
@@ -2476,8 +1495,8 @@ do
                 get = function() return Details.righttext_simple_formatting.format_tsp or "" end,
                 func = function(self, _, text)
                     Details.righttext_simple_formatting.format_tsp = text
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
+                    refreshWindowsAfterOptionChange(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 name = "",
                 desc = Loc["STRING_SIMPLE_TEXT_FORMAT_TYPE3"],
@@ -2498,8 +1517,8 @@ do
                 get = function() return Details.righttext_simple_formatting.format_ts or "" end,
                 func = function(self, _, text)
                     Details.righttext_simple_formatting.format_ts = text
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
+                    refreshWindowsAfterOptionChange(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 name = "",
                 desc = Loc["STRING_SIMPLE_TEXT_FORMAT_TYPE2"],
@@ -2520,8 +1539,8 @@ do
                 get = function() return Details.righttext_simple_formatting.format_tp or "" end,
                 func = function(self, _, text)
                     Details.righttext_simple_formatting.format_tp = text
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
+                    refreshWindowsAfterOptionChange(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 name = "",
                 desc = Loc["STRING_SIMPLE_TEXT_FORMAT_TYPE1"],
@@ -2530,54 +1549,18 @@ do
                 group = "simpletext",
             },
 
-            --{type = "blank", hidden = not detailsFramework.IsAddonApocalypseWow()},
-
-            {type = "label", get = function() return Loc["STRING_OR"] end, text_template = subSectionTitleTextTemplate,
-            hidden = not detailsFramework.IsAddonApocalypseWow()},
-
-            {--use alignment
-                type = "toggle",
-                get = function() return Details.righttext_simple_formatting.use_alignment end,
-                set = function(self, fixedparam, value)
-                    Details.righttext_simple_formatting.use_alignment = value
-                    Details.righttext_simple_formatting.enabled = not value
-                    Details:InstanceCallDetailsFunc(Details.InstanceClearTexts)
-                    Details:InstanceCallDetailsFunc(Details.InstanceRefreshRows)
-                    sectionFrame.UpdateRightTextOption()
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
-                end,
-                name = Loc["STRING_SIMPLE_TEXT_FORMAT_ASLIGNED"],
-                desc = Loc["STRING_SIMPLE_TEXT_FORMAT_ASLIGNED_DESC"],
-                id = "use_alignment_toggle",
-                hidden = not detailsFramework.IsAddonApocalypseWow(),
-                group = "alignmenttext",
-            },
-
-            {--show percent
-                type = "toggle",
-                get = function() return currentInstance.row_info.show_percent end,
-                set = function(self, fixedparam, value)
-                    Details:InstanceCallMethod("SetSimpleFormattingSettings", value)
-                    afterUpdate()
-                end,
-                name = Loc["STRING_OPTIONS_TEXT_SHOW_PERCENT"],
-                desc = Loc["STRING_OPTIONS_TEXT_SHOW_PERCENT"],
-                hidden = not detailsFramework.IsAddonApocalypseWow(),
-                id = "show_percent_toggle",
-                group = "alignmenttext",
-            },
-
+            --the aligned columns toggle and the show percent toggle live in the designer section, only the
+            --spacing used while the columns are aligned is left here
             {--alignment space
                 type = "range",
                 get = function() return Details.righttext_simple_formatting.alignment_space end,
                 set = function(self, fixedparam, value)
                     Details.righttext_simple_formatting.alignment_space = value
                     --this spacing feeds ResolveAnchor on this client, so re-anchor the value columns
-                    Details:InstanceCallDetailsFunc(Details.AdjustInLineTextPadding)
-                    Details:InstanceCallDetailsFunc(Details.InstanceRefreshRows)
-                    Details:RefreshMainWindow(-1, true)
-                    afterUpdate()
+                    callDetailsFuncAfterOptionChange(getInstance(), Details.AdjustInLineTextPadding)
+                    callDetailsFuncAfterOptionChange(getInstance(), Details.InstanceRefreshRows)
+                    refreshWindowsAfterOptionChange(getInstance())
+                    afterUpdate(getInstance())
                 end,
                 min = 30,
                 max = 120,
@@ -2597,80 +1580,36 @@ do
         C_Timer.After(0.15, function()
             DF:BuildMenu(sectionFrame, sectionOptions, startX, startY-20, heightSize, false, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template)
 
-            local separatorOption = sectionFrame:GetWidgetById("text_separator_select")
-            local bracketOption = sectionFrame:GetWidgetById("text_bracket_select")
-            local warningLabel = sectionFrame:GetWidgetById("inline_text_warning_label")
-            Details222.OptionsPanel.textSeparatorOption = separatorOption
-            Details222.OptionsPanel.textbracketOption = bracketOption
-
             local useSimpleText = sectionFrame:GetWidgetById("use_simple_formatting_toggle")
             local formatTSP = sectionFrame:GetWidgetById("format_tsp_textentry")
             local formatTS = sectionFrame:GetWidgetById("format_ts_textentry")
             local formatTP = sectionFrame:GetWidgetById("format_tp_textentry")
             local selectTemplate = sectionFrame:GetWidgetById("selecttemplate_dropdown")
-            local useAlignment = sectionFrame:GetWidgetById("use_alignment_toggle")
             local alignmentSpace = sectionFrame:GetWidgetById("alignment_space_range")
-            local showPercent = sectionFrame:GetWidgetById("show_percent_toggle")
 
-            local columnOffsetSliders = {
-                [2] = sectionFrame:GetWidgetById("column_offset_2_range"),
-                [3] = sectionFrame:GetWidgetById("column_offset_3_range"),
-                [4] = sectionFrame:GetWidgetById("column_offset_4_range"),
-            }
-
-            --the column sliders drive the gap between packed columns when auto align is on and each
-            --column's distance from the statusbar when it is off, so their ranges swap with the mode
-            function sectionFrame.UpdateColumnOffsetSliders()
-                if (not currentInstance) then
-                    return
-                end
-
-                for index, slider in pairs(columnOffsetSliders) do
-                    local minValue, maxValue = currentInstance:GetBarTextAnchorOffsetRange(index)
-                    --the framework wrapper has no method for the range, so reach the inner slider
-                    slider.slider:SetMinMaxValues(minValue, maxValue)
-                    --NoCallback, otherwise refreshing the widget writes the setting straight back
-                    slider:SetValueNoCallback(currentInstance:GetBarTextAnchorOffset(index))
-                end
-            end
-
+            --the designer section can switch between simple text and aligned columns too, so the
+            --checkbox is set from the stored value rather than left as it was clicked
             function sectionFrame.UpdateRightTextOption()
+                useSimpleText:SetChecked(Details.righttext_simple_formatting.enabled)
+
                 if Details.righttext_simple_formatting.enabled then
-                    --useSimpleText:Enable()
                     formatTSP:Enable()
                     formatTS:Enable()
                     formatTP:Enable()
                     selectTemplate:Enable()
-                    useAlignment:SetChecked(false)
                     alignmentSpace:Disable()
-                    showPercent:Disable()
                 else
-                    useSimpleText:SetChecked(false)
                     formatTSP:Disable()
                     formatTS:Disable()
                     formatTP:Disable()
                     selectTemplate:Disable()
-                    --useAlignment:Enable()
                     alignmentSpace:Enable()
-                    showPercent:Enable()
                 end
             end
 
             sectionFrame:SetScript("OnShow", function()
                 if detailsFramework.IsAddonApocalypseWow() then
                     sectionFrame.UpdateRightTextOption()
-                else
-                    sectionFrame.UpdateColumnOffsetSliders()
-
-                    if (currentInstance.use_multi_fontstrings) then
-                        separatorOption:Disable()
-                        bracketOption:Disable()
-                        warningLabel:Show()
-                    else
-                        separatorOption:Enable()
-                        bracketOption:Enable()
-                        warningLabel:Hide()
-                    end
                 end
             end)
         end)
@@ -2680,742 +1619,111 @@ do
 end
 
 -- ~05 - title bar
-do
-
-    local func = function(menu_button)
-        editInstanceSetting(currentInstance, "menu_icons", menu_button, not currentInstance.menu_icons[menu_button])
-        editInstanceSetting(currentInstance, "ToolbarMenuSetButtons")
-        afterUpdate()
-    end
-
-    --menu text face
-        local onSelectFont = function(_, _, fontName)
-            Details.font_faces.menus = fontName
-        end
-
-        local buildFontMenu = function()
-            local fontObjects = SharedMedia:HashTable ("font")
-            local fontTable = {}
-            for name, fontPath in pairs(fontObjects) do
-                fontTable[#fontTable+1] = {value = name, label = name, icon = font_select_icon, texcoord = font_select_texcoord, onclick = onSelectFont, font = fontPath, descfont = name, desc = Loc ["STRING_MUSIC_DETAILS_ROBERTOCARLOS"]}
-            end
-            table.sort (fontTable, function(t1, t2) return t1.label < t2.label end)
-            return fontTable
-        end
-
-    --attribute text font
-        local on_select_attribute_font = function(self, instance, fontName)
-            editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, nil, fontName)
-            afterUpdate()
-        end
-
-        local build_font_menu = function()
-            local fonts = {}
-            for name, fontPath in pairs(SharedMedia:HashTable ("font")) do
-                fonts [#fonts+1] = {value = name, label = name, icon = font_select_icon, texcoord = font_select_texcoord, onclick = on_select_attribute_font, font = fontPath, descfont = name, desc = "Our thoughts strayed constantly\nAnd without boundary\nThe ringing of the division bell had began."}
-            end
-            table.sort (fonts, function(t1, t2) return t1.label < t2.label end)
-            return fonts
-        end
-
-    --icon set menu
-        local on_select_icon_set = function(self, instance, texturePath)
-            editInstanceSetting(currentInstance, "toolbar_icon_file", texturePath)
-            editInstanceSetting(currentInstance, "ChangeSkin")
-            afterUpdate()
-        end
-
-    --custom title bar texture
-        local onSelectCustomTitleBarTexture =  function(_, instance, textureName)
-            editInstanceSetting(currentInstance, "SetTitleBarSettings", nil, nil, textureName)
-            editInstanceSetting(currentInstance, "RefreshTitleBar")
-        end
-
-        local buildTextureCustomTitleBar = function()
-            local textures = SharedMedia:HashTable("statusbar")
-            local texTable = {}
-            for name, texturePath in pairs(textures) do
-                texTable[#texTable+1] = {value = name, label = name, statusbar = texturePath,  onclick = onSelectCustomTitleBarTexture}
-            end
-            table.sort(texTable, function(t1, t2) return t1.label < t2.label end)
-            return texTable
-        end
-
-        local buildIconStyleMenu = function()
-            local iconMenu = {
-                {value = "Interface\\AddOns\\Details\\images\\toolbar_icons", label = "Set 1", icon = "Interface\\AddOns\\Details\\images\\toolbar_icons", texcoord = {0, 0.125, 0, 1}, onclick = on_select_icon_set},
-                {value = "Interface\\AddOns\\Details\\images\\toolbar_icons_shadow", label = "Set 2", icon = "Interface\\AddOns\\Details\\images\\toolbar_icons_shadow", texcoord = {0, 0.125, 0, 1}, onclick = on_select_icon_set},
-                {value = "Interface\\AddOns\\Details\\images\\toolbar_icons_2", label = "Set 3", icon = "Interface\\AddOns\\Details\\images\\toolbar_icons_2", texcoord = {0, 0.125, 0, 1}, onclick = on_select_icon_set},
-                {value = "Interface\\AddOns\\Details\\images\\toolbar_icons_2_shadow", label = "Set 4", icon = "Interface\\AddOns\\Details\\images\\toolbar_icons_2_shadow", texcoord = {0, 0.125, 0, 1}, onclick = on_select_icon_set},
-            }
-            return iconMenu
-        end
-
-    local buttonWidth = 25
-
-    local buildSection = function(sectionFrame)
-        local sectionOptions = {
-
-            {type = "label", get = function() return "Title Bar" end, text_template = subSectionTitleTextTemplate},
-
-            {--use custom titlebar
-                type = "toggle",
-                get = function() return currentInstance.titlebar_shown end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetTitleBarSettings", value)
-                    editInstanceSetting(currentInstance, "RefreshTitleBar")
-                    afterUpdate()
-                end,
-                name = "Enable Custom Title Bar",
-                desc = "Use an alternative title bar instead of the title bar builtin in the Skin file.\n\n|cFFFFFF00Important|r: To disable the title bar from the Skin file, go to 'Window Body' and make the 'skin color' fully transparent.",
-            },
-
-            {--custom title bar height
-                type = "range",
-                get = function() return currentInstance.titlebar_height end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetTitleBarSettings", nil, value)
-                    editInstanceSetting(currentInstance, "RefreshTitleBar")
-                    afterUpdate()
-                end,
-                min = 0,
-                max = 32,
-                step = 1,
-                name = "Height",
-                desc = "Height",
-            },
-
-            {--custom title bar texture
-                type = "select",
-                get = function() return currentInstance.titlebar_texture end,
-                values = function()
-                    return buildTextureCustomTitleBar()
-                end,
-                name = Loc ["STRING_TEXTURE"],
-                desc = Loc ["STRING_TEXTURE"],
-            },
-
-			{--texture color
-                type = "color",
-                get = function()
-                    local r, g, b, a = unpack(currentInstance.titlebar_texture_color)
-                    return {r, g, b, a}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetTitleBarSettings", nil, nil, nil, {r, g, b, a})
-                    editInstanceSetting(currentInstance, "RefreshTitleBar")
-                    afterUpdate()
-                end,
-                name = "Color",
-                desc = "Color",
-            },
-
-
-            --SetTitleBarSettings(shown, height, texture, color)
-
-            {--disable all displays
-                type = "toggle",
-                get = function() return currentInstance.disable_alldisplays_window end,
-                set = function(self, fixedparam, value)
-                    Details.disable_alldisplays_window = value
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW"],
-                desc = Loc ["STRING_OPTIONS_DISABLE_ALLDISPLAYSWINDOW_DESC"],
-            },
-
-
-
-            {type = "blank"},
-
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_TITLEBAR_MENUBUTTONS_HEADER"] end, text_template = subSectionTitleTextTemplate},
-
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_MENU_SHOWBUTTONS"] end, text_template = options_text_template},
-            {--button orange gear
-                type = "execute",
-                get = function() return "" end,
-                func = function(self, fixedparam, value)
-                    func(1)
-                end,
-                width = buttonWidth,
-                height = 20,
-                inline = true,
-                name = "",
-                --desc = "",
-                icontexture = [[Interface\AddOns\Details\images\toolbar_icons]],
-                icontexcoords = {0/256, 32/256, 0, 1},
-            },
-
-            {--button segments
-                type = "execute",
-                get = function() return "" end,
-                func = function(self, fixedparam, value)
-                    func(2)
-                end,
-                width = buttonWidth,
-                height = 20,
-                inline = true,
-                name = "",
-                --desc = "",
-                icontexture = [[Interface\AddOns\Details\images\toolbar_icons]],
-                icontexcoords = {33/256, 64/256, 0, 1},
-            },
-
-            {--button sword
-                type = "execute",
-                get = function() return "" end,
-                func = function(self, fixedparam, value)
-                    func(3)
-                end,
-                width = buttonWidth,
-                height = 20,
-                inline = true,
-                name = "",
-                --desc = "",
-                icontexture = [[Interface\AddOns\Details\images\toolbar_icons]],
-                icontexcoords = {64/256, 96/256, 0, 1},
-            },
-
-            {--button report
-                type = "execute",
-                get = function() return "" end,
-                func = function(self, fixedparam, value)
-                    func(4)
-                end,
-                width = buttonWidth,
-                height = 20,
-                inline = true,
-                name = "",
-                --desc = "",
-                icontexture = [[Interface\AddOns\Details\images\toolbar_icons]],
-                icontexcoords = {96/256, 128/256, 0, 1},
-            },
-
-            {--button clear
-                type = "execute",
-                get = function() return "" end,
-                func = function(self, fixedparam, value)
-                    func(5)
-                end,
-                width = buttonWidth,
-                height = 20,
-                inline = true,
-                name = "",
-                --desc = "",
-                icontexture = [[Interface\AddOns\Details\images\toolbar_icons]],
-                icontexcoords = {128/256, 160/256, 0, 1},
-            },
-
-            {--button clear
-                type = "execute",
-                get = function() return "" end,
-                func = function(self, fixedparam, value)
-                    func(6)
-                end,
-                width = buttonWidth,
-                height = 20,
-                inline = true,
-                name = "",
-                --desc = "",
-                icontexture = [[Interface\AddOns\Details\images\toolbar_icons]],
-                icontexcoords = {160/256, 192/256, 0, 1},
-            },
-
-            {--icon set icon style
-                type = "select",
-                get = function() return currentInstance.toolbar_icon_file end,
-                values = function()
-                    return buildIconStyleMenu()
-                end,
-                name = "Icon Set",
-                desc = "Icon Set",
-            },
-
-            {--title bar icons size
-                type = "range",
-                get = function() return currentInstance.menu_icons_size end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "ToolbarMenuButtonsSize", value)
-                    afterUpdate()
-                end,
-                min = 0.4,
-                max = 1.6,
-                step = 0.05,
-                usedecimals = true,
-                name = Loc ["STRING_OPTIONS_SIZE"],
-                desc = Loc ["STRING_OPTIONS_MENU_BUTTONSSIZE_DESC"],
-            },
-
-            {--title bar icons spacing
-                type = "range",
-                get = function() return currentInstance.menu_icons.space end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "ToolbarMenuSetButtonsOptions", value)
-                    afterUpdate()
-                end,
-                min = -5,
-                max = 10,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_MENUS_SPACEMENT"],
-                desc = Loc ["STRING_OPTIONS_MENUS_SPACEMENT_DESC"],
-            },
-
-            {--title bar icons position X
-                type = "range",
-                get = function() return currentInstance.toolbar_side == 1 and currentInstance.menu_anchor[1] or currentInstance.menu_anchor_down[1] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "MenuAnchor", value)
-                    afterUpdate()
-                end,
-                min = -200,
-                max = 200,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_MENU_X"],
-                desc = Loc ["STRING_OPTIONS_MENU_X_DESC"],
-            },
-
-            {--title bar icons position Y
-                type = "range",
-                get = function() return currentInstance.toolbar_side == 1 and currentInstance.menu_anchor[2] or currentInstance.menu_anchor_down[2] end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "MenuAnchor", nil, value)
-                    afterUpdate()
-                end,
-                min = -200,
-                max = 200,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_MENU_Y"],
-                desc = Loc ["STRING_OPTIONS_MENU_X_DESC"],
-            },
-
-            {--icons desaturated
-                type = "toggle",
-                get = function() return currentInstance.desaturated_menu end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "DesaturateMenu", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_DESATURATE_MENU"],
-                desc = Loc ["STRING_OPTIONS_DESATURATE_MENU_DESC"],
-            },
-
-            {--hide icon main icon
-                type = "toggle",
-                get = function() return currentInstance.hide_icon end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "HideMainIcon", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_HIDE_ICON"],
-                desc = Loc ["STRING_OPTIONS_HIDE_ICON_DESC"],
-            },
-
-            {--button attach to right
-                type = "toggle",
-                get = function() return currentInstance.menu_anchor.side == 2 and true or false end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "LeftMenuAnchorSide", value and 2 or 1)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_MENU_ANCHOR"],
-                desc = Loc ["STRING_OPTIONS_MENU_ANCHOR_DESC"],
-            },
-
-            {--plugins button attach to right
-                type = "toggle",
-                get = function() return currentInstance.plugins_grow_direction == 2 and true or false end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "plugins_grow_direction", value and 2 or 1)
-                    editInstanceSetting(currentInstance, "ToolbarMenuSetButtons")
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_PICONS_DIRECTION"],
-                desc = Loc ["STRING_OPTIONS_PICONS_DIRECTION_DESC"],
-            },
-
-            {--disable reset button
-                type = "toggle",
-                get = function() return Details.disable_reset_button end,
-                set = function(self, fixedparam, value)
-                    Details.disable_reset_button = value
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_DISABLE_RESET"],
-                desc = Loc ["STRING_OPTIONS_DISABLE_RESET_DESC"],
-            },
-
-            {--click to open menus
-                type = "toggle",
-                get = function() return Details.instances_menu_click_to_open end,
-                set = function(self, fixedparam, value)
-                    Details.instances_menu_click_to_open = value
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_CLICK_TO_OPEN_MENUS"],
-                desc = Loc ["STRING_OPTIONS_CLICK_TO_OPEN_MENUS_DESC"],
-            },
-
-            {--auto hide buttons
-                type = "toggle",
-                get = function() return currentInstance.auto_hide_menu.left end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetAutoHideMenu", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_MENU_AUTOHIDE_LEFT"],
-                desc = Loc ["STRING_OPTIONS_MENU_AUTOHIDE_DESC"],
-            },
-
-            {type = "breakline"},
-            {type = "label", get = function() return Loc ["STRING_OPTIONS_ATTRIBUTE_TEXT"] end, text_template = subSectionTitleTextTemplate},
-
-            {--enable text
-                type = "toggle",
-                get = function() return currentInstance.attribute_text.enabled end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_ENABLED"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ENABLED_DESC"],
-            },
-
-            {--encounter time
-                type = "toggle",
-                get = function() return currentInstance.attribute_text.show_timer and true or false end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ENCOUNTERTIMER"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ENCOUNTERTIMER_DESC"],
-            },
-
-            {--text size
-                type = "range",
-                get = function() return tonumber(currentInstance.attribute_text.text_size) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                min = 5,
-                max = 32,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_TEXT_SIZE"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_TEXTSIZE_DESC"],
-            },
-
-            {--text font
-                type = "select",
-                get = function() return currentInstance.attribute_text.text_face end,
-                values = function()
-                    return build_font_menu()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_FONT"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_FONT_DESC"],
-            },
-
-			{--text color
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(currentInstance.attribute_text.text_color)
-                    return {r, g, b, a}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, nil, nil, nil, {r, g, b, a})
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_TEXTCOLOR"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_TEXTCOLOR_DESC"],
-            },
-
-            {--text shadow
-                type = "toggle",
-                get = function() return currentInstance.attribute_text.shadow end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, nil, nil, nil, nil, nil, value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_TEXT_LOUTILINE"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_SHADOW_DESC"],
-            },
-
-            {--text X
-                type = "range",
-                get = function() return tonumber(currentInstance.attribute_text.anchor[1]) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, value)
-                    afterUpdate()
-                end,
-                min = -30,
-                max = 300,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORX"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORX_DESC"],
-            },
-
-            {--text Y
-                type = "range",
-                get = function() return tonumber(currentInstance.attribute_text.anchor[2]) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, value)
-                    afterUpdate()
-                end,
-                min = -100,
-                max = 50,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORY"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_ANCHORY_DESC"],
-            },
-
-            {--anchor to top
-                type = "toggle",
-                get = function() return currentInstance.attribute_text.side == 1 and true or false end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "AttributeMenu", nil, nil, nil, nil, nil, nil, value and 1 or 2)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_SIDE"],
-                desc = Loc ["STRING_OPTIONS_MENU_ATTRIBUTE_SIDE_DESC"],
-            },
-
-            {type = "blank"},
-            {--menu text font
-                type = "select",
-                get = function() return Details.font_faces.menus end,
-                values = function()
-                    return buildFontMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_MENU_FONT_FACE"],
-                desc = Loc ["STRING_OPTIONS_MENU_FONT_FACE_DESC"],
-            },
-
-            {--menu text size
-                type = "range",
-                get = function() return Details.font_sizes.menus end,
-                set = function(self, fixedparam, value)
-                    Details.font_sizes.menus = value
-                    afterUpdate()
-                end,
-                min = 5,
-                max = 32,
-                step = 1,
-                name = Loc ["STRING_OPTIONS_TEXT_SIZE"],
-                desc = Loc ["STRING_OPTIONS_MENU_FONT_SIZE_DESC"],
-            },
-
-        }
-
-        sectionFrame.sectionOptions = sectionOptions
-        sectionOptions.always_boxfirst = true
-        C_Timer.After(0.25, function()
-            DF:BuildMenu(sectionFrame, sectionOptions, startX, startY-20, heightSize, false, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template)
-        end)
-    end
-
-    tinsert(Details.optionsSection, buildSection)
-end
+--every title bar option moved into the designer section, so this section has no builder and no button. the slot
+--is kept so the sections after it keep their ids
+tinsert(Details.optionsSection, false)
 
 -- ~06 - body setings
 do
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
-    --frame strata options
-        local strata = {
-            ["BACKGROUND"] = "Background",
-            ["LOW"] = "Low",
-            ["MEDIUM"] = "Medium",
-            ["HIGH"] = "High",
-            ["DIALOG"] = "Dialog"
-        }
+        --these helpers close over 'getInstance', so they have to be built per section build; they used
+        --to live outside the builder, where they closed over the single instance the options window was
+        --editing and could not be pointed at any other window
 
-        local onStrataSelect = function(_, instance, strataName)
-            editInstanceSetting(currentInstance, "SetFrameStrata", strataName)
-            afterUpdate()
-        end
+        --instance selector selection
+            local onSelectInstance = function() end
 
-        local strataTable = {
-            {value = "BACKGROUND", label = "Background", onclick = onStrataSelect, icon = [[Interface\Buttons\UI-MicroStream-Green]], iconcolor = {0, .5, 0, .8}, texcoord = nil}, --Interface\Buttons\UI-MicroStream-Green UI-MicroStream-Red UI-MicroStream-Yellow
-            {value = "LOW", label = "Low", onclick = onStrataSelect, icon = [[Interface\Buttons\UI-MicroStream-Green]] , texcoord = nil}, --Interface\Buttons\UI-MicroStream-Green UI-MicroStream-Red UI-MicroStream-Yellow
-            {value = "MEDIUM", label = "Medium", onclick = onStrataSelect, icon = [[Interface\Buttons\UI-MicroStream-Yellow]] , texcoord = nil}, --Interface\Buttons\UI-MicroStream-Green UI-MicroStream-Red UI-MicroStream-Yellow
-            {value = "HIGH", label = "High", onclick = onStrataSelect, icon = [[Interface\Buttons\UI-MicroStream-Yellow]] , iconcolor = {1, .7, 0, 1}, texcoord = nil}, --Interface\Buttons\UI-MicroStream-Green UI-MicroStream-Red UI-MicroStream-Yellow
-            {value = "DIALOG", label = "Dialog", onclick = onStrataSelect, icon = [[Interface\Buttons\UI-MicroStream-Red]] , iconcolor = {1, 0, 0, 1},  texcoord = nil}, --Interface\Buttons\UI-MicroStream-Green UI-MicroStream-Red UI-MicroStream-Yellow
-        }
-        local buildStrataMenu = function() return strataTable end
+            local buildInstanceMenu = function()
+                local instanceList = {}
+                for index = 1, math.min (#Details.tabela_instancias, Details.instances_amount) do
+                    local instance = Details.tabela_instancias[index]
 
-    --backdrop texture
-        local onBackdropSelect = function(_, instance, backdropName)
-            editInstanceSetting(currentInstance, "SetBackdropTexture", backdropName)
-            afterUpdate()
-        end
+                    --what the window is showing
+                    local atributo = instance.atributo
+                    local sub_atributo = instance.sub_atributo
 
-        local backdrop_icon_size = {16, 16}
-        local backdrop_icon_color = {.6, .6, .6}
-
-        local buildBackdropMenu = function()
-            local backdropTable = {}
-            for name, backdropPath in pairs(SharedMedia:HashTable ("background")) do
-                backdropTable[#backdropTable+1] = {value = name, label = name, onclick = onBackdropSelect, icon = [[Interface\ITEMSOCKETINGFRAME\UI-EMPTYSOCKET]], iconsize = backdrop_icon_size, iconcolor = backdrop_icon_color}
-            end
-            return backdropTable
-        end
-
-    --instance selector selection
-        local onSelectInstance = function() end
-
-        local buildInstanceMenu = function()
-            local instanceList = {}
-            for index = 1, math.min (#Details.tabela_instancias, Details.instances_amount) do
-                local instance = Details.tabela_instancias[index]
-
-                --what the window is showing
-                local atributo = instance.atributo
-                local sub_atributo = instance.sub_atributo
-
-                if (atributo == 5) then --custom
-                    local CustomObject = Details.custom [sub_atributo]
-                    if (not CustomObject) then
-                        instance:ResetAttribute()
-                        atributo = instance.atributo
-                        sub_atributo = instance.sub_atributo
-                        instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. Details.atributos.lista [atributo] .. " - " .. Details.sub_atributos [atributo].lista [sub_atributo], onclick = onSelectInstance, icon = Details.sub_atributos [atributo].icones[sub_atributo] [1], texcoord = Details.sub_atributos [atributo].icones[sub_atributo] [2]}
-                    else
-                        instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. CustomObject.name, onclick = onSelectInstance, icon = CustomObject.icon}
-                    end
-                else
-                    local modo = instance.modo
-
-                    if (modo == 1) then --solo plugin
-                        atributo = Details.SoloTables.Mode or 1
-                        local SoloInfo = Details.SoloTables.Menu [atributo]
-                        if (SoloInfo) then
-                            instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. SoloInfo [1], onclick = onSelectInstance, icon = SoloInfo [2]}
+                    if (atributo == 5) then --custom
+                        local CustomObject = Details.custom [sub_atributo]
+                        if (not CustomObject) then
+                            instance:ResetAttribute()
+                            atributo = instance.atributo
+                            sub_atributo = instance.sub_atributo
+                            instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. Details.atributos.lista [atributo] .. " - " .. Details.sub_atributos [atributo].lista [sub_atributo], onclick = onSelectInstance, icon = Details.sub_atributos [atributo].icones[sub_atributo] [1], texcoord = Details.sub_atributos [atributo].icones[sub_atributo] [2]}
                         else
-                            instanceList [#instanceList+1] = {value = index, label = "#".. index .. " unknown", onclick = onSelectInstance, icon = ""}
+                            instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. CustomObject.name, onclick = onSelectInstance, icon = CustomObject.icon}
                         end
+                    else
+                        local modo = instance.modo
 
-                    elseif (modo == 4) then --raid plugin
-                        local plugin_name = instance.current_raid_plugin or instance.last_raid_plugin
-                        if (plugin_name) then
-                            local plugin_object = Details:GetPlugin (plugin_name)
-                            if (plugin_object) then
-                                instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. plugin_object.__name, onclick = onSelectInstance, icon = plugin_object.__icon}
+                        if (modo == 1) then --solo plugin
+                            atributo = Details.SoloTables.Mode or 1
+                            local SoloInfo = Details.SoloTables.Menu [atributo]
+                            if (SoloInfo) then
+                                instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. SoloInfo [1], onclick = onSelectInstance, icon = SoloInfo [2]}
+                            else
+                                instanceList [#instanceList+1] = {value = index, label = "#".. index .. " unknown", onclick = onSelectInstance, icon = ""}
+                            end
+
+                        elseif (modo == 4) then --raid plugin
+                            local plugin_name = instance.current_raid_plugin or instance.last_raid_plugin
+                            if (plugin_name) then
+                                local plugin_object = Details:GetPlugin (plugin_name)
+                                if (plugin_object) then
+                                    instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. plugin_object.__name, onclick = onSelectInstance, icon = plugin_object.__icon}
+                                else
+                                    instanceList [#instanceList+1] = {value = index, label = "#".. index .. " unknown", onclick = onSelectInstance, icon = ""}
+                                end
                             else
                                 instanceList [#instanceList+1] = {value = index, label = "#".. index .. " unknown", onclick = onSelectInstance, icon = ""}
                             end
                         else
-                            instanceList [#instanceList+1] = {value = index, label = "#".. index .. " unknown", onclick = onSelectInstance, icon = ""}
+                            instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. Details.atributos.lista [atributo] .. " - " .. Details.sub_atributos [atributo].lista [sub_atributo], onclick = onSelectInstance, icon = Details.sub_atributos [atributo].icones[sub_atributo] [1], texcoord = Details.sub_atributos [atributo].icones[sub_atributo] [2]}
                         end
-                    else
-                        instanceList [#instanceList+1] = {value = index, label = "#".. index .. " " .. Details.atributos.lista [atributo] .. " - " .. Details.sub_atributos [atributo].lista [sub_atributo], onclick = onSelectInstance, icon = Details.sub_atributos [atributo].icones[sub_atributo] [1], texcoord = Details.sub_atributos [atributo].icones[sub_atributo] [2]}
                     end
                 end
+                return instanceList
             end
-            return instanceList
-        end
 
 
-    local buildSection = function(sectionFrame)
+        --the skin color, side bars, scale, strata, background texture and window border options live in the
+        --designer section
         local sectionOptions = {
             {type = "label", get = function() return Loc["STRING_OPTIONS_GENERAL_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
-
-			{--window color (skin color)
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(currentInstance.color)
-                    return {r, g, b, 1}
-                end,
-
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "InstanceColor", r, g, b, a, nil, true)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_WINDOW_SKIN_COLOR"],
-                desc = Loc ["STRING_OPTIONS_WINDOW_SKIN_COLOR_DESC"],
-            },
-
-            {--show borders
-                type = "toggle",
-                get = function() return currentInstance.show_sidebars end,
-                set = function(self, fixedparam, value)
-                    if (value) then
-                        editInstanceSetting(currentInstance, "ShowSideBars")
-                    else
-                        editInstanceSetting(currentInstance, "HideSideBars")
-                    end
-
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_SHOW_SIDEBARS"],
-                desc = Loc ["STRING_OPTIONS_SHOW_SIDEBARS_DESC"],
-            },
 
 			{--row's area color
                 type = "color",
                 get = function()
-                    return {currentInstance.bg_r, currentInstance.bg_g, currentInstance.bg_b, currentInstance.bg_alpha}
+                    return {getInstance().bg_r, getInstance().bg_g, getInstance().bg_b, getInstance().bg_alpha}
                 end,
                 set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "SetBackgroundColor", r, g, b)
-                    editInstanceSetting(currentInstance, "SetBackgroundAlpha", a)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetBackgroundColor", r, g, b)
+                    editInstanceSetting(getInstance(), "SetBackgroundAlpha", a)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_WINDOW_ROWAREA_COLOR"],
                 desc = Loc ["STRING_OPTIONS_WINDOW_ROWAREA_COLOR_DESC"],
             },
 
-            {--window scale
-                type = "range",
-                get = function() return tonumber(currentInstance.window_scale) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetWindowScale", value, true)
-                    afterUpdate()
-                end,
-                min = 0.65,
-                max = 1.5,
-                step = 0.02,
-                usedecimals = true,
-                name = Loc ["STRING_OPTIONS_WINDOW_SCALE"],
-                desc = Loc ["STRING_OPTIONS_WINDOW_SCALE_DESC"],
-            },
-
             {--ignore on mass hide
                 type = "toggle",
-                get = function() return currentInstance.ignore_mass_showhide end,
+                get = function() return getInstance().ignore_mass_showhide end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "ignore_mass_showhide", value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "ignore_mass_showhide", value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_WINDOW_IGNOREMASSTOGGLE"],
                 desc = Loc ["STRING_OPTIONS_WINDOW_IGNOREMASSTOGGLE_DESC"],
             },
 
-            {--frame strata
-                type = "select",
-                get = function() return strata[currentInstance.strata] or "Low" end,
-                values = function()
-                    return buildStrataMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_INSTANCE_STRATA"],
-                desc = Loc ["STRING_OPTIONS_INSTANCE_STRATA_DESC"],
-            },
-
-            {--backdrop texture
-                type = "select",
-                get = function() return currentInstance.backdrop_texture end,
-                values = function()
-                    return buildBackdropMenu()
-                end,
-                name = Loc ["STRING_OPTIONS_INSTANCE_BACKDROP"],
-                desc = Loc ["STRING_OPTIONS_INSTANCE_BACKDROP_DESC"],
-            },
-
             {type = "blank"},
             {--click through
                 type = "toggle",
-                get = function() return currentInstance.clickthrough_window end,
+                get = function() return getInstance().clickthrough_window end,
                 set = function(self, fixedparam, value)
-                    Details:InstanceGroupCall(currentInstance, "UpdateClickThroughSettings", nil, value, value, value)
-                    afterUpdate()
+                    Details:InstanceGroupCall(getInstance(), "UpdateClickThroughSettings", nil, value, value, value)
+                    afterUpdate(getInstance())
                 end,
                 name = "Click Through",
                 desc = "Click Through",
@@ -3423,10 +1731,10 @@ do
             },
             {--click only in combat
                 type = "toggle",
-                get = function() return currentInstance.clickthrough_incombatonly end,
+                get = function() return getInstance().clickthrough_incombatonly end,
                 set = function(self, fixedparam, value)
-                    Details:InstanceGroupCall(currentInstance, "UpdateClickThroughSettings", value)
-                    afterUpdate()
+                    Details:InstanceGroupCall(getInstance(), "UpdateClickThroughSettings", value)
+                    afterUpdate(getInstance())
                 end,
                 name = "Click Through Only in Combat",
                 desc = "Click Through Only in Combat",
@@ -3439,8 +1747,8 @@ do
                 get = function() return tonumber(Details.grouping_horizontal_gap) end,
                 set = function(self, fixedparam, value)
                     Details.grouping_horizontal_gap = value
-                    currentInstance:BaseFrameSnap()
-                    afterUpdate()
+                    getInstance():BaseFrameSnap()
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 20,
@@ -3456,7 +1764,7 @@ do
                 get = function() return Details.disable_window_groups end,
                 set = function(self, fixedparam, value)
                     Details.disable_window_groups = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_DISABLE_GROUPS"],
                 desc = Loc ["STRING_OPTIONS_DISABLE_GROUPS_DESC"],
@@ -3467,7 +1775,7 @@ do
                 get = function() return Details.disable_lock_ungroup_buttons end,
                 set = function(self, fixedparam, value)
                     Details.disable_lock_ungroup_buttons = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_DISABLE_LOCK_RESIZE"],
                 desc = Loc ["STRING_OPTIONS_DISABLE_LOCK_RESIZE_DESC"],
@@ -3479,7 +1787,7 @@ do
                 get = function() return Details.disable_stretch_button end,
                 set = function(self, fixedparam, value)
                     Details.disable_stretch_button = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_DISABLE_STRETCH_BUTTON"],
                 desc = Loc ["STRING_OPTIONS_DISABLE_STRETCH_BUTTON_DESC"],
@@ -3489,10 +1797,10 @@ do
 
             {--title bar on top side
                 type = "toggle",
-                get = function() return currentInstance.toolbar_side == 1 and true or false end,
+                get = function() return getInstance().toolbar_side == 1 and true or false end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "ToolbarSide", value and 1 or 2)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "ToolbarSide", value and 1 or 2)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TOOLBARSIDE"],
                 desc = Loc ["STRING_OPTIONS_TOOLBARSIDE_DESC"],
@@ -3500,10 +1808,10 @@ do
 
             {--stretch button always on top
                 type = "toggle",
-                get = function() return currentInstance.grab_on_top end,
+                get = function() return getInstance().grab_on_top end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "grab_on_top", value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "grab_on_top", value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_STRETCHTOP"],
                 desc = Loc ["STRING_OPTIONS_STRETCHTOP_DESC"],
@@ -3511,10 +1819,10 @@ do
 
             {--stretch button on top side
                 type = "toggle",
-                get = function() return currentInstance.stretch_button_side == 1 and true or false end,
+                get = function() return getInstance().stretch_button_side == 1 and true or false end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "StretchButtonAnchor", value and 1 or 2)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "StretchButtonAnchor", value and 1 or 2)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_STRETCH"],
                 desc = Loc ["STRING_OPTIONS_STRETCH_DESC"],
@@ -3550,56 +1858,14 @@ do
             },
 
             {type = "breakline"},
-            {type = "label", get = function() return "Window Area Border" end, text_template = subSectionTitleTextTemplate},
-
-            {--show full border ~border
-                type = "toggle",
-                get = function() return currentInstance.fullborder_shown end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "UpdateFullBorder", value)
-                    afterUpdate()
-                end,
-                name = "Show Border",
-                desc = "Show Border",
-            },
-
-			{--full border color
-                type = "color",
-                get = function()
-                    return {unpack(currentInstance.fullborder_color)}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "UpdateFullBorder", nil, {r, g, b, a})
-                    afterUpdate()
-                end,
-                name = "Border Color",
-                desc = "Border Color",
-            },
-
-            {--border size
-                type = "range",
-                get = function() return tonumber(currentInstance.fullborder_size) end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "UpdateFullBorder", nil, nil, value)
-                    afterUpdate()
-                end,
-                min = 0,
-                max = 5,
-                step = 0.5,
-                usedecimals = true,
-                name = "Border Thickness",
-                desc = "Border Thickness",
-            },
-
-            {type = "blank"},
             {type = "label", get = function() return "Row's Area Border" end, text_template = subSectionTitleTextTemplate},
 
             {--show full border ~border
                 type = "toggle",
-                get = function() return currentInstance.rowareaborder_shown end,
+                get = function() return getInstance().rowareaborder_shown end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "UpdateRowAreaBorder", value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "UpdateRowAreaBorder", value)
+                    afterUpdate(getInstance())
                 end,
                 name = "Show Border",
                 desc = "Show Border",
@@ -3608,11 +1874,11 @@ do
 			{--full border color
                 type = "color",
                 get = function()
-                    return {unpack(currentInstance.rowareaborder_color)}
+                    return {unpack(getInstance().rowareaborder_color)}
                 end,
                 set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "UpdateRowAreaBorder", nil, {r, g, b, a})
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "UpdateRowAreaBorder", nil, {r, g, b, a})
+                    afterUpdate(getInstance())
                 end,
                 name = "Border Color",
                 desc = "Border Color",
@@ -3620,10 +1886,10 @@ do
 
             {--border size
                 type = "range",
-                get = function() return tonumber(currentInstance.rowareaborder_size) end,
+                get = function() return tonumber(getInstance().rowareaborder_size) end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "UpdateRowAreaBorder", nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "UpdateRowAreaBorder", nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 5,
@@ -3647,11 +1913,12 @@ end
 
 -- ~07 - status bar
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
     --update micro displays
         local updateMicroFrames = function()
-            local instance = currentInstance
+            local instance = getInstance()
 
             local hideLeftButton = sectionFrame.MicroDisplayLeftDropdown.hideLeftMicroFrameButton
             if (instance.StatusBar ["left"].options.isHidden) then
@@ -3691,59 +1958,16 @@ do
 
         sectionFrame:GetParent().updateMicroFrames = updateMicroFrames
 
+        --showing the status bar, its color and locking the micro displays live in the designer section
         local sectionOptions = {
             {type = "label", get = function() return Loc ["STRING_OPTIONS_INSTANCE_STATUSBAR_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
 
-            {--show statusbar
-                type = "toggle",
-                get = function() return currentInstance.show_statusbar end,
-                set = function(self, fixedparam, value)
-                    if (value) then
-                        editInstanceSetting(currentInstance, "ShowStatusBar")
-                    else
-                        editInstanceSetting(currentInstance, "HideStatusBar")
-                    end
-
-                    --editInstanceSetting(currentInstance, "BaseFrameSnap") --was causing issues 09/Aug/2020
-                    updateMicroFrames()
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_SHOW_STATUSBAR"],
-                desc = Loc ["STRING_OPTIONS_SHOW_STATUSBAR_DESC"],
-            },
-
-			{--color
-                type = "color",
-                get = function()
-                    local r, g, b = unpack(currentInstance.statusbar_info.overlay)
-                    local alpha = currentInstance.statusbar_info.alpha
-                    return {r, g, b, alpha}
-                end,
-                set = function(self, r, g, b, a)
-                    editInstanceSetting(currentInstance, "StatusBarColor", r, g, b, a)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_INSTANCE_STATUSBARCOLOR"],
-                desc = Loc ["STRING_OPTIONS_INSTANCE_STATUSBARCOLOR_DESC"],
-            },
-
-            {--lock micro displays
-                type = "toggle",
-                get = function() return currentInstance.micro_displays_locked end,
-                set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "MicroDisplaysLock", value)
-                    afterUpdate()
-                end,
-                name = Loc ["STRING_OPTIONS_MICRODISPLAY_LOCK"],
-                desc = Loc ["STRING_OPTIONS_MICRODISPLAY_LOCK_DESC"],
-            },
-
             {--anchor on top side
                 type = "toggle",
-                get = function() return currentInstance.micro_displays_side == 1 and true or false end,
+                get = function() return getInstance().micro_displays_side == 1 and true or false end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "MicroDisplaysSide", value and 1 or 2, true)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "MicroDisplaysSide", value and 1 or 2, true)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_MICRODISPLAYSSIDE"],
                 desc = Loc ["STRING_OPTIONS_MICRODISPLAYSSIDE_DESC"],
@@ -3772,14 +1996,14 @@ do
                 local anchor, index = unpack(micro_display)
 
                 if (index == -1) then
-                    return Details.StatusBar:SetPlugin (currentInstance, -1, anchor)
+                    return Details.StatusBar:SetPlugin (getInstance(), -1, anchor)
                 end
 
                 local absolute_name = Details.StatusBar.Plugins [index].real_name
-                Details.StatusBar:SetPlugin (currentInstance, absolute_name, anchor)
+                Details.StatusBar:SetPlugin (getInstance(), absolute_name, anchor)
 
                 updateMicroFrames() -- in development
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             --dropdown options
@@ -3823,12 +2047,12 @@ do
 
 
             local hideLeftMicroFrameButton = DF:NewButton(sectionFrame.MicroDisplayLeftDropdown, _, "$parenthideLeftMicroFrameButton", "hideLeftMicroFrameButton", 22, 22, function(self, button)
-                if (currentInstance.StatusBar ["left"].options.isHidden) then
-                    Details.StatusBar:SetPlugin (currentInstance, currentInstance.StatusBar ["left"].real_name, "left")
+                if (getInstance().StatusBar ["left"].options.isHidden) then
+                    Details.StatusBar:SetPlugin (getInstance(), getInstance().StatusBar ["left"].real_name, "left")
                 else
-                    Details.StatusBar:SetPlugin (currentInstance, -1, "left")
+                    Details.StatusBar:SetPlugin (getInstance(), -1, "left")
                 end
-                if (currentInstance.StatusBar ["left"].options.isHidden) then
+                if (getInstance().StatusBar ["left"].options.isHidden) then
                     self:GetNormalTexture():SetDesaturated(false)
                 else
                     self:GetNormalTexture():SetDesaturated(true)
@@ -3848,13 +2072,13 @@ do
             end)
 
             local HideCenterMicroFrameButton = DF:NewButton(sectionFrame.MicroDisplayCenterDropdown, _, "$parentHideCenterMicroFrameButton", "HideCenterMicroFrameButton", 22, 22, function(self)
-                if (currentInstance.StatusBar ["center"].options.isHidden) then
-                    Details.StatusBar:SetPlugin (currentInstance, currentInstance.StatusBar ["center"].real_name, "center")
+                if (getInstance().StatusBar ["center"].options.isHidden) then
+                    Details.StatusBar:SetPlugin (getInstance(), getInstance().StatusBar ["center"].real_name, "center")
                 else
-                    Details.StatusBar:SetPlugin (currentInstance, -1, "center")
+                    Details.StatusBar:SetPlugin (getInstance(), -1, "center")
                 end
 
-                if (currentInstance.StatusBar ["center"].options.isHidden) then
+                if (getInstance().StatusBar ["center"].options.isHidden) then
                     self:GetNormalTexture():SetDesaturated(false)
                 else
                     self:GetNormalTexture():SetDesaturated(true)
@@ -3873,12 +2097,12 @@ do
             end)
 
             local HideRightMicroFrameButton = DF:NewButton(sectionFrame.MicroDisplayRightDropdown, _, "$parentHideRightMicroFrameButton", "HideRightMicroFrameButton", 20, 20, function(self)
-                if (currentInstance.StatusBar ["right"].options.isHidden) then
-                    Details.StatusBar:SetPlugin (currentInstance, currentInstance.StatusBar ["right"].real_name, "right")
+                if (getInstance().StatusBar ["right"].options.isHidden) then
+                    Details.StatusBar:SetPlugin (getInstance(), getInstance().StatusBar ["right"].real_name, "right")
                 else
-                    Details.StatusBar:SetPlugin (currentInstance, -1, "right")
+                    Details.StatusBar:SetPlugin (getInstance(), -1, "right")
                 end
-                if (currentInstance.StatusBar ["right"].options.isHidden) then
+                if (getInstance().StatusBar ["right"].options.isHidden) then
                     self:GetNormalTexture():SetDesaturated(false)
                 else
                     self:GetNormalTexture():SetDesaturated(true)
@@ -3897,8 +2121,8 @@ do
             end)
 
             local configRightMicroFrameButton = DF:NewButton(sectionFrame.MicroDisplayRightDropdown, _, "$parentconfigRightMicroFrameButton", "configRightMicroFrameButton", 18, 18, function(self)
-                currentInstance.StatusBar ["right"]:Setup()
-                currentInstance.StatusBar ["right"]:Setup()
+                getInstance().StatusBar ["right"]:Setup()
+                getInstance().StatusBar ["right"]:Setup()
             end)
             configRightMicroFrameButton:SetPoint("left", HideRightMicroFrameButton, "right", 1, -1)
             configRightMicroFrameButton:SetNormalTexture([[Interface\Buttons\UI-OptionsButton]])
@@ -3906,8 +2130,8 @@ do
             configRightMicroFrameButton.tooltip = Loc ["STRING_OPTIONS_MICRODISPLAYS_OPTION_TOOLTIP"]
 
             local configCenterMicroFrameButton = DF:NewButton(sectionFrame.MicroDisplayCenterDropdown, _, "$parentconfigCenterMicroFrameButton", "configCenterMicroFrameButton", 18, 18, function(self)
-                currentInstance.StatusBar ["center"]:Setup()
-                currentInstance.StatusBar ["center"]:Setup()
+                getInstance().StatusBar ["center"]:Setup()
+                getInstance().StatusBar ["center"]:Setup()
             end)
             configCenterMicroFrameButton:SetPoint("left", HideCenterMicroFrameButton, "right", 1, -1)
             configCenterMicroFrameButton:SetNormalTexture([[Interface\Buttons\UI-OptionsButton]])
@@ -3915,8 +2139,8 @@ do
             configCenterMicroFrameButton.tooltip = Loc ["STRING_OPTIONS_MICRODISPLAYS_OPTION_TOOLTIP"]
 
             local configLeftMicroFrameButton = DF:NewButton(sectionFrame.MicroDisplayLeftDropdown, _, "$parentconfigLeftMicroFrameButton", "configLeftMicroFrameButton", 18, 18, function(self)
-                currentInstance.StatusBar ["left"]:Setup()
-                currentInstance.StatusBar ["left"]:Setup()
+                getInstance().StatusBar ["left"]:Setup()
+                getInstance().StatusBar ["left"]:Setup()
             end)
             configLeftMicroFrameButton:SetPoint("left", hideLeftMicroFrameButton, "right", 1, -1)
             configLeftMicroFrameButton:SetNormalTexture([[Interface\Buttons\UI-OptionsButton]])
@@ -3948,7 +2172,8 @@ end
 
 -- ~08 - plugins
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         local CreateFrame = _G.CreateFrame
         local button_color_rgb = {1, 0.93, 0.74}
@@ -4402,7 +2627,8 @@ end
 -- ~09 - profiles
 do
 
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         --build profile menu for "always use this profile" feature
 		local profile_selected_alwaysuse = function(_, instance, profile_name)
@@ -4413,7 +2639,7 @@ do
 			Details:ApplyProfile (profile_name)
 
 			Details:Msg(Loc ["STRING_OPTIONS_PROFILE_LOADED"], profile_name)
-			afterUpdate()
+			afterUpdate(getInstance())
 		end
 		local buildProfileMenuForAlwaysUse = function()
 			local menu = {}
@@ -4426,10 +2652,10 @@ do
         local selectProfile = function(_, _, profileName)
             Details:ApplyProfile(profileName)
             Details:Msg(Loc ["STRING_OPTIONS_PROFILE_LOADED"], profileName)
-            --Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-            --afterUpdate()
-            _G.DetailsOptionsWindow:Hide()
-            Details:OpenOptionsWindow(currentInstance, false, 9)
+            --Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+            --afterUpdate(getInstance())
+            hideOptionsWindow()
+            Details:OpenOptionsWindow(getInstance(), false, 9)
         end
 
 		local buildProfileMenu = function(func)
@@ -4469,7 +2695,7 @@ do
                 set = function(self, fixedparam, value)
                     Details.profile_save_pos = value
                     Details:SetProfileCProp (nil, "profile_save_pos", value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_PROFILE_POSSIZE"],
                 desc = Loc ["STRING_OPTIONS_PROFILE_POSSIZE_DESC"],
@@ -4501,8 +2727,8 @@ do
                     local new_profile = Details:CreateProfile(profileName)
                     if (new_profile) then
                         Details:ApplyProfile(profileName)
-                        afterUpdate()
-                        Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
+                        afterUpdate(getInstance())
+                        Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
                     else
                         return Details:Msg(Loc ["STRING_OPTIONS_PROFILE_NOTCREATED"])
                     end
@@ -4542,8 +2768,8 @@ do
 
                     Details:EraseProfile(profileName)
 
-                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(currentInstance)
-                    afterUpdate()
+                    Details222.OptionsPanel.SetCurrentInstanceAndRefresh(getInstance())
+                    afterUpdate(getInstance())
                     Details:Msg(Loc ["STRING_OPTIONS_PROFILE_REMOVEOKEY"])
                 end,
                 name = Loc ["STRING_OPTIONS_PROFILES_ERASE"],
@@ -4630,7 +2856,7 @@ do
                         Details.always_use_profile_exception [unitname] = nil
                     end
 
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_ALWAYS_USE"],
                 desc = Loc ["STRING_OPTIONS_ALWAYS_USE_DESC"],
@@ -4660,7 +2886,8 @@ end
 
 -- ~10 ~tooltips
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         --button for anchor toggle
         local refreshToggleAnchor = function()
@@ -4675,7 +2902,7 @@ do
 		--text face
             local on_select_tooltip_font = function(self, _, fontName)
                 Details.tooltip.fontface = fontName
-                Details:SendOptionsModifiedEvent (DetailsOptionsWindow.instance)
+                Details:SendOptionsModifiedEvent(getInstance())
             end
 
             local buildTooltipFontOptions = function()
@@ -4702,7 +2929,7 @@ do
                 Details.atributo_misc:UpdateSelectedToKFunction()
                 Details.atributo_custom:UpdateSelectedToKFunction()
 
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local abbreviationOptions = {
@@ -4728,7 +2955,7 @@ do
                 Details.atributo_misc:UpdateSelectedToKFunction()
                 Details.atributo_custom:UpdateSelectedToKFunction()
 
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local icon = [[Interface\Buttons\UI-Panel-BiggerButton-Up]]
@@ -4749,7 +2976,7 @@ do
         --tooltip side
             local onSelectAnchorPoint = function(_, _, selected_anchor)
                 Details.tooltip.anchor_point = selected_anchor
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local anchorPointOptions = {
@@ -4770,7 +2997,7 @@ do
         --tooltip relative side
 			local onSelectAnchorRelative = function(_, _, selected_anchor)
 				Details.tooltip.anchor_relative = selected_anchor
-                afterUpdate()
+                afterUpdate(getInstance())
 			end
 
 			local anchorRelativeOptions = {
@@ -4792,7 +3019,7 @@ do
             local onSelectAnchor = function(_, _, selected_anchor)
                 Details.tooltip.anchored_to = selected_anchor
                 refreshToggleAnchor()
-                afterUpdate()
+                afterUpdate(getInstance())
             end
 
             local anchorOptions = {
@@ -4811,7 +3038,7 @@ do
                 get = function() return Details.tooltip.fontshadow end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.fontshadow = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TEXT_OUTLINE"],
                 desc = Loc ["STRING_OPTIONS_TOOLTIPS_FONTSHADOW_DESC"],
@@ -4829,7 +3056,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Shadow Color",
                 desc = "Color of the text shadow",
@@ -4841,7 +3068,7 @@ do
                 get = function() return Details.tooltip.fontsize end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.fontsize = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 5,
                 max = 32,
@@ -4876,7 +3103,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_LEFT"],
                 desc = Loc ["STRING_LEFT"],
@@ -4894,7 +3121,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_RIGHT"],
                 desc = Loc ["STRING_RIGHT"],
@@ -4912,7 +3139,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TOOLTIPS_ANCHORCOLOR"],
                 desc = Loc ["STRING_OPTIONS_TOOLTIPS_ANCHORCOLOR"],
@@ -4933,7 +3160,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Bar Color",
                 desc = "Bar Color",
@@ -4951,7 +3178,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TOOLTIPS_BACKGROUNDCOLOR"],
                 desc = Loc ["STRING_OPTIONS_TOOLTIPS_BACKGROUNDCOLOR"],
@@ -4969,7 +3196,7 @@ do
                     color[2] = g
                     color[3] = b
                     color[4] = a
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Divisor Color",
                 desc = "Divisor Color",
@@ -4980,7 +3207,7 @@ do
                 get = function() return Details.tooltip.rounded_corner end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.rounded_corner = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show Rounded Border",
                 desc = "Show Rounded Border",
@@ -4993,7 +3220,7 @@ do
                 get = function() return Details.tooltip.show_amount end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.show_amount = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TOOLTIPS_SHOWAMT"],
                 desc = Loc ["STRING_OPTIONS_TOOLTIPS_SHOWAMT_DESC"],
@@ -5070,7 +3297,7 @@ do
                 get = function() return Details.tooltip.anchor_offset[1] end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.anchor_offset[1] = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = -100,
                 max = 100,
@@ -5084,7 +3311,7 @@ do
                 get = function() return Details.tooltip.anchor_offset[2] end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.anchor_offset[2] = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = -100,
                 max = 100,
@@ -5101,7 +3328,7 @@ do
                 get = function() return Details.tooltip.show_header end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.show_header = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show Header",
                 desc = "Show header line in the tooltip",
@@ -5113,7 +3340,7 @@ do
                 get = function() return Details.tooltip.show_dps_column end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.show_dps_column = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show DPS Column",
                 desc = "Show DPS/HPS column in the tooltip",
@@ -5125,7 +3352,7 @@ do
                 get = function() return Details.tooltip.show_percent_column end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.show_percent_column = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show Percent Column",
                 desc = "Show percentage column in the tooltip",
@@ -5140,7 +3367,7 @@ do
                     if value then
                         Details.tooltip.show_help_count = 0
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show Help Text",
                 desc = "Show help text at the bottom of the tooltip",
@@ -5152,7 +3379,7 @@ do
                 get = function() return Details.tooltip.apocalypse_width_useline end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.apocalypse_width_useline = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Match Line Width",
                 desc = "Make the tooltip width match the instance line width",
@@ -5164,7 +3391,7 @@ do
                 get = function() return Details.tooltip.apocalypse_width or 300 end,
                 set = function(self, fixedparam, value)
                     Details.tooltip.apocalypse_width = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 230,
                 max = 550,
@@ -5181,10 +3408,10 @@ do
             --toogle to not show tooltips at all (line_no_tooltip)
             {--disable tooltips
                 type = "toggle",
-                get = function() return currentInstance.line_no_tooltip end,
+                get = function() return getInstance().line_no_tooltip end,
                 set = function(self, fixedparam, value)
-                    currentInstance.line_no_tooltip = value
-                    afterUpdate()
+                    getInstance().line_no_tooltip = value
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_TOOLTIPS_DISABLE"],
                 desc = Loc ["STRING_OPTIONS_TOOLTIPS_DISABLE_DESC"],
@@ -5205,11 +3432,12 @@ end
 
 -- ~11 ~datafeed
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         local onSelectMinimapAction = function(_, _, option)
             Details.minimap.onclick_what_todo = option
-            afterUpdate()
+            afterUpdate(getInstance())
         end
         local menu = {
                 {value = 1, label = Loc ["STRING_OPTIONS_MINIMAP_ACTION1"], onclick = onSelectMinimapAction, icon = [[Interface\FriendsFrame\FriendsFrameScrollIcon]]},
@@ -5223,7 +3451,7 @@ do
 		local onSelectTimeAbbreviation = function(_, _, abbreviationtype)
 			Details.tooltip.abbreviation = abbreviationtype
 			Details:BrokerTick()
-			afterUpdate()
+			afterUpdate(getInstance())
 		end
 		local icon = [[Interface\COMMON\mini-hourglass]]
 		local iconcolor = {1, 1, 1, .5}
@@ -5261,7 +3489,7 @@ do
                         LDBIcon:Show("Details")
                     end
 
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_MINIMAP"],
                 desc = Loc ["STRING_OPTIONS_MINIMAP_DESC"],
@@ -5286,7 +3514,7 @@ do
                 func = function(self, _, text)
                     local brokerText = text or ""
                     Details:SetDataBrokerText (brokerText)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_DATABROKER_TEXT"],
                 desc = Loc ["STRING_OPTIONS_DATABROKER_TEXT1_DESC"],
@@ -5321,7 +3549,7 @@ do
                 get = function() return Details.ilevel:IsTrackerEnabled() end,
                 set = function(self, fixedparam, value)
                     Details.ilevel:TrackItemLevel(value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = Loc ["STRING_OPTIONS_ILVL_TRACKER_DESC"],
@@ -5335,7 +3563,7 @@ do
                 get = function() return Details.report_heal_links end,
                 set = function(self, fixedparam, value)
                     Details.report_heal_links = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_REPORT_HEALLINKS"],
                 desc = Loc ["STRING_OPTIONS_REPORT_HEALLINKS_DESC"],
@@ -5356,13 +3584,14 @@ end
 
 -- ~12 ~wallpaper
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
 		--callback from the image editor
 			local callmeback = function(width, height, overlayColor, alpha, texCoords)
-                editInstanceSetting(currentInstance, "InstanceWallpaper", nil, nil, alpha, texCoords, width, height, overlayColor)
+                editInstanceSetting(getInstance(), "InstanceWallpaper", nil, nil, alpha, texCoords, width, height, overlayColor)
 				sectionFrame:UpdateWallpaperInfo()
-				afterUpdate()
+				afterUpdate(getInstance())
 			end
 
         --select wallpaper
@@ -5372,43 +3601,43 @@ do
                 local selectedTextureOption = texturePath
 
                 if (texturePath:find("TALENTFRAME")) then
-                    editInstanceSetting(currentInstance, "InstanceWallpaper", texturePath, nil, nil, {0, 1, 0, 0.703125}, nil, nil, {1, 1, 1, 1})
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "InstanceWallpaper", texturePath, nil, nil, {0, 1, 0, 0.703125}, nil, nil, {1, 1, 1, 1})
+                    afterUpdate(getInstance())
 
                     if (_G.DetailsImageEdit and _G.DetailsImageEdit:IsShown()) then
-                        local wp = currentInstance.wallpaper
+                        local wp = getInstance().wallpaper
                         if (wp.anchor == "all") then
-                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wp.alpha, true)
+                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wp.alpha, true)
                         else
-                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wp.alpha)
+                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wp.alpha)
                         end
                     end
 
                 elseif (texturePath:find("EncounterJournal")) then
 
-                    editInstanceSetting(currentInstance, "InstanceWallpaper", texturePath, nil, nil, {0.06, 0.68, 0.1, 0.57}, nil, nil, {1, 1, 1, 1})
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "InstanceWallpaper", texturePath, nil, nil, {0.06, 0.68, 0.1, 0.57}, nil, nil, {1, 1, 1, 1})
+                    afterUpdate(getInstance())
 
                     if (_G.DetailsImageEdit and _G.DetailsImageEdit:IsShown()) then
-                        local wp = currentInstance.wallpaper
+                        local wp = getInstance().wallpaper
                         if (wp.anchor == "all") then
-                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wp.alpha, true)
+                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wp.alpha, true)
                         else
-                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wp.alpha)
+                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wp.alpha)
                         end
                     end
 
                 else
                     local texCoords = selectedTextureOption and selectedTextureOption.texcoord
-                    editInstanceSetting(currentInstance, "InstanceWallpaper", texturePath, nil, nil, texCoords or {0, 1, 0, 1}, nil, nil, {1, 1, 1, 1})
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "InstanceWallpaper", texturePath, nil, nil, texCoords or {0, 1, 0, 1}, nil, nil, {1, 1, 1, 1})
+                    afterUpdate(getInstance())
 
                     if (_G.DetailsImageEdit and _G.DetailsImageEdit:IsShown()) then
-                        local wp = currentInstance.wallpaper
+                        local wp = getInstance().wallpaper
                         if (wp.anchor == "all") then
-                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wp.alpha, true)
+                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wp.alpha, true)
                         else
-                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wp.alpha)
+                            DF:ImageEditor (callmeback, wp.texture, wp.texcoord, wp.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wp.alpha)
                         end
                     end
                 end
@@ -5541,7 +3770,7 @@ do
 
         --update preview
 		function sectionFrame:UpdateWallpaperInfo()
-            local wallpaper = currentInstance.wallpaper
+            local wallpaper = getInstance().wallpaper
 
 			preview:SetTexture(wallpaper.texture)
 			preview:SetTexCoord(unpack(wallpaper.texcoord))
@@ -5551,8 +3780,8 @@ do
 
         --wallpaper alignment
             local onSelectAnchor = function(_, instance, anchor)
-                editInstanceSetting(currentInstance, "InstanceWallpaper", nil, anchor)
-                afterUpdate()
+                editInstanceSetting(getInstance(), "InstanceWallpaper", nil, anchor)
+                afterUpdate(getInstance())
                 sectionFrame:UpdateWallpaperInfo()
             end
 
@@ -5573,24 +3802,24 @@ do
 
         --open image editor
             local startImageEdit = function()
-                if (not currentInstance.wallpaper.texture) then
+                if (not getInstance().wallpaper.texture) then
                     Details:Msg("no texture to edit.")
                     return
                 end
 
-                local wallpaper = currentInstance.wallpaper
+                local wallpaper = getInstance().wallpaper
 
                 if (wallpaper.texture:find("TALENTFRAME")) then
                     if (wallpaper.anchor == "all") then
-                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha, true)
+                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha, true)
                     else
-                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha)
+                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha)
                     end
                 else
                     if (wallpaper.anchor == "all") then
-                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha, true)
+                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha, true)
                     else
-                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, currentInstance.baseframe.wallpaper:GetWidth(), currentInstance.baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha)
+                        DF:ImageEditor (callmeback, wallpaper.texture, wallpaper.texcoord, wallpaper.overlay, getInstance().baseframe.wallpaper:GetWidth(), getInstance().baseframe.wallpaper:GetHeight(), nil, wallpaper.alpha)
                     end
                 end
             end
@@ -5648,7 +3877,7 @@ do
                             return
                         end
 
-                        local instance = _G.DetailsOptionsWindow.instance
+                        local instance = getInstance()
                         local path = "Interface\\" .. text
                         editbox:ClearFocus()
                         instance:InstanceWallpaper (path, "all", 0.50, {0, 1, 0, 1}, 256, 256, {1, 1, 1, 1})
@@ -5679,22 +3908,22 @@ do
 
             {--enable wallpaper
                 type = "toggle",
-                get = function() return currentInstance.wallpaper.enabled end,
+                get = function() return getInstance().wallpaper.enabled end,
                 set = function(self, fixedparam, value)
 
-                    currentInstance.wallpaper.enabled = value
+                    getInstance().wallpaper.enabled = value
 
                     if (value) then
                         --first time using a wallpaper
-                        if (not currentInstance.wallpaper.texture) then
-                            currentInstance.wallpaper.texture = "Interface\\AddOns\\Details\\images\\background"
+                        if (not getInstance().wallpaper.texture) then
+                            getInstance().wallpaper.texture = "Interface\\AddOns\\Details\\images\\background"
                         end
-                        editInstanceSetting(currentInstance, "InstanceWallpaper", true)
+                        editInstanceSetting(getInstance(), "InstanceWallpaper", true)
                     else
-                        editInstanceSetting(currentInstance, "InstanceWallpaper", false)
+                        editInstanceSetting(getInstance(), "InstanceWallpaper", false)
                     end
 
-                    afterUpdate()
+                    afterUpdate(getInstance())
 
                     sectionFrame:UpdateWallpaperInfo()
                 end,
@@ -5705,7 +3934,7 @@ do
             {--select wallpaper
                 type = "select",
                 get = function()
-                    return currentInstance.wallpaper.texture or ""
+                    return getInstance().wallpaper.texture or ""
                 end,
                 values = function()
                     return sectionFrame.wallpaperOptions
@@ -5716,7 +3945,7 @@ do
 
             {--align wallpaper
                 type = "select",
-                get = function() return currentInstance.wallpaper.anchor or "" end,
+                get = function() return getInstance().wallpaper.anchor or "" end,
                 values = function()
                     return buildWallpaperAnchorMenu()
                 end,
@@ -5726,10 +3955,10 @@ do
 
             {--wallpaper level
                 type = "range",
-                get = function() return currentInstance.wallpaper.level end, --default 2
+                get = function() return getInstance().wallpaper.level end, --default 2
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetInstanceWallpaperLevel", value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetInstanceWallpaperLevel", value)
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 3,
@@ -5783,7 +4012,8 @@ end
 
 -- ~13 ~automation ~auto hide
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
     --auto switch options
         local Current_Switch_Func = function()end
@@ -5823,89 +4053,89 @@ do
         --damager not in combat
         local onSelectAutoSwitchDamagerNoCombat = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_damager = false
-                afterUpdate()
+                getInstance().switch_damager = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_damager = selected
-            afterUpdate()
+            getInstance().switch_damager = selected
+            afterUpdate(getInstance())
         end
 
         --damager in combat
         local onSelectAutoSwitchDamagerInCombat = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_damager_in_combat = false
-                afterUpdate()
+                getInstance().switch_damager_in_combat = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_damager_in_combat = selected
-            afterUpdate()
+            getInstance().switch_damager_in_combat = selected
+            afterUpdate(getInstance())
         end
 
         --healer not in combat
         local onSelectAutoSwitchHealerNoCombat = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_healer = false
-                afterUpdate()
+                getInstance().switch_healer = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_healer = selected
-            afterUpdate()
+            getInstance().switch_healer = selected
+            afterUpdate(getInstance())
         end
 
         --healer in combat
         local onSelectAutoSwitchHealerInCombat = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_healer_in_combat = false
-                afterUpdate()
+                getInstance().switch_healer_in_combat = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_healer_in_combat = selected
-            afterUpdate()
+            getInstance().switch_healer_in_combat = selected
+            afterUpdate(getInstance())
         end
 
         --tank not in combat
         local onSelectAutoSwitchTankNoCombat = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_tank = false
-                afterUpdate()
+                getInstance().switch_tank = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_tank = selected
-            afterUpdate()
+            getInstance().switch_tank = selected
+            afterUpdate(getInstance())
         end
 
         --tank in combat
         local onSelectAutoSwitchTankInCombat = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_tank_in_combat = false
-                afterUpdate()
+                getInstance().switch_tank_in_combat = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_tank_in_combat = selected
-            afterUpdate()
+            getInstance().switch_tank_in_combat = selected
+            afterUpdate(getInstance())
         end
 
         --after wipe
         local onSelectAutoSwitchAfterWipe = function(_, _, switchTo)
             if (switchTo == 0) then
-                currentInstance.switch_all_roles_after_wipe = false
-                afterUpdate()
+                getInstance().switch_all_roles_after_wipe = false
+                afterUpdate(getInstance())
                 return
             end
             local selected = sectionFrame.lastSwitchList [switchTo]
-            currentInstance.switch_all_roles_after_wipe = selected
-            afterUpdate()
+            getInstance().switch_all_roles_after_wipe = selected
+            afterUpdate(getInstance())
         end
 
         local getSelectedSwitch = function(switchName)
-            local switchTable = currentInstance[switchName]
+            local switchTable = getInstance()[switchName]
             if (switchTable) then
                 if (switchTable[1] == "raid") then
                     local pluginObject = Details:GetPlugin(switchTable[2])
@@ -6018,10 +4248,10 @@ do
 
             {--auto current segment
                 type = "toggle",
-                get = function() return currentInstance.auto_current end,
+                get = function() return getInstance().auto_current end,
                 set = function(self, fixedparam, value)
-                    currentInstance.auto_current = value
-                    afterUpdate()
+                    getInstance().auto_current = value
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_INSTANCE_CURRENT"],
                 desc = Loc ["STRING_OPTIONS_INSTANCE_CURRENT_DESC"],
@@ -6032,7 +4262,7 @@ do
                 get = function() return Details.instances_suppress_trash end,
                 set = function(self, fixedparam, value)
                     Details:SetTrashSuppression(value)
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 180,
@@ -6046,10 +4276,10 @@ do
 
             {--enabled
                 type = "toggle",
-                get = function() return currentInstance.menu_alpha.enabled end,
+                get = function() return getInstance().menu_alpha.enabled end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetMenuAlpha", value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetMenuAlpha", value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = Loc ["STRING_OPTIONS_MENU_ALPHAENABLED_DESC"],
@@ -6057,10 +4287,10 @@ do
 
             {--ignore bars
                 type = "toggle",
-                get = function() return currentInstance.menu_alpha.ignorebars end,
+                get = function() return getInstance().menu_alpha.ignorebars end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetMenuAlpha", nil, nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetMenuAlpha", nil, nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_MENU_IGNOREBARS"],
                 desc = Loc ["STRING_OPTIONS_MENU_IGNOREBARS_DESC"],
@@ -6068,10 +4298,10 @@ do
 
             {--on hover over alpha
                 type = "range",
-                get = function() return currentInstance.menu_alpha.onenter end,
+                get = function() return getInstance().menu_alpha.onenter end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetMenuAlpha", nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetMenuAlpha", nil, value)
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 1,
@@ -6083,10 +4313,10 @@ do
 
             {--no interaction
                 type = "range",
-                get = function() return currentInstance.menu_alpha.onleave end,
+                get = function() return getInstance().menu_alpha.onleave end,
                 set = function(self, fixedparam, value)
-                    editInstanceSetting(currentInstance, "SetMenuAlpha", nil, nil, value)
-                    afterUpdate()
+                    editInstanceSetting(getInstance(), "SetMenuAlpha", nil, nil, value)
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 1,
@@ -6101,10 +4331,10 @@ do
 
             {--auto swap to overall after mythic plus
                 type = "toggle",
-                get = function() return currentInstance.automation.overall_mythic_plus end,
+                get = function() return getInstance().automation.overall_mythic_plus end,
                 set = function(self, fixedparam, value)
-                    currentInstance.automation.overall_mythic_plus = value
-                    afterUpdate()
+                    getInstance().automation.overall_mythic_plus = value
+                    afterUpdate(getInstance())
                 end,
                 name = "Overall After Mythic+",
                 desc = "Change to overall data when the mythic plus dungeon is completed.", --localize-me
@@ -6154,22 +4384,22 @@ do
 		header4Label:SetPoint("topleft", sectionFrame, "topleft", right_start_at + 270, yyy)
 
         local onEnableHideContext = function(self, contextId, value)
-            editInstanceSetting(currentInstance, "hide_on_context", contextId, "enabled", value)
-            editInstanceSetting(currentInstance, "AdjustAlphaByContext")
-            afterUpdate()
+            editInstanceSetting(getInstance(), "hide_on_context", contextId, "enabled", value)
+            editInstanceSetting(getInstance(), "AdjustAlphaByContext")
+            afterUpdate(getInstance())
 		end
 
         local onInverseValue = function(self, contextId, value)
-            editInstanceSetting(currentInstance, "hide_on_context", contextId, "inverse", value)
-            editInstanceSetting(currentInstance, "AdjustAlphaByContext")
-            afterUpdate()
+            editInstanceSetting(getInstance(), "hide_on_context", contextId, "inverse", value)
+            editInstanceSetting(getInstance(), "AdjustAlphaByContext")
+            afterUpdate(getInstance())
 		end
 
         local onAlphaChanged = function(self, contextId, value)
             value = floor(value)
-            editInstanceSetting(currentInstance, "hide_on_context", contextId, "value", value)
-            editInstanceSetting(currentInstance, "AdjustAlphaByContext")
-            afterUpdate()
+            editInstanceSetting(getInstance(), "hide_on_context", contextId, "value", value)
+            editInstanceSetting(getInstance(), "AdjustAlphaByContext")
+            afterUpdate(getInstance())
 		end
 
 		sectionFrame.AutoHideOptions = {}
@@ -6215,7 +4445,7 @@ do
 			sectionFrame.AutoHideOptions[i] = line
         end
 
-        Details222.OptionsPanel.UpdateAutoHideSettings(currentInstance)
+        Details222.OptionsPanel.UpdateAutoHideSettings(getInstance(), sectionFrame)
 
         --profile by spec
 
@@ -6250,7 +4480,8 @@ end
 
 -- ~14 ~raidtools ~tools
 do --raid tools
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         --on select channel for interrip announcer
 		local on_select_channel = function(self, _, channel)
@@ -6262,7 +4493,7 @@ do --raid tools
                     sectionFrame.widget_list_by_type.textentry[1]:Disable()
                 end
             end)
-			afterUpdate()
+			afterUpdate(getInstance())
         end
 		local channel_list = {
 			{value = "PRINT", icon = [[Interface\LFGFRAME\BattlenetWorking2]], iconsize = {14, 14}, iconcolor = {1, 1, 1, 1}, texcoord = {12/64, 53/64, 11/64, 53/64}, label = Loc ["STRING_CHANNEL_PRINT"], onclick = on_select_channel},
@@ -6278,7 +4509,7 @@ do --raid tools
 		--on select channel for cooldown announcer
 		local on_select_channel = function(self, _, channel)
 			Details.announce_cooldowns.channel = channel
-			afterUpdate()
+			afterUpdate(getInstance())
 		end
 
 		local channel_list = {
@@ -6295,7 +4526,7 @@ do --raid tools
         --on select channel for report deaths
 		local on_select_channel = function(self, _, channel)
 			Details.announce_deaths.where = channel
-			afterUpdate()
+			afterUpdate(getInstance())
 		end
 
 		local officer = Details.GetReportIconAndColor ("OFFICER")
@@ -6425,7 +4656,7 @@ do --raid tools
                     else
                         Details:DisableInterruptAnnouncer()
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = Loc ["STRING_OPTIONS_RT_INTERRUPTS_ONOFF_DESC"],
@@ -6453,7 +4684,7 @@ do --raid tools
                 end,
                 func = function(_, _, text)
                     Details.announce_interrupts.whisper = text or ""
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_RT_INTERRUPTS_WHISPER"],
                 desc = Loc ["STRING_OPTIONS_RT_INTERRUPTS_WHISPER"],
@@ -6466,7 +4697,7 @@ do --raid tools
                 end,
                 func = function(_, _, text)
                     Details.announce_interrupts.next = text or ""
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_RT_INTERRUPTS_NEXT"],
                 desc = Loc ["STRING_OPTIONS_RT_INTERRUPTS_NEXT_DESC"],
@@ -6479,7 +4710,7 @@ do --raid tools
                 end,
                 func = function(_, _, text)
                     Details.announce_interrupts.custom = text or ""
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_RT_INTERRUPTS_CUSTOM"],
                 desc = Loc ["STRING_OPTIONS_RT_INTERRUPTS_CUSTOM_DESC"],
@@ -6510,7 +4741,7 @@ do --raid tools
                     else
                         Details:DisableCooldownAnnouncer()
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = Loc ["STRING_OPTIONS_RT_COOLDOWNS_ONOFF_DESC"],
@@ -6533,7 +4764,7 @@ do --raid tools
                 end,
                 func = function(_, _, text)
                     Details.announce_cooldowns.custom = text or ""
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_RT_COOLDOWNS_CUSTOM"],
                 desc = Loc ["STRING_OPTIONS_RT_COOLDOWNS_CUSTOM_DESC"],
@@ -6576,7 +4807,7 @@ do --raid tools
                     else
                         Details:DisableDeathAnnouncer()
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = Loc ["STRING_OPTIONS_RT_DEATHS_ONOFF_DESC"],
@@ -6587,7 +4818,7 @@ do --raid tools
                 get = function() return Details.announce_deaths.last_hits end,
                 set = function(self, fixedparam, value)
                     Details.announce_deaths.last_hits = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 1,
                 max = 5,
@@ -6601,7 +4832,7 @@ do --raid tools
                 get = function() return Details.announce_deaths.only_first end,
                 set = function(self, fixedparam, value)
                     Details.announce_deaths.only_first = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 1,
                 max = 30,
@@ -6628,7 +4859,7 @@ do --raid tools
                 get = function() return Details.death_recap.enabled end,
                 set = function(self, fixedparam, value)
                     Details.death_recap.enabled = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_ENABLED"],
                 desc = "Modify the Blizzard's Death Recap screen.", --localize-me
@@ -6639,7 +4870,7 @@ do --raid tools
                 get = function() return Details.death_recap.relevance_time end,
                 set = function(self, fixedparam, value)
                     Details.death_recap.relevance_time = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 1,
                 max = 12,
@@ -6653,7 +4884,7 @@ do --raid tools
                 get = function() return Details.death_recap.show_life_percent end,
                 set = function(self, fixedparam, value)
                     Details.death_recap.show_life_percent = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Life Percent", --localize-me
                 desc = "Show the percent of life the player had when received the hit.", --localize-me
@@ -6664,7 +4895,7 @@ do --raid tools
                 get = function() return Details.death_recap.show_segments end,
                 set = function(self, fixedparam, value)
                     Details.death_recap.show_segments = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Segment List", --localize-me
                 desc = "Show a list of the latest segments in case you want to see recaps from previous fights.", --localize-me
@@ -6678,7 +4909,7 @@ do --raid tools
                 get = function() return Details.announce_firsthit.enabled end,
                 set = function(self, fixedparam, value)
                     Details.announce_firsthit.enabled = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_RT_FIRST_HIT"],
                 desc = Loc ["STRING_OPTIONS_RT_FIRST_HIT_DESC"],
@@ -6689,7 +4920,7 @@ do --raid tools
                 get = function() return Details.on_death_menu end,
                 set = function(self, fixedparam, value)
                     Details.on_death_menu = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Show Death Menu", --localize-me
                 desc = "Show a panel below the Release / Death Recap panel with some shortcuts for Raid Leaders.", --localize-me
@@ -6707,7 +4938,8 @@ end
 
 -- ~15 ~broadcaster
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         local button_width = 160
 
@@ -6746,7 +4978,7 @@ do
                     local openOptions = function()
                         StreamerPlugin.OpenOptionsPanel(true)
                         C_Timer.After(0.2, function()
-                            _G.DetailsOptionsWindow:Hide()
+                            hideOptionsWindow()
                         end)
                     end
 
@@ -6817,7 +5049,7 @@ do
             local enableEventTracker = function()
                 Details.event_tracker.enabled = not Details.event_tracker.enabled
                 Details:LoadFramesForBroadcastTools()
-                afterUpdate()
+                afterUpdate(getInstance())
 
                 if (Details.event_tracker.enabled) then
                     sectionFrame.enableEventTrackerButtton:SetText("Disable")
@@ -6829,7 +5061,7 @@ do
             local openEventTrackerOptions = function()
                 Details:OpenEventTrackerOptions(true)
                 C_Timer.After(0.2, function()
-                    _G.DetailsOptionsWindow:Hide()
+                    hideOptionsWindow()
                 end)
             end
 
@@ -6859,7 +5091,7 @@ do
             local enableArenaDPS = function()
                 Details.realtime_dps_meter.enabled = not Details.realtime_dps_meter.enabled
                 Details:LoadFramesForBroadcastTools()
-                afterUpdate()
+                afterUpdate(getInstance())
 
                 if (Details.realtime_dps_meter.enabled) then
                     sectionFrame.enableArenaDPSTrackerButtton:SetText("Disable")
@@ -6871,7 +5103,7 @@ do
             local openArenaDPSOptions = function()
                 Details:OpenCurrentRealDPSOptions(true)
                 C_Timer.After(0.2, function()
-                    _G.DetailsOptionsWindow:Hide()
+                    hideOptionsWindow()
                 end)
             end
 
@@ -6912,7 +5144,7 @@ do
                 get = function() return Details.streamer_config.no_alerts end,
                 set = function(self, fixedparam, value)
                     Details.streamer_config.no_alerts = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Suppress Alerts", --localize-me
                 desc = "Suppress Alerts",
@@ -6924,7 +5156,7 @@ do
                 set = function(self, fixedparam, value)
                     Details.streamer_config.faster_updates = value
                     Details:RefreshUpdater()
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "60 Updates per Second", --localize-me
                 desc = "60 Updates per Second",
@@ -6935,7 +5167,7 @@ do
                 get = function() return Details.streamer_config.quick_detection end,
                 set = function(self, fixedparam, value)
                     Details.streamer_config.quick_detection = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Quick Player Info Detection", --localize-me
                 desc = "Quick Player Info Detection",
@@ -6946,7 +5178,7 @@ do
                 get = function() return Details.streamer_config.disable_mythic_dungeon end,
                 set = function(self, fixedparam, value)
                     Details.streamer_config.disable_mythic_dungeon = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Disable Mythic+ Stuff", --localize-me
                 desc = "Disable Mythic+ Stuff",
@@ -6957,7 +5189,7 @@ do
                 get = function() return Details.mythic_plus.show_damage_graphic end,
                 set = function(self, fixedparam, value)
                     Details.mythic_plus.show_damage_graphic = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Disable Mythic+ Chart", --localize-me
                 desc = "Disable Mythic+ Chart",
@@ -6968,7 +5200,7 @@ do
                 get = function() return Details.mythic_plus.show_damage_graphic end,
                 set = function(self, fixedparam, value)
                     Details.mythic_plus.show_damage_graphic = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Clear Cache Regularly", --localize-me
                 desc = "Clear Cache Regularly",
@@ -6979,7 +5211,7 @@ do
                 get = function() return Details.streamer_config.no_helptips end,
                 set = function(self, fixedparam, value)
                     Details.streamer_config.no_helptips = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = "Hide Yellow Helptips", --localize-me
                 desc = "Those yellow boxes with an arrow and a text showing a text with tips.",
@@ -7001,7 +5233,8 @@ end
 
 -- ~16 ~customspells ~spells
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
 		local name_entry_func = function(index, text)
 			Details:UserCustomSpellUpdate (index, text)
@@ -7164,7 +5397,8 @@ end
 
 -- ~17 ~charts data
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
 	--title
     local titulo_datacharts = DF:NewLabel(sectionFrame, _, "$parentTituloDataChartsText", "DataChartsLabel", Loc ["STRING_OPTIONS_DATACHARTTITLE"], "GameFontNormal", 16)
@@ -7584,7 +5818,8 @@ end
 
 -- ~18 - mythic dungeon section
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         local sectionOptions = {
             {type = "label", get = function() return Loc["STRING_OPTIONS_MPLUS_DPS_ANCHOR"] end, text_template = subSectionTitleTextTemplate},
@@ -7654,7 +5889,7 @@ do
                 get = function() return Details.mythic_plus.autoclose_time end,
                 set = function(self, fixedparam, value)
                     Details.mythic_plus.autoclose_time = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 20,
                 max = 300,
@@ -7675,7 +5910,8 @@ end
 -- ~19 - search results
 do
     --[=
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
         --local sectionOptions = {}
         --DF:BuildMenu(sectionFrame, sectionOptions, startX, startY-20, heightSize, false, options_text_template, options_dropdown_template, options_switch_template, true, options_slider_template, options_button_template)
     end
@@ -7686,7 +5922,8 @@ end
 
 -- ~20 combat log settings
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
         --deathlog limit
         local onSelectDeathLogLimit = function(_, _, limitAmount)
             Details:SetDeathLogLimit(limitAmount)
@@ -7707,7 +5944,7 @@ do
                 get = function() return Details.auto_combatlog end,
                 set = function(self, fixedparam, value)
                     Details.auto_combatlog = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_AUTO_COMBATLOG"],
                 desc = Loc ["STRING_OPTIONS_AUTO_COMBATLOG_DESC"],
@@ -7750,7 +5987,7 @@ do
                 get = function() return Details.only_pvp_frags end,
                 set = function(self, fixedparam, value)
                     Details.only_pvp_frags = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_PVPFRAGS"],
                 desc = Loc ["STRING_OPTIONS_PVPFRAGS_DESC"],
@@ -7772,7 +6009,7 @@ do
                 get = function() return Details.deathlog_healingdone_min end,
                 set = function(self, fixedparam, value)
                     Details.deathlog_healingdone_min = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 min = 0,
                 max = 100000,
@@ -7788,7 +6025,7 @@ do
                 get = function() return Details.damage_taken_everything end,
                 set = function(self, fixedparam, value)
                     Details.damage_taken_everything = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                 end,
                 name = Loc ["STRING_OPTIONS_DTAKEN_EVERYTHING"],
                 desc = Loc ["STRING_OPTIONS_DTAKEN_EVERYTHING_DESC"],
@@ -7800,7 +6037,7 @@ do
                 get = function() return Details.combat_log.merge_gemstones_1007 end,
                 set = function(self, fixedparam, value)
                     Details.combat_log.merge_gemstones_1007 = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                 end,
                 name = "Merge Ring Gems 11.0.7",
@@ -7816,7 +6053,7 @@ do
                 get = function() return Details.combat_log.track_hunter_frenzy end,
                 set = function(self, fixedparam, value)
                     Details.combat_log.track_hunter_frenzy = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                 end,
                 name = DF:AddClassIconToText("Hunter Track Pet Frenzy", false, "HUNTER"),
@@ -7829,9 +6066,9 @@ do
                 get = function() return Details.combat_log.calc_evoker_damage end,
                 set = function(self, fixedparam, value)
                     Details.combat_log.calc_evoker_damage = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
-                    currentInstance:InstanceReset()
+                    getInstance():InstanceReset()
                 end,
                 name = DF:AddClassIconToText("Show Augmentation Extra Bar", false, "EVOKER"),
                 desc = "Calculate how much the Augmentation Evoker are buffing other players",
@@ -7843,7 +6080,7 @@ do
                 get = function() return Details.combat_log.evoker_show_realtimedps end,
                 set = function(self, fixedparam, value)
                     Details.combat_log.evoker_show_realtimedps = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                 end,
                 name = DF:AddClassIconToText("Use Real Time Dps for Aug. Evoker", false, "EVOKER"),
@@ -7859,7 +6096,7 @@ do
                 get = function() return Details.parser_options.shield_overheal end,
                 set = function(self, fixedparam, value)
                     Details.parser_options.shield_overheal = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                     Details:UpdateParserGears()
                 end,
@@ -7873,7 +6110,7 @@ do
                 get = function() return Details.parser_options.energy_overflow end,
                 set = function(self, fixedparam, value)
                     Details.parser_options.energy_overflow = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                     Details:UpdateParserGears()
                 end,
@@ -7887,7 +6124,7 @@ do
                 get = function() return Details.combat_log.merge_critical_heals end,
                 set = function(self, fixedparam, value)
                     Details.combat_log.merge_critical_heals = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                 end,
                 name = "Merge Critical Heals",
@@ -7900,7 +6137,7 @@ do
                 get = function() return Details.parser_options.tank_avoidance end,
                 set = function(self, fixedparam, value)
                     Details.parser_options.tank_avoidance = value
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                     Details:UpdateParserGears()
                 end,
@@ -7919,7 +6156,7 @@ do
                     else
                         Details:CaptureDisable("energy")
                     end
-                    afterUpdate()
+                    afterUpdate(getInstance())
                     Details:ClearParserCache()
                     Details:UpdateParserGears()
                 end,
@@ -7942,7 +6179,8 @@ end
 
 --[=[
 do
-    local buildSection = function(sectionFrame)
+    local buildSection = function(sectionFrame, getInstance)
+        getInstance = getInstance or defaultGetInstance
 
         local sectionOptions = {
 
@@ -7954,3 +6192,131 @@ do
     tinsert(Details.optionsSection, buildSection)
 end
 --]=]
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--~catalog ~options ~external
+--the options catalog hands the option definitions built above to another addon, bound to an instance the
+--caller chooses instead of the instance details' own options window is currently editing.
+--
+--the definitions are produced by running the very same section builder details! runs, so there is a single
+--source of truth; the builder is given a hidden frame to attach its loose widgets to, and the definitions it
+--assigns to that frame are copied before being handed out, because DetailsFramework:BuildMenu writes the
+--widget it creates back into the option table and two panels cannot share one definition table.
+
+--sections which build widgets outside of the sectionOptions array; the catalog for these is partial and the
+--listed widgets have to be built by the consumer itself
+local partialSections = {
+    [4] = "the separator and bracket dropdowns, the column offset sliders and the right text option are loose widgets",
+    [7] = "the three micro display dropdowns are loose widgets",
+    [9] = "the profile list and its buttons are loose widgets",
+    [12] = "the wallpaper preview and the texture list are loose widgets",
+    [13] = "the fifteen line auto hide grid is a loose widget set",
+    [14] = "the raid tools panels are loose widgets",
+    [15] = "the plugin enable and options buttons are loose widgets",
+    [16] = "the custom spell list is a loose widget set",
+    [17] = "the chart import and export editors are loose widgets",
+}
+
+--sections which have no option definitions at all and must never be built into a catalog frame
+local catalogExcludedSections = {
+    --the designer builds a live preview window and an object editor, there is nothing in it to hand out
+    [Details222.OptionsPanel.DESIGNER_SECTION_ID] = true,
+}
+
+--holds the hidden frames the section builders attach their loose widgets to
+local catalogParent = CreateFrame("frame", "DetailsOptionsCatalogParent", UIParent)
+catalogParent:Hide()
+
+local catalogFrameCount = 0
+
+--creates the hidden frame a section is built into when only its option definitions are wanted
+local createCatalogFrame = function(sectionId)
+    catalogFrameCount = catalogFrameCount + 1
+    local frameName = "DetailsOptionsCatalogSection" .. sectionId .. "Build" .. catalogFrameCount
+    local catalogFrame = CreateFrame("frame", frameName, catalogParent, "BackdropTemplate")
+    catalogFrame:SetSize(997, 592)
+    catalogFrame:SetPoint("topleft", catalogParent, "topleft", 0, 0)
+    catalogFrame:EnableMouse(false)
+    catalogFrame.isOptionsCatalogFrame = true
+    catalogFrame.sectionId = sectionId
+    return catalogFrame
+end
+
+--copies one option definition so the consumer can hand it to its own BuildMenu without taking over the
+--widget already attached to the definition details! built for itself
+local copyOptionTable = function(optionTable)
+    local newOptionTable = {}
+    for key, value in pairs(optionTable) do
+        newOptionTable[key] = value
+    end
+    --BuildMenu stores the widget it created in this key, the copy must start without one
+    newOptionTable.widget = nil
+    return newOptionTable
+end
+
+---tells whether a section builds widgets which are not part of its option definitions
+---@param sectionId number
+---@return boolean isPartial
+---@return string|nil reason
+function Details222.OptionsCatalog.IsSectionPartial(sectionId)
+    local reason = partialSections[sectionId]
+    return reason ~= nil, reason
+end
+
+---returns the option definitions of a section, bound to the instance returned by getInstance
+---the returned table is a fresh copy and is safe to pass to DetailsFramework:BuildMenu
+---@param sectionId number
+---@param getInstance fun():instance
+---@return table|nil sectionOptions
+---@return table|nil catalogFrame the hidden frame the section was built into
+function Details222.OptionsCatalog.GetSectionOptions(sectionId, getInstance)
+    if (catalogExcludedSections[sectionId]) then
+        return nil, nil
+    end
+
+    local buildSectionFunc = Details.optionsSection[sectionId]
+    if (not buildSectionFunc) then
+        return nil, nil
+    end
+
+    local catalogFrame = createCatalogFrame(sectionId)
+    buildSectionFunc(catalogFrame, getInstance)
+
+    local sectionOptions = catalogFrame.sectionOptions
+    if (type(sectionOptions) ~= "table") then
+        return nil, catalogFrame
+    end
+
+    local optionsCopy = {}
+    for index, optionTable in ipairs(sectionOptions) do
+        optionsCopy[index] = copyOptionTable(optionTable)
+    end
+
+    --the array itself carries settings BuildMenu reads, e.g. always_boxfirst, they travel with the copy
+    for key, value in pairs(sectionOptions) do
+        if (type(key) ~= "number") then
+            optionsCopy[key] = value
+        end
+    end
+
+    return optionsCopy, catalogFrame
+end
+
+---returns the option definitions of every section which has them, keyed by section id
+---@param getInstance fun():instance
+---@return table allSections
+function Details222.OptionsCatalog.GetAllSections(getInstance)
+    local allSections = {}
+    for sectionId in pairs(Details222.OptionsCatalog.GetSectionNames()) do
+        local sectionOptions = Details222.OptionsCatalog.GetSectionOptions(sectionId, getInstance)
+        if (sectionOptions) then
+            allSections[sectionId] = sectionOptions
+        end
+    end
+    return allSections
+end
+
+--Details222 is the addon private namespace, another addon cannot reach it; the catalog is the surface
+--built for external consumers, so it is published on the public Details table, which is _G.Details
+Details.OptionsCatalog = Details222.OptionsCatalog

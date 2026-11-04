@@ -35,6 +35,12 @@ local context = addon:GetModule("Context")
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
+-- Alpha floor for the additive quality halo the instant it turns on, just above
+-- the halo threshold. The halo ramps from this value at (threshold + 1) up to a
+-- blinding 1.0 at intensity 100, so it is already clearly visible the moment it
+-- kicks in rather than fading up from invisible. See DrawQualityGlow.
+local HALO_MIN_ALPHA = 0.4
+
 ---@class ItemStack
 ---@field button Item
 ---@field data? ItemData
@@ -90,6 +96,30 @@ local function bagKindFromBagID(bagid)
 		return const.BAG_KIND.BANK
 	end
 	return const.BAG_KIND.BACKPACK
+end
+
+-- Size of the small family-bag glyph drawn in the center of a specialized empty slot. The
+-- source atlas is large (e.g. Mobile-Herbalism is 128x128); this sizes it well under the
+-- 37x37 slot so it reads as an icon and not a slot background.
+local FAMILY_ICON_SIZE = 24
+-- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
+local FAMILY_ICON_ALPHA = 0.4
+
+-- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
+-- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
+-- and is stored on the decoration itself so it survives across draws and theme swaps.
+---@param decoration ItemButton
+---@return Texture
+local function getFamilyIconTexture(decoration)
+	if not decoration.BetterBagsFamilyIcon then
+		local tex = decoration:CreateTexture(nil, "OVERLAY")
+		tex:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
+		tex:SetPoint("CENTER", decoration, "CENTER", 0, 0)
+		tex:SetAlpha(FAMILY_ICON_ALPHA)
+		tex:Hide()
+		decoration.BetterBagsFamilyIcon = tex
+	end
+	return decoration.BetterBagsFamilyIcon
 end
 
 ---@param ctx Context
@@ -280,6 +310,9 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	local tooltipOwner = GameTooltip:GetOwner()
 	self.kind = bagKindFromBagID(data.bagid)
 
+	-- Any real (or empty) item drawn into the slot clears the specialized-bag glyph.
+	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
+
 	-- TODO(lobato): Figure out what to do with empty items.
 	if data.isItemEmpty then
 		return
@@ -308,18 +341,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
 	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(data.itemInfo.itemIcon) else SetItemButtonTexture(decoration, data.itemInfo.itemIcon) end
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
-	if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > const.ITEM_QUALITY.Common then
-		decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
-		decoration.IconBorder:SetBlendMode("ADD")
-		decoration.IconBorder:SetTexCoord(14 / 64, 49 / 64, 15 / 64, 50 / 64)
-	else
-		decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
-		decoration.IconBorder:SetBlendMode("BLEND")
-		decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
-	end
-	if not addon.isRetail then
-		self:DrawClassicQualityBorder(decoration, data.itemInfo.itemQuality)
-	end
+	self:DrawQualityGlow(decoration, data.itemInfo.itemQuality)
 	self:UpdateCount(ctx, data)
 	--self:SetLock(data.itemInfo.isLocked)
 	if addon.isRetail then
@@ -357,6 +379,20 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	decoration:SetFrameLevel(math.max(0, self.button:GetFrameLevel() - 1))
 	self:UpdateUpgrade(ctx, data)
+
+	-- Classic quality glow fix: the interaction button's own NormalTexture
+	-- (Interface\Buttons\UI-Quickslot2, a 64x64 beveled frame) is re-shown by
+	-- Blizzard's drag/update logic and, because the decoration sits one frame
+	-- level BELOW self.button, that frame drew OVER the decoration's quality glow
+	-- and hid it. A plain Hide() loses to the re-show, so clear the texture value
+	-- itself -- nothing renders even when it is re-shown, and the additive glow
+	-- from DrawQualityGlow (above) becomes visible, matching retail behavior
+	-- (same halo, same "Extra Glowy" intensity control). Retail has no such
+	-- re-show, so leave it untouched.
+	if not addon.isRetail and self.button.GetNormalTexture and self.button:GetNormalTexture() then
+		self.button:GetNormalTexture():SetTexture(nil)
+	end
+
 	self.frame:Show()
 	self.button:Show()
 end
@@ -472,8 +508,59 @@ end
 -- non-retail clients have to draw the rarity border themselves.
 ---@param decoration ItemButton
 ---@param quality number?
+-- DrawQualityGlow draws the item quality indicator on the decoration's IconBorder,
+-- scaled by the per-kind "Quality Glow" intensity slider (0-100). Poor/Common items
+-- never get a border (matching Blizzard's SetItemButtonQuality, which returns no
+-- color for them) and neither does intensity 0. The slider then has two phases,
+-- both colored by the item's quality:
+--   * intensity 1..threshold (60): a flat colored border (WhiteIconFrame, BLEND)
+--     whose alpha fades in as intensity/threshold, reaching a solid border at the
+--     threshold. No glow yet.
+--   * intensity threshold+1..100: the additive glowing halo (UI-ActionButton-Border,
+--     ADD) that alphas in from HALO_MIN_ALPHA to a blinding 1.0 at 100.
+-- Retail and Classic share this single path.
+---@param decoration Frame
+---@param quality number
+function itemFrame.itemProto:DrawQualityGlow(decoration, quality)
+	local border = decoration.IconBorder
+	if not border then return end
+	local intensity = database:GetGlowIntensity(self.kind)
+	if not (quality and quality > const.ITEM_QUALITY.Common) or not intensity or intensity <= 0 then
+		border:Hide()
+		return
+	end
+	local qualityColor = const.ITEM_QUALITY_COLOR[quality] or const.ITEM_QUALITY_COLOR[const.ITEM_QUALITY.Common]
+	local threshold = const.GLOW_INTENSITY_HALO_THRESHOLD
+	local baseAlpha = qualityColor[4] or 1
+	if intensity <= threshold then
+		-- Flat colored quality border, fading in with intensity. No halo.
+		border:SetTexture([[Interface\Common\WhiteIconFrame]])
+		border:SetBlendMode("BLEND")
+		border:SetTexCoord(0, 1, 0, 1)
+		local alpha = intensity / threshold
+		border:SetVertexColor(qualityColor[1], qualityColor[2], qualityColor[3], baseAlpha * alpha)
+	else
+		-- Additive glowing halo ramping from a clearly-visible floor to full.
+		border:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
+		border:SetBlendMode("ADD")
+		border:SetTexCoord(14 / 64, 49 / 64, 15 / 64, 50 / 64)
+		local t = (intensity - threshold) / (const.GLOW_INTENSITY_MAX - threshold)
+		local alpha = HALO_MIN_ALPHA + (1 - HALO_MIN_ALPHA) * t
+		border:SetVertexColor(qualityColor[1], qualityColor[2], qualityColor[3], baseAlpha * alpha)
+	end
+	border:Show()
+end
+
+-- DrawClassicQualityBorder draws a thin colored quality border for free slots on
+-- Classic (special bags with a non-common bag quality). Only Uncommon+ gets a
+-- border, matching Blizzard's SetItemButtonQuality (no color for Poor/Common):
+-- drawing a white border on a plain empty slot double-borders the empty-slot
+-- texture and reads as a stray/offset frame.
+---@param decoration Frame
+---@param quality number
 function itemFrame.itemProto:DrawClassicQualityBorder(decoration, quality)
-	local qualityColor = quality and const.ITEM_QUALITY_COLOR[quality]
+	if not decoration.IconBorder then return end
+	local qualityColor = quality and quality > const.ITEM_QUALITY.Common and const.ITEM_QUALITY_COLOR[quality]
 	if qualityColor then
 		decoration.IconBorder:SetVertexColor(unpack(qualityColor))
 		decoration.IconBorder:Show()
@@ -536,7 +623,24 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
-	local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
+
+	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph atlas,
+	-- drawn centered and semi-transparent. Generic bags leave it nil, so the overlay stays hidden.
+	local familyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon
+	local familyTexture = getFamilyIconTexture(decoration)
+	if familyIcon then
+		familyTexture:SetAtlas(familyIcon)
+		familyTexture:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
+		familyTexture:Show()
+	else
+		familyTexture:Hide()
+	end
+
+	-- No `or Common` fallback: a nil quality must stay nil so SetItemButtonQuality (and, on
+	-- classic, DrawClassicQualityBorder) draw no border. Coercing to Common would paint one,
+	-- since ColorManager returns a color for Common. The aggregated free-slot "stack" button
+	-- deliberately carries no quality so it renders borderless like a plain empty slot.
+	local quality = data.itemInfo and data.itemInfo.itemQuality
 	SetItemButtonQuality(decoration, quality, nil, false, false)
 	decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
 	decoration.IconBorder:SetBlendMode("BLEND")
@@ -587,6 +691,7 @@ end
 function itemFrame.itemProto:ClearItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	events:SendMessage(ctx, "item/Clearing", self, decoration)
+	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
 	self.currentData = nil
 	self.kind = nil
 	self.frame:ClearAllPoints()

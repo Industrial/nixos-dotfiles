@@ -1881,7 +1881,7 @@ local debuff_options = {
 		name = "OPTIONS_STACK_SIMILAR_AURAS",
 		desc = "OPTIONS_STACK_SIMILAR_AURAS_DESC",
 		id = "auras_general_stack_similar_aura",
-		hidden = IS_WOW_PROJECT_MIDNIGHT,
+		hidden = IS_WOW_PROJECT_MIDNIGHT_API,
 	},
 	{
 		type = "toggle",
@@ -1894,7 +1894,7 @@ local debuff_options = {
 		name = "OPTIONS_STACK_AURATIME",
 		desc = "OPTIONS_STACK_AURATIME_DESC",
 		id = "auras_general_stack_auratime",
-		hidden = IS_WOW_PROJECT_MIDNIGHT,
+		hidden = IS_WOW_PROJECT_MIDNIGHT_API,
 	},
 	
 	{type = "blank"},
@@ -2274,7 +2274,6 @@ local debuff_options = {
 		end,
 		name = "Show offensive player CDs",
 		desc = "Show offensive CDs on enemy/friendly players.",
-		hidden = IS_WOW_PROJECT_MIDNIGHT,
 	},
 	
 	{
@@ -3889,7 +3888,6 @@ Plater.CreateAuraTesting()
 				end,
 				name = "Offensive player CDs",
 				desc = "When the unit has an offensive effect on it, show it.",
-				hidden = IS_WOW_PROJECT_MIDNIGHT,
 			},
 			--show defensive CDs
 			{

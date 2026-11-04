@@ -211,6 +211,11 @@ L.autotalk_boss_desc = "Selecciona automáticamente el diálogo del NPC que prov
 L.autotalk_generic_desc = "Selecciona automáticamente el diálogo del NPC que hace que avances a la siguiente fase del calabozo."
 L.autotalk_notice = "Interactuando automáticamente con los NPC %s."
 
+-- Auto Player Choice
+--L.autoPlayerChoice = "Automatic Player Choice"
+--L.autoPlayerChoice_delve_power_desc = "Automatically select player powerups when they are dropped by creatures in the Delve."
+--L.autoPlayerChoice_notice = "Automatically selecting: %s"
+
 -- GUI notes
 L.intermissionOnly = "Solo en Intermedio" -- A note to explain that a specific ability only happens during the intermission stage of a boss fight
 L.stage1Only = "Solo Fase 1" -- A note to explain that a specific ability only happens during stage 1 of a boss fight
@@ -306,6 +311,7 @@ L.arrows = "Flechas" -- Plural of L.arrow
 L.ball = "Pelota" -- A ball, like a football, basketball, etc
 L.balls = "Pelotas" -- Plural of L.ball
 L.blind = "Ceguera" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "Sangre" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 L.bouncing_ball = "Pelota rebotando" -- A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 L.bouncing_balls = "Pelotas rebotando" -- Plural of L.bouncing_ball
 L.chakram = "Chakram" -- Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

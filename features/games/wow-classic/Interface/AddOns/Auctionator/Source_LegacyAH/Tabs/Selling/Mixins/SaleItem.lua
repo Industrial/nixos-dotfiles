@@ -484,11 +484,6 @@ function AuctionatorSaleItemMixin:UpdateForNoItem()
   self.TotalPrice:SetText(GetMoneyString(0))
 end
 
-local groupDurationToRadioDuration = {
-  [1] = 12,
-  [2] = 24,
-  [3] = 48,
-}
 function AuctionatorSaleItemMixin:SetDuration()
   self.Duration:SetSelectedValue(
     Auctionator.Config.Get(Auctionator.Config.Options.AUCTION_DURATION)

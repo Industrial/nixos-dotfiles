@@ -2,12 +2,13 @@ local COMPAT, _, T = select(4,GetBuildInfo()), ...
 if T.SkipLocalActionBook then return end
 if T.TenEnv then T.TenEnv() end
 
-local MODERN, CI_ERA = COMPAT >= 10e4 or nil, COMPAT < 2e4 or nil
+local MODERN, CI_ERA, CI_4E = COMPAT > 12e4 or nil, COMPAT < 160e2 or nil, COMPAT > 160e2 and COMPAT < 2e4
+local SECRETS = COMPAT > 12e4 or COMPAT > 160e2 and COMPAT < 2e4 or nil
 local CF_CLASSIC = not MODERN or nil
 local CF_WRATH, CF_CATA, CF_MISTS = CF_CLASSIC and COMPAT > 3e4 or nil, CF_CLASSIC and COMPAT > 4e4 or nil, CF_CLASSIC and COMPAT > 5e4 or nil
 local MODERN_MOUNTS, MODERN_BATTLEPETS = MODERN or CF_WRATH, MODERN or CF_MISTS
 local EV = T.Evie
-local AB = T.ActionBook:compatible(2,43)
+local AB = T.ActionBook:compatible(2,53)
 local RW = T.ActionBook:compatible("Rewire", 1,27)
 local KR = T.ActionBook:compatible("Kindred", 1,14)
 local IM = T.ActionBook:compatible("Imp", 1,0)
@@ -91,7 +92,7 @@ local function toCooldown(now, start, duration, enabled)
 	return duration > 0 and enabled ~= 0 and start+duration-now or 0, duration, enabled
 end
 
-local spellPHS, actionPHS if MODERN then
+local spellPHS, actionPHS if SECRETS then
 	local phSpell = {
 		count = C_Spell.GetSpellDisplayCount,
 		cooldownInfo = GetSpellCooldown,
@@ -123,7 +124,7 @@ local function actionHint(slot)
 	local cdLeft, cdLength, cdEnabled, _cdModRate, cdActive = GetActionCooldown(slot)
 	local count, charges, maxCharges, ccdStart, ccdLength
 	local hasUsableCharge, retChargeCooldown
-	if MODERN and issecretvalue(cdLeft) then
+	if SECRETS and issecretvalue(cdLeft) then
 		hasUsableCharge = cdEnabled and not cdActive
 		cdUsable, cdLeft, cdEnabled, charges, maxCharges, ccdStart, ccdLength = hasUsableCharge, nil
 		state, cdLength = state + 524288, actionPHS + slot
@@ -193,7 +194,7 @@ securecall(function() -- mount: mount ID
 		local cname, sid, icon, active, usable2 = C_MountJournal.GetMountInfoByID(id)
 		local state, cdUsable = (active and 1 or 0), nil
 		local cdLeft, cdLength, cdEnabled, _cdModRate, cdActive = GetSpellCooldown(sid)
-		if MODERN and issecretvalue(cdLeft) then
+		if SECRETS and issecretvalue(cdLeft) then
 			if sid then
 				cdUsable, cdLeft = not cdActive
 				state, cdLength = state + 524288, spellPHS + sid
@@ -275,8 +276,8 @@ securecall(function() -- spell: spell ID + mount spell ID
 				return ...
 			end
 			function SetSpellBookItem(self, id)
-				local st, sid = GetSpellBookItemInfo(id, "spell")
-				return SetRankText(self, st == "SPELL" and sid, self:SetSpellBookItem(id, "spell"))
+				local st, sid = GetSpellBookItemInfo(id, BOOKTYPE_SPELL)
+				return SetRankText(self, st == "SPELL" and sid, self:SetSpellBookItem(id, BOOKTYPE_SPELL))
 			end
 			function SetSpellByID(self, ...)
 				return SetRankText(self, (...), self:SetSpellByID(...))
@@ -320,7 +321,7 @@ securecall(function() -- spell: spell ID + mount spell ID
 		local cdLeft, cdLength, cdEnabled, _cdMod, cdActive = GetSpellCooldown(n)
 		local count, charges, maxCharges, ccdStart, ccdLength, _ccdMod, _ccdActive
 		local hasUsableCharge, retChargeCooldown
-		if MODERN and issecretvalue(cdLeft) then
+		if SECRETS and issecretvalue(cdLeft) then
 			hasUsableCharge = cdEnabled and not cdActive
 			cdUsable, count, cdLeft, cdLength, cdEnabled = hasUsableCharge, 1
 			if msid then
@@ -336,7 +337,7 @@ securecall(function() -- spell: spell ID + mount spell ID
 				retChargeCooldown = 1
 			end
 			cdUsable = cdLeft == 0 or cdEnabled == 0
-			if MODERN and issecretvalue(count) then
+			if SECRETS and issecretvalue(count) then
 				-- 12.0.5: spell:1249752 from the SBA trips on count while lacking a cooldown
 				count, overCount = 1, C_Spell.GetSpellDisplayCount(msid)
 			end
@@ -830,7 +831,7 @@ securecall(function() -- battlepet: pet ID, species ID
 		return
 	end
 	local petAction, special = {}, {}
-	local BPET_ATYPE_NAME, SummonCompanion = not MODERN_BATTLEPETS and COMPANIONS or L"Battle Pet"
+	local BPET_ATYPE_NAME = not MODERN_BATTLEPETS and COMPANIONS or L"Battle Pet"
 	local function SetBattlePetByID(self, id)
 		local sid, cname, lvl, _, _, _, _, name, _, ptype, _, _, desc, _, cb = C_PetJournal.GetPetInfoByPetID(id)
 		if not sid then return false end
@@ -847,16 +848,6 @@ securecall(function() -- battlepet: pet ID, species ID
 	end
 	if not MODERN_BATTLEPETS then
 		SetBattlePetByID = callMethod.SetCompanionPet
-	end
-	if not MODERN then
-		function SummonCompanion(guid)
-			if C_PetJournal.IsCurrentlySummoned(guid) then
-				C_PetJournal.DismissSummonedPet(guid)
-			else
-				DoEmote("STAND")
-				C_PetJournal.SummonPetByGUID(guid)
-			end
-		end
 	end
 	local function battlepetHint(pid)
 		local sid, cn, _, _, _, _, _, n, tex = C_PetJournal.GetPetInfoByPetID(pid)
@@ -904,11 +895,7 @@ securecall(function() -- battlepet: pet ID, species ID
 		if not rpid then return end
 		local pk = rpid:upper()
 		if not petAction[pk] then
-			if MODERN then
-				petAction[pk] = AB:CreateActionSlot(battlepetHint, rpid, "macrotext", EMOTE143_CMD1 .. "\n" .. SLASH_SUMMON_BATTLE_PET1 .. " " .. rpid)
-			else -- no /summonbattlepet implementation in 4.4.0, 5.5.0
-				petAction[pk] = AB:CreateActionSlot(battlepetHint, rpid, "func", SummonCompanion, rpid)
-			end
+			petAction[pk] = AB:CreateActionSlot(battlepetHint, rpid, "macrotext", EMOTE143_CMD1 .. "\n" .. SLASH_SUMMON_BATTLE_PET1 .. " " .. rpid)
 		end
 		return petAction[pk]
 	end
@@ -982,60 +969,43 @@ securecall(function() -- equipmentset: equipment sets by name
 	end)
 end)
 securecall(function() -- raidmark
-	local map, waitingToClearSelf = {}
-	local SABT_RAIDMARK = not CI_ERA
+	local markInfo = {}
 	local function CanChangeRaidTargets(unit)
-		return not not ((not IsInRaid() or UnitIsGroupLeader("player") or UnitIsGroupAssistant("player")) and not (unit and UnitIsPlayer(unit) and UnitIsEnemy("player", unit)))
+		return not not ((not IsInRaid() or UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") or IsEveryoneAssistant()) and (not unit or CanBeRaidTarget(unit)))
 	end
-	local function setRaidTarget(id)
-		SetRaidTarget("target", GetRaidTargetIndex("target") == id and 0 or id)
+	local function hintRaidMark(i, _, target)
+		local target, mi, isMark = target or "target", markInfo[i], i ~= 0
+		local state = SECRETS and 0 or isMark and GetRaidTargetIndex(target) == i and 1 or 0
+		return CanChangeRaidTargets(isMark and target), state, mi[2], mi[3], 0, 0, 0
 	end
-	local function raidmarkHint(i, _, target)
-		local target = target or "target"
-		local state = MODERN and 0 or GetRaidTargetIndex(target) == i and 1 or 0
-		return CanChangeRaidTargets(target), state, "Interface/TargetingFrame/UI-RaidTargetingIcon_" .. i, _G["RAID_TARGET_" .. i], 0, 0, 0
-	end
-	local function removeHint()
-		return CanChangeRaidTargets(), 0, "Interface/Icons/INV_Gauntlets_02", REMOVE_WORLD_MARKERS, 0, 0, 0
-	end
-	local function FinishClearRaidTargets()
-		if waitingToClearSelf and GetRaidTargetIndex("player") == 1 then
-			waitingToClearSelf = nil
-			if CanChangeRaidTargets() then
-				SetRaidTarget("player", 0)
-			end
-			return "remove"
-		end
-	end
-	map[0] = SABT_RAIDMARK and AB:CreateActionSlot(removeHint, nil, "attribute", "type","raidtarget", "action","clear-all")
-	                        or AB:CreateActionSlot(removeHint, nil, "func", function()
-		if not CanChangeRaidTargets() then return end
-		local pt = GetRaidTargetIndex("player")
-		for i=8, 0, -1 do
-			SetRaidTarget("player", i == pt and 1 or i == 1 and pt or i)
-		end
-		if not (pt or waitingToClearSelf) and IsInGroup() then
-			waitingToClearSelf, EV.RAID_TARGET_UPDATE = 1, FinishClearRaidTargets
-		end
-	end) or nil
+	markInfo[0] = {AB:CreateActionSlot(hintRaidMark, 0, "attribute", "type","raidtarget", "action","clear-all"),
+	               "Interface/Icons/INV_Gauntlets_02", REMOVE_WORLD_MARKERS}
 	for i=1,8 do
-		map[i] = SABT_RAIDMARK and AB:CreateActionSlot(raidmarkHint, i, "attribute", "type","raidtarget", "marker",i)
-		                        or AB:CreateActionSlot(raidmarkHint, i, "func", setRaidTarget, i)
+		markInfo[i] = {AB:CreateActionSlot(hintRaidMark, i, "attribute", "type","raidtarget", "marker",i),
+		               "Interface/TargetingFrame/UI-RaidTargetingIcon_" .. i, _G["RAID_TARGET_" .. i]}
 	end
 	local function createRaidMark(id)
-		return map[id]
+		local mi = markInfo[id]
+		return mi and mi[1]
 	end
 	local function describeRaidMark(id)
-		if id == 0 then return L"Raid Marker", REMOVE_WORLD_MARKERS, "Interface/Icons/INV_Gauntlets_02" end
-		return L"Raid Marker", _G["RAID_TARGET_" .. id], "Interface/TargetingFrame/UI-RaidTargetingIcon_" .. id
+		local mi = markInfo[id]
+		if mi then
+			return L"Raid Marker", mi[3], mi[2]
+		end
+	end
+	local tmcMark = {}
+	local function parseRaidMark(clause)
+		local d = string.match('^[!~].-(%d+)')
+		local r = d and d+0 or false
+		tmcMark[clause] = r
+		return r
 	end
 	AB:RegisterActionType("raidmark", createRaidMark, describeRaidMark, 1)
 	RW:ImportSlashCmd("TARGET_MARKER", true, false, 40, function(_, _, clause, target)
-		clause = tonumber(clause)
-		if clause == 0 then
-			return true, removeHint()
-		elseif clause then
-			return true, raidmarkHint(clause, nil, target)
+		clause = tmcMark[clause] or clause and parseRaidMark(clause)
+		if clause then
+			return true, hintRaidMark(clause, nil, target)
 		end
 	end)
 end)
@@ -1043,6 +1013,7 @@ securecall(function() -- worldmarker
 	if not (MODERN or CF_CATA) then
 		return
 	end
+	local wmPHS = SECRETS and AB:ReservePartialHintSuffix({active=IsRaidMarkerActive})
 	local NUM_WORLD_MARKERS = CF_CATA and NUM_WORLD_RAID_MARKERS_CATA == 5 and 5 or 8
 	local map, icons = {}, {[0]="Interface/Icons/INV_Misc_PunchCards_White",
 		"Interface/Icons/INV_Misc_QirajiCrystal_04","Interface/Icons/INV_Misc_QirajiCrystal_03",
@@ -1060,26 +1031,33 @@ securecall(function() -- worldmarker
 			tip:AddLine(ERR_NOT_LEADER, 0.95, 0.15, 0, 1)
 		end
 	end
-	local function worldmarkHint(i)
+	local function hintWorldMark(i)
+		local isMark = i > 0
 		local canMark = not not (IsInGroup() and (not IsInRaid() or UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") or IsEveryoneAssistant()))
-		return canMark, i > 0 and IsRaidMarkerActive(i) and 1 or 0, icons[i], i == 0 and REMOVE_WORLD_MARKERS or _G["WORLD_MARKER" .. i], 0, 0, 0, Tooltip_SetWorldMark, i
+		local active, ext, state = isMark and IsRaidMarkerActive(i)
+		if SECRETS and issecretvalue(active) then
+			active, ext, state = false, wmPHS + i, 67108864
+		else
+			state = active and 1 or 0
+		end
+		return canMark, state, icons[i], i == 0 and REMOVE_WORLD_MARKERS or _G["WORLD_MARKER" .. i], 0, 0, 0, Tooltip_SetWorldMark, i, ext
 	end
 	for i=1, NUM_WORLD_MARKERS do
-		map[i] = AB:CreateActionSlot(worldmarkHint, i, "attribute", "type","worldmarker", "action","toggle", "marker",i)
+		map[i] = AB:CreateActionSlot(hintWorldMark, i, "attribute", "type","worldmarker", "action","toggle", "marker",i)
 	end
-	map[0] = AB:CreateActionSlot(worldmarkHint, 0, "macrotext", SLASH_CLEAR_WORLD_MARKER1 .. " " .. ALL)
-	local function createWorldmark(id)
+	map[0] = AB:CreateActionSlot(hintWorldMark, 0, "macrotext", SLASH_CLEAR_WORLD_MARKER1 .. " " .. ALL)
+	local function createWorldMark(id)
 		return map[id]
 	end
-	local function describeWorldmark(id)
+	local function describeWorldMark(id)
 		if map[id] == nil then return L"Raid World Marker", "?" end
 		return L"Raid World Marker", id == 0 and REMOVE_WORLD_MARKERS or _G["WORLD_MARKER" .. id], icons[id]
 	end
-	AB:RegisterActionType("worldmark", createWorldmark, describeWorldmark, 1)
+	AB:RegisterActionType("worldmark", createWorldMark, describeWorldMark, 1)
 	RW:SetCommandHint(SLASH_WORLD_MARKER1, 40, function(_, _, clause)
 		clause = tonumber(clause)
 		if map[clause] and clause > 0 then
-			return true, worldmarkHint(clause)
+			return true, hintWorldMark(clause)
 		end
 	end)
 end)
@@ -1325,7 +1303,7 @@ securecall(function() -- toy: item ID, flags[FORCE_SHOW]
 		state = state + (inRange and 0 or 16) + (hasRange and 512 or 0) + (cdEnabled == 0 and 2048 or 0)
 		if sid then
 			local charges, maxCharges, ccdStart, ccdLength, _ccdMod, _ccdActive = GetSpellCharges(sid)
-			if MODERN and issecretvalue(charges) then
+			if SECRETS and issecretvalue(charges) then
 				charges, maxCharges, ccdStart, ccdLength = nil
 				--FIXME: BUG[12.0.0/2601]: this breaks Humans' hearthstone bonus charge recharge visualization while in combat
 			end
@@ -1444,7 +1422,7 @@ securecall(function() -- disenchant: iid
 		qual = qual and qual > 0 and qual < 8 and (qual * 16384) or 0
 		local state, cdUsable = 0, nil
 		local cdLeft, cdLength, cdEnabled, _cdMod, cdActive = GetSpellCooldown(DISENCHANT_SID)
-		if MODERN and issecretvalue(cdLeft) then
+		if SECRETS and issecretvalue(cdLeft) then
 			cdUsable, cdLeft, cdEnabled = not cdActive
 			state, cdLength = state + 524288, DISENCHANT_SID + spellPHS
 		else
@@ -1480,31 +1458,63 @@ securecall(function() -- /ping
 		return
 	end
 	local TOKENS, INFO = {}, {
-		{PING, "Ping_Marker_Icon_NonThreat"},
-		{PING, "Ping_Marker_Icon_Threat"},
-		assist={PING_TYPE_ASSIST, "Ping_Wheel_Icon_Assist"},
-		attack={PING_TYPE_ATTACK, "Ping_Wheel_Icon_Attack"},
-		onmyway={PING_TYPE_ON_MY_WAY, "Ping_Marker_Icon_OnMyWay"},
-		warning={PING_TYPE_WARNING, "Ping_Wheel_Icon_Warning"},
+		nothreat={PING_TYPE_NOT_THREAT, "Ping_Marker_Icon_NonThreat", alt="5"},
+		threat={PING_TYPE_THREAT, "Ping_Marker_Icon_Threat", alt="6"},
+		assist={PING_TYPE_ASSIST, "Ping_Wheel_Icon_Assist", alt="4"},
+		attack={PING_TYPE_ATTACK, "Ping_Wheel_Icon_Attack", alt="1"},
+		onmyway={PING_TYPE_ON_MY_WAY, "Ping_Marker_Icon_OnMyWay", alt="3"},
+		warning={PING_TYPE_WARNING, "Ping_Wheel_Icon_Warning", alt="2"},
 	}
 	for k,v in pairs(INFO) do
-		if type(k) == "string" then
-			TOKENS[v[1]:lower()] = k
-		end
+		TOKENS[v[1]:lower()] = k
+		TOKENS[v.alt] = k
 	end
 	RW:SetCommandHint(SLASH_PING1, 40, function(_, _, clause, target)
 		if clause then
 			clause = lowered[clause]
 			local ci = INFO[TOKENS[clause] or clause]
 			if not ci then
+				local c2 = clause:gsub("%s+", "")
+				c2 = TOKENS[c2] or c2
+				ci = INFO[c2]
+				if ci then
+					TOKENS[clause] = c2
+				end
+			end
+			if not ci then
 				local unit = target ~= "cursor" and target or "mouseover"
-				local pingType = (UnitCanAttack("player", unit) and UnitIsEnemy("player", unit) and 4 or 5)
-				ci = INFO[pingType == 4 and 2 or 1]
+				local pingType = (UnitCanAttack("player", unit) and UnitIsEnemy("player", unit) and "threat" or "nothreat")
+				ci = INFO[pingType]
 			end
 			local perm = (not IsInRaid() or UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") or not C_PartyInfo.GetRestrictPings())
 			local cdInfo, nowMs = C_Ping.GetCooldownInfo(), GetTime()*1000
 			local cd = cdInfo.endTimeMs > nowMs and (cdInfo.endTimeMs-nowMs)/1000 or 0
 			return true, perm and cd == 0 or false, 262144, ci[2], ci[1], 0, cd, cd > 0 and (cdInfo.endTimeMs-cdInfo.startTimeMs)/1000 or 0
+		end
+	end)
+end)
+securecall(function() -- /pingspell, /pingitem
+	if not (MODERN or CI_4E) then
+		return
+	end
+	local function adjustSpellItemPingHint(usable, state, ...)
+		if usable ~= nil and state then
+			local perm = (not IsInRaid() or UnitIsGroupLeader("player") or UnitIsGroupAssistant("player") or not C_PartyInfo.GetRestrictPings())
+			local cdInfo, nowMs = C_Ping.GetCooldownInfo(), GetTime()*1000
+			local cd = cdInfo.endTimeMs > nowMs and (cdInfo.endTimeMs-nowMs)/1000 or 0
+			return true, perm and cd == 0 or false, state + 4194304 + 8388608, ...
+		end
+	end
+	RW:SetCommandHint(SLASH_PING_SPELL1, 40, function(_, _, clause, _target)
+		local sn = clause and C_Spell.GetSpellName(clause)
+		if sn then
+			return adjustSpellItemPingHint(spellFeedback(sn, nil, nil))
+		end
+	end)
+	RW:SetCommandHint(SLASH_PING_ITEM1, 40, function(_, _, clause, _target)
+		local iid = clause and C_Item.GetItemIDForItemInfo(clause)
+		if iid then
+			return adjustSpellItemPingHint(itemHint(iid))
 		end
 	end)
 end)
@@ -1623,7 +1633,7 @@ securecall(function() -- uipanel: token
 		return not InCombatLockdown() and ShowUIPanel(panel)
 	end
 	local panelMap, panels = {}, {
-		character={CHARACTER, icon="Interface/PVPFrame/Icons/prestige-icon-7-3", gw=PaperDollFrame, tw=CharacterFrameTab1},
+		character={CHARACTER, icon="Interface/PVPFrame/Icons/prestige-icon-7-3", gw=PaperDollFrame, tw=CI_4E and CharacterMicroButton or CharacterFrameTab1},
 		reputation={REPUTATION, icon="Interface/Icons/Achievement_Reputation_01", gw=ReputationFrame, tw=MODERN and CharacterFrameTab2 or CharacterFrameTab3},
 		currency={CURRENCY, icon="Interface/Icons/INV_Misc_Coin_17", gw=TokenFrame, tw=MODERN and CharacterFrameTab3 or CF_WRATH and CharacterFrameTab5},
 		spellbook={SPELLBOOK, icon="Interface/Icons/INV_Misc_Book_09", gw=CF_CLASSIC and SpellBookFrame, tmt="/click SpellbookMicroButton\n/click SpellBookFrameCloseButton", cw=SpellBookFrameCloseButton},

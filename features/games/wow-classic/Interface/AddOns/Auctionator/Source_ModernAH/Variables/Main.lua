@@ -1,7 +1,23 @@
--- All "realms" that are connected together use the same AH database, this
--- determines which database is in use.
--- Call this AFTER event PLAYER_LOGIN fires.
+local function GetRegionalRulesetName()
+  if C_GameRules.IsGameRuleActive(Enum.GameRule.PvPRuleset) then
+    return "PvP"
+  elseif C_GameRules.IsGameRuleActive(Enum.GameRule.RPRuleset) then
+    return "RP"
+  elseif C_GameRules.IsGameRuleActive(Enum.GameRule.HardcoreRuleset) then
+    return "HC"
+  else
+    return "PvE"
+  end
+end
 function Auctionator.Variables.GetConnectedRealmRoot()
+  -- Special case for regionally unique names, AHs are grouped by ruleset
+  if RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() then
+    return GetRegionalRulesetName()
+  end
+
+  -- All "realms" that are connected together use the same AH database, this
+  -- determines which database is in use.
+
   -- We use GetRealmName() because GetNormalizedRealmName() isn't available on
   -- first load.
   local currentRealm = GetNormalizedRealmName()

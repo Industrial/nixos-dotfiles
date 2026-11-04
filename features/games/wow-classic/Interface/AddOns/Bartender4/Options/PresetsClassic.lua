@@ -10,12 +10,9 @@ local _, Bartender4 = ...
 local L = LibStub("AceLocale-3.0"):GetLocale("Bartender4")
 local Bar = Bartender4.Bar.prototype
 
-local WoW10 = select(4, GetBuildInfo()) >= 100000
-if WoW10 then return end
-
-local WoWBCC = (WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC)
-local WoWCata = (WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC)
-local WoWMists = (WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC)
+local WoWBCC = Bartender4.GameType.ClassicBCC
+local WoWCata = Bartender4.GameType.ClassicCata
+local WoWMists = Bartender4.GameType.ClassicMists
 
 local PresetsMod = Bartender4:NewModule("Presets")
 
@@ -240,7 +237,7 @@ local function BuildBlizzardProfile()
 		SetBarLocation( config, "BOTTOM", 346, 38)
 	elseif WoWBCC then
 		config.padding = 5
-		SetBarLocation( config, "BOTTOM", 295, 42)
+		SetBarLocation( config, "BOTTOM", 272, 42)
 	elseif GetClassicExpansionLevel() >= 2 --[[Wrath]] then
 		config.padding = 4
 		SetBarLocation( config, "BOTTOM", 304, 42)
@@ -251,7 +248,7 @@ local function BuildBlizzardProfile()
 
 	config = Bartender4.db:GetNamespace("MicroMenu").profile
 	config.position.scale = 1.0
-	config.padding = -3
+	config.padding = WoWMists and -4 or -3
 	SetBarLocation( config, "BOTTOM", 33, 42)
 
 	if PresetsMod.showXPBar then
@@ -305,7 +302,7 @@ end
 function PresetsMod:ResetProfile(type)
 	if not type then type = PresetsMod.defaultType end
 	Bartender4.db:ResetProfile()
-	if type == "BLIZZARD" then
+	if type == "BLIZZARD" or type == "DEFAULT"then
 		BuildBlizzardProfile()
 	elseif type == "DOUBLE" then
 		BuildDoubleProfile()
@@ -318,7 +315,7 @@ end
 function PresetsMod:OnEnable()
 	Bartender4.finishedLoading = true
 	if self.applyBlizzardOnEnable then
-		self:ResetProfile("BLIZZARD")
+		self:ResetProfile("DEFAULT")
 		self.applyBlizzardOnEnable = nil
 	end
 end
@@ -359,7 +356,7 @@ function PresetsMod:SetupOptions()
 				name = L["XP Bar"],
 				get = function() return PresetsMod.showXPBar end,
 				set = function(info, val) PresetsMod.showXPBar = val end,
-				disabled = function() return PresetsMod.defaultType == "RESET" end,
+				disabled = function() return PresetsMod.defaultType == "ZRESET" end,
 			},
 			nl2 = {
 				order = 36,
@@ -370,7 +367,7 @@ function PresetsMod:SetupOptions()
 				order = 40,
 				type = "execute",
 				name = L["Apply Preset"],
-				func = function() PresetsMod.ResetProfile() end,
+				func = function() PresetsMod:ResetProfile() end,
 			}
 		}
 		self.optionobject = Bartender4:NewOptionObject( otbl )

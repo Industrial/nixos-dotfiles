@@ -432,14 +432,18 @@ end
 do -- Tools
 	local tbl = {}
 	-- Get all AceGUI option tables under the "Tools" category
-	function API.GetToolOptions()
-		return CopyTable(tbl)
+	function API.GetToolOptionsTable()
+		local tableToFill = {}
+		for key, func in next, tbl do
+			tableToFill[key] = func()
+		end
+		return tableToFill
 	end
 	-- Register an AceGUI options table for a module under the "Tools" category
-	function API.RegisterToolOptions(key, settingsTable)
+	function API.RegisterToolOptions(key, settingsFunc)
 		if type(key) ~= "string" then error("The key needs to be a string.") return end
-		if type(settingsTable) ~= "table" then error("The settings table needs to be a table.") return end
-		tbl[key] = settingsTable
+		if type(settingsFunc) ~= "function" then error("The settings table needs to be returned by a function.") return end
+		tbl[key] = settingsFunc
 	end
 end
 
@@ -526,6 +530,31 @@ do
 			list[k] = L[k]
 		end
 		return list
+	end
+end
+
+do
+	local bitband, pcall = bit.band, pcall
+	function API.IsValidFrame(frameName)
+		if type(frameName) ~= "string" then return false end
+		local frame = _G[frameName]
+		if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or type(frame.GetWidth) ~= "function" then
+			return false
+		else
+			local success, isForbidden = pcall(frame.IsForbidden, frame)
+			if not success or isForbidden then return false end
+
+			local hasWidthResult, width = pcall(frame.GetWidth, frame)
+			if not hasWidthResult or type(width) ~= "number" then return false end
+		end
+
+		-- Frames with forbidden aspects, Enum.ForbiddenAspect.UntrustedLayoutScriptExecution = 8
+		if type(frame.GetInheritableForbiddenAspects) == "function" then
+			local success, value = pcall(frame.GetInheritableForbiddenAspects, frame, 1)
+			if not success or bitband(value, 8) == 8 then return false end
+		end
+
+		return true
 	end
 end
 

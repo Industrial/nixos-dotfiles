@@ -9,6 +9,7 @@ local _
 
 local DEBUG_OPEN_AT_LOGIN = false
 local IS_WOW_PROJECT_MIDNIGHT = detailsFramework.IsAddonApocalypseWow()
+local IS_WOW_PROJECT_MIDNIGHT_API = detailsFramework.IsMidnightWowAPI()
 
 --fake aura data for the designer's Auras preview. structure matches what Plater.AddAura
 --expects (name, texture, count, duration, spellID, type). ApplyTime is mutated per-tick by
@@ -181,7 +182,10 @@ function Plater.CreateDesignerWindow(tabFrame, tabContainer, parent)
         object_list_lines = objectListLines,
         object_list_line_height = objectListLineHeight,
         text_template = editorOptionsTextTemplate,
-        slider_template = editorOptionsSliderTemplate,
+        slider_template = "DESIGNER_SLIDER_TEMPLATE",
+        switch_template = "DESIGNER_SWITCH_TEMPLATE",
+        dropdown_template = "DESIGNER_DROPDOWN_TEMPLATE",
+        color_template = "DESIGNER_COLORPICK_TEMPLATE",
         no_anchor_points = true,
         start_editing_callback = function(layoutEditor, objectInfo)
             if (objectInfo.id:match("^CAST")) then
@@ -1238,8 +1242,12 @@ function designer.SetIndicatorPreview(indicatorType)
     elseif (indicatorType == "classicon") then
         local _, class = UnitClass("player")
         if (class) then
-            texture:SetTexture([[Interface\GLUES\CHARACTERCREATE\UI-CharacterCreate-Classes]])
-            texture:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+            if IS_WOW_PROJECT_MIDNIGHT_API then
+                thisIndicator:SetAtlas("classicon-" .. class)
+            else
+                texture:SetTexture([[Interface\GLUES\CHARACTERCREATE\UI-CharacterCreate-Classes]])
+                texture:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]))
+            end
         end
 
     elseif (indicatorType == "specicon") then

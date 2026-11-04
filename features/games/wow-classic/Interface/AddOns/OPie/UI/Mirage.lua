@@ -1,7 +1,7 @@
 local COMPAT, _, T = select(4,GetBuildInfo()), ...
 if T.TenEnv then T.TenEnv() end
 local XU = T.exUI
-local SECRETS = COMPAT >= 12e4 or nil
+local SECRETS = COMPAT > 12e4 or COMPAT > 160e2 and COMPAT < 2e4 or nil
 local _assert, getWidgetData, newWidgetData, setWidgetData, _AddObjectMethods, _CallObjectScript = XU:GetImpl()
 
 local IndicatorData, Indicator, CooldownData = {}, {}, {}
@@ -272,6 +272,7 @@ local CreateCooldown, CallCooldownUpdate do
 		cdSetVeilShown(d, false)
 		d.self:Hide()
 		d.spark:Hide()
+		d.sparkAG:Stop()
 		if -0.1 < toExpire and toExpire < 0.25 then
 			d.flashAG:Play()
 		end
@@ -280,6 +281,7 @@ local CreateCooldown, CallCooldownUpdate do
 		local d = getWidgetData(self, CooldownData)
 		cdSetVeilShown(d, true)
 		d.pos = nil -- Forces quad texture update
+		d.sparkAG:Play()
 		return cdOnUpdate(self, 0)
 	end
 	function CallCooldownUpdate(d)
@@ -335,11 +337,9 @@ local CreateCooldown, CallCooldownUpdate do
 		w:SetSize(24,24)
 		w, d.spark = w:CreateAnimationGroup(), w
 		w:SetLooping("REPEAT")
-		b = w:CreateAnimation("Rotation")
-		b:SetDegrees(90)
-		b:SetDuration(1/3)
-		w:Play()
-
+		b, d.sparkAG = w:CreateAnimation("Rotation"), w
+		b:SetDegrees(270)
+		b:SetDuration(1)
 		w = parent:CreateTexture(nil, "OVERLAY")
 		w:SetSize(size*60/64, size*60/64)
 		w:SetPoint("CENTER")
@@ -524,14 +524,29 @@ function Indicator:SetCooldownTextShown(cooldownShown, rechargeShown)
 	local d = getWidgetData(self, IndicatorData)
 	d.cdTextShown, d.rcTextShown = cooldownShown, rechargeShown
 end
-function Indicator:SetHighlighted(highlight)
-	getWidgetData(self, IndicatorData).hiEdge:SetShown(highlight)
-end
-function Indicator:SetActive(active)
-	getWidgetData(self, IndicatorData).iglow:SetShown(active)
-end
-function Indicator:SetOuterGlow(shown)
-	getWidgetData(self, IndicatorData).oglow:SetShown(shown)
+if SECRETS then
+	function Indicator:SetActive(active)
+		local d = getWidgetData(self, IndicatorData)
+		d.iglow:SetAlphaFromBoolean(active, d.fullInnerGlowAlpha, 0)
+	end
+	function Indicator:SetHighlighted(highlight)
+		local hi = getWidgetData(self, IndicatorData).hiEdge
+		hi:SetAlphaFromBoolean(highlight, 1, 0)
+	end
+	function Indicator:SetOuterGlow(shown)
+		local og = getWidgetData(self, IndicatorData).oglow
+		og:SetAlphaFromBoolean(shown, 1, 0)
+	end
+else
+	function Indicator:SetActive(active)
+		getWidgetData(self, IndicatorData).iglow:SetShown(active)
+	end
+	function Indicator:SetHighlighted(highlight)
+		getWidgetData(self, IndicatorData).hiEdge:SetShown(highlight)
+	end
+	function Indicator:SetOuterGlow(shown)
+		getWidgetData(self, IndicatorData).oglow:SetShown(shown)
+	end
 end
 function Indicator:SetEquipState(isInContainer, isInInventory)
 	local s = getWidgetData(self, IndicatorData).equipBanner
@@ -576,11 +591,11 @@ local function CreateIndicator(name, parent, size, nested, gx)
 		w:SetAllPoints()
 		w:SetTexture(gx.BorderHigh)
 	w, d.hiEdge = T.CreateQuadTexture("BACKGROUND", size*2, gx.OuterGlow, cf), w
-		w:SetShown(false)
 	w, d.oglow = ef:CreateTexture(nil, "ARTWORK", nil, 1), w
 		w:SetAllPoints()
 		w:SetTexture(gx.InnerGlow)
-		w:SetAlpha(nested and 0.6 or 1)
+		d.fullInnerGlowAlpha = nested and 0.6 or 1
+		w:SetAlpha(d.fullInnerGlowAlpha)
 	w, d.iglow = ef:CreateTexture(nil, "ARTWORK"), w
 		w:SetPoint("CENTER")
 		w:SetSize(60*size/64, 60*size/64)

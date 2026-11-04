@@ -1,0 +1,9 @@
+## Interface: 60000
+## Title: Lib: SmoothStatusBar-1.0
+## Notes: Smoothly animates status bar
+## X-Curse-Packaged-Version: 1.2.4
+## X-Curse-Project-Name: LibSmoothStatusBar-1.0
+## X-Curse-Project-ID: libsmoothstatusbar-1-0
+## X-Curse-Repository-ID: wow/libsmoothstatusbar-1-0/mainline
+
+LibSmoothStatusBar-1.0.xml

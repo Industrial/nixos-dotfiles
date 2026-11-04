@@ -16,8 +16,9 @@ plugin.defaultDB = {
 		false, -- Normal & Heroic Dungeons
 		true, -- Mythic & Mythic+ Dungeons
 		true, -- Raids
-		false, -- Timewalking (Dungeons & Raids)
+		true, -- Timewalking (Dungeons & Raids)
 		true, -- Scenarios
+		true, -- Delves
 	},
 	blockGarrison = true,
 	blockGuildChallenge = true,
@@ -50,6 +51,8 @@ local zoneList = loader.zoneTbl
 local isTestBuild = loader.isTestBuild
 local isClassic = loader.isClassic
 local isVanilla = loader.isVanilla
+local isTBC = loader.isTBC
+local isForever = loader.isForever
 local GetSubZoneText = GetSubZoneText
 local IsEncounterInProgress = BigWigsLoader.IsEncounterInProgress
 local SetCVar = C_CVar.SetCVar
@@ -109,7 +112,7 @@ plugin.pluginOptions = {
 					desc = L.blockMoviesDesc,
 					width = "full",
 					order = 2,
-					hidden = isVanilla,
+					hidden = isVanilla or isTBC,
 				},
 				blockGarrison = {
 					type = "toggle",
@@ -117,7 +120,7 @@ plugin.pluginOptions = {
 					desc = L.blockFollowerMissionDesc,
 					width = "full",
 					order = 3,
-					hidden = isClassic,
+					hidden = isClassic or isForever,
 				},
 				blockGuildChallenge = {
 					type = "toggle",
@@ -125,7 +128,7 @@ plugin.pluginOptions = {
 					desc = L.blockGuildChallengeDesc,
 					width = "full",
 					order = 4,
-					hidden = isClassic,
+					hidden = isClassic or isForever,
 				},
 				blockSpellErrors = {
 					type = "toggle",
@@ -167,6 +170,7 @@ plugin.pluginOptions = {
 						L.blockTalkingHeadRaids,
 						L.blockTalkingHeadTimewalking,
 						L.blockTalkingHeadScenarios,
+						L.blockTalkingHeadDelves,
 					},
 					get = function(info, entry)
 						return plugin.db.profile[info[#info]][entry]
@@ -176,7 +180,7 @@ plugin.pluginOptions = {
 					end,
 					width = 2,
 					order = 9,
-					hidden = isClassic,
+					hidden = isClassic or isForever,
 				},
 				blockZoneInToasts = {
 					type = "toggle",
@@ -447,7 +451,9 @@ do
 					bbFrame.RegisterEvent(registeredToasts[i], "DISPLAY_EVENT_TOASTS")
 				end
 			end
-			self:RegisterEvent("TALKINGHEAD_REQUESTED")
+			if not isForever then
+				self:RegisterEvent("TALKINGHEAD_REQUESTED")
+			end
 		end
 
 		MuteSoundFile(567394) -- SOUNDKIT.RAID_BOSS_EMOTE_WARNING
@@ -519,6 +525,20 @@ do
 		[343]=true,[344]=true,[345]=true,[346]=true,[347]=true,[348]=true,[349]=true,[350]=true,[351]=true,
 		[352]=true,[353]=true,[354]=true,[355]=true,[356]=true,[357]=true,[358]=true,[359]=true,[360]=true,
 		[361]=true,[362]=true,[363]=true,[364]=true,[365]=true,[366]=true,[367]=true,[368]=true,[369]=true,
+	}
+	local basicWarnings = {
+		[337] = true, -- Flickering Spoils Will Manifest Upon Delve Completion
+		[338] = true, -- Shadowed Flickering Spoils Will Manifest Upon Delve Completion
+		[339] = true, -- A Flickergate Has Manifested Within
+		[370] = true, -- A Sanctified Banner Has Manifested Within
+		[371] = true, -- Grand Sanctified Spoils Will Manifest Upon Delve Completion
+		[372] = true, -- Sanctified Spoils Will Manifest Upon Delve Completion
+		[482] = true, -- Additional Bountiful Rewards Will Manifest Upon Delve Completion
+		[483] = true, -- Dundun Hides Within. Can You Find Him?
+		[490] = true, -- Additional Undercoin Reward Will Manifest Upon Delve Completion
+		[491] = true, -- Additional Voidlight Marl Reward Will Manifest Upon Delve Completion
+		[492] = true, -- Additional Decor Reward Will Manifest Upon Delve Completion
+		[493] = true, -- Additional Companion Experience Reward Will Manifest Upon Delve Completion
 	}
 	local nemesisBoxCounts = {0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4}
 	local GetNextToastToDisplay = C_EventToastManager and C_EventToastManager.GetNextToastToDisplay
@@ -663,22 +683,10 @@ do
 						tbl.subtitle = CL.other:format(L.newRespawnPoint, latestKill[3]) -- New Respawn Point: Boss Name
 						self:SimpleTimer(function() printMessage(self, tbl) end, 3) -- Delay a little after the boss kill
 					end
-				elseif tbl.eventToastID == 339 or tbl.eventToastID == 370 then -- Delve Spoils Within
-					-- 339: A Flickergate Has Manifested Within
-					-- 370: A Sanctified Banner Has Manifested Within
+				elseif basicWarnings[tbl.eventToastID] then -- Basic warnings with no customization
 					tbl.subtitle = tbl.title
 					tbl.title = nil
-					tbl.bwDuration = 3
-					printMessage(self, tbl)
-				elseif tbl.eventToastID == 337 or tbl.eventToastID == 338 or tbl.eventToastID == 371 or tbl.eventToastID == 372 or tbl.eventToastID == 483 then -- Delve Spoils Found
-					-- 337: Flickering Spoils Will Manifest Upon Delve Completion
-					-- 338: Shadowed Flickering Spoils Will Manifest Upon Delve Completion
-					-- 371: Grand Sanctified Spoils Will Manifest Upon Delve Completion
-					-- 372: Sanctified Spoils Will Manifest Upon Delve Completion
-					-- 483: Dundun Hides Within. Can You Find Him?
-					tbl.subtitle = tbl.title
-					tbl.title = nil
-					tbl.bwDuration = 3
+					tbl.bwDuration = 5
 					printMessage(self, tbl)
 				else -- Something we don't support, pass to Blizz to process
 					local msgTable = {"eventToastID", tbl.eventToastID, "title", tbl.title}
@@ -792,13 +800,13 @@ do
 					KillEvent(RaidWarningFrame, "RAID_BOSS_WHISPER")
 				end
 			end
-			if self.db.profile.blockGarrison and not isClassic then
+			if self.db.profile.blockGarrison and not (isClassic or isForever) then
 				KillEvent(AlertFrame, "GARRISON_MISSION_FINISHED")
 				KillEvent(AlertFrame, "GARRISON_BUILDING_ACTIVATABLE")
 				KillEvent(AlertFrame, "GARRISON_FOLLOWER_ADDED")
 				KillEvent(AlertFrame, "GARRISON_RANDOM_MISSION_ADDED")
 			end
-			if self.db.profile.blockGuildChallenge and not isClassic then
+			if self.db.profile.blockGuildChallenge and not (isClassic or isForever) then
 				KillEvent(AlertFrame, "GUILD_CHALLENGE_COMPLETED")
 			end
 			if self.db.profile.blockSpellErrors then
@@ -1097,6 +1105,14 @@ do
 		[269139]=true,[269140]=true,[269141]=true,[269142]=true,[269143]=true,[269144]=true,[269145]=true,[269146]=true,
 		[269150]=true,[269152]=true,
 
+		-- Midnight/The Ring of Glory [Delve]
+		[360627]=3077,[360633]=3077,[360650]=3077,[360653]=3077,[360722]=3077,[360656]=3077,[361072]=3077,[360660]=3077,
+		[361078]=3077,[360661]=3077,[360662]=3077,[361080]=3077,[360664]=3077,[361081]=3077,[360666]=3077,[360705]=3077,
+		[360706]=3077,[360707]=3077,[360708]=3077,[360709]=3077,[361057]=3077,[361058]=3077,[361059]=3077,[361060]=3077,
+		[361062]=3077,[361063]=3077,[360667]=3077,[360668]=3077,[360669]=3077,[360671]=3077,[360687]=3077,[360681]=3077,
+		[360686]=3077,[360674]=3077,[360688]=3077,[360694]=3077,[360695]=3077,[360697]=3077,[360699]=3077,[360701]=3077,
+		-- Midnight/Gnarldor Isle [Delve]
+		[360721]=3038,[360600]=3038,[360613]=3038,
 		-- Midnight/Den of Nalorakk [Dungeon]
 		[307905]=true,[307906]=true,[307907]=true,[307909]=true,[307910]=true,[307908]=true,[307900]=true,[307902]=true,
 		-- Midnight/Maisara Caverns [Dungeon]
@@ -1111,13 +1127,22 @@ do
 		-- Midnight/Altar of Fangs [Dungeon]
 		[345108]=true,[344783]=true,[345112]=true,[344971]=true,[344862]=true,[344910]=true,[344908]=true,[344609]=true,[344660]=true,
 		[344969]=true,[344967]=true,[344998]=true,[345031]=true,[344973]=true,[344615]=true,[344896]=true,[345003]=true,[344719]=true,
-		[344808]=true,[345109]=true,[345100]=true,[344840]=true,
+		[344808]=true,[345109]=true,[345100]=true,[344840]=true,[344970]=true,
 		-- Midnight/The Voidspire [Raid]
 		[316005]=true,[316006]=true,[316007]=true,[316008]=true,[316009]=true,[316010]=true,[303419]=true,[303420]=true,[303421]=true,
 		-- Midnight/The Dreamrift [Raid]
 		[299649]=true,[299650]=true,[299651]=true,[299652]=true,[299653]=true,[299655]=true,[299656]=true,
+		-- Midnight/The Venomous Abyss [Raid]
+		[344934]=3004,[344966]=3004,
+	}
+	local talkingHeadsWithConditions = {
+		-- Midnight/Murder Row [Dungeon]
+		[129619]=function(instanceID, soundKitId) return instanceID == 2813 and soundKitId == 0 end, -- Silent talking head with text
+		-- Midnight/Gnarldor Isle [Delve]
+		[138220]=function(instanceID, soundKitId) return instanceID == 3077 and soundKitId == 0 end, -- Silent talking head with text
 	}
 
+	-- Normal & Heroic Dungeons (1-off), Mythic & Mythic+ Dungeons (2-on), Raids (3-on), Timewalking (4-off), Scenarios (5-on), Delves (6-on)
 	local lookup = {
 		[1] = 1, -- Normal Dungeon
 		[2] = 1, -- Heroic Dungeon
@@ -1130,20 +1155,31 @@ do
 		[24] = 4, -- Timewalking Dungeon
 		[152] = 5, -- Visions of N'Zoth
 		[205] = 1, -- Follower Dungeon
+		[208] = 6, -- Delves
+		[233] = 3, -- Mythic (Flexible 15-25 player raids)
+		[250] = 3, -- World (Lair bosses on retail wow)
 	}
 	local TalkingHeadLineInfo = C_TalkingHead and C_TalkingHead.GetCurrentLineInfo
 	function plugin:TALKINGHEAD_REQUESTED()
-		local _, _, diff = GetInstanceInfo()
+		local _, _, diff, _, _, _, _, instanceID = GetInstanceInfo()
 		local entry = lookup[diff]
 		if entry then
-			local _, _, soundKitId = TalkingHeadLineInfo()
-			if known[soundKitId] then
+			local displayInfoID, _, soundKitId = TalkingHeadLineInfo()
+			if known[soundKitId] == instanceID or known[soundKitId] == true then
 				if self.db.profile.blockTalkingHeads[entry] and TalkingHeadFrame and TalkingHeadFrame:IsShown() then
 					TalkingHeadFrame:Hide()
 				end
 				self:Debug("BlockedTalkingHead", soundKitId)
 			else
-				self:Debug("NewTalkingHead", TalkingHeadLineInfo())
+				local condition = talkingHeadsWithConditions[displayInfoID]
+				if condition and condition(instanceID, soundKitId) then
+					if self.db.profile.blockTalkingHeads[entry] and TalkingHeadFrame and TalkingHeadFrame:IsShown() then
+						TalkingHeadFrame:Hide()
+					end
+					self:Debug("BlockedTalkingHead+", displayInfoID, soundKitId, instanceID)
+				else
+					self:Debug("NewTalkingHead", TalkingHeadLineInfo())
+				end
 			end
 		end
 	end

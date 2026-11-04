@@ -4,7 +4,7 @@ if T.TenEnv then T.TenEnv() end
 
 local EV, WR, AB, KR, RW, IM = T.Evie, T.Ware, T.ActionBook:compatible(2,38), T.ActionBook:compatible("Kindred", 1,36), T.ActionBook:compatible("Rewire", 1,27), T.ActionBook:compatible("Imp", 1,11)
 assert(EV and WR and AB and KR and RW and IM and 1, "Incompatible library bundle")
-local MODERN, CI_ERA, CF_CATA = COMPAT >= 10e4, COMPAT < 2e4, COMPAT < 10e4 and COMPAT > 4e4
+local MODERN, CI_ERA, CF_CATA = COMPAT >= 10e4, COMPAT < 160e2, COMPAT < 10e4 and COMPAT > 4e4
 local playerClass, _, playerRace = UnitClassBase("player"), UnitRace("player")
 
 securecall(function() -- weirdly-persistent Druid Incarnations + Celestial Alignment
@@ -284,7 +284,7 @@ securecall(function() -- /ping's option parsing is silly
 	local f = CreateFrame("Frame", nil, nil, "SecureHandlerBaseTemplate")
 	local tk, env = nil, WR.GetRestrictedEnvironment(f)
 	env.PING_COMMAND, tk = SLASH_PING1 .. " ", WR.newtable(env, "TOKENS")
-	tk.assist, tk.attack, tk.onmyway, tk.warning = PING_TYPE_ASSIST, PING_TYPE_ATTACK, PING_TYPE_ON_MY_WAY, PING_TYPE_WARNING
+	tk.attack, tk.warning, tk.onmyway, tk.assist, tk.nothreat, tk.threat = 1,2,3,4,5,6
 	f:SetAttribute("RunSlashCmd", [[-- AB_PingQuirk_Run 
 		local cmd, v, target, s = ...
 		if v then

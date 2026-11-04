@@ -1,12 +1,6 @@
 # Bartender4
 
-## [4.17.9.1](https://github.com/Nevcairiel/Bartender4/tree/4.17.9.1) (2026-08-12)
-[Full Changelog](https://github.com/Nevcairiel/Bartender4/compare/4.17.8...4.17.9.1) [Previous Releases](https://github.com/Nevcairiel/Bartender4/releases)
+## [4.18.3.1](https://github.com/Nevcairiel/Bartender4/tree/4.18.3.1) (2026-09-30)
+[Full Changelog](https://github.com/Nevcairiel/Bartender4/compare/4.18.2...4.18.3.1) [Previous Releases](https://github.com/Nevcairiel/Bartender4/releases)
 
-- Remove mention of removed global MouseIsOver  
-- Fixes 12.1 mouse over issue  
-- Fix keyring button missing in Burning Crusade Anniversary  
-    This should fix issue #284 - the keyring button and a checkbox to show/hide it missing in Burning Crusade Anniversary.  
-- Disable severing the action bar link on Classic, to reduce event spam  
-    For some reason classic behaves opposite of Retail here  
-    Fixes #294  
+- Disable ClampedToScreen for the Status Tracking Bars  

@@ -1,0 +1,698 @@
+-----------------------------------------------------------------------
+-- AddOn namespace.
+-----------------------------------------------------------------------
+local ADDON_NAME, private = ...
+
+local RSGeneralDB = private.NewLib("RareScannerGeneralDB")
+
+-- RareScanner database libraries
+local RSNpcDB = private.ImportLib("RareScannerNpcDB")
+local RSContainerDB = private.ImportLib("RareScannerContainerDB")
+local RSEventDB = private.ImportLib("RareScannerEventDB")
+local RSConfigDB = private.ImportLib("RareScannerConfigDB")
+
+-- RareScanner libraries
+local RSConstants = private.ImportLib("RareScannerConstants")
+local RSLogger = private.ImportLib("RareScannerLogger")
+local RSUtils = private.ImportLib("RareScannerUtils")
+
+
+---============================================================================
+-- Already found entities
+----- Stores entities information found while playing
+---============================================================================
+
+function RSGeneralDB.InitAlreadyFoundEntitiesDB()
+	if (not private.dbglobal.rares_found) then
+		private.dbglobal.rares_found = {}
+	end
+	if (not private.dbglobal.containers_found) then
+		private.dbglobal.containers_found = {}
+	end
+	if (not private.dbglobal.events_found) then
+		private.dbglobal.events_found = {}
+	end
+end
+
+local function GetAlreadyFoundDB(atlasName)
+	if (not atlasName) then
+		return
+	end
+	
+	if (RSConstants.IsNpcAtlas(atlasName)) then
+		return private.dbglobal.rares_found
+	elseif (RSConstants.IsContainerAtlas(atlasName)) then
+		return private.dbglobal.containers_found
+	elseif (RSConstants.IsEventAtlas(atlasName)) then
+		return private.dbglobal.events_found
+	end
+end
+
+function RSGeneralDB.RemoveAlreadyFoundEntity(entityID, atlasName)
+	local foundDB = GetAlreadyFoundDB(atlasName)
+	if (entityID and foundDB) then
+		foundDB[entityID] = nil
+	end
+end
+
+function RSGeneralDB.GetAlreadyFoundEntities(atlasName)
+	return GetAlreadyFoundDB(atlasName)
+end
+
+function RSGeneralDB.GetAlreadyFoundEntitiesNoDB()
+	return private.dbglobal.entities_nodb
+end
+
+function RSGeneralDB.RefreshAlreadyFoundEntitiesNoDB()
+	local entities_nodb = private.dbglobal.entities_nodb
+	if (not entities_nodb) then
+		return
+	end
+		
+	for mapID, mapInfo in pairs (entities_nodb) do
+		for artID, entitiesIDs in pairs (mapInfo) do
+			local numEntities = #entitiesIDs
+			
+			for i = numEntities, 1, -1 do
+				local entityID = entitiesIDs[i]
+				if (RSNpcDB.GetInternalNpcInfo(entityID) or RSContainerDB.GetInternalContainerInfo(entityID) or RSEventDB.GetInternalEventInfo(entityID) or RSUtils.Contains(RSConstants.IGNORED_VIGNETTES_NPCS, entityID) or RSUtils.Contains(RSConstants.IGNORED_VIGNETTES_CONTAINERS, entityID)) then
+		            table.remove(entitiesIDs, i)
+		        -- Check if pre-events
+		        else
+		       		local npcID = RSNpcDB.GetFinalNpcID(entityID)
+		       		if (npcID and RSNpcDB.GetInternalNpcInfo(npcID)) then
+		       			table.remove(entitiesIDs, i)
+		       		end
+		       		
+		       		local containerID = RSContainerDB.GetFinalContainerID(entityID)
+		       		if (containerID and RSContainerDB.GetInternalContainerInfo(containerID)) then
+		       			table.remove(entitiesIDs, i)
+		       		end
+		       	end
+			end
+			
+			if (next(entitiesIDs) == nil) then
+		        mapInfo[artID] = nil
+		    end
+		end
+			
+		if (next(mapInfo) == nil) then
+	        entities_nodb[mapID] = nil
+	    end
+	end
+end
+
+function RSGeneralDB.GetAlreadyFoundEntity(entityID, atlasName)
+	local foundDB = GetAlreadyFoundDB(atlasName)
+	if (entityID and foundDB) then
+		return foundDB[entityID]
+	end
+
+	return nil
+end
+
+function RSGeneralDB.IsAlreadyFoundEntityInZone(entityID, mapID, atlasName)
+	local entityInfo = RSGeneralDB.GetAlreadyFoundEntity(entityID, atlasName)
+	if (entityID and mapID and entityInfo) then
+		if (entityInfo.mapID == mapID and (not entityInfo.artID or RSUtils.Contains(entityInfo.artID, C_Map.GetMapArtID(mapID)))) then
+			return true
+		end
+	end
+
+	return false
+end
+
+function RSGeneralDB.AddAlreadyFoundNpcWithoutVignette(npcID)
+	-- Extract position from player
+	local mapID = C_Map.GetBestMapForUnit("player")
+	if (mapID) then
+		local mapPosition = C_Map.GetPlayerMapPosition(mapID, "player")
+		local artID = C_Map.GetMapArtID(mapID)
+		if (mapPosition) then
+			local x, y = mapPosition:GetXY()
+			RSLogger:PrintDebugMessage(string.format("AddAlreadyFoundNpcWithoutVignette[%s]. Usada la posicion del jugador", npcID))
+			return RSGeneralDB.AddAlreadyFoundEntity(npcID, mapID, x, y, artID, RSConstants.NPC_VIGNETTE)
+		end
+	end
+
+	-- If it couldnt get the position from player extract it from the internal database
+	-- If its a multizone NPC we cannot know what zone the player is at
+	if (RSNpcDB.IsInternalNpcMonoZone(npcID)) then
+		local npcInfo = RSNpcDB.GetInternalNpcInfo(npcID)
+		if (npcInfo.zoneID ~= RSConstants.UNKNOWN_ZONE_ID) then
+			RSLogger:PrintDebugMessage(string.format("AddAlreadyFoundNpcWithoutVignette[%s]. Usada la informacion interna", npcID))
+			return RSGeneralDB.AddAlreadyFoundEntity(npcID, npcInfo.zoneID, npcInfo.x, npcInfo.y, npcInfo.artID, RSConstants.NPC_VIGNETTE)
+		end
+	end
+
+	return nil
+end
+
+function RSGeneralDB.AddAlreadyFoundContainerWithoutVignette(containerID)
+	-- Extract position from player
+	local mapID = C_Map.GetBestMapForUnit("player")
+	if (mapID) then
+		local mapPosition = C_Map.GetPlayerMapPosition(mapID, "player")
+		local artID = C_Map.GetMapArtID(mapID)
+		if (mapPosition) then
+			local x, y = mapPosition:GetXY()
+			RSLogger:PrintDebugMessage(string.format("AddAlreadyFoundContainerWithoutVignette[%s]. Usada la posicion del jugador", containerID))
+			return RSGeneralDB.AddAlreadyFoundEntity(containerID, mapID, x, y, artID, RSConstants.CONTAINER_VIGNETTE)
+		end
+	end
+
+	-- If it couldnt get the position from player extract it from the internal database
+	local containerInfo = RSGeneralDB.GetInternalContainerInfo(containerID)
+	if (containerInfo and containerInfo.zoneID ~= RSConstants.UNKNOWN_ZONE_ID) then
+		RSLogger:PrintDebugMessage(string.format("AddAlreadyFoundContainerWithoutVignette[%s]. Usada la informacion interna", containerID))
+		return RSGeneralDB.AddAlreadyFoundEntity(containerID, containerInfo.zoneID, containerInfo.x, containerInfo.y, containerInfo.artID, RSConstants.CONTAINER_VIGNETTE)
+	end
+
+	return nil
+end
+
+function RSGeneralDB.UpdateAlreadyFoundEntityPlayerPosition(entityID, atlasName)
+	local foundDB = GetAlreadyFoundDB(atlasName)
+	if (entityID and foundDB and foundDB[entityID]) then
+		local mapID = C_Map.GetBestMapForUnit("player")
+		if (mapID) then
+			local mapPosition = C_Map.GetPlayerMapPosition(mapID, "player")
+			local artID = C_Map.GetMapArtID(mapID)
+			if (mapPosition) then
+				local x, y = mapPosition:GetXY()
+				RSLogger:PrintDebugMessage(string.format("UpdateAlreadyFoundEntityPlayerPosition[%s]. Nueva posicion por cercania.", entityID))
+				RSGeneralDB.UpdateAlreadyFoundEntity(entityID, mapID, x, y, artID, atlasName)
+			end
+		end
+	end
+end
+
+local function PrintAlreadyFoundTable(raresFound)
+	if (raresFound) then
+		return string.format("mapID:%s,artID:%s,x:%s,y:%s,atlasName:%s,foundTime:%s", raresFound.mapID or "", ((type(raresFound.artID) == "table" and unpack(raresFound.artID)) or raresFound.artID or ""), raresFound.coordX or "", raresFound.coordY or "", raresFound.atlasName, raresFound.foundTime)
+	end
+
+	return ""
+end
+
+local function AddAlreadyFoundEntityNoDB(mapID, artID, entityID)
+	if (not RSNpcDB.GetInternalNpcInfo(entityID) and not RSContainerDB.GetInternalContainerInfo(entityID) and not RSEventDB.GetInternalEventInfo(entityID)) then
+		if (not private.dbglobal.entities_nodb) then
+			private.dbglobal.entities_nodb = {}
+		end
+		
+		if (not private.dbglobal.entities_nodb[mapID]) then
+			private.dbglobal.entities_nodb[mapID] = {}
+		end
+		
+		if (not private.dbglobal.entities_nodb[mapID][artID]) then
+			private.dbglobal.entities_nodb[mapID][artID] = {}
+		end
+		
+		tinsert(private.dbglobal.entities_nodb[mapID][artID], entityID)
+	end
+end
+
+function RSGeneralDB.UpdateAlreadyFoundEntity(entityID, mapID, x, y, artID, atlasName)
+	local foundDB = GetAlreadyFoundDB(atlasName)
+	if (entityID and mapID and x and y and artID and foundDB and foundDB[entityID]) then
+		-- If the map is the same, check if different artID
+		local currentMapID = foundDB[entityID].mapID;
+		local currentArtID = foundDB[entityID].artID;
+		if (currentMapID == mapID and currentArtID) then
+			if (type(currentArtID) == "table" and not RSUtils.Contains(currentArtID, artID)) then
+				table.insert(currentArtID, artID)
+				foundDB[entityID].artID = currentArtID
+			elseif (type(currentArtID) ~= "table" and currentArtID ~= artID) then
+				foundDB[entityID].artID = { artID };
+			end
+			-- Otherwise override
+		else
+			foundDB[entityID].artID = { artID };
+		end
+
+		foundDB[entityID].mapID = mapID
+		foundDB[entityID].coordX = x;
+		foundDB[entityID].coordY = y;
+		foundDB[entityID].foundTime = time();
+		if (atlasName) then
+			foundDB[entityID].atlasName = atlasName;
+		end
+
+		RSLogger:PrintDebugMessage(string.format("UpdateAlreadyFoundEntity[%s]: %s", entityID, PrintAlreadyFoundTable(RSGeneralDB.GetAlreadyFoundEntity(entityID, atlasName))))
+		
+		-- If not in the database add to a temp table
+		AddAlreadyFoundEntityNoDB(mapID, artID, entityID)
+		
+		-- If multispawn record coordinates for debugging purposes
+		if (RSConstants.DEBUG_MODE and RSContainerDB.IsMultiZoneSpawn(entityID)) then
+			if (not private.dbglobal.multitiple_spawns) then
+				private.dbglobal.multitiple_spawns = {}
+			end
+			
+			if (not private.dbglobal.multitiple_spawns[entityID]) then
+				private.dbglobal.multitiple_spawns[entityID] = {}
+			end
+			
+			if (not private.dbglobal.multitiple_spawns[entityID][mapID]) then
+				private.dbglobal.multitiple_spawns[entityID][mapID] = {}
+			end
+			
+			local coords = string.sub(RSUtils.Lpad(string.sub(x,3), 4, '0'), 1, 4).."-"..string.sub(RSUtils.Lpad(string.sub(y,3), 4, '0'), 1, 4)
+			if (not RSUtils.Contains(private.dbglobal.multitiple_spawns[entityID][mapID], coords)) then
+				tinsert(private.dbglobal.multitiple_spawns[entityID][mapID], coords)
+				RSLogger:PrintDebugMessage(string.format("UpdateAlreadyFoundEntity Nuevas coordendas[%s]: %s", entityID, coords))
+			end
+		end
+	end
+end
+
+function RSGeneralDB.AddAlreadyFoundEntity(entityID, mapID, x, y, artID, atlasName)
+	local foundDB = GetAlreadyFoundDB(atlasName)
+	if (entityID and mapID and x and y and artID and foundDB) then
+		foundDB[entityID] = {};
+		foundDB[entityID].mapID = mapID;
+		if (type(artID) == "table") then
+			foundDB[entityID].artID = artID;
+		else
+			foundDB[entityID].artID = { artID };
+		end
+		foundDB[entityID].coordX = x;
+		foundDB[entityID].coordY = y;
+		foundDB[entityID].atlasName = atlasName;
+		foundDB[entityID].foundTime = time();
+
+		RSLogger:PrintDebugMessage(string.format("AddAlreadyFoundEntity[%s]: %s", entityID, PrintAlreadyFoundTable(RSGeneralDB.GetAlreadyFoundEntity(entityID, atlasName))))
+				
+		-- If not in the database add to a temp table
+		AddAlreadyFoundEntityNoDB(mapID, artID, entityID)
+		
+		return RSGeneralDB.GetAlreadyFoundEntity(entityID, atlasName)
+	end
+
+	RSLogger:PrintDebugMessage(string.format("AddAlreadyFoundEntity[%s]: No añadido! faltaban parametros!", entityID))
+	return nil
+end
+
+function RSGeneralDB.GetBestMapForUnit(entityID, atlasName)	
+	if (RSConstants.IsNpcAtlas(atlasName) and RSNpcDB.IsInternalNpcMonoZone(entityID)) then
+		local npcInfo = RSNpcDB.GetInternalNpcInfo(entityID)
+		return npcInfo.zoneID
+	elseif (RSConstants.IsContainerAtlas(atlasName) and RSContainerDB.IsInternalContainerMonoZone(entityID)) then
+		local containerInfo = RSContainerDB.GetInternalContainerInfo(entityID)
+		return containerInfo.zoneID
+	end
+	
+	local mapID = C_Map.GetBestMapForUnit("player")
+	if (mapID) then
+		return mapID
+	end
+	
+	return nil
+end
+
+---============================================================================
+-- Entities with pre-events
+----- Obtains the latest entityID in a chain of pre-events
+---============================================================================
+
+function RSGeneralDB.GetFinalEntityID(entityPreEventID)
+	local entityID = tonumber(entityPreEventID)
+	
+	-- NPC with pre-event
+	entityID = RSNpcDB.GetFinalNpcID(entityID)
+	
+	-- Container with pre-event
+	entityID = RSContainerDB.GetFinalContainerID(entityID)
+	
+	return entityID
+end
+
+---============================================================================
+-- Loot info cache database
+----- Stores information of items to avoid requesting the server too often
+---============================================================================
+
+function RSGeneralDB.InitItemInfoDB()
+	if (not private.dbglobal.loot_info) then
+		private.dbglobal.loot_info = {}
+	end
+end
+
+function RSGeneralDB.GetItemName(itemID)
+	if (not itemID) then
+		return
+	end
+
+	-- The first time request the server for the information
+	local retOk, itemName, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = pcall(C_Item.GetItemInfo, itemID)
+	return itemName
+end
+
+function RSGeneralDB.GetItemInfo(itemID)
+	if (not itemID) then
+		return
+	end
+
+	-- The first time request the server for the information
+	if (not private.dbglobal.loot_info[itemID]) then
+		local retOk, _, itemLink, itemRarity, _, _, _, _, _, itemEquipLoc, iconFileDataID, _, itemClassID, itemSubClassID, _, _, _, _ = pcall(C_Item.GetItemInfo, itemID)
+		if (itemLink and itemRarity and itemEquipLoc and iconFileDataID and itemClassID and itemSubClassID) then
+			RSGeneralDB.SetItemInfo(itemID, itemLink, itemRarity, itemEquipLoc, iconFileDataID, itemClassID, itemSubClassID)
+		end
+		return itemLink, itemRarity, itemEquipLoc, iconFileDataID, itemClassID, itemSubClassID
+	-- Next time return cached data
+	else
+		return unpack(private.dbglobal.loot_info[itemID])
+	end
+end
+
+function RSGeneralDB.SetItemInfo(itemID, itemLink, itemRarity, itemEquipLoc, iconFileDataID, itemClassID, itemSubClassID)
+	if (itemID) then
+		private.dbglobal.loot_info[itemID] = { itemLink, itemRarity, itemEquipLoc, iconFileDataID, itemClassID, itemSubClassID }
+	end
+end
+
+---============================================================================
+-- Completed quests cache database
+----- Stores information of completed quests
+---============================================================================
+
+function RSGeneralDB.InitCompletedQuestDB()
+	if (RSConstants.DEBUG_MODE and not private.dbchar.quests_completed) then
+		private.dbchar.quests_completed = {}
+	end
+end
+
+function RSGeneralDB.IsCompletedQuestInCache(questID)
+	if (questID and private.dbchar.quests_completed) then
+		return private.dbchar.quests_completed[questID]
+	end
+	
+	return false
+end
+
+function RSGeneralDB.SetCompletedQuest(questID)
+	if (questID and private.dbchar.quests_completed) then
+		private.dbchar.quests_completed[questID] = true
+	end
+end
+
+function RSGeneralDB.ResetCompletedQuestDB()
+	if (private.dbchar.quests_completed) then
+		if (RSConstants.DEBUG_MODE) then
+			private.dbchar.quests_completed = {}
+		else
+			private.dbchar.quests_completed = nil
+		end
+	end
+end
+
+---============================================================================
+-- Recently seen entities database
+---============================================================================
+
+function RSGeneralDB.InitRecentlySeenDB()
+	private.dbglobal.recentlySeen = {}
+end
+
+function RSGeneralDB.DeleteRecentlySeen(entityID)
+	if (entityID and private.dbglobal.recentlySeen[entityID]) then
+		private.dbglobal.recentlySeen[entityID] = nil
+	end
+end
+
+function RSGeneralDB.SetRecentlySeen(entityID)
+	if (entityID) then
+		private.dbglobal.recentlySeen[entityID] = true
+	end
+end
+
+function RSGeneralDB.IsRecentlySeen(entityID)
+	if (entityID and private.dbglobal.recentlySeen[entityID]) then
+		return true
+	end
+
+	return false
+end
+
+---============================================================================
+-- Overlay database
+---============================================================================
+
+function RSGeneralDB.HasOverlayActive(entityID)
+	if (private.dbchar.overlayActive and entityID and private.dbchar.overlayActive[entityID]) then
+		return true
+	end
+	
+	return false
+end
+
+function RSGeneralDB.AddOverlayActive(entityID)
+	if (not private.dbchar.overlayActive) then
+		private.dbchar.overlayActive = {}
+	end
+	
+	-- if its already in the list ignore it
+	if (private.dbchar.overlayActive[entityID]) then
+		return RSConfigDB.GetWorldMapOverlayColour(private.dbchar.overlayActive[entityID].colourID)
+	end
+	
+	-- look for an available colour
+	local assignedColourId = nil;
+	for i = 1,private.db.map.overlayMaxColours,1 do 
+		local colourIdFound = false	
+		for id, info in pairs (private.dbchar.overlayActive) do
+			if (info.colourID == i) then
+				colourIdFound = true
+				break
+			end
+		end
+		
+		if (not colourIdFound) then
+			assignedColourId = i;
+			private.dbchar.overlayActive[entityID] = { colourID = i, timestamp = time() }
+			break
+		end
+	end
+	
+	-- if not added because all colours are used, replace the oldest
+	local replacedEntityID = nil
+	if (not assignedColourId) then
+		local a = {}
+		for _, info in pairs (private.dbchar.overlayActive) do
+			table.insert(a, info.timestamp)
+		end
+		table.sort(a)
+		for currentEntityID, info in pairs (private.dbchar.overlayActive) do
+			if (info.timestamp == a[1]) then
+				replacedEntityID = currentEntityID
+				private.dbchar.overlayActive[currentEntityID] = nil
+				private.dbchar.overlayActive[entityID] = { colourID = info.colourID, timestamp = time() }
+				assignedColourId = info.colourID
+				break
+			end
+		end
+	end
+	
+	local r, g, b = RSConfigDB.GetWorldMapOverlayColour(assignedColourId)
+	return r, g, b, replacedEntityID
+end
+
+function RSGeneralDB.GetOverlayActive(entityID)
+	if (private.dbchar.overlayActive and entityID and private.dbchar.overlayActive[entityID]) then
+		return private.dbchar.overlayActive[entityID]
+	end
+	
+	return nil
+end
+
+function RSGeneralDB.GetAllOverlayActive()
+	if (private.dbchar.overlayActive) then
+		return private.dbchar.overlayActive
+	end
+	
+	return {}
+end
+
+function RSGeneralDB.RemoveOverlayActive(entityID)
+	if (private.dbchar.overlayActive and entityID and private.dbchar.overlayActive[entityID]) then
+		private.dbchar.overlayActive[entityID] = nil
+	end
+end
+
+function RSGeneralDB.RemoveAllOverlayActive()
+	private.dbchar.overlayActive = nil
+end
+
+---============================================================================
+-- Guide database
+---============================================================================
+
+function RSGeneralDB.HasGuideActive(entityID)
+	return private.dbchar.guideActive and private.dbchar.guideActive == entityID
+end
+
+function RSGeneralDB.SetGuideActive(entityID)
+	private.dbchar.guideActive = entityID
+end
+
+function RSGeneralDB.GetGuideActive()
+	return private.dbchar.guideActive
+end
+
+function RSGeneralDB.RemoveGuideActive()
+	private.dbchar.guideActive = nil
+end
+
+---============================================================================
+-- Help database
+---============================================================================
+
+function RSGeneralDB.GetHelpActive()
+	return private.dbchar.helpActive
+end
+
+function RSGeneralDB.RemoveHelpActive()
+	private.dbchar.helpActive = nil
+end
+
+---============================================================================
+-- Button position
+---============================================================================
+
+function RSGeneralDB.SetButtonPositionCoordinates(x, y)
+	if (x and y) then
+		private.db.scannerXPos = x
+		private.db.scannerYPos = y
+	end
+end
+
+function RSGeneralDB.GetButtonPositionCoordinates()
+	-- Previous settings based on character database
+	if (private.dbchar.scannerXPos and private.dbchar.scannerYPos) then
+		if (not private.db.scannerXPos or not private.db.scannerYPos) then
+			RSGeneralDB.SetButtonPositionCoordinates(private.dbchar.scannerXPos, private.dbchar.scannerYPos)
+		end
+		private.dbchar.scannerXPos = nil
+		private.dbchar.scannerYPos = nil
+	end
+	
+	-- Current settings based on profiles database
+	if (private.db.scannerXPos and private.db.scannerYPos) then
+		return private.db.scannerXPos, private.db.scannerYPos
+	end
+
+	return nil
+end
+
+---============================================================================
+-- Version control database
+---============================================================================
+
+function RSGeneralDB.InitDbVersionDB()
+	if (not private.dbglobal.dbversion) then
+		private.dbglobal.dbversion = {}
+	end
+end
+
+function RSGeneralDB.GetAllDbVersions()
+	return private.dbglobal.dbversion
+end
+
+function RSGeneralDB.GetDbVersion()
+	for _, dbversion in ipairs(RSGeneralDB.GetAllDbVersions()) do
+		if (dbversion.locale == GetLocale()) then
+			return dbversion
+		end
+	end
+
+	return nil
+end
+
+function RSGeneralDB.AddDbVersion(newVersion)
+	if (newVersion and private.dbglobal.dbversion) then
+		local localeExisting = false;
+		for i = #private.dbglobal.dbversion, 1, -1 do
+			if (not localeExisting and private.dbglobal.dbversion[i].locale == GetLocale()) then
+				localeExisting = true
+				private.dbglobal.dbversion[i].version = newVersion
+				private.dbglobal.dbversion[i].sync = nil
+				RSLogger:PrintDebugMessage(string.format("Idioma [%s]. Actualizando BD a version [%s]", GetLocale(), newVersion))
+			elseif (localeExisting and private.dbglobal.dbversion[i].locale == GetLocale()) then
+				-- Fix issue with versions multiplicating
+				tremove(private.dbglobal.dbversion, i)
+				RSLogger:PrintDebugMessage(string.format("Idioma [%s]. Eliminado por estar repetido", GetLocale()))
+			end
+		end
+		if (not localeExisting) then
+			tinsert(private.dbglobal.dbversion, { locale = GetLocale(), version = newVersion })
+			RSLogger:PrintDebugMessage(string.format("Idioma [%s]. Insertado version [%s] por primera vez para este idioma.", GetLocale(), newVersion))
+		end
+	end
+end
+
+function RSGeneralDB.GetLootDbVersion()
+	return private.dbglobal.lootdbversion
+end
+
+function RSGeneralDB.SetLootDbVersion(version)
+	private.dbglobal.lootdbversion = version
+end
+
+function RSGeneralDB.GetLastCleanDb()
+	return private.dbchar.lastClean
+end
+
+function RSGeneralDB.SetLastCleanDb()
+	private.dbchar.lastClean = time()
+end
+
+---============================================================================
+-- Search plugin integration
+---============================================================================
+
+function RSGeneralDB.ClearWorldMapTextFilter()
+	private.dbchar.worldMapTextFilter = nil
+end
+
+function RSGeneralDB.GetWorldMapTextFilter()
+	return private.dbchar.worldMapTextFilter
+end
+
+function RSGeneralDB.SetWorldMapTextFilter(text)
+	if (text == '') then
+		RSGeneralDB.ClearWorldMapTextFilter()
+	else
+		private.dbchar.worldMapTextFilter = text
+	end
+end
+
+---============================================================================
+-- Cinematics
+---============================================================================
+
+local isCinematicPlaying = false
+
+function RSGeneralDB.SetCinematicPlaying(value)
+	isCinematicPlaying = value
+end
+
+function RSGeneralDB.GetCinematicPlaying()
+	return isCinematicPlaying
+end
+
+---============================================================================
+-- Chat tooltip position
+---============================================================================
+
+function RSGeneralDB.SetChatTooltipPositionCoordinates(x, y)
+	if (x and y) then
+		private.db.chattipXPos = x
+		private.db.chattipYPos = y
+	end
+end
+
+function RSGeneralDB.GetChatTooltipPositionCoordinates()
+	return private.db.chattipXPos, private.db.chattipYPos
+end

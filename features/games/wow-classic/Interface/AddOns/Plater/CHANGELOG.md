@@ -1,9 +1,10 @@
 @cont1nuity:
-- Adding enrage and magic filters.
-- Staggering menu load to be safer on hardcore.
-- Auras should now consistently show accurately on all units.
-- Staggering uncritical updates on aura options to make it less impacting.
-- Changing the way the nameplate layout is done internally to improve on performance.
-- Pre-creating aura containers for better overall performance.
-- Adjusting unit type recognition to make it more consistent.
+- Some general performance improvements.
+- Mind Controls should no longer have enemy nameplates lingering when they switch to friendly again.
+- More WoW Forever compatibility.
+- Re-enable resources for WoW Forever.
+- Fixing some aura skinning issues.
+
+@Terciob:
+- Designer updates.
 

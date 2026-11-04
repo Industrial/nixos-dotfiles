@@ -9,8 +9,6 @@ local ActionBar = Bartender4.ActionBar
 
 local lsmlist = AceGUIWidgetLSMlists
 
-local WoW10 = select(4, GetBuildInfo()) >= 100000
-
 local tonumber, tostring, assert = tonumber, tostring, assert
 
 --[[===================================================================================
@@ -171,7 +169,7 @@ function module:GetOptionsObject()
 				desc = L["Hide the border around the action button."],
 				set = optSetter,
 				get = optGetter,
-				hidden = not WoW10,
+				hidden = not Bartender4.Features.ModernButtonBorder,
 			},
 		}
 
@@ -334,8 +332,8 @@ function module:CreateBarOption(id, options)
 		local order = 10 + barID
 		local name = self:GetBarName(id)
 		local desc = (L["Configure Bar %s"]):format(id)
-		-- remap WoW10 bars
-		if WoW10 then
+		-- remap Mainline Bars
+		if Bartender4.Features.MainlineBarLayout then
 			if barID == 7 or barID == 8 or barID == 9 or barID == 10 then
 				order = 13 + barID
 				desc = (L["Configure Class Bar %d"]):format(barID - 6) .. "\n\n" .. L["Usually used for druid shapeshift forms, but can be re-used for additional bars on other classes"]

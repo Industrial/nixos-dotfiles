@@ -194,7 +194,7 @@ end
 function core:RegisterEnableMob(moduleName, ...)
 	local module = bosses[moduleName]
 	if not module then
-		core:Error(("RegisterEnableMob failed, no boss module named '%s' found."):format(tostring(moduleName)))
+		core:Error(("RegisterEnableMob failed, no boss module named %q found."):format(tostring(moduleName)))
 	else
 		for i = 1, select("#", ...) do
 			local mobId = select(i, ...)
@@ -324,11 +324,6 @@ do
 		end
 	end
 
-	local function EnablePlugins()
-		for i = 1, #plugins do
-			plugins[i]:Enable()
-		end
-	end
 	local zoneList = loader.zoneTbl
 	local function CheckIfLeavingDelve(_, oldId, newId)
 		if zoneList[oldId] and not zoneList[newId] then
@@ -358,10 +353,8 @@ do
 				core.RegisterEvent(mod, "PLAYER_MAP_CHANGED", CheckIfLeavingDelve)
 			end
 
-			if IsLoggedIn() then
-				EnablePlugins()
-			else
-				core.RegisterEvent(mod, "PLAYER_LOGIN", EnablePlugins)
+			for i = 1, #plugins do
+				plugins[i]:Enable()
 			end
 
 			if loader.isRetail then
@@ -431,8 +424,8 @@ do
 			return BigWigsAPI:GetLocale("BigWigs: Encounters")[key]
 		end
 		function core:NewBoss(moduleName, zoneId, journalId)
-			if bosses[moduleName] then
-				core:Print(bossAlreadyRegistered:format(moduleName))
+			if bosses[moduleName] or bossesPendingInit[moduleName] then
+				core:Error(bossAlreadyRegistered:format(moduleName))
 			else
 				local m = setmetatable({
 					name = "BigWigs_Bosses_"..moduleName, -- XXX AceAddon/AceDB backwards compat
@@ -448,9 +441,8 @@ do
 					RegisterEvent = core.RegisterEvent,
 					UnregisterEvent = core.UnregisterEvent,
 				}, bossMeta)
-				bosses[moduleName] = m
 				initModules[#initModules+1] = m
-				bossesPendingInit[moduleName] = true
+				bossesPendingInit[moduleName] = m
 
 				if journalId then
 					local name = EJ_GetEncounterInfo(journalId)
@@ -480,8 +472,8 @@ do
 		local L = BigWigsAPI:GetLocale("BigWigs")
 		local pluginMeta = { __index = pluginPrototype, __metatable = false }
 		function core:NewPlugin(moduleName, globalFuncs)
-			if plugins[moduleName] then
-				core:Print(pluginAlreadyRegistered:format(moduleName))
+			if plugins[moduleName] or pluginsPendingInit[moduleName] then
+				core:Error(pluginAlreadyRegistered:format(moduleName))
 			else
 				local m = setmetatable({
 					name = "BigWigs_Plugins_"..moduleName, -- XXX AceAddon/AceDB backwards compat
@@ -497,10 +489,8 @@ do
 					RegisterEvent = core.RegisterEvent,
 					UnregisterEvent = core.UnregisterEvent,
 				}, pluginMeta)
-				plugins[#plugins+1] = m
-				plugins[moduleName] = m
 				initModules[#initModules+1] = m
-				pluginsPendingInit[moduleName] = true
+				pluginsPendingInit[moduleName] = m
 
 				return m, L
 			end
@@ -713,13 +703,16 @@ do
 		end
 
 		function core:RegisterBossModule(moduleName)
-			local module = bosses[moduleName]
+			local module = bossesPendingInit[moduleName]
 			if not module then
-				error(("RegisterBossModule failed, no boss module named '%s' found."):format(tostring(moduleName)))
-			elseif not bossesPendingInit[moduleName] then
-				error(("RegisterBossModule failed, boss module '%s' is already registered."):format(tostring(moduleName)))
+				core:Error(("RegisterBossModule failed, no boss module named '%s' is ready to be registered."):format(tostring(moduleName)))
 			else
 				bossesPendingInit[moduleName] = nil
+				bosses[moduleName] = module
+				if module._enableMobsTemp then
+					core:RegisterEnableMob(moduleName, unpack(module._enableMobsTemp))
+				end
+				module._enableMobsTemp = nil
 				module.SetupOptions = moduleOptions
 				module:SetupOptions()
 
@@ -746,14 +739,34 @@ do
 		end
 	end
 
-	function core:RegisterPlugin(moduleName)
-		local module = plugins[moduleName]
+	function core:AddColors(moduleName, options)
+		local module = bosses[moduleName] or bossesPendingInit[moduleName]
 		if not module then
-			error(("RegisterPlugin failed, no plugin named '%s' found."):format(tostring(moduleName)))
-		elseif not pluginsPendingInit[moduleName] then
-			error(("RegisterPlugin failed, plugin '%s' is already registered."):format(tostring(moduleName)))
+			-- Can't do errors as some modules purposely don't load for alliance/horde but will still be in !Options
+			--core:Error(("AddColors: Invalid module %q."):format(moduleName))
+			return
+		end
+		module.colorOptions = options
+	end
+
+	function core:AddSounds(moduleName, options)
+		local module = bosses[moduleName] or bossesPendingInit[moduleName]
+		if not module then
+			-- Can't do errors as some modules purposely don't load for alliance/horde but will still be in !Options
+			--core:Error(("AddSounds: Invalid module %q."):format(moduleName))
+			return
+		end
+		module.soundOptions = options
+	end
+
+	function core:RegisterPlugin(moduleName)
+		local module = pluginsPendingInit[moduleName]
+		if not module then
+			core:Error(("RegisterPlugin failed, no plugin named '%s' is ready to be registered."):format(tostring(moduleName)))
 		else
 			pluginsPendingInit[moduleName] = nil
+			plugins[#plugins+1] = module
+			plugins[moduleName] = module
 			local defaultDB, defaultGlobalDB = nil, nil
 			if type(module.defaultDB) == "table" then
 				defaultDB = module.defaultDB
@@ -770,11 +783,12 @@ do
 				module:OnRegister()
 				module.OnRegister = nil
 			end
-			core:SendMessage("BigWigs_PluginOptionsReady", module.moduleName, module.pluginOptions, module.subPanelOptions)
 
 			if coreEnabled then
 				module:Enable() -- Support LoD plugins that load after we're enabled (e.g. zone based)
 			end
+
+			core:SendMessage("BigWigs_PluginOptionsReady", module.moduleName, module.pluginOptions, module.subPanelOptions)
 		end
 	end
 end
@@ -827,24 +841,6 @@ function core:GetPlugin(moduleName, silent)
 		end
 		return moduleTbl
 	end
-end
-
-function core:AddColors(moduleName, options)
-	local module = bosses[moduleName]
-	if not module then
-		-- core:Error(("AddColors: Invalid module %q."):format(moduleName))
-		return
-	end
-	module.colorOptions = options
-end
-
-function core:AddSounds(moduleName, options)
-	local module = bosses[moduleName]
-	if not module then
-		-- core:Error(("AddSounds: Invalid module %q."):format(moduleName))
-		return
-	end
-	module.soundOptions = options
 end
 
 -------------------------------------------------------------------------------

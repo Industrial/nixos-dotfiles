@@ -1,0 +1,35 @@
+## Interface: 120100, 50504, 40402, 38002, 30405, 20506, 16001, 11509
+## Title: BetterBags - iLvl
+## Category: Inventory
+## Notes: Adds an iLvl filter to BetterBags.
+## Author: OrenYoh
+## Version: 2.7.1
+## IconTexture: Interface\AddOns\BetterBags_iLvl\images\ilvl
+## Dependencies: BetterBags
+## OptionalDeps: BetterBags_Tabards, BetterBags_Legendary
+## SavedVariablesPerCharacter: BetterBags_iLvlDB
+## X-Curse-Project-ID: 1014142
+## X-Wago-ID: RNL9j06o
+
+# Locales
+i18n\enUS.lua
+i18n\frFR.lua
+i18n\zhTW.lua
+i18n\zhCN.lua
+i18n\deDE.lua
+i18n\esES.lua
+i18n\esMX.lua
+i18n\itIT.lua
+i18n\koKR.lua
+i18n\ptBR.lua
+
+# Main
+BetterBags_iLvl.lua
+
+# Core
+core/config.lua
+core/frame.lua
+
+# Modules
+modules/filter.lua
+modules/options.lua

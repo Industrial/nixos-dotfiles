@@ -11,12 +11,12 @@ V =
       "Zeige nur wenn angelegt", "Outfit", "Ausstattungen", "Begleiterfähigkeit", "Begleiterfähigkeiten", "Zielmarkierungssymbol", "Weltmarkierung", "Markierungssymbole", "Klingenschluchtküste", "Zeige einen Platzhalter wenn nicht verfügbar",
       "Zauber", "Spielzeug", "Spielzeuge", "UI Fenster", z, "Erneut benutzen, damit dieses Aussehen durch eine Situation ersetzt werden kann.", "Erneut benutzen, um zu verhindern, dass dieses Aussehen durch eine Situation ersetzt wird.", "Benutze den höchsten bekannten Rang", "Zonenfähigkeiten",
     }
-    or C == "esES" and { -- 43/49 (87%)
-      "Habilidades", z, "Usar otros artículos con el mismo nombre", "Apariencia bloqueada", "Apariencia desbloqueada", "Mascota de duelo", "Mascotas de duelo", "Calendario", z, "Macro personalizado",
+    or C == "esES" and { -- 48/49 (97%)
+      "Habilidades", "Acción", "Usar otros artículos con el mismo nombre", "Apariencia bloqueada", "Apariencia desbloqueada", "Mascota de duelo", "Mascotas de duelo", "Calendario", "Entre facciones", "Macro personalizado",
       "Montura de Dracoequitación", "Conjunto de equipamiento", "Hueco de Equipo", "Conjuntos de equipamiento", "Equipado", "Botón de acción extra", "Montura voladora", "Punto de la Fundadora", "Menú de juego", "Montura terrestre",
       z, "Panel de interfaz", "Artículo", "Artículos", "Macro", "Macros", "Misceláneo", "Montura", "Monturas", "Nueva macro",
-      "Mostrar sólo al equipar", "Atuendo", z, "Habilidad de mascota", "Habilidades de mascota", "Marcador de objetivo", "Marcador del mundo", "Marcadores del mundo", "Costas del Ventajo", "Mostrar un marcador cuando no esté disponible",
-      "Hechizo", "Juguete", "Juguetes", "Paneles de IU", z, z, "Usar otra vez para prevenir que esta apariencia sea reemplazada por una Situación.", "Usar el rango mas alto", "Habilidades de zona",
+      "Mostrar sólo al equipar", "Atuendo", "Atuendos", "Habilidad de mascota", "Habilidades de mascota", "Marcador de objetivo", "Marcador del mundo", "Marcadores del mundo", "Costas del Ventajo", "Mostrar un marcador cuando no esté disponible",
+      "Hechizo", "Juguete", "Juguetes", "Paneles de IU", "Desbloquea la apariencia cuando cambies", "Usalo de nuevo para permitir que esta apariencia sea reemplazada por una Situación", "Usar otra vez para prevenir que esta apariencia sea reemplazada por una Situación.", "Usar el rango mas alto", "Habilidades de zona",
     }
     or C == "esMX" and { -- 49/49 (100%)
       "Habilidades", "Acción", "Usar otros artículos con el mismo nombre", "Apariencia bloqueada", "Apariencia desbloqueada", "Mascota de duelo", "Mascotas de duelo", "Calendario", "Entre facciones", "Macro personalizado",
@@ -55,10 +55,10 @@ V =
     }
     or C == "zhCN" and { -- 49/49 (100%)
       "技能", "动作条动作", "同时使用同名物品", "外观已锁定", "外观已解锁", "战斗宠物", "战斗宠物", "日历", "跨阵营", "自定义宏",
-      "驭龙术坐骑", "装备方案", "装备栏位", "装备套装", "可使用装备", "额外技能", "飞行坐骑", "创始者之角", "主菜单", "地面坐骑",
+      "驭空术坐骑", "装备方案", "装备栏位", "装备套装", "可使用装备", "任务动作图标", "飞行坐骑", "创始者之角", "主菜单", "地面坐骑",
       "家宅", "界面面板", "物品", "物品", "宏", "宏", "杂项", "坐骑", "坐骑", "新建宏",
       "仅在装备时显示", "外观方案", "幻化套装", "宠物技能", "宠物技能", "团队标记", "世界标记", "团队标记", "烈风海岸", "不可用时仍显示（变暗）",
-      "法术", "玩具", "玩具", "UI面板", "切换后解锁该外观", "再次点击以允许该外观被情景外观替换。", "再次点击以禁止该外观被情景外观替换。", "使用已学会的最高等级技能", "区域能力",
+      "法术", "玩具", "玩具", "用户界面", "切换后解锁该外观", "再次点击以允许该外观被情景外观替换。", "再次点击以禁止该外观被情景外观替换。", "使用已学会的最高等级技能", "区域限定技能",
     }
     or C == "zhTW" and { -- 45/49 (91%)
       "技能", z, "也要使用名稱相同的物品", "外觀已鎖定", "外觀已解鎖", "戰寵", "戰寵", "行事曆", z, "自訂巨集",

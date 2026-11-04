@@ -211,6 +211,11 @@ L.autotalk_boss_desc = "自動選擇開始首領戰鬥的對話選項。"
 L.autotalk_generic_desc = "自動選擇使地城進入下一階段的對話選項。"
 L.autotalk_notice = "自動與 NPC %s互動。"
 
+-- Auto Player Choice
+--L.autoPlayerChoice = "Automatic Player Choice"
+--L.autoPlayerChoice_delve_power_desc = "Automatically select player powerups when they are dropped by creatures in the Delve."
+--L.autoPlayerChoice_notice = "Automatically selecting: %s"
+
 -- GUI notes
 L.intermissionOnly = "僅限階段轉換"
 L.stage1Only = "僅限第一階段"
@@ -306,6 +311,7 @@ L.arrows = "箭矢" -- Plural of L.arrow
 L.ball = "球" -- A ball, like a football, basketball, etc 球，可能還有寶珠
 L.balls = "球" -- Plural of L.ball
 L.blind = "致盲" -- Any ability that blinds or disorientates you. Usually an ability a boss casts and you need to turn away from the boss or it will blind you.
+L.blood = "血" -- Short for any ability with the name "Blood" in it e.g. "Blood Infusion" (1293969) or "Blood Hunter" (1225274)
 L.bouncing_ball = "接球" -- 彈跳球/傳接球 A ball, but it bounces, usually you need to prevent it touching the ground so it bounces to a different location
 L.bouncing_balls = "接球" -- Plural of L.bouncing_ball
 L.chakram = "飛刀" -- 通俗點來說，飛來飛去砍人的玩意都叫飛刀 Short for any ability with the name "Chakram" in it e.g. "Wind Chakram" (1258152) or "Solar Chakram" (186046)

@@ -1,10 +1,8 @@
-if not BigWigsLoader.isRetail then return end -- 12.1+ only module
-
 -------------------------------------------------------------------------------
 -- Module Declaration
 --
 
-local plugin, L = BigWigs:NewPlugin("Auras")
+local plugin, L = BigWigs:NewPlugin("Auras") -- Retail & Forever only module
 if not plugin then return end
 
 --------------------------------------------------------------------------------
@@ -181,15 +179,12 @@ local function ValidateAnchor(unitType, pointDB, relativeToDB, relPointDB, xOffs
 		db[unitType][yOffsetDB] = y
 	end
 
-	if relativeToDB and db[unitType][relativeToDB] ~= plugin.defaultDB[unitType][relativeToDB] then
-		local frame = _G[db[unitType][relativeToDB]]
-		if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or frame:IsForbidden() then
-			db[unitType][pointDB] = plugin.defaultDB[unitType][pointDB]
-			db[unitType][relPointDB] = plugin.defaultDB[unitType][relPointDB]
-			db[unitType][xOffsetDB] = plugin.defaultDB[unitType][xOffsetDB]
-			db[unitType][yOffsetDB] = plugin.defaultDB[unitType][yOffsetDB]
-			db[unitType][relativeToDB] = plugin.defaultDB[unitType][relativeToDB]
-		end
+	if relativeToDB and db[unitType][relativeToDB] ~= plugin.defaultDB[unitType][relativeToDB] and not BigWigsAPI.IsValidFrame(db[unitType][relativeToDB]) then
+		db[unitType][pointDB] = plugin.defaultDB[unitType][pointDB]
+		db[unitType][relPointDB] = plugin.defaultDB[unitType][relPointDB]
+		db[unitType][xOffsetDB] = plugin.defaultDB[unitType][xOffsetDB]
+		db[unitType][yOffsetDB] = plugin.defaultDB[unitType][yOffsetDB]
+		db[unitType][relativeToDB] = plugin.defaultDB[unitType][relativeToDB]
 	end
 end
 
@@ -1291,12 +1286,8 @@ do
 							anchor:UpdateAnchorPosition()
 						end
 					end,
-					validate = function(_, value)
-						local frame = _G[value]
-						if type(frame) ~= "table" or type(frame.GetObjectType) ~= "function" or type(frame.IsForbidden) ~= "function" or frame:IsForbidden() then
-							return false
-						end
-						return true
+					validate = function(_, frameName)
+						return BigWigsAPI.IsValidFrame(frameName)
 					end,
 					disabled = false,
 				},
@@ -2477,7 +2468,7 @@ end
 
 do
 	local dispelTypeList = { "Magic", "Curse", "Disease", "Poison", "Enrage", "Bleed", "None" }
-	local privateAuraSpellList = { 407221, 418720, 421828, 428970, 406317 }
+	local testSpellTextures = { 4914668, 4048815, 4914673, 4914674, 4630415 }
 
 	local methods = { -- pretty annoying
 		GetApplicationBar = false,
@@ -2568,10 +2559,8 @@ do
 		local aura = pool:Acquire()
 
 		-- Setup test aura info
-		local spellId = privateAuraSpellList[math.random(#privateAuraSpellList)]
+		local icon = testSpellTextures[math.random(#testSpellTextures)]
 		local dispelType = dispelTypeList[math.random(#dispelTypeList)]
-
-		local icon = C_Spell.GetSpellTexture(spellId)
 		local applications = math.random(0, 5)
 
 		local duration = C_DurationUtil.CreateDuration()

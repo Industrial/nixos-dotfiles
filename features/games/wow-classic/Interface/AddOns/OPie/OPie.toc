@@ -1,6 +1,6 @@
-## Interface: 11509, 20506, 50504, 120100
+## Interface: 11509, 20506, 50504, 16001, 120100, 16000
 ## Title: OPie
-## Version: 8.8.1
+## Version: 8.10.1
 ## License: All rights reserved. Do not redistribute, in whole or in part, without explicit prior permission from the author.
 ## Author: foxlit
 ## Notes: Group abilities into rings that appear when you hold down a binding.
@@ -41,11 +41,11 @@ UI\Options\Home.lua
 UI\Options\Options.lua
 UI\Options\Bindings.lua
 UI\Options\RingEdit.lua
+Meta\PSConfig.lua
 Meta\StanceBar.lua
 Meta\SpecSet.lua
 Meta\DataBroker.lua
 Meta\EQSet2.lua
-Meta\PSConfig.lua
 Bundle\QuestItems.lua
 Bundle\ExtraActions.lua
 Bundle\Mythport.lua

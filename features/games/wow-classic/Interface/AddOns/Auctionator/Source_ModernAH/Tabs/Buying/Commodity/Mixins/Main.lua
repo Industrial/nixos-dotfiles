@@ -179,7 +179,11 @@ function AuctionatorBuyCommodityFrameTemplateMixin:GetPrices()
   end
   local unitPrice = 0
   if self.selectedQuantity > 0 then
-    unitPrice = math.ceil(math.ceil(total / self.selectedQuantity / 100) * 100)
+    if Auctionator.Constants.IsForever then
+      unitPrice = math.ceil(total / self.selectedQuantity)
+    else
+      unitPrice = math.ceil(math.ceil(total / self.selectedQuantity / 100) * 100)
+    end
   end
 
   return unitPrice, total

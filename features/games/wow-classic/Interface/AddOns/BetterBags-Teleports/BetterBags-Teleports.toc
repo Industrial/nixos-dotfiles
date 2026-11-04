@@ -1,10 +1,10 @@
-## Interface: 120007, 120100, 50500, 40402, 11507, 11509
+## Interface: 120100, 120105
 
 ## Title: BetterBags - Teleports
 ## Author: Sauravisus (Xirastrasza - Argent Dawn EU, Horde)
 ## Notes: Puts all your hearthstones, and teleport items in one category.
-## Version: 3.1.4
-## X-Date: 2026-07-22T14:54:30Z
+## Version: 4.0.2
+## X-Date: 2026-09-21T19:04:06Z
 ## X-Category: Bags & Inventory
 ## X-Curse-Project-ID: 956341
 ## Dependencies: BetterBags
@@ -26,6 +26,18 @@
 ## Group: BetterBags
 
 
-data.lua
+data\init.lua
+data\classic.lua
+data\tbc.lua
+data\wotlk.lua
+data\cata.lua
+data\mists.lua
+data\wod.lua
+data\legion.lua
+data\bfa.lua
+data\sl.lua
+data\df.lua
+data\tww.lua
+data\midnight.lua
 main.lua
 

@@ -1,0 +1,16 @@
+## Interface: 120000,120001,120005,120007,120100,120105,16001
+## Title: Shadowed UF (Options)
+## Notes: Configuration for Shadowed Unit Frames.
+## Author: Shadowed
+## LoadOnDemand: true
+## Dependencies: ShadowedUnitFrames
+## Group: ShadowedUnitFrames
+
+#@no-lib-strip@
+libs\AceDBOptions-3.0\AceDBOptions-3.0.xml
+libs\AceGUI-3.0\AceGUI-3.0.xml
+libs\AceGUI-3.0-SharedMediaWidgets\widget.xml
+libs\AceConfig-3.0\AceConfig-3.0.xml
+#@end-no-lib-strip@
+
+config.lua
