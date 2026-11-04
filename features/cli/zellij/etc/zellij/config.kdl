@@ -1,15 +1,30 @@
 auto_layouts true
 copy_command "wl-copy --trim-newline"
 copy_on_select true
-default_layout "system"
+// A bare `zellij` gets zellij's built-in single-pane layout. The six-tab,
+// seventeen-pane operations dashboard is opt-in: `zellij --layout system`.
+default_layout "default"
 default_mode "normal"
 // Inherit $SHELL (login shell). Was hardcoded to "fish"; do not pin a shell here.
 layout_dir "/etc/zellij/layouts"
 mouse_mode true
 on_force_close "quit"
+// Kept in step with scrollback_lines_to_serialize so a resurrected pane carries
+// as much history as a live one.
 scroll_buffer_size 10000
-session_serialization false
+// Session resurrection: tabs, panes, cwds and running commands survive a
+// reboot. This is zellij's headline advantage over tmux and it was off.
+session_serialization true
+serialize_pane_viewport true
+scrollback_lines_to_serialize 10000
 theme "stylix"
+// Web server posture, declared rather than inherited: zellij 0.43+ ships a
+// built-in web client that serves sessions to a browser. Off on this fleet, and
+// sessions may not opt in either ("disabled" rather than "off"). Relax
+// web_sharing to "off" if per-session opt-in is ever wanted; both need a
+// restart to take effect.
+web_server false
+web_sharing "disabled"
 ui {
   pane_frames {
   rounded_corners true
@@ -34,6 +49,13 @@ keybinds clear-defaults=true {
   normal {
     // // Manual copy keybind (Alt+y for yank/copy)
     // bind "Alt y" { Copy; }
+  }
+  // The way out of locked mode. `clear-defaults=true` dropped zellij's own
+  // Ctrl-g lock and nothing replaced it, leaving no way to pass keys straight
+  // through to a nested TUI (nvim, lazygit, an inner zellij). Every other
+  // `shared_except` below excludes "locked" so that pass-through is total.
+  locked {
+    bind "Ctrl g" { SwitchToMode "normal"; }
   }
   resize {
     bind "Alt n" { SwitchToMode "normal"; }
@@ -174,6 +196,7 @@ keybinds clear-defaults=true {
     bind "x" { CloseFocus; SwitchToMode "normal"; }
   }
   shared_except "locked" {
+    bind "Ctrl g" { SwitchToMode "locked"; }
     bind "Alt q" { Quit; }
     bind "Alt n" { NewPane; }
     //bind "Alt i" { MoveTab "Left"; }
@@ -187,28 +210,28 @@ keybinds clear-defaults=true {
     bind "Alt [" { PreviousSwapLayout; }
     bind "Alt ]" { NextSwapLayout; }
   }
-  shared_except "normal" {
+  shared_except "normal" "locked" {
     bind "Enter" "Esc" { SwitchToMode "normal"; }
   }
-  shared_except "pane" {
+  shared_except "pane" "locked" {
     bind "Alt w" { SwitchToMode "pane"; }
   }
-  shared_except "resize" {
+  shared_except "resize" "locked" {
     bind "Alt n" { SwitchToMode "resize"; }
   }
-  shared_except "scroll" {
+  shared_except "scroll" "locked" {
     bind "Alt s" { SwitchToMode "scroll"; }
   }
-  shared_except "session" {
+  shared_except "session" "locked" {
     bind "Alt o" { SwitchToMode "session"; }
   }
-  shared_except "tab" {
+  shared_except "tab" "locked" {
     bind "Alt t" { SwitchToMode "tab"; }
   }
-  //shared_except "move" {
+  //shared_except "move" "locked" {
   //  bind "Alt h" { SwitchToMode "move"; }
   //}
-  shared_except "tmux" {
+  shared_except "tmux" "locked" {
     bind "Alt b" { SwitchToMode "tmux"; }
   }
 }

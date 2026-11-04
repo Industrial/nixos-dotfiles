@@ -1,9 +1,13 @@
 # Nushell Environment Config File
-# Loaded before config.nu (and before login.nu for login shells).
-# Keep this aligned with features/cli/fish environment.sessionVariables.
+# Loaded before config.nu, which is loaded before $nu.data-dir/vendor/autoload.
+#
+# The autoload files only run on the REPL path, so `nu -c '...'` and `nu script.nu`
+# never see 00-nixos-env.nu. That is why the editor and XDG assignments below stay
+# here: they are the non-interactive floor. The authoritative declaration is
+# features/cli/shell-init's environment.sessionVariables.
 
 # -----------------------------------------------------------------------------
-# Editors / XDG (matches Fish sessionVariables; EDITOR fixed to nvim)
+# Editors / XDG (matches environment.sessionVariables; EDITOR fixed to nvim)
 # -----------------------------------------------------------------------------
 $env.EDITOR = "nvim"
 $env.GIT_EDITOR = "nvim"
@@ -63,6 +67,8 @@ $env.config = ($env.config? | default {} | merge {
 })
 
 # -----------------------------------------------------------------------------
-# Starship — official init (export-env), not hand-rolled PROMPT_COMMAND
+# Starship is NOT sourced here. features/cli/shell-init generates `starship init
+# nu` at build time into $nu.data-dir/vendor/autoload/10-starship.nu, which Nushell
+# sources on its own. The committed starship.nu this line used to source was a copy
+# of that output and drifted from the installed binary.
 # -----------------------------------------------------------------------------
-source starship.nu

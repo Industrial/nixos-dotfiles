@@ -45,18 +45,12 @@ in {
     };
   };
 
+  # `environment.sessionVariables` used to be declared here. It is a global attribute with
+  # nothing fish-specific about it, and it now lives in features/cli/shell-init, which is what
+  # carries it into the shells NixOS's own POSIX glue does not reach.
   environment = {
     shells = with pkgs; [
       fish
     ];
-    sessionVariables = {
-      EDITOR = "nvim";
-      GIT_EDITOR = "nvim";
-      DIFFPROG = "nvim -d";
-      XDG_CACHE_HOME = "$HOME/.cache";
-      XDG_CONFIG_HOME = "$HOME/.config";
-      XDG_DATA_HOME = "$HOME/.local/share";
-      XDG_STATE_HOME = "$HOME/.local/state";
-    };
   };
 }

@@ -76,8 +76,19 @@ individually cheap above a 4 ms floor: Hávamál +3 ms, `direnv hook` +4 ms, `fz
 3 ms of a 206 ms startup, so there is no performance argument for dropping it.
 
 The `nu -l` figure is the one worth acting on, and it is not this leaf's: the login path pays
-for `features/cli/nushell/login.nu`'s own `bash --login -c "env -0"` round-trip, which a
-separate leaf deletes.
+for `features/cli/nushell/login.nu`'s own `bash --login -c "env -0"` round-trip.
+
+**Update, 2026-11-05:** that leaf has landed. `login.nu` and its `bash --login` round-trip
+are deleted, along with the committed `starship.nu`. `features/cli/shell-init` now generates
+starship, zoxide, carapace and atuin init plus a `00-nixos-env.nu` into
+`$nu.data-dir/vendor/autoload` at build time, which is where the NixOS session variables
+now reach Nushell.
+
+One load-order fact that matters when reading the numbers above: vendor autoload runs
+**after** `env.nu` and `config.nu`, and **only on the REPL path** — `nu -c` and `nu script.nu`
+never source it. That is why `env.nu` keeps its own `EDITOR`/`XDG_*` assignments as a
+non-interactive floor, and why a startup budget measured with `nu -c exit` would be blind to
+any of it.
 
 ### What `programs.fish.enable` still provides
 

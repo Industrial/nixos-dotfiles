@@ -1,0 +1,112 @@
+# Starship prompt, declared.
+#
+# `format` is written out module by module on purpose: `$all` drags in ~90
+# language/cloud modules, each of which costs a filesystem scan per prompt.
+# What is listed here is what the fleet actually uses.
+#
+# Colours are starship's own defaults or plain named ANSI colours. The base16
+# scheme that reaches the terminal is owned elsewhere; hand-picking hex here
+# would only be work to undo.
+"$schema" = 'https://starship.rs/config-schema.json'
+
+add_newline = true
+
+# Left edge stays one short line plus the prompt character; the clock lives in
+# right_format so it never pushes the cursor rightwards.
+format = """
+$directory\
+$git_branch\
+$git_state\
+$git_status\
+$nix_shell\
+$direnv\
+$cmd_duration\
+$status\
+$line_break\
+$character"""
+
+right_format = '$time'
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+style = 'cyan bold'
+
+[git_branch]
+format = 'on [$symbol$branch(:$remote_branch)]($style) '
+symbol = ' '
+style = 'bold purple'
+
+# Mid-rebase/merge/cherry-pick state, so an interrupted operation is visible
+# rather than inferred from a detached HEAD.
+[git_state]
+format = '\([$state( $progress_current/$progress_total)]($style)\) '
+style = 'bold yellow'
+
+# Spelled out instead of `$all_status` so the stash marker ($stashed) is a
+# declared part of the prompt and not an implementation detail of a shorthand.
+[git_status]
+format = '([\[$conflicted$stashed$deleted$renamed$modified$typechanged$staged$untracked$ahead_behind\]]($style) )'
+style = 'bold red'
+conflicted = '='
+stashed = '\$'
+deleted = '✘'
+renamed = '»'
+modified = '!'
+typechanged = ''
+staged = '+'
+untracked = '?'
+ahead = '⇡'
+behind = '⇣'
+diverged = '⇕'
+up_to_date = ''
+
+# `heuristic` stays off: on NixOS every shell binary already lives in
+# /nix/store, so the heuristic would report a nix shell permanently.
+[nix_shell]
+format = 'via [$symbol$state( \($name\))]($style) '
+symbol = '❄️  '
+style = 'bold blue'
+heuristic = false
+
+[direnv]
+disabled = false
+format = '[$symbol$loaded]($style) '
+symbol = 'direnv '
+style = 'bold bright-yellow'
+allowed_msg = ''
+not_allowed_msg = 'not allowed'
+denied_msg = 'denied'
+loaded_msg = 'on'
+unloaded_msg = 'off'
+
+[cmd_duration]
+min_time = 500
+format = 'took [$duration]($style) '
+style = 'bold yellow'
+
+[status]
+disabled = false
+format = '[$symbol$status]($style) '
+symbol = '✘'
+success_symbol = ''
+style = 'bold red'
+map_symbol = false
+recognize_signal_code = true
+
+# The shell runs edit_mode = vi, so the character module carries the mode
+# indicator: ❯ while inserting, ❮ in normal/visual/replace.
+[character]
+format = '$symbol '
+success_symbol = '[❯](bold green)'
+error_symbol = '[❯](bold red)'
+vimcmd_symbol = '[❮](bold green)'
+vimcmd_visual_symbol = '[❮](bold yellow)'
+vimcmd_replace_symbol = '[❮](bold purple)'
+vimcmd_replace_one_symbol = '[❮](bold purple)'
+
+[time]
+disabled = false
+format = '[$time]($style)'
+time_format = '%H:%M:%S'
+style = 'bold bright-black'

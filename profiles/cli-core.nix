@@ -14,6 +14,7 @@
     ../features/cli/fish
     ../features/cli/nushell
     ../features/cli/nushell-plugins
+    ../features/cli/shell-init
     ../features/cli/starship
     ../features/cli/zoxide
 
