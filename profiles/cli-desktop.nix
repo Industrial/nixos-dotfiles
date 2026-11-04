@@ -14,10 +14,12 @@
     ../features/cli/broot # Second TUI file manager; duplicates ranger in cli-core.
     ../features/cli/calcurse # Personal calendar — a headless host has no agenda.
     ../features/cli/fastfetch # neofetch-style banner; the output exists to be looked at.
+    ../features/cli/lazysql # Exploratory SQL browsing by hand; a service reaches its database in code.
     ../features/cli/leaves # Disk-usage treemap; duplicates dust in cli-core and needs eyes.
     ../features/cli/ngrok # Exposes a local dev server for a human demo, not fleet traffic.
     ../features/cli/nixos-update-notifier # Its user timer `wants` graphical-session.target.
     ../features/cli/nvtop # GPU process monitor; here the GPU is the display adapter.
+    ../features/cli/slumber # Postman-style HTTP requests driven by hand, same case as ngrok.
     ../features/cli/spotify-player # Music player — nobody listens to a server.
     ../features/cli/usbtree # Tree rendering of lsusb's data, for whoever plugged the thing in.
   ];

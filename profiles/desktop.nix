@@ -13,6 +13,7 @@
     ../features/network/tor
     ../features/nixos/window-manager
     ../features/window-manager/alacritty
+    ../features/window-manager/ghostty
     ../features/window-manager/gnome
     ../features/window-manager/hyprland
     ../features/window-manager/stylix
