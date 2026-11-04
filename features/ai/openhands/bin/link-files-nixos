@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# features > ai > openhands > link-files-nixos
+#
+# ~/.openhands becomes a symlink to this feature's .openhands payload, the same
+# shape features/ai/claude-code uses for ~/.claude.
+#
+# A DIRECTORY symlink, and that is the whole design constraint. OpenHands writes
+# settings.json back through persistence/store.py `_atomic_write_json`, which
+# ends in `tmp_path.replace(path)` — an atomic rename. A rename over a *file*
+# symlink replaces the symlink with a regular file, so per-file links (the shape
+# features/ai/opencode uses for config.json) would survive exactly until the
+# first save in the settings UI and then silently stop being declarative. With
+# the directory linked instead, the temp file and the rename both land inside
+# the payload, so a UI change shows up as a plain `git diff` here. Unlike
+# ~/.claude.json, Claude Code's own state file, OpenHands does not write
+# *through* a symlink — verified in store.py, and the reason this is a directory
+# link rather than a file one.
+#
+# Tier 3 — the repo's own .openhands, read relative to the workspace working
+# directory — is NOT handled here. That symlink lives inside the repository, so
+# it is committed rather than created at activation time, mirroring /.claude ->
+# .claude-setup/.claude. See ../project/README.md.
+#
+# Runtime state lands inside the payload by design and is gitignored; see
+# ../.gitignore for the split and why each entry is on the excluded side. An
+# existing real ~/.openhands is moved aside rather than deleted, and its
+# generated keys and conversation history are carried over so the auto-generated
+# API key and the automation database survive the swap.
+set -euo pipefail
+echo "features > ai > openhands > link-files-nixos"
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+featureDirectoryPath="$(dirname "$here")"
+sourceDirectoryPath="${featureDirectoryPath}/.openhands"
+targetDirectoryPath="${HOME}/.openhands"
+
+[ -d "${sourceDirectoryPath}" ] || {
+  echo "  no ${sourceDirectoryPath} (is the feature checked out?)" >&2
+  exit 1
+}
+
+if [ -L "${targetDirectoryPath}" ] &&
+  [ "$(readlink -f "${targetDirectoryPath}")" = "$(readlink -f "${sourceDirectoryPath}")" ]; then
+  echo "  ~/.openhands already linked"
+else
+  if [ -L "${targetDirectoryPath}" ]; then
+    rm -f "${targetDirectoryPath}"
+  elif [ -e "${targetDirectoryPath}" ]; then
+    backupPath="${targetDirectoryPath}.pre-dotfiles.$(date +%Y%m%d-%H%M%S)"
+    mv "${targetDirectoryPath}" "${backupPath}"
+    echo "  moved existing ~/.openhands -> ${backupPath}"
+    # Keep this list in step with ../.gitignore: anything gitignored there is
+    # runtime state, and runtime state is what has to survive the swap. The
+    # generated keys matter most — losing agent-canvas/ means the next start
+    # mints a new session key and every open browser tab is unauthenticated.
+    for item in \
+      secrets.json provider-connections agent-canvas automation cache \
+      profiles meta-profiles; do
+      [ -e "${backupPath}/${item}" ] || continue
+      [ -e "${sourceDirectoryPath}/${item}" ] && continue
+      cp -a "${backupPath}/${item}" "${sourceDirectoryPath}/${item}"
+    done
+    echo "  carried over runtime state (gitignored)"
+  fi
+
+  ln -sfn "${sourceDirectoryPath}" "${targetDirectoryPath}"
+  echo "  ~/.openhands -> ${sourceDirectoryPath}"
+fi
+
+# `_ensure_secure_directory` chmods the persistence dir to 0700 on first write
+# and `_atomic_write_json` lands files at 0600. Doing it up front keeps the
+# first run from reporting a permissions change on a tracked file, and keeps
+# secrets.json out of a group-readable state in the window before it is written.
+chmod 700 "${sourceDirectoryPath}"
+find "${sourceDirectoryPath}" -maxdepth 1 -type f -name '*.json' -exec chmod 600 {} +
+echo "  tightened payload permissions (0700 dir, 0600 json)"

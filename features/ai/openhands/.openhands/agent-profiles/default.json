@@ -1,0 +1,16 @@
+{
+  "schema_version": 4,
+  "agent_kind": "acp",
+  "id": "f5319013-3b46-4e28-a2e9-8aa8b6cd770c",
+  "name": "default",
+  "revision": 3,
+  "mcp_server_refs": null,
+  "secret_refs": null,
+  "acp_server": "claude-code",
+  "acp_model": null,
+  "acp_session_mode": null,
+  "acp_prompt_timeout": 1800.0,
+  "acp_startup_timeout": 90.0,
+  "acp_command": null,
+  "acp_args": null
+}

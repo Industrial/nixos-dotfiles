@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# features > ai > openhands > check-payload
+#
+# The invariants that make this payload usable as ~/.openhands. Run it after any
+# change to the feature, and before the switch.
+#
+# Same spirit as features/ai/claude-code/bin/check-payload: assert rather than
+# trust, because the interesting failures here are silent. A secret that drifts
+# into git, a settings.json whose active_agent_profile_id points at a profile
+# that is not committed, a payload that stopped being linked — none of those
+# announce themselves at runtime.
+set -uo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+feature="$(dirname "$here")"
+payload="$feature/.openhands"
+project="$feature/project"
+dotfiles="$(cd "$feature/../../.." && pwd)"
+
+fails=0
+pass() { printf '  ok    %s\n' "$1"; }
+fail() {
+  printf '  FAIL  %s\n' "$1"
+  fails=$((fails + 1))
+}
+
+echo "check-payload $payload"
+
+# Runtime state lives inside the payload by design — ~/.openhands IS this
+# directory — so "is it present?" is not the question. "Is it committed?" is.
+tracked() { ! git -C "$dotfiles" check-ignore -q "$1" 2>/dev/null; }
+
+# 1 — the declarative files exist and parse. Everything else is downstream of
+# settings.json being loadable: `load(strict=False)` swallows a parse error and
+# returns None, which the server then treats as "no settings yet" and overwrites
+# with defaults. A corrupt file loses the config silently rather than loudly.
+for f in "$payload/settings.json" "$payload/agent-profiles/default.json"; do
+  rel="${f#"$feature"/}"
+  if [ ! -f "$f" ]; then
+    fail "missing $rel"
+  elif ! jq -e . "$f" >/dev/null 2>&1; then
+    fail "$rel is not valid JSON"
+  else
+    pass "$rel parses"
+  fi
+done
+
+# 2 — no secret is tracked. The highest-consequence check in the file: these
+# paths hold the automation API key and the auto-generated session keys, and a
+# dotfiles repo is pushed to a remote.
+leaked=0
+for s in \
+  "$payload/secrets.json" \
+  "$payload/agent-canvas/api-key.txt" \
+  "$payload/agent-canvas/automation-kv-secret.txt" \
+  "$payload/agent-canvas/secret-key.txt"; do
+  [ -e "$s" ] || continue
+  if tracked "$s"; then
+    fail "SECRET IS TRACKED: ${s#"$feature"/}"
+    leaked=$((leaked + 1))
+  fi
+done
+[ "$leaked" -eq 0 ] && pass "no secret file is tracked"
+
+# Belt and braces: ask git itself what it is carrying, rather than only checking
+# the paths this script happens to know about. A new key file upstream adds
+# would slip past the list above but not past this.
+staged_secrets="$(git -C "$dotfiles" ls-files "${payload#"$dotfiles"/}" |
+  grep -E '(secret|api-key|credential|token)' || true)"
+if [ -z "$staged_secrets" ]; then
+  pass "git ls-files finds no secret-shaped path in the payload"
+else
+  fail "secret-shaped paths tracked:"
+  printf '%s\n' "$staged_secrets" | sed 's/^/        /'
+fi
+
+# 3 — runtime state is excluded. Each of these is either large, machine-local,
+# or rewritten constantly; a tracked one turns every session into a dirty tree.
+unexcluded=0
+for r in \
+  "$payload/automation" \
+  "$payload/cache" \
+  "$payload/agent-canvas/dev_conversations" \
+  "$payload/agent-canvas/bash_events" \
+  "$payload/provider-connections"; do
+  [ -e "$r" ] || continue
+  if tracked "$r"; then
+    fail "runtime state is tracked: ${r#"$feature"/}"
+    unexcluded=$((unexcluded + 1))
+  fi
+done
+[ "$unexcluded" -eq 0 ] && pass "runtime state is gitignored"
+
+# 4 — settings.json and the committed profile agree. `active_agent_profile_id`
+# is a UUID pointing into agent-profiles/; if the profile it names is not in the
+# payload, a fresh host starts with the id set and the profile absent, and the
+# agent selection silently falls back to defaults.
+if [ -f "$payload/settings.json" ]; then
+  wanted="$(jq -r '.active_agent_profile_id // empty' "$payload/settings.json" 2>/dev/null)"
+  if [ -z "$wanted" ]; then
+    pass "no active_agent_profile_id to resolve"
+  else
+    found=0
+    for p in "$payload"/agent-profiles/*.json; do
+      [ -f "$p" ] || continue
+      [ "$(jq -r '.id // empty' "$p" 2>/dev/null)" = "$wanted" ] && found=1
+    done
+    if [ "$found" -eq 1 ]; then
+      pass "active_agent_profile_id resolves to a committed profile"
+    else
+      fail "active_agent_profile_id $wanted has no profile in the payload"
+    fi
+  fi
+fi
+
+# 5 — the agent shape this feature exists for. default.nix goes to real trouble
+# to make Claude Code work as the ACP backend (CLAUDE_CODE_EXECUTABLE, the
+# PYTHONPATH unset); settings.json choosing a different backend would make all
+# of that dead code without any error.
+if [ -f "$payload/settings.json" ]; then
+  kind="$(jq -r '.agent_settings.agent_kind // empty' "$payload/settings.json")"
+  server="$(jq -r '.agent_settings.acp_server // empty' "$payload/settings.json")"
+  if [ "$kind" = "acp" ] && [ "$server" = "claude-code" ]; then
+    pass "agent is acp/claude-code"
+  else
+    fail "agent is $kind/$server, expected acp/claude-code"
+  fi
+
+  # acp_isolate_data_dir must stay false. True points CLAUDE_CONFIG_DIR at a
+  # per-conversation directory, which hides the host's ~/.claude — the login,
+  # the skills, the MCP servers, the whole reason this backend was chosen.
+  iso="$(jq -r '.agent_settings.acp_isolate_data_dir' "$payload/settings.json")"
+  if [ "$iso" = "false" ]; then
+    pass "acp_isolate_data_dir is false (host ~/.claude stays visible)"
+  else
+    fail "acp_isolate_data_dir is $iso — the host Claude Code config would be hidden"
+  fi
+fi
+
+# 6 — ~/.openhands actually points here. Checked last because it is the one
+# invariant that depends on activation having run rather than on the contents.
+if [ -L "$HOME/.openhands" ] &&
+  [ "$(readlink -f "$HOME/.openhands")" = "$(readlink -f "$payload")" ]; then
+  pass "~/.openhands -> the payload"
+elif [ -e "$HOME/.openhands" ]; then
+  fail "~/.openhands exists but is not this payload — run bin/link-files-nixos"
+else
+  fail "~/.openhands missing — run bin/link-files-nixos"
+fi
+
+# 7 — Tier 3. A committed symlink, so this is a content check, not a link check.
+if [ -L "$dotfiles/.openhands" ] &&
+  [ "$(readlink -f "$dotfiles/.openhands")" = "$(readlink -f "$project")" ]; then
+  pass "/.openhands -> the project payload"
+else
+  fail "/.openhands is not a symlink to ${project#"$dotfiles"/}"
+fi
+
+if [ -f "$project/hooks.json" ] && ! jq -e . "$project/hooks.json" >/dev/null 2>&1; then
+  fail "project/hooks.json is not valid JSON"
+elif [ -f "$project/hooks.json" ]; then
+  pass "project/hooks.json parses"
+fi
+
+echo
+if [ "$fails" -eq 0 ]; then
+  echo "  all checks passed"
+else
+  echo "  $fails check(s) failed"
+fi
+exit "$fails"

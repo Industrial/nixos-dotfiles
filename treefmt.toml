@@ -102,6 +102,21 @@ priority = 3
 command = "biome"
 options = ["format", "--write"]
 includes = ["*.{js,jsx,ts,tsx,json}"]
+# Server-owned JSON, excluded because formatting it starts a fight the formatter
+# cannot win. ~/.openhands is a symlink to this payload, and the agent-server
+# writes settings.json back through `_atomic_write_json` on every change made in
+# the settings UI -- so biome reformats, the next save rewrites it in the
+# server's own style, and the tree is dirty again. The canonical form of these
+# files is whatever the server emits; see features/ai/openhands/.gitignore for
+# the declarative/runtime split and bin/link-files-nixos for why the directory
+# (not the file) is the symlink.
+#
+# Both globs are needed: `**/` matches one or more directory levels, so it
+# covers agent-profiles/default.json but NOT settings.json at the payload root.
+excludes = [
+  "features/ai/openhands/.openhands/*.json",
+  "features/ai/openhands/.openhands/**/*.json",
+]
 priority = 4
 
 [formatter.yaml]

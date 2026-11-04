@@ -28,10 +28,38 @@
 # different feature and would have to run on the rootless daemon
 # (features/nixos/docker/default.nix — there is no /var/run/docker.sock on these hosts).
 #
-# Canvas binds 127.0.0.1:8000 by default and keeps its state in ~/.openhands. Nothing here
-# opens a port or installs a service: this is the CLI, run on demand as `agent-canvas`.
-# Making it a systemd.user service is a separate decision and needs the state directory and
-# the session key thought through first.
+# Canvas binds 127.0.0.1:8000 by default. Nothing here opens a port or installs a service:
+# this is the CLI, run on demand as `agent-canvas`. Making it a systemd.user service is a
+# separate decision and needs the state directory and the session key thought through first.
+#
+#
+# CONFIGURATION IS DECLARATIVE, BUT NOT FROM THIS MODULE, because OpenHands splits its
+# config across three tiers with different writability and only one of them is Nix-shaped.
+#
+#   Tier 1 — agent-server infrastructure. `load_config()` (agent_server/config.py) reads a
+#   JSON file named by OPENHANDS_AGENT_SERVER_CONFIG_PATH, overlays OH_* env vars on top,
+#   and never writes back; the model is `frozen`. This is the only tier a Nix-store path
+#   would survive, and nothing here needs changing from its defaults yet — notably
+#   `acp_skill_sourcing = "native"`, which is what makes the ACP CLI read the host's own
+#   ~/.claude and the repository instead of OpenHands injecting its managed skills.
+#
+#   Tier 2 — user settings, ~/.openhands. The substantive tier: which agent backend, which
+#   model, MCP config, iteration limits, enabled skills. `agent-canvas --help` says it
+#   outright — "LLM settings are configured through the web UI settings page, not
+#   environment variables" — so the server owns the file and writes it back through
+#   `_atomic_write_json`, whose final `tmp.replace(path)` would replace a file symlink with
+#   a regular file. bin/link-files-nixos therefore links the DIRECTORY: ~/.openhands ->
+#   ./.openhands, so UI changes land in the payload as an ordinary git diff. Secrets and
+#   runtime state live in that directory too and are gitignored; see ./.gitignore.
+#
+#   Tier 3 — repository config, discovered relative to the workspace working directory.
+#   /.openhands at the dotfiles root is a tracked symlink to ./project, mirroring how
+#   /.claude is a tracked symlink to .claude-setup/.claude. No activation step: the link is
+#   inside the repo, so committing it is what reproduces it. See ./project/README.md.
+#
+# bin/check-payload asserts the invariants that hold this together — no secret tracked, the
+# active profile committed, the backend still acp/claude-code, acp_isolate_data_dir still
+# false. Run it after touching the payload.
 #
 # PYTHONPATH MUST BE UNSET, and this is the whole reason this module is not a one-liner.
 #

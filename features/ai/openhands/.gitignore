@@ -1,0 +1,64 @@
+# Runtime state OpenHands writes into ~/.openhands, which is a symlink to
+# .openhands/ here (bin/link-files-nixos). Declarative config stays tracked:
+#
+#   .openhands/settings.json
+#   .openhands/agent-profiles/
+#   project/            (Tier 3 — the repo's own .openhands, see project/README.md)
+#
+# The split is not cosmetic. settings.json is written back by the server through
+# persistence/store.py `_atomic_write_json`, which ends in `tmp.replace(path)`.
+# That is why ~/.openhands is a DIRECTORY symlink and not a file symlink: the
+# rename lands inside this directory, so the tracked file is updated in place
+# and shows up as a normal diff. A per-file symlink into the Nix store (or into
+# here) would be replaced by a regular file on the first save and silently stop
+# being declarative.
+#
+# Everything below is either a generated credential or state with no reason to
+# be reproducible. When adding an entry, prefer "does a fresh host want this
+# byte-for-byte?" over "is it small?".
+
+# --- credentials and generated keys ---
+# secrets.json holds OPENHANDS_AUTOMATION_API_KEY in plaintext (encrypted only
+# when OH_SECRET_KEY is set, which this repo deliberately does not set — there
+# is no agenix/sops here, so a committed key would be worse than a generated
+# one). The agent-canvas/*.txt files are the 48-byte keys the launcher
+# auto-generates and persists across restarts.
+.openhands/secrets.json
+.openhands/agent-canvas/api-key.txt
+.openhands/agent-canvas/automation-kv-secret.txt
+.openhands/agent-canvas/secret-key.txt
+.openhands/provider-connections/
+
+# --- conversation and session state ---
+.openhands/agent-canvas/dev_conversations/
+.openhands/agent-canvas/bash_events/
+.openhands/agent-canvas/storage/
+.openhands/agent-canvas/workspaces/
+.openhands/agent-canvas/tmux/
+.openhands/agent-canvas/logs/
+
+# --- automation service database ---
+.openhands/automation/
+
+# --- caches ---
+.openhands/cache/
+
+# --- lock files (fcntl targets, see persistence/store.py `_file_lock`) ---
+.openhands/.settings.lock
+.openhands/.secrets.lock
+.openhands/agent-profiles/.agent-profiles.lock
+.openhands/profiles/.profiles.lock
+.openhands/meta-profiles/.meta-profiles.lock
+
+# --- atomic-write temp files ---
+# `_atomic_write_json` writes a sibling temp file before the rename; a crash
+# between the two leaves it behind.
+.openhands/*.tmp
+.openhands/**/*.tmp
+
+# --- Tier 3 runtime ---
+# The SDK falls back to <workspace>/.openhands for the ACP credential root and
+# the npm cache when a conversation is not persisted (acp_agent.py:2528, 2535).
+# Normal persisted conversations never land here, but the fallback exists.
+project/acp/
+project/npm-cache/
