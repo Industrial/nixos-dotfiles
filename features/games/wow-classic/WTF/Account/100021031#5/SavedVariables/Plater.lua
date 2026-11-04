@@ -4,6 +4,7 @@ PlaterDB = {
 },
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Default",
+["Völundr Industrial"] = "Default",
 },
 ["captured_casts"] = {
 [116] = {

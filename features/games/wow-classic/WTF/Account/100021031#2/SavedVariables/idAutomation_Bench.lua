@@ -1,0 +1,5 @@
+
+idAutomation_BenchDB = {
+["runs"] = {
+},
+}

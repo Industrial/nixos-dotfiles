@@ -2,6 +2,7 @@
 HandyNotesDB = {
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Skelf Onyourshelf",
+["Völundr Industrial"] = "Skelf Onyourshelf",
 },
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
@@ -11,6 +12,7 @@ HandyNotesDB = {
 HandyNotes_HandyNotesDB = {
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Skelf Onyourshelf",
+["Völundr Industrial"] = "Skelf Onyourshelf",
 },
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {

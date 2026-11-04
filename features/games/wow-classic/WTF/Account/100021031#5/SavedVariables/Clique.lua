@@ -3,6 +3,7 @@ CliqueDB = nil
 CliqueDB3 = {
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Skelf Onyourshelf",
+["Völundr Industrial"] = "Skelf Onyourshelf",
 },
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {

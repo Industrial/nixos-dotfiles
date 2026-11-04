@@ -2,6 +2,7 @@
 TomTomDB = {
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Default",
+["Völundr Industrial"] = "Default",
 },
 ["profiles"] = {
 ["Default"] = {
@@ -35,6 +36,7 @@ TomTomWaypoints = nil
 TomTomWaypointsM = {
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Skelf Onyourshelf",
+["Völundr Industrial"] = "Skelf Onyourshelf",
 },
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
