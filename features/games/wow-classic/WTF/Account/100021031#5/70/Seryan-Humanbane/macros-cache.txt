@@ -1,0 +1,14 @@
+VER 3 0100000000000002 "ES" "134400"
+#showtooltip
+/use Earth Shock
+/startattack
+END
+VER 3 0100000000000001 "FS" "134400"
+#showtooltip
+/use Flame Shock
+/startattack
+END
+VER 3 0100000000000003 "HW" "134400"
+#showtooltip
+/cast [@mouseover,exists,help,nodead][] Healing Wave
+END

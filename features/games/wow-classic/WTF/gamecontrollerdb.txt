@@ -1,0 +1,3 @@
+# SDL2 Game Controller Mappings File
+# Add SDL mapping strings here for new or custom game controller mappings.
+# This file will not be overwritten once it has been created.
