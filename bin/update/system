@@ -40,8 +40,9 @@ else
 fi
 
 cd "$dotfiles_root"
-bin/update/login-shell "tom"
 
+# The login shell is NOT set here. `users.users.<name>.shell` in the NixOS config is the
+# single writer; activation applies it. See docs/adr/0005-shell-strategy.md.
 features/network/ladybird/bin/link-files-nixos
 features/programming/cursor/bin/link-files-nixos
 features/ai/opencode/bin/link-files-nixos

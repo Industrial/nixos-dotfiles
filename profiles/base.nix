@@ -37,6 +37,7 @@
     ../features/cli/killall
     ../features/cli/l
     ../features/cli/lazygit
+    ../features/cli/leaves
     ../features/cli/ll
     ../features/cli/lnav
     ../features/cli/lsof

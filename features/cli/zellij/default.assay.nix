@@ -1,6 +1,7 @@
 # Colocated suite: zellij packages (fetchurl stubbed).
 let
   assay = import ./../../../common/assay/default.nix;
+  src = builtins.readFile ./default.nix;
   mod = import ./default.nix {
     settings = {
       hostname = "h";
@@ -16,4 +17,8 @@ let
 in
   assay.suite "zellij" {
     packages = assay.eq mod.environment.systemPackages ["zellij" "wl-clipboard"];
+    pinsHintsPluginToTag =
+      assay.eq (builtins.match ".*/download/v.*" src != null) true;
+    noMovingHintsPluginTarget =
+      assay.eq (builtins.match ".*/latest/.*" src != null) false;
   }

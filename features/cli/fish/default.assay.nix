@@ -23,4 +23,13 @@ let
 in
   assay.suite "fish" {
     shape = assay.hasAttrs mod ["programs" "environment"];
+
+    # The sourced Hávamál path is created by havamal.nix's buildPhase; havamal.assay.nix
+    # asserts the other half. See docs/adr/0005-shell-strategy.md.
+    sourcesVendorConfEntry =
+      assay.eq (builtins.match ".*vendor_conf\\.d/Hávamál\\.fish.*" mod.programs.fish.interactiveShellInit != null) true;
+
+    # fish is a fallback, not the login shell: this module must not write
+    # users.users.<name>.shell. features/cli/nushell is the single writer.
+    declaresNoLoginShell = assay.eq (mod ? users) false;
   }

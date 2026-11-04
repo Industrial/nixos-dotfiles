@@ -5,7 +5,7 @@
   ...
 }: let
   zjstatus-hints = pkgs.fetchurl {
-    url = "https://github.com/b0o/zjstatus-hints/releases/latest/download/zjstatus-hints.wasm";
+    url = "https://github.com/b0o/zjstatus-hints/releases/download/v0.1.4/zjstatus-hints.wasm";
     hash = "sha256-k2xV6QJcDtvUNCE4PvwVG9/ceOkk+Wa/6efGgr7IcZ0=";
   };
 in {

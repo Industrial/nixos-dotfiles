@@ -36,7 +36,6 @@ bin/update/host
 
 This will:
 - Update the system using `nixos-rebuild switch`
-- Update the login shell
 - Link necessary files for certain features
 
 Other update commands:
@@ -46,7 +45,9 @@ Other update commands:
 - `bin/update/channels` - Update NixOS channels
 - `bin/update/profiles` - Update profiles
 - `bin/update/repositories` - Update git repositories
-- `bin/update/login-shell` - Update login shell only
+
+The login shell is set declaratively by `users.users.<name>.shell` and has exactly one
+writer; see `docs/adr/0005-shell-strategy.md`.
 
 ## System Management
 

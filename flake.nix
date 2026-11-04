@@ -94,6 +94,21 @@
     # the fleet's nix settings would be a separate trust decision, not a side effect of
     # installing a package.
     llm-agents.url = "github:numtide/llm-agents.nix";
+
+    # Prebuilt nix-index databases, so `comma` can answer "which package ships this
+    # binary?" immediately instead of each host spending a multi-hour local `nix-index`
+    # run to build the same index.
+    nix-index-database = {
+      url = "github:nix-community/nix-index-database";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Source-only: the upstream Nushell script collection. Consumed in wave 6 to emit a
+    # selected set of completers at build time; nothing from it is vendored into this repo.
+    nu-scripts = {
+      url = "github:nushell/nu_scripts";
+      flake = false;
+    };
   };
 
   nixConfig = {
