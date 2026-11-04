@@ -49,8 +49,6 @@ in {
     # Host / NixOS tooling extras
     systemd
     libinput
-    slumber
-    lazysql
 
     llvmPackages.llvm
   ];
