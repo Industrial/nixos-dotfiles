@@ -1,217 +1,183 @@
-# World of Warcraft Classic Configuration
+# World of Warcraft Configuration
 
-This feature module manages World of Warcraft Classic settings, AddOns, and configurations by symlinking them from your dotfiles to the Wine prefix.
+This feature module tracks World of Warcraft settings (`WTF/`) and AddOns
+(`Interface/`) in this repository and symlinks them into the Wine prefix, so the
+game reads and writes straight into your dotfiles.
 
 ## Directory Structure
 
 ```
 features/games/wow-classic/
-├── default.nix          # NixOS/home-manager module
+├── default.nix          # NixOS module (installs the link-wow-classic command)
 ├── default.assay.nix    # Tests
-├── WTF/                 # Settings, saved variables, account data
-└── Interface/           # AddOns
+├── bin/link-wow-classic # The linker
+├── WTF/                 # Settings, keybinds, macros, saved variables
+└── Interface/
     └── AddOns/          # Individual addon directories
+        ├── idAutomation       # git submodule (Industrial/idAutomation)
+        └── idAutomation_Bench # symlink -> idAutomation/bench/idAutomation_Bench
 ```
 
 ## How It Works
 
-The module creates out-of-store symlinks from your dotfiles to the WoW installation:
+`link-wow-classic` replaces the game's `WTF` and `Interface` directories with
+symlinks pointing back into this repo:
 
-- `~/.dotfiles/features/games/wow-classic/WTF/` → `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF/`
-- `~/.dotfiles/features/games/wow-classic/Interface/` → `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface/`
-
-**Out-of-store symlinks** mean the game can write to these files, and changes are immediately reflected in your dotfiles repo.
-
-## Initial Setup
-
-### 1. Enable the Feature
-
-Add to your host configuration (e.g., in `profiles/gaming.nix`):
-
-```nix
-imports = [
-  ./features/games/wow-classic
-];
+```
+<flavor>/WTF       -> ~/.dotfiles/features/games/wow-classic/WTF
+<flavor>/Interface -> ~/.dotfiles/features/games/wow-classic/Interface
 ```
 
-### 2. Rebuild System
+Because these are plain out-of-store symlinks, the game can write to them and
+changes show up immediately as working-tree changes here. No rebuild is needed
+for content changes — only for edits to `default.nix`.
+
+### Flavor directory detection
+
+Blizzard renames the product folder between releases (classic-era, beta,
+forever, retail, …). **The linker does not hardcode a name** — it scans the WoW
+root for the subdirectory containing a `.flavor.info` marker. Hardcoding broke
+once already when the install moved off the beta, which silently stopped
+linking.
+
+Overrides, both optional:
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `WOW_ROOT` | Directory holding the flavor folders | `~/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft` |
+| `WOW_FLAVOR_DIR` | Exact flavor folder; skips detection | auto-detected |
+| `DOTFILES_ROOT` | Location of this checkout | `$PWD` if it looks right, else `~/.dotfiles` |
+
+If several flavors are installed, detection is ambiguous and the linker exits
+with the candidate paths so you can pick one via `WOW_FLAVOR_DIR`.
+
+### Safety behaviour
+
+- A real (non-symlink) `WTF` or `Interface` in the game folder is **moved aside**
+  to `<name>.pre-link-<timestamp>`, never deleted.
+- A missing source directory in the repo is a hard error — the linker refuses to
+  create dangling symlinks into the game folder.
+- A missing WoW install is a hard error too, rather than a silent success.
+
+## Setup
+
+### 1. Enable the feature
+
+Already imported by `profiles/gaming.nix`:
+
+```nix
+imports = [ ../features/games/wow-classic ];
+```
+
+### 2. Rebuild
 
 ```bash
 bin/deploy fleet <hostname>
-# or
-nixos-rebuild switch
 ```
 
 This installs the `link-wow-classic` command.
 
-### 3. Copy Existing Configuration (First Time Only)
-
-If you already have WoW Classic installed with settings and AddOns:
+### 3. Link
 
 ```bash
-# From dotfiles root directory
-cd ~/.dotfiles
-
-# Copy WTF directory (settings, saved variables)
-cp -r "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/WTF" \
-      features/games/wow-classic/
-
-# Copy Interface directory (AddOns)
-cp -r "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/Interface" \
-      features/games/wow-classic/
-
-# Commit to git
-git add features/games/wow-classic/
-git commit -m "feat(wow): add existing WoW Classic configuration"
+bin/wow link          # from the dotfiles root
+link-wow-classic      # or the system command, from anywhere
 ```
-
-### 4. Create Symlinks
-
-Run the linking script to symlink dotfiles to WoW installation:
-
-```bash
-# From dotfiles root directory
-bin/wow link
-# or use the system command directly:
-link-wow-classic
-```
-
-This will:
-- Remove existing WTF and Interface directories in the WoW installation
-- Create symlinks pointing to your dotfiles
-- Display confirmation of symlink creation
 
 ## Workflow
 
-### Adding New AddOns
+### Adding AddOns
 
-**Option 1: Install via WoW AddOn Manager (Recommended)**
-1. Use WowUp, CurseForge, or install manually
-2. AddOns appear in `~/.dotfiles/features/games/wow-classic/Interface/AddOns/`
-3. Commit the new AddOns to git:
-   ```bash
-   git add features/games/wow-classic/Interface/AddOns/
-   git commit -m "feat(wow): add <AddonName> addon"
-   ```
+Install with WowUp or CurseForge and point the manager at the game's `Interface/AddOns`
+— it writes through the symlink into this repo. Then commit:
 
-**Option 2: Manual Installation**
-1. Download addon
-2. Extract to `~/.dotfiles/features/games/wow-classic/Interface/AddOns/<AddonName>/`
-3. Commit to git
+```bash
+git add features/games/wow-classic/Interface/AddOns/
+git commit -m "feat(wow): add <AddonName>"
+```
 
-**⚠️ Important: Addon Dependencies**
+Addon managers resolve library dependencies for you; hand-copied addons often
+fail with "missing dependency" because a library listed under `## Dependencies:`
+or `## RequiredDeps:` in the `.toc` was not fetched.
 
-Some addons require library dependencies (e.g., Memento requires ArcaneWizardLibrary). When manually copying addons:
-- **Recommended**: Use WowUp or CurseForge client - they automatically download dependencies
-- **Manual approach**: If you see errors like "missing dependency", either:
-  - Install via addon manager which handles dependencies
-  - Manually download and add the required library
-  - Remove the addon if you don't need it
+### Settings changes
 
-Dependencies are usually listed in the addon's `.toc` file under `## Dependencies:` or `## RequiredDeps:`.
+`WTF/` updates whenever you change settings, keybinds, macros, or addon config
+in game. Commit it like any other change:
 
-### Settings Changes
-
-Settings are automatically saved to `WTF/` when you:
-- Change in-game settings
-- Modify addon configurations
-- Switch characters or realms
-
-Just commit the changes:
 ```bash
 git add features/games/wow-classic/WTF/
 git commit -m "chore(wow): update settings"
 ```
 
-### Syncing to New Machine
+### Syncing to a new machine
 
-On a new machine with the same dotfiles:
-1. Install WoW Classic via Lutris
-2. Enable this feature module in your host config
-3. Rebuild with `bin/deploy fleet <hostname>`
-4. Run `bin/wow link` to create symlinks
-5. All settings and AddOns are now linked!
+1. Install WoW
+2. `bin/deploy fleet <hostname>`
+3. `git submodule update --init --recursive features/games/wow-classic/Interface/AddOns/idAutomation`
+4. `bin/wow link`
 
-## Important Directories in WTF/
+### The idAutomation submodule
 
-- `WTF/Account/<AccountName>/` - Account-wide settings
-- `WTF/Account/<AccountName>/<Realm>/<Character>/` - Character-specific settings
-- `WTF/Account/<AccountName>/SavedVariables/` - Account-wide addon data
-- `WTF/Account/<AccountName>/<Realm>/<Character>/SavedVariables/` - Character-specific addon data
-- `WTF/Config.wtf` - Global client configuration
+`Interface/AddOns/idAutomation` is a git submodule
+(`git@github.com:Industrial/idAutomation.git`), not tracked content. Commit and
+push inside the submodule, then bump the pointer in this repo. Restoring addons
+from a backup must **exclude** it, or you detach the submodule.
 
-## Git Considerations
+`idAutomation_Bench` is a relative symlink into the submodule's `bench/`
+directory — it is a dev-only harness that lives with its source, not a
+standalone addon. Keep it a symlink; copying it in creates a second source of
+truth.
 
-### What to Track
+## What gets tracked
 
-**Always track:**
-- Interface/AddOns/ (your addons)
-- WTF/Config.wtf (graphics, keybinds)
-- WTF/Account/*/SavedVariables/ (addon settings)
+Tracked:
 
-**Consider .gitignore:**
-- `WTF/Cache/` (cache files)
-- `*.bak` (backup files)
-- `*.old` (old config files)
+- `Interface/AddOns/` — all addons
+- `WTF/Config.wtf` — graphics, sound, cvars
+- `WTF/Account/*/` — keybinds (`bindings-cache.wtf`), macros (`macros-cache.txt`)
+- `WTF/**/SavedVariables/` — addon settings
 
-### .gitignore Example
+Ignored via `.gitignore`: `*.bak`, `*.old`, `*.log`, `WTF/Cache/`.
 
-Create `features/games/wow-classic/.gitignore`:
-```
-# Cache and temporary files
-WTF/Cache/
-*.bak
-*.old
+### Install-identity keys in Config.wtf
 
-# Logs (if any get created)
-*.log
-```
+`portal` and `agentUID` identify which product the install is. They belong to
+the *install*, not to your settings — a `Config.wtf` restored from a beta backup
+carries `portal "test"` and `agentUID "wow_classic_beta"`, which points a
+non-beta client at test infrastructure. When restoring settings across a product
+migration, take these two keys from the new install.
+
+### Account slot directories
+
+The game writes per-WoW-account directories under `WTF/Account/`, named either
+`<bnetID>#<slot>` or a legacy account name. The slot number is **not stable
+across installs**: the beta used `100021031#5` while the current install writes
+`100021031#2` and `2NDUSTRIAL`. All three are kept here so whichever the client
+picks finds data.
+
+If your UI comes up at defaults after a migration, the character data is under a
+slot the client is not reading. Check which directory the client touched most
+recently and rename the restored one to match.
 
 ## Troubleshooting
 
-### Symlinks Not Created
+**Nothing links.** Check detection:
 
-The module only creates symlinks if the WoW path exists:
 ```bash
-# Check if path exists
-ls -la "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/"
+ls -d "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft"/*/.flavor.info
 ```
 
-### Permission Issues
+**The game recreated real directories.** Usually a reinstall or repair. Re-run
+`bin/wow link`; the fresh directories get archived to `*.pre-link-*`.
 
-Ensure the Wine prefix is writable:
+**Permission issues.** The Wine prefix must be writable by you:
+
 ```bash
-ls -la "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_/"
-# Should show 'tom' as owner
-```
-
-### Changes Not Appearing
-
-Out-of-store symlinks mean:
-- Changes in WoW → immediately in dotfiles
-- Changes in dotfiles → immediately in WoW
-- No rebuild needed for content changes
-- Rebuild only needed if you modify `default.nix`
-
-## Alternative: Selective AddOn Tracking
-
-If you prefer to track only specific AddOns, edit `default.nix`:
-
-```nix
-# Instead of symlinking entire Interface directory:
-home.file."${wowClassicPath}/Interface/AddOns/WeakAuras" = {
-  source = config.lib.file.mkOutOfStoreSymlink "${dotfilesWowPath}/Interface/AddOns/WeakAuras";
-  recursive = true;
-};
-
-home.file."${wowClassicPath}/Interface/AddOns/Details" = {
-  source = config.lib.file.mkOutOfStoreSymlink "${dotfilesWowPath}/Interface/AddOns/Details";
-  recursive = true;
-};
+ls -la "$HOME/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/"
 ```
 
 ## References
 
-- [Home Manager Manual - home.file](https://nix-community.github.io/home-manager/options.html#opt-home.file)
-- [WowUp - AddOn Manager](https://wowup.io/)
-- [WoW Classic AddOns on CurseForge](https://www.curseforge.com/wow/addons)
+- [WowUp — AddOn Manager](https://wowup.io/)
+- [WoW AddOns on CurseForge](https://www.curseforge.com/wow/addons)

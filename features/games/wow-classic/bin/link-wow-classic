@@ -1,44 +1,100 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 echo "features > games > wow-classic > link-wow-classic"
 
-# Paths
-currentDirectoryPath=$(pwd)
-wowGamePath="${HOME}/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft/_classic_era_"
-wtfSourcePath="${currentDirectoryPath}/features/games/wow-classic/WTF"
-interfaceSourcePath="${currentDirectoryPath}/features/games/wow-classic/Interface"
-wtfTargetPath="${wowGamePath}/WTF"
-interfaceTargetPath="${wowGamePath}/Interface"
-
-# Check if WoW installation exists
-if [ ! -d "${wowGamePath}" ]; then
-  echo "WARNING: WoW Classic installation not found at ${wowGamePath}"
-  echo "Skipping symlink creation"
-  exit 0
+# Where the dotfiles checkout lives. This script is embedded into a nix store
+# wrapper by default.nix, so $BASH_SOURCE cannot be used to find the repo.
+# Order: explicit override, then $PWD if it looks like the checkout, then ~/.dotfiles.
+featureRelativePath="features/games/wow-classic"
+if [ -n "${DOTFILES_ROOT:-}" ]; then
+  dotfilesRootPath="${DOTFILES_ROOT}"
+elif [ -d "${PWD}/${featureRelativePath}" ]; then
+  dotfilesRootPath="${PWD}"
+else
+  dotfilesRootPath="${HOME}/.dotfiles"
 fi
 
-# Create symlinks
-echo "Creating symlinks for WoW Classic configuration..."
+featurePath="${dotfilesRootPath}/${featureRelativePath}"
+wtfSourcePath="${featurePath}/WTF"
+interfaceSourcePath="${featurePath}/Interface"
 
-# Remove existing directories if they exist and aren't symlinks
-if [ -e "${wtfTargetPath}" ] && [ ! -L "${wtfTargetPath}" ]; then
-  echo "Removing existing WTF directory..."
-  rm -rf "${wtfTargetPath}"
+if [ ! -d "${featurePath}" ]; then
+  echo "ERROR: dotfiles feature not found at ${featurePath}" >&2
+  echo "       Set DOTFILES_ROOT=/path/to/.dotfiles or run from the checkout root." >&2
+  exit 1
 fi
 
-if [ -e "${interfaceTargetPath}" ] && [ ! -L "${interfaceTargetPath}" ]; then
-  echo "Removing existing Interface directory..."
-  rm -rf "${interfaceTargetPath}"
+for sourcePath in "${wtfSourcePath}" "${interfaceSourcePath}"; do
+  if [ ! -d "${sourcePath}" ]; then
+    echo "ERROR: link source missing: ${sourcePath}" >&2
+    echo "       Refusing to create a dangling symlink into the game directory." >&2
+    exit 1
+  fi
+done
+
+# Locate the game's flavor directory. Blizzard renames this per product -- the
+# classic-era, beta, forever and retail installs each use a different folder --
+# so detect it via the .flavor.info marker rather than hardcoding a name.
+wowRootPath="${WOW_ROOT:-${HOME}/Games/battlenet/drive_c/Program Files (x86)/World of Warcraft}"
+
+if [ ! -d "${wowRootPath}" ]; then
+  echo "ERROR: WoW installation root not found at ${wowRootPath}" >&2
+  echo "       Set WOW_ROOT to the directory containing the flavor folders." >&2
+  exit 1
 fi
 
-# Create symlinks
+if [ -n "${WOW_FLAVOR_DIR:-}" ]; then
+  gamePath="${WOW_FLAVOR_DIR}"
+  if [ ! -d "${gamePath}" ]; then
+    echo "ERROR: WOW_FLAVOR_DIR does not exist: ${gamePath}" >&2
+    exit 1
+  fi
+else
+  flavorPaths=()
+  for candidatePath in "${wowRootPath}"/*/; do
+    [ -f "${candidatePath}.flavor.info" ] && flavorPaths+=("${candidatePath%/}")
+  done
+
+  case "${#flavorPaths[@]}" in
+    0)
+      echo "ERROR: no game flavor directory found under ${wowRootPath}" >&2
+      echo "       Looked for a subdirectory containing .flavor.info." >&2
+      exit 1
+      ;;
+    1)
+      gamePath="${flavorPaths[0]}"
+      ;;
+    *)
+      echo "ERROR: multiple game flavors found; pick one explicitly:" >&2
+      printf '         WOW_FLAVOR_DIR=%q\n' "${flavorPaths[@]}" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+echo "Game flavor directory: ${gamePath}"
+
+wtfTargetPath="${gamePath}/WTF"
+interfaceTargetPath="${gamePath}/Interface"
+
+# Move real directories aside instead of deleting them. The game writes live
+# settings here, so an unrecoverable delete is never the right default.
+timestamp="$(date +%Y%m%d-%H%M%S)"
+for targetPath in "${wtfTargetPath}" "${interfaceTargetPath}"; do
+  if [ -e "${targetPath}" ] && [ ! -L "${targetPath}" ]; then
+    archivePath="${targetPath}.pre-link-${timestamp}"
+    echo "Moving existing $(basename "${targetPath}") aside -> ${archivePath}"
+    mv -- "${targetPath}" "${archivePath}"
+  fi
+done
+
 echo "Linking WTF directory..."
-ln -sfn "${wtfSourcePath}" "${wtfTargetPath}"
+ln -sfnT "${wtfSourcePath}" "${wtfTargetPath}"
 
 echo "Linking Interface directory..."
-ln -sfn "${interfaceSourcePath}" "${interfaceTargetPath}"
+ln -sfnT "${interfaceSourcePath}" "${interfaceTargetPath}"
 
-echo "WoW Classic configuration linked successfully!"
-echo "  WTF: ${wtfTargetPath} -> ${wtfSourcePath}"
-echo "  Interface: ${interfaceTargetPath} -> ${interfaceSourcePath}"
+echo "WoW configuration linked successfully!"
+echo "  WTF:       ${wtfTargetPath} -> $(readlink "${wtfTargetPath}")"
+echo "  Interface: ${interfaceTargetPath} -> $(readlink "${interfaceTargetPath}")"
