@@ -174,55 +174,19 @@ def --env sessionize [] {
 }
 
 # ----------------------------------------------------------------------------
-# Auto-attach
+# No auto-attach
 # ----------------------------------------------------------------------------
 #
-# Interactive terminals get a multiplexer; nothing else does. The guard is deliberately
-# conservative because the failure mode is severe — a script or an agent that attaches is
-# trapped inside a pane, and `bin/update/system` is one of those scripts. So a `nu -c` is
-# kept out twice over: Nushell does not load this file for it at all (see the load-order
-# note at the top), and `$nu.is-interactive` would refuse even if it did —
-#   nu --config ~/.config/nushell/config.nu -c '...'
-# forces the file to load non-interactively, and the guard still answers false.
-
-# True when this shell should hand itself to zellij. `interactive` is $nu.is-interactive;
-# `on_terminal` is a closure so that the `tty` fork it costs is only paid once the free
-# env checks have passed. Everything else it reads is $env, so the guard can be exercised
-# without anything attaching:
-#   nu -c 'zellij-should-attach true {|| true}'
-def zellij-should-attach [interactive: bool, on_terminal: closure] {
-    # `nu -c`, `nu script.nu`, and the LSP / MCP / DAP servers.
-    if not $interactive { return false }
-    # Already a pane in a session, or another multiplexer owns this terminal.
-    if ($env.ZELLIJ? != null) { return false }
-    if ($env.TMUX? != null) { return false }
-    # Opt-out for anything that needs a bare shell — a startup benchmark, for one.
-    if (($env.ZELLIJ_AUTO_ATTACH? | default "1") == "0") { return false }
-    # Agent harnesses and editor terminals are interactive and on a tty, and a multiplexer
-    # in front of them breaks the pty they drive.
-    if ($env.CLAUDECODE? != null) or ($env.CURSOR_TRACE_ID? != null) { return false }
-    if ($env.INSIDE_EMACS? != null) or ($env.NVIM? != null) { return false }
-    if (($env.TERM_PROGRAM? | default "") in ["vscode", "cursor"]) { return false }
-    if (($env.TERM? | default "dumb") in ["", "dumb", "unknown"]) { return false }
-    if (which zellij | is-empty) { return false }
-    (do $on_terminal)
-}
-
-# Is stdin a terminal? SSH answers without forking: sshd allocated the pty.
-def zellij-on-terminal [] {
-    if ($env.SSH_TTY? != null) or ($env.SSH_CONNECTION? != null) { return true }
-    (^tty --silent | complete).exit_code == 0
-}
-
-if (zellij-should-attach $nu.is-interactive {|| zellij-on-terminal}) {
-    # Leaving the session cleanly (detach, or the last pane closing) leaves this shell with
-    # nothing to host, so it goes with it. A *failed* attach falls through to the REPL
-    # instead of handing back a terminal with no shell in it.
-    try {
-        zellij attach --create main
-        exit
-    }
-}
+# A terminal opens a shell, not a multiplexer. This file used to hand an interactive
+# shell to `zellij attach --create main` behind a conservative guard; the guard worked,
+# and the behaviour was still unwanted — every terminal becoming a zellij pane is a
+# decision a terminal should not make for you. Removed 2026-11-05.
+#
+# zellij is one word away when you want it (`zellij`, or `zellij --layout dev|ops|agents|
+# data`), and `sessionize` above (Alt-S) attaches a session named for a project. If you
+# ever want the old behaviour back, it belongs in the terminal emulator's own startup
+# command, not here — that way it applies to the terminal you chose to set it on rather
+# than to every shell on the system, including the ones scripts and agents open.
 
 # ============================================================================
 # Keybindings

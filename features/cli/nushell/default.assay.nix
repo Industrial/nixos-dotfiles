@@ -28,6 +28,20 @@ let
   # enough to catch a setting deleted, re-hand-written, or silently unbounded again.
   config = builtins.readFile ./config.nu;
   inConfig = needle: lib.hasInfix needle config;
+
+  # Code only: every `#`-to-end-of-line dropped. An ABSENCE claim read against the whole
+  # file is a lie waiting to happen — a comment explaining what was removed contains the
+  # very string the claim says is gone, and the claim fails while the code is correct.
+  # (That is exactly what happened when auto-attach was removed.) Presence claims can keep
+  # using inConfig; absence claims must use inConfigCode.
+  #
+  # `#` inside a string literal would be over-stripped. Nothing in config.nu has one, and
+  # configHasNoHashInStrings below fails if that ever stops being true.
+  configCode =
+    builtins.concatStringsSep "\n"
+    (map (line: builtins.head (lib.splitString "#" line))
+      (lib.splitString "\n" config));
+  inConfigCode = needle: lib.hasInfix needle configCode;
   fdCallSites = builtins.filter (lib.hasInfix "fd --type") (lib.splitString "\n" config);
 in
   assay.suite "nushell" {
@@ -93,13 +107,17 @@ in
       assay.eq (inConfig "zellij attach --create $name") true;
     sessionizerIsBoundToAKey = assay.eq (inConfig ''cmd: "sessionize"'') true;
 
-    # Auto-attach. Every one of these guards is load-bearing: without the first, `nu -c` and
-    # every agent and script that runs it ends up trapped inside a pane.
-    autoAttachRequiresInteractive = assay.eq (inConfig "if not $interactive { return false }") true;
-    autoAttachRefusesInsideAPane = assay.eq (inConfig "if ($env.ZELLIJ? != null) { return false }") true;
-    autoAttachRequiresTerminalOrSsh =
-      assay.eq [(inConfig "$env.SSH_TTY?") (inConfig "^tty --silent")] [true true];
-    autoAttachHasAnOptOut = assay.eq (inConfig "ZELLIJ_AUTO_ATTACH") true;
+    # No auto-attach. A terminal opens a shell, not a multiplexer. These assert the
+    # absence, so a future change that reintroduces it has to delete a test to do it.
+    # `sessionize` (asserted above) is the explicit way in, and it stays.
+    doesNotAutoAttach = assay.eq (inConfigCode "zellij attach --create main") false;
+    declaresNoAttachGuard = assay.eq (inConfigCode "def zellij-should-attach") false;
+    keepsNoAutoAttachOptOut = assay.eq (inConfigCode "ZELLIJ_AUTO_ATTACH") false;
+    doesNotExitTheShellOnStartup = assay.eq (inConfigCode "exit") false;
+
+    # The comment-stripping above is only sound while no string literal contains a '#'.
+    configHasNoHashInStrings =
+      assay.eq (builtins.match ''.*"[^"\n]*#[^"\n]*".*'' config != null) false;
 
     # Hávamál stays. It costs ~3 ms and it is the one piece of this shell that is not
     # utility; HAVAMAL=0 and the in-pane check are what keep it from being a nuisance.
