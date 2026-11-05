@@ -1,0 +1,297 @@
+#!/usr/bin/env bash
+set -euo pipefail
+#
+# Interactive Nushell startup budget.
+#
+# This repo put five generated autoload hooks and three nu_scripts completers in front of
+# a shell that used to be `nu` and nothing else. Every one of them was justified on its
+# own and none of them is the problem; the sum is. Nothing else in the tree measures the
+# sum, so this is the gate that keeps it honest — a convenience that costs 3 ms now has to
+# be argued for against a number instead of waved through.
+#
+# ---------------------------------------------------------------------------------------
+# What is measured, and why it is not `nu -c exit`
+# ---------------------------------------------------------------------------------------
+#
+# `nu -c exit` measures none of it. As of Nushell 0.116 `nu -c` and `nu script.nu` load
+# neither `env.nu` nor `config.nu` nor `$nu.data-dir/vendor/autoload` — `nu -c
+# '$env.config.edit_mode'` answers `emacs`, not the `vi` that config.nu sets. A benchmark
+# built on it would be blind to every file this gate exists to protect.
+#
+# The pinned method is therefore a replay: `nu -n -c` with `env.nu`, `config.nu` and every
+# `.nu` of the *built* vendor/autoload directory sourced explicitly, in the filename order
+# Nushell sources them, against a `nu -n -c ""` floor measured in the same hyperfine run.
+#
+# The alternative, a real pty — `script -qec "nu -i" /dev/null` — is the more faithful
+# shape and was rejected for the gate anyway:
+#
+#   * it needs a tty and an *activated* machine, because vendor/autoload only exists under
+#     $HOME after a rebuild. A runner has neither, and so does a host whose first switch
+#     is what the pull request is asking for. The gate has to answer before the switch.
+#   * it folds reedline construction and terminal probing into the number. Neither is ours
+#     and neither is what a change under features/cli/* can regress, so they are noise
+#     with a machine-dependent mean sitting on top of the signal.
+#   * on any host with the auto-attach guard on, it hands the benchmark to zellij.
+#
+# What the replay cannot see is the work behind `$nu.is-interactive`: the Hávamál stanza
+# (~3 ms) and the zellij auto-attach. That is a deliberate exclusion — a random file read
+# does not belong in a benchmark, and an attach even less so. HAVAMAL=0 and
+# ZELLIJ_AUTO_ATTACH=0 are exported below regardless: the guards already answer false for
+# `-c`, and this is the gate that runs against the next Nushell that changes its mind.
+#
+# ---------------------------------------------------------------------------------------
+# Why a ratio and not milliseconds
+# ---------------------------------------------------------------------------------------
+#
+# A shared GitHub runner is slower and noisier than the machine a millisecond budget would
+# have been written on, so a wall-clock threshold flakes. The gate is the ratio
+# startup/floor from a single hyperfine run on a single machine: both halves move with the
+# machine, and what is left is the thing we own.
+#
+# Measured on drakkar, 2026-11-05, hyperfine 2.0.0 / nushell 0.116.1, 100-350 runs each:
+#
+#   floor      `nu -n -c ""`                            8.3 ms  ± 0.7
+#   + env.nu + config.nu                               11.6 ms  ± 0.7
+#   + the five generated hooks (00-40)                 21.6 ms  ± 0.8
+#   + the three nu_scripts completers (52-54)          27.4 ms  ± 1.1   = 3.32x floor
+#
+# That third line also settles a disagreement the earlier waves left open: the config-load
+# phase before the completers landed was recorded once as 26.6 ms and once as 21.7 ms. This
+# harness puts it at 21.6 ms ± 0.8 over 139 runs, which is the 21.7 ms figure to within a
+# tenth of a millisecond; 26.6 ms does not reproduce.
+#
+# So the budget below is 4.0x, against a measured 3.32x — three full runs of this script on
+# an otherwise busy drakkar gave 3.32x, 3.38x and 3.38x:
+#
+#   * 0.6x of margin is four times the spread those three runs showed, and the spread is
+#     the floor's: each benchmark's *mean* is good to about ±0.1 ms (sigma/sqrt(n)), while
+#     the floor's mean itself wanders 7.8-8.3 ms between runs, which moves the ratio by
+#     ~0.15. A gate with less margin than that would flake on drakkar, never mind a runner.
+#   * in units of work the same margin is narrow, which is the point. Measured by injection:
+#     putting back the two completers wave 6 held back on budget grounds (cargo, docker;
+#     +2.4 ms) gives 3.85x and passes; five more upstream completers on top of those
+#     (gh, npm, just) gives 4.22x and fails. One more convenience is affordable, a habit of
+#     them is not.
+#   * at drakkar's 8.3 ms floor, 4.0x is 33 ms — tighter than the 35 ms the budget was
+#     originally written as, so moving to a ratio did not quietly buy slack the millisecond
+#     figure refused.
+#
+# Re-derive all of it with SHELL_BUDGET_AUTOLOAD (below) rather than trusting this comment.
+#
+
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+# ---------------------------------------------------------------------------------------
+# The budget. One declared place; everything below reads it and nothing restates it.
+# ---------------------------------------------------------------------------------------
+BUDGET_RATIO=4.0
+
+# hyperfine sampling. --min-runs is a floor for the slow benchmark; the fast one gets
+# 300+ runs out of hyperfine's default minimum wall time either way.
+WARMUP=5
+MIN_RUNS=50
+
+# Whose vendor/autoload is measured. Every host takes features/cli/shell-init with its
+# default hooks and completers, so this picks a machine to evaluate, not a configuration.
+HOST="${SHELL_BUDGET_HOST:-drakkar}"
+
+# Where the raw hyperfine JSON lands, so a regression can be read as a trend rather than a
+# bare pass/fail. .tmp is gitignored; on a runner the step summary below carries the same
+# fields into the run's permanent record.
+REPORT_JSON="${SHELL_BUDGET_JSON:-$ROOT/.tmp/shell-budget.json}"
+
+# ---------------------------------------------------------------------------------------
+# Toolchain
+# ---------------------------------------------------------------------------------------
+#
+# `nix-shell -p hyperfine nushell` would resolve against the *channel* — nixos-unstable on
+# a runner (.github/actions/setup-nix pins nix_path to it), and possibly nothing at all on
+# a host with no channels. A different nushell is a different startup cost, so the one
+# measured has to be the one this flake pins: `--inputs-from .` resolves `nixpkgs#` against
+# this flake's locked input. `devenv shell` stays out for the reason bin/ci/assay gives.
+if [[ -z "${SHELL_BUDGET_TOOLCHAIN:-}" ]]; then
+  export SHELL_BUDGET_TOOLCHAIN=1
+  exec nix shell --inputs-from . nixpkgs#hyperfine nixpkgs#nushell nixpkgs#jq -c "$0" "$@"
+fi
+
+# ---------------------------------------------------------------------------------------
+# The autoload directory under measurement
+# ---------------------------------------------------------------------------------------
+#
+# features/cli/shell-init keeps its derivation private — the module only ever mentions it
+# inside the activation script's text — so there is no `nix build .#something` for it. The
+# string context is the handle: a writeText holding that activation text has the autoload
+# directory as a build input, so realising the one realises the other, and the path can
+# then be read back out of the file.
+#
+# The `sessionVariables` override is what keeps that affordable. NixOS declares
+# NAUTILUS_4_EXTENSION_DIR as "${config.system.path}/lib/nautilus/extensions-4" and
+# GIO_EXTRA_MODULES as three gio module directories, so `00-nixos-env.nu` carries the
+# host's *entire* systemPackages closure as string context — nix will not write that file
+# until every package on the machine exists. Realising it verbatim costs a desktop closure
+# (on drakkar: ollama-cuda, a full nix-index database, the lot), which is not something a
+# pull request gate gets to download. Re-declaring each variable as its own value with the
+# context discarded produces a byte-identical file — same names, same values, same count of
+# conditional assignments, and the cost of `$env.FOO = "/nix/store/..."` does not depend on
+# whether that path has been built — off a derivation that depends on nothing but text.
+# Verified by `diff -r` against the real directory before this was pinned; the only
+# remaining runtime reference of the measured directory is starship.
+#
+# SHELL_BUDGET_AUTOLOAD skips all of that and measures a directory of `.nu` files given
+# directly. That is how you price a completer before adding it to the feature, and how you
+# check that this gate still bites: copy the built directory, drop another completer from
+# the nu_scripts input into the copy, and point this at it.
+autoload="${SHELL_BUDGET_AUTOLOAD:-}"
+if [[ -n "$autoload" ]]; then
+  echo "shell-budget: measuring the autoload directory given in SHELL_BUDGET_AUTOLOAD"
+else
+  echo "shell-budget: realising nixosConfigurations.${HOST}'s vendor/autoload..."
+  ref="$(nix build --no-link --print-out-paths --impure --expr "
+    let
+      flake = builtins.getFlake \"$ROOT\";
+      lib = flake.inputs.nixpkgs.lib;
+      host = flake.nixosConfigurations.${HOST};
+      # A sessionVariables value is a string or a list of them; NixOS joins the list with
+      # \":\" when it renders the file, so each element is stripped on its own.
+      bare = v:
+        if v == null
+        then null
+        else if builtins.isList v
+        then map (x: builtins.unsafeDiscardStringContext (toString x)) v
+        else builtins.unsafeDiscardStringContext (toString v);
+      measured = host.extendModules {
+        modules = [
+          {
+            # mkOverride 10 rather than mkForce: a feature that already forces one of these
+            # would otherwise collide with this definition at the same priority.
+            environment.sessionVariables =
+              lib.mapAttrs (_: v: lib.mkOverride 10 (bare v))
+                host.config.environment.sessionVariables;
+          }
+        ];
+      };
+    in
+      measured.pkgs.writeText \"nushell-vendor-autoload-ref\"
+        measured.config.system.activationScripts.nushellVendorAutoload.text
+  ")"
+  autoload="$(grep -oE '/nix/store/[a-z0-9]{32}-nushell-vendor-autoload' "$ref" | head -n1)"
+fi
+
+if [[ ! -d "$autoload" ]]; then
+  echo "shell-budget: not a directory: ${autoload:-<empty>}" >&2
+  exit 1
+fi
+
+autoload_files=("$autoload"/*.nu)
+if [[ ! -e "${autoload_files[0]}" ]]; then
+  echo "shell-budget: no .nu files in $autoload" >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------------------
+# Measure
+# ---------------------------------------------------------------------------------------
+#
+# A throwaway HOME, so the number does not depend on whose machine this is: env.nu builds
+# PATH out of $env.HOME at load, and 30-carapace.nu puts $HOME/.config/carapace/bin on it.
+# XDG_DATA_HOME goes with it, which keeps `nu` away from the real vendor/autoload — `-n`
+# already does that, but the guard costs nothing and the files here are the point.
+work="$(mktemp -d)"
+trap 'rm -rf "$work"' EXIT
+export HOME="$work/home"
+mkdir -p "$HOME"
+export XDG_DATA_HOME="$HOME/.local/share"
+export ZELLIJ_AUTO_ATTACH=0
+export HAVAMAL=0
+unset ZELLIJ TMUX NU_LOG_LEVEL || true
+
+nushell_dir="$ROOT/features/cli/nushell"
+replay="source '$nushell_dir/env.nu'; source '$nushell_dir/config.nu'; "
+for f in "${autoload_files[@]}"; do
+  replay+="source '$f'; "
+done
+
+# One run, outside hyperfine, so a replay that errors fails here with its error visible
+# rather than as a mysteriously fast benchmark. Nushell exits 0 on a `source` error.
+if ! out="$(nu -n -c "$replay print 'shell-budget-replay-ok'" 2>&1)" \
+  || [[ "$out" != *shell-budget-replay-ok* ]]; then
+  echo "shell-budget: the startup replay does not run clean:" >&2
+  echo "$out" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$REPORT_JSON")"
+hyperfine \
+  --warmup "$WARMUP" --min-runs "$MIN_RUNS" --style basic \
+  --export-json "$REPORT_JSON" \
+  -n floor 'nu -n -c ""' \
+  -n startup "nu -n -c \"$replay\""
+
+# ---------------------------------------------------------------------------------------
+# Report and verdict
+# ---------------------------------------------------------------------------------------
+if [[ "$(jq -r '.schema_version' "$REPORT_JSON")" != "2" ]]; then
+  echo "shell-budget: unexpected hyperfine JSON schema; the field names below moved" >&2
+  exit 1
+fi
+
+IFS=$'\t' read -r floor_ms floor_sd floor_n start_ms start_sd start_n ratio < <(
+  jq -r '
+    def wall($n): (.results[] | select(.name == $n) | .summary.time_wall_clock);
+    [ (wall("floor")   | .mean * 1000, .stddev * 1000, .count),
+      (wall("startup") | .mean * 1000, .stddev * 1000, .count),
+      ((wall("startup") | .mean) / (wall("floor") | .mean))
+    ] | @tsv
+  ' "$REPORT_JSON"
+)
+
+if [[ -z "${ratio:-}" ]]; then
+  echo "shell-budget: could not read the timings back out of $REPORT_JSON" >&2
+  exit 1
+fi
+
+headroom_ms="$(awk -v b="$BUDGET_RATIO" -v r="$ratio" -v f="$floor_ms" \
+  'BEGIN { printf "%.1f", (b - r) * f }')"
+
+printf '\nshell-budget: nushell interactive startup, replayed\n'
+printf '  nushell    %s\n' "$(nu --version)"
+printf '  autoload   %s (%d files)\n' "$autoload" "${#autoload_files[@]}"
+printf '  floor      %6.2f ms  +/- %.2f  (%d runs)  nu -n -c ""\n' "$floor_ms" "$floor_sd" "$floor_n"
+printf '  startup    %6.2f ms  +/- %.2f  (%d runs)  env.nu + config.nu + autoload\n' "$start_ms" "$start_sd" "$start_n"
+printf '  ratio      %6.2fx    budget %.2fx    headroom %s ms\n' "$ratio" "$BUDGET_RATIO" "$headroom_ms"
+
+# One greppable line per run: a sequence of these across CI logs is the trend.
+record="$(printf 'shell-budget\thost=%s\tfloor_ms=%.2f\tstartup_ms=%.2f\tratio=%.3f\tbudget=%.2f\tfiles=%d' \
+  "$HOST" "$floor_ms" "$start_ms" "$ratio" "$BUDGET_RATIO" "${#autoload_files[@]}")"
+printf '%s\n' "$record"
+if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+  {
+    printf '### Nushell startup budget\n\n'
+    printf '| floor | startup | ratio | budget |\n|---|---|---|---|\n'
+    printf '| %.2f ms | %.2f ms | %.2fx | %.2fx |\n\n' \
+      "$floor_ms" "$start_ms" "$ratio" "$BUDGET_RATIO"
+    printf '<pre>%s</pre>\n' "$record"
+  } >>"$GITHUB_STEP_SUMMARY"
+fi
+
+if awk -v r="$ratio" -v b="$BUDGET_RATIO" 'BEGIN { exit !(r <= b) }'; then
+  printf '\nshell-budget: OK\n'
+  exit 0
+fi
+
+cat >&2 <<EOF
+
+shell-budget: FAIL — interactive startup is $(printf '%.2f' "$ratio")x the \`nu -n\` floor on
+this machine, over the ${BUDGET_RATIO}x budget. That is $(awk \
+  -v s="$start_ms" -v f="$floor_ms" -v b="$BUDGET_RATIO" \
+  'BEGIN { printf "%.1f", s - b * f }') ms of this machine's time to give back.
+
+The startup path is features/cli/nushell/{env.nu,config.nu} plus every file
+features/cli/shell-init generates into vendor/autoload. To find the cost, bisect it:
+hyperfine \`nu -n -c "source FILE"\` against \`nu -n -c ""\` one file at a time, or re-run
+this script with SHELL_BUDGET_AUTOLOAD pointed at a directory holding a subset of them.
+
+cli.shellInit.completers is the knob meant to be turned down; a hook is not.
+EOF
+exit 1

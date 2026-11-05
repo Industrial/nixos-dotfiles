@@ -107,7 +107,11 @@ in {
           menubar-accel = "F10";
           menubar-detachable = false;
           menus-have-tearoff = false;
-          monospace-font-name = "JetBrains Mono 11";
+          # GNOME does not read fontconfig's monospace alias for this; it has its own key,
+          # so the family has to be named again here. It must stay the family
+          # features/window-manager/stylix declares and the terminals request -- it was
+          # "JetBrains Mono 11", which made GTK monospace text a fourth, disagreeing opinion.
+          monospace-font-name = "IosevkaTerm Nerd Font Mono 11";
           overlay-scrolling = true;
           scaling-factor = lib.gvariant.mkInt32 0;
           show-battery-percentage = true;

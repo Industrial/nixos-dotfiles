@@ -1,0 +1,8 @@
+name: 'Feature Reachability'
+description: 'Fail if a feature reaches no host closure'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run feature reachability check
+      shell: bash
+      run: ./bin/ci/feature-reachability

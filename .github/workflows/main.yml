@@ -40,6 +40,24 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Dead Code Detection
         uses: ./.github/actions/deadnix
+  feature-reachability:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      - name: Feature Reachability
+        uses: ./.github/actions/feature-reachability
+  lint-fetch-pins:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      - name: Fetch Pin Lint
+        uses: ./.github/actions/lint-fetch-pins
   assay:
     runs-on: ubuntu-latest
     steps:
@@ -49,6 +67,18 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Assay
         uses: ./.github/actions/assay
+  shell-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      # Same gate as the pull request workflow, and deliberately not a stricter one: the
+      # budget is a ratio measured on the runner it runs on, so there is nothing for main
+      # to tighten. What main adds is a continuous series of the measurement.
+      - name: Shell startup budget
+        uses: ./.github/actions/shell-budget
   stig:
     runs-on: ubuntu-latest
     steps:

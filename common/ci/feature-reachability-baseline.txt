@@ -1,0 +1,87 @@
+# Features (repo-relative) that reach no host closure today and are allowed to.
+# One glob/path per line. # comments allowed. Read by bin/ci/feature-reachability.
+#
+# Everything here was already unreachable when the check landed (wave 7 of the terminal
+# frontier mission). The check exists to stop the list growing, not to force 55 decisions
+# in one commit: a feature that becomes unreachable from now on fails CI instead.
+#
+# To remove an entry: wire the feature into a profile or host, or delete the feature.
+# bin/ci/feature-reachability prints a note naming entries that are no longer orphans.
+
+# --- Parked behind a commented-out import in profiles/ai.nix. -------------------------
+# Desktop/local AI apps kept as one-line opt-ins. Each resolves on 0 of 5 hosts.
+features/ai/anythingllm-desktop
+features/ai/litellm
+features/ai/lmstudio
+features/ai/n8n
+features/ai/ollama
+features/ai/opencode
+features/ai/paperclip
+
+# --- Parked behind a commented-out import in profiles/communication.nix. -------------
+features/communication/fractal
+features/communication/teams
+features/communication/telegram
+features/communication/weechat
+
+# --- profiles/creative.nix is itself commented out of hosts/drakkar. -----------------
+# gimp, obs-studio and openpencil are live imports *inside* that profile, which is why
+# only a closure walk sees them: the profile reaches no machine, so neither do they.
+features/creative/blender
+features/creative/gimp
+features/creative/inkscape
+features/creative/kdenlive
+features/creative/obs-studio
+features/creative/openpencil
+
+# --- Parked behind a commented-out import in profiles/crypto.nix. --------------------
+features/crypto/bisq
+features/crypto/monero
+features/crypto/solana
+
+# --- Parked behind a commented-out import in profiles/development.nix. ---------------
+features/finance/ib-gateway
+features/programming/bun
+features/programming/glogg
+features/programming/insomnia
+features/programming/meld
+features/programming/node
+features/programming/pgadmin
+features/programming/python
+features/programming/terraform
+features/programming/vscode
+features/programming/zig
+
+# --- Parked behind a commented-out import in profiles/base.nix. ----------------------
+features/network/mullvad
+
+# --- The mimir media stack. ----------------------------------------------------------
+# hosts/mimir/configuration.nix carries jellyfin, flexget, jackett, qbittorrent-nox,
+# transmission, seerr and invidious as commented-out imports; the rest of the *arr set
+# and the two shared wiring modules are referenced by nothing at all and come back with
+# the stack or leave with it.
+features/media/api-keys.nix
+features/media/arr-wiring.nix
+features/media/flexget
+features/media/invidious
+features/media/jackett
+features/media/jellyfin
+features/media/lidarr
+features/media/prowlarr
+features/media/qbittorrent-nox
+features/media/radarr
+features/media/readarr
+features/media/seerr
+features/media/sonarr
+features/media/transmission
+features/media/whisparr
+
+# --- Written, never wired. Referenced by no profile or host, commented or otherwise. --
+features/fleet/keepalived
+features/games/wow-forever
+features/hardware/zsa-voyager
+features/network/ladybird
+features/network/syncthing
+features/office/obsidian
+features/office/onlyoffice
+features/window-manager/slock

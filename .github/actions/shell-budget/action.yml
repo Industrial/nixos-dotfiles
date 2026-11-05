@@ -1,0 +1,8 @@
+name: 'Shell Startup Budget'
+description: 'Benchmark interactive Nushell startup against the nu -n floor on the same runner'
+runs:
+  using: 'composite'
+  steps:
+    - name: Nushell startup budget
+      shell: bash
+      run: ./bin/ci/shell-budget

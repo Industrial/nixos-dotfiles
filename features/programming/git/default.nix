@@ -79,6 +79,19 @@
       [delta]
         navigate = true
         side-by-side = true
+        # delta's syntax highlighting is bat's, so this defaults to $BAT_THEME -- which
+        # features/cli/bat sets to the same value. Declared here anyway, because git runs in
+        # contexts that never sourced a login shell (hooks, sudo, editors spawning `git
+        # diff`), and in those the default would silently become delta's own.
+        #
+        # "base16" renders through the terminal's palette rather than its own hex, so this is
+        # the gruvbox-dark-hard scheme by way of the ANSI colours
+        # features/window-manager/{alacritty,ghostty} emit. delta's plus/minus *backgrounds*
+        # are deliberately left at its defaults: base16 offers no dark red or dark green to
+        # derive them from, and every in-scheme alternative is worse -- tinted-delta uses
+        # base01 for both, which throws away the add/remove distinction, and a
+        # foreground-only style throws away the syntax highlighting instead.
+        syntax-theme = base16
       [rebase]
         autoStash = true
       [pull]

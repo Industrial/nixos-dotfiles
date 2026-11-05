@@ -49,6 +49,9 @@ Other update commands:
 The login shell is set declaratively by `users.users.<name>.shell` and has exactly one
 writer; see `docs/adr/0005-shell-strategy.md`.
 
+The terminal — shell load order, the generated zellij keymap, the startup budget and the
+escape hatches — is documented in [`docs/runbooks/terminal.md`](docs/runbooks/terminal.md).
+
 ## System Management
 
 ### Generations

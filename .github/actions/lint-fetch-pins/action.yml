@@ -1,0 +1,8 @@
+name: 'Fetch Pin Lint'
+description: 'Fail if a fetcher under features/ resolves a moving target'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run fetch pin lint
+      shell: bash
+      run: ./bin/ci/lint-fetch-pins

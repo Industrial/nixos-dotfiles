@@ -4,19 +4,52 @@ let
   # `writeTextFile = args: args.name` keeps the activation `.text` forceable
   # without a real nixpkgs: the stub must cover every pkgs attribute the text
   # interpolates, which here is writeTextFile and nothing else.
-  pkgs = {
-    ghostty = "ghostty";
-    writeTextFile = args: args.name;
+  settings = {
+    hostname = "h";
+    username = "alice";
+    userdir = "/home/alice";
   };
-  mod = import ./default.nix {
-    settings = {
-      hostname = "h";
-      username = "alice";
-      userdir = "/home/alice";
+  mkMod = writeTextFile:
+    import ./default.nix {
+      inherit settings;
+      pkgs = {
+        ghostty = "ghostty";
+        inherit writeTextFile;
+      };
     };
-    inherit pkgs;
-  };
+  mod = mkMod (args: args.name);
   activation = mod.system.activationScripts.linkGhosttyConfig.text;
+
+  palette = import ./../stylix/palette.nix;
+
+  # The file ghostty actually loads is the committed config plus a generated colour block.
+  # Everything below named `committed*` is about the first half; the `generated*` cases are
+  # about the second. Keeping them apart is what lets the neutrality tripwires survive: the
+  # hand-written file must still carry no colour, because the only sanctioned way to change
+  # the scheme is features/window-manager/stylix/palette.nix.
+  generatedConfig =
+    builtins.head
+    (builtins.match ".*ln -sf (.*) /home/alice/[.]config/ghostty/config[.]ghostty\n"
+      (mkMod (args: args.text)).system.activationScripts.linkGhosttyConfig.text);
+  generatedPairs =
+    map (l: let
+      m = builtins.match " *([a-z0-9-]+) *= *(.*)" l;
+    in {
+      key = builtins.elemAt m 0;
+      value = builtins.elemAt m 1;
+    })
+    (builtins.filter (l: builtins.match " *([#].*)?" l == null)
+      (builtins.filter builtins.isString (builtins.split "\n" generatedConfig)));
+  generatedGet = k: map (p: p.value) (builtins.filter (p: p.key == k) generatedPairs);
+  # `palette = N=#rrggbb`, which ghostty accumulates rather than replaces.
+  paletteSlots =
+    map (v: let
+      m = builtins.match "([0-9]+)=(#[0-9a-f]{6})" v;
+    in {
+      index = builtins.elemAt m 0;
+      color = builtins.elemAt m 1;
+    })
+    (generatedGet "palette");
 
   # Ghostty's config is "key = value", not TOML, so there is no fromTOML to
   # lean on -- parse it here instead, and let a line that does not parse fail
@@ -42,9 +75,14 @@ let
 
   # The monospace family is owned by stylix. Read the literal out of that file
   # rather than restating it, so the two cannot drift apart silently.
+  #
+  # The anchor is stylix's `monospaceName` let-binding rather than the `name =` inside its
+  # `fonts.monospace` block: wave 7 gave the family a single binding there because fontconfig's
+  # generic `monospace` alias is now written from the same value, and reading the binding is
+  # what keeps this suite pointed at the one definition rather than one of its two uses.
   stylixMonospace =
     builtins.head
-    (builtins.match ".*monospace = \\{[^}]*name = \"([^\"]+)\";.*"
+    (builtins.match ".*[\n]  monospaceName = \"([^\"]+)\";.*"
       (builtins.readFile ./../stylix/default.nix));
   # alacritty.toml is the third copy of the same literal.
   alacrittyMonospace =
@@ -111,11 +149,45 @@ in
         (get "font-feature"))
       true;
 
-    # Wave 7's leaf-stylix-terminal owns the palette; stay out of its way.
+    # The committed file carries no colour. Wave 7 added the palette by *appending* a
+    # generated block rather than editing this file, so these two tripwires are still live
+    # and still mean what they meant: a colour key or a hex literal appearing here would be a
+    # second scheme author, competing with features/window-manager/stylix/palette.nix.
     paletteStaysNeutral =
       assay.eq (builtins.all (k: !(builtins.elem k colourKeys)) keys) true;
     noHexLiterals =
       assay.eq (builtins.all (v: builtins.match ".*#.*" v == null) values) true;
+
+    # ...and the generated half is where the colour lives. 22 palette slots: 0-15 is the ANSI
+    # palette every terminal program inherits, 16-21 the six base16 colours ANSI cannot hold.
+    generatedSetsTwentyTwoPaletteSlots = assay.eq (builtins.length paletteSlots) 22;
+    generatedPaletteIsInAnsiOrder =
+      assay.eq (map (s: s.index) paletteSlots)
+      (builtins.genList toString 22);
+    generatedPaletteIsThePalette =
+      assay.eq (map (s: s.color) paletteSlots) palette.ansi;
+    generatedBackgroundIsBase00 =
+      assay.eq (generatedGet "background") [palette.withHash.base00];
+    generatedForegroundIsBase05 =
+      assay.eq (generatedGet "foreground") [palette.withHash.base05];
+    generatedSelectionIsVisible =
+      assay.eq (generatedGet "selection-background") [palette.withHash.base02];
+    # `theme` would load one of ghostty's bundled theme files, whose own palette would apply
+    # alongside these keys -- two scheme authors again, just from the other direction.
+    generatedSetsNoBundledTheme = assay.eq (generatedGet "theme") [];
+    # Every colour emitted, including the eight non-palette keys, must be from the scheme.
+    everyGeneratedColourIsFromThePalette =
+      assay.eq
+      (builtins.all
+        (p:
+          builtins.match "#.*" p.value
+          == null
+          || builtins.elem p.value (builtins.attrValues palette.withHash))
+        generatedPairs)
+      true;
+    # The committed half must survive the concatenation intact.
+    generatedConfigKeepsTheFont =
+      assay.eq (generatedGet "font-family") [stylixMonospace];
 
     # Presentation matched to alacritty.toml.
     opacityMatchesAlacritty = assay.eq (get "background-opacity") ["0.85"];

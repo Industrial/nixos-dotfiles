@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+# Fail if a fetcher under features/ resolves a moving target.
+#
+# `fetchurl { url = ".../latest/foo.AppImage"; }` or `fetchFromGitHub { rev = "master"; }`
+# is not a pin: the hash stops matching the day upstream moves, and the build breaks for
+# a reason that has nothing to do with the commit that broke it. features/cli/zellij shipped
+# exactly that (a zjstatus-hints URL on the release channel, now v0.1.4).
+#
+# Comments and string bodies are handled the way bin/ci/feature-reachability handles them,
+# for the same reason: the doc-comment URLs in features/monitoring/homepage-dashboard
+# (gethomepage.dev/latest/...) and the published-but-not-wired `pkgs.fetchzip` quoted inside
+# an option description in features/security/stig are not fetches, and must not be reported.
+#
+# Attribute values that are a bare identifier get one hop of resolution in the same file, so
+# `url = appimageUrl;` beside `appimageUrl = "https://cdn.anythingllm.com/latest/...";` is
+# caught rather than skipped.
+#
+# Ratchets: documented exceptions live in common/ci/fetch-pin-baseline.txt and only new
+# violations fail the build.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+python3 - "$ROOT" <<'PY'
+import fnmatch
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+scan_root = root / "features"
+baseline_file = root / "common/ci/fetch-pin-baseline.txt"
+
+skip_parts = {".git", ".devenv", ".direnv", ".moon", ".tmp", "node_modules", "target", ".cursor"}
+
+FETCHERS = (
+    "fetchurl",
+    "fetchzip",
+    "fetchtarball",
+    "fetchTarball",
+    "fetchgit",
+    "fetchFromGitHub",
+    "fetchFromGitLab",
+    "fetchFromGitea",
+    "fetchFromSourcehut",
+)
+# Attributes that decide *which* bytes get fetched. `hash`/`sha256` are the pin, not the
+# target, so they are not checked here.
+TARGET_ATTRS = ("url", "urls", "rev", "tag", "ref", "branch", "revision")
+
+# A moving target named in a URL: a path component that is, starts or ends with one of
+# these words. `latest-standalone` counts; `v0.1.4` and `mainline` do not.
+URL_MOVING = re.compile(r"(?<![A-Za-z0-9])(latest|master|main|HEAD)(?![A-Za-z0-9])")
+# A moving git ref. A tag or a full revision is fine; a branch name is not.
+REF_MOVING = re.compile(r"^(latest|master|main|HEAD|refs/heads/.*|heads/.*)$")
+
+
+def strip_nix_comments(text: str, keep_strings: bool = True) -> str:
+    """Blank out comments (and optionally string bodies), preserving offsets and lines."""
+    out = []
+    i, n = 0, len(text)
+
+    def blank(seg: str) -> str:
+        return "".join(ch if ch == "\n" else " " for ch in seg)
+
+    while i < n:
+        if text[i] == "#":
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+            out.append(blank(text[i:j]))
+            i = j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append(blank(text[i:j]))
+            i = j
+        elif text.startswith("''", i):
+            # Nix indented strings hold documentation and shell scripts, never a fetch.
+            j = i + 2
+            while j < n:
+                if text.startswith("'''", j) or text.startswith("''$", j):
+                    j += 3
+                elif text.startswith("''", j):
+                    j += 2
+                    break
+                else:
+                    j += 1
+            out.append(blank(text[i:j]))
+            i = j
+        elif text[i] == '"':
+            j = i + 1
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                elif text[j] == '"':
+                    j += 1
+                    break
+                else:
+                    j += 1
+            out.append(text[i:j] if keep_strings else blank(text[i:j]))
+            i = j
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
+FETCHER_RE = re.compile(r"(?<![\w.-])(?:pkgs\.|lib\.|builtins\.)?(" + "|".join(FETCHERS) + r")\s*\{")
+ATTR_RE = re.compile(r"(?<![\w.-])(" + "|".join(TARGET_ATTRS) + r")\s*=")
+IDENT_RE = re.compile(r"(?<![\w.\"-])([a-zA-Z_][a-zA-Z0-9_'-]*)(?![\w'\"-])")
+STRING_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
+OPENERS, CLOSERS = "{[(", "}])"
+
+
+def span_to(text: str, start: int, stop_at: str) -> int:
+    """End offset of the expression starting at `start`, stopping at `stop_at` on depth 0."""
+    depth, i, n = 0, start, len(text)
+    while i < n:
+        ch = text[i]
+        if ch in OPENERS:
+            depth += 1
+        elif ch in CLOSERS:
+            if depth == 0 and ch in stop_at:
+                return i
+            depth -= 1
+        elif depth == 0 and ch in stop_at:
+            return i
+        i += 1
+    return n
+
+
+def resolve_identifiers(text: str, value: str) -> str:
+    """One hop: append the definition of every bare identifier named in `value`.
+
+    Identifiers come from the expression outside its string literals, plus whatever the
+    literals interpolate -- a word that merely happens to appear inside a URL is not an
+    identifier and must not drag an unrelated binding of the same name into the scan.
+    """
+    interpolated = " ".join(re.findall(r"\$\{([^{}]*)\}", value))
+    outside = STRING_RE.sub(lambda m: " " * len(m.group(0)), value)
+    extra = []
+    for name in {m.group(1) for m in IDENT_RE.finditer(f"{outside} {interpolated}")}:
+        if name in ("if", "then", "else", "let", "in", "null", "true", "false", "with", "inherit"):
+            continue
+        for m in re.finditer(r"(?<![\w.\"-])" + re.escape(name) + r"\s*=", text):
+            start = m.end()
+            extra.append(text[start : span_to(text, start, ";")])
+    return value + " " + " ".join(extra)
+
+
+def line_of(text: str, offset: int) -> int:
+    return text.count("\n", 0, offset) + 1
+
+
+def findings_for(path: Path):
+    raw = path.read_text(errors="replace")
+    text = strip_nix_comments(raw)
+    out = []
+    for fetcher in FETCHER_RE.finditer(text):
+        body_start = text.index("{", fetcher.start()) + 1
+        body_end = span_to(text, body_start, "}")
+        body = text[body_start:body_end]
+        for attr in ATTR_RE.finditer(body):
+            value = body[attr.end() : span_to(body, attr.end(), ";")]
+            scannable = resolve_identifiers(text, value)
+            literals = [m.group(1) for m in STRING_RE.finditer(scannable)]
+            pattern = URL_MOVING if attr.group(1) in ("url", "urls") else REF_MOVING
+            for literal in literals:
+                hit = pattern.search(literal)
+                if hit:
+                    out.append(
+                        (
+                            line_of(text, body_start + attr.start()),
+                            fetcher.group(1),
+                            attr.group(1),
+                            literal,
+                            hit.group(1) if pattern is URL_MOVING else literal,
+                        )
+                    )
+    return out
+
+
+baseline = []
+if baseline_file.is_file():
+    for line in baseline_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            baseline.append(line)
+
+
+def baselined(rel: str) -> bool:
+    return any(rel == pat or fnmatch.fnmatch(rel, pat) for pat in baseline)
+
+
+scanned = 0
+violations = []
+excused = []
+for path in sorted(scan_root.rglob("*.nix")):
+    rel = path.relative_to(root)
+    if any(part in skip_parts or part.startswith("result") for part in rel.parts):
+        continue
+    scanned += 1
+    hits = findings_for(path)
+    if not hits:
+        continue
+    (excused if baselined(rel.as_posix()) else violations).append((rel.as_posix(), hits))
+
+if violations:
+    print(
+        f"lint-fetch-pins: FAIL — {len(violations)} file(s) fetch a moving target:",
+        file=sys.stderr,
+    )
+    for rel, hits in violations:
+        for line, fetcher, attr, literal, token in hits:
+            print(f"  {rel}:{line}: {fetcher} {attr} = \"{literal}\" — names '{token}'", file=sys.stderr)
+    print(
+        "Pin the fetch to a tag, release or revision, or record the file in "
+        "common/ci/fetch-pin-baseline.txt with the reason it cannot be pinned.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+print(f"lint-fetch-pins: OK — {scanned} nix files scanned, {len(excused)} baselined")
+PY

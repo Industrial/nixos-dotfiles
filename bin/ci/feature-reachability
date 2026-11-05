@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+# Fail if a feature is imported by no host closure.
+#
+# This is the check that `features/cli/leaves` and `features/cli/nmtui` needed: a feature
+# directory that exists, carries a suite, evaluates fine, and reaches no machine.
+#
+# Reachability is a transitive walk of literal path imports from every nixosConfiguration
+# entry point (hosts/*/configuration.nix plus installer/configuration.nix), not a grep for
+# the feature's name. Two properties that a name grep gets wrong and this does not:
+#
+#   - a live import carrying a trailing reason comment is an import
+#     (`../features/cli/bluetuith # Bluetooth pairing TUI` in profiles/cli-desktop.nix),
+#   - a commented-out import is not an import
+#     (`#../features/ai/opencode` in profiles/ai.nix).
+#
+# Both follow from stripping Nix comments and strings before matching, which is what
+# strip_nix_comments below does.
+#
+# Why text and not `nix eval`: a module's `imports` list is not reachable as data without
+# applying the module function to its specialArgs, and the only way to enumerate the files
+# that actually reached a closure is to evaluate all five hosts in full -- the eval this
+# repo already avoids in CI for memory reasons. Textual resolution is exact here because
+# every import in profiles/, hosts/, installer/ and features/ is a literal relative path
+# (no `map`, `lib.optionals` or `readDir` over module lists); if that ever stops being
+# true, this check reports the newly unreferenced feature and the lie is caught here.
+#
+# Ratchets: pre-existing orphans live in common/ci/feature-reachability-baseline.txt and
+# only new ones fail the build.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+python3 - "$ROOT" <<'PY'
+import fnmatch
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+features = root / "features"
+baseline_file = root / "common/ci/feature-reachability-baseline.txt"
+
+skip_parts = {".git", ".devenv", ".direnv", ".moon", ".tmp", "node_modules", "target", ".cursor"}
+
+
+def strip_nix_comments(text: str) -> str:
+    """Blank out comments and string bodies, preserving offsets and line structure.
+
+    `#` to end of line, `/* */`, `"..."` and `''...''`. Keeping offsets means a match in
+    the result still points at the right line in the file.
+    """
+    out = []
+    i, n = 0, len(text)
+
+    def blank(seg: str) -> str:
+        return "".join(ch if ch == "\n" else " " for ch in seg)
+
+    while i < n:
+        if text[i] == "#":
+            j = text.find("\n", i)
+            j = n if j < 0 else j
+            out.append(blank(text[i:j]))
+            i = j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append(blank(text[i:j]))
+            i = j
+        elif text.startswith("''", i):
+            j = i + 2
+            while j < n:
+                if text.startswith("'''", j) or text.startswith("''$", j):
+                    j += 3
+                elif text.startswith("''", j):
+                    j += 2
+                    break
+                else:
+                    j += 1
+            out.append(blank(text[i:j]))
+            i = j
+        elif text[i] == '"':
+            j = i + 1
+            while j < n:
+                if text[j] == "\\":
+                    j += 2
+                elif text[j] == '"':
+                    j += 1
+                    break
+                else:
+                    j += 1
+            out.append(blank(text[i:j]))
+            i = j
+        else:
+            out.append(text[i])
+            i += 1
+    return "".join(out)
+
+
+# A Nix relative path literal: ./x or ../x, up to the first character that cannot be part
+# of one. `$` is excluded ahead of the dots so "${settings.userdir}/.dotfiles" inside a
+# string -- already blanked -- can never be read as a path.
+PATH_RE = re.compile(r"(?<![\w.$/-])(\.{1,2}/[^\s;\])}\"',]*)")
+
+
+def path_refs(path: Path):
+    return [m.group(1) for m in PATH_RE.finditer(strip_nix_comments(path.read_text(errors="replace")))]
+
+
+def resolve(origin: Path, ref: str):
+    """Resolve a path literal the way Nix's import does: dir -> dir/default.nix."""
+    try:
+        target = (origin.parent / ref).resolve()
+    except OSError:
+        return None
+    if target.is_dir():
+        default = target / "default.nix"
+        return default if default.is_file() else None
+    if target.is_file():
+        return target
+    suffixed = Path(f"{target}.nix")
+    return suffixed if suffixed.is_file() else None
+
+
+entry_points = sorted(root.glob("hosts/*/configuration.nix"))
+installer = root / "installer/configuration.nix"
+if installer.is_file():
+    entry_points.append(installer)
+if not entry_points:
+    print("feature-reachability: FAIL — found no host entry points to walk from", file=sys.stderr)
+    sys.exit(1)
+
+visited = set(entry_points)
+queue = list(entry_points)
+while queue:
+    current = queue.pop()
+    for ref in path_refs(current):
+        target = resolve(current, ref)
+        if target is None or target in visited or target.suffix != ".nix":
+            continue
+        if root not in target.parents:
+            continue
+        visited.add(target)
+        queue.append(target)
+
+
+def skipped(path: Path) -> bool:
+    return any(part in skip_parts or part.startswith("result") for part in path.relative_to(root).parts)
+
+
+def nested_in_feature(path: Path) -> bool:
+    """True when an ancestor below features/ is itself a feature, i.e. path is its submodule."""
+    ancestor = path.parent
+    while ancestor != features:
+        if (ancestor / "default.nix").is_file():
+            return True
+        ancestor = ancestor.parent
+    return False
+
+
+# A feature is the unit a profile or host imports: the topmost directory holding a
+# default.nix (features/cli/zellij), or a loose module beside those directories
+# (features/fleet/comin.nix). Files inside a feature are its own business.
+units = []
+for candidate in features.rglob("*"):
+    if candidate.is_dir() and not skipped(candidate) and (candidate / "default.nix").is_file():
+        if not nested_in_feature(candidate):
+            units.append(candidate)
+for candidate in features.rglob("*.nix"):
+    if skipped(candidate) or candidate.name == "default.nix" or candidate.name.endswith(".assay.nix"):
+        continue
+    if not nested_in_feature(candidate):
+        units.append(candidate)
+
+orphans = []
+for unit in sorted(set(units)):
+    module = (unit / "default.nix") if unit.is_dir() else unit
+    if module not in visited:
+        orphans.append(unit.relative_to(root).as_posix())
+
+baseline = []
+if baseline_file.is_file():
+    for line in baseline_file.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            baseline.append(line)
+
+
+def baselined(rel: str) -> bool:
+    return any(rel == pat or fnmatch.fnmatch(rel, pat) for pat in baseline)
+
+
+new = [o for o in orphans if not baselined(o)]
+stale = [p for p in baseline if not any(o == p or fnmatch.fnmatch(o, p) for o in orphans)]
+
+if stale:
+    print(f"feature-reachability: note — the baseline lists {len(stale)} path(s) that are no longer orphans:")
+    for p in stale:
+        print(f"  {p}")
+
+if new:
+    print(
+        f"feature-reachability: FAIL — {len(new)}/{len(units)} features reach no host closure:",
+        file=sys.stderr,
+    )
+    for o in new:
+        print(f"  {o}  (no import chain from any host or the installer reaches it)", file=sys.stderr)
+    print(
+        "Wire each into a profile or host, delete it, or record it in "
+        "common/ci/feature-reachability-baseline.txt with the reason it is parked.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+print(
+    f"feature-reachability: OK — {len(units) - len(orphans)}/{len(units)} features reachable, "
+    f"{len(orphans)} baselined"
+)
+PY

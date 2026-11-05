@@ -18,7 +18,7 @@ for line in allow_raw:
         continue
     allow.append(line)
 
-skip_parts = {".git", ".devenv", ".direnv", ".moon", "node_modules", "target", ".cursor"}
+skip_parts = {".git", ".devenv", ".direnv", ".moon", ".tmp", "node_modules", "target", ".cursor"}
 
 def excluded(rel: Path) -> bool:
     s = rel.as_posix()

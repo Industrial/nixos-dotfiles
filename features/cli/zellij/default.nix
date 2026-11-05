@@ -42,6 +42,52 @@
 
   dotfiles = "${settings.userdir}/.dotfiles";
 
+  # The palette. config.kdl has said `theme "stylix"` for a long time and nothing generated a
+  # theme by that name, so zellij fell back to its built-in default -- silently, because a
+  # named-but-absent theme is not an error (`zellij setup --check` exits 0 on it; verified
+  # against 0.45.1). That is the whole bug: the gruvbox-dark-hard palette reached zellij's
+  # chrome not at all.
+  #
+  # The name is read back out of config.kdl rather than restated, so the file that *names* the
+  # theme and the file that *is* the theme cannot drift apart. config.kdl's settings belong to
+  # another feature wave; this only reads it.
+  palette = import ./../../window-manager/stylix/palette.nix;
+  themeName =
+    builtins.head
+    (builtins.match ".*[\n]theme \"([^\"]+)\".*"
+      (builtins.readFile ./etc/zellij/config.kdl));
+
+  # zellij's eleven-key theme format, which is what tinted-theming/tinted-zellij and stylix's
+  # own zellij target both emit for a base16 scheme. Every one of these keys is honoured by
+  # 0.45.1 (probed by giving each an unparseable value and watching the config fail); zellij
+  # derives the newer per-component theme spec from them, so eleven lines theme the tab bar,
+  # the pane frames, the ribbons and the exit-code indicators together.
+  #
+  # `bg` is base02, not base00, and that is deliberate: zellij never paints a pane's
+  # background -- the terminal emulator's shows through -- so `bg` only tints the chrome.
+  # base00 there would make the frames and status bar invisible against the panes.
+  # `white` is base07 for the same reason: it is UI text on that chrome, not pane foreground.
+  themeFile = pkgs.writeTextFile {
+    name = "zellij-theme-${themeName}.kdl";
+    text = ''
+      themes {
+        ${themeName} {
+          fg "${palette.withHash.base05}"
+          bg "${palette.withHash.base02}"
+          black "${palette.withHash.base00}"
+          red "${palette.withHash.base08}"
+          green "${palette.withHash.base0B}"
+          yellow "${palette.withHash.base0A}"
+          blue "${palette.withHash.base0D}"
+          magenta "${palette.withHash.base0E}"
+          cyan "${palette.withHash.base0C}"
+          white "${palette.withHash.base07}"
+          orange "${palette.withHash.base09}"
+        }
+      }
+    '';
+  };
+
   # Shared chrome for every layout: zellij's own tab-bar on top, zjstatus-hints below.
   #
   # The dashboard already used zjstatus-hints and the rescued `agents` layout used zellij's
@@ -83,6 +129,16 @@
       name = "zellij-layout-${name}.kdl";
       inherit text;
     };
+
+  # The keymap card, parsed out of config.kdl by keymap-card.nix and installed beside the config
+  # it describes. `clear-defaults=true` means zellij's own help screen reports zellij's defaults
+  # rather than the keys this fleet binds, so the card is the only readable account of them —
+  # and it is generated for the same reason the layouts above are: a transcription disagrees
+  # with its source the moment either one moves.
+  keymapCard = pkgs.writeTextFile {
+    name = "zellij-keymap.md";
+    text = import ./keymap-card.nix;
+  };
 
   # The operations dashboard, unchanged in shape from the hand-written system.kdl. Two edits:
   # every path now derives from settings.userdir, and the `dsk` tab runs yazi where it used to
@@ -308,6 +364,9 @@ in {
       "zellij/config.kdl" = {
         source = ./etc/zellij/config.kdl;
       };
+      "zellij/keymap.md" = {
+        source = keymapCard;
+      };
       "zellij/layouts/system.kdl" = {
         source = mkLayout "system" (withChrome systemTabs + systemKeybinds);
       };
@@ -319,6 +378,9 @@ in {
       };
       "zellij/layouts/data.kdl" = {
         source = mkLayout "data" (withChrome dataTabs);
+      };
+      "zellij/themes/${themeName}.kdl" = {
+        source = themeFile;
       };
       "zellij/plugins/zjstatus-hints.wasm" = {
         source = zjstatus-hints;
@@ -332,11 +394,17 @@ in {
         text = ''
           mkdir -p ${settings.userdir}/.config/zellij/layouts
           mkdir -p ${settings.userdir}/.config/zellij/plugins
+          mkdir -p ${settings.userdir}/.config/zellij/themes
           ln -sf /etc/zellij/config.kdl ${settings.userdir}/.config/zellij/config.kdl
+          ln -sf /etc/zellij/keymap.md ${settings.userdir}/.config/zellij/keymap.md
           for layout in agents data dev system; do
             ln -sf /etc/zellij/layouts/$layout.kdl ${settings.userdir}/.config/zellij/layouts/$layout.kdl
           done
           ln -sf /etc/zellij/plugins/zjstatus-hints.wasm ${settings.userdir}/.config/zellij/plugins/zjstatus-hints.wasm
+          # Themes resolve relative to the *config dir*, which is this directory. config.kdl
+          # has a `layout_dir` pointing at /etc but zellij has no `theme_dir` set, so unlike
+          # the layouts above this symlink is the only thing that makes the theme reachable.
+          ln -sf /etc/zellij/themes/${themeName}.kdl ${settings.userdir}/.config/zellij/themes/${themeName}.kdl
         '';
       };
     };

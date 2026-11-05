@@ -1,0 +1,16 @@
+# Files (repo-relative) allowed to fetch a moving target.
+# One glob/path per line. # comments allowed. Read by bin/ci/lint-fetch-pins.
+#
+# An entry belongs here only when upstream publishes no per-version artifact at all. Both
+# of today's entries pin the *hash*, so a vendor bump fails the build loudly with the
+# prefetch command to run — what they cannot do is name the version in the URL.
+
+# AnythingLLM Desktop ships one CDN path, https://cdn.anythingllm.com/latest/, and no
+# per-release AppImage URL (see the feature header). The hash is pinned and `version` is
+# kept in step with the GitHub releases page by hand. Not imported by any profile today.
+features/ai/anythingllm-desktop/default.nix
+
+# Interactive Brokers publishes IB Gateway as a single `latest-standalone` installer; there
+# is no versioned download. Hash pinned, same bump-on-break contract as above. Parked
+# behind a commented-out import in profiles/development.nix.
+features/finance/ib-gateway/default.nix

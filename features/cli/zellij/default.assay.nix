@@ -39,6 +39,23 @@ let
   noLayout = pattern: builtins.all (name: !(inLayout name pattern)) layoutNames;
   activation = mod.system.activationScripts.linkZellijConfig.text;
   inActivation = pattern: builtins.match pattern activation != null;
+
+  palette = import ./../../window-manager/stylix/palette.nix;
+  # The name config.kdl asks for, resolved the same way the module resolves it, so these
+  # cases follow a rename in config.kdl instead of pinning the string twice more.
+  themeName =
+    builtins.head (builtins.match ".*[\n]theme \"([^\"]+)\".*" kdl);
+  themeText = texts.environment.etc."zellij/themes/${themeName}.kdl".source;
+  # `key "#rrggbb"` -> { key = "#rrggbb"; }, so the eleven entries can be asserted by name.
+  themeEntries =
+    builtins.listToAttrs
+    (map (m: {
+        name = builtins.elemAt m 0;
+        value = builtins.elemAt m 1;
+      })
+      (builtins.filter (m: m != null)
+        (map (l: builtins.match " *([a-z]+) \"(#[0-9a-f]{6})\"" l)
+          (builtins.filter builtins.isString (builtins.split "\n" themeText)))));
 in
   assay.suite "zellij" {
     packages = assay.eq mod.environment.systemPackages ["zellij" "wl-clipboard"];
@@ -89,11 +106,13 @@ in
     # The name proves the generation: a `source = ./etc/...` path could not be this string.
     everyLayoutIsInstalled = assay.eq (builtins.attrNames mod.environment.etc) [
       "zellij/config.kdl"
+      "zellij/keymap.md"
       "zellij/layouts/agents.kdl"
       "zellij/layouts/data.kdl"
       "zellij/layouts/dev.kdl"
       "zellij/layouts/system.kdl"
       "zellij/plugins/zjstatus-hints.wasm"
+      "zellij/themes/stylix.kdl"
     ];
     layoutsAreGenerated =
       assay.eq mod.environment.etc."zellij/layouts/system.kdl".source
@@ -107,6 +126,13 @@ in
       assay.eq (inActivation ".*/home/u/.config/zellij/config.kdl.*") true;
     activationLinksEveryLayout =
       assay.eq (inActivation ".*for layout in agents data dev system; do.*") true;
+
+    # The keymap card is generated from config.kdl (keymap-card.assay.nix covers the parser)
+    # and lands beside the config it describes, in /etc and in ~/.config/zellij.
+    keymapCardIsGenerated =
+      assay.eq mod.environment.etc."zellij/keymap.md".source "zellij-keymap.md";
+    activationLinksTheKeymapCard =
+      assay.eq (inActivation ".*/etc/zellij/keymap.md /home/u/.config/zellij/keymap.md.*") true;
 
     # One status line in every layout, and it is the plugin config.kdl already loads —
     # zellij's built-in status-bar would report the defaults `clear-defaults=true` dropped.
@@ -141,4 +167,55 @@ in
       assay.eq (inLayout "agents" ".*cwd \"/home/u/[.]dotfiles\".*") true;
     agentsRunsNoUnresolvableOpencode =
       assay.eq (inLayout "agents" ".*opencode.*") false;
+
+    # The theme. config.kdl has always said `theme "stylix"`; until wave 7 nothing generated
+    # a theme by that name, and zellij answers a missing theme by silently using its own --
+    # `zellij setup --check` exits 0 on it, so nothing downstream could have noticed either.
+    # These are the cases that would have caught it.
+    configNamesTheStylixTheme = assay.eq (inKdl ".*\ntheme \"stylix\"\n.*") true;
+    themeFileIsInstalledUnderThatName =
+      assay.eq (mod.environment.etc ? "zellij/themes/${themeName}.kdl") true;
+    themeIsGenerated =
+      assay.eq mod.environment.etc."zellij/themes/${themeName}.kdl".source
+      "zellij-theme-stylix.kdl";
+    # Themes resolve relative to zellij's config dir, and there is no `theme_dir` the way
+    # there is a `layout_dir`, so this symlink is the whole delivery mechanism.
+    activationLinksTheTheme =
+      assay.eq
+      (inActivation ".*/etc/zellij/themes/stylix.kdl /home/u/.config/zellij/themes/stylix.kdl.*")
+      true;
+    activationCreatesTheThemeDir =
+      assay.eq (inActivation ".*mkdir -p /home/u/.config/zellij/themes.*") true;
+
+    # The block inside the file must be named what config.kdl asks for; a theme file whose
+    # inner name disagrees is exactly as invisible as no theme file at all.
+    themeDeclaresTheRequestedName =
+      assay.eq (builtins.match ".*themes [{]\n  ${themeName} [{].*" themeText != null) true;
+    # All eleven keys zellij 0.45 honours, and every value from the shared palette.
+    themeSetsEveryKey = assay.eq (builtins.sort (a: b: a < b) (builtins.attrNames themeEntries)) [
+      "bg"
+      "black"
+      "blue"
+      "cyan"
+      "fg"
+      "green"
+      "magenta"
+      "orange"
+      "red"
+      "white"
+      "yellow"
+    ];
+    everyThemeColorIsFromThePalette =
+      assay.eq
+      (builtins.all (v: builtins.elem v (builtins.attrValues palette.withHash))
+        (builtins.attrValues themeEntries))
+      true;
+    # zellij never paints a pane background -- the emulator's shows through -- so `bg` tints
+    # the chrome only, and base00 there would make the frames invisible against the panes.
+    chromeBackgroundIsNotThePaneBackground =
+      assay.eq (themeEntries.bg != palette.withHash.base00) true;
+    ansiSlotsMatchTheTerminals =
+      assay.eq
+      [themeEntries.red themeEntries.green themeEntries.blue]
+      [palette.withHash.base08 palette.withHash.base0B palette.withHash.base0D];
   }

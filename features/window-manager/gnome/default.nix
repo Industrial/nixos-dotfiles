@@ -158,10 +158,22 @@
     ];
     fontconfig = {
       enable = true;
+      # `monospace` is deliberately absent. It used to be ["JetBrains Mono"], written without
+      # mkDefault, which silently beat the mkDefault that stylix's fontconfig target writes
+      # from `stylix.fonts.monospace.name` -- so the fleet asked for IosevkaTerm in three
+      # places (stylix, alacritty.toml, ghostty's config) and resolved the generic monospace
+      # alias to a fourth font. The alias now has exactly one writer, stylix, and agrees with
+      # what the terminals request.
+      #
+      # This feature is only ever imported from profiles/desktop.nix, which also imports
+      # features/window-manager/stylix and stylix's own NixOS module, so there is no host
+      # where dropping this line leaves the alias undefined.
+      #
+      # serif/sansSerif stay: Inter for UI text is a GNOME look someone chose on purpose,
+      # and it is not what the terminals ask for.
       defaultFonts = {
         serif = ["Inter"];
         sansSerif = ["Inter"];
-        monospace = ["JetBrains Mono"];
         emoji = ["Noto Color Emoji"];
       };
     };
