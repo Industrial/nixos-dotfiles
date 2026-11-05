@@ -19,10 +19,19 @@
 # `bash --login -c "env -0"` round-trip existed to paper over — a subprocess on every login
 # shell, replaced here by a file the shell already reads.
 #
+# The same directory is also where the upstream nu_scripts completers land. Those are
+# `extern` declarations — hand-written Nushell signatures for git, nix, make and friends — and
+# they are copied out of the pinned `nu-scripts` flake input at build time rather than
+# vendored into this repo, for the same reason the `init` output is generated rather than
+# committed: a copy drifts from its source.
+#
 # Usage: importing the feature enables it. To drop a hook on a host:
 #   cli.shellInit.hooks = ["env" "starship"];
+# To take a completer the default set leaves out:
+#   cli.shellInit.completers = ["git" "make" "nix" "cargo"];
 {
   config,
+  inputs,
   lib,
   pkgs,
   settings,
@@ -86,6 +95,59 @@ with lib; let
 
   hookNames = ["env" "starship" "zoxide" "carapace" "atuin"];
 
+  # ---------------------------------------------------------------------------
+  # Completer table — upstream nu_scripts, copied out of the flake input
+  # ---------------------------------------------------------------------------
+  #
+  # The 5x prefixes put these *after* `30-carapace.nu`, and the reason is not precedence.
+  # Precedence is settled by the parser rather than by load order: an `extern` gives the
+  # command a known signature, and `completions.external.completer` — carapace — is only
+  # consulted for commands whose signature Nushell does not know. Sourcing
+  # git-completions.nu before or after the carapace init completes `git sw` to `git switch`
+  # either way, which is measured, not assumed. So for every command covered here the
+  # hand-written Nu completer wins, and carapace keeps everything else.
+  #
+  # What the order does decide is blast radius. These are by far the largest files in the
+  # directory and the ones most likely to break: nu_scripts tracks Nushell's language closely
+  # and this repo bumps the input on its own schedule. Loading last means a bad bump costs
+  # completions and nothing else — the prompt, `cd`, the external completer and history are
+  # all in place by the time Nushell reaches 50. Ahead of carapace the same failure would sit
+  # in front of the things a shell is unusable without.
+  #
+  # Prefixes are alphabetical rather than ordered by the default set, so a host opting cargo
+  # or docker in does not renumber anything.
+  completers = {
+    cargo = {
+      filename = "50-cargo-completions.nu";
+      path = "custom-completions/cargo/cargo-completions.nu";
+    };
+    docker = {
+      filename = "51-docker-completions.nu";
+      path = "custom-completions/docker/docker-completions.nu";
+    };
+    git = {
+      filename = "52-git-completions.nu";
+      path = "custom-completions/git/git-completions.nu";
+    };
+    make = {
+      filename = "53-make-completions.nu";
+      path = "custom-completions/make/make-completions.nu";
+    };
+    nix = {
+      filename = "54-nix-completions.nu";
+      path = "custom-completions/nix/nix-completions.nu";
+    };
+  };
+
+  completerNames = ["cargo" "docker" "git" "make" "nix"];
+
+  # Measured on drakkar as the `source` cost of each file over a bare `nu` (hyperfine, 300+
+  # runs): cargo +1.3 ms, docker +1.6 ms, git +3.6 ms, make +0.5 ms, nix +2.0 ms. All five
+  # together are +8.6 ms, which is the entire remaining headroom under the 35 ms interactive
+  # startup budget; these three are +5.8 ms and leave some. cargo and docker stay selectable
+  # and off — the two commands whose carapace specs are least often the weaker answer.
+  defaultCompleters = ["git" "make" "nix"];
+
   emit = name: let
     hook = hooks.${name};
   in
@@ -98,10 +160,28 @@ with lib; let
       test -s $out/${hook.filename}
     '';
 
+  emitCompleter = name: let
+    completer = completers.${name};
+  in "cp ${inputs.nu-scripts}/${completer.path} $out/${completer.filename}";
+
   autoload = pkgs.runCommand "nushell-vendor-autoload" {} ''
     scratch="$TMPDIR/scratch-home"
     mkdir -p "$scratch" $out
     ${concatMapStringsSep "\n" emit cfg.hooks}
+    ${concatMapStringsSep "\n" emitCompleter cfg.completers}
+
+    # Every file in here is sourced by every interactive shell, on the REPL path only, so a
+    # file that does not parse prints its error on every shell start and nowhere else — not in
+    # `nu -c`, not in CI, not in a script. The nu_scripts completers are the ones that will
+    # eventually hit this: they are written against whatever Nushell release upstream had, and
+    # the language moves. nu-check at build time turns the next such bump into a failed build.
+    for f in $out/*.nu; do
+      if ! HOME="$scratch" ${pkgs.nushell}/bin/nu --no-config-file \
+        --commands "exit (if (nu-check '$f') { 0 } else { 1 })"; then
+        echo "shell-init: $f does not parse under nushell ${pkgs.nushell.version}" >&2
+        exit 1
+      fi
+    done
 
     # The scratch HOME must not reach a file that gets sourced on a real machine. This caught
     # carapace once; the next tool to bake $HOME into its init output should fail here rather
@@ -117,7 +197,7 @@ in {
     # at a time. This feature is imported by profiles/cli-core.nix for every host, so the
     # import is the opt-in and the default is on.
     enable =
-      mkEnableOption "generated Nushell vendor autoload (session variables, starship, zoxide, carapace, atuin)"
+      mkEnableOption "generated Nushell vendor autoload (session variables, starship, zoxide, carapace, atuin, nu_scripts completers)"
       // {default = true;};
 
     hooks = mkOption {
@@ -128,6 +208,26 @@ in {
         prefix fixes the load order, so this list selects; it does not reorder.
       '';
       example = ["env" "starship"];
+    };
+
+    # A second list rather than five more entries in `hooks`: these are copies of a pinned
+    # source, not the output of a command, and they answer a different question (which
+    # commands get hand-written completions) from the one `hooks` answers (which tools get to
+    # install themselves into the shell). Keeping them apart also means the startup budget
+    # has one knob that is safe to turn down.
+    completers = mkOption {
+      type = types.listOf (types.enum completerNames);
+      default = defaultCompleters;
+      description = ''
+        Which upstream nu_scripts custom completers to copy into
+        `$nu.data-dir/vendor/autoload`. These are `extern` declarations, so they beat carapace
+        for the commands they cover whatever the load order; the numeric prefix selects
+        nothing but the order of the files.
+
+        The default leaves cargo and docker out on startup budget, not on quality — see the
+        per-file costs in the completer table.
+      '';
+      example = ["git" "nix"];
     };
   };
 

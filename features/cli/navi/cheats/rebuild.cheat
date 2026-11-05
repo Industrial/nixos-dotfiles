@@ -1,0 +1,39 @@
+% dotfiles, rebuild
+
+; Read out of bin/update/system, bin/update/flake, bin/update/channels, bin/update/profiles,
+; bin/generations/{list,delete,rollback}, bin/delete/collectgarbage, bin/fetch/stateVersion.
+
+# Rebuild and switch this host from the root flake, the flags bin/update/system passes
+sudo nixos-rebuild switch --flake ".#$(hostname)" --show-trace --print-build-logs
+
+# Rebuild this host through the repo wrapper: tees logs/update-system, warns when the booted system is not the default profile
+bin/update/system
+
+# Stage a generation without activating it, for a kernel or firmware change that needs a reboot
+sudo nixos-rebuild boot --flake ".#$(hostname)"
+
+# Update every flake input, after nix-channel --update
+bin/update/flake
+
+# nix-channel --update on its own
+bin/update/channels
+
+# Upgrade the imperative nix profile, which is not the system
+bin/update/profiles
+
+# List the system generations present on this host
+bin/generations/list
+
+# Switch to one of the generations bin/generations/list prints
+sudo /nix/var/nix/profiles/<generation>/bin/switch-to-configuration switch
+
+# Delete every system generation but the newest two
+bin/generations/delete
+
+# nix-collect-garbage -d through the repo's root-cmd wrapper
+bin/delete/collectgarbage
+
+# Newest nixos channel version, which is what stateVersion wants
+bin/fetch/stateVersion
+
+$ generation: bin/generations/list

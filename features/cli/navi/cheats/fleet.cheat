@@ -1,0 +1,36 @@
+% dotfiles, fleet, deploy
+
+; Read out of bin/fleet, docs/runbooks/fleet-deploy.md, docs/runbooks/nix-remote-build.md and
+; flake.nix (deploy.nodes, magicRollback = false, autoRollback = false).
+
+# SSH reachability probe for every fleet host, over Tailscale
+bin/fleet status
+
+# nix flake check, then deploy-rs --dry-activate against one host
+bin/fleet check <host>
+
+# Dry-activate one host; always this first, because there is no automatic rollback on this fleet
+bin/fleet deploy <host> --dry-activate
+
+# Activate one host for real
+bin/fleet deploy <host>
+
+# Activate every host, carrying on past one that is unreachable
+bin/fleet deploy all
+
+# The deploy-rs invocation bin/fleet wraps
+nix run --accept-flake-config github:serokell/deploy-rs -- ".#<host>" --skip-checks
+
+# Roll back a host by hand: flake.nix sets magicRollback and autoRollback false, so a failed activation stays applied
+sudo nixos-rebuild switch --rollback
+
+# Emergency rebuild on the host itself, for when ssh is the thing that broke
+sudo nixos-rebuild switch --flake ".#$(hostname)"
+
+# Build a host's system closure without compiling anything locally
+nix build ".#nixosConfigurations.<host>.config.system.build.toplevel" --max-jobs 0
+
+# Is distributed building actually configured on this machine
+nix show-config | rg 'builders|distributed'
+
+$ host: printf '%s\n' drakkar huginn mimir muninn

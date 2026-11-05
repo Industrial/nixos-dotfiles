@@ -1,0 +1,41 @@
+% dotfiles, zellij
+
+; Read out of zellij 0.45.1's own CLI (its shipped shell completions), features/cli/zellij and
+; the sessionizer in features/cli/nushell/config.nu.
+;
+; The keymap is deliberately NOT transcribed here. config.kdl is `clear-defaults=true`, so
+; zellij's published defaults do not describe this host, and a hand-copied table would go stale
+; the next time that file is touched. The two entries below read the live config instead.
+
+# Attach to a session, creating it if it does not exist — what Alt-S in nushell ends up running
+zellij attach --create <session>
+
+# List the live sessions, names only
+zellij list-sessions --short
+
+# Start one of the named layouts this host ships
+zellij --layout <layout>
+
+# Open a new tab in the running session rooted at a directory, which is what the sessionizer does from inside a session
+zellij action new-tab --cwd <dir> --name <name>
+
+# Which config file, layout directory and cache directory this zellij actually uses
+zellij setup --check
+
+# The keymap this host binds; config.kdl is clear-defaults, so zellij's published defaults do not apply
+bat ~/.config/zellij/config.kdl
+
+# Attach to a session read-only
+zellij watch <session>
+
+# Kill a session but keep it for resurrection
+zellij kill-session <session>
+
+# Forget every session, including the exited ones zellij keeps around
+zellij delete-all-sessions
+
+# Dump the layout a running session has ended up in
+zellij action dump-layout
+
+$ session: zellij list-sessions --short
+$ layout: ls ~/.config/zellij/layouts | sed 's/\.kdl$//'

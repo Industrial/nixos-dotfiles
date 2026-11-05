@@ -1,0 +1,56 @@
+% dotfiles, gates, assay, ci
+
+; Read out of bin/ci/assay, bin/ci/lint, bin/ci/deadnix, bin/assay-coverage-check, moon.yml,
+; treefmt.ci.toml, devenv.nix (scripts and git-hooks) and AGENTS.md.
+
+# Run every assay suite in the repo
+devenv shell -- assay run .
+
+# Run only the suites colocated under one path
+devenv shell -- assay run <path>
+
+# Fail if any in-scope .nix lacks a colocated .assay.nix
+./bin/assay-coverage-check
+
+# assay run . plus the coverage check, without evaluating the devenv profile — what CI runs
+bin/ci/assay
+
+# Whole-repo assay through moon, cached
+moon run dotfiles:test
+
+# Only the suites the current changes affect
+moon run dotfiles:test --affected
+
+# Format the tree with the treefmt formatter set
+moon run dotfiles:format
+
+# treefmt with the CI formatter set: alejandra, deadnix, actionlint, beautysh, biome, yamlfmt, taplo
+bin/ci/lint
+
+# deadnix over the host flakes, failing on dead code
+bin/ci/deadnix
+
+# Check one nix file's formatting without rewriting it
+alejandra --check <nixfile>
+
+# Format a TOML file in place the way treefmt does
+taplo format <tomlfile>
+
+# Measure interactive nushell startup
+hyperfine 'nu -c exit'
+
+# Run deepsec over the commits a push would send, the way the pre-push hook does
+devenv shell -- bin/git-hooks/deepsec-pre-push
+
+# Push past the deepsec pre-push hook
+DEEPSEC_PRE_PUSH_SKIP=1 git push
+
+# Use Codex credentials for the deepsec hook instead of the default claude
+DEEPSEC_PRE_PUSH_AGENT=codex git push
+
+# Initialise the .cursor submodule, without which devenv shell has no tooling
+git submodule update --init --recursive .cursor
+
+$ path: fd --type directory --max-depth 2 . features profiles common bin
+$ nixfile: fd --extension nix --type file
+$ tomlfile: fd --extension toml --type file

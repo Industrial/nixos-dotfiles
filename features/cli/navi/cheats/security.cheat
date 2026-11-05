@@ -1,0 +1,43 @@
+% dotfiles, security, stig
+
+; Read out of bin/ci/stig, bin/stig-vm-test, bin/stig-triage-gen, bin/ci/vulnix, bin/ci/clamav,
+; bin/ci/lynis and docs/runbooks/stig-compliance.md.
+
+# STIG compliance report for every host, plus the CAT I regression gate
+bin/ci/stig
+
+# The same, plus one booted VM per covered STIG control; main schedules this, PRs do not
+STIG_VM=1 bin/ci/stig
+
+# List the STIG controls that have VM coverage
+bin/stig-vm-test --list
+
+# Boot a VM for named controls only
+bin/stig-vm-test <control>
+
+# How many controls have VM coverage on this system
+nix eval --json '.#stigVmTests.passthru.count'
+
+# Build and read one host's STIG report as JSON
+nix build .#stigReport.<host> && jq . result/report.json
+
+# One host's STIG summary line, without leaving a result symlink behind
+cat "$(nix build --no-link --print-out-paths .#stigReport.<host>)/summary.txt"
+
+# Which CAT I controls are open on a host
+jq -r '.summary.catOneOpen | join(" ")' result/report.json
+
+# Regenerate docs/security/stig-triage.md from the vendored projection
+bin/stig-triage-gen
+
+# Known CVEs in this system's closure
+bin/ci/vulnix
+
+# ClamAV scan of the repository against a freshly fetched database
+bin/ci/clamav
+
+# Lynis audit of the running system; clones CISOfy/lynis into .tmp
+bin/ci/lynis
+
+$ host: printf '%s\n' drakkar huginn mimir muninn
+$ control: bin/stig-vm-test --list

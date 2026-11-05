@@ -1,0 +1,17 @@
+# navi 2.24.0.
+#
+# `cheats.paths` is deliberately absent. The .cheat files reach navi through
+# $XDG_DATA_HOME/navi/cheats, which is navi's own `default_cheat_pathbuf()`, so a `--path` on
+# the command line still overrides them and a sheet written by hand beside them is still found.
+# Naming the store path here would have made this repo's set the only one navi can see.
+client:
+  # navi's `--tldr` client shells out to whichever `tldr` is on PATH and picks its output flag
+  # from this one boolean: true passes `--raw`, which is tealdeer's; false passes `--markdown`,
+  # which is the tldr-node-client's and which tealdeer rejects outright. features/cli/tealdeer
+  # is what provides `tldr` on this fleet, so with this on `navi --tldr parted` renders from
+  # the offline page cache instead of failing on an unknown flag.
+  tealdeer: true
+finder:
+  # Stated rather than inherited: fzf is already navi's default, profiles/cli-core.nix imports
+  # features/cli/fzf, and the alternative navi accepts (skim) is on no host here.
+  command: fzf

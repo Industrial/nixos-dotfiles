@@ -1,0 +1,24 @@
+# tealdeer 1.9.1. Every table in this file is `#[serde(deny_unknown_fields)]`, so a key
+# tealdeer does not recognise is a hard parse error on every `tldr` invocation rather than a
+# warning — checked against tealdeer-1.9.1/src/config.rs, not from memory.
+
+[updates]
+# Off, and that is the whole point of this feature.
+#
+# With auto_update on, tealdeer takes its `Cache::open_or_create` path and the first `tldr`
+# after auto_update_interval_hours blocks on a 3.4 MB download before printing anything. With
+# it off, rendering is a read-only `Cache::open` against the pages directory and `tldr` never
+# opens a socket. Keeping the pages current is tealdeer-pages-refresh.timer's job, which runs
+# where nobody is waiting for it.
+auto_update = false
+
+# archive_source is deliberately absent. Its default
+# (https://github.com/tldr-pages/tldr/releases/latest/download) is the moving target the
+# refresh timer wants: default.nix pins v2.3 only as the seed, so the pin is a floor and the
+# timer is free to pick up v2.4 the day it ships.
+#
+# warn_cache_age is deliberately absent too. Absent means "warn after 30 days" (tealdeer
+# resolves `None` to `MAX_CACHE_AGE`); `"never"` would be the only way to silence it. The
+# refresh unit swallows its own failures so an offline host does not show a red user unit
+# after every boot, which leaves this warning as the one remaining signal that refreshing has
+# actually stopped working. It stays on.

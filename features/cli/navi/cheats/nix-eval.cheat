@@ -1,0 +1,42 @@
+% dotfiles, nix, eval
+
+; Read out of bin/repl, bin/ci/stig, bin/ci/update-host, bin/stig-vm-test, flake.nix
+; (nixosConfigurations, packages.installer-iso) and docs/runbooks/nix-remote-build.md.
+
+# Prove one host still evaluates without building it — the fast check after editing a feature
+nix eval --raw ".#nixosConfigurations.<host>.config.system.build.toplevel.drvPath"
+
+# Prove all five configurations still evaluate, installer included
+for h in drakkar huginn mimir muninn installer; do nix eval --raw ".#nixosConfigurations.$h.config.system.build.toplevel.drvPath" >/dev/null && echo "$h ok" || echo "$h FAILED"; done
+
+# Read one option off a host's evaluated config
+nix eval --json ".#nixosConfigurations.<host>.config.<option>"
+
+# Which version of a package a host would get
+nix eval --raw ".#nixosConfigurations.<host>.pkgs.<package>.version"
+
+# Where a package lands in the store, as a host sees it
+nix eval --raw ".#nixosConfigurations.<host>.pkgs.<package>.outPath"
+
+# The current system double, for flake outputs keyed by system
+nix eval --raw --impure --expr 'builtins.currentSystem'
+
+# A nix repl on this flake
+bin/repl
+
+# List this flake's outputs
+nix flake show
+
+# Which inputs the lock file pins
+nix flake metadata --json | jq -r '.locks.nodes | keys[]'
+
+# SRI hash for a URL, in the form fetchurl's `hash` wants
+nix store prefetch-file --json <url> | jq -r .hash
+
+# Build the installer ISO
+nix build .#installer-iso
+
+# Why one store path depends on another
+nix why-depends <from> <to>
+
+$ host: printf '%s\n' drakkar huginn mimir muninn installer
