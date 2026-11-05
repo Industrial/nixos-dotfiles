@@ -408,8 +408,19 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   end
   button:SetAllPoints()
 
+  -- LOCAL PATCH: the same Forever guard frames/bagbutton.lua already carries.
+  -- `isRetail` is true on WoW: Forever, but that client ships no
+  -- ItemSlotBackgroundCombinedBagsTemplate, so CreateTexture fails with
+  -- "Couldn't find inherited node", leaves ItemSlotBackground nil, and the
+  -- SetAllPoints below throws. Reported live on ToggleAllBags, via
+  -- bag.lua DrawGlobalSections -> GetItemButton -> this function.
   if addon.isRetail then
-    button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+    if addon.isForever then
+      button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND")
+      button.ItemSlotBackground:SetTexture("Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag")
+    else
+      button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+    end
     button.ItemSlotBackground:SetAllPoints(button)
     button.ItemSlotBackground:Hide()
   end
