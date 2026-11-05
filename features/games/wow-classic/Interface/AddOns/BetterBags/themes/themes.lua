@@ -440,6 +440,20 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   end
   if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
   if button.NewItemTexture then button.NewItemTexture:Hide() end
+  -- LOCAL PATCH: retail slot-state art that ContainerFrameItemButtonTemplate
+  -- ships shown by default. Blizzard's ItemButton:Initialize would normally
+  -- manage it, but that throws on Forever (see frames/item.lua bindToSlot), so
+  -- it was never hidden and a padlock rendered in every slot.
+  --
+  -- ExtendedSlot is the padlock; BetterBags already hides it in SetFreeSlots
+  -- (frames/item.lua:605) and ClearItem (:708), just never at creation, so any
+  -- button not going through those paths kept it. EmptyBagIcon and
+  -- BagIndicator are referenced nowhere in the addon at all. UpgradeIcon,
+  -- IconOverlay and ItemContextOverlay are deliberately left alone -- those
+  -- ARE driven by BetterBags.
+  if button.ExtendedSlot then button.ExtendedSlot:Hide() end
+  if button.EmptyBagIcon then button.EmptyBagIcon:Hide() end
+  if button.BagIndicator then button.BagIndicator:Hide() end
   button:Show()
   return button
 end
