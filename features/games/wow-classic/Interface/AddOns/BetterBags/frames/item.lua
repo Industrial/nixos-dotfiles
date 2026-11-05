@@ -892,6 +892,32 @@ function itemFrame:_DoCreate(_, bagID)
 	return i
 end
 
+--- Binds a button to a physical bag slot.
+--
+-- Blizzard's `ContainerFrameItemButtonMixin:Initialize` throws on WoW Forever
+-- (1.60.1): `ContainerFrame.lua:1861` hands a bad id to its own `self:SetID()`
+-- and the button is left half-initialized -- reported live as 11x
+-- "bad argument #1 to 'SetID'" on login, from the pre-population loops in
+-- `OnEnable`. These buttons use ContainerFrameItemButtonTemplate but are
+-- parented to a plain Frame rather than a real ContainerFrame, which Blizzard's
+-- Initialize does not expect.
+--
+-- BetterBags already carries a manual path for clients with no `Initialize` at
+-- all; this uses that same path whenever the call is missing OR fails, so a
+-- throw finishes the binding instead of aborting it.
+---@param button table ItemButton or theme decoration
+---@param bagID number
+---@param slotID number
+local function bindToSlot(button, bagID, slotID)
+	-- Written unconditionally: Blizzard templates read `self.bagID`, and
+	-- Initialize may have thrown before setting its own copy.
+	button.bagID = bagID
+	if button.Initialize and pcall(button.Initialize, button, bagID, slotID) then
+		return
+	end
+	button:SetID(slotID)
+end
+
 ---@param ctx Context
 ---@param slotkey string
 ---@return Item
@@ -907,19 +933,9 @@ function itemFrame:GetButton(ctx, slotkey)
 		slotID = tonumber(slotID)
 		local item = self:Create(ctx, bagID)
 		-- Assign physical slot ID and bag ID exactly once on creation
-		if item.button.Initialize then
-			item.button:Initialize(bagID, slotID)
-		else
-			item.button:SetID(slotID)
-			item.button.bagID = bagID
-		end
+		bindToSlot(item.button, bagID, slotID)
 		local decoration = themes:GetItemButton(ctx, item)
-		if decoration.Initialize then
-			decoration:Initialize(bagID, slotID)
-		else
-			decoration:SetID(slotID)
-			decoration.bagID = bagID
-		end
+		bindToSlot(decoration, bagID, slotID)
 		item.slotkey = slotkey
 
 		self.buttonsBySlotkey[slotkey] = item
