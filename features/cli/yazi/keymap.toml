@@ -1,0 +1,24 @@
+# A TOML linter such as Tombi can use this schema to validate your config.
+#:schema https://yazi-rs.github.io/schemas/keymap.json
+
+# `prepend_keymap` is merged in front of yazi's preset instead of replacing it,
+# so every default binding -- and the `~` help menu that lists them -- keeps
+# working.
+#
+# Every `run` below is a built-in command taken from
+# yazi-config/preset/keymap-default.toml. A `plugin <name>` for a plugin that
+# is not bundled does nothing at all when the key is pressed, which is the
+# worst way to discover a typo, so none are used here.
+
+[mgr]
+prepend_keymap = [
+  # Scroll the preview without moving the cursor off the hovered file. The
+  # preset's J/K stay bound; these are the pair the rest of the fleet scrolls
+  # with.
+  { on = "<C-e>", run = "seek 1", desc = "Seek down 1 unit in the preview" },
+  { on = "<C-y>", run = "seek -1", desc = "Seek up 1 unit in the preview" },
+
+  # The preset owns `g h`, `g c`, `g d` and `g t`; this repo gets `g r`. `~`
+  # is expanded by yazi itself, so no host path is baked in.
+  { on = ["g", "r"], run = "cd ~/.dotfiles", desc = "Go to ~/.dotfiles" },
+]

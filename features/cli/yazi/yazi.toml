@@ -1,0 +1,37 @@
+# A TOML linter such as Tombi can use this schema to validate your config.
+#:schema https://yazi-rs.github.io/schemas/yazi.json
+
+# Only the keys that actually differ from yazi 26.9.1's own preset
+# (yazi-config/preset/yazi-default.toml, embedded in the binary) are set here.
+# yazi deserialises this file *over* that preset field by field, so a partial
+# table is correct and the diff stays readable.
+#
+# `[plugin]` is deliberately absent. The preset already routes images ->
+# image/magick/svg, video -> video, PDFs -> pdf and archives -> archive, and
+# every binary those previewers spawn (`magick`, `resvg`, `ffmpeg`, `ffprobe`,
+# `pdftoppm`, `7zz`, `chafa`, `file`) is already on yazi's PATH because the
+# nixpkgs wrapper prefixes it. Restating the previewer table here would only
+# add a second place for an upstream rename to rot, and a stale previewer name
+# shows up as "no preview", never as an error.
+
+[mgr]
+# Narrow parent column, wide preview: the preview pane is the point of this
+# feature. The preset is [ 1, 4, 3 ].
+ratio = [1, 3, 4]
+# "natural" puts v2 before v10; the preset's "alphabetical" does not.
+sort_by = "natural"
+# A dotfiles fleet browsed with hidden files hidden is a file manager with the
+# work filtered out.
+show_hidden = true
+# Size in the gutter. `m s` / `m n` still switch it at runtime.
+linemode = "size"
+
+[preview]
+# Wrap rather than truncate: a cut-off line in a preview is a line you have to
+# open the file to read.
+wrap = "yes"
+# Upper bound on the decoded image before it reaches the graphics driver. The
+# preset's 600x900 is visibly soft in a full-height pane on a 4K display;
+# `[tasks] image_alloc` (512 MiB, unchanged) is still the real ceiling.
+max_width = 1600
+max_height = 1200

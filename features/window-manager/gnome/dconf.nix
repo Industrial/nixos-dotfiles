@@ -64,6 +64,7 @@ in {
             "discord.desktop"
             "org.gnome.Nautilus.desktop"
             "alacritty.desktop"
+            "com.mitchellh.ghostty.desktop"
           ];
         };
 

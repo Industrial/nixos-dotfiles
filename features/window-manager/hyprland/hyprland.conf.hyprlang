@@ -94,6 +94,8 @@ dwindle {
   # Application
     # Open terminal
     bind = SUPER, Return, exec, alacritty
+    # Open terminal (ghostty — ligatures; alacritty keeps the default bind)
+    bind = SUPER SHIFT, Return, exec, ghostty
     # Run command (dmenu-like)
     bind = SUPER CTRL, P, global, caelestia:launcher
   # Focus

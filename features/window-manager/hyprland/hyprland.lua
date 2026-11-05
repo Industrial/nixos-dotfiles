@@ -186,6 +186,8 @@ hl.bind("SUPER + CTRL + Space", hl.dsp.window.float({ action = "toggle" }))
 
 -- Application
 hl.bind("SUPER + Return", hl.dsp.exec_cmd("alacritty"))
+-- Ghostty sits beside alacritty (ligatures); alacritty keeps the default bind.
+hl.bind("SUPER + SHIFT + Return", hl.dsp.exec_cmd("ghostty"))
 hl.bind("SUPER + P", hl.dsp.exec_cmd("hyprlauncher"))
 
 -- Focus / move

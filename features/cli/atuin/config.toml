@@ -1,0 +1,42 @@
+# Atuin client configuration — local only.
+#
+# Linked to ~/.config/atuin/config.toml by the `linkAtuinConfig` activation script in
+# ./default.nix. Keys are the atuin 18.24 client surface
+# (crates/atuin-client/src/settings.rs); every key this file does not name keeps atuin's
+# own default, so what is here is only the decisions.
+
+# --- local only --------------------------------------------------------------------
+# Both of these reach the network on atuin's defaults: `auto_sync` pushes and pulls
+# against the sync server every `sync_frequency`, and `update_check` asks for a release
+# tag. This host's history stays on this host.
+auto_sync = false
+update_check = false
+
+# `sync_address` is deliberately absent rather than blanked. With sync off and no session
+# key in ~/.local/share/atuin/session there is nothing to sync, and naming a server would
+# record an intent this host does not have; atuin's own default address only becomes
+# reachable after an explicit `atuin login`.
+
+# --- search ------------------------------------------------------------------------
+# The same algorithm the Nushell completer uses, so Ctrl-R and Tab rank alike.
+search_mode = "fuzzy"
+# Recall across hosts and directories is the whole reason atuin replaced the per-shell
+# history file. The narrower host / session / directory views stay one Tab away in the
+# search UI.
+filter_mode = "global"
+# 40 lines (the default) is most of a terminal for a history search.
+inline_height = 24
+# Enter puts the selected line on the prompt instead of running it. A history search that
+# executes on one keystroke is a footgun.
+enter_accept = false
+
+# --- what gets recorded ------------------------------------------------------------
+# Drop commands matching atuin's secret patterns (AWS keys, GitHub tokens, …) before they
+# reach the database.
+secrets_filter = true
+
+[daemon]
+# Local only means there is nothing for a background daemon to do, and a daemon would be a
+# second writer to the same SQLite file. The `shell-history-checkpoint` timer in
+# ./default.nix keeps the write-ahead log in hand instead.
+enabled = false

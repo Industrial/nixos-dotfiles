@@ -2,8 +2,17 @@
 # Loaded before config.nu, which is loaded before $nu.data-dir/vendor/autoload.
 #
 # The autoload files only run on the REPL path, so `nu -c '...'` and `nu script.nu`
-# never see 00-nixos-env.nu. That is why the editor and XDG assignments below stay
-# here: they are the non-interactive floor. The authoritative declaration is
+# never see 00-nixos-env.nu.
+#
+# An earlier revision of this comment called the assignments below "the non-interactive
+# floor". That was wrong, and measurement disproved it: as of Nushell 0.116 `nu -c` and
+# `nu script.nu` do not load THIS file either — `nu -c 'which prepend-path | is-not-empty'`
+# answers false. The real non-interactive floor is the inherited process environment,
+# which NixOS populates through /etc/set-environment and pam_env.
+#
+# What these assignments actually buy is an interactive shell that bypassed pam_env
+# (a nested shell, a terminal started from a session that never read it). They are a
+# belt-and-braces duplicate of the authoritative declaration, which is
 # features/cli/shell-init's environment.sessionVariables.
 
 # -----------------------------------------------------------------------------

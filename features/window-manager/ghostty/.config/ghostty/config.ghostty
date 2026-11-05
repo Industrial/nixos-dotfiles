@@ -1,0 +1,28 @@
+# Ghostty 1.4.0. The syntax is "key = value" -- not TOML; whitespace around the
+# equals is insignificant and blank lines are ignored. ghostty(5) documents the
+# load path as $XDG_CONFIG_HOME/ghostty/config.ghostty, which is what the
+# activation script links.
+#
+# No shell/`command` override -- Ghostty runs the login shell, matching
+# features/window-manager/alacritty/.config/alacritty/alacritty.toml.
+#
+# Colours are deliberately absent. The gruvbox-dark-hard base16 palette is
+# owned by features/window-manager/stylix; setting `theme`, `background`,
+# `foreground` or `palette` here would fork it.
+
+# This literal must stay byte-identical to `stylix.fonts.monospace.name` in
+# features/window-manager/stylix/default.nix, which alacritty.toml also
+# duplicates -- three copies that must not drift.
+font-family = IosevkaTerm Nerd Font Mono
+font-size = 19
+
+# Programming ligatures: the concrete reason Ghostty sits beside Alacritty,
+# which cannot shape them. IosevkaTerm carries its ligature set in `calt`
+# (`->`, `=>`, `!=`, `==>`, `::` all substitute under it); the family ships no
+# `liga` feature at all, so naming `liga` here would be a silent no-op.
+font-feature = calt
+
+# Window presentation, matched to alacritty.toml.
+background-opacity = 0.85
+window-padding-x = 8
+window-padding-y = 8
