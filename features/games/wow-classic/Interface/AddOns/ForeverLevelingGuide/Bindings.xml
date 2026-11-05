@@ -1,0 +1,7 @@
+<Bindings>
+  <Binding name="WOWF_LIBRO" header="FOREVERLEVELINGGUIDE" category="ADDONS">WowF_Atajo("libro")</Binding>
+  <Binding name="WOWF_PANEL" category="ADDONS">WowF_Atajo("panel")</Binding>
+  <Binding name="WOWF_LIMPIAR" category="ADDONS">WowF_Atajo("limpiar")</Binding>
+  <Binding name="WOWF_AJUSTES" category="ADDONS">WowF_Atajo("ajustes")</Binding>
+  <Binding name="WOWF_DIARIO" category="ADDONS">WowF_Atajo("diario")</Binding>
+</Bindings>

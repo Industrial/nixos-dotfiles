@@ -1,0 +1,53 @@
+-- GENERADO por herramientas/generar-guia-campamento.mjs desde herramientas/fuente/guia-campamento.json: no editar a mano.
+-- Guía de los bufos de campamento de WoW Forever (build 1.60.1.70374, revisada 2026-10-16). una = true: una sola fuente.
+WowFGuiaCampamento = {
+  build = "1.60.1.70374",
+  icy = "https://www.icy-veins.com/wow-forever/camping",
+  mecanica = {
+    { clave = "inicio", es = "Hacia el nivel 5 te dan la misión The Great Outdoors: presenta el campamento y la Cooking. La fogata (Basic Campfire Kit) la pone quien tenga Cooking.", en = "Around level 5 you get the quest The Great Outdoors: it introduces camping and Cooking. The campfire (Basic Campfire Kit) is placed by someone with Cooking.", una = true, fuente = "https://www.icy-veins.com/wow-forever/camping" },
+    { clave = "fogata", es = "La fogata manda: Basic Campfire Kit = 3 objetos más; Journeyman Campfire Kit = 5; Expert Campfire Kit = 10. Las dos últimas se aprenden con un Blueprint.", en = "The campfire sets the size: Basic Campfire Kit = 3 more items; Journeyman Campfire Kit = 5; Expert Campfire Kit = 10. The last two are learned from a Blueprint.", una = false, fuente = "https://www.wowhead.com/forever/spell=1307227" },
+    { clave = "colocar", es = "Cada jugador pone UN objeto de su profesión junto a la fogata. Todos los objetos de campamento comparten una espera de 60 min.", en = "Each player places ONE item from their profession next to the campfire. All camp items share a 60 min cooldown.", una = false, fuente = "https://www.wowhead.com/forever/spell=1308027" },
+    { clave = "sentarse", es = "Siéntate (/sit) o fabrica a menos de 20 yardas de la fogata. A los 60 s (Welcoming Campfire) recibes Camp Benefits con todos los bufos de los objetos puestos.", en = "Sit (/sit) or craft within 20 yards of the campfire. After 60 sec (Welcoming Campfire) you get Camp Benefits with every buff from the placed items.", una = false, fuente = "https://www.wowhead.com/forever/spell=1229739" },
+    { clave = "duracion", es = "Los bufos duran 60 min y siguen contigo aunque te levantes y te vayas del campamento.", en = "The buffs last 60 min and stay with you even after you stand up and leave the camp.", una = false, fuente = "https://www.wowhead.com/forever/spell=1229741" },
+    { clave = "quien", es = "Sirve para cualquiera que se siente cerca: no hace falta grupo ni tener la profesión. Ojo: el Faction Banner solo da Spirit a los de su facción.", en = "It works for anyone sitting nearby: no group and no profession needed. Note: the Faction Banner only gives Spirit to its own faction.", una = false, fuente = "https://wago.tools/db2/SpellEffect?build=1.60.1.70374" },
+    { clave = "nosuma", es = "Cada bufo es una versión más débil de un bufo de clase y NO se suma con él: si te ponen el de clase (por ejemplo Blessing of Might), reemplaza al del campamento.", en = "Each buff is a weaker version of a class buff and does NOT stack with it: if you get the class buff (for example Blessing of Might), it replaces the camp one.", una = false, fuente = "https://wago.tools/db2/Spell?build=1.60.1.70374" },
+    { clave = "reemplazar", es = "Un objeto de rango más alto de la misma profesión se pone ENCIMA del de rango bajo y lo reemplaza; conserva su bufo y suma lo nuevo (puesto de fabricar, vendedor...).", en = "A higher rank item of the same profession is placed ON TOP of the lower one and replaces it; it keeps its buff and adds the new part (crafting station, vendor...).", una = false, fuente = "https://wago.tools/db2/SpellEffect?build=1.60.1.70374" },
+    { clave = "objetos15", es = "Los objetos puestos y la fogata duran 15 min en el suelo: siéntate pronto.", en = "Placed items and the campfire last 15 min on the ground: sit down early.", una = true, fuente = "https://wago.tools/db2/SpellMisc?build=1.60.1.70374" },
+    { clave = "lugar", es = "Se acampa casi en cualquier sitio al aire libre, menos en las ciudades grandes, y hay una distancia mínima entre fogatas.", en = "You can camp almost anywhere outdoors, except in major cities, and there is a minimum distance between campfires.", una = true, fuente = "https://www.icy-veins.com/wow-forever/camping" },
+    { clave = "comerciar", es = "Los objetos de campamento se pueden comerciar y vender en la casa de subastas, pero para ponerlos hace falta el rango de la profesión.", en = "Camp items can be traded and sold on the Auction House, but you need the profession rank to place them.", una = true, fuente = "https://www.icy-veins.com/wow-forever/camping" },
+    { clave = "esperafogata", es = "La fogata tiene su propia espera de 5 min.", en = "The campfire has its own 5 min cooldown.", una = true, fuente = "https://www.icy-veins.com/wow-forever/camping" },
+  },
+  legacy = {
+    { id = 1225479, n = "Field Guide", es = "baja la espera de 60 min de los objetos de campamento (-8 / -17 / -25 %).", en = "lowers the 60 min camp item cooldown (-8 / -17 / -25%).", una = false, fuente = "https://www.wowhead.com/forever/spell=1225479" },
+    { id = 1225502, n = "Permanence", es = "los bufos del campamento duran más (Icy Veins: +50 % en el rango 1).", en = "camp buffs last longer (Icy Veins: +50% at rank 1).", una = true, fuente = "https://www.wowhead.com/forever/spell=1225502" },
+    { id = 1225478, n = "Well Rested", es = "la XP descansada se llena más rápido y su tope sube (va bien con la Camp Tent).", en = "rested XP builds faster and its cap goes up (pairs well with the Camp Tent).", una = true, fuente = "https://www.wowhead.com/forever/spell=1225478" },
+  },
+  buffs = {
+    ["Camp Tent"] = { prof = 165, stat = "rested", excluye = "", es = "XP descansada: la mejor mientras subes de nivel.", en = "Rested XP: the best while leveling." },
+    ["Fish Bowl"] = { prof = 356, stat = "todo", excluye = "Blessing of Kings", es = "+% a todas las estadísticas: sirve a cualquier rama.", en = "+% to all stats: good for any spec." },
+    ["First Aid Kit"] = { prof = 129, stat = 7, excluye = "Power Word: Fortitude", es = "Stamina: más vida, clave para tanque y PvP.", en = "Stamina: more health, key for tanks and PvP." },
+    ["Enchanted Lute"] = { prof = 333, stat = "todo", excluye = "Mark of the Wild", es = "Armor, estadísticas y resistencias: muy bueno para tanque.", en = "Armor, stats and resistances: great for tanks." },
+    ["Camp Chair"] = { prof = 393, stat = 32, excluye = "Moonkin Aura", es = "+% de crítico con golpes y hechizos.", en = "+% crit with attacks and spells." },
+    ["Lodestone"] = { prof = 186, stat = 38, excluye = "Blessing of Might", es = "Attack Power cuerpo a cuerpo (no sirve a distancia).", en = "Melee Attack Power (not for ranged)." },
+    ["Sharpening Wheel"] = { prof = 164, stat = 4, excluye = "Strength of Earth Totem", es = "Strength: para quien pega con Strength.", en = "Strength: for Strength users." },
+    ["Incense Candle"] = { prof = 182, stat = 5, excluye = "Arcane Intellect", es = "Intellect: más maná y crítico de hechizos.", en = "Intellect: more mana and spell crit." },
+    ["Mana Well"] = { prof = 171, stat = 43, excluye = "Blessing of Wisdom", es = "Maná cada 5 s: menos pausas para beber.", en = "Mana every 5 sec: fewer drinking breaks." },
+    ["Faction Banner"] = { prof = 197, stat = 6, excluye = "Divine Spirit", es = "Spirit: recuperas maná y vida más rápido fuera de combate.", en = "Spirit: faster mana and health regen out of combat." },
+    ["Reagent Bot"] = { prof = 202, stat = "", excluye = "", es = "No da bufo: vendedor de reagents en el campamento.", en = "No buff: a reagent vendor at the camp." },
+    ["Basic Campfire Kit"] = { prof = 185, stat = "", excluye = "", es = "No da bufo: es la fogata que permite todo lo demás.", en = "No buff: it is the campfire that makes everything else work." },
+  },
+  roles = {
+    tanque = { "Fish Bowl", "First Aid Kit", "Enchanted Lute", "Sharpening Wheel", "Lodestone", "Camp Chair" },
+    fisico = { "Camp Chair", "Lodestone", "Sharpening Wheel", "Fish Bowl", "First Aid Kit", "Enchanted Lute" },
+    cazador = { "Camp Chair", "Fish Bowl", "Mana Well", "Incense Candle", "First Aid Kit", "Enchanted Lute" },
+    lanzador = { "Incense Candle", "Camp Chair", "Mana Well", "Fish Bowl", "Faction Banner", "First Aid Kit" },
+    sanador = { "Mana Well", "Incense Candle", "Faction Banner", "Fish Bowl", "First Aid Kit", "Camp Chair" },
+    pvp = { "First Aid Kit", "Fish Bowl", "Enchanted Lute", "Camp Chair" },
+  },
+  criterio = { es = "Orden del addon según lo que da cada bufo y las estadísticas de tu rama (las guías de WoW Forever no dan un orden por rol). Se quitan los bufos que ya te pones tú con tu clase.", en = "Addon order based on what each buff gives and your spec's stats (the WoW Forever guides do not give an order per role). Buffs your own class already gives you are removed." },
+  sinDatos = {
+    { es = "Cookie's Feast: el cliente solo dice \"comida que sube la Stamina\"; aún no hay números de WoW Forever.", en = "Cookie's Feast: the client only says \"Stamina-boosting food\"; no WoW Forever numbers yet." },
+    { es = "Dónde cae el Blueprint del Expert Campfire Kit y de casi todos los objetos de rango 300.", en = "Where the Expert Campfire Kit Blueprint and most rank 300 Blueprints drop." },
+    { es = "Rangos 20 / 140 / 300: vienen de la beta (el Journeyman y el Expert Campfire Kit piden 140 y 220 en el cliente; Icy Veins dice 90 y 200 para aprender el Blueprint).", en = "Ranks 20 / 140 / 300 come from the beta (the client asks 140 and 220 for the Journeyman and Expert Campfire Kit; Icy Veins says 90 and 200 to learn the Blueprint)." },
+  },
+}

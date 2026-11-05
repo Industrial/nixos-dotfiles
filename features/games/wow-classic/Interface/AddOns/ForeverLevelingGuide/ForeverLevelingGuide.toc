@@ -1,0 +1,100 @@
+## Interface: 16001
+## Title: Forever Leveling Guide
+## Notes: Your leveling plan inside the game: talents, professions, gear, dungeons, rotation, macros and farming routes. /wowf
+## Notes-esES: Tu plan de subida dentro del juego: talentos, profesiones, equipo, mazmorras, rotación, macros y rutas de farmeo. /wowf
+## Notes-esMX: Tu plan de subida dentro del juego: talentos, profesiones, equipo, mazmorras, rotación, macros y rutas de farmeo. /wowf
+## Author: Andy
+## Version: 4.66
+## SavedVariables: WowFExportarDB
+## OptionalDeps: wowF_Plan
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+wowF_Idioma.lua
+wowF_Estilo.lua
+wowF_Retratos.lua
+wowF_Fondos_Datos.lua
+wowF_Fondos.lua
+wowF_DatosEN.lua
+wowF_Mazmorras.lua
+wowF_Diario_Datos.lua
+wowF_Mecanicas_Datos.lua
+wowF_MapasMazmorras_Datos.lua
+wowF_MapasPistas_Datos.lua
+wowF_Iconos_Datos.lua
+wowF_RutaTanque_Datos.lua
+wowF_Encuentros.lua
+wowF_Zonas.lua
+wowF_Exportar.lua
+wowF_Iconos.lua
+wowF_Farmeo.lua
+wowF_Datos.lua
+wowF_Armar.lua
+wowF_ArmasDatos.lua
+wowF_Armas.lua
+wowF_Comparar.lua
+wowF_ProfObjetivo.lua
+wowF_EquipoGuia.lua
+wowF_Panel.lua
+wowF_Libro.lua
+wowF_Diagrama.lua
+wowF_Diario.lua
+wowF_DiarioRuta.lua
+wowF_DiarioMapa.lua
+wowF_Probador.lua
+wowF_Boton.lua
+wowF_Entrenadores.lua
+wowF_MisionesMazmorra.lua
+wowF_Viaje.lua
+wowF_LineaMisiones.lua
+wowF_MarcaNPC.lua
+wowF_SubirZonas.lua
+wowF_Reinicio.lua
+wowF_EntrenadorClase.lua
+wowF_Hechizos.lua
+wowF_Duraciones_Datos.lua
+wowF_CostosEntrenador_Datos.lua
+wowF_Rotacion.lua
+wowF_Aprendizaje.lua
+wowF_Bienvenida.lua
+wowF_Opciones.lua
+wowF_Valiosos.lua
+wowF_AvisoBotin.lua
+wowF_AvisosNuevos.lua
+wowF_Recompensa.lua
+wowF_TooltipMejora.lua
+wowF_Entrenamiento.lua
+wowF_HabilidadArma.lua
+wowF_Vendedor.lua
+wowF_MisionGrupo.lua
+wowF_Mobs.lua
+wowF_AreaMobs.lua
+wowF_HierbasSecundaria.lua
+wowF_Favor_Datos.lua
+wowF_Dependencias_Datos.lua
+wowF_Dependencias.lua
+wowF_Favor.lua
+wowF_Cajas_Datos.lua
+wowF_Cajas.lua
+wowF_Legacy.lua
+wowF_BiS.lua
+wowF_Subastas_Datos.lua
+wowF_Consumibles_Datos.lua
+wowF_Consumibles.lua
+wowF_BiSGuia.lua
+wowF_Notas_Datos.lua
+wowF_Notas.lua
+wowF_Guia.lua
+wowF_Campamento_Datos.lua
+wowF_Campamento.lua
+wowF_GuiaCampamento_Datos.lua
+wowF_GuiaCampamento.lua
+wowF_Reputacion_Datos.lua
+wowF_Reputacion.lua
+wowF_Atajos.lua
+wowF_VistaCombate.lua
+wowF_VistaProfesiones.lua
+wowF_VistaGuias.lua
+wowF_VistaEquipo.lua
+wowF_Caza.lua
+wowF_Rares_Datos.lua
+wowF_Rares.lua
+wowF_VistaRares.lua
