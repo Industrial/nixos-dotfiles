@@ -4,6 +4,7 @@ BigWigs3DB = {
 },
 ["profileKeys"] = {
 ["Skelf Onyourshelf"] = "Default",
+["Banknspank Saladfingers"] = "Default",
 ["Völundr Industrial"] = "Default",
 },
 ["profiles"] = {

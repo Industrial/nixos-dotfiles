@@ -1,0 +1,20 @@
+
+ModernMapMarkersDB = {
+["showBattlegrounds"] = true,
+["showZeppelins"] = true,
+["portalFaction"] = "all",
+["showAllRaces"] = false,
+["showWorldBosses"] = true,
+["showTrams"] = true,
+["showDungeons"] = true,
+["showPortals"] = true,
+["showLeylines"] = true,
+["showSkyships"] = true,
+["showMarkers"] = true,
+["transportFaction"] = "all",
+["showRaids"] = true,
+["showBoats"] = true,
+["bgFaction"] = "all",
+["showConvergences"] = true,
+["showTransportHints"] = true,
+}

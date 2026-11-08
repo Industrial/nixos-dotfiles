@@ -2,6 +2,31 @@ VER 3 0000000000000001 "Debug" "134400"
 /run if idDebug_RunStep then idDebug_RunStep() end
 /reload
 END
+VER 3 0000000000000003 "pet" "4640499"
+/petattack [@pettarget,noexists]
+/petfollow [@pettarget,exists]
+END
+VER 3 0000000000000004 "SIC" "457329"
+#showtooltip
+/cleartarget [dead][help]
+/tar [@mouseover,harm,nodead]
+/targetenemy [noharm]
+/use [@target, help] [@target, harm, nodead] Hunter's Mark
+/petattack
+/use !Auto Shot
+END
 VER 3 0000000000000002 "SP" "136006"
 /click idAutomationPrepareButton
+END
+VER 3 0000000000000005 "Upkeep Buffs" "INV_MISC_QUESTIONMARK"
+#showtooltip
+/click idAutomationUpkeepBuffsButton
+END
+VER 3 0000000000000006 "Upkeep Health" "INV_MISC_QUESTIONMARK"
+#showtooltip [combat] item:929; item:3770
+/use [combat] Healing Potion; Mutton Chop
+END
+VER 3 0000000000000007 "Upkeep Mana" "INV_MISC_QUESTIONMARK"
+#showtooltip [nocombat] item:9451
+/use [nocombat] Bubbling Water
 END

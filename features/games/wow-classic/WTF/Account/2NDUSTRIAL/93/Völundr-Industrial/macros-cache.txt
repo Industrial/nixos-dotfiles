@@ -1,0 +1,4 @@
+VER 3 0100000000000004 "ATK" "132317"
+#showtooltip
+/use !Shoot
+END

@@ -13,14 +13,21 @@ BetterBagsDB = {
 ["|cffa5a5ffRadiant Echoes|r"] = true,
 ["|cffa5a5ffA Greedy Emissary|r"] = true,
 ["|cffa5a5ffNoblegarden|r"] = true,
-["|cff1DDB7FRemix: Artifact|r"] = true,
+["|cff1dc7db20th Anniversary|r"] = true,
 ["|cffa5a5ffWinds of Mysterious Fortune|r"] = true,
 ["|cff1DDB7FRemix: Cache|r"] = true,
 ["|cffa5a5ffHallow's End|r"] = true,
-["|cff1dc7db20th Anniversary|r"] = true,
+["|cff1DDB7FRemix: Artifact|r"] = true,
 ["|cffa5a5ffDastardly Duos|r"] = true,
 },
+["global"] = {
+["changelog"] = {
+["lastSeen"] = 1794073051,
+},
+},
 ["profileKeys"] = {
+["Derpnschmerp Gorkndork"] = "Default",
+["Banknspank Saladfingers"] = "Default",
 ["Skelf Onyourshelf"] = "Default",
 ["Völundr Industrial"] = "Default",
 },
@@ -35,23 +42,25 @@ BetterBagsDB = {
 ["name"] = "Bank",
 ["id"] = 1,
 ["kind"] = 1,
-["isDefault"] = true,
 ["order"] = 1,
+["isDefault"] = true,
 },
 },
 },
 ["ephemeralCategoryFilters"] = {
-["Hearthstones"] = {
+["Low iLvl"] = {
 ["enabled"] = {
+true,
 true,
 [0] = true,
 },
 ["itemList"] = {
 },
-["name"] = "Hearthstones",
+["name"] = "Low iLvl",
 },
 ["Teleporters"] = {
 ["enabled"] = {
+true,
 true,
 [0] = true,
 },
@@ -62,113 +71,94 @@ true,
 ["|cff00ff00Mog - Learnable|r"] = {
 ["enabled"] = {
 true,
+true,
 [0] = true,
 },
 ["itemList"] = {
 },
 ["name"] = "|cff00ff00Mog - Learnable|r",
 },
-["Low iLvl"] = {
+["Hearthstones"] = {
 ["enabled"] = {
+true,
 true,
 [0] = true,
 },
 ["itemList"] = {
 },
-["name"] = "Low iLvl",
+["name"] = "Hearthstones",
 },
 },
-["showBagButton"] = false,
-["itemLevelColor"] = {
-["maxItemLevelByCharacter"] = {
-["Skelf-Classic Beta PvE 2"] = 10,
-},
-},
-["__bankDefaultTabsFixed"] = true,
-["positions"] = {
-[0] = {
-["y"] = -139.0599365234375,
-["x"] = -503.2744750976563,
-["point"] = "TOP",
-["scale"] = 1,
-},
-},
-["firstTimeMenu"] = false,
-["__groupsScopedByKind"] = true,
-["categoryOptions"] = {
-["#4: Simple Leather Satchel"] = {
-["shown"] = true,
-},
-["Finger"] = {
-["shown"] = true,
-},
-["One-Hand"] = {
-["shown"] = true,
-},
-["Trade Goods"] = {
-["shown"] = true,
-},
-["Recipe"] = {
-["shown"] = true,
-},
-["#1: Backpack"] = {
-["shown"] = true,
-},
-["Recent Items"] = {
-["shown"] = true,
-},
-["Quest"] = {
-["shown"] = true,
-},
-["#3: Small Green Pouch"] = {
-["shown"] = true,
-},
-["Two-Hand"] = {
-["shown"] = true,
-},
-["Teleporters"] = {
-["shown"] = true,
-},
-["Miscellaneous"] = {
-["shown"] = true,
-},
-["Chest"] = {
-["shown"] = true,
-},
-["Consumable"] = {
-["shown"] = true,
-},
-["|cff00ff00Mog - Learnable|r"] = {
-["shown"] = true,
-},
-["Hearthstones"] = {
-["shown"] = true,
-},
-["#2: Apprentice's Skinning Satchel"] = {
-["shown"] = true,
-},
-["Junk"] = {
-["shown"] = true,
-},
-["Low iLvl"] = {
-["shown"] = true,
-},
-},
+["nextSectionSortSplit"] = true,
+["searchRuleVersion"] = 2,
 ["customCategoryFilters"] = {
 ["Low iLvl"] = {
 ["enabled"] = {
 true,
+true,
 [0] = true,
 },
-["save"] = true,
-["name"] = "Low iLvl",
 ["itemList"] = {
 },
+["name"] = "Low iLvl",
+["save"] = true,
 },
 },
 ["groupCounter"] = {
 1,
 },
+["itemLevelColor"] = {
+["maxItemLevelByCharacter"] = {
+["Skelf-Classic Beta PvE 2"] = 10,
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = 22,
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = 31,
 },
 },
+["positions"] = {
+[0] = {
+["y"] = 148.1954803466797,
+["x"] = 923.48095703125,
+["point"] = "LEFT",
+["scale"] = 1,
+},
+},
+["showBagButton"] = false,
+["__bankDefaultTabsFixed"] = true,
+["firstTimeMenu"] = false,
+["__groupsScopedByKind"] = true,
+},
+},
+}
+BetterBagsPerfDB = {
+["renderRecordings"] = {
+},
+["pixelAudit"] = {
+["watching"] = false,
+["reports"] = {
+},
+["lastLayouts"] = {
+},
+["nextId"] = 1,
+},
+["settings"] = {
+["maxSessions"] = 10,
+["trackAllocations"] = false,
+["excludedModules"] = "Debug, Localization",
+["preset"] = "full",
+["traceMaxCalls"] = 1000000,
+["maxDurationSec"] = 0,
+["traceCalls"] = true,
+["timelineFrames"] = 18000,
+["pauseGC"] = false,
+["worstFrames"] = 10,
+["maxNodes"] = 5000,
+["calibrate"] = true,
+["spikeThresholdMs"] = 16,
+["traceArgs"] = true,
+},
+["sessions"] = {
+},
+["nextRenderRecordingId"] = 1,
+["version"] = 1,
+["nextId"] = 1,
 }

@@ -1,0 +1,8 @@
+Version: 1
+Frame: wowFPanel
+FrameLevel: 1
+Anchor: RIGHT
+X: -339
+Y: 76
+W: 420
+H: 862

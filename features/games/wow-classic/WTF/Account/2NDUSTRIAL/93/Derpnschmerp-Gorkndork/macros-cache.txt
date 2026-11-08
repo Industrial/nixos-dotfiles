@@ -1,0 +1,30 @@
+VER 3 0100000000000007 "AS" "134400"
+#showtooltip
+/use [@mouseover,exists,harm]Arcane Shot
+/use Arcane Shot
+END
+VER 3 0100000000000004 "ATK" "132317"
+#showtooltip
+/use !Shoot
+END
+VER 3 0100000000000009 "CS" "134400"
+#showtooltip
+/use Concussive Shot
+END
+VER 3 0100000000000005 "MP" "134400"
+#showtooltip
+/use Mend Pet
+END
+VER 3 010000000000000A "SH" "134400"
+#showtooltip
+/use Summon Hawk
+/petattack
+END
+VER 3 0100000000000006 "SS" "134400"
+#showtooltip
+/use Serpent Sting
+END
+VER 3 0100000000000008 "WC" "134400"
+#showtooltip
+/use Wing Clip
+END
