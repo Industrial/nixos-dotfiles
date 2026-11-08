@@ -355,8 +355,15 @@ if not WoWPro.RETAIL then
     WoWPro.ProfessionLocalNames = {}
 	WoWPro.ProfessionLocalNames["Riding"] = "Riding"
     for profName, spellID in pairs(WoWPro.ProfessionSpellIDs) do
+        -- LOCAL PATCH: `spellInfo` is nil for a profession this client does
+        -- not have a spell for, and indexing it threw -- which aborted the
+        -- REST OF THIS FILE. UpdateTradeSkills (below) and ScanTrade (further
+        -- below) are therefore never defined, which is where
+        -- "WoWPro.lua:569: cannot omit callback" and
+        -- "WoWPro_Events.lua:277: attempt to call a nil value" both came
+        -- from: one throw at load, three reported errors.
         local spellInfo = WoWPro.C_Spell_GetSpellInfo(spellID)
-        local localName = spellInfo.name
+        local localName = spellInfo and spellInfo.name
         if localName ~= nil then
             WoWPro.ProfessionLocalNames[localName] = profName
         end
