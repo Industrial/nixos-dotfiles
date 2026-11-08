@@ -15,6 +15,12 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
@@ -34,21 +40,149 @@ local views = addon:NewModule('Views')
 ---@field dirtySections table<string, boolean>
 ---@field WipeHandler fun(view: View, ctx: Context)
 ---@field isNew boolean
+---@field rendering boolean True between BeginRender and FinishRender.
+---@field claims table<Item, boolean>|nil The current pass's claimed buttons (see frames/bag.lua Draw).
+---@field staleSections table<string, Section>|nil Last pass's sections not drawn again yet.
+---@field tabID number
+---@field sortRequired boolean
+---@field emptyGroupFrame? Frame The hint shown in an empty group tab.
 views.viewProto = {}
+addon:GetModule('Perf'):RegisterPrototype(views.viewProto, 'View')
 
 function views:OnEnable()
 end
 
+---@class (exact) ViewLayout
+---@field itemsPerRow number How many items a section puts in a row.
+---@field columns number How many columns of sections the view lays out.
+
+---@class (exact) ViewMeasure
+---@field itemsPerRow number
+---@field columns number
+---@field sections table<Section, SectionMeasure>
+---@field content GridMeasure Where the sections go.
+---@field width number
+---@field height number
+
+---@alias SectionMeasurer fun(section: Section, itemsPerRow: number): SectionMeasure
+
+-- Bind puts the tab's data into the view: a section per category in the data's order, and a
+-- cell per item, gap and free slot, each item button drawn from its data. It ends the render
+-- pass (releasing the sections it did not draw again). Bind lays nothing out: Layout does,
+-- and can run again with other limits (a window being resized) without binding again.
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
----@param callback fun()
-function views.viewProto:Render(ctx, bag, slotInfo, callback)
+function views.viewProto:Bind(ctx, bag, slotInfo)
+  local _ = bag
+  self:BeginRender(ctx)
+  self.isNew = false
+
+  local tabData = slotInfo.tabs and slotInfo.tabs[self.tabID] or {
+    items = {},
+    categories = {},
+  }
+
+  for _, catData in ipairs(tabData.categories) do
+    self:GetOrCreateSection(ctx, catData.name)
+  end
+
+  for _, item in ipairs(tabData.items) do
+    local slotkey = item.slotkey
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    local section = self:GetOrCreateSection(ctx, category)
+    if item.isItemGap then
+      section:AddCell(slotkey, { isGap = true, width = 37, height = 37 })
+    else
+      local itemButton = self:GetOrCreateItemButton(ctx, slotkey)
+      if item.isFreeSlot then
+        itemButton:SetFreeSlots(ctx, item, -1)
+      else
+        itemButton:SetItemFromData(ctx, item)
+      end
+      section:AddCell(slotkey, itemButton)
+    end
+    self:SetSlotSection(slotkey, section)
+  end
+
+  for sectionName, section in pairs(self.sections) do
+    local layout = slotInfo.sectionLayouts and slotInfo.sectionLayouts[sectionName]
+    if layout and layout.hideHeader then
+      section:RemoveHeader()
+    end
+  end
+
+  if self.emptyGroupFrame then
+    self.emptyGroupFrame:SetShown(self.tabID ~= nil and self.tabID > 1 and #tabData.categories == 0)
+  end
+
+  self.sortRequired = false
+  self.itemCount = slotInfo.totalItems
+  self:FinishRender(ctx)
+end
+
+-- Measure works out the layout of the bound sections, moving nothing (render-pipeline.md, the
+-- layout engine): each section measured with itemsPerRow items in a row (by measureSection when
+-- given: the canvas caches measures across the layouts it tries), and the sections packed in rows
+-- of 41 * itemsPerRow + 16 within columns at their measured sizes.
+---@param itemsPerRow number
+---@param columns number
+---@param measureSection? SectionMeasurer
+---@return ViewMeasure
+function views.viewProto:Measure(itemsPerRow, columns, measureSection)
+  local sections = {}
+  for _, section in pairs(self.sections) do
+    if measureSection ~= nil then
+      sections[section] = measureSection(section, itemsPerRow)
+    else
+      sections[section] = section:Measure(self.kind, itemsPerRow)
+    end
+  end
+  local content = self.content:Measure({
+    cells = self.content.cells,
+    maxWidthPerRow = ((37 + 4) * itemsPerRow) + 16,
+    columns = columns,
+    sizeOf = function(cell)
+      local measured = sections[cell]
+      if measured ~= nil then
+        return measured.width, measured.height
+      end
+    end,
+  })
+  return {
+    itemsPerRow = itemsPerRow,
+    columns = columns,
+    sections = sections,
+    content = content,
+    width = content.width,
+    height = content.height,
+  }
+end
+
+-- Arrange applies a measure: the sections where it put them, then every section's cells and size.
+-- Sections go first so an item that changes section moves from where its new section stands
+-- (render/motion.lua). It returns the size it took.
+---@param measured ViewMeasure
+---@return number width, number height
+function views.viewProto:Arrange(measured)
+  self.content.maxCellWidth = measured.columns
+  self.content:Arrange(measured.content)
+  for section, sectionMeasure in pairs(measured.sections) do
+    section:Arrange(self.kind, sectionMeasure)
+  end
+  for _, section in pairs(self.sections) do
+    debug:WalkAndFixAnchorGraph(section.frame)
+  end
+  return measured.width, measured.height
+end
+
+-- Layout measures the bound sections with layout's items per row and columns and arranges them.
+---@param ctx Context
+---@param layout ViewLayout
+---@return number width, number height
+function views.viewProto:Layout(ctx, layout)
   local _ = ctx
-  _ = bag
-  _ = slotInfo
-  _ = callback
-  error('Render method not implemented')
+  return self:Arrange(self:Measure(layout.itemsPerRow, layout.columns))
 end
 
 ---@param oldSlotKey string
@@ -65,9 +199,53 @@ function views.viewProto:AddSlot(newSlotKey)
   error('AddSlot method not implemented')
 end
 
+-- BeginRender starts a render pass without releasing or hiding anything. Last pass's
+-- sections are set aside so GetOrCreateSection can draw the same category into the same
+-- section, and every button the pass draws is recorded in claims; the bag releases the
+-- buttons no renderer claimed once every renderer has run. A second call before
+-- FinishRender is a no-op.
+---@param ctx Context
+---@param claims table<Item, boolean>|nil
+function views.viewProto:BeginRender(ctx, claims)
+  local _ = ctx
+  if self.rendering then return end
+  self.rendering = true
+  self.claims = claims
+  self.staleSections = self.sections
+  self.sections = {}
+  self.content:Wipe()
+  self.itemCount = 0
+  wipe(self.itemsByBagAndSlot)
+  self:ClearDeferredItems()
+  self:ClearDirtySections()
+  wipe(self.slotToSection)
+  self.sortRequired = true
+  self.isNew = true
+end
+
+-- FinishRender ends the pass and releases the sections it did not draw again. Their item
+-- buttons are left alone: a button may already be drawn somewhere else in this pass.
+---@param ctx Context
+function views.viewProto:FinishRender(ctx)
+  if not self.rendering then return end
+  self.rendering = false
+  self.claims = nil
+  local stale = self.staleSections
+  self.staleSections = nil
+  for _, section in pairs(stale or {}) do
+    section:Release(ctx)
+  end
+end
+
+-- Wipe tears the view down: every section and every item button it drew is released,
+-- including the sections a failed render pass set aside.
 ---@param ctx Context
 function views.viewProto:Wipe(ctx)
   assert(self.WipeHandler, 'WipeHandler not set')
+  for _, section in pairs(self.staleSections or {}) do
+    section:ReleaseAllCells(ctx)
+  end
+  self:FinishRender(ctx)
   self.WipeHandler(self, ctx)
   self:ClearDeferredItems()
   self:ClearDirtySections()
@@ -96,11 +274,13 @@ function views.viewProto:GetOrCreateItemButton(ctx, slotkey, createFunc)
     if createFunc then
       item = self:GetItemFrame(ctx, createFunc)
     else
+      -- Static per-slot buttons belong to ItemFrame, not to the view.
       item = itemFrame:GetButton(ctx, slotkey)
-      self.itemFrames = self.itemFrames or {}
-      tinsert(self.itemFrames, item)
     end
     self.itemsByBagAndSlot[slotkey] = item
+  end
+  if self.claims then
+    self.claims[item] = true
   end
   return item
 end
@@ -118,8 +298,14 @@ function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local color = filter and filter.color or nil
 
   if section == nil then
-    section = sectionFrame:Create(ctx)
-    section.frame:SetParent(self.content:GetScrollView())
+    section = self.staleSections and self.staleSections[category]
+    if section then
+      self.staleSections[category] = nil
+      section:PrepareForReuse()
+    else
+      section = sectionFrame:Create(ctx)
+      section.frame:SetParent(self.content:GetScrollView())
+    end
     section:SetTitle(category, color)
     if not onlyCreate then
       self.content:AddCell(category, section)

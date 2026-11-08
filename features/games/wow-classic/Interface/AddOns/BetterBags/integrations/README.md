@@ -10,6 +10,7 @@ The integrations module provides seamless compatibility with popular World of Wa
   - [Masque](#masque-masquelua)
   - [Pawn](#pawn-pawnlua)
   - [SimpleItemLevel](#simpleitemlevel-simpleitemlevellua)
+  - [Profession Shopping List](#profession-shopping-list-professionshoppinglistlua)
 - [Integration Architecture](#integration-architecture)
 - [Usage](#usage)
 - [Adding New Integrations](#adding-new-integrations)
@@ -55,8 +56,8 @@ Integrates with Masque for custom button skinning.
 
 **Features:**
 - Custom button skins for item buttons
-- Separate groups for Backpack and Bank
-- Respects theme DisableMasque setting
+- Separate groups for Backpack, Bank and BetterBags Next's Vendor
+- Respects the theme's `Masque = false` (`Sonata:UsesMasque()`), taking buttons out of their groups when such a theme is applied
 - Dynamic button registration/removal
 - Blend mode fixes for proper display
 
@@ -69,13 +70,21 @@ Integrates with Masque for custom button skinning.
 **Groups:**
 - `BetterBags/Backpack` - All backpack item buttons
 - `BetterBags/Bank` - All bank item buttons
+- `BetterBags/Vendor` - BetterBags Next's vendor buttons (`next/vendorbutton.lua`): their square
+  button, with its parts named (`Icon`, `IconBorder`, `Count`, `Highlight`), as an `Item` button
 
 **Event Handlers:**
 - `item/NewButton` - Register new item buttons
-- `item/Updated` - Update button registration
-- `item/Clearing` - Remove button from group
+- `item/Updated` - Update button registration (sent by a full button draw; a redraw whose inputs are unchanged is skipped and sends nothing)
+- `item/Clearing` - Not handled: a released item button stays in its group (buttons exist for the whole session; its next draw re-skins it)
 - `bagbutton/Updated` - Register bag slot buttons
 - `bagbutton/Clearing` - Remove bag slot buttons
+- `vendor/NewButton` - Register a new vendor button (sent once per button; vendor buttons are reused,
+  and a theme that uses Masque adds back the ones a theme without it took out)
+- `vendor/Updated` - Re-skin a vendor button that styled itself again for a new pixel grid (its icon,
+  count and highlight drawn over the skin; `NextVendorButton:Fit`), adding it when it is not in the group
+- `guild/NewButton`, `guild/Updated` - Register a guild bank button, and re-skin it after every draw or
+  restyle
 
 **Methods:**
 | Method | Description | Parameters | Returns |
@@ -84,31 +93,28 @@ Integrates with Masque for custom button skinning.
 | `RemoveButtonFromGroup(group, button)` | Remove button from group | `string`, `Button` | - |
 | `IsGroupEnabled(group)` | Check if group is enabled | `string` | `boolean` |
 | `ReapplyBlend(button)` | Fix blend mode | `Button` | - |
+| `IsSkinned(button)` | Whether the button is in one of BetterBags' Masque groups (Masque places its parts; BetterBags Next's item fitter leaves them alone) | `Button` | `boolean` |
 
 ### Pawn (`pawn.lua`)
 
-Shows item upgrade indicators using Pawn's upgrade detection.
-
-**Features:**
-- Upgrade arrow indicators on items
-- Equipment slot preloading for comparison
-- Support for both Retail and Classic
-- Combat lockdown handling
-- Deferred updates after combat
+Shows item upgrade indicators using Pawn's upgrade detection, the way Pawn asks a bag addon to work with it (`PawnBags.lua`).
 
 **Key Components:**
 ```lua
--- Uses Pawn's upgrade detection
-PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(itemLink, true)
+-- Asked about each item link; nil means past Pawn's budget, or no item data yet: check back on a timer
+PawnShouldItemLinkHaveUpgradeArrow(itemLink, true)
+-- RefreshAll is called when arrows may have changed. Registering also turns off Pawn's arrows on Blizzard's bag frames
+PawnRegisterThirdPartyBag("BetterBags", { RefreshAll = ... })
 ```
 
-**Event Handlers:**
-- `bag/Rendered` - Update all items after bag render
-
 **Behavior:**
-- Shows upgrade arrows on items that are upgrades according to Pawn
-- Preloads all equipment slots for accurate comparison
-- Defers updates during combat to avoid taint
+- Answers are kept by item link, without the player's level and spec: a sort, a re-read or a respec asks Pawn nothing in the read, and a read only asks about an item it has not seen
+- An item Pawn has no answer for yet is not treated as "not an upgrade": no `upgrade` search field, and Automation leaves it alone
+- Pawn's signal asks for no refresh: every item held is checked again a few at a time, showing its old arrow meanwhile
+- Only an arrow that changed recalculates the bags holding it, and no category or button is redone for it
+- Nothing is checked again during combat
+
+Details: `.claude/rules/caches.md` §2a.
 
 ### SimpleItemLevel (`simpleitemlevel.lua`)
 
@@ -133,6 +139,30 @@ SimpleItemLevel.API.ItemIsUpgrade(itemLink)
 - Only activates when SimpleItemLevel is present
 - Only processes backpack items (not bank)
 - Falls back when Pawn is not available
+
+### Profession Shopping List (`professionshoppinglist.lua`)
+
+Buys what Profession Shopping List's list needs from a BetterBags Next vendor
+(`.claude/rules/profession-shopping-list.md`).
+
+**Features:**
+- A Shopping List section at the top of the vendor's Buy tab: what the list buys there, how many, and
+  what they cost
+- Docked in a green card ("Buy N items?", the total price): a double click buys it all
+
+**Key Components:**
+```lua
+-- Profession Shopping List's API
+ProfessionShoppingList:GetMerchantShoppingList() -- itemID = { required, owned }
+ProfessionShoppingList:BuyFromMerchant()
+EventRegistry "ProfessionShoppingList.OnTrackedRecipesChanged"
+```
+
+**Behavior:**
+- Only activates when Profession Shopping List has both `GetMerchantShoppingList` and `BuyFromMerchant`
+  (v12.1.5-02 or later)
+- Retries on `ADDON_LOADED` when Profession Shopping List loads after BetterBags
+- Sends `shoppingList/Changed` when the tracked recipes change
 
 ## Integration Architecture
 
@@ -179,7 +209,7 @@ Integrations are automatic and require no configuration:
 While there's no built-in disable option, integrations can be prevented by:
 - Not installing the third-party addon
 - Disabling the third-party addon
-- For Masque: Using a theme with `DisableMasque = true`
+- For Masque: Using a theme with `Masque = false`
 
 ## Adding New Integrations
 
@@ -264,7 +294,7 @@ masque:ReapplyBlend(button)
 3. **Performance**: Cache addon references, avoid repeated lookups
 4. **User Feedback**: Print confirmation when integration loads
 5. **Combat Safety**: Defer updates during combat when needed
-6. **Theme Respect**: Honor theme settings (e.g., DisableMasque)
+6. **Theme Respect**: Honor theme settings (e.g., `Masque = false`)
 7. **Graceful Degradation**: Continue working if integration fails
 
 ## Troubleshooting
@@ -278,7 +308,7 @@ masque:ReapplyBlend(button)
 
 ### Masque Skins Not Applying
 
-- Ensure theme doesn't have `DisableMasque = true`
+- Ensure the theme doesn't set `Masque = false`
 - Check Masque group settings in Masque config
 - Try `/reload` to refresh skin application
 

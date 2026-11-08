@@ -1,6 +1,6 @@
-## Interface: 120100, 16001, 50504, 38000, 20506, 11508, 11509
+## Interface: 120100, 120105, 16001, 50504, 38000, 20506, 11508, 11509
 ## Title: Auctionator
-## Version: 340
+## Version: 342
 ## Author: plusmouse, Borjamacare
 ## X-Website: https://www.curseforge.com/wow/addons/auctionator
 ## X-Category: Auction/Economy

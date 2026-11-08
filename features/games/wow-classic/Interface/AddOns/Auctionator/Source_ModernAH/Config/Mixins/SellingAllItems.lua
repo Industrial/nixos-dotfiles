@@ -11,6 +11,12 @@ function AuctionatorConfigSellingAllItemsFrameMixin:OnLoad()
   self.ItemSalesPreference:SetOnChange(function(selectedValue)
     self:OnSalesPreferenceChange(selectedValue)
   end)
+
+  if Auctionator.Constants.IsForever then
+    self.DurationGroup.radioButtons[1].RadioButton.Label:SetText(self.DurationGroup.radioButtons[1].labelText:gsub("12", "2"))
+    self.DurationGroup.radioButtons[2].RadioButton.Label:SetText(self.DurationGroup.radioButtons[2].labelText:gsub("24", "8"))
+    self.DurationGroup.radioButtons[3].RadioButton.Label:SetText(self.DurationGroup.radioButtons[3].labelText:gsub("48", "24"))
+  end
 end
 
 function AuctionatorConfigSellingAllItemsFrameMixin:ShowSettings()

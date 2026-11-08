@@ -9,6 +9,9 @@ local context = addon:GetModule('Context')
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class (exact) FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -42,9 +45,10 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field activePane number|nil
 ---@field previousTab number|nil
 local stackedLayout = {}
+addon:GetModule('Perf'):RegisterPrototype(stackedLayout, 'StackedLayout')
 
 ---@param targetFrame Frame
----@param baseFrame Frame
+---@param baseFrame Frame The form window's content box; the index hangs from it.
 ---@param scrollBox WowScrollBox
 ---@param index boolean
 ---@param tabbed boolean
@@ -116,7 +120,7 @@ end
 ---@package
 function stackedLayout:setupIndex()
   self.indexFrame = CreateFrame("Frame", nil, self.baseFrame) --[[@as Frame]]
-  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -34)
+  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 6, -4)
   self.indexFrame:SetPoint("BOTTOM", self.baseFrame, "BOTTOM", 0, 0)
   self.indexFrame:SetWidth(120)
 
@@ -156,6 +160,26 @@ function stackedLayout:createTextAreaBackground(parent)
   return frame
 end
 
+-- fitNavText keeps a navigation entry as wide as its text in its current font, from when it is
+-- made and after every font change (hover, selection, a theme, the client's text size). The Nav
+-- roles differ in their shadow: Nav's (offset 1) makes the text about 0.8 wider than the hover
+-- and selected roles' glow (offset 0), and an entry sized in one of those kept the narrower width,
+-- so in the Nav role it wrapped onto a clipped second line ("Import/" for "Import/Export"; a
+-- render recording on WoW: Forever: width 110.0 for a 110.8 string). Setting the width to 0 and
+-- the text again (Blizzard's QuestLogTitleButton_Resize) refreshes the string's width but left the
+-- entry's, so the entry then takes that width explicitly, rounded up, with a pixel to spare.
+---@param button Button
+local function fitNavText(button)
+  local fs = button:GetFontString()
+  local function fit()
+    fs:SetWidth(0)
+    button:SetText(button:GetText())
+    fs:SetWidth(math.ceil(fs:GetStringWidth()) + 1)
+  end
+  sonata:WatchTextFont(fs, fit)
+  fit()
+end
+
 ---@package
 ---@param title string
 ---@param point Frame
@@ -164,19 +188,16 @@ function stackedLayout:addIndex(title, point, sub)
   if not self.index then return end
   local indexButton = CreateFrame("Button", nil, self.indexFrame) --[[@as Button]]
   indexButton:SetSize(100, 24)
-  if sub then
-    local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    indexButton:SetFontString(font)
-  else
-    local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    indexButton:SetFontString(font)
-  end
+  -- The text role of the entry; "Hover" and "Active" name its hovered and open states.
+  local navRole = sub and "NavSub" or "Nav"
+  indexButton.navRole = navRole
+  indexButton:SetFontString(sonata:CreateText(indexButton, navRole))
   indexButton:SetText(sub and "  " .. title or title)
   local fs = indexButton:GetFontString()
-  fs:SetTextColor(1, 1, 1)
   fs:ClearAllPoints()
   fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
   fs:SetJustifyH("LEFT")
+  fitNavText(indexButton)
 
   -- Change OnClick behavior based on mode
   if self.tabbed then
@@ -186,26 +207,16 @@ function stackedLayout:addIndex(title, point, sub)
     local tabIndex = #self.tabContainers
     indexButton.tabIndex = tabIndex -- Store tab index for hover logic
 
-    -- Add hover glow effect
     indexButton:SetScript("OnEnter", function()
-      -- Animate the text with a subtle glow
-      fs:SetTextColor(1, 0.9, 0.5) -- Warm golden color
-      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
-      fs:SetShadowOffset(0, 0) -- No offset creates a glow effect
+      sonata:SetTextRole(fs, navRole .. "Hover")
     end)
 
     indexButton:SetScript("OnLeave", function()
       -- Only keep highlighted if this is the active tab AND no pane is active
       if self.activeTab == tabIndex and not self.activePane then
-        -- Keep active tab golden with glow
-        fs:SetTextColor(1, 0.82, 0)
-        fs:SetShadowColor(1, 0.8, 0.3, 0.8)
-        fs:SetShadowOffset(0, 0)
+        sonata:SetTextRole(fs, navRole .. "Active")
       else
-        -- Reset to normal
-        fs:SetTextColor(1, 1, 1)
-        fs:SetShadowColor(0, 0, 0, 1)
-        fs:SetShadowOffset(1, -1)
+        sonata:SetTextRole(fs, navRole)
       end
     end)
 
@@ -385,17 +396,7 @@ function stackedLayout:UpdateTabHighlighting(activeTabIndex)
       isActive = true
     end
 
-    if isActive then
-      -- Highlight active tab with golden color and glow
-      fs:SetTextColor(1, 0.82, 0)  -- Gold color
-      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
-      fs:SetShadowOffset(0, 0)  -- No offset creates a glow effect
-    else
-      -- Normal color for inactive tabs
-      fs:SetTextColor(1, 1, 1)
-      fs:SetShadowColor(0, 0, 0, 1)
-      fs:SetShadowOffset(1, -1)
-    end
+    sonata:SetTextRole(fs, isActive and button.navRole .. "Active" or button.navRole)
   end
 end
 
@@ -430,15 +431,10 @@ end
 ---@private
 ---@param container Frame
 ---@param title string
----@param color? table
+---@param role? string The text role; the default is Heading.
 ---@return FontString
-function stackedLayout:createTitle(container, title, color)
-  local titleFont = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  if color then
-    titleFont:SetTextColor(unpack(color))
-  else
-    titleFont:SetTextColor(1, 1, 1)
-  end
+function stackedLayout:createTitle(container, title, role)
+  local titleFont = sonata:CreateText(container, role or "Heading")
   titleFont:SetJustifyH("LEFT")
   titleFont:SetText(title)
   return titleFont
@@ -447,15 +443,10 @@ end
 ---@private
 ---@param container Frame
 ---@param description string
----@param color? table
+---@param role? string The text role; the default is Body.
 ---@return FontString
-function stackedLayout:createDescription(container, description, color)
-  local descriptionFont = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  if color then
-    descriptionFont:SetTextColor(unpack(color))
-  else
-    descriptionFont:SetTextColor(1, 1, 1)
-  end
+function stackedLayout:createDescription(container, description, role)
+  local descriptionFont = sonata:CreateText(container, role or "Body")
   descriptionFont:SetJustifyH("LEFT")
   descriptionFont:SetText(description)
   descriptionFont:SetWordWrap(true)
@@ -649,11 +640,11 @@ function stackedLayout:AddCheckbox(opts)
   end)
   container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Load')))
 
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("LEFT", container.checkbox, "RIGHT", 5, 0)
   container.title:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
@@ -670,10 +661,10 @@ function stackedLayout:addDropdownRetail(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
   container.dropdown = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
@@ -724,10 +715,10 @@ function stackedLayout:addDropdownClassic(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
   container.classicDropdown = CreateFrame("Frame", nil, container, "UIDropDownMenuTemplate") --[[@as Frame]]
@@ -795,10 +786,10 @@ function stackedLayout:AddSlider(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormSlider]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
 
@@ -814,44 +805,52 @@ function stackedLayout:AddSlider(opts)
   container.slider:SetMinMaxValues(opts.min, opts.max)
   container.slider:SetValueStep(opts.step)
   container.slider:SetObeyStepOnDrag(true)
+  -- Only the user's own changes are saved. The form sets the slider from the stored setting
+  -- when it is built and on every reload, which fires OnValueChanged with userInput false;
+  -- saving those wrote every slider's setting back at each login and sent its refresh.
   addon.SetScript(container.slider, "OnValueChanged", function(ctx, _, value, user)
-    opts.setValue(ctx, value)
     if user then
+      opts.setValue(ctx, value)
       container.input:SetText(tostring(value))
       self:ReloadAllFormElements()
     end
   end)
+
+  -- applyTyped moves the slider to a value typed into the box, clamped to the range, and
+  -- saves it when it changed the slider.
+  local function applyTyped(ctx, value)
+    if value < opts.min then
+      value = opts.min
+    elseif value > opts.max then
+      value = opts.max
+    end
+    local before = container.slider:GetValue()
+    container.slider:SetValue(value)
+    container.input:SetText(tostring(value))
+    local after = container.slider:GetValue()
+    if after ~= before then
+      opts.setValue(ctx, after)
+    end
+  end
 
   container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
   container.input:SetSize(50, 20)
   container.input:SetPoint("TOP", container.slider, "BOTTOM", 0, -5)
   container.input:SetNumeric(true)
   container.input:SetAutoFocus(false)
-  addon.SetScript(container.input, "OnEditFocusLost", function(_)
+  addon.SetScript(container.input, "OnEditFocusLost", function(ctx)
     local value = tonumber(container.input:GetText())
     if value then
-      if value < opts.min then
-        value = opts.min
-      elseif value > opts.max then
-        value = opts.max
-      end
-      container.slider:SetValue(value)
-      container.input:SetText(tostring(value))
+      applyTyped(ctx, value)
     end
     container.input:SetText(tostring(container.slider:GetValue()))
     self:ReloadAllFormElements()
   end)
-  addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
+  addon.SetScript(container.input, "OnTextChanged", function(ctx, _, user)
     if user then
       local value = tonumber(container.input:GetText())
       if value then
-        if value < opts.min then
-          value = opts.min
-        elseif value > opts.max then
-          value = opts.max
-        end
-        container.slider:SetValue(value)
-        container.input:SetText(tostring(value))
+        applyTyped(ctx, value)
       end
     else
       container.input:SetText(tostring(container.slider:GetValue()))
@@ -907,10 +906,10 @@ function stackedLayout:AddTextArea(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormTextArea]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container.description:SetPoint("RIGHT", container, "RIGHT", -20, 0)
 
@@ -991,10 +990,10 @@ function stackedLayout:AddInputBox(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormInputBox]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
   container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
@@ -1077,10 +1076,10 @@ function stackedLayout:AddColor(opts)
     }
     ColorPickerFrame:SetupColorPickerAndShow(options)
   end)
-  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title = self:createTitle(container, opts.title, "Label")
   container.title:SetPoint("LEFT", container.colorPicker, "RIGHT", 5, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
 
@@ -1102,7 +1101,7 @@ function stackedLayout:AddLabel(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormLabel]]
   self:alignFrame(t, container)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description = self:createDescription(container, opts.description, "Description")
   container.description:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
   container.description:SetPoint("RIGHT", container, "RIGHT", -5, 0)
 
@@ -1245,32 +1244,21 @@ function stackedLayout:AddPaneLink(opts)
   -- Add to index with pane navigation (no inline content)
   local indexButton = CreateFrame("Button", nil, self.indexFrame) --[[@as Button]]
   indexButton:SetSize(100, 24)
-  local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  indexButton:SetFontString(font)
+  indexButton.navRole = "NavSub"
+  indexButton:SetFontString(sonata:CreateText(indexButton, "NavSub"))
   indexButton:SetText("  " .. opts.title)
   local fs = indexButton:GetFontString()
-  fs:SetTextColor(1, 1, 1)
   fs:ClearAllPoints()
   fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
   fs:SetJustifyH("LEFT")
+  fitNavText(indexButton)
 
-  -- Hover effect
   indexButton:SetScript("OnEnter", function()
-    fs:SetTextColor(1, 0.9, 0.5)
-    fs:SetShadowColor(1, 0.8, 0.3, 0.8)
-    fs:SetShadowOffset(0, 0)
+    sonata:SetTextRole(fs, "NavSubHover")
   end)
 
   indexButton:SetScript("OnLeave", function()
-    if self.activePane ~= paneIndex then
-      fs:SetTextColor(1, 1, 1)
-      fs:SetShadowColor(0, 0, 0, 1)
-      fs:SetShadowOffset(1, -1)
-    else
-      fs:SetTextColor(1, 0.82, 0)
-      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
-      fs:SetShadowOffset(0, 0)
-    end
+    sonata:SetTextRole(fs, self.activePane == paneIndex and "NavSubActive" or "NavSub")
   end)
 
   indexButton:SetScript("OnClick", function()

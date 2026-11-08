@@ -1,0 +1,9 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <Frame name="QuestieTraceConsentFrame" parent="UIParent" inherits="QuestieTraceDialogTemplate">
+    <Scripts>
+      <OnLoad inherit="append">
+        QuestieTraceCore.OnConsentFrameLoad(self);
+      </OnLoad>
+    </Scripts>
+  </Frame>
+</Ui>

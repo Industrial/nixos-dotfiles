@@ -186,10 +186,7 @@ do
 	end
 
 	function Details:GetOnlyName(string)
-		if (string) then
-			return string:gsub(("%-.*"), "")
-		end
-		return self.nome:gsub(("%-.*"), "")
+		return Details:RemoveRealmName(string or self.nome, self and self.serial)
 	end
 
 	function Details:RemoveOwnerName(string)
@@ -234,6 +231,38 @@ do
 			unitName = Ambiguate(unitName, "none")
 		--end
 		return unitName
+	end
+
+	function Details:RemoveRealmName(unitName, guid)
+		if (not guid) then
+			return unitName
+		end
+
+		if (DetailsFramework.IsForeverWow()) then
+			local firstName = UnitNameFromGUID(guid) or UnitName(unitName)
+
+			if (firstName) then
+				return firstName
+			end
+
+			if (issecretvalue(unitName)) then
+				return unitName
+			end
+
+			return (strsplit(" ", unitName))
+		end
+
+		local shortName = Ambiguate(unitName, "short")
+
+		if (shortName) then
+			return shortName
+		end
+
+		if (issecretvalue(unitName)) then
+			return unitName
+		end
+
+		return (unitName:gsub("%-.*", ""))
 	end
 
 	---return the class name, class file name and class id of the unit passed

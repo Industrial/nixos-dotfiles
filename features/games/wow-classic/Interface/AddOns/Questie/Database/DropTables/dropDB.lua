@@ -1,0 +1,174 @@
+---@class DropDB
+local DropDB = QuestieLoader:CreateModule("DropDB")
+
+---@type SupportValidation
+local SupportValidation = QuestieLoader:ImportModule("SupportValidation")
+
+-------------------------
+--Import modules.
+-------------------------
+---@type QuestieDB
+local QuestieDB = QuestieLoader:ImportModule("QuestieDB")
+---@type l10n
+local l10n = QuestieLoader:ImportModule("l10n")
+---@type Expansions
+local Expansions = QuestieLoader:ImportModule("Expansions")
+
+DropDB.tableWowhead = nil
+DropDB.tablePserver = nil
+DropDB.tableCorrections = nil
+DropDB.sourcePserver = "" -- this tracks which pserv DB is loaded so we can display the correct icon in debug mode
+
+DropDB.correctionKeys = { -- all keys must be negative or they'll be parsed as real data
+    WOWHEAD = -1,
+    PSERVER = -2,
+}
+
+---@return boolean valid
+---@return string? report
+function DropDB:Initialize()
+    local QuestieItemDropCorrections = LibQuestieDB.Support.Get("QuestieItemDropCorrections")
+    local wowheadModule, pserverModule, pserverField
+    if Questie.IsClassic then
+        -- Classic Wowhead data includes SoD IDs, which Era quests never reference.
+        wowheadModule, pserverModule = "QuestieClassicItemDrops", "QuestieClassicItemDrops"
+        pserverField, DropDB.sourcePserver = "cmangosData", "cmangos"
+    elseif Questie.IsTBC then
+        wowheadModule, pserverModule = "QuestieTBCItemDrops", "QuestieTBCItemDrops"
+        pserverField, DropDB.sourcePserver = "cmangosData", "cmangos"
+    elseif Questie.IsWotlk then
+        wowheadModule, pserverModule = "QuestieWotlkItemDrops", "QuestieWotlkItemDrops"
+        pserverField, DropDB.sourcePserver = "cmangosData", "cmangos"
+    elseif Questie.IsCata then
+        wowheadModule, pserverModule = "QuestieCataItemDrops", "QuestieCataItemDrops"
+        pserverField, DropDB.sourcePserver = "mangos3Data", "mangos3"
+    elseif Questie.IsMoP then
+        -- MoP private-server data is sparse; MoP-only quests use Wowhead instead.
+        wowheadModule, pserverModule = "QuestieMopItemDrops", "QuestieCataItemDrops"
+        pserverField, DropDB.sourcePserver = "mangos3Data", "mangos3"
+    else
+        Questie.Error("ItemDrops: Unknown Expansion!")
+        return false, "ItemDrops: Unknown Expansion!"
+    end
+
+    local wowheadSupport = LibQuestieDB.Support.Get(wowheadModule)
+    local pserverSupport = wowheadSupport
+    if pserverModule ~= wowheadModule then
+        pserverSupport = LibQuestieDB.Support.Get(pserverModule)
+    end
+    local valid, report = SupportValidation.ValidateTableShapes({
+        {wowheadModule, wowheadSupport},
+        {pserverModule, pserverSupport},
+    }, "DropTables", Expansions.Current)
+    if not valid then return false, report end
+
+    local decoded
+    decoded, report = SupportValidation.DecodeTables({
+        {"Wowhead", wowheadSupport.wowheadData},
+        {"Pserver", pserverSupport[pserverField]},
+    }, "DropTables", Expansions.Current)
+    if not decoded then return false, report end
+    DropDB.tableWowhead = decoded.Wowhead
+    DropDB.tablePserver = decoded.Pserver
+
+    -- Only selected correction sources participate; later/unused flavors need not exist.
+    local mergeInputs = {
+        {"Wowhead", DropDB.tableWowhead},
+        {"Pserver", DropDB.tablePserver},
+        {"QuestieItemDropCorrections", QuestieItemDropCorrections},
+    }
+    if type(QuestieItemDropCorrections) == "table" then
+        for index, flavor in ipairs({"Era", "Tbc", "Wotlk", "Cata", "MoP"}) do
+            if index <= Expansions.Current then
+                mergeInputs[#mergeInputs + 1] = {"QuestieItemDropCorrections." .. flavor, QuestieItemDropCorrections[flavor]}
+            end
+        end
+    end
+    valid, report = SupportValidation.ValidateTableShapes(mergeInputs, "DropTables", Expansions.Current)
+    if not valid then return false, report end
+
+    -- Corrections are loaded starting from Era; this means Era corrections are still
+    -- applied to later expansions unless overridden by later expansions' corrections
+    -- Only the merged map is written; correction rows stay shared and read-only.
+    DropDB.tableCorrections = {}
+    for k,v in pairs(QuestieItemDropCorrections.Era) do DropDB.tableCorrections[k] = v end
+    if Expansions.Current >= Expansions.Tbc then
+        for k,v in pairs(QuestieItemDropCorrections.Tbc) do DropDB.tableCorrections[k] = v end
+        if Expansions.Current >= Expansions.Wotlk then
+            for k,v in pairs(QuestieItemDropCorrections.Wotlk) do DropDB.tableCorrections[k] = v end
+            if Expansions.Current >= Expansions.Cata then
+                for k,v in pairs(QuestieItemDropCorrections.Cata) do DropDB.tableCorrections[k] = v end
+                if Expansions.Current >= Expansions.MoP then
+                    for k,v in pairs(QuestieItemDropCorrections.MoP) do DropDB.tableCorrections[k] = v end
+                end
+            end
+        end
+    end
+    return SupportValidation.ValidateDropTables(
+        DropDB.tableWowhead, DropDB.tablePserver, DropDB.tableCorrections, DropDB.sourcePserver, Expansions.Current)
+end
+
+-- To obtain final drop rate data, query QuestieDB.GetItemDroprate(ItemID,NpcID)
+-- That function will query DropDB to ascertain the real value.
+-- DropDB then determines which data to provide based upon current expansion level and other rules.
+
+-- The number provided is a float; it is up to the end user to determine how to display that.
+-- 100.0 would be 100%, 47.254 would be 47.254%, etc.
+
+-- Return values are {dropRate, sourceDB} as {float, str}
+
+-- This function will return nil if the DB is not loaded properly or there is no data match.
+-- Be sure you can handle successful nil returns!
+
+---@param itemId ItemId
+---@param npcId NpcId
+---@return table<number, string>
+function DropDB.GetItemDroprate(itemId, npcId)
+
+    -- The hierarchy for drop rate data is as follows:
+    -- 1. Manual Corrections > 2. Pserver Data > 3. Wowhead Data
+    -- We check each database in order for item:npc matches, and we report the first match we find.
+
+    -- Wowhead data consists of the full drop rates (every NPC listed on wowhead for an item), for all items
+    -- contained in either item objectives or RequiredSourceItems for the supported expansion's Quest data.
+
+    -- Pserver (Cmangos/Mangos3) data only consists of items that those databases believe drop only while on a quest (internally specified with a negative drop value).
+
+    -- Wowhead's crowdsourced drop data is likely more accurate for items that always drop, but unfortunately, while their looter addon does
+    -- record active quests when reporting data, item drop rates are not filtered on Wowhead's site to show data only from those on the quest.
+
+    -- While some private server data might be wrong for quest items, it is generally far more accurate than Wowhead for quest-only items.
+    -- For eggregious outliers, we can make manual corrections that take full priority.
+
+    -- It is worth noting that in Questie, we only display item drop data on NPCs that QuestieDB itself believes actually drops the item.
+    -- So if we've manually excluded an NPC from dropping the item in QuestieDB corrections (like for a rare mob), then even if that drop
+    -- data exists in our drop data DB, it won't ever actually be shown on NPC tooltips, because Questie itself doesn't think it should.
+    -- This function will still return data for those NPCs in case external addons request it, Questie simply won't ever ask this function to.
+
+    if DropDB.tableCorrections and DropDB.tableCorrections[itemId] and DropDB.tableCorrections[itemId][npcId] then
+        if DropDB.tableCorrections[itemId][npcId] >= 0 then -- If the correction is not a reference, use its value
+            return {DropDB.tableCorrections[itemId][npcId],"questie"}
+        end
+
+        -- If the correction is a reference to a different DB, use data from that DB instead
+        if DropDB.tableCorrections[itemId][npcId] == DropDB.correctionKeys.WOWHEAD and DropDB.tableWowhead and DropDB.tableWowhead[itemId] and DropDB.tableWowhead[itemId][npcId] then
+            return {DropDB.tableWowhead[itemId][npcId],"wowhead"}
+        elseif DropDB.tableCorrections[itemId][npcId] == DropDB.correctionKeys.PSERVER and DropDB.tablePserver and DropDB.tablePserver[itemId] and DropDB.tablePserver[itemId][npcId] then
+            return {DropDB.tablePserver[itemId][npcId],DropDB.sourcePserver}
+        end
+
+        Questie.Debug(Questie.DEBUG_CRITICAL,
+            "ItemDrops: Correction data for item " .. tostring(itemId) .. " dropped by NPC " .. tostring(npcId) .. " was invalid!")
+    end
+
+    -- Rather than these being elseif, they're separate, so that if we find a correction but it's invalid for whatever reason,
+    -- we still have a chance to fall back rather than returning nil. This may happen for instance if we have a correction
+    -- that points to Wowhead, but the loaded Wowhead DB doesn't have data for that item:npc pair.
+    if DropDB.tablePserver and DropDB.tablePserver[itemId] and DropDB.tablePserver[itemId][npcId] then
+        return {DropDB.tablePserver[itemId][npcId],DropDB.sourcePserver}
+    elseif DropDB.tableWowhead and DropDB.tableWowhead[itemId] and DropDB.tableWowhead[itemId][npcId] then
+        return {DropDB.tableWowhead[itemId][npcId],"wowhead"}
+    end
+
+    return nil
+end

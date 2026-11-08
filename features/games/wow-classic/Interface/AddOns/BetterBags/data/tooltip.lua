@@ -20,11 +20,96 @@ local context = addon:GetModule('Context')
 -- tooltip is left as cached.
 local MAX_RESOLVE_RESCANS = 3
 
+-- isNestedBlock says whether a C_TooltipInfo line starts a nested item (TooltipDataLineType.NestedBlock).
+---@param line table
+---@return boolean
+local function isNestedBlock(line)
+  local types = Enum and Enum.TooltipDataLineType
+  return types ~= nil and types.NestedBlock ~= nil and line.type == types.NestedBlock
+end
+
+-- markLine notes what a whole tooltip line says about the item: a toy ("Toy", TOY) or something
+-- already known ("Already known", ITEM_SPELL_KNOWN). The joined text cannot tell a whole line from
+-- words inside one. A recipe's tooltip holds the item it makes after a NestedBlock line, in the same
+-- list (a retail dump: a toy recipe's tooltip has the toy's "Toy" line), so a toy line counts only
+-- before it (nested). Returns marks, made the first time a line marks something.
+---@param marks? table
+---@param text? string
+---@param nested? boolean The line is in the nested item's lines.
+---@return table?
+local function markLine(marks, text, nested)
+  if text == nil or text == "" then
+    return marks
+  end
+  if text == _G.TOY and not nested then
+    marks = marks or {}
+    marks.toy = true
+  elseif text == _G.ITEM_SPELL_KNOWN then
+    marks = marks or {}
+    marks.known = true
+  end
+  return marks
+end
+
+-- linePatterns keeps, by global string, the pattern of a whole tooltip line written from it.
+local linePatterns = {}
+
+-- linePattern makes that pattern: colors left out, and anything for its number, its name, its plural
+-- (|4minute:minutes;) and its article (frFR's |2, "de" or "d'"). A string's wording, and where the name goes, differs
+-- by client locale.
+---@param format string
+---@return string
+local function linePattern(format)
+  local pattern = linePatterns[format]
+  if not pattern then
+    local plain = format:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|4[^;]*;", "\1"):gsub("|2%s*", "\1"):gsub("%%%d?%$?[sd]", "\1")
+    pattern = "^" .. plain:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"):gsub("\1", ".*") .. "$"
+    linePatterns[format] = pattern
+  end
+  return pattern
+end
+
+local LIMITED_DURATION = { "ITEM_DURATION_DAYS", "ITEM_DURATION_HOURS", "ITEM_DURATION_MIN", "ITEM_DURATION_SEC" }
+
+-- markClassicLine also notes what keeps an item off the legacy auction house, for items:LegacyAuctionableOf: conjured,
+-- a limited duration, a wrapped gift. Retail's scan leaves these out: its client answers for itself.
+---@param marks? table
+---@param text? string
+---@return table?
+local function markClassicLine(marks, text)
+  marks = markLine(marks, text)
+  if text == nil or text == "" then
+    return marks
+  end
+  local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  local mark
+  if plain == _G.ITEM_CONJURED then
+    mark = "conjured"
+  elseif _G.ITEM_WRAPPED_BY and plain:find(linePattern(_G.ITEM_WRAPPED_BY)) then
+    mark = "wrapped"
+  else
+    for _, name in ipairs(LIMITED_DURATION) do
+      if _G[name] and plain:find(linePattern(_G[name])) then
+        mark = "limited"
+        break
+      end
+    end
+  end
+  if mark then
+    marks = marks or {}
+    marks[mark] = true
+  end
+  return marks
+end
+
 function tooltipScanner:Init()
   -- Cache to store extracted tooltip text, keyed by item GUID
   -- This prevents repeated expensive tooltip extractions
   ---@type table<string, string>
   self.cache = {}
+  -- What a cached tooltip's lines mark (markLine), by the same key; kept 1:1 with `cache`.
+  ---@type table<string, table>
+  self.marks = {}
 
   -- Retail sparse-tooltip resolution bookkeeping. C_TooltipInfo tooltips can be
   -- returned "sparse" (e.g. an item's "Use:" spell line still cold on login) and
@@ -70,23 +155,25 @@ end
 --- @param bagid number The bag ID
 --- @param slotid number The slot ID within the bag
 --- @param itemGUID string The item's GUID for caching
---- @return string? The concatenated tooltip text, or nil if extraction failed
+--- @return string? text The concatenated tooltip text, or nil if extraction failed
+--- @return table? marks What its lines mark (markLine), or nil
 function tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
   -- Check cache first to avoid repeated extraction
   if self.cache[itemGUID] then
-    return self.cache[itemGUID]
+    return self.cache[itemGUID], self.marks[itemGUID]
   end
 
-  local text, dataInstanceID
+  local text, dataInstanceID, marks
   if addon.isRetail then
-    text, dataInstanceID = self:ExtractRetail(bagid, slotid)
+    text, dataInstanceID, marks = self:ExtractRetail(bagid, slotid)
   else
-    text = self:ExtractClassic(bagid, slotid)
+    text, marks = self:ExtractClassic(bagid, slotid)
   end
 
   -- Cache the result if extraction succeeded
   if text and text ~= "" then
     self.cache[itemGUID] = text
+    self.marks[itemGUID] = marks
     -- Record the retail sparse-tooltip instance so a later TOOLTIP_DATA_UPDATE can
     -- invalidate this exact entry if it was scanned while still partial.
     if addon.isRetail and dataInstanceID ~= nil and itemGUID ~= nil and itemGUID ~= ""
@@ -96,7 +183,7 @@ function tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
     debug:Log("TooltipScanner", "Cached tooltip for GUID %s: %s", itemGUID, string.sub(text, 1, 50) .. "...")
   end
 
-  return text
+  return text, marks
 end
 
 --- Extract tooltip text using Retail's C_TooltipInfo API
@@ -105,6 +192,7 @@ end
 --- @param slotid number
 --- @return string? text The concatenated tooltip text, or nil.
 --- @return number? dataInstanceID The tooltip's sparse-data instance id (for TOOLTIP_DATA_UPDATE), or nil.
+--- @return table? marks What its lines mark (markLine), or nil.
 function tooltipScanner:ExtractRetail(bagid, slotid)
   -- C_TooltipInfo.GetBagItem is only available in Retail (Patch 10.0.2+)
   -- Returns structured TooltipData with lines array
@@ -125,6 +213,7 @@ function tooltipScanner:ExtractRetail(bagid, slotid)
   end
 
   local lines = {}
+  local marks, nested
   for _, line in ipairs(tooltipData.lines) do
     -- Extract both left and right text from each line
     if line.leftText and line.leftText ~= "" then
@@ -133,6 +222,8 @@ function tooltipScanner:ExtractRetail(bagid, slotid)
     if line.rightText and line.rightText ~= "" then
       table.insert(lines, line.rightText)
     end
+    nested = nested or isNestedBlock(line)
+    marks = markLine(marks, line.leftText, nested)
   end
 
   if #lines == 0 then
@@ -142,14 +233,15 @@ function tooltipScanner:ExtractRetail(bagid, slotid)
   -- Concatenate all lines with spaces for search indexing. Also surface the
   -- dataInstanceID so a later TOOLTIP_DATA_UPDATE for this instance can be
   -- correlated back to the item (see OnTooltipDataResolved).
-  return table.concat(lines, " "), tooltipData.dataInstanceID
+  return table.concat(lines, " "), tooltipData.dataInstanceID, marks
 end
 
 --- Extract tooltip text using Classic/Era's GameTooltip scanning
 --- @private
 --- @param bagid number
 --- @param slotid number
---- @return string?
+--- @return string? text
+--- @return table? marks What its lines mark (markLine), or nil.
 function tooltipScanner:ExtractClassic(bagid, slotid)
   if not self.scanTooltip then
     debug:Log("TooltipScanner", "Scan tooltip not initialized")
@@ -170,6 +262,7 @@ function tooltipScanner:ExtractClassic(bagid, slotid)
   end
 
   local lines = {}
+  local marks
   -- Cap at 30 lines to avoid the Classic bug where lines 9+ have incorrect FontString names
   -- In practice, most item tooltips are well under 30 lines
   for i = 1, math.min(numLines, 30) do
@@ -182,6 +275,7 @@ function tooltipScanner:ExtractClassic(bagid, slotid)
       if text and text ~= "" then
         table.insert(lines, text)
       end
+      marks = markClassicLine(marks, text)
     end
 
     -- Extract text from right-aligned FontString (e.g., stat values)
@@ -198,13 +292,161 @@ function tooltipScanner:ExtractClassic(bagid, slotid)
   end
 
   -- Concatenate all lines with spaces for search indexing
-  return table.concat(lines, " ")
+  return table.concat(lines, " "), marks
+end
+
+-- joinRetailLines joins a C_TooltipInfo tooltip's left and right texts with spaces, as
+-- ExtractRetail does, or nil when it has none.
+---@param tooltipData? TooltipData
+---@return string? text
+---@return table? marks
+local function joinRetailLines(tooltipData)
+  if not tooltipData or not tooltipData.lines then
+    return nil
+  end
+  local lines = {}
+  local marks, nested
+  for _, line in ipairs(tooltipData.lines) do
+    if line.leftText and line.leftText ~= "" then
+      table.insert(lines, line.leftText)
+    end
+    if line.rightText and line.rightText ~= "" then
+      table.insert(lines, line.rightText)
+    end
+    nested = nested or isNestedBlock(line)
+    marks = markLine(marks, line.leftText, nested)
+  end
+  if #lines == 0 then
+    return nil
+  end
+  return table.concat(lines, " "), marks
+end
+
+-- joinScanLines joins the scan tooltip's left and right texts with spaces, as ExtractClassic does,
+-- or nil when it has none.
+---@param scanTooltip GameTooltip
+---@return string? text
+---@return table? marks
+local function joinScanLines(scanTooltip)
+  local lines = {}
+  local marks
+  for i = 1, math.min(scanTooltip:NumLines(), 30) do
+    for _, side in ipairs({ "Left", "Right" }) do
+      local fontString = _G["BetterBagsScanTooltipText" .. side .. i]
+      local text = fontString and fontString:GetText()
+      if text and text ~= "" then
+        table.insert(lines, text)
+      end
+      if side == "Left" then
+        marks = markLine(marks, text)
+      end
+    end
+  end
+  if #lines == 0 then
+    return nil
+  end
+  return table.concat(lines, " "), marks
+end
+
+-- GetMerchantItemText returns the tooltip text of the open merchant's item at index, for
+-- BetterBags Next's vendor search (next/merchant.lua): C_TooltipInfo.GetMerchantItem on retail,
+-- the scan tooltip's SetMerchantItem on Classic. Not cached: merchants change their items.
+---@param index number
+---@return string? text
+---@return table? marks What its lines mark (markLine), or nil.
+function tooltipScanner:GetMerchantItemText(index)
+  if addon.isRetail then
+    if not C_TooltipInfo or not C_TooltipInfo.GetMerchantItem then
+      return nil
+    end
+    return joinRetailLines(C_TooltipInfo.GetMerchantItem(index))
+  end
+  if not self.scanTooltip then
+    return nil
+  end
+  self.scanTooltip:ClearLines()
+  self.scanTooltip:SetMerchantItem(index)
+  return joinScanLines(self.scanTooltip)
+end
+
+-- GetGuildBankItemText returns the tooltip text of a guild bank item, for search
+-- (items:AttachGuildBankItemInfo): C_TooltipInfo.GetGuildBankItem on retail, the scan tooltip's
+-- SetGuildBankItem on Classic. A guild bank slot has no item GUID, so the text is cached by the
+-- item's link (an item's text is the same wherever it lies), under "guild:" .. link, a key no GUID
+-- has; a sparse retail tooltip resolves as a bag item's does (OnTooltipDataResolved).
+---@param tab number
+---@param slot number
+---@param link string
+---@return string? text
+---@return table? marks What its lines mark (markLine), or nil.
+function tooltipScanner:GetGuildBankItemText(tab, slot, link)
+  local key = "guild:" .. link
+  if self.cache[key] then
+    return self.cache[key], self.marks[key]
+  end
+  local text, dataInstanceID, marks
+  if addon.isRetail then
+    if C_TooltipInfo and C_TooltipInfo.GetGuildBankItem then
+      local data = C_TooltipInfo.GetGuildBankItem(tab, slot)
+      text, marks = joinRetailLines(data)
+      dataInstanceID = data and data.dataInstanceID
+    end
+  elseif self.scanTooltip then
+    self.scanTooltip:ClearLines()
+    self.scanTooltip:SetGuildBankItem(tab, slot)
+    text, marks = joinScanLines(self.scanTooltip)
+  end
+  if text and text ~= "" then
+    self.cache[key] = text
+    self.marks[key] = marks
+    if dataInstanceID ~= nil and (self.resolveRescans[key] or 0) < MAX_RESOLVE_RESCANS then
+      self:RecordInstance(key, dataInstanceID)
+    end
+  end
+  return text, marks
+end
+
+-- GetInventoryRepairCost returns what repairing an equipped item costs: the TooltipData's
+-- repairCost on retail (Blizzard's TooltipDataRules.lua reads it), the third return of the scan
+-- tooltip's SetInventoryItem on Classic (PaperDollFrame.lua). 0 when nothing says.
+---@param slot number
+---@return number
+function tooltipScanner:GetInventoryRepairCost(slot)
+  if addon.isRetail then
+    local data = C_TooltipInfo and C_TooltipInfo.GetInventoryItem and C_TooltipInfo.GetInventoryItem("player", slot)
+    return data and data.repairCost or 0
+  end
+  if not self.scanTooltip then
+    return 0
+  end
+  self.scanTooltip:ClearLines()
+  local _, _, repairCost = self.scanTooltip:SetInventoryItem("player", slot)
+  return repairCost or 0
+end
+
+-- GetBagRepairCost returns what repairing an item in a bag costs: the TooltipData's repairCost on
+-- retail, the second return of the scan tooltip's SetBagItem on Classic (ContainerFrame_Shared.lua).
+---@param bag number
+---@param slot number
+---@return number
+function tooltipScanner:GetBagRepairCost(bag, slot)
+  if addon.isRetail then
+    local data = C_TooltipInfo and C_TooltipInfo.GetBagItem and C_TooltipInfo.GetBagItem(bag, slot)
+    return data and data.repairCost or 0
+  end
+  if not self.scanTooltip then
+    return 0
+  end
+  self.scanTooltip:ClearLines()
+  local _, repairCost = self.scanTooltip:SetBagItem(bag, slot)
+  return repairCost or 0
 end
 
 --- Clear the entire tooltip cache
 --- Called when items are wiped or addon is reset
 function tooltipScanner:ClearCache()
   wipe(self.cache)
+  if self.marks then wipe(self.marks) end
   if self.instanceToGUID then wipe(self.instanceToGUID) end
   if self.guidToInstance then wipe(self.guidToInstance) end
   debug:Log("TooltipScanner", "Tooltip cache cleared")
@@ -217,6 +459,7 @@ function tooltipScanner:RemoveFromCache(itemGUID)
     self.cache[itemGUID] = nil
     debug:Log("TooltipScanner", "Removed GUID %s from tooltip cache", itemGUID)
   end
+  if self.marks then self.marks[itemGUID] = nil end
   -- Keep the instance maps 1:1 with the cache so they can never leak an entry
   -- for a GUID whose text is gone.
   local did = self.guidToInstance and self.guidToInstance[itemGUID]
@@ -243,7 +486,7 @@ end
 --- Handle a debounced batch of TOOLTIP_DATA_UPDATE fires (retail only). Each
 --- resolved dataInstanceID that maps to one of our cached items means that item's
 --- tooltip was scanned while still sparse and has now resolved: drop the stale
---- cache entry so the next harvest re-scans it warm, and request a re-index.
+--- cache entry so the next sweep re-scans it warm, and request that sweep.
 --- @param resolved EventArg[] Coalesced fires; each entry's args[1] is a dataInstanceID.
 function tooltipScanner:OnTooltipDataResolved(resolved)
   if not addon.isRetail then return end
@@ -260,14 +503,12 @@ function tooltipScanner:OnTooltipDataResolved(resolved)
     end
   end
   if not invalidated then return end
-  -- Re-harvest so the invalidated item(s) re-scan (now warm) and the search index
-  -- rebuilds. Backpack is always re-swept; the bank only when it's actually open,
-  -- so we never clobber the last-seen bank contents while away from it.
+  -- Recalculate the bags: the sweep re-scans the invalidated items (a cache miss, now
+  -- warm) and re-indexes them, without reading the bags (refresh-scheduler.md §10). The
+  -- backpack always; the bank and the guild bank only when they are open.
   local ctx = context:New('TooltipDataResolved')
-  events:SendMessage(ctx, 'bags/RefreshBackpack')
-  if addon.atBank then
-    events:SendMessage(ctx, 'bags/RefreshBank')
-  end
+  events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = addon.atBank == true,
+    guild = addon.atGuildBank == true or nil, categoriesUnchanged = true })
 end
 
 --- Get the current cache size (for debugging/monitoring)

@@ -1,0 +1,500 @@
+---@class ZoneDB
+local ZoneDB = QuestieLoader:CreateModule("ZoneDB")
+
+---@type SupportValidation
+local SupportValidation = QuestieLoader:ImportModule("SupportValidation")
+
+local _ZoneDB = ZoneDB.private
+---@type Expansions
+local Expansions = QuestieLoader:ImportModule("Expansions")
+---@type QuestiePlayer
+local QuestiePlayer = QuestieLoader:ImportModule("QuestiePlayer")
+---@type QuestieDB
+local QuestieDB = QuestieLoader:ImportModule("QuestieDB")
+---@type QuestieCorrections
+local QuestieCorrections = QuestieLoader:ImportModule("QuestieCorrections")
+---@type QuestieQuestBlacklist
+local QuestieQuestBlacklist = QuestieLoader:ImportModule("QuestieQuestBlacklist")
+---@type QuestieEvent
+local QuestieEvent = QuestieLoader:ImportModule("QuestieEvent")
+---@type QuestieProfessions
+local QuestieProfessions = QuestieLoader:ImportModule("QuestieProfessions")
+---@type l10n
+local l10n = QuestieLoader:ImportModule("l10n")
+
+-- Provider-owned support: bind at file load because other modules already need the zone IDs.
+-- Keep these tables read-only and leave malformed containers for Initialize to report.
+local zoneData = LibQuestieDB.Support.Get("ZoneDB")
+local zonePrivate
+if type(zoneData) == "table" then
+    ZoneDB.zoneIDs = zoneData.zoneIDs
+    ZoneDB.instanceIdToAreaId = zoneData.instanceIdToAreaId
+    zonePrivate = zoneData.private
+
+    if type(zonePrivate) == "table" then
+        _ZoneDB.areaIdToUiMapId = zonePrivate.areaIdToUiMapId
+        _ZoneDB.areaIdToUiMapIdOverride = zonePrivate.areaIdToUiMapIdOverride
+
+        _ZoneDB.uiMapIdToAreaId = zonePrivate.uiMapIdToAreaId
+        _ZoneDB.uiMapIdToAreaIdOverride = zonePrivate.uiMapIdToAreaIdOverride
+
+        _ZoneDB.subZoneToParentZone = zonePrivate.subZoneToParentZone
+        _ZoneDB.subZoneToParentZoneOverride = zonePrivate.subZoneToParentZoneOverride
+        _ZoneDB.dungeons = zonePrivate.dungeons
+    end
+end
+
+-- Initialize decodes the mapping strings into Questie-owned maps before applying overrides.
+local areaIdToUiMapId
+local uiMapIdToAreaId
+local subZoneToParentZone
+local dungeons -- Shared provider data; unlike the maps, this table is not modified.
+
+-- Generated from alternativeAreaId in dungeons
+-- [alternativeDungeonAreaId] = dungeonZone
+---@type table<AreaId, AreaId>
+local alternativeDungeonAreaIdToDungeonAreaId = {}
+
+-- Working quest groups shared by the builder and seasonal splitter, then returned to the caller.
+local zoneMap = {}
+
+local HIDE_ON_MAP
+
+---@return false|nil valid @Nil on success; false stops initialization.
+---@return string? report
+function ZoneDB.Initialize()
+    HIDE_ON_MAP = QuestieQuestBlacklist.HIDE_ON_MAP
+    local valid, report = SupportValidation.ValidateTableShapes({
+        {"ZoneDB", zoneData},
+        {"ZoneDB.private", zonePrivate},
+    }, "Zones", Expansions.Current)
+    if not valid then return false, report end
+
+    -- Decode every merge source before applying any overrides.
+    local decoded
+    decoded, report = SupportValidation.DecodeTables({
+        {"areaIdToUiMapId", _ZoneDB.areaIdToUiMapId},
+        {"areaIdToUiMapIdOverride", _ZoneDB.areaIdToUiMapIdOverride},
+        {"uiMapIdToAreaId", _ZoneDB.uiMapIdToAreaId},
+        {"uiMapIdToAreaIdOverride", _ZoneDB.uiMapIdToAreaIdOverride},
+        {"subZoneToParentZone", _ZoneDB.subZoneToParentZone},
+        {"subZoneToParentZoneOverride", _ZoneDB.subZoneToParentZoneOverride},
+    }, "Zones", Expansions.Current)
+    if not decoded then return false, report end
+
+    -- Area IDs to UI map IDs.
+    areaIdToUiMapId = decoded.areaIdToUiMapId
+    local areaIdToUiMapIdOverride = decoded.areaIdToUiMapIdOverride
+    for areaId, uiMapId in pairs(areaIdToUiMapIdOverride) do
+        areaIdToUiMapId[areaId] = uiMapId
+    end
+
+    -- UI map IDs back to area IDs.
+    uiMapIdToAreaId = decoded.uiMapIdToAreaId
+    local uiMapIdToAreaIdOverride = decoded.uiMapIdToAreaIdOverride
+    for uiMapId, areaId in pairs(uiMapIdToAreaIdOverride) do
+        uiMapIdToAreaId[uiMapId] = areaId
+    end
+
+    -- Subzones to their parent zones.
+    subZoneToParentZone = decoded.subZoneToParentZone
+    local subZoneToParentZoneOverride = decoded.subZoneToParentZoneOverride
+    for areaId, parentZoneId in pairs(subZoneToParentZoneOverride) do
+        subZoneToParentZone[areaId] = parentZoneId
+    end
+
+    -- Validate the effective maps before dungeon indexing or optional debug checks.
+    dungeons = _ZoneDB.dungeons
+    valid, report = SupportValidation.ValidateZones({
+        zoneIDs = ZoneDB.zoneIDs,
+        instanceIdToAreaId = ZoneDB.instanceIdToAreaId,
+        areaIdToUiMapId = areaIdToUiMapId,
+        areaIdToUiMapIdOverride = areaIdToUiMapIdOverride,
+        uiMapIdToAreaId = uiMapIdToAreaId,
+        uiMapIdToAreaIdOverride = uiMapIdToAreaIdOverride,
+        subZoneToParentZone = subZoneToParentZone,
+        subZoneToParentZoneOverride = subZoneToParentZoneOverride,
+        dungeons = dungeons,
+    }, Expansions.Current)
+    if not valid then return false, report end
+
+    -- Run tests if debug enabled
+    if Questie.db.profile.debugEnabled then
+        _ZoneDB:RunTests()
+    end
+
+    for areaId, dungeonZoneEntry in pairs(dungeons) do
+        local alternativeDungeonZones = dungeonZoneEntry[2]
+        if alternativeDungeonZones then
+            for _, alternativeDungeonZone in ipairs(alternativeDungeonZones) do
+                alternativeDungeonAreaIdToDungeonAreaId[alternativeDungeonZone] = areaId
+            end
+        end
+    end
+end
+
+function ZoneDB:GetDungeons()
+    return dungeons
+end
+
+---@param areaId AreaId
+---@return UiMapId
+function ZoneDB:GetUiMapIdByAreaId(areaId)
+    local uiMapId = areaIdToUiMapId[areaId]
+    if (not uiMapId) then
+        Questie.Debug(Questie.DEBUG_CRITICAL, "No UiMapId found for AreaId: " .. tostring(areaId))
+    end
+
+    return uiMapId
+end
+
+---@param uiMapId UiMapId
+---@return AreaId
+function ZoneDB:GetAreaIdByUiMapId(uiMapId)
+    local foundId = uiMapIdToAreaId[uiMapId]
+    if foundId then
+        return foundId
+    end
+
+    -- As a last resort we try to match AreaId and UiMapId by name
+    -- uses the original table in zoneTables as the area id's are
+    -- all in that and we dont care if the uiMapId is there or not
+    local mapInfo = C_Map.GetMapInfo(uiMapId)
+    for areaId in pairs(areaIdToUiMapId) do
+        local areaName = C_Map.GetAreaInfo(areaId)
+        if mapInfo and mapInfo.name == areaName then
+            Questie.Debug(Questie.DEBUG_DEVELOP, "[ZoneDB:GetAreaIdByUiMapId] : ", "Found AreaId", areaName, ":", areaId, "for UiMapId", mapInfo.name, ":",
+                uiMapId, "by name")
+            return areaId
+        end
+    end
+    error("No AreaId found for UiMapId: " .. uiMapId .. ":" .. C_Map.GetMapInfo(uiMapId).name)
+end
+
+local areaNameToAreaId -- built on first use, C_Map.GetAreaInfo needs a fully loaded client
+
+---@param name string Localized zone name, e.g. from GetRealZoneText()
+---@return AreaId?
+function ZoneDB:GetAreaIdByName(name)
+    if not areaNameToAreaId then
+        areaNameToAreaId = {}
+        for areaId in pairs(areaIdToUiMapId) do
+            local areaName = C_Map.GetAreaInfo(areaId)
+            -- Sub areas can share the name of their zone; the zone has the lower ID, keep that one
+            if areaName and ((not areaNameToAreaId[areaName]) or areaId < areaNameToAreaId[areaName]) then
+                areaNameToAreaId[areaName] = areaId
+            end
+        end
+    end
+
+    return areaNameToAreaId[name]
+end
+
+---@param areaId AreaId
+---@return AreaCoordinate?
+function ZoneDB:GetDungeonLocation(areaId)
+    local dungeon = dungeons[areaId]
+    if dungeon then
+        return dungeon[4]
+    else
+        local alternativeDungeonAreaId = alternativeDungeonAreaIdToDungeonAreaId[areaId]
+        if alternativeDungeonAreaId then
+            return dungeons[alternativeDungeonAreaId][4]
+        end
+    end
+    return nil
+end
+
+---@param areaId AreaId
+---@return string?
+function ZoneDB:GetLocalizedDungeonName(areaId)
+    local dungeon = dungeons[areaId]
+    local dungeonName
+    if dungeon then
+        dungeonName = dungeon[1]
+    else
+        local alternativeDungeonAreaId = alternativeDungeonAreaIdToDungeonAreaId[areaId]
+        if alternativeDungeonAreaId then
+            areaId = alternativeDungeonAreaId
+            dungeonName = dungeons[alternativeDungeonAreaId][1]
+        end
+    end
+
+    if dungeonName then
+        -- The Questie DB has an entry for the area being a dungeon. We still prefer the Blizzard name if found.
+        return C_Map.GetAreaInfo(areaId) or dungeonName
+    end
+    return nil
+end
+
+---@param areaId AreaId
+---@return boolean
+function ZoneDB.IsDungeonZone(areaId)
+    return dungeons[areaId] ~= nil or alternativeDungeonAreaIdToDungeonAreaId[areaId] ~= nil
+end
+
+---@param areaId AreaId
+---@return AreaId
+function ZoneDB:GetParentZoneId(areaId)
+    return alternativeDungeonAreaIdToDungeonAreaId[areaId] or subZoneToParentZone[areaId]
+end
+
+-- We keep localized variables outside of the function only used by GetZonesWithQuests
+do
+    -- This is for yielding
+    local yieldAmount = 200
+    local extraYield = yieldAmount / 4
+
+    ---Build quest groups for the player's race/class after database and ZoneDB initialization.
+    ---Each call scans the database and replaces ZoneDB's latest map; previously returned maps remain intact.
+    ---Build once and reuse the result. Overrides only regroup this index, never the quests' database fields.
+    ---@param yield boolean? @True requires a coroutine managed by ThreadLib; false/nil builds synchronously.
+    ---@param overrides table<ZoneOrSort, ZoneOrSort>? @Source group -> exact destination; applied once after seasonal splitting.
+    ---@return table<ZoneOrSort, table<QuestId, boolean>> zoneMap @Shared with GetRelevantZones; callers should treat it as read-only.
+    function ZoneDB.GetZonesWithQuests(yield, overrides)
+        zoneMap = {}
+        local count = 0
+        local hiddenQuests = QuestieCorrections.hiddenQuests
+        local _HasRequiredRace = QuestiePlayer.HasRequiredRace
+        local _HasRequiredClass = QuestiePlayer.HasRequiredClass
+        local _QueryQuestSingle = QuestieDB.QueryQuestSingle
+
+        for questId in pairs(QuestieDB.QuestPointers) do
+            if (not hiddenQuests[questId]) or hiddenQuests[questId] == HIDE_ON_MAP or QuestieEvent.IsEventQuest(questId) then
+                if _HasRequiredRace(_QueryQuestSingle(questId, "requiredRaces")) and _HasRequiredClass(_QueryQuestSingle(questId, "requiredClasses")) then
+                    local zoneOrSort = _QueryQuestSingle(questId, "zoneOrSort")
+                    if zoneOrSort > 0 then
+                        local parentZoneId = ZoneDB:GetParentZoneId(zoneOrSort)
+
+                        if parentZoneId then
+                            if (not zoneMap[parentZoneId]) then
+                                zoneMap[parentZoneId] = {}
+                            end
+                            zoneMap[parentZoneId][questId] = true
+                        else
+                            if (not zoneMap[zoneOrSort]) then
+                                zoneMap[zoneOrSort] = {}
+                            end
+                            zoneMap[zoneOrSort][questId] = true
+                        end
+                    elseif _ZoneDB.IsSpecialQuest(zoneOrSort) then
+                        if (not zoneMap[zoneOrSort]) then
+                            zoneMap[zoneOrSort] = {}
+                        end
+                        zoneMap[zoneOrSort][questId] = true
+                    else
+                        -- This branch is kind of expensive so yield more often if it happens a lot
+                        local startedBy = _QueryQuestSingle(questId, "startedBy")
+
+                        if startedBy then
+                            zoneMap = _ZoneDB.GetZonesWithQuestsFromNPCs(zoneMap, startedBy[1])
+                            zoneMap = _ZoneDB.GetZonesWithQuestsFromObjects(zoneMap, startedBy[2])
+                        end
+                        if yield then
+                            count = count + extraYield
+                            if count >= yieldAmount then
+                                count = 0
+                                coroutine.yield()
+                            end
+                        end
+
+                        local finishedBy = _QueryQuestSingle(questId, "finishedBy")
+                        if finishedBy then
+                            zoneMap = _ZoneDB.GetZonesWithQuestsFromNPCs(zoneMap, finishedBy[1])
+                            zoneMap = _ZoneDB.GetZonesWithQuestsFromObjects(zoneMap, finishedBy[2])
+                        end
+                        if yield then count = count + extraYield end
+                    end
+                end
+            end
+
+            if yield then
+                if count >= yieldAmount then
+                    count = 0
+                    coroutine.yield()
+                end
+                count = count + 1
+            end
+        end
+        if yield then coroutine.yield() end
+        zoneMap = _ZoneDB.SplitSeasonalQuests()
+
+        if overrides then
+            -- Regroup final categories, including holiday groups created above.
+            -- Detach sources before merging: A -> B and B -> C must not send A's quests on to C.
+            -- Missing sources create no destination; self-redirects restore the same quest membership.
+            local redirectedQuests = {}
+            for source in pairs(overrides) do
+                redirectedQuests[source] = zoneMap[source]
+                zoneMap[source] = nil
+            end
+            for source, quests in pairs(redirectedQuests) do
+                local destination = overrides[source]
+                local destinationQuests = zoneMap[destination] or {}
+                zoneMap[destination] = destinationQuests
+                for questId in pairs(quests) do
+                    destinationQuests[questId] = true
+                end
+            end
+        end
+
+        return zoneMap
+    end
+end
+
+
+---@param zoneOrSort ZoneOrSort
+function _ZoneDB.IsSpecialQuest(zoneOrSort)
+    for _, v in pairs(QuestieDB.sortKeys) do
+        if zoneOrSort == v then
+            return true
+        end
+    end
+    return false
+end
+
+---@param zones any @ I have no idea what this is does or looks
+---@param npcIds NpcId[]
+---@return any @ Ditto
+function _ZoneDB.GetZonesWithQuestsFromNPCs(zones, npcIds)
+    if (not npcIds) then
+        return zones
+    end
+
+    for npcId in pairs(npcIds) do
+        local spawns = QuestieDB.QueryNPCSingle(npcId, "spawns")
+        if spawns then
+            for zone in pairs(spawns) do
+                if not zones[zone] then zones[zone] = {} end
+                zones[zone][npcId] = true
+            end
+        end
+    end
+
+    return zones
+end
+
+---@param zones any @ I have no idea what this is does or looks
+---@param objectIds ObjectId[]
+---@return any @ Ditto
+function _ZoneDB.GetZonesWithQuestsFromObjects(zones, objectIds)
+    if (not objectIds) then
+        return zones
+    end
+
+    for objectId in pairs(objectIds) do
+        local spawns = QuestieDB.QueryObjectSingle(objectId, "spawns")
+        if spawns then
+            for zone in pairs(spawns) do
+                if not zones[zone] then zones[zone] = {} end
+                zones[zone][objectId] = true
+            end
+        end
+    end
+
+    return zones
+end
+
+---@return table
+function _ZoneDB.SplitSeasonalQuests()
+    local sortKeys = QuestieDB.sortKeys
+
+    if (not zoneMap[sortKeys.SPECIAL]) or (not zoneMap[sortKeys.SEASONAL]) then
+        return zoneMap
+    end
+    local questsToSplit = zoneMap[sortKeys.SEASONAL]
+    -- Merging SEASONAL and SPECIAL quests to be split into real groups
+    for k, v in pairs(zoneMap[sortKeys.SPECIAL]) do questsToSplit[k] = v end
+
+    local updatedZoneMap = zoneMap
+
+    for questId, _ in pairs(questsToSplit) do
+        local eventName = QuestieEvent.GetEventNameFor(questId)
+        if eventName == "Love is in the Air" then
+            if (not updatedZoneMap[sortKeys.LOVE_IS_IN_THE_AIR]) then
+                updatedZoneMap[sortKeys.LOVE_IS_IN_THE_AIR] = {}
+            end
+            updatedZoneMap[sortKeys.LOVE_IS_IN_THE_AIR][questId] = true
+        elseif eventName == "Children's Week" then
+            if (not updatedZoneMap[sortKeys.CHILDRENS_WEEK]) then
+                updatedZoneMap[sortKeys.CHILDRENS_WEEK] = {}
+            end
+            updatedZoneMap[sortKeys.CHILDRENS_WEEK][questId] = true
+        elseif eventName == "Harvest Festival" then
+            if (not updatedZoneMap[sortKeys.HARVEST_FESTIVAL]) then
+                updatedZoneMap[sortKeys.HARVEST_FESTIVAL] = {}
+            end
+            updatedZoneMap[sortKeys.HARVEST_FESTIVAL][questId] = true
+        elseif eventName == "Hallow's End" then
+            if (not updatedZoneMap[sortKeys.HALLOWS_END]) then
+                updatedZoneMap[sortKeys.HALLOWS_END] = {}
+            end
+            updatedZoneMap[sortKeys.HALLOWS_END][questId] = true
+        elseif eventName == "Winter Veil" then
+            if (not updatedZoneMap[sortKeys.WINTER_VEIL]) then
+                updatedZoneMap[sortKeys.WINTER_VEIL] = {}
+            end
+            updatedZoneMap[sortKeys.WINTER_VEIL][questId] = true
+        elseif eventName == "Lunar Festival" then
+            if (not updatedZoneMap[sortKeys.LUNAR_FESTIVAL]) then
+                updatedZoneMap[sortKeys.LUNAR_FESTIVAL] = {}
+            end
+            updatedZoneMap[sortKeys.LUNAR_FESTIVAL][questId] = true
+        elseif eventName == "Midsummer" then
+            if (not updatedZoneMap[sortKeys.MIDSUMMER]) then
+                updatedZoneMap[sortKeys.MIDSUMMER] = {}
+            end
+            updatedZoneMap[sortKeys.MIDSUMMER][questId] = true
+        else
+            -- here for actual "Special" quests that are not part of events
+            -- E.g. CLUCK!
+            if (not updatedZoneMap[sortKeys.SPECIALTEMP]) then
+                updatedZoneMap[sortKeys.SPECIALTEMP] = {}
+            end
+            updatedZoneMap[sortKeys.SPECIALTEMP][questId] = true
+        end
+    end
+
+    updatedZoneMap[sortKeys.SEASONAL] = nil
+    updatedZoneMap[sortKeys.SPECIAL] = nil
+    return updatedZoneMap
+end
+
+---Build localized dropdown choices from existing quest groups without scanning the quest database again.
+---Only IDs registered in l10n.zoneCategoryLookup can appear; this does not invent labels for override destinations.
+---@param zonesWithQuests table<ZoneOrSort, table<QuestId, boolean>> @The caller's generated map, including its grouping overrides.
+---@return table<number, table<ZoneOrSort, string>>
+function ZoneDB.GetRelevantZones(zonesWithQuests)
+    local zones = {}
+    for category, data in pairs(l10n.zoneCategoryLookup) do
+        zones[category] = {}
+        for id, zoneName in pairs(data) do
+            local zoneQuests = zonesWithQuests[id]
+            if (not zoneQuests) then
+                zones[category][id] = nil
+            else
+                zones[category][id] = l10n(zoneName)
+            end
+        end
+    end
+
+    return zones
+end
+
+----- Tests -----
+
+function _ZoneDB:RunTests()
+    -- Fetch all UiMapIds (WOTLK/TBC, ERA)
+    local maps = C_Map.GetMapChildrenInfo(946, nil, true) or C_Map.GetMapChildrenInfo(947, nil, true)
+    Questie.Debug(Questie.DEBUG_CRITICAL, "[" .. Questie:Colorize("ZoneDBTests") .. "] Testing ZoneDB")
+    for _, map in pairs(maps) do
+        --- We don't care about World, Continent or Cosmic
+        if map.mapType ~= Enum.UIMapType.World and map.mapType ~= Enum.UIMapType.Continent and map.mapType ~= Enum.UIMapType.Cosmic then
+            local success, result = pcall(ZoneDB.GetAreaIdByUiMapId, ZoneDB, map.mapID)
+            if not success then
+                Questie.Error("[ZoneDBTests] ZoneDB.GetAreaIdByUiMapId fails for " .. map.name .. " (" .. map.mapID .. "). Result: " .. result)
+            end
+        end
+    end
+    Questie.Debug(Questie.DEBUG_CRITICAL, "[" .. Questie:Colorize("ZoneDBTests") .. "] Testing ZoneDB done")
+end

@@ -1,0 +1,6089 @@
+local addonName = ... ---@type string
+
+---@class BetterBags: AceAddon
+local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
+
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
+---@class CursorPlacement: AceModule
+local cursorPlacement = addon:GetModule('CursorPlacement')
+
+---@class Render: AceModule
+local render = addon:GetModule('Render')
+
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
+---@class DrawableModule: AceModule
+local drawable = addon:GetModule('Drawable')
+
+---@class Scrollbox: AceModule
+local scrollbox = addon:GetModule('Scrollbox')
+
+---@class NextScrollBar: AceModule
+local nextScrollBar = addon:GetModule('NextScrollBar')
+
+---@class NextStyle: AceModule
+local style = addon:GetModule('NextStyle')
+
+---@class SonataNext: AceModule
+local sonataNext = addon:GetModule('SonataNext')
+
+---@class NextTween: AceModule
+local tween = addon:GetModule('NextTween')
+
+---@class NextSparkles: AceModule
+local sparkles = addon:GetModule('NextSparkles')
+
+---@class NextTabs: AceModule
+local nextTabs = addon:GetModule('NextTabs')
+
+---@class NextLift: AceModule
+local lift = addon:GetModule('NextLift')
+
+---@class NextPixel: AceModule
+local pixel = addon:GetModule('NextPixel')
+
+---@class PixelAudit: AceModule
+local pixelAudit = addon:GetModule('PixelAudit')
+
+---@class NextOrnaments: AceModule
+local nextOrnaments = addon:GetModule('NextOrnaments')
+
+---@class NextRain: AceModule
+local nextRain = addon:GetModule('NextRain')
+
+---@class NextShatter: AceModule
+local shatter = addon:GetModule('NextShatter')
+
+---@class NextSnow: AceModule
+local nextSnow = addon:GetModule('NextSnow')
+
+---@class NextThreads: AceModule
+local nextThreads = addon:GetModule('NextThreads')
+
+---@class NextSmoke: AceModule
+local nextSmoke = addon:GetModule('NextSmoke')
+
+---@class NextBats: AceModule
+local nextBats = addon:GetModule('NextBats')
+
+---@class NextBeam: AceModule
+local nextBeam = addon:GetModule('NextBeam')
+
+---@class NextPaper: AceModule
+local nextPaper = addon:GetModule('NextPaper')
+
+---@class NextGlass: AceModule
+local nextGlass = addon:GetModule('NextGlass')
+
+---@class NextSheen: AceModule
+local nextSheen = addon:GetModule('NextSheen')
+
+---@class NextMenuButtonModule: AceModule
+local nextMenuButton = addon:GetModule('NextMenuButton')
+
+---@class NextGlitch: AceModule
+local glitch = addon:GetModule('NextGlitch')
+
+---@class NextFrameArt: AceModule
+local nextFrameArt = addon:GetModule('NextFrameArt')
+
+---@class NextCoins: AceModule
+local coins = addon:GetModule('NextCoins')
+
+---@class NextContent: AceModule
+local nextContent = addon:GetModule('NextContent')
+
+---@class NextDrag: AceModule
+local nextDrag = addon:GetModule('NextDrag')
+
+---@class NextDock: AceModule
+local nextDock = addon:GetModule('NextDock')
+
+---@class NextChain: AceModule
+local chain = addon:GetModule('NextChain')
+
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
+
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
+-- NextPanel is the panel BetterBagsNext's bags are made of (next.md §3): a full-height panel on a
+-- side of the screen that slides in from that edge, its inner edge feathered out to nothing, with
+-- the title and its sparkles, a search box, the tabs down its inner side, the content in one
+-- column and a footer. Everything mirrors with the side: the backpack is on the right, the bank on
+-- the left. Where a panel rests, at its edge or chained beside its partner, is NextChain's
+-- (next/chain.lua). A kind (next/bag.lua, next/bank.lua) makes its prototype with Extend and supplies its
+-- header buttons, its tabs and what they do, what opening and closing do, sorting and refreshing.
+---@class NextPanel: AceModule
+---@field proto NextPanelFrame The panel's prototype every kind's chains to.
+local nextPanel = addon:NewModule('NextPanel')
+
+-- The panel's frame level in the HIGH strata; a chained bag coming in from beneath its anchor is
+-- lowered below it for the way, and put back here once in place.
+local PANEL_LEVEL = 500
+-- The overlay's place over the panel's frame: above the content and its sections and item buttons (about 10 levels
+-- deep), below the braid and the sparkles.
+local OVERLAY_LEVEL = 20
+-- How far the footer's line sits below the bottom of the scroll area (styleFooter).
+local FOOTER_LINE = 4
+
+-- The scroll box every panel holds its content in (BuildContent), with BetterBags Next's own bar (next-settings.md §2),
+-- hidden until it is used. A small panel's columns' width counts the room it keeps for its bar (ContentRoom).
+local SCROLL_OPTIONS = {
+  Symmetric = true,
+  AutoHideBar = true,
+  Snap = function(region, units) return pixel:Length(region, units) end,
+  SnapScroll = function(box) pixel:SnapScroll(box) end,
+  CreateBar = function(box, opts) return nextScrollBar:Create(box, opts) end,
+}
+
+-- isSecret says whether addon code may not compare or do arithmetic on a value: a secret, as a vendor's name in a
+-- dungeon is (UnitName, SecretWhenUnitNameIdentityRestricted), and every size and position of the title showing it
+-- (SecretWhenAnchoringSecret). Clients without secrets have no issecretvalue.
+---@param value any
+---@return boolean
+local function isSecret(value)
+  return issecretvalue ~= nil and issecretvalue(value)
+end
+
+-- sparkSize is the spark's size (the theme's Header.Spark), 0 with none.
+---@return number
+local function sparkSize()
+  local spark = style.Theme.Header.Spark
+  return spark and spark.Size or 0
+end
+
+---@alias NextSide "RIGHT"|"LEFT"
+
+-- Where a panel is, part way between its sizes: its body's top left (in UIParent's units) and height,
+-- its beam's length, its feathers' alpha (full: the inner one; outer: the far one, away from its
+-- screen edge) and its small border's.
+---@class (exact) NextMorphPoint
+---@field x number
+---@field y number
+---@field h number
+---@field ribbon number
+---@field full number
+---@field outer number
+---@field edge number
+
+-- A switch between sizes (panelProto:Morph): the tween's key, where the panel is now, and what puts
+-- it at its end at once.
+---@class (exact) NextMorph
+---@field at NextMorphPoint
+---@field finish fun()
+
+-- A bag's half of the braid two coupled bags' ribbons twist into (next.md §12): two strands of
+-- lines from its body edge to the middle of the gap, lights running along them, and the knot in the
+-- middle (shown by the chained bag).
+---@class (exact) NextBraid
+---@field layer Frame Above the panel, where the braid is drawn.
+---@field strands Line[][]
+---@field beads Texture[]
+---@field knot Texture
+---@field amount number 0 (straight ribbon) to 1 (braided).
+---@field half number From the body edge to the middle of the gap.
+---@field chained boolean It is the chained bag (it shows the knot).
+---@field phase number
+---@field time number
+---@field swell number The knot's swell as the pair couples.
+
+-- A puff of the title's cloud and where it rests: x along and y above the title's middle, from the
+-- title's point the ribbon joins (TitleJoin), its size and alpha before it breathes.
+---@class (exact) NextCloudPuff
+---@field texture Texture
+---@field base {x: number, y: number, w: number, h: number, a: number}
+---@field period number Seconds per breath.
+---@field phase number Where in its breath it starts.
+
+---@class (exact) NextCloud
+---@field puffs NextCloudPuff[]
+---@field join Texture The puff on the ribbon's end.
+---@field driver Frame Runs the breathing while the panel shows.
+---@field time number Seconds the cloud has breathed.
+---@field swell number How brightly it swells with the shimmer, 0 to 1.
+
+---@class (exact) NextPanelOptions
+---@field kind BagKind
+---@field side NextSide The edge of the screen it is on and slides out from.
+---@field name string The frame's global name.
+---@field scrollName string The scroll box's global name.
+---@field title string
+---@field openSound number
+---@field closeSound number
+---@field noDrag? boolean Its sections are not dragged, and nothing is dropped on it (the vendor).
+---@field chainRole "backpack"|"companion" What it is in the chain (next.md §12).
+
+---@class (exact) NextHeaderButton
+---@field key string The field the button is kept in on the panel, and its icon's key in the theme (Header.Buttons.Icons).
+---@field iconKey? string Its icon's key when it is not key (the size button's, by its state).
+---@field tooltip string
+---@field tooltipFunc? fun(button: Button) Fills the tooltip instead of tooltip.
+---@field onClick fun(ctx: Context)
+---@field label? string|fun(): string Its name in the bag button's menu (Header.Buttons.Menu), else its tooltip.
+---@field checked? fun(): boolean In the menu, a toggle checked while this says so.
+---@field menuTooltip? fun(): string? Its tooltip in the menu, read as the menu opens (else its tooltip, when not its name).
+---@field menuLast? boolean Last in the menu (Open Options Screen, as in the original bags' menu).
+
+---@class NextPanelFrame
+---@field kind BagKind
+---@field side NextSide
+---@field openSound number
+---@field closeSound number
+---@field frame Frame The panel.
+---@field body Frame The opaque part, inside the feathered edge.
+---@field fill Texture The body's color, reaching OVERREACH past the screen edge while docked.
+---@field outerFeather Texture The body's far edge feathered out, while it is not at its screen edge.
+---@field docked boolean It is at its screen edge (not beside its anchor, nor flying).
+---@field waiting boolean Out of sight beyond its anchor's edge, waiting for the anchor to open.
+---@field chainRole "backpack"|"companion"
+---@field target? number The offset it is headed to (or rests at).
+---@field ribbonLines Texture[] The ribbon and its glow lines.
+---@field ribbonLength number How far the ribbon reaches from the body: full length, or the middle of
+--- the gap while coupled.
+---@field titleButton Button Over the title: a click chains (next.md §12).
+---@field titleGlow Texture Behind the title, lit while the pointer is over it.
+---@field braid NextBraid This bag's half of the braid while coupled.
+---@field knotSparkles NextSparkleEmitter Bursts from the knot as the pair couples.
+---@field sparkSpread number How far out from the body the ribbon's sparkles are born.
+---@field feather Texture
+---@field wash Texture The faint color at the top of the body.
+---@field dropGlow Texture Lit while a section from the other bag would drop here (next.md §7).
+---@field washColor number[] The wash's color now.
+---@field washKey string What the wash is the color of (the theme's Panel.Washes: Default, Warbank, Guild).
+---@field ribbonPool Texture[] Every ribbon line made; ribbonLines are the ones the theme draws.
+---@field footerLine Texture The line above the footer.
+---@field title FontString
+---@field label string What the bag is called ("Backpack", "Bank", "Vendor"): never secret, unlike a
+--- vendor's title in an instance, so tooltips name the bag by it.
+---@field ribbon Texture The ribbon's brightest line.
+---@field spark Texture What glides in along the ribbon and settles into the cloud.
+---@field cloud NextCloud Round the title, the ribbon flowing into it.
+---@field headerButtons Button[] In order from the screen edge.
+---@field searchBox SearchFrame
+---@field scroll ScrollboxDrawable
+---@field content NextCanvas
+---@field root Drawable
+---@field tabs NextTabRail
+---@field moneyFrame? Money
+---@field freeText FontString
+---@field emptyText FontString Shown while the tab holds nothing.
+---@field sparkles NextSparkleEmitter Around the title's ribbon.
+---@field edgeSparkles NextSparkleEmitter Along the feathered edge.
+---@field offset number How far the panel is from its place, outward being off the screen.
+---@field closing boolean It is sliding out.
+---@field onShown? (fun())[] What to call once the slide in playing has ended. Every slide in starts
+--- a new list: a slide a close or Escape cut short never ends, so its list is never called.
+---@field opening boolean It is drawing as it opens.
+---@field tabChanged boolean The next draw shows another tab.
+---@field drawOnClose boolean
+---@field drawPendingOnShow boolean
+---@field lastSlotInfo? SlotInfo
+---@field drawnButtons table<Item, boolean>
+---@field claims? table<Item, boolean>
+---@field loaded boolean
+---@field bankTab? number
+---@field watchesCooldowns? boolean It refreshes its buttons' cooldowns (the backpack).
+---@field size NextSize "full" height on its screen edge, or "small" and movable (docs/next-small-mode.md).
+---@field edges Texture[] A small panel's 1-pixel lavender edge, all round.
+---@field mover Frame A small panel's title row, dragged to move it.
+---@field placeX? number A small panel's place: its top left in UIParent's units.
+---@field placeY? number
+---@field moving? boolean The player is dragging the small panel.
+---@field morph? NextMorph Set while it glides to its new size (Morph).
+---@field morphFrom? NextMorphPoint Where its body was as it switched.
+---@field grips table<"LEFT"|"RIGHT", Button> A small panel's grips on its bottom corners (next.md §14g).
+---@field gripHover table<"LEFT"|"RIGHT", boolean> The pointer is over the grip.
+---@field sizing? "LEFT"|"RIGHT" The grip the player is sizing the small panel with.
+---@field sizingFrom? number[] Its width and height when the sizing started.
+---@field sizeGliding boolean Its size glides: back to its default (ResetSize), or onto its columns' width once a grip lets go (StopSizing).
+---@field sizeGlideKey table Its size glide's tween key.
+---@field keptScroll? number The scroll offset, in pixels of its scroll box, it keeps while a grip sizes it or its size glides (KeepScroll).
+---@field snap? {layout: number, body: number} While its size glides onto its columns' width (StopSizing): the width its rows are decided on, and the body's width it ends at, which its content keeps through the bounce.
+---@field smallWidth? number A small panel's size, as it last took it (SmallSize).
+---@field smallHeight? number
+---@field restingWidth? number A small panel's width as it last took it, before its frame stood it on whole pixels: what it lays out for at rest (RestingLayoutWidth).
+---@field namesOwed? boolean Its names asked for another width while it was busy (FollowNames): it tries again each frame until it follows (followLater).
+---@field namesKey table The tween key that tries, a frame on, what its names asked for while it was busy (followLater).
+---@field heightKey table The tween key that fits its height a frame after it was laid out, and each frame it waits (heightLater).
+---@field released? boolean Its close (Hide) has saved the place of the backpack beside it (chain:Released): its slide's end does not again. Cleared as it hides and as it opens.
+---@field contentHeight? number How tall what it shows was laid out last, in its own units: its scroll box's FitHeight (Autosize Bags, FittedHeight).
+---@field glideCut? boolean Its size glide is being ended early (endSizeGlide): its end settles no chain.
+---@field spotGlide? fun() While it glides into its spot (GlideTo): puts it where that glide has it now, toward the spot as it is now.
+---@field spotMoved? boolean Its anchor's size glide moved its spot while it was busy, and left it there (snapTo): its own snap settles the chain as it ends; settling it (chain:Settle) clears it, and so does anything else that puts it on its spot (FitSmall, the anchor's glide placing it, the anchor dragged and dropped).
+---@field titleWhole? number How wide its title's whole text is, in its own units; nil while it shows a secret (measureTitle).
+---@field fitsTitle? boolean Its title is cut short to the room its header buttons leave at full size too (the vendor's).
+local panelProto = {}
+nextPanel.proto = panelProto
+addon:GetModule('Perf'):RegisterPrototype(panelProto, 'NextPanelFrame')
+
+-- The panel's render root: it hands the scroll box the content's width and the height between
+-- the header and what is under the scroll area (ContentBottom), and the width the content's rows are decided
+-- on (LayoutWidth: in the panel's own units, never rounded to its grid, next-pixel-perfect.md §3). While the panel
+-- snaps to its columns' width, the content keeps the width it ends at: the bounce past it, inside the scroll box's
+-- room, closes no gap.
+local rootProto = drawable:Extend({}, 'NextPanelRoot')
+
+---@return RenderPlan
+function rootProto:GetRenderPlan()
+  return { Plan = { { step = render.PRE }, { step = render.DEP, target = self.bag.scroll }, { step = render.SELF } } }
+end
+
+---@return RenderResult
+function rootProto:PreRender()
+  local snap = self.bag.snap
+  return {
+    Width = (snap and snap.body or self.bag:BodyWidth()) - 2 * style.PAD - style.RAIL,
+    LayoutWidth = self.bag:LayoutWidth() - 2 * style.PAD - style.RAIL,
+    Height = math.max(1, self.bag:Height() - style.CONTENT_TOP - self.bag:ContentBottom()),
+  }
+end
+
+-- Render keeps how tall what the panel shows was laid out (its scroll box's FitHeight), which an autosized small panel takes
+-- a frame on (FollowHeight).
+---@param results? RenderResults
+---@return RenderResult
+function rootProto:Render(_, _, results)
+  local bag = self.bag
+  -- The pixel check run in game from /bbdb (debug/pixelaudit.lua) checks the panel once it stays the same.
+  if pixelAudit.watching then
+    pixelAudit:Changed(bag.frame)
+  end
+  if bag.sizing ~= nil or bag.sizeGliding then
+    bag:recordSizing("rendered")
+  end
+  local scrolled = results ~= nil and results.Results[bag.scroll] or nil
+  if scrolled ~= nil then
+    bag.contentHeight = scrolled.FitHeight
+  end
+  bag:FollowHeight(true)
+  return { Width = bag:Width(), Height = bag:Height() }
+end
+
+-- Extend makes proto a kind's prototype: its instances fall back to the panel's methods, and the
+-- profiler measures its own methods under name.
+---@generic T
+---@param proto T
+---@param name string
+---@return T
+function nextPanel:Extend(proto, name)
+  setmetatable(proto, { __index = panelProto })
+  addon:GetModule('Perf'):RegisterPrototype(proto, name)
+  return proto
+end
+
+-- Create makes a panel of a kind's prototype (one Extend made), hidden.
+---@param proto table
+---@param opts NextPanelOptions
+---@return NextPanelFrame
+function nextPanel:Create(proto, opts)
+  ---@type NextPanelFrame
+  local p = setmetatable({}, { __index = proto })
+  p.kind = opts.kind
+  p.label = opts.title
+  p.side = opts.side
+  p.openSound = opts.openSound
+  p.closeSound = opts.closeSound
+  p.offset = 0
+  p.closing = false
+  p.opening = false
+  p.tabChanged = false
+  p.drawOnClose = false
+  p.drawPendingOnShow = false
+  p.drawnButtons = {}
+  p.sizeGliding = false
+  p.sizeGlideKey = {}
+  p.namesKey = {}
+  p.heightKey = {}
+  p.size = database:GetNextSize()
+  p:BuildPanel(opts.name)
+  p:BuildMover()
+  p:BuildSearch()
+  p:BuildHeader(opts.title)
+  p:BuildContent(opts.scrollName)
+  p:BuildFooter()
+  p:BuildSparkles()
+  p:BuildTabs()
+  p:BuildGrips()
+  p:StyleParts()
+  sonataNext:RegisterWidget(p)
+  p:Watch()
+  p.content:SetHeaderHandler(p)
+  if not opts.noDrag then
+    p.content:SetColumnSource(function() return p:SectionColumns() end)
+    nextDrag:Register(p)
+  end
+  chain:Register(p, opts.chainRole)
+  p:ApplyGeometry()
+  pixelAudit:Register(p.frame, {
+    title = opts.title, owners = { panel = p },
+    skip = function() return p:MovingParts() end,
+    describe = function() return p:PixelState() end,
+    layout = function() return p:PixelLayout() end,
+  })
+  return p
+end
+
+-- MovingParts are the parts of a panel that move by nature, on the screen's pixels only by chance (next-pixel-
+-- perfect.md): its sparkles and the spark fly, the cloud's puffs breathe every frame, the braid's lights run
+-- along it, its ornaments that sway, spin, pulse or bob (NextOrnaments), its data rain's glyphs (NextRain), its snow, its
+-- threads, its fluttering bats and its raindrops (NextSnow, NextThreads, NextBats, NextGlass). The pixel checks
+-- leave them out (PixelAudit, the specs).
+---@return table<table, boolean>
+function panelProto:MovingParts()
+  local skip = {}
+  for _, key in ipairs({ "sparkles", "edgeSparkles", "cloudSparkles", "knotSparkles" }) do
+    if self[key] ~= nil then
+      skip[self[key].frame] = true
+    end
+  end
+  for _, puff in ipairs(self.cloud.puffs) do
+    skip[puff.texture] = true
+  end
+  skip[self.spark] = true
+  skip[self.braid.layer] = true
+  self.ornaments:MovingParts(skip)
+  self.rain:MovingParts(skip)
+  self.snow:MovingParts(skip)
+  self.threads:MovingParts(skip)
+  self.bats:MovingParts(skip)
+  self.glass:MovingParts(skip)
+  return skip
+end
+
+-- PixelState says what a pixel check report needs to know of the panel's state: its size and its scales.
+---@return string
+function panelProto:PixelState()
+  return string.format("%s, Bag Scale %d%%, Icon Scale %d%%", self:IsSmall() and "small" or "full",
+    database:GetNextBagScale(), database:GetNextIconScale())
+end
+
+-- PixelLayout describes the panel's column for a pixel check report (data-driven.md): the canvas (its anchor, where
+-- it is in screen pixels, the scroll offset in pixels); a drag: the section the column keeps a room for (where and how
+-- tall), the drag in progress, what the lift holds, whether the left button is down; then each section in order:
+-- shown, docked (away) or leaving, its height, what it hangs from, where, in units and screen pixels, and where
+-- Motion moves it, if it does.
+---@return string[]
+function panelProto:PixelLayout()
+  local canvas = self.content
+  local frame = canvas.frame
+  local k = 1 / pixel:Unit(frame)
+  local lines = {}
+  local function nameOf(f)
+    for _, section in ipairs(canvas.order) do
+      if section.frame == f then
+        return tostring(section.name)
+      end
+    end
+    return f ~= nil and "a frame" or "nothing"
+  end
+  local point, _, _, x, y = frame:GetPoint(1)
+  local left, top = frame:GetLeft(), frame:GetTop()
+  local box = self.scroll.scrollBox
+  table.insert(lines, string.format("canvas %s %.3f,%.3f | at %s,%s px | scroll %.3f px of %.3f",
+    tostring(point), x or 0, y or 0, left and string.format("%.3f", left * k) or "?",
+    top and string.format("%.3f", top * k) or "?", box:GetDerivedScrollOffset() * k, box:GetDerivedScrollRange() * k))
+  local drag, current, held = canvas.drag, nextDrag.current, lift.held
+  local column = "none"
+  if drag ~= nil then
+    column = string.format("%s index %d room %.3f (%.3f px) at %.3f px", tostring(drag.section.name), drag.index,
+      drag.height or 0, (drag.height or 0) * k, (canvas:GetDragSlotY() or 0) * k)
+  end
+  table.insert(lines, string.format("drag: column %s | dragging %s | lift holds %s | left button %s", column,
+    current ~= nil and tostring(current.name) or "none", held ~= nil and nameOf(held.frame) or "nothing",
+    IsMouseButtonDown("LeftButton") and "down" or "up"))
+  for i, section in ipairs(canvas.order) do
+    local f = section.frame
+    local sp, rel, _, sx, sy = f:GetPoint(1)
+    local x0, y0, x1, y1 = motion:GetMove(f)
+    local away = canvas.away[section]
+    local parent = f:GetParent()
+    local hangs = (parent == frame and rel == frame) and "canvas" or
+      ((parent and parent:GetName() or (parent == frame and "canvas" or "another frame")) .. (rel == frame and "" or ", anchored elsewhere"))
+    table.insert(lines, string.format("%d %s: shown=%s away=%s leaving=%s height %.3f (%.3f px) | hangs from %s | %s y %.3f (%.3f px), x %.3f | %s",
+      i, tostring(section.name), tostring(f:IsShown()), tostring(away ~= nil), tostring(canvas:IsLeaving(section)),
+      section.height or 0, (section.height or 0) * k, hangs, tostring(sp), sy or 0, (sy or 0) * k, sx or 0,
+      x0 ~= nil and string.format("moving %.3f,%.3f to %.3f,%.3f", x0, y0, x1, y1) or "still"))
+  end
+  return lines
+end
+
+-- SetSize switches every BetterBags Next panel to a size (docs/next-small-mode.md), saved: a chained
+-- pair lets go of its braid at once, a panel not shown takes the size at once, and a shown one
+-- morphs to it once every panel has it (where a full panel rests depends on its partner's size). It
+-- returns what it did, for profiler traces: "switched", or "same" when it is the size already.
+---@param ctx Context
+---@param size NextSize
+---@return string
+function nextPanel:SetSize(ctx, size)
+  local _ = ctx
+  if database:GetNextSize() == size then
+    return "same"
+  end
+  database:SetNextSize(size)
+  chain:LetGo()
+  local morphing = {}
+  for _, panel in ipairs(chain:Panels()) do
+    if panel:PrepareResize(size) then
+      table.insert(morphing, panel)
+    end
+  end
+  -- Autosized (next-small-autosize.md), every panel switching to small takes the height of what it shows there before any works
+  -- out where it glides to: a bag chained beside another is placed from that one's top, centered for its height where it was
+  -- never moved.
+  if size == "small" and database:GetNextAutosize() then
+    for _, panel in ipairs(morphing) do
+      panel:PrepareHeight()
+    end
+  end
+  for _, panel in ipairs(morphing) do
+    panel:Morph()
+  end
+  for _, panel in ipairs(chain:Panels()) do
+    panel:UpdateSizeButton()
+  end
+  return "switched"
+end
+
+-- outward is the direction from the panel toward the middle of the screen: left (-1) for the
+-- panel on the right, right (1) for the panel on the left.
+---@return number
+function panelProto:Outward()
+  return self.side == "LEFT" and 1 or -1
+end
+
+-- HiddenOffset is where the panel is when it has slid off the screen; a small panel, a short way
+-- toward its edge side from its place, faded out.
+---@return number
+function panelProto:HiddenOffset()
+  if self:IsSmall() then
+    return -self:Outward() * style.Small.Slide
+  end
+  return -self:Outward() * (style.WIDTH + style.OVERREACH)
+end
+
+-- setOffset puts the panel x from where it rests: from its screen edge, top to bottom; a small
+-- panel, x along from its place, fading as it leaves it (its slide in and out).
+---@private
+---@param x number
+function panelProto:setOffset(x)
+  -- Anything that places the panel while it glides to a new size, or back to its default size, ends
+  -- the glide first.
+  self:endMorph()
+  self:endSizeGlide()
+  self.offset = x
+  local frame = self.frame
+  frame:ClearAllPoints()
+  -- From UIParent's edges (whole pixels), whole pixels away (docs/next-pixel-perfect.md): sliding, it steps a
+  -- pixel at a time, and it rests on the grid.
+  local unit = self:PixelUnit()
+  if self:IsSmall() then
+    -- Its place is on the screen; its anchor's offsets are in its own units (its Bag Scale).
+    local s = self:Scale()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pixel:SnapIn(unit, (self.placeX + x) / s),
+      pixel:SnapIn(unit, self.placeY / s))
+    frame:SetAlpha(1 - math.min(1, math.abs(x) / style.Small.Slide))
+    return
+  end
+  x = pixel:SnapIn(unit, x)
+  if self.side == "LEFT" then
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, 0)
+    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, 0)
+  else
+    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, 0)
+    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, 0)
+  end
+end
+
+-- RestOffset is where the panel rests: at its edge, or beside its anchor (next.md §12).
+---@return number
+function panelProto:RestOffset()
+  return chain:RestOffset(self)
+end
+
+-- FillInsets returns how far into the body its fill is on each side (Panel.Fill.Inset: Left, Right, Top, Bottom,
+-- drawn for the backpack, whose inner side is on the left, mirrored on a panel whose inner side is on the right), on
+-- whole pixels of the frame's grid: Blizzard insets a window's fill into its frame (PortraitFrameFlatBaseTemplate),
+-- GW2_UI starts its painting below its header.
+---@return number left, number right, number top, number bottom
+function panelProto:FillInsets()
+  local frame = self.frame
+  local F = style.Theme.Panel.Fill
+  local inset = (F and F.Inset) or {}
+  local inner, outer = pixel:Snap(frame, inset.Left or 0), pixel:Snap(frame, inset.Right or 0)
+  local top, bottom = pixel:Snap(frame, inset.Top or 0), pixel:Snap(frame, inset.Bottom or 0)
+  if self.side == "LEFT" then
+    return outer, inner, top, bottom
+  end
+  return inner, outer, top, bottom
+end
+
+-- SetDocked shapes the body's far edge: at its screen edge the fill and the wash reach OVERREACH past
+-- it, so the opening bounce never shows what is behind; away from it (beside its anchor, or flying)
+-- they stop at the frame and the far edge feathers out toward the middle of the screen.
+---@param docked boolean
+function panelProto:SetDocked(docked)
+  if self:IsSmall() then
+    -- A small panel is never at its screen edge: its fill is its frame.
+    self.docked = false
+    return
+  end
+  self.docked = docked
+  local frame = self.frame
+  local reach = docked and pixel:Length(frame, style.OVERREACH) or 0
+  -- The side at the screen edge: past it while docked, else its inset (FillInsets).
+  local left, right, top, bottom = self:FillInsets()
+  if self.side == "LEFT" then
+    self.fill:SetPoint("TOPLEFT", frame, "TOPLEFT", docked and -reach or left, -top)
+    self.wash:SetPoint("TOPLEFT", frame, "TOPLEFT", -reach, 0)
+  else
+    self.fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", docked and reach or -right, bottom)
+    self.wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", reach, 0)
+  end
+  self.outerFeather:SetShown(not docked)
+end
+
+-- finishShowing calls what waited for the panel to finish showing (Show's onShown), once, and says it
+-- has (next/PanelShown, with the panel: the vendor docks what waits at a merchant once the backpack is on
+-- screen, automation.md §4).
+---@private
+function panelProto:finishShowing()
+  self:scheduleBurst()
+  local callbacks = self.onShown or {}
+  self.onShown = nil
+  for _, callback in ipairs(callbacks) do
+    callback()
+  end
+  events:SendMessage(context:New('NextPanel_Shown'), 'next/PanelShown', self)
+end
+
+-- FlyTo flies the panel to an offset (chaining, next.md §12): detached from its edge as it leaves,
+-- docked again if it comes to rest there. A flight that took over an opening slide still says when
+-- the panel has finished showing.
+---@param to number
+function panelProto:FlyTo(to)
+  local from = self.offset
+  if self:BeyondFarEdge() then
+    -- Out of sight beyond its anchor's edge (waiting, or before its entrance): it comes from its
+    -- own edge instead of crossing the screen.
+    from = self:HiddenOffset()
+  end
+  self.waiting = false
+  self.target = to
+  if to ~= 0 then
+    self:SetDocked(false)
+  end
+  tween:Play(self, {
+    duration = style.Time.Fly,
+    from = from,
+    to = to,
+    ease = style:Ease("Fly"),
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = function()
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      if to == 0 then
+        self:SetDocked(true)
+      end
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- Hold stops the panel where it is (chain:Holds: its anchor is sliding out).
+function panelProto:Hold()
+  tween:Stop(self)
+  self.target = self.offset
+end
+
+-- PlaceAt puts the panel at an offset at once (the screen changed).
+---@param to number
+function panelProto:PlaceAt(to)
+  tween:Stop(self)
+  self.frame:SetFrameLevel(PANEL_LEVEL)
+  self.target = to
+  self:setOffset(to)
+  self:SetDocked(to == 0)
+  self:finishShowing()
+end
+
+-- BeyondFarEdge says the panel is out of sight beyond the far edge of the screen (its near side
+-- past it): where a chained bag waits for its anchor and comes in from (next.md §12).
+---@return boolean
+function panelProto:BeyondFarEdge()
+  return self.offset * self:Outward() >= UIParent:GetWidth()
+end
+
+-- moveIn brings the panel in from an offset to one, after delay seconds, its sections cascading
+-- in as it comes; once in place it is at its own level again, says it has finished showing, and
+-- the chain couples it.
+---@private
+---@param from number
+---@param to number
+---@param duration number
+---@param ease NextEase
+---@param delay number
+function panelProto:moveIn(from, to, duration, ease, delay)
+  if glitch:Opens() then
+    self:glitchIn(to, delay)
+    self.content:Cascade(true, delay + style.Time.OpenCascadeDelay)
+    return
+  end
+  if shatter:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once its shards have all formed.
+    local lock = shatter:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:shatterIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  if nextSmoke:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it shows under the smoke.
+    local lock = nextSmoke:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:smokeIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  if nextBeam:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it has materialized.
+    local lock = nextBeam:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:beamIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  if nextPaper:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once the sheet lies flat.
+    local lock = nextPaper:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:paperIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  if nextSheen:Opens() then
+    -- Its threads draw themselves in, and its sections cascade in, once it has faded in.
+    local lock = nextSheen:OpenLock()
+    self.threads:DrawIn(delay + lock)
+    self:sheenIn(to, delay)
+    self.content:Cascade(true, delay + lock)
+    return
+  end
+  self.threads:DrawIn(delay + style.Time.OpenCascadeDelay)
+  self:setOffset(from)
+  tween:Play(self, {
+    duration = duration,
+    delay = delay,
+    from = from,
+    to = to,
+    ease = ease,
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = function()
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+  self.content:Cascade(true, delay + style.Time.OpenCascadeDelay)
+end
+
+-- glitchIn opens the panel where it rests by glitching into place (the theme's Panel.Glitch.Open, next-themes.md §21),
+-- after delay unseen: a CRT's beam across its body opening to its height (PowerOn), then the panel flickering into view
+-- while it tears, jumps and splits, weaker each moment (Time, a moment every Step). A tween of the panel's own, like the
+-- slide it stands in for: whatever stops or replaces the panel's tween (a flight, a placement, Escape) ends the glitch
+-- (endGlitch). Once in place it says it has finished showing, as the slide does.
+---@private
+---@param to number
+---@param delay number
+function panelProto:glitchIn(to, delay)
+  local G = glitch:Spec()
+  local O = G.Open
+  local powerOn = O.PowerOn or 0
+  local total = powerOn + O.Time
+  local nextMoment = 0
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if glitch:Spec() == nil then
+        -- Its theme went while it glitched in (another theme, Glitch Effects off): shown plainly, it finishes.
+        glitch:Rest(self)
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      local t = p * total
+      if t < powerOn then
+        -- A line growing across its middle, then opening to its height, fading as it does.
+        local f = t / powerOn
+        local open = math.max(0, (f - 0.4) / 0.6)
+        self.frame:SetAlpha(0)
+        glitch:Beam(self, math.min(1, f / 0.4), open, 1 - 0.6 * open)
+        return
+      end
+      if t >= nextMoment then
+        nextMoment = t + G.Step
+        local dx, alpha = glitch:Roll(self, 1 - (t - powerOn) / O.Time, true, true)
+        self:setOffset(to + dx)
+        self.frame:SetAlpha(alpha)
+      end
+    end,
+    onStop = function()
+      self:endGlitch(to)
+    end,
+    onDone = function()
+      self:endGlitch(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- glitchOut closes the panel where it is by glitching out of sight (the theme's Panel.Glitch.Close): flickering, tearing
+-- and jumping, stronger each moment (Time), then a CRT turning off (PowerOff): squashed into a line across its middle,
+-- the line shrinking to a point. Then done (Hide's end).
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:glitchOut(from, to, done)
+  local G = glitch:Spec()
+  local C = G.Close
+  local powerOff = C.PowerOff or 0
+  local total = C.Time + powerOff
+  local nextMoment = 0
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      local t = p * total
+      if t < C.Time then
+        if t >= nextMoment then
+          nextMoment = t + G.Step
+          local dx, alpha = glitch:Roll(self, t / C.Time, true, true)
+          self:setOffset(from + dx)
+          self.frame:SetAlpha(alpha)
+        end
+        return
+      end
+      local f = powerOff > 0 and (t - C.Time) / powerOff or 1
+      self.frame:SetAlpha(0)
+      if f < 0.6 then
+        glitch:Beam(self, 1, 1 - f / 0.6, 1)
+      else
+        local shrink = (f - 0.6) / 0.4
+        glitch:Beam(self, 1 - shrink, 0, 1 - shrink)
+      end
+    end,
+    onStop = function()
+      self:endGlitch(from)
+    end,
+    onDone = function()
+      self:endGlitch(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- endGlitch puts the panel back as it is without a glitch (NextGlitch:Rest), at full strength, and where its glitch had
+-- it (base, each glitch its own): unless another tween has taken the panel over (a glitch replacing this one, a flight),
+-- which places it.
+---@private
+---@param base number
+function panelProto:endGlitch(base)
+  glitch:Rest(self)
+  self.frame:SetAlpha(1)
+  if not tween:IsPlaying(self) then
+    self:setOffset(base)
+  end
+end
+
+-- FillRect is where the body's fill is on the screen, in UIParent's units: its left and top, width and height (it
+-- reaches past the body on a full panel's screen-edge side, past its inset), or nil before the client placed it. A
+-- shatter maps the fill's art onto its shards from it.
+---@return number? left, number? top, number? width, number? height
+function panelProto:FillRect()
+  local f = self.fill
+  local left, top, right, bottom = f:GetLeft(), f:GetTop(), f:GetRight(), f:GetBottom()
+  if left == nil or top == nil or right == nil or bottom == nil then
+    return nil
+  end
+  local s = lift:ScaleOf(self.frame)
+  return left * s, top * s, (right - left) * s, (top - bottom) * s
+end
+
+-- breakPoint is where a closing panel breaks from (NextShatter): the pointer when it is over the body (the close button
+-- clicked, a key pressed with the pointer there), else nothing (its middle).
+---@private
+---@return {x: number, y: number}?
+function panelProto:breakPoint()
+  local x, y = lift:Cursor()
+  local left, top, height, width = self:BodyRect()
+  if x >= left and x <= left + width and y <= top and y >= top - height then
+    return { x = x, y = y }
+  end
+  return nil
+end
+
+-- shatterIn opens the panel where it rests by freezing it together from shards of ice (the theme's Panel.Shatter.Open,
+-- next-themes.md §22), after delay unseen: the shards form out of a frost storm growing across its body (Open.Storm), or
+-- fly in from around it, then the seams flash and the panel shows under them as they thaw away (NextShatter's
+-- Assemble). A tween of the panel's own, like the
+-- slide it stands in for: whatever stops or replaces it (a flight, a placement, Escape) ends the shatter at rest
+-- (endShatter). Once in place it says it has finished showing, as the slide does.
+---@private
+---@param to number
+---@param delay number
+function panelProto:shatterIn(to, delay)
+  local total = shatter:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextShatterRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not shatter:Opens() then
+        -- Its theme went while it froze together (another theme, Ice Shatter off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its shards are cut where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or shatter:Begin(self)
+      self.frame:SetAlpha(run:Assemble(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      rest()
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- shatterOut closes the panel where it is by shattering it (the theme's Panel.Shatter.Close): frost spreads over it,
+-- cracks run along its seams out from where it breaks (breakPoint), then it is gone and its shards fly apart on the
+-- shatter layer, which carries them on after the panel has hidden. Then done (Hide's end), at once as it shatters.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:shatterOut(from, to, done)
+  local C = shatter:Spec().Close
+  local total = (C.Frost or 0) + (C.Crack or 0)
+  local run = shatter:Begin(self, self:breakPoint()) ---@type NextShatterRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not shatter:Closes() then
+        -- Its theme went while it froze: it closes plainly at the end.
+        rest()
+        return
+      end
+      if run ~= nil then
+        run:Freeze(p * total)
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Shatter()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- smokeIn opens the panel where it rests out of smoke (the theme's Panel.Smoke.Open, next-themes.md §23), after delay
+-- unseen: the smoke rises up its body from the bottom and the panel shows under it (NextSmoke's Open). A tween of the
+-- panel's own, like the slide it stands in for: whatever stops or replaces it (a flight, a placement, Escape) ends the
+-- smoke at rest (endShatter). Once the panel has fully appeared it says it has finished showing, as the slide does, and
+-- its smoke lingers on its own layer until it has cleared (Linger).
+---@private
+---@param to number
+---@param delay number
+function panelProto:smokeIn(to, delay)
+  local total = nextSmoke:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextSmokeRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextSmoke:Opens() then
+        -- Its theme went while it came in (another theme, Smoke Puff off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its smoke is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextSmoke:Begin(self)
+      self.frame:SetAlpha(run:Open(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- batsOut closes the panel where it is by breaking it up into bats (the theme's Panel.Bats.Close, next-themes.md §23;
+-- asked: "how the frost theme shatters, we want the bag break up *and morph* into bats and fly away"): it trembles where
+-- it stands over Close.Shudder, then it is gone and pieces of its own art take its place on the bats layer, drift apart
+-- from where it breaks (breakPoint) and turn into bats that fly away, carried on after the panel has hidden (NextBats).
+-- Then done (Hide's end), as it breaks.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:batsOut(from, to, done)
+  local run = nextBats:Begin(self, self:breakPoint()) ---@type NextBatRun?
+  local shudder = nextBats:Spec().Close.Shudder or 0
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = shudder,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBats:Closes() then
+        -- Its theme went while it trembled: it closes plainly at the end.
+        rest()
+        self:setOffset(from)
+        return
+      end
+      if run ~= nil then
+        self:setOffset(from + run:Shudder(p * shudder))
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Break()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- beamIn opens the panel where it rests by beaming it down (the theme's Panel.Beam.Open, next-themes.md §24), after
+-- delay unseen: the transporter's shimmer, its column of light and a glow over its body, and the panel materializing
+-- under them (NextBeam's Draw). A tween of the panel's own, like the slide it stands in for: whatever stops or replaces
+-- it (a flight, a placement, Escape) ends the beam at rest (endShatter). Once the panel has materialized it says it has
+-- finished showing, as the slide does, and its beam lingers on its own layer until it has gone out (Linger).
+---@private
+---@param to number
+---@param delay number
+function panelProto:beamIn(to, delay)
+  local total = nextBeam:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextBeamRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBeam:Opens() then
+        -- Its theme went while it beamed down (another theme, Transporter off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its beam is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextBeam:Begin(self, "Open")
+      self.frame:SetAlpha(run:Draw(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- beamOut closes the panel where it is by beaming it up (the theme's Panel.Beam.Close, next-themes.md §24): the
+-- transporter's shimmer, its column and a glow over its body, and the panel fading out under them; then it is gone (done,
+-- Hide's end) and its beam lingers on its own layer until it has gone out.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:beamOut(from, to, done)
+  local total = nextBeam:CloseTime()
+  local run = nextBeam:Begin(self, "Close") ---@type NextBeamRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if not nextBeam:Closes() then
+        -- Its theme went while it beamed up: shown plainly, it closes at the end.
+        rest()
+        self.frame:SetAlpha(1)
+        return
+      end
+      if run ~= nil then
+        self.frame:SetAlpha(run:Draw(p * total))
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- sheenIn opens the panel where it rests catching the light (the theme's Panel.Sheen.Open, next-themes-glass.md §26),
+-- after delay unseen: a band of light sweeps across its body from its inner side out as the panel and its glass fade in
+-- under it (NextSheen's Draw; NextGlass:SetPresence). A tween of the panel's own, like the slide it stands in for:
+-- whatever stops or replaces it (a flight, a placement, Escape) ends it at rest (endShatter). Opened again as it closed,
+-- it goes on from as far in as its sheen had faded it (sheenShown; NextSheen:OpenAt), not from nothing; any other open
+-- starts from nothing, whatever the frame's alpha (a companion held for its anchor is at full, out of sight; a small panel
+-- is given its slide's alpha as it is fitted; found in review: both came in at full). Once revealed it says it has
+-- finished showing, as the slide does, and its band crosses on by itself on its own layer (Linger).
+---@private
+---@param to number
+---@param delay number
+function panelProto:sheenIn(to, delay)
+  local total = nextSheen:OpenTime()
+  local alpha = self.sheenShown or 0
+  local start = nextSheen:OpenAt(alpha)
+  self:setOffset(to)
+  self.frame:SetAlpha(alpha)
+  self.glass:SetPresence(alpha)
+  local run ---@type NextSheenRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+    self.sheenShown = nil
+  end
+  tween:Play(self, {
+    duration = math.max(0.01, total - start),
+    delay = delay,
+    from = start,
+    to = total,
+    ease = "linear",
+    onUpdate = function(t)
+      if not nextSheen:Opens() then
+        -- Its theme went while it came in (another theme, Glass Sheen off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        self.glass:SetPresence(1)
+        return
+      end
+      -- Its band is laid over its body as it begins: setOffset has put it where it rests.
+      run = run or nextSheen:Begin(self, "Open")
+      local shown = run:Draw(t)
+      self.frame:SetAlpha(shown)
+      self.glass:SetPresence(shown)
+      self.sheenShown = shown
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self.sheenShown = nil
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- sheenOut closes the panel where it is catching the light (the theme's Panel.Sheen.Close): a band of light sweeps back
+-- across its body as the panel and its glass fade out under it; then it is gone (done, Hide's end) and its band crosses on
+-- by itself on the sheen layer. Closed as it opened, it goes on from as far in as its sheen had shown it (sheenShown;
+-- NextSheen:CloseAt), its band as strong as the bag then was (found in the third review: a close two frames into its open
+-- played its band at full over a bag about to vanish). Closed before any of it showed (the moment it opened, a chained bag
+-- in its stagger), it goes at once with no band: the band's second half over nothing (found in review).
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:sheenOut(from, to, done)
+  local total = nextSheen:CloseTime()
+  local alpha = self.sheenShown or self.frame:GetAlpha()
+  local start = nextSheen:CloseAt(alpha)
+  local seen = alpha > 0.01
+  local run ---@type NextSheenRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+    self.sheenShown = nil
+  end
+  tween:Play(self, {
+    duration = math.max(0.01, total - start),
+    from = start,
+    to = total,
+    ease = "linear",
+    onUpdate = function(t)
+      if not nextSheen:Closes() then
+        -- Its theme went while it faded: shown plainly, it closes at the end.
+        rest()
+        self.frame:SetAlpha(1)
+        self.glass:SetPresence(1)
+        return
+      end
+      -- Its band laid over its body as it begins, and again if its theme comes back as it fades (found in the third
+      -- review: held still at its starting alpha without one). Unseen without a band: kept unseen (the open it replaced
+      -- has put it back at full) until it hides.
+      if seen then
+        run = run or nextSheen:Begin(self, "Close", alpha)
+      end
+      local shown = run ~= nil and run:Draw(t) or alpha
+      self.frame:SetAlpha(shown)
+      self.glass:SetPresence(shown)
+      self.sheenShown = shown
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger(total)
+        run = nil
+      end
+      self.sheenShown = nil
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- paperIn opens the panel where it rests by unfolding it (the theme's Panel.Paper.Open, next-themes.md §25), after delay
+-- unseen: a sheet folded in four unfolds over it, a fold at a time (NextPaper's Unfold), and once it lies flat the panel
+-- shows. A tween of the panel's own, like the slide it stands in for: whatever stops or replaces it (a flight, a placement,
+-- Escape) ends the fold at rest (endShatter). Once flat it says it has finished showing, as the slide does, and the
+-- sheet goes by itself over it on its own layer (Linger). It steps itself as stop motion: its tween is smooth.
+---@private
+---@param to number
+---@param delay number
+function panelProto:paperIn(to, delay)
+  local total = nextPaper:OpenTime()
+  self:setOffset(to)
+  self.frame:SetAlpha(0)
+  local run ---@type NextPaperRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    delay = delay,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    smooth = true,
+    onUpdate = function(p)
+      if not nextPaper:Opens() then
+        -- Its theme went while it unfolded (another theme, Paper Folding off): shown plainly, it finishes.
+        rest()
+        self:setOffset(to)
+        self.frame:SetAlpha(1)
+        return
+      end
+      -- Its sheet is laid over where its body is once its delay is up (a chained bag waiting unseen is in place by then).
+      run = run or nextPaper:Begin(self, "Open")
+      self.frame:SetAlpha(run:Unfold(p * total))
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(to)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Linger()
+        run = nil
+      end
+      self:endShatter(to)
+      self.frame:SetFrameLevel(PANEL_LEVEL)
+      self:finishShowing()
+      chain:Arrived(self)
+    end,
+  })
+end
+
+-- paperOut closes the panel where it is by crumpling it up (the theme's Panel.Paper.Close, next-themes.md §25): it trembles
+-- as it is grabbed, then it is gone (done, Hide's end) and its sheet, its items printed on it, crumples on the paper
+-- layer into a ball that is tossed up a little and falls off the screen, on its own.
+---@private
+---@param from number
+---@param to number
+---@param done fun()
+function panelProto:paperOut(from, to, done)
+  local total = nextPaper:GrabTime()
+  local run = nextPaper:Begin(self, "Close") ---@type NextPaperRun?
+  local function rest()
+    if run ~= nil then
+      run:Release()
+      run = nil
+    end
+  end
+  tween:Play(self, {
+    duration = total,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    smooth = true,
+    onUpdate = function(p)
+      if not nextPaper:Closes() then
+        -- Its theme went as it was grabbed: it closes plainly at the end.
+        rest()
+        self:setOffset(from)
+        return
+      end
+      if run ~= nil then
+        self:setOffset(from + run:Grab(p * total))
+      end
+    end,
+    onStop = function()
+      rest()
+      self:endShatter(from)
+    end,
+    onDone = function()
+      if run ~= nil then
+        run:Crumple()
+        run = nil
+      end
+      self:endShatter(from)
+      self:setOffset(to)
+      done()
+    end,
+  })
+end
+
+-- PaperDecals lists what is printed on the panel's sheet as it crumples (NextPaper): each item shown in its scroll area,
+-- with its icon, where it is on the screen in UIParent's units.
+---@return {left: number, top: number, width: number, height: number, texture: string|number}[]
+function panelProto:PaperDecals()
+  local out = {}
+  local box = self.scroll.scrollBox
+  local boxTop, boxBottom = box:GetTop(), box:GetBottom()
+  local s = lift:ScaleOf(self.frame)
+  for _, button in pairs(self.content.buttons or {}) do
+    local frame = button.frame
+    -- The decoration an item button draws on (none yet: never drawn), or a guild bank button itself.
+    local holder = button._decoration or button.button
+    local icon = holder and (holder.icon or holder.IconTexture)
+    local file = icon and icon:GetTexture()
+    if file ~= nil and frame:IsVisible() then
+      local left, top, right, bottom = frame:GetLeft(), frame:GetTop(), frame:GetRight(), frame:GetBottom()
+      if left ~= nil and top <= boxTop and bottom >= boxBottom then
+        table.insert(out, { left = left * s, top = top * s, width = (right - left) * s, height = (top - bottom) * s,
+          texture = file })
+      end
+    end
+  end
+  return out
+end
+
+-- endShatter puts the panel back as it is without a shatter (or its smoke, its bats, its sheen), at full strength, its
+-- glass too, and where it had it (base): unless another tween has taken the panel over (a flight), which places it.
+---@private
+---@param base number
+function panelProto:endShatter(base)
+  self.frame:SetAlpha(1)
+  self.glass:SetPresence(1)
+  if not tween:IsPlaying(self) then
+    self:setOffset(base)
+  end
+end
+
+-- scheduleBurst glitches the panel now and then while it shows (the theme's Panel.Glitch.Bursts): its next burst Every
+-- seconds on average (from 0.4 to 1.6 of it) from now. Each call replaces the one before (a token).
+---@private
+function panelProto:scheduleBurst()
+  self.burstToken = (self.burstToken or 0) + 1
+  local G = glitch:Spec()
+  local B = G and G.Bursts
+  if not B then
+    return
+  end
+  local token = self.burstToken
+  C_Timer.After(B.Every * (0.4 + 1.2 * glitch.Random()), function()
+    if self.burstToken == token then
+      self:burst()
+    end
+  end)
+end
+
+-- stopBursts ends a burst under way and drops the one scheduled.
+---@private
+function panelProto:stopBursts()
+  self.burstToken = (self.burstToken or 0) + 1
+  if self.glitch ~= nil then
+    tween:Stop(self.glitch)
+  end
+end
+
+-- burst glitches the panel for Bursts.Time, rising and falling: tears, static, its title's colours and letters, and,
+-- unless the pointer is over it, a jump and its sections shoved (nothing a click is aimed at moves). Not in combat, nor
+-- while it moves (a slide, a flight, a glitch), is moved or sized, or a section is held: it waits for the next.
+---@private
+function panelProto:burst()
+  local G = glitch:Spec()
+  local B = G and G.Bursts
+  if not B then
+    return
+  end
+  if InCombatLockdown() or tween:IsPlaying(self) or self:placedElsewhere() or lift:IsHolding() then
+    self:scheduleBurst()
+    return
+  end
+  local base = self.offset
+  -- Where it last put the panel: anything else that places it (a flight, a placement) leaves it elsewhere.
+  local written = base
+  local displace = not self.frame:IsMouseOver()
+  local layer = glitch:Layer(self)
+  local nextMoment = 0
+  tween:Play(layer, {
+    duration = B.Time,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      if tween:IsPlaying(self) then
+        return
+      end
+      -- Something else took the panel over while it bursts (it is moved, sized, switches size or glides to one, or is
+      -- placed): it stops, at rest, and leaves the panel to it.
+      if self:placedElsewhere() or self.offset ~= written then
+        tween:Stop(layer)
+        return
+      end
+      local t = p * B.Time
+      if t >= nextMoment or p >= 1 then
+        nextMoment = t + G.Step
+        local dx = glitch:Roll(self, math.sin(math.pi * p), displace, false)
+        if displace then
+          written = base + dx
+          self:setOffset(written)
+          -- A burst never flickers: setOffset fades a small panel by its distance from its place.
+          self.frame:SetAlpha(1)
+        end
+      end
+    end,
+    onStop = function()
+      glitch:Rest(self)
+      -- Stopped part-way where it shoved the panel (it closes, or a parent hides it): back where it found it, unless
+      -- something else has taken it over (placed it, or moves or sizes it now).
+      if self.offset == written and not self:placedElsewhere() then
+        self:setOffset(base)
+      end
+    end,
+    onDone = function()
+      -- Its last moment (at no strength) has put it back where it was.
+      glitch:Rest(self)
+      self:scheduleBurst()
+    end,
+  })
+end
+
+-- placedElsewhere says something else places or sizes the panel now: the player moving it or sizing it with a grip,
+-- a size switch, or its size gliding (a snap, back to its default). A burst waits for it, and stops for it.
+---@private
+---@return boolean
+function panelProto:placedElsewhere()
+  return self.moving or self.sizing ~= nil or self.morph ~= nil or self.sizeGliding or false
+end
+
+-- Enter brings a chained bag in beside its anchor (next.md §12): from out of sight beyond the
+-- anchor's edge, beneath the anchor, after delay (EntranceDelay), falling into place.
+---@param to number
+---@param delay number
+function panelProto:Enter(to, delay)
+  self.waiting = false
+  self.target = to
+  self:SetDocked(false)
+  local anchor = chain:AnchorOf(self)
+  if anchor ~= nil then
+    self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
+  end
+  self:moveIn(chain:EntranceOffset(self), to, style.Time.Enter, style:Ease("Enter"), delay)
+end
+
+-- WaitForAnchor holds a chained bag out of sight beyond its anchor's edge while the anchor is
+-- about to open (chain:WaitsForAnchor); the chain brings it in once the anchor opens. If the anchor
+-- has not opened within AnchorWait, it opens alone, from its own edge.
+function panelProto:WaitForAnchor()
+  self.waiting = true
+  local at = chain:EntranceOffset(self)
+  self.target = at
+  self:SetDocked(false)
+  self:setOffset(at)
+  tween:Play(self, {
+    duration = style.Chain.AnchorWait,
+    from = at,
+    to = at,
+    ease = "linear",
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = function()
+      self.waiting = false
+      self.target = 0
+      self:SetDocked(true)
+      self:moveIn(self:HiddenOffset(), 0, style.Time.Open, style:Ease("Open"), 0)
+    end,
+  })
+end
+
+-- BuildPanel makes the panel: full height on its edge of the screen, its body a deep indigo with
+-- a faint wash of color at the top, its inner edge feathered out to nothing. It sits in the HIGH
+-- strata, above the rest of the UI: what must cover it is higher (Blizzard's popups and game menu
+-- are DIALOG, menus FULLSCREEN_DIALOG, tooltips TOOLTIP), or HIGH and toplevel, raising itself
+-- above it when shown (the stack split, StackSplitFrame.xml).
+---@param name string
+function panelProto:BuildPanel(name)
+  local left = self.side == "LEFT"
+  local frame = CreateFrame("Frame", name, UIParent)
+  frame:SetFrameStrata("HIGH")
+  frame:SetFrameLevel(PANEL_LEVEL)
+  frame:SetToplevel(true)
+  frame:EnableMouse(true)
+  frame:Hide()
+  self.frame = frame
+  -- Its geometry (the frame's size and place, the body, the fill, the feather) is its size's
+  -- (ApplyGeometry).
+  self.body = CreateFrame("Frame", nil, frame)
+  -- A frame over the content, under the title and the header's buttons (which are drawn on and over it): a theme's frame
+  -- drawn above the content (Panel.Frame.Above: the original bags' border, over their content) and its ornaments that
+  -- say Above are drawn on it. It never takes the mouse: the window stays the drop target (bag-drop-zone.md).
+  local overlay = CreateFrame("Frame", nil, frame)
+  overlay:SetAllPoints(frame)
+  overlay:EnableMouse(false)
+  overlay:SetFrameLevel(frame:GetFrameLevel() + OVERLAY_LEVEL)
+  self.overlay = overlay
+
+  local fill = frame:CreateTexture(nil, "BACKGROUND")
+  local feather = frame:CreateTexture(nil, "BACKGROUND")
+  local wash = frame:CreateTexture(nil, "BORDER")
+  feather:SetColorTexture(1, 1, 1, 1)
+  self.fill = fill
+  self.feather = feather
+  self.wash = wash
+
+  -- The far edge feathered out toward the middle of the screen, while not at its edge (SetDocked).
+  local outerFeather = frame:CreateTexture(nil, "BACKGROUND")
+  outerFeather:SetColorTexture(1, 1, 1, 1)
+  if left then
+    outerFeather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
+    outerFeather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 0)
+  else
+    outerFeather:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, 0)
+    outerFeather:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 0, 0)
+  end
+  outerFeather:Hide()
+  self.outerFeather = outerFeather
+  self.docked = true
+
+  wash:SetColorTexture(1, 1, 1, 1)
+  self.washKey = "Default"
+
+  -- A small panel's 1-pixel lavender edge round its body, so it reads against the world. On the body,
+  -- not the frame: a full panel's frame reaches over its feather, and a growing panel has the full
+  -- panel's frame while its edge fades (Morph).
+  self.edges = {}
+  local body = self.body
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    local edge = frame:CreateTexture(nil, "BORDER", nil, 1)
+    edge:SetColorTexture(1, 1, 1, 1)
+    if side == "TOP" or side == "BOTTOM" then
+      edge:SetPoint(side .. "LEFT", body, side .. "LEFT", 0, 0)
+      edge:SetPoint(side .. "RIGHT", body, side .. "RIGHT", 0, 0)
+    else
+      edge:SetPoint("TOP" .. side, body, "TOP" .. side, 0, 0)
+      edge:SetPoint("BOTTOM" .. side, body, "BOTTOM" .. side, 0, 0)
+    end
+    edge:Hide()
+    table.insert(self.edges, edge)
+  end
+
+  local glow = frame:CreateTexture(nil, "BORDER")
+  glow:SetAllPoints(self.body)
+  glow:SetColorTexture(1, 1, 1, 1)
+  glow:SetAlpha(0)
+  glow:Hide()
+  self.dropGlow = glow
+  -- The theme's ornaments (Panel.Ornaments, next-themes.md §12), anchored to the body.
+  self.ornaments = nextOrnaments:Create(self)
+  -- The theme's data rain (Panel.Rain, next-themes.md §21), down the feather or behind the content.
+  self.rain = nextRain:Create(self)
+  -- The theme's snow and its threads of light (Panel.Snow, Panel.Threads, next-themes.md §22).
+  self.snow = nextSnow:Create(self)
+  self.threads = nextThreads:Create(self)
+  -- Its bats fluttering out of the header now and then (Panel.Bats.Flutter, next-themes.md §23).
+  self.bats = nextBats:Create(self)
+  -- The theme's body as a pane of glass, its rain and its lightning (Panel.Glass, next-themes-glass.md §26).
+  self.glass = nextGlass:Create(self)
+  -- The theme's frame round the body (Panel.Frame, next-themes.md §15): Blizzard's nine-slice art.
+  self.frameArt = nextFrameArt:Create(frame, self.body, self.overlay)
+  self:styleBody()
+end
+
+-- styleBody draws the body from the theme (Panel): its fill (a color, or art), its feathers, the
+-- wash at its top (or none), its border's color and size, and the drop glow's color.
+---@private
+function panelProto:styleBody()
+  local P = style.Theme.Panel
+  style:Paint(self.fill, P.Fill)
+  pixel:Width(self.outerFeather, style.Chain.OuterFeather)
+  self:paintFeathers(1, 1)
+  local wash = self.wash
+  if P.Wash then
+    pixel:Height(wash, P.Wash.Height)
+    wash:SetBlendMode(P.Wash.BlendMode or "ADD")
+    self:paintWash(self:WashColor(self.washKey))
+    wash:Show()
+  else
+    wash:Hide()
+  end
+  local E = P.Edge
+  for i, edge in ipairs(self.edges) do
+    if E then
+      if i <= 2 then
+        pixel:Height(edge, E.Size)
+      else
+        pixel:Width(edge, E.Size)
+      end
+    end
+  end
+  self:paintEdges(1)
+  local G = P.DropGlow
+  if G then
+    -- A texture's alpha is its vertex color's (§ paintEdges): colored, it keeps the alpha it shows.
+    local alpha = self.dropGlow:GetAlpha()
+    local r, g, b = style:RGBA(G.Color)
+    self.dropGlow:SetVertexColor(r, g, b)
+    self.dropGlow:SetAlpha(alpha)
+    self.dropGlow:SetBlendMode(G.BlendMode or "ADD")
+  else
+    tween:Stop(self.dropGlow)
+    self.dropGlow:SetAlpha(0)
+    self.dropGlow:Hide()
+  end
+  self.ornaments:Style()
+  self.rain:Style()
+  self.snow:Style()
+  self.threads:Style()
+  self.bats:Style()
+  self.glass:Style()
+  -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
+  self.frameArt:Apply(P.Frame, self.side == "LEFT")
+end
+
+-- The masks that round a corner (tools/textures/next_masks.py), one image for each corner, cut round at it and opaque
+-- elsewhere: the client ignores a mask's texture coordinates, so one image cannot be flipped for the others (reported:
+-- "lower left corner not masked. top left is perfect though", the one corner its unflipped image fitted).
+local CORNER_MASKS = {}
+for _, corner in ipairs({ "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }) do
+  CORNER_MASKS[corner] = "Interface\\AddOns\\BetterBags\\textures\\next\\corner_" .. corner:lower() .. ".png"
+end
+-- The corners in the order they are rounded, and how many: the client masks a texture at most 3 times (a fourth is an
+-- error: "Texture already has the maximum number of mask textures (3)"), and the body's fill spans every corner.
+local CORNER_ORDER = { "TOPINNER", "BOTTOMINNER", "TOPOUTER", "BOTTOMOUTER" }
+panelProto.MAX_CORNERS = 3
+
+-- shapeCorners rounds a small panel's corners (the theme's Panel.Corners, next-themes.md §24; reported with the Make It So
+-- theme: the window's square corners "peak out around the LCARS ... we need a way to shape the window itself"): for each
+-- corner the theme rounds (by its side, a radius), up to MAX_CORNERS of them in CORNER_ORDER, a mask at that corner
+-- (that corner's own image, the radius twice across) cuts everything drawn across the body (its fill, its wash, its
+-- edge, its side rail's strip, the glow a drop lights). The mask is wrapped white outside its rect (CLAMPTOWHITE), so it
+-- cuts nothing but its corner. Mirrored on a panel whose inner side is on the right. A full panel stands against the
+-- screen's top and bottom, beside its feathered edge: its corners stay square. The masks a theme no longer rounds come
+-- off every part before any new one goes on, so no part is ever given a fourth. From ApplyGeometry, which every styling
+-- of the body is followed by (a theme's ApplyStyle, a new grid's takeScale, the panel being made).
+---@private
+function panelProto:shapeCorners()
+  local C = style.Theme.Panel.Corners
+  local small = self:IsSmall()
+  local mirrored = self.side == "LEFT"
+  self.cornerMasks = self.cornerMasks or {}
+  local parts = { self.fill, self.wash, self.dropGlow, self.rail }
+  for _, edge in ipairs(self.edges) do
+    table.insert(parts, edge)
+  end
+  local rounded, count = {}, 0
+  for _, side in ipairs(CORNER_ORDER) do
+    local radius = small and C and C[side] or 0
+    if radius > 0 and count < self.MAX_CORNERS then
+      rounded[side] = radius
+      count = count + 1
+    end
+  end
+  for side, mask in pairs(self.cornerMasks) do
+    if rounded[side] == nil and mask.applied then
+      for _, t in ipairs(parts) do
+        t:RemoveMaskTexture(mask)
+      end
+      mask.applied = false
+      mask:Hide()
+    end
+  end
+  for _, side in ipairs(CORNER_ORDER) do
+    local radius = rounded[side]
+    if radius ~= nil then
+      local mask = self.cornerMasks[side]
+      if mask == nil then
+        mask = self.frame:CreateMaskTexture()
+        self.cornerMasks[side] = mask
+      end
+      local corner = nextOrnaments.CORNERS[side]
+      if mirrored then
+        corner = nextOrnaments.MIRRORED[corner]
+      end
+      mask:SetTexture(CORNER_MASKS[corner], "CLAMPTOWHITE", "CLAMPTOWHITE")
+      mask:ClearAllPoints()
+      mask:SetPoint(corner, self.body, corner, 0, 0)
+      pixel:Size(mask, 2 * radius, 2 * radius)
+      mask:Show()
+      if not mask.applied then
+        for _, t in ipairs(parts) do
+          t:AddMaskTexture(mask)
+        end
+        mask.applied = true
+      end
+    end
+  end
+end
+
+-- paintEdges draws the border at a strength, 0 to 1, of the theme's alpha. A texture's alpha is its
+-- vertex color's alpha: SetAlpha replaces the alpha SetVertexColor gave it and the other way round
+-- (Blizzard sets a chat window's alpha with SetAlpha and reads it back from GetVertexColor,
+-- FloatingChatFrame.lua). So the border is faded through its vertex color alone: a size switch that
+-- faded it with SetAlpha left it at full strength, brighter than the theme's 0.35, until a theme
+-- colored it again (reported in game).
+---@param strength number
+function panelProto:paintEdges(strength)
+  local E = style.Theme.Panel.Edge
+  if not E then
+    return
+  end
+  local r, g, b, a = style:RGBA(E.Color, E.Alpha)
+  for _, edge in ipairs(self.edges) do
+    edge:SetVertexColor(r, g, b, a * strength)
+  end
+end
+
+-- EdgeAlphaFor is how strong the border is at a size: 1 where the theme draws it (a small panel's,
+-- a full one's too with Panel.Edge.Full), else 0.
+---@param small boolean
+---@return number
+function panelProto:EdgeAlphaFor(small)
+  local E = style.Theme.Panel.Edge
+  return (E and (small or E.Full)) and 1 or 0
+end
+
+-- paintFeathers draws the feathers at a strength, 0 to 1: the inner one, from the body's color at the
+-- body's inner side out to nothing, and the far one, toward the middle of the screen. A gradient is
+-- the texture's vertex colors (warcraft.wiki.gg TextureBase:SetGradient; Blizzard puts a gradient's
+-- alpha in its colors, Blizzard_NamePlates.lua), so a feather fades by its gradient's alpha, as the
+-- wash does (paintWash). Faded with SetAlpha instead, they did not fade at all in game.
+---@param inner number
+---@param outer number
+function panelProto:paintFeathers(inner, outer)
+  local F = style.Theme.Panel.Feather
+  local color = F and F.Color or "Body"
+  local _, _, _, a = style:RGBA(color)
+  if not F then
+    a = 0
+  end
+  local function paint(texture, strength, solidOnLeft)
+    local solid, clear = style:CreateColor(color, a * strength), style:CreateColor(color, 0)
+    if solidOnLeft then
+      texture:SetGradient("HORIZONTAL", solid, clear)
+    else
+      texture:SetGradient("HORIZONTAL", clear, solid)
+    end
+  end
+  local left = self.side == "LEFT"
+  paint(self.feather, inner, left)
+  paint(self.outerFeather, outer, not left)
+end
+
+-- IsSmall says the panel is small (docs/next-small-mode.md): a movable panel, its body alone.
+---@return boolean
+function panelProto:IsSmall()
+  return self.size == "small"
+end
+
+-- PixelUnit is one screen pixel in the panel's own units at its size's scale (docs/next-pixel-perfect.md):
+-- its sizes and places are whole pixels of it, worked out for the size it is taking even while it still
+-- switches.
+---@return number
+function panelProto:PixelUnit()
+  return pixel:UnitAt(UIParent:GetEffectiveScale() * self:Scale())
+end
+
+-- takeScale gives the frame its size's scale, and places its parts again for the new grid when that changed
+-- the screen pixel's size in it (docs/next-pixel-perfect.md): they were placed in whole pixels of the old.
+---@private
+function panelProto:takeScale()
+  self.frame:SetScale(self:Scale())
+  if self.partsUnit ~= nil and math.abs(self.partsUnit - pixel:Unit(self.frame)) > 1e-9 then
+    self:fitRibbon()
+    self:StyleParts()
+  end
+end
+
+-- Scale is the scale the panel is drawn at for its size (docs/next-appearance-size.md): a small panel's
+-- Bag Scale, 1 for a full panel docked to its screen edge (asked: "bag scale should just not apply when
+-- docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
+-- is on the screen, in UIParent's: on screen it is its size times this.
+---@return number
+function panelProto:Scale()
+  if self:IsSmall() then
+    return database:GetNextBagScale() / 100
+  end
+  return 1
+end
+
+-- ContentRoom is the room a panel keeps beside its content across, in units: its padding, its side rail, and the
+-- scroll box's room for its bar on both sides (the room the render root and the scroll box take off its width).
+---@return number
+function panelProto:ContentRoom()
+  return 2 * style.PAD + style.RAIL + scrollbox:GutterWidthFor(SCROLL_OPTIONS)
+end
+
+-- ColumnsWidth is the width of the columns a small panel width wide holds, in units: as many cells as its rows hold at
+-- that width, and the room beside them (what reads it keeps it within its minimum: SmallSize, LayoutWidth).
+---@param width number
+---@return number
+function panelProto:ColumnsWidth(width)
+  local room = self:ContentRoom()
+  return self.content:RowWidth(self.content:PerRow(width - room)) + room
+end
+
+-- SnapWidth is the width a small panel let go width wide snaps to (next.md §14g), in units: its widest row of icons
+-- as laid out at that width (as many cells as a row holds there, or as its largest section holds when that is fewer,
+-- NextCanvas:Widest) and the room beside it; the columns it holds while it lays out no section; never below its
+-- minimum; then the first grid step from there that cuts no name short (FitWidth). Every row stays as it is. Asked: "if
+-- i drag the window to be too big ... it should shrink back down to where the icon is", and "never normalize such that
+-- the column count changes away from the user".
+---@param width number
+---@return number
+function panelProto:SnapWidth(width)
+  local room = self:ContentRoom()
+  local perRow = self.content:PerRow(width - room)
+  local widest = self.content:Widest(width - room)
+  if widest > 0 then
+    perRow = math.min(perRow, widest)
+  end
+  return self:FitWidth(self.content:RowWidth(perRow) + room)
+end
+
+-- StepWidth is the narrowest grid step at least width wide, in units: whole cells, at least one, and the room beside them
+-- (RowWidth, ContentRoom).
+---@param width number
+---@return number
+function panelProto:StepWidth(width)
+  local room = self:ContentRoom()
+  local cells = self.content:PerRow(width - room)
+  if self.content:RowWidth(cells) + room < width - 1e-6 then
+    cells = cells + 1
+  end
+  return self.content:RowWidth(cells) + room
+end
+
+-- How far short of a small panel's own width, in screen pixels, its content can draw a whole row (NextCanvas:NameCells): its
+-- frame stands on the whole pixel nearest its width, or on the screen's last whole pixel before it (up to a pixel), and its
+-- scroll box keeps the room for its bar on each side in whole pixels (half a pixel each).
+local ROW_SHORT = 2
+
+-- FitWidth is the width a small panel takes for a width the player chose (saved, its default, or where a grip let go), in
+-- its own units: at least its minimum, which holds its title whole (MinWidth); then, from as many cells as that holds, the
+-- first grid step at which no section's name is cut short (NextCanvas:NameCells), never past the screen. A step at a time:
+-- more cells can mean more columns, each narrower, so the fewest cells that hold every name could take the player's columns
+-- away. The width chosen, on a grid step or not, when its names fit there or at no step up to the screen. Asked: "always have
+-- the bag width sit at the minimum step ... such that no text is truncated in bag title or section title".
+---@param width number
+---@return number
+function panelProto:FitWidth(width)
+  width = math.max(self:MinWidth(), width)
+  local room = self:ContentRoom()
+  local most = self.content:PerRow(UIParent:GetWidth() / self:Scale() - room)
+  local cells = self.content:NameCells(width - room, most, ROW_SHORT * self:PixelUnit())
+  if cells == nil or cells == self.content:PerRow(width - room) then
+    return width
+  end
+  return self.content:RowWidth(cells) + room
+end
+
+-- FittedWidth is the width a small panel takes at rest, in its own units, never rounded to its grid: the width the player gave
+-- it (saved for its kind), else its default, fitted to its title and names (FitWidth); never past the screen at its scale.
+---@return number
+function panelProto:FittedWidth()
+  local w = database:GetNextSmallSize(self.kind)
+  return math.min(UIParent:GetWidth() / self:Scale(), self:FitWidth(w or self:DefaultWidth()))
+end
+
+-- DefaultWidth is a small panel's width before the player sizes it: the columns the full body's width holds, so no
+-- room is left past its last column at any Icon Scale (asked: "default should probably be exact too").
+---@return number
+function panelProto:DefaultWidth()
+  return self:ColumnsWidth(style.BODY_WIDTH)
+end
+
+-- SmallSize is the size a small panel takes on this screen while nothing sizes it (next.md §14g), in its
+-- own units: the width the player gave it with its grips (saved for its kind), else its default width, fitted to its
+-- title and names (FittedWidth), never past the screen at its scale; and its height (RestingHeight). It says its width
+-- unrounded too.
+---@return number width, number height, number fitted
+function panelProto:SmallSize()
+  local s, unit = self:Scale(), self:PixelUnit()
+  local w = self:FittedWidth()
+  -- In whole pixels at its scale, never past the screen.
+  return math.min(pixel:FloorIn(unit, UIParent:GetWidth() / s), pixel:LengthIn(unit, w)), self:RestingHeight(), w
+end
+
+-- RestingHeight is the height a small panel takes while nothing sizes it, in its own units, in whole pixels at its scale: with
+-- Autosize Bags on, what it shows (FittedHeight); off, the height the player gave it with its grips (saved for its kind), else
+-- a share of the screen's height in whole units. Never below its minimum nor past the screen at its scale.
+---@return number
+function panelProto:RestingHeight()
+  local s, unit = self:Scale(), self:PixelUnit()
+  local h
+  if database:GetNextAutosize() then
+    h = self:FittedHeight()
+  else
+    local _, saved = database:GetNextSmallSize(self.kind)
+    h = saved or math.floor(UIParent:GetHeight() * style.Small.Height)
+  end
+  return math.min(pixel:FloorIn(unit, UIParent:GetHeight() / s), pixel:LengthIn(unit, math.max(self:MinHeight(), h)))
+end
+
+-- FittedHeight is how tall a small panel is with Autosize Bags on (next-small-autosize.md; asked: "grows on the vertical (Y
+-- axis) to hold all items + free space the user currently has"), in its own units: its header, what it shows as last laid out
+-- (contentHeight, every section and Free Space), as much room as between its sections down to its footer's line (asked: the
+-- room from the last section's item buttons "to the border to the currency/money section, is too small, make this a bit
+-- wider"; the line sits FOOTER_LINE under the scroll area) and what is under its scroll area (ContentBottom), so nothing
+-- scrolls; never shorter than its tab rail, which hangs beside it from under its header (asked: "always at least as tall as
+-- tab rail"). Neither the room the render root hands its scroll box nor the scroll box as its snapped anchors place it may be a
+-- fraction short of what it holds: its header is taken at the larger of its height and that height in whole pixels (the top
+-- anchor), and the sum rounded up to whole pixels, which covers the bottom anchor's rounding (what it holds is whole pixels, and
+-- a length rounded up is never less than one rounded).
+---@return number
+function panelProto:FittedHeight()
+  local unit = self:PixelUnit()
+  local top = math.max(style.CONTENT_TOP, pixel:SnapIn(unit, style.CONTENT_TOP))
+  local below = math.max(0, style.SECTION_SPACING - FOOTER_LINE)
+  local height = top + (self.contentHeight or 0) + below + self:ContentBottom()
+  local rail = self.tabs.frame
+  if rail:IsShown() then
+    height = math.max(height, top + rail:GetHeight())
+  end
+  return pixel:CeilIn(unit, height)
+end
+
+-- SmallWidth and SmallHeight are a small panel's size now: the frame's while a grip sizes it or its size
+-- glides (back to its default, or onto its columns' width), else the size it took last (ApplyGeometry, FitSmall);
+-- the full body's while it is built, before it first takes its size (its header fits its title before its footer
+-- and content, which its default width reads, exist).
+---@return number
+function panelProto:SmallWidth()
+  if self.sizing ~= nil or self.sizeGliding then
+    return self.frame:GetWidth()
+  end
+  return self.smallWidth or style.BODY_WIDTH
+end
+
+---@return number
+function panelProto:SmallHeight()
+  if self.sizing ~= nil or self.sizeGliding then
+    return self.frame:GetHeight()
+  end
+  return self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)
+end
+
+-- A pinned button's corners named by their side (as ornaments name theirs), for a panel whose inner side is on the
+-- left (the backpack's), and the corner across.
+local PIN_CORNERS = { TOPINNER = "TOPLEFT", TOPOUTER = "TOPRIGHT", BOTTOMINNER = "BOTTOMLEFT", BOTTOMOUTER = "BOTTOMRIGHT" }
+local MIRRORED_CORNERS = { TOPLEFT = "TOPRIGHT", TOPRIGHT = "TOPLEFT", BOTTOMLEFT = "BOTTOMRIGHT", BOTTOMRIGHT = "BOTTOMLEFT" }
+
+-- pinnedOf is where the theme pins a header button (Header.Buttons.Pinned, next-themes.md §13): a corner of the body
+-- and WoW offsets from it, or nil for one laid out with the others.
+---@param button Button
+---@return table?
+local function pinnedOf(button)
+  local pinned = style.Theme.Header.Buttons.Pinned
+  return pinned and pinned[button.key] or nil
+end
+
+-- shownButtons is how many of the header's buttons show and are laid out with the others (not pinned).
+---@private
+---@return number
+function panelProto:shownButtons()
+  local shown = 0
+  for _, button in ipairs(self.headerButtons) do
+    if button:IsShown() and pinnedOf(button) == nil then
+      shown = shown + 1
+    end
+  end
+  return shown
+end
+
+-- pinnedRoom is the room the shown pinned buttons along the top take from the title's row: as far in as the
+-- farthest of them reaches from its side (its size, and its offset toward the body's middle: an offset out past the
+-- edge takes less); a pin at a bottom corner takes none.
+---@private
+---@return number
+function panelProto:pinnedRoom()
+  local room = 0
+  for _, button in ipairs(self.headerButtons) do
+    local pin = pinnedOf(button)
+    if pin ~= nil and button:IsShown() and pin.Point:sub(1, 3) == "TOP" then
+      local point, x = PIN_CORNERS[pin.Point], pin.X or 0
+      if point == nil then
+        point = pin.Point
+      elseif self.side == "LEFT" then
+        point, x = MIRRORED_CORNERS[point], -x
+      end
+      room = math.max(room, style.HEADER_BUTTON + (point:find("RIGHT") and -x or x))
+    end
+  end
+  return room
+end
+
+-- RowInMenu says whether the theme puts the header's row in the bag button's menu (Header.Buttons.Menu,
+-- NextMenuButton): its buttons not pinned leave the header.
+---@return boolean
+function panelProto:RowInMenu()
+  return type(style.Theme.Header.Buttons.Menu) == "table"
+end
+
+-- TitleStart is how far in from the body's inner side the title's row starts: past the theme's bag button at the top
+-- inner corner (NextMenuButton:Room), else InnerPad and TitleInset in.
+---@return number
+function panelProto:TitleStart()
+  local inner = self.menuButton ~= nil and self.menuButton:Room() or 0
+  if inner > 0 then
+    return inner
+  end
+  return self:InnerPad() + style.TITLE_INSET
+end
+
+-- titleEnd is how much of the title's row the header takes from its outer side, and the room the title leaves beside
+-- it: the header's buttons and pins (headerRoom) and 12; with the row in the bag button's menu, the pins (or the bag
+-- button at a top outer corner) exactly, so a centered title is centered between them, else Pad.
+---@private
+---@return number room, number slack
+function panelProto:titleEnd()
+  if self:RowInMenu() then
+    local _, outer = self.menuButton:Room()
+    local room = math.max(self:pinnedRoom(), outer)
+    return room > 0 and room or style.PAD, 0
+  end
+  return self:headerRoom(), 12
+end
+
+-- headerButtonsWidth is how much of the header its shown buttons take, with the room between them: none
+-- while they go down the side rail (Header.Buttons.Rail).
+---@private
+---@return number
+function panelProto:headerButtonsWidth()
+  if style.Theme.Header.Buttons.Rail then
+    return 0
+  end
+  local shown = self:shownButtons()
+  return shown * style.HEADER_BUTTON + math.max(0, shown - 1) * style.HEADER_BUTTON_GAP
+end
+
+-- headerRoom is how much of the title's row the header buttons take from its outer side: Pad, the row and the pinned
+-- buttons; or, for a theme whose row starts past its pinned buttons (Header.Buttons.RowStart: Blizzard's close in the
+-- corner, the others beside it), the row from there or the pinned buttons, whichever reaches further in.
+---@private
+---@return number
+function panelProto:headerRoom()
+  local start = style.Theme.Header.Buttons.RowStart
+  local row = self:headerButtonsWidth()
+  if start ~= nil then
+    return math.max(row > 0 and (start + row) or 0, self:pinnedRoom(), style.PAD)
+  end
+  return style.PAD + row + self:pinnedRoom()
+end
+
+-- RailGap is the room between the buttons down the side rail: its own Gap, else the header's.
+---@private
+---@return number
+function panelProto:RailGap()
+  local rail = style.Theme.Header.Buttons.Rail
+  return rail and rail.Gap or style.HEADER_BUTTON_GAP
+end
+
+-- InnerPad is the room inside the body on its inner side (away from its screen edge): Pad, and the side
+-- rail's width when the theme puts the header buttons down one (next-themes.md §13).
+---@return number
+function panelProto:InnerPad()
+  return style.PAD + style.RAIL
+end
+
+-- SidePads are the room inside the body on its left and on its right: InnerPad on its inner side (the
+-- backpack's left, the other panels' right), Pad on its screen edge side.
+---@return number left, number right
+function panelProto:SidePads()
+  if self.side == "LEFT" then
+    return style.PAD, self:InnerPad()
+  end
+  return self:InnerPad(), style.PAD
+end
+
+-- MinWidth is the narrowest a small panel goes (next.md §14g), on a grid step (StepWidth): room for its shown header
+-- buttons and its whole title (titleWhole, and a pixel: its frame and the title's room each stand on the nearest whole
+-- pixel, FitTitle), or Small.MinTitle of a title it may not measure (a secret, cut short past that, as ever); for its
+-- footer's free slots (FooterWidth) and money; and for one column of its cells (an icon, or a card in the vendor), each
+-- with the side rail beside it.
+---@return number
+function panelProto:MinWidth()
+  local pads = style.PAD + self:InnerPad()
+  local room, slack = self:titleEnd()
+  local title = self.titleWhole ~= nil and self.titleWhole + self:PixelUnit() or style.Small.MinTitle
+  local header = self:TitleStart() + room + slack + title
+  local money = self.moneyFrame ~= nil and self.moneyFrame.frame:GetWidth() or 0
+  local footer = pads + style.TITLE_INSET + self:FooterWidth() + 12 + money
+  local column = pads + style.GUTTER + self.content:CellWidth()
+  return self:StepWidth(math.max(header, footer, column))
+end
+
+-- FooterWidth is the least room the footer's inner side needs: its free slots (the backpack's currencies, which
+-- took their place: currency.md).
+---@return number
+function panelProto:FooterWidth()
+  return self.freeText:GetStringWidth()
+end
+
+-- MinHeight is the shortest a small panel goes: its header, what is under its scroll area, and one
+-- row of a section; and room for its buttons down the side rail, Pad below the last.
+---@return number
+function panelProto:MinHeight()
+  local height = style.CONTENT_TOP + self:ContentBottom() + style.SECTION_HEADER + self.content:CellHeight()
+  local rail = style.Theme.Header.Buttons.Rail
+  if rail then
+    local shown = self:shownButtons()
+    local column = shown * style.HEADER_BUTTON + math.max(0, shown - 1) * self:RailGap()
+    height = math.max(height, rail.Top + column + style.PAD)
+  end
+  return height
+end
+
+-- ContentBottom is how far above the body's bottom the scroll area ends: the footer's height, and
+-- whatever a kind puts between the two (the vendor's destroy card).
+---@return number
+function panelProto:ContentBottom()
+  return style.FOOTER
+end
+
+-- Height is how tall the panel is: the screen's height, or a small panel's.
+---@return number
+function panelProto:Height()
+  if self:IsSmall() then
+    return self:SmallHeight()
+  end
+  return UIParent:GetHeight()
+end
+
+-- Width is how wide the panel's frame is: its body and its feather, or a small panel's body alone.
+---@return number
+function panelProto:Width()
+  if self:IsSmall() then
+    return self:SmallWidth()
+  end
+  return style.WIDTH
+end
+
+-- BodyWidth is how wide the body is: the full body's at full size, a small panel's own width.
+---@return number
+function panelProto:BodyWidth()
+  if self:IsSmall() then
+    return self:SmallWidth()
+  end
+  return style.BODY_WIDTH
+end
+
+-- LayoutWidth is the body's width its content's rows are decided on: a small panel's width as the player left it
+-- (or its default), in its own units, kept within its minimum and the screen as SmallSize keeps it but never
+-- rounded to its grid, so its items are laid out the same at every Bag Scale; the width it snaps to while it snaps
+-- onto its columns (its rows the same through the bounce); the frame's while a grip sizes it or it glides back to its
+-- default size. A full panel's is the theme's.
+---@return number
+function panelProto:LayoutWidth()
+  if not self:IsSmall() then
+    return style.BODY_WIDTH
+  end
+  if self.snap ~= nil then
+    return self.snap.layout
+  end
+  if self.sizing ~= nil or self.sizeGliding then
+    return self:FrameLayoutWidth(self.frame:GetWidth())
+  end
+  return self:RestingLayoutWidth()
+end
+
+-- RestingLayoutWidth is the width a small panel lays out for while nothing sizes it, in its own units: never rounded to
+-- its grid (docs/next-pixel-perfect.md). It is the width it last took (restingWidth: as it opens, is fitted again, a grip
+-- is let go, a reset, or its names followed), which its frame stands for, so what it shows changing never lays it out for
+-- another width than its frame's; its fitted width only before it first took one.
+---@return number
+function panelProto:RestingLayoutWidth()
+  return self.restingWidth or self:FittedWidth()
+end
+
+-- FrameLayoutWidth is the width to lay out for from a width the frame reports while a grip holds it. At rest the frame
+-- stands on the whole pixel nearest the width the panel lays out for, which can be a fraction under what its columns take
+-- and read as a cell fewer: within half a pixel of it, that width is what the frame stands for (asked: "never normalize
+-- such that the column count changes away from the user"). Anywhere else, the frame's width is the width the player sees.
+---@param width number
+---@return number
+function panelProto:FrameLayoutWidth(width)
+  local resting = self:RestingLayoutWidth()
+  if math.abs(width - resting) <= self:PixelUnit() / 2 + 1e-6 then
+    return resting
+  end
+  return width
+end
+
+-- BodyLeft is where the body starts, from the frame's left edge: past the feather on the full
+-- backpack (its feather is on its left), else at the frame's edge.
+---@return number
+function panelProto:BodyLeft()
+  if self.side == "RIGHT" and not self:IsSmall() then
+    return style.FEATHER
+  end
+  return 0
+end
+
+-- RibbonBase is the ribbon's length while the panel is not coupled: a small panel's beam is
+-- shorter. SparkSpreadBase is how far out along it the ribbon's sparkles are born.
+---@return number
+function panelProto:RibbonBase()
+  return self:IsSmall() and style.Small.Ribbon or style.RIBBON_LENGTH
+end
+
+---@return number
+function panelProto:SparkSpreadBase()
+  local R = style.Theme.Sparkles and style.Theme.Sparkles.Ribbon
+  return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
+end
+
+-- clampPlace keeps a small panel's place (its top left) on the screen while the bags are clamped to it
+-- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale; always on whole pixels of
+-- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too). With
+-- Autosize Bags on, its bottom stays on the screen either way: its top at least its height up (asked: "move the bag up just
+-- enough"), so it grows up from the screen's bottom, and goes back down to where it was left as it shrinks.
+---@private
+---@param x number
+---@param y number
+---@return number x, number y
+function panelProto:clampPlace(x, y)
+  local s = self:Scale()
+  if not database:GetClampBagsToScreen() then
+    if database:GetNextAutosize() then
+      y = math.max(y, math.min(UIParent:GetHeight(), self:SmallHeight() * s))
+    end
+    return pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
+  end
+  -- A side rail outside the body (Header.Buttons.Rail.Outside) stays on the screen too, on the inner side.
+  local strip = style.RAIL_OUT * s
+  local left, right = strip, 0
+  if self.side == "LEFT" then
+    left, right = 0, strip
+  end
+  x = pixel:Snap(UIParent, math.max(left, math.min(UIParent:GetWidth() - self:SmallWidth() * s - right, x)))
+  y = pixel:Snap(UIParent, math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y)))
+  return x, y
+end
+
+-- leftPlace is the place a grip let go or a Shift-click saves for a small panel at x, y on the screen: there, but with Autosize
+-- Bags on, for a top raised above the one saved to keep its bottom on the screen (clampPlace), which keeps the one saved (neither
+-- moves its top), so it goes back down to it as it shrinks. A top Clamp Bags to Screen keeps under the one saved is where it is,
+-- as it always was.
+---@private
+---@param x number
+---@param y number
+---@return number x, number y
+function panelProto:leftPlace(x, y)
+  if database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil then
+    local _, saved = database:GetNextSmallPlace(self.kind)
+    if saved ~= nil and saved < y then
+      return x, saved
+    end
+  end
+  return x, y
+end
+
+-- SmallPlace is where a small panel sits: chained (docs/next-small-mode.md), beside its anchor where
+-- the anchor is now (LivePlace); else where the player left it, else a margin in from its own screen
+-- edge (the backpack's right, a companion's left), centered; on the screen either way.
+---@return number x, number y
+function panelProto:SmallPlace()
+  local anchor = chain:SmallAnchorOf(self)
+  if anchor ~= nil then
+    return self:clampPlace(chain:ChainedPlace(self, anchor, anchor:LivePlace()))
+  end
+  local x, y = database:GetNextSmallPlace(self.kind)
+  if x == nil then
+    local s = self:Scale()
+    y = (UIParent:GetHeight() + self:SmallHeight() * s) / 2
+    if self.side == "RIGHT" then
+      x = UIParent:GetWidth() - self:SmallWidth() * s - style.Small.Margin
+    else
+      x = style.Small.Margin
+    end
+  end
+  return self:clampPlace(x, y)
+end
+
+-- LivePlace is where a small panel's top left is now: under the mouse while the player drags it, or
+-- where the frame is while it is sized or its size glides, else its place.
+---@return number x, number y
+function panelProto:LivePlace()
+  if self.moving or self.sizing ~= nil or self.sizeGliding then
+    local x, y = self.frame:GetLeft(), self.frame:GetTop()
+    if x ~= nil and y ~= nil then
+      local s = lift:ScaleOf(self.frame)
+      return x * s, y * s
+    end
+  end
+  return self:SmallPlace()
+end
+
+-- SmallLeft is where a shown small panel's left edge is now: under the mouse while dragged, the
+-- frame's while sized or while its size glides, else its place plus its slide.
+---@return number
+function panelProto:SmallLeft()
+  if self.moving or self.sizing ~= nil or self.sizeGliding then
+    local x = self.frame:GetLeft()
+    if x ~= nil then
+      return x * lift:ScaleOf(self.frame)
+    end
+  end
+  return self.placeX + self.offset
+end
+
+-- GlideTo glides a shown small panel from where it is into its spot (SmallPlace: beside the partner it was dropped beside, or
+-- beside its anchor where its spot moved), closing the distance it starts from its spot with the spot as it is on each frame
+-- while the bag it glides beside is still its anchor: that anchor's size may glide meanwhile (its names), moving the spot, and
+-- that glide places it too (spotGlide), whichever goes first in a frame. An anchor that lets it go (a bank closing is no
+-- longer the chain's companion) leaves it going to the spot it read last. Then the chain braids it if it is in place.
+function panelProto:GlideTo()
+  local anchor = chain:SmallAnchorOf(self)
+  local x, y = self:SmallPlace()
+  local dx, dy = self.placeX + self.offset - x, self.placeY - y
+  self.offset = 0
+  self.target = 0
+  local frame, s, at = self.frame, self:Scale(), 0
+  local function place()
+    if chain:SmallAnchorOf(self) == anchor then
+      x, y = self:SmallPlace()
+    end
+    self.placeX, self.placeY = x, y
+    frame:ClearAllPoints()
+    local unit = self:PixelUnit()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pixel:SnapIn(unit, (x + dx * (1 - at)) / s),
+      pixel:SnapIn(unit, (y + dy * (1 - at)) / s))
+    frame:SetAlpha(1)
+  end
+  local function ended()
+    if self.spotGlide == place then
+      self.spotGlide = nil
+    end
+  end
+  tween:Play(self, {
+    duration = style.Time.Glide,
+    from = 0,
+    to = 1,
+    ease = style:Ease("Glide"),
+    onUpdate = function(t)
+      at = t
+      place()
+    end,
+    onStop = ended,
+    onDone = function()
+      ended()
+      self:setOffset(0)
+      chain:Arrived(self)
+    end,
+  })
+  -- After Play: a glide it replaces lets go of its own as it stops.
+  self.spotGlide = place
+end
+
+-- ApplyGeometry shapes the panel for its size and puts it where it is for that size (its offset).
+-- Full (next.md §3): the frame on its screen edge, top to bottom, the body inside its feathered
+-- inner edge, no clicks taken over the feather, the fill and the wash reaching past the screen edge
+-- while docked. Small (docs/next-small-mode.md): the frame is the body, a share of the screen tall,
+-- at its place, edged in faint lavender, moved by its title row, its beam shorter.
+function panelProto:ApplyGeometry()
+  -- Its size glide ends first: its end sizes the frame to what it set out for, which ending it after (setOffset) would
+  -- leave the frame at.
+  self:endSizeGlide()
+  local small = self:IsSmall()
+  local frame, body = self.frame, self.body
+  local unit = self:PixelUnit()
+  local bodyLeft = pixel:SnapIn(unit, self:BodyLeft())
+  local bodyRight = pixel:SnapIn(unit, (not small and self.side == "LEFT") and style.FEATHER or 0)
+  self:takeScale()
+  if small then
+    self.smallWidth, self.smallHeight, self.restingWidth = self:SmallSize()
+    frame:SetSize(self.smallWidth, self.smallHeight)
+  else
+    frame:SetWidth(pixel:LengthIn(unit, self:Width()))
+  end
+  frame:SetHitRectInsets(bodyLeft, bodyRight, 0, 0)
+  body:ClearAllPoints()
+  body:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
+  body:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -bodyRight, 0)
+  local fill, wash = self.fill, self.wash
+  local left, right, top, bottom = self:FillInsets()
+  fill:ClearAllPoints()
+  fill:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft + left, -top)
+  fill:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -(bodyRight + right), bottom)
+  wash:ClearAllPoints()
+  wash:SetPoint("TOPLEFT", frame, "TOPLEFT", bodyLeft, 0)
+  wash:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -bodyRight, 0)
+  self.feather:SetShown(not small)
+  if not small then
+    self.feather:ClearAllPoints()
+    self:growFeather(0)
+  end
+  local edgeShown = self:EdgeAlphaFor(small) > 0
+  for _, edge in ipairs(self.edges) do
+    edge:SetShown(edgeShown)
+  end
+  self.ribbonLength = pixel:LengthIn(unit, self:RibbonBase())
+  for _, line in ipairs(self.ribbonLines) do
+    line:SetWidth(self.ribbonLength)
+  end
+  self.sparkSpread = self:SparkSpreadBase()
+  frame:SetMovable(small)
+  frame:SetResizable(small)
+  self:ApplyClamp()
+  self.mover:SetShown(small)
+  self:UpdateGrips()
+  self:FitTitle()
+  if small then
+    self.placeX, self.placeY = self:SmallPlace()
+    self.docked = false
+    self.outerFeather:Hide()
+  else
+    frame:SetAlpha(1)
+    -- The fill and the wash reach past the screen edge while it rests there (SetDocked).
+    self:SetDocked((self.offset or 0) == 0)
+  end
+  self.ornaments:Layout()
+  self:setOffset(self.offset or 0)
+  -- Once anchored: its rows are the frame's height.
+  self.rain:Layout()
+  self.snow:Layout()
+  self.threads:Layout()
+  self.glass:Layout()
+  -- Its corners rounded at the size it has now.
+  self:shapeCorners()
+end
+
+-- ApplyClamp clamps a small panel to the screen while the bags are clamped to it (Clamp Bags to Screen,
+-- window.md §3a); a full panel rests at its screen edge and is never clamped.
+function panelProto:ApplyClamp()
+  self.frame:SetClampedToScreen(self:IsSmall() and database:GetClampBagsToScreen())
+end
+
+-- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the
+-- screen: on opening (the screen may have changed while it was closed, and what it shows), when the screen
+-- changes, and as Fit Names While Open or Autosize Bags is turned on or off. Its content is laid out again when its size,
+-- or the width it lays out for, changed; autosized, at once for a new width first, so it takes the height of what it shows
+-- there. A size glide running ends first (ApplyGeometry).
+function panelProto:FitSmall()
+  self:endSizeGlide()
+  self:takeScale()
+  local width, height, fitted = self:SmallSize()
+  if self.restingWidth ~= fitted and database:GetNextAutosize() then
+    self.smallWidth, self.restingWidth = width, fitted
+    render:RenderNow(self.root, { ctx = context:New("NextPanelFit") })
+    height = self:RestingHeight()
+  end
+  local changed = self.frame:GetWidth() ~= width or self.frame:GetHeight() ~= height or self.restingWidth ~= fitted
+  self.smallWidth, self.smallHeight, self.restingWidth = width, height, fitted
+  self.frame:SetSize(width, height)
+  self.placeX, self.placeY = self:SmallPlace()
+  self.spotMoved = nil
+  self:setOffset(self.offset)
+  self:FitTitle()
+  if changed then
+    render:Invalidate(self.root)
+  end
+end
+
+-- BodyRect is where the body is on screen for the panel's size and offset now, in UIParent's units: its
+-- top left, its height and its width (the full body's, or a small panel's own at its scale); and its
+-- scale.
+---@return number x, number y, number height, number width, number scale
+function panelProto:BodyRect()
+  if self:IsSmall() then
+    local s = self:Scale()
+    return self.placeX + self.offset, self.placeY, self:SmallHeight() * s, self:SmallWidth() * s, s
+  end
+  local left = self.offset
+  if self.side == "RIGHT" then
+    left = UIParent:GetWidth() - style.WIDTH + self.offset
+  end
+  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH, 1
+end
+
+-- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
+-- closing first), it takes the size at once and lays its content out for it. Shown, it finishes
+-- what it was doing, keeps where its body is now, and morphs once every panel has its size (Morph).
+-- It returns whether it morphs.
+---@param size NextSize
+---@return boolean
+function panelProto:PrepareResize(size)
+  self:endSizeGlide()
+  if self.closing then
+    tween:Stop(self, true)
+  end
+  if not self.frame:IsShown() then
+    -- A glide still running (Escape closed it mid-glide) ends as ApplyGeometry places it (setOffset).
+    self.size = size
+    self.offset = self:HiddenOffset()
+    self:ApplyGeometry()
+    render:Invalidate(self.root)
+    return false
+  end
+  if self.morph ~= nil then
+    -- Switched back while it glides: it turns around from where it is.
+    self.morphFrom = self.morph.at
+    tween:Stop(self.morph)
+    self.morph = nil
+  else
+    -- An opening slide or a flight ends where it was going: its end says the panel has shown.
+    tween:Stop(self, true)
+    local x, y, h, w, scale = self:BodyRect()
+    local small = self:IsSmall()
+    self.morphFrom = {
+      x = x, y = y, h = h, w = w, scale = scale, ribbon = self.ribbonLength,
+      full = small and 0 or 1,
+      outer = (not small and not self.docked) and 1 or 0,
+      edge = self:EdgeAlphaFor(small),
+    }
+  end
+  self.size = size
+  return true
+end
+
+-- PrepareHeight lays an autosized panel switching to small out at its small width and takes the height that shows what it holds
+-- there (RestingHeight), so the switch glides once, to that height, and every panel's place is worked out from the heights
+-- they end at (nextPanel:SetSize, before any Morph; ApplyGeometry then takes the same height).
+function panelProto:PrepareHeight()
+  -- The width it takes there first, as FitSmall does: what it shows can ask for another since it was last small (a name).
+  local width, _, fitted = self:SmallSize()
+  self.smallWidth, self.restingWidth = width, fitted
+  render:RenderNow(self.root, { ctx = context:New("NextPanelMorph") })
+  self.smallHeight = self:RestingHeight()
+end
+
+-- Morph switches the panel to its new size in two steps (asked: a "2 step" animation, so the feather
+-- never looks "spilled out" past the border, and growing the inverse of shrinking, moving at once).
+-- The glide: the body glides from where it was (PrepareResize) to where it rests at its new size, its
+-- top left, its height and its width (a small panel's own, next.md §14g), the beam shortening or
+-- growing, and what the old size had fading out on the way: the feathers as it shrinks, the small
+-- border as it grows. The fade: what the new size has fades in once it is there: the small border, or
+-- the feathers. Its parts are the new size's from the start (ApplyGeometry), the frame anchored by its
+-- top left and sized as it goes, so the body only moves and stretches; nothing reaches past the screen
+-- edge on the way. A step with nothing to do (turned around) is skipped. The content is laid out at
+-- the end, and also at once when the body narrows, so nothing is cut off on the way.
+function panelProto:Morph()
+  local from = self.morphFrom --[[@as NextMorphPoint]]
+  self.morphFrom = nil
+  local small = self:IsSmall()
+  self.offset = small and 0 or chain:RestOffset(self)
+  self.target = self.offset
+  self:ApplyGeometry()
+  local tx, ty, th, tw, ts = self:BodyRect()
+  -- The content is laid out in the panel's own units.
+  if tw / ts < from.w / from.scale - 0.5 then
+    render:Invalidate(self.root)
+  end
+  local toRibbon = self.ribbonLength
+  self:SetDocked(false)
+  local frame, feather, edges, outerFeather = self.frame, self.feather, self.edges, self.outerFeather
+  feather:Show()
+  -- A full panel away from its screen edge has a far feather too (SetDocked): it fades with the near
+  -- one (at.outer), and the switch's end decides whether it shows (ApplyGeometry).
+  outerFeather:Show()
+  if small then
+    feather:ClearAllPoints()
+    if self.side == "LEFT" then
+      feather:SetPoint("TOPLEFT", frame, "TOPRIGHT", 0, 0)
+      feather:SetPoint("BOTTOMLEFT", frame, "BOTTOMRIGHT", 0, 0)
+    else
+      feather:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 0)
+      feather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 0)
+    end
+    feather:SetWidth(style.FEATHER)
+  end
+  -- The border fades across the switch, when the theme has one: a theme without one never colors its lines, which
+  -- showed white (reported in game with Guild Wars 2).
+  local bordered = style.Theme.Panel.Edge and true or false
+  for _, edge in ipairs(edges) do
+    edge:SetShown(bordered)
+  end
+  -- The frame is the body plus the feather at full size: only the body's width glides.
+  local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
+  local at = { x = from.x, y = from.y, h = from.h, w = from.w, scale = from.scale, ribbon = from.ribbon,
+    full = from.full, outer = from.outer, edge = from.edge }
+  ---@type NextMorph
+  local morph = { at = at, finish = function() end }
+  self.morph = morph
+
+  -- The body's place and size are on the screen and its scale glides with them (a small panel's Bag
+  -- Scale, 1 at full size); the frame's anchor and size are in its own units.
+  local function draw()
+    local sc = at.scale
+    frame:SetScale(sc)
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", at.x / sc - bodyLeft, at.y / sc)
+    frame:SetSize(at.w / sc + extra, at.h / sc)
+    self:paintFeathers(at.full, at.outer)
+    self:paintEdges(at.edge)
+    self.ribbonLength = at.ribbon
+    for _, line in ipairs(self.ribbonLines) do
+      line:SetWidth(at.ribbon)
+    end
+  end
+
+  morph.finish = function()
+    self.morph = nil
+    self:paintFeathers(1, 1)
+    self:paintEdges(1)
+    self:ApplyGeometry()
+    render:Invalidate(self.root)
+    chain:Arrived(self)
+  end
+
+  -- The glide: the body and the beam, with the feathers (shrinking) or the border (growing) fading out.
+  local function glide(after)
+    local x0, y0, h0, w0, s0, r0 = at.x, at.y, at.h, at.w, at.scale, at.ribbon
+    local f0, o0, e0 = at.full, at.outer, at.edge
+    local f1, o1, e1 = f0, o0, e0
+    if small then
+      f1, o1 = 0, 0
+    else
+      e1 = self:EdgeAlphaFor(false)
+    end
+    if math.abs(tx - x0) < 0.01 and math.abs(ty - y0) < 0.01 and math.abs(th - h0) < 0.01
+      and math.abs(tw - w0) < 0.01 and math.abs(ts - s0) < 0.0001 and math.abs(toRibbon - r0) < 0.01
+      and math.abs(f1 - f0) < 0.001 and math.abs(o1 - o0) < 0.001 and math.abs(e1 - e0) < 0.001 then
+      after()
+      return
+    end
+    tween:Play(morph, {
+      duration = style.Time.Morph,
+      from = 0,
+      to = 1,
+      ease = style:Ease("Morph"),
+      onUpdate = function(t)
+        at.x = x0 + (tx - x0) * t
+        at.y = y0 + (ty - y0) * t
+        at.h = h0 + (th - h0) * t
+        at.w = w0 + (tw - w0) * t
+        at.scale = s0 + (ts - s0) * t
+        at.ribbon = r0 + (toRibbon - r0) * t
+        at.full = f0 + (f1 - f0) * t
+        at.outer = o0 + (o1 - o0) * t
+        at.edge = e0 + (e1 - e0) * t
+        draw()
+      end,
+      onDone = after,
+    })
+  end
+
+  -- The fade: the small border (shrinking) or the feathers (growing) fading in, for the share of
+  -- MorphFade they have to go. The far feather only away from the screen edge (SetDocked).
+  local toOuter = (not small and self.offset ~= 0) and 1 or 0
+  local function fade(after)
+    local f0, o0, e0 = at.full, at.outer, at.edge
+    local f1, o1, e1 = f0, o0, self:EdgeAlphaFor(true)
+    if not small then
+      f1, o1, e1 = 1, toOuter, e0
+    end
+    local share = math.max(math.abs(f1 - f0), math.abs(o1 - o0), math.abs(e1 - e0))
+    if share < 0.001 then
+      after()
+      return
+    end
+    tween:Play(morph, {
+      duration = style.Time.MorphFade * share,
+      from = 0,
+      to = 1,
+      ease = style:Ease("MorphFade"),
+      onUpdate = function(t)
+        at.full = f0 + (f1 - f0) * t
+        at.outer = o0 + (o1 - o0) * t
+        at.edge = e0 + (e1 - e0) * t
+        draw()
+      end,
+      onDone = after,
+    })
+  end
+
+  draw()
+  glide(function()
+    fade(morph.finish)
+  end)
+end
+
+-- endMorph puts a panel switching size at the end of its switch at once, both steps (anything else
+-- that places the panel).
+---@private
+function panelProto:endMorph()
+  local morph = self.morph
+  if morph ~= nil then
+    tween:Stop(morph)
+    morph.finish()
+  end
+end
+
+-- UpdateSizeButton shows what the size button does now (the backpack has one).
+function panelProto:UpdateSizeButton()
+end
+
+-- BuildMover makes what moves a small panel (docs/next-small-mode.md): its title row, from the top
+-- of the body down to the search box, dragged. The title (a button over it) moves it too, and the
+-- header buttons above it still click. Over a full panel it is hidden: there the frame takes it.
+function panelProto:BuildMover()
+  local mover = CreateFrame("Frame", nil, self.frame)
+  mover:SetPoint("TOPLEFT", self.body, "TOPLEFT", 0, 0)
+  mover:SetPoint("TOPRIGHT", self.body, "TOPRIGHT", 0, 0)
+  mover:SetHeight(math.max(1, style.SEARCH_TOP - 4))
+  mover:SetFrameLevel(self.frame:GetFrameLevel() + 1)
+  mover:EnableMouse(true)
+  mover:RegisterForDrag("LeftButton")
+  addon.SetScript(mover, "OnDragStart", function()
+    self:StartMove()
+  end)
+  addon.SetScript(mover, "OnDragStop", function()
+    self:StopMove()
+  end)
+  -- It covers part of the panel, which is a drop target (Watch): an item dropped or clicked onto
+  -- the title row goes into the bag too.
+  addon.SetScript(mover, "OnReceiveDrag", function()
+    self:PlaceCursorItem()
+  end)
+  addon.SetScript(mover, "OnMouseUp", function(_, _, button)
+    if button == "LeftButton" then
+      self:PlaceCursorItem()
+    end
+  end)
+  mover:Hide()
+  self.mover = mover
+end
+
+-- StartMove starts moving a small panel with the mouse, finishing its opening slide first. A full
+-- panel, one closing, or a press with something on the cursor (a drop, not a move) does not move.
+-- It returns whether it did.
+---@return boolean
+function panelProto:StartMove()
+  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or GetCursorInfo() ~= nil then
+    return false
+  end
+  self:endMorph()
+  self:endSizeGlide()
+  tween:Stop(self, true)
+  self.frame:StartMoving()
+  -- StartMoving flags the frame user-placed, and the client then restores a named frame's place
+  -- from its layout cache at login (warcraft.wiki.gg Frame:StartMoving): the place is ours to keep.
+  self.frame:SetUserPlaced(false)
+  self.moving = true
+  -- Chained (docs/next-small-mode.md): dragging the other bag lets it go of its anchor; dragging the
+  -- anchor, its open partner follows it every frame.
+  chain:Detach(self)
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    -- A glide into its spot ends where it was going: from now on its spot follows the anchor.
+    tween:Stop(follower, true)
+    self.mover:SetScript("OnUpdate", function()
+      follower.placeX, follower.placeY = follower:SmallPlace()
+      follower.spotMoved = nil
+      follower:setOffset(0)
+    end)
+  end
+  return true
+end
+
+-- StopMove ends a move: the panel's new place, kept on the screen, is saved for its kind, and it is
+-- anchored there again (the client anchors a moved frame to the nearest corner of the screen).
+function panelProto:StopMove()
+  if not self.moving then
+    return
+  end
+  self.mover:SetScript("OnUpdate", nil)
+  local frame = self.frame
+  frame:StopMovingOrSizing()
+  local x, y = frame:GetLeft(), frame:GetTop()
+  self.moving = false
+  if x ~= nil and y ~= nil then
+    -- Where the client left it, on the screen (its edges are in its own units).
+    local s = lift:ScaleOf(frame)
+    x, y = self:clampPlace(x * s, y * s)
+    -- Dropped beside its partner, it chains to it and glides into its spot.
+    local sx, sy = chain:Dropped(self, x, y)
+    self.placeX, self.placeY = x, y
+    self.offset = 0
+    if sx ~= nil then
+      database:SetNextSmallPlace(self.kind, sx, sy)
+      self:GlideTo()
+      return
+    end
+    database:SetNextSmallPlace(self.kind, x, y)
+  end
+  self:setOffset(0)
+  -- An anchor let go: its partner settles beside where it was dropped, its place saved too.
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    follower.placeX, follower.placeY = follower:SmallPlace()
+    follower.spotMoved = nil
+    follower:setOffset(0)
+    database:SetNextSmallPlace(follower.kind, follower.placeX, follower.placeY)
+  end
+end
+
+-- The grips' art states: the theme's key, the button's setter, its getter.
+local GRIP_STATES = {
+  { "Normal", "SetNormalTexture", "GetNormalTexture" },
+  { "Highlight", "SetHighlightTexture", "GetHighlightTexture" },
+  { "Pushed", "SetPushedTexture", "GetPushedTexture" },
+}
+
+-- BuildGrips makes the grips on a small panel's bottom corners (next.md §14g, asked: "a window handle
+-- when in minimized mode that lets users resize the window, dom like, just like the original bags").
+-- Dragged, a grip sizes the panel from its corner; Shift-clicked, the panel glides back to its default
+-- size. Pressed with something on the cursor, it is a drop, as the rest of the panel is. Under the
+-- pointer it shows (fadeGrip), and a tooltip says so.
+function panelProto:BuildGrips()
+  self.grips = {}
+  self.gripHover = {}
+  for _, side in ipairs({ "LEFT", "RIGHT" }) do
+    local grip = CreateFrame("Button", nil, self.frame)
+    grip:SetFrameLevel(self.frame:GetFrameLevel() + 4)
+    grip:EnableMouse(true)
+    addon.SetScript(grip, "OnMouseDown", function(_, _, button)
+      if button == "LeftButton" and not IsShiftKeyDown() then
+        self:StartSizing(side)
+      end
+    end)
+    addon.SetScript(grip, "OnMouseUp", function(_, _, button)
+      if button ~= "LeftButton" then
+        return
+      end
+      if self.sizing == side then
+        self:StopSizing()
+      elseif GetCursorInfo() ~= nil then
+        self:PlaceCursorItem()
+      elseif IsShiftKeyDown() then
+        self:ResetSize(side)
+      end
+    end)
+    addon.SetScript(grip, "OnReceiveDrag", function()
+      self:PlaceCursorItem()
+    end)
+    addon.SetScript(grip, "OnEnter", function()
+      self.gripHover[side] = true
+      self:fadeGrip(side)
+      GameTooltip:SetOwner(grip, side == "LEFT" and "ANCHOR_TOPRIGHT" or "ANCHOR_TOPLEFT")
+      GameTooltip:SetText(L:G("Resize"))
+      GameTooltip:AddLine(L:G("Drag to resize."), 1, 1, 1, true)
+      GameTooltip:AddLine(L:G("Shift-click to reset to the default size."), 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    addon.SetScript(grip, "OnLeave", function()
+      self.gripHover[side] = false
+      self:fadeGrip(side)
+      GameTooltip:Hide()
+    end)
+    self.grips[side] = grip
+    self.gripHover[side] = false
+  end
+end
+
+-- styleGrips draws the grips from the theme (Small.Grip): its size, in from the corners by its inset,
+-- its art for each state, turned around on the left corner, seen or not as the pointer has it.
+---@private
+function panelProto:styleGrips()
+  local G = style.Small.Grip
+  for side, grip in pairs(self.grips) do
+    pixel:Size(grip, G.Size, G.Size)
+    grip:ClearAllPoints()
+    if side == "LEFT" then
+      pixel:Point(grip, "BOTTOMLEFT", self.body, "BOTTOMLEFT", G.Inset, G.Inset)
+    else
+      pixel:Point(grip, "BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -G.Inset, G.Inset)
+    end
+    for _, state in ipairs(GRIP_STATES) do
+      local spec = G[state[1]]
+      grip[state[2]](grip, style:TexturePath(spec.Texture))
+      local texture = grip[state[3]](grip)
+      style:Paint(texture, spec)
+      if side == "LEFT" then
+        local c = spec.TexCoords or { 0, 1, 0, 1 }
+        texture:SetTexCoord(c[2], c[1], c[3], c[4])
+      end
+    end
+    self:fadeGrip(side, true)
+  end
+end
+
+-- fadeGrip shows a grip while it is wanted (asked: "auto-hide the handles so they only show on
+-- hover"): while the pointer is over it or it is dragged, as the original bags' grip shows (window.lua,
+-- ShowOnHover), or at all times for a theme whose grips do not hide (Small.Grip.ShowOnHover false).
+-- Unseen, it still takes the pointer, so hovering the corner finds it. It fades as Next's hovers do,
+-- or turns at once with now.
+---@private
+---@param side "LEFT"|"RIGHT"
+---@param now? boolean
+function panelProto:fadeGrip(side, now)
+  local grip = self.grips[side]
+  local wanted = not style.Small.Grip.ShowOnHover or self.gripHover[side] or self.sizing == side
+  local to = wanted and 1 or 0
+  if now then
+    tween:Stop(grip)
+    grip:SetAlpha(to)
+    return
+  end
+  tween:Play(grip, {
+    duration = style.Time.Hover,
+    from = grip:GetAlpha(),
+    to = to,
+    ease = style:Ease("Hover"),
+    onUpdate = function(v)
+      grip:SetAlpha(v)
+    end,
+  })
+end
+
+-- UpdateGrips shows a small panel's grips, but for the one on the side its chained partner is on
+-- (chain:ChainedSide), which would push the partner (asked: "disable it on the side it's chained on,
+-- if it's chained"). A grip being dragged stays until it is let go.
+function panelProto:UpdateGrips()
+  local small = self:IsSmall()
+  local chained = small and chain:ChainedSide(self) or nil
+  for side, grip in pairs(self.grips) do
+    grip:SetShown(small and (side ~= chained or self.sizing == side))
+  end
+end
+
+-- StartSizing starts sizing a small panel from a grip's corner (next.md §14g), from where it was
+-- pressed (alwaysStartFromMouse, as the classic bags do), within its minimum and the screen. The
+-- corner across from it stays still. Its opening slide or a glide is finished first, and its content
+-- reflows at once as it goes. With Autosize Bags on it sizes both ways too, and its height bounces back to what it shows as it
+-- is let go (StopSizing; asked: "don't lock dragging on the Y axis ... let it drag larger, but then "bounce" it back"). A full
+-- panel, one closing, moving or already sizing, or a press with something on the cursor (a drop) does not size. It returns
+-- whether it did.
+---@param side "LEFT"|"RIGHT"
+---@return boolean
+function panelProto:StartSizing(side)
+  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or GetCursorInfo() ~= nil then
+    return false
+  end
+  self:endMorph()
+  self:endSizeGlide()
+  tween:Stop(self, true)
+  local frame, s = self.frame, self:Scale()
+  frame:SetResizeBounds(self:MinWidth(), self:MinHeight(), UIParent:GetWidth() / s, UIParent:GetHeight() / s)
+  self.sizingFrom = { frame:GetWidth(), frame:GetHeight() }
+  self.sizing = side
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
+  self.content:SetInstant(true)
+  frame:StartSizing(side == "LEFT" and "BOTTOMLEFT" or "BOTTOMRIGHT", true)
+  self:recordSizing("start")
+  return true
+end
+
+-- recordSizing gives the render recorder (render-recorder.md §2) a step of a grip sizing the panel or of its size
+-- gliding: where the client puts it and a few of its icons, in screen pixels. Nothing while it does not record.
+---@private
+---@param step string
+function panelProto:recordSizing(step)
+  local recorder = addon:GetModule('RenderRecorder', true)
+  if recorder ~= nil and recorder.recording then
+    recorder:PanelSizing(self, step)
+  end
+end
+
+-- KeepScroll puts what the panel shows back where it was while a grip sizes it, or while its size glides back to its
+-- default: Blizzard's scroll box keeps its scroll percentage as its height changes (ScrollBoxBaseMixin:OnSizeChanged
+-- updates; the offset is the scroll range times the percentage), which moved everything shown a pixel every few frames
+-- (reported: the jitter "on Y, it's ever so slight"). It keeps the scroll offset in pixels, as a browser keeps the top
+-- of a page where it was; past the end, the end. It runs after Blizzard's handler (BuildContent), so nothing is drawn
+-- moved. It returns whether it scrolled, for profiler traces.
+---@return boolean
+function panelProto:KeepScroll()
+  local kept = self.keptScroll
+  if kept == nil or (self.sizing == nil and not self.sizeGliding) then
+    return false
+  end
+  local box = self.scroll.scrollBox
+  if math.abs(box:GetDerivedScrollOffset() - kept) < 0.001 then
+    return false
+  end
+  box:ScrollToOffset(kept, true)
+  self:recordSizing("scroll kept")
+  return true
+end
+
+-- Resized runs whenever the frame's size changes: while a grip sizes it, its title fits the new width
+-- and its content reflows there.
+function panelProto:Resized()
+  if self.sizing == nil then
+    return
+  end
+  self:FitTitle()
+  render:Invalidate(self.root)
+  self:recordSizing("resized")
+end
+
+-- StopSizing ends a grip's sizing: the panel keeps the height it was let go at and snaps to the width of the
+-- columns it shows there, its names whole (SnapWidth; asked: "never normalize such that the column count changes away
+-- from the user"), saved for its kind with its place, on the screen. A press let go at the size it had, or that snaps
+-- back to it, saves nothing, so the default size still follows the screen. What its names asked for while the grip held
+-- it is in the snap. With Autosize Bags on its height bounces back with its width's snap to what it shows at the width it
+-- snaps to, from wherever the grip took it; only its width is saved (a press that moved only its height saves nothing), and the
+-- height saved stays the one the player gave it, for when Autosize Bags is off.
+function panelProto:StopSizing()
+  if self.sizing == nil then
+    return
+  end
+  local frame = self.frame
+  frame:StopMovingOrSizing()
+  local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
+  local from, side = self.sizingFrom, self.sizing
+  local autosize = database:GetNextAutosize()
+  self:recordSizing("let go")
+  self.content:SetInstant(false)
+  -- Sizing placed everything at once, which leaves nothing to glide from: in columns the snap moves them, by hundreds of
+  -- pixels. One column keeps its rows through a snap.
+  if self.content.grid ~= nil then
+    render:RenderNow(self.root, { ctx = context:New("NextPanelSnap") })
+  end
+  self.sizing = nil
+  -- Let go away from the pointer, it fades now.
+  self:fadeGrip(side)
+  self.sizingFrom = nil
+  local to = self:SnapWidth(self:FrameLayoutWidth(w))
+  local heightMoved = not autosize and math.abs(h - from[2]) >= 0.5
+  if x ~= nil and y ~= nil and (math.abs(to - from[1]) >= 0.5 or heightMoved) then
+    local height = h
+    if autosize then
+      height = select(2, database:GetNextSmallSize(self.kind))
+    end
+    database:SetNextSmallSize(self.kind, to, height)
+    self.smallWidth, self.smallHeight, self.restingWidth = self:SmallSize()
+    if autosize then
+      -- What it shows laid out at the width it snaps to (a name can take it wider than where it was let go), so the height
+      -- it bounces to is that width's and it glides once.
+      render:RenderNow(self.root, { ctx = context:New("NextPanelSnap") })
+      self.smallHeight = self:RestingHeight()
+    end
+    -- A chained bag's grip on its chained side is off (UpdateGrips), so its chained side stayed beside
+    -- its partner: the side across from the grip stays where it is, on the screen, and is its spot.
+    local s = lift:ScaleOf(frame)
+    local left = side == "LEFT" and x + w - self.smallWidth or x
+    -- From the top it was left at, so a raised bag the grip made shorter goes back down (leftPlace).
+    self.placeX, self.placeY = self:clampPlace(self:leftPlace(left * s, y * s))
+    database:SetNextSmallPlace(self.kind, self:leftPlace(self.placeX, self.placeY))
+  end
+  self:UpdateGrips()
+  -- Autosized, its height can change where its width does not, and its top with it (its bottom kept on the screen,
+  -- clampPlace).
+  local unit = self:PixelUnit()
+  local toY = y ~= nil and pixel:SnapIn(unit, self.placeY / self:Scale()) or nil
+  local rises = autosize and toY ~= nil and math.abs(toY - y) > unit / 2
+  local refits = autosize and math.abs(h - self:SmallHeight()) >= 0.5
+  if x ~= nil and y ~= nil and (math.abs(w - self:SmallWidth()) >= 0.5 or refits or rises) then
+    -- Snapped wider for a name, the screen's edge can put its place back (Clamp Bags to Screen): both its edges move.
+    local toX = pixel:SnapIn(unit, self.placeX / self:Scale())
+    local ends = side == "LEFT" and x + w - self:SmallWidth() or x
+    self:snapTo(side, x, y, w, to, math.abs(toX - ends) > unit / 2 and toX or nil, h, rises and toY or nil)
+    return
+  end
+  frame:SetSize(self:SmallWidth(), self:SmallHeight())
+  self:setOffset(0)
+  self:FitTitle()
+  render:Invalidate(self.root)
+  self:recordSizing("placed")
+end
+
+-- snapTo glides a small panel w wide, its top left at x, y in its own units, to the width it takes (its SmallWidth now:
+-- its columns' where a grip let go, or what its names need, FollowNames), as the original bags snap to their content
+-- (window.md §3b): past it by Motion's overshoot, then back (a panel that grows does not overshoot). The edge that moves
+-- moves, the side across stays (the left grip's left edge, the right grip's right); where both move (the screen's edge
+-- puts it back), its left edge goes to toX with its width. Its content keeps the rows of layout (the width it snapped to,
+-- unrounded) and the width it ends at all the way, so the bounce, inside the scroll box's room, moves no item. Where it
+-- moves the side a bag chained to it hangs from, that bag moves with it, as it does beside an anchor dragged (StartMove), and
+-- settles once it ends (chain:Update); where that side stays (a grip's snap, a glide its place holds that side for), the bag
+-- and the braid are left as they are. Its height glides from h to its SmallHeight with the same bounce, as the original bags'
+-- does (Autosize Bags: what it shows, FollowHeight and a grip let go), its top to toY where that height moves it (centered
+-- where it was never moved, or its bottom kept on the screen), which moves the bag chained to it too. Anything that places,
+-- sizes, switches or hides it ends the snap at its size (endSizeGlide).
+---@private
+---@param side "LEFT"|"RIGHT"
+---@param x number
+---@param y number
+---@param w number
+---@param layout number
+---@param toX? number
+---@param h? number Its height as it starts, in its own units: its SmallHeight (no height glide) when nil.
+---@param toY? number Where its top ends, in its own units: it stays at y when nil.
+function panelProto:snapTo(side, x, y, w, layout, toX, h, toY)
+  local frame = self.frame
+  local width, height = self:SmallWidth(), self:SmallHeight()
+  h = h or height
+  local overshoot = motion.SnapOvershoot(w, width, self:MinWidth())
+  local overshootH = motion.SnapOvershoot(h, height, self:MinHeight())
+  -- How far along a size is from its start to its end, by the size it has now (so the edge it moves keeps the side across
+  -- still through the bounce); by the glide's progress for a size that does not change.
+  local function along(from, to, now, p)
+    if math.abs(to - from) < 1e-6 then
+      return p
+    end
+    return (now - from) / (to - from)
+  end
+  -- Whether it moves the side a bag chained to it hangs from (chain:ChainedSide): its edge on that side, both edges, or its top.
+  -- A grip's never does (it has none there, and keeps the top), nor a glide its place holds that side for: the bag beside it is
+  -- left where it is.
+  local function carries()
+    return toX ~= nil or toY ~= nil or chain:ChainedSide(self) == side
+  end
+  self.snap = { layout = layout, body = width }
+  self.sizeGliding = true
+  tween:Play(self.sizeGlideKey, {
+    duration = style.Time.Snap,
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(p)
+      -- Its size and its left edge in whole pixels, as a grip dragged sizes it: its scroll box clips what it holds, and a
+      -- clipping frame's edge between two pixels drew what it holds stretched across the fraction (texture-sharpening.md §5).
+      local unit = self:PixelUnit()
+      local current = pixel:LengthIn(unit, motion.SnapSizeAt(w, width, overshoot, p))
+      local tall = pixel:LengthIn(unit, motion.SnapSizeAt(h, height, overshootH, p))
+      local left = side == "LEFT" and x + w - current or x
+      if toX ~= nil then
+        left = pixel:SnapIn(unit, x + (toX - x) * along(w, width, current, p))
+      end
+      local top = y
+      if toY ~= nil then
+        top = pixel:SnapIn(unit, y + (toY - y) * along(h, height, tall, p))
+      end
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+      frame:SetSize(current, tall)
+      self:FitTitle()
+      render:Invalidate(self.root)
+      self:recordSizing("snap")
+      -- Its spot follows where it is now (LivePlace): one gliding into it glides toward it as it is now (spotGlide); one busy
+      -- otherwise is left to it, its spot moved (spotMoved), and settles once this ends (chain:Update), or, one a grip or a
+      -- snap of its own holds, which that update leaves alone, as its snap ends; placed on its spot, it owes nothing. A
+      -- burst's shove is no matter: placing it ends the burst. The bag beside it is read each frame: one can be dropped
+      -- beside it, and chained, while it glides.
+      local follower = chain:Follower(self)
+      if follower ~= nil and carries() then
+        if not follower:busy() then
+          follower.placeX, follower.placeY = follower:SmallPlace()
+          follower.spotMoved = nil
+          follower:setOffset(0)
+        elseif follower.spotGlide ~= nil then
+          follower.spotGlide()
+        else
+          follower.spotMoved = true
+        end
+      end
+    end,
+    onDone = function()
+      self.sizeGliding = false
+      self.snap = nil
+      frame:SetSize(width, height)
+      self:setOffset(0)
+      self:FitTitle()
+      render:Invalidate(self.root)
+      self:recordSizing("snapped")
+      -- The chain settles where it moved the side a bag chained to it hangs from, or its own spot moved under it. Ended
+      -- early (endSizeGlide), what ended it places the panel itself: a size switch has let go of the braid, which settling
+      -- the chain here would couple again while the pair switches.
+      if not self.glideCut and (self.spotMoved or carries()) then
+        chain:Update(context:New("NextPanelSnapped"))
+      end
+    end,
+  })
+end
+
+-- busy says something moves, sizes or places a small panel now: a grip sizes it, its size glides, the player moves it, it
+-- switches size, a slide or a glide plays on it (its open slide, a glide into its spot), or a section is dragged on it. A
+-- Glitch burst's shove is not: whatever places the panel ends the burst.
+---@private
+---@return boolean
+function panelProto:busy()
+  return self.sizing ~= nil or self.sizeGliding or self.moving or self.morph ~= nil or tween:IsPlaying(self)
+    or self.content.drag ~= nil
+end
+
+-- Settled says nothing moves, sizes or places a small panel now (busy), and it is on its place: a Glitch burst shoves it off
+-- for a moment (its offset), and what follows its names glides from its place.
+---@return boolean
+function panelProto:Settled()
+  return not self:busy() and self.offset == 0
+end
+
+-- chainedPartner is the small bag chained to panel: the anchor it sits beside, open or not (chain:SmallAnchorOf), or the
+-- open bag that sits beside it (chain:Follower).
+---@param panel NextPanelFrame
+---@return NextPanelFrame?
+local function chainedPartner(panel)
+  return chain:SmallAnchorOf(panel) or chain:Follower(panel)
+end
+
+-- FollowNames fits an open small panel to what it shows while Fit Names While Open is on (nextFitNamesWhileOpen): at every
+-- draw and every new title it glides wider when a section's name or its title would be cut short, and back toward the width
+-- the player chose once they fit (FittedWidth), as a grip let go glides (snapTo), its content laid out at the width it ends at
+-- all the way, and where the player has it scrolled kept (keptScroll). Nothing is saved: the size saved stays the player's.
+-- The edge that moves is the one its place does not hold: where its place is its left edge (where it was left), its right
+-- edge; where its place hangs from its right edge (the backpack's default place, a companion chained left of its anchor), its
+-- left; where the screen's edge puts its place back, both. Not settled (Settled), or while the open bag chained to it is not,
+-- it waits, and tries again a frame on, each frame, until it follows (followLater): a chained pair glides one at a time, as
+-- each is placed from the other's edge. With later (a new title: what sets one draws what it shows next, in the same frame)
+-- it follows a frame on, so that draw fits both in one glide. Asked: "with an option to enable/disable this behavior in
+-- settings, default disable. with it disabled, behavior is as it is now". It returns what it did, for profiler traces:
+-- "closed" (not an open small panel), "off", "owed" (it waits), "fits" (it is at that width), "placed" (its frame was that
+-- wide already) or "following".
+---@param later? boolean
+---@return string
+function panelProto:FollowNames(later)
+  if not self:IsSmall() or not self.frame:IsShown() or self.closing or self.opening then
+    return "closed"
+  end
+  if not database:GetNextFitNamesWhileOpen() then
+    return "off"
+  end
+  local partner = chainedPartner(self)
+  if later or not self:Settled() or (partner ~= nil and partner:IsShown() and not partner.closing and not partner:Settled()) then
+    self.namesOwed = true
+    self:followLater()
+    return "owed"
+  end
+  self.namesOwed = nil
+  local fitted = self:FittedWidth()
+  if math.abs(fitted - self:RestingLayoutWidth()) < 0.5 then
+    return "fits"
+  end
+  local frame, s, unit = self.frame, self:Scale(), self:PixelUnit()
+  -- Where it is now, as setOffset anchored it, in its own units.
+  local x, y = pixel:SnapIn(unit, (self.placeX + self.offset) / s), pixel:SnapIn(unit, self.placeY / s)
+  local w, left = frame:GetWidth(), self.placeX
+  local right = left + w * s
+  -- Its width alone: its height, and the place that puts it, follow what it shows on their own (FollowHeight).
+  local width, _, resting = self:SmallSize()
+  self.smallWidth, self.restingWidth = width, resting
+  self.placeX, self.placeY = self:SmallPlace()
+  self.offset = 0
+  if math.abs(w - self.smallWidth) < 0.5 then
+    self:setOffset(0)
+    self:FitTitle()
+    render:Invalidate(self.root)
+    return "placed"
+  end
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
+  local half = pixel:Unit(UIParent) / 2
+  if math.abs(self.placeX - left) <= half then
+    self:snapTo("RIGHT", x, y, w, fitted)
+  elseif math.abs(self.placeX + self.smallWidth * s - right) <= half then
+    self:snapTo("LEFT", x, y, w, fitted)
+  else
+    self:snapTo("LEFT", x, y, w, fitted, pixel:SnapIn(unit, self.placeX / s))
+  end
+  return "following"
+end
+
+-- followLater tries FollowNames again a frame on (a zero-length tween, namesKey), never at once: what keeps the panel waiting
+-- may end early, cut short by something about to place or size it itself (StartMove, StartSizing, PrepareResize end a glide
+-- and then start), which a frame on it is doing. A try that finds it still waiting tries again a frame on, so it follows the
+-- frame after whatever it waits for ends, however that ends; it stops once it follows, closes, or the setting is turned off.
+-- A try while it waits is FollowNames' checks alone: no layout, no name measured.
+---@private
+function panelProto:followLater()
+  tween:Play(self.namesKey, {
+    duration = 0,
+    from = 0,
+    to = 1,
+    onUpdate = function() end,
+    onDone = function()
+      self:FollowNames()
+    end,
+  })
+end
+
+-- FollowHeight fits an open small panel's height to what it shows while Autosize Bags is on (nextAutosize,
+-- next-small-autosize.md; asked: "follow live"): a frame after it is laid out (the render root asks with later, Render), and
+-- after its tab rail changes, it glides to its height (RestingHeight: everything it shows and its Free Space, never shorter
+-- than its tab rail nor past the screen) with the bounce a grip let go glides with (snapTo), its width as it is; its top where
+-- it was left, or where that height puts it (centered at its default place, its bottom kept on the screen: clampPlace), the bag
+-- chained to it moving with that top. Nothing is saved. Not settled (Settled), or while the open bag chained to it is not, it
+-- waits, and tries again a frame on, each frame, until it follows (heightLater), as FollowNames does: a chained pair glides one
+-- at a time. It returns what it did, for profiler traces: "closed" (not an open small panel), "off", "owed" (it waits), "fits"
+-- (it is that tall) or "following".
+---@param later? boolean
+---@return string
+function panelProto:FollowHeight(later)
+  if not self:IsSmall() or not self.frame:IsShown() or self.closing then
+    return "closed"
+  end
+  if not database:GetNextAutosize() then
+    return "off"
+  end
+  local partner = chainedPartner(self)
+  if later or not self:Settled() or (partner ~= nil and partner:IsShown() and not partner.closing and not partner:Settled()) then
+    self:heightLater()
+    return "owed"
+  end
+  local unit = self:PixelUnit()
+  local height = self:RestingHeight()
+  if math.abs(height - self:SmallHeight()) < unit / 2 then
+    return "fits"
+  end
+  local frame, s = self.frame, self:Scale()
+  -- Where it is now, as setOffset anchored it, in its own units.
+  local x, y = pixel:SnapIn(unit, self.placeX / s), pixel:SnapIn(unit, self.placeY / s)
+  local w, h = frame:GetWidth(), frame:GetHeight()
+  self.smallHeight = height
+  self.placeX, self.placeY = self:SmallPlace()
+  -- Where it stands apart from its place across (carried by an anchor that has since closed), its left edge glides there with its
+  -- height, never jumping as the glide ends.
+  local toX, toY = pixel:SnapIn(unit, self.placeX / s), pixel:SnapIn(unit, self.placeY / s)
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
+  self:snapTo("RIGHT", x, y, w, self:RestingLayoutWidth(), math.abs(toX - x) > unit / 2 and toX or nil, h,
+    math.abs(toY - y) > unit / 2 and toY or nil)
+  return "following"
+end
+
+-- heightLater tries FollowHeight again a frame on (a zero-length tween, heightKey), never at once, as followLater does for
+-- FollowNames: it stops once it follows, fits, closes, or the setting is turned off. A try while it waits is FollowHeight's
+-- checks alone: no layout.
+---@private
+function panelProto:heightLater()
+  tween:Play(self.heightKey, {
+    duration = 0,
+    from = 0,
+    to = 1,
+    onUpdate = function() end,
+    onDone = function()
+      self:FollowHeight()
+    end,
+  })
+end
+
+-- ResetSize glides a small panel back to its default size (asked: "shift + left click the grip to
+-- reset to default size (animated, of course)"): the corner across from the grip stays still, the
+-- right grip keeping its top left and the left grip its top right, and the default size follows the
+-- screen again. Its content reflows on the way, at once, as it does while a grip is dragged. It returns
+-- what it did, for profiler traces: "resetting", "default" (it is the default size already) or
+-- "closing".
+---@param side "LEFT"|"RIGHT"
+---@return string
+function panelProto:ResetSize(side)
+  if self.closing then
+    return "closing"
+  end
+  if database:GetNextSmallSize(self.kind) == nil then
+    return "default"
+  end
+  self:endMorph()
+  self:endSizeGlide()
+  tween:Stop(self, true)
+  local frame = self.frame
+  local x0, y0 = self.placeX + self.offset, self.placeY
+  local w0, h0 = frame:GetWidth(), frame:GetHeight()
+  database:SetNextSmallSize(self.kind, nil, nil)
+  local w1, h1, fitted = self:SmallSize()
+  self.smallWidth, self.smallHeight, self.restingWidth = w1, h1, fitted
+  -- Places on the screen, sizes in its own units.
+  local s = self:Scale()
+  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, y0)
+  self.placeX, self.placeY = x1, y1
+  self.offset = 0
+  database:SetNextSmallPlace(self.kind, self:leftPlace(x1, y1))
+  self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
+  self.sizeGliding = true
+  self.content:SetInstant(true)
+  tween:Play(self.sizeGlideKey, {
+    duration = style.Time.Resize,
+    from = 0,
+    to = 1,
+    ease = style:Ease("Resize"),
+    onUpdate = function(t)
+      -- In whole pixels, size and corner, as a grip dragged sizes it (texture-sharpening.md §5): the corner across from
+      -- the grip glides on whole pixels and the moving side follows the size.
+      local unit = self:PixelUnit()
+      local w, h = pixel:LengthIn(unit, w0 + (w1 - w0) * t), pixel:LengthIn(unit, h0 + (h1 - h0) * t)
+      local top = pixel:SnapIn(unit, (y0 + (y1 - y0) * t) / s)
+      local left
+      if side == "LEFT" then
+        local r0, r1 = x0 / s + w0, x1 / s + w1
+        left = pixel:SnapIn(unit, r0 + (r1 - r0) * t) - w
+      else
+        left = pixel:SnapIn(unit, (x0 + (x1 - x0) * t) / s)
+      end
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+      frame:SetSize(w, h)
+      self:FitTitle()
+      render:Invalidate(self.root)
+      self:recordSizing("reset")
+    end,
+    onDone = function()
+      self.sizeGliding = false
+      self.content:SetInstant(false)
+      frame:SetSize(w1, h1)
+      self:setOffset(0)
+      self:FitTitle()
+      render:Invalidate(self.root)
+      self:recordSizing("reset done")
+    end,
+  })
+  return "resetting"
+end
+
+-- endSizeGlide puts a panel whose size glides (back to its default, or onto its columns' width) at its end at once
+-- (anything else that places or sizes it). What ended it places the panel itself, so a snap's end settles no chain
+-- (glideCut): settling the chain coupled a pair switching size.
+---@private
+function panelProto:endSizeGlide()
+  if self.sizeGliding then
+    self.glideCut = true
+    tween:Stop(self.sizeGlideKey, true)
+    self.glideCut = nil
+  end
+end
+
+-- SetDropGlow lights the body while a section from the other bag would drop on it.
+---@param on boolean
+function panelProto:SetDropGlow(on)
+  local glow, G = self.dropGlow, style.Theme.Panel.DropGlow
+  if not G then
+    return
+  end
+  if on then
+    glow:Show()
+  end
+  tween:Play(glow, {
+    duration = style.Time.Hover,
+    from = glow:GetAlpha(),
+    to = on and G.Alpha or 0,
+    ease = style:Ease("Hover"),
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+    onDone = function()
+      if not on then
+        glow:Hide()
+      end
+    end,
+  })
+end
+
+-- ShownBankType is the bank type the panel shows: none for the backpack.
+---@return number?
+function panelProto:ShownBankType()
+  return nil
+end
+
+-- InTabMode is whether the panel's tabs are Blizzard's bank tabs: never for the backpack.
+---@return boolean
+function panelProto:InTabMode()
+  return false
+end
+
+-- titleAdapter is what the classic title's item drop needs of a section (SectionFrame
+-- OnTitleClickOrDrop): its bag kind and title.
+---@private
+---@param section NextSection
+---@return table
+function panelProto:titleAdapter(section)
+  local kind = self.kind
+  return {
+    GetKind = function() return kind end,
+    GetTitle = function() return section.name end,
+  }
+end
+
+-- OnHeaderDragStart picks a section up by its header (next.md §7).
+---@param section NextSection
+function panelProto:OnHeaderDragStart(section)
+  nextDrag:Begin(self, section)
+end
+
+-- OnHeaderDragStop drops the section being dragged.
+---@param section NextSection
+function panelProto:OnHeaderDragStop(section)
+  local _ = section
+  nextDrag:Drop(context:New('NextSectionDrop'))
+end
+
+-- cursorItemData returns what the bags last read of the item on the cursor: its bag slot's, else an item
+-- of its ID the bags hold; nil for one they do not hold (an equipped item).
+---@param itemID number
+---@return ItemData?
+local function cursorItemData(itemID)
+  local location = C_Cursor.GetCursorItem()
+  if location and location:IsBagAndSlot() then
+    local bag, slot = location:GetBagAndSlot()
+    local data = items:GetItemDataFromSlotKey(bag .. "_" .. slot)
+    if data and not data.isItemEmpty and data.itemInfo and data.itemInfo.itemID == itemID then
+      return data
+    end
+  end
+  for _, info in pairs(items:GetAllSlotInfo()) do
+    for _, data in pairs(info.itemsBySlotKey or {}) do
+      if not data.isItemEmpty and data.itemInfo and data.itemInfo.itemID == itemID then
+        return data
+      end
+    end
+  end
+  return nil
+end
+
+-- FileCursorItem files the item on the cursor in the category whose header it was dropped on or clicked
+-- with (asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
+-- category"; docs/next-batch-2.md §8). Where the item lands without being added (Items:NaturalCategory)
+-- decides what Categories:FileItem does; the item goes back to its slot and the bags are recalculated.
+-- A plugin's category and a gear set take nothing: it says why, the item staying on the cursor. It
+-- returns what it did.
+---@param ctx Context
+---@param section NextSection
+---@return string
+function panelProto:FileCursorItem(ctx, section)
+  local cursorType, itemID = GetCursorInfo()
+  if cursorType ~= "item" or not itemID then
+    return "ignored"
+  end
+  local name = section.name
+  if name:sub(1, 6) == "Gear: " and categories:GetCategoryByName(name) == nil then
+    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
+    return "gear set"
+  end
+  local data = cursorItemData(itemID)
+  local natural = data and items:NaturalCategory(ctx, data) or nil
+  local result = categories:FileItem(ctx, itemID, name, natural)
+  if result == "plugin" then
+    print("BetterBags: " .. format(L:G("A plugin fills %s: items can't be added to it."), name))
+    return result
+  end
+  ClearCursor()
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+  return result
+end
+
+-- onHeaderItem takes an item dropped or clicked onto a header: a category's files it (FileCursorItem);
+-- Recent Items, Free Space and a bag in the Show Bags view pass it to the panel as the classic title
+-- does (bag-drop-zone.md).
+---@private
+---@param ctx Context
+---@param section NextSection
+function panelProto:onHeaderItem(ctx, section)
+  if section.kind == "category" and database:GetBagView(self.kind) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    self:FileCursorItem(ctx, section)
+    return
+  end
+  sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+end
+
+-- OnHeaderClick takes an item clicked onto a header (onHeaderItem), and moves a section to the open
+-- window on a right click (Move Categories).
+---@param ctx Context
+---@param section NextSection
+---@param button string
+function panelProto:OnHeaderClick(ctx, section, button)
+  if CursorHasItem() then
+    self:onHeaderItem(ctx, section)
+    return
+  end
+  if button == "RightButton" and section.kind ~= "free" then
+    sectionFrame:MoveItems(nextDrag:SectionItems(section))
+  end
+end
+
+-- OnHeaderReceiveDrag takes an item dropped on a header (onHeaderItem).
+---@param ctx Context
+---@param section NextSection
+function panelProto:OnHeaderReceiveDrag(ctx, section)
+  if CursorHasItem() then
+    self:onHeaderItem(ctx, section)
+  end
+end
+
+-- SectionColumns is how many columns of sections this bag is set to, how they fill, whether wide sections span
+-- them and whether they are compact (next.md §7a, §7b). Show Bags (a bag's slots, or a guild tab's, in order) is one column.
+---@return number count, string? fill, boolean? span, number? wideRows, boolean? compact
+function panelProto:SectionColumns()
+  -- The logout stripped the settings these read (initialization.md).
+  if addon.loggingOut or database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return 1
+  end
+  return database:GetNextSectionColumns(self.kind), database:GetNextSectionFill(self.kind),
+    database:GetNextSectionSpan(self.kind), database:GetNextSectionWideRows(self.kind),
+    database:GetNextSectionCompact(self.kind)
+end
+
+-- OnHeaderEnter tells what a header does.
+---@param section NextSection
+function panelProto:OnHeaderEnter(section)
+  if nextDrag:IsActive() then
+    return
+  end
+  GameTooltip:SetOwner(section.header, self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT")
+  GameTooltip:SetText(section.name, 1, 1, 1, 1, true)
+  if section.kind == "category" then
+    GameTooltip:AddLine(L:G("Drag to reorder, or onto a tab or the other bag."), 0.8, 0.8, 0.8, true)
+  end
+  if section.kind ~= "free" then
+    GameTooltip:AddLine(L:G("Right-click to move it to the open window."), 0.8, 0.8, 0.8, true)
+  end
+  GameTooltip:Show()
+end
+
+---@param section NextSection
+function panelProto:OnHeaderLeave(section)
+  local _ = section
+  GameTooltip:Hide()
+end
+
+---@private
+---@param c number[]
+function panelProto:paintWash(c)
+  self.washColor = { c[1], c[2], c[3], c[4] }
+  self.wash:SetGradient("VERTICAL", CreateColor(c[1], c[2], c[3], 0), CreateColor(c[1], c[2], c[3], c[4]))
+end
+
+-- WashColor is the wash's color for what the panel shows: the theme's Panel.Washes by key (Default,
+-- Warbank, Guild), or a palette color by name.
+---@param key string
+---@return number[]
+function panelProto:WashColor(key)
+  local washes = style.Theme.Panel.Washes
+  return { style:RGBA(washes[key] or key) }
+end
+
+-- SetWash fades the wash at the top of the panel to its color for what it shows (WashColor), at once
+-- with now; a theme applied later paints it in that theme's color for the same key. Under a theme without a
+-- wash it only records the key: a panel made under one has no color to fade from (styleBody paints none).
+---@param key string
+---@param now? boolean
+function panelProto:SetWash(key, now)
+  self.washKey = key
+  if not style.Theme.Panel.Wash then
+    tween:Stop(self.wash)
+    return
+  end
+  local from = self.washColor
+  local to = self:WashColor(key)
+  if now then
+    tween:Stop(self.wash)
+    self:paintWash(to)
+    return
+  end
+  tween:Play(self.wash, {
+    duration = style.Time.Wash,
+    from = 0,
+    to = 1,
+    ease = style:Ease("Wash"),
+    onUpdate = function(t)
+      local c = {}
+      for i = 1, 4 do
+        c[i] = from[i] + (to[i] - from[i]) * t
+      end
+      self:paintWash(c)
+    end,
+  })
+end
+
+---@private
+---@param spec NextHeaderButton
+---@return Button
+function panelProto:headerButton(spec)
+  local button = CreateFrame("Button", nil, self.frame)
+  -- Above a small panel's mover, which lies over the title row, and the overlay, whose frame art they sit on.
+  button:SetFrameLevel(self.overlay:GetFrameLevel() + 3)
+  local icon = button:CreateTexture(nil, "ARTWORK")
+  button.icon = icon
+  -- Drawn over the icon while hovered (an icon's Highlight).
+  button.highlight = button:CreateTexture(nil, "ARTWORK", nil, 1)
+  button.highlight:Hide()
+  button.key = spec.key
+  button.spec = spec
+  button.hover = false
+  self:SetHeaderIcon(button, spec.iconKey or spec.key)
+  button:SetScript("OnEnter", function()
+    button.hover = true
+    self:PaintHeaderIcon(button)
+    -- Away from the panel: below the header, or out beside the side rail.
+    local anchor
+    if style.Theme.Header.Buttons.Rail then
+      anchor = self.side == "LEFT" and "ANCHOR_RIGHT" or "ANCHOR_LEFT"
+    else
+      anchor = self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT"
+    end
+    GameTooltip:SetOwner(button, anchor)
+    if spec.tooltipFunc then
+      spec.tooltipFunc(button)
+    else
+      GameTooltip:SetText(spec.tooltip, 1, 1, 1, 1, true)
+    end
+    GameTooltip:Show()
+  end)
+  button:SetScript("OnLeave", function()
+    button.hover = false
+    button.pressed = false
+    self:PaintHeaderIcon(button)
+    GameTooltip:Hide()
+  end)
+  -- Pressed: its icon's Pushed art, as a button's pushed texture is.
+  button:SetScript("OnMouseDown", function()
+    button.pressed = true
+    self:PaintHeaderIcon(button)
+  end)
+  button:SetScript("OnMouseUp", function()
+    button.pressed = false
+    self:PaintHeaderIcon(button)
+  end)
+  addon.SetScript(button, "OnClick", function(ctx)
+    spec.onClick(ctx)
+  end)
+  return button
+end
+
+-- drawIconArt draws a header icon's art: an Atlas, else a Texture (one of the theme's Textures, or a file) with its
+-- TexCoords, filtered trilinearly so a glyph drawn smaller than its file stays smooth.
+---@param icon Texture
+---@param art table
+local function drawIconArt(icon, art)
+  icon:SetTexCoord(0, 1, 0, 1)
+  if art.Atlas then
+    icon:SetAtlas(art.Atlas)
+  else
+    icon:SetTexture(style:TexturePath(art.Texture), nil, nil, "TRILINEAR")
+    if art.TexCoords then
+      icon:SetTexCoord(unpack(art.TexCoords))
+    end
+  end
+end
+
+-- SetHeaderIcon draws a header button's icon from the theme (Header.Buttons.Icons[iconKey],
+-- next-themes.md §11): an Atlas (it wins over a Texture the theme inherits), else a Texture (one of
+-- the theme's Textures, or a file) with its TexCoords, filtered trilinearly so a glyph drawn smaller
+-- than its file stays smooth; centered in its button, the theme's Scale of it times the icon's own.
+-- The key is kept, so a theme applied later draws the button again (styleHeader). A key the theme
+-- gives no icon is an error naming it.
+---@param button Button
+---@param iconKey string
+function panelProto:SetHeaderIcon(button, iconKey)
+  local spec = style.Theme.Header.Buttons.Icons[iconKey]
+  if spec == nil then
+    error("the Next theme has no icon for " .. iconKey)
+  end
+  button.iconKey = iconKey
+  button.glyph = spec.Glyph ~= false
+  local icon = button.icon
+  local size = style.HEADER_BUTTON * style.Theme.Header.Buttons.Scale * (spec.Scale or 1)
+  -- In the middle of its button by whole pixels (docs/next-pixel-perfect.md).
+  local buttonSize = pixel:Length(button, style.HEADER_BUTTON)
+  icon:ClearAllPoints()
+  pixel:Center(icon, button, buttonSize, buttonSize, size, size)
+  local highlight = button.highlight
+  highlight:ClearAllPoints()
+  pixel:Center(highlight, button, buttonSize, buttonSize, size, size)
+  if spec.Highlight then
+    drawIconArt(highlight, spec.Highlight)
+    highlight:SetBlendMode(spec.Highlight.BlendMode or "BLEND")
+  end
+  self:PaintHeaderIcon(button)
+end
+
+-- PaintHeaderIcon colors a header button's icon for how it is now: its own color (its icon's Color,
+-- HoverColor), else the theme's for a glyph (Color, HoverColor) or for art (ArtColor, ArtHoverColor),
+-- brighter under the pointer. A tint suits a white glyph and darkens full-color art into a silhouette
+-- (asked with a Parchment screenshot), so the two are colored apart. A disabled button is not brighter
+-- under the pointer: it is drawn at DisabledAlpha of its color, and art desaturated too (a white glyph
+-- looks the same desaturated). Its Highlight shows over it while it is hovered and enabled, as a button's
+-- highlight texture does (GW2_UI's buttons). An icon with art of its own while pressed (Pushed) or disabled
+-- (Disabled: neither dimmed nor grayed, the art shows it) draws that art then, as a button's pushed and disabled
+-- textures do (Blizzard's close button).
+---@param button Button
+function panelProto:PaintHeaderIcon(button)
+  local B = style.Theme.Header.Buttons
+  local own = B.Icons[button.iconKey]
+  local enabled = button:IsEnabled()
+  local color
+  if button.hover and enabled then
+    color = own.HoverColor or (button.glyph and B.HoverColor or B.ArtHoverColor)
+  else
+    color = own.Color or (button.glyph and B.Color or B.ArtColor)
+  end
+  local r, g, b, a = style:RGBA(color)
+  local art = own
+  if not enabled and own.Disabled then
+    art = own.Disabled
+  elseif enabled and button.pressed and own.Pushed then
+    art = own.Pushed
+  end
+  local drawnDisabled = art == own.Disabled
+  if not enabled and not drawnDisabled then
+    a = a * B.DisabledAlpha
+  end
+  local icon = button.icon
+  drawIconArt(icon, art)
+  icon:SetDesaturated(not enabled and not button.glyph and not drawnDisabled)
+  icon:SetVertexColor(r, g, b, a)
+  local H = own.Highlight
+  button.highlight:SetShown(H ~= nil and button.hover and enabled)
+  if H ~= nil then
+    button.highlight:SetVertexColor(1, 1, 1, H.Alpha or 1)
+  end
+end
+
+-- SetHeaderButtonEnabled enables or disables a header button, its icon drawn for it (PaintHeaderIcon).
+---@param button Button
+---@param enabled boolean
+function panelProto:SetHeaderButtonEnabled(button, enabled)
+  button:SetEnabled(enabled and true or false)
+  self:PaintHeaderIcon(button)
+end
+
+-- GetHeaderButtons returns the header's buttons, in order from the screen edge.
+---@return NextHeaderButton[]
+function panelProto:GetHeaderButtons()
+  return {}
+end
+
+-- TitleJoin says where the ribbon ends and the title's cloud begins: the window's hard edge, where
+-- the body (and its wash) starts, as the title's point it is measured from, how far from that
+-- point, and which way is in, across the cloud (1 right, -1 left). Nothing of the ribbon goes on
+-- into the window (asked: it should "stop flush with the hard edge of the window").
+---@return string point, number x, number inward
+function panelProto:TitleJoin()
+  local edge = self:TitleStart()
+  if self.side == "LEFT" then
+    return "RIGHT", edge, -1
+  end
+  return "LEFT", -edge, 1
+end
+
+-- CloudSpan is how far the title's cloud reaches across, from the ribbon's end to Pad past the
+-- title's far side, for the title as it is now.
+---@return number
+function panelProto:CloudSpan()
+  local width = self.title:GetStringWidth()
+  -- Secret while the title shows a secret (a vendor's name in an instance): addon code may not do
+  -- arithmetic on it. Clients without secrets have no issecretvalue.
+  local C = style.Cloud
+  if isSecret(width) then
+    width = C and C.SecretTitleWidth or 0
+  end
+  return width + self:TitleStart() + (C and C.Pad or 0)
+end
+
+-- LayoutCloud spreads the cloud's puffs across the title as it is now (a share of the way across
+-- from the join, the widest as wide as the cloud) and draws them.
+function panelProto:LayoutCloud()
+  local C = style.Cloud
+  if not C then
+    return
+  end
+  local _, joinX, inward = self:TitleJoin()
+  local span = self:CloudSpan()
+  for i, puff in ipairs(self.cloud.puffs) do
+    local spec = C.Puffs[i]
+    puff.base = {
+      x = joinX + inward * spec.F * span,
+      y = spec.Y,
+      w = spec.W or span * spec.Wide,
+      h = spec.H,
+      a = spec.A,
+    }
+    puff.texture:SetSize(puff.base.w, puff.base.h)
+  end
+  self:applyCloud()
+end
+
+-- applyCloud draws the cloud as it is now: each puff where it rests, risen and brightened by its
+-- breath, the whole cloud and the join's puff brightened by the shimmer's swell.
+---@private
+function panelProto:applyCloud()
+  local C, cloud = style.Cloud, self.cloud
+  if not C then
+    return
+  end
+  local point = self:TitleJoin()
+  local swell = 1 + C.Swell * cloud.swell
+  for _, puff in ipairs(cloud.puffs) do
+    local breath = 2 * math.pi * cloud.time / puff.period + puff.phase
+    local base = puff.base
+    puff.texture:SetPoint("CENTER", self.title, point, base.x, base.y + C.Drift * math.sin(breath))
+    puff.texture:SetAlpha(base.a * (1 + C.Depth * math.sin(breath * 0.77 + 1)) * swell)
+  end
+  cloud.join:SetAlpha(C.Join.A + C.JoinSwell * cloud.swell)
+end
+
+-- SetCloudSwell brightens the cloud with the shimmer, 0 to 1.
+---@param swell number
+function panelProto:SetCloudSwell(swell)
+  self.cloud.swell = swell
+  self:applyCloud()
+end
+
+-- BuildHeader makes the title on the body's inner side, the cloud round it (soft puffs of glow,
+-- warm where the ribbon ends, no line anywhere, breathing slowly), the ribbon running from the
+-- window's hard edge out of the window (a thin gold line with a soft glow, fading out toward its
+-- end), the spark that glides in along it, and the kind's buttons along the top from the screen
+-- edge.
+---@param text string
+function panelProto:BuildHeader(text)
+  local frame = self.frame
+  -- On the overlay, over a theme's frame drawn above the content.
+  local title = self.overlay:CreateFontString(nil, "OVERLAY")
+  style:SetFont(title, style.Theme.Header.Title.Font)
+  title:SetText(text)
+  self.title = title
+  self.titleText = text
+  -- The title's colour ghosts (Header.Title.Ghosts): as many as the theme lists, made as needed.
+  self.ghosts = {}
+  self.ghostPool = {}
+
+  local cloud = { puffs = {}, pool = {}, time = 0, swell = 0 }
+  cloud.join = frame:CreateTexture(nil, "ARTWORK", nil, 1)
+  self.ribbonLines = {}
+  self.ribbonPool = {}
+  self.ribbonLength = style.RIBBON_LENGTH
+
+  cloud.driver = CreateFrame("Frame", nil, frame)
+  -- A child of the panel: it runs only while the panel shows.
+  cloud.driver:SetScript("OnUpdate", function(_, elapsed)
+    cloud.time = cloud.time + elapsed
+    self:applyCloud()
+  end)
+  self.cloud = cloud
+
+  local spark = frame:CreateTexture(nil, "OVERLAY")
+  spark:SetAlpha(0)
+  self.spark = spark
+
+  self:BuildBraid()
+  self:BuildTitleButton()
+
+  -- The side rail's strip (Header.Buttons.Rail): over the body's fill and feather, under its edge and
+  -- ornaments.
+  self.rail = frame:CreateTexture(nil, "BACKGROUND", nil, 7)
+  self.rail:Hide()
+
+  self.headerButtons = {}
+  for _, spec in ipairs(self:GetHeaderButtons()) do
+    local button = self:headerButton(spec)
+    self[spec.key] = button
+    table.insert(self.headerButtons, button)
+  end
+  -- Where the header's row waits while the theme puts it in the bag button's menu: hidden, so its buttons keep whether
+  -- the panel shows them (the menu lists those it shows) without being seen.
+  self.menuHolder = CreateFrame("Frame", nil, frame)
+  self.menuHolder:Hide()
+  self.menuButton = nextMenuButton:Create(self)
+  self:styleHeader()
+end
+
+-- styleHeader draws the header from the theme (Header, Layout): the title in its role where it goes,
+-- the cloud's puffs (as many as it lists, or none), the ribbon's lines (as many as its glow lists,
+-- at its length and thickness, or none), the spark, the title's glow, the braid, and the buttons (their
+-- size, icons and tint), then lays the cloud and the buttons out.
+---@private
+function panelProto:styleHeader()
+  local frame, body, title = self.frame, self.body, self.title
+  local left = self.side == "LEFT"
+  local H = style.Theme.Header
+  style:SetFont(title, H.Title.Font)
+  self:measureTitle()
+  title:ClearAllPoints()
+  -- Justified toward its anchor: a small panel's title has a width (FitTitle), and text is centered in
+  -- its width unless justified otherwise (UI.xsd: justifyH defaults to CENTER). A theme may center it in the room
+  -- the header buttons leave (Title.Justify = "CENTER"), as Blizzard centers a window's title.
+  local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
+  local centered = H.Title.Justify == "CENTER"
+  if left then
+    pixel:Point(title, "TOPRIGHT", body, "TOPRIGHT", -inset, -top)
+    title:SetJustifyH(centered and "CENTER" or "RIGHT")
+  else
+    pixel:Point(title, "TOPLEFT", body, "TOPLEFT", inset, -top)
+    title:SetJustifyH(centered and "CENTER" or "LEFT")
+  end
+  self:styleGhosts()
+
+  -- The cloud: a puff per entry, out of step (each breathes at its own pace, from its own point in
+  -- the breath); the ones it no longer lists are hidden.
+  local cloud, C = self.cloud, H.Cloud
+  cloud.puffs = {}
+  if C then
+    for i, spec in ipairs(C.Puffs) do
+      local t = cloud.pool[i]
+      if t == nil then
+        t = frame:CreateTexture(nil, "ARTWORK", nil, -2)
+        cloud.pool[i] = t
+      end
+      style:Paint(t, { Texture = C.Texture, Color = spec.Color, BlendMode = C.BlendMode })
+      t:Show()
+      table.insert(cloud.puffs, { texture = t, period = 4 + (i % 4) * 0.9, phase = i * 1.7 })
+    end
+    style:Paint(cloud.join, { Texture = C.Texture, Color = C.Join.Color, BlendMode = C.BlendMode })
+    pixel:Size(cloud.join, C.Join.Size, C.Join.Size)
+    cloud.join:Show()
+  else
+    cloud.join:Hide()
+  end
+  for i = #cloud.puffs + 1, #cloud.pool do
+    cloud.pool[i]:Hide()
+  end
+
+  -- The ribbon: a line per glow entry ({ offset, alpha }), fading out toward its far end.
+  local R = H.Ribbon
+  self.ribbonLines = {}
+  local glows = R and R.Glow or {}
+  for i, glow in ipairs(glows) do
+    local line = self.ribbonPool[i]
+    if line == nil then
+      line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+      line:SetColorTexture(1, 1, 1, 1)
+      self.ribbonPool[i] = line
+    end
+    table.insert(self.ribbonLines, line)
+    line:SetSize(self.ribbonLength, pixel:Length(line, R.Thickness))
+    line.raise = glow[1]
+    if left then
+      line:SetGradient("HORIZONTAL", style:CreateColor(R.Color, glow[2]), style:CreateColor(R.Color, 0))
+    else
+      line:SetGradient("HORIZONTAL", style:CreateColor(R.Color, 0), style:CreateColor(R.Color, glow[2]))
+    end
+    line:SetBlendMode(R.BlendMode or "ADD")
+    line:Show()
+  end
+  for i = #glows + 1, #self.ribbonPool do
+    self.ribbonPool[i]:Hide()
+  end
+  -- The brightest line, the spark's path; with no ribbon, an unseen one where it would start.
+  if self.ribbonPool[1] == nil then
+    local line = frame:CreateTexture(nil, "ARTWORK", nil, 0)
+    line:SetColorTexture(1, 1, 1, 1)
+    line.raise = 0
+    line:Hide()
+    self.ribbonPool[1] = line
+  end
+  self.ribbon = self.ribbonLines[1] or self.ribbonPool[1]
+  for i, glow in ipairs(glows) do
+    if glow[1] == 0 then
+      self.ribbon = self.ribbonLines[i]
+      break
+    end
+  end
+
+  -- Painted, the spark and the title's glow keep the alpha they show: a texture's alpha is its vertex
+  -- color's (paintEdges), and Paint colors them. Painting the glow left it lit until it was hovered
+  -- (reported in game).
+  local spark, S = self.spark, H.Spark
+  spark:ClearAllPoints()
+  spark:SetPoint("CENTER", self.ribbon, left and "LEFT" or "RIGHT", 0, 0)
+  if S then
+    local alpha = spark:GetAlpha()
+    style:Paint(spark, { Texture = S.Texture, Color = S.Color, BlendMode = S.BlendMode or "ADD" })
+    spark:SetAlpha(alpha)
+    pixel:Size(spark, S.Size, S.Size)
+    spark:Show()
+  else
+    tween:Stop(spark)
+    spark:SetAlpha(0)
+    spark:Hide()
+    -- Its shimmer swelled the cloud; with no spark, nothing would settle it. Not drawn here: the cloud's puffs, made
+    -- again above, are laid out and drawn below (LayoutCloud). Drawn here they had no place yet, which failed, and
+    -- the cloud stayed at full strength, added as light (reported with the shimmer turned off, next-themes.md §20).
+    self.cloud.swell = 0
+  end
+
+  local glow, G = self.titleGlow, H.TitleGlow
+  glow:ClearAllPoints()
+  if G then
+    local alpha = glow:GetAlpha()
+    style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
+    glow:SetAlpha(alpha)
+    glow:Show()
+  else
+    tween:Stop(glow)
+    glow:SetAlpha(0)
+    glow:Hide()
+  end
+
+  self:styleBraid()
+  self:styleRail()
+  for _, button in ipairs(self.headerButtons) do
+    pixel:Size(button, style.HEADER_BUTTON, style.HEADER_BUTTON)
+    self:SetHeaderIcon(button, button.iconKey)
+  end
+  self.menuButton:Style()
+  self:LayoutCloud()
+  self:LayoutHeader()
+end
+
+-- styleRail draws the side rail's strip (Header.Buttons.Rail, next-themes.md §13) down the body's inner side,
+-- its width, in its art, mirrored on a panel whose inner side is on the right; none without a rail or art.
+---@private
+function panelProto:styleRail()
+  local rail, R = self.rail, style.Theme.Header.Buttons.Rail
+  rail:ClearAllPoints()
+  if not (R and R.Fill) then
+    rail:Hide()
+    return
+  end
+  local mirrored = self.side == "LEFT"
+  local side = mirrored and "RIGHT" or "LEFT"
+  local body = self.body
+  -- Outside, its edge against the body's inner edge.
+  local own = side
+  if R.Outside then
+    own = mirrored and "LEFT" or "RIGHT"
+  end
+  -- Its art from Start below the body's top (GW2_UI's side panel runs from its window's top line).
+  rail:SetPoint("TOP" .. own, body, "TOP" .. side, 0, -pixel:Snap(body, R.Start or 0))
+  rail:SetPoint("BOTTOM" .. own, body, "BOTTOM" .. side, 0, 0)
+  pixel:Width(rail, R.Width)
+  style:Paint(rail, R.Fill)
+  if mirrored then
+    local c = R.Fill.TexCoords or { 0, 1, 0, 1 }
+    rail:SetTexCoord(c[2], c[1], c[3], c[4])
+  end
+  rail:Show()
+end
+
+-- titleWidth is how wide the title's text is drawn: its measure, at most the width it is cut short to
+-- (FitTitle). While it shows a secret (a vendor's name in an instance) every measure of it is secret, its width
+-- too (its anchoring is secret: warcraft.wiki.gg Secret Values, "Secret anchors"; reported in game: "attempt to
+-- compare a secret number value" here), so it is the width FitTitle cut it to, else a stand-in.
+---@private
+---@return number
+function panelProto:titleWidth()
+  local title = self.title
+  local width, cut = title:GetStringWidth(), title:GetWidth()
+  if isSecret(width) or isSecret(cut) then
+    local C = style.Cloud
+    return self.titleCut or (C and C.SecretTitleWidth or 0)
+  end
+  if cut > 0 then
+    width = math.min(width, cut)
+  end
+  return width
+end
+
+-- styleGhosts draws the title's colour ghosts (Header.Title.Ghosts: each in its font role, X across and Y up from the
+-- title, at its Alpha): copies of the title in other colours, under it, hung from the body by the title's own numbers
+-- (never from the title, a text: next-pixel-perfect.md §2); the ones a theme no longer lists hide.
+---@private
+function panelProto:styleGhosts()
+  local list = style.Theme.Header.Title.Ghosts or {}
+  self.ghosts = {}
+  for i, spec in ipairs(list) do
+    local ghost = self.ghostPool[i]
+    if ghost == nil then
+      ghost = self.overlay:CreateFontString(nil, "OVERLAY", nil, -1)
+      self.ghostPool[i] = ghost
+    end
+    style:SetFont(ghost, spec.Font)
+    ghost:SetText(self.titleText or "")
+    ghost:SetAlpha(spec.Alpha or 1)
+    ghost:Show()
+    self.ghosts[i] = ghost
+  end
+  for i = #list + 1, #self.ghostPool do
+    self.ghostPool[i]:Hide()
+  end
+  self:fitGhosts()
+  self:PlaceGhosts(nil)
+end
+
+-- PlaceGhosts hangs the title's colour ghosts where the title hangs, each at its X and Y, plus spread[i] across (a
+-- glitch splitting them; none: at rest), with the title's justification.
+---@param spread? number[]
+function panelProto:PlaceGhosts(spread)
+  local list = style.Theme.Header.Title.Ghosts or {}
+  local body, title = self.body, self.title
+  local left = self.side == "LEFT"
+  local inset, top = pixel:Snap(body, self:TitleStart()), pixel:Snap(body, style.TITLE_TOP)
+  for i, ghost in ipairs(self.ghosts) do
+    -- The theme's own list: a glitch can end (at rest) after a theme with fewer ghosts is in use and before this panel
+    -- restyled.
+    local spec = list[i] or {}
+    local x = pixel:Snap(body, spec.X or 0) + pixel:Snap(body, spread and spread[i] or 0)
+    local y = pixel:Snap(body, spec.Y or 0)
+    if left then
+      pixel:Point(ghost, "TOPRIGHT", body, "TOPRIGHT", -inset + x, -top + y)
+    else
+      pixel:Point(ghost, "TOPLEFT", body, "TOPLEFT", inset + x, -top + y)
+    end
+    ghost:SetJustifyH(title:GetJustifyH())
+  end
+end
+
+-- titleShift is how far in from the title's anchor its text starts: half the room it leaves, rounded down, when its
+-- theme centers it (Title.Justify = "CENTER", FitTitle), else none.
+---@private
+---@return number
+function panelProto:titleShift()
+  local cut = self.titleCut
+  if style.Theme.Header.Title.Justify ~= "CENTER" or cut == nil then
+    return 0
+  end
+  local body = self.body
+  return math.max(0, pixel:Floor(body, (cut - pixel:Ceil(body, self:titleWidth())) / 2))
+end
+
+-- placeTitleRow puts what is drawn about the title on whole pixels (docs/next-pixel-perfect.md), from the
+-- body's corner on the title's side by whole-pixel offsets, never from the title text's middle or its far
+-- edge (the client's measure of the text, between pixels): the ribbon's lines out of the window from its
+-- hard edge, the cloud's join where they end, the glow behind the title. The title's middle is its top
+-- plus half its font's height (a whole number of pixels), rounded down.
+function panelProto:placeTitleRow()
+  local H = style.Theme.Header
+  local body, left = self.body, self.side == "LEFT"
+  local corner = left and "TOPRIGHT" or "TOPLEFT"
+  local _, fontHeight = self.title:GetFont()
+  local top = pixel:Snap(body, style.TITLE_TOP)
+  local middle = top + pixel:Floor(body, (fontHeight or 0) / 2)
+  for _, line in ipairs(self.ribbonPool) do
+    local thickness = line:GetHeight()
+    local lineTop = middle - pixel:Snap(body, line.raise or 0) - pixel:Floor(body, thickness / 2)
+    line:ClearAllPoints()
+    if left then
+      line:SetPoint("TOPLEFT", body, "TOPRIGHT", 0, -lineTop)
+    else
+      line:SetPoint("TOPRIGHT", body, "TOPLEFT", 0, -lineTop)
+    end
+  end
+  local join = self.cloud.join
+  local half = pixel:Floor(body, join:GetWidth() / 2)
+  join:ClearAllPoints()
+  join:SetPoint("TOPLEFT", body, corner, -half, -(middle - pixel:Floor(body, join:GetHeight() / 2)))
+  local glow, G = self.titleGlow, H.TitleGlow
+  if G then
+    local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
+    local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
+    local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
+    glow:ClearAllPoints()
+    if left then
+      glow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - gx), -(top - gy))
+    else
+      glow:SetPoint("TOPLEFT", body, "TOPLEFT", inset - gx, -(top - gy))
+    end
+    glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
+  end
+  -- The title's button covers its text, 8 past it across and 6 above and below, hung from the body by the title's
+  -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
+  -- anchored to it, the tooltip the button owns included (warcraft.wiki.gg Secret Values, "Secret anchors").
+  local button = self.titleButton
+  local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
+  button:ClearAllPoints()
+  if left then
+    button:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - 8), -(top - 6))
+  else
+    button:SetPoint("TOPLEFT", body, "TOPLEFT", inset - 8, -(top - 6))
+  end
+  button:SetSize(pixel:Ceil(body, self:titleWidth()) + 16, (fontHeight or 0) + 12)
+end
+
+-- BuildTitleButton makes the title a button (next.md §12): a click chains the bag to its partner,
+-- puts it back, or moves both across, and a right click does what its kind says (OnTitleRightClick);
+-- the pointer over it lights a soft glow behind the title and says what a click does.
+function panelProto:BuildTitleButton()
+  local frame = self.frame
+  local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
+  glow:SetAlpha(0)
+  self.titleGlow = glow
+
+  -- Placed with the title (placeTitleRow).
+  local button = CreateFrame("Button", nil, frame)
+  button:SetFrameLevel(frame:GetFrameLevel() + 55)
+  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  addon.SetScript(button, "OnClick", function(ctx, _, mouse)
+    if mouse == "RightButton" then
+      self:OnTitleRightClick(ctx)
+      return
+    end
+    chain:Click(ctx, self)
+  end)
+  -- Dragging the title moves a small panel, as its title row does.
+  button:RegisterForDrag("LeftButton")
+  addon.SetScript(button, "OnDragStart", function()
+    self:StartMove()
+  end)
+  addon.SetScript(button, "OnDragStop", function()
+    self:StopMove()
+  end)
+  addon.SetScript(button, "OnEnter", function()
+    self:lightTitle(true)
+    GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetText(self.label)
+    GameTooltip:AddLine(chain:Tooltip(self), 1, 1, 1, true)
+    local hint = self:TitleRightClickHint()
+    if hint ~= nil then
+      GameTooltip:AddLine(hint, 0.8, 0.8, 0.8, true)
+    end
+    GameTooltip:Show()
+  end)
+  addon.SetScript(button, "OnLeave", function()
+    self:lightTitle(false)
+    GameTooltip:Hide()
+  end)
+  self.titleButton = button
+end
+
+-- OnTitleRightClick runs a right click on the title: nothing, unless its kind says otherwise (the backpack sorts).
+---@param ctx Context
+function panelProto:OnTitleRightClick(ctx)
+  local _ = ctx
+end
+
+-- TitleRightClickHint says what a right click on the title does, for its tooltip: nil when it does nothing.
+---@return string?
+function panelProto:TitleRightClickHint()
+  return nil
+end
+
+---@private
+---@param on boolean
+function panelProto:lightTitle(on)
+  local glow, G = self.titleGlow, style.Theme.Header.TitleGlow
+  if not G then
+    return
+  end
+  tween:Play(glow, {
+    duration = style.Time.Hover,
+    from = glow:GetAlpha(),
+    to = on and G.Alpha or 0,
+    ease = style:Ease("Hover"),
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+  })
+end
+
+-- BuildBraid makes this bag's half of the braid (next.md §12), hidden until it couples: two strands
+-- of additive gold lines, the lights that run along them, and the knot in the middle of the gap.
+function panelProto:BuildBraid()
+  -- Its own layer above the panel: a coupled bag's grown feather reaches into the other bag's half
+  -- of the gap, and would cover that half if the braid were drawn with the panel's own regions.
+  local frame = CreateFrame("Frame", nil, self.frame)
+  frame:SetAllPoints(self.frame)
+  frame:SetFrameLevel(self.frame:GetFrameLevel() + 40)
+  local braid = { strands = { {}, {} }, linePools = { {}, {} }, beads = {}, beadPool = {}, amount = 0, half = 0,
+    chained = false, phase = 0, time = 0, swell = 0, layer = frame }
+  braid.knot = frame:CreateTexture(nil, "ARTWORK", nil, 3)
+  braid.knot:Hide()
+  self.braid = braid
+end
+
+-- styleBraid draws the braid's parts from the theme (Chain): as many segments per strand and beads as
+-- it says, in its colors and thickness; the ones it no longer uses are hidden.
+---@private
+function panelProto:styleBraid()
+  local C, braid = style.Chain, self.braid
+  for s = 1, 2 do
+    local pool = braid.linePools[s]
+    braid.strands[s] = {}
+    for i = 1, C.Segments do
+      local line = pool[i]
+      if line == nil then
+        line = braid.layer:CreateLine(nil, "ARTWORK", nil, 1)
+        line:SetColorTexture(1, 1, 1, 1)
+        line:Hide()
+        pool[i] = line
+      end
+      line:SetVertexColor(style:RGBA(C.Color))
+      line:SetBlendMode("ADD")
+      line:SetThickness(C.Thickness)
+      braid.strands[s][i] = line
+    end
+    for i = C.Segments + 1, #pool do
+      pool[i]:Hide()
+    end
+  end
+  braid.beads = {}
+  for i = 1, C.Beads do
+    local bead = braid.beadPool[i]
+    if bead == nil then
+      bead = braid.layer:CreateTexture(nil, "ARTWORK", nil, 2)
+      bead:Hide()
+      braid.beadPool[i] = bead
+    end
+    style:Paint(bead, { Texture = "Glow", Color = C.BeadColor, BlendMode = "ADD" })
+    bead:SetSize(C.BeadSize, C.BeadSize)
+    braid.beads[i] = bead
+  end
+  for i = C.Beads + 1, #braid.beadPool do
+    braid.beadPool[i]:Hide()
+  end
+  style:Paint(braid.knot, { Texture = "Glow", Color = C.KnotColor, BlendMode = "ADD" })
+  braid.knot:SetSize(C.KnotSize, C.KnotSize)
+  self:applyBraid()
+end
+
+-- fitRibbon sets the ribbon's length for the braid's state (its base, shortened toward the middle of the gap as the
+-- bags couple: SetCoupling) in whole pixels on the panel's grid (docs/next-pixel-perfect.md): as the bags couple it
+-- shortens a pixel at a time, and on a new grid (a Bag Scale changed while the panel is open, takeScale) it is
+-- worked out again from its base, never a length rounded to the old grid.
+---@private
+function panelProto:fitRibbon()
+  local braid, base = self.braid, self:RibbonBase()
+  self.ribbonLength = pixel:Length(self.frame, base + (math.min(braid.half, base) - base) * braid.amount)
+  for _, line in ipairs(self.ribbonLines) do
+    line:SetWidth(self.ribbonLength)
+  end
+end
+
+-- SetCoupling draws this bag's half of the braid: amount from 0 (straight ribbon, no braid) to 1,
+-- half the gap's width, whether it is the chained bag (which shows the knot), and how far the braid
+-- has turned. Its ribbon reaches the middle of the gap as it couples, its ribbon sparkles stay on its
+-- side, and its inner feather grows toward feather wide (into the gap, past its frame).
+---@param amount number
+---@param half number
+---@param chained boolean
+---@param phase number
+---@param time number
+---@param feather number The inner feather's width when fully coupled.
+function panelProto:SetCoupling(amount, half, chained, phase, time, feather)
+  local braid = self.braid
+  braid.amount, braid.half, braid.chained, braid.phase, braid.time = amount, half, chained, phase, time
+  self:growFeather((feather - style.FEATHER) * amount)
+  self:fitRibbon()
+  self.coupled = amount > 0
+  local S = style.Theme.Sparkles or {}
+  local o, ribbon = self.sparkles.options, S.Ribbon
+  if amount > 0 then
+    -- Ribbon sparkles die before the middle of the gap, so none drifts over the other bag.
+    self.sparkSpread = half * 0.3
+    o.Life = { 1.0, 1.6 }
+    o.Speed = { 3, half * 0.5 / 1.6 }
+  elseif ribbon then
+    self.sparkSpread = self:SparkSpreadBase()
+    o.Life = ribbon.Life
+    o.Speed = ribbon.Speed
+  end
+  local e, edge = self.edgeSparkles.options, S.Edge
+  if amount > 0 and self:IsSmall() then
+    -- Two small bags braided (docs/next-small-mode.md): their gap can be narrow, so the edge
+    -- sparkles die before the middle of it, never over the other bag (born up to 24 out, half the
+    -- gap at least 32: 24 + half * 0.5 stays below the gap).
+    e.Life = { 1.0, 1.6 }
+    e.Speed = { 3, math.max(3, half * 0.5 / 1.6) }
+  elseif edge then
+    e.Life = edge.Life
+    e.Speed = edge.Speed
+  end
+  self:applyBraid()
+end
+
+-- growFeather widens the inner feather by grow pixels past the frame's inner edge, into the gap; it
+-- still starts at the body edge.
+---@private
+---@param grow number
+function panelProto:growFeather(grow)
+  local feather, frame = self.feather, self.frame
+  grow = pixel:Snap(frame, grow)
+  if self.side == "LEFT" then
+    feather:SetPoint("TOPRIGHT", frame, "TOPRIGHT", grow, 0)
+    feather:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", grow, 0)
+  else
+    feather:SetPoint("TOPLEFT", frame, "TOPLEFT", -grow, 0)
+    feather:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", -grow, 0)
+  end
+  feather:SetWidth(pixel:Length(frame, style.FEATHER) + grow)
+end
+
+-- applyBraid lays this bag's half of the braid out. A strand's height above the ribbon at d pixels
+-- from the body edge is the same function of the distance from the middle of the gap on both bags,
+-- so the halves meet: s = (d - half) on the left bag, (half - d) on the right one, turning with the
+-- braid; it swells from nothing at the body to the full amplitude in the middle, and the second
+-- strand mirrors the first, so they cross. The strand in front (by the turn) is brighter.
+---@private
+function panelProto:applyBraid()
+  local braid, C = self.braid, style.Chain
+  local shown = braid.amount > 0 and braid.half > 0 and C.Braid ~= false
+  if not shown then
+    for _, strand in ipairs(braid.strands) do
+      for _, line in ipairs(strand) do
+        line:Hide()
+      end
+    end
+    for _, bead in ipairs(braid.beads) do
+      bead:Hide()
+    end
+    braid.knot:Hide()
+    return
+  end
+  local point, joinX = self:TitleJoin()
+  local out, h, n = self:Outward(), braid.half, C.Segments
+  local amp = C.Amplitude * braid.amount
+  local k = 2 * math.pi / C.Wavelength
+  local function at(d, sign)
+    local s = (d - h) * out
+    return sign * amp * math.sin(math.pi * d / (2 * h)) * math.sin(k * s + braid.phase), s
+  end
+  for strand = 1, 2 do
+    local sign = strand == 1 and 1 or -1
+    for i, line in ipairs(braid.strands[strand]) do
+      local d0, d1 = h * (i - 1) / n, h * i / n
+      local y0 = at(d0, sign)
+      local y1, s1 = at(d1, sign)
+      line:SetStartPoint(point, self.title, joinX + out * d0, y0)
+      line:SetEndPoint(point, self.title, joinX + out * d1, y1)
+      local front = sign * math.cos(k * s1 + braid.phase)
+      line:SetAlpha(C.Alpha * braid.amount * (1 - C.Depth * (1 - front) / 2))
+      line:Show()
+    end
+  end
+  for i, bead in ipairs(braid.beads) do
+    local u = (braid.time / C.BeadTime + (i - 1) / #braid.beads) % 1
+    local d = u * h
+    local y = at(d, i % 2 == 0 and -1 or 1)
+    bead:SetPoint("CENTER", self.title, point, joinX + out * d, y)
+    bead:SetAlpha(math.sin(math.pi * u) * braid.amount)
+    bead:Show()
+  end
+  local knot = braid.knot
+  if braid.chained then
+    knot:SetPoint("CENTER", self.title, point, joinX + out * h, at(h, 1))
+    knot:SetAlpha(C.KnotAlpha * braid.amount * (1 + C.KnotSwell * braid.swell))
+    knot:Show()
+  else
+    knot:Hide()
+  end
+end
+
+-- BurstKnot flashes the knot and bursts sparkles from it, as the pair couples.
+function panelProto:BurstKnot()
+  local braid = self.braid
+  tween:Play(braid.knot, {
+    duration = style.Time.Couple,
+    from = 1,
+    to = 0,
+    onUpdate = function(v)
+      braid.swell = v
+      self:applyBraid()
+    end,
+  })
+  local knot = style.Theme.Sparkles and style.Theme.Sparkles.Knot
+  self.knotSparkles:Burst(knot and knot.Burst or 0)
+end
+
+-- LayoutHeader lines the shown header buttons up from the screen edge, so a hidden one leaves
+-- no gap.
+function panelProto:LayoutHeader()
+  local left = self.side == "LEFT"
+  local body = self.body
+  for _, button in ipairs(self.headerButtons) do
+    local pin = pinnedOf(button)
+    if pin ~= nil then
+      button:ClearAllPoints()
+      local point, x = PIN_CORNERS[pin.Point], pin.X or 0
+      if point == nil then
+        point = pin.Point
+      elseif left then
+        -- Named by its side: drawn for the backpack (inner side on the left), mirrored on a panel on the left of
+        -- the screen, whose inner side is on the right.
+        point, x = MIRRORED_CORNERS[point], -x
+      end
+      pixel:Point(button, point, body, point, x, pin.Y or 0)
+    end
+  end
+  -- With the row in the bag button's menu, its buttons are laid out under the hidden holder, unseen.
+  self:holdRow()
+  if style.Theme.Header.Buttons.Rail then
+    self:layoutRail()
+    self:FitTitle()
+    return
+  end
+  local previous
+  -- Corner to corner, whole pixels apart (docs/next-pixel-perfect.md).
+  for _, button in ipairs(self.headerButtons) do
+    if pinnedOf(button) == nil then
+      button:ClearAllPoints()
+    end
+    if button:IsShown() and pinnedOf(button) == nil then
+      if previous == nil then
+        -- From the outer side: Pad in, or RowStart (past the pinned buttons, headerRoom).
+        local start = style.Theme.Header.Buttons.RowStart or style.PAD
+        if left then
+          pixel:Point(button, "TOPLEFT", body, "TOPLEFT", start, -style.HEADER_BUTTON_TOP)
+        else
+          pixel:Point(button, "TOPRIGHT", body, "TOPRIGHT", -start, -style.HEADER_BUTTON_TOP)
+        end
+      elseif left then
+        pixel:Point(button, "TOPLEFT", previous, "TOPRIGHT", style.HEADER_BUTTON_GAP, 0)
+      else
+        pixel:Point(button, "TOPRIGHT", previous, "TOPLEFT", -style.HEADER_BUTTON_GAP, 0)
+      end
+      previous = button
+    end
+  end
+  self:FitTitle()
+end
+
+-- holdRow puts the header's row under the hidden holder while the theme puts it in the bag button's menu, and back on
+-- the panel's frame after; pinned buttons stay on the panel's frame. A new parent changes a frame's level (Blizzard's
+-- LFDFrame.lua: "Setting a new parent changes the frame level"), so each button gets back the level it had, over the
+-- overlay and a small panel's mover, as Blizzard's FrameUtil.SetParentMaintainRenderLayering puts one back.
+---@private
+function panelProto:holdRow()
+  local inMenu = self:RowInMenu()
+  for _, button in ipairs(self.headerButtons) do
+    local held = inMenu and pinnedOf(button) == nil
+    local parent
+    if held and button:GetParent() ~= self.menuHolder then
+      parent = self.menuHolder
+    elseif not held and button:GetParent() == self.menuHolder then
+      parent = self.frame
+    end
+    if parent ~= nil then
+      local level = button:GetFrameLevel()
+      button:SetParent(parent)
+      button:SetFrameLevel(level)
+    end
+  end
+end
+
+-- layoutRail puts the shown header buttons down the side rail (next-themes.md §13), in order from its top, Top
+-- down and Gap apart, centered across it (inside the body or outside it), each by its corner on the body's inner
+-- side in whole pixels (docs/next-pixel-perfect.md).
+---@private
+function panelProto:layoutRail()
+  local R = style.Theme.Header.Buttons.Rail
+  local body = self.body
+  local corner = self.side == "LEFT" and "TOPRIGHT" or "TOPLEFT"
+  local size = pixel:Length(body, style.HEADER_BUTTON)
+  local width = pixel:Length(body, R.Width)
+  local x = pixel:Floor(body, (width - size) / 2)
+  if R.Outside then
+    x = x - width
+  end
+  if self.side == "LEFT" then
+    x = -x
+  end
+  local y, step = pixel:Snap(body, R.Top), size + pixel:Snap(body, self:RailGap())
+  for _, button in ipairs(self.headerButtons) do
+    if pinnedOf(button) == nil then
+      button:ClearAllPoints()
+      if button:IsShown() then
+        button:SetPoint(corner, body, corner, x, -y)
+        y = y + step
+      end
+    end
+  end
+end
+
+-- measureTitle keeps how wide the title's whole text is, in the panel's units (titleWhole): the room a small panel keeps
+-- for it (MinWidth). Measured as its text or its font is set (SetTitle, styleHeader), never as it is fitted: FitTitle runs
+-- every frame of a resize, and a glitch shows the title's letters corrupted for a moment, which setting its text would end.
+-- A font string keeps the width it was cut to through a new text or font, and measures that: set back to none, its text set
+-- again, it measures its whole text (next-themes-art.md §14); then it takes back the width it had, which FitTitle sets
+-- again. Nil while it shows a secret (a vendor's name in an instance), whose measure is secret too and is never kept.
+---@private
+function panelProto:measureTitle()
+  local title = self.title
+  title:SetWidth(0)
+  title:SetText(self.titleText)
+  local width = title:GetStringWidth()
+  self.titleWhole = not isSecret(width) and width or nil
+  title:SetWidth(self.titleCut or 0)
+end
+
+-- FitTitle keeps the title on one line in the room the shown header buttons leave it, cut short
+-- rather than over them: on every small panel, whose width the player sets (next.md §14g), at
+-- either size on a panel whose title can be any length (fitsTitle: a vendor's name), and on every panel whose
+-- theme centers its title (Title.Justify = "CENTER": in that room). Else the title is as long as it is. Given another
+-- width, the title's cloud is laid out again (LayoutCloud): the client measures a title cut short at the width it is cut
+-- to, so a cloud laid out as a title was set cut short (a bank's tab name, set as it opens, before it is fitted) was too
+-- short for the title once the panel made room for it.
+function panelProto:FitTitle()
+  local title, was = self.title, self.titleCut
+  if not (self.fitsTitle or self:IsSmall() or style.Theme.Header.Title.Justify == "CENTER") then
+    title:SetWordWrap(true)
+    title:SetWidth(0)
+    self.titleCut = nil
+  else
+    title:SetWordWrap(false)
+    -- Kept: the title's own width cannot be read back while it shows a secret (titleWidth), and only a title cut
+    -- short (the vendor's, at both sizes) ever shows one.
+    local room, slack = self:titleEnd()
+    self.titleCut = pixel:Length(title, math.max(1, self:BodyWidth() - self:TitleStart() - room - slack))
+    title:SetWidth(self.titleCut)
+  end
+  self:fitGhosts()
+  self:placeTitleRow()
+  if self.titleCut ~= was then
+    self:LayoutCloud()
+  end
+end
+
+-- fitGhosts gives the title's colour ghosts the width and wrapping FitTitle gave the title: cut short to titleCut, or
+-- as long as it is. Never read back from the title: while it shows a secret (a vendor's name in an instance) its width
+-- is secret too, and SetWidth takes no secret from addon code (SecretArguments = "AllowedWhenUntainted").
+---@private
+function panelProto:fitGhosts()
+  local cut = self.titleCut
+  for _, ghost in ipairs(self.ghosts or {}) do
+    ghost:SetWordWrap(cut == nil)
+    ghost:SetWidth(cut or 0)
+  end
+end
+
+-- BuildSearch takes the panel's search box (the kind's in-bag box, whose query the data phase reads,
+-- searchBox:GetSearchText; the vendor's own) out of the theme's hands and draws it in Next's look,
+-- so it stands out (asked: it was "very difficult to see"): a fill lighter than the panel, a lavender
+-- edge all round that brightens under the pointer and while focused, a lavender magnifier, and the
+-- help text in Next's muted lavender after it, instead of the template's border and 35% gray text.
+function panelProto:BuildSearch()
+  local sf = self:CreateSearchBox()
+  local t = sf.textBox
+  local fill = sf.frame:CreateTexture(nil, "BACKGROUND")
+  fill:SetAllPoints()
+  fill:SetColorTexture(1, 1, 1, 1)
+  self.searchFill = fill
+  self.searchEdges = {}
+  for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+    local edge = sf.frame:CreateTexture(nil, "BORDER")
+    edge:SetColorTexture(1, 1, 1, 1)
+    if side == "TOP" or side == "BOTTOM" then
+      edge:SetPoint(side .. "LEFT", sf.frame, side .. "LEFT", 0, 0)
+      edge:SetPoint(side .. "RIGHT", sf.frame, side .. "RIGHT", 0, 0)
+    else
+      edge:SetPoint("TOP" .. side, sf.frame, "TOP" .. side, 0, 0)
+      edge:SetPoint("BOTTOM" .. side, sf.frame, "BOTTOM" .. side, 0, 0)
+    end
+    table.insert(self.searchEdges, edge)
+  end
+  local help = t.Instructions
+  help:SetJustifyH("LEFT")
+  self.searchBox = sf
+  self:styleSearch()
+
+  -- Hooked after the template's scripts (and the box's own OnTextChanged, which replaced the
+  -- template's: InputBoxInstructions_OnTextChanged hid the help text), so Next's colors win.
+  addon.HookScript(t, "OnEnter", function()
+    self.searchHover = true
+    self:UpdateSearchLook()
+  end)
+  addon.HookScript(t, "OnLeave", function()
+    self.searchHover = false
+    self:UpdateSearchLook()
+  end)
+  addon.HookScript(t, "OnEditFocusGained", function() self:UpdateSearchLook() end)
+  addon.HookScript(t, "OnEditFocusLost", function() self:UpdateSearchLook() end)
+  addon.HookScript(t, "OnTextChanged", function()
+    help:SetShown(t:GetText() == "")
+    self:UpdateSearchLook()
+  end)
+  self:UpdateSearchShown()
+end
+
+-- styleSearch places and draws the search box from the theme (Layout, Search): where it sits, its
+-- border's size (or none), its magnifier, its help text and what is typed in their roles (the
+-- template gives the help text a color of its own, so its role's color is set on it too), then its
+-- look for its state. A theme that keeps the template's look (Search.Template: Blizzard's own bag search box,
+-- InputBoxVisualTemplate's border) draws neither Next's fill nor its edge.
+---@private
+function panelProto:styleSearch()
+  local sf, S = self.searchBox, style.Theme.Search
+  local t = sf.textBox
+  local body = self.body
+  local leftPad, rightPad = self:SidePads()
+  -- In from the body's sides by the theme's Inset (the original bags' box: 20 in, 10 from the right), its inner side's
+  -- on the inner side; else the side pads.
+  local inset = S.Inset
+  if inset then
+    leftPad, rightPad = inset.Left or 0, inset.Right or 0
+    if self.side == "LEFT" then
+      leftPad, rightPad = rightPad, leftPad
+    end
+  end
+  sf.frame:ClearAllPoints()
+  pixel:Point(sf.frame, "TOPLEFT", body, "TOPLEFT", leftPad, -style.SEARCH_TOP)
+  pixel:Point(sf.frame, "TOPRIGHT", body, "TOPRIGHT", -rightPad, -style.SEARCH_TOP)
+  pixel:Height(sf.frame, style.SEARCH_HEIGHT)
+  local template = S.Template == true
+  for _, key in ipairs({ "Left", "Middle", "Right" }) do
+    t[key]:SetAlpha(template and 1 or 0)
+  end
+  self.searchFill:SetShown(not template)
+  local E = not template and S.Edge
+  for i, edge in ipairs(self.searchEdges) do
+    if E then
+      if i <= 2 then
+        pixel:Height(edge, E.Size)
+      else
+        pixel:Width(edge, E.Size)
+      end
+      edge:Show()
+    else
+      edge:Hide()
+    end
+  end
+  self.searchEdgeAlpha = E and E.Idle or 0
+  style:SetTemplateFont(t.Instructions, S.HelpFont)
+  -- A theme may keep the template's own color for its help (HelpColor: InputBoxInstructionsTemplate's 0.35 gray).
+  if S.HelpColor then
+    t.Instructions:SetTextColor(style:RGBA(S.HelpColor))
+  end
+  style:SetFont(t, S.TextFont)
+  self:placeSearch()
+  self:UpdateSearchLook(true)
+end
+
+-- placeSearch lays the search box's insides out on whole pixels (docs/next-pixel-perfect.md), each by its
+-- top left, centered in the box's height by whole pixels (the odd one below): the magnifier, the help
+-- text after it (by its font's height) as wide as the box allows, what is typed from the same place, and
+-- the template's clear button at the far end.
+---@private
+function panelProto:placeSearch()
+  local t = self.searchBox.textBox
+  if style.Theme.Search.Inner then
+    self:placeSearchInner(style.Theme.Search.Inner)
+    return
+  end
+  local height = pixel:Length(t, style.SEARCH_HEIGHT)
+  local gap, iconSize, right = pixel:Lengths(t, style.SEARCH_GAP, style.SEARCH_ICON, style.SEARCH_RIGHT)
+  local icon = t.searchIcon
+  icon:ClearAllPoints()
+  icon:SetPoint("TOPLEFT", t, "TOPLEFT", gap, -pixel:Floor(t, (height - iconSize) / 2))
+  icon:SetSize(iconSize, iconSize)
+  local help = t.Instructions
+  local _, helpHeight = help:GetFont()
+  local helpTop = -pixel:Floor(t, (height - (helpHeight or 0)) / 2)
+  help:ClearAllPoints()
+  pixel:Point(help, "TOPLEFT", t, "TOPLEFT", 2 * gap + iconSize, helpTop)
+  pixel:Point(help, "TOPRIGHT", t, "TOPRIGHT", -right, helpTop)
+  pixel:TextInsets(t, 2 * gap + iconSize, right, 0, 0)
+  local clear = t.clearButton
+  if clear ~= nil then
+    local size = clear:GetHeight()
+    clear:ClearAllPoints()
+    clear:SetPoint("TOPRIGHT", t, "TOPRIGHT", -pixel:Snap(t, 3), -pixel:Floor(t, (height - size) / 2))
+    pixel:Size(clear, clear:GetWidth(), size)
+    if clear.Icon ~= nil then
+      clear.Icon:ClearAllPoints()
+      local iconWidth = pixel:Length(clear, clear.Icon:GetWidth())
+      local box = clear:GetHeight()
+      pixel:Center(clear.Icon, clear, clear:GetWidth(), box, iconWidth, iconWidth)
+    end
+  end
+end
+
+-- placeSearchInner lays the search box's insides out as a theme's Inner says, anchored as SearchBoxTemplate anchors them
+-- (InputBoxTemplates.xml, every client): the magnifier IconSize square by its LEFT, IconX in and IconY from the box's
+-- middle; the help from TextLeft in to TextRight from the right, centered on the box's height, and what is typed in the
+-- same room (TextInsets); the clear button by its RIGHT, ClearRight from the box's.
+---@private
+---@param I table
+function panelProto:placeSearchInner(I)
+  local t = self.searchBox.textBox
+  local icon = t.searchIcon
+  icon:ClearAllPoints()
+  pixel:Size(icon, I.IconSize, I.IconSize)
+  pixel:Point(icon, "LEFT", t, "LEFT", I.IconX or 0, I.IconY or 0)
+  local left, right = pixel:Snap(t, I.TextLeft or 0), pixel:Snap(t, I.TextRight or 0)
+  local help = t.Instructions
+  help:ClearAllPoints()
+  pixel:Point(help, "TOPLEFT", t, "TOPLEFT", left, 0)
+  pixel:Point(help, "BOTTOMRIGHT", t, "BOTTOMRIGHT", -right, 0)
+  help:SetJustifyV("MIDDLE")
+  pixel:TextInsets(t, left, right, 0, 0)
+  local clear = t.clearButton
+  if clear ~= nil then
+    clear:ClearAllPoints()
+    pixel:Point(clear, "RIGHT", t, "RIGHT", -(I.ClearRight or 0), 0)
+  end
+end
+
+-- SearchState is how the search box looks now: "focus" while typed in, "hover" under the pointer,
+-- "active" while it holds a search, else "idle".
+---@return string
+function panelProto:SearchState()
+  local t = self.searchBox.textBox
+  if t:HasFocus() then
+    return "focus"
+  end
+  if self.searchHover then
+    return "hover"
+  end
+  if t:GetText() ~= "" then
+    return "active"
+  end
+  return "idle"
+end
+
+-- UpdateSearchLook draws the search box for its state: the fill and magnifier at once, the edge
+-- fading to its strength (at once with now).
+---@param now? boolean
+function panelProto:UpdateSearchLook(now)
+  local S = style.Theme.Search
+  local state = self:SearchState()
+  local focused = state == "focus"
+  local fill = focused and S.FocusFill or S.Fill
+  -- Under a theme that keeps the template's own border (styleSearch), the fill is not drawn.
+  if S.Template ~= true then
+    if style:IsArt(fill) then
+      style:Paint(self.searchFill, fill)
+    else
+      self.searchFill:SetTexCoord(0, 1, 0, 1)
+      self.searchFill:SetColorTexture(1, 1, 1, 1)
+      self.searchFill:SetVertexColor(style:RGBA(fill))
+    end
+  end
+  -- Holding a search: its ActiveColor when it has one (Blizzard's magnifier is white then, SearchBoxTemplate).
+  local icon, I = self.searchBox.textBox.searchIcon, S.Icon
+  if focused then
+    icon:SetVertexColor(style:RGBA(I.FocusColor))
+  elseif I.ActiveColor and self.searchBox.textBox:GetText() ~= "" then
+    icon:SetVertexColor(style:RGBA(I.ActiveColor))
+  else
+    icon:SetVertexColor(style:RGBA(I.Color, state == "idle" and I.Idle or I.Active))
+  end
+  local E = S.Template ~= true and S.Edge
+  if not E then
+    tween:Stop(self.searchEdges)
+    return
+  end
+  local target = focused and E.Focus or (state == "idle" and E.Idle or E.Hover)
+  local function paint(alpha)
+    self.searchEdgeAlpha = alpha
+    local r, g, b = style:RGBA(E.Color)
+    for _, edge in ipairs(self.searchEdges) do
+      edge:SetVertexColor(r, g, b, alpha)
+    end
+  end
+  if now then
+    tween:Stop(self.searchEdges)
+    paint(target)
+    return
+  end
+  local from = self.searchEdgeAlpha
+  tween:Play(self.searchEdges, {
+    duration = style.Time.Hover,
+    from = 0,
+    to = 1,
+    ease = style:Ease("Hover"),
+    onUpdate = function(t) paint(t >= 1 and target or from + (target - from) * t) end,
+  })
+end
+
+-- CreateSearchBox makes the panel's search box: the kind's in-bag box, out of the theme's hands.
+---@return SearchFrame
+function panelProto:CreateSearchBox()
+  local sf = searchBox:CreateBox(self.kind, self.frame)
+  sonata:UnregisterElement("SearchBox", sf.textBox)
+  return sf
+end
+
+-- UpdateSearchShown shows the search box while in-bag search is on, as the classic bag does.
+function panelProto:UpdateSearchShown()
+  self.searchBox.frame:SetShown(database:GetInBagSearch() and true or false)
+end
+
+-- BuildContent makes the scroll box between the header and the footer and the canvas it holds. It
+-- scrolls with BetterBags Next's own bar (next-settings.md §2), hidden until it is used.
+---@param scrollName string
+function panelProto:BuildContent(scrollName)
+  local scroll = scrollbox:Create(self.frame, scrollName, SCROLL_OPTIONS)
+  self.scroll = scroll
+  self.content = nextContent:Create(scroll.scrollChild)
+  scroll:SetChild(self.content)
+  self.root = drawable:Create(rootProto, { frame = self.frame, bag = self })
+  -- After Blizzard's own handler (ScrollBoxBaseMixin:OnSizeChanged), which moves what it shows as its height changes.
+  addon.HookScript(scroll.scrollBox, "OnSizeChanged", function()
+    self:KeepScroll()
+  end)
+
+  local emptyText = style:CreateText(self.frame, style.Theme.Footer.EmptyFont)
+  emptyText:SetText(L:G("Nothing here yet"))
+  emptyText:Hide()
+  self.emptyText = emptyText
+  self:styleContent()
+end
+
+-- styleContent places the scroll box between the header and what is under it (ContentBottom), and
+-- the empty tab's text, from the theme.
+---@private
+function panelProto:styleContent()
+  local scroll = self.scroll
+  local leftPad, rightPad = self:SidePads()
+  scroll.frame:ClearAllPoints()
+  pixel:Point(scroll.frame, "TOPLEFT", self.body, "TOPLEFT", leftPad, -style.CONTENT_TOP)
+  pixel:Point(scroll.frame, "BOTTOMRIGHT", self.body, "BOTTOMRIGHT", -rightPad, self:ContentBottom())
+  style:SetFont(self.emptyText, style.Theme.Footer.EmptyFont)
+  -- Across the scroll area, centered in it (by the client): anchored by its middle it would sit between
+  -- two pixels on an area an odd number of pixels wide (docs/next-pixel-perfect.md).
+  local empty = self.emptyText
+  empty:ClearAllPoints()
+  pixel:Point(empty, "TOPLEFT", scroll.frame, "TOPLEFT", 0, -style.EMPTY_TOP)
+  pixel:Point(empty, "TOPRIGHT", scroll.frame, "TOPRIGHT", 0, -style.EMPTY_TOP)
+  empty:SetJustifyH("CENTER")
+end
+
+-- CreateMoney returns the money frame the footer shows, or nil for none.
+---@return Money?
+function panelProto:CreateMoney()
+  return nil
+end
+
+-- BuildFooterParts makes what a kind shows in its footer besides its free slots and money (the backpack's
+-- currencies, which take the free slots' place: currency.md), with the footer, before the panel is first laid out.
+function panelProto:BuildFooterParts()
+end
+
+-- BuildFooter puts the free slots on the inner side and the money on the screen-edge side, under
+-- a fading line.
+function panelProto:BuildFooter()
+  local line = self.frame:CreateTexture(nil, "ARTWORK")
+  line:SetColorTexture(1, 1, 1, 1)
+  self.footerLine = line
+  self.freeText = style:CreateText(self.frame, style.Theme.Footer.Font)
+  local m = self:CreateMoney()
+  if m ~= nil then
+    m.frame:SetParent(self.frame)
+    -- The shared money frame (frames/money.lua), this panel's own instance, on whole pixels.
+    if m.copperButton ~= nil then
+      coins:Fit(m)
+    end
+    self.moneyFrame = m
+  end
+  self:BuildFooterParts()
+  self:styleFooter()
+end
+
+-- styleFooter draws the footer from the theme (Footer, Layout): its line fading toward the inner side
+-- (or none), the free slots on the inner side in its role, the money on the screen-edge side.
+---@private
+function panelProto:styleFooter()
+  local body, line, F = self.body, self.footerLine, style.Theme.Footer
+  local left = self.side == "LEFT"
+  local leftPad, rightPad = self:SidePads()
+  line:ClearAllPoints()
+  pixel:Point(line, "BOTTOMLEFT", body, "BOTTOMLEFT", leftPad, style.FOOTER - FOOTER_LINE)
+  pixel:Point(line, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -rightPad, style.FOOTER - FOOTER_LINE)
+  local spec = F.Line
+  if spec and style:IsArt(spec) then
+    -- Art, drawn for the backpack and mirrored on the panels on the other side of the screen.
+    pixel:Height(line, spec.Size or 1)
+    style:Paint(line, spec, spec.Alpha)
+    if left then
+      local c = spec.TexCoords or { 0, 1, 0, 1 }
+      line:SetTexCoord(c[2], c[1], c[3], c[4])
+    end
+    line:Show()
+  elseif spec then
+    pixel:Height(line, spec.Size)
+    line:SetTexCoord(0, 1, 0, 1)
+    line:SetColorTexture(1, 1, 1, 1)
+    local inner, outer = style:CreateColor(spec.Color, spec.Inner), style:CreateColor(spec.Color, spec.Outer)
+    if left then
+      line:SetGradient("HORIZONTAL", inner, outer)
+    else
+      line:SetGradient("HORIZONTAL", outer, inner)
+    end
+    line:Show()
+  else
+    line:Hide()
+  end
+
+  local freeText = self.freeText
+  style:SetFont(freeText, F.Font)
+  freeText:ClearAllPoints()
+  local inset = self:InnerPad() + style.TITLE_INSET
+  if left then
+    pixel:Point(freeText, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -inset, style.FOOTER_TEXT)
+  else
+    pixel:Point(freeText, "BOTTOMLEFT", body, "BOTTOMLEFT", inset, style.FOOTER_TEXT)
+  end
+  local m = self.moneyFrame
+  if m ~= nil then
+    if m.text ~= nil then
+      style:SetFont(m.text, F.MoneyFont)
+    end
+    if m.Place ~= nil then
+      coins:Style(m, F.CoinFont and style:Font(F.CoinFont) or nil)
+      m.Place()
+    end
+    m.frame:ClearAllPoints()
+    if left then
+      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
+    else
+      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
+    end
+  end
+end
+
+-- BuildSparkles makes the three emitters: one out of the title's cloud, one around the title's
+-- ribbon, one along the feathered
+-- edge, both drifting out of the window.
+function panelProto:BuildSparkles()
+  local fx = CreateFrame("Frame", nil, self.frame)
+  fx:SetAllPoints(self.frame)
+  fx:SetFrameLevel(self.frame:GetFrameLevel() + 50)
+  local out = self:Outward()
+  -- Which way is in, across the cloud (the panel's side, which never changes).
+  local _, _, inward = self:TitleJoin()
+  -- From the panel's top left, for its size now: the title's side the join is measured from (its
+  -- left edge on the backpack, its right on the bank), where the ribbon starts, and the body's inner
+  -- edge.
+  local function titleEdge()
+    if self.side == "LEFT" then
+      return self:BodyLeft() + self:BodyWidth() - self:TitleStart()
+    end
+    return self:BodyLeft() + self:TitleStart()
+  end
+  -- Where the ribbon starts, from the panel's top left: the window's hard edge, the title's join read now (a theme
+  -- moves the title: its Pad and inset, a side rail).
+  local function ribbonStart()
+    local _, joinX = self:TitleJoin()
+    return titleEdge() + joinX
+  end
+  local function innerEdge()
+    if self.side == "LEFT" then
+      return self:BodyLeft() + self:BodyWidth()
+    end
+    return self:BodyLeft()
+  end
+  local function titleMiddle()
+    return -(style.TITLE_TOP + 13)
+  end
+  -- Born in the cloud above or below the title, never over it, most of them near the join.
+  self.cloudSparkles = sparkles:Create(fx, {
+    Direction = out,
+    Spawn = function()
+      local span = self:CloudSpan()
+      local y = 14 + math.random() * 14
+      if math.random() < 0.5 then
+        y = -y
+      end
+      return ribbonStart() + inward * span * math.random() ^ 1.7, titleMiddle() + y
+    end,
+  })
+  self.sparkSpread = self:SparkSpreadBase()
+  self.sparkles = sparkles:Create(fx, {
+    Direction = out,
+    Spawn = function()
+      return ribbonStart() + out * math.random() * self.sparkSpread, titleMiddle() + (math.random() * 2 - 1) * 8
+    end,
+  })
+  -- Along the inner feathered edge, chained or not (asked, of an earlier version that stopped them
+  -- while coupled: "let's not do that"). Coupled, they drift into the gap and die before the other
+  -- bag: they travel at most 36 * 4.2 + 24 pixels, the gap is at least 192.
+  self.edgeSparkles = sparkles:Create(fx, {
+    Direction = out,
+    Spawn = function()
+      local edge = style.Theme.Sparkles.Edge
+      return innerEdge() + out * math.random() * (edge and edge.Reach or 0), -math.random() * fx:GetHeight()
+    end,
+  })
+  -- From the knot in the middle of the gap, as the pair couples (BurstKnot).
+  self.knotSparkles = sparkles:Create(fx, {
+    Direction = out,
+    Spawn = function()
+      return ribbonStart() + out * self.braid.half, titleMiddle()
+    end,
+  })
+  self:styleSparkles()
+end
+
+-- The emitters and the theme's Sparkles entry for each.
+local EMITTERS = { cloudSparkles = "Cloud", sparkles = "Ribbon", edgeSparkles = "Edge", knotSparkles = "Knot" }
+
+-- styleSparkles gives each emitter the theme's rate, life, size, speed, rise, wobble, spin and alpha
+-- (the Sparkles entry of its name), or turns it off (none for its name, or no sparkles at all). A
+-- coupled bag's ribbon and edge sparkles keep their shorter lives (SetCoupling).
+---@private
+function panelProto:styleSparkles()
+  local S = style.Theme.Sparkles
+  for field, name in pairs(EMITTERS) do
+    local emitter, spec = self[field], S and S[name]
+    if spec then
+      local o = emitter.options
+      for _, key in ipairs({ "Rate", "Max", "Life", "Size", "Speed", "Rise", "Wobble", "Spin", "Alpha" }) do
+        o[key] = spec[key]
+      end
+      emitter:SetEnabled(true)
+    else
+      emitter:SetEnabled(false)
+    end
+  end
+  if self.coupled then
+    local braid = self.braid
+    self:SetCoupling(braid.amount, braid.half, braid.chained, braid.phase, braid.time,
+      style.FEATHER + (self.feather:GetWidth() - style.FEATHER) / math.max(braid.amount, 1e-6))
+  else
+    self.sparkSpread = self:SparkSpreadBase()
+  end
+end
+
+-- StyleParts draws every part of the panel from the current theme: its body, header, search box,
+-- content, footer, sparkles and tabs.
+function panelProto:StyleParts()
+  -- Its parts are placed in whole pixels of the grid it is drawn on now (docs/next-pixel-perfect.md).
+  self.partsUnit = pixel:Unit(self.frame)
+  self:styleBody()
+  self.mover:SetHeight(math.max(1, style.SEARCH_TOP - 4))
+  self:styleSearch()
+  self:styleHeader()
+  self:styleContent()
+  self:styleFooter()
+  self:styleSparkles()
+  self:styleGrips()
+  self.tabs:ApplyStyle()
+  self.content:ApplyStyle()
+end
+
+-- ApplyStyle restyles the panel for the theme SonataNext applied: every part (StyleParts), its
+-- shape for its size and the theme's sizes (ApplyGeometry), where a chained pair rests, its emitters
+-- running again while it shows, and its content drawn again with the theme's sizes (at once while it
+-- shows, else when it next shows).
+---@param ctx Context
+function panelProto:ApplyStyle(ctx)
+  self:StyleParts()
+  self:ApplyGeometry()
+  chain:Update(ctx)
+  local shown = self.frame:IsShown() and not self.closing
+  if shown then
+    for field in pairs(EMITTERS) do
+      if field ~= "knotSparkles" then
+        self[field]:Start()
+      end
+    end
+    if not tween:IsPlaying(self.spark) then
+      self:playShimmer()
+    end
+    -- Bursts by this theme's Panel.Glitch (none without one).
+    self:scheduleBurst()
+  end
+  if self.lastSlotInfo ~= nil then
+    self:Draw(ctx, self.lastSlotInfo)
+  end
+end
+
+-- ApplyScales sizes the panel for the Size tab's scales (docs/next-appearance-size.md): its content is drawn
+-- again at the item buttons' size (at once while it shows, else when it next shows), so each row fits as
+-- many as its width allows. A small panel takes its Bag Scale as it is refitted to the screen (FitSmall):
+-- the chain refits every open one after this (chain:ScalesChanged), and a closed one refits as it opens.
+---@param ctx Context
+function panelProto:ApplyScales(ctx)
+  if self.lastSlotInfo ~= nil then
+    self:Draw(ctx, self.lastSlotInfo)
+  end
+end
+
+-- BuildTabs makes the tab rail down the body's inner edge and lists the kind's tabs.
+function panelProto:BuildTabs()
+  self.tabs = nextTabs:Create(self.body, self.side)
+  self.tabs:SetClickHandler(function(ctx, id, button)
+    self:OnTabClicked(ctx, id, button)
+  end)
+  self.tabs:SetDragHandler(function(ctx, id)
+    self:OnTabDragged(ctx, id)
+  end)
+  self.tabs:SetReorderHandler(function(ctx, ids)
+    self:OnTabsReordered(ctx, ids)
+  end)
+  -- Chained, the gap between the bags follows their tabs' widths (next.md §12); autosized, its height follows the rail's
+  -- (FollowHeight, a frame on: the rail is shown after its tabs are set).
+  self.tabs:SetResizeHandler(function(ctx)
+    chain:Update(ctx)
+    self:FollowHeight(true)
+  end)
+  self:RefreshTabs()
+end
+
+-- RefreshTabs lists the kind's tabs.
+function panelProto:RefreshTabs()
+end
+
+-- TabOrderKey names the rail the order of the tabs shown is saved under (database:GetNextTabOrder), nil
+-- when they keep the order they come in.
+---@return string?
+function panelProto:TabOrderKey()
+  return nil
+end
+
+-- OrderedTabs returns the panel's tabs in the order the player moved them to (NextTabs:Ordered, under
+-- TabOrderKey).
+---@param entries NextTabEntry[]
+---@return NextTabEntry[]
+function panelProto:OrderedTabs(entries)
+  local key = self:TabOrderKey()
+  return nextTabs:Ordered(entries, key and database:GetNextTabOrder(key) or nil)
+end
+
+-- OnTabsReordered saves the order a tab was moved to (asked: "make sure it saves"; docs/next-batch-2.md
+-- §5) and lists the tabs again in it.
+---@param ctx Context
+---@param ids number[]
+function panelProto:OnTabsReordered(ctx, ids)
+  local _ = ctx
+  local key = self:TabOrderKey()
+  if key == nil then
+    return
+  end
+  database:SetNextTabOrder(key, ids)
+  self:RefreshTabs()
+end
+
+-- OnTabClicked runs a click on a tab.
+---@param ctx Context
+---@param id number
+---@param button string
+function panelProto:OnTabClicked(ctx, id, button)
+  local _, _, _ = ctx, id, button
+end
+
+-- OnTabDragged runs a drag from, or a drop on, a draggable tab.
+---@param ctx Context
+---@param id number
+function panelProto:OnTabDragged(ctx, id)
+  local _, _ = ctx, id
+end
+
+---@return number
+function panelProto:GetCurrentTabID()
+  if database:GetGroupsEnabled(self.kind) then
+    return database:GetActiveGroup(self.kind) or 1
+  end
+  return 1
+end
+
+-- Watch wires the panel to the rest of the addon: its show and hide, cooldowns (for a kind that
+-- watches them), drops, the in-bag search setting, and the kind's own events (WatchKind).
+function panelProto:Watch()
+  local frame = self.frame
+  addon.SetScript(frame, "OnShow", function(ctx)
+    self:OnCooldown(ctx)
+    -- Shown again by a parent that hid it (Alt+Z hides UIParent), its OnHide having stopped what moves (OnHidden):
+    -- started again. A panel opening starts them itself (Show).
+    if self.hiddenByParent then
+      -- A slide its OnHide stopped part-way left a small panel off its place, faded: back on it (what follows its names
+      -- waits for a panel off its place, Settled).
+      if self:IsSmall() and not tween:IsPlaying(self) and self.offset ~= 0 then
+        self:setOffset(0)
+      end
+      self:startEffects()
+      self:scheduleBurst()
+    end
+    self:OnFrameShown(ctx)
+  end)
+  addon.SetScript(frame, "OnHide", function(ctx)
+    self:OnHidden(ctx)
+  end)
+  addon.SetScript(frame, "OnSizeChanged", function()
+    self:Resized()
+  end)
+  addon.SetScript(frame, "OnReceiveDrag", function()
+    self:PlaceCursorItem()
+  end)
+  addon.SetScript(frame, "OnMouseUp", function(_, _, button)
+    if button == "LeftButton" then
+      self:PlaceCursorItem()
+    end
+  end)
+  if self.watchesCooldowns then
+    events:BucketEvent("BAG_UPDATE_COOLDOWN", function(ctx)
+      self:OnCooldown(ctx)
+    end, function()
+      return self:IsShown()
+    end)
+  end
+  events:RegisterMessage("next/SectionColumnsChanged", function(_, kind)
+    if kind == self.kind then
+      self.content:Invalidate()
+    end
+  end)
+  events:RegisterMessage("bags/SortSettled", function(_, kind)
+    if kind == self.kind then
+      self.content:ReleaseWidths()
+    end
+  end)
+  events:RegisterMessage("search/SetInFrame", function(ctx)
+    self:UpdateSearchShown()
+    events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true, categoriesUnchanged = true })
+  end)
+  self:WatchKind()
+end
+
+-- WatchKind registers the kind's own events and messages.
+function panelProto:WatchKind()
+end
+
+-- startEffects starts what moves while the panel shows: its sparkles, ornaments, rain, snow, threads, bats, glass and
+-- shimmer.
+---@private
+function panelProto:startEffects()
+  self.sparkles:Start()
+  self.edgeSparkles:Start()
+  self.cloudSparkles:Start()
+  self.ornaments:Start()
+  self.rain:Start()
+  self.snow:Start()
+  self.threads:Start()
+  self.bats:Start()
+  self.glass:Start()
+  self:playShimmer()
+end
+
+-- OnFrameShown runs whenever the panel's frame shows, every way it does (its OnShow): what a kind draws only while it
+-- shows (the backpack's currencies, currency.md).
+---@param ctx Context
+function panelProto:OnFrameShown(ctx)
+  local _ = ctx
+end
+
+-- playShimmer glides the spark in along the ribbon from its far end, easing to rest where the
+-- ribbon ends at the window's edge, then lets it grow and fade there while the cloud swells and
+-- settles, every ShimmerEvery seconds. Everything eases in and out: nothing jumps.
+---@private
+function panelProto:playShimmer()
+  local spark, S = self.spark, style.Theme.Header.Spark
+  if not S then
+    return
+  end
+  local out = self:Outward()
+  local inner = self.side == "LEFT" and "LEFT" or "RIGHT"
+  local size = S.Size
+  tween:Play(spark, {
+    duration = style.Time.Shimmer,
+    delay = math.max(0, style.Time.ShimmerEvery - style.Time.Shimmer - style.Time.Absorb),
+    from = 0,
+    to = 1,
+    ease = "linear",
+    onUpdate = function(t)
+      local p = tween.Ease.inOutSine(t)
+      spark:ClearAllPoints()
+      spark:SetPoint("CENTER", self.ribbon, inner, out * (1 - p) * self.ribbonLength, 0)
+      spark:SetSize(size, size)
+      spark:SetAlpha(math.sin(math.pi * t / 2))
+      self:SetCloudSwell(t > 0.6 and ((t - 0.6) / 0.4) ^ 2 or 0)
+    end,
+    onDone = function()
+      tween:Play(spark, {
+        duration = style.Time.Absorb,
+        from = 0,
+        to = 1,
+        ease = "linear",
+        onUpdate = function(t)
+          local grown = size + S.Growth * (1 - (1 - t) ^ 2)
+          spark:SetSize(grown, grown)
+          spark:SetAlpha((1 - t) ^ 1.5)
+          self:SetCloudSwell((1 - t) ^ 2)
+        end,
+        onDone = function()
+          if self.frame:IsShown() and not self.closing then
+            self:playShimmer()
+          end
+        end,
+      })
+    end,
+  })
+end
+
+-- OnShowing runs as the panel starts to open, before it draws.
+---@param ctx Context
+function panelProto:OnShowing(ctx)
+  local _ = ctx
+end
+
+-- Show slides the panel in from its edge, drawing a draw it kept while hidden (with slotInfo when
+-- given), fading its sections in and starting its sparkles. It returns whether it drew. onShown
+-- runs once the panel has slid into place: at once when it is open, when a slide still playing
+-- ends, never for a slide closing or Escape cut short. A bank open loads the bank then
+-- (refresh-scheduler.md §11).
+---@param ctx Context
+---@param slotInfo? SlotInfo
+---@param onShown? fun()
+---@return boolean drew
+function panelProto:Show(ctx, slotInfo, onShown)
+  if self.frame:IsShown() and not self.closing then
+    if onShown ~= nil then
+      if self.onShown ~= nil then
+        table.insert(self.onShown, onShown)
+      else
+        onShown()
+      end
+    end
+    return false
+  end
+  self.onShown = { onShown }
+  local sliding = self.frame:IsShown()
+  self.closing = false
+  self.released = nil
+  self.waiting = false
+  PlaySound(self.openSound)
+  self:OnShowing(ctx)
+  self.frame:Show()
+  local drew = false
+  if self.drawPendingOnShow then
+    self.drawPendingOnShow = false
+    local data = slotInfo or self.lastSlotInfo
+    if data then
+      self.opening = true
+      self:Draw(ctx, data, function() end)
+      self.opening = false
+      drew = true
+    end
+  end
+  -- Where it comes in from and rests (next.md §12): opened again as it slid out, from where it is;
+  -- beside its open anchor, after the anchor, from beyond the anchor's edge; chained to a backpack
+  -- about to open, out of sight until it does; else at its own edge, from its edge.
+  local to = self:RestOffset()
+  if self:IsSmall() then
+    -- Where it was left (docs/next-small-mode.md), sliding a short way in from its edge side as it
+    -- fades in; opened again as it slid out, from where it is. Fitted either way: what it shows may have
+    -- changed as it slid out (FitSmall keeps its offset, so its slide goes on from where it is).
+    self.target = 0
+    self:FitSmall()
+    self:moveIn(sliding and self.offset or self:HiddenOffset(), 0, style.Time.Open, style:Ease("SmallOpen"), 0)
+  elseif sliding then
+    self.target = to
+    self:SetDocked(to == 0)
+    if to == 0 then
+      self:moveIn(self.offset, 0, style.Time.Open, style:Ease("Open"), 0)
+    else
+      self:moveIn(self.offset, to, style.Time.Enter, style:Ease("Enter"), 0)
+    end
+  elseif chain:AnchorOf(self) ~= nil then
+    self:Enter(to, chain:EntranceDelay(self))
+  elseif chain:WaitsForAnchor(self) then
+    self:WaitForAnchor()
+  else
+    self.target = 0
+    self:SetDocked(true)
+    self:moveIn(self:HiddenOffset(), 0, style.Time.Open, style:Ease("Open"), 0)
+  end
+  self:startEffects()
+  self.menuButton:Paint()
+  addon.TriggerItemContextChanged()
+  chain:Update(ctx)
+  return drew
+end
+
+-- OnSlidOut runs when the panel has slid off the screen and hidden.
+---@param ctx Context
+function panelProto:OnSlidOut(ctx)
+  local _ = ctx
+end
+
+-- Hide slides the panel out to its edge, then hides it.
+---@param ctx Context
+function panelProto:Hide(ctx)
+  if not self.frame:IsShown() or self.closing then
+    return
+  end
+  addon.ForceHideBlizzardBags()
+  PlaySound(self.closeSound)
+  self.closing = true
+  -- A bag that hangs from it only while it is open stays where it stands, saved once for this close.
+  chain:Released(self)
+  self.released = true
+  -- Beside its anchor, it leaves through the anchor's edge, beneath the anchor (next.md §12); else
+  -- through its own. Out of sight beyond the far edge, it leaves through its own without crossing
+  -- the screen.
+  local to = chain:ExitOffset(self)
+  local anchor = chain:ShownAnchorOf(self)
+  if to ~= self:HiddenOffset() and anchor ~= nil then
+    self.frame:SetFrameLevel(math.max(1, anchor.frame:GetFrameLevel() - 100))
+  end
+  self.target = to
+  local from = self.offset
+  if self:BeyondFarEdge() and to == self:HiddenOffset() then
+    from = to
+  end
+  self.waiting = false
+  self:stopBursts()
+  chain:Update(ctx)
+  local function slidOut()
+    self.closing = false
+    self.frame:Hide()
+    -- What OnHidden does too, for a hide whose OnHide does not run: back at its own level, and the
+    -- bag the chain held for it (chain:Holds) placed again.
+    self.frame:SetFrameLevel(PANEL_LEVEL)
+    chain:Update(ctx)
+    addon.TriggerItemContextChanged()
+    self:OnSlidOut(ctx)
+  end
+  if glitch:Closes() then
+    -- Where it is (the glitch's place: no sliding through an edge).
+    self:glitchOut(self.offset, to, slidOut)
+    return
+  end
+  if shatter:Closes() then
+    local C = shatter:Spec().Close
+    self.threads:Unravel((C.Frost or 0) + (C.Crack or 0))
+    -- Where it is: it breaks where it stands, from the pointer when it is over the body.
+    self:shatterOut(self.offset, to, slidOut)
+    return
+  end
+  if nextBats:Closes() then
+    self.threads:Unravel(nextBats:Spec().Close.Shudder or 0)
+    -- Where it is: it turns into bats where it stands.
+    self:batsOut(self.offset, to, slidOut)
+    return
+  end
+  if nextBeam:Closes() then
+    self.threads:Unravel(nextBeam:CloseTime())
+    -- Where it is: it beams up where it stands.
+    self:beamOut(self.offset, to, slidOut)
+    return
+  end
+  if nextPaper:Closes() then
+    self.threads:Unravel(nextPaper:GrabTime())
+    -- Where it is: it is crumpled up where it stands.
+    self:paperOut(self.offset, to, slidOut)
+    return
+  end
+  if nextSheen:Closes() then
+    self.threads:Unravel(nextSheen:CloseTime())
+    -- Where it is: it fades out where it stands.
+    self:sheenOut(self.offset, to, slidOut)
+    return
+  end
+  self.threads:Unravel(style.Time.Close)
+  tween:Play(self, {
+    duration = style.Time.Close,
+    from = from,
+    to = to,
+    ease = style:Ease(self:IsSmall() and "SmallClose" or "Close"),
+    onUpdate = function(x)
+      self:setOffset(x)
+    end,
+    onDone = slidOut,
+  })
+end
+
+---@param ctx Context
+function panelProto:Toggle(ctx)
+  if self:IsShown() and not self.closing then
+    self:Hide(ctx)
+  else
+    self:Show(ctx)
+  end
+end
+
+---@return boolean
+function panelProto:IsShown()
+  return self.frame:IsShown()
+end
+
+-- IsClosing says the panel is sliding out: closed, though its frame still shows.
+---@return boolean
+function panelProto:IsClosing()
+  return self.closing
+end
+
+---@return string
+function panelProto:GetName()
+  return self.frame:GetName()
+end
+
+---@param text string
+function panelProto:SetTitle(text)
+  -- Kept (a secret, a vendor's name in a dungeon, may be kept and shown, never read): a glitch shows the title's letters
+  -- corrupted for a moment and puts it back (ShowTitle).
+  self.titleText = text
+  self:ShowTitle(text)
+  self:measureTitle()
+  self:FitTitle()
+  self:LayoutCloud()
+  self:FollowNames(true)
+end
+
+-- ShowTitle shows text as the title, and on its colour ghosts (Header.Title.Ghosts), without laying anything out: a
+-- glitch's corrupted letters, then the title again.
+---@param text string
+function panelProto:ShowTitle(text)
+  self.title:SetText(text)
+  for _, ghost in ipairs(self.ghosts or {}) do
+    ghost:SetText(text)
+  end
+end
+
+-- OnHidden runs on every way the panel hides (the slide's end, Escape hiding it at once): a drag from it
+-- ends, what waits in its dock or came from it goes back (NextDock), the slide, the sparkles and the
+-- spark stop, and OnClosed runs.
+---@param ctx Context
+function panelProto:OnHidden(ctx)
+  -- Its own flag still set: a parent hid it, and shows it again with it (its OnShow).
+  self.hiddenByParent = self.frame:IsShown()
+  nextDrag:PanelHidden(self)
+  nextDock:PanelHidden(self)
+  self:StopMove()
+  self:StopSizing()
+  self:endSizeGlide()
+  -- Hidden at once (Escape), a bag that hangs from it only while it is open stays where it stands, as Hide has it. Not again at
+  -- the end of Hide's slide, which hides it too: in the slide's 0.24 s its top can move (a glide the close cut short ends where it
+  -- was going), another companion open and the backpack go beside it, or the backpack be dropped, and the place the close saved
+  -- stands. Nor for a parent hiding it (Alt+Z), which closes nothing.
+  if not self.released and not self.hiddenByParent then
+    chain:Released(self)
+  end
+  -- Every close reaches here once: its slide's end, Escape part way through it, or a parent's hide cutting it short, which
+  -- leaves it open with no Show to clear the mark.
+  self.released = nil
+  self.closing = false
+  self:stopBursts()
+  tween:Stop(self)
+  tween:Stop(self.spark)
+  self.spark:SetAlpha(0)
+  self.spark:SetSize(sparkSize(), sparkSize())
+  self:SetCloudSwell(0)
+  self.sparkles:Stop()
+  self.edgeSparkles:Stop()
+  self.cloudSparkles:Stop()
+  self.knotSparkles:Stop()
+  self.ornaments:Stop()
+  self.rain:Stop()
+  self.snow:Stop()
+  self.threads:Stop()
+  self.bats:Stop()
+  self.glass:Stop()
+  self.waiting = false
+  self.frame:SetFrameLevel(PANEL_LEVEL)
+  chain:Update(ctx)
+  self:OnClosed(ctx)
+end
+
+-- OnClosed expires Recent Items, and refreshes once when any expired or gaps are held, while the
+-- panel is hidden (recent-items.md §3). A hide while the panel is still shown (a parent hid) does
+-- nothing.
+---@param ctx Context
+function panelProto:OnClosed(ctx)
+  if self.frame:IsShown() then
+    return
+  end
+  local expired = items:ExpireRecentItems(self.kind)
+  if expired or self.drawOnClose then
+    self.drawOnClose = false
+    self:Refresh(ctx)
+  end
+end
+
+-- Deactivate switches the panel off with BetterBags Next (next.md §11): it hides at once (its
+-- OnHide still runs its close work) and lets go of every button it drew.
+---@param ctx Context
+function panelProto:Deactivate(ctx)
+  if self.frame:IsShown() then
+    self.frame:Hide()
+  end
+  self:Wipe(ctx)
+end
+
+-- Activate catches the panel up when BetterBags Next is switched back on: what its handlers would
+-- have done while they were off (the search box's setting, the tabs, the money).
+---@param ctx Context
+function panelProto:Activate(ctx)
+  local _ = ctx
+  self:UpdateSearchShown()
+  self:RefreshTabs()
+  if self.moneyFrame then
+    self.moneyFrame:Update()
+  end
+end
+
+-- Refresh recalculates the kind's bag from what was last read.
+---@param ctx Context
+function panelProto:Refresh(ctx)
+  local _ = ctx
+end
+
+-- Draw binds the active tab's data and lays it out, claiming the buttons it draws and releasing
+-- the ones the last draw drew that this one did not. A draw while hidden waits for Show.
+---@param ctx Context
+---@param slotInfo SlotInfo
+---@param callback? fun()
+function panelProto:Draw(ctx, slotInfo, callback)
+  if not self.frame:IsShown() then
+    self.lastSlotInfo = slotInfo
+    self.drawPendingOnShow = true
+    if callback then
+      callback()
+    end
+    return
+  end
+  if self.claims then
+    for item in pairs(self.claims) do
+      self.drawnButtons[item] = true
+    end
+  end
+  local claims = {}
+  self.claims = claims
+  self.content:Bind(ctx, slotInfo, self:GetCurrentTabID(), claims)
+  for item in pairs(self.drawnButtons) do
+    if not claims[item] then
+      item:Release(ctx)
+    end
+  end
+  self.drawnButtons = claims
+  self.claims = nil
+  self.lastSlotInfo = slotInfo
+  -- Before it is laid out: how narrow a small panel goes keeps room for its footer's text (MinWidth), and it follows what it
+  -- shows first (FollowNames).
+  local free = format(L:G("%d free slots"), self.content.freeTotal)
+  local tab = slotInfo.tabs and slotInfo.tabs[self:GetCurrentTabID()]
+  local hidden = tab and tab.hiddenItems or 0
+  self.freeText:SetText(hidden > 0 and (free .. " · " .. format(L:G("%d hidden"), hidden)) or free)
+  self:FollowNames()
+  render:RenderNow(self.root, { ctx = ctx })
+  -- After the render, which styles what it lays out (the item fitter, vendor cards) and Masque skins
+  -- (texture-sharpening.md).
+  texels:Unsharpen(self.frame)
+  -- Data that was never read (the bank before its first read after it opens) has no tabs.
+  self.emptyText:SetText(slotInfo.tabs == nil and L:G("Loading...") or L:G("Nothing here yet"))
+  self.emptyText:SetShown(#self.content.order == 0)
+  if not self.opening then
+    self.content:Cascade(self.tabChanged)
+  end
+  self.tabChanged = false
+  if callback then
+    callback()
+  end
+end
+
+---@param ctx Context
+---@param results table<string, boolean>
+function panelProto:Search(ctx, results)
+  for slotkey, button in pairs(self.content.buttons) do
+    if not button.isFreeSlot then
+      button:UpdateSearch(ctx, results[slotkey])
+    end
+  end
+end
+
+---@param ctx Context
+function panelProto:ResetSearch(ctx)
+  for _, button in pairs(self.content.buttons) do
+    if not button.isFreeSlot then
+      button:UpdateSearch(ctx, true)
+    end
+  end
+end
+
+-- ToggleSearch opens the panel and puts the cursor in its search box, or lets go of the box.
+---@param ctx Context
+function panelProto:ToggleSearch(ctx)
+  local textBox = self.searchBox.textBox
+  if self:IsShown() and not self.closing and textBox:HasFocus() then
+    textBox:ClearFocus()
+    return
+  end
+  self:Show(ctx)
+  if self.searchBox.frame:IsShown() then
+    textBox:SetFocus()
+  end
+end
+
+-- OnCooldown refreshes the cooldown of every item button it shows, and returns how many it
+-- checked and how many it applied Blizzard's update to.
+---@param ctx Context
+---@return number checked, number applied
+function panelProto:OnCooldown(ctx)
+  if not self.watchesCooldowns or not self:IsShown() then
+    return 0, 0
+  end
+  local checked, applied = 0, 0
+  for _, button in pairs(self.content.buttons) do
+    local data = not button.isFreeSlot and button:GetItemData() or nil
+    if data then
+      checked = checked + 1
+      local reason = button:UpdateCooldown(ctx, data, true)
+      if reason ~= "unchanged" and reason ~= "empty" then
+        applied = applied + 1
+      end
+    end
+  end
+  return checked, applied
+end
+
+---@param ctx Context
+function panelProto:Sort(ctx)
+  local _ = ctx
+end
+
+-- PlaceCursorItem puts the item on the cursor into a free slot of the kind's bags (the bank's
+-- active bank type).
+---@return string result What CursorPlacement:PlaceCursorItem did.
+function panelProto:PlaceCursorItem()
+  return cursorPlacement:PlaceCursorItem(self.kind, self.bankTab)
+end
+
+-- Wipe tears the drawing down: every section and every button drawn is released.
+---@param ctx Context
+function panelProto:Wipe(ctx)
+  self.content:Release()
+  for _, drawn in ipairs({ self.drawnButtons, self.claims or {} }) do
+    for item in pairs(drawn) do
+      item:Release(ctx)
+    end
+  end
+  self.drawnButtons = {}
+  self.claims = nil
+end

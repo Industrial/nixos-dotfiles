@@ -35,9 +35,6 @@ local searchBox = addon:GetModule("SearchBox")
 ---@class Currency: AceModule
 local currency = addon:GetModule("Currency")
 
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule("ThemeConfig")
-
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule("MoneyFrame")
 
@@ -61,8 +58,12 @@ local contextMenu = addon:GetModule("ContextMenu")
 ---@class BackpackBehaviorProto
 ---@field bag Bag Reference to the parent bag
 backpack.proto = {}
+addon:GetModule('Perf'):RegisterPrototype(backpack.proto, 'Backpack')
 
-function backpack.proto:OnShow(ctx)
+-- OnShow shows the backpack's window; onShown runs once the window has finished showing.
+---@param ctx Context
+---@param onShown? fun()
+function backpack.proto:OnShow(ctx, onShown)
 	PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)
 
 	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
@@ -73,45 +74,18 @@ function backpack.proto:OnShow(ctx)
 		end
 	end
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeInGroup:Play()
-	else
-		self.bag.frame:Show()
-	end
-
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	self.bag.window:Show(ctx, onShown)
+	addon.TriggerItemContextChanged()
 end
 
 ---@param ctx Context
 function backpack.proto:OnHide(ctx)
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		-- Set up callback to handle post-hide logic
-		self.bag.fadeOutGroup.callback = function()
-			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-			if self.bag.drawOnClose then
-				debug:Log("draw", "Drawing bag on close")
-				self.bag.drawOnClose = false
-				self.bag:Refresh(ctx)
-			end
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-		end
-		self.bag.fadeOutGroup:Play()
-	else
-		self.bag.frame:Hide()
+	self.bag.window:Hide(ctx, function()
 		if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-		if self.bag.drawOnClose then
-			debug:Log("draw", "Drawing bag on close")
-			self.bag.drawOnClose = false
-			self.bag:Refresh(ctx)
-		end
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-	end
+		addon.TriggerItemContextChanged()
+	end)
 end
 
 ---@param ctx Context
@@ -121,17 +95,11 @@ function backpack.proto:OnCreate(ctx)
 
 	-- Bag slots panel
 	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK, self.bag.frame)
-	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
-	slots.frame:SetParent(self.bag.frame)
-	slots.frame:Hide()
 	self.bag.slots = slots
 
 	-- Currency icon grid (bottom of backpack)
-	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame)
+	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame, self.bag.bottomBar)
 
-	-- Theme config
-	self.bag.themeConfigFrame = themeConfig:Create(self.bag.sideAnchor)
-	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
 
 	-- Group tabs
 	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)
@@ -157,7 +125,7 @@ end
 
 ---@param ctx Context
 function backpack.proto:OnRefresh(ctx)
-	events:SendMessage(ctx, "bags/RefreshBackpack")
+	events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
 end
 
 ---@return FrameStrata
@@ -224,6 +192,13 @@ function backpack.proto:RegisterEvents()
 			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
+end
+
+-- Resync catches up on what RegisterEvents' handlers would have done while the classic design was
+-- switched off (next.md §11): the groups, listed as tabs.
+---@param ctx Context
+function backpack.proto:Resync(ctx)
+	self:GenerateGroupTabs(ctx)
 end
 
 ---@return boolean
@@ -338,13 +313,10 @@ end
 -- SetupPlusTabTooltip adds a tooltip to the "+" tab.
 ---@param ctx Context
 function backpack.proto:SetupPlusTabTooltip(ctx)
-	---@class Themes: AceModule
-	local themes = addon:GetModule("Themes")
-
 	-- Find the tab by ID
 	for _, tab in pairs(self.bag.tabs.tabIndex) do
 		if tab.id == NEW_GROUP_TAB_ID then
-			local decoration = themes:GetTabButton(ctx, tab)
+			local decoration = tabs:GetDecoration(ctx, tab)
 			decoration:SetScript("OnEnter", function(f)
 				GameTooltip:SetOwner(f, "ANCHOR_TOP")
 				GameTooltip:SetText(L:G("New Group..."), 1, 1, 1, 1, true)
@@ -377,7 +349,7 @@ function backpack.proto:SwitchToGroup(ctx, groupID)
 	self.bag.currentItemCount = -1
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
 	self.bag:Draw(ctx, slotInfo, function() end)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 end
 
 -- ShowCreateGroupDialog shows a dialog to create a new group.

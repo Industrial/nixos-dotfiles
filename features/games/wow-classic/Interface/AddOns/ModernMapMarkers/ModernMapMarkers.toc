@@ -1,0 +1,27 @@
+## Interface: 16001
+## Title: |cff7fff7fM|cffffffffodern |cff7fff7fM|cffffffffap |cff7fff7fM|cffffffffarkers
+## Notes: Shows dungeon, raid, world boss, boat, zeppelin, skyship, tram & portal locations on the world map. (WoW: Forever port)
+## Author: Drakensangs (Ported by Zae)
+## Version: 0.74
+## Category: Map
+## Category-deDE: Karte
+## Category-esES: Mapa
+## Category-esMX: Mapa
+## Category-frFR: Carte
+## Category-itIT: Mappa
+## Category-koKR: 지도
+## Category-ptBR: Mapa
+## Category-ruRU: Карта
+## Category-zhCN: 地图
+## Category-zhTW: 地圖
+## IconTexture: Interface\AddOns\ModernMapMarkers\textures\dungeon
+## SavedVariablesPerCharacter: ModernMapMarkersDB
+## X-WoWI-ID: 27222
+## X-WoWI-Type: Retail
+## X-Wago-ID: aNervn62
+## OptionalDeps: HiddenMaps, ForeverDungeonJournal
+
+MarkerData.lua
+ModernMapMarkers_Dungeons.lua
+ModernMapMarkers.lua
+ModernMapMarkers_UI.lua

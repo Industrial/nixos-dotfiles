@@ -2,6 +2,10 @@ Auctionator.Groups.CallbackRegistry = CreateFromMixins(CallbackRegistryMixin)
 Auctionator.Groups.CallbackRegistry:OnLoad()
 Auctionator.Groups.CallbackRegistry:GenerateCallbackEvents(Auctionator.Groups.Constants.Events)
 
+local function FilterDeadItems(group)
+  return tFilter(group, function(itemLink) return C_Item.GetItemInfoInstant(itemLink) ~= nil or itemLink:match("battlepet:") end, true)
+end
+
 function Auctionator.Groups.Initialize()
   if AUCTIONATOR_SELLING_GROUPS == nil then
     AUCTIONATOR_SELLING_GROUPS = {
@@ -22,6 +26,8 @@ function Auctionator.Groups.Initialize()
     AUCTIONATOR_SELLING_GROUPS.CustomSections = nil
   end
 
+  AUCTIONATOR_SELLING_GROUPS.HiddenItems = FilterDeadItems(AUCTIONATOR_SELLING_GROUPS.HiddenItems)
+
   local group1 = AUCTIONATOR_SELLING_GROUPS.CustomGroups[1]
   if group1.name ~= "FAVOURITES_GROUP" and group1.name ~= "FAVOURITES" then
     for index, group in ipairs(AUCTIONATOR_SELLING_GROUPS.CustomGroups) do
@@ -35,6 +41,7 @@ function Auctionator.Groups.Initialize()
 
   if group1.name == "FAVOURITES_GROUP" then
     AUCTIONATOR_SELLING_GROUPS.CustomGroups[1].name = "FAVOURITES"
+    AUCTIONATOR_SELLING_GROUPS.CustomGroups[1].list = FilterDeadItems(AUCTIONATOR_SELLING_GROUPS.CustomGroups[1].list)
   end
 end
 local function AutoCreateCache()

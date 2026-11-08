@@ -96,6 +96,39 @@ local function enableTooltips(menu)
 	end
 end
 
+-- ToggleBagSlots shows or hides a bag's "Show Bags" panel and switches the bag to its
+-- physical view or back (the menu's Show Bags entry, and a theme's ShowBags action button). On
+-- the retail bank the panel is the bank tab filter, whose state is saved (showBankTabs). Bag
+-- slots cannot change in combat.
+---@param ctx Context
+---@param bag Bag
+function contextMenu:ToggleBagSlots(ctx, bag)
+	if InCombatLockdown() then
+		print("BetterBags: " .. L:G("Cannot toggle bag slots in combat."))
+		return
+	end
+	if not bag.slots then
+		return
+	end
+	local usesBankTabs = addon.isRetail and bag.kind == const.BAG_KIND.BANK
+	if bag.slots:IsShown() then
+		if usesBankTabs then
+			database:SetShowBankTabs(false)
+		end
+		database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
+		bag.slots:Hide()
+	else
+		if usesBankTabs then
+			database:SetShowBankTabs(true)
+		end
+		database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
+		database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
+		bag.slots:Draw(ctx)
+		bag.slots:Show()
+	end
+	events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
+end
+
 ---@param bag Bag
 ---@return MenuList[]
 function contextMenu:CreateContextMenu(bag)
@@ -108,11 +141,73 @@ function contextMenu:CreateContextMenu(bag)
 		text = addonName .. " Dev Mode",
 		--@end-debug@]==]
 		--@non-debug@
-		text = addonName..' v0.5.14',
+		text = addonName..' v0.9.2',
 		--@end-non-debug@
 		isTitle = true,
 		notCheckable = true,
 	})
+
+	-- The Resizable Window option (config/config.lua) as a toggle: the bag's size mode for the view
+	-- it shows; the redraw applies it (bagProto:ApplySizeSettings).
+	table.insert(menuList, {
+		text = L:G("Drag to Resize"),
+		tooltipTitle = L:G("Drag to Resize"),
+		tooltipText = L:G("Click to toggle sizing the bag by dragging its corner. When off, it sizes itself to its items."),
+		checked = function()
+			return database:GetBagSizeMode(bag.kind) == "window"
+		end,
+		func = function()
+			local resizable = database:GetBagSizeMode(bag.kind) == "window"
+			database:SetBagSizeMode(bag.kind, resizable and "content" or "window")
+			events:SendMessage(context:New("ToggleDragToResize"), "bags/Redraw")
+		end,
+	})
+
+	-- Show bag slot toggle (only if slots are available).
+	if bag.slots then
+		-- Only the retail bank's panel is the bank-tab filter persisted by showBankTabs;
+		-- the Classic/Era bank uses the plain bag-slots panel and toggles like the backpack.
+		local usesBankTabs = addon.isRetail and bag.kind == const.BAG_KIND.BANK
+		table.insert(menuList, {
+			text = L:G("Show Bags"),
+			checked = function()
+				-- For the retail bank, use the persisted setting so the checkmark
+				-- reflects the state that will be restored on next open.
+				if usesBankTabs then
+					return database:GetShowBankTabs()
+				end
+				return bag.slots and bag.slots:IsShown()
+			end,
+			tooltipTitle = L:G("Show Bags"),
+			tooltipText = L:G("Click to toggle the display of the bag slots."),
+			func = function()
+				contextMenu:ToggleBagSlots(context:New("ToggleBagSlots"), bag)
+			end,
+		})
+	end
+
+	if bag.kind == const.BAG_KIND.BACKPACK then
+		-- Show the Blizzard bag button toggle.
+		table.insert(menuList, {
+			text = L:G("Show Bag Button"),
+			tooltipTitle = L:G("Show Bag Button"),
+			tooltipText = L:G("Click to toggle the display of the Blizzard bag button."),
+			checked = function()
+				local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
+				return BagsBar:GetParent() ~= sneakyFrame
+			end,
+			func = function()
+				local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
+				local isShown = BagsBar:GetParent() ~= sneakyFrame
+				if isShown then
+					BagsBar:SetParent(sneakyFrame)
+				else
+					BagsBar:SetParent(UIParent)
+				end
+				database:SetShowBagButton(not isShown)
+			end,
+		})
+	end
 
 	table.insert(menuList, {
 		text = L:G("Bag Anchor"),
@@ -241,75 +336,33 @@ function contextMenu:CreateContextMenu(bag)
 		end
 	end
 
-	-- Show bag slot toggle (only if slots are available).
-	if bag.slots then
-		-- Only the retail bank's panel is the bank-tab filter persisted by showBankTabs;
-		-- the Classic/Era bank uses the plain bag-slots panel and toggles like the backpack.
-		local usesBankTabs = addon.isRetail and bag.kind == const.BAG_KIND.BANK
+	-- Switching to BetterBags Next without a reload (next.md §11), from the backpack's menu: the
+	-- bank's is shown at the bank, where the bags cannot be switched.
+	if bag.kind == const.BAG_KIND.BACKPACK then
 		table.insert(menuList, {
-			text = L:G("Show Bags"),
-			checked = function()
-				-- For the retail bank, use the persisted setting so the checkmark
-				-- reflects the state that will be restored on next open.
-				if usesBankTabs then
-					return database:GetShowBankTabs()
-				end
-				return bag.slots and bag.slots:IsShown()
-			end,
-			tooltipTitle = L:G("Show Bags"),
-			tooltipText = L:G("Click to toggle the display of the bag slots."),
+			text = L:G("Switch to Next"),
+			notCheckable = true,
+			tooltipTitle = L:G("Switch to Next"),
+			tooltipText = L:G("Use BetterBags Next, the experimental new bags. Switch back from its backpack."),
 			func = function()
-				if InCombatLockdown() then
-					print("BetterBags: " .. L:G("Cannot toggle bag slots in combat."))
-					return
-				end
-				if not bag.slots then
-					return
-				end
-				local ctx = context:New("ToggleBagSlots")
-				if bag.slots and bag.slots:IsShown() then
-					if usesBankTabs then
-						database:SetShowBankTabs(false)
-					end
-					database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
-					bag.slots:Hide()
-					events:SendMessage(ctx, 'bags/FullRefreshAll')
-				elseif bag.slots then
-					if usesBankTabs then
-						database:SetShowBankTabs(true)
-					end
-						database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
-						database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
-					bag.slots:Draw(ctx)
-					bag.slots:Show()
-					events:SendMessage(ctx, 'bags/FullRefreshAll')
-				end
+				local ctx = context:New("SwitchToNext")
+				contextMenu:Hide(ctx)
+				addon:GetModule('BagSystem'):Switch(ctx, "next")
 			end,
 		})
 	end
 
-	if bag.kind == const.BAG_KIND.BACKPACK then
-		-- Show the Blizzard bag button toggle.
-		table.insert(menuList, {
-			text = L:G("Show Bag Button"),
-			tooltipTitle = L:G("Show Bag Button"),
-			tooltipText = L:G("Click to toggle the display of the Blizzard bag button."),
-			checked = function()
-				local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
-				return BagsBar:GetParent() ~= sneakyFrame
-			end,
-			func = function()
-				local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
-				local isShown = BagsBar:GetParent() ~= sneakyFrame
-				if isShown then
-					BagsBar:SetParent(sneakyFrame)
-				else
-					BagsBar:SetParent(UIParent)
-				end
-				database:SetShowBagButton(not isShown)
-			end,
-		})
-	end
+	table.insert(menuList, {
+		text = L:G("What's New"),
+		notCheckable = true,
+		tooltipTitle = L:G("What's New"),
+		tooltipText = L:G("Click to see what changed in BetterBags."),
+		func = function()
+			local ctx = context:New("OpenChangelog")
+			contextMenu:Hide(ctx)
+			events:SendMessage(ctx, "changelog/Open")
+		end,
+	})
 
 	table.insert(menuList, {
 		text = L:G("Open Options Screen"),

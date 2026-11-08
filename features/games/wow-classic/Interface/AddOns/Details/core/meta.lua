@@ -9,6 +9,7 @@ local rawget = rawget --lua local
 local setmetatable = setmetatable --lua local
 local _table_remove = table.remove --lua local
 local _bit_band = bit.band --lua local
+local OBJECT_TYPE_PLAYER = 0x00000400
 local _time = time --lua local
 
 local InCombatLockdown = InCombatLockdown --wow api local
@@ -55,10 +56,8 @@ local classTypeUtility = Details.atributos.misc
 				local thisActor = actorTable[i]
 				local actorName = thisActor.nome
 
-				if (bIsInInstance and Details.remove_realm_from_name) then
-					thisActor.displayName = actorName:gsub(("%-.*"), "")
-				elseif (Details.remove_realm_from_name) then
-					thisActor.displayName = actorName:gsub(("%-.*"), "") --"%*"
+				if (Details.remove_realm_from_name and _bit_band(thisActor.flag_original or 0, OBJECT_TYPE_PLAYER) ~= 0) then
+					thisActor.displayName = Details:RemoveRealmName(actorName, thisActor.serial)
 				else
 					thisActor.displayName = actorName
 				end
@@ -177,10 +176,8 @@ local classTypeUtility = Details.atributos.misc
 						local actorName = actorObject.nome
 
 						--set back the display name (isn't saved with the object)
-						if (bIsInInstance and Details.remove_realm_from_name) then
-							actorObject.displayName = actorName:gsub(("%-.*"), "")
-						elseif (Details.remove_realm_from_name) then
-							actorObject.displayName = actorName:gsub(("%-.*"), "")
+						if (Details.remove_realm_from_name and _bit_band(actorObject.flag_original or 0, OBJECT_TYPE_PLAYER) ~= 0) then
+							actorObject.displayName = Details:RemoveRealmName(actorName, actorObject.serial)
 						else
 							actorObject.displayName = actorName
 						end
@@ -266,10 +263,6 @@ local classTypeUtility = Details.atributos.misc
 			instanceObject.grupada_pos = nil
 			instanceObject.agrupado = nil
 			instanceObject._version = nil
-			instanceObject.h_baixo = nil
-			instanceObject.h_esquerda = nil
-			instanceObject.h_direita = nil
-			instanceObject.h_cima = nil
 			instanceObject.break_snap_button = nil
 			instanceObject.alert = nil
 			instanceObject.StatusBar = nil
@@ -314,10 +307,6 @@ local classTypeUtility = Details.atributos.misc
 			instanceObject.grupada_pos = nil
 			instanceObject.agrupado = nil
 			instanceObject._version = nil
-			instanceObject.h_baixo = nil
-			instanceObject.h_esquerda = nil
-			instanceObject.h_direita = nil
-			instanceObject.h_cima = nil
 			instanceObject.break_snap_button = nil
 			instanceObject.alert = nil
 			instanceObject.StatusBar = nil
@@ -583,10 +572,8 @@ local classTypeUtility = Details.atributos.misc
 				local actorName = actorObject.nome
 
 				--set back the display name (isn't saved with the object)
-				if (bIsInInstance and Details.remove_realm_from_name) then
-					actorObject.displayName = actorName:gsub(("%-.*"), "")
-				elseif (Details.remove_realm_from_name) then
-					actorObject.displayName = actorName:gsub(("%-.*"), "")
+				if (Details.remove_realm_from_name and _bit_band(actorObject.flag_original or 0, OBJECT_TYPE_PLAYER) ~= 0) then
+					actorObject.displayName = Details:RemoveRealmName(actorName, actorObject.serial)
 				else
 					actorObject.displayName = actorName
 				end

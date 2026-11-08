@@ -51,11 +51,19 @@ addon.tocVersion = tocVersion
 -- Helper to check if we're running Midnight (12.x) or later
 addon.isMidnight = addon.isRetail and tocVersion >= 120000
 
+-- Whether the client has a guild bank. Blizzard defines GuildBankFrame_LoadUI where it does: the
+-- guild bank's bootstrap file on retail and WoW: Forever (Blizzard_GuildBankUI_Bootstrap.lua), the
+-- TBC, Wrath, Cata and Mists UIParent on Classic; never on Classic Era, whose game type loads none
+-- of them (guild-bank.md §1).
+addon.hasGuildBank = _G.GuildBankFrame_LoadUI ~= nil
+
 ---@enum BagKind
 const.BAG_KIND = {
   UNDEFINED = -1,
   BACKPACK = 0,
   BANK = 1,
+  -- The guild bank, read only by BetterBags Next (guild-bank.md).
+  GUILD = 2,
 }
 
 -- enumerateBagIndices walks contiguous Enum.BagIndex members named
@@ -244,9 +252,48 @@ const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.ReagentBag,
 }
 
+-- WoW: Forever has a keyring (Enum.BagIndex.Keyring, -1), read with the backpack as on
+-- Classic Era, and like Blizzard's own bags only while the game enables it. It has no bag
+-- slot button. Live retail's enum has a Keyring member too, but no keyring.
+if addon.isForever and C_ActionBar.ShouldShowKeyring() then
+  const.BACKPACK_BAGS[Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring
+  const.BACKPACK_ONLY_BAGS[Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring
+end
+
 const.BACKPACK_ONLY_REAGENT_BAGS = {
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
+
+-- The guild bank's tabs are the data engine's containers for the guild kind (guild-bank.md §1).
+-- A tab is not a bag, so it has no bag index: each gets a container id of its own, counted from the
+-- first multiple of 1000 above every bag index the client declares (1000 on every client: their
+-- indices are well under 100), so a guild slot's key ("1001_5") never names a bag slot and every
+-- "<container>_<slot>" reader still works. GUILD_BANK_BAGS maps a container to its tab,
+-- GUILD_BANK_TAB_CONTAINER a tab to its container, GUILD_BANK_BAGS_LIST is the containers in tab
+-- order. MAX_GUILDBANK_TABS is Blizzard's (Constants.lua: 8; 6 on TBC Anniversary).
+do
+  local highest = 0
+  for _, id in pairs(Enum.BagIndex) do
+    if type(id) == "number" and id > highest then
+      highest = id
+    end
+  end
+  local base = (math.floor(highest / 1000) + 1) * 1000
+  const.GUILD_BANK_BAGS = {}
+  const.GUILD_BANK_TAB_CONTAINER = {}
+  const.GUILD_BANK_BAGS_LIST = {}
+  for tab = 1, _G.MAX_GUILDBANK_TABS or 8 do
+    local container = base + tab
+    const.GUILD_BANK_BAGS[container] = tab
+    const.GUILD_BANK_TAB_CONTAINER[tab] = container
+    const.GUILD_BANK_BAGS_LIST[tab] = container
+  end
+end
+-- Slots per guild bank tab (Blizzard's MAX_GUILDBANK_SLOTS_PER_TAB, local to its guild bank UI).
+const.GUILD_BANK_SLOTS = 98
+-- The tab id of the guild bank's combined view, every tab's items in categories. It is never a
+-- container id.
+const.GUILD_BANK_ALL_TAB = 1
 
 const.ITEM_BAG_FAMILY = {
   [0] = L:G("Bags"),
@@ -306,6 +353,10 @@ const.GRID_COMPACT_STYLE = {
 }
 
 ---@enum SectionSortType
+-- The most columns of sections a bag of BetterBags Next can be set to (next.md §7a).
+const.NEXT_SECTION_COLUMNS_MAX = 4
+const.NEXT_SECTION_COLUMNS_DEFAULT = 2
+
 const.SECTION_SORT_TYPE = {
   ALPHABETICALLY = 1,
   SIZE_DESCENDING = 2,
@@ -650,11 +701,13 @@ const.FORM_LAYOUT = {
 
 ---@class SizeInfo
 ---@field columnCount number
----@field itemsPerRow number
+---@field itemsPerRow number Used when the window fits its contents (sizeMode "content").
 ---@field scale number
----@field width number
+---@field width number The window's width when the player sizes it (sizeMode "window").
 ---@field height number
 ---@field opacity number
+---@field sizeMode WindowSizeMode
+---@field snapToContent boolean After a resize the window shrinks to its content's width (sizeMode "window").
 
 ---@class (exact) CategoryOptions
 ---@field shown boolean
@@ -670,9 +723,59 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     enableBagFading = false,
+    animateItemMovement = false,
+    -- Whether every bag is kept on the screen (window.md §3a): off, bags may be moved off it.
+    clampBagsToScreen = false,
+    nextEnabled = false,
+    -- How BetterBags Next's backpack and its companion (the bank or a vendor) sit: "apart" on
+    -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or
+    -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
+    nextChain = "apart",
+    -- The order the player moved each BetterBags Next tab rail's tabs to, by rail ("backpack", "bank",
+    -- "bankTabs", "guild", "vendor"): tab ids, those not in it after them (docs/next-batch-2.md §5).
+    nextTabOrder = {},
+    -- BetterBags Next's Size tab (docs/next-appearance-size.md), in percent: item buttons at the theme's
+    -- icon size times nextIconScale; small panels at nextBagScale (full panels are always at 100).
+    nextIconScale = 100,
+    nextBagScale = 100,
+    -- Whether a small panel follows what it shows while it is open, widening when a section's name or its title would be
+    -- cut short and narrowing back once it fits (next.md §14g); off, it fits as it opens and as a grip is let go.
+    nextFitNamesWhileOpen = false,
+    -- Whether a small panel is as tall as what it shows (Autosize Bags, next-small-autosize.md), growing and shrinking with it
+    -- while open; off, it is the height the player gave it, or a share of the screen.
+    nextAutosize = true,
+    -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
+    -- edges (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
+    -- size the player gave it with its grips (next.md §14g).
+    nextSize = "small",
+    nextSmallPlaces = {},
+    nextSmallSizes = {},
+    -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
+    -- other was dropped beside).
+    nextSmallChain = "apart",
+    -- BetterBags Next's theme (SonataNext, .claude/rules/next-themes.md).
+    nextTheme = "Default",
+    -- BetterBags Next's Animation switches (Appearance > Animation, next-themes.md §20): each effect on until the player
+    -- turns it off, on any theme. These are the only names there are.
+    nextAnimation = { sparkles = true, shimmer = true, titleCloud = true, ribbon = true, braid = true, ornaments = true,
+      glitch = true, rain = true, shatter = true, snow = true, smoke = true, bats = true, beam = true, paper = true,
+      stopMotion = true, glassRain = true, lightning = true, sheen = true },
+    -- How dark a glass theme's bags are (Appearance > Theme > Glass Tint, next-themes-glass.md §26), in percent of the way
+    -- from clear glass to its smoke.
+    nextGlassTint = 60,
+    -- BetterBags Next's currencies (.claude/rules/currency.md): what is tracked, in order ({ kind, id }, a currency
+    -- or an item); how the strip at the bottom of the backpack and the tracker dragged out of it show (these are the
+    -- only names there are); whether the tracker is out, and where it was left (its top left in UIParent's units).
+    nextCurrencies = {},
+    nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
+      scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
+    nextCurrencyTracker = { out = false },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
+    -- The guild bank shows its own tabs one at a time instead of every tab in categories
+    -- (guild-bank.md §4).
+    showGuildBankTabs = false,
     debug = false,
     inBagSearch = true,
     categorySell = false,
@@ -687,18 +790,47 @@ const.DATABASE_DEFAULTS = {
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
     },
     showAllFreeSpace = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
+    },
+    nextSectionColumns = {
+      [const.BAG_KIND.BACKPACK] = const.NEXT_SECTION_COLUMNS_DEFAULT,
+      [const.BAG_KIND.BANK] = const.NEXT_SECTION_COLUMNS_DEFAULT,
+      [const.BAG_KIND.GUILD] = const.NEXT_SECTION_COLUMNS_DEFAULT,
+    },
+    nextSectionFill = {
+      [const.BAG_KIND.BACKPACK] = "across",
+      [const.BAG_KIND.BANK] = "across",
+      [const.BAG_KIND.GUILD] = "across",
+    },
+    nextSectionWideRows = {
+      [const.BAG_KIND.BACKPACK] = 2,
+      [const.BAG_KIND.BANK] = 2,
+      [const.BAG_KIND.GUILD] = 2,
+    },
+    nextSectionSpan = {
+      [const.BAG_KIND.BACKPACK] = true,
+      [const.BAG_KIND.BANK] = true,
+      [const.BAG_KIND.GUILD] = true,
+    },
+    nextSectionCompact = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
     },
     preserveItemGaps = {
       [const.BAG_KIND.BACKPACK] = true,
       [const.BAG_KIND.BANK] = true,
+      [const.BAG_KIND.GUILD] = true,
     },
     glowIntensity = {
       [const.BAG_KIND.BACKPACK] = 60,
       [const.BAG_KIND.BANK] = 60,
+      [const.BAG_KIND.GUILD] = 60,
     },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {
@@ -706,6 +838,10 @@ const.DATABASE_DEFAULTS = {
         showNewItemFlash = false,
       },
       [const.BAG_KIND.BANK] = {
+        markRecentItems = true,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.GUILD] = {
         markRecentItems = true,
         showNewItemFlash = false,
       },
@@ -725,6 +861,13 @@ const.DATABASE_DEFAULTS = {
         dontMergePartial = false,
         dontMergeTransmog = false,
       },
+      [const.BAG_KIND.GUILD]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
     },
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
@@ -732,6 +875,10 @@ const.DATABASE_DEFAULTS = {
         color = true
       },
       [const.BAG_KIND.BANK] = {
+        enabled = true,
+        color = true
+      },
+      [const.BAG_KIND.GUILD] = {
         enabled = true,
         color = true
       },
@@ -748,10 +895,12 @@ const.DATABASE_DEFAULTS = {
     positions = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
+      [const.BAG_KIND.GUILD] = {},
     },
     anchorPositions = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
+      [const.BAG_KIND.GUILD] = {},
     },
     ---@type table<BagKind, AnchorState>
     anchorState = {
@@ -760,6 +909,10 @@ const.DATABASE_DEFAULTS = {
         shown = false,
       },
       [const.BAG_KIND.BANK] = {
+        enabled = false,
+        shown = false,
+      },
+      [const.BAG_KIND.GUILD] = {
         enabled = false,
         shown = false,
       },
@@ -773,6 +926,24 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
       },
+      [const.BAG_KIND.GUILD] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+    },
+    nextSectionSort = {
+      [const.BAG_KIND.BACKPACK] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+      },
+      [const.BAG_KIND.BANK] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+      },
+      [const.BAG_KIND.GUILD] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+      },
     },
     itemSort = {
       [const.BAG_KIND.BACKPACK] = {
@@ -783,6 +954,10 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
+      [const.BAG_KIND.GUILD] = {
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
     },
     customSectionSort = {
       ---@type table<string, number>
@@ -790,12 +965,7 @@ const.DATABASE_DEFAULTS = {
       ---@type table<string, number>
       [const.BAG_KIND.BANK] = {},
       ---@type table<string, number>
-    },
-    collapsedSections = {
-      ---@type table<string, boolean>
-      [const.BAG_KIND.BACKPACK] = {},
-      ---@type table<string, boolean>
-      [const.BAG_KIND.BANK] = {},
+      [const.BAG_KIND.GUILD] = {},
     },
     size = {
       ---@type SizeInfo[]
@@ -807,6 +977,8 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
+          snapToContent = true,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 2,
@@ -815,6 +987,18 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
+          snapToContent = true,
+        },
+        [const.BAG_KIND.GUILD] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+          sizeMode = "content",
+          snapToContent = true,
         },
       },
       [const.BAG_VIEW.SECTION_ALL_BAGS] = {
@@ -825,6 +1009,8 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
+          snapToContent = true,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 1,
@@ -833,19 +1019,31 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
+          snapToContent = true,
+        },
+        [const.BAG_KIND.GUILD] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+          sizeMode = "content",
+          snapToContent = true,
         },
       },
     },
     views = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.GUILD] = const.BAG_VIEW.SECTION_GRID,
     },
     previousViews = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.GUILD] = const.BAG_VIEW.SECTION_GRID,
     },
-    ---@type table<string, CategoryOptions>
-    categoryOptions = {},
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>
@@ -863,6 +1061,15 @@ const.DATABASE_DEFAULTS = {
         EquipmentLocation = true,
       },
       [const.BAG_KIND.BANK] = {
+        Type = true,
+        Subtype = false,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.GUILD] = {
         Type = true,
         Subtype = false,
         Expansion = false,
@@ -889,11 +1096,13 @@ const.DATABASE_DEFAULTS = {
         },
       },
       [const.BAG_KIND.BANK] = {},
+      [const.BAG_KIND.GUILD] = {},
     },
     ---@type table<BagKind, number>
     groupCounter = {
       [const.BAG_KIND.BACKPACK] = 1,
       [const.BAG_KIND.BANK] = 0,
+      [const.BAG_KIND.GUILD] = 0,
     },
     ---@type table<BagKind, table<string, number>|table<number, table<string, number>>>
     categoryToGroup = {
@@ -902,16 +1111,19 @@ const.DATABASE_DEFAULTS = {
         [Enum.BankType and Enum.BankType.Character or 0] = {},
         [Enum.BankType and Enum.BankType.Account or 2] = {},
       } or {},
+      [const.BAG_KIND.GUILD] = {},
     },
     ---@type table<BagKind, number>
     activeGroup = {
       [const.BAG_KIND.BACKPACK] = 1,
       [const.BAG_KIND.BANK] = 1,
+      [const.BAG_KIND.GUILD] = 1,
     },
     ---@type table<BagKind, boolean>
     groupsEnabled = {
       [const.BAG_KIND.BACKPACK] = true,
       [const.BAG_KIND.BANK] = true,
+      [const.BAG_KIND.GUILD] = false,
     },
     -- Profile system migration flag
     __profileSystemMigrated = false,
@@ -919,6 +1131,12 @@ const.DATABASE_DEFAULTS = {
     __bankCategoriesScopedByBankType = false,
     -- Saved backpack dump for testing and debugging
     debugBackpackDump = {},
+  },
+  -- Account wide: shared by every character and profile.
+  global = {
+    -- The newest changelog release the player has seen (its id), and whether the changelog
+    -- opens by itself on login when there is a release they have not seen.
+    changelog = { lastSeen = 0, autoOpen = true },
   },
   char = {}
 }

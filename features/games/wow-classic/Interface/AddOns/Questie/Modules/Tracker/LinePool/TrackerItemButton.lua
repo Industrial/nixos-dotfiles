@@ -1,0 +1,225 @@
+---@type QuestieCompat
+local QuestieCompat = QuestieLoader:ImportModule("QuestieCompat")
+
+---@class TrackerItemButton
+local TrackerItemButton = QuestieLoader:CreateModule("TrackerItemButton")
+
+---@type QuestieDB
+local QuestieDB = QuestieLoader:ImportModule("QuestieDB")
+---@type QuestieCombatQueue
+local QuestieCombatQueue = QuestieLoader:ImportModule("QuestieCombatQueue")
+---@type QuestieTracker
+local QuestieTracker = QuestieLoader:ImportModule("QuestieTracker")
+---@type TrackerFadeTicker
+local TrackerFadeTicker = QuestieLoader:ImportModule("TrackerFadeTicker")
+
+local LSM30 = LibStub("LibSharedMedia-3.0")
+local GetItemCount = QuestieCompat.GetItemCount
+local IsItemInRange = C_Item.IsItemInRange or IsItemInRange
+
+---@param buttonName string
+---@param OnHighlightEnter function @Callback function to highlight the quest of a line
+---@param OnHighlightLeave function @Callback function to remove the highlight
+function TrackerItemButton.New(buttonName, OnHighlightEnter, OnHighlightLeave)
+    local btn = CreateFrame("Button", buttonName, UIParent, "SecureActionButtonTemplate")
+    local cooldown = CreateFrame("Cooldown", nil, btn, "CooldownFrameTemplate")
+    btn.range = btn:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmallGray")
+    btn.count = btn:CreateFontString(nil, "ARTWORK", "Game10Font_o1")
+    btn:Hide()
+
+    if Questie.db.profile.trackerFadeQuestItemButtons then
+        btn:SetAlpha(0)
+    end
+
+    -- Blizzard-designated quest items need not exist in QuestieDB.
+    btn.SetItem = function(self, questItemId, questId, size, isNativeQuestItem)
+        -- Force reset all secure attributes before setting up the button
+        self:SetAttribute("type1", nil)
+        self:SetAttribute("item1", nil)
+        self:RegisterForClicks()
+        self.itemId = nil
+        self.questID = nil
+
+        local validTexture
+
+        -- GetItemCount covers bags and equipped items, so no slot scan is needed
+        if GetItemCount(questItemId) > 0 and (isNativeQuestItem or QuestieDB.QueryItemSingle(questItemId, "class") == QuestieDB.itemClasses.QUEST) then
+            validTexture = QuestieCompat.GetItemIcon(questItemId) or "Interface\\Icons\\INV_Misc_QuestionMark"
+            self.itemId = questItemId
+        end
+
+        if validTexture and self.itemId then
+            self.questID = questId
+            self.charges = GetItemCount(self.itemId, nil, true)
+            self.rangeTimer = -1
+
+            self:SetNormalTexture(validTexture)
+            self:SetPushedTexture(validTexture)
+            self:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+            self:SetSize(size, size)
+
+            -- Always register both click types for all expansions
+            self:RegisterForClicks("AnyUp", "AnyDown")
+
+            self:SetScript("OnEvent", self.OnEvent)
+            self:SetScript("OnShow", self.OnShow)
+            self:SetScript("OnHide", self.OnHide)
+            self:SetScript("OnEnter", self.OnEnter)
+            self:SetScript("OnLeave", self.OnLeave)
+
+            self:SetAttribute("type1", "item")
+            self:SetAttribute("item1", "item:" .. self.itemId)
+            self:Show()
+
+            -- Cooldown Updates
+            cooldown:SetSize(size - 4, size - 4)
+            cooldown:SetPoint("CENTER", self, "CENTER", 0, 0)
+            self:UpdateCooldown()
+
+            -- Range Updates
+            self.range:SetText("●")
+            self.range:SetPoint("TOPRIGHT", self, "TOPRIGHT", 3, 0)
+            self.range:Hide()
+
+            -- Charges Updates
+            self.count:Hide()
+            self.count:SetFont(LSM30:Fetch("font", Questie.db.profile.trackerFontQuest), Questie.db.profile.trackerFontSizeQuest, "OUTLINE")
+            if self.charges > 1 then
+                self.count:SetText(self.charges)
+                self.count:Show()
+            end
+            self.count:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -2, 3)
+
+            return true
+        else
+            self:SetAttribute("item1", nil)
+            self:Hide()
+        end
+
+        return false
+    end
+    btn.UpdateCooldown = function(self)
+        local start, duration, enabled = QuestieCompat.GetItemCooldown(self.itemId)
+
+        if enabled == 1 and duration > 0 then
+            cooldown:SetCooldown(start, duration, enabled)
+            cooldown:Show()
+        else
+            cooldown:Hide()
+        end
+    end
+    btn.UpdateCharges = function(self)
+        local charges = GetItemCount(self.itemId, nil, true)
+        if (not charges or charges ~= self.charges) then
+            self.count:Hide()
+            self.charges = charges
+            if self.charges > 1 then
+                self.count:SetText(self.charges)
+                self.count:Show()
+            end
+            if self.charges == 0 then
+                Questie.Debug(Questie.DEBUG_DEVELOP, "[TrackerLinePool: Button.UpdateCharges]")
+                QuestieCombatQueue:Queue(function()
+                    C_Timer.After(0.2, function()
+                        QuestieTracker:Update()
+                    end)
+                end)
+            end
+        end
+    end
+    btn.OnEvent = function(self, event, ...)
+        if (event == "PLAYER_TARGET_CHANGED") then
+            self.rangeTimer = -1
+            self.range:Hide()
+        elseif (not self.itemId) then
+            return
+        elseif (event == "BAG_UPDATE_COOLDOWN") then
+            self:UpdateCooldown()
+        elseif (event == "BAG_UPDATE") then
+            self:UpdateCharges()
+        end
+    end
+    btn.OnUpdate = function(self, elapsed)
+        if not self.itemId or not self:IsVisible() then
+            return
+        end
+
+        if UnitExists("target") then
+            local rangeTimer = self.rangeTimer
+            if (rangeTimer) then
+                rangeTimer = rangeTimer - elapsed
+
+                -- IsItemInRange is restricted to only be used either on hostile targets or friendly ones while NOT in combat
+                if (rangeTimer <= 0) and (not UnitIsFriend("player", "target") or (not InCombatLockdown())) then
+                    local isInRange = IsItemInRange(self.itemId, "target")
+
+                    if isInRange == false then
+                        self.range:SetVertexColor(1.0, 0.1, 0.1)
+                        self.range:Show()
+                    elseif isInRange == true then
+                        self.range:SetVertexColor(0.6, 0.6, 0.6)
+                        self.range:Show()
+                    end
+
+                    rangeTimer = 0.3
+                end
+
+                self.rangeTimer = rangeTimer
+            end
+        end
+    end
+    btn.OnShow = function(self)
+        self:RegisterEvent("PLAYER_TARGET_CHANGED")
+        self:RegisterEvent("BAG_UPDATE_COOLDOWN")
+        self:RegisterEvent("BAG_UPDATE")
+        -- Events were missed while hidden
+        if self.itemId then
+            self:UpdateCooldown()
+            self:UpdateCharges()
+        end
+    end
+    btn.OnHide = function(self)
+        self:UnregisterEvent("PLAYER_TARGET_CHANGED")
+        self:UnregisterEvent("BAG_UPDATE_COOLDOWN")
+        self:UnregisterEvent("BAG_UPDATE")
+    end
+    btn.OnEnter = function(self)
+        local centerX = select(1, self:GetCenter()) or 0
+        local screenCenter = (GetScreenWidth() or UIParent:GetWidth()) / 2
+        if centerX < screenCenter then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 8, -25)
+        else
+            GameTooltip:SetOwner(self, "ANCHOR_LEFT", -8, -25)
+        end
+
+        GameTooltip:SetHyperlink("item:" .. tostring(self.itemId) .. ":0:0:0:0:0:0:0")
+        GameTooltip:Show()
+
+        TrackerFadeTicker.Unfade(self)
+        -- Highlights the quest of the line the button is attached to. In combat it can stay on UIParent.
+        local line = self:GetParent()
+        if line and line.Quest then
+            OnHighlightEnter(line)
+        end
+    end
+    btn.OnLeave = function(self)
+        GameTooltip:Hide()
+
+        TrackerFadeTicker.Fade(self)
+        OnHighlightLeave()
+    end
+
+    btn.FakeHide = function(self)
+        self:RegisterForClicks()
+        self:SetAttribute("type1", nil)
+        self:SetAttribute("item1", nil)
+        self:SetScript("OnEnter", nil)
+        self:SetScript("OnLeave", nil)
+    end
+
+    btn:HookScript("OnUpdate", btn.OnUpdate)
+
+    btn:FakeHide()
+
+    return btn
+end

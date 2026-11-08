@@ -3197,42 +3197,19 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 	local canShowPercent = false
 
 	if not issecretvalue(actorName) then
-		if Details.righttext_simple_formatting.use_alignment then
-			if (instance.row_info.show_percent) then
-				canShowPercent = true
-			end
-		else
-			canShowPercent = true
-		end
+		canShowPercent = instance.row_info.show_percent
 
 		if source.amountPerSecond < 1 then
 			source.amountPerSecond = 1
 		end
+	end
 
-		if actorName then
-			actorName = detailsFramework:RemoveRealmName(actorName)
-		else
-			actorName = source.name
-			if not issecretvalue(actorName) then
-				actorName = detailsFramework:RemoveRealmName(actorName)
-			else
-				actorName = Ambiguate(source.name, "short")
-			end
-		end
-	else
-		if specIcon then
-			actorName = Ambiguate(source.name, "short")
-		else
-			actorName = source.name
-		end
+	if (Details.remove_realm_from_name) then
+		actorName = Details:RemoveRealmName(source.name, source.sourceGUID)
 	end
 
 	if (instance.row_info.textL_show_number) then
-		if issecretvalue(actorName) then
-			instanceLine.lineText1:SetText(format("%d. %s", rank, actorName)) --left text
-		else
-			instanceLine.lineText1:SetText(format("%d. %s", rank, actorName)) --left text
-		end
+		instanceLine.lineText1:SetText(format("%d. %s", rank, actorName)) --left text
 	else
 		instanceLine.lineText1:SetText(actorName) --left text
 	end
@@ -3254,7 +3231,7 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 	local t = {
 		aID = nil, -- 0
 		spellicon = nil, --0
-		spec = detailsFramework:GetSpecInfoFromSpecIcon(specIcon), --0
+		spec = not issecretvalue(specIcon) and detailsFramework:GetSpecInfoFromSpecIcon(specIcon) or nil, --0
 		serial = "",
 		enemy = false,
 		thisSpecIcon = instanceLine.blzSpecIcon,
@@ -4169,7 +4146,7 @@ function Details:SetClassIcon(texture, instance, class) --[[exported]] --~icons
 	else
 		if (instance and instance.row_info.use_spec_icons) then
 			if (self.thisSpecIcon) then
-				local specInfo = detailsFramework:GetSpecInfoFromSpecIcon(self.thisSpecIcon)
+				local specInfo = not issecretvalue(self.thisSpecIcon) and detailsFramework:GetSpecInfoFromSpecIcon(self.thisSpecIcon)
 				local specId = specInfo and specInfo.specId
 
 				if (specId and not Details.class_specs_coords[specId]) then

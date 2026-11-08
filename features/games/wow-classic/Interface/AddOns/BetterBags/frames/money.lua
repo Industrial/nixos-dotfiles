@@ -4,6 +4,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class MoneyFrame: AceModule
 local money = addon:NewModule('MoneyFrame')
 
@@ -18,6 +21,7 @@ local events = addon:GetModule('Events')
 ---@field goldButton Button
 ---@field warbank? boolean
 money.moneyProto = {}
+addon:GetModule('Perf'):RegisterPrototype(money.moneyProto, 'Money')
 
 function money.moneyProto:Update()
   local currentMoney
@@ -135,11 +139,7 @@ function money:CreateButton(kind, parent)
   b:GetNormalTexture():SetSize(13, 13)
   local fs = b:CreateFontString(nil, "OVERLAY")
   b:SetFontString(fs)
-  if addon.isRetail then
-    b:SetNormalFontObject("Number12Font")
-  else
-    b:SetNormalFontObject("NumberFontNormalRight")
-  end
+  sonata:SetButtonTextRole(b, "Money")
   fs:SetPoint("RIGHT", -13, 0)
   b:Show()
   return b

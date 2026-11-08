@@ -1,0 +1,579 @@
+---@class QuestieMenu
+local QuestieMenu = QuestieLoader:CreateModule("QuestieMenu")
+
+---@type QuestieLib
+local QuestieLib = QuestieLoader:ImportModule("QuestieLib")
+---@type QuestieOptions
+local QuestieOptions = QuestieLoader:ImportModule("QuestieOptions")
+---@type QuestieJourney
+local QuestieJourney = QuestieLoader:ImportModule("QuestieJourney")
+---@type QuestieMap
+local QuestieMap = QuestieLoader:ImportModule("QuestieMap")
+---@type QuestieDB
+local QuestieDB = QuestieLoader:ImportModule("QuestieDB")
+---@type MeetingStones
+local MeetingStones = QuestieLoader:ImportModule("MeetingStones")
+---@type QuestieProfessions
+local QuestieProfessions = QuestieLoader:ImportModule("QuestieProfessions")
+---@type QuestieQuest
+local QuestieQuest = QuestieLoader:ImportModule("QuestieQuest")
+---@type l10n
+local l10n = QuestieLoader:ImportModule("l10n")
+---@type QuestieCorrections
+local QuestieCorrections = QuestieLoader:ImportModule("QuestieCorrections")
+---@type QuestieCombatQueue
+local QuestieCombatQueue = QuestieLoader:ImportModule("QuestieCombatQueue")
+---@type AvailableQuests
+local AvailableQuests = QuestieLoader:ImportModule("AvailableQuests")
+---@type Townsfolk
+local Townsfolk = QuestieLoader:ImportModule("Townsfolk")
+---@type Moonwell
+local Moonwell = QuestieLoader:ImportModule("Moonwell")
+---@type QuestieOptionsEngine
+local QuestieOptionsEngine = QuestieLoader:ImportModule("QuestieOptionsEngine")
+
+local LibDropDown = LibStub:GetLibrary("LibUIDropDownMenuQuestie-4.0")
+
+local tinsert = tinsert
+
+local professionKeys = QuestieProfessions.professionKeys
+
+local _townsfolk_texturemap = {
+    ["Flight Master"] = "Interface\\Minimap\\tracking\\flightmaster",
+    ["Meeting Stones"] = QuestieLib.AddonPath.."Icons\\mstone.blp",
+    ["Class Trainer"] = "Interface\\Minimap\\tracking\\class",
+    ["Stable Master"] = "Interface\\Minimap\\tracking\\stablemaster",
+    ["Spirit Healer"] = "Interface\\raidframe\\raid-icon-rez",
+    ["Weapon Master"] = QuestieLib.AddonPath.."Icons\\weaponmaster.blp",
+    ["Mailbox"] = "Interface\\Minimap\\tracking\\mailbox",
+    ["Moonwell"] = "Interface\\Icons\\inv_fabric_moonrag_01.blp",
+    ["Profession Trainers"] = "Interface\\Minimap\\tracking\\profession",
+    ["Ammo"] = "Interface\\Minimap\\tracking\\ammunition",
+    ["Bags"] = 133634,--select(10, GetItemInfo(4496)) -- small brown pouch
+    ["Potions"] = 134831,--select(10, GetItemInfo(929)) -- Healing Potion
+    ["Trade Goods"] = 132912,--select(10, GetItemInfo(2321)) -- thread
+    ["Drink"] = 134712,--select(10, GetItemInfo(8766)) -- morning glory dew
+    ["Food"] = 133964,--select(10, GetItemInfo(4540)) -- bread
+    ["Pet Food"] = 132165,--select(3, GetSpellInfo(6991)) -- feed pet
+    ["Portal Trainer"] = "Interface\\Minimap\\vehicle-alliancemageportal",
+    ["Barber"] = QuestieLib.AddonPath.."Icons\\barbershop.png",
+    ["Arcane Reforger"] = QuestieLib.AddonPath.."Icons\\reforge.png",
+    ["Transmogrifier"] = "Interface\\Minimap\\tracking\\transmogrifier",
+    ["Battle Pet Trainer"] = QuestieLib.AddonPath.."Icons\\petbattle.png",
+    ["Reagents"] = "Interface\\Minimap\\tracking\\reagents",
+    ["Poisons"] = "Interface\\Minimap\\tracking\\poisons",
+    [professionKeys.FIRST_AID] = "Interface\\Icons\\spell_holy_sealofsacrifice",
+    [professionKeys.BLACKSMITHING] = "Interface\\Icons\\trade_blacksmithing",
+    [professionKeys.LEATHERWORKING] = "Interface\\Icons\\trade_leatherworking",
+    [professionKeys.ALCHEMY] = "Interface\\Icons\\trade_alchemy",
+    [professionKeys.HERBALISM] = "Interface\\Icons\\trade_herbalism",
+    [professionKeys.COOKING] = "Interface\\Icons\\inv_misc_food_15",
+    [professionKeys.MINING] = "Interface\\Icons\\trade_mining",
+    [professionKeys.TAILORING] = "Interface\\Icons\\trade_tailoring",
+    [professionKeys.ENGINEERING] = "Interface\\Icons\\trade_engineering",
+    [professionKeys.ENCHANTING] = "Interface\\Icons\\trade_engraving",
+    [professionKeys.FISHING] = "Interface\\Icons\\trade_fishing",
+    [professionKeys.SKINNING] = "Interface\\Icons\\inv_misc_pelt_wolf_01",
+    [professionKeys.JEWELCRAFTING] = "Interface\\Icons\\inv_misc_gem_01",
+    [professionKeys.ARCHAEOLOGY] = "Interface\\Icons\\trade_archaeology",
+    [professionKeys.INSCRIPTION] = "Interface\\Icons\\inv_inscription_tradeskill01",
+    [professionKeys.RIDING] = "Interface\\Icons\\spell_nature_swiftness",
+}
+
+local _townsfolk_order = {
+    "Repair",
+    "Innkeeper",
+    "Mailbox",
+    "Class Trainer",
+    "Weapon Master",
+    "Auctioneer",
+    "Banker",
+    "Flight Master",
+    "Stable Master",
+    "Battlemaster",
+    "Portal Trainer",
+    "Meeting Stones",
+    "Battle Pet Trainer",
+    "Barber",
+    "Arcane Reforger",
+    "Transmogrifier",
+    "Spirit Healer",
+}
+
+local _spawned = {} -- used to check if we have already spawned an icon for this npc
+local _spawnTickers = {} -- pending spawn ticker per townsfolk key, cancelled when the key is untracked
+
+---@param id NpcId
+---@param key string
+---@return string
+local function getNpcTitle(id, key)
+    local npcName = QuestieDB.QueryNPCSingle(id, "name") or ("Missing NPC name for " .. tostring(id))
+    local npcTitle = Questie:Colorize(npcName, "white")
+
+    local subName = QuestieDB.QueryNPCSingle(id, "subName")
+    if (not subName) then
+        local trainerName = QuestieProfessions.GetTrainerName(key)
+        if trainerName then
+            subName = l10n(trainerName)
+        else
+            subName = l10n(tostring(key))
+        end
+    end
+
+    return npcTitle .. " (" .. subName .. ")"
+end
+
+---True when a profession trainer is tracked only because "Known Professions" is on and the character knows it
+---@param key string|number
+---@return boolean
+local function isTrackedAsKnownProfession(key)
+    return Questie.db.profile.townsfolkKnownProfessions == true
+        and Townsfolk.professionTrainers[key] ~= nil
+        and (not Questie.db.profile.townsfolkConfig[key])
+        and QuestieProfessions:GetPlayerProfessions()[key] ~= nil
+end
+
+---@param key string|number
+---@return boolean
+local function isTracked(key)
+    return Questie.db.profile.townsfolkConfig[key] or isTrackedAsKnownProfession(key)
+end
+
+local function toggle(key, forceRemove) -- /run QuestieLoader:ImportModule("QuestieMap"):ShowNPC(525, nil, 1, "teaste", {}, true)
+    if key == "Moonwell" then
+        if Questie.db.profile.townsfolkConfig[key] and (not forceRemove) then
+            Moonwell:ShowAll()
+        else
+            Moonwell:HideAll()
+        end
+        return
+    end
+
+    local ids = Townsfolk.townsfolk[key] or
+            Questie.db.char.townsfolk[key] or
+            Townsfolk.professionTrainers[key] or
+            Questie.db.char.vendorList[key]
+
+    if (not ids) then
+        Questie.Debug(Questie.DEBUG_INFO, "Invalid townsfolk key", tostring(key))
+        return
+    end
+
+    local icon = _townsfolk_texturemap[key] or ("Interface\\Minimap\\tracking\\" .. strlower(key))
+    if key == "Mailbox" or key == "Meeting Stones" then -- object type townsfolk
+        if isTracked(key) and (not forceRemove) then
+            for _, id in pairs(ids) do
+                if key == "Meeting Stones" then
+                    local dungeonName, levelRange = MeetingStones:GetLocalizedDungeonNameAndLevelRangeByObjectId(id)
+                    if dungeonName and levelRange then
+                        QuestieMap:ShowObject(id, icon, 1.2, Questie:Colorize(l10n("Meeting Stone"), "white") .. "|n" .. dungeonName .. " " .. levelRange, {}, true, key)
+                    end
+                else
+                    QuestieMap:ShowObject(id, icon, 1.2, Questie:Colorize(l10n(key), "white"), {}, true, key)
+                end
+            end
+        else
+            for _, id in pairs(ids) do
+                QuestieMap:UnloadManualFrames(id, key)
+            end
+        end
+    else
+        if isTracked(key) and (not forceRemove) then
+            local faction = UnitFactionGroup("Player")
+            local timer
+            local e = 1
+            local max = (#ids)+1
+            if _spawnTickers[key] then
+                _spawnTickers[key]:Cancel()
+            end
+            timer = C_Timer.NewTicker(0.01, function()
+                local start = e
+                while e < max and e-start < 32 do
+                    local id = ids[e]
+                    if (not _spawned[id]) then
+                        local friendly = QuestieDB.QueryNPCSingle(id, "friendlyToFaction")
+                        if ((not friendly) or friendly == "AH" or (faction == "Alliance" and friendly == "A") or (faction == "Horde" and friendly == "H")) and (not QuestieCorrections.questNPCBlacklist[id]) then
+                            local npcTitle = getNpcTitle(id, key)
+
+                            QuestieMap:ShowNPC(id, icon, 1.2, npcTitle, {}, true, key, true)
+                            _spawned[id] = true
+                        end
+                    end
+                    e = e + 1
+                end
+                if e == max then
+                    timer:Cancel()
+                    if _spawnTickers[key] == timer then
+                        _spawnTickers[key] = nil
+                    end
+                end
+            end)
+            _spawnTickers[key] = timer
+        else
+            -- Stop a spawn still in progress, or it keeps drawing icons after they were removed
+            if _spawnTickers[key] then
+                _spawnTickers[key]:Cancel()
+                _spawnTickers[key] = nil
+            end
+            for _, id in pairs(ids) do
+                QuestieMap:UnloadManualFrames(id, key)
+                _spawned[id] = nil
+            end
+        end
+    end
+end
+
+local function build(key)
+    local icon = _townsfolk_texturemap[key] or ("Interface\\Minimap\\tracking\\" .. strlower(key))
+
+    return {
+        text = l10n(tostring(key)),
+        func = function() Questie.db.profile.townsfolkConfig[key] = not Questie.db.profile.townsfolkConfig[key] toggle(key) end,
+        icon=icon,
+        notCheckable=false,
+        checked=Questie.db.profile.townsfolkConfig[key],
+        isNotRadio=true,
+        keepShownOnClick=true
+    }
+end
+
+local refreshProfessionButtons
+
+---@param profMenu table The menuList this entry belongs to
+local function buildProfession(key, localizedText, profMenu)
+    local icon = _townsfolk_texturemap[key] or ("Interface\\Minimap\\tracking\\" .. strlower(key))
+
+    return {
+        text = localizedText,
+        func = function(button)
+            -- Locked rows still get clicks forwarded from their icon, which bypasses the disabled button
+            if not isTrackedAsKnownProfession(key) then
+                Questie.db.profile.townsfolkConfig[key] = not Questie.db.profile.townsfolkConfig[key]
+                toggle(key)
+            end
+            -- Unchecking a known profession leaves it tracked through "Known Professions", so it turns gray.
+            -- This also restores the check the dropdown flipped before calling us on a locked row.
+            refreshProfessionButtons(profMenu, button:GetParent())
+        end,
+        arg1=key,
+        icon=icon,
+        notCheckable=false,
+        checked=function() return isTracked(key) end,
+        -- Gray, locked check while the trainer is tracked only through "Known Professions"
+        disabled=isTrackedAsKnownProfession(key),
+        isNotRadio=true,
+        keepShownOnClick=true
+    }
+end
+
+---Redraws the profession entries of an open dropdown list after "Known Professions" was toggled
+---@param profMenu table The menuList the dropdown list was built from
+---@param listFrame Frame The dropdown list showing profMenu
+function refreshProfessionButtons(profMenu, listFrame)
+    for _, info in pairs(profMenu) do
+        if info.arg1 then
+            info.disabled = isTrackedAsKnownProfession(info.arg1)
+        end
+    end
+
+    local listFrameName = listFrame:GetName()
+    for i = 1, listFrame.numButtons or 0 do
+        local buttonName = listFrameName .. "Button" .. i
+        local button = _G[buttonName]
+        local key = button.arg1
+        if key and Townsfolk.professionTrainers[key] then
+            local locked = isTrackedAsKnownProfession(key)
+            local checked = isTracked(key)
+            local check, uncheck = _G[buttonName .. "Check"], _G[buttonName .. "UnCheck"]
+
+            button:SetEnabled(not locked)
+            _G[buttonName .. "InvisibleButton"]:SetShown(locked)
+            check:SetShown(checked)
+            uncheck:SetShown(not checked)
+            check:SetDesaturated(locked)
+            check:SetAlpha(locked and 0.5 or 1)
+            uncheck:SetDesaturated(locked)
+            uncheck:SetAlpha(locked and 0.5 or 1)
+            if checked then
+                button:LockHighlight()
+            else
+                button:UnlockHighlight()
+            end
+        end
+    end
+end
+
+---Syncs the map with "Known Professions": shows trainers of known professions and hides those of
+---professions that are no longer tracked (setting turned off or profession unlearned)
+function QuestieMenu.RefreshKnownProfessionTrainers()
+    for key in pairs(Townsfolk.professionTrainers) do
+        if (not Questie.db.profile.townsfolkConfig[key]) then
+            local shownFrames = QuestieMap.manualFrames[key]
+            if isTracked(key) or _spawnTickers[key] or (shownFrames and next(shownFrames)) then
+                toggle(key)
+            end
+        end
+    end
+end
+
+function QuestieMenu:OnLogin(forceRemove) -- toggle all icons
+    Townsfolk:UpdatePlayerVendors()
+
+    if (not Questie.db.profile.townsfolkConfig) then
+        Questie.db.profile.townsfolkConfig = {
+            ["Flight Master"] = true,
+            ["Mailbox"] = true,
+            ["Meeting Stones"] = true,
+            ["Moonwell"] = false
+        }
+    end
+    for key in pairs(Questie.db.profile.townsfolkConfig) do
+        if forceRemove then
+            toggle(key, forceRemove)
+        end
+        toggle(key)
+    end
+    if Questie.db.profile.townsfolkKnownProfessions then
+        for key in pairs(QuestieProfessions:GetPlayerProfessions()) do
+            if Townsfolk.professionTrainers[key] and (not Questie.db.profile.townsfolkConfig[key]) then
+                if forceRemove then
+                    toggle(key, forceRemove)
+                end
+                toggle(key)
+            end
+        end
+    end
+end
+
+local div = { -- from libEasyMenu code
+    hasArrow = false,
+    dist = 0,
+    isTitle = true,
+    isUninteractable = true,
+    notCheckable = true,
+    iconOnly = true,
+    isSeparator = true,
+    icon = "Interface\\Common\\UI-TooltipDivider-Transparent",
+    tCoordLeft = 0,
+    tCoordRight = 1,
+    tCoordTop = 0,
+    tCoordBottom = 1,
+    tSizeX = 0,
+    tSizeY = 8,
+    tFitDropDownSizeX = true,
+    text="",
+    iconInfo = {
+        tCoordLeft = 0,
+        tCoordRight = 1,
+        tCoordTop = 0,
+        tCoordBottom = 1,
+        tSizeX = 0,
+        tSizeY = 8,
+        tFitDropDownSizeX = true
+    },
+}
+local secondaryProfessions = {
+    [professionKeys.ARCHAEOLOGY] = true,
+    [professionKeys.FIRST_AID] = true,
+    [professionKeys.COOKING] = true,
+    [professionKeys.FISHING] = true
+}
+local ridingProfessions = {
+    [professionKeys.RIDING] = true
+}
+
+function QuestieMenu.buildProfessionMenu()
+    local profMenu = {}
+    local profMenuSorted = {}
+    local secondaryProfMenuSorted = {}
+    local profMenuData = {}
+    local ridingMenu = {}
+
+    tinsert(profMenu, { text= l10n("Known Professions"), func = function(button)
+        Questie.db.profile.townsfolkKnownProfessions = not Questie.db.profile.townsfolkKnownProfessions
+        QuestieMenu.RefreshKnownProfessionTrainers()
+        refreshProfessionButtons(profMenu, button:GetParent())
+    end, icon="Interface\\Minimap\\tracking\\profession", notCheckable=false, checked=function() return Questie.db.profile.townsfolkKnownProfessions end, isNotRadio=true, keepShownOnClick=true})
+    tinsert(profMenu, div)
+
+    for key, _ in pairs(Townsfolk.professionTrainers) do
+        local localizedKey = l10n(QuestieProfessions:GetProfessionName(key))
+        profMenuData[localizedKey] = buildProfession(key, localizedKey, profMenu)
+        if secondaryProfessions[key] then
+            tinsert(secondaryProfMenuSorted, localizedKey)
+        elseif ridingProfessions[key] then
+            tinsert(ridingMenu, localizedKey)
+        else
+            tinsert(profMenuSorted, localizedKey)
+        end
+    end
+    table.sort(profMenuSorted)
+    table.sort(secondaryProfMenuSorted)
+    for _, key in pairs(profMenuSorted) do
+        tinsert(profMenu, profMenuData[key])
+    end
+    tinsert(profMenu, div)
+    for _, key in pairs(secondaryProfMenuSorted) do
+        tinsert(profMenu, profMenuData[key])
+    end
+    tinsert(profMenu, div)
+    for _, key in pairs(ridingMenu) do
+        tinsert(profMenu, profMenuData[key])
+    end
+    return profMenu
+end
+
+function QuestieMenu.buildVendorMenu()
+    local vendorMenu = {}
+    local vendorMenuSorted = {}
+    local vendorMenuData = {}
+    for key, _ in pairs(Questie.db.char.vendorList) do
+        local localizedKey = l10n(tostring(key))
+        vendorMenuData[localizedKey] = build(key)
+        tinsert(vendorMenuSorted, localizedKey)
+    end
+    table.sort(vendorMenuSorted)
+    for _, key in pairs(vendorMenuSorted) do
+        tinsert(vendorMenu, vendorMenuData[key])
+    end
+    return vendorMenu
+end
+
+function QuestieMenu.buildTownsfolkMenu()
+    local townsfolkMenu = {}
+    for _, key in ipairs(_townsfolk_order) do
+        if Townsfolk.townsfolk[key] or Questie.db.char.townsfolk[key] then
+            tinsert(townsfolkMenu, build(key))
+        end
+    end
+    return townsfolkMenu
+end
+
+function QuestieMenu:Show(hideDelay)
+    if not Questie.db.profile.townsfolkConfig then
+        Questie.db.profile.townsfolkConfig = {}
+    end
+    if not QuestieMenu.menu then
+        QuestieMenu.menu = LibDropDown:Create_UIDropDownMenu("QuestieTownsfolkMenuFrame", UIParent)
+    end
+    local menuTable = QuestieMenu.buildTownsfolkMenu()
+    local hasTailoring = QuestieProfessions:HasProfessionAndSkillLevel({professionKeys.TAILORING, 1})
+    if hasTailoring then
+        tinsert(menuTable, build("Moonwell"))
+    end
+    tinsert(menuTable, { text= l10n("Available Quest"), func = function()
+        local value = not Questie.db.profile.showAvailableQuests
+        Questie.db.profile.showAvailableQuests = value
+        QuestieQuest:ToggleNotes(value)
+        QuestieQuest:SmoothReset()
+    end, icon=QuestieLib.AddonPath.."Icons\\available.blp", notCheckable=false, checked=Questie.db.profile.showAvailableQuests, isNotRadio=true, keepShownOnClick=true})
+    tinsert(menuTable, { text= l10n("Trivial Quest"), func = function()
+        local value = Questie.db.profile.lowLevelStyle == Questie.LOWLEVEL_ALL
+        if value then
+            Questie.db.profile.lowLevelStyle = Questie.LOWLEVEL_NONE
+        else
+            Questie.db.profile.lowLevelStyle = Questie.LOWLEVEL_ALL
+        end
+        AvailableQuests.ResetLevelRequirementCache()
+        AvailableQuests.CalculateAndDrawAll()
+    end, icon=QuestieLib.AddonPath.."Icons\\available_gray.blp", notCheckable=false, checked=Questie.db.profile.lowLevelStyle==Questie.LOWLEVEL_ALL, isNotRadio=true, keepShownOnClick=true})
+    tinsert(menuTable, { text= l10n("Objective"), func = function()
+        local value = not Questie.db.profile.enableObjectives
+        Questie.db.profile.enableObjectives = value
+        QuestieQuest:ToggleNotes(value)
+        QuestieQuest:SmoothReset()
+    end, icon=QuestieLib.AddonPath.."Icons\\event.blp", notCheckable=false, checked=Questie.db.profile.enableObjectives, isNotRadio=true, keepShownOnClick=true})
+    tinsert(menuTable, {text= l10n("Profession Trainers"), func = function() end, keepShownOnClick=true, hasArrow=true, menuList=QuestieMenu.buildProfessionMenu(), notCheckable=true})
+    tinsert(menuTable, {text= l10n("Vendor"), func = function() end, keepShownOnClick=true, hasArrow=true, menuList=QuestieMenu.buildVendorMenu(), notCheckable=true})
+
+    tinsert(menuTable, div)
+
+    tinsert(menuTable, { text= l10n('Advanced Search'), func=function()
+        QuestieOptionsEngine:HideFrame();
+        QuestieJourney.tabGroup:SelectTab("search");
+        if not QuestieJourney:IsShown() then
+            QuestieJourney:ToggleJourneyWindow()
+        end
+    end})
+
+    tinsert(menuTable, { text= l10n('Quests by Zone'), func=function()
+        QuestieOptionsEngine:HideFrame();
+        QuestieJourney.tabGroup:SelectTab("zone");
+        if not QuestieJourney:IsShown() then
+            QuestieJourney:ToggleJourneyWindow()
+        end
+    end})
+
+    tinsert(menuTable, { text= l10n('Quests by Faction'), func=function()
+        QuestieOptionsEngine:HideFrame();
+        QuestieJourney.tabGroup:SelectTab("faction");
+        if not QuestieJourney:IsShown() then
+            QuestieJourney:ToggleJourneyWindow()
+        end
+    end})
+
+    tinsert(menuTable, { text= l10n("Questie Options"), func=function()
+        if QuestieJourney:IsShown() then
+            QuestieJourney:ToggleJourneyWindow()
+        end
+        QuestieOptionsEngine:ShowFrame();
+    end})
+
+    tinsert(menuTable, { text= l10n('My Journey'), func=function()
+        QuestieOptionsEngine:HideFrame();
+        QuestieJourney.tabGroup:SelectTab("journey");
+        if not QuestieJourney:IsShown() then
+            QuestieJourney:ToggleJourneyWindow()
+        end
+    end})
+
+    if Questie.db.profile.debugEnabled then
+        tinsert(menuTable, { text= l10n('Reload UI'), func=function() ReloadUI() end})
+    end
+    tinsert(menuTable, {text= CANCEL, func=function() end})
+    LibDropDown:EasyMenu(menuTable, QuestieMenu.menu, "cursor", -80, -15, "MENU", hideDelay or 2)
+end
+
+function QuestieMenu:Hide()
+    LibDropDown:CloseDropDownMenus()
+end
+
+function QuestieMenu.IsOpen()
+   return LibDropDown:getOpen()
+end
+
+function QuestieMenu:ShowTownsfolk(hideDelay)
+    if not Questie.db.profile.townsfolkConfig then
+        Questie.db.profile.townsfolkConfig = {}
+    end
+    if not QuestieMenu.menuTowns then
+        QuestieMenu.menuTowns = LibDropDown:Create_UIDropDownMenu("QuestieTownsfolkMenuFrameTownsfolk", UIParent)
+    end
+    local menuTable = QuestieMenu.buildTownsfolkMenu()
+    tinsert(menuTable, {text= CANCEL, func=function() end})
+    LibDropDown:EasyMenu(menuTable, QuestieMenu.menuTowns, "cursor", -80, -15, "MENU", hideDelay)
+end
+
+function QuestieMenu:ShowProfessions(hideDelay)
+    if not Questie.db.profile.townsfolkConfig then
+        Questie.db.profile.townsfolkConfig = {}
+    end
+    if not QuestieMenu.menuProfs then
+        QuestieMenu.menuProfs = LibDropDown:Create_UIDropDownMenu("QuestieTownsfolkMenuFrameProfs", UIParent)
+    end
+    local menuTable = QuestieMenu.buildProfessionMenu()
+    tinsert(menuTable, {text= CANCEL, func=function() end})
+    LibDropDown:EasyMenu(menuTable, QuestieMenu.menuProfs, "cursor", -75, -15, "MENU", hideDelay)
+end
+
+function QuestieMenu:ShowVendors(hideDelay)
+    if not Questie.db.profile.townsfolkConfig then
+        Questie.db.profile.townsfolkConfig = {}
+    end
+    if not QuestieMenu.menuVendors then
+        QuestieMenu.menuVendors = LibDropDown:Create_UIDropDownMenu("QuestieTownsfolkMenuFrameVendors", UIParent)
+    end
+    local menuTable = QuestieMenu.buildVendorMenu()
+    tinsert(menuTable, {text= CANCEL, func=function() end})
+    LibDropDown:EasyMenu(menuTable, QuestieMenu.menuVendors, "cursor", -60, -15, "MENU", hideDelay)
+end

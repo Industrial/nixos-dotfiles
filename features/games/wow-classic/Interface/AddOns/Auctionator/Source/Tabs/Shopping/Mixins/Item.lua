@@ -113,7 +113,7 @@ function AuctionatorShoppingItemMixin:OnLoad()
   InitializeQualityDropDown(self.QualityContainer.DropDown)
   InitializeTierDropDown(self.TierContainer.DropDown)
 
-  if Auctionator.Constants.IsRetail then
+  if Auctionator.Constants.IsRetail and not Auctionator.Constants.IsForever then
     self:SetHeight(470)
     self.TierContainer:Show()
     self.ExpansionContainer:Show()

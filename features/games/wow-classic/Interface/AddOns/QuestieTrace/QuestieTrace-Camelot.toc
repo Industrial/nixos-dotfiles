@@ -1,0 +1,79 @@
+## Interface: 16001
+## Title: QuestieTrace
+## Version: 1.9.2
+## Author: Logon/TheCrux(BreakBB)
+## Notes: Data collection addon for Questie
+## Notes-deDE: Datensammlungs-Addon für Questie
+## Notes-esES: Addon de recopilación de datos para Questie
+## Notes-esMX: Addon de recopilación de datos para Questie
+## Notes-frFR: Addon de collecte de données pour Questie
+## Notes-ptBR: Addon de coleta de dados para Questie
+## Notes-ruRU: Аддон для сбора данных для Questie
+## Notes-koKR: Questie용 데이터 수집 애드온
+## Notes-zhCN: Questie 数据收集插件
+## Notes-zhTW: Questie 資料收集插件
+## Category: Quests
+## Category-deDE: Quests
+## Category-esES: Misiones
+## Category-esMX: Misiones
+## Category-frFR: Quêtes
+## Category-itIT: Missioni
+## Category-koKR: 퀘스트
+## Category-ptBR: Missões
+## Category-ruRU: Задания
+## Category-zhCN: 任务
+## Category-zhTW: 任務
+## RequiredDeps:
+## OptionalDeps: LibStub, LibDeflate
+## SavedVariables: QuestieTrace, QuestieTraceDumps
+## SavedVariablesPerCharacter: QuestieTraceCharacter
+## IconTexture: Interface\AddOns\QuestieTrace\icon.png
+## X-Curse-Project-ID: 1695789
+
+Libs/LibStub/LibStub.lua
+Libs/LibDeflate/LibDeflate.lua
+
+Modules/globals.lua
+Modules/Privacy.lua
+
+Modules/Localization/l10n.lua
+Modules/Localization/Translations/Consent.lua
+Modules/Localization/Translations/ExportReminder.lua
+Modules/Localization/Translations/ExportUI.lua
+
+Widgets/Dialog.lua
+Widgets/Dialog.xml
+Modules/Consent.lua
+Modules/Consent.xml
+
+Modules/Trackers/PlayerIdentity.lua
+Modules/Trackers/UnitLevel.lua
+Modules/Trackers/Position.lua
+Modules/Trackers/Loot.lua
+Modules/Trackers/Merchant.lua
+Modules/Trackers/ItemCount.lua
+Modules/Trackers/Reputation.lua
+Modules/Trackers/QuestLog.lua
+Modules/Trackers/CompletedQuests.lua
+Modules/Trackers/QuestPOI.lua
+Modules/Trackers/QuestDialog.lua
+Modules/Trackers/UnitInteraction.lua
+Modules/Trackers/GameObject.lua
+Modules/Trackers/UnitState.lua
+Modules/Trackers/GroupState.lua
+Modules/Trackers/SkillLines.lua
+Modules/Trackers/SpellBook.lua
+Modules/Trackers/ResetTime.lua
+Modules/Trackers/Display.lua
+Modules/Trackers/PlayerProgress.lua
+Modules/Trackers/ItemInfo.lua
+Modules/Trackers/FrameHeartbeat.lua
+
+Modules/Dumps/MapHierarchy.lua
+
+Modules/Export/Encoding.lua
+Modules/Export/Export.lua
+Modules/Export/ExportUI.lua
+Modules/Export/ExportReminder.lua
+
+QuestieTrace.lua

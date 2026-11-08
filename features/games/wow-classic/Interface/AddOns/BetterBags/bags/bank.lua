@@ -56,6 +56,7 @@ local isClosingBank = false
 ---@class BankBehaviorProto
 ---@field bag Bag Reference to the parent bag
 bank.proto = {}
+addon:GetModule('Perf'):RegisterPrototype(bank.proto, 'Bank')
 
 -- SuppressBlizzardBankPanel neutralizes Blizzard's BankPanel so BetterBags can render its own
 -- bank window. The panel must stay Shown (invisibly) for GetActiveBankType to work, so we drop
@@ -89,8 +90,10 @@ function bank:SuppressBlizzardBankPanel()
 	BankPanel:Show()
 end
 
+-- OnShow sets the bank up and shows its window; onShown runs once the window has finished showing.
 ---@param ctx Context
-function bank.proto:OnShow(ctx)
+---@param onShown? fun()
+function bank.proto:OnShow(ctx, onShown)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 
 	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
@@ -123,79 +126,40 @@ function bank.proto:OnShow(ctx)
 		end
 	end
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		-- Set up callback to handle BankPanel and tab initialization
-		self.bag.fadeInGroup.callback = function()
-			self.bag.fadeInGroup.callback = nil  -- Clean up callback
+	-- CRITICAL: BankPanel taint handling (see patterns.md)
+	-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
+	bank:SuppressBlizzardBankPanel()
 
-			-- CRITICAL: BankPanel taint handling (see patterns.md)
-			-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-			bank:SuppressBlizzardBankPanel()
+	local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
+	self.bag.tabs:SetTabByID(ctx, activeGroup)
+	self:SwitchToGroup(ctx, activeGroup)
 
-			local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
-			self.bag.tabs:SetTabByID(ctx, activeGroup)
-			self:SwitchToGroup(ctx, activeGroup)
+	self.bag.moneyFrame:Update()
+	self.bag.window:Show(ctx, onShown)
+	addon.TriggerItemContextChanged()
 
-			self.bag.moneyFrame:Update()
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-
-			-- Restore the bank tab slots panel when the setting is enabled,
-			-- so re-opening the bank shows the same mode as when it was closed.
-			if self.bag.slots and database:GetShowBankTabs() then
-				-- Ensure BankPanel bank type matches the pre-selected first tab.
-				-- SwitchToGroup() above may have set it to Account if the active
-				-- group is a Warbank group; correct it here so right-click item
-				-- deposits go to the right bank type for the displayed tab.
-				local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
-				if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
-					if firstButton.bankType == Enum.BankType.Account then
-						BankPanel:SetBankType(Enum.BankType.Account)
-					else
-						BankPanel:SetBankType(Enum.BankType.Character)
-					end
-				end
-				self.bag.slots:Draw(ctx)
-				self.bag.slots:Show()
+	-- Restore the bank tab slots panel when the setting is enabled,
+	-- so re-opening the bank shows the same mode as when it was closed.
+	if self.bag.slots and database:GetShowBankTabs() then
+		-- Ensure BankPanel bank type matches the pre-selected first tab.
+		-- SwitchToGroup() above may have set it to Account if the active
+		-- group is a Warbank group; correct it here so right-click item
+		-- deposits go to the right bank type for the displayed tab.
+		local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
+		if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
+			if firstButton.bankType == Enum.BankType.Account then
+				addon.SetBlizzardBankType(Enum.BankType.Account)
+			else
+				addon.SetBlizzardBankType(Enum.BankType.Character)
 			end
 		end
-		self.bag.fadeInGroup:Play()
-	else
-		-- Direct show path (existing logic)
-		-- CRITICAL: BankPanel taint handling (see patterns.md)
-		-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-		bank:SuppressBlizzardBankPanel()
-
-		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
-		self.bag.tabs:SetTabByID(ctx, activeGroup)
-		self:SwitchToGroup(ctx, activeGroup)
-
-		self.bag.moneyFrame:Update()
-		self.bag.frame:Show()
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-
-		-- Restore the bank tab slots panel when the setting is enabled,
-		-- so re-opening the bank shows the same mode as when it was closed.
-		if self.bag.slots and database:GetShowBankTabs() then
-			-- Ensure BankPanel bank type matches the pre-selected first tab.
-			-- SwitchToGroup() above may have set it to Account if the active
-			-- group is a Warbank group; correct it here so right-click item
-			-- deposits go to the right bank type for the displayed tab.
-			local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
-			if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
-				if firstButton.bankType == Enum.BankType.Account then
-					BankPanel:SetBankType(Enum.BankType.Account)
-				else
-					BankPanel:SetBankType(Enum.BankType.Character)
-				end
-			end
-			self.bag.slots:Draw(ctx)
-			self.bag.slots:Show()
-		end
+		self.bag.slots:Draw(ctx)
+		self.bag.slots:Show()
 	end
 end
 
-function bank.proto:OnHide()
+---@param ctx Context
+function bank.proto:OnHide(ctx)
 	-- IMPORTANT: Do NOT touch BankPanel or call CloseBankFrame() here.
 	-- OnHide runs in protected context when triggered by UISpecialFrames (ESC key).
 	-- Any BankPanel manipulation here causes persistent taint that breaks UseContainerItem()
@@ -205,35 +169,18 @@ function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeOutGroup.callback = function()
-			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			-- Explicitly reset the bank slots panel's shown state so it does not
-			-- auto-reappear when the bank is reopened (bag.frame:Show() would
-			-- otherwise re-show any child whose IsShown() is still true).
-			if self.bag.slots then
-				local ctx = context:New("OnHide")
-				if self.bag.slots.OnClose then
-					self.bag.slots:OnClose(ctx)
-				end
-				self.bag.slots.frame:Hide()
-			end
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-		end
-		self.bag.fadeOutGroup:Play()
-	else
-		self.bag.frame:Hide()
-		-- Explicitly reset the bank slots panel's shown state (see fade path above).
+	self.bag.window:Hide(ctx, function()
+		-- Explicitly reset the bank slots panel's shown state so it does not
+		-- auto-reappear when the bank is reopened (bag.frame:Show() would
+		-- otherwise re-show any child whose IsShown() is still true).
 		if self.bag.slots then
-			local ctx = context:New("OnHide")
 			if self.bag.slots.OnClose then
-				self.bag.slots:OnClose(ctx)
+				self.bag.slots:OnClose(ctx or context:New("OnHide"))
 			end
 			self.bag.slots.frame:Hide()
 		end
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-	end
+		addon.TriggerItemContextChanged()
+	end)
 end
 
 -- SwitchToBlizzardTab filters the bank view to show only items from the
@@ -249,29 +196,30 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	-- resolver (items:ResolveItemContextMatchResult) sees the active bank tab
 	-- when deciding whether an item is greyed out for the current bank type.
 	self.bag.bankTab = bagIndex
+	self:UpdatePurchaseBankButton()
 
 	-- Update BankPanel bank type so right-click item deposits go to the
 	-- correct bank (character vs account/warbank).
 	if addon.isRetail and BankPanel and BankPanel.SetBankType then
 		if Enum.BagIndex.AccountBankTab_1 and bagIndex >= Enum.BagIndex.AccountBankTab_1 then
-			BankPanel:SetBankType(Enum.BankType.Account)
+			addon.SetBlizzardBankType(Enum.BankType.Account)
 		else
-			BankPanel:SetBankType(Enum.BankType.Character)
+			addon.SetBlizzardBankType(Enum.BankType.Character)
 		end
 	end
 
 	self.bag.currentItemCount = -1
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 
 	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
 	-- during its own data sweep, resolved against the active bank type. Switching
 	-- bank tabs changes that context (e.g. Warbank -> Character bank), so the
-	-- backpack must be re-swept and redrawn or its grey-out stays stale until the
+	-- backpack must be recalculated and redrawn or its grey-out stays stale until the
 	-- next backpack refresh (previously only a manual sort cleared it).
 	if addon.atBank then
-		events:SendMessage(ctx, 'bags/RefreshBackpack')
+		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
 	end
 end
 
@@ -291,6 +239,17 @@ function bank.proto:OnCreate(ctx)
 			self.bag.slots = slots
 		end
 	end
+
+	-- Buying a bank tab is protected (C_Bank.PurchaseBankTab), so the click must be the
+	-- template's own OnClick, which opens Blizzard's purchase dialog. Never set an OnClick.
+	local purchaseBankButton = CreateFrame("Button", "BetterBagsPurchaseBankButton", self.bag.frame, "BankPanelPurchaseButtonScriptTemplate, UIPanelButtonTemplate")
+	purchaseBankButton:SetAttribute("overrideBankType", Enum.BankType.Character)
+	purchaseBankButton:SetText(L:G("Purchase Bank"))
+	purchaseBankButton:SetSize(purchaseBankButton:GetTextWidth() + 40, 26)
+	purchaseBankButton:SetPoint("CENTER", self.bag.scrollBox, "CENTER")
+	purchaseBankButton:SetFrameLevel(self.bag.scrollBox:GetFrameLevel() + 10)
+	purchaseBankButton:Hide()
+	self.bag.purchaseBankButton = purchaseBankButton
 
 	self.bag.tabs:SetClickHandler(function(ectx, tabID, button)
 		if tabID == NEW_GROUP_TAB_ID then
@@ -317,6 +276,28 @@ end
 
 function bank.proto:OnRefresh()
 	-- Retail bank is event-driven, refresh handled via BANKFRAME events
+end
+
+-- NeedsBankPurchase returns whether the bank shows the character bank while the character
+-- owns no character bank tab and one can be bought, so the bank has nothing to show. On WoW:
+-- Forever the first tab is free, but only Blizzard's own bank window, which BetterBags hides,
+-- buys it (BankFrameMixin:PurchaseFirstSlot).
+---@return boolean
+function bank.proto:NeedsBankPurchase()
+	if const.ACCOUNT_BANK_BAGS[self.bag.bankTab] then
+		return false
+	end
+	return C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Character) == 0
+		and C_Bank.FetchNextPurchasableBankTabData(Enum.BankType.Character) ~= nil
+end
+
+function bank.proto:UpdatePurchaseBankButton()
+	self.bag.purchaseBankButton:SetShown(self:NeedsBankPurchase())
+	-- The classic bag's Loading... gives way to the button. BetterBags Next's bank, which uses these
+	-- methods with itself as the bag (next/bank.lua), draws its own.
+	if self.bag.UpdateLoadingText then
+		self.bag:UpdateLoadingText()
+	end
 end
 
 ---@return FrameStrata
@@ -350,6 +331,7 @@ function bank.proto:RegisterEvents()
 
 	events:RegisterEvent("BANK_TABS_CHANGED", function(ectx)
 		behavior:GenerateGroupTabs(ectx)
+		behavior:UpdatePurchaseBankButton()
 	end)
 
 	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ctx, _)
@@ -379,6 +361,14 @@ function bank.proto:RegisterEvents()
 		end
 		behavior:GenerateGroupTabs(ctx)
 	end)
+end
+
+-- Resync catches up on what RegisterEvents' handlers would have done while the classic design was
+-- switched off (next.md §11): the tabs, and the Purchase Bank button.
+---@param ctx Context
+function bank.proto:Resync(ctx)
+	self:GenerateGroupTabs(ctx)
+	self:UpdatePurchaseBankButton()
 end
 
 ---@return boolean
@@ -571,30 +561,31 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	-- Update bankType
 	if addon.isRetail and group.bankType == Enum.BankType.Account then
 		if BankPanel and BankPanel.SetBankType then
-			BankPanel:SetBankType(Enum.BankType.Account)
+			addon.SetBlizzardBankType(Enum.BankType.Account)
 		end
 		self.bag.bankTab = Enum.BagIndex.AccountBankTab_1 -- Set a default so right-click deposits know it's a Warbank tab
 	else
 		if BankPanel and BankPanel.SetBankType then
-			BankPanel:SetBankType(Enum.BankType.Character)
+			addon.SetBlizzardBankType(Enum.BankType.Character)
 		end
 		self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	end
+	self:UpdatePurchaseBankButton()
 
 	self.bag:SetTitle(group.name)
 	self.bag.currentItemCount = -1
 
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 
 	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
 	-- during its own data sweep, resolved against the active bank type. Switching
 	-- group tabs changes that context (e.g. Warbank -> Character bank), so the
-	-- backpack must be re-swept and redrawn or its grey-out stays stale until the
+	-- backpack must be recalculated and redrawn or its grey-out stays stale until the
 	-- next backpack refresh (previously only a manual sort cleared it).
 	if addon.atBank then
-		events:SendMessage(ctx, 'bags/RefreshBackpack')
+		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false, categoriesUnchanged = true })
 	end
 end
 
@@ -603,7 +594,7 @@ function bank.proto:SwitchToBankAndWipe(ctx)
 	ctx:Set("wipe", true)
 	self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	if BankPanel and BankPanel.SetBankType then
-		BankPanel:SetBankType(Enum.BankType.Character)
+		addon.SetBlizzardBankType(Enum.BankType.Character)
 	end
 	if self.bag.tabs then
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)

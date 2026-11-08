@@ -6,14 +6,11 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@cast addon +AceHook-3.0
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class BagFrame: AceModule
-local BagFrame = addon:GetModule('BagFrame')
+---@class BagSystem: AceModule
+local bagSystem = addon:GetModule('BagSystem')
 
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
@@ -69,14 +66,9 @@ local refresh = addon:GetModule('Refresh')
 ---@class ItemLoader: AceModule
 local itemLoader = addon:GetModule('ItemLoader')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
 
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
-
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
@@ -90,13 +82,23 @@ local debug = addon:GetModule('Debug')
 ---@class Form: AceModule
 local form = addon:GetModule('Form')
 
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
+
+---@class PerfSessions: AceModule
+local perfSessions = addon:GetModule('PerfSessions')
+
 ---@class BagFrames
 ---@field Backpack Bag
 ---@field Bank Bag
 addon.Bags = {}
 
+---@type NextVendorPanel? BetterBags Next's vendor (next.md §10), made only while BetterBags Next is on.
+addon.Vendor = nil
+
 addon.atBank = false
 addon.atWarbank = false
+addon.atAuctionHouse = false
 
 -- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
 function BetterBags_ToggleBags()
@@ -164,6 +166,14 @@ end
 function addon:OnInitialize()
   -- 1. Core and Utilities
   events:Init()
+  -- The profiler comes up before everything else it can measure: a capture armed for this
+  -- reload installs its wrappers here, so every Init below is part of the session.
+  perf:Init()
+  perfSessions:Init()
+  perfSessions:StartIfArmed()
+  addon:GetModule('RenderRecorder'):Init()
+  addon:GetModule('PixelAudit'):Init()
+  addon:GetModule('Simulator'):Init()
   debug:Init()
   async:Init()
   addon:GetModule('Bucket'):Init()
@@ -174,20 +184,51 @@ function addon:OnInitialize()
   -- 3. Data Models and Scanners
   addon:GetModule('TooltipScanner'):Init()
   itemLoader:Init()
+  addon:GetModule('GuildBank'):Init()
   categories:Init()
   addon:GetModule('Groups'):Init()
   addon:GetModule('EquipmentSets'):Init()
   search:Init()
   items:Init()
   refresh:Init()
+  addon:GetModule('Seller'):Init()
+  addon:GetModule('Automation'):Init()
+  addon:GetModule('Currencies'):Init()
 
   -- 4. Themes and Presentation Frames
-  themes:Init()
+  addon:GetModule('Render'):Init()
+  addon:GetModule('Motion'):Init()
+  addon:GetModule('Window'):Init()
+  addon:GetModule('Sonata'):Init()
+  -- BetterBags Next's look, from its saved theme, before any of its panels is made.
+  addon:GetModule('SonataNext'):Init()
+  -- Its pixel grid (docs/next-pixel-perfect.md): the theme is applied again when the grid changes.
+  addon:GetModule('NextPixel'):Init()
+  -- The shatter layer's pools and the shards flying on it (next-themes.md §22).
+  addon:GetModule('NextShatter'):Init()
+  -- The smoke and bats layers' pools and the puffs and bats living out on them (next-themes.md §23).
+  addon:GetModule('NextSmoke'):Init()
+  addon:GetModule('NextBats'):Init()
+  -- The beam layer's pool and the beams going out on it (next-themes.md §24).
+  addon:GetModule('NextBeam'):Init()
+  -- The paper layer's pool and the sheets going on it (next-themes.md §25).
+  addon:GetModule('NextPaper'):Init()
+  -- The sheen layer's pool and the bands of light crossing on it (next-themes-glass.md §26).
+  addon:GetModule('NextSheen'):Init()
+  -- The client's fonts its roles copy, rewritten by UI addons once the game has loaded (docs/next-gw2-theme.md).
+  addon:GetModule('SonataNext'):WatchClientFonts()
+  -- The player's Animation switches, laid over the theme in use as they change (next-themes.md §20).
+  addon:GetModule('SonataNext'):WatchAnimation()
+  -- BetterBags Next's settings window (next-settings.md §3): built the first time it opens.
+  addon:GetModule('NextSettings'):Init()
+  addon:GetModule('NextSettingsContent'):Init()
+  addon:GetModule('Tabs'):Init()
   itemFrame:Init()
   sectionFrame:Init()
   contextMenu:Init()
   addon:GetModule('BagButton'):Init()
   addon:GetModule('ItemRowFrame'):Init()
+  bagSystem:Init()
 
   -- 5. Integrations
   consoleport:Init()
@@ -195,7 +236,10 @@ function addon:OnInitialize()
   applyCompat()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_initialize')
-  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+  -- The bags of the design the setting names, the classic bags or BetterBags Next (next.md §11),
+  -- each made in an event scope of its own so it can be switched without a reload.
+  local design = bagSystem:SavedDesign()
+  addon.Bags.Backpack = bagSystem:CreateBackpack(rootctx, design)
 
   -- Establish the bag-button bindings and the highlight-button list before any
   -- of the fallible frame/theme/bank creation below. AceAddon runs
@@ -238,35 +282,20 @@ function addon:OnInitialize()
     end
   end
 
-  -- Keep the Blizzard bag-bar highlight in sync with the backpack window on EVERY
-  -- show/hide path, not just addon:ToggleAllBags. The "X" close button
-  -- (frame.Owner:Hide) and ESC (UISpecialFrames hides the frame widget directly) both
-  -- bypass addon.OnUpdate, the only caller of UpdateButtonHighlight, so without these
-  -- hooks the bag-bar buttons stay lit after closing the bag by those paths. Hooking
-  -- our own insecure frame's OnShow/OnHide is taint-free and idempotent with OnUpdate.
-  addon.Bags.Backpack.frame:HookScript("OnShow", function()
-    addon:UpdateButtonHighlight()
-  end)
-  addon.Bags.Backpack.frame:HookScript("OnHide", function()
-    addon:UpdateButtonHighlight()
-  end)
+  addon:WatchBackpackFrame(addon.Bags.Backpack.frame)
 
-  -- Only create the bank bag if the setting is enabled
-  if database:GetEnableBankBag() then
-    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-  end
+  -- The rest of the design: the bank with Enable Bank Bags, and BetterBags Next's vendor (next.md
+  -- §10), which takes Blizzard's merchant frame under the hidden frame Blizzard's bags are under
+  -- (kept apart from addon.Bags: it is no bag).
+  bagSystem:CreateRest(rootctx:Copy(), design)
+  bagSystem:Use(design)
 
-  -- Apply themes globally -- do not instantiate new windows after this call.
-  themes:Enable()
+  -- Sonata decorates every window registered so far with the saved theme (Default when it is
+  -- missing or unavailable this session); windows made later are decorated as they register.
+  addon:GetModule('Sonata'):Enable()
 
-  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
-
-  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-
-  -- Only add bank to UISpecialFrames if it was created
-  if addon.Bags.Bank then
-    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-  end
+  -- The backpack's title, and Escape closes every window of the design.
+  bagSystem:Finish(design)
 
   -- Disable the bag tutorial screens, as Better Bags does not match
   -- the base UI/UX these screens refer to.
@@ -277,6 +306,22 @@ function addon:OnInitialize()
 end
 
 
+-- WatchBackpackFrame keeps the Blizzard bag-bar highlight in sync with a backpack's frame on EVERY
+-- show/hide path, not just addon:ToggleAllBags. The "X" close button (frame.Owner:Hide) and ESC
+-- (UISpecialFrames hides the frame widget directly) both bypass addon.OnUpdate, the only caller of
+-- UpdateButtonHighlight, so without these hooks the bag-bar buttons stay lit after closing the bag
+-- by those paths. Hooking our own insecure frame's OnShow/OnHide is taint-free and idempotent with
+-- OnUpdate. Each design's backpack is watched once it is made (core/bagsystem.lua).
+---@param frame Frame
+function addon:WatchBackpackFrame(frame)
+  frame:HookScript("OnShow", function()
+    addon:UpdateButtonHighlight()
+  end)
+  frame:HookScript("OnHide", function()
+    addon:UpdateButtonHighlight()
+  end)
+end
+
 ---@param bagid number
 ---@return Bag|nil
 function addon:GetBagFromBagID(bagid)
@@ -284,7 +329,10 @@ function addon:GetBagFromBagID(bagid)
     return addon.Bags.Backpack
   elseif const.BANK_BAGS[bagid] then
     return addon.Bags.Bank
-  elseif const.ACCOUNT_BANK_BAGS[bagid] then
+  elseif const.GUILD_BANK_BAGS[bagid] then
+    return addon.Bags.GuildBank
+  elseif const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid] then
+    -- Classic has no Warbank (no ACCOUNT_BANK_BAGS).
     return addon.Bags.Bank
   else
     return nil
@@ -298,6 +346,8 @@ function addon:GetBagFromKind(kind)
     return addon.Bags.Backpack
   elseif kind == const.BAG_KIND.BANK then
     return addon.Bags.Bank
+  elseif kind == const.BAG_KIND.GUILD then
+    return addon.Bags.GuildBank
   else
     return nil
   end
@@ -372,14 +422,20 @@ function addon:OnEnable()
   pawn:Enable()
   question:Enable()
   itemLoader:Enable()
+  addon:GetModule('GuildBank'):Enable()
   refresh:Enable()
+  addon:GetModule('Seller'):Enable()
+  addon:GetModule('Automation'):Enable()
+  addon:GetModule('Currencies'):Enable()
   views:Enable()
-  searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
+  addon:GetModule('ChangelogWindow'):Enable()
+  addon:GetModule('NextSettingsContent'):Enable()
 
   consoleport:Enable()
   quickfind:Enable()
+  addon:GetModule('ProfessionShoppingList'):Enable()
 
   self:SecureHook('ToggleAllBags')
   self:SecureHook('CloseSpecialWindows')
@@ -408,19 +464,33 @@ function addon:OnEnable()
   if addon.Bags.Bank then
     events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
       debug:Log("init/OnInitialize/items", "Drawing bank")
-       -- Show the bank frame if it's not already shown.
-      if not addon.Bags.Bank:IsShown() and addon.atBank then
-        addon.Bags.Bank:Show(ctx)
-      end
-      addon.Bags.Bank:Draw(ctx, slotInfo, function()
+      local function drawn()
         events:SendMessage(ctx, 'bags/Draw/Bank/Done')
         if not addon.Bags.Bank.loaded then
           addon.Bags.Bank.loaded = true
           events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
         end
-      end)
+      end
+      -- Show the bank frame if it's not already shown. Showing it draws it (the draw its
+      -- behavior deferred while it was hidden), so it is not drawn a second time.
+      if not addon.Bags.Bank:IsShown() and addon.atBank and addon.Bags.Bank:Show(ctx, slotInfo) then
+        drawn()
+        return
+      end
+      addon.Bags.Bank:Draw(ctx, slotInfo, drawn)
     end)
   end
+
+  -- The guild bank's panel exists only with BetterBags Next, which a switch can make after this
+  -- (next.md §11), so it is looked for at each read.
+  events:RegisterMessage('items/RefreshGuildBank/Done', function(ctx, slotInfo)
+    local guildBank = addon.Bags.GuildBank
+    if guildBank then
+      guildBank:Draw(ctx, slotInfo, function()
+        events:SendMessage(ctx, 'bags/Draw/GuildBank/Done')
+      end)
+    end
+  end)
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 

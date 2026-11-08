@@ -21,6 +21,11 @@ local BagButtonFrame = addon:NewModule('BagButton')
 
 local buttonCount = 0
 
+-- An empty container slot's art on WoW: Forever 1.60.1.70790, which removed ItemSlotBackgroundCombinedBagsTemplate
+-- (Mainline/ContainerFrame.xml) and draws its own empty slots in this atlas
+-- (ContainerFrameItemButtonMixin:GetItemButtonBackgroundTexture).
+local FOREVER_EMPTY_SLOT_ATLAS = "bags-item-slot64"
+
 ---@class BagButton
 ---@field frame ItemButton|Button
 ---@field masqueGroup string
@@ -29,6 +34,7 @@ local buttonCount = 0
 ---@field kind BagKind
 ---@field canBuy boolean
 BagButtonFrame.bagButtonProto = {}
+addon:GetModule('Perf'):RegisterPrototype(BagButtonFrame.bagButtonProto, 'BagButtonFrame')
 
 ---@param ctx Context
 function BagButtonFrame.bagButtonProto:Draw(ctx)
@@ -153,26 +159,47 @@ function BagButtonFrame.bagButtonProto:OnClick()
   end
   if self.empty and self.kind == const.BAG_KIND.BANK and self.canBuy then self:CheckForPurchase() return end
   if IsModifiedClick("PICKUPITEM") then
-    PickupBagFromSlot(self.invID)
+    BagButtonFrame:PickupBag(self.invID)
   else
-    PutItemInBag(self.invID)
+    BagButtonFrame:PutInBag(self.invID)
   end
 end
 
 function BagButtonFrame.bagButtonProto:OnDragStart()
-  if InCombatLockdown() then
-    print("BetterBags: "..L:G("Cannot change bags in combat."))
-    return
-  end
-  PickupBagFromSlot(self.invID)
+  BagButtonFrame:PickupBag(self.invID)
 end
 
 function BagButtonFrame.bagButtonProto:OnReceiveDrag()
+  BagButtonFrame:PutInBag(self.invID)
+end
+
+-- PickupBag picks the bag in a bag slot (an inventory slot, C_Container.ContainerIDToInventoryID) up, as
+-- Blizzard's bag slot buttons do on a drag (BaseBagSlotButtonMixin:BagSlotOnDragStart); never in
+-- combat, where the game changes no bag. The classic bags' bag buttons and BetterBags Next's bag tabs
+-- (Show Blizzard Bags) use it. It returns whether it did.
+---@param invID number
+---@return boolean
+function BagButtonFrame:PickupBag(invID)
   if InCombatLockdown() then
     print("BetterBags: "..L:G("Cannot change bags in combat."))
-    return
+    return false
   end
-  PutItemInBag(self.invID)
+  PickupBagFromSlot(invID)
+  return true
+end
+
+-- PutInBag puts the bag on the cursor in a bag slot, the one there coming onto the cursor, as Blizzard's
+-- bag slot buttons do on a drop or a click (BagSlotOnReceiveDrag, PutItemInBag); never in combat. It
+-- returns whether it did.
+---@param invID number
+---@return boolean
+function BagButtonFrame:PutInBag(invID)
+  if InCombatLockdown() then
+    print("BetterBags: "..L:G("Cannot change bags in combat."))
+    return false
+  end
+  PutItemInBag(invID)
+  return true
 end
 
 function BagButtonFrame:Init()
@@ -212,7 +239,10 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  if addon.isRetail then
+  if addon.isForever then
+    f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", nil, -6)
+    f.ItemSlotBackground:SetAtlas(FOREVER_EMPTY_SLOT_ATLAS)
+  elseif addon.isRetail then
     f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   else
     f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND")

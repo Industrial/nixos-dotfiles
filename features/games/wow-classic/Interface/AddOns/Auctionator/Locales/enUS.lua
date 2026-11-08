@@ -87,10 +87,11 @@ AUCTIONATOR_LOCALES.enUS = function()
   L["CONFIG_SELLING_ALL_ITEMS_CATEGORY"] = "Selling: All Items"
 
   L["AUTHOR_HEADER"] = "Author"
+  L["PAST_AUTHOR_HEADER"] = "Past Author"
   L["TRANSLATORS_HEADER"] = "Translators"
   L["VERSION_HEADER"] = "Version"
   L["OPEN_ADDON_OPTIONS"] = "Open Addon Options"
-  L["ENGAGE_HEADER"] = "Engage With Auctionator"
+  L["SUPPORT_HEADER"] = "Get support"
   L["DISCORD"] = "Discord"
   L["DISCORD_TOOLTIP_HEADER"] = "Join us in Discord!"
   L["DISCORD_TOOLTIP_TEXT"] = "We have an active community of Auctionator users that can help answer any questions you might have."
@@ -506,9 +507,9 @@ AUCTIONATOR_LOCALES.enUS = function()
   L["ADD_TO_X"] = "Add to %s"
   L["REMOVE_FROM_X"] = "Remove from %s"
 
-  L["CONTRIBUTE_HEADER"] = "|cff04cca4Development is time consuming. Consider supporting|r"
+  L["CONTRIBUTE_HEADER"] = "|cff04cca4Development is done by a hardworking human (no AI)|r"
   L["CONTRIBUTE_TOOLTIP_HEADER"] = "About donating"
-  L["CONTRIBUTE_TOOLTIP_TEXT"] = "Auctionator has had thousands of hours spent on development and support to get it to its current state in just the last few years. Donating is one way of supporting this indefinitely."
+  L["CONTRIBUTE_TOOLTIP_TEXT"] = "Auctionator has had tens of thousands of hours spent on development and support to get it to its current state. Donating is one way of supporting this indefinitely."
   L["DONATE"] = "Donate"
 
   return L

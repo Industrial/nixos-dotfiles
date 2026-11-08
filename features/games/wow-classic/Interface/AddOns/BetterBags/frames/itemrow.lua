@@ -27,6 +27,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field text FontString
 ---@field slotkey string
 item.itemRowProto = {}
+addon:GetModule('Perf'):RegisterPrototype(item.itemRowProto, 'ItemRow')
 
 function item.itemRowProto:Unlock()
 end
@@ -177,8 +178,10 @@ function item:_DoCreate(ctx)
   buttonCount = buttonCount + 1
 
   -- Create a hidden parent to the ItemButton frame to work around
-  -- item taint introduced in 10.x
+  -- item taint introduced in 10.x. It stays hidden until the row is drawn: the button inside
+  -- reacts to being visible.
   local p = CreateFrame("Frame")
+  p:Hide()
   i.frame = p
   --TODO(lobato): Create our own template for row buttons.
   ---@class ItemButton
@@ -205,7 +208,7 @@ function item:_DoCreate(ctx)
   text:SetTextHeight(28)
   text:SetWordWrap(true)
   text:SetJustifyH("LEFT")
-  text:SetFont("Fonts\\FRIZQT__.TTF", 14, "")
+  text:SetFont(STANDARD_TEXT_FONT, 14, "")
   text:SetShadowColor(0, 0, 0, 1)
   i.text = text
 

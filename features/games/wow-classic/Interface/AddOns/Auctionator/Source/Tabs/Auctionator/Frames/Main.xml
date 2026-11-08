@@ -21,28 +21,28 @@
 
       <Frame inherits="AuctionatorConfigurationSubHeadingFrame" parentKey="Author">
         <KeyValues>
-          <KeyValue key="subHeadingText" value="Borj(amacare)" type="string"/>
+          <KeyValue key="subHeadingText" value="plusmouse" type="string"/>
         </KeyValues>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.AuthorHeading" relativePoint="BOTTOMLEFT" y="10" />
+          <Anchor point="TOPLEFT" relativeKey="$parent.AuthorHeading" relativePoint="BOTTOMLEFT" y="10"/>
         </Anchors>
       </Frame>
 
-      <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="ContributorsHeading">
+      <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="PastAuthorHeading">
         <KeyValues>
-          <KeyValue key="headingText" value="AUCTIONATOR_L_AUTHOR_HEADER" type="global"/>
+          <KeyValue key="headingText" value="AUCTIONATOR_L_PAST_AUTHOR_HEADER" type="global"/>
         </KeyValues>
         <Anchors>
           <Anchor point="TOPLEFT" relativeKey="$parent.AuthorHeading" relativePoint="TOPRIGHT" />
         </Anchors>
       </Frame>
 
-      <Frame inherits="AuctionatorConfigurationSubHeadingFrame" parentKey="Contributors">
+      <Frame inherits="AuctionatorConfigurationSubHeadingFrame" parentKey="PastAuthor">
         <KeyValues>
-          <KeyValue key="subHeadingText" value="plusmouse" type="string"/>
+          <KeyValue key="subHeadingText" value="Borj(amacare)" type="string"/>
         </KeyValues>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.ContributorsHeading" relativePoint="BOTTOMLEFT" y="10"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.PastAuthorHeading" relativePoint="BOTTOMLEFT" y="10" />
         </Anchors>
       </Frame>
 
@@ -51,7 +51,7 @@
           <KeyValue key="headingText" value="AUCTIONATOR_L_VERSION_HEADER" type="global"/>
         </KeyValues>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.ContributorsHeading" relativePoint="TOPRIGHT" x="-280"/>
+          <Anchor point="TOPLEFT" relativeKey="$parent.PastAuthorHeading" relativePoint="TOPRIGHT" x="-280"/>
         </Anchors>
       </Frame>
 
@@ -87,7 +87,7 @@
 
       <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="EngageHeading">
         <KeyValues>
-          <KeyValue key="headingText" value="AUCTIONATOR_L_ENGAGE_HEADER" type="global"/>
+          <KeyValue key="headingText" value="AUCTIONATOR_L_SUPPORT_HEADER" type="global"/>
         </KeyValues>
         <Anchors>
           <Anchor point="TOPLEFT" relativeKey="$parent.ContributeLink" relativePoint="BOTTOMLEFT" y="15"/>
@@ -106,24 +106,12 @@
         </Anchors>
       </Frame>
 
-      <Frame inherits="AuctionatorConfigurationCopyAndPasteFrame" parentKey="BugReportLink">
-        <KeyValues>
-          <KeyValue key="labelText" value="AUCTIONATOR_L_BUG_REPORT" type="global"/>
-          <KeyValue key="copyText" value="https://github.com/TheMouseNest/Auctionator/issues" type="string"/>
-          <KeyValue key="tooltipTitleText" value="AUCTIONATOR_L_BUG_TOOLTIP_HEADER" type="global"/>
-          <KeyValue key="tooltipText" value="AUCTIONATOR_L_BUG_TOOLTIP_TEXT" type="global"/>
-        </KeyValues>
-        <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.DiscordLink" relativePoint="BOTTOMLEFT" y="10" />
-        </Anchors>
-      </Frame>
-
       <Frame inherits="AuctionatorConfigurationHeadingFrame" parentKey="TranslatorsHeading">
         <KeyValues>
           <KeyValue key="headingText" value="AUCTIONATOR_L_TRANSLATORS_HEADER" type="global"/>
         </KeyValues>
         <Anchors>
-          <Anchor point="TOPLEFT" relativeKey="$parent.BugReportLink" relativePoint="BOTTOMLEFT" y="15" />
+          <Anchor point="TOPLEFT" relativeKey="$parent.DiscordLink" relativePoint="BOTTOMLEFT" y="15" />
         </Anchors>
       </Frame>
 

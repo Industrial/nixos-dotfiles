@@ -701,8 +701,7 @@ L["STRING_OPTIONS_DESIGNER_DESATURATED_MENU"] = "Обесцвеченные кн
 L["STRING_OPTIONS_DESIGNER_FACTION_ICON_SIZE_OFFSET"] = "Смещение размера значка фракции"
 L["STRING_OPTIONS_DESIGNER_HINT"] = "Нажмите на часть предпросмотра, чтобы отредактировать. Изменения применяются к окну, выбранному в правом верхнем углу."
 L["STRING_OPTIONS_DESIGNER_ICON_GRAYSCALE"] = "Иконки в оттенках серого"
---[[Translation missing --]]
-L["STRING_OPTIONS_DESIGNER_ICON_SET"] = "Icon Set"
+L["STRING_OPTIONS_DESIGNER_ICON_SET"] = "Набор иконок"
 L["STRING_OPTIONS_DESIGNER_ICON_SIZE_OFFSET"] = "Смещение размера иконки"
 L["STRING_OPTIONS_DESIGNER_MENU_ICON_SIZE"] = "Размер кнопки"
 L["STRING_OPTIONS_DESIGNER_MENU_ICON_SPACING"] = "Расстояние между кнопками"
@@ -950,8 +949,8 @@ L["STRING_OPTIONS_OVERALL_LOGOFF"] = "Очищать при выходе из м
 L["STRING_OPTIONS_OVERALL_LOGOFF_DESC"] = "Когда включено, общие данные автоматически стираются при выходе из игрового мира."
 L["STRING_OPTIONS_OVERALL_MYTHICPLUS"] = "Очистить при старте Эпохального+"
 L["STRING_OPTIONS_OVERALL_MYTHICPLUS_DESC"] = "Когда включено, общие данные автоматически стираются при запуске нового эпохального+ прохождения."
-L["STRING_OPTIONS_OVERALL_NEWBOSS"] = "Очищать при новым рейдовым боссе"
-L["STRING_OPTIONS_OVERALL_NEWBOSS_DESC"] = "Когда включено, общие данные автоматически стираются при столкновении с другим рейдовым боссом."
+L["STRING_OPTIONS_OVERALL_NEWBOSS"] = "Очищать при новом рейдовом боссе"
+L["STRING_OPTIONS_OVERALL_NEWBOSS_DESC"] = "При включении этой функции все данные автоматически удаляются при сражении с другим рейдовым боссом."
 L["STRING_OPTIONS_OVERALL_RAIDBOSS"] = "Рейдовые боссы"
 L["STRING_OPTIONS_OVERALL_RAIDBOSS_DESC"] = "Сегменты сражений в рейде добавляются к общим данным."
 L["STRING_OPTIONS_OVERALL_RAIDCLEAN"] = "Рейдовый мусор"
@@ -1029,7 +1028,7 @@ L["STRING_OPTIONS_PROFILES_ERASE_DESC"] = "Удалить выбранный п�
 L["STRING_OPTIONS_PROFILES_RESET"] = "Сброс текущего профиля"
 L["STRING_OPTIONS_PROFILES_RESET_DESC"] = "Сбросить все настройки выбранного профиля до значений по умолчанию."
 L["STRING_OPTIONS_PROFILES_SELECT"] = "Выбрать профиль"
-L["STRING_OPTIONS_PROFILES_SELECT_DESC"] = "Загрузить существующий профиль. Если вы используете один и тот же профиль на всех персонажей (при параметре \"Использовать на всех персонажах\"), то создается исключение для этого персонажа."
+L["STRING_OPTIONS_PROFILES_SELECT_DESC"] = "Загрузить существующий профиль. Если Вы используете один и тот же профиль на всех персонажей (при параметре 'Использовать на всех персонажах'), то создается исключение для этого персонажа."
 L["STRING_OPTIONS_PROFILES_TITLE"] = "Профили"
 L["STRING_OPTIONS_PROFILES_TITLE_DESC"] = "Эти параметры позволяют использовать одни и те же настойки для разных персонажей."
 L["STRING_OPTIONS_PS_ABBREVIATE"] = "Формат чисел"
@@ -1107,7 +1106,7 @@ L["STRING_OPTIONS_RT_DEATHS_WHERE_DESC"] = [=[Выберите место, гд�
 
 |cFFFFFF00Важно|r для рейдов используются /raid канал, а для подземелий /p.
 
-Если выбран |cFFFFFF00Наблюдатель|r, то смерти показываются только для вас в чате.]=]
+Если выбран |cFFFFFF00Наблюдатель|r, то смерти показываются только для Вас в чате.]=]
 L["STRING_OPTIONS_RT_DEATHS_WHERE1"] = "Рейд и Подземелье"
 L["STRING_OPTIONS_RT_DEATHS_WHERE2"] = "Только Рейд"
 L["STRING_OPTIONS_RT_DEATHS_WHERE3"] = "Только подземелье"
@@ -1116,14 +1115,14 @@ L["STRING_OPTIONS_RT_FIRST_HIT_DESC"] = "Печатает в панель чат
 L["STRING_OPTIONS_RT_IGNORE_TITLE"] = "Игнорировать кулдауны"
 L["STRING_OPTIONS_RT_INFOS"] = "Дополнительная информация:"
 L["STRING_OPTIONS_RT_INFOS_PREPOTION"] = "Использованные пре-поты (зелье)"
-L["STRING_OPTIONS_RT_INFOS_PREPOTION_DESC"] = "Когда включено после рейдового сражения пишет в чате (|cFFFFFF00только для вас|r), кто использовал зелье в /pull."
+L["STRING_OPTIONS_RT_INFOS_PREPOTION_DESC"] = "Когда включено после рейдового сражения пишет в чате (|cFFFFFF00только для Вас|r), кто использовал зелье в /pull."
 L["STRING_OPTIONS_RT_INTERRUPT"] = "%s прервано!"
 L["STRING_OPTIONS_RT_INTERRUPT_ANCHOR"] = "Объявлять прерывания:"
 L["STRING_OPTIONS_RT_INTERRUPT_NEXT"] = "Следующий: %s"
 L["STRING_OPTIONS_RT_INTERRUPTS_CHANNEL"] = "Канал"
 L["STRING_OPTIONS_RT_INTERRUPTS_CHANNEL_DESC"] = [=[Какой канал чата используется для отправки предупреждающего сообщения.
 
-Если выбран |cFFFFFF00Наблюдатель|r, то все прерывания отправляться только вам в чат.]=]
+Если выбран |cFFFFFF00Наблюдатель|r, то все прерывания отправляться только Вам в чат.]=]
 L["STRING_OPTIONS_RT_INTERRUPTS_CUSTOM"] = "Ваш текст"
 L["STRING_OPTIONS_RT_INTERRUPTS_CUSTOM_DESC"] = [=[Введите собственную фразу для отправки.
 
@@ -1694,7 +1693,7 @@ L["STRING_UNLOCK"] = "Разгруппировать окна в этой кно
 L["STRING_UNLOCK_WINDOW"] = "разблокировать"
 L["STRING_UPTADING"] = "обновление"
 L["STRING_VERSION_AVAILABLE"] = "Доступна новая версия, загрузите ее из приложения или сайта CurseForge."
-L["STRING_VERSION_UPDATE"] = "новая версия: что изменилось? щелкните сюда"
+L["STRING_VERSION_UPDATE"] = "новая версия: что изменилось? Нажмите здесь"
 L["STRING_VOIDZONE_TOOLTIP"] = "Урон и время"
 L["STRING_WAITPLUGIN"] = "Плагин недоступен, проверьте: - Esc > Аддоны > включен ли там. - Страница плагинов в Details! опции. - Плагин открылся в другом окне. - Плагин используется в закрытом окне."
 L["STRING_WAVE"] = "волна"

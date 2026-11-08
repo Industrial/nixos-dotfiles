@@ -18,9 +18,6 @@ local groups = addon:GetModule('Groups')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
 ---@class QuickFindIntegration: AceModule
 local quickfind = addon:NewModule('QuickFind')
 
@@ -159,8 +156,8 @@ function quickfind:ShowInBag(id)
           bag.behavior:SwitchToAccountBank(ctx, tabID)
         end
       else
-        -- Fallback: unknown tab type, use visual-only
-        if bag.tabs then
+        -- Fallback: unknown tab type, use visual-only (a BetterBags Next bank's tabs have none)
+        if bag.tabs and bag.tabs.SetTabByID then
           bag.tabs:SetTabByID(ctx, tabID)
         end
       end
@@ -173,8 +170,7 @@ function quickfind:ShowInBag(id)
     return
   end
 
-  -- Get the in-bag search box from the themes module
-  local searchBox = themes:GetInBagSearchBox(bag.frame)
+  local searchBox = bag.searchBox
   if searchBox and searchBox.textBox then
     searchBox.textBox:SetText(itemData.itemInfo.itemName)
     searchBox.textBox:SetFocus()

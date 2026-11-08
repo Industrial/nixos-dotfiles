@@ -14,7 +14,6 @@ BetterBags is a bag replacement addon for World of Warcraft, inspired by AdiBags
 It has a fresh, clean look, updated to the 2026 World of Warcraft art style.
 
 It currently includes most of the features of AdiBags and is being worked on daily.  
-One of the last major features currently missing is user selectable themes.  
 If you have any feedback, please let us know in the [Discord](https://discord.gg/a6DQuK8hV7).
 
 BetterBags currently supports the following versions of World of Warcraft:  
@@ -70,7 +69,8 @@ Classic (Era, MoP Classic, SoD, BC Anniversary, etc.)
 - Powerful recent items support with customizable duration (mark all new items as recent, flash all recent items).
 - Right-click category header to move or vendor all items currently in the category.
 - Comprehensive Search that allows you to find an item most properties of an item (`Type`, `Subtype`, `iLvl`, and many more).
-- Multiple built-in themes with plugin support for the creation of more themes.
+- Multiple built-in themes (Default, Simple Dark, Slate, Dark, Parchment, and ElvUI and GW2 UI themes when those are installed), with a declarative theme API for creating more.
+- Bags that size themselves to their items, or windows you resize by dragging their corner (Settings > Resizable Window).
 - Profiles to allow easy swapping of layouts and categories between characters.
 - Category import and export strings to easily share your categories between friends.
 - Robust plugin system allows for custom categories, configurations for user fine-tuning and even localization.
@@ -92,6 +92,7 @@ The Section Grid offers:
 - Categories can be pinned to the top, enabled, disabled or hidden at will.
 - Items within these categories can be sorted alphabetically and then by quality (or vice versa).
 - Multiple stacking options for fine-tuning your own experience.
+- Built-in categories are named after the item's type and, when turned on in the options, its subtype and expansion (for example `Armor - Plate - Classic`). A subtype named like its type is not repeated, so quest items read `Quest` rather than `Quest - Quest`.
 
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/JLlOHxR.png" target="_blank"><img src="https://i.imgur.com/JLlOHxR.png" alt="Section Grid View in Retail."></a>
@@ -116,6 +117,16 @@ This temporary view allows you to see your bags and the items within them how th
 
 *Show Bags in Retail.*
 </div>
+
+### Dropping Items Into Your Bags
+You can drop an item anywhere on the bag or bank window, not just on an empty slot: drag it there and let go, or pick it up and left-click the window. This is the quickest way to unequip gear, by dragging it from your character panel onto your bags.
+- The item goes into the first free slot of a bag made for it (a profession bag of its kind, the reagent bag for crafting reagents, the keyring for keys on Classic Era and WoW: Forever), otherwise into the first ordinary bag, starting with your backpack. It is never put in a special bag it doesn't fit.
+- Dropping on the bank window stores the item in the bank type you are looking at (your character bank or the Warband bank), starting with the tab you have selected.
+- An item you picked up from the same window goes back where it came from.
+- If there is no room, you get the usual "Inventory is full." message and the item stays on your cursor.
+- Dropping on an item swaps with it as always, and holding Shift while dropping on a category name still adds the item to that category.
+- Items dragged from a vendor (buying) are not placed this way; drop them on a slot.
+- A refundable item dropped on the Warband bank stays on your cursor, because putting it in the Warband bank ends its refund. Drop it on a Warband bank slot if that is what you want.
 
 ### Bag Anchor
 By default, the bag and bank will grow from the bottom-left corner. Extending both up and right depending on the number of items per row and number of columns.
@@ -177,6 +188,8 @@ If you would like more glow on the action buttons (more like what AdiBags had), 
 
 ### Item Level Upgrade Arrow
 Equipment in your bags that is an item level upgrade compared to the gear you are currently wearing will have a green upgrade arrow in the top corner of the item in your bags. This lets you easily see which pieces of gear in your bags might be an upgrade, such as when you're leveling and your item level is rapidly increasing.
+
+Gear for an empty equipment slot counts as an upgrade too. An item gets no arrow if your character can't use it, isn't high enough level for it, it isn't your armor type, or it has a primary stat (Strength, Agility, Intellect) that your current specialization doesn't use. While you hold a two-handed weapon, one-handers, shields and off-hands get no arrow, and while you hold a one-hander, two-handed melee weapons get none; a one-hander is compared with your off hand only if you can dual wield. For stat-weighted upgrades, choose Pawn as the upgrade provider.
 
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/QGjlIYX.png" target="_blank"><img src="https://i.imgur.com/QGjlIYX.png" alt="Item Level Upgrade in Retail.">  </a>
@@ -361,7 +374,7 @@ Supported windows include bags, all bank tabs, the mailbox, the trade window, an
 ## Search
 BetterBags offers a comprehensive Search option that can be toggled with a keybinding (`BetterBags > Search Bags`).
 
-When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, `binding`, and `tooltip`. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator. The exception is `tooltip`: there, `=` and `!=` match the text anywhere in the tooltip, the same as `%=`.  
+When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, `binding`, and `tooltip`. A bare word that names a true or false field (eg. `collectable`, `toy`, `pet`) also matches the items where that field is true, so `not collectable` leaves out every pet you can still learn. Quote the word to search for its text alone. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator. The exception is `tooltip`: there, `=` and `!=` match the text anywhere in the tooltip, the same as `%=`.  
 If you would like to exclude items in gear sets from your searches, the easiest way to do so is add `and not category = "gear:"` to the end of your search. (eg. `slot = finger or slot = neck and not (category = 'gear:')` will highlight all rings and necklaces that are NOT part of a gear set)
 Search allows you to find items by the following indices (based on the item below):
 
@@ -375,24 +388,37 @@ Search allows you to find items by the following indices (based on the item belo
 - `name` (name = "Tome of Unstable Power") The name of the item; the first line in the tooltip.
 - `type` (type = Armor) The type of the item. Some examples include Armor, Weapon, Consumable, and Reagent.
 - `subtype` (subtype = Miscellaneous) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
-- `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags.
+- `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags. In a search category's query, it is the category the item has without any search category (a custom category, a gear set, or its type), so a search category is never matched through its own name or another search category's.
 - `equipmentLocation` or `slot` (slot = Trinket) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
-- `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW, Mid.
+- `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW, Mid. `<`, `<=`, `>` and `>=` compare expansions in release order (`exp < legion` finds everything from before Legion), and an expansion can be given by its number (`exp = 3` for Cataclysm, 0 being Classic). In a comparison the start of a name works when only one expansion starts that way (`exp >= mid`, not `exp >= c`).
 - `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece of gear is part of.
 - `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
 - `tooltip` (tooltip = health) The full text of the item's tooltip. Unlike the other string fields, `=` and `!=` match the value anywhere in the tooltip, not only at the start.
+- `bagname` or `bag` (bag = "Herb Satchel") The name of the bag the item is in: Backpack, the bag's own name, Keyring, Bank, Reagent Bank, a bank bag's name, or a guild bank tab's name. A plain search word does not look in it.
+- `track` (track = hero) The upgrade track of upgradeable gear (Retail): Explorer, Adventurer, Veteran, Champion, Hero, Myth, in the game's language.
+- `stat` (stat = haste) The stats on the item, by name: Haste, Critical Strike, Versatility, Mastery, Stamina, Strength, Agility, Intellect, Leech, Speed, Avoidance, sockets, and so on. `stat = crit` finds Critical Strike, as names match from their start.
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
 - `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Artifact = 6, Heirloom = 7.
+- `quality` (quality >= 2) The crafting quality tier of a profession reagent or a crafted item, the number its quality icon shows (Retail only). Items without a tier have none, so `quality != 2` includes them. For Poor to Legendary, use `rarity`.
 - `id` (id = 212685) The internal itemID of the item. A number uniquely identifying the base item. Specific ItemIDs can be found in the url on the item's WoWHead page.
 - `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.
 - `subclass` (subclass = 0) The numeric representation of itemSubtype. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding class and subclass.
-- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic only), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
+- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic), -1 for the keyring (WoW: Forever), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
 - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
+- `minlevel` (minlevel > 70) The character level required to use the item, 0 for none. Not the item level (that is `level`).
+- `stacksize` (stacksize = 200) The most of the item one stack holds. The size of a stack in your bags is `count`.
+- `price` (price > 10000) The vendor sell price of one of the item, in copper (10000 is 1 gold). 0 for items a vendor will not buy.
+- `maxlevel` (maxlevel >= 600) The item level of upgradeable gear once fully upgraded (Retail); for anything else, its item level.
+- `upgradelevel`, `upgrademax` (upgradelevel = 3) How many upgrades upgradeable gear has, and how many its track has (Retail): an item shown as "Hero 3/6" has upgradelevel 3 and upgrademax 6.
+- `petcount`, `petlimit` (petcount = 0) How many of a battle pet item's pet you have, and how many you may have (Retail).
+- `slotequipped` (ilvl > slotequipped) For gear, the lowest item level you wear in its slots (both rings for a ring), 0 when you wear nothing there. A one-hander counts your off hand only if you can dual wield.
+- `slotbest` (maxlevel >= slotbest) For gear, the best item level your character has had in its slot (Retail).
+- `total` (total >= 100) How many of the item the bags hold altogether (the backpack's bags for the backpack, the bank's for the bank), counting every stack of it.
 
 ### Booleans
 - `reagent` (reagent = false) Is the item classified as a reagent?
@@ -400,15 +426,38 @@ Search allows you to find items by the following indices (based on the item belo
 - `isbound` (isbound = true) Is the item bound to the character or account? (From Blizzard C_Item)
 - `quest` (quest = false) Is the item for a non-active quest?
 - `activeQuest` (activeQuest = false) Is the item for an active quest?
+- `equipment` (equipment = true) Can the item be equipped (gear, and bags, which go in the bag slots)?
+- `hasuse` (hasuse = true) Does the item have a Use: line in its tooltip, "Use: Teaches you..." on recipes and pets included?
+- `cosmetic` (cosmetic = true) Is the item cosmetic gear (Retail)?
+- `pet` (pet = true) Does the item teach a battle pet (Retail)?
+- `upgradeable` (upgradeable = true) Is the item gear on an upgrade track (Retail)?
+- `scrappable` (scrappable = true) Can the item be scrapped (Retail)?
+- `inset` (inset = true) Is the item in any equipment set? (`equipmentSet` names one.)
+- `upgrade` (upgrade = true) Does BetterBags show the upgrade arrow on the item? It follows the upgrade provider chosen in the settings (BetterBags, Pawn or SimpleItemLevel).
+- `auctionable` or `ah` (auctionable = true) Can the item be posted on the Auction House? It asks the game, so it knows about bound and other items that cannot be listed. Classic Era and The Burning Crusade Classic have no such check, so there BetterBags works it out: no for what is bound, a quest item, damaged, conjured, limited in duration or a wrapped gift, and yes otherwise, so the game may still refuse an item with used charges or a lockbox. In the guild bank it matches nothing. `ah` on its own searches for those letters: write `ah = true`.
+- `lootable` (lootable = true) Can the item be opened, such as a lockbox, clam or cache? Not in the guild bank.
+- `usable` (usable = false) Can your character use the item? (Weapon and armor skills, level, professions, reputation: the red text in its tooltip.)
+- `equippable` (equippable = true) Is the item gear your character can wear?
+- `transmoggable` (transmoggable = true) Does the item have an appearance (Retail)?
+- `collectable` (collectable = true) Is the item a battle pet you can still learn one more of (Retail)? Caged pets count.
+- `appearance` (appearance = unknown) Is the item's look in your collection? `known` when any item that gives the same appearance has been collected, `unknown` when none has (Retail).
+- `source` (source = unknown) Is this very item's appearance source in your collection? `known` or `unknown` (Retail).
+- `toy` (toy = true) Is the item a toy? (Its tooltip says "Toy".)
+- `known` (known = true) Does the item's tooltip say "Already known" (a toy, recipe, pet or mount you already have)?
+
+The fields `quality`, `track`, `stat`, `minlevel`, `stacksize`, `price`, `maxlevel`, `upgradelevel`, `upgrademax`, `equipment`, `hasuse`, `cosmetic`, `pet`, `upgradeable`, `scrappable`, `toy`, `known`, `transmoggable`, `usable`, `equippable`, `auctionable`, `lootable` and `upgrade` are read once the game has sent the item's data, `petcount`, `petlimit` and `collectable` once your pet journal has loaded, and `appearance` and `source` once your appearance collection has loaded: an item that has just arrived may match none of them for a moment.
 
 ### Logical Operators
 - `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.
 - `OR` (slot = Legs OR ilvl > 500 \[This will match items that are leg pieces or are greater than 500 ilvl.\]) The union of two terms. Items can match either or both sides of the OR.
-- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\]) The complement of a term. Items must not match the NOT.
+- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\]) The complement of a term. Items must not match the NOT. It works on its own, inside an `OR`, and before a group (`NOT (rarity = poor OR rarity = common)`).
 - `(` and `)` To group search terms.
+- **Precedence:** `NOT` applies first, then `AND`, then `OR`, as in most query languages: `type = armor OR type = weapon AND ilvl > 200` matches all armor, and weapons above item level 200. Use parentheses to group differently: `(type = armor OR type = weapon) AND ilvl > 200`. Rules saved before this precedence were rewritten once with parentheses, so they still mean what they meant.
 - `=` (type = Armor, ilvl = 506) Items with a value equal to the text or number on the right side. This will find any items starting with the value.
 - `%=` (slot %= Hand \[This will match any gear pieces that are slotted into any slot with `Hand` in the name. eg. Hands, Main Hand, Offhand\]) Items with the value in the full text of the field(s).
 - `!=` (expansion != DF) Items with a value not equal to the text or number on the right side. This will find any items NOT starting with the value.
+- `==` (name == "Hearthstone") Items whose whole value is the text (in any case), not just its start. With a number, the same as `=`.
+- `~=` (name ~= "Hearthstone") Every item `==` does not find.
 - `"` or `'` (slot = "Main Hand") To search for a multi-word string.
 
 ### Comparison Operators
@@ -417,6 +466,14 @@ Search allows you to find items by the following indices (based on the item belo
 - `<` Items with a value less than the number on the right side.
 - `>=` Items with a value greater than or equal to the number on the right side.
 - `<=` Items with a value less than or equal to the number on the right side.
+
+### Math, money and your character
+Either side of a comparison can be worked out:
+- `+`, `-`, `*`, `/`, `%` (ilvl <= player.level - 10) Arithmetic. Put spaces around the sign: `100-10` is still one word, as before.
+- `min(...)`, `max(...)`, `floor(x)`, `ceil(x)`, `abs(x)` (maxlevel >= min(player.ilvl * 0.95, player.ilvl - 5)). `math.min` and the others work too.
+- Money: `5g`, `50s`, `1g50s`, `20c` (price < 2g50s) are amounts in copper.
+- Fields compared with fields, or with math on them (maxlevel > ilvl, price * count > 5g), are checked item by item.
+- Your character: `player.level`, `player.ilvl` (your average item level, bags included), `player.equippedilvl` (what you wear), `player.class` (its name or its English token, `paladin`), `player.classid`, `player.spec`, `player.specid`, `player.profession` (any of your professions, by name or skill line: `player.profession = tailoring`), `player.name`, `player.realm`. A comparison of your character alone (player.level >= 80) matches every item or none, so `player.class = mage AND ...` limits a category to one class. Compared with an item's text, a value of your character is its value: `tooltip %= player.class` finds items whose tooltip names your class.
 
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/H2jgRO8.png" target="_blank"><img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail."></a>
@@ -470,12 +527,15 @@ To manually create custom categories that you can add items to, left-click on an
 	</tr>
 </table>
 
+### Ignored Items
+On the Categories page, a category's **Ignored Items** tab lists items it never takes, whatever would put them there: an item added to it by hand, a plugin's list, or its search. Drag an item onto the tab to ignore it, and right-click it to stop. An ignored item goes to the next category that wants it, or to its usual one. It works for a plugin's categories too.
+
 ### Search-based Custom Categories
 Any search you complete has the option to be turned into a custom category. These categories will dynamically update as new items are added to the bag that match the search criteria.  
 To create a Search Category, type in a search, then press `Enter`. Fill out the required information in the dialogue box and save.
 - Category Name (string) is what the new category will be named.
 - Search Query (string) is the search that will be run to determine which items will be in the category. Any search options (described above) will work in the query.
-- Priority (number) is the order in which search categories will "steal" items. Items can only be in 1 category at a time and higher priority will get items first.
+- The order of your categories decides which one gets an item that fits more than one: the higher one wins. Drag them in the list on the Categories page to change it. A new category starts at the top, and an item you add to a category by hand stays there.
 - Group By (string) allows you to create multiple categories from 1 string. Valid options are none, type, subtype, and expansion. This can be chosen as an option or included directly in the search string.  
 `exp = mid and not "housing decor" group by type` will create a category for every type of item from the Midnight expansion, eg. "Midnight - Armor", "Midnight - Weapon", etc.
 
@@ -498,9 +558,22 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 	</tr>
 </table>
 
+### Automation
+A category can act on its items on its own. Pick it on the Categories page (`/bb`), then its **Automation** tab:
+- **Auto Sell**: when you open a merchant, the category's items in your backpack are sold.
+- **Confirm Auto Sell** (on by default): with BetterBags Next, the category's section flies over to the vendor and waits there, glowing, as a category you drag onto the vendor does: double-click it to sell, right-click to put it back. Turned off, its items are sold as soon as you open the merchant. Hold Shift as you open the merchant to keep them. The classic bags have no such box: with it on, sell the category yourself by right-clicking its title.
+
+Every sale, automatic or not, sells one item at a time, as fast as your connection allows (at least 0.2 seconds apart): selling everything at once makes the game answer "That object is busy." Anything a merchant won't buy stays in your bags, and isn't offered to that merchant again; the next merchant that buys it gets it. A merchant that buys nothing at all is sold nothing.
+- **Destroy What Can't Be Sold** (needs Auto Sell on): the category's items no merchant buys are destroyed. With BetterBags Next, its section waits at the vendor like a sale, glowing red: each click destroys the next item, a whole stack. Anywhere, **Destroy Next Item** (Key Bindings > BetterBags) does the same. The game only lets an addon destroy one item per key press or click.
+- **Skip Recent Items** (under Recent Items, for any category, apart from the merchant settings): items that land in the category skip Recent Items. They show in the category right away and are no longer marked new.
+
+Automation never sells or destroys an item in an equipment set or a purchase you can still refund. Selling at once acts on a newly looted item by its category even while it shows under Recent Items; a section waiting at the vendor holds only the items it shows, and a category that isn't on the backpack's current tab doesn't fly over. A rule like `rarity = poor`, `ilvl < player.ilvl - 50 AND binding = soulbound` or `toy = true AND known = true` makes a category worth automating.
+
 ## Themes
-BetterBags offers a few built-in themes and an API to allow addon authors to create their own themes.  
-BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme.
+BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and Slate, Dark and Parchment, from BetterBags' sister addon Moonlight.  
+BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme that follows your ElvUI or GW2 UI settings.
+
+Themes are data: a theme describes how each kind of window and element looks, and BetterBags applies it to every bag, bank, dialog, panel, item button, tab, section title, search box and button. Addon authors can write their own; see [`sonata/README.md`](sonata/README.md).
 
 <table>
 	<tr>
@@ -554,13 +627,41 @@ Import and Export strings only contain category information. Set your own style 
 	</tr>
 </table>
 
+## BetterBags Next (experimental)
+An early look at a new design for your bags. Turn it on with **BetterBags Next (experimental)** in the settings, or type `/bb next`; BetterBags asks to reload the UI for it to take effect, and the same setting or command turns it off again.
+
+- Your backpack becomes a full-height panel that slides in from the right edge of the screen, and your bank its mirror image on the left, both with soft, feathered edges instead of a border.
+- Your groups become tabs down the inner side of each panel: click one to switch, right-click one to rename or delete it, and click **+** to make a new group.
+- Your categories are listed in one column, each its own row of large icons, with Recent Items first and Free Space last. The list scrolls.
+- **Section Columns** on a bag's Layout tab sets out its categories side by side. **Compact Sections** then packs them as tightly as their icons and names allow, side by side and into any room beside a taller category, with every icon still in the columns of one grid and every name whole.
+- Sections fade in as a panel opens, items glide to their new places when you sort or loot, and sparkles drift out of the window from the title.
+- Drag a category by its header to move it: the whole section comes with your cursor and the others slide out of its way. Drop it where you want it and it stays there. Drop it on a tab to move the category to that group, or (at the bank) on the other bag, or one of its tabs, to move everything in it there; dropped on the other bag's items, it goes into the tab that bag shows. Right-click a header to move the section to whatever window is open, as in the regular bags.
+- Drop an item on a category's header to add it to that category. Dropped back on the category it would be in anyway, it simply goes back there, without being added.
+- Press a tab and drag it up or down to put your tabs in the order you like, in the backpack, the bank, the guild bank and at a vendor. The order is kept.
+- **Show Blizzard Bags** (the bag button at the top of the backpack) shows your bags themselves: each bag in a tab, to swap it (drop a bag on a tab, or drag a bag off it), and your items bag by bag in slot order. Click it again to see your categories. The **X** at the top right closes the backpack.
+- Searching, sorting, the settings button, dropping items onto the panel, cooldowns and tooltips work as they do in the regular bags.
+- In the bank, your Warbank groups are listed after your bank groups, in teal, and the top of the panel turns teal while one shows. The buttons at the top close the bank, deposit your Warbound items, sort the bank (or the Warbank, while it shows) and switch between your groups and the bank's own tabs, where you can see each tab on its own, buy tabs, and right-click a tab to change its name, icon and deposit settings. In WoW: Forever, drop a bag on a bank tab to use it.
+- **Appearance > Size** sets **Icon Scale**, how big item buttons are (each row fits as many as it can), on top of the theme's own size, and **Bag Scale**, the size of the small, movable bags (the full-height bags on the screen's edges keep theirs). A small bag is always wide enough that its title and its sections' names are not cut short when it opens and when you let go of its resize grip; turn on **Fit Names While Open** for it to widen as soon as a longer name comes in while it is open, and narrow back once it fits. **Autosize Bags** (on by default) makes each small bag as tall as everything it holds and its Free Space, growing and shrinking as items come and go, as far as the screen allows; its width stays as you set it, and it moves up rather than past the bottom of the screen. Drag its resize grips to set its width; let go and its height bounces back to fit. Turn it off to set the height yourself.
+
+Not there yet: currencies, the bag anchor, the bag menu, and an opacity setting. To go back to the regular bags, use the setting or `/bb next`. It is an experiment and may change or go away; please report what you think.
+
+## Reporting Performance Problems
+If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.
+
+1. Type `/bbdb` to open the debug window and switch to the **Performance** tab.
+2. Press **Start Capture**, do whatever causes the stutter (open your bags, loot, use the abilities that lag), then press **Stop Capture**. To record the load-in itself, tick **Capture next reload** and type `/reload` instead.
+3. The capture is saved as a session in the list on the left. Select it to see a flame graph of where the time went, the slowest frames, and a summary.
+4. Log out or `/reload` so the game writes the session to `WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua`, and attach that file to your report.
+
+Profiling is always off unless you start it, and it is never left running across a reload. Saved sessions can be deleted from the same tab.
+
 ## Plugin System
 BetterBags has a robust plugin system that allows developers to write custom categories.
 
 Plugins have the following options:
 - Custom Category API, to create new categories through the plugin.
 - Config Module API, allowing plugin authors to let users fine-tune their own experience.
-- Theme API, to allow plugins to create new themes.
+- Theme API, to allow plugins to create new themes ([`sonata/README.md`](sonata/README.md)).
 - Localization module, which allows the plugin author to localize their text.
 
 <div align="center" style="text-align:center">
@@ -579,7 +680,6 @@ The following features are under active development:
 
 These features are planned for the long term:
 - Feature parity between search categories and manual categories.
-- User customizable themes.
 - Dynamic number of columns.
 - Reagent bag markers for items in the reagent bag.
 - Faster/smoother item updates.

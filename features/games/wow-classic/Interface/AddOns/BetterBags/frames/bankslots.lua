@@ -26,11 +26,20 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+---@class Render: AceModule
+local render = addon:GetModule('Render')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+---@class Texels: AceModule
+local texels = addon:GetModule('Texels')
+
+---@class DrawableModule: AceModule
+local drawable = addon:GetModule('Drawable')
+
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
+
+---@class SonataApply: AceModule
+local apply = addon:GetModule('SonataApply')
 
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
@@ -60,28 +69,33 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 ---@field plusText Texture The green '+' atlas icon shown for unpurchased slots (child of purchaseButton)
 ---@field bagBadge Texture Corner badge showing the bag in this tab's socket (WoW: Forever only)
 local bankSlotButtonProto = {}
+addon:GetModule('Perf'):RegisterPrototype(bankSlotButtonProto, 'BankSlotButton')
 
 -- GetBagSocketIndex returns the Enum.BagIndex.Characterbanktab slot of the bag socket
--- behind this tab, or nil when the tab has none. On WoW: Forever every character bank
+-- behind a bank tab, or nil when the tab has none. On WoW: Forever every character bank
 -- tab after the first is a bag socket: it only has slots once a bag is placed in it. The
 -- first tab is the fixed, bagless base bank (Camelot/BankFrame.lua starts its bag
 -- buttons at socket 2).
+---@param bankType BankType
+---@param bagIndex number
 ---@return number?
-function bankSlotButtonProto:GetBagSocketIndex()
-  if not addon.isForever or self.bankType ~= Enum.BankType.Character then
+function BankSlots:GetBagSocketIndex(bankType, bagIndex)
+  if not addon.isForever or bankType ~= Enum.BankType.Character then
     return nil
   end
-  local socketIndex = self.bagIndex - Enum.BagIndex.CharacterBankTab_1 + 1
+  local socketIndex = bagIndex - Enum.BagIndex.CharacterBankTab_1 + 1
   if socketIndex < 2 then
     return nil
   end
   return socketIndex
 end
 
--- PickupBag picks up the bag in this tab's socket, places the cursor bag into it, or
+-- PickupBag picks up the bag in a bank tab's socket, places the cursor bag into it, or
 -- swaps the two, exactly like Blizzard's own bank bag button.
-function bankSlotButtonProto:PickupBag()
-  local socketIndex = self:GetBagSocketIndex()
+---@param bankType BankType
+---@param bagIndex number
+function BankSlots:PickupBag(bankType, bagIndex)
+  local socketIndex = self:GetBagSocketIndex(bankType, bagIndex)
   if not socketIndex then
     return
   end
@@ -90,6 +104,15 @@ function bankSlotButtonProto:PickupBag()
     return
   end
   C_Container.PickupContainerItem(Enum.BagIndex.Characterbanktab, socketIndex)
+end
+
+---@return number?
+function bankSlotButtonProto:GetBagSocketIndex()
+  return BankSlots:GetBagSocketIndex(self.bankType, self.bagIndex)
+end
+
+function bankSlotButtonProto:PickupBag()
+  BankSlots:PickupBag(self.bankType, self.bagIndex)
 end
 
 -- Update refreshes the button's visual state based on current tab data.
@@ -151,17 +174,19 @@ function bankSlotButtonProto:SetSelected(selected)
   end
 end
 
--- bankSlotsPanel is the slide-out panel showing all possible bank tab slots.
+-- bankSlotsPanel is the slide-out panel showing all possible bank tab slots: a Slots window
+-- (window/window.lua) hanging below the bank, sized to its tab buttons.
 ---@class bankSlotsPanel
+---@field window BetterBagsWindow
 ---@field frame Frame
 ---@field content Grid
----@field fadeInGroup AnimationGroup
----@field fadeOutGroup AnimationGroup
+---@field grid Drawable
 ---@field buttons BankSlotButton[]
 ---@field selectedBagIndex number?
 ---@field bagFrame Frame The parent bag frame this panel is attached to
 ---@field tabsWereShown boolean Whether group tabs were visible before panel opened
 BankSlots.bankSlotsPanelProto = {}
+addon:GetModule('Perf'):RegisterPrototype(BankSlots.bankSlotsPanelProto, 'BankSlotsPanel')
 
 -- Draw refreshes all button visuals from the current C_Bank tab data.
 ---@param ctx Context
@@ -192,35 +217,21 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
     btn:Update(charTabData, accountTabData)
   end
 
-  -- Layout the grid and size the panel to fit
-  local w, h = self.content:Draw({
-    cells = self.content.cells,
-    maxWidthPerRow = 1024,
-  })
-  self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
-
-  -- Camelot uses a headerless tooltip-bordered decoration, so reserve no header
-  -- band (symmetric 12px padding); other retail themes reserve their flat header.
-  local topInset
-  if addon.isForever then
-    topInset = 12
+  -- Lay the panel out again: at once while it shows, else when it is shown.
+  if self.window:IsShown() then
+    render:RenderNow(self.window, { ctx = ctx })
   else
-    local headerHeight = themes:GetFlatHeaderHeight(self.frame)
-    topInset = headerHeight > 0 and headerHeight or 12
+    self.window:Invalidate()
   end
+  -- Its bag and tab buttons' art (texture-sharpening.md).
+  texels:Unsharpen(self.window.frame)
+end
 
-  self.content:GetContainer():ClearAllPoints()
-  self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -topInset)
-  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
-
-  -- Height = content height + top inset + bottom inset (12).
-  self.frame:SetHeight(h + topInset + 12)
-
-  -- Enforce minimum bag frame width so the main bank window is never
-  -- narrower than the bank tab panel anchored below it.
-  local panelWidth = self.frame:GetWidth()
-  if self.bagFrame:GetWidth() < panelWidth then
-    self.bagFrame:SetWidth(panelWidth)
+-- OnRendered lays the bank out again: the bank window is never narrower than the panel.
+function BankSlots.bankSlotsPanelProto:OnRendered()
+  local bank = addon.Bags and addon.Bags.Bank
+  if bank ~= nil and bank.window ~= nil and self.window:IsShown() then
+    bank.window:Invalidate()
   end
 end
 
@@ -232,19 +243,20 @@ function BankSlots.bankSlotsPanelProto:SetShown(shown)
   end
 end
 
+-- Show hangs the panel below the bank where the theme says, in place of the group tabs, and
+-- selects the first tab once it is shown.
 ---@param callback? fun()
 function BankSlots.bankSlotsPanelProto:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
-  if callback then
-    self.fadeInGroup.callback = function()
-      self.fadeInGroup.callback = nil
-      callback()
-    end
+  -- Where the theme says: Layout.Points relative to the bag, else Layout.Offset below it.
+  local layout = self.window:GetLayout()
+  if layout.Points ~= nil then
+    apply:Points(self.frame, layout.Points, self.bagFrame)
+  else
+    local offset = layout.Offset or {}
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", offset.X or 0, offset.Y or 0)
   end
-  -- Reanchor the bank slots panel to the bottom of the bank window, occupying
-  -- the space where the group tabs normally sit.
-  self.frame:ClearAllPoints()
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
   -- Completely hide the group tabs and remember whether they were visible so
   -- they can be restored correctly when the bank slots panel is closed.
   local bankBag = addon.Bags and addon.Bags.Bank
@@ -258,23 +270,32 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
       self.tabsWereShown = false
     end
   end
-  self.fadeInGroup:Play()
+  local ctx = context:New('BankSlots_Show')
+  self.window:Show(ctx, function()
+    self:SelectFirstTab(ctx)
+    if callback then
+      callback()
+    end
+  end)
 end
 
+-- Hide fades the panel out, then clears the tab filter, gives the bank its tabs back and
+-- refreshes the bank.
 ---@param callback? fun()
 function BankSlots.bankSlotsPanelProto:Hide(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
-  if callback then
-    self.fadeOutGroup.callback = function()
-      self.fadeOutGroup.callback = nil
+  local ctx = context:New('BankSlots_Hide')
+  self.window:Hide(ctx, function()
+    self:OnClose(ctx)
+    events:SendMessage(ctx, 'bags/RefreshBank')
+    if callback then
       callback()
     end
-  end
-  self.fadeOutGroup:Play()
+  end)
 end
 
 function BankSlots.bankSlotsPanelProto:IsShown()
-  return self.frame:IsShown()
+  return self.window:IsShown()
 end
 
 -- SelectTab selects the given bank tab slot and triggers a filtered bank
@@ -323,9 +344,6 @@ function BankSlots.bankSlotsPanelProto:OnClose(ctx)
     addon.Bags.Bank.blizzardBankTab = nil
     items:ClearBankCache(ctx)
   end
-  -- Restore panel anchor to above the bag frame (original position).
-  self.frame:ClearAllPoints()
-  self.frame:SetPoint("BOTTOMLEFT", self.bagFrame, "TOPLEFT", 0, 14)
   -- Restore group tabs visibility to what it was before the panel opened.
   local bankBag = addon.Bags and addon.Bags.Bank
   if (self.tabsWereShown or database:GetGroupsEnabled(const.BAG_KIND.BANK)) and bankBag and bankBag.tabs then
@@ -334,11 +352,16 @@ function BankSlots.bankSlotsPanelProto:OnClose(ctx)
   self.tabsWereShown = false
 end
 
--- OpenTabConfig opens the Blizzard tab configuration dialog for the given
--- bank tab. Uses BankPanel.TabSettingsMenu for character bank tabs and
--- AccountBankPanel.TabSettingsMenu for account/warbank tabs.
 ---@param bagIndex number
 function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
+  BankSlots:OpenTabConfig(bagIndex)
+end
+
+-- OpenTabConfig opens the Blizzard tab configuration dialog for the given
+-- bank tab, beside the bank. Uses BankPanel.TabSettingsMenu for character bank tabs and
+-- AccountBankPanel.TabSettingsMenu for account/warbank tabs.
+---@param bagIndex number
+function BankSlots:OpenTabConfig(bagIndex)
   local bagFrame = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.frame
 
   -- Determine bank type: account bank tabs start at AccountBankTab_1
@@ -458,36 +481,40 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   local b = {}
   setmetatable(b, {__index = BankSlots.bankSlotsPanelProto})
 
-  -- Camelot (WoW: Forever): DefaultPanelFlatTemplate renders a broken title-bar band
-  -- and oversized metal header on this client, so the panel is a headerless, dark,
-  -- tooltip-bordered frame instead of a themed flat window. The template goes on the
-  -- panel frame itself: on a sibling child frame the filled backdrop shares the slot
-  -- grid's frame level and draws over the buttons. See camelot-forever.md.
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", "BetterBagsBankSlots", bagFrame, addon.isForever and "TooltipBorderedFrameTemplate" or nil)
+  -- A Slots window (window/window.lua) hanging below the bank; the theme draws its chrome
+  -- (sonata.md section 3b) and pads it.
+  b.window = window:Create({
+    Kind = "Slots",
+    Name = "BetterBagsBankSlots",
+    Title = "",
+    Parent = bagFrame,
+    Movable = false,
+    Points = { { Point = "TOPLEFT", RelativeTo = bagFrame, RelativePoint = "BOTTOMLEFT", X = 0, Y = -2 } },
+    -- Clamped as the bank is (Clamp Bags to Screen, window.md §3a), or it would part from a bank moved off the screen.
+    Clamp = function()
+      return database:GetClampBagsToScreen()
+    end,
+    OnRendered = function()
+      b:OnRendered()
+    end,
+  })
+  local f = b.window.frame
   b.frame = f
   b.bagFrame = bagFrame
 
-  if addon.isForever then
-    f:SetBackdropColor(0, 0, 0, 0.9)
-    f:SetBackdropBorderColor(1, 1, 1, 1)
-  else
-    -- Register with an empty title so no title text is rendered in the window
-    -- decoration across any theme. The panel has no title bar text by design.
-    themes:RegisterFlatWindow(f, "")
-  end
-
-  b.content = grid:Create(b.frame)
-  -- Use the same inset on top and bottom so the slot icons are vertically
-  -- centred. The -30 used by other flat panels reserves space for a title bar;
-  -- this panel has no title, so we match the 12 px bottom gap.
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
-  b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
+  b.content = grid:Create(b.window.content)
   b.content:HideScrollBar()
   -- Bank tab slots grid is not scrollable; disable mouse wheel so scroll
   -- events pass through to the outer scrollable bag container.
   b.content:EnableMouseWheelScroll(false)
   b.content:Show()
+  b.grid = drawable:FromFrame(b.content:GetContainer(), function()
+    return b.content:Draw({
+      cells = b.content.cells,
+      maxWidthPerRow = 1024,
+    })
+  end)
+  b.window:SetContent(b.grid)
 
   b.buttons = {}
   b.selectedBagIndex = nil
@@ -519,7 +546,7 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     btn.isSelected = false
 
     -- Container frame holds both sub-buttons; only one is visible at a time.
-    local container = CreateFrame("Frame", nil, b.frame)
+    local container = CreateFrame("Frame", nil, b.window.content)
     container:SetSize(37, 37)
     btn.frame = container
 
@@ -672,19 +699,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     table.insert(b.buttons, btn)
   end
 
-  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
-
-  -- When fade-in finishes, auto-select the first bank tab
-  addon.HookScript(b.fadeInGroup, "OnFinished", function(ectx)
-    b:SelectFirstTab(ectx)
-  end)
-
-  -- When fade-out finishes, clear the blizzardBankTab filter and restore normal view
-  addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
-    b:OnClose(ectx)
-    events:SendMessage(ectx, 'bags/RefreshBank')
-  end)
-
   -- Redraw when tab settings are updated (name/icon changed)
   events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function(ectx)
     if b:IsShown() then
@@ -720,7 +734,5 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     end)
   end
 
-  b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 8)
-  b.frame:Hide()
   return b
 end

@@ -1,0 +1,78 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+  <!-- Visual subset of Blizzard's GameDialog.xml. No StaticPopup mixins or registration. -->
+  <Button name="QuestieTraceDialogButtonTemplate" registerForClicks="LeftButtonUp" virtual="true">
+    <Size x="120" y="21"/>
+    <ButtonText parentKey="Text">
+      <Anchors>
+        <Anchor point="CENTER" x="0" y="1"/>
+      </Anchors>
+    </ButtonText>
+    <NormalTexture file="Interface\Buttons\UI-DialogBox-Button-Up">
+      <TexCoords left="0" right="1" top="0" bottom="0.71875"/>
+    </NormalTexture>
+    <PushedTexture file="Interface\Buttons\UI-DialogBox-Button-Down">
+      <TexCoords left="0" right="1" top="0" bottom="0.71875"/>
+    </PushedTexture>
+    <DisabledTexture file="Interface\Buttons\UI-DialogBox-Button-Disabled">
+      <TexCoords left="0" right="1" top="0" bottom="0.71875"/>
+    </DisabledTexture>
+    <HighlightTexture file="Interface\Buttons\UI-DialogBox-Button-Highlight" alphaMode="ADD">
+      <TexCoords left="0" right="1" top="0" bottom="0.71875"/>
+    </HighlightTexture>
+    <NormalFont style="GameFontNormal"/>
+    <DisabledFont style="GameFontDisable"/>
+    <HighlightFont style="GameFontHighlight"/>
+  </Button>
+
+  <Frame name="QuestieTraceDialogTemplate" inherits="BackdropTemplate" mixin="QuestieTraceDialogMixin" virtual="true"
+      hidden="true" frameStrata="DIALOG" enableMouse="true" clampedToScreen="true">
+    <Size x="420" y="136"/>
+    <Anchors>
+      <Anchor point="TOP" y="-135"/>
+    </Anchors>
+    <Layers>
+      <Layer level="BACKGROUND" textureSubLevel="-7">
+        <Texture parentKey="Background" hidden="true">
+          <Anchors>
+            <Anchor point="TOPLEFT" x="7" y="-7"/>
+            <Anchor point="BOTTOMRIGHT" x="-7" y="7"/>
+          </Anchors>
+        </Texture>
+      </Layer>
+      <Layer level="BACKGROUND" textureSubLevel="-4">
+        <Texture parentKey="Border" setAllPoints="true" hidden="true"/>
+      </Layer>
+      <Layer level="ARTWORK">
+        <Texture parentKey="AlertIcon" file="Interface\DialogFrame\UI-Dialog-Icon-AlertNew">
+          <Size x="36" y="36"/>
+          <Anchors>
+            <Anchor point="LEFT" x="24" y="0"/>
+          </Anchors>
+        </Texture>
+        <FontString parentKey="Text" inherits="GameFontHighlight" justifyH="CENTER" justifyV="MIDDLE">
+          <Size x="290" y="0"/>
+          <Anchors>
+            <Anchor point="TOP" x="0" y="-16"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <Frames>
+      <Button parentKey="AcceptButton" inherits="QuestieTraceDialogButtonTemplate">
+        <Anchors>
+          <Anchor point="TOPRIGHT" relativeKey="$parent.Text" relativePoint="BOTTOM" x="-5" y="-9"/>
+        </Anchors>
+      </Button>
+      <Button parentKey="DeclineButton" inherits="QuestieTraceDialogButtonTemplate">
+        <Anchors>
+          <Anchor point="TOPLEFT" relativeKey="$parent.Text" relativePoint="BOTTOM" x="5" y="-9"/>
+        </Anchors>
+      </Button>
+    </Frames>
+    <Scripts>
+      <OnLoad method="OnLoad" inherit="append"/>
+      <OnShow method="OnShow"/>
+      <OnUpdate method="OnUpdate"/>
+    </Scripts>
+  </Frame>
+</Ui>

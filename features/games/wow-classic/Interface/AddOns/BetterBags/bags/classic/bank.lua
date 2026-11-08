@@ -19,9 +19,6 @@ local events = addon:GetModule("Events")
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule("BagSlots")
 
@@ -35,21 +32,20 @@ local bagSlots = addon:GetModule("BagSlots")
 --- (gated on bag.slots) disappears from the bank.
 -------
 
-function bank.proto:OnShow()
+-- OnShow shows the bank's window; onShown runs once the window has finished showing.
+---@param ctx Context
+---@param onShown? fun()
+function bank.proto:OnShow(ctx, onShown)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeInGroup:Play()
-	else
-		self.bag.frame:Show()
-	end
-
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	self.bag.window:Show(ctx, onShown)
+	addon.TriggerItemContextChanged()
 end
 
-function bank.proto:OnHide()
-	-- Guard against re-entry to prevent recursion.
+-- OnHide closes the bank window, then the bank itself. CloseBankFrame fires BANKFRAME_CLOSED,
+-- which hides the bag again: the guard stops that while this hide runs, and the window's own
+-- state (hidden, or fading out) stops it afterwards.
+---@param ctx Context
+function bank.proto:OnHide(ctx)
 	if self.isHiding then
 		return
 	end
@@ -58,21 +54,11 @@ function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeOutGroup.callback = function()
-			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			self.isHiding = false  -- Clear flag after animation completes
-			CloseBankFrame()
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-		end
-		self.bag.fadeOutGroup:Play()
-	else
-		self.bag.frame:Hide()
-		self.isHiding = false  -- Clear flag immediately
+	self.bag.window:Hide(ctx, function()
 		CloseBankFrame()
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-	end
+		addon.TriggerItemContextChanged()
+	end)
+	self.isHiding = false
 end
 
 ---@param ctx Context
@@ -82,15 +68,12 @@ function bank.proto:OnCreate(ctx)
 
 	-- Bag slots panel (bank bags, including purchasable bank bag slots)
 	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BANK, self.bag.frame)
-	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
-	slots.frame:SetParent(self.bag.frame)
-	slots.frame:Hide()
 	self.bag.slots = slots
 end
 
 ---@param ctx Context
 function bank.proto:OnRefresh(ctx)
-	events:SendMessage(ctx, "bags/RefreshBank")
+	events:SendMessage(ctx, 'bags/Rederive', { backpack = false, bank = true, categoriesUnchanged = true })
 end
 
 ---@return Money|nil
@@ -101,6 +84,13 @@ end
 
 function bank.proto:RegisterEvents()
 	-- No bank-specific events in Classic
+end
+
+-- Resync has nothing to catch up on when the classic design is switched back on (next.md §11):
+-- there are no bank events here.
+---@param ctx Context
+function bank.proto:Resync(ctx)
+	local _ = ctx
 end
 
 ---@param ctx Context

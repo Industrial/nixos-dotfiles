@@ -11,6 +11,7 @@ The frames module contains all UI frame components for the BetterBags addon, pro
   - [Section Frame](#section-frame-sectionlua)
   - [Grid Layout](#grid-layout-gridlua)
   - [List Layout](#list-layout-listlua)
+  - [Item Row](#item-row-itemrowlua)
 - [UI Components](#ui-components)
   - [Search](#search-searchlua)
   - [Currency Display](#currency-display-currencylua)
@@ -44,6 +45,7 @@ The main container frame for displaying bags (backpack or bank).
 - Sort functionality
 - Search integration
 - Window positioning and anchoring
+- Drop target: an item dropped anywhere on the window, or the window left-clicked while holding one, goes into a free slot of its bags
 
 **Main Class:**
 ```lua
@@ -64,6 +66,12 @@ The main container frame for displaying bags (backpack or bank).
 - `Search(ctx, results)` - Apply search filter
 - `Sort(ctx)` - Sort bag contents
 - `Refresh(ctx)` - Full refresh of bag data
+- `WatchMouse()` - Wire the window's mouse (called by `Create`): dragging moves the window, a drop or a left click with an item held calls `PlaceCursorItem`
+- `PlaceCursorItem()` - Put the item on the cursor into a free slot of this window's bags (`CursorPlacement`, `util/cursorplacement.lua`)
+
+**Window Mouse and Drops:**
+
+The window frame is the only mouse-enabled frame under the bag's backgrounds (section frames, grids and scroll boxes take no mouse), so a drop on a background, a gap or the empty part of a section reaches it. Item buttons, section titles and the bag button sit above it and take their own drops first. While an item is on the cursor, pressing on the window is a drop and never moves it; `OnDragStop` saves the position only after a move started (`movingWindow`). The placement rules and why a drop cannot taint are in `.claude/rules/bag-drop-zone.md`.
 
 ### Item Frame (`item.lua`)
 
@@ -103,8 +111,8 @@ Container for grouping items into categorized sections.
 
 **Key Features:**
 - Category-based item grouping
-- Expandable/collapsible sections
 - Drag-and-drop category assignment (backpack and bank, with cross-type constraints)
+- Item drops on the title: with Shift the item is added to the section's category; without Shift the drop goes to the title's bag window (`bag:PlaceCursorItem()`)
 - Right-click section actions
 - Automatic sorting
 
@@ -190,6 +198,10 @@ Scrollable list implementation for linear item display.
 ---@field provider DataProviderMixin
 ```
 
+### Item Row (`itemrow.lua`)
+
+A row of the category pane's item list (`config/categorypane.lua`): an item button with the item's name beside it, colored by quality. The name uses `STANDARD_TEXT_FONT`, the font file Blizzard sets for the client's language; a hard-coded `Fonts\FRIZQT__.TTF` has Latin glyphs only and left Russian, Korean and Chinese names unreadable.
+
 ## UI Components
 
 ### Search (`search.lua`)
@@ -249,6 +261,10 @@ Tab management for bank views.
 **Tab Disable State:**
 
 `SetTabsDisabled(disabled)` sets a `tabsDisabled` flag on the tab container and dims the tab bar to 50% alpha when disabled. While disabled, all `OnClick` and `OnMouseDown` handlers silently return early, preventing tab switching and drag-to-reorder. Note: the bank slots panel no longer uses `SetTabsDisabled`; it instead completely hides the tabs frame via `frame:Hide()` / `frame:Show()` for a cleaner visual transition.
+
+**Decorations and Themes:**
+
+Each tab has one decoration, `tabs:GetDecoration(ctx, tab)`, made once from `BetterBagsSecureBagTabTemplate` and styled by Sonata as a `Tab` element (`.claude/rules/sonata.md`). States go through `SonataElements:SetTabState` (normal, selected, drop). Every bar is measured again on `sonata/ThemeChanged`, since the theme sets the tabs' font and height.
 
 **Icon-Only Tab Sizing:**
 
@@ -414,7 +430,7 @@ Dialog for creating or renaming a group tab. Used by the bank to accept a name a
 - Pre-fillable input (for rename workflows — pass `initialValue` to `Show()`)
 - Configurable confirm-button label (pass `confirmText` to `Show()`)
 - Optional bank-type dropdown (shown when `showDropdown = true`)
-- Themed via the addon's active theme: the dialog is registered as a Simple window with the Themes module so it visually matches the rest of the UI
+- A Panel window (`window/window.lua`) sized to its text, drawn by the active Sonata theme like the rest of the UI
 
 **`Show()` Signature:**
 ```lua
@@ -642,7 +658,7 @@ local query = searchBox:GetText()
 1. **Context Usage**: Always pass Context objects for tracking operations
 2. **Pool Management**: Use item pools for performance
 3. **Event Handling**: Register frame events through the Events module
-4. **Theme Integration**: Use Themes module for consistent styling
+4. **Theme Integration**: Build windows on the Window module and register buttons, tabs and other elements with Sonata; never style them by hand (`sonata/README.md`)
 5. **Animation**: Use Animations module for transitions
 6. **Search Performance**: Implement efficient search filtering
 7. **Memory Management**: Release frames back to pools when done
@@ -651,7 +667,7 @@ local query = searchBox:GetText()
 
 - **Items Module**: Provides item data for display, handles filtering for character bank tabs
 - **Categories Module**: Determines section grouping
-- **Themes Module**: Handles visual styling
+- **Window and Sonata Modules**: every window is a `Window`, drawn and restyled by the active Sonata theme (`.claude/rules/window.md`, `sonata/README.md`)
 - **Events Module**: Coordinates frame updates
 - **Database Module**: Stores frame positions, settings, and character bank tabs preference
 - **Search Module**: Provides search functionality

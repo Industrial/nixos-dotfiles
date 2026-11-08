@@ -1,0 +1,366 @@
+---@meta _
+
+--------------------------------------------------------------------------------
+-- Metadata vocabulary
+--------------------------------------------------------------------------------
+
+---@alias QuestieDBMetadataStorageType "number"|"string"|"table"
+---@alias QuestieDBMetadataStructure "questgivers"|"stringarray"|"trigger"|"objectives"|"idarray"|"pair"|"pairs"|"reputationpairs"|"extraobjectives"|"spawnlist"|"waypointlist"
+---@alias QuestieDBMetadataCompilerType "u8string"|"questgivers"|"u8"|"s16"|"u32"|"u16"|"u8u16stringarray"|"trigger"|"objectives"|"u24"|"u8s24array"|"u8u24array"|"u12pair"|"s24pair"|"u8s24pairs"|"extraobjectives"|"s24"|"spawnlist"|"waypointlist"|"faction"|"u16u24array"
+---@alias QuestieDBMetadataNormalizer "faction"
+
+--------------------------------------------------------------------------------
+-- Positional field keys
+--------------------------------------------------------------------------------
+
+---@class QuestieDBQuestKeys
+---@field name integer Localized quest name.
+---@field startedBy integer Quest starters: NPCs, objects, and items.
+---@field finishedBy integer Quest finishers: NPCs and objects.
+---@field requiredLevel integer Minimum player level.
+---@field questLevel integer Quest level.
+---@field requiredRaces integer Allowed-race bitmask.
+---@field requiredClasses integer Allowed-class bitmask.
+---@field objectivesText integer Localized quest objective text lines.
+---@field triggerEnd integer Completion trigger text and spawn coordinates.
+---@field objectives integer Creature, object, item, reputation, kill-credit, and spell objectives.
+---@field sourceItemId integer Item provided by the quest starter.
+---@field preQuestGroup integer Grouped prerequisite quests.
+---@field preQuestSingle integer Alternative single prerequisite quests.
+---@field childQuests integer Quests unlocked by this quest.
+---@field inGroupWith integer Quests in the same quest group.
+---@field exclusiveTo integer Mutually exclusive quests.
+---@field zoneOrSort integer Positive AreaTable ID or negative QuestSort ID.
+---@field requiredSkill integer Required profession and skill value.
+---@field requiredMinRep integer Minimum faction reputation requirement.
+---@field requiredMaxRep integer Maximum faction reputation requirement.
+---@field requiredSourceItems integer Non-objective items still needed for the quest.
+---@field nextQuestInChain integer Quest that makes this quest unavailable once active or completed.
+---@field questFlags integer Quest flag bitmask.
+---@field specialFlags integer Repeatable, event-gated, and monthly-reset flags.
+---@field parentQuest integer Quest that must be active for this quest to be available.
+---@field reputationReward integer Faction reputation rewards.
+---@field breadcrumbForQuestId integer Quest this optional breadcrumb leads to.
+---@field breadcrumbs integer Breadcrumb quests that lead to this quest.
+---@field extraObjectives integer Hidden objectives with locations, icons, text, and references.
+---@field requiredSpell integer Spell the character must know.
+---@field requiredSpecialization integer Required profession or specialization ID.
+---@field requiredMaxLevel integer Maximum player level for availability.
+---@field availableUntilCompleted integer Quest that must remain uncompleted for continued availability.
+---@field availableStartingWith integer Quest that starts availability while active or completed.
+---@field requiredRanks integer Alternative profession rank requirements.
+---@field disabledByQuest integer Quest that temporarily disables this quest while active.
+
+---@class QuestieDBNpcKeys
+---@field name integer Localized NPC name.
+---@field minLevelHealth integer Deprecated health field with compatibility placeholder `0`.
+---@field maxLevelHealth integer Deprecated health field with compatibility placeholder `1`.
+---@field minLevel integer Minimum NPC level.
+---@field maxLevel integer Maximum NPC level.
+---@field rank integer NPC rank.
+---@field spawns integer Spawn coordinates grouped by zone.
+---@field waypoints integer Movement paths grouped by zone.
+---@field zoneID integer Best estimate of the NPC's most common zone.
+---@field questStarts integer Quests started by this NPC.
+---@field questEnds integer Quests finished at this NPC.
+---@field factionID integer FactionTemplate ID.
+---@field friendlyToFaction integer Friendly player factions: A, H, AH, or nil when hostile to both.
+---@field subName integer Localized NPC title or function.
+---@field npcFlags integer NPC function bitmask, such as vendor, trainer, or flight master.
+
+---@class QuestieDBItemKeys
+---@field name integer Localized item name.
+---@field npcDrops integer NPCs that can drop this item.
+---@field objectDrops integer Objects that can drop this item.
+---@field itemDrops integer Containers that can contain this item.
+---@field startQuest integer Quest started by this item.
+---@field questRewards integer Quests that reward this item.
+---@field flags integer Item flag bitmask.
+---@field foodType integer Food category.
+---@field itemLevel integer Item level.
+---@field requiredLevel integer Player level required to equip or use this item.
+---@field ammoType integer Ammo category for projectile items.
+---@field class integer Item class ID.
+---@field subClass integer Item subclass ID within the item class.
+---@field vendors integer NPCs that sell this item.
+---@field relatedQuests integer Quests related to this item.
+---@field teachesSpell integer Spell taught when this item is used.
+
+---@class QuestieDBObjectKeys
+---@field name integer Localized object name.
+---@field questStarts integer Quests started by this object.
+---@field questEnds integer Quests finished at this object.
+---@field spawns integer Spawn coordinates grouped by zone.
+---@field zoneID integer Best estimate of the object's most common zone.
+---@field factionID integer Faction restriction mask used by spawn data.
+---@field waypoints integer Movement paths for objects attached to transports.
+
+-- Correction enums extend authoring keys only. Schema keys and getters remain canonical.
+---@class QuestieDBQuestCorrectionKeys: QuestieDBQuestKeys
+---@field name_add integer Correction-only add; table-valued fields only.
+---@field name_remove integer Correction-only remove; table-valued fields only.
+---@field startedBy_add integer Correction-only add; table-valued fields only.
+---@field startedBy_remove integer Correction-only remove; table-valued fields only.
+---@field finishedBy_add integer Correction-only add; table-valued fields only.
+---@field finishedBy_remove integer Correction-only remove; table-valued fields only.
+---@field requiredLevel_add integer Correction-only add; table-valued fields only.
+---@field requiredLevel_remove integer Correction-only remove; table-valued fields only.
+---@field questLevel_add integer Correction-only add; table-valued fields only.
+---@field questLevel_remove integer Correction-only remove; table-valued fields only.
+---@field requiredRaces_add integer Correction-only add; table-valued fields only.
+---@field requiredRaces_remove integer Correction-only remove; table-valued fields only.
+---@field requiredClasses_add integer Correction-only add; table-valued fields only.
+---@field requiredClasses_remove integer Correction-only remove; table-valued fields only.
+---@field objectivesText_add integer Correction-only add; table-valued fields only.
+---@field objectivesText_remove integer Correction-only remove; table-valued fields only.
+---@field triggerEnd_add integer Correction-only add; table-valued fields only.
+---@field triggerEnd_remove integer Correction-only remove; table-valued fields only.
+---@field objectives_add integer Correction-only add; table-valued fields only.
+---@field objectives_remove integer Correction-only remove; table-valued fields only.
+---@field sourceItemId_add integer Correction-only add; table-valued fields only.
+---@field sourceItemId_remove integer Correction-only remove; table-valued fields only.
+---@field preQuestGroup_add integer Correction-only add; table-valued fields only.
+---@field preQuestGroup_remove integer Correction-only remove; table-valued fields only.
+---@field preQuestSingle_add integer Correction-only add; table-valued fields only.
+---@field preQuestSingle_remove integer Correction-only remove; table-valued fields only.
+---@field childQuests_add integer Correction-only add; table-valued fields only.
+---@field childQuests_remove integer Correction-only remove; table-valued fields only.
+---@field inGroupWith_add integer Correction-only add; table-valued fields only.
+---@field inGroupWith_remove integer Correction-only remove; table-valued fields only.
+---@field exclusiveTo_add integer Correction-only add; table-valued fields only.
+---@field exclusiveTo_remove integer Correction-only remove; table-valued fields only.
+---@field zoneOrSort_add integer Correction-only add; table-valued fields only.
+---@field zoneOrSort_remove integer Correction-only remove; table-valued fields only.
+---@field requiredSkill_add integer Correction-only add; table-valued fields only.
+---@field requiredSkill_remove integer Correction-only remove; table-valued fields only.
+---@field requiredMinRep_add integer Correction-only add; table-valued fields only.
+---@field requiredMinRep_remove integer Correction-only remove; table-valued fields only.
+---@field requiredMaxRep_add integer Correction-only add; table-valued fields only.
+---@field requiredMaxRep_remove integer Correction-only remove; table-valued fields only.
+---@field requiredSourceItems_add integer Correction-only add; table-valued fields only.
+---@field requiredSourceItems_remove integer Correction-only remove; table-valued fields only.
+---@field nextQuestInChain_add integer Correction-only add; table-valued fields only.
+---@field nextQuestInChain_remove integer Correction-only remove; table-valued fields only.
+---@field questFlags_add integer Correction-only add; table-valued fields only.
+---@field questFlags_remove integer Correction-only remove; table-valued fields only.
+---@field specialFlags_add integer Correction-only add; table-valued fields only.
+---@field specialFlags_remove integer Correction-only remove; table-valued fields only.
+---@field parentQuest_add integer Correction-only add; table-valued fields only.
+---@field parentQuest_remove integer Correction-only remove; table-valued fields only.
+---@field reputationReward_add integer Correction-only add; table-valued fields only.
+---@field reputationReward_remove integer Correction-only remove; table-valued fields only.
+---@field breadcrumbForQuestId_add integer Correction-only add; table-valued fields only.
+---@field breadcrumbForQuestId_remove integer Correction-only remove; table-valued fields only.
+---@field breadcrumbs_add integer Correction-only add; table-valued fields only.
+---@field breadcrumbs_remove integer Correction-only remove; table-valued fields only.
+---@field extraObjectives_add integer Correction-only add; table-valued fields only.
+---@field extraObjectives_remove integer Correction-only remove; table-valued fields only.
+---@field requiredSpell_add integer Correction-only add; table-valued fields only.
+---@field requiredSpell_remove integer Correction-only remove; table-valued fields only.
+---@field requiredSpecialization_add integer Correction-only add; table-valued fields only.
+---@field requiredSpecialization_remove integer Correction-only remove; table-valued fields only.
+---@field requiredMaxLevel_add integer Correction-only add; table-valued fields only.
+---@field requiredMaxLevel_remove integer Correction-only remove; table-valued fields only.
+---@field availableUntilCompleted_add integer Correction-only add; table-valued fields only.
+---@field availableUntilCompleted_remove integer Correction-only remove; table-valued fields only.
+---@field availableStartingWith_add integer Correction-only add; table-valued fields only.
+---@field availableStartingWith_remove integer Correction-only remove; table-valued fields only.
+---@field requiredRanks_add integer Correction-only add; table-valued fields only.
+---@field requiredRanks_remove integer Correction-only remove; table-valued fields only.
+---@field disabledByQuest_add integer Correction-only add; table-valued fields only.
+---@field disabledByQuest_remove integer Correction-only remove; table-valued fields only.
+
+---@class QuestieDBNpcCorrectionKeys: QuestieDBNpcKeys
+---@field name_add integer Correction-only add; table-valued fields only.
+---@field name_remove integer Correction-only remove; table-valued fields only.
+---@field minLevelHealth_add integer Correction-only add; table-valued fields only.
+---@field minLevelHealth_remove integer Correction-only remove; table-valued fields only.
+---@field maxLevelHealth_add integer Correction-only add; table-valued fields only.
+---@field maxLevelHealth_remove integer Correction-only remove; table-valued fields only.
+---@field minLevel_add integer Correction-only add; table-valued fields only.
+---@field minLevel_remove integer Correction-only remove; table-valued fields only.
+---@field maxLevel_add integer Correction-only add; table-valued fields only.
+---@field maxLevel_remove integer Correction-only remove; table-valued fields only.
+---@field rank_add integer Correction-only add; table-valued fields only.
+---@field rank_remove integer Correction-only remove; table-valued fields only.
+---@field spawns_add integer Correction-only add; table-valued fields only.
+---@field spawns_remove integer Correction-only remove; table-valued fields only.
+---@field waypoints_add integer Correction-only add; table-valued fields only.
+---@field waypoints_remove integer Correction-only remove; table-valued fields only.
+---@field zoneID_add integer Correction-only add; table-valued fields only.
+---@field zoneID_remove integer Correction-only remove; table-valued fields only.
+---@field questStarts_add integer Correction-only add; table-valued fields only.
+---@field questStarts_remove integer Correction-only remove; table-valued fields only.
+---@field questEnds_add integer Correction-only add; table-valued fields only.
+---@field questEnds_remove integer Correction-only remove; table-valued fields only.
+---@field factionID_add integer Correction-only add; table-valued fields only.
+---@field factionID_remove integer Correction-only remove; table-valued fields only.
+---@field friendlyToFaction_add integer Correction-only add; table-valued fields only.
+---@field friendlyToFaction_remove integer Correction-only remove; table-valued fields only.
+---@field subName_add integer Correction-only add; table-valued fields only.
+---@field subName_remove integer Correction-only remove; table-valued fields only.
+---@field npcFlags_add integer Correction-only add; table-valued fields only.
+---@field npcFlags_remove integer Correction-only remove; table-valued fields only.
+
+---@class QuestieDBItemCorrectionKeys: QuestieDBItemKeys
+---@field name_add integer Correction-only add; table-valued fields only.
+---@field name_remove integer Correction-only remove; table-valued fields only.
+---@field npcDrops_add integer Correction-only add; table-valued fields only.
+---@field npcDrops_remove integer Correction-only remove; table-valued fields only.
+---@field objectDrops_add integer Correction-only add; table-valued fields only.
+---@field objectDrops_remove integer Correction-only remove; table-valued fields only.
+---@field itemDrops_add integer Correction-only add; table-valued fields only.
+---@field itemDrops_remove integer Correction-only remove; table-valued fields only.
+---@field startQuest_add integer Correction-only add; table-valued fields only.
+---@field startQuest_remove integer Correction-only remove; table-valued fields only.
+---@field questRewards_add integer Correction-only add; table-valued fields only.
+---@field questRewards_remove integer Correction-only remove; table-valued fields only.
+---@field flags_add integer Correction-only add; table-valued fields only.
+---@field flags_remove integer Correction-only remove; table-valued fields only.
+---@field foodType_add integer Correction-only add; table-valued fields only.
+---@field foodType_remove integer Correction-only remove; table-valued fields only.
+---@field itemLevel_add integer Correction-only add; table-valued fields only.
+---@field itemLevel_remove integer Correction-only remove; table-valued fields only.
+---@field requiredLevel_add integer Correction-only add; table-valued fields only.
+---@field requiredLevel_remove integer Correction-only remove; table-valued fields only.
+---@field ammoType_add integer Correction-only add; table-valued fields only.
+---@field ammoType_remove integer Correction-only remove; table-valued fields only.
+---@field class_add integer Correction-only add; table-valued fields only.
+---@field class_remove integer Correction-only remove; table-valued fields only.
+---@field subClass_add integer Correction-only add; table-valued fields only.
+---@field subClass_remove integer Correction-only remove; table-valued fields only.
+---@field vendors_add integer Correction-only add; table-valued fields only.
+---@field vendors_remove integer Correction-only remove; table-valued fields only.
+---@field relatedQuests_add integer Correction-only add; table-valued fields only.
+---@field relatedQuests_remove integer Correction-only remove; table-valued fields only.
+---@field teachesSpell_add integer Correction-only add; table-valued fields only.
+---@field teachesSpell_remove integer Correction-only remove; table-valued fields only.
+
+---@class QuestieDBObjectCorrectionKeys: QuestieDBObjectKeys
+---@field name_add integer Correction-only add; table-valued fields only.
+---@field name_remove integer Correction-only remove; table-valued fields only.
+---@field questStarts_add integer Correction-only add; table-valued fields only.
+---@field questStarts_remove integer Correction-only remove; table-valued fields only.
+---@field questEnds_add integer Correction-only add; table-valued fields only.
+---@field questEnds_remove integer Correction-only remove; table-valued fields only.
+---@field spawns_add integer Correction-only add; table-valued fields only.
+---@field spawns_remove integer Correction-only remove; table-valued fields only.
+---@field zoneID_add integer Correction-only add; table-valued fields only.
+---@field zoneID_remove integer Correction-only remove; table-valued fields only.
+---@field factionID_add integer Correction-only add; table-valued fields only.
+---@field factionID_remove integer Correction-only remove; table-valued fields only.
+---@field waypoints_add integer Correction-only add; table-valued fields only.
+---@field waypoints_remove integer Correction-only remove; table-valued fields only.
+
+--------------------------------------------------------------------------------
+-- Complete generated schemas
+--------------------------------------------------------------------------------
+
+---@class QuestieDBQuestSchema
+---@field entity "Quest" Canonical entity type.
+---@field metaPrefix "Quest-" Metadata key prefix for quest fields.
+---@field fieldCount integer Number of positional fields.
+---@field keys QuestieDBQuestKeys Canonical field name to positional index.
+---@field names table<integer, QuestieDBQuestField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field emptyIsNil table<integer, true> Fields whose empty table normalizes to nil.
+---@field zeroPairIsNil table<integer, true> Pair fields whose `{0, 0}` normalizes to nil.
+---@field normalize table<integer, QuestieDBMetadataNormalizer> Sparse named-normalizer map.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBNpcSchema
+---@field entity "Npc" Canonical entity type.
+---@field metaPrefix "Npc-" Metadata key prefix for NPC fields.
+---@field fieldCount integer Number of positional fields.
+---@field keys QuestieDBNpcKeys Canonical field name to positional index.
+---@field names table<integer, QuestieDBNpcField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field emptyIsNil table<integer, true> Fields whose empty table normalizes to nil.
+---@field zeroPairIsNil table<integer, true> Pair fields whose `{0, 0}` normalizes to nil.
+---@field normalize table<integer, QuestieDBMetadataNormalizer> Sparse named-normalizer map.
+---@field constantValues table<integer, number> Deprecated health placeholders returned without per-entity metadata.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBItemSchema
+---@field entity "Item" Canonical entity type.
+---@field metaPrefix "Item-" Metadata key prefix for item fields.
+---@field fieldCount integer Number of positional fields.
+---@field keys QuestieDBItemKeys Canonical field name to positional index.
+---@field names table<integer, QuestieDBItemField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field emptyIsNil table<integer, true> Fields whose empty table normalizes to nil.
+---@field zeroPairIsNil table<integer, true> Pair fields whose `{0, 0}` normalizes to nil.
+---@field normalize table<integer, QuestieDBMetadataNormalizer> Sparse named-normalizer map.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBObjectSchema
+---@field entity "Object" Canonical entity type.
+---@field metaPrefix "Object-" Metadata key prefix for object fields.
+---@field fieldCount integer Number of positional fields.
+---@field keys QuestieDBObjectKeys Canonical field name to positional index.
+---@field names table<integer, QuestieDBObjectField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field emptyIsNil table<integer, true> Fields whose empty table normalizes to nil.
+---@field zeroPairIsNil table<integer, true> Pair fields whose `{0, 0}` normalizes to nil.
+---@field normalize table<integer, QuestieDBMetadataNormalizer> Sparse named-normalizer map.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@alias QuestieDBEntitySchema QuestieDBQuestSchema|QuestieDBNpcSchema|QuestieDBItemSchema|QuestieDBObjectSchema
+
+--------------------------------------------------------------------------------
+-- Public schema wrappers
+--------------------------------------------------------------------------------
+
+---@class QuestieDBQuestMeta
+---@field questKeys QuestieDBQuestKeys Canonical field name to positional index, shared with `Meta.Quest.keys`.
+---@field names table<integer, QuestieDBQuestField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field fieldCount integer Number of positional fields.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBNpcMeta
+---@field npcKeys QuestieDBNpcKeys Canonical field name to positional index, shared with `Meta.Npc.keys`.
+---@field names table<integer, QuestieDBNpcField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field fieldCount integer Number of positional fields.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBItemMeta
+---@field itemKeys QuestieDBItemKeys Canonical field name to positional index, shared with `Meta.Item.keys`.
+---@field names table<integer, QuestieDBItemField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field fieldCount integer Number of positional fields.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBObjectMeta
+---@field objectKeys QuestieDBObjectKeys Canonical field name to positional index, shared with `Meta.Object.keys`.
+---@field names table<integer, QuestieDBObjectField> Positional index to canonical field name.
+---@field types table<integer, QuestieDBMetadataStorageType> Positional index to stored value type.
+---@field structures table<integer, QuestieDBMetadataStructure> Sparse structural shape map for table fields.
+---@field compilerTypes table<integer, QuestieDBMetadataCompilerType> Positional index to the originating Questie compiler type.
+---@field fieldCount integer Number of positional fields.
+---@field l10nFields integer[] Field indices carrying translations.
+
+---@class QuestieDBMeta
+---@field Quest QuestieDBQuestSchema Complete generated quest schema.
+---@field Npc QuestieDBNpcSchema Complete generated NPC schema.
+---@field Item QuestieDBItemSchema Complete generated item schema.
+---@field Object QuestieDBObjectSchema Complete generated object schema.
+---@field QuestMeta QuestieDBQuestMeta Public quest wrapper reusing members of `Quest`.
+---@field NpcMeta QuestieDBNpcMeta Public NPC wrapper reusing members of `Npc`.
+---@field ItemMeta QuestieDBItemMeta Public item wrapper reusing members of `Item`.
+---@field ObjectMeta QuestieDBObjectMeta Public object wrapper reusing members of `Object`.

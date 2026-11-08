@@ -24,6 +24,10 @@ function _detalhes:ResetInstanceConfig (maintainsnap)
 	Details222.RowTexts.Prepare(self)
 
 	if (not maintainsnap) then
+		--a window on the screen leaves its group through the snap module, so the windows it was snapped to let go of it
+		if (self.snap and self.baseframe) then
+			Details222.WindowSnap.Ungroup(self)
+		end
 		self.snap = {}
 		self.horizontalSnap = nil
 		self.verticalSnap = nil
@@ -76,6 +80,10 @@ function _detalhes:ResetInstanceConfigKeepingValues (maintainsnap)
 	Details222.RowTexts.Prepare(self)
 
 	if (not maintainsnap) then
+		--a window on the screen leaves its group through the snap module, so the windows it was snapped to let go of it
+		if (self.snap and self.baseframe) then
+			Details222.WindowSnap.Ungroup(self)
+		end
 		self.snap = {}
 		self.horizontalSnap = nil
 		self.verticalSnap = nil
@@ -84,7 +92,17 @@ function _detalhes:ResetInstanceConfigKeepingValues (maintainsnap)
 end
 
 function _detalhes:LoadInstanceConfig()
-	for key, value in pairs(_detalhes.instance_defaults) do 
+	--show_percent used to be ignored by the simple text format, which always drew the percent, and it now applies
+	--there too. a window saved before that has false by default, so it is turned on once to keep what it was showing
+	local rowInfo = self.row_info
+	if (rowInfo and rowInfo.show_percent_upgraded == nil) then
+		if (not Details.righttext_simple_formatting.use_alignment) then
+			rowInfo.show_percent = true
+		end
+		rowInfo.show_percent_upgraded = true
+	end
+
+	for key, value in pairs(_detalhes.instance_defaults) do
 		if (self [key] == nil) then
 			if (type(value) == "table") then
 				self [key] = Details.CopyTable(_detalhes.instance_defaults [key])
@@ -266,7 +284,8 @@ _detalhes.instance_defaults = {
 				textR_custom_text = "{data1} ({data2}, {data3}%)",
 			--right text show which infos
 				textR_show_data = {true, true, true},
-				show_percent = false, --dlc 12 and above
+				show_percent = true, --dlc 12 and above
+				show_percent_upgraded = true, --see LoadInstanceConfig
 				textR_bracket = "(",
 				textR_separator = ",",
 			--left text bar number

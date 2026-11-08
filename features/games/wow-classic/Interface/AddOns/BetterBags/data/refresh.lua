@@ -18,15 +18,51 @@ local context = addon:GetModule('Context')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class (exact) Refresh: AceModule
----@field private isSorting boolean
 local refresh = addon:NewModule('Refresh')
 
+-- How long a sort waits for its item moves before refreshing anyway. WoW has no "sort
+-- finished" event, and a sort that moves nothing fires no BAG_UPDATE at all.
+refresh.SORT_FALLBACK_SECONDS = 0.5
+
+-- The world's read, at login and after every loading screen (.claude/rules/refresh-scheduler.md §8).
+-- How long the bags may keep changing after the loading screen before the read runs anyway:
+refresh.WORLD_SETTLE_TIMEOUT = 2
+-- How long to wait for the item data before reading anyway (the late data is read again):
+refresh.WORLD_PRIME_TIMEOUT = 2
+-- Seconds a bank open waits for a bank tab's item data before reading the tab anyway (the captured
+-- opens received the whole bank's 1.2 s after BANKFRAME_OPENED); the late data is read again.
+refresh.BANK_PRIME_TIMEOUT = 2
+-- Seconds a bank open waits for the bank window to say it has finished showing before loading the
+-- bank anyway (Escape can hide it mid-animation while the bank stays open). The longest built-in
+-- show animation is BetterBags Next's 0.45 s slide.
+refresh.BANK_SHOW_TIMEOUT = 1
+-- How long after PLAYER_ENTERING_WORLD to stop waiting for the end of the loading screen:
+refresh.WORLD_LOADING_TIMEOUT = 10
+-- How long after a wait starts to stop waiting for the client to say the world is back. A safety net:
+-- PLAYER_ENTERING_WORLD follows every loading screen.
+refresh.WORLD_RETURN_TIMEOUT = 60
+-- The guild bank (guild-bank.md §3). Seconds it waits for its window to say it has finished
+-- showing before loading its tabs anyway, as the bank does (BANK_SHOW_TIMEOUT):
+refresh.GUILD_SHOW_TIMEOUT = 1
+-- Seconds a guild bank tab waits for its items' data before it is read anyway (the late data is
+-- read again), as a bank open does (BANK_PRIME_TIMEOUT):
+refresh.GUILD_PRIME_TIMEOUT = 2
+
+-- The events the world frame listens to while it waits. The bag events mean the client is still
+-- delivering the bags.
+local WORLD_EVENTS = { 'PLAYER_ENTERING_WORLD', 'LOADING_SCREEN_DISABLED', 'BAG_UPDATE', 'BAG_CONTAINER_UPDATE' }
+
+---@param name string
+---@return boolean
+local function isEventValid(name)
+  if _G.C_EventUtils and _G.C_EventUtils.IsEventValid then
+    return _G.C_EventUtils.IsEventValid(name)
+  end
+  return true
+end
+
 function refresh:Init()
-  self.isSorting = false
   -- Serialized refresh queue. RequestUpdate only enqueues; the pump (_Step) runs exactly
   -- ONE unit at a time in a single coroutine, with a deliberate idle hand-off frame
   -- between units. Because no two sweeps are ever in flight, no request-time side effect
@@ -34,35 +70,68 @@ function refresh:Init()
   -- on, and a unit's commit+draw can never share a frame with the next unit's harvest.
   self._queue = {}
   self._active = nil
+  -- The request the active unit runs.
+  self._activeRequest = nil
   self._idlePending = false
   self._running = false
+  -- While held (out of the world: from OnEnable, and from leaving the world, until the world's read),
+  -- no unit starts or goes on, and requests wait in the queue.
+  self._held = false
+  -- The wait for the world under way (HoldForWorld), if any.
+  self._world = nil
+  -- The redraw asked for this frame (RequestRedraw), if any.
+  self._redrawPending = nil
+  -- The guild bank visit under way (_OpenGuildBank), if any.
+  self._guildBankOpen = nil
 end
 
+-- RequestRedraw draws the bags again on the next frame (Redraw). Every request made in the
+-- same frame shares that one draw, which restyles the buttons if any request asked for it:
+-- dragging a slider asks on every value it passes, and a captured glow-intensity drag asked
+-- for 22 redraws in one frame, each restyling every button.
+---@param buttons? boolean
+function refresh:RequestRedraw(buttons)
+  local pending = self._redrawPending
+  if pending then
+    pending.buttons = pending.buttons or buttons == true
+    return
+  end
+  pending = { buttons = buttons == true }
+  self._redrawPending = pending
+  C_Timer.After(0, function()
+    self._redrawPending = nil
+    self:Redraw(context:New('Redraw'), pending.buttons)
+  end)
+end
+
+-- Redraw draws the bags again from their committed data: no bag is read and nothing is
+-- derived. It is for settings that only change how the bags look: layout sizes, section
+-- titles, how item buttons draw, the theme (.claude/rules/refresh-scheduler.md §9). With
+-- buttons, every item button runs all of its setters (ItemFrame:RestyleButtons). Like the
+-- draw after a sweep, it draws the backpack (which defers the draw while it is hidden) and
+-- the bank only while it is shown.
 ---@param ctx Context
-function refresh:RedrawBackpack(ctx)
-  debug:Log('RedrawBackpack', 'Redrawing backpack')
-  ctx:Set('redraw', true)
-  addon.Bags.Backpack:Draw(ctx, items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK], function()
-    events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
-  end)
-end
-
-function refresh:AfterSort(ctx)
-  -- TODO(lobato): Detect if only new items were moved,
-  -- and only refresh the backpack if that's the case.
-  -- After moving an item, the client state does not update right
-  -- away, and there is a delay. This delay will prevent issues
-  -- with drawing.
-  C_Timer.After(0.5, function()
-    self.isSorting = false
-    events:SendMessage(ctx, 'bags/FullRefreshAll')
-  end)
-
-  --if ctx:GetBool('moved') then
-  --  events:SendMessage(ctx, 'bags/FullRefreshAll')
-  --else
-  --  events:SendMessage(ctx, 'bags/FullRefreshAll')
-  --end
+---@param buttons? boolean
+function refresh:Redraw(ctx, buttons)
+  if buttons then
+    local itemFrame = addon:GetModule('ItemFrame', true)
+    if itemFrame then
+      itemFrame:RestyleButtons()
+    end
+  end
+  local slotInfo = items:GetAllSlotInfo()
+  local bags = addon.Bags
+  if not slotInfo or not bags then return end
+  if bags.Backpack and slotInfo[const.BAG_KIND.BACKPACK] then
+    bags.Backpack:Draw(ctx, slotInfo[const.BAG_KIND.BACKPACK], function()
+      events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
+    end)
+  end
+  if bags.Bank and bags.Bank:IsShown() and slotInfo[const.BAG_KIND.BANK] then
+    bags.Bank:Draw(ctx, slotInfo[const.BAG_KIND.BANK], function()
+      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
+    end)
+  end
 end
 
 ---@class RefreshRequest
@@ -74,25 +143,125 @@ end
 ---@field sortWarbank? boolean Sort account/warbank items
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
 ---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
+---@field onlyIfSortPending? boolean Sweep each requested kind only if its sort has not been shown yet (the sort fallback)
+---@field derive? boolean Recalculate from the items the last read committed, reading no bag slot (§10)
+---@field categoriesUnchanged? boolean A derive whose cause changes nothing an item's category reads, so kept categories stand (data-loader.md §18)
+---@field recategorize? boolean Work every item's category out again (a read that absorbed a derive without categoriesUnchanged)
+---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
+---@field merged? number How many requests this one carries (set by merging, for profiler traces)
+---@field world? string Why the world's read ran: "primed", "timeout" or "bagShown" (set on it, for profiler traces)
+---@field worldCause? string What the world's read follows: "login" or "transfer" (a loading screen)
+---@field tabArrived? boolean A read that adds a bank tab: it re-sorts everything, and nothing travels (Items: slotInfo.tabArrived)
+---@field bankOpen? string Why a bank open's read ran: "primed", "timeout", or "empty" with no tab (for profiler traces)
+---@field bankWave? number The bank open read this is (_LoadNextBankTab); the next tab loads once it has run
+---@field bankWaveTab? number The bank tab that read added (for profiler traces)
+---@field guild? boolean Update the guild bank's items (only while it is open)
+---@field guildLoad? string Why a guild bank read ran, "primed" or "timeout" (for profiler traces)
+
+---@param request RefreshRequest
+---@return boolean
+local function isSortRequest(request)
+  return (request.sort or request.sortBank or request.sortWarbank or request.onlyIfSortPending) and true or false
+end
+
+-- markUnread marks every bag of a bag table (bag ID -> bag ID) unread (items:MarkBagUnread). A
+-- client without a table's bags (no Warbank) has none to mark.
+---@param bags? table<number, number>
+local function markUnread(bags)
+  for bagID in pairs(bags or {}) do
+    items:MarkBagUnread(bagID)
+  end
+end
+
+-- canMerge says whether incoming can ride on waiting, a request that has not started.
+-- waiting reads the client when it runs, after incoming was made, so it sees everything
+-- incoming is about; running incoming afterwards would find nothing new. A wipe covers
+-- anything. A plain request never absorbs a wipe: that would skip its check for newly
+-- acquired items (MarkAddedItemsRecent does not run on wipes). A layout reset applies to
+-- every kind a request names, so it only merges into a wipe, which resets every layout.
+-- Sorts and the sort fallback are ordered against the sweeps around them and never merge.
+-- A derive reads no bag, so a read never rides on one. A derive rides on a read that reads
+-- every bag of its kinds, which recalculates everything too; a read of some bags carries
+-- the others' items over without refreshing them (a re-scanned tooltip), so it does not.
+---@param waiting RefreshRequest
+---@param incoming RefreshRequest
+---@return boolean
+local function canMerge(waiting, incoming)
+  if isSortRequest(waiting) or isSortRequest(incoming) then return false end
+  if waiting.wipe then return true end
+  if incoming.wipe then return false end
+  if (waiting.resetLayout == true) ~= (incoming.resetLayout == true) then return false end
+  if waiting.derive then
+    return incoming.derive == true
+  end
+  if incoming.derive then
+    return waiting.bags == nil
+      and (not incoming.backpack or waiting.backpack == true)
+      and (not incoming.bank or waiting.bank == true)
+      and (not incoming.guild or waiting.guild == true)
+  end
+  return true
+end
+
+-- mergeInto folds incoming into waiting: the kinds of both, and the bags of both (none
+-- named means every bag). The caller's bag tables are never changed.
+---@param waiting RefreshRequest
+---@param incoming RefreshRequest
+local function mergeInto(waiting, incoming)
+  waiting.backpack = waiting.backpack or incoming.backpack
+  waiting.bank = waiting.bank or incoming.bank
+  waiting.guild = waiting.guild or incoming.guild
+  if waiting.wipe or not waiting.bags or not incoming.bags then
+    waiting.bags = nil
+  else
+    local bags = {}
+    for bagID in pairs(waiting.bags) do bags[bagID] = true end
+    for bagID in pairs(incoming.bags) do bags[bagID] = true end
+    waiting.bags = bags
+  end
+  waiting.restyle = waiting.restyle or incoming.restyle
+  waiting.tabArrived = waiting.tabArrived or incoming.tabArrived
+  -- Kept categories stand only when every request merged says nothing categories read changed. A
+  -- read keeps categories; a read that absorbs a recalculation that changed them must not.
+  if waiting.derive and incoming.derive then
+    waiting.categoriesUnchanged = (waiting.categoriesUnchanged and incoming.categoriesUnchanged) or nil
+  elseif incoming.derive and not incoming.categoriesUnchanged then
+    waiting.recategorize = true
+  end
+  -- A bank open's read carries on: the next tab loads once this request has run. An open has one
+  -- read waiting at a time, so a read riding on another open's is the newer open's (that one ended).
+  if incoming.bankWave ~= nil then
+    waiting.bankWave, waiting.bankWaveTab, waiting.bankOpen = incoming.bankWave, incoming.bankWaveTab, incoming.bankOpen
+  end
+  waiting.merged = (waiting.merged or 1) + (incoming.merged or 1)
+end
 
 -- RequestUpdate enqueues an update request onto the serialized refresh queue. It performs
 -- NO side effects itself: the request's mutations (cache wipe, recent-item clearing,
 -- Blizzard sort calls) and data sweeps all run inside the request's own unit when the
 -- pump reaches it, so a request queued while another is in flight can never corrupt the
--- in-flight sweep. If the scheduler is idle, the first step runs synchronously in this
--- call (harvesting this frame's client state); every subsequent step is handed off to the
--- next frame via _Arm.
+-- in-flight sweep. A request that another request still waiting in the queue already
+-- covers is merged into it (canMerge). If the scheduler is idle, the first step runs
+-- synchronously in this call (harvesting this frame's client state); every subsequent step
+-- is handed off to the next frame via _Arm. While the scheduler is held for the world's read
+-- (at login, and after leaving the world), requests only wait.
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
-  table.insert(self._queue, request)
-  if not self._running then
+  local waiting = self._queue[#self._queue]
+  if waiting and canMerge(waiting, request) then
+    mergeInto(waiting, request)
+  else
+    table.insert(self._queue, request)
+  end
+  if not self._running and not self._held then
     self._running = true
     self:_Step()
   end
 end
 
--- _Arm schedules the next pump step for the next frame. This is the ONLY clock in the
--- refresh path: a single chain, never one-per-refresh, so step ordering is deterministic.
+-- _Arm schedules the next pump step for the next frame. This is the ONLY clock that steps
+-- the pump: a single chain, never one-per-refresh, so step ordering is deterministic. (The
+-- sort fallback timer only calls RequestUpdate.)
 function refresh:_Arm()
   C_Timer.After(0, function()
     self:_Step()
@@ -111,17 +280,37 @@ function refresh:_Resume()
     if geterrorhandler then
       geterrorhandler()(err)
     end
+    self:_UnitDone()
     return
   end
   if coroutine.status(co) == 'dead' then
     self._active = nil
     self._idlePending = true
+    self:_UnitDone()
+  end
+end
+
+-- _UnitDone runs when a unit has finished, or failed: a bank open's read lets the next bank tab
+-- load (_BankWaveDone), even after a failure, so one bad read never stops the bank loading.
+function refresh:_UnitDone()
+  local request = self._activeRequest
+  self._activeRequest = nil
+  if request and request.bankWave then
+    self:_BankWaveDone(request.bankWave)
   end
 end
 
 -- _Step is one frame of the pump: advance the active unit, else burn the idle hand-off
--- frame, else start the next queued unit. When the queue drains it stops the clock.
+-- frame, else start the next queued unit. When the queue drains it stops the clock. While held
+-- (out of the world, §8) it stops the clock too: no unit starts, and a unit parked when the player
+-- left the world waits, since the bags it would read next are not there; the world's read starts
+-- the clock again.
 function refresh:_Step()
+  if self._held then
+    self._running = false
+    return
+  end
+
   if self._active then
     self:_Resume()
     self:_Arm()
@@ -140,6 +329,7 @@ function refresh:_Step()
     return
   end
 
+  self._activeRequest = request
   self._active = coroutine.create(function()
     self:_RunUnit(request)
   end)
@@ -147,14 +337,86 @@ function refresh:_Step()
   self:_Arm()
 end
 
+local function backpackSorter()
+  if addon.isRetail and C_Container and C_Container.SortBags then
+    return C_Container.SortBags
+  end
+  return _G.SortBags
+end
+
+local function bankSorter()
+  if addon.isRetail and C_Container and C_Container.SortBankBags then
+    return C_Container.SortBankBags
+  end
+  return _G.SortBankBags
+end
+
+local function warbankSorter()
+  if addon.isRetail and C_Container and C_Container.SortAccountBankBags then
+    return C_Container.SortAccountBankBags
+  end
+  return nil
+end
+
+-- _ArmSortFallback guarantees that a sort is shown even if none of its item moves ever
+-- produce a refresh (the bags were already sorted, or the client refused the sort). When
+-- the timer fires it requests a sweep of each kind whose sort is still unshown; that unit
+-- checks again when it runs, so a moves refresh queued ahead of it is never repeated.
+---@param backpack boolean
+---@param bank boolean
+function refresh:_ArmSortFallback(backpack, bank)
+  C_Timer.After(self.SORT_FALLBACK_SECONDS, function()
+    local request = { onlyIfSortPending = true }
+    request.backpack = backpack and items:IsSortSweepPending(const.BAG_KIND.BACKPACK) or nil
+    request.bank = bank and items:IsSortSweepPending(const.BAG_KIND.BANK) or nil
+    if request.backpack or request.bank then
+      self:RequestUpdate(request)
+    end
+  end)
+end
+
+-- _CallSorter calls one of the client's sorts. Its own function so the profiler measures it by name,
+-- apart from the unit that asked (data-driven.md): a capture showed 56 ms inside the call, every sort.
+---@param _ string Its name, for the call trace.
+---@param sorter function
+function refresh:_CallSorter(_, sorter)
+  sorter()
+end
+
+-- _SettleSort decides, when a sort's fallback's unit runs, whether kind is swept: not if the sort has
+-- been shown, or left nothing to show. It returns whether to sweep, and whether that recalculates
+-- rather than reads (items:SortLeaves).
+---@param kind BagKind
+---@return boolean sweep, boolean recalculate
+function refresh:_SettleSort(kind)
+  if not items:IsSortSweepPending(kind) then
+    return false, false
+  end
+  local leaves = items:SortLeaves(kind)
+  if leaves == "nothing" then
+    items:SortSweepShown(kind)
+    events:SendMessage(context:New('SortSettled'), 'bags/SortSettled', kind)
+    return false, false
+  end
+  return true, leaves == "recalculate"
+end
+
 -- _RunUnit executes a single request end-to-end inside the pump's coroutine: request-time
--- mutations first, then the bank sweep, then the backpack sweep (each an inline
--- items:RunRefresh that yields once), then the protected Blizzard sort calls. Because this
--- is the only sweep in flight, ClearItemCache/ClearNewItems run with nothing parked to
--- corrupt.
+-- mutations and sort calls first, then the bank sweep, then the backpack sweep (each an
+-- inline items:RunRefresh that yields once). Because this is the only sweep in flight,
+-- ClearItemCache/ClearNewItems run with nothing parked to corrupt.
 ---@param request RefreshRequest
 function refresh:_RunUnit(request)
   local ctx = context:New('BagUpdate')
+
+  -- The backpack's is worked out at its turn, below: the bank's sweep yields before it.
+  local recalculateBank = false
+  -- A bank closed or still showing is not swept below, and its sort stays to be shown by its next read.
+  if request.onlyIfSortPending and request.bank and addon.atBank and addon.Bags.Bank and not self:BankShowing() then
+    local sweep, recalculate = self:_SettleSort(const.BAG_KIND.BANK)
+    request.bank = sweep or nil
+    recalculateBank = recalculate
+  end
 
   if request.bags then
     ctx:Set('targetedBags', request.bags)
@@ -167,60 +429,115 @@ function refresh:_RunUnit(request)
     ctx:Set('resetLayout', true)
   end
 
+  if request.derive then
+    ctx:Set('derive', true)
+  end
+  if request.categoriesUnchanged then
+    ctx:Set('categoriesUnchanged', true)
+  end
+  if request.recategorize then
+    ctx:Set('recategorize', true)
+  end
+  if request.restyle then
+    ctx:Set('restyle', true)
+  end
+
   if request.wipe then
     items:ClearItemCache(ctx)
     ctx:Set('wipe', true)
     request.backpack = true
     request.bank = true
+    request.guild = true
+  end
+
+  -- Sorting. Every sorted kind is marked "sort sweep pending": the next committed read of
+  -- that kind re-reads all of its bags with a fresh layout and clears the mark. When the
+  -- client can sort now, the sort is issued here and this unit does not sweep that kind,
+  -- since the sweep would only redraw the pre-sort contents the moves replace a moment
+  -- later; the moves' BAG_UPDATE refresh shows the result, and the fallback timer covers a
+  -- sort that moves nothing. When it cannot sort (combat, no sort API), the kind is swept
+  -- here, now. The mark and the fallback are set before any call that could fail.
+  local sorters = {}
+  local deferBackpack, deferBank = false, false
+  local canSort = not InCombatLockdown()
+  local sortsBank = request.sortBank or request.sortWarbank
+
+  if request.sort then
+    items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
+    local sorter = canSort and backpackSorter() or nil
+    if sorter then
+      table.insert(sorters, { "backpack", sorter })
+      deferBackpack = true
+    else
+      request.backpack = true
+    end
+  end
+
+  if sortsBank then
+    items:MarkSortSweepPending(const.BAG_KIND.BANK)
+    local bank = request.sortBank and canSort and bankSorter() or nil
+    local warbank = request.sortWarbank and canSort and warbankSorter() or nil
+    if bank then table.insert(sorters, { "bank", bank }) end
+    if warbank then table.insert(sorters, { "warbank", warbank }) end
+    if bank or warbank then
+      deferBank = true
+    else
+      request.bank = true
+    end
+  end
+
+  if deferBackpack or deferBank then
+    self:_ArmSortFallback(deferBackpack, deferBank)
   end
 
   if request.sort then
-    ctx:Set('resetLayout', true)
     items:ClearNewItems(const.BAG_KIND.BACKPACK)
-    request.backpack = true
   end
-
-  if request.sortBank or request.sortWarbank then
-    ctx:Set('resetLayout', true)
+  if sortsBank then
     items:ClearNewItems(const.BAG_KIND.BANK)
-    request.bank = true
   end
 
-  if request.bank and addon.atBank and addon.Bags.Bank then
+  for _, sorter in ipairs(sorters) do
+    self:_CallSorter(sorter[1], sorter[2])
+  end
+
+  -- showsSort: a recalculation that shows the sort, and clears its mark once it has committed.
+  local function recalculating(sweepCtx)
+    sweepCtx:Set('derive', true)
+    sweepCtx:Set('showsSort', true)
+    sweepCtx:Set('categoriesUnchanged', true)
+    return sweepCtx
+  end
+
+  -- While the bank window shows after an open, the bank is not swept: the open's reads, which
+  -- follow, read every bank tab (_OpenBank).
+  if request.bank and addon.atBank and addon.Bags.Bank and not self:BankShowing() then
     local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
     if addon.atWarbank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab < accountBankStart then
       addon.Bags.Bank.bankTab = accountBankStart
     end
 
-    items:RunRefresh(ctx:Copy(), const.BAG_KIND.BANK)
+    local bankCtx = ctx:Copy()
+    if request.tabArrived then
+      bankCtx:Set('tabArrived', true)
+    end
+    items:RunRefresh(recalculateBank and recalculating(bankCtx) or bankCtx, const.BAG_KIND.BANK)
   end
 
+  -- While the guild bank window shows after an open, the guild bank is not swept: its tabs load
+  -- after, and each is read as it arrives (_GuildTabLoaded).
+  if request.guild and addon.atGuildBank and addon.Bags.GuildBank and not self:GuildBankShowing() then
+    items:RunRefresh(ctx:Copy(), const.BAG_KIND.GUILD)
+  end
+
+  local recalculateBackpack = false
+  if request.onlyIfSortPending and request.backpack then
+    local sweep, recalculate = self:_SettleSort(const.BAG_KIND.BACKPACK)
+    request.backpack = sweep or nil
+    recalculateBackpack = recalculate
+  end
   if request.backpack then
-    items:RunRefresh(ctx, const.BAG_KIND.BACKPACK)
-  end
-
-  if not InCombatLockdown() then
-    if request.sort then
-      if addon.isRetail and C_Container and C_Container.SortBags then
-        C_Container.SortBags()
-      elseif _G.SortBags then
-        _G.SortBags()
-      end
-    end
-
-    if request.sortBank then
-      if addon.isRetail and C_Container and C_Container.SortBankBags then
-        C_Container.SortBankBags()
-      elseif _G.SortBankBags then
-        _G.SortBankBags()
-      end
-    end
-
-    if request.sortWarbank then
-      if addon.isRetail and C_Container and C_Container.SortAccountBankBags then
-        C_Container.SortAccountBankBags()
-      end
-    end
+    items:RunRefresh(recalculateBackpack and recalculating(ctx) or ctx, const.BAG_KIND.BACKPACK)
   end
 end
 
@@ -256,6 +573,28 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/RefreshBackpack', function()
     self:RequestUpdate({ backpack = true })
   end)
+  -- bags/Redraw (ctx, { buttons = boolean }?) redraws without reading the bags.
+  events:RegisterMessage('bags/Redraw', function(_, options)
+    self:RequestRedraw(options ~= nil and options.buttons == true)
+  end)
+  -- bags/Rederive (ctx, { backpack?, bank?, guild?, resetLayout?, buttons?, categoriesUnchanged? }?)
+  -- recalculates the bags from the items already read (§10); naming no kind recalculates every kind.
+  -- buttons makes every button draw in full, for settings the buttons draw from. categoriesUnchanged
+  -- says the cause changes nothing an item's category reads (data-loader.md §18): the grey-out, the
+  -- upgrade arrows, a tooltip that loaded, recency, the search box; kept categories then stand.
+  events:RegisterMessage('bags/Rederive', function(_, options)
+    options = options or {}
+    local all = options.backpack == nil and options.bank == nil and options.guild == nil
+    self:RequestUpdate({
+      derive = true,
+      backpack = (all or options.backpack == true) or nil,
+      bank = (all or options.bank == true) or nil,
+      guild = (all or options.guild == true) or nil,
+      resetLayout = options.resetLayout == true or nil,
+      restyle = options.buttons == true or nil,
+      categoriesUnchanged = options.categoriesUnchanged == true or nil,
+    })
+  end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })
   end)
@@ -280,12 +619,26 @@ function refresh:OnEnable()
     self:RequestUpdate({ sortWarbank = true })
   end)
 
+  -- A bag the client changed is unread until a read of it commits (items:MarkBagUnread): a
+  -- recalculation leaves its committed items as they were. BAG_UPDATE's read waits for the bag's
+  -- item data (the loader's batch above), so the bag is marked when the change is reported.
+  events:RegisterEvent('BAG_UPDATE', function(_, _, bagID)
+    if bagID then
+      items:MarkBagUnread(bagID)
+    end
+  end)
+
+  -- Bags were added, removed or swapped: every bag is read again.
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function()
+    markUnread(const.BACKPACK_BAGS)
+    markUnread(const.BANK_BAGS)
+    markUnread(const.ACCOUNT_BANK_BAGS)
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
 
+  -- Gear sets come from the set map rebuilt every sweep, never from a bag slot.
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+    self:RequestUpdate({ derive = true, backpack = true, bank = true, resetLayout = true })
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
@@ -301,32 +654,551 @@ function refresh:OnEnable()
         addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
       end
     end
-    -- Opening the bank starts from a clean, gapless layout; any gaps held from a
-    -- previous session are collapsed here.
-    self:RequestUpdate({ bank = true, resetLayout = true })
+    self:_OpenBank(context:New('BANKFRAME_OPENED'))
   end)
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
+    self._bankOpen = nil
+    items:SetLoadedBankBags(nil)
   end)
 
   if not addon.isRetail then
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      items:MarkBagUnread(-1)
       self:RequestUpdate({ bank = true, bags = { [-1] = true } })
     end)
   elseif addon.isForever then
     -- A bag placed in or removed from a bank tab's bag socket resizes that tab's
     -- container, so sweep every bank bag. Bag -1 is the keyring on Forever.
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      markUnread(const.BANK_BAGS)
       self:RequestUpdate({ bank = true })
     end)
   end
 
-  -- Route the initial login sweep through the ItemLoader's ContinuableContainer, exactly
-  -- like a BAG_UPDATE, so the first harvest only runs once the item cache is primed.
-  -- Harvesting a cold cache here reads nil type/subtype from C_Item.GetItemInfo and dumps
-  -- items into "Everything" until a /reload. The loader's callback (registered above) fans
-  -- this out to RequestUpdate, and RunRefresh forces a wipe on each kind's first sweep, so
-  -- no explicit wipe is needed here.
-  itemLoader:LoadAllBagsAndUpdate()
+  -- The guild bank (guild-bank.md §3), told by the guild bank's data source (data/guildbank.lua).
+  events:RegisterMessage('guildbank/Opened', function(ctx)
+    self:_OpenGuildBank(ctx)
+  end)
+  events:RegisterMessage('guildbank/TabLoaded', function(_, tab)
+    self:_GuildTabLoaded(tab)
+  end)
+  events:RegisterMessage('guildbank/Changed', function()
+    self:_GuildBankChanged()
+  end)
+  events:RegisterMessage('guildbank/TabsChanged', function()
+    self:RequestUpdate({ guild = true })
+  end)
+  events:RegisterMessage('guildbank/Closed', function(ctx)
+    self._guildBankOpen = nil
+    items:ClearGuildBankCache(ctx)
+  end)
+
+  -- A loading screen (a dungeon, a portal, a hearthstone) takes the player's items out of the client
+  -- until it delivers them again, with no BAG_UPDATE on the way out, and before PLAYER_LEAVING_WORLD:
+  -- held from whichever of the two comes first (_LeaveWorld).
+  if isEventValid('LOADING_SCREEN_ENABLED') then
+    events:RegisterEvent('LOADING_SCREEN_ENABLED', function()
+      self:_LeaveWorld('loadingScreen')
+    end)
+  end
+  events:RegisterEvent('PLAYER_LEAVING_WORLD', function()
+    self:_LeaveWorld('leaving')
+  end)
+
+  self:HoldForWorld('login')
+end
+
+-- _LeaveWorld marks every bag unread (a recalculation asks the client nothing about it) and holds every
+-- sweep until the world is back (§8), on either signal of a loading screen: LOADING_SCREEN_ENABLED
+-- ("loadingScreen") or PLAYER_LEAVING_WORLD ("leaving"). A capture of a trip into an instance and back
+-- out had the backpack's 26 items there at LOADING_SCREEN_ENABLED and gone at PLAYER_LEAVING_WORLD, which
+-- came 1.9 s and 0.9 s later with hundreds of frames run in between: held only from PLAYER_LEAVING_WORLD,
+-- a tooltip finishing, a window closing or the queue's step recalculated the bags in that gap and asked
+-- the client about the items it had taken ("bad argument #1 to 'GetItemGUID'"). The other signal of the
+-- same loading screen joins the wait under way (one still waiting for a loading screen to end that has
+-- not had that signal); the same signal again is another loading screen, a wait of its own. It returns
+-- what it did, for profiler traces: "held" or "joined".
+---@param signal "loadingScreen"|"leaving"
+---@return string
+function refresh:_LeaveWorld(signal)
+  markUnread(const.BACKPACK_BAGS)
+  markUnread(const.BANK_BAGS)
+  markUnread(const.ACCOUNT_BANK_BAGS)
+  local hold = self._world
+  if hold and hold.phase == 'loading' and not hold.signals[signal] then
+    hold.signals[signal] = true
+    return 'joined'
+  end
+  self:HoldForWorld('transfer')
+  self._world.signals[signal] = true
+  return 'held'
+end
+
+-- _OpenGuildBank shows the guild bank's window at once and loads its tabs only once the window has
+-- finished showing, as a bank open does (_OpenBank). Without a window that shows the guild bank (the
+-- classic bags), Blizzard's own guild bank frame shows it and nothing is read.
+---@param ctx Context
+function refresh:_OpenGuildBank(ctx)
+  local bag = addon.Bags and addon.Bags.GuildBank
+  if bag == nil then
+    return
+  end
+  local open = { showing = true }
+  self._guildBankOpen = open
+  C_Timer.After(self.GUILD_SHOW_TIMEOUT, function() self:_GuildBankShown(open, 'timeout') end)
+  bag:Show(ctx, nil, function() self:_GuildBankShown(open, 'finished') end)
+end
+
+-- _GuildBankShown ends a guild bank open's wait for its window, once, and loads its tabs
+-- (GuildBank:Load). reason says what ended it. It returns what it did, for profiler traces:
+-- "loading", "already" (the wait had ended) or "ended" (the visit has ended).
+---@param open table
+---@param reason string
+---@return string
+function refresh:_GuildBankShown(open, reason)
+  local _ = reason
+  if self._guildBankOpen ~= open then
+    return 'ended'
+  end
+  if not open.showing then
+    return 'already'
+  end
+  open.showing = false
+  addon:GetModule('GuildBank'):Load()
+  return 'loading'
+end
+
+-- GuildBankShowing says the guild bank window is still showing after an open: nothing reads it.
+---@return boolean
+function refresh:GuildBankShowing()
+  return self._guildBankOpen ~= nil and self._guildBankOpen.showing == true
+end
+
+-- _PrimeGuildAndRead loads the item data of the guild bank tabs given, then reads the guild bank. It
+-- reads after GUILD_PRIME_TIMEOUT if the data has not all arrived, and again when it does. The read
+-- itself finds whether a tab's items first appear in it (refresh-scheduler.md §11a). Nothing happens
+-- for a visit that has ended.
+---@param tabs number[]
+function refresh:_PrimeGuildAndRead(tabs)
+  local open = self._guildBankOpen
+  if open == nil or open.showing then
+    return
+  end
+  local read = false
+  local function readGuild(reason)
+    if self._guildBankOpen ~= open then return end
+    if read then
+      if reason == 'primed' then
+        self:RequestUpdate({ guild = true })
+      end
+      return
+    end
+    read = true
+    self:RequestUpdate({ guild = true, guildLoad = reason })
+  end
+  C_Timer.After(self.GUILD_PRIME_TIMEOUT, function() readGuild('timeout') end)
+  addon:GetModule('ItemLoader'):PrimeGuildBank(tabs, function() readGuild('primed') end)
+end
+
+-- _GuildTabLoaded reads a guild bank tab the server has sent (GuildBank:Load), once its items' data
+-- has loaded.
+---@param tab number
+function refresh:_GuildTabLoaded(tab)
+  self:_PrimeGuildAndRead({ tab })
+end
+
+-- _GuildBankChanged reads the guild bank's loaded tabs again when something in them changed (an item
+-- moved, or locked while another player moves it), once their items' data has loaded.
+function refresh:_GuildBankChanged()
+  local guildBank = addon:GetModule('GuildBank')
+  local tabs = {}
+  for container in pairs(guildBank:LoadedContainers()) do
+    table.insert(tabs, guildBank:TabOf(container))
+  end
+  table.sort(tabs)
+  self:_PrimeGuildAndRead(tabs)
+end
+
+-- HoldForWorld holds every sweep until the client has delivered the bags, then reads them once
+-- (.claude/rules/refresh-scheduler.md §8): at login (cause "login", from OnEnable) and after every
+-- loading screen (cause "transfer", from PLAYER_LEAVING_WORLD). At PLAYER_LOGIN the client has not
+-- attached the bags or sent their contents yet: a captured login read a backpack of 20 empty slots
+-- here, and the bags then arrived over five seconds, each step requesting another sweep. A loading
+-- screen (a dungeon, a portal) takes the player's items out of the client in the same way: a window
+-- closing as a player went into a dungeon recalculated the bags and asked the client about slots it had
+-- emptied ("bad argument #1 to 'GetItemGUID'"). While held, no unit starts or goes on, and requests made
+-- meanwhile wait in the queue; the world's read absorbs them. The read runs:
+--   1. after the loading screen ends (LOADING_SCREEN_DISABLED, or PLAYER_ENTERING_WORLD where the
+--      client lacks it, or WORLD_LOADING_TIMEOUT after PLAYER_ENTERING_WORLD, or WORLD_RETURN_TIMEOUT
+--      after the wait started),
+--   2. at the first frame without bag events (or after WORLD_SETTLE_TIMEOUT),
+--   3. once the item data of every bag slot and equipped slot has loaded (or after
+--      WORLD_PRIME_TIMEOUT; the late data is read again when it arrives).
+-- At login, opening the backpack before then reads at once. Each wait is its own: a new one (the player
+-- leaving the world again) replaces the last, whose timers and item data then end nothing. The world
+-- frame's scripts are the current wait's (set here and by _WorldSettle, cleared by _WorldPrime and
+-- _WorldRead); only timers and the item data's callback can outlive their wait, and they check it.
+---@param cause "login"|"transfer"
+function refresh:HoldForWorld(cause)
+  self._held = true
+  ---@type table
+  local hold = { cause = cause, phase = 'loading', bagActivity = false, signals = {} }
+  self._world = hold
+  addon:GetModule('ItemLoader'):Hold()
+
+  local frame = self._worldFrame
+  if not frame then
+    frame = CreateFrame('Frame')
+    self._worldFrame = frame
+  end
+  frame:SetScript('OnUpdate', nil)
+  for _, event in ipairs(WORLD_EVENTS) do
+    if isEventValid(event) then
+      frame:RegisterEvent(event)
+    end
+  end
+  frame:SetScript('OnEvent', function(_, event)
+    self:_OnWorldEvent(hold, event)
+  end)
+  C_Timer.After(self.WORLD_RETURN_TIMEOUT, function()
+    self:_WorldSettle(hold)
+  end)
+
+  if cause == 'login' then
+    local backpack = addon.Bags and addon.Bags.Backpack
+    if backpack and backpack.frame then
+      addon.HookScript(backpack.frame, 'OnShow', function()
+        self:_OnLoginBagShown()
+      end)
+    end
+  end
+end
+
+---@param hold table
+---@param event string
+function refresh:_OnWorldEvent(hold, event)
+  if event == 'BAG_UPDATE' or event == 'BAG_CONTAINER_UPDATE' then
+    hold.bagActivity = true
+  elseif event == 'LOADING_SCREEN_DISABLED' then
+    self:_WorldSettle(hold)
+  elseif event == 'PLAYER_ENTERING_WORLD' then
+    if not isEventValid('LOADING_SCREEN_DISABLED') then
+      self:_WorldSettle(hold)
+    else
+      C_Timer.After(self.WORLD_LOADING_TIMEOUT, function()
+        self:_WorldSettle(hold)
+      end)
+    end
+  end
+end
+
+-- _WorldSettle starts waiting for a frame without bag events. Frames do not run during the
+-- loading screen, so the first one comes after it.
+---@param hold table
+function refresh:_WorldSettle(hold)
+  if self._world ~= hold or hold.phase ~= 'loading' then return end
+  hold.phase = 'settling'
+  hold.bagActivity = false
+  hold.settleStart = GetTime()
+  self._worldFrame:SetScript('OnUpdate', function()
+    self:_OnWorldFrame(hold)
+  end)
+end
+
+---@param hold table
+function refresh:_OnWorldFrame(hold)
+  if hold.bagActivity and GetTime() - hold.settleStart < self.WORLD_SETTLE_TIMEOUT then
+    hold.bagActivity = false
+    return
+  end
+  self:_WorldPrime(hold)
+end
+
+-- _OpenBank shows the bank window at once (with the bank's committed items: none after a close)
+-- and loads the bank only once the window has finished showing, so the bank's reads and draws never
+-- land in its show animation (asked: "finish our bank window show animation, before we start
+-- loading in bank info, just to prevent hitching"; refresh-scheduler.md §11). Until then no sweep
+-- reads the bank (_RunUnit): the open's reads read every bank tab after.
+---@param ctx Context
+function refresh:_OpenBank(ctx)
+  local open = { showing = true }
+  self._bankOpen = open
+  C_Timer.After(self.BANK_SHOW_TIMEOUT, function() self:_BankShown(open, 'timeout') end)
+  -- The classic bank goes by its saved position until bags/BankLoaded (window.md §3c).
+  events:SendMessage(ctx, 'bags/BankOpening')
+  if addon.Bags and addon.Bags.Bank then
+    addon.Bags.Bank:Show(ctx, nil, function() self:_BankShown(open, 'finished') end)
+  else
+    self:_BankShown(open, 'no window')
+  end
+end
+
+-- _BankShown ends a bank open's wait for its window, once, and loads the bank. reason says what
+-- ended it ("finished", "timeout", "no window"). It returns what it did, for profiler traces:
+-- "loading", "already" (the wait had ended) or "ended" (the open has ended).
+---@param open table
+---@param reason string
+---@return string
+function refresh:_BankShown(open, reason)
+  local _ = reason
+  if self._bankOpen ~= open then
+    return 'ended'
+  end
+  if not open.showing then
+    return 'already'
+  end
+  open.showing = false
+  self:_LoadBank(open)
+  return 'loading'
+end
+
+-- BankShowing says the bank window is still showing after a bank open: nothing reads the bank.
+---@return boolean
+function refresh:BankShowing()
+  return self._bankOpen ~= nil and self._bankOpen.showing == true
+end
+
+-- isWarbankBag says whether a bag is a Warbank tab.
+---@param bag? number
+---@return boolean
+local function isWarbankBag(bag)
+  return bag ~= nil and const.ACCOUNT_BANK_BAGS ~= nil and const.ACCOUNT_BANK_BAGS[bag] ~= nil
+end
+
+-- BankTabs lists the bank's tabs that have slots (Items:BankBags, the bags a read of the bank reads),
+-- in the bank's order: the character bank's (on Classic the bank, then its bags), then the Warbank's
+-- or, on Classic, the reagent bank (Enum.BagIndex.Reagentbank, -3, after the bank's bags).
+---@return number[]
+function refresh:BankTabs()
+  local tabs = {}
+  for bag in pairs(items:BankBags()) do
+    if (C_Container.GetContainerNumSlots(bag) or 0) > 0 then
+      table.insert(tabs, bag)
+    end
+  end
+  local function rank(bag)
+    return const.BANK_BAGS and const.BANK_BAGS[bag] and 0 or 1
+  end
+  table.sort(tabs, function(a, b)
+    local ra, rb = rank(a), rank(b)
+    if ra ~= rb then return ra < rb end
+    return a < b
+  end)
+  return tabs
+end
+
+-- _LoadBank loads the bank tab by tab, as the guild bank loads (GuildBank:Load, refresh-scheduler.md
+-- §11). Asked: "pop in data for each physical tab (non-virtual tab) one by one ... mimic the guild bank
+-- behavior as close as possible"; a captured open (500 items) read and drew the whole bank in one
+-- 520 ms frame. Reads of the bank read only the tabs loaded so far (Items:SetLoadedBankBags), as guild
+-- bank reads read only the tabs received. The guild bank's tabs come from the server one query at a
+-- time; the bank's are all on the client, so every tab's item data loads at once, each tab in a load
+-- of its own (or for BANK_PRIME_TIMEOUT), and the tabs are read one per read (_LoadNextBankTab). A
+-- bank with no tab with slots (WoW: Forever before its first tab) is read once, empty.
+---@param open table The open being loaded (refresh._bankOpen).
+function refresh:_LoadBank(open)
+  local tabs = self:BankTabs()
+  open.order, open.tabs, open.waiting, open.loaded = tabs, {}, {}, {}
+  if #tabs == 0 then
+    items:SetLoadedBankBags(nil)
+    self._bankWaves = (self._bankWaves or 0) + 1
+    open.reading = self._bankWaves
+    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = 'empty', bankWave = open.reading })
+    return
+  end
+  for _, bag in ipairs(tabs) do
+    open.tabs[bag] = { ready = false, read = false }
+    open.waiting[bag] = true
+  end
+  items:SetLoadedBankBags(open.loaded)
+  C_Timer.After(self.BANK_PRIME_TIMEOUT, function()
+    for _, bag in ipairs(tabs) do
+      self:_BankTabReady(open, bag, 'timeout')
+    end
+  end)
+  local loader = addon:GetModule('ItemLoader')
+  for _, bag in ipairs(tabs) do
+    loader:PrimeBank({ bag }, function() self:_BankTabReady(open, bag, 'primed') end)
+  end
+end
+
+-- _BankTabReady says a bank tab's item data has loaded ("primed"), or that the open stopped waiting
+-- for it ("timeout"), and reads the next tab if it is that one's turn. A tab read before its data
+-- arrived is read again when it does, as a guild bank tab is. It returns what it did, for profiler
+-- traces: "ready", "read again", "already" or "ended" (the open has ended).
+---@param open table
+---@param bag number
+---@param reason string
+---@return string
+function refresh:_BankTabReady(open, bag, reason)
+  if self._bankOpen ~= open then
+    return 'ended'
+  end
+  local tab = open.tabs[bag]
+  if tab.ready then
+    if reason ~= 'primed' then
+      return 'already'
+    end
+    if tab.read then
+      self:RequestUpdate({ bank = true, resetLayout = true, tabArrived = true })
+      return 'read again'
+    end
+    tab.reason = 'primed'
+    return 'already'
+  end
+  tab.ready, tab.reason = true, reason
+  self:_LoadNextBankTab(open)
+  return 'ready'
+end
+
+-- _NextBankTab is the bank tab to read next: the Blizzard tab shown (tab mode), else the first of
+-- the bank type shown (Warbank or character bank, from the bank's bankTab, which both bag designs
+-- keep), else the first left. A tab chosen while the bank loads is read next, as a guild bank tab
+-- chosen while it loads is queried next (GuildBank:LoadTab).
+---@param open table
+---@return number?
+function refresh:_NextBankTab(open)
+  local bank = addon.Bags and addon.Bags.Bank
+  local shown = bank and bank.blizzardBankTab
+  if shown ~= nil and open.waiting[shown] then
+    return shown
+  end
+  local warbank = isWarbankBag(bank and bank.bankTab)
+  for _, bag in ipairs(open.order) do
+    if open.waiting[bag] and isWarbankBag(bag) == warbank then
+      return bag
+    end
+  end
+  for _, bag in ipairs(open.order) do
+    if open.waiting[bag] then
+      return bag
+    end
+  end
+  return nil
+end
+
+-- _LoadNextBankTab reads the next bank tab once the read before it has run and the tab's item data
+-- has loaded: one tab per read, so each read shows one more tab, frames apart, even when every tab's
+-- data was already loaded. Every read of an open rebuilds the layout, or the bank would end in a layout decided
+-- from the tabs read so far (refresh-scheduler.md §11a). Once every tab is read, reads of the bank read every bank
+-- bag again. It returns
+-- the tab it read, or why it read none, for profiler traces: "reading", "waiting" (for the tab's
+-- data) or "done". It is only called with the open under way.
+---@param open table
+---@return number|string
+function refresh:_LoadNextBankTab(open)
+  if open.reading ~= nil then
+    return 'reading'
+  end
+  local bag = self:_NextBankTab(open)
+  if bag == nil then
+    items:SetLoadedBankBags(nil)
+    events:SendMessage(context:New('BankLoaded'), 'bags/BankLoaded')
+    return 'done'
+  end
+  local tab = open.tabs[bag]
+  if not tab.ready then
+    return 'waiting'
+  end
+  open.waiting[bag] = nil
+  open.loaded[bag] = true
+  tab.read = true
+  self._bankWaves = (self._bankWaves or 0) + 1
+  open.reading = self._bankWaves
+  self:RequestUpdate({
+    bank = true,
+    resetLayout = true,
+    tabArrived = true,
+    bankOpen = tab.reason,
+    bankWave = open.reading,
+    bankWaveTab = bag,
+  })
+  return bag
+end
+
+-- _BankWaveDone runs once a bank open's read has run (or failed): the next tab may load.
+---@param wave number
+function refresh:_BankWaveDone(wave)
+  local open = self._bankOpen
+  if open == nil or open.reading ~= wave then
+    return
+  end
+  open.reading = nil
+  self:_LoadNextBankTab(open)
+end
+
+-- _WorldPrime loads the item data of every bag slot and every equipped slot, then reads. Once a wait:
+-- its callers are the settling frame, which it stops, and the login's backpack showing before it.
+---@param hold table
+function refresh:_WorldPrime(hold)
+  hold.phase = 'priming'
+  hold.priming = true
+  self._worldFrame:SetScript('OnUpdate', nil)
+  C_Timer.After(self.WORLD_PRIME_TIMEOUT, function()
+    self:_WorldRead(hold, 'timeout')
+  end)
+  addon:GetModule('ItemLoader'):PrimeAll(function()
+    self:_OnWorldPrimed(hold)
+  end)
+end
+
+---@param hold table
+function refresh:_OnWorldPrimed(hold)
+  if self._world == hold then
+    self:_WorldRead(hold, 'primed')
+    return
+  end
+  -- The read ran before the item data arrived (timeout, or the backpack opened at login), so the
+  -- items it read cold are read again. A wait replaced before it read has nothing to read again:
+  -- the next wait's read reads everything.
+  if hold.read then
+    self:RequestUpdate({ backpack = true, bank = true })
+  end
+end
+
+function refresh:_OnLoginBagShown()
+  local hold = self._world
+  if not hold or hold.cause ~= 'login' then return end
+  if not hold.priming then
+    -- Reads at once when the item data is already loaded.
+    self:_WorldPrime(hold)
+  end
+  self:_WorldRead(hold, 'bagShown')
+end
+
+-- _WorldRead ends the hold: one wipe of both kinds absorbs every request made while held, and
+-- sorts asked for meanwhile run after it. A unit parked when the player left the world goes on
+-- first (one unit at a time).
+---@param hold table
+---@param reason string
+function refresh:_WorldRead(hold, reason)
+  if self._world ~= hold then return end
+  self._world = nil
+  hold.read = true
+  local frame = self._worldFrame
+  frame:SetScript('OnUpdate', nil)
+  frame:SetScript('OnEvent', nil)
+  for _, event in ipairs(WORLD_EVENTS) do
+    frame:UnregisterEvent(event)
+  end
+  addon:GetModule('ItemLoader'):Release()
+
+  ---@type RefreshRequest
+  local read = { wipe = true, backpack = true, bank = true, world = reason, worldCause = hold.cause, merged = 0 }
+  local queue = { read }
+  for _, request in ipairs(self._queue) do
+    if isSortRequest(request) then
+      table.insert(queue, request)
+    else
+      read.merged = read.merged + (request.merged or 1)
+    end
+  end
+  self._queue = queue
+  self._held = false
+  if not self._running then
+    self._running = true
+    self:_Step()
+  end
 end

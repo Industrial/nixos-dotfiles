@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -18,21 +21,21 @@ local context = addon:GetModule('Context')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
 
 ---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
 local searchBox = addon:NewModule('SearchBox')
 
+-- A SearchFrame is the overlay search panel (searchBox:Create, a Search window) or a bag's
+-- in-bag search box (searchBox:CreateBox, which has no window).
 ---@class (exact) SearchFrame
 ---@field frame Frame
----@field fadeInGroup AnimationGroup
----@field fadeOutGroup AnimationGroup
+---@field window? BetterBagsWindow
 ---@field textBox EditBox
 ---@field helpText FontString
 ---@field kind BagKind
@@ -42,48 +45,63 @@ local searchBox = addon:NewModule('SearchBox')
 ---@field helpTextFadeIn AnimationGroup
 ---@field helpTextFadeOut AnimationGroup
 searchBox.searchProto = {}
+addon:GetModule('Perf'):RegisterPrototype(searchBox.searchProto, 'SearchBoxFrame')
 
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
 -- search key bind.
 function BetterBags_ToggleSearch()
   local ctx = context:New('BetterBags_ToggleSearch')
+  -- A BetterBags Next backpack searches in its own panel and has no overlay (next.md).
+  local backpack = addon.Bags and addon.Bags.Backpack
+  if backpack and backpack.ToggleSearch then
+    backpack:ToggleSearch(ctx)
+    return
+  end
   searchBox.searchFrame:Toggle(ctx)
 end
 
 ---@param ctx Context
+-- Toggle opens the overlay over the backpack, focusing its box once shown, or closes it.
+---@param ctx Context
 function searchBox.searchProto:Toggle(ctx)
-  if self.frame:IsShown() then
-    self.textBox:SetText("")
-    self.textBox:ClearFocus()
-    self.fadeOutGroup:Play()
+  if self.frame:IsShown() and not (self.window and self.window:IsClosing()) then
+    self:Hide(ctx)
   else
-    self.textBox:ClearFocus()
     addon.Bags.Backpack:Show(ctx)
-    self.fadeInGroup:Play()
+    self:Show(ctx)
   end
 end
 
-function searchBox.searchProto:Hide()
-  if self.frame:IsShown() then
-    self.textBox:SetText("")
-    self.textBox:ClearFocus()
-    if self.fadeOutGroup then
-      self.fadeOutGroup:Play()
-    else
-      self.frame:Hide()
-    end
-  end
-end
-
-function searchBox.searchProto:Show()
+-- Hide empties the box and closes it; the overlay fades out with its theme, then shows its
+-- help again.
+---@param ctx? Context
+function searchBox.searchProto:Hide(ctx)
   if not self.frame:IsShown() then
-    self.textBox:ClearFocus()
-    if self.fadeInGroup then
-      self.fadeInGroup:Play()
-    else
-      self.frame:Show()
-    end
+    return
   end
+  self.textBox:SetText("")
+  self.textBox:ClearFocus()
+  if self.window == nil then
+    self.frame:Hide()
+    return
+  end
+  self.window:Hide(ctx or context:New('SearchBox_Hide'), function()
+    self.textBox:SetText("")
+    self.helpText:Show()
+  end)
+end
+
+-- Show opens the box; the overlay fades in with its theme and focuses its box once shown.
+---@param ctx? Context
+function searchBox.searchProto:Show(ctx)
+  self.textBox:ClearFocus()
+  if self.window == nil then
+    self.frame:Show()
+    return
+  end
+  self.window:Show(ctx or context:New('SearchBox_Show'), function()
+    self.textBox:SetFocus()
+  end)
 end
 
 function searchBox.searchProto:SetShown(shown)
@@ -122,21 +140,13 @@ function searchBox.searchProto:UpdateSearch(ctx)
   end
 
   if self.kind ~= nil then
-    if self.kind == const.BAG_KIND.BACKPACK then
+    local bag = searchBox:BagOfKind(self.kind)
+    if bag then
       if text == "" then
-        addon.Bags.Backpack:ResetSearch(ctx)
+        bag:ResetSearch(ctx)
       else
         local results = search:Search(text)
-        addon.Bags.Backpack:Search(ctx, results)
-      end
-    else
-      if addon.Bags.Bank then
-        if text == "" then
-          addon.Bags.Bank:ResetSearch(ctx)
-        else
-          local results = search:Search(text)
-          addon.Bags.Bank:Search(ctx, results)
-        end
+        bag:Search(ctx, results)
       end
     end
   else
@@ -168,7 +178,7 @@ end
 --
 -- The live filter is driven by whichever box the user typed into. When in-bag
 -- search is enabled (the default), that is the per-kind in-bag box created by
--- searchBox:CreateBox and stored on the themed decoration as `decoration.search`
+-- searchBox:CreateBox and kept by its bag as `bag.searchBox`
 -- -- a distinct SearchFrame instance from the module-level overlay searchFrame.
 -- GetText() only ever sees the overlay box, so the data pipeline
 -- (data/items.lua Phase8_EnrichCategories) must call this kind-aware getter when
@@ -179,16 +189,11 @@ end
 ---@return string
 function searchBox:GetSearchText(kind)
   if kind ~= nil and database:GetInBagSearch() then
-    local themes = addon:GetModule('Themes', true)
-    local bags = addon.Bags
-    local bag = bags and ((kind == const.BAG_KIND.BANK) and bags.Bank or bags.Backpack)
-    if themes and bag and bag.frame then
-      local box = themes:GetInBagSearchBox(bag.frame)
-      if box and box.textBox then
-        local text = box.textBox:GetText()
-        if text and text ~= "" then
-          return text
-        end
+    local box = self:GetInBagBox(kind)
+    if box and box.textBox then
+      local text = box.textBox:GetText()
+      if text and text ~= "" then
+        return text
       end
     end
   end
@@ -197,82 +202,101 @@ function searchBox:GetSearchText(kind)
   return self:GetText()
 end
 
+-- GetInBagBox returns the in-bag search box of the bag of a kind, if that bag exists.
+---@param kind BagKind
+---@return SearchFrame?
+function searchBox:GetInBagBox(kind)
+  local bag = self:BagOfKind(kind)
+  return bag and bag.searchBox or nil
+end
+
+-- BagOfKind is the bag that shows a kind: the backpack, the bank, or BetterBags Next's guild bank.
+---@param kind BagKind
+---@return table?
+function searchBox:BagOfKind(kind)
+  local bags = addon.Bags
+  if bags == nil then
+    return nil
+  end
+  if kind == const.BAG_KIND.BANK then
+    return bags.Bank
+  elseif kind == const.BAG_KIND.GUILD then
+    return bags.GuildBank
+  end
+  return bags.Backpack
+end
+
 ---@param ctx Context
 ---@param parent Frame
 ---@return SearchFrame
-function searchBox:Create(ctx, parent)
+-- Create makes the overlay search panel the search keybinding toggles: a Search window of a
+-- fixed size above the backpack, drawn and animated by the theme, hidden until toggled.
+---@param _ctx Context
+---@param parent Frame
+---@return SearchFrame
+function searchBox:Create(_ctx, parent)
   local sf = setmetatable({}, {__index = searchBox.searchProto})
-  local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "BetterBagsSearchPanelTemplate") --[[@as Frame]]
+  sf.window = window:Create({
+    Kind = "Search",
+    Name = "BetterBagsSearchFrame",
+    Title = "",
+    Strata = "HIGH",
+    Level = 700,
+    Movable = false,
+    SizeMode = function() return "window" end,
+    Resizable = false,
+    Points = { { Point = "BOTTOM", RelativeTo = parent, RelativePoint = "TOP", X = 0, Y = 10 } },
+  })
+  local f = sf.window.frame
   f:SetSize(400, 75)
-  f:SetPoint("BOTTOM", parent, "TOP", 0, 10)
-  f:SetFrameStrata("HIGH")
-  f:SetFrameLevel(700)
-  f:SetAlpha(0)
-  f.Inset:Hide()
-  f:Show()
+  local content = sf.window.content
 
-  local enterLabel = f:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-  enterLabel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 6)
+  local enterLabel = sonata:CreateText(content, "Muted", "ARTWORK")
+  enterLabel:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 6, 6)
   enterLabel:SetText("[Enter] Create a new category...")
   enterLabel:Hide()
   sf.enterLabelFadeIn, sf.enterLabelFadeOut = animations:AttachFadeGroup(enterLabel)
 
   sf.enterLabel = enterLabel
 
-  local textBox = CreateFrame("EditBox", nil, f) --[[@as EditBox]]
-  textBox:SetFontObject("GameFontNormalHuge")
-  textBox:SetTextColor(1, 1, 1, 1)
-  textBox:SetParent(f)
-  textBox:SetPoint("TOPLEFT", f, "TOPLEFT", 10, 0)
-  textBox:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 0)
+  local textBox = CreateFrame("EditBox", nil, content) --[[@as EditBox]]
+  sonata:SetTextRole(textBox, "Search")
+  textBox:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+  textBox:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0, 0)
   textBox:ClearFocus()
   textBox:SetAutoFocus(false)
   textBox:SetJustifyH("CENTER")
-  textBox:SetScript("OnEscapePressed", function(me)
+  addon.SetScript(textBox, "OnEscapePressed", function(ectx, me)
     ---@cast me +EditBox
     me:ClearFocus()
-    sf:Toggle(ctx)
+    sf:Toggle(ectx)
   end)
 
   addon.SetScript(textBox, "OnTextChanged", function(ectx)
     sf:UpdateSearch(ectx)
   end)
 
-  textBox:SetScript("OnEnterPressed", function()
+  -- Enter to Make Category: the Categories page makes a category from the search (Config).
+  addon.SetScript(textBox, "OnEnterPressed", function(ctx)
     if database:GetEnterToMakeCategory() then
-      searchCategoryConfig:Open({
-        name = "",
-        itemList = {},
-        priority = 10,
-        searchCategory = {
-          query = searchBox:GetText(),
-        }
-      })
+      events:SendMessage(ctx, 'config/NewCategoryFromSearch', searchBox:GetText())
     end
   end)
 
-  local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
+  local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK")
+  sonata:SetTextRole(helpText, "Empty")
   helpText:SetPoint("CENTER", textBox, "CENTER", 0, 0)
   helpText:SetText("Start typing to search your bags...")
   helpText:Show()
   sf.helpTextFadeIn, sf.helpTextFadeOut = animations:AttachFadeGroup(helpText)
   sf.helpText = helpText
 
-  sf.fadeInGroup, sf.fadeOutGroup = animations:AttachFadeAndSlideLeft(f)
-  sf.fadeInGroup:HookScript("OnFinished", function()
-    textBox:SetFocus()
-  end)
-  sf.fadeOutGroup:HookScript("OnFinished", function()
-    textBox:SetText("")
-    helpText:Show()
-  end)
-
   sf.frame = f
   sf.textBox = textBox
   searchBox.searchFrame = sf
 
-  events:RegisterMessage('addon/CloseSpecialWindows', function()
-    sf:Hide()
+  events:RegisterMessage('addon/CloseSpecialWindows', function(ectx)
+    sf:Hide(ectx)
   end)
   return sf
 end
@@ -298,16 +322,9 @@ function searchBox:CreateBox(kind, parent)
     sf:UpdateSearch(ctx)
   end)
 
-  textBox:SetScript("OnEnterPressed", function()
+  addon.SetScript(textBox, "OnEnterPressed", function(ctx)
     if database:GetEnterToMakeCategory() then
-      searchCategoryConfig:Open({
-        name = "",
-        itemList = {},
-        priority = 10,
-        searchCategory = {
-          query = textBox:GetText(),
-        }
-      })
+      events:SendMessage(ctx, 'config/NewCategoryFromSearch', textBox:GetText())
     end
   end)
 
@@ -326,11 +343,14 @@ function searchBox:CreateBox(kind, parent)
   sf.textBox = textBox
   if kind == const.BAG_KIND.BACKPACK then
     sf.helpText:SetText("Search Backpack")
+  elseif kind == const.BAG_KIND.GUILD then
+    sf.helpText:SetText("Search Guild Bank")
   else
     sf.helpText:SetText("Search Bank")
   end
   sf.helpText:ClearAllPoints()
   sf.helpText:SetPoint("CENTER")
   sf.frame:Hide()
+  addon:GetModule('Sonata'):RegisterElement("SearchBox", textBox)
   return sf
 end

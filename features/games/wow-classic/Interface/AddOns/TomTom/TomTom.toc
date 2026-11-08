@@ -1,0 +1,78 @@
+## Interface: 120105, 120007, 120100, 11509, 16001, 20506, 38002, 40402, 50504
+
+## Title: TomTom
+## Author: Cladhaire, Ludovicus
+## Version: v4.4.1-release
+## License: All Rights Reserved
+## IconTexture: Interface\AddOns\TomTom\Images\Modern\TomTom-Logo.tga
+## Notes: Acts as your portable navigation assistant
+## Notes-frFR: Agit comme un assistant de navigation portable
+## Notes-zhCN:一个简单的导航助手。
+## Notes-ruRU: Удобный портативный навигатор по игровой карте
+## Notes-deDE: Dient dir als portabler Navigationsassistent.
+## SavedVariables: TomTomDB, TomTomWaypointsM
+## OptionalDeps: HereBeDragons-2.0
+
+## X-Localizations: enUS, enGB, deDE, frFR, zhCN, ruRU, zhTW
+## X-CompatibleLocales: enUS, enGB, deDE, frFR, esES, esMX, zhCN, zhTW, koKR, ruRU
+## X-Curse-Project-ID: 18808
+## X-WoWI-ID: 7032
+## X-Wago-ID: Rn6VaONd
+
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+libs\AceDB-3.0\AceDB-3.0.xml
+libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+libs\HereBeDragons\HereBeDragons-2.0.lua
+libs\HereBeDragons\HereBeDragons-Pins-2.0.lua
+libs\LibDBIcon-1.0\lib.xml
+
+AddonCore.lua
+
+i18n\Localization.enUS.lua
+i18n\Localization.deDE.lua
+i18n\Localization.frFR.lua
+i18n\Localization.zhCN.lua
+i18n\Localization.ruRU.lua
+i18n\Localization.zhTW.lua
+i18n\Localization.koKR.lua
+i18n\Localization.ptBR.lua
+
+core\format.lua
+core\settings.lua
+core\options.lua
+core\modules.lua
+core\suppress.lua
+core\callbacks.lua
+core\core.lua
+core\position.lua
+core\mapdata.lua
+core\menu.lua
+core\options_controls.lua
+core\profiles.lua
+core\distance.lua
+core\waypoints.lua
+core\pins.lua
+modules\coord_block.lua
+modules\map_coords.lua
+modules\map_click.lua
+modules\comm.lua
+modules\slash.lua
+core\utils.lua
+
+TomTom.xml
+
+modules\crazy_arrow\themes.lua
+modules\crazy_arrow\theme_classic.lua
+modules\crazy_arrow\theme_modern.lua
+modules\crazy_arrow\theme_modern_topdown.lua
+core\waypoint_themes.lua
+
+modules\minimap_pins.lua
+modules\worldmap_pins.lua
+modules\crazy_arrow\crazy_arrow.lua
+modules\feeds.lua
+modules\corpse.lua
+modules\paste.lua
+
+modules\poi.lua

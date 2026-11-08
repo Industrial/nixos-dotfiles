@@ -20,14 +20,53 @@ local DB = addon:NewModule('Database')
 ---@field alpha number
 
 function DB:Init()
+  -- A new install has no saved variables yet: AceDB creates them only when the global is nil
+  -- (AceDB-3.0 New), and nothing reads them before this. A character new to an existing install is
+  -- no new install: every character shares the Default profile.
+  local newInstall = _G[addonName .. 'DB'] == nil
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
+  -- At PLAYER_LOGOUT AceDB strips every setting still at its default, and every table left empty,
+  -- from the profile, right after this callback: a setting read after it can be nil
+  -- (initialization.md §7).
+  addon.loggingOut = false
+  DB.data.RegisterCallback(DB, 'OnDatabaseShutdown', function()
+    addon.loggingOut = true
+  end)
+  if newInstall then
+    -- New installs start with BetterBags Next (next.md §1). Saved in the profile: the default stays
+    -- off, so a profile from before that never turned Next on keeps the classic bags.
+    DB.data.profile.nextEnabled = true
+  end
   DB:Migrate()
 end
 
 ---@return databaseOptions
 function DB:GetData()
   return DB.data
+end
+
+-- GetChangelogLastSeen returns the id of the newest changelog release the player has seen.
+-- The changelog's state is account wide (AceDB global).
+---@return number
+function DB:GetChangelogLastSeen()
+  return DB.data.global.changelog.lastSeen
+end
+
+---@param id number
+function DB:SetChangelogLastSeen(id)
+  DB.data.global.changelog.lastSeen = id
+end
+
+-- GetChangelogAutoOpen returns whether the changelog opens by itself on login.
+---@return boolean
+function DB:GetChangelogAutoOpen()
+  return DB.data.global.changelog.autoOpen
+end
+
+---@param value boolean
+function DB:SetChangelogAutoOpen(value)
+  DB.data.global.changelog.autoOpen = value
 end
 
 ---@param kind BagKind
@@ -138,6 +177,18 @@ function DB:GetShowBankTabs()
   return DB.data.profile.showBankTabs
 end
 
+-- The guild bank shows its own tabs, one at a time, instead of every tab in categories
+-- (guild-bank.md §4).
+---@param shown boolean
+function DB:SetShowGuildBankTabs(shown)
+  DB.data.profile.showGuildBankTabs = shown
+end
+
+---@return boolean
+function DB:GetShowGuildBankTabs()
+  return DB.data.profile.showGuildBankTabs
+end
+
 ---@param enabled boolean
 function DB:SetEnableBagFading(enabled)
   DB.data.profile.enableBagFading = enabled
@@ -146,6 +197,356 @@ end
 ---@return boolean
 function DB:GetEnableBagFading()
   return DB.data.profile.enableBagFading
+end
+
+-- GetAnimateItemMovement returns whether items, sections and rows travel to their new places when
+-- the bags rearrange (render-pipeline.md §4c). Off unless turned on.
+---@return boolean
+function DB:GetAnimateItemMovement()
+  return DB.data.profile.animateItemMovement
+end
+
+---@param enabled boolean
+function DB:SetAnimateItemMovement(enabled)
+  DB.data.profile.animateItemMovement = enabled
+end
+
+-- GetClampBagsToScreen returns whether every bag is kept on the screen (window.md §3a): the classic
+-- bags and their slots panels, and BetterBags Next's small panels. Off unless turned on.
+---@return boolean
+function DB:GetClampBagsToScreen()
+  return DB.data.profile.clampBagsToScreen
+end
+
+---@param enabled boolean
+function DB:SetClampBagsToScreen(enabled)
+  DB.data.profile.clampBagsToScreen = enabled
+end
+
+-- GetNextEnabled returns whether the backpack is BetterBags Next's panel (next.md); it takes
+-- effect after a reload. Off unless turned on.
+---@return boolean
+function DB:GetNextEnabled()
+  return DB.data.profile.nextEnabled
+end
+
+---@param enabled boolean
+function DB:SetNextEnabled(enabled)
+  DB.data.profile.nextEnabled = enabled
+end
+
+---@alias NextChainLayout "apart"|"left"|"right"
+
+-- GetNextChain returns how BetterBags Next's backpack and its companion (the bank or a vendor) sit:
+-- apart on opposite edges, or chained on the left or the right (next.md §12).
+---@return NextChainLayout
+function DB:GetNextChain()
+  return DB.data.profile.nextChain
+end
+
+---@param layout NextChainLayout
+function DB:SetNextChain(layout)
+  if layout ~= "apart" and layout ~= "left" and layout ~= "right" then
+    error("unknown BetterBags Next chain layout: " .. tostring(layout))
+  end
+  DB.data.profile.nextChain = layout
+end
+
+-- GetNextTabOrder returns the order the player moved a BetterBags Next tab rail's tabs to (tab ids; none
+-- until moved). key names the rail: "backpack", "bank", "bankTabs", "guild", "vendor".
+---@param key string
+---@return number[]
+function DB:GetNextTabOrder(key)
+  return DB.data.profile.nextTabOrder[key] or {}
+end
+
+---@param key string
+---@param ids number[]
+function DB:SetNextTabOrder(key, ids)
+  local copy = {}
+  for i, id in ipairs(ids) do
+    copy[i] = id
+  end
+  DB.data.profile.nextTabOrder[key] = copy
+end
+
+-- A BetterBags Next scale (docs/next-appearance-size.md): a whole percentage in 50 to 150, 100 for
+-- anything but a number.
+---@param value any
+---@return number
+local function nextScale(value)
+  value = tonumber(value)
+  if value == nil then
+    return 100
+  end
+  return math.max(50, math.min(150, math.floor(value + 0.5)))
+end
+
+-- GetNextIconScale returns how big BetterBags Next's item buttons are, in percent of the Next theme's
+-- icon size.
+---@return number
+function DB:GetNextIconScale()
+  return DB.data.profile.nextIconScale
+end
+
+---@param value number
+function DB:SetNextIconScale(value)
+  DB.data.profile.nextIconScale = nextScale(value)
+end
+
+-- GetNextBagScale returns the scale of BetterBags Next's small panels, in percent; full panels are
+-- always at their size.
+---@return number
+function DB:GetNextBagScale()
+  return DB.data.profile.nextBagScale
+end
+
+---@param value number
+function DB:SetNextBagScale(value)
+  DB.data.profile.nextBagScale = nextScale(value)
+end
+
+-- GetNextFitNamesWhileOpen returns whether BetterBags Next's small panels follow what they show while open: wider when a
+-- section's name or the title would be cut short, back once it fits (next.md §14g).
+---@return boolean
+function DB:GetNextFitNamesWhileOpen()
+  return DB.data.profile.nextFitNamesWhileOpen
+end
+
+---@param on boolean
+function DB:SetNextFitNamesWhileOpen(on)
+  DB.data.profile.nextFitNamesWhileOpen = on
+end
+
+-- GetNextAutosize returns whether BetterBags Next's small panels are as tall as what they show (Autosize Bags,
+-- next-small-autosize.md): growing and shrinking with it while open, never past the screen.
+---@return boolean
+function DB:GetNextAutosize()
+  return DB.data.profile.nextAutosize
+end
+
+---@param on boolean
+function DB:SetNextAutosize(on)
+  DB.data.profile.nextAutosize = on
+end
+
+---@alias NextSize "full"|"small"
+
+-- GetNextSize returns BetterBags Next's panel size: "full" height on the screen's edges, or "small"
+-- movable panels (docs/next-small-mode.md).
+---@return NextSize
+function DB:GetNextSize()
+  return DB.data.profile.nextSize
+end
+
+---@param size NextSize
+function DB:SetNextSize(size)
+  if size ~= "full" and size ~= "small" then
+    error("unknown BetterBags Next size: " .. tostring(size))
+  end
+  DB.data.profile.nextSize = size
+end
+
+-- GetNextSmallPlace returns where a kind's small panel was left: its top left in UIParent's units,
+-- or nothing before it was first moved.
+---@param kind BagKind
+---@return number? x, number? y
+function DB:GetNextSmallPlace(kind)
+  local place = DB.data.profile.nextSmallPlaces[kind]
+  if place == nil then
+    return nil
+  end
+  return place.x, place.y
+end
+
+---@param kind BagKind
+---@param x number
+---@param y number
+function DB:SetNextSmallPlace(kind, x, y)
+  DB.data.profile.nextSmallPlaces[kind] = { x = x, y = y }
+end
+
+-- GetNextSmallSize returns the size the player gave a kind's small panel with its grips (next.md
+-- §14g), in UIParent's units, or nothing while it is the default size.
+---@param kind BagKind
+---@return number? width, number? height
+function DB:GetNextSmallSize(kind)
+  local size = DB.data.profile.nextSmallSizes[kind]
+  if size == nil then
+    return nil
+  end
+  return size.width, size.height
+end
+
+-- SetNextSmallSize saves a kind's small panel's size; nothing puts it back to the default size.
+---@param kind BagKind
+---@param width? number
+---@param height? number
+function DB:SetNextSmallSize(kind, width, height)
+  if width == nil then
+    DB.data.profile.nextSmallSizes[kind] = nil
+    return
+  end
+  DB.data.profile.nextSmallSizes[kind] = { width = width, height = height }
+end
+
+-- GetNextTheme returns BetterBags Next's saved theme (SonataNext): Default until another is picked.
+---@return string
+function DB:GetNextTheme()
+  return DB.data.profile.nextTheme
+end
+
+---@param key string
+function DB:SetNextTheme(key)
+  DB.data.profile.nextTheme = key
+end
+
+---@alias NextAnimation "sparkles"|"shimmer"|"titleCloud"|"ribbon"|"braid"|"ornaments"|"glitch"|"rain"|"shatter"|"snow"|"smoke"|"bats"|"beam"|"paper"|"stopMotion"|"glassRain"|"lightning"|"sheen"
+
+-- nextAnimationName checks an Animation switch's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
+---@param name string
+local function nextAnimationName(name)
+  if const.DATABASE_DEFAULTS.profile.nextAnimation[name] == nil then
+    error("unknown BetterBags Next animation: " .. tostring(name))
+  end
+end
+
+-- GetNextAnimation says whether one of BetterBags Next's effects is on (Appearance > Animation, next-themes.md §20):
+-- every one until the player turns it off.
+---@param name NextAnimation
+---@return boolean
+function DB:GetNextAnimation(name)
+  nextAnimationName(name)
+  return DB.data.profile.nextAnimation[name]
+end
+
+---@param name NextAnimation
+---@param on boolean
+function DB:SetNextAnimation(name, on)
+  nextAnimationName(name)
+  DB.data.profile.nextAnimation[name] = on
+end
+
+-- GetNextGlassTint returns how dark a glass theme's bags are (Appearance > Theme > Glass Tint, next-themes-glass.md
+-- §26): in percent of the way from clear glass to the theme's smoke.
+---@return number
+function DB:GetNextGlassTint()
+  return DB.data.profile.nextGlassTint
+end
+
+-- SetNextGlassTint saves it, a whole number from 0 to 100.
+---@param value number
+function DB:SetNextGlassTint(value)
+  DB.data.profile.nextGlassTint = math.max(0, math.min(100, math.floor(value + 0.5)))
+end
+
+---@alias NextCurrencyKind "currency"|"item"
+
+-- NextTrackedCurrency is something BetterBags Next tracks as a currency (currency.md): a currency, or an item counted
+-- as one.
+---@class (exact) NextTrackedCurrency
+---@field kind NextCurrencyKind
+---@field id number
+
+-- GetNextCurrencies returns what BetterBags Next tracks, in the order it shows: a copy, so nothing a caller does
+-- changes what is saved.
+---@return NextTrackedCurrency[]
+function DB:GetNextCurrencies()
+  local out = {}
+  for _, entry in ipairs(DB.data.profile.nextCurrencies) do
+    table.insert(out, { kind = entry.kind, id = entry.id })
+  end
+  return out
+end
+
+-- SetNextCurrencies saves what BetterBags Next tracks, in order: a copy of the list, refusing anything that is no
+-- currency or item.
+---@param list NextTrackedCurrency[]
+function DB:SetNextCurrencies(list)
+  local saved = {}
+  for _, entry in ipairs(list) do
+    if (entry.kind ~= "currency" and entry.kind ~= "item") or type(entry.id) ~= "number" then
+      error("not a currency or an item: " .. tostring(entry.kind) .. " " .. tostring(entry.id))
+    end
+    table.insert(saved, { kind = entry.kind, id = entry.id })
+  end
+  DB.data.profile.nextCurrencies = saved
+end
+
+---@alias NextCurrencyOption "capBars"|"gains"|"hideEmpty"|"itemsEverywhere"|"layout"|"scale"|"background"|"hideInCombat"|"growX"|"growY"
+
+-- The values an option is checked against: the tracker's layouts and the ways it grows (currency.md §5).
+local CURRENCY_CHOICES = {
+  layout = { row = true, column = true, list = true },
+  growX = { left = true, right = true },
+  growY = { up = true, down = true },
+}
+
+-- nextCurrencyOption checks a currency option's name: one of the defaults' (const.DATABASE_DEFAULTS), nothing else.
+---@param name string
+local function nextCurrencyOption(name)
+  if const.DATABASE_DEFAULTS.profile.nextCurrency[name] == nil then
+    error("unknown BetterBags Next currency option: " .. tostring(name))
+  end
+end
+
+-- GetNextCurrencyOption returns how BetterBags Next's currencies show (currency.md §6): cap bars, gains, what you
+-- have none of hidden, items counted everywhere, and the tracker's layout, scale (percent), background, whether it
+-- hides in combat, and which way it grows (growX "left" or "right", growY "down" or "up").
+---@param name NextCurrencyOption
+---@return any
+function DB:GetNextCurrencyOption(name)
+  nextCurrencyOption(name)
+  return DB.data.profile.nextCurrency[name]
+end
+
+---@param name NextCurrencyOption
+---@param value any
+function DB:SetNextCurrencyOption(name, value)
+  nextCurrencyOption(name)
+  local choices = CURRENCY_CHOICES[name]
+  if choices ~= nil and not choices[value] then
+    error("not a currency tracker " .. name .. ": " .. tostring(value))
+  end
+  DB.data.profile.nextCurrency[name] = value
+end
+
+-- GetNextCurrencyTracker returns whether the currency tracker is out of the backpack, and where it was left: the corner
+-- it grows from (growX, growY), in UIParent's units from the screen's top left; nothing before it was first placed.
+-- Put away, it remembers where it was.
+---@return boolean out, number? x, number? y
+function DB:GetNextCurrencyTracker()
+  local t = DB.data.profile.nextCurrencyTracker
+  return t.out == true, t.x, t.y
+end
+
+---@param out boolean
+---@param x? number
+---@param y? number
+function DB:SetNextCurrencyTracker(out, x, y)
+  local t = DB.data.profile.nextCurrencyTracker
+  t.out = out
+  if x ~= nil then
+    t.x, t.y = x, y
+  end
+end
+
+---@alias NextSmallChain "apart"|"backpack"|"companion"
+
+-- GetNextSmallChain returns which small panel anchors a chained pair (docs/next-small-mode.md):
+-- "apart", "backpack" (a companion was dropped beside it) or "companion" (the backpack was dropped
+-- beside a companion, and sits beside whichever is open).
+---@return NextSmallChain
+function DB:GetNextSmallChain()
+  return DB.data.profile.nextSmallChain
+end
+
+---@param layout NextSmallChain
+function DB:SetNextSmallChain(layout)
+  if layout ~= "apart" and layout ~= "backpack" and layout ~= "companion" then
+    error("unknown BetterBags Next small chain: " .. tostring(layout))
+  end
+  DB.data.profile.nextSmallChain = layout
 end
 
 ---@param kind BagKind
@@ -213,6 +614,38 @@ function DB:SetBagViewFrameSize(kind, view, width, height)
   DB.data.profile.size[view][kind].height = height
 end
 
+-- GetBagSizeMode returns how the bag's window is sized in the view it shows: "content" (it
+-- fits its contents) or "window" (the player sizes it and its contents reflow).
+---@param kind BagKind
+---@return WindowSizeMode
+function DB:GetBagSizeMode(kind)
+  return DB.data.profile.size[DB:GetBagView(kind)][kind].sizeMode
+end
+
+---@param kind BagKind
+---@param mode WindowSizeMode
+function DB:SetBagSizeMode(kind, mode)
+  if mode ~= "content" and mode ~= "window" then
+    error("unknown bag size mode: " .. tostring(mode))
+  end
+  DB.data.profile.size[DB:GetBagView(kind)][kind].sizeMode = mode
+end
+
+-- GetBagSnapToContent returns whether the bag's window, in the view it shows, shrinks to its
+-- content's width, and its height when there is room below it, when the player finishes
+-- resizing it. On unless turned off.
+---@param kind BagKind
+---@return boolean
+function DB:GetBagSnapToContent(kind)
+  return DB.data.profile.size[DB:GetBagView(kind)][kind].snapToContent ~= false
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetBagSnapToContent(kind, value)
+  DB.data.profile.size[DB:GetBagView(kind)][kind].snapToContent = value
+end
+
 function DB:GetItemLevelOptions(kind)
   return DB.data.profile.itemLevel[kind]
 end
@@ -257,6 +690,9 @@ function DB:ResetMaxItemLevel()
   local context = addon:GetModule('Context')
   local ctx = context:New('ResetMaxItemLevel')
   events:SendMessage(ctx, 'itemLevel/MaxChanged', 1)
+  -- The maximum is learned while items are read, and sweeps keep the items of unchanged
+  -- slots without reading them again; re-read everything so it is learned again.
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 function DB:GetItemLevelColors()
@@ -295,18 +731,26 @@ function DB:SetBagViewSizeOpacity(kind, view, opacity)
   DB.data.profile.size[view][kind].opacity = opacity
 end
 
+-- sectionSortOf is the Section Order of the bags in use: each design keeps its own, as BetterBags Next's section columns
+-- are apart from the classic bags' columns (next.md §7a).
+---@param profile table
+---@return table
+local function sectionSortOf(profile)
+  return profile.nextEnabled and profile.nextSectionSort or profile.sectionSort
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return SectionSortType
 function DB:GetSectionSortType(kind, view)
-  return DB.data.profile.sectionSort[kind][view]
+  return sectionSortOf(DB.data.profile)[kind][view]
 end
 
 ---@param kind BagKind
 ---@param view BagView
 ---@param sort SectionSortType
 function DB:SetSectionSortType(kind, view, sort)
-  DB.data.profile.sectionSort[kind][view] = sort
+  sectionSortOf(DB.data.profile)[kind][view] = sort
 end
 
 ---@param kind BagKind
@@ -358,7 +802,10 @@ end
 function DB:DeleteItemFromCategory(itemID, category)
   if DB.data.profile.customCategoryFilters[category] then
     DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
-    DB.data.profile.customCategoryIndex[itemID] = nil
+    -- Only its home: an item filed elsewhere stays filed there.
+    if DB.data.profile.customCategoryIndex[itemID] == category then
+      DB.data.profile.customCategoryIndex[itemID] = nil
+    end
   end
 end
 
@@ -395,13 +842,6 @@ function DB:DeleteItemCategory(category)
   -- UpdateDetailPanel). Also drops any grouped sub-categories ("Name - X").
   local groupedPrefix = category .. " - "
 
-  DB.data.profile.categoryOptions[category] = nil
-  for name in pairs(DB.data.profile.categoryOptions) do
-    if name:sub(1, #groupedPrefix) == groupedPrefix then
-      DB.data.profile.categoryOptions[name] = nil
-    end
-  end
-
   for name in pairs(DB.data.profile.ephemeralCategoryFilters) do
     if name:sub(1, #groupedPrefix) == groupedPrefix then
       DB.data.profile.ephemeralCategoryFilters[name] = nil
@@ -414,15 +854,6 @@ function DB:DeleteItemCategory(category)
       for name in pairs(DB.data.profile.customSectionSort[kind]) do
         if name:sub(1, #groupedPrefix) == groupedPrefix then
           DB.data.profile.customSectionSort[kind][name] = nil
-        end
-      end
-    end
-
-    if DB.data.profile.collapsedSections[kind] then
-      DB.data.profile.collapsedSections[kind][category] = nil
-      for name in pairs(DB.data.profile.collapsedSections[kind]) do
-        if name:sub(1, #groupedPrefix) == groupedPrefix then
-          DB.data.profile.collapsedSections[kind][name] = nil
         end
       end
     end
@@ -440,25 +871,202 @@ function DB:DeleteItemCategory(category)
   end
 end
 
--- PruneOrphanedSectionSort removes pinned-sort ("Pinned" list) entries whose
--- category no longer exists in either the persistent (customCategoryFilters) or
--- persisted-ephemeral (ephemeralCategoryFilters) stores. Such orphans were left
--- behind by the old DeleteItemCategory (which did not scrub customSectionSort),
--- and the config pane's LoadPinnedItems would resurface them forever as
--- undeletable "dynamic" categories. Called once from Migrate to self-heal
--- existing profiles; new deletes no longer create orphans.
-function DB:PruneOrphanedSectionSort()
+-- The name GetCategory now gives a category whose name repeated its item type
+-- ("Quest - Quest" is "Quest", "Quest - Quest - Classic" is "Quest - Classic"), or nil.
+---@param name string
+---@return string|nil
+local function nameWithoutRepeatedType(name)
+  local separator = string.find(name, " - ", 1, true)
+  if not separator then return nil end
+  local typeName = string.sub(name, 1, separator - 1)
+  local rest = string.sub(name, separator + 3)
+  if rest == typeName or string.sub(rest, 1, #typeName + 3) == typeName .. " - " then
+    return rest
+  end
+  return nil
+end
+
+-- RenameRepeatedTypeCategories moves the group assignments and pinned order saved under a
+-- category name that repeated its item type (issue #183) to the category's current name. Custom
+-- categories keep their names, and a setting already saved under the current name wins.
+function DB:RenameRepeatedTypeCategories()
+  local profile = DB.data.profile
+  ---@param map table<any, any>
+  local function renameKeys(map)
+    local renames = {}
+    for name in pairs(map) do
+      if type(name) == "string"
+        and profile.customCategoryFilters[name] == nil
+        and profile.ephemeralCategoryFilters[name] == nil then
+        renames[name] = nameWithoutRepeatedType(name)
+      end
+    end
+    for oldName, newName in pairs(renames) do
+      if map[newName] == nil then
+        map[newName] = map[oldName]
+      end
+      map[oldName] = nil
+    end
+  end
+
   for _, kind in pairs(const.BAG_KIND) do
-    local sort = DB.data.profile.customSectionSort[kind]
-    if sort then
-      for name in pairs(sort) do
-        if DB.data.profile.customCategoryFilters[name] == nil
-          and DB.data.profile.ephemeralCategoryFilters[name] == nil then
-          sort[name] = nil
+    if type(profile.customSectionSort[kind]) == "table" then
+      renameKeys(profile.customSectionSort[kind])
+    end
+    local groupsByName = profile.categoryToGroup[kind]
+    if type(groupsByName) == "table" then
+      renameKeys(groupsByName)
+      for _, groupsByBankType in pairs(groupsByName) do
+        if type(groupsByBankType) == "table" then
+          renameKeys(groupsByBankType)
         end
       end
     end
   end
+end
+
+-- The words a search's "group by" clause names, and the group by each means.
+local GROUP_BY_WORDS = { none = 0, type = 1, subtype = 2, expansion = 3, exp = 3 }
+
+-- categoryKinds returns every bag kind a category can be used in.
+---@return BagKind[]
+local function categoryKinds()
+  local kinds = {}
+  for name, kind in pairs(const.BAG_KIND) do
+    if name ~= "UNDEFINED" then
+      table.insert(kinds, kind)
+    end
+  end
+  return kinds
+end
+
+-- normalizeEnabled returns the bags a category is used in, one entry per bag: a bag it does not name,
+-- it is used in; the old single flag (a boolean) holds for every bag.
+---@param enabled any
+---@return table<BagKind, boolean>
+local function normalizeEnabled(enabled)
+  local all
+  if type(enabled) == "boolean" then
+    all = enabled
+  end
+  if type(enabled) ~= "table" then
+    enabled = {}
+  end
+  for _, kind in ipairs(categoryKinds()) do
+    if enabled[kind] == nil then
+      if all ~= nil then
+        enabled[kind] = all
+      else
+        enabled[kind] = true
+      end
+    end
+  end
+  return enabled
+end
+
+-- normalizeRule makes group by the category's own (from its rule, or a "group by" clause left at the
+-- end of its search) and drops a rule whose search is empty.
+---@param filter CustomCategoryFilter
+local function normalizeRule(filter)
+  local rule = filter.searchCategory
+  if type(rule) ~= "table" then
+    filter.searchCategory = nil
+    return
+  end
+  local query = strtrim(rule.query or "")
+  local lower = query:lower()
+  local from, _, word = lower:find("group%s+by%s+(%w+)%s*$")
+  if from ~= nil and (from == 1 or lower:sub(from - 1, from - 1):match("%s")) and GROUP_BY_WORDS[word] then
+    filter.groupBy = GROUP_BY_WORDS[word]
+    query = strtrim(query:sub(1, from - 1))
+  elseif filter.groupBy == nil and rule.groupBy ~= nil then
+    filter.groupBy = rule.groupBy
+  end
+  if query == "" then
+    filter.searchCategory = nil
+  else
+    filter.searchCategory = { query = query }
+  end
+end
+
+-- NormalizeCategories brings saved categories to the unified shape (category-lifecycle.md §6): every
+-- category used in every bag it does not leave out, marked saved, an item list, group by its own and no
+-- empty rule;
+-- the item index rebuilt from the item lists (an item listed in several keeps the category its index
+-- names, else the lowest priority number, then the first name; entries naming no list are dropped);
+-- hidden sections dropped (hiding was retired). Run on every load and every import; it changes nothing
+-- a second time.
+function DB:NormalizeCategories()
+  local profile = DB.data.profile
+  profile.categoryOptions = nil
+  profile.customCategoryFilters = profile.customCategoryFilters or {}
+  profile.ephemeralCategoryFilters = profile.ephemeralCategoryFilters or {}
+  for name, filter in pairs(profile.customCategoryFilters) do
+    filter.name = name
+    filter.save = true
+    filter.itemList = type(filter.itemList) == "table" and filter.itemList or {}
+    filter.enabled = normalizeEnabled(filter.enabled)
+    normalizeRule(filter)
+  end
+  for name, filter in pairs(profile.ephemeralCategoryFilters) do
+    filter.name = name
+    filter.enabled = normalizeEnabled(filter.enabled)
+  end
+
+  local old = profile.customCategoryIndex or {}
+  local claims = {}
+  for _, filter in pairs(profile.customCategoryFilters) do
+    for itemID in pairs(filter.itemList) do
+      claims[itemID] = claims[itemID] or {}
+      table.insert(claims[itemID], filter)
+    end
+  end
+  local index = {}
+  for itemID, list in pairs(claims) do
+    local home
+    for _, filter in ipairs(list) do
+      if filter.name == old[itemID] then
+        home = filter
+      end
+    end
+    if home == nil then
+      table.sort(list, function(a, b)
+        local pa, pb = a.priority or 10, b.priority or 10
+        if pa ~= pb then
+          return pa < pb
+        end
+        return a.name < b.name
+      end)
+      home = list[1]
+    end
+    for _, filter in ipairs(list) do
+      if filter ~= home then
+        filter.itemList[itemID] = nil
+      end
+    end
+    index[itemID] = home.name
+  end
+  profile.customCategoryIndex = index
+end
+
+-- MigrateSearchRules brings the profile's saved rules to the query language QueryParser reads
+-- now, once: rules written in version 1 (AND and OR at one precedence, grouped left to right) get
+-- the parentheses that keep their meaning with AND binding tighter (QueryParser:GroupLeftToRight).
+-- from is the version they were written in: the profile's (searchRuleVersion), else 1.
+---@param from? number
+function DB:MigrateSearchRules(from)
+  ---@class QueryParser: AceModule
+  local QueryParser = addon:GetModule('QueryParser')
+  local profile = DB.data.profile
+  if (from or profile.searchRuleVersion or 1) < 2 then
+    for _, filter in pairs(profile.customCategoryFilters or {}) do
+      local rule = filter.searchCategory
+      if type(rule) == "table" and type(rule.query) == "string" then
+        rule.query = QueryParser:GroupLeftToRight(rule.query)
+      end
+    end
+  end
+  profile.searchRuleVersion = QueryParser.VERSION
 end
 
 ---@param category string
@@ -516,6 +1124,9 @@ function DB:CreateOrUpdateCategory(category)
       DB.data.profile.customCategoryIndex[itemID] = category.name
     end
   else
+    -- A plugin's category saves only what is the player's (its bags, and the color, priority,
+    -- automation and confirming they set): the plugin gives the rest again when it makes it.
+    local saved = DB.data.profile.ephemeralCategoryFilters[category.name]
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,
       enabled = category.enabled,
@@ -523,27 +1134,41 @@ function DB:CreateOrUpdateCategory(category)
       isGroupBySubcategory = category.isGroupBySubcategory,
       groupByParent = category.groupByParent,
       itemList = {},
+      color = saved and saved.color,
+      priority = saved and saved.priority,
+      automation = saved and saved.automation,
+      confirmSale = saved and saved.confirmSale,
+      skipRecent = saved and saved.skipRecent,
+      ignoredItems = saved and saved.ignoredItems,
+      hidden = saved and saved.hidden,
     }
   end
+end
+
+-- UpdateEphemeralItemCategory saves what a player set for a plugin's category (its bags, color,
+-- priority, automation, confirming, skipping Recent Items, its Ignored Items, the bags it is hidden in).
+---@param name string
+---@param fields {enabled?: table<BagKind, boolean>, color?: number[], priority?: number, automation?: string, confirmSale?: boolean, skipRecent?: boolean, ignoredItems?: table<number, boolean>}
+function DB:UpdateEphemeralItemCategory(name, fields)
+  local saved = DB.data.profile.ephemeralCategoryFilters[name]
+  if saved == nil then
+    saved = { name = name, itemList = {} }
+    DB.data.profile.ephemeralCategoryFilters[name] = saved
+  end
+  saved.enabled = fields.enabled
+  saved.color = fields.color
+  saved.priority = fields.priority
+  saved.automation = fields.automation
+  saved.confirmSale = fields.confirmSale
+  saved.skipRecent = fields.skipRecent
+  saved.ignoredItems = fields.ignoredItems
+  saved.hidden = fields.hidden
 end
 
 ---@param category string
 ---@return boolean
 function DB:IsSearchCategory(category)
   return DB.data.profile.searchCategories[category] ~= nil
-end
-
----@param category string
----@return CategoryOptions
-function DB:GetCategoryOptions(category)
-  local options = DB.data.profile.categoryOptions[category]
-  if not options then
-    options = {
-      shown = true,
-    }
-    DB.data.profile.categoryOptions[category] = options
-  end
-  return options
 end
 
 ---@return boolean
@@ -572,27 +1197,6 @@ end
 ---@return table<string, number>
 function DB:GetCustomSectionSort(kind)
   return DB.data.profile.customSectionSort[kind]
-end
-
----@param kind BagKind
----@param category string
----@return boolean
-function DB:GetSectionCollapsed(kind, category)
-  return DB.data.profile.collapsedSections[kind][category] or false
-end
-
----@param kind BagKind
----@param category string
----@param collapsed boolean
-function DB:SetSectionCollapsed(kind, category, collapsed)
-  DB.data.profile.collapsedSections[kind][category] = collapsed
-end
-
----@param kind BagKind
----@param category string
-function DB:ToggleSectionCollapsed(kind, category)
-  local current = DB:GetSectionCollapsed(kind, category)
-  DB:SetSectionCollapsed(kind, category, not current)
 end
 
 ---@param guid string
@@ -641,6 +1245,7 @@ end
 function DB:SetCategorySell(enabled)
   DB.data.profile.categorySell = enabled
 end
+
 
 ---@return boolean
 function DB:GetCategorySell()
@@ -737,6 +1342,80 @@ function DB:GetPreserveItemGaps(kind)
   local t = DB.data.profile.preserveItemGaps
   if not t then return false end
   return t[kind]
+end
+
+-- GetNextSectionColumns is how many columns of sections a bag of BetterBags Next is set to (next.md §7a).
+---@param kind BagKind
+---@return number
+function DB:GetNextSectionColumns(kind)
+  local count = DB.data.profile.nextSectionColumns[kind]
+  if type(count) ~= "number" then
+    return const.NEXT_SECTION_COLUMNS_DEFAULT
+  end
+  return math.max(1, math.min(const.NEXT_SECTION_COLUMNS_MAX, math.floor(count)))
+end
+
+---@param kind BagKind
+---@param count number
+function DB:SetNextSectionColumns(kind, count)
+  DB.data.profile.nextSectionColumns[kind] = math.max(1, math.min(const.NEXT_SECTION_COLUMNS_MAX, math.floor(count)))
+end
+
+-- GetNextSectionFill is how a bag's sections fill its columns: "across" a row and then the next, or "down" a
+-- column and then the next.
+---@param kind BagKind
+---@return "across"|"down"
+function DB:GetNextSectionFill(kind)
+  return DB.data.profile.nextSectionFill[kind] or "across"
+end
+
+---@param kind BagKind
+---@param fill "across"|"down"
+function DB:SetNextSectionFill(kind, fill)
+  DB.data.profile.nextSectionFill[kind] = fill
+end
+
+-- GetNextSectionSpan is whether a bag's wide sections take more than one of its columns.
+---@param kind BagKind
+---@return boolean
+function DB:GetNextSectionSpan(kind)
+  return DB.data.profile.nextSectionSpan[kind] ~= false
+end
+
+---@param kind BagKind
+---@param on boolean
+function DB:SetNextSectionSpan(kind, on)
+  DB.data.profile.nextSectionSpan[kind] = on
+end
+
+-- GetNextSectionCompact is whether a bag's sections stand on the next free grid position rather than in its columns.
+---@param kind BagKind
+---@return boolean
+function DB:GetNextSectionCompact(kind)
+  return DB.data.profile.nextSectionCompact[kind] == true
+end
+
+---@param kind BagKind
+---@param on boolean
+function DB:SetNextSectionCompact(kind, on)
+  DB.data.profile.nextSectionCompact[kind] = on
+end
+
+-- GetNextSectionWideRows is how many rows a section takes in one of a bag's columns before it counts as wide.
+---@param kind BagKind
+---@return number
+function DB:GetNextSectionWideRows(kind)
+  local rows = DB.data.profile.nextSectionWideRows[kind]
+  if type(rows) ~= "number" then
+    return 2
+  end
+  return math.max(2, math.floor(rows))
+end
+
+---@param kind BagKind
+---@param rows number
+function DB:SetNextSectionWideRows(kind, rows)
+  DB.data.profile.nextSectionWideRows[kind] = math.max(2, math.floor(rows))
 end
 
 ---@param kind BagKind
@@ -911,37 +1590,7 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 5. Update display options
-  if DB.data.profile.categoryOptions[oldName] then
-    DB.data.profile.categoryOptions[newName] = DB.data.profile.categoryOptions[oldName]
-    DB.data.profile.categoryOptions[oldName] = nil
-  end
-
-  -- Delete grouped sub-categories from display options
-  for categoryName, _ in pairs(DB.data.profile.categoryOptions) do
-    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
-      DB.data.profile.categoryOptions[categoryName] = nil
-    end
-  end
-
-  -- 6. Update collapse state for all bag kinds
-  for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.collapsedSections[kind] and DB.data.profile.collapsedSections[kind][oldName] ~= nil then
-      DB.data.profile.collapsedSections[kind][newName] = DB.data.profile.collapsedSections[kind][oldName]
-      DB.data.profile.collapsedSections[kind][oldName] = nil
-    end
-
-    -- Delete grouped sub-categories from collapsed sections
-    if DB.data.profile.collapsedSections[kind] then
-      for categoryName, _ in pairs(DB.data.profile.collapsedSections[kind]) do
-        if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
-          DB.data.profile.collapsedSections[kind][categoryName] = nil
-        end
-      end
-    end
-  end
-
-  -- 7. Update custom section sort (pinned position) for all bag kinds
+  -- 5. Update custom section sort (pinned position) for all bag kinds
   for _, kind in pairs(const.BAG_KIND) do
     if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
       DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
@@ -1109,12 +1758,13 @@ function DB:ExportSettings()
   local serialization = addon:GetModule('Serialization')
 
   -- Create a table with only category configuration settings
+  -- Version 2: unified categories (DB:NormalizeCategories), no hidden sections. Version 3: rules
+  -- written with AND binding tighter than OR (search rule version 2). Older imports are brought to it.
   local exportData = {
-    version = 1, -- Version number for future compatibility
+    version = 3,
     customCategoryFilters = serialization:DeepCopy(DB.data.profile.customCategoryFilters),
     customCategoryIndex = serialization:DeepCopy(DB.data.profile.customCategoryIndex),
     ephemeralCategoryFilters = serialization:DeepCopy(DB.data.profile.ephemeralCategoryFilters),
-    categoryOptions = serialization:DeepCopy(DB.data.profile.categoryOptions),
     categoryFilters = serialization:DeepCopy(DB.data.profile.categoryFilters),
     customSectionSort = serialization:DeepCopy(DB.data.profile.customSectionSort),
   }
@@ -1179,10 +1829,6 @@ function DB:ImportSettings(dataString)
     DB.data.profile.ephemeralCategoryFilters = serialization:DeepCopy(importData.ephemeralCategoryFilters)
   end
 
-  if importData.categoryOptions then
-    DB.data.profile.categoryOptions = serialization:DeepCopy(importData.categoryOptions)
-  end
-
   if importData.categoryFilters then
     DB.data.profile.categoryFilters = serialization:DeepCopy(importData.categoryFilters)
   end
@@ -1191,10 +1837,36 @@ function DB:ImportSettings(dataString)
     DB.data.profile.customSectionSort = serialization:DeepCopy(importData.customSectionSort)
   end
 
+  DB:NormalizeCategories()
+  -- Exports before version 3 hold rules of search rule version 1.
+  DB:MigrateSearchRules(importData.version >= 3 and 2 or 1)
   return true, "Category configuration imported successfully"
 end
 
+-- SplitSectionOrder gives BetterBags Next, once, a Section Order a player chose when both designs shared one.
+function DB:SplitSectionOrder()
+  local profile = DB.data.profile
+  if profile.nextSectionSortSplit then
+    return
+  end
+  profile.nextSectionSortSplit = true
+  for kind, views in pairs(profile.nextSectionSort) do
+    for view in pairs(views) do
+      local chosen = profile.sectionSort[kind] and profile.sectionSort[kind][view]
+      if chosen ~= nil and chosen ~= const.SECTION_SORT_TYPE.ALPHABETICALLY then
+        views[view] = chosen
+      end
+    end
+  end
+end
+
 function DB:Migrate()
+
+  --[[
+    BetterBags Next's Section Order was the classic bags' until it took a default of its own. What a player
+    chose carries over once; the old default cannot be told from a choice, and takes the new one.
+  ]]--
+  DB:SplitSectionOrder()
 
   --[[
     Deletion of the old lockedItems table.
@@ -1214,19 +1886,12 @@ function DB:Migrate()
     DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
   end
 
-  --[[
-    Migration of the custom category filters from single filter to per-bag filter.
-    Do not remove before Q4'24.
-  ]]
-  for name, _ in pairs(DB.data.profile.customCategoryFilters) do
-    if type(DB.data.profile.customCategoryFilters[name].enabled) == "boolean" then
-      local value = DB.data.profile.customCategoryFilters[name].enabled --[[@as boolean]]
-      DB.data.profile.customCategoryFilters[name].enabled = {
-        [const.BAG_KIND.BACKPACK] = value,
-        [const.BAG_KIND.BANK] = value
-      }
-    end
-  end
+  -- Unified categories, every load (category-lifecycle.md §6). It also turns the old single enabled
+  -- flag into one per bag.
+  DB:NormalizeCategories()
+
+  -- Saved rules from before AND bound tighter than OR, once per profile (search-indexing.md §6).
+  DB:MigrateSearchRules()
 
   -- Fix the column count and items per row values from a previous bug.
   -- Do not remove before Q1'25.
@@ -1244,13 +1909,16 @@ function DB:Migrate()
   end
 
   --[[
-    Clear all collapsed section states since the collapse feature has been disabled.
-    Do not remove before Q1'27.
+    Section collapsing was removed: drop its saved state.
+    Do not remove before Q3'27.
   ]]--
-  DB.data.profile.collapsedSections = {
-    [const.BAG_KIND.BACKPACK] = {},
-    [const.BAG_KIND.BANK] = {},
-  }
+  DB.data.profile.collapsedSections = nil
+
+  --[[
+    Category automation sells everything in waves (automation.md §3): the 12-item limit setting
+    is gone. Do not remove before Q3'27.
+  ]]--
+  DB.data.profile.autoSellLimit = nil
 
   -- ============================================================
   -- Dynamic Item Level Coloring Migration (Q1'27)
@@ -1560,10 +2228,17 @@ function DB:Migrate()
     DB.data.profile.__profileSystemMigrated = true
   end
 
-  -- Heal profiles corrupted by the old DeleteItemCategory, which left pinned
-  -- categories behind in customSectionSort so they resurfaced as undeletable
-  -- "dynamic" categories.
-  DB:PruneOrphanedSectionSort()
+  -- Quest items are no longer named "Quest - Quest"; their settings follow the new name.
+  DB:RenameRepeatedTypeCategories()
+
+  --[[
+    The Moonlight themes were first released (alpha, 2026-10-16) under these keys.
+    Do not remove before Q3'27.
+  ]]--
+  local renamedThemes = { MoonlightDark = "Dark", MoonlightParchment = "Parchment" }
+  if renamedThemes[DB.data.profile.theme] ~= nil then
+    DB.data.profile.theme = renamedThemes[DB.data.profile.theme]
+  end
 end
 
 -- ============================================================
@@ -1637,6 +2312,9 @@ function DB:CreateProfile(name)
 
   -- SetProfile creates new profile if doesn't exist
   DB.data:SetProfile(name)
+  -- No old rules in it; rules written before the next load are current ones. No order to carry over either.
+  DB:MigrateSearchRules(addon:GetModule('QueryParser').VERSION)
+  DB.data.profile.nextSectionSortSplit = true
   return true, "Profile created successfully"
 end
 
@@ -1666,6 +2344,9 @@ function DB:CopyFromProfile(sourceName)
 
   -- Copy from source to current profile
   DB.data:CopyProfile(sourceName)
+  -- The copy has the source's rules, in the version the source has, and its order, split or not.
+  DB:MigrateSearchRules()
+  DB:SplitSectionOrder()
   return true, "Profile copied successfully"
 end
 
@@ -1726,6 +2407,8 @@ end
 ---@return string message
 function DB:ResetCurrentProfile()
   DB.data:ResetProfile(false, true)
+  DB:MigrateSearchRules(addon:GetModule('QueryParser').VERSION)
+  DB.data.profile.nextSectionSortSplit = true
   return true, "Profile reset to defaults"
 end
 
@@ -1737,8 +2420,13 @@ end
 
 --- Save a backpack dump
 ---@param dump table
-function DB:SetDebugBackpackDump(dump)
+function DB:SetDebugBackpackDump(dump, client, extras)
   DB.data.profile.debugBackpackDump = dump
+  -- The client the dump was taken on (ItemProbe:Client).
+  DB.data.profile.debugBackpackDumpClient = client
+  -- What else the dump recorded: the player values, the worn gear, every bag's name, the open
+  -- bank's items (frames/debug.lua).
+  DB.data.profile.debugDumpExtras = extras
 end
 
 DB:Enable()

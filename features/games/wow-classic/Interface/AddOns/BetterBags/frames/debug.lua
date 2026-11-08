@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -11,9 +14,6 @@ local events = addon:GetModule('Events')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
-
----@class Context: AceModule
-local context = addon:GetModule('Context')
 
 ---@class Tabs: AceModule
 local tabs = addon:GetModule('Tabs')
@@ -24,7 +24,28 @@ local list = addon:GetModule('List')
 ---@class ItemBrowser: AceModule
 local itemBrowser = addon:GetModule('ItemBrowser')
 
+---@class PerfPane: AceModule
+local perfPane = addon:GetModule('PerfPane')
+
+---@class SimulatePane: AceModule
+local simulatePane = addon:GetModule('SimulatePane')
+
+---@class PixelPane: AceModule
+local pixelPane = addon:GetModule('PixelPane')
+
+---@class ItemProbe: AceModule
+local itemProbe = addon:GetModule('ItemProbe')
+
+---@class PerfSessions: AceModule
+local perfSessions = addon:GetModule('PerfSessions')
+
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
+
+-- The debug window is a Flat window (window/window.lua) of a fixed size the player can move;
+-- its tabs' contents fill the window's content box.
 ---@class DebugWindow: AceModule
+---@field window BetterBagsWindow
 ---@field frame Frame
 ---@field rows number
 ---@field tabFrame Tab
@@ -68,9 +89,25 @@ local function sanitizeForDump(val, seen)
 end
 
 
+-- probeItems adds to each dumped item what the client's APIs answered about it (debug/itemprobe.lua),
+-- and returns the dump.
+---@param dump table<string, table>
+---@return table<string, table>
+local function probeItems(dump)
+  for _, item in pairs(dump) do
+    if not item.isItemEmpty and item.bagid and item.slotid then
+      item.apiProbe = itemProbe:Probe(item.bagid, item.slotid)
+    end
+  end
+  return dump
+end
+
 ---@param button BetterBagsDebugListButton
 ---@param elementData table
 local function initDebugListItem(button, elementData)
+  sonata:SetTextRole(button.RowNumber, "BodyLarge")
+  sonata:SetTextRole(button.Category, "Title")
+  sonata:SetTextRole(button.Message, "Title")
   button.RowNumber:SetText(format("%s", elementData.row))
   button.Category:SetText(elementData.title)
   button.Category:SetPoint("LEFT", button.RowNumber, "RIGHT", 10, 0)
@@ -83,15 +120,28 @@ function debugWindow:Create(ctx)
   self.cells = {}
   self.rows = 0
   self.provider = CreateDataProvider()
-  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "DefaultPanelFlatTemplate") --[[@as Frame]]
-  self.frame:SetPoint("CENTER")
+  self.window = window:Create({
+    Kind = "Flat",
+    Name = "BetterBagsDebugWindow",
+    -- Above BetterBags Next's panels (HIGH), which it is used beside while profiling.
+    Strata = "DIALOG",
+    Title = "BetterBags Debug Window",
+    SizeMode = function() return "window" end,
+    Resizable = false,
+    Fade = function() return false end,
+    CloseClicks = { "LeftButtonUp", "RightButtonUp" },
+    -- Left click turns debug mode off (closing the window); right click clears the log.
+    OnClose = function(ectx, button)
+      if button == "RightButton" then
+        events:SendMessage(ectx, 'debug/ClearLog')
+      else
+        database:SetDebugMode(false)
+        events:SendMessage(ectx, 'config/DebugMode', false)
+      end
+    end,
+  })
+  self.frame = self.window.frame
   self.frame:SetSize(800, 600)
-  self.frame:SetMovable(true)
-  self.frame:EnableMouse(true)
-  self.frame:RegisterForDrag("LeftButton")
-  self.frame:SetScript("OnDragStart", self.frame.StartMoving)
-  self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
-  self.frame:SetTitle("BetterBags Debug Window")
 
   -- Create tab frame
   self.tabFrame = tabs:Create(self.frame)
@@ -107,10 +157,13 @@ function debugWindow:Create(ctx)
     return false
   end)
 
-  -- Add default "Debug Log", "Items", and "Dump" tabs
+  -- Add default "Debug Log", "Items", "Dump", "Performance", "Simulate" and "Pixels" tabs
   self.tabFrame:AddTab(ctx, "Debug Log")
   self.tabFrame:AddTab(ctx, "Items")
   self.tabFrame:AddTab(ctx, "Dump")
+  self.tabFrame:AddTab(ctx, "Performance")
+  self.tabFrame:AddTab(ctx, "Simulate")
+  self.tabFrame:AddTab(ctx, "Pixels")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
@@ -118,22 +171,9 @@ function debugWindow:Create(ctx)
   self.contentFrames[1] = self:CreateDebugLogFrame()
   self.contentFrames[2] = self:CreateItemsFrame()
   self.contentFrames[3] = self:CreateDumpFrame()
-
-  -- Use existing CloseButton from template if available, otherwise create one
-  local closeButton = self.frame.CloseButton or CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
-  closeButton:ClearAllPoints()
-  closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 2, 2)
-  closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
-
-  closeButton:SetScript("OnClick", function(_, e)
-    local ectx = context:New('DebugFrameCloseClick')
-    if e == "LeftButton" then
-      database:SetDebugMode(false)
-      events:SendMessage(ectx, 'config/DebugMode', false)
-    elseif e == "RightButton" then
-      events:SendMessage(ectx, 'debug/ClearLog')
-    end
-  end)
+  self.contentFrames[4] = self:CreatePerformanceFrame()
+  self.contentFrames[5] = self:CreateSimulateFrame()
+  self.contentFrames[6] = self:CreatePixelsFrame()
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
     self.contentFrames[1]:InsertTable(self.cells)
@@ -141,12 +181,17 @@ function debugWindow:Create(ctx)
     wipe(self.cells)
   end)
 
-  events:RegisterMessage('config/DebugMode', function(_, enabled)
+  events:RegisterMessage('config/DebugMode', function(ectx, enabled)
     if enabled then
-      self.frame:Show()
+      self.window:Show(ectx)
     else
-      self.frame:Hide()
+      self.window:Hide(ectx)
     end
+  end)
+
+  -- The pixel check run in game (debug/pixelaudit.lua) found parts off the grid: its log pops up.
+  events:RegisterMessage('pixelAudit/Found', function(ectx)
+    self:ShowPixels(ectx)
   end)
 
   events:RegisterMessage('debug/ClearLog', function()
@@ -156,9 +201,7 @@ function debugWindow:Create(ctx)
   end)
 
   if database:GetDebugMode() then
-    self.frame:Show()
-  else
-    self.frame:Hide()
+    self.window:Show(ctx)
   end
   self:AddLogLine(ctx, "Debug", "debug window created")
 end
@@ -182,9 +225,10 @@ end
 ---CreateDebugLogFrame creates the frame for the debug log tab.
 ---@return ListFrame
 function debugWindow:CreateDebugLogFrame()
-  local frame = list:Create(self.frame)
-  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
-  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
+  local box = self.window.content
+  local frame = list:Create(box)
+  frame.frame:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  frame.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
   frame:SetupDataSource("BetterBagsDebugListButton", initDebugListItem, function()end)
   return frame
 end
@@ -192,9 +236,10 @@ end
 ---CreateItemsFrame creates the frame for the Items tab.
 ---@return ItemBrowserFrame
 function debugWindow:CreateItemsFrame()
-  local frame = itemBrowser:Create(self.frame)
-  frame:GetFrame():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
-  frame:GetFrame():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
+  local box = self.window.content
+  local frame = itemBrowser:Create(box)
+  frame:GetFrame():SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  frame:GetFrame():SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
   frame:Hide() -- Hide by default as Debug Log is the initial tab
   return frame
 end
@@ -202,24 +247,25 @@ end
 ---CreateDumpFrame creates the frame for the Dump tab.
 ---@return Frame
 function debugWindow:CreateDumpFrame()
-  local f = CreateFrame("Frame", nil, self.frame)
-  f:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
-  f:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
+  local box = self.window.content
+  local f = CreateFrame("Frame", nil, box)
+  f:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  f:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
   f:Hide()
 
   -- Add title and description
-  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local title = sonata:CreateText(f, "Title")
   title:SetPoint("TOPLEFT", 20, -20)
   title:SetText("Debug Data Dump")
 
-  local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local desc = sonata:CreateText(f, "Body")
   desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
   desc:SetWidth(760)
   desc:SetJustifyH("LEFT")
-  desc:SetText("Dump your current full backpack item data to saved variables. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
+  desc:SetText("Dump your current full backpack item data to saved variables, with what the game answered about each item, your worn gear, your character and every bag's name; at a bank, the bank's items too. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
 
   -- Status Label
-  local status = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local status = sonata:CreateText(f, "Field")
   status:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -30)
 
   -- Function to update status text
@@ -232,6 +278,12 @@ function debugWindow:CreateDumpFrame()
       end
     end
     status:SetText(format("Current Dumped Items Count: %d", count))
+    local loads = perfSessions:GetArmedLoads()
+    if loads > 0 then
+      f.diagnosticsStatus:SetText(format("Diagnostics armed: the next %d loads will be captured.", loads))
+    else
+      f.diagnosticsStatus:SetText("Diagnostics not armed.")
+    end
   end
 
   -- Dump Button
@@ -239,6 +291,7 @@ function debugWindow:CreateDumpFrame()
   dumpButton:SetSize(200, 35)
   dumpButton:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -20)
   dumpButton:SetText("Dump Backpack Items")
+  f.dumpButton = dumpButton
 
   addon.SetScript(dumpButton, "OnClick", function(_ctx)
     local itemsModule = addon:GetModule("Items")
@@ -246,7 +299,18 @@ function debugWindow:CreateDumpFrame()
     local backpackItems = slotInfo and slotInfo.itemsBySlotKey
     if backpackItems then
       local sanitized = sanitizeForDump(backpackItems)
-      database:SetDebugBackpackDump(sanitized)
+      probeItems(sanitized)
+      local extras = {
+        player = itemProbe:Player(),
+        equipped = itemProbe:ProbeEquipment(),
+        bagNames = itemProbe:BagNames(),
+      }
+      -- The bank's items exist only while it is open.
+      local bankInfo = itemsModule.slotInfo[const.BAG_KIND.BANK]
+      if addon.atBank and bankInfo and bankInfo.itemsBySlotKey then
+        extras.bank = probeItems(sanitizeForDump(bankInfo.itemsBySlotKey))
+      end
+      database:SetDebugBackpackDump(sanitized, itemProbe:Client(), extras)
       f.Update()
       print("BetterBags: Dumped backpack items to saved variables!")
     else
@@ -266,7 +330,74 @@ function debugWindow:CreateDumpFrame()
     print("BetterBags: Cleared dumped backpack items!")
   end)
 
+  -- A diagnostics run (PerfSessions:ArmDiagnostics): one play session that answers every open
+  -- in-game question.
+  local diagnosticsButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  diagnosticsButton:SetSize(200, 35)
+  diagnosticsButton:SetPoint("TOPLEFT", dumpButton, "BOTTOMLEFT", 0, -30)
+  diagnosticsButton:SetText("Capture Diagnostics")
+  f.diagnosticsButton = diagnosticsButton
+
+  f.diagnosticsStatus = sonata:CreateText(f, "Field")
+  f.diagnosticsStatus:SetPoint("LEFT", diagnosticsButton, "RIGHT", 20, 0)
+
+  local diagnosticsHelp = sonata:CreateText(f, "Body")
+  diagnosticsHelp:SetPoint("TOPLEFT", diagnosticsButton, "BOTTOMLEFT", 0, -10)
+  diagnosticsHelp:SetWidth(760)
+  diagnosticsHelp:SetJustifyH("LEFT")
+  diagnosticsHelp:SetText("Capture Diagnostics records your next two loads with the profiler: quit and start the game, then /reload. Each capture stops by itself a minute after you enter the world.")
+
+  addon.SetScript(diagnosticsButton, "OnClick", function(_ctx)
+    perfSessions:ArmDiagnostics()
+    f.Update()
+    print("BetterBags: Diagnostics armed. Quit and start the game, then /reload.")
+  end)
+
   return f
+end
+
+---CreatePerformanceFrame creates the profiler's Performance tab.
+---@return PerfPaneFrame
+function debugWindow:CreatePerformanceFrame()
+  local box = self.window.content
+  local pane = perfPane:Create(box)
+  pane.frame:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  pane.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
+  pane:Hide()
+  return pane
+end
+
+---CreateSimulateFrame creates the event simulator's Simulate tab.
+---@return SimulatePaneFrame
+function debugWindow:CreateSimulateFrame()
+  local box = self.window.content
+  local pane = simulatePane:Create(box)
+  pane.frame:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  pane.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
+  pane:Hide()
+  return pane
+end
+
+---CreatePixelsFrame creates the pixel check's Pixels tab.
+---@return PixelPaneFrame
+function debugWindow:CreatePixelsFrame()
+  local box = self.window.content
+  local pane = pixelPane:Create(box)
+  pane.frame:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)
+  pane.frame:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0)
+  pane:Hide()
+  return pane
+end
+
+---ShowPixels opens the window on the Pixels tab, turning debug mode on as /bbdb does when it is off.
+---@param ctx Context
+function debugWindow:ShowPixels(ctx)
+  if not database:GetDebugMode() then
+    database:SetDebugMode(true)
+    events:SendMessage(ctx, 'config/DebugMode', true)
+  end
+  self.tabFrame:SetTabByIndex(ctx, 6)
+  self:SwitchTab(6)
 end
 
 ---SwitchTab switches to the specified tab.
@@ -275,7 +406,7 @@ function debugWindow:SwitchTab(tabId)
   for id, frame in pairs(self.contentFrames) do
     if id == tabId then
       frame:Show()
-      if id == 2 or id == 3 then
+      if id >= 2 then
         frame:Update()
       end
     else

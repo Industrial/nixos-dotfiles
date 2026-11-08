@@ -1,0 +1,443 @@
+---@class TrackerLinePool
+local TrackerLinePool = QuestieLoader:CreateModule("TrackerLinePool")
+-------------------------
+--Import QuestieTracker modules.
+-------------------------
+---@type TrackerBaseFrame
+local TrackerBaseFrame = QuestieLoader:ImportModule("TrackerBaseFrame")
+---@type TrackerUtils
+local TrackerUtils = QuestieLoader:ImportModule("TrackerUtils")
+---@type TrackerItemButton
+local TrackerItemButton = QuestieLoader:ImportModule("TrackerItemButton")
+---@type TrackerLine
+local TrackerLine = QuestieLoader:ImportModule("TrackerLine")
+---@type TrackerLayout
+local TrackerLayout = QuestieLoader:ImportModule("TrackerLayout")
+---@type QuestieLib
+local QuestieLib = QuestieLoader:ImportModule("QuestieLib")
+---@type TrackerData
+local TrackerData = QuestieLoader:ImportModule("TrackerData")
+
+local coYield = coroutine.yield
+
+local TICKS_PER_YIELD = 50
+
+if Questie.IsHardcore then
+    TICKS_PER_YIELD = 25
+end
+
+local linePoolSize = 250
+local lineIndex = 0
+local buttonPoolSize = 25
+local buttonIndex = 0
+---@type table<number, TrackerLineFrame>
+local linePool = {}
+local buttonPool = {}
+
+---@type table<QuestId, table<TrackerLineFrame>>
+local linesByQuest = {}
+
+---@type table<number, table<TrackerLineFrame>>
+local linesByScenarioIndex = {}
+
+---@param questFrame Frame
+function TrackerLinePool.Initialize(questFrame)
+    local trackerQuestFrame = questFrame
+
+    -- create linePool for quests/achievements
+    local previousLine
+    local yieldCount = 0
+    for i = 1, linePoolSize do
+        local line = TrackerLine.New(i, trackerQuestFrame.ScrollChildFrame, previousLine, TrackerLinePool.OnHighlightEnter, TrackerLinePool.OnHighlightLeave, TrackerLinePool.AddQuestLine, TrackerLinePool.AddScenarioLine)
+        linePool[i] = line
+        previousLine = line
+
+        yieldCount = yieldCount + 1
+        if yieldCount >= TICKS_PER_YIELD then
+            yieldCount = 0
+            coYield()
+        end
+    end
+
+    -- create buttonPool for quest items
+    for i = 1, C_QuestLog.GetMaxNumQuestsCanAccept() do
+        local btn = TrackerItemButton.New("Questie_ItemButton" .. i, TrackerLinePool.OnHighlightEnter, TrackerLinePool.OnHighlightLeave)
+
+        buttonPool[i] = btn
+        buttonPool[i]:Hide()
+    end
+end
+
+function TrackerLinePool.ResetLinesForChange()
+    if TrackerBaseFrame.isSizing == true or TrackerBaseFrame.isMoving == true then
+        Questie.Debug(Questie.DEBUG_SPAM, "[TrackerLinePool:ResetLinesForChange]")
+    else
+        Questie.Debug(Questie.DEBUG_INFO, "[TrackerLinePool:ResetLinesForChange]")
+    end
+
+    if InCombatLockdown() or not Questie.db.profile.trackerEnabled then
+        return
+    end
+
+    linesByQuest = {} -- Reset to keep correct questId <-> line mapping
+
+    for _, line in pairs(linePool) do
+        line.mode = nil
+        line.Recipe = nil
+        line.trackTimedQuest = nil
+        line.questHasSecondaryQIB = false
+        if line.expandQuest then
+            line.expandQuest.mode = nil
+            line.expandQuest.questId = nil
+        end
+        if line.expandZone then
+            line.expandZone.mode = nil
+            line.expandZone.zoneId = nil
+        end
+        if line.criteriaMark then
+            line.criteriaMark.mode = nil
+            line.criteriaMark:SetCriteria(false)
+            line.criteriaMark:Hide()
+        end
+        if line.playButton then
+            line.playButton.mode = nil
+            line.playButton:Hide()
+        end
+        if line.questFocus then
+            line.questFocus:Hide()
+        end
+    end
+
+    lineIndex = 0
+end
+
+function TrackerLinePool.ResetButtonsForChange()
+    if TrackerBaseFrame.isSizing == true or TrackerBaseFrame.isMoving == true then
+        Questie.Debug(Questie.DEBUG_SPAM, "[TrackerLinePool:ResetButtonsForChange]")
+    else
+        Questie.Debug(Questie.DEBUG_INFO, "[TrackerLinePool:ResetButtonsForChange]")
+    end
+
+    if InCombatLockdown() or not Questie.db.profile.trackerEnabled then
+        return
+    end
+
+    buttonIndex = 0
+end
+
+---@param callback function
+function TrackerLinePool.UpdateObjectiveLines(callback)
+    for _, line in pairs(linePool) do
+        if line.mode == "objective" then
+            callback(line)
+        end
+    end
+end
+
+-- Not named UpdateQuestTitleLines: Spoken_Quests looks up that name to inject its own play buttons into the tracker.
+---@param callback function
+function TrackerLinePool.ForEachQuestTitleLine(callback)
+    for _, line in pairs(linePool) do
+        if line.mode == "quest" then
+            callback(line)
+        end
+    end
+end
+
+function TrackerLinePool.UpdateWrappedLineWidths(trackerLineWidth)
+    local margins = TrackerLayout.GetMargins()
+    local objectiveMarginLeft = margins.objective
+    local questItemButtonSize = margins.itemButtonSize
+
+    -- Updates all the line.label widths in the linePool for wrapped text only
+    for _, line in pairs(linePool) do
+        if Questie.db.profile.TrackerWidth == 0 then
+            if line.mode == "objective" then
+                if line.label:GetNumLines() > 1 and line:GetHeight() > Questie.db.profile.trackerFontSizeObjective then
+                    line.label:SetText(line.label:GetText())
+
+                    if line.altButton then
+                        line.label:SetWidth(trackerLineWidth - objectiveMarginLeft - questItemButtonSize)
+                        line:SetWidth(trackerLineWidth + questItemButtonSize)
+                    else
+                        line.label:SetWidth(trackerLineWidth - objectiveMarginLeft)
+                        line:SetWidth(trackerLineWidth)
+                    end
+
+                    line:SetHeight(line.label:GetStringHeight() + 2 + Questie.db.profile.trackerQuestPadding)
+                    line.label:SetHeight(line:GetHeight() - 2 - Questie.db.profile.trackerQuestPadding)
+                end
+            end
+        end
+    end
+end
+
+---@return TrackerLineFrame|nil
+function TrackerLinePool.GetNextLine()
+    lineIndex = lineIndex + 1
+    if not linePool[lineIndex] then
+        return nil -- past the line limit
+    end
+
+    return linePool[lineIndex]
+end
+
+---@return table|nil buttonIndex buttonPool[buttonIndex]
+function TrackerLinePool.GetNextItemButton()
+    buttonIndex = buttonIndex + 1
+    if not buttonPool[buttonIndex] then
+        return nil -- past the line limit
+    end
+
+    return buttonPool[buttonIndex]
+end
+
+---@param index number
+---@return TrackerLineFrame
+function TrackerLinePool.GetLine(index)
+    return linePool[index]
+end
+
+---@return TrackerLineFrame
+function TrackerLinePool.GetCurrentLine()
+    return linePool[lineIndex]
+end
+
+---@return table buttonIndex buttonPool[buttonIndex]
+function TrackerLinePool.GetCurrentButton()
+    return buttonPool[buttonIndex]
+end
+
+---@return TrackerLineFrame
+function TrackerLinePool.GetFirstLine()
+    return linePool[1]
+end
+
+---@return TrackerLineFrame
+function TrackerLinePool.GetLastLine()
+    return linePool[linePoolSize]
+end
+
+function TrackerLinePool.HideUnusedLines()
+    if TrackerBaseFrame.isSizing == true or TrackerBaseFrame.isMoving == true then
+        Questie.Debug(Questie.DEBUG_SPAM, "[TrackerLinePool:HideUnusedLines]")
+    else
+        Questie.Debug(Questie.DEBUG_INFO, "[TrackerLinePool:HideUnusedLines]")
+    end
+    local startUnusedLines = 0
+
+    if Questie.db.char.isTrackerExpanded then
+        startUnusedLines = lineIndex + 1
+    end
+
+    for i = startUnusedLines, linePoolSize do
+        local line = linePool[i]
+        if line then -- Safe Guard to really concurrent triggers
+            line:Hide()
+            line.mode = nil
+            line.ZoneId = nil
+            line.Quest = nil
+            line.Recipe = nil
+            line.Objective = nil
+            line.Button = nil
+            line.altButton = nil
+            line.questHasSecondaryQIB = false
+            line.trackTimedQuest = nil
+            line.expandQuest.mode = nil
+            line.expandQuest.questId = nil
+            line.expandZone.mode = nil
+            line.expandZone.zoneId = nil
+            line.criteriaMark.mode = nil
+            line.playButton.mode = nil
+        end
+    end
+end
+
+function TrackerLinePool.HideUnusedButtons()
+    if TrackerBaseFrame.isSizing == true or TrackerBaseFrame.isMoving == true then
+        Questie.Debug(Questie.DEBUG_SPAM, "[TrackerLinePool:HideUnusedButtons]")
+    else
+        Questie.Debug(Questie.DEBUG_INFO, "[TrackerLinePool:HideUnusedButtons]")
+    end
+    local startUnusedButtons = 0
+
+    if Questie.db.char.isTrackerExpanded then
+        startUnusedButtons = buttonIndex + 1
+    end
+
+    for i = startUnusedButtons, buttonPoolSize do
+        local button = buttonPool[i]
+        if button then
+            button:FakeHide()
+            button.itemId = nil
+            button.lineID = nil
+            button.fontSize = nil
+            button:ClearAllPoints()
+            button:SetParent(UIParent)
+            button:Hide()
+        end
+    end
+end
+
+---@return number lineIndex
+function TrackerLinePool.GetHighestIndex()
+    return lineIndex > linePoolSize and linePoolSize or lineIndex
+end
+
+---@param alpha number
+function TrackerLinePool.SetAllExpandQuestAlpha(alpha)
+    local highestIndex = TrackerLinePool.GetHighestIndex()
+    for i = 1, highestIndex do
+        linePool[i].expandQuest:SetAlpha(alpha)
+    end
+end
+
+---@param alpha number
+function TrackerLinePool.SetAllQuestFocusAlpha(alpha)
+    local highestIndex = TrackerLinePool.GetHighestIndex()
+    for i = 1, highestIndex do
+        linePool[i].questFocus:SetAlpha(alpha)
+    end
+end
+
+---@param alpha number
+function TrackerLinePool.SetAllItemButtonAlpha(alpha)
+    for i = 1, buttonIndex do
+        local button = buttonPool[i]
+        if (not button) then
+            -- This should not happen as we keep track of the buttonIndex
+            break
+        end
+
+        button:SetAlpha(alpha)
+    end
+end
+
+TrackerLinePool.OnHighlightEnter = function(self)
+    if Questie.db.profile.trackerDisableHoverFade then
+        return
+    end
+
+    local highestIndex = TrackerLinePool.GetHighestIndex()
+    for i = 1, highestIndex do
+        local line = linePool[i]
+        line:SetAlpha(0.5)
+
+        if (line.Quest ~= nil and line.Quest == self.Quest) or (line.Recipe ~= nil and line.Recipe == self.Recipe)
+            or (line.expandZone ~= nil and self:GetParent().expandZone ~= nil and line.expandZone.zoneId == self:GetParent().expandZone.zoneId) then
+            line:SetAlpha(1)
+        end
+    end
+end
+
+TrackerLinePool.OnHighlightLeave = function()
+    local highestIndex = TrackerLinePool.GetHighestIndex()
+    for i = 1, highestIndex do
+        linePool[i]:SetAlpha(1)
+    end
+end
+
+---The buttons in front of a title can reach beyond the line frame.
+---@param line TrackerLineFrame
+---@return boolean
+local function _IsButtonHovered(line)
+    for _, button in ipairs({line.questFocus, line.playButton, line.expandQuest}) do
+        if button:IsVisible() and button:IsMouseOver() then
+            return true
+        end
+    end
+    -- Quest item buttons are taller than a line, so they reach into the next line
+    for i = 1, math.min(buttonIndex, buttonPoolSize) do
+        local button = buttonPool[i]
+        if button and button:GetParent() == line and button:IsVisible() and button:IsMouseOver() then
+            return true
+        end
+    end
+    return false
+end
+
+---Lines are reused for other quests on a redraw, so the highlight must follow the line now under the mouse.
+function TrackerLinePool.RefreshHighlight()
+    TrackerLinePool.OnHighlightLeave()
+
+    local highestIndex = TrackerLinePool.GetHighestIndex()
+    for i = 1, highestIndex do
+        local line = linePool[i]
+        if line:IsVisible() and (line:IsMouseOver() or _IsButtonHovered(line)) then
+            -- A zone header highlights its zone, like hovering its expand zone button does.
+            -- The header line is taller than the button, so the bottom strip only hits the line.
+            local expandZone = line.expandZone
+            if expandZone and expandZone:IsVisible() then
+                TrackerLinePool.OnHighlightEnter(expandZone)
+            else
+                TrackerLinePool.OnHighlightEnter(line)
+            end
+            return
+        end
+    end
+end
+
+---@param questId QuestId
+---@param line TrackerLineFrame
+function TrackerLinePool.AddQuestLine(questId, line)
+    if (not linesByQuest[questId]) then
+        linesByQuest[questId] = {}
+    end
+
+    if (not tContains(linesByQuest[questId], line)) then
+        table.insert(linesByQuest[questId], line)
+    end
+end
+
+---@param questId QuestId
+---@param quest TrackerQuest
+function TrackerLinePool.UpdateQuestLines(questId, quest)
+    if not linesByQuest[questId] then
+        return
+    end
+
+    for _, line in pairs(linesByQuest[questId]) do
+        if line.Objective then
+            -- A changed objective list can leave an old row until the next out-of-combat layout.
+            local objective = quest.Objectives[line.Objective.Index]
+            if objective then
+                line.Objective = objective
+                line.label:SetText(TrackerData.GetObjectiveText(objective))
+            else
+                line.label:SetText("")
+            end
+        end
+    end
+end
+
+---@param criteriaIndex number
+---@param line TrackerLineFrame
+function TrackerLinePool.AddScenarioLine(criteriaIndex, line)
+    if (not linesByScenarioIndex[criteriaIndex]) then
+        linesByScenarioIndex[criteriaIndex] = {}
+    end
+
+    if (not tContains(linesByScenarioIndex[criteriaIndex], line)) then
+        linesByScenarioIndex[criteriaIndex] = line
+    end
+end
+
+---@param criteriaIndex number
+function TrackerLinePool.UpdateScenarioLines(criteriaIndex)
+    if not linesByScenarioIndex[criteriaIndex] then
+        return
+    end
+
+    local line = linesByScenarioIndex[criteriaIndex]
+    if line.Objective then
+        ---@type QuestObjective
+        local objective = line.Objective
+        local criteriaInfo = C_ScenarioInfo.GetCriteriaInfo(objective.Index)
+        if (not criteriaInfo) then
+            return
+        end
+
+        local lineEnding = tostring(criteriaInfo.quantity) .. "/" .. tostring(criteriaInfo.totalQuantity)
+        line.label:SetText(QuestieLib:GetRGBForObjective(objective) .. objective.Description .. ": " .. lineEnding)
+    end
+end

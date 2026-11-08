@@ -3,13 +3,13 @@
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
 ## Author: Cidan
-## Version: v0.5.14
-## SavedVariables: BetterBagsDB
-## X-Date: 2026-10-02T01:10:42Z
+## Version: v0.9.2
+## SavedVariables: BetterBagsDB, BetterBagsPerfDB
+## X-Date: 2026-11-07T17:36:49Z
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, ElvUI
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, GW2_UI, ElvUI
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -32,6 +32,10 @@ templates\debug.xml
 
 core\boot.lua
 
+# The profiler loads first so every later file can register its prototypes.
+debug\perf\engine.lua
+debug\perf\format.lua
+
 animations\fade.lua
 
 core\context.lua
@@ -39,11 +43,15 @@ core\pool.lua
 
 debug\debug.lua
 debug\frames.lua
-debug\profile.lua
 debug\items.lua
+debug\itemprobe.lua
 debug\analytics.lua
 
 core\events.lua
+debug\perf\sessions.lua
+debug\renderrecorder.lua
+debug\pixelaudit.lua
+debug\simulator.lua
 core\localization.lua
 core\translations.lua
 core\overrides.lua
@@ -54,8 +62,46 @@ core\hooks.lua
 core\async.lua
 core\fonts.lua
 
+# The render pipeline (staged render plans) loads before anything that draws with it.
+render\render.lua
+render\drawable.lua
+render\scrollbox.lua
+render\flow.lua
+render\motion.lua
+render\texels.lua
+
+# Sonata, the theme engine. Theme data files register after the engine.
+sonata\resolve.lua
+sonata\engine.lua
+sonata\next.lua
+sonata\apply.lua
+sonata\decoration.lua
+sonata\elements.lua
+
+# Every BetterBags window is a Window: its frame, chrome, content box and layout.
+window\window.lua
+
+# BetterBags' Sonata themes. Base holds what every theme inherits.
+sonata\themes\base.lua
+sonata\themes\default.lua
+sonata\themes\simpledark.lua
+sonata\themes\moonlight.lua
+sonata\themes\elvui.lua
+sonata\themes\gw2.lua
+sonata\themes\next\default.lua
+sonata\themes\next\ember.lua
+sonata\themes\next\glitch.lua
+sonata\themes\next\frost.lua
+sonata\themes\next\halloween.lua
+sonata\themes\next\makeitso.lua
+sonata\themes\next\papercraft.lua
+sonata\themes\next\gw2.lua
+sonata\themes\next\parchment.lua
+sonata\themes\next\plain.lua
+sonata\themes\next\quiet.lua
+sonata\themes\next\rainywindow.lua
+
 # The Theme API loads earlier than actual themes.
-themes\themes.lua
 
 util\trees\trees.lua
 util\trees\intervaltree.lua
@@ -67,18 +113,23 @@ data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
 data\groups.lua
+data\guildbank.lua
 data\items.lua
 data\stacks.lua
 data\slots.lua
 data\loader.lua
 data\refresh.lua
+data\seller.lua
+data\automation.lua
+data\currencies.lua
+data\changelogdata.lua
+data\changelog.lua
 
 util\color.lua
-util\resize.lua
 util\sort.lua
 util\bucket.lua
-util\windowgroup.lua
 util\movementflow.lua
+util\cursorplacement.lua
 util\serialization.lua
 
 forms\layouts\layout.lua
@@ -87,9 +138,9 @@ forms\layouts\twocolumn.lua
 
 forms\form.lua
 
-frames\searchcategory.lua
 frames\question.lua
 frames\groupdialog.lua
+frames\changelog.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua
@@ -102,10 +153,14 @@ frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
 frames\list.lua
-frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
 frames\itembrowser.lua
+frames\flamegraph.lua
+frames\tracechart.lua
+frames\perfpane.lua
+frames\simulatepane.lua
+frames\pixelpane.lua
 frames\debug.lua
 
 views\views.lua
@@ -117,26 +172,89 @@ bags\era\backpack.lua
 bags\bank.lua
 bags\era\bank.lua
 
+frames\bagcanvas.lua
+frames\menubutton.lua
+frames\bagactions.lua
 frames\bag.lua
 
-themes\default.lua
-themes\simpledark.lua
-themes\gw2.lua
-themes\elvui.lua
+next\pixel.lua
+next\itemfit.lua
+next\coins.lua
+next\style.lua
+next\frameart.lua
+next\fill.lua
+next\tween.lua
+next\stopmotion.lua
+next\lift.lua
+next\controls\base.lua
+next\controls\scrollbar.lua
+next\controls\button.lua
+next\controls\toggle.lua
+next\controls\input.lua
+next\controls\slider.lua
+next\controls\menu.lua
+next\controls\dropdown.lua
+next\controls\swatch.lua
+next\controls\toptabs.lua
+next\controls\dialog.lua
+next\controls\itemgrid.lua
+next\sparkles.lua
+next\tabs.lua
+next\content.lua
+next\dockcard.lua
+next\dock.lua
+next\drag.lua
+next\chain.lua
+next\ornaments.lua
+next\menubutton.lua
+next\glitch.lua
+next\rain.lua
+next\shatter.lua
+next\snow.lua
+next\threads.lua
+next\smoke.lua
+next\bats.lua
+next\beam.lua
+next\paper.lua
+next\glass.lua
+next\sheen.lua
+next\panel.lua
+next\currencydrag.lua
+next\currencyentry.lua
+next\currencytracker.lua
+next\currencystrip.lua
+next\bag.lua
+next\bank.lua
+next\merchant.lua
+next\vendorbutton.lua
+next\vendor.lua
+next\guildbutton.lua
+next\guildbank.lua
 
-config\categorypane.lua
-config\themepane.lua
-config\currencypane.lua
-config\era\currencypane.lua
-config\itemcolorpane.lua
+
+config\catalog.lua
 config\config.lua
 config\plugin.lua
+next\settings\rows.lua
+next\settings\page.lua
+next\settings\pages.lua
+next\settings\window.lua
+next\settings\themes.lua
+next\settings\reorder.lua
+next\settings\itemstab.lua
+next\settings\categories.lua
+next\settings\bagcategories.lua
+next\settings\currency.lua
+next\settings\currencies.lua
+next\settings\content.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua
+integrations\professionshoppinglist.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
 integrations\quickfind.lua
 
+core\bagsystem.lua
 core\init.lua
 core\era\init.lua

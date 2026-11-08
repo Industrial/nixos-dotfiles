@@ -16,6 +16,9 @@ local events = addon:GetModule('Events')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
@@ -36,6 +39,37 @@ local interactionEvents = {
 -- PlayerInteractionType.AccountBanker may not even exist there).
 if addon.hasWarbank then
   interactionEvents[Enum.PlayerInteractionType.AccountBanker] = true
+end
+
+-- SetBlizzardBankType sets the bank type of Blizzard's hidden BankPanel, which decides where
+-- right-click deposits go. Its own function so the profiler measures it: inline Blizzard calls
+-- are not measured (perf-profiler.md §2). Do not inline it.
+---@param bankType Enum.BankType
+function addon.SetBlizzardBankType(bankType)
+  if BankPanel and BankPanel.SetBankType then
+    BankPanel:SetBankType(bankType)
+  end
+end
+
+-- TriggerItemContextChanged makes every shown item button re-check whether it matches the open
+-- window. Its own function so the profiler measures it, like SetBlizzardBankType.
+function addon.TriggerItemContextChanged()
+  ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+end
+
+-- interactionRecalculation is what an interaction window opening or closing recalculates:
+-- always the backpack (its grey-out depends on the open window), and the bank only when its
+-- committed stacks were built under the other interaction state, its only input that depends
+-- on it (items:NeedsInteractionRecalculation).
+---@return table options for bags/Rederive
+local function interactionRecalculation()
+  local items = addon:GetModule('Items')
+  return {
+    resetLayout = true,
+    backpack = true,
+    bank = items:NeedsInteractionRecalculation(const.BAG_KIND.BANK),
+    categoriesUnchanged = true,
+  }
 end
 
 function addon.ForceHideBlizzardBags()
@@ -59,7 +93,7 @@ function addon.OnUpdate(ctx)
     addon.Bags.Backpack:Show(ctx)
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
-      events:SendMessage(ctx, 'bags/FullRefreshAll')
+      events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
     end
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
@@ -79,6 +113,8 @@ function addon.OpenInteractionWindow(ctx, _, interactionType)
   debug:Log("Interaction", "OpenInteractionWindow", interactionType)
   if interactionType == Enum.PlayerInteractionType.AccountBanker then
     addon.atWarbank = true
+  elseif interactionType == Enum.PlayerInteractionType.Auctioneer then
+    addon.atAuctionHouse = true
   end
   addon.atInteracting = true
   addon.backpackShouldOpen = true
@@ -92,8 +128,9 @@ function addon.CloseInteractionWindow(ctx, _, interactionType)
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
+  addon.atAuctionHouse = false
   addon.backpackShouldClose = true
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 

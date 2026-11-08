@@ -19,11 +19,17 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
+---@class SonataElements: AceModule
+local elements = addon:GetModule('SonataElements')
 
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
+
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
 
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
@@ -33,6 +39,9 @@ local items = addon:GetModule('Items')
 
 ---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
+
+---@class Seller: AceModule
+local seller = addon:GetModule('Seller')
 
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')
@@ -70,11 +79,9 @@ sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dra
 ---@field private fillWidth boolean
 ---@field private headerDisabled boolean
 ---@field private maxItemsPerRow number
----@field private collapsed boolean
 ---@field private kind BagKind
----@field shouldShrinkWhenCollapsed boolean Whether to actually shrink the frame when collapsed
----@field private originalTextColor? table The original RGBA color of the section title text
 local sectionProto = {}
+addon:GetModule('Perf'):RegisterPrototype(sectionProto, 'Section')
 
 ---@param kind BagKind
 ---@param view BagView
@@ -90,44 +97,22 @@ end
 ---@param color? number[] Optional RGB color array {r, g, b} to apply to the title.
 function sectionProto:SetTitle(text, color)
   self.title:SetText(text)
-  themes:UpdateSectionFont(self.title:GetFontString())
 
-  -- SetFontObject doesn't clear explicit SetTextColor overrides in WoW's API.
-  -- We must always explicitly set the color to ensure pooled sections don't bleed colors.
+  -- The theme sets the title's font (a SectionHeader element), and a custom color stays on the
+  -- font string until something resets it, so a pooled section always sets the color: the
+  -- custom one, else the theme's.
   local fontString = self.title:GetFontString()
   if color and color[1] and color[2] and color[3] then
-    -- Apply custom color
     fontString:SetTextColor(color[1], color[2], color[3], 1)
   else
-    -- Reset to the font object's default color to clear any previous override
-    local fontObject = fontString:GetFontObject()
-    if fontObject then
-      local r, g, b, a = fontObject:GetTextColor()
-      fontString:SetTextColor(r, g, b, a or 1)
-    end
+    fontString:SetTextColor(elements:GetSectionHeaderColor(fontString))
   end
-
-  -- Store the current text color as the original for collapse dimming
-  local r, g, b, a = fontString:GetTextColor()
-  self.originalTextColor = {r = r, g = g, b = b, a = a}
 end
 
--- GetTitleWithoutIndicator returns the title text without the collapse indicator.
+-- GetTitle returns the title text, which is the section's category.
 ---@return string
-function sectionProto:GetTitleWithoutIndicator()
+function sectionProto:GetTitle()
   return self.title:GetText()
-end
-
--- SetCollapsed sets the collapsed state of the section.
----@param collapsed boolean
-function sectionProto:SetCollapsed(collapsed)
-  self.collapsed = collapsed
-end
-
--- IsCollapsed returns whether the section is collapsed.
----@return boolean
-function sectionProto:IsCollapsed()
-  return self.collapsed or false
 end
 
 function sectionProto:AddCell(id, cell)
@@ -192,14 +177,21 @@ function sectionProto:Wipe()
   self.frame:SetParent(nil)
   self.fillWidth = false
   self.frame:SetAlpha(1)
-  self.collapsed = false
-  self.shouldShrinkWhenCollapsed = true
   self.removeHeader = false
   self.title:Show()
-  -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
-  -- Note: We don't restore the color here because SetTitle always explicitly sets it,
-  -- ensuring pooled sections don't bleed custom colors to other categories.
-  self.originalTextColor = nil
+end
+
+-- PrepareForReuse readies a section kept from the previous render pass to be drawn
+-- again: the per-pass state the pool reset clears, without hiding or unparenting it.
+function sectionProto:PrepareForReuse()
+  self:EnableHeader()
+  self.content:SortHorizontal()
+  self.content:Wipe()
+  self.view = const.BAG_VIEW.SECTION_GRID
+  self.fillWidth = false
+  self.frame:SetAlpha(1)
+  self.removeHeader = false
+  self.title:Show()
 end
 
 function sectionProto:WipeOnlyContents()
@@ -265,79 +257,94 @@ function sectionProto:DislocateAllCellsWithID(slotkey)
   self.content:DislocateAllCellsWithID(slotkey)
 end
 
--- Grid will render the section as a grid of icons.
+-- The widest row a section of N items per row may lay out: N 37-pixel cells 4 apart, with room
+-- to spare below the next cell (render/flow.lua checks a row without the gap before its last cell).
+---@param itemsPerRow number
+---@return number
+local function rowLimit(itemsPerRow)
+  return ((37 + 4) * itemsPerRow) + 16
+end
+
+---@class (exact) SectionMeasure
+---@field itemsPerRow number
+---@field content GridMeasure Where the section's cells go.
+---@field width number The section's width: its cells (or its title) and 6 pixels on each side, in whole pixels.
+---@field height number
+---@field hidden? boolean It has nothing to show.
+
+-- Measure works out the section's size with itemsPerRow cells in a row, moving nothing
+-- (render-pipeline.md, the layout engine): 6 pixels of padding on each side of its cells, as wide
+-- as its title's text (rounded up to a whole pixel) when full names show, and its title's height
+-- above them unless the header is removed.
+---@param kind BagKind
+---@param itemsPerRow number
+---@return SectionMeasure
+function sectionProto:Measure(kind, itemsPerRow)
+  local content = self.content:Measure({ cells = self.content.cells, maxWidthPerRow = rowLimit(itemsPerRow) })
+  local w, h = content.width, content.height
+  if w == 0 then
+    return { itemsPerRow = itemsPerRow, content = content, width = 0, height = 0, hidden = true }
+  end
+  if self.fillWidth or database:GetShowFullSectionNames(kind) then
+    w = math.max(w, math.ceil(self.title:GetTextWidth()))
+  end
+  local height = self.removeHeader and h or (h + self.title:GetHeight() + 6)
+  return { itemsPerRow = itemsPerRow, content = content, width = w + 12, height = height }
+end
+
+-- Arrange applies a measure: the cells where it put them, the title, and the section's size.
+---@param kind BagKind
+---@param measured SectionMeasure
+---@return number width
+---@return number height
+function sectionProto:Arrange(kind, measured)
+  self.kind = kind
+  self.maxItemsPerRow = measured.itemsPerRow
+  if measured.hidden then
+    self.frame:Hide()
+    return 0, 0
+  end
+  self.content:Arrange(measured.content)
+  if self.removeHeader then
+    self.title:Hide()
+    self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 6, 0)
+  else
+    self.title:Show()
+    self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  end
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
+  self.content:Show()
+  self.frame:SetSize(measured.width, measured.height)
+  self.frame:Show()
+  return measured.width, measured.height
+end
+
+-- GetCellOrigin returns where the section's cells start, from its top left: 6 pixels in, below
+-- its title unless the header is removed.
+---@return number x, number y
+function sectionProto:GetCellOrigin()
+  if self.removeHeader then
+    return 6, 0
+  end
+  return 6, -self.title:GetHeight()
+end
+
+-- GetItemsPerRowCap returns the items per row from which all the section's cells fit one row:
+-- measuring it with more changes nothing.
+---@return number
+function sectionProto:GetItemsPerRowCap()
+  local oneRow = self.content:Measure({ cells = self.content.cells, maxWidthPerRow = math.huge }).width
+  return math.max(1, math.ceil((oneRow - 16) / (37 + 4)))
+end
+
+-- Grid will render the section as a grid of icons, at its items per row.
 ---@param kind BagKind
 ---@param _view BagView
 ---@param _freeSpaceShown boolean
 ---@return number width
 ---@return number height
 function sectionProto:Grid(kind, _view, _freeSpaceShown)
-  self.kind = kind
-
-  local w, h = self.content:Draw({
-    cells = self.content.cells,
-    maxWidthPerRow = ((37 + 4) * self.maxItemsPerRow) + 16,
-  })
-
-  if w == 0 then
-    self.frame:Hide()
-    return 0, 0
-  end
-
-  if self.fillWidth or database:GetShowFullSectionNames(kind) then
-    w = math.max(w, self.title:GetTextWidth())
-  end
-
-  local fullWidth = w + 12
-  local fullHeight
-  if self.removeHeader then
-    self.title:Hide()
-    fullHeight = h
-    self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 6, 0)
-  else
-    self.title:Show()
-    fullHeight = h + self.title:GetHeight() + 6
-    self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
-  end
-  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
-
-  -- If collapsed, hide content and optionally shrink frame
-  if self.collapsed then
-    self.content:Hide()
-    -- Apply dimmed color to indicate collapsed state
-    if self.originalTextColor then
-      local dimFactor = 0.6
-      self.title:GetFontString():SetTextColor(
-        self.originalTextColor.r * dimFactor,
-        self.originalTextColor.g * dimFactor,
-        self.originalTextColor.b * dimFactor,
-        self.originalTextColor.a
-      )
-    end
-    -- Only shrink if we're allowed to (no other expanded sections in our row)
-    if self.shouldShrinkWhenCollapsed then
-      local collapsedHeight = self.removeHeader and 0 or (self.title:GetHeight() + 6)
-      self.frame:SetSize(fullWidth, collapsedHeight)
-    else
-      -- Keep full height but hide content
-      self.frame:SetSize(fullWidth, fullHeight)
-    end
-  else
-    self.content:Show()
-    -- Restore original color when expanded
-    if self.originalTextColor then
-      self.title:GetFontString():SetTextColor(
-        self.originalTextColor.r,
-        self.originalTextColor.g,
-        self.originalTextColor.b,
-        self.originalTextColor.a
-      )
-    end
-    self.frame:SetSize(fullWidth, fullHeight)
-  end
-
-  self.frame:Show()
-  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.removeHeader and 0 or (self.title:GetHeight() + 6)) or fullHeight
+  return self:Arrange(kind, self:Measure(kind, self.maxItemsPerRow))
 end
 
 -------
@@ -407,34 +414,15 @@ function sectionFrame:HideDragGhost()
   end
 end
 
--- Reset tab highlights after dragging ends
+-- ResetTabHighlights puts every tab of both bags back in its state after a drag ends.
 function sectionFrame:ResetTabHighlights()
-  local ctx = context:New("ResetTabHighlights")
-
-  local backpackBag = addon.Bags.Backpack
-  if backpackBag and backpackBag.tabs then
-    for i, tab in ipairs(backpackBag.tabs.tabIndex) do
-      if tab:IsShown() and i ~= backpackBag.tabs.selectedTab then
-        local decoration = themes:GetTabButton(ctx, tab)
-        decoration.LeftActive:Hide()
-        decoration.MiddleActive:Hide()
-        decoration.RightActive:Hide()
-      end
+  local tabs = addon:GetModule("Tabs")
+  local bags = addon.Bags or {}
+  for _, bag in ipairs({ bags.Backpack or false, bags.Bank or false }) do
+    if bag and bag.tabs then
+      tabs:ResetDropHighlights(bag.tabs)
     end
   end
-
-  local bankBag = addon.Bags.Bank
-  if bankBag and bankBag.tabs then
-    for i, tab in ipairs(bankBag.tabs.tabIndex) do
-      if tab:IsShown() and i ~= bankBag.tabs.selectedTab then
-        local decoration = themes:GetTabButton(ctx, tab)
-        decoration.LeftActive:Hide()
-        decoration.MiddleActive:Hide()
-        decoration.RightActive:Hide()
-      end
-    end
-  end
-
   GameTooltip:Hide()
 end
 
@@ -461,7 +449,7 @@ function sectionFrame:PerformDrop()
   end
 
   local eventsModule = addon:GetModule("Events")
-  eventsModule:SendMessage(dropCtx, "bags/FullRefreshAll")
+  eventsModule:SendMessage(dropCtx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param ctx Context
@@ -475,79 +463,77 @@ end
 
 ---@param ctx Context
 ---@param section Section
-function sectionFrame:OnTitleCollapseToggle(ctx, section)
-  local category = section:GetTitleWithoutIndicator()
-  -- Try to find which bag this section belongs to by checking both
-  local kind = section:GetKind()
-  if not kind then
-    -- If kind not set, try both bags
-    if addon.Bags.Backpack and addon.Bags.Backpack:IsShown() then
-      kind = const.BAG_KIND.BACKPACK
-    elseif addon.Bags.Bank and addon.Bags.Bank:IsShown() then
-      kind = const.BAG_KIND.BANK
-    end
-  end
-  if kind then
-    database:ToggleSectionCollapsed(kind, category)
-    events:SendMessage(ctx, 'bags/FullRefreshAll')
-  end
-end
-
----@param ctx Context
----@param section Section
 function sectionFrame:OnTitleClickOrDrop(ctx, section)
   if not CursorHasItem() then return end
-  if not IsShiftKeyDown() then return end
+  if not IsShiftKeyDown() then
+    -- Without Shift a title is part of its window's drop target (issue #408).
+    local bag = addon:GetBagFromKind(section:GetKind())
+    if bag then
+      bag:PlaceCursorItem()
+    end
+    return
+  end
   local cursorType, itemID = GetCursorInfo()
   ---@cast cursorType string
   ---@cast itemID number
   if cursorType ~= "item" then return end
-  local category = section:GetTitleWithoutIndicator()
+  local category = section:GetTitle()
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
----@param section Section
-function sectionFrame:OnTitleRightClick(section)
-  local flow = movementFlow:GetMovementFlow()
-  if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
-  if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
-
-  -- This list contains all items to move.
+-- WithStacks returns the items of list and every pile their virtual stacks hide (a stack shows one
+-- item for all of its piles), without empty slots.
+---@param list ItemData[]
+---@return ItemData[]
+function sectionFrame:WithStacks(list)
   ---@type ItemData[]
-  local list = {}
-
-  for _, cell in pairs(section:GetAllCells()) do
-    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
-    -- no GetItemData method; they persist in a section after items leave it
-    -- (e.g. mailing away Recent Items) and must be skipped or this errors.
-    if not cell.isGap then
-      local data = cell:GetItemData()
-      if not data.isItemEmpty then
-        table.insert(list, data)
-
-        -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
-        local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
-        if stack ~= nil then
-          for subSlotKey in pairs(stack.slotkeys) do
-            local subData = items:GetItemDataFromSlotKey(subSlotKey)
-            table.insert(list, subData)
-          end
+  local all = {}
+  for _, data in ipairs(list) do
+    if not data.isItemEmpty then
+      table.insert(all, data)
+      local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
+      if stack ~= nil then
+        for subSlotKey in pairs(stack.slotkeys) do
+          table.insert(all, items:GetItemDataFromSlotKey(subSlotKey))
         end
       end
     end
   end
+  return all
+end
+
+-- MoveItems moves items, with every other pile of their virtual stacks, to the window the
+-- movement flow names (Move Categories): the bank (the bank type it shows), the mailbox, the trade
+-- window, or a vendor (with the category-sell setting, ten items at most, so they can be bought
+-- back, sold one at a time by the Seller like every sale). With bankType the items go into that bank,
+-- while the bank is open.
+---@param list ItemData[]
+---@param bankType? number
+function sectionFrame:MoveItems(list, bankType)
+  local flow = movementFlow:GetMovementFlow()
+  if bankType ~= nil then
+    if not addon.atBank then return end
+    flow = (Enum.BankType and bankType == Enum.BankType.Account) and const.MOVEMENT_FLOW.WARBANK
+      or const.MOVEMENT_FLOW.BANK
+  end
+  if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
+  if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
+
+  -- This list contains all items to move.
+  local all = self:WithStacks(list)
 
   -- Limit the selling amount to be able to buy back
   if flow == const.MOVEMENT_FLOW.NPCSHOP then
     local newlist = {}
     for i=1, 10 do
-      if list[i] then
-        table.insert(newlist, list[i])
+      if all[i] then
+        table.insert(newlist, all[i])
       end
     end
-    list = newlist
+    seller:Sell(newlist)
+    return
   end
 
   -- Only DF since warbank has Enum.BankType
@@ -556,9 +542,24 @@ function sectionFrame:OnTitleRightClick(section)
     containerType = Enum.BankType.Account
   end
 
-  for _, item in pairs(list) do
+  for _, item in ipairs(all) do
     C_Container.UseContainerItem(item.bagid, item.slotid, nil, containerType, flow == const.MOVEMENT_FLOW.REAGENT)
   end
+end
+
+---@param section Section
+function sectionFrame:OnTitleRightClick(section)
+  ---@type ItemData[]
+  local list = {}
+  for _, cell in pairs(section:GetAllCells()) do
+    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
+    -- no GetItemData method; they persist in a section after items leave it
+    -- (e.g. mailing away Recent Items) and must be skipped or this errors.
+    if not cell.isGap then
+      table.insert(list, cell:GetItemData())
+    end
+  end
+  self:MoveItems(list)
 end
 
 function sectionProto:onTitleMouseEnter()
@@ -572,7 +573,7 @@ function sectionProto:onTitleMouseEnter()
 
   -- Show group assignment info and drag hint for draggable sections
   local kind = self:GetKind()
-  local category = self:GetTitleWithoutIndicator()
+  local category = self:GetTitle()
   if category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
     local groupID = groups:GetGroupForCategory(kind, category)
     if groupID then
@@ -609,8 +610,6 @@ function sectionFrame:_DoCreate()
   s.frame = f
 
   s.maxItemsPerRow = 5
-  s.collapsed = false
-  s.shouldShrinkWhenCollapsed = true
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
@@ -636,7 +635,7 @@ function sectionFrame:_DoCreate()
 
   title:SetScript("OnDragStart", function()
     if s.headerDisabled then return end
-    local category = s:GetTitleWithoutIndicator()
+    local category = s:GetTitle()
     -- Don't allow dragging special sections
     if category == L:G("Free Space") or category == L:G("Recent Items") then
       return
@@ -695,9 +694,12 @@ function sectionFrame:_DoCreate()
 
   s.title = title
 
-  themes:RegisterSectionFont(title:GetFontString())
+  sonata:RegisterElement("SectionHeader", title:GetFontString())
 
   local content = grid:Create(s.frame)
+  motion:Link(content.inner, f, function()
+    return s:GetCellOrigin()
+  end)
   content:Show()
   content:HideScrollBar()
   -- Section content grids are not scrollable; disable mouse wheel so scroll
