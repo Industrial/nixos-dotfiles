@@ -382,18 +382,43 @@ if not WoWPro.RETAIL then
         local scanned = 0
         local tradeskills = {}
 
-        for idx = 1, _G.GetNumSkillLines() do
-            local localName, header, _, skillLevel, _, skillModifier, skillMaxRank = _G.GetSkillLineInfo(idx)
-            local skillName = WoWPro.ProfessionLocalNames[localName]
-            local profID = WoWPro.ProfessionNameToSkillLine[skillName]
-            if not header and profID and skillName then
-                tradeskills[profID] = {
-                    name = skillName,
-                    skillLvl = skillLevel,
-                    skillMod = skillModifier,
-                    skillMax = skillMaxRank
-                }
-                scanned = scanned + 1
+        -- LOCAL PATCH: WoW: Forever is flagged CLASSIC by WoWPro and takes
+        -- this branch, but it has REMOVED the old skill API this branch is
+        -- built on -- `GetNumSkillLines` is nil and calling it threw
+        -- ("WoWPro_Trade.lua:385: attempt to call a nil value", reached from
+        -- WoWPro_Events.lua:277).
+        --
+        -- So the branch is chosen by FLAVOR and the API by what actually
+        -- exists. GetProfessions/GetProfessionInfo is the one both this
+        -- client and retail ship, and it answers the same question, so the
+        -- fallback is a real scan rather than an empty list.
+        if type(_G.GetNumSkillLines) == "function" then
+            for idx = 1, _G.GetNumSkillLines() do
+                local localName, header, _, skillLevel, _, skillModifier, skillMaxRank = _G.GetSkillLineInfo(idx)
+                local skillName = WoWPro.ProfessionLocalNames[localName]
+                local profID = WoWPro.ProfessionNameToSkillLine[skillName]
+                if not header and profID and skillName then
+                    tradeskills[profID] = {
+                        name = skillName,
+                        skillLvl = skillLevel,
+                        skillMod = skillModifier,
+                        skillMax = skillMaxRank
+                    }
+                    scanned = scanned + 1
+                end
+            end
+        elseif type(_G.GetProfessions) == "function" and type(_G.GetProfessionInfo) == "function" then
+            for _, profID in pairs({_G.GetProfessions()}) do
+                local name, _, skillLineRank, skillLineMaxRank, _, _, skillLineID, skillLineModifier = _G.GetProfessionInfo(profID)
+                if skillLineID and WoWPro.ProfessionSkillLines[skillLineID] then
+                    tradeskills[skillLineID] = {
+                        name = WoWPro.ProfessionSkillLines[skillLineID].name or name,
+                        skillLvl = skillLineRank,
+                        skillMod = skillLineModifier,
+                        skillMax = skillLineMaxRank
+                    }
+                    scanned = scanned + 1
+                end
             end
         end
 
