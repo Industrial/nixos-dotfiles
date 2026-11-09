@@ -107,18 +107,18 @@ function addon:BINDINGS_CHANGED()
     -- Clear any existing attributes
     self:ClearAttributes()
 
-    -- Very simple optimisation. If the player has no 'ooc' bindings
-    -- set, then attributes can be applied once and then only updated
-    -- when the bindings list is changed.
-    local has_ooc = false
+    -- Very simple optimisation. If the player has no 'ooc' or 'combat'
+    -- bindings set, then attributes can be applied once and then only
+    -- updated when the bindings list is changed.
+    local has_combat_swap = false
     for idx, entry in ipairs(self.bindings) do
-        if entry.sets.ooc then
-             has_ooc = true
+        if entry.sets.ooc or entry.sets.combat then
+            has_combat_swap = true
             break
         end
     end
 
-    self.has_ooc = has_ooc
+    self.has_combat_swap = has_combat_swap
 
     -- Update all click/binding attributes
     self:UpdateAttributes()

@@ -7,7 +7,6 @@ local addon = select(2, ...)
 
 function addon:RegisterUnitFrame(frame)
     -- We need a frame
-    --
     if not frame then return end
     -- Make sure its not already registered
     if self.ccframes[frame] then return end

@@ -56,7 +56,7 @@ function page:Initialize()
     frame.AddButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.AddButton:SetText(L["Add Binding"])
     frame.AddButton:SetHeight(23)
-    frame.AddButton:SetWidth(120)
+    config:FitButtonToText(frame.AddButton, 120)
     frame.AddButton:ClearAllPoints()
     frame.AddButton:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, 5)
     frame.AddButton:SetScript("OnClick", function(button)
@@ -67,9 +67,9 @@ function page:Initialize()
     frame.EditButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.EditButton:SetText(L["Edit Binding"])
     frame.EditButton:SetHeight(23)
-    frame.EditButton:SetWidth(120)
+    config:FitButtonToText(frame.EditButton, 120)
     frame.EditButton:ClearAllPoints()
-    frame.EditButton:SetPoint("LEFT", frame.AddButton, "RIGHT", 0, 0)
+    frame.EditButton:SetPoint("LEFT", frame.AddButton, "RIGHT", 4, 0)
     frame.EditButton:Disable()
     frame.EditButton:SetScript("OnClick", function(button)
         -- Send the selected binding to the edit page
@@ -79,7 +79,7 @@ function page:Initialize()
     frame.QuickbindMode = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
     frame.QuickbindMode:SetText(L["Quickbind Mode"])
     frame.QuickbindMode:SetHeight(23)
-    frame.QuickbindMode:SetWidth(140)
+    config:FitButtonToText(frame.QuickbindMode, 140, L["End Quickbind"])
     frame.QuickbindMode:ClearAllPoints()
     frame.QuickbindMode:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -6, 5)
 
@@ -243,8 +243,8 @@ function page:Initialize()
     local searchBox = frame.SearchBox
 
     searchBox:SetHeight(22)
-    searchBox:SetWidth(285)
     searchBox:SetPoint("TOPLEFT", frame, "TOPLEFT", 60, -40)
+    searchBox:SetPoint("RIGHT", frame.OptionsButton, "LEFT", -32, 0)
     page:EnableSearch()
 
     page:UPDATE_BROWSE_PAGE()
@@ -302,13 +302,19 @@ end
 
 local BindRowButton_OnEnter = function(button)
     button.DeleteButton:Show()
-    if button.warning then
-        config.ui.tooltip:SetOwner(button, "ANCHOR_TOP")
-        config.ui.tooltip:AddLine(L["|cffFF4800Ambiguous macro name"])
-        config.ui.tooltip:AddLine(button.warning, 1, 1, 1, true)
-        config.ui.tooltip:AddLine(" ")
-        config.ui.tooltip:AddLine(L["This works best with unique macro names, or you can use the Run Custom Macro action."], 1, 1, 1, true)
-        config.ui.tooltip:Show()
+    local warning = button.warning
+    if warning then
+        local tooltip = config.ui.tooltip
+        tooltip:SetOwner(button, "ANCHOR_TOP")
+        tooltip:AddLine(warning.title)
+        for _, line in ipairs(warning.lines) do
+            tooltip:AddLine(line, 1, 1, 1, true)
+        end
+        if warning.footer then
+            tooltip:AddLine(" ")
+            tooltip:AddLine(warning.footer, 1, 1, 1, true)
+        end
+        tooltip:Show()
     end
 end
 
@@ -344,7 +350,7 @@ end
 
 ---Initialize a binding row, including behaviour scripts and binding data from the provider
 ---@param button table the CliqueBindingTemplate row frame
----@param data {id: table, icon: number|string, name: string, text: string, bindingText: string, warning: string?}
+---@param data {id: table, icon: number|string, name: string, text: string, bindingText: string, warning: {title: string, lines: string[], footer: string?}?}
 function page:InitializeBindingRow(button, data)
     if not button.created then
         table.insert(page.bindRows, button)
@@ -470,28 +476,31 @@ function page:UPDATE_BROWSE_PAGE()
 
     -- Send the bindings to the data provider
     local bindingData = {}
+    local statuses = addon:GetBindingStatuses()
 
     for idx,  bind in ipairs(sorted) do
         local data = {
             id = bind,
             icon = addon:GetBindingIcon(bind),
             name = addon:GetBindingActionText(bind.type, bind),
-            text = addon:GetBindingInfoText(bind),
+            text = addon:GetBindSetsDisplayText(bind),
             bindingText = addon:GetBindingKeyComboText(bind),
         }
 
         -- Good to flag broken bindings here
-        if bind.type == "macro" and bind.macro then
+        if statuses[bind] then
+            page:ApplyBindingStatus(data, statuses[bind])
+        elseif bind.type == "macro" and bind.macro then
             if not libMacros:MacroExistsByName(bind.macro) then
                 data.text = L["|cffFF4800No macros with name '%s' exists"]:format(bind.macro)
             elseif libMacros:MacroNameIsAmbiguous(bind.macro) then
                 data.text = L["|cffFF4800Ambiguous macro name"]
-                data.warning = L["Multiple macros are named '%s'. Which one of them runs is unpredictable."]:format(bind.macro)
+                data.warning = {
+                    title = L["|cffFF4800Ambiguous macro name"],
+                    lines = { L["Multiple macros are named '%s'. Which one of them runs is unpredictable."]:format(bind.macro) },
+                    footer = L["This works best with unique macro names, or you can use the Run Custom Macro action."],
+                }
             end
-        end
-
-        if addon:IsGamePadBinding(bind) and not addon:IsGamePadEnabled() then
-            data.text = "|cffFF4800" .. L["Disabled - Gamepad not enabled"] .. "|r"
         end
 
         if page:FilterEntry(data) then
@@ -502,6 +511,17 @@ function page:UPDATE_BROWSE_PAGE()
     dataProvider:InsertTable(bindingData)
 
     page:UpdateBindConfigWarning()
+end
+
+---@param status BindingStatus
+function page:ApplyBindingStatus(data, status)
+    local label = addon:GetBindingStatusLabel(status)
+    if data.text ~= "" then
+        data.text = ("%s (%s)"):format(label, data.text)
+    else
+        data.text = label
+    end
+    data.warning = { title = label, lines = status.lines, footer = status.footer }
 end
 
 function page:UpdateBindConfigWarning()

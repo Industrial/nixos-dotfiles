@@ -825,10 +825,9 @@ L.selectPlayer = "Spieler wählen"
 L.myself = "Ich"
 L.trigger = "Auslöser"
 L.remove = "Entfernen"
-L.auraCountdownDesc = "Fügt bei Aktivierung einen Sprach-Countdown zu den letzten 3 Sekunden der Aura hinzu."
-L.auraDuration = "Auren Dauer"
-L.auraDurationDesc = "Die Dauer der Aura in Sekunden."
 L.currentUnit = "(Aktuell: %s)"
+L.throttle = "Drosseln"
+L.throttleDesc = "Legt fest, wie regelmäßig (in Sekunden) dieser Sound zwischen dem Auslösen der Aura gespielt werden darf. Bei Eingabe von 0 wird der Sound bei jedem Auslösen der Aura gespielt."
 
 -----------------------------------------------------------------------
 -- AutoReply.lua

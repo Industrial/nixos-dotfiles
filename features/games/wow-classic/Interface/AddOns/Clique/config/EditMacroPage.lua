@@ -76,7 +76,6 @@ function page:Initialize()
     frame.bindSummary.BindingText:SetText("")
 
     -- Tweak the bindSummary text so we can show the macro
-    frame.bindSummary.Text:SetWidth(300)
     frame.bindSummary.Text:SetHeight(100)
     frame.bindSummary.Text:SetJustifyV("BOTTOM")
     frame.bindSummary.Text:SetWordWrap(true)
@@ -105,7 +104,7 @@ function page:Initialize()
     frame.dataProvider = page:GetIconDataProvider()
     local dataProvider = frame.dataProvider
 
-    local stride = 10
+    local stride = 11
     local top = 5
     local bottom = 5
     local left = 5
@@ -125,7 +124,7 @@ function page:Initialize()
     local editBox = frame.EditBox
 
     editBox:SetPoint("BOTTOMLEFT", frame.background, "TOPLEFT", 0, 10)
-    editBox:SetWidth(435)
+    editBox:SetPoint("BOTTOMRIGHT", frame.background, "TOPRIGHT", 0, 10)
     editBox:SetHeight(85)
 
     local label = L["Create a custom macro using the text box below. You may need to specify the target of any actions using the 'mouseover' unit, which will be the unit that you click on. For example:\n\n/cast [target=mouseover] Regrowth\n/cast [@mouseover] Regrowth\n/cast [@cursor] Blizzard"]

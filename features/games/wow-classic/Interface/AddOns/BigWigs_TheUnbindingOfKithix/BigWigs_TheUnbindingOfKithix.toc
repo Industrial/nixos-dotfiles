@@ -1,4 +1,4 @@
-## Interface: 120100, 120105, 120007
+## Interface: 120100, 120105, 120107
 ## AllowLoadGameType: standard
 
 ## Title: BigWigs [|cffeda55fThe Unbinding of Kith'ix|r]
@@ -21,10 +21,10 @@
 ## Notes-koKR: BigWigs The Unbinding of Kith'ix Modules
 ## Notes-ptBR: BigWigs The Unbinding of Kith'ix Modules
 ## Notes-ruRU: BigWigs The Unbinding of Kith'ix Modules
-## Notes-zhCN: BigWigs The Unbinding of Kith'ix Modules
-## Notes-zhTW: BigWigs The Unbinding of Kith'ix Modules
+## Notes-zhCN: BigWigs 基希克斯破封模块
+## Notes-zhTW: BigWigs 克希斯的解放模組
 ## IconTexture: Interface\AddOns\BigWigs\Media\Icons\minimap_raid.tga
-## Version: v426.3
+## Version: v427.9
 
 ## LoadOnDemand: 1
 ## Dependencies: BigWigs

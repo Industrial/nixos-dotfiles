@@ -144,24 +144,25 @@ local frameElementsConfig = {
 
 function addon:GetFrameConfig(name)
     local isRetail = addon:ProjectIsRetail()
+    local isForever = addon:ProjectIsForever()
 
-    if name == "PlayerFrame" and isRetail then
+    if name == "PlayerFrame" and (isRetail or isForever) then
         return frameElementsConfig["PlayerFrame-Retail"]
     elseif name == "PlayerFrame" then
         return frameElementsConfig["PlayerFrame-Classic"]
-    elseif name == "TargetFrame" and isRetail then
+    elseif name == "TargetFrame" and (isRetail or isForever) then
         return frameElementsConfig["TargetFrame-Retail"]
     elseif name == "TargetFrame" then
         return frameElementsConfig["TargetFrame-Classic"]
-    elseif name == "FocusFrame" and isRetail then
+    elseif name == "FocusFrame" and (isRetail or isForever) then
         return frameElementsConfig["FocusFrame-Retail"]
     elseif name == "FocusFrame" then
         return frameElementsConfig["FocusFrame-Classic"]
-    elseif name == "TargetFrameToT" and isRetail then
+    elseif name == "TargetFrameToT" and (isRetail or isForever) then
         return frameElementsConfig["TargetFrameToT-Retail"]
     elseif name == "TargetFrameToT" then
         return frameElementsConfig["TargetFrameToT-Classic"]
-    elseif name == "FocusFrameToT" and isRetail then
+    elseif name == "FocusFrameToT" and (isRetail or isForever) then
         return frameElementsConfig["FocusFrameToT-Retail"]
     elseif name == "FocusFrameToT" then
         return frameElementsConfig["FocusFrameToT-Classic"]

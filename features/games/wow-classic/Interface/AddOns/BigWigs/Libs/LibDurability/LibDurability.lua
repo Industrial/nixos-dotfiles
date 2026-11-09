@@ -1,5 +1,5 @@
 --@curseforge-project-slug: libdurability@
-local LD = LibStub:NewLibrary("LibDurability", 4)
+local LD = LibStub:NewLibrary("LibDurability", 5)
 if not LD then return end -- No upgrade needed
 
 -- Throttle times for separate channels
@@ -24,7 +24,13 @@ local frame = LD.frame
 local next, type, error, tonumber, format, match = next, type, error, tonumber, string.format, string.match
 local Ambiguate, GetTime, GetInventoryItemDurability, IsInGroup, IsInRaid = Ambiguate, GetTime, GetInventoryItemDurability, IsInGroup, IsInRaid
 local SendAddonMessage = C_ChatInfo.SendAddonMessage
-local pName = UnitNameUnmodified("player")
+local pName
+if RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() then
+	local name, surname = UnitNameUnmodified("player")
+	pName = name .. " " .. surname
+else
+	pName = UnitNameUnmodified("player")
+end
 
 local function GetDurability()
 	local curTotal, maxTotal, broken = 0, 0, 0
@@ -48,12 +54,11 @@ end
 LD.GetDurability = GetDurability
 
 C_ChatInfo.RegisterAddonMessagePrefix("LibDRBLT")
-local issecretvalue = issecretvalue or function() return false end
 frame:SetScript("OnEvent", function(_, event, prefix, msg, channel, sender)
 	if event == "READY_CHECK" then
 		local percent, broken = GetDurability()
 		SendAddonMessage("LibDRBLT", format("%d,%d", percent, broken), IsInGroup(2) and "INSTANCE_CHAT" or IsInRaid() and "RAID" or "PARTY")
-	elseif not issecretvalue(msg) and prefix == "LibDRBLT" and throttleTable[channel] then
+	elseif prefix == "LibDRBLT" and throttleTable[channel] then
 		if msg == "R" then
 			local t = GetTime()
 			if t - throttleTable[channel] > 4 then

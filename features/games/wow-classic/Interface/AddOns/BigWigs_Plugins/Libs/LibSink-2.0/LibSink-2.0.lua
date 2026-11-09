@@ -4,7 +4,7 @@
 -- Sink-2.0
 
 local SINK20 = "LibSink-2.0"
-local SINK20_MINOR = 120000
+local SINK20_MINOR = 120001
 
 local sink = LibStub:NewLibrary(SINK20, SINK20_MINOR)
 if not sink then return end
@@ -462,7 +462,11 @@ do
 			text = format("\124cff%02x%02x%02x%s\124r", (r or 0) * 255, (g or 0) * 255, (b or 0) * 255, text)
 		end
 		if icon then text = "\124T"..icon..":15:15:0:0:64:64:4:60:4:60\124t "..text end
-		RaidNotice_AddMessage(RaidWarningFrame, text, white)
+		if RaidWarningUtil and RaidWarningUtil.AddMessage then
+			RaidWarningUtil.AddMessage(text, white)
+		else
+			RaidNotice_AddMessage(RaidWarningFrame, text, white)
+		end
 	end
 end
 

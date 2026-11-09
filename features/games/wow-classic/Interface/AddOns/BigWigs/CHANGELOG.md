@@ -1,11 +1,11 @@
 # BigWigs
 
-## [v426.3](https://github.com/BigWigsMods/BigWigs/tree/v426.3) (2026-09-30)
-[Full Changelog](https://github.com/BigWigsMods/BigWigs/compare/v426.2...v426.3) [Previous Releases](https://github.com/BigWigsMods/BigWigs/releases)
+## [v427.9](https://github.com/BigWigsMods/BigWigs/tree/v427.9) (2026-11-08)
+[Full Changelog](https://github.com/BigWigsMods/BigWigs/compare/v427.8...v427.9) [Previous Releases](https://github.com/BigWigsMods/BigWigs/releases)
 
 - Bump version  
-- Plugins/BossBlock: Add more talking heads  
-- MidnightLairs/Nymrissa: Fix rounding error  
-- TheVenomousAbyss/CoiledAltar: Fix Dreadmarch/Unnerving Fixation message  
-- TheVenomousAbyss/Ulatek: offset -> delay (+tweaks)  
-- TheVenomousAbyss/Ulatek: Add last Circling Prey in mythic  
+- Tools/Keystones: Trim realm name in score display  
+- UnitName fixes for WoW Forever, closes #2829  
+- TheVenomousAbyss/CoiledAltar: Update Spiritcackle rename  
+- Plugins/Bars: Allow additional bar callbacks on Forever  
+- TheVenomousAbyss/Sszorak: Extend the capture time on Croswinds message capturing  

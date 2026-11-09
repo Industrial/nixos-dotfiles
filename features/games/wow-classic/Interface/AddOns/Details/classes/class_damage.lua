@@ -8,7 +8,6 @@
 --damage object
 	local Details = _G.Details
 	local Loc = LibStub("AceLocale-3.0"):GetLocale( "Details" )
-	local Translit = LibStub("LibTranslit-1.0")
 	local gump = Details.gump
 	local _ = nil
 	local detailsFramework = DetailsFramework
@@ -3179,7 +3178,7 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 	instanceLine.deathRecapId = source.deathRecapID
 
 	local _, instanceType = GetInstanceInfo()
-	if instanceType == "arena" then
+	if instanceType == "arena" and not source.isSpellRow then
 		local okey, errortext = pcall(function() --Details.PvPPlayers
 			if UnitName(actorName) == nil then
 				instanceLine.textura:SetVertexColor(detailsFramework:ParseColors(Details.class_colors.ARENA_YELLOW))
@@ -3196,7 +3195,7 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 
 	local canShowPercent = false
 
-	if not issecretvalue(actorName) then
+	if not issecretvalue(actorName) and not issecretvalue(value) then
 		canShowPercent = instance.row_info.show_percent
 
 		if source.amountPerSecond < 1 then
@@ -3204,8 +3203,12 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 		end
 	end
 
-	if (Details.remove_realm_from_name) then
+	if (Details.remove_realm_from_name and not source.isSpellRow) then
 		actorName = Details:RemoveRealmName(source.name, source.sourceGUID)
+	end
+
+	if (instance.row_info.textL_translit_text and not source.isSpellRow) then
+		actorName = Details:TransliterateName(actorName)
 	end
 
 	if (instance.row_info.textL_show_number) then
@@ -3242,7 +3245,23 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 
 	Details.SetClassIcon(t, instanceLine.icone_classe, instance, classFilename)
 
-	if updateStatusbarColor then
+	if (source.isSpellRow) then
+		instanceLine.icone_classe:SetTexture(source.spellIcon)
+		instanceLine.icone_classe:SetTexCoord(0.078125, 0.921875, 0.078125, 0.921875)
+		instanceLine.icone_classe:SetVertexColor(1, 1, 1)
+	end
+
+	--player custom bar color, replaces the class color and the arena colors
+	local selfColor = Details.class_colors.SELF
+	if (Details.use_self_color and selfColor and not source.isSpellRow and isPlayer) then
+		if updateStatusbarColor then
+			t.customColor = selfColor
+			Details.SetBarColors(t, instanceLine, instance, selfColor[1], selfColor[2], selfColor[3])
+		else
+			--arena rows only paint the bar texture, keep it that way to not leave the color on the background of a reused line
+			instanceLine.textura:SetVertexColor(selfColor[1], selfColor[2], selfColor[3], 1)
+		end
+	elseif updateStatusbarColor then
 		local classColor = Details.class_colors[classFilename or "UNGROUPPLAYER"]
 		if (classColor) then
 			Details.SetBarColors(t, instanceLine, instance, classColor[1], classColor[2], classColor[3])
@@ -3253,7 +3272,7 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 	end
 
 	if mainDisplay == DETAILS_ATTRIBUTE_DAMAGE then
-		if (subDisplay == DETAILS_SUBATTRIBUTE_DAMAGEDONE or subDisplay == DETAILS_SUBATTRIBUTE_DAMAGETAKEN) then
+		if (subDisplay == DETAILS_SUBATTRIBUTE_DAMAGEDONE or subDisplay == DETAILS_SUBATTRIBUTE_DAMAGETAKEN or attributeId == DETAILS_SUBATTRIBUTE_DAMAGEMYSPELLS) then
 			if canShowPercent then
 				local ruleToUse = 3 --total dps percent
 				local percentValue
@@ -3318,7 +3337,7 @@ function Details:UpdateBarApocalypseWow(instanceLine, source, instance, topValue
 		end
 
 	elseif mainDisplay == DETAILS_ATTRIBUTE_HEAL then
-		if (subDisplay == DETAILS_SUBATTRIBUTE_HEALDONE or subDisplay == DETAILS_SUBATTRIBUTE_OVERHEAL) then
+		if (subDisplay == DETAILS_SUBATTRIBUTE_HEALDONE or subDisplay == DETAILS_SUBATTRIBUTE_OVERHEAL or attributeId == DETAILS_SUBATTRIBUTE_HEALMYSPELLS) then
 			if canShowPercent then
 				local ruleToUse = 3 --total hps percent
 				local percentValue
@@ -3930,7 +3949,7 @@ function Details:SetBarLeftText(bar, instance, enemy, arenaEnemy, arenaAlly, usi
 	if (instance.row_info.textL_translit_text) then
 		if (not self.transliteratedName) then
 			--translate cyrillic alphabet to western alphabet by Vardex(https://github.com/Vardex May 22, 2019)
-			self.transliteratedName = Translit:Transliterate(self.displayName, "!")
+			self.transliteratedName = Details:TransliterateName(self.displayName)
 		end
 		self.displayName = self.transliteratedName or self.displayName
 	end
@@ -4737,7 +4756,7 @@ function damageClass:ToolTip_DamageDone(instance, numero, barra, keydown)
 					for _spellid, _skill in pairs(petActor:GetActorSpells()) do
 						local formattedPetName = petName:gsub((" <.*"), "")
 						if (instance.row_info.textL_translit_text) then
-							formattedPetName = Translit:Transliterate(formattedPetName, "!")
+							formattedPetName = Details:TransliterateName(formattedPetName)
 						end
 						ActorSkillsSortTable [#ActorSkillsSortTable+1] = {_spellid, _skill.total, _skill.total/meu_tempo, formattedPetName}
 					end
@@ -4972,7 +4991,7 @@ function damageClass:ToolTip_DamageDone(instance, numero, barra, keydown)
 				petName = damageTable[1]:gsub(("%s%<.*"), "")
 
 				if (instance.row_info.textL_translit_text) then
-					petName = Translit:Transliterate(petName, "!")
+					petName = Details:TransliterateName(petName)
 				end
 
 				if (instance.sub_atributo == 1) then

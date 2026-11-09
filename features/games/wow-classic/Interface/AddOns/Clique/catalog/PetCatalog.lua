@@ -79,21 +79,16 @@ function lib:GetPetCatalogEntries(orderIndex)
             ))
         elseif spellbook:IsFlyout(idx, bookType) then
             local actionId = spellbook:GetSpellId(idx, bookType)
-            local numFlyoutSlots = spellbook:GetNumFlyoutSlots(actionId)
 
-            for flyoutIdx = 1, numFlyoutSlots do
-                local flyoutSpellId = spellbook:GetFlyoutSpellId(actionId, flyoutIdx)
-                local flyoutName, flyoutIcon = spellbook:GetSpellNameTexture(flyoutSpellId)
-                local passive = spellbook:GetSpellPassive(flyoutSpellId)
-
+            for _, slot in ipairs(spellbook:GetVisibleFlyoutSlots(actionId)) do
                 spellbookIdx = spellbookIdx + 1
                 table.insert(results, catalog:CreateEntry(
                     catalog.entryType.Pet,
                     spellbookIdx,
-                    flyoutName,
-                    flyoutIcon,
-                    flyoutSpellId,
-                    passive,
+                    slot.name,
+                    slot.icon,
+                    slot.spellId,
+                    slot.passive,
                     false,
                     false,
                     false,

@@ -12,6 +12,8 @@ local twipe = table.wipe
 
 function addon:Initialize()
     self:SetupDatabase()
+    -- Before anything (e.g. FixMyBindingsV1) can change the saved bindings
+    self:BackupCurrentProfile()
     self:SetupSecureHeader()
     self:SetupGlobalButtons()
 
@@ -305,14 +307,14 @@ function addon:FixMyBindingsV1()
 
         if bind.type == nil or bind.type == "" then
             table.remove(bindings, idx)
-            self:Printf("Removed broken binding with action type '%s' from index %s", tostring(bind.type), tostring(idx))
+            self:Printf(L["Removed broken binding with action type '%s' from index %s"], tostring(bind.type), tostring(idx))
         end
     end
 end
 
 function addon:EnteringCombat()
-    -- If there are no 'ooc' bindings, then no need to re-apply
-    if not self.has_ooc then
+    -- If there are no 'ooc'/'combat' bindings, then no need to re-apply
+    if not self.has_combat_swap then
         return
     end
 
@@ -357,7 +359,7 @@ function addon:LeavingCombat()
 
     -- Wire up hccframes that registered during combat (proxy creation is deferred
     -- under lockdown). inCombat is still true, so setup_clicks lays down the combat
-    -- set; the has_ooc block below swaps it via the delta.
+    -- set; the has_combat_swap block below swaps it via the delta.
     for _, frame in pairs(self.hccframes) do
         if not self.proxies[frame] and not self:IsFrameBlacklisted(frame) then
             local proxy = self:GetOrCreateProxy(frame)
@@ -366,8 +368,8 @@ function addon:LeavingCombat()
         end
     end
 
-    -- Only apply attributes if we have an 'ooc' binding set
-    if self.has_ooc then
+    -- Only apply attributes if we have an 'ooc'/'combat' binding set
+    if self.has_combat_swap then
         -- inCombat must stay accurate for the registration path; the delta then
         -- swaps only the combat/ooc keys (apply_ooc clears the masking keys first).
         self.header:SetAttribute("inCombat", false)
@@ -484,6 +486,11 @@ function addon:SlashCommand(msg, editbox)
     if msg == "inspect" or msg:match("^inspect%s+") then
         local pattern = msg:match("^inspect%s+(.+)$")
         self:InspectRegisteredFrames(pattern)
+        return
+    end
+
+    if msg == "restorebackup" then
+        self:RestoreCurrentProfileBackup()
         return
     end
 

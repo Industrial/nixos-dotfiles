@@ -30,6 +30,20 @@ function config:IsInMouseFocus(frame)
     end
 end
 
+-- Translations can be much longer than English, so widen a button to fit
+-- the longest label it will show, but never below its English width
+function config:FitButtonToText(button, minWidth, ...)
+    local label = button:GetFontString()
+    local current = button:GetText()
+    local width = minWidth
+    for _, text in ipairs({ current, ... }) do
+        label:SetText(text)
+        width = math.max(width, label:GetStringWidth() + 24)
+    end
+    button:SetText(current)
+    button:SetWidth(width)
+end
+
 -- Return a table that contains the action attributes for an entry
 -- from the action catalog keyed by entryType and entryId
 function config:GetActionAttributes(entryType, entryId)

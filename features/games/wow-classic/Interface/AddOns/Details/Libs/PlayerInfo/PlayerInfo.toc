@@ -2,7 +2,7 @@
 ## Interface-Mists: 50503
 ## Title: Player Info
 ## Notes: Show information about players in your group.
-## Version: #Details.20261107.15402.172
+## Version: #Details.20261109.15410.172
 ## IconTexture: Interface\AddOns\Details\images\minimap
 ## AddonCompartmentFunc: Details_OpenDefaultOptionsWindow
 

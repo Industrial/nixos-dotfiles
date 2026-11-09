@@ -820,15 +820,14 @@ L.bossDebuffsOnYou = "首领减益（你）"
 L.bossDebuffsOnTank = "首领减益（坦克）"
 L.showCountText = "显示层数"
 L.cooldownText = "冷却时间"
-L.countText = "施加次数"
+L.countText = "层数"
 L.selectPlayer = "选择玩家"
 L.myself = "自己"
 L.trigger = "触发条件"
 L.remove = "移除"
-L.auraCountdownDesc = "启用后，光环结束前3秒将播放语音倒计时。"
-L.auraDuration = "光环持续时间"
-L.auraDurationDesc = "光环的持续时间（秒）。"
 L.currentUnit = "（当前：%s）"
+L.throttle = "播放间隔"
+L.throttleDesc = "光环触发时播放音效的最短间隔（秒）。设为 0 则每次触发都播放。"
 
 -----------------------------------------------------------------------
 -- AutoReply.lua

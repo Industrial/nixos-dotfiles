@@ -14,19 +14,40 @@ local addon = select(2, ...)
 
 -- A sticky note shown above every version entry. Use this for guidance that
 -- stays relevant across releases (current setup gotchas, install advice).
-addon.changelogPinned = {
-    title = "Important — please read!!",
-    paragraphs = {
-        "First and foremost, thank you all for your patience. After a very frustrating week Clique should be back and fully functional. In the 12.0.7 patch Blizzard introduced some code that was probably well-intentioned, but broke core unit frame and click-casting behaviour. As addon authors tried to fix these problems, in some cases those fixes ended up fighting with each other.",
-        "The big change in Clique is that it now fully takes control of the frames that it manages. This means that if you want the default left-click (target) and right-click (menu) behaviour, you need to bind them in Clique or add those frames to the denylist. These actions are bound like this by default, but you may have removed them at some point.",
-    },
-}
+addon.changelogPinned = nil
 
 -- Each entry may set `autoShow = false` to be listed in the changelog without
 -- triggering the version-aware auto-show after an update. Absent defaults to
 -- true. Auto-show fires for the newest auto-show-eligible version the player
 -- hasn't seen yet (see ShouldAutoShowChangelog).
 addon.changelog = {
+    {
+        version  = "5.1.5",
+        date     = "2026-11-08",
+        autoShow = false,
+        items = {
+            "Fixed an issue that prevented 'Anywhere' (global) mouse-button bindings from working over Clique-registered unit frames. On unit frames those spells will use the frame unit, otherwise they will follow normal action bar targeting rules including self-casting if that is enabled. Non-Clique registered unit frames will still 'eat' these mouse buttons, and that's not something Clique can fix due to the game client.",
+            "Over a unit frame, a 'Unit frames' (default) binding on the same button is preferred over an 'Anywhere' (global) binding. An 'Anywhere' (global) and an 'Any unit under the mouse' (hovercast) binding on the same button conflict, and the binding list shows which one is used.",
+        },
+    },
+    {
+        version  = "5.1.4",
+        date     = "2026-11-07",
+        autoShow = false,
+        items = {
+            "Fix an issue with flyout spells",
+        },
+    },
+    {
+        version = "5.1.0",
+        date    = "2026-11-01",
+        items = {
+            "Clique has a new binding editor that should better explain how and when your bindings work.",
+            "Binding resolution has been simplified and should behave more predictably.",
+            "Added support for in-combat specific bindings.",
+            "Added support for World of Warcraft: Forever.",
+        },
+    },
     {
         version  = "5.0.13",
         date     = "2026-07-23",
@@ -97,6 +118,8 @@ addon.changelog = {
         version = "5.0.4",
         date    = "2026-06-22",
         items = {
+            "Patch 12.0.7 broke core unit frame and click-casting behaviour. Clique now fully takes control of the frames that it manages.",
+            "If you want the default left-click (target) and right-click (menu) behaviour, bind those actions in Clique or add the frames to the denylist.",
             "Target and menu actions should now work reliably, if you don't have them just create new bindings for them as you prefer.",
             "Overriding default Blizzard frame actions should work better now, Clique is more aggressive in managing registered frames.",
             "Options have been moved into the main config window, so you no longer have to flip back and forth.",
@@ -201,10 +224,22 @@ function addon:BuildChangelogText()
     return table.concat(lines, "\n")
 end
 
+-- The same suffixes that make the packager publish a prerelease
+local function isPrerelease(version)
+    return version:find("%-alpha") ~= nil or version:find("%-beta") ~= nil
+end
+
 function addon:ShouldAutoShowChangelog()
     local g = self.globalSettings
     if not g or g.changelogDoNotShow then
         return false
     end
-    return self:IsVersionNewer(self:GetLatestAutoShowChangelogVersion(), g.lastSeenChangelogVersion)
+
+    -- Alpha entries can be numbered past the release they lead to (e.g. "5.1.1-alpha"
+    -- before 5.1.0), so a release always shows once after a prerelease was seen
+    local latest, seen = self:GetLatestAutoShowChangelogVersion(), g.lastSeenChangelogVersion
+    if latest and not isPrerelease(latest) and seen and isPrerelease(seen) then
+        return true
+    end
+    return self:IsVersionNewer(latest, seen)
 end

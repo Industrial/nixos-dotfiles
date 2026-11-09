@@ -79,7 +79,7 @@ function config:Initialize()
     -- Create the placeholder frame which will be initialized later
     local configUI = CreateFrame("Frame", "CliqueUIBindingFrame", UIParent, "PortraitFrameTemplate")
     configUI:SetHeight(620)
-    configUI:SetWidth(480)
+    configUI:SetWidth(540)
     configUI:SetToplevel(true)
     configUI:EnableMouse(true)
     configUI:SetMovable(true)

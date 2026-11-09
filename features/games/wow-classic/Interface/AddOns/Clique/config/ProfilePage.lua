@@ -44,7 +44,7 @@ local function registerDialogs()
         button1                = L["Okay"],
         button2                = L["Cancel"],
         OnAccept               = function(self)
-            messageAndSwitchProfile(_G[self:GetName() .. "EditBox"]:GetText())
+            messageAndSwitchProfile(_G[self:GetName() .. "EditBox"]:GetText():trim())
         end,
         timeout                = 0,
         whileDead              = 1,
@@ -60,12 +60,12 @@ local function registerDialogs()
         EditBoxOnEnterPressed  = function(self)
             local btn = _G[self:GetParent():GetName() .. "Button1"]
             if addon:APIIsTrue(btn:IsEnabled()) then
-                messageAndSwitchProfile(_G[self:GetParent():GetName() .. "EditBox"]:GetText())
+                messageAndSwitchProfile(_G[self:GetParent():GetName() .. "EditBox"]:GetText():trim())
             end
             self:GetParent():Hide()
         end,
         EditBoxOnTextChanged   = function(self)
-            local txt = _G[self:GetParent():GetName() .. "EditBox"]:GetText()
+            local txt = _G[self:GetParent():GetName() .. "EditBox"]:GetText():trim()
             if #txt > 0 then
                 _G[self:GetParent():GetName() .. "Button1"]:Enable()
             else

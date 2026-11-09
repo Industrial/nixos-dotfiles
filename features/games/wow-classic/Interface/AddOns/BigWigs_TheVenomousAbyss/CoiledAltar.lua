@@ -20,6 +20,8 @@ local backupBars = {}
 
 local durationEventCount = {}
 local warnStageThree = false
+local stageThreeEventCount = 0
+local encounterStart = 0
 local spellCount = {}
 
 local gapTimer do
@@ -62,7 +64,7 @@ local gapTimer do
 		[1286573] = { [2] = { [33] = 52 } }, -- Soul Sever
 	}
 	function gapTimer(spellId, duration)
-		local timers = mod:Mythic() and timersMythic or mod:Heroic() and timersHeroic or mod:Normal() and timersNormal
+		local timers = mod:Mythic() and timersMythic or mod:Heroic() and timersHeroic or (mod:Normal() or mod:Story()) and timersNormal
 		if timers and timers[spellId] then
 			if duration == true then
 				return true
@@ -93,11 +95,11 @@ mod:SetRenames({
 	[1282281] = {1282281}, -- Venomfang
 	[1283832] = {1283832}, -- Axegrinder
 
-	[1289900] = {1289900, CL.you:format(mod:SpellName(1289900)), original = {1285911, CL.you:format(mod:SpellName(1285911))}, notes = {CL.generalNote, CL.messageOnYouNote}}, -- Dreadmarch
+	[1289900] = {1289900, CL.you:format(mod:SpellName(1289900)), original = {1289900, CL.you:format(mod:SpellName(1289900))}, notes = {CL.generalNote, CL.messageOnYouNote}}, -- Dreadmarch
 	[1285911] = {CL.you:format(CL.fixate), original = CL.you:format(mod:SpellName(1285911)), notes = CL.messageOnYouNote}, -- Unnerving Fixation
 	[1286573] = {CL.tank_frontal, CL.you:format(CL.frontal), original = {1286573, CL.you:format(mod:SpellName(1286573))}, notes = {CL.generalNote, CL.messageOnYouNote}}, -- Soul Sever
 	[1286918] = {1286918}, -- Eternal Nightfall
-	[1286441] = {CL.adds, CL.add, notes = {CL.mythicOnlyNote, CL.otherDifficultiesNote}}, -- Spiritcackle
+	[1286441] = {CL.add, CL.add, notes = {CL.mythicOnlyNote, CL.otherDifficultiesNote}}, -- Spiritcackle
 	[1286895] = {1286895, CL.you:format(mod:SpellName(1286895)), notes = {CL.generalNote, CL.messageOnYouNote}}, -- Gloombomb
 
 	[1298381] = {CL.pools}, -- Defilement of the Coiled Altar
@@ -111,29 +113,29 @@ mod:SetRenames({
 
 mod:SetAuraData({
 	-- important
-	{1282419, soundOnApplied = "warning", duration = 5, header = CL.important}, -- Volatile Venom
-	{1310498, soundOnApplied = "warning", duration = 5, difficulty = "mythic"}, -- Mutagenic Venom
-	{1283485, soundOnApplied = "warning", duration = 5, note = CL.debuffTargetedNote:format(mod:SpellName(1283485))}, -- Guillotine
-	{1297435, soundOnApplied = "warning", duration = 6, note = CL.debuffTargetedNote:format(mod:SpellName(1297435))}, -- Dreadmarch XXX not applied to players?
-	{1285911, soundOnApplied = "warning", duration = 7}, -- Unnerving Fixation
-	{1310881, soundOnApplied = "warning", duration = 5}, -- Gloombomb
-	{1286837, soundOnApplied = "alarm", soundOnAppliedDose = "none", duration = 11}, -- Gravebound
-	{1299266, soundOnApplied = "warning", duration = 5, note = CL.debuffTargetedNote:format(mod:SpellName(1299266))}, -- Grim Guillotine
+	{1282419, soundOnApplied = "warning", header = CL.important}, -- Volatile Venom
+	{1310498, soundOnApplied = "warning", difficulty = "mythic"}, -- Mutagenic Venom
+	{1283485, soundOnApplied = "warning", note = CL.debuffTargetedNote:format(mod:SpellName(1283485))}, -- Guillotine
+	{1297435, soundOnApplied = "warning", note = CL.debuffTargetedNote:format(mod:SpellName(1297435))}, -- Dreadmarch XXX not applied to players?
+	{1285911, soundOnApplied = "warning"}, -- Unnerving Fixation
+	{1310881, soundOnApplied = "warning"}, -- Gloombomb
+	{1286837, soundOnApplied = "alarm", soundOnAppliedDose = "none"}, -- Gravebound
+	{1299266, soundOnApplied = "warning", note = CL.debuffTargetedNote:format(mod:SpellName(1299266))}, -- Grim Guillotine
 	-- Zul'jan
 	{1283345, soundOnApplied = "none", soundOnAppliedDose = "none", note = CL.tank_debuff, header = mod:SpellName(-35063)}, -- Twinfang Toxin
 	{1283290, soundOnApplied = "none"}, -- Noxious Ground
 	{1299838, soundOnApplied = "none", soundOnAppliedDose = "none"}, -- Venom Rupture
 	{1307425, soundOnApplied = "none", soundOnAppliedDose = "none", note = CL.debuffHitByCastNote:format(mod:SpellName(1283485))}, -- Guillotined
 	{1301690, soundOnApplied = "none", soundOnAppliedDose = "none", note = CL.debuffHitByCastNote:format(mod:SpellName(1301690))}, -- Sever
-	{1306906, soundOnApplied = "none", dispel = "poison", duration = 14}, -- Venomfang
+	{1306906, soundOnApplied = "none", dispel = "poison"}, -- Venomfang
 	{1285017, soundOnApplied = "none"}, -- Axegrinder
 	-- Malacrass
 	{1297445, soundOnApplied = "none", mechanic = "horrified", note = CL.mainDebuffNote, header = mod:SpellName(-35062)}, -- Dreadmarch
-	{1310744, soundOnApplied = "none", duration = 5, difficulty = "mythic"}, -- Malevolent Resonance
+	{1310744, soundOnApplied = "none", difficulty = "mythic"}, -- Malevolent Resonance
 	{1307959, soundOnApplied = "none", soundOnAppliedDose = "none", note = CL.debuffHitByCastNote:format(mod:SpellName(1307959))}, -- Soul Sever
-	{1286918, soundOnApplied = "none", duration = 15}, -- Eternal Nightfall
+	{1286918, soundOnApplied = "none"}, -- Eternal Nightfall
 	{1286947, soundOnApplied = "none"}, -- Suffocating Darkness
-	{1286399, soundOnApplied = "alarm", mechanic = "fleeing", duration = 5, note = CL.debuffFailureInterruptNote:format(mod:SpellName(1286399))}, -- Wail of Terror
+	{1286399, soundOnApplied = "alarm", mechanic = "fleeing", note = CL.debuffFailureInterruptNote:format(mod:SpellName(1286399))}, -- Wail of Terror
 	-- intermission
 	{1300665, soundOnApplied = "none", soundOnAppliedDose = "none", difficulty = "mythic", header = CL.intermission}, -- Spirit Erasure
 	-- p3
@@ -221,12 +223,16 @@ function mod:OnEncounterStart()
 	self:SetStage(1)
 	self:ResetCounts()
 	warnStageThree = false
+	stageThreeEventCount = 0
+	encounterStart = GetTime()
 
 	-- Starts the encounter by casting Fangs of the Coiled Altar
-	self:Message(1282487, "red")
+	if self:ShouldShowBars() then
+		self:Message(1282487, "red")
 
-	self:SendMessage("BigWigs_BlockBlizzMessages")
-	self:RegisterEvent("ENCOUNTER_WARNING")
+		self:SendMessage("BigWigs_BlockBlizzMessages")
+		self:RegisterEvent("ENCOUNTER_WARNING")
+	end
 	self:RegisterUnitEvent("UNIT_SPELLCAST_CHANNEL_STOP", nil, "boss2")
 end
 
@@ -323,7 +329,12 @@ function mod:MythicTimeline(_, eventInfo)
 		end
 
 	elseif stage == 3 then
-		if rounded == 62 or rounded == 90 then
+		stageThreeEventCount = stageThreeEventCount + 1
+		if stageThreeEventCount > 27 then
+			-- Dreadmarch 3 is a 6s cast of March of the Damned (1316797), which is enrage
+			barInfo = false -- don't show bars beyond enrage
+
+		elseif rounded == 62 or rounded == 90 then
 			barInfo = self:Spiritcackle()
 		elseif rounded == 55 or rounded == 48 or rounded == 104 then
 			barInfo = self:Dreadmarch(duration)
@@ -392,7 +403,7 @@ function mod:OtherTimeline(_, eventInfo)
 
 	local stage = self:GetStage()
 	if stage == 1 then
-		if rounded == 2 then
+		if rounded == 2 or (rounded == 42 and self:Story()) then -- no Guillotine in story
 			barInfo = self:ToxicDeluge()
 		elseif rounded == 12 then
 			barInfo = self:Axegrinder()
@@ -407,6 +418,9 @@ function mod:OtherTimeline(_, eventInfo)
 			end
 		elseif rounded == 20 or rounded == 17 or rounded == 21 or rounded == 16 then
 			barInfo = self:Sever()
+			if self:Story() then -- canceled instead of finished
+				barInfo.timer = self:ScheduleTimer(function() self:StopTimelineBar(barInfo, true) end, duration)
+			end
 		elseif rounded == 85 then
 			barInfo = self:FangsOfTheCoiledAltar()
 		end
@@ -438,10 +452,16 @@ function mod:OtherTimeline(_, eventInfo)
 				barInfo = self:EternalNightfall()
 			elseif rounded == 6 or rounded == 34 then -- 5.5
 				barInfo = self:Dreadmarch(duration)
+				if self:Story() then -- canceled instead of finished
+					barInfo.timer = self:ScheduleTimer(function() self:StopTimelineBar(barInfo, true) end, duration)
+				end
 			elseif rounded == 20 or rounded == 40 then
 				barInfo = self:Gloombomb()
 			elseif rounded == 32 or rounded == 33 then
 				barInfo = self:SoulSever()
+				if self:Story() then -- canceled instead of finished
+					barInfo.timer = self:ScheduleTimer(function() self:StopTimelineBar(barInfo, true) end, duration)
+				end
 			end
 		end
 
@@ -489,6 +509,9 @@ function mod:OtherTimeline(_, eventInfo)
 				barInfo = self:ToxicDeluge()
 			elseif rounded == 29 or rounded == 28 or rounded == 30 or rounded == 33 then
 				barInfo = self:BlightedSever()
+				if self:Story() then -- canceled instead of finished
+					barInfo.timer = self:ScheduleTimer(function() self:StopTimelineBar(barInfo, true) end, duration)
+				end
 			elseif rounded == 92 or rounded == 91 then
 				barInfo = self:DefilementOfTheCoiledAltar()
 			elseif rounded == 34 then
@@ -546,13 +569,17 @@ function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
 		-- mythic typically fires the next event before canceling
 		if spellCount[1282487] > barInfo.count then
 			-- next bar started, so it finished
-			barInfo:onFinished()
+			if self:ShouldShowBars() then
+				barInfo:onFinished()
+			end
 		else
 			-- normal and heroic typically cancel and delay the next event
 			self:SimpleTimer(function()
 				if spellCount[1282487] > barInfo.count then
 					-- next bar started, so it finished
-					barInfo:onFinished()
+					if self:ShouldShowBars() then
+						barInfo:onFinished()
+					end
 				else
 					-- actually ended early, so trigger next phase
 					self:StartPhaseTwo()
@@ -563,23 +590,11 @@ function mod:ENCOUNTER_TIMELINE_EVENT_STATE_CHANGED(_, eventID)
 		return
 	end
 
-	if barInfo and barInfo.gapTimer and state == 2 then -- Finished (reuse the eventID to set the spell indicator for the next bar)
-		self:Bar(barInfo.key, barInfo.gapTimer, CL.count:format(self:GetRename(barInfo.key, barInfo.renamePosition), spellCount[barInfo.key]), nil, eventID)
-	end
-
 	if barInfo and not barInfo.ignoreState then
 		if state == 2 then -- Finished
-			activeBars[eventID] = nil
-			self:StopBar(barInfo.msg)
-			if barInfo.onFinished and self:ShouldShowBars() then
-				barInfo:onFinished()
-			end
+			self:StopTimelineBar(barInfo, true)
 		elseif state == 3 then -- Canceled
-			activeBars[eventID] = nil
-			self:StopBar(barInfo.msg)
-			if barInfo.onCanceled and self:ShouldShowBars() then
-				barInfo:onCanceled()
-			end
+			self:StopTimelineBar(barInfo, false, true)
 		end
 	elseif backupBars[eventID] then
 		if state == 0 then -- Enum.EncounterTimelineEventState.Active
@@ -595,6 +610,31 @@ end
 function mod:ENCOUNTER_TIMELINE_EVENT_REMOVED(_, eventID)
 	activeBars[eventID] = nil
 	backupBars[eventID] = nil
+end
+
+function mod:StopTimelineBar(barInfo, isFinished, runCanceled)
+	if not barInfo then return end
+	if barInfo.state and barInfo.state >= 2 then return end -- already ended
+
+	-- Start the next bar if there is a gap timer
+	if isFinished and barInfo.gapTimer and self:ShouldShowBars() and not self:IsWiping() then
+		-- reuse the eventID to set the spell indicator for the next bar
+		self:Bar(barInfo.key, barInfo.gapTimer, CL.count:format(self:GetRename(barInfo.key, barInfo.renamePosition), spellCount[barInfo.key]), nil, barInfo.eventID)
+	end
+
+	self:StopBar(barInfo.msg)
+	if isFinished and barInfo.onFinished and self:ShouldShowBars() and not self:IsWiping() then
+		barInfo:onFinished()
+	end
+
+	if not isFinished and runCanceled and barInfo.onCanceled then
+		barInfo:onCanceled()
+	end
+
+	barInfo.state = isFinished and 2 or 3 -- Finished/Canceled
+	if barInfo.eventID then
+		activeBars[barInfo.eventID] = nil
+	end
 end
 
 --------------------------------------------------------------------------------
@@ -884,7 +924,14 @@ do
 
 	function mod:DreadmarchMessage()
 		-- Dreadmarch and Unnerving Fixation are both 4s Medium
-		if dreadmarchAboutToCast and not dreadmarchOnMe then
+		local onMe
+		if self:Story() then
+			-- the only Dreadmarch debuff in story is from the enrage, a 10s cast 10 minutes into the fight
+			onMe = GetTime() - encounterStart > 600
+		else
+			onMe = dreadmarchAboutToCast
+		end
+		if onMe and not dreadmarchOnMe then
 			-- Malacrass is about to afflict you with [Dreadmarch]!
 			dreadmarchOnMe = true
 			self:PersonalMessage(1289900, false, self:GetRename(1289900, 2))

@@ -23,18 +23,21 @@ function addon.tcontains(arr, value)
     end
 end
 
+function addon:GameSupportsMetaKeys()
+    return IsMetaKeyDown and IsLeftMetaKeyDown and IsRightMetaKeyDown
+end
+
 -- Returns the prefix string for the current keyboard state.
 --
 -- Arguments:
 --   extended - Whether or not to split the modifier keys into left and right components
-
 function addon:GetPrefixString(extended)
     local shift, lshift, rshift = IsShiftKeyDown(), IsLeftShiftKeyDown(), IsRightShiftKeyDown()
     local ctrl, lctrl, rctrl = IsControlKeyDown(), IsLeftControlKeyDown(), IsRightControlKeyDown()
-    local alt, lalt, ralt = IsAltKeyDown(), IsLeftAltKeyDown() IsRightAltKeyDown()
+    local alt, lalt, ralt = IsAltKeyDown(), IsLeftAltKeyDown(), IsRightAltKeyDown()
     local meta, lmeta, rmeta = false, false, false
 
-    if self:ProjectIsRetail() then
+    if self:GameSupportsMetaKeys() then
         meta, lmeta, rmeta = IsMetaKeyDown(), IsLeftMetaKeyDown(), IsRightMetaKeyDown()
     end
 
@@ -299,16 +302,14 @@ function addon:GetCapturedKey(key)
 end
 
 function addon:GetBindingInfoText(binding)
-    if type(binding) ~= "table" or not binding.sets then
-        return L["This binding is invalid, please delete"]
+    -- Invalid and set-less bindings are reported by GetBindingStatuses.
+    if type(binding) ~= "table" or type(binding.sets) ~= "table" then
+        return ""
     end
 
     local sets = binding.sets
-    if not sets then
+    if not next(sets) then
         return ""
-    elseif not next(sets) then
-        -- No bindings set, so display a message
-        return L["This binding is DISABLED"]
     else
         local bits = {}
         for k,v in pairs(sets) do
@@ -377,7 +378,7 @@ function addon:GetMouseButtonNumber(binding)
     return binding.key:match("BUTTON(%d+)$")
 end
 
--- The frame->proxy transport: "click" or "macrotext" (opt-in). See BUGS.md B12.
+-- The frame->proxy transport: "click", or the dormant "macrotext" fallback. See docs/attributes.md.
 function addon:GetDispatchMode()
     return self.settings.dispatchMode
 end

@@ -42,12 +42,14 @@ function lib:GetTabInfo(idx)
         local numSpells = skillLineInfo.numSpellBookItems
         local offset = skillLineInfo.itemIndexOffset
         local shouldHide = skillLineInfo.shouldHide
-        local isOffspec = skillLineInfo.offSpecID ~= nil
-        return name, texture, numSpells, offset, shouldHide, isOffspec
+        local offSpecID = skillLineInfo.offSpecID
+        local isOffspec = offSpecID ~= nil
+        return name, texture, numSpells, offset, shouldHide, isOffspec, offSpecID
     else
-        local name, texture, offset, numSpells, isGuild, offSpecID, shouldHide = GetSpellTabInfo(idx)
+        local name, texture, offset, numSpells, _isGuild, offSpecID, shouldHide = GetSpellTabInfo(idx)
         local isOffspec = (offSpecID ~= 0)
-        return name, texture, numSpells, offset, shouldHide, isOffspec
+        local tabOffSpecID = isOffspec and offSpecID or nil
+        return name, texture, numSpells, offset, shouldHide, isOffspec, tabOffSpecID
     end
 end
 
@@ -153,8 +155,39 @@ function lib:GetNumFlyoutSlots(idx)
 end
 
 function lib:GetFlyoutSpellId(actionId, flyoutIdx)
-    local flyoutSpellID, overrideSpellID, isKnown, spellName, slotSpecID = GetFlyoutSlotInfo(actionId, flyoutIdx)
-    return flyoutSpellID
+    local flyoutSpellID, _overrideSpellID, isKnown, _spellName, slotSpecID = GetFlyoutSlotInfo(actionId, flyoutIdx)
+    return flyoutSpellID, isKnown, slotSpecID
+end
+
+---@class FlyoutSlot
+---@field spellId number
+---@field name string
+---@field icon number
+---@field passive boolean
+
+-- Only known slots, plus off-spec slots when offSpecID is given
+---@param actionId number
+---@param offSpecID number?
+---@return FlyoutSlot[]
+function lib:GetVisibleFlyoutSlots(actionId, offSpecID)
+    local slots = {}
+
+    for flyoutIdx = 1, self:GetNumFlyoutSlots(actionId) do
+        local spellId, isKnown, slotSpecID = self:GetFlyoutSpellId(actionId, flyoutIdx)
+        local isOffspecSlot = offSpecID ~= nil and slotSpecID == offSpecID
+        local name, icon = self:GetSpellNameTexture(spellId)
+
+        if (isKnown or isOffspecSlot) and name then
+            table.insert(slots, {
+                spellId = spellId,
+                name = name,
+                icon = icon,
+                passive = self:GetSpellPassive(spellId),
+            })
+        end
+    end
+
+    return slots
 end
 
 function lib:GetSpellCatalogEntries(orderIndex)
@@ -164,7 +197,7 @@ function lib:GetSpellCatalogEntries(orderIndex)
     local spellbookIdx = orderIndex + 1
 
     for tabIdx = 1, self:GetNumTabs() do
-        local tabName, tabTexture, numSpells, offset, shouldHide, isOffspec = self:GetTabInfo(tabIdx)
+        local _tabName, _tabTexture, numSpells, offset, shouldHide, isOffspec, offSpecID = self:GetTabInfo(tabIdx)
 
         if not shouldHide then
             for idx = 1, numSpells do
@@ -190,23 +223,16 @@ function lib:GetSpellCatalogEntries(orderIndex)
                         tabIdx
                     ))
                 elseif self:IsFlyout(realIdx, bookType) then
-                    local numFlyoutSlots = self:GetNumFlyoutSlots(spellId)
-
-                    for flyoutIdx = 1, numFlyoutSlots do
-                        local flyoutSpellId = self:GetFlyoutSpellId(spellId, flyoutIdx)
-                        local name, icon = self:GetSpellNameTexture(flyoutSpellId)
-                        local passive = self:GetSpellPassive(flyoutSpellId)
-                        local offspec = isOffspec
-
+                    for _, slot in ipairs(self:GetVisibleFlyoutSlots(spellId, offSpecID)) do
                         spellbookIdx = spellbookIdx + 1
                         table.insert(results, catalog:CreateEntry(
                             catalog.entryType.Spell,
                             spellbookIdx,
-                            name,
-                            icon,
-                            flyoutSpellId,
-                            passive,
-                            offspec,
+                            slot.name,
+                            slot.icon,
+                            slot.spellId,
+                            slot.passive,
+                            isOffspec,
                             false,
                             false,
                             tabIdx

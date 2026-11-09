@@ -1,4 +1,4 @@
-## Interface: 120100, 120105, 120007
+## Interface: 120100, 120105, 120107
 ## AllowLoadGameType: standard
 
 ## Title: BigWigs [|cffeda55fThe Venomous Abyss|r]
@@ -24,7 +24,7 @@
 ## Notes-zhCN: BigWigs 烈毒之渊模块
 ## Notes-zhTW: BigWigs 劇毒深淵模組
 ## IconTexture: Interface\AddOns\BigWigs\Media\Icons\minimap_raid.tga
-## Version: v426.3
+## Version: v427.9
 
 ## LoadOnDemand: 1
 ## Dependencies: BigWigs

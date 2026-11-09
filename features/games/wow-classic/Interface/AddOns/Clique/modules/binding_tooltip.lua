@@ -8,6 +8,7 @@ local L = addon.L
 
 local activeFrame = nil
 local lastPrefix = nil
+local lastPhase = nil
 local bindingTooltip = nil
 
 local MAX_ACTION_TEXT_LEN = 25
@@ -35,7 +36,8 @@ function module:GetBindingTooltip()
             end
 
             local prefix = addon:GetPrefixString(false)
-            if prefix ~= lastPrefix then
+            local phase = InCombatLockdown() and "combat" or "ooc"
+            if prefix ~= lastPrefix or phase ~= lastPhase then
                 module:PopulateTooltip()
             end
         end)
@@ -43,20 +45,62 @@ function module:GetBindingTooltip()
     return bindingTooltip
 end
 
+-- Adds the plan's winners for this phase. A binding in neither 'friend' nor
+-- 'enemy' doesn't count where a 'friend'/'enemy' binding takes the unit.
+local function addWinners(active, plan, phase, reaction, skipKeys)
+    local winners = plan.winners[phase]
+    for _, entry in ipairs(plan.order) do
+        if not (skipKeys and skipKeys[entry.key]) then
+            for _, slot in ipairs(plan.entries[entry].slots) do
+                local remapped = reaction and slot.remappedTypeAttrs and winners[slot.remappedTypeAttrs[reaction]]
+                if winners[slot.typeAttr] == entry and (slot.unit == nil or slot.unit == reaction) and not remapped then
+                    active[entry] = true
+                end
+            end
+        end
+    end
+end
+
+-- The bindings that act on `frame` now. A frame takes every click, and binds
+-- its keys while hovered, so 'hovercast'/'global' only add the keys it leaves free.
+local function getActiveBindings(frame, phase)
+    local unit = frame:GetAttribute("unit")
+    local reaction = unit and (UnitCanAttack("player", unit) and "enemy" or UnitCanAssist("player", unit) and "friend") or nil
+
+    local active = {}
+    local framePlan = addon:BuildClickPlan(false, addon.bindings)
+    addWinners(active, framePlan, phase, reaction)
+
+    local frameKeys = {}
+    for _, entry in ipairs(framePlan.order) do
+        frameKeys[entry.key] = true
+    end
+    for _, entry in ipairs(addon.bindings) do
+        if entry.key and entry.key:match("BUTTON%d+$") then
+            frameKeys[entry.key] = true
+        end
+    end
+    addWinners(active, addon:BuildClickPlan(true, addon.bindings), phase, reaction, frameKeys)
+    return active
+end
+
 function module:PopulateTooltip()
     local tip = self:GetBindingTooltip()
     local prefix = addon:GetPrefixString(false)
+    local phase = InCombatLockdown() and "combat" or "ooc"
     lastPrefix = prefix
+    lastPhase = phase
 
     tip:ClearLines()
     tip:AddLine(L["Clique Bindings"], 1, 1, 0)
 
     local sorted = {unpack(addon.bindings)}
     addon:SortBindingsByKey(sorted)
+    local active = getActiveBindings(activeFrame, phase)
 
     local found = false
     for _, binding in ipairs(sorted) do
-        if binding.key and addon:IsBindingCorrectSpec(binding) then
+        if active[binding] then
             local keyPrefix = addon:GetPrefixStringFromBinding(binding)
             if keyPrefix == prefix then
                 local keyText = addon:GetBindingKeyComboText(binding)

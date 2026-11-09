@@ -35,10 +35,12 @@ function addon:GetNumTalentSpecs()
     -- specializations (i.e. Restoration, Guardian, Balance, Feral for Druids)
     if addon:ProjectIsRetail() or addon:ProjectIsMists() then
         return GetNumSpecializations() or 0
-    elseif GetNumTalentGroups then
-        -- Some other variants support multiple talent loadouts, where the player
-        -- can have different configurations (essentially primary/secondary loadouts)
-        local ok, numSpecs = pcall(GetNumTalentGroups)
+    end
+
+    -- Other variants count Primary/Secondary groups; Forever has GetNumSpecGroups but no GetNumTalentGroups
+    local getNumGroups = GetNumSpecGroups or GetNumTalentGroups
+    if getNumGroups then
+        local ok, numSpecs = pcall(getNumGroups)
         if ok then return numSpecs or 0 end
     end
 

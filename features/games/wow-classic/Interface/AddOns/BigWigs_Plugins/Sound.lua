@@ -169,7 +169,6 @@ plugin.pluginOptions = {
 		--	values = function() return soundList end,
 		--	width = "full",
 		--	itemControl = "DDI-Sound",
-		--	hidden = BigWigsLoader.isClassic,
 		--},
 		newline2 = {
 			type = "description",
@@ -390,7 +389,7 @@ function plugin:OnPluginEnable()
 	self:RegisterMessage("BigWigs_ProfileUpdate", updateProfile)
 	self:RegisterMessage("BigWigs_BossModuleRegistered")
 	self:RegisterMessage("BigWigs_RefreshAuraSounds")
-	if BigWigsLoader.isRetail then
+	if BigWigsLoader.isModern then
 		self:RegisterEvent("ENCOUNTER_WARNING")
 		self:RegisterMessage("BigWigs_BlockBlizzMessages")
 		self:RegisterMessage("BigWigs_AllowBlizzMessages")
@@ -474,19 +473,11 @@ function plugin:ADDON_RESTRICTION_STATE_CHANGED(event)
 end
 
 do
-	local function getCountdownSoundFile(duration)
-		if duration and duration > 0 and duration <= 30 then
-			local path = [[Interface\AddOns\BigWigs\Media\Sounds\AuraCountdowns\Amy\Amy_Countdown%d.ogg]]
-			return path:format(duration)
-		end
-	end
-
 	local auraEventToID = {
 		-- These are the enum values for UnitAuraSoundTrigger
 		onApplied = 0,
 		onStack = 1,
 		onRemoved = 2,
-		onCountdown = 0,
 	}
 	local AddAuraSound = C_UnitAuras.AddAuraSound
 	function plugin:RegisterAuraSounds(bossModule)
@@ -545,11 +536,8 @@ do
 					end
 					soundsToRegister.onRemoved = self:GetSoundFile(nil, nil, onRemovedSound)
 				end
-				if bossModule:GetAuraCountdownVoice(spellId) then
-					soundsToRegister.onCountdown = getCountdownSoundFile(bossModule:GetAuraDuration(spellId))
-				end
 
-				local throttle = bossModule:GetAuraSoundThrottle(spellId) or 1
+				local throttle = bossModule:GetAuraSoundThrottle(spellId)
 				for event, sound in next, soundsToRegister do
 					local auraSoundInfoTable = {
 						spellID = spellId,

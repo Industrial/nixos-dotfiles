@@ -825,10 +825,9 @@ L.selectPlayer = "플레이어 선택"
 L.myself = "나"
 L.trigger = "발동 조건"
 L.remove = "추방"
-L.auraCountdownDesc = "이 기능을 활성화하면 오라의 마지막 3초 동안 음성 카운트다운이 추가됩니다."
-L.auraDuration = "오라 지속 시간"
-L.auraDurationDesc = "오라가 지속되는 시간(초)."
 L.currentUnit = "(현재: %s)"
+L.throttle = "속도 조절"
+L.throttleDesc = "오라가 활성화 될 때마다 이 소리가 재생되는 간격(초 단위). 0으로 설정하면 오라가 활성화 될 때마다 소리가 재생됩니다."
 
 -----------------------------------------------------------------------
 -- AutoReply.lua

@@ -213,7 +213,7 @@ function window:Initialize()
     -- Spec swaps and talent edits update the spellbook asynchronously, so a
     -- short debounce isn't enough; refresh on a longer delayed dirty flag.
     window.frame:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
-    if addon:ProjectIsRetail() then
+    if C_Traits then
         window.frame:RegisterEvent("TRAIT_CONFIG_UPDATED")
     end
 

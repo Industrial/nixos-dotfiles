@@ -57,16 +57,15 @@
 						<Anchor point="LEFT" relativeKey="$parent.Icon" relativePoint="RIGHT" x="5" y="7"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Text" inherits="GameFontHighlightSmall" maxLines="1" justifyH="LEFT">
-					<Size x="200" y="0"/>
+				<FontString parentKey="BindingText" inherits="GameFontHighlightSmall" maxLines="1" justifyH="RIGHT">
 					<Anchors>
-						<Anchor point="LEFT" relativeKey="$parent.Name" relativePoint="LEFT" x="0" y="-15"/>
+						<Anchor point="RIGHT" relativeKey="$parent" relativePoint="RIGHT" x="-5" y="-8"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="BindingText" inherits="GameFontHighlightSmall" maxLines="1" justifyH="RIGHT">
-					<Size x="200" y="0"/>
+				<FontString parentKey="Text" inherits="GameFontHighlightSmall" maxLines="1" wordwrap="false" justifyH="LEFT">
 					<Anchors>
-						<Anchor point="RIGHT" relativeKey="$parent" relativePoint="RIGHT" x="-5" y="-10"/>
+						<Anchor point="LEFT" relativeKey="$parent.Name" relativePoint="LEFT" x="0" y="-15"/>
+						<Anchor point="RIGHT" relativeKey="$parent.BindingText" relativePoint="LEFT" x="-10" y="0"/>
 					</Anchors>
 				</FontString>
 			</Layer>
@@ -138,16 +137,15 @@
 						<Anchor point="LEFT" relativeKey="$parent.Icon" relativePoint="RIGHT" x="5" y="7"/>
 					</Anchors>
 				</FontString>
-				<FontString parentKey="Text" inherits="GameFontHighlightSmall" maxLines="1" justifyH="LEFT">
-					<Size x="300" y="0"/>
-					<Anchors>
-						<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT" x="5" y="5"/>
-					</Anchors>
-				</FontString>
 				<FontString parentKey="BindingText" inherits="GameFontHighlightSmall" maxLines="1" justifyH="RIGHT">
-					<Size x="200" y="0"/>
 					<Anchors>
 						<Anchor point="BOTTOMRIGHT" relativePoint="BOTTOMRIGHT" x="-5" y="5"/>
+					</Anchors>
+				</FontString>
+				<FontString parentKey="Text" inherits="GameFontHighlightSmall" maxLines="1" wordwrap="false" justifyH="LEFT">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" relativePoint="BOTTOMLEFT" x="5" y="5"/>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.BindingText" relativePoint="BOTTOMLEFT" x="-10" y="0"/>
 					</Anchors>
 				</FontString>
 			</Layer>

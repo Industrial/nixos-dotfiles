@@ -31,7 +31,8 @@ local CL = BigWigsAPI:GetLocale("BigWigs: Common")
 local LibSpec = LibStub("LibSpecialization")
 local loader = BigWigsLoader
 local season = loader.season
-local isClassic, isRetail, isForever, isVanilla, isTBC, isWrath, isCata, isMists = loader.isClassic, loader.isRetail, loader.isForever, loader.isVanilla, loader.isTBC, loader.isWrath, loader.isCata, loader.isMists
+local isClassic, isRetail, isForever, isModern = loader.isClassic, loader.isRetail, loader.isForever, loader.isModern
+local isVanilla, isTBC, isWrath, isCata, isMists = loader.isVanilla, loader.isTBC, loader.isWrath, loader.isCata, loader.isMists
 local C_EncounterJournal_GetSectionInfo = (isCata or isMists) and function(key)
 	return C_EncounterJournal.GetSectionInfo(key) or BigWigsAPI:GetLocale("BigWigs: Encounter Info")[key]
 end or isRetail and C_EncounterJournal.GetSectionInfo or function(key)
@@ -55,7 +56,7 @@ local format, find, gsub, band, tremove, twipe = string.format, string.find, str
 local select, type, next, tonumber = select, type, next, tonumber
 local PlaySoundFile = loader.PlaySoundFile
 local C = core.C
-local myName = loader.UnitName("player")
+local myName = BigWigsAPI.UnitName("player")
 local myNameWithColor
 local myLocale = GetLocale()
 local hasVoice = BigWigsAPI:HasVoicePack()
@@ -606,9 +607,6 @@ function boss:Enable(isWipe)
 		enabledModules[#enabledModules+1] = self
 
 		if self:GetEncounterID() then
-			if not self:Retail() then
-				self:RegisterEvent("INSTANCE_ENCOUNTER_ENGAGE_UNIT", "CheckForEncounterEngage")
-			end
 			self:RegisterEvent("ENCOUNTER_END", "EncounterEnd")
 		end
 
@@ -659,7 +657,7 @@ function boss:Disable(isWipe)
 
 		-- No enabled modules? Unregister the combat log!
 		if #enabledModules == 0 then
-			if not self:Retail() then
+			if not isModern then
 				bossUtilityFrame:UnregisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 			end
 			petUtilityFrame:UnregisterEvent("UNIT_PET")
@@ -1134,23 +1132,6 @@ do
 		end
 	end
 
-	--- Get the current aura countdown voice.
-	-- @return string or nil
-	function boss:GetAuraCountdownVoice(spellID)
-		local index = moduleAurasList[self] and moduleAurasList[self].spellIDToIndex[spellID]
-		if not index then
-			error(("Module %q has no aura data for spell ID %q."):format(self.moduleName, tostring(spellID)))
-			return
-		end
-
-		local duration = moduleAurasList[self][index].duration
-		if not duration then return end
-
-		local db = self.db.profile.auras
-		local baseSpellID = moduleAurasList[self][index][1]
-		return db[baseSpellID] and db[baseSpellID].countdown
-	end
-
 	--- Get the default aura applied sound.
 	-- @return string
 	function boss:GetAuraAppliedSoundDefault(spellID)
@@ -1201,19 +1182,7 @@ do
 			return
 		end
 
-		return moduleAurasList[self][index].throttle
-	end
-
-	--- Get the aura duration.
-	-- @return number or nil
-	function boss:GetAuraDuration(spellID)
-		local index = moduleAurasList[self] and moduleAurasList[self].spellIDToIndex[spellID]
-		if not index then
-			error(("Module %q has no aura data for spell ID %q."):format(self.moduleName, tostring(spellID)))
-			return
-		end
-
-		return moduleAurasList[self][index].duration
+		return moduleAurasList[self][index].throttle or 1
 	end
 
 	--- Get the aura type. (Magic/Poison/Etc)
@@ -1530,7 +1499,7 @@ do
 	-- @param func callback function, passed a keyed table (sourceGUID, sourceName, sourceFlags, sourceRaidFlags, destGUID, destName, destFlags, destRaidFlags, spellId, spellName, extraSpellId, extraSpellName, amount)
 	-- @number ... any number of spell ids
 	function boss:Log(event, func, ...)
-		if self:Retail() then return end
+		if isModern then return end
 		if not event or not func then core:Print(format(missingArgument, self.moduleName)) return end
 		if type(func) ~= "function" and not self[func] then core:Print(format(missingFunction, self.moduleName, func)) return end
 		if not eventMap[self][event] then eventMap[self][event] = {} end
@@ -1563,7 +1532,7 @@ do
 	-- @param func callback function, passed a keyed table (mobId, destGUID, destName, destFlags, destRaidFlags)
 	-- @number ... any number of mob ids
 	function boss:Death(func, ...)
-		if self:Retail() then return end
+		if isModern then return end
 		if not func then core:Print(format(missingArgument, self.moduleName)) return end
 		if type(func) ~= "function" and not self[func] then core:Print(format(missingFunction, self.moduleName, func)) return end
 		if not eventMap[self].UNIT_DIED then eventMap[self].UNIT_DIED = {} end
@@ -1616,7 +1585,7 @@ do
 		-- @param func callback function, passed (guid, mobId)
 		-- @number ... any number of mob ids
 		function boss:RegisterEngageMob(func, ...)
-			if self:Retail() then return end
+			if isModern then return end
 			if not func then core:Print(format(missingArgument, self.moduleName)) return end
 			if type(func) ~= "function" and not self[func] then core:Print(format(missingFunction, self.moduleName, func)) return end
 			if not eventMap[self].UNIT_ENTERING_COMBAT then eventMap[self].UNIT_ENTERING_COMBAT = {} end
@@ -1863,7 +1832,7 @@ do
 		-- disables the module if set as engaged but has no boss match.
 		-- noEngage if set to "NoEngage", the module is prevented from engaging if enabling during a boss fight (after a DC)
 		function boss:CheckForEncounterEngage(noEngage)
-			if self:Retail() then return end
+			if isModern then return end
 			if not self:IsEngaged() then
 				for i = 1, 10 do
 					local bossUnit = bosses[i]
@@ -2146,7 +2115,7 @@ do
 
 				self:SendMessage("BigWigs_OnBossEngage", self)
 
-				if self:Retail() then
+				if isModern then
 					if self.OnEncounterStart then
 						self:OnEncounterStart(difficulty)
 					end
@@ -2634,17 +2603,12 @@ do
 end
 
 do
-	local UnitName = loader.UnitName
+	local UnitName = BigWigsAPI.UnitName
 	--- Get the full name of a unit.
 	-- @string unit unit token or name
 	-- @return name name with the server appended if appropriate
 	function boss:UnitName(unit)
-		local name, server = UnitName(unit)
-		if not name then
-			return
-		elseif server and server ~= "" then
-			name = name .."-".. server
-		end
+		local name = UnitName(unit)
 		return name
 	end
 end
@@ -2999,7 +2963,7 @@ do
 	-- @number id The ID of the specific gossip option to be selected
 	-- @bool[opt] skipConfirmDialogBox If the pop up confirmation dialog box should be skipped
 	local autotalk_notice = CL.autotalk_notice
-	local UnitName = loader.UnitName
+	local UnitName = BigWigsAPI.UnitName
 	function boss:SelectGossipID(id, skipConfirmDialogBox)
 		local npc = UnitName("npc")
 		if npc then
@@ -3036,8 +3000,10 @@ do
 		local buttonID = button and button.id
 		if buttonID then
 			local spellID = choiceInfo.options[choiceNumber].spellID
+			local text
 			if spellID then
 				local spellLink = loader.GetSpellLink(spellID)
+				text = choiceInfo.options[choiceNumber].header
 				local linkToUse
 				if type(spellLink) == "string" and spellLink:find("Hspell", nil, true) then
 					linkToUse = spellLink -- Use Blizz link if valid...
@@ -3047,12 +3013,27 @@ do
 				end
 				core:Print(format(CL.autoPlayerChoice_notice, linkToUse), self.isLittleWigs)
 			else
-				core:Print(format(CL.autoPlayerChoice_notice, choiceInfo.options[choiceNumber].header), self.isLittleWigs)
+				text = choiceInfo.options[choiceNumber].header
+				if text and text ~= "" then
+					core:Print(format(CL.autoPlayerChoice_notice, text), self.isLittleWigs)
+				else
+					text = button.text or "???"
+				end
 			end
-			self:SendMessage("BigWigs_Message", self, nil, choiceInfo.options[choiceNumber].header, "cyan", choiceInfo.options[choiceNumber].choiceArtID, nil, 4)
+			self:SendMessage("BigWigs_Message", self, nil, text, "cyan", choiceInfo.options[choiceNumber].choiceArtID, nil, 4)
 			SendPlayerChoiceResponse(buttonID)
 			OnUIClosed()
 		end
+	end
+end
+
+--- Get the spell ID of a specific choice
+-- @param choiceInfo The table provided by :GetPlayerChoiceOptions()
+-- @number choiceNumber The number of the specific choice you want
+-- @return number The spell ID of the choice
+function boss:GetPlayerChoiceSpellID(choiceInfo, choiceNumber)
+	if choiceInfo and choiceInfo.options and choiceInfo.options[choiceNumber] then
+		return choiceInfo.options[choiceNumber].spellID
 	end
 end
 
@@ -4941,7 +4922,7 @@ end
 -- @param key the option key
 -- @string[opt] player the player to mark (if nil, the icon is removed)
 function boss:PrimaryIcon(key, player)
-	if isRetail then return end
+	if isModern then return end
 	if key and not checkFlag(self, key, C.ICON) then return end
 	if not player then
 		self:SendMessage("BigWigs_RemoveRaidIcon", self, 1)
@@ -4954,7 +4935,7 @@ end
 -- @param key the option key
 -- @string[opt] player the player to mark (if nil, the icon is removed)
 function boss:SecondaryIcon(key, player)
-	if isRetail then return end
+	if isModern then return end
 	if key and not checkFlag(self, key, C.ICON) then return end
 	if not player then
 		self:SendMessage("BigWigs_RemoveRaidIcon", self, 2)
@@ -4968,7 +4949,7 @@ end
 -- @string unit the unit (player/npc) to mark
 -- @number[opt] icon the icon to mark the player with, numbering from 1-8 (if nil, the icon is removed)
 function boss:CustomIcon(key, unit, icon)
-	if isRetail then return end
+	if isModern then return end
 	if key == false or self:GetOption(key) then
 		if solo then -- setting the same icon twice while not in a group removes it
 			SetRaidTarget(unit, 0)
