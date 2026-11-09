@@ -11,7 +11,7 @@ VER 3 0000000000000004 "SIC" "457329"
 /cleartarget [dead][help]
 /tar [@mouseover,harm,nodead]
 /targetenemy [noharm]
-/use [@target, help] [@target, harm, nodead] Hunter's Mark
+/use [@target, harm, nodead] Hunter's Mark
 /petattack
 /use !Auto Shot
 END
@@ -19,14 +19,12 @@ VER 3 0000000000000002 "SP" "136006"
 /click idAutomationPrepareButton
 END
 VER 3 0000000000000005 "Upkeep Buffs" "INV_MISC_QUESTIONMARK"
-#showtooltip
+#showtooltip Frost Armor
 /click idAutomationUpkeepBuffsButton
 END
 VER 3 0000000000000006 "Upkeep Health" "INV_MISC_QUESTIONMARK"
-#showtooltip [combat] item:929; item:3770
-/use [combat] Healing Potion; Mutton Chop
+#showtooltip
 END
 VER 3 0000000000000007 "Upkeep Mana" "INV_MISC_QUESTIONMARK"
-#showtooltip [nocombat] item:9451
-/use [nocombat] Bubbling Water
+#showtooltip
 END

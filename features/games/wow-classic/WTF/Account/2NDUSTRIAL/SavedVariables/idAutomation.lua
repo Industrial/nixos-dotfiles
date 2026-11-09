@@ -370,11 +370,11 @@ idAutomationDB = {
 ["enable"] = true,
 ["last_tab"] = "friends",
 ["who_history"] = 10,
-["remember_last_seen"] = true,
 ["role_healer"] = false,
+["role_tank"] = false,
 ["sort_mode"] = "status",
 ["role_damage"] = true,
-["role_tank"] = false,
+["remember_last_seen"] = true,
 ["show_offline"] = true,
 },
 ["RaidPanel"] = {
@@ -515,34 +515,6 @@ idAutomationDB = {
 ["compare"] = true,
 ["pin"] = false,
 },
-["ActionBar"] = {
-["cooldown_text"] = true,
-["show_pet_bar"] = true,
-["hide_blizzard"] = true,
-["enable"] = false,
-["color_range"] = true,
-["empty_slot_opacity"] = 75,
-["color_mana"] = true,
-},
-["media_background"] = "Solid",
-["CalendarPanel"] = {
-["show_resets"] = true,
-["default_view"] = "month",
-["enable"] = true,
-},
-["enable"] = true,
-["MacrosPanel"] = {
-["enable"] = true,
-["macroSpecSets"] = {
-},
-["spec_sets"] = false,
-["lint"] = true,
-},
-["Panels"] = {
-["enable"] = true,
-["window_scale"] = 100,
-["reset_positions"] = false,
-},
 ["AuctionHousePanel"] = {
 ["enable"] = true,
 ["buy_tolerance"] = 5,
@@ -558,6 +530,40 @@ idAutomationDB = {
 ["entries"] = {
 },
 },
+},
+["media_background"] = "Solid",
+["ActionBar"] = {
+["cooldown_text"] = true,
+["show_pet_bar"] = true,
+["hide_blizzard"] = true,
+["enable"] = false,
+["color_range"] = true,
+["empty_slot_opacity"] = 75,
+["color_mana"] = true,
+},
+["enable"] = true,
+["MacrosPanel"] = {
+["enable"] = true,
+["macroSpecSets"] = {
+},
+["spec_sets"] = false,
+["lint"] = true,
+},
+["Panels"] = {
+["enable"] = true,
+["window_scale"] = 100,
+["reset_positions"] = false,
+},
+["CalendarPanel"] = {
+["show_resets"] = true,
+["default_view"] = "month",
+["enable"] = true,
+},
+["BankPanel"] = {
+["enable"] = true,
+["rules"] = {
+},
+["keep_gold"] = 0,
 },
 ["Loot"] = {
 ["show_feed"] = true,
@@ -575,20 +581,14 @@ idAutomationDB = {
 ["confirm_bop_solo"] = false,
 },
 ["LootPanel"] = {
-["window_y"] = 868.6842651367188,
+["badges"] = true,
 ["show_auto_rolled"] = true,
 ["window_x"] = 1394.02294921875,
-["badges"] = true,
+["stack_y"] = 1129.66162109375,
 ["at_cursor"] = false,
 ["stack_x"] = 3513.91015625,
 ["enable"] = true,
-["stack_y"] = 1129.66162109375,
-},
-["BankPanel"] = {
-["enable"] = true,
-["rules"] = {
-},
-["keep_gold"] = 0,
+["window_y"] = 868.6842651367188,
 },
 ["QuestLogPanel"] = {
 ["show_reward_value"] = true,
@@ -920,87 +920,69 @@ idAutomationDB = {
 ["enable"] = true,
 ["layout"] = {
 ["panels"] = {
-["collections"] = {
+["merchant"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-"mounts",
-"pets",
-"toys",
-"heirlooms",
-"appearances",
+["detached"] = {
 },
 },
 ["guild"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
+"roster",
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-"roster",
+["detached"] = {
 },
 },
 ["calendar"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "month",
 "invites",
 "holidays",
 },
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
 },
 ["bags"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-},
-},
-["trainer"] = {
-["minimized"] = false,
 ["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
 },
 },
 ["chat"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
+["detached"] = {
 },
 },
 ["achievements"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "categories",
 "recent",
 "statistics",
 },
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
 },
 ["character"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "equipment",
 "stats",
@@ -1008,101 +990,122 @@ idAutomationDB = {
 "currency",
 "titles",
 },
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
 },
 ["settings"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
+["detached"] = {
 },
 },
-["loot"] = {
+["talents"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
+"tree",
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-"items",
+["detached"] = {
 },
 },
 ["macros"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
+["detached"] = {
 },
 },
 ["inspect"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
+["detached"] = {
 },
 },
-["merchant"] = {
+["loot"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
+"items",
 },
 ["pinned"] = false,
 ["open"] = false,
+["detached"] = {
+},
+},
+["trainer"] = {
+["minimized"] = false,
 ["parts"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
+},
+["map"] = {
+["minimized"] = false,
+["parts"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
 },
 },
 ["professions"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "recipes",
 "knowledge",
 "orders",
 },
-},
-["map"] = {
-["minimized"] = false,
+["pinned"] = false,
+["open"] = false,
 ["detached"] = {
+},
+},
+["collections"] = {
+["minimized"] = false,
+["parts"] = {
+"mounts",
+"pets",
+"toys",
+"heirlooms",
+"appearances",
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-},
-},
-["housing"] = {
-["minimized"] = false,
 ["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-"decor",
-"layout",
-"neighborhood",
 },
 },
 ["gossip"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
+["detached"] = {
+},
+},
+["taxi"] = {
+["minimized"] = false,
 ["parts"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
 },
 },
 ["hud"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "minimap",
 "tracker",
@@ -1110,109 +1113,88 @@ idAutomationDB = {
 "unitframes",
 "clock",
 },
-},
-["taxi"] = {
-["minimized"] = false,
+["pinned"] = false,
+["open"] = false,
 ["detached"] = {
+},
+},
+["raid"] = {
+["minimized"] = false,
+["parts"] = {
+"group",
+"roles",
+"ready",
 },
 ["pinned"] = false,
 ["open"] = false,
+["detached"] = {
+},
+},
+["spellbook"] = {
+["minimized"] = false,
 ["parts"] = {
+"spells",
+"passives",
+"pets",
+},
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
+},
+["keybindings"] = {
+["minimized"] = false,
+["parts"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
+},
+["auction"] = {
+["minimized"] = false,
+["parts"] = {
+},
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
 },
 },
 ["groupfinder"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "dungeons",
 "raids",
 "premade",
 "applicants",
 },
-},
-["raid"] = {
-["minimized"] = false,
-["detached"] = {
-},
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-"group",
-"roles",
-"ready",
-},
-},
-["spellbook"] = {
-["minimized"] = false,
 ["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-"spells",
-"passives",
-"pets",
-},
-},
-["keybindings"] = {
-["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-},
-},
-["auction"] = {
-["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-},
-},
-["talents"] = {
-["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
-["parts"] = {
-"tree",
-"loadouts",
-"specs",
 },
 },
 ["trade"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
+["detached"] = {
 },
 },
 ["mail"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "inbox",
 "send",
 },
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
 },
 ["social"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "friends",
 "invites",
@@ -1220,29 +1202,31 @@ idAutomationDB = {
 "who",
 "ignored",
 },
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
 },
 ["quests"] = {
 ["minimized"] = false,
-["detached"] = {
-},
-["pinned"] = false,
-["open"] = false,
 ["parts"] = {
 "active",
 "details",
 "completed",
 },
+["pinned"] = false,
+["open"] = false,
+["detached"] = {
+},
 },
 ["pvp"] = {
 ["minimized"] = false,
-["detached"] = {
+["parts"] = {
+"honor",
 },
 ["pinned"] = false,
 ["open"] = false,
-["parts"] = {
-"honor",
-"arenas",
-"conquest",
+["detached"] = {
 },
 },
 },
@@ -1398,73 +1382,74 @@ idAutomationDB = {
 ["panels"] = {
 ["merchant"] = {
 ["minimized"] = false,
-["parts"] = {
+["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["detached"] = {
+["parts"] = {
 },
 },
 ["guild"] = {
 ["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
 ["parts"] = {
 "roster",
 "news",
 "bank",
 "perks",
 },
-["pinned"] = false,
-["open"] = false,
-["detached"] = {
-},
 },
 ["spellbook"] = {
 ["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
 ["parts"] = {
 "spells",
 "passives",
 "pets",
 },
-["pinned"] = false,
-["open"] = false,
-["detached"] = {
-},
 },
 ["auction"] = {
 ["minimized"] = false,
-["parts"] = {
+["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["detached"] = {
+["parts"] = {
 },
 },
 ["talents"] = {
 ["minimized"] = false,
-["parts"] = {
-"tree",
-"loadouts",
-"specs",
+["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["detached"] = {
+["parts"] = {
+"tree",
 },
 },
 ["mail"] = {
 ["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = true,
 ["parts"] = {
 "inbox",
 "send",
-"sent",
-},
-["pinned"] = false,
-["open"] = false,
-["detached"] = {
 },
 },
 ["social"] = {
 ["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
 ["parts"] = {
 "friends",
 "invites",
@@ -1472,13 +1457,13 @@ idAutomationDB = {
 "who",
 "ignored",
 },
-["pinned"] = false,
-["open"] = true,
-["detached"] = {
-},
 },
 ["character"] = {
 ["minimized"] = false,
+["detached"] = {
+},
+["pinned"] = false,
+["open"] = false,
 ["parts"] = {
 "equipment",
 "stats",
@@ -1486,18 +1471,14 @@ idAutomationDB = {
 "currency",
 "titles",
 },
-["pinned"] = false,
-["open"] = false,
-["detached"] = {
-},
 },
 ["bank"] = {
 ["minimized"] = false,
-["parts"] = {
+["detached"] = {
 },
 ["pinned"] = false,
 ["open"] = false,
-["detached"] = {
+["parts"] = {
 },
 },
 },
@@ -1604,7 +1585,7 @@ idAutomationDB = {
 },
 ["debug"] = false,
 ["_meta"] = {
-["last_updated"] = 1794163622,
+["last_updated"] = 1794253083,
 ["schema_version"] = 1,
 },
 ["debug_default_retired"] = true,
@@ -1785,6 +1766,10 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
+["GetAuraDataByAuraInstanceID"] = true,
+["GetUnitAuras"] = true,
+["GetAuraDataByIndex"] = true,
+["GetAuraDuration"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -1792,10 +1777,6 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
-["GetAuraDataByAuraInstanceID"] = true,
-["GetAuraDataByIndex"] = true,
-["GetAuraDuration"] = true,
-["GetUnitAuras"] = true,
 },
 ["_keys"] = {
 "api:table",
@@ -2322,7 +2303,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetUnitAuras"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -2330,9 +2310,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
 ["GetAuraDataByIndex"] = true,
 ["GetAuraDuration"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "nil",
@@ -2534,7 +2515,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetUnitAuras"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -2542,9 +2522,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
 ["GetAuraDataByIndex"] = true,
 ["GetAuraDuration"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "nil",
@@ -5753,7 +5734,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetUnitAuras"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -5761,9 +5741,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
 ["GetAuraDataByIndex"] = true,
 ["GetAuraDuration"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "string",
@@ -5917,7 +5898,6 @@ idAutomationDB = {
 },
 ["api"] = {
 ["present"] = true,
-["GetUnitAuras"] = true,
 ["_keys"] = {
 "GetAuraDataByAuraInstanceID:boolean",
 "GetAuraDataByIndex:boolean",
@@ -5925,9 +5905,10 @@ idAutomationDB = {
 "GetUnitAuras:boolean",
 "present:boolean",
 },
+["GetAuraDataByAuraInstanceID"] = true,
 ["GetAuraDataByIndex"] = true,
 ["GetAuraDuration"] = true,
-["GetAuraDataByAuraInstanceID"] = true,
+["GetUnitAuras"] = true,
 },
 ["player_HARMFUL_2"] = {
 ["valueType"] = "string",
@@ -6543,12 +6524,12 @@ idAutomationDB = {
 [776] = 0,
 [62356] = 0,
 [848] = 0,
-[62011] = 0,
+[856] = 0,
 [61995] = 0,
 [61999] = 0,
 [62003] = 0,
 [61499] = 0,
-[856] = 0,
+[61503] = 0,
 [62015] = 0,
 [62019] = 0,
 [62023] = 0,
@@ -6561,7 +6542,7 @@ idAutomationDB = {
 [62006] = 0,
 [62034] = 0,
 [62035] = 0,
-[850] = 0,
+[62008] = 0,
 [841] = 0,
 [849] = 0,
 [857] = 0,
@@ -6571,15 +6552,15 @@ idAutomationDB = {
 [842] = 0,
 [770] = 0,
 [778] = 0,
-[61500] = 0,
+[850] = 0,
 [62032] = 0,
 [802] = 0,
-[852] = 0,
+[62009] = 0,
 [61992] = 0,
 [61996] = 0,
 [62000] = 0,
 [62004] = 0,
-[62008] = 0,
+[61500] = 0,
 [61504] = 0,
 [62016] = 0,
 [62020] = 0,
@@ -6587,7 +6568,7 @@ idAutomationDB = {
 [62028] = 0,
 [771] = 0,
 [779] = 0,
-[61501] = 0,
+[852] = 0,
 [62044] = 0,
 [62048] = 0,
 [684] = 0,
@@ -6611,7 +6592,7 @@ idAutomationDB = {
 [61997] = 0,
 [62001] = 0,
 [844] = 0,
-[62009] = 0,
+[61501] = 0,
 [62013] = 0,
 [62017] = 0,
 [62021] = 0,
@@ -6623,7 +6604,7 @@ idAutomationDB = {
 [62045] = 0,
 [62049] = 0,
 [62053] = 0,
-[61503] = 0,
+[62011] = 0,
 [62010] = 0,
 },
 },
@@ -6659,8 +6640,8 @@ idAutomationDB = {
 ["gossipPins"] = {
 },
 ["brokerMoney"] = {
-["Banknspank - CAMWOW EU4 Realm 1 PvE"] = 54732,
-["Derpnschmerp - CAMWOW EU4 Realm 1 PvE"] = 26761,
+["Banknspank - CAMWOW EU4 Realm 1 PvE"] = 88946,
+["Derpnschmerp - CAMWOW EU4 Realm 1 PvE"] = 91679,
 },
 ["profiles"] = {
 ["Default"] = {
@@ -7543,10 +7524,10 @@ idAutomationDB = {
 ["name"] = "Wool Cloth",
 ["link"] = "|cnIQ1:|Hitem:2592::::::::19:1484:::::::::|h[Wool Cloth]|h|r",
 },
-[10327] = {
-["link"] = "|cnIQ1:|Hitem:10327::::::::19:1484::11:::::::|h[Horn of Echeyakee]|h|r",
-["name"] = "Horn of Echeyakee",
-["icon"] = 134227,
+[16765] = {
+["link"] = "|cnIQ1:|Hitem:16765::::::::18:1484:::::::::|h[Warsong Outrider Update]|h|r",
+["name"] = "Warsong Outrider Update",
+["icon"] = 133468,
 ["quality"] = 1,
 },
 [3301] = {
@@ -7585,11 +7566,11 @@ idAutomationDB = {
 ["icon"] = 134532,
 ["quality"] = 1,
 },
-[16765] = {
-["link"] = "|cnIQ1:|Hitem:16765::::::::18:1484:::::::::|h[Warsong Outrider Update]|h|r",
-["name"] = "Warsong Outrider Update",
-["icon"] = 133468,
-["quality"] = 1,
+[3299] = {
+["quality"] = 0,
+["icon"] = 133725,
+["name"] = "Fractured Canine",
+["link"] = "|cnIQ0:|Hitem:3299::::::::20:1484:::::::::|h[Fractured Canine]|h|r",
 },
 [6328] = {
 ["quality"] = 1,
@@ -7627,11 +7608,11 @@ idAutomationDB = {
 ["icon"] = 7813752,
 ["quality"] = 1,
 },
-[2287] = {
-["quality"] = 1,
-["icon"] = 133974,
-["name"] = "Haunch of Meat",
-["link"] = "|cnIQ1:|Hitem:2287::::::::20:1484:::::::::|h[Haunch of Meat]|h|r",
+[3307] = {
+["link"] = "|cnIQ2:|Hitem:3307::::::::18:1484:::::::::|h[Barbaric Cloth Boots]|h|r",
+["name"] = "Barbaric Cloth Boots",
+["icon"] = 132539,
+["quality"] = 2,
 },
 [3181] = {
 ["link"] = "|cnIQ0:|Hitem:3181::::::::16:1484:::::::::|h[Partially Digested Meat]|h|r",
@@ -7675,17 +7656,17 @@ idAutomationDB = {
 ["name"] = "Warsong Report",
 ["link"] = "|cnIQ1:|Hitem:16746::::::::18:1484:::::::::|h[Warsong Report]|h|r",
 },
-[5080] = {
-["quality"] = 1,
-["icon"] = 133742,
-["name"] = "Gazlowe's Ledger",
-["link"] = "|cnIQ1:|Hitem:5080::::::::16:1484:::::::::|h[Gazlowe's Ledger]|h|r",
+[1788] = {
+["link"] = "|cnIQ0:|Hitem:1788::::::::16:1484::1::1:28:5254:::::|h[Patched Leather Boots]|h|r",
+["name"] = "Patched Leather Boots",
+["icon"] = 132592,
+["quality"] = 0,
 },
-[3307] = {
-["link"] = "|cnIQ2:|Hitem:3307::::::::18:1484:::::::::|h[Barbaric Cloth Boots]|h|r",
-["name"] = "Barbaric Cloth Boots",
-["icon"] = 132539,
-["quality"] = 2,
+[5068] = {
+["link"] = "|cnIQ1:|Hitem:5068::::::::20:1484::11:::::::|h[Dried Seeds]|h|r",
+["name"] = "Dried Seeds",
+["icon"] = 133849,
+["quality"] = 1,
 },
 [3180] = {
 ["quality"] = 0,
@@ -7717,11 +7698,11 @@ idAutomationDB = {
 ["name"] = "Theramore Medal",
 ["link"] = "|cnIQ1:|Hitem:5078::::::::15:1484:::::::::|h[Theramore Medal]|h|r",
 },
-[1788] = {
-["link"] = "|cnIQ0:|Hitem:1788::::::::16:1484::1::1:28:5254:::::|h[Patched Leather Boots]|h|r",
-["name"] = "Patched Leather Boots",
-["icon"] = 132592,
-["quality"] = 0,
+[5335] = {
+["link"] = "|cnIQ1:|Hitem:5335::::::::19:1484::11:::::::|h[A Sack of Coins]|h|r",
+["name"] = "A Sack of Coins",
+["icon"] = 133639,
+["quality"] = 1,
 },
 [208800] = {
 ["quality"] = 1,
@@ -7753,11 +7734,11 @@ idAutomationDB = {
 ["name"] = "99-Year-Old Port",
 ["link"] = "|cnIQ1:|Hitem:5334::::::::17:1484:::::::::|h[99-Year-Old Port]|h|r",
 },
-[5335] = {
-["link"] = "|cnIQ1:|Hitem:5335::::::::19:1484::11:::::::|h[A Sack of Coins]|h|r",
-["name"] = "A Sack of Coins",
-["icon"] = 133639,
+[5080] = {
 ["quality"] = 1,
+["icon"] = 133742,
+["name"] = "Gazlowe's Ledger",
+["link"] = "|cnIQ1:|Hitem:5080::::::::16:1484:::::::::|h[Gazlowe's Ledger]|h|r",
 },
 [5337] = {
 ["link"] = "|cnIQ2:|Hitem:5337::::::::17:1484::11:::::::|h[Wayfaring Gloves]|h|r",
@@ -7975,11 +7956,11 @@ idAutomationDB = {
 ["icon"] = 133057,
 ["quality"] = 2,
 },
-[5068] = {
-["link"] = "|cnIQ1:|Hitem:5068::::::::20:1484::11:::::::|h[Dried Seeds]|h|r",
-["name"] = "Dried Seeds",
-["icon"] = 133849,
+[2287] = {
 ["quality"] = 1,
+["icon"] = 133974,
+["name"] = "Haunch of Meat",
+["link"] = "|cnIQ1:|Hitem:2287::::::::20:1484:::::::::|h[Haunch of Meat]|h|r",
 },
 [5118] = {
 ["link"] = "|cnIQ0:|Hitem:5118::::::::20:1484:::::::::|h[Large Flat Tooth]|h|r",
@@ -7999,11 +7980,11 @@ idAutomationDB = {
 ["icon"] = 132995,
 ["quality"] = 1,
 },
-[3299] = {
-["quality"] = 0,
-["icon"] = 133725,
-["name"] = "Fractured Canine",
-["link"] = "|cnIQ0:|Hitem:3299::::::::20:1484:::::::::|h[Fractured Canine]|h|r",
+[10327] = {
+["link"] = "|cnIQ1:|Hitem:10327::::::::19:1484::11:::::::|h[Horn of Echeyakee]|h|r",
+["name"] = "Horn of Echeyakee",
+["icon"] = 134227,
+["quality"] = 1,
 },
 [263306] = {
 ["link"] = "|cnIQ2:|Hitem:263306::::::::16:1484::11:::::::|h[Nightclaw Gloves]|h|r",

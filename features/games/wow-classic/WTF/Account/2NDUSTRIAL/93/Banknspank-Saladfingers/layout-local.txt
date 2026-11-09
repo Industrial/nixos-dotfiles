@@ -5,4 +5,11 @@ Anchor: RIGHT
 X: -339
 Y: 76
 W: 420
-H: 862
+H: 46
+Frame: BetterBagsBagBank
+FrameLevel: 1
+Anchor: CENTER
+X: -376
+Y: 81
+W: 200
+H: 200

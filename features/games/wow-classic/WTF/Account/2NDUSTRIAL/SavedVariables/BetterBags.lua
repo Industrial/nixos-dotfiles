@@ -48,7 +48,7 @@ BetterBagsDB = {
 },
 },
 ["ephemeralCategoryFilters"] = {
-["Low iLvl"] = {
+["|cff00ff00Mog - Tradable|r"] = {
 ["enabled"] = {
 true,
 true,
@@ -56,7 +56,18 @@ true,
 },
 ["itemList"] = {
 },
-["name"] = "Low iLvl",
+["name"] = "|cff00ff00Mog - Tradable|r",
+["priority"] = 9,
+},
+["|cff00ff00Mog - Learnable|r"] = {
+["enabled"] = {
+true,
+true,
+[0] = true,
+},
+["itemList"] = {
+},
+["name"] = "|cff00ff00Mog - Learnable|r",
 },
 ["Teleporters"] = {
 ["enabled"] = {
@@ -68,7 +79,7 @@ true,
 },
 ["name"] = "Teleporters",
 },
-["|cff00ff00Mog - Learnable|r"] = {
+["Low iLvl"] = {
 ["enabled"] = {
 true,
 true,
@@ -76,7 +87,7 @@ true,
 },
 ["itemList"] = {
 },
-["name"] = "|cff00ff00Mog - Learnable|r",
+["name"] = "Low iLvl",
 },
 ["Hearthstones"] = {
 ["enabled"] = {
@@ -107,22 +118,28 @@ true,
 ["groupCounter"] = {
 1,
 },
-["itemLevelColor"] = {
-["maxItemLevelByCharacter"] = {
-["Skelf-Classic Beta PvE 2"] = 10,
-["Banknspank-CAMWOW EU4 Realm 1 PvE"] = 22,
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = 31,
-},
-},
 ["positions"] = {
+{
+["y"] = 81.20281982421875,
+["x"] = -400.940185546875,
+["point"] = "CENTER",
+["scale"] = 1,
+},
 [0] = {
-["y"] = 148.1954803466797,
-["x"] = 923.48095703125,
-["point"] = "LEFT",
+["y"] = 179.8610076904297,
+["x"] = 748.761474609375,
+["point"] = "BOTTOM",
 ["scale"] = 1,
 },
 },
 ["showBagButton"] = false,
+["itemLevelColor"] = {
+["maxItemLevelByCharacter"] = {
+["Skelf-Classic Beta PvE 2"] = 10,
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = 26,
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = 35,
+},
+},
 ["__bankDefaultTabsFixed"] = true,
 ["firstTimeMenu"] = false,
 ["__groupsScopedByKind"] = true,
