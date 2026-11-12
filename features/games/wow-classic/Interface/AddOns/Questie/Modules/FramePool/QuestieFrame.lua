@@ -27,7 +27,8 @@ local QuestieCombatQueue = QuestieLoader:ImportModule("QuestieCombatQueue")
 ---@type l10n
 local l10n = QuestieLoader:ImportModule("l10n")
 
-local HBDPins = LibStub("HereBeDragonsQuestie-Pins-2.0")
+---@type HBDPins
+local HBDPins = QuestieLoader:ImportModule("HBDPins")
 
 ---@class IconData
 ---@field Id QuestId
@@ -164,7 +165,10 @@ function QuestieFrame.ResetHoverHighlights(self)
         for i = #self.data.touchedPins, 1, -1 do
             local entry = self.data.touchedPins[i]
             local icon = entry.icon;
-            icon.texture:SetVertexColor(unpack(entry.color));
+            -- A pin unloaded or recycled since was tinted for someone else: its color is not ours to restore
+            if icon.data == entry.data then
+                icon.texture:SetVertexColor(unpack(entry.color));
+            end
         end
         self.data.touchedPins = nil;
     end
@@ -346,7 +350,7 @@ function _QuestieFrame.UpdateTexture(self, texture)
         self:SetSize(16, 16)
     end
 
-    -- Party member objectives (quests the local player does not have) are dimmed so they are
+    -- Party member objectives (ones the local player does not need) are dimmed so they are
     -- visually distinct from the player's own quest icons. Frame alpha composes with the
     -- texture/minimap fade alpha. Runs on every draw, so recycled frames reset to 1.
     if self.data.ObjectiveData and self.data.ObjectiveData.IsPartyObjective then

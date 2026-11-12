@@ -1021,6 +1021,9 @@ function QuestieTracker:UpdateFormatting()
         local objectiveMarginLeft = margins.objective
         local questItemButtonSize = margins.itemButtonSize
 
+        -- Called without a new draw too, e.g. by the width ratio slider. The widths requested while drawing must not
+        -- hold back resizing to the new width, or wrapped lines are sized for the old one.
+        TrackerLayout.ResetRequestedWidth()
         TrackerLinePool.UpdateObjectiveLines(function(line)
             if line.questHasSecondaryQIB then
                 -- The objective line belongs to a quest with two quest items, so we need to add extra padding to account for the second QIB
@@ -1120,19 +1123,6 @@ function QuestieTracker:UpdateHeight()
 
         local firstLineTop = firstLine:GetTop()
         local currentLineBottom = currentLine:GetBottom()
-
-        -- LOCAL PATCH: GetTop()/GetBottom() answer NIL for a frame the client
-        -- has not laid out yet -- a hidden parent, or a measurement taken
-        -- before the first layout pass. Reported live as
-        -- "attempt to perform arithmetic on local 'firstLineTop' (a nil
-        -- value)", 23 times, reached through QuestieCombatQueue -- i.e. a
-        -- queued update running while the tracker was not on screen.
-        --
-        -- There is nothing to measure in that state, so this pass is skipped
-        -- rather than inventing a height. The next Update() re-measures.
-        if not firstLineTop or not currentLineBottom then
-            return
-        end
 
         if currentLine.mode == "zone" then
             -- If a single zone is the only line in the tracker then don't add pixel padding

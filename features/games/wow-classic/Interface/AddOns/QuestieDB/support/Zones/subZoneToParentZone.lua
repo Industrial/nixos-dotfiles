@@ -332,6 +332,7 @@ ZoneDB.private.subZoneToParentZone = [[return {
   [288] = 267, -- Azurelode Mine -> Hillsbrad Foothills
   [289] = 267, -- Nethander Stead -> Hillsbrad Foothills
   [290] = 267, -- Dun Garok -> Hillsbrad Foothills
+  [293] = 267, -- Thoradin's Wall -> Hillsbrad Foothills
   [294] = 267, -- Eastern Strand -> Hillsbrad Foothills
   [295] = 267, -- Western Strand -> Hillsbrad Foothills
   [297] = 33, -- Jaguero Isle -> Stranglethorn Vale

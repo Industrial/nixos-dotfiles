@@ -21,6 +21,8 @@ local QuestieTracker = QuestieLoader:ImportModule("QuestieTracker")
 local QuestieDBMIntegration = QuestieLoader:ImportModule("QuestieDBMIntegration")
 ---@type QuestieMap
 local QuestieMap = QuestieLoader:ImportModule("QuestieMap")
+---@type QuestiePartyObjectives
+local QuestiePartyObjectives = QuestieLoader:ImportModule("QuestiePartyObjectives")
 ---@type QuestieFramePool
 local QuestieFramePool = QuestieLoader:ImportModule("QuestieFramePool")
 ---@type QuestieLib
@@ -75,7 +77,8 @@ local function _HasEnded(acceptance)
     return acceptance ~= nil and (not ActiveQuests.IsCurrent(acceptance))
 end
 
-local HBD = LibStub("HereBeDragonsQuestie-2.0")
+---@type HBD
+local HBD = QuestieLoader:ImportModule("HBD")
 
 -- this variable defines how many operations to run (batched at a time) before yielding for a frame.
 -- 1 would mean yielding every operation (so lower = slower but less lag)
@@ -197,12 +200,27 @@ function QuestieQuest:ShowQuestIcons()
     end
 end
 
+-- Manual notes follow map visibility without quest-specific filters.
+---@param icon IconFrame
+---@return boolean
+local function _ShouldShowManualIcon(icon)
+    local profile = Questie.db.profile
+    if (not profile.enabled) then
+        return false
+    end
+
+    if icon.miniMapIcon then
+        return profile.enableMiniMapIcons
+    end
+    return profile.enableMapIcons
+end
+
 function _QuestieQuest:ShowManualIcons()
     for _, townsfolk in pairs(QuestieMap.manualFrames) do
         for _, frameList in pairs(townsfolk) do
             for _, frameName in pairs(frameList) do
                 local icon = _G[frameName];
-                if icon ~= nil and icon.hidden then
+                if icon ~= nil and icon.hidden and _ShouldShowManualIcon(icon) then
                     icon:FakeShow()
                 end
             end
@@ -242,7 +260,7 @@ function _QuestieQuest:HideManualIcons()
         for _, frameList in pairs(townsfolk) do
             for _, frameName in pairs(frameList) do
                 local icon = _G[frameName];
-                if icon ~= nil and (not icon.hidden) then
+                if icon ~= nil and (not icon.hidden) and (not _ShouldShowManualIcon(icon)) then
                     icon:FakeHide()
                 end
             end
@@ -454,6 +472,9 @@ function QuestieQuest:SmoothReset()
             if QuestieQuest._resetAgain then
                 QuestieQuest._resetAgain = nil
                 QuestieQuest:SmoothReset()
+            else
+                -- The reset unloaded the icons of the party members' objectives too
+                QuestiePartyObjectives:ScheduleUpdate()
             end
             return true
         end

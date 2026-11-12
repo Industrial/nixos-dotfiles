@@ -125,6 +125,7 @@ ZoneDB.private.subZoneToParentZoneOverride = [[return {
     [10116] = 3457, -- Karazhan - Medivh's Chambers (Dungeon/Raid)
     [10117] = 3457, -- Karazhan - The Power Station (Dungeon/Raid)
     [10118] = 3457, -- Karazhan - Netherspace (Dungeon/Raid)
+    [16169] = 331, -- Ashenvale (SoD map ID) - Ashenvale
 }]]
 
 --! Generated table, add something manually here and i'll kill you //Logon
@@ -332,6 +333,7 @@ ZoneDB.private.subZoneToParentZone = [[return {
   [288] = 267, -- Azurelode Mine -> Hillsbrad Foothills
   [289] = 267, -- Nethander Stead -> Hillsbrad Foothills
   [290] = 267, -- Dun Garok -> Hillsbrad Foothills
+  [293] = 267, -- Thoradin's Wall -> Hillsbrad Foothills
   [294] = 267, -- Eastern Strand -> Hillsbrad Foothills
   [295] = 267, -- Western Strand -> Hillsbrad Foothills
   [297] = 33, -- Jaguero Isle -> Stranglethorn Vale

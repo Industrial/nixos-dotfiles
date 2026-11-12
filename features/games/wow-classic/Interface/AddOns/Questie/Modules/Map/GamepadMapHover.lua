@@ -7,9 +7,11 @@ local MapIconTooltip = QuestieLoader:ImportModule("MapIconTooltip")
 ---@type QuestieFrame
 local QuestieFrame = QuestieLoader:ImportModule("QuestieFrame")
 
+---@type HBDPins
+local HBDPins = QuestieLoader:ImportModule("HBDPins")
+
 -- Blizzard's gamepad cursor can't see Questie pins (see HBDHooks), so we find the hovered icon ourselves.
 
-local PIN_TEMPLATE = "HereBeDragonsPinsTemplateQuestie"
 local UPDATE_INTERVAL = 0.05
 local MAX_DISTANCE_SQUARED = 12 * 12 -- same range as Blizzard's gamepad cursor
 
@@ -29,6 +31,22 @@ end
 ---@return IconFrame?
 function GamepadMapHover.GetHoveredIcon()
     return hoveredIcon
+end
+
+---Rebuilds the tooltip of the hovered icon if the quest is the icon's or listed on the tooltip. A tooltip is only
+---built when an icon is entered, so it would not show changed progress of the quest while the icon stays.
+---@param questId QuestId
+function GamepadMapHover.RefreshQuest(questId)
+    local questOrder = _GamepadMapHover.tooltip and _GamepadMapHover.tooltip.questOrder
+    if hoveredIcon and hoveredData and (hoveredData.Id == questId or (questOrder and questOrder[questId])) then
+        local icon, data = hoveredIcon, hoveredData
+        _GamepadMapHover.Leave()
+        -- Only enter the icon if the next Update would find it again: icons are pooled, and the cursor, the map and
+        -- the tooltip setting can change between two updates
+        if icon.data == data and _GamepadMapHover.IsActive() and _GamepadMapHover.FindIconUnderCursor() == icon then
+            _GamepadMapHover.Enter(icon)
+        end
+    end
 end
 
 function _GamepadMapHover.OnUpdate(_, elapsed)
@@ -76,7 +94,7 @@ function _GamepadMapHover.FindIconUnderCursor()
     local cursorX, cursorY = WorldMapFrame.ScrollContainer:GetGamepadCursorPosition()
 
     local closestIcon, closestDistance
-    for pin in WorldMapFrame:EnumeratePinsByTemplate(PIN_TEMPLATE) do
+    for pin in WorldMapFrame:EnumeratePinsByTemplate(HBDPins.worldmapPinTemplate) do
         local icon = pin.icon
         if _IsIconVisible(icon) then
             -- pin.GetCenter is overridden by HBDHooks

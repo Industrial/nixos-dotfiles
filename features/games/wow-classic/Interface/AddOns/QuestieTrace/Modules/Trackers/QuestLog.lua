@@ -84,9 +84,6 @@ local prevTimedQuestIds -- Timed quest IDs from the previous derived timer sampl
 ---@type table<number, number>
 local prevRewardCounts -- Highest reward index previously captured for each active quest.
 
----@type table<string, FunctionStreamEntry[]>?
-local questAcceptLevelStream -- functions["QuestAcceptLevel"] shortcut
-
 ---------------------------------------------------------------------------
 -- API helpers (logic preserved from existing implementation)
 ---------------------------------------------------------------------------
@@ -816,8 +813,6 @@ Core.RegisterTracker({
   Init = function(capture)
     functions = capture.session.functions
     functions["QuestLog"] = {}
-    functions["QuestAcceptLevel"] = {}
-    questAcceptLevelStream = functions["QuestAcceptLevel"]
     prevQuestLog = nil
     prevFlat = {}
     prevQuest = {}
@@ -839,28 +834,7 @@ Core.RegisterTracker({
   end,
 
   ---@param capture CaptureState
-  ---@param event string
-  ---@param ... any
-  OnEvent = function(capture, event, ...)
-    if event == "QUEST_ACCEPTED" then
-      local first, second = ...
-      local questId = second
-      if not questId and first then
-        questId = GetQuestIdAtLogIndex(first)
-      end
-      if questAcceptLevelStream and type(questId) == "number" and questId > 0 then
-        local t = GetTime() - capture.startedAt
-        local tp = GetTimePreciseSec() - capture.startedAtPrecise
-        local level = UnitLevel("player")
-        local stream = questAcceptLevelStream[questId]
-        if not stream then
-          stream = {}
-          questAcceptLevelStream[questId] = stream
-        end
-        stream[#stream + 1] = { t = t, tp = tp, v = level }
-      end
-    end
-
+  OnEvent = function(capture)
     RequestSample(capture)
   end,
 })

@@ -13,7 +13,7 @@
 ## Notes-koKR: Questie 데이터베이스
 ## Notes-zhCN: Questie 数据库
 ## Notes-zhTW: Questie 資料庫
-## Version: 1.0.12
+## Version: 1.0.16
 ## Category: Quests
 ## Category-deDE: Quests
 ## Category-esES: Misiones
@@ -29,7 +29,7 @@
 ## X-Contract-Version: 4
 ## X-Flavor: Mists
 ## X-Mode: baked
-## X-BUILD-COMMIT: 4d31c10394b11bd133069ecf1662062cdf4d8691
+## X-BUILD-COMMIT: a444a6418113ae0fce5d30c897674132e756ba1d
 ## X-BUILD-TIME: 2023-11-14T22:13:20Z
 
 src\config.lua
@@ -91,7 +91,6 @@ src\corrections\MoP\mopObjectFixes.lua
 src\corrections\manifest.lua
 src\corrections\_end.lua
 src\l10n\overlay.lua
-src\l10n\Titan\zhCN.lua
 src\ui\modeIndicator.lua
 src\api.lua
 src\support\eraToForever.lua
@@ -2071,8 +2070,7 @@ src\support\eraToForever.lua
 ## X-Quest-410-3: gvaBGQYV
 ## X-Quest-410-10: oQOBgxkMCPYA
 ## X-Quest-410-13: gRkBbg==
-## X-Quest-410-16: gRkBmw==
-## X-Quest-410-S: qQFRVGhlIERvcm1hbnQgU2hhZGUEBQUKBhoCAAOyERhVFxlACBgYARgZGQGZQXAZkgQ=
+## X-Quest-410-S: qQFRVGhlIERvcm1hbnQgU2hhZGUEBQUKBhoCAAOyERhVFxlACBgYARgZGQGZQXAZEgQ=
 ## X-Quest-411-3: gYEZBdo=
 ## X-Quest-411-8: gVg5QnJpbmcgdGhlIE5ldGhlciBHZW0gdG8gQmV0aG9yIEljZXNoYXJkIGluIHRoZSBVbmRlcmNpdHku
 ## X-Quest-411-13: gRkBmQ==
@@ -2186,8 +2184,7 @@ src\support\eraToForever.lua
 ## X-Quest-430-S: qAFPUmV0dXJuIHRvIFF1aW5uBAoFCwsZDF0RGIIWGQGpFxlAAEFwGgIAEIQ=
 ## X-Quest-431-3: gvaBGQYy
 ## X-Quest-431-13: gRkBbg==
-## X-Quest-431-16: gRkBmw==
-## X-Quest-431-S: qQFUQ2FuZGxlcyBvZiBCZWNrb25pbmcEBQUKBhoCAAOyERhVFxlACBgYARgZGQGZQXAZkAQ=
+## X-Quest-431-S: qQFUQ2FuZGxlcyBvZiBCZWNrb25pbmcEBQUKBhoCAAOyERhVFxlACBgYARgZGQGZQXAZEAQ=
 ## X-Quest-432-2: gYEZBOY=
 ## X-Quest-432-3: gYEZBOY=
 ## X-Quest-432-8: gVhdS2lsbCA4IFJvY2tqYXcgU2t1bGx0aHVtcGVycyBhbmQgOCBSb2NramF3IEJvbmVzbmFwcGVycyBpbiB0aGUgR29sJ0JvbGFyIFF1YXJyeSBhbmQgaXRzIG1pbmUu

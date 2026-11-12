@@ -5,7 +5,8 @@ local _HBDHooks = {}
 ---@type QuestieMap
 local QuestieMap = QuestieLoader:ImportModule("QuestieMap");
 
-local HBDPins = LibStub("HereBeDragonsQuestie-Pins-2.0")
+---@type HBDPins
+local HBDPins = QuestieLoader:ImportModule("HBDPins")
 
 
 function HBDHooks:Init()
@@ -31,7 +32,7 @@ function HBDHooks.HideWorldMapPinsFromGamepadCursor()
     -- New pins copy their fields from this mixin
     HBDPins.worldmapProviderPin.GetCenter = _ReturnNoCenter
 
-    for pin in HBDPins.worldmapProvider:GetMap():EnumeratePinsByTemplate("HereBeDragonsPinsTemplateQuestie") do
+    for pin in HBDPins.worldmapProvider:GetMap():EnumeratePinsByTemplate(HBDPins.worldmapPinTemplate) do
         pin.GetCenter = _ReturnNoCenter
     end
 end
@@ -41,7 +42,7 @@ function _HBDHooks:OnMapChanged()
     _HBDHooks.ORG_OnMapChanged(HBDPins.worldmapProvider)
 
     local mapScale = QuestieMap.GetScaleValue()
-    for pin in HBDPins.worldmapProvider:GetMap():EnumeratePinsByTemplate("HereBeDragonsPinsTemplateQuestie") do
+    for pin in HBDPins.worldmapProvider:GetMap():EnumeratePinsByTemplate(HBDPins.worldmapPinTemplate) do
         QuestieMap.utils.RescaleIcon(pin.icon, mapScale)
     end
 end

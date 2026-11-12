@@ -153,7 +153,7 @@ end
 ---@param showLevel number @ Whether the quest level should be included
 ---@param showState boolean @ Whether to show (Complete/Failed)
 function QuestieLib:GetColoredQuestName(questId, showLevel, showState)
-    local name = QuestieDB.QueryQuestSingle(questId, "name")
+    local name = QuestieDB.QueryQuestSingle(questId, "name") or ("[Missing name: " .. tostring(questId) .. "]")
     local level, _ = QuestieLib.GetEffectiveQuestLevel(questId);
 
     if showLevel then
@@ -173,7 +173,7 @@ function QuestieLib:GetColoredQuestName(questId, showLevel, showState)
             name = name .. " " .. Questie:Colorize(l10n("(") .. l10n("Complete") .. l10n(")"), "green")
 
             -- Quests treated as complete - zero objectives or synthetic objectives
-        elseif isComplete == 0 and QuestieDB.GetQuest(questId).isComplete == true then
+        elseif isComplete == 0 and (QuestieDB.GetQuest(questId) or {}).isComplete == true then
             name = name .. " " .. Questie:Colorize(l10n("(") .. l10n("Complete") .. l10n(")"), "green")
         end
     end

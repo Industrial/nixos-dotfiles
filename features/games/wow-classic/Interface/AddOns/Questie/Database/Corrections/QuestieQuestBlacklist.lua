@@ -4084,9 +4084,9 @@ function QuestieQuestBlacklist:Load()
         [5666] = Expansions.Current >= Expansions.Cata, -- Removed with cata
         [5667] = Expansions.Current >= Expansions.Cata, -- Removed with cata
         [5668] = Expansions.Current >= Expansions.Cata, -- Removed with cata
-        [5669] = Expansions.Current >= Expansions.Cata, -- Removed with cata
-        [5670] = Expansions.Current >= Expansions.Cata, -- Removed with cata
-        [5671] = Expansions.Current >= Expansions.Cata, -- Removed with cata
+        [5669] = true, -- Not in the game
+        [5670] = true, -- Not in the game
+        [5671] = true, -- Not in the game
         [5672] = Expansions.Current >= Expansions.Wotlk, -- Removed with Wotlk
         [5673] = Expansions.Current >= Expansions.Wotlk, -- Removed with Wotlk
         [5674] = Expansions.Current >= Expansions.Wotlk, -- Removed with Wotlk
@@ -4101,8 +4101,8 @@ function QuestieQuestBlacklist:Load()
         [5683] = Expansions.Current >= Expansions.Cata, -- Removed with cata
         [5684] = Expansions.Current >= Expansions.Cata, -- Removed with cata
         [5685] = Expansions.Current >= Expansions.Cata, -- Removed with cata
-        [5686] = Expansions.Current >= Expansions.Cata, -- Removed with cata
-        [5687] = Expansions.Current >= Expansions.Cata, -- Removed with cata
+        [5686] = true, -- Not in the game
+        [5687] = true, -- Not in the game
         [5688] = Expansions.Current >= Expansions.Cata, -- Removed with cata
         [5689] = Expansions.Current >= Expansions.Cata, -- Removed with cata
         [5690] = Expansions.Current >= Expansions.Cata, -- Removed with cata
@@ -7049,8 +7049,12 @@ function QuestieQuestBlacklist:Load()
 
         --- Forever quests
         [60860] = true, -- This is a promotion quest that is only available in Asia
+        [60870] = true, -- This is a promotion quest that is only available in Asia
         [78124] = HIDE_ON_MAP, -- Nar'thalas Almanac
         [78127] = HIDE_ON_MAP, -- The Dalaran Digest
+        [78132] = not Questie.IsSoD, -- Dragonslayer's Helm
+        [78133] = not Questie.IsSoD, -- Dragonslayer's Shield
+        [78134] = not Questie.IsSoD, -- Dragonslayer's Lance
         [78142] = HIDE_ON_MAP, -- Bewitchments and Glamours
         [78143] = HIDE_ON_MAP, -- Secrets of the Dreamers
         [78145] = HIDE_ON_MAP, -- Arcanic Systems Manual
@@ -7058,6 +7062,7 @@ function QuestieQuestBlacklist:Load()
         [78147] = HIDE_ON_MAP, -- Crimes Against Anatomy
         [78148] = HIDE_ON_MAP, -- Runes of the Sorcerer-Kings
         [78149] = HIDE_ON_MAP, -- Fury of the Land
+        [79090] = not Questie.IsSoD, -- Repelling Invaders
         [79091] = HIDE_ON_MAP, -- Archmage Antonidas: The Unabridged Autobiography
         [79092] = HIDE_ON_MAP, -- Archmage Theocritus' Research Journal
         [79093] = HIDE_ON_MAP, -- Rumi of Gnomeregan: The Collected Works
@@ -7065,6 +7070,7 @@ function QuestieQuestBlacklist:Load()
         [79095] = HIDE_ON_MAP, -- The Apothecary's Metaphysical Primer
         [79096] = HIDE_ON_MAP, -- Ataeric: On Arcane Curiosities
         [79097] = HIDE_ON_MAP, -- Baxtan: On Destructive Magics
+        [79098] = not Questie.IsSoD, -- Clear the Forest!
         [79535] = HIDE_ON_MAP, -- Basilisks: Should Petrification be Feared?
         [79947] = HIDE_ON_MAP, -- Geomancy: The Stone-Cold Truth
         [79948] = HIDE_ON_MAP, -- Defensive Magics 101
@@ -7072,7 +7078,25 @@ function QuestieQuestBlacklist:Load()
         [79950] = HIDE_ON_MAP, -- Demons and You
         [79951] = HIDE_ON_MAP, -- Mummies: A Guide to the Unsavory Undead
         [79952] = HIDE_ON_MAP, -- RwlRwlRwlRwl!
-        [79953] = HIDE_ON_MAP, -- A Ludite's Guide to Caring for Your Demonic Pet
+        [79953] = HIDE_ON_MAP, -- A Ludite's Guide to Caring for Your Demonic Pet        
+        [81730] = not Questie.IsSoD, -- Duskwood Mission I: Defeat Worgen
+        [81731] = not Questie.IsSoD, -- Duskwood Mission II: Defeat Ogres
+        [81732] = not Questie.IsSoD, -- Duskwood Mission III: Defeat Dragonkin
+        [81733] = not Questie.IsSoD, -- Duskwood Mission IV: Ogre Intelligence
+        [81734] = not Questie.IsSoD, -- Duskwood Mission V: Worgen Intelligence
+        [81735] = not Questie.IsSoD, -- Duskwood Mission VI: Dragon Intelligence
+        [81736] = not Questie.IsSoD, -- Duskwood Mission VII: Recover Shadowscythe
+        [81737] = not Questie.IsSoD, -- Duskwood Mission VIII: Recover Ogre Magi text
+        [81738] = not Questie.IsSoD, -- Duskwood Mission IX: Recover Dragon Egg
+        [81739] = not Questie.IsSoD, -- Duskwood Mission X: Nightmare Moss
+        [81740] = not Questie.IsSoD, -- Duskwood Mission XI: Cold Iron Ore
+        [81741] = not Questie.IsSoD, -- Duskwood Mission XII: Dream-Touched Dragonscale
+        [81742] = not Questie.IsSoD, -- Duskwood Mission XIII: Defeat Ylanthrius
+        [81743] = not Questie.IsSoD, -- Duskwood Mission XIV: Defeat Vvarc'zul
+        [81744] = not Questie.IsSoD, -- Duskwood Mission XV: Defeat Amokarok
+        [81745] = not Questie.IsSoD, -- Duskwood Mission XVI: Rescue Kroll Mountainshade
+        [81746] = not Questie.IsSoD, -- Duskwood Mission XVII: Rescue Alara Grovemender
+        [81747] = not Questie.IsSoD, -- Duskwood Mission XVIII: Rescue Elenora Marshwalker
         [81947] = HIDE_ON_MAP, -- Sanguine Sorcery
         [81949] = HIDE_ON_MAP, -- Legends of the Tidesages
         [81951] = HIDE_ON_MAP, -- The Liminal and the Arcane
@@ -7093,11 +7117,18 @@ function QuestieQuestBlacklist:Load()
         [91899] = HIDE_ON_MAP, -- A Sealed Crate
         [91900] = HIDE_ON_MAP, -- A Sealed Crate
         [91901] = HIDE_ON_MAP, -- A Sealed Crate
+        [91902] = HIDE_ON_MAP, -- A Sealed Crate
         [91904] = HIDE_ON_MAP, -- A Sealed Crate
         [91905] = HIDE_ON_MAP, -- A Sealed Crate
         [91906] = HIDE_ON_MAP, -- A Sealed Crate
+        [91907] = HIDE_ON_MAP, -- A Sealed Crate
 
         [93928] = true, -- Of Mice and Milk
+
+        [96339] = HIDE_ON_MAP, -- Legacy Reward: Replica Ironforge Air Rifle -- todo fix
+        [96383] = HIDE_ON_MAP, -- Legacy Reward: Spectral Bear Cub -- todo fix
+
+        [99267] = true, -- An Unfortunate End
     }
 
     if Questie.IsSoD then

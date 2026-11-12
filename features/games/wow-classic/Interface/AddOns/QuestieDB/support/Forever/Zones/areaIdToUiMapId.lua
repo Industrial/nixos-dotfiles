@@ -290,6 +290,7 @@ ZoneDB.private.areaIdToUiMapId = [[return {
     [288] = 1424, -- Azurelode Mine -> Hillsbrad Foothills
     [289] = 1424, -- Nethander Stead -> Hillsbrad Foothills
     [290] = 1424, -- Dun Garok -> Hillsbrad Foothills
+    [293] = 1424, -- Thoradin's Wall -> Hillsbrad Foothills
     [294] = 1424, -- Eastern Strand -> Hillsbrad Foothills
     [295] = 1424, -- Western Strand -> Hillsbrad Foothills
     [297] = 1434, -- Jaguero Isle -> Stranglethorn Vale

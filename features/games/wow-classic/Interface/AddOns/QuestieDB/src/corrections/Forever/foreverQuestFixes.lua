@@ -12,9 +12,9 @@ local QuestieCorrections = QuestieLoader:ImportModule("QuestieCorrections")
 ---@type l10n
 local l10n = QuestieLoader:ImportModule("l10n")
 
-QuestieCorrections.itemObjectiveFirst[91317] = true
 QuestieCorrections.itemObjectiveFirst[92682] = true
 QuestieCorrections.killCreditObjectiveFirst[94489] = true
+QuestieCorrections.objectObjectiveFirst[95885] = true
 QuestieCorrections.itemObjectiveFirst[97277] = true
 QuestieCorrections.itemObjectiveFirst[97485] = true
 QuestieCorrections.killCreditObjectiveFirst[98386] = true

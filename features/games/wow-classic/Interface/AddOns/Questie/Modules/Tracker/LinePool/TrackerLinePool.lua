@@ -17,6 +17,8 @@ local TrackerLayout = QuestieLoader:ImportModule("TrackerLayout")
 local QuestieLib = QuestieLoader:ImportModule("QuestieLib")
 ---@type TrackerData
 local TrackerData = QuestieLoader:ImportModule("TrackerData")
+---@type TrackerQuestTooltip
+local TrackerQuestTooltip = QuestieLoader:ImportModule("TrackerQuestTooltip")
 
 local coYield = coroutine.yield
 
@@ -79,12 +81,14 @@ function TrackerLinePool.ResetLinesForChange()
         return
     end
 
+    TrackerQuestTooltip.Hide()
     linesByQuest = {} -- Reset to keep correct questId <-> line mapping
 
     for _, line in pairs(linePool) do
         line.mode = nil
         line.Recipe = nil
         line.trackTimedQuest = nil
+        line.label.activeTimer = nil
         line.questHasSecondaryQIB = false
         if line.expandQuest then
             line.expandQuest.mode = nil
@@ -243,6 +247,7 @@ function TrackerLinePool.HideUnusedLines()
             line.altButton = nil
             line.questHasSecondaryQIB = false
             line.trackTimedQuest = nil
+            line.label.activeTimer = nil
             line.expandQuest.mode = nil
             line.expandQuest.questId = nil
             line.expandZone.mode = nil
@@ -359,6 +364,7 @@ end
 ---Lines are reused for other quests on a redraw, so the highlight must follow the line now under the mouse.
 function TrackerLinePool.RefreshHighlight()
     TrackerLinePool.OnHighlightLeave()
+    TrackerQuestTooltip.Hide()
 
     local highestIndex = TrackerLinePool.GetHighestIndex()
     for i = 1, highestIndex do
@@ -371,6 +377,9 @@ function TrackerLinePool.RefreshHighlight()
                 TrackerLinePool.OnHighlightEnter(expandZone)
             else
                 TrackerLinePool.OnHighlightEnter(line)
+            end
+            if not _IsButtonHovered(line) then
+                TrackerQuestTooltip.Show(line)
             end
             return
         end

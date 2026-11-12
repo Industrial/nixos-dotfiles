@@ -453,6 +453,8 @@ constants.zoneIDs = {
   THE_BURNING_OF_ANDORHAL = 15828,
   STARFALL_BARROW_DEN = 15938, -- AreaTable name: Starfall Village; instance MapID 2817.
   KARAZHAN_CRYPTS = 16074,
+  DEADWIND_PASS_SOD = 16114, -- Separate area on instance MapID 2853, not area 41.
+  ASHENVALE_INSTANCE = 16169, -- AreaTable name: Ashenvale; instance MapID 2832 (Nightmare Grove), not area 331.
   SCARLET_ENCLAVE = 16236,
   SCARLET_ENCLAVE_PRISON = 16369,
   SCARLET_ENCLAVE_TYRS_HAND = 16370,
@@ -461,6 +463,7 @@ constants.zoneIDs = {
   SCARLET_ENCLAVE_MINE = 16373,
   SCARLET_ENCLAVE_ARCANE_SANCTUM = 16374,
   THE_SCARAB_DAIS = 16295,
+  NEW_AVALON_SOD = 16335, -- Eastern Plaguelands subarea; not area 4343 or Scarlet Enclave 16371.
   NAXXRAMAS_SOD = 16394, -- Separate area on instance MapID 2921, not area 3456.
 
   -- Forever additions: AreaTable 1.60.1.70291 compared with Era 1.15.9.70003.
