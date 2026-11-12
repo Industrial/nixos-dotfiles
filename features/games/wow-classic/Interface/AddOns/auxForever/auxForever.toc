@@ -1,0 +1,63 @@
+## Interface: 16001
+## Author: shirsig
+## Title: auxForever
+## Version: forever-0.8.2
+## Notes: aux by shirsig, re-imagined by a fan
+## SavedVariables: aux
+
+libs\package.lua
+compat.lua
+
+aux-addon.lua
+util.lua
+control.lua
+color.lua
+gui\core.lua
+frame.lua
+util\persistence.lua
+util\sort.lua
+util\money.lua
+core\cache.lua
+util\info.lua
+core\history.lua
+core\api.lua
+core\disenchant.lua
+util\filter.lua
+util\completion.lua
+core\slash.lua
+core\scan.lua
+util\scan.lua
+core\tooltip.lua
+core\shortcut.lua
+
+gui\listing.lua
+gui\auction_listing.lua
+gui\item_listing.lua
+gui\buy_bar.lua
+
+tabs\search\core.lua
+tabs\search\results.lua
+tabs\search\saved.lua
+tabs\search\filter.lua
+tabs\search\frame.lua
+tabs\search\quick.lua
+tabs\search\builder.lua
+tabs\search\recipe.lua
+tabs\search\crate.lua
+
+tabs\sniper\core.lua
+tabs\sniper\frame.lua
+
+tabs\post\core.lua
+tabs\post\frame.lua
+
+tabs\auctions\core.lua
+tabs\auctions\frame.lua
+
+tabs\bids\core.lua
+tabs\bids\frame.lua
+
+gamepad.lua
+
+
+
