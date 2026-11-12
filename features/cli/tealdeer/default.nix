@@ -35,12 +35,14 @@
   ...
 }: let
   # tldr-pages cuts a release roughly once a year. Bumping this means bumping `hash` too:
-  # `nix store prefetch-file --json <url> | jq -r .hash`.
+  # `nix store prefetch-file --json <url> | jq -r .hash`. The hash can also drift *without* a
+  # tag bump: upstream rebuilds the release asset in place, so a fixed-output mismatch on an
+  # unchanged `pagesRelease` is that, not a corrupted download — re-prefetch and repin.
   pagesRelease = "v2.3";
 
   pagesArchive = pkgs.fetchurl {
     url = "https://github.com/tldr-pages/tldr/releases/download/${pagesRelease}/tldr-pages.en.zip";
-    hash = "sha256-A/sif0Ra64MLbHEj15rMF2dJa1CKMGjkYSzVFjeqK9o=";
+    hash = "sha256-2mWWVuxb3/VLYxlpLk+bY5EpQJDZgUkyhptMkse2Vlc=";
   };
 
   # tealdeer resolves a page at `<cache_dir>/tldr-pages/pages.<lang>/<platform>/<cmd>.md`:
