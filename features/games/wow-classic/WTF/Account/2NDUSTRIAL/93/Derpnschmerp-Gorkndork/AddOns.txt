@@ -1,4 +1,4 @@
-Auctionator: enabled
+Auctionator: disabled
 Bartender4: enabled
 BetterBags: enabled
 BetterBags-Appearances: disabled
@@ -57,3 +57,13 @@ Blizzard_CompactRaidFrames: enabled
 !Swatter: disabled
 !ImprovedErrorFrame: disabled
 OPie_Classic: disabled
+Auc-Advanced: disabled
+Auc-Filter-Basic: disabled
+Auc-ScanData: disabled
+Auc-Stat-Histogram: disabled
+Auc-Stat-iLevel: disabled
+Auc-Stat-Purchased: disabled
+Auc-Stat-Simple: disabled
+Auc-Stat-StdDev: disabled
+Auc-Util-FixAH: disabled
+BeanCounter: disabled

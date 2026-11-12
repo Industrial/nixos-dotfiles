@@ -1,4 +1,4 @@
-Auctionator: enabled
+Auctionator: disabled
 Bartender4: enabled
 BetterBags: enabled
 BetterBags-Appearances: enabled
@@ -46,7 +46,7 @@ ShadowedUF_SmoothBars: enabled
 ShadowedUnitFrames: enabled
 StatLogic: enabled
 TomTom: enabled
-TradeSkillMaster: enabled
+TradeSkillMaster: disabled
 WoWPro: enabled
 WoWPro_Achievements: enabled
 WoWPro_Dailies: disabled
@@ -58,3 +58,14 @@ Blizzard_CompactRaidFrames: enabled
 !Swatter: disabled
 !ImprovedErrorFrame: disabled
 OPie_Classic: disabled
+AuctionMaster: disabled
+Auc-Advanced: disabled
+Auc-Filter-Basic: enabled
+Auc-ScanData: enabled
+Auc-Stat-Histogram: enabled
+Auc-Stat-iLevel: enabled
+Auc-Stat-Purchased: enabled
+Auc-Stat-Simple: enabled
+Auc-Util-FixAH: enabled
+Auc-Stat-StdDev: enabled
+BeanCounter: enabled

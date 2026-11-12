@@ -19,12 +19,14 @@ VER 3 0000000000000002 "SP" "136006"
 /click idAutomationPrepareButton
 END
 VER 3 0000000000000005 "Upkeep Buffs" "INV_MISC_QUESTIONMARK"
-#showtooltip Frost Armor
+#showtooltip
 /click idAutomationUpkeepBuffsButton
 END
 VER 3 0000000000000006 "Upkeep Health" "INV_MISC_QUESTIONMARK"
-#showtooltip
+#showtooltip [combat] item:1710; item:1707
+/use [combat] Greater Healing Potion; Stormwind Brie
 END
 VER 3 0000000000000007 "Upkeep Mana" "INV_MISC_QUESTIONMARK"
-#showtooltip
+#showtooltip [combat] item:3385; item:1708
+/use [combat] Lesser Mana Potion; Sweet Nectar
 END

@@ -9,7 +9,14 @@ H: 46
 Frame: BetterBagsBagBank
 FrameLevel: 1
 Anchor: CENTER
-X: -376
+X: -374
 Y: 81
 W: 200
 H: 200
+Frame: BetterBagsBagBackpack
+FrameLevel: 500
+Anchor: CENTER
+X: -600
+Y: 167
+W: 300
+H: 213

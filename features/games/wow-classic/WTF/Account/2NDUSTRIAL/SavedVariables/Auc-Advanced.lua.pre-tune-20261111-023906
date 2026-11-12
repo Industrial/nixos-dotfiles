@@ -1,0 +1,64 @@
+
+AucAdvancedConfig = {
+["users.CAMWOW EU4 Realm 1 PvE.Banknspank"] = "Default",
+["profile.Default"] = {
+["core"] = {
+["matcher"] = {
+["matcherlist"] = {
+"BeanCount",
+"Undercut",
+},
+},
+},
+["util"] = {
+["automagic"] = {
+["SavedMailButtons"] = {
+},
+},
+["appraiser"] = {
+["columnsortcurDir"] = -1,
+["columnsortcurSort"] = 6,
+},
+},
+["stat"] = {
+["sales"] = {
+["upgraded32"] = true,
+["ignoredsigs"] = {
+},
+},
+},
+},
+["version"] = 1,
+}
+AucAdvancedData = {
+["UtilSearchUiData"] = {
+["Global"] = {
+["configator.left"] = 1715.413940429688,
+["configator.top"] = 850,
+},
+["Current"] = {
+["columnsortcurDir"] = -1,
+["columnsortcurSort"] = 11,
+["snatch.itemsList"] = {
+},
+},
+["Version"] = 1,
+["SavedSearches"] = {
+},
+},
+["Stats"] = {
+},
+}
+AucAdvancedServers = {
+["Timestamp"] = 1794359664,
+["KnownRealms"] = {
+["CAMWOWEU4Realm1PvE"] = {
+["Login"] = 1794360481,
+["Alliance"] = 1794360390,
+},
+},
+["Version"] = 2,
+["ExpandedNames"] = {
+["CAMWOWEU4Realm1PvE"] = "CAMWOW EU4 Realm 1 PvE",
+},
+}

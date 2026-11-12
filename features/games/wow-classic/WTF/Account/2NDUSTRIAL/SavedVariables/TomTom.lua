@@ -1,10 +1,10 @@
 
 TomTomDB = {
 ["profileKeys"] = {
-["Derpnschmerp Gorkndork"] = "Default",
+["Völundr Industrial"] = "Default",
 ["Banknspank Saladfingers"] = "Default",
 ["Skelf Onyourshelf"] = "Default",
-["Völundr Industrial"] = "Default",
+["Derpnschmerp Gorkndork"] = "Default",
 },
 ["profiles"] = {
 ["Default"] = {
@@ -17,6 +17,11 @@ nil,
 -96.42876434326172,
 },
 },
+["paste"] = {
+["button"] = {
+["showInCompartment"] = true,
+},
+},
 ["block"] = {
 ["enable"] = false,
 ["position"] = {
@@ -27,23 +32,18 @@ nil,
 -100,
 },
 },
-["paste"] = {
-["button"] = {
-["showInCompartment"] = true,
-},
-},
 },
 },
 }
 TomTomWaypointsM = {
-["global"] = {
-["pinFlagsLive"] = true,
-},
 ["profileKeys"] = {
-["Derpnschmerp Gorkndork"] = "Derpnschmerp Gorkndork",
+["Völundr Industrial"] = "Skelf Onyourshelf",
 ["Banknspank Saladfingers"] = "Banknspank Saladfingers",
 ["Skelf Onyourshelf"] = "Skelf Onyourshelf",
-["Völundr Industrial"] = "Skelf Onyourshelf",
+["Derpnschmerp Gorkndork"] = "Derpnschmerp Gorkndork",
+},
+["global"] = {
+["pinFlagsLive"] = true,
 },
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
@@ -66,35 +66,18 @@ TomTomWaypointsM = {
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
-},
-["minimap"] = {
-},
-["world"] = {
-},
-},
-["minimap"] = true,
-["world"] = true,
-},
-},
-[1440] = {
-["1440:165000000:110000000:Blackfathom Deeps"] = {
-1440,
-0.165,
-0.11,
-["arrivaldistance"] = 15,
-["crazy"] = true,
-["persistent"] = true,
-["desc"] = "Blackfathom Deeps",
-["silent"] = true,
-["cleardistance"] = 10,
-["title"] = "Blackfathom Deeps",
-["from"] = "?",
-["callbacks"] = {
-["distance"] = {
-},
-["minimap"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
 },
 ["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
 },
 },
 ["minimap"] = true,
@@ -116,35 +99,111 @@ TomTomWaypointsM = {
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
-},
-["minimap"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
 },
 ["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
 },
 },
 ["minimap"] = true,
 ["world"] = true,
 },
 },
-[1441] = {
-["1441:478000000:237000000:Razorfen Downs"] = {
-1441,
-0.478,
-0.237,
+[1420] = {
+["1420:851000000:314000000:Scarlet Monastery - Library"] = {
+1420,
+0.851,
+0.314,
 ["arrivaldistance"] = 15,
 ["crazy"] = true,
 ["persistent"] = true,
-["desc"] = "Razorfen Downs",
+["desc"] = "Scarlet Monastery - Library",
 ["silent"] = true,
 ["cleardistance"] = 10,
-["title"] = "Razorfen Downs",
+["title"] = "Scarlet Monastery - Library",
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
-},
-["minimap"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
 },
 ["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+},
+["minimap"] = true,
+["world"] = true,
+},
+["1420:851000000:314000000:Scarlet Monastery - Armory"] = {
+1420,
+0.851,
+0.314,
+["arrivaldistance"] = 15,
+["callbacks"] = {
+["distance"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
+},
+["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+},
+["persistent"] = true,
+["minimap"] = true,
+["cleardistance"] = 10,
+["title"] = "Scarlet Monastery - Armory",
+["from"] = "?",
+["crazy"] = true,
+["world"] = true,
+},
+["1420:851000000:314000000:Scarlet Monastery - Graveyard"] = {
+1420,
+0.851,
+0.314,
+["arrivaldistance"] = 15,
+["crazy"] = true,
+["persistent"] = true,
+["desc"] = "Scarlet Monastery - Graveyard",
+["silent"] = true,
+["cleardistance"] = 10,
+["title"] = "Scarlet Monastery - Graveyard",
+["from"] = "?",
+["callbacks"] = {
+["distance"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
+},
+["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
 },
 },
 ["minimap"] = true,
@@ -166,10 +225,18 @@ TomTomWaypointsM = {
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
-},
-["minimap"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
 },
 ["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
 },
 },
 ["minimap"] = true,
@@ -191,35 +258,51 @@ TomTomWaypointsM = {
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
-},
-["minimap"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
 },
 ["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
 },
 },
 ["minimap"] = true,
 ["world"] = true,
 },
 },
-[1420] = {
-["1420:851000000:314000000:Scarlet Monastery - Graveyard"] = {
-1420,
-0.851,
-0.314,
+[1441] = {
+["1441:478000000:237000000:Razorfen Downs"] = {
+1441,
+0.478,
+0.237,
 ["arrivaldistance"] = 15,
 ["crazy"] = true,
 ["persistent"] = true,
-["desc"] = "Scarlet Monastery - Graveyard",
+["desc"] = "Razorfen Downs",
 ["silent"] = true,
 ["cleardistance"] = 10,
-["title"] = "Scarlet Monastery - Graveyard",
+["title"] = "Razorfen Downs",
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
-},
-["minimap"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
 },
 ["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
 },
 },
 ["minimap"] = true,
