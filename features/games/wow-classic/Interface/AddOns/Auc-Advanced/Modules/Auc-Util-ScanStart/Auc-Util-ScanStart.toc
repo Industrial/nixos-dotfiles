@@ -1,0 +1,16 @@
+## Title: Auc:Util:Scan Start
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## Dependencies: Auc-Advanced
+##
+## Version: 4.0.4
+## Revision: $Id: Auc-Util-ScanStart.toc 6758 2022-01-25 11:42:44Z none $
+## Author: Norganna's AddOns
+## X-Part-Of: Auctioneer
+## X-Category: Auction House
+## X-Max-Interface: 80100
+## X-URL: http://auctioneeraddon.com/
+## X-Feedback: http://forums.norganna.org
+##
+Embed.xml

@@ -1,0 +1,18 @@
+## Title: Auc:Util:SimpleAuction
+## Notes: Creates a simplified "Post" frame within the main Auction House window for those who want a bit more utility and information when creating auctions.
+##
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## Dependencies: Auc-Advanced
+##
+## Version: 4.0.4
+## Revision: $Id: Auc-Util-SimpleAuction.toc 6744 2022-01-25 11:42:44Z none $
+## Author: Norganna's AddOns
+## X-Part-Of: Auctioneer
+## X-Category: Auction House
+## X-Max-Interface: 80100
+## X-URL: http://auctioneeraddon.com/
+## X-Feedback: http://forums.norganna.org
+##
+Embed.xml

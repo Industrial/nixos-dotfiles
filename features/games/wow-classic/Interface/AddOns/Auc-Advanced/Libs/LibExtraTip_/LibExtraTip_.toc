@@ -1,0 +1,18 @@
+## Title: LibExtraTip |cff224477(lib)
+## Notes: Assists in the management of additional tooltip information.
+##
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## LoadOnDemand: 0
+##
+## Version: 4.0.4
+## Revision: $Id: LibExtraTip.toc 6735 2022-01-25 11:42:44Z none $
+## Author: Norganna's AddOns
+## X-Part-Of: Libraries
+## X-Category: Library
+## X-Max-Interface: 80100
+## X-URL: http://zip.norganna.org/libs/LibExtraTip/
+## X-Feedback: http://forums.norganna.org
+##
+Load.xml

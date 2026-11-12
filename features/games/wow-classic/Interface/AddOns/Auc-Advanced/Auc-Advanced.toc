@@ -1,0 +1,54 @@
+## Title: Auc:Auctioneer Core |cff774422(Forver)
+## Notes: Auctioneer assists players to track item values on the Auction House; whether buying or selling.
+##
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## LoadOnDemand: 0
+## Dependencies: Stubby, Informant, Enchantrix
+## OptionalDependencies: !nLog, SlideBar, Configator, Babylonian, DebugLib, TipHelper, LibExtraTip_, LibDataBroker
+## SavedVariables: AucAdvancedConfig, AucAdvancedData, AucAdvancedServers
+## Category-enUS: Auctions
+## Category-deDE: Auktionen
+## Category-esES: Subastas
+## Category-esMX: Subastas
+## Category-frFR: Ventes
+## Category-itIT: Aste
+## Category-koKR: 경매
+## Category-ptBR: Leilões
+## Category-ruRU: Лоты
+## Category-zhCN: 拍卖
+## Category-zhTW: 拍賣
+## SavedVariablesPerCharacter: AucAdvancedLocal
+##
+## Version: 4.0.4
+## Revision: $Id: Auc-Advanced.toc 6733 2022-01-25 11:42:44Z none $
+## Author: Norganna's AddOns
+## X-Part-Of: Auctioneer
+## X-Category: Auction House
+## X-Max-Interface: 11305
+## X-URL: http://auctioneeraddon.com/
+## X-Feedback: http://forums.norganna.org
+##
+Libs\Load.xml
+
+CoreManifest.lua
+CoreModule.lua
+CoreStrings.lua
+CoreConst.lua
+DataBonusIDs.lua
+CoreResources.lua
+CoreServers.lua
+
+CoreMain.lua
+CoreUtil.lua
+CoreConfig.lua
+CorePost.lua
+CoreSettings.lua
+CoreScan.lua
+CoreBuy.lua
+CoreAPI.lua
+
+CoreFinal.lua
+
+Modules\Active.xml

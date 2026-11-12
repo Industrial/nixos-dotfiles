@@ -1,0 +1,29 @@
+## Title: Auc:Util:FixAH
+## Notes: Works around a paging issue when viewing items in the Auction House "browse" frame.  Simply forces all new searches to show the results beginning on the first page.
+##
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## Dependencies: Auc-Advanced
+## Category-enUS: Auctions
+## Category-deDE: Auktionen
+## Category-esES: Subastas
+## Category-esMX: Subastas
+## Category-frFR: Ventes
+## Category-itIT: Aste
+## Category-koKR: 경매
+## Category-ptBR: Leilões
+## Category-ruRU: Лоты
+## Category-zhCN: 拍卖
+## Category-zhTW: 拍賣
+##
+## Version: 4.0.4
+## Revision: $Id: Auc-Util-FixAH.toc 6766 2022-01-25 11:42:44Z none $
+## Author: Norganna's AddOns
+## X-Part-Of: Auctioneer
+## X-Category: Auction House
+## X-Max-Interface: 80100
+## X-URL: http://auctioneeraddon.com/
+## X-Feedback: http://forums.norganna.org
+##
+Load.xml

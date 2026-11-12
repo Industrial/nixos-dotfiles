@@ -1,0 +1,13 @@
+## Title: Auctioneer:Stat:Example2
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## Dependencies: Auc-Advanced
+##
+## Version: 4.0.4
+## Revision: $Id$
+## URL: http://auctioneeraddon.com/
+## Author: Norganna's AddOns
+## X-Part-Of: Auctioneer
+##
+Embed.xml
