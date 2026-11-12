@@ -1,0 +1,22 @@
+## Title: Stubby |cff224477(lib)
+## Notes: Allows AddOns to load automatically, and provides event handling support.
+##
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## OptionalDeps: !nLog, DebugLib
+## SavedVariables: StubbyConfig
+##
+## Version: 4.0.4
+## Revision: $Id$
+## Author: Norganna's AddOns
+## X-Part-Of: Libraries
+## X-Category: Library
+## X-URL: http://auctioneeraddon.com/
+## X-Feedback: https://auctioneeraddon.com/slack
+##
+Support\Load.xml
+
+Libs\Load.xml
+Stubby.lua
+Stubby.xml
