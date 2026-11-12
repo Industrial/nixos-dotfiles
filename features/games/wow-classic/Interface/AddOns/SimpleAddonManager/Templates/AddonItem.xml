@@ -1,0 +1,84 @@
+<UI>
+    <Button name="SimpleAddonManagerAddonItem" virtual="true">
+        <Size x="400" y="20"/>
+        <!--<NormalTexture parentKey="NormalTexture" atlas="voicechat-channellist-row-background" alphaMode="ADD"/>-->
+        <HighlightTexture parentKey="HighlightTexture" atlas="voicechat-channellist-row-highlight" alphaMode="ADD"/>
+        <PushedTexture parentKey="PushedTexture" atlas="voicechat-channellist-row-background" alphaMode="ADD"/>
+        <NormalFont style="GameFontNormal"/>
+        <HighlightFont style="GameFontHighlight"/>
+        <Layers>
+            <Layer level="OVERLAY">
+                <FontString parentKey="Status" inherits="GameFontNormalSmall" justifyH="RIGHT">
+                    <Color r="1" g="1" b="1"/>
+                    <Anchors>
+                        <Anchor point="TOPRIGHT" x="-8" y="0"/>
+                        <Anchor point="BOTTOMRIGHT" x="-8" y="0"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+            <Layer level="OVERLAY">
+                <FontString parentKey="Name" inherits="GameFontNormal" justifyH="LEFT">
+                    <Color r="1" g="1" b="1"/>
+                    <Anchors>
+                        <Anchor point="TOPLEFT" x="30" y="0"/>
+                        <Anchor point="BOTTOMRIGHT" relativeKey="$parent.Status" relativePoint="BOTTOMLEFT" x="-25" y="0"/>
+                    </Anchors>
+                </FontString>
+            </Layer>
+        </Layers>
+        <Frames>
+            <CheckButton parentKey="EnabledButton">
+                <Size>
+                    <AbsDimension x="24" y="24"/>
+                </Size>
+                <HitRectInsets>
+                    <AbsInset left="0" right="0" top="0" bottom="0"/>
+                </HitRectInsets>
+                <Anchors>
+                    <Anchor point="LEFT" x="4" y="0"/>
+                </Anchors>
+                <NormalTexture file="Interface\Buttons\UI-CheckBox-Up"/>
+                <PushedTexture file="Interface\Buttons\UI-CheckBox-Down"/>
+                <HighlightTexture file="Interface\Buttons\UI-CheckBox-Highlight" alphaMode="ADD"/>
+                <CheckedTexture parentKey="CheckedTexture" file="Interface\Buttons\UI-CheckBox-Check"/>
+                <DisabledCheckedTexture file="Interface\Buttons\UI-CheckBox-Check-Disabled"/>
+                <Frames>
+                    <Frame parentKey="LockIcon" enableMouse="false">
+                        <Size>
+                            <AbsDimension x="16" y="16"/>
+                        </Size>
+                        <Anchors>
+                            <Anchor point="BOTTOMRIGHT" x="3" y="0"/>
+                        </Anchors>
+                        <Layers>
+                            <Layer level="OVERLAY">
+                                <Texture file="Interface\AddOns\SimpleAddonManager\Icons\lock"/>
+                            </Layer>
+                        </Layers>
+                    </Frame>
+                </Frames>
+            </CheckButton>
+            <Button parentKey="ExpandOrCollapseButton">
+                <Size x="13" y="13"/>
+                <Anchors>
+                    <Anchor point="RIGHT" relativeKey="$parent.EnabledButton" relativePoint="LEFT" x="-6" y="0" />
+                </Anchors>
+                <HitRectInsets>
+                    <AbsInset left="1" right="-4" top="-2" bottom="-2"/>
+                </HitRectInsets>
+                <NormalTexture file="Interface\Buttons\UI-MinusButton-UP">
+                    <Size x="16" y="16"/>
+                    <Anchors>
+                        <Anchor point="LEFT" x="3" y="0"/>
+                    </Anchors>
+                </NormalTexture>
+                <HighlightTexture parentKey="Highlight" file="Interface\Buttons\UI-PlusButton-Hilight" alphaMode="ADD">
+                    <Size x="16" y="16"/>
+                    <Anchors>
+                        <Anchor point="LEFT" x="3" y="0"/>
+                    </Anchors>
+                </HighlightTexture>
+            </Button>
+        </Frames>
+    </Button>
+</UI>

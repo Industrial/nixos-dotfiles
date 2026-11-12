@@ -1,0 +1,64 @@
+## Interface: 120105, 50504, 38002, 20506, 16001, 11509
+## Title: Simple Addon Manager
+## Notes: A simple to use Addon Manager with profile, search, category filter, and more.
+## Author: Eliote
+## Version: v1.69
+## SavedVariables: SimpleAddonManagerDB
+## X-Category: Addon Manager
+## X-Category-ptBR: Gerenciador de Addon
+## Category-enUS: Addon Manager
+## Category-deDE: Addon-Manager
+## Category-esES: Administrador de complementos
+## Category-esMX: Administrador de complementos
+## Category-frFR: Gestionnaire de modules complémentaires
+## Category-itIT: Gestore componenti aggiuntivi
+## Category-koKR: 애드온 관리자
+## Category-ptBR: Gerenciador de Addon
+## Category-ruRU: Менеджер дополнений
+## Category-zhCN: 插件管理器
+## Category-zhTW: 外掛程式管理器
+## IconTexture: 133742
+
+## X-Curse-Project-ID: 689213
+## X-Wago-ID: Rn6Vzq6d
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Libs\ElioteDropDownMenu-1.0\ElioteDropDownMenu-1.0.lua
+Libs\AceConsole-3.0\AceConsole-3.0.lua
+Libs\Json\json.lua
+
+Localization\enUS.lua
+
+Localization\deDE.lua
+Localization\esES.lua
+Localization\esMX.lua
+Localization\frFR.lua
+Localization\itIT.lua
+Localization\koKR.lua
+Localization\ptBR.lua
+Localization\ruRU.lua
+Localization\zhCN.lua
+Localization\zhTW.lua
+
+Templates\AddonItem.xml
+Templates\CategoryItem.xml
+
+ColorUtil.lua
+
+Core.lua
+CoreCompat.lua
+MainFrame.lua
+Filters.lua
+AddonListFrame.lua
+CategoryFrame.lua
+MiniMapButton.lua
+Options.lua
+Profile.lua
+Search.lua
+SlashCommand.lua
+AddonFinder.lua
+Lock.lua
+AddonProfiler.lua
