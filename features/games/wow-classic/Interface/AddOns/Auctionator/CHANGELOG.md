@@ -1,6 +1,6 @@
 # Auctionator
 
-## [343](https://github.com/TheMouseNest/Auctionator/tree/343) (2026-11-08)
-[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/342...343) 
+## [346](https://github.com/TheMouseNest/Auctionator/tree/346) (2026-11-12)
+[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/345...346) 
 
-- Properly segment RPPvP auction house  
+- Forever: Restore copper values for gear (as it appears fixed by Blizz now)  

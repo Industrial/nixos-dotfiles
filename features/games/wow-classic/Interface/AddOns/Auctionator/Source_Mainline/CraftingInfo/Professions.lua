@@ -98,8 +98,15 @@ local function GetCheapestQualityTotal(schematicForm)
   return Auctionator.CraftingInfo.CalculateCraftCost(recipeSchematic, transaction)
 end
 
-local function CalculateProfitFromCosts(currentAH, toCraft, count)
-  return math.floor(math.floor(currentAH * count * Auctionator.Constants.AfterAHCut - toCraft) / 100) * 100
+local CalculateProfitFromCosts
+if Auctionator.Constants.IsForever then
+  CalculateProfitFromCosts = function(currentAH, toCraft, count)
+    return currentAH * count * Auctionator.Constants.AfterAHCut - toCraft
+  end
+else
+  CalculateProfitFromCosts = function(currentAH, toCraft, count)
+    return math.floor(math.floor(currentAH * count * Auctionator.Constants.AfterAHCut - toCraft) / 100) * 100
+  end
 end
 
 -- Search through a list of items for the first matching the wantedQuality

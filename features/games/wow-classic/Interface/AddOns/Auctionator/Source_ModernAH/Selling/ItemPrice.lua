@@ -18,7 +18,7 @@ function Auctionator.Selling.CalculateItemPriceFromPrice(basePrice)
   local value
 
   if userPrefersPercentage() then
-    value = basePrice * getPercentage()
+    value = math.floor(basePrice * getPercentage())
 
     Auctionator.Debug.Message("Percentage calculation", basePrice, getPercentage(), value)
   else
@@ -28,7 +28,7 @@ function Auctionator.Selling.CalculateItemPriceFromPrice(basePrice)
   end
 
   if Auctionator.Constants.IsForever or Auctionator.Constants.IsClassic then
-    if value < 1 then 
+    if value < 1 then
       value = 1
     end
   --Ensure the value is at least 1s
