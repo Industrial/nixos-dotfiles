@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "redox": {
+      "command": "redox-mcp",
+      "args": []
+    },
     "git": {
       "command": "uvx",
       "args": [

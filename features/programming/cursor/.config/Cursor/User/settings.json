@@ -1,4 +1,6 @@
 {
+  "redox.server.enable": true,
+  "redox.server.path": "redox-lsp",
   "[javascript]": {
     "editor.defaultFormatter": "biomejs.biome"
   },
