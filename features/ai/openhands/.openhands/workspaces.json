@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "workspaces": [
+    {
+      "id": "/data/Code/idclear/monorepo",
+      "name": "monorepo",
+      "path": "/data/Code/idclear/monorepo"
+    }
+  ],
+  "workspaceParents": []
+}
