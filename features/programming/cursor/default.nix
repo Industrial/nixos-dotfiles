@@ -21,6 +21,7 @@
 
   # TODO: We need a way to manage the MCP servers. Add the JSON file to the .config/Cursor/mcp.json and link it correctly.
   emeraldVscodeExtension = import ../emerald/vscode-extension.nix {inherit inputs pkgs;};
+  redoxVscodeExtension = import ../redox/vscode-extension.nix {inherit inputs pkgs;};
 
   # Override license for unfree extensions to allow evaluation
   allowUnfreeExtension = drv:
@@ -129,6 +130,12 @@
 
       # Emerald (built from source — not on any marketplace)
       emeraldVscodeExtension
+
+      # Redox (built from source — not on any marketplace). The derivation
+      # ships `node_modules` with the extension: without the
+      # `vscode-languageclient` closure `activate` throws and the extension
+      # degrades silently to TextMate highlighting (redox plan 71 §1.2).
+      redoxVscodeExtension
 
       # # Astro
       # extensions.vscode-marketplace.astro-build.astro-vscode
