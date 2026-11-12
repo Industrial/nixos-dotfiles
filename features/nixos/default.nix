@@ -112,6 +112,28 @@
           };
         };
       })
+      # nixpkgs' cargoUseSystemLibs setup hook exports ZSTD_SYS_USE_PKG_CONFIG,
+      # AWS_LC_SYS_USE_SYSTEM and friends for every buildRustPackage, but these
+      # packages do not carry the matching system libraries: zstd-sys then
+      # panics on its pkg-config probe and aws-lc-sys on a missing AWS-LC
+      # install. Opt each out so the vendored C sources build instead — the
+      # same escape hatch nixpkgs itself uses for tokei. Drop a name once
+      # nixpkgs fixes it upstream.
+      (final: prev: let
+        noSystemLibs = pkg:
+          pkg.overrideAttrs (_: {
+            dontCargoUseSystemLibs = true;
+          });
+      in {
+        rusty-path-of-building = noSystemLibs prev.rusty-path-of-building;
+        slumber = noSystemLibs prev.slumber;
+        ashell = noSystemLibs prev.ashell;
+        nushellPlugins =
+          prev.nushellPlugins
+          // {
+            polars = noSystemLibs prev.nushellPlugins.polars;
+          };
+      })
     ];
   };
 

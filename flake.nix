@@ -56,6 +56,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    redox = {
+      url = "github:Industrial/redox";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     deploy-rs = {
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";
