@@ -1,0 +1,33 @@
+## Title: BeanCounter
+## Notes: Auction House transaction history to include purchases and sales, failures and successes.
+##
+## Interface: 16001
+## AllowLoadGameType: forever
+## ExcludeLoadGameType: standard, classic
+## Dependencies: Stubby, Auc-Advanced
+## OptionalDeps: !nLog, Babylonian, DebugLib, SlideBar, Configator, LibExtraTip_, TipHelper, LibDataBroker
+## Category-enUS: Auctions
+## Category-deDE: Auktionen
+## Category-esES: Subastas
+## Category-esMX: Subastas
+## Category-frFR: Ventes
+## Category-itIT: Aste
+## Category-koKR: 경매
+## Category-ptBR: Leilões
+## Category-ruRU: Лоты
+## Category-zhCN: 拍卖
+## Category-zhTW: 拍賣
+## SavedVariables: BeanCounterDB, BeanCounterDBSettings, BeanCounterDBNames, BeanCounterAccountDB, BeanCounterMailPatch
+##
+## Version: 4.0.4
+## Revision: $Id: BeanCounter.toc 6767 2022-01-25 11:42:44Z none $
+## Author: Norganna's AddOns
+## X-Part-Of: Auctioneer
+## X-Category: Auction House
+## X-Max-Interface: 80100
+## X-URL: http://auctioneeraddon.com/
+## X-Feedback: http://forums.norganna.org
+##
+
+Embed.xml
+
