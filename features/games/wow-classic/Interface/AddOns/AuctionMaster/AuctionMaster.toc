@@ -1,0 +1,77 @@
+## Interface: 16001, 120100, 50504
+## Title: AuctionMaster
+## Notes: Auction house selling and price statistics tool for WoW.
+## Author: Udorn
+## X-License: All Rights Reserved
+## Version: v11.6.3
+## X-Curse-Project-ID: 5762
+## X-Localizations: enUS, deDE
+## Category: Auctions
+## SavedVariables: AuctionMasterDB
+## IconTexture: Interface\AddOns\AuctionMaster\assets\logo
+
+
+src/locale/Locale.lua
+src/locale/enUS.lua
+src/locale/deDE.lua
+src/core/Client.lua
+src/core/Print.lua
+src/core/Format.lua
+src/core/Theme.lua
+src/core/Database.lua
+src/core/DebugLog.lua
+src/core/Events.lua
+src/core/Compat.lua
+src/scan/ItemDbKey.lua
+src/scan/ItemStore.lua
+src/Core.lua
+src/config/Options.lua
+src/Portrait.lua
+src/core/ChangelogData.lua
+src/ui/DiscordPopup.lua
+src/Changelog.lua
+src/ui/Widgets.lua
+src/ui/Native.lua
+src/ui/Attachment.lua
+src/ui/MainWindow.lua
+src/scan/Scan.lua
+src/scan/ItemSearch.lua
+src/api/API.lua
+src/bargains/Bargains.lua
+src/bargains/BargainScan.lua
+src/tooltip/Tooltip.lua
+src/tooltip/ItemTooltip.lua
+src/sell/SellSettings.lua
+src/sell/DirectBuy.lua
+src/sell/SellScan.lua
+src/sell/OwnAuctions.lua
+src/sell/PostPrice.lua
+src/inventory/Inventory.lua
+src/inventory/Mailbox.lua
+src/professions/MerchantScanner.lua
+src/professions/VendorItems.lua
+src/professions/ShoppingList.lua
+src/professions/ProfessionScanner.lua
+src/professions/RecipeCost.lua
+src/professions/RecipeList.lua
+src/professions/RecipeSummary.lua
+src/professions/Leveling.lua
+src/professions/ProfessionsFrame.lua
+src/ui/RecipesTab.lua
+src/ui/ShoppingRows.lua
+src/ui/BargainsPanel.lua
+src/ui/ShoppingPanel.lua
+src/disenchant/Disenchant.lua
+src/disenchant/DisenchantTooltip.lua
+src/sell/SellPanel.lua
+src/ui/AuctionsView.lua
+src/ui/CraftPanel.lua
+src/ui/CraftList.lua
+src/tracker/ShoppingTracker.lua
+src/tracker/ObjectiveTracker.lua
+src/tracker/WatchFrameTracker.lua
+src/ui/ChangelogWindow.lua
+src/ui/CharactersWindow.lua
+
+srcClassic/tooltip/Tooltip.lua [ExcludeLoadGameType standard, camelot][AllowLoadGameType mists]
+srcForever/disenchant/ForeverRules.lua [ExcludeLoadGameType standard, classic][AllowLoadGameType camelot]
