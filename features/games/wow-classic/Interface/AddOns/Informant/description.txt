@@ -1,0 +1,2 @@
+Informant
+Informant displays additional information about items in their tooltips: buy price; sell price; item level; what quests, classes or professions use the item; the value of the item produced by a recipe; etc. Informant can also tell you what vendors sell a given item.
