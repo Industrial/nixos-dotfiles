@@ -9,7 +9,7 @@
 ## SavedVariables: InformantConfig, InformantLocalUpdates
 ## IconTexture: Interface/Addons/Informant/inficon.blp
 ##
-## Version: 4.0.4
+## Version: 4.0.5
 ## Author: saluzafa, Norganna, unfunf22,
 ## Revision: $Id$
 ## X-Category: Item Data
