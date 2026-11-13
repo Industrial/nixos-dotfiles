@@ -19,7 +19,7 @@
 ## Category-zhTW: 拍賣
 ## SavedVariables: BeanCounterDB, BeanCounterDBSettings, BeanCounterDBNames, BeanCounterAccountDB, BeanCounterMailPatch
 ##
-## Version: 4.0.4
+## Version: 4.0.5
 ## Revision: $Id: BeanCounter.toc 6767 2022-01-25 11:42:44Z none $
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer
