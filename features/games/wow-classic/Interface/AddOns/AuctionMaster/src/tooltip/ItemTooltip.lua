@@ -44,6 +44,12 @@ function AM.Tooltip.SetPriceMode(mode)
   AM.Database.GetGlobalObject("settings").priceTooltip = mode ~= "stack" and mode or nil
 end
 
+-- Nothing is known of an item before the first full scan (unless it was searched): the tooltip says so, instead of
+-- "No auctions found", which would be a guess.
+local function HasFullScan()
+  return AM.Scan.GetLastSuccess() ~= nil
+end
+
 local function AddPriceLine(tooltip, label, price, labelColor)
   AM.Tooltip.AddDoubleLine(tooltip, label, AM.FormatMoney(price, true), labelColor or HIGHLIGHT_FONT_COLOR,
     HIGHLIGHT_FONT_COLOR)
@@ -117,7 +123,7 @@ AM.Tooltip.AddItemCallback(function(tooltip, itemId, location, count, itemDbKey)
       AddPriceLine(tooltip, L["TOOLTIP_MIN_PRICE_SCAN"], listed * multiplier)
     end
   elseif itemDbKey and IsSellable(itemId, location) then
-    GameTooltip_AddHighlightLine(tooltip, LOGO .. "  " .. L["TOOLTIP_NO_AUCTIONS"])
+    GameTooltip_AddHighlightLine(tooltip, LOGO .. "  " .. (HasFullScan() and L["TOOLTIP_NO_AUCTIONS"] or L["TOOLTIP_NO_SCAN"]))
     AddVendorLine()
   elseif vendorPrice then
     GameTooltip_AddColoredLine(tooltip, LOGO .. " " .. L["TOOLTIP_TITLE"], NORMAL_FONT_COLOR)
@@ -139,6 +145,10 @@ AM.Tooltip.AddPetCallback(function(tooltip, itemDbKey)
   local function Add(text, color)
     color = color or HIGHLIGHT_FONT_COLOR
     tooltip:AddLine(text, color.r, color.g, color.b)
+  end
+  if not listed and not marketValue and not HasFullScan() then
+    Add(LOGO .. " " .. L["TOOLTIP_NO_SCAN"])
+    return
   end
   local listedText = listed and L["TOOLTIP_LISTED"]:format(AM.FormatCount(listedCount)) or L["TOOLTIP_NO_AUCTIONS"]
 

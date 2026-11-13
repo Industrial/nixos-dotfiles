@@ -16,8 +16,11 @@ local Scan = AM.Scan
 -- Retail), but sometimes it never comes: the first call after a long break has been seen to get no answer, and such a
 -- lost call still counts for the 15 minutes, every call before they are over is ignored. After ResponseTimeout()
 -- seconds the scan is reported as not answered and stops showing as running, but it keeps listening: an answer that
--- arrives later is still used, with a message. The 15 minutes stay counted from the lost call, and if the auction house
--- is open when they are over, the scan starts again by itself.
+-- arrives later is still used, with a message. The 15 minutes stay counted from the lost call; there is no retry of
+-- its own, the scan button (AM.ScanButton) shows when the next scan is possible.
+--
+-- The addon only starts a scan by itself when the auction house opens if the player switched that on in the options
+-- (Scan.IsAutoEnabled), AUTO_DELAY seconds after it opened; otherwise every scan is started with the scan button.
 local THROTTLE_SECONDS = 15 * 60
 local READY_WAIT = 30
 local READY_POLL = 0.5
@@ -36,7 +39,7 @@ local scanId = 0
 local startTime = nil
 local readCount, readTotal = 0, 0 -- auctions read so far and in all, while READING
 local requestedAt = nil -- time() of the last ReplicateItems call
-local lost = false -- the last call got no answer within the timeout, and none came later
+local manual = false -- the player started the running scan (a click), not the addon by itself: see AM.Chat
 
 local events = CreateFrame("Frame")
 local loadEvents = CreateFrame("Frame") -- listens for item data only while a scan waits for it
@@ -51,14 +54,32 @@ local function Finish(count)
   AM.Portrait.StopAnimate()
   AM.DebugLog.Log("scan", "finished, %s auctions read", count)
   if count then
-    AM.Print(L["SCAN_FINISHED"]:format(count, GetTime() - startTime))
+    AM.Print(L["SCAN_FINISHED"]:format(count, GetTime() - startTime), "detailed")
   end
   AM.MainWindow.Refresh()
   AM.Events.Fire("SCAN_CHANGED")
 end
 
+-- The throttle (lastScan) is account-wide like the server's, lastSuccess belongs to the auction house that was scanned.
 local function GetState()
   return AM.Database.GetGlobalObject("scan")
+end
+
+-- The scan state of the current auction house. lastSuccess used to be account-wide: it is taken over by the first
+-- auction house that asks and has stored auctions, the one that took the data of that scan over (see
+-- Database.GetFactionObject). One without auctions was never scanned.
+local function GetHouseState()
+  local house = AM.Database.GetFactionObject("scan")
+  local global = GetState()
+  if house.lastSuccess == nil and global.lastSuccess ~= nil and AM.ItemStore.HasScan() then
+    house.lastSuccess, global.lastSuccess = global.lastSuccess, nil
+  end
+  return house
+end
+
+-- When the last full scan of the current auction house was started that stored its items, nil if there was none.
+function Scan.GetLastSuccess()
+  return GetHouseState().lastSuccess
 end
 
 local function IsThrottled()
@@ -133,7 +154,7 @@ local function Store(id, items, unresolved, collector)
   -- An empty result means there was nothing to read, don't wipe the stored prices.
   if #stored > 0 then
     AM.ItemStore.Replace(stored)
-    GetState().lastSuccess = requestedAt -- the start, like the countdown to the next scan
+    GetHouseState().lastSuccess = requestedAt -- the start, like the countdown to the next scan
     AM.Bargains.OnFullScan()
     AM.Bargains.FinishScan(collector)
   end
@@ -358,16 +379,15 @@ end
 
 local function OnReplicateUpdate()
   AM.DebugLog.Log("scan", "replicate list ready, state %d, %d items", state, C_AuctionHouse.GetNumReplicateItems())
-  lost = false
   if state == TIMED_OUT then
-    AM.Print(L["SCAN_LATE_RESPONSE"]:format(GetTime() - startTime))
+    AM.Print(L["SCAN_LATE_RESPONSE"]:format(GetTime() - startTime), "detailed")
     AM.Portrait.StartAnimate()
   end
   -- The event fires again for every item the client caches while we read them, which
   -- is of no interest here. The first event means the list is complete.
   events:UnregisterEvent("REPLICATE_ITEM_LIST_UPDATE")
   local total = C_AuctionHouse.GetNumReplicateItems()
-  AM.Print(L["SCAN_READING"])
+  AM.Print(L["SCAN_READING"], "detailed")
   state = READING
   readCount, readTotal = 0, total
   ReadBatch(scanId, {}, {}, 0, total, AM.Bargains.StartScan())
@@ -381,6 +401,41 @@ end
 function Scan.GetProgress()
   if state == READING then
     return readCount, readTotal
+  end
+end
+
+-- The progress shown for a running scan, 1 to 99: 1 while it waits for the server, then the share of the auctions read
+-- (nil read: not answered yet). It stays at 99 until the scan is stored, as the item data can take a while after that.
+function Scan.Percent(read, total)
+  if not read or not total or total <= 0 then
+    return 1
+  end
+  return math.max(1, math.min(99, math.floor(read / total * 100)))
+end
+
+-- The progress of the running scan in percent (see Scan.Percent), nil if none runs.
+function Scan.GetPercent()
+  if Scan.IsRunning() then
+    return Scan.Percent(Scan.GetProgress())
+  end
+end
+
+-- True while the last call got no answer within the timeout (a late answer is still used).
+function Scan.HasTimedOut()
+  return state == TIMED_OUT
+end
+
+-- Whether the addon starts a scan by itself when the auction house opens (global object "settings", off unless the
+-- player switched it on: stored as true or nil).
+function Scan.IsAutoEnabled()
+  return AM.Database.GetGlobalObject("settings").autoScan == true
+end
+
+function Scan.SetAutoEnabled(enabled)
+  if enabled then
+    AM.Database.GetGlobalObject("settings").autoScan = true
+  else
+    AM.Database.GetGlobalObject("settings").autoScan = nil
   end
 end
 
@@ -403,46 +458,32 @@ local function ResponseTimeout()
   return AM.Client.IsForever() and 20 or 40
 end
 
--- When the 15 minutes of a lost call are over, the scan starts again if the auction house is open and no answer came in
--- the meantime. One second later than the countdown, as time() counts in whole seconds.
-local function RetryWhenFree()
-  C_Timer.After(Scan.GetWaitSeconds() + 1, function()
-    if lost and (state == IDLE or state == TIMED_OUT) and AuctionHouseFrame and AuctionHouseFrame:IsShown() then
-      AM.DebugLog.Log("scan", "15 minutes after the lost call are over, starting again")
-      Scan.Start()
-    end
-  end)
-end
-
 local function OnTimeout()
   state = TIMED_OUT
-  lost = true
   AM.DebugLog.Log("scan", "no response within %d seconds", ResponseTimeout())
   AM.Portrait.StopAnimate()
   AM.MainWindow.Refresh()
   AM.Events.Fire("SCAN_CHANGED")
-  AM.Print(L["SCAN_NO_RESPONSE"]:format(date("%H:%M:%S", GetState().lastScan + THROTTLE_SECONDS)))
-  RetryWhenFree()
 end
 
-function Scan.Start()
+-- manual: the player asked for the scan (a click), so what goes wrong is told at every chat setting.
+function Scan.Start(isManual)
   if state ~= IDLE and state ~= TIMED_OUT then
     return
   end
 
   if IsThrottled() then
     AM.DebugLog.Log("scan", "not started, last scan at %s", GetState().lastScan)
-    AM.Print(L["SCAN_TOO_SOON"]
-      :format(date("%H:%M:%S", GetState().lastScan), date("%H:%M:%S", GetState().lastScan + THROTTLE_SECONDS)))
     return
   end
+
+  manual = isManual == true
 
   state = WAITING
   scanId = scanId + 1
   startTime = GetTime()
 
   AM.DebugLog.Log("scan", "started")
-  AM.Print(L["SCAN_STARTED"])
   AM.Portrait.StartAnimate()
   events:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
   events:RegisterEvent("AUCTION_HOUSE_CLOSED")
@@ -480,10 +521,24 @@ function Scan.Start()
   Send()
 end
 
+-- The automatic scan waits AUTO_DELAY seconds after the auction house opened: a call sent sooner has been seen to get
+-- no answer, while a click some seconds later worked. It is dropped when the auction house was closed in that time,
+-- or opened again (that opening waits for itself: openId).
+local AUTO_DELAY = 2
+local openId = 0
+
 events:RegisterEvent("AUCTION_HOUSE_SHOW")
 events:SetScript("OnEvent", function(_, event)
   if event == "AUCTION_HOUSE_SHOW" then
-    Scan.Start()
+    openId = openId + 1
+    if Scan.IsAutoEnabled() then
+      local id = openId
+      C_Timer.After(AUTO_DELAY, function()
+        if id == openId and AuctionHouseFrame and AuctionHouseFrame:IsShown() then
+          Scan.Start()
+        end
+      end)
+    end
   elseif event == "REPLICATE_ITEM_LIST_UPDATE" then
     OnReplicateUpdate()
   else
@@ -493,7 +548,7 @@ events:SetScript("OnEvent", function(_, event)
     local timedOut = state == TIMED_OUT
     Finish()
     if not timedOut then
-      AM.Print(L["SCAN_ABORTED"])
+      AM.Print(L["SCAN_ABORTED"], manual and "quiet" or "detailed")
     end
   end
 end)

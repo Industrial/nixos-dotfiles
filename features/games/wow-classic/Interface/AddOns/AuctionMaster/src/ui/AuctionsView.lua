@@ -188,7 +188,10 @@ end
 local function CreateBar(frame)
   bar = CreateFrame("Frame", nil, frame)
   local anchor = AuctionHouseFrame.MoneyFrameBorder
-  bar:SetPoint("TOPLEFT", anchor or frame, anchor and "TOPRIGHT" or "BOTTOMLEFT", 16, 1)
+  -- right of the full scan button (AM.ScanButton), which sits right of the gold display
+  local scan = AM.ScanButton.GetFrame()
+  local left = 16 + (scan and scan:GetWidth() + 2 * GAP or 0)
+  bar:SetPoint("TOPLEFT", anchor or frame, anchor and "TOPRIGHT" or "BOTTOMLEFT", left, 1)
   if frame.CancelAuctionButton then
     bar:SetPoint("BOTTOMRIGHT", frame.CancelAuctionButton, "BOTTOMLEFT", -GAP, 0)
   else

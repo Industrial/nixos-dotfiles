@@ -173,6 +173,27 @@ local function ListenToGame()
   end
 end
 
+-- Calls func if the client has it, else nil. A value of false is kept (it is logged as "false", not "nil").
+local function Try(func, ...)
+  if type(func) == "function" then
+    local ok, value = pcall(func, ...)
+    if ok then
+      return value
+    end
+  end
+end
+
+-- One line per session with what tells the auction houses apart: faction, realm and the rule set of Forever. Read
+-- from the log instead of asking for /run output.
+local function DescribeContext()
+  local rules = C_GameRules or {}
+  return DescribeAll("context faction", Try(UnitFactionGroup, "player"),
+    "realm", Try(GetRealmName), Try(GetNormalizedRealmName), Try(GetRealmID),
+    "gameMode", Try(rules.GetCurrentGameModeRecordID), Try(rules.GetActiveGameMode),
+    "hardcore", Try(rules.IsHardcoreActive), "selfFound", Try(rules.IsSelfFoundAllowed),
+    "standard", Try(rules.IsStandard))
+end
+
 function DebugLog.SetEnabled(on)
   on = on and true or false
   State().enabled = on
@@ -182,7 +203,7 @@ function DebugLog.SetEnabled(on)
   if on then
     enabled = true
     ListenToGame()
-    DebugLog.Log("log", "on, addon %s", AM.version)
+    DebugLog.Log("log", "on, addon %s, %s", AM.version, DescribeContext())
   else
     DebugLog.Log("log", "off")
     enabled = false
@@ -219,5 +240,12 @@ function DebugLog.Init()
     enabled = true
     ListenToGame()
     DebugLog.Log("log", "session start, addon %s", AM.version)
+    -- Init runs at ADDON_LOADED, the faction and the game rules are only known at login.
+    local loginFrame = CreateFrame("Frame")
+    loginFrame:RegisterEvent("PLAYER_LOGIN")
+    loginFrame:SetScript("OnEvent", function(self)
+      self:UnregisterAllEvents()
+      DebugLog.Log("log", DescribeContext())
+    end)
   end
 end

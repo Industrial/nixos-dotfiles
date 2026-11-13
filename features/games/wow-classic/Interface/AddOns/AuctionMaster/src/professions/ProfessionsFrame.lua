@@ -38,7 +38,7 @@ local function CreateAddButton(parent, anchor, point, relativePoint, x, y, readR
     end
     local count = readCount()
     ShoppingList.AddRecipe(recipe, count)
-    AM.Print(L["SHOPPING_ADDED"]:format(count, recipe.name))
+    AM.Print(L["SHOPPING_ADDED"]:format(count, recipe.name), "detailed")
   end)
   button:SetScript("OnEnter", function(self)
     local name = readName()
@@ -328,7 +328,7 @@ local function HookRetail()
     local info = GetRecipeInfo()
     if recipeId and ShoppingList.HasRecipe(recipeId) then
       ShoppingList.RemoveRecipeById(recipeId)
-      AM.Print(L["SHOPPING_REMOVED"]:format(info and info.name or ""))
+      AM.Print(L["SHOPPING_REMOVED"]:format(info and info.name or ""), "detailed")
     end
   end)
   remove:SetScript("OnEnter", function(self)
@@ -381,7 +381,7 @@ local function HookClassic()
     local recipe = ShoppingList.ReadClassicRecipe()
     if recipe and ShoppingList.HasRecipe(recipe.id) then
       ShoppingList.RemoveRecipeById(recipe.id)
-      AM.Print(L["SHOPPING_REMOVED"]:format(recipe.name))
+      AM.Print(L["SHOPPING_REMOVED"]:format(recipe.name), "detailed")
     end
   end)
   remove:SetScript("OnEnter", function(self)

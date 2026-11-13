@@ -234,7 +234,9 @@ local function CreateListPanel()
   local Native = AM.Native
   local native = Native.CreateListPanel(panel)
   native.frame:SetPoint("TOPLEFT", 16, -52)
-  native.frame:SetPoint("BOTTOMRIGHT", -16, 16)
+  -- down to the bottom edge of the window, where the lists of the game's Buy view end as well (on the frame around the
+  -- gold display), so the strip below looks the same on every tab
+  native.frame:SetPoint("BOTTOMRIGHT", -16, -1)
   local header = native.header
 
   -- Headers touch each other like the ones of the auction house: each takes the gap to its neighbour. The name

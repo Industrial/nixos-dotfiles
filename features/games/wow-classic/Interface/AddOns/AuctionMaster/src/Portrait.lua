@@ -62,7 +62,7 @@ local function CreatePortrait()
 
   local letters = button:CreateTexture(nil, "OVERLAY")
   AM.Widgets.PlaceLetters(letters, button, SIZE)
-  letters:SetTexture(ASSETS .. "internal\\letters-128")
+  letters:SetTexture(ASSETS .. "letters-128")
 
   -- Where the game's ring is no texture of the frame we can rely on (Classic, where our window covers part of it, or
   -- a UI addon that restyles the window and removes it) we draw a ring of our own below the logo: round discs (a color

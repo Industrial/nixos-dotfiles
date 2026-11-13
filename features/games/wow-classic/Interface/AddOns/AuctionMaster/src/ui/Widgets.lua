@@ -413,7 +413,7 @@ local function CreateOwnFrame(title, onMoved, noPortrait, parent)
     local mask = logoFrame:CreateMaskTexture()
     mask:SetAllPoints()
     mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKANDWHITE", "CLAMPTOBLACKANDWHITE")
-    for index, name in ipairs({ "portrait_orange_dark", "portrait_orange", "internal\\letters-128" }) do
+    for index, name in ipairs({ "portrait_orange_dark", "portrait_orange", "letters-128" }) do
       local layer = logoFrame:CreateTexture(nil, "ARTWORK", nil, index)
       layer:SetTexture(ASSETS .. name)
       if index == 3 then
@@ -512,7 +512,7 @@ function Widgets.CreatePortraitFrame(title, onMoved, noPortrait, parent)
   end
   if portrait then
     portrait:Hide()
-    for index, name in ipairs({ "portrait_orange_dark", "portrait_orange", "internal\\letters-128" }) do
+    for index, name in ipairs({ "portrait_orange_dark", "portrait_orange", "letters-128" }) do
       local layer = container:CreateTexture(nil, "ARTWORK", nil, index)
       layer:SetTexture(ASSETS .. name)
       if index == 3 then

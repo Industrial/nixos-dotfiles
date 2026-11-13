@@ -487,6 +487,14 @@ function Bargains.GetFilterHits(id)
   end
 end
 
+-- The time of the full scan the filter hits are from, nil where there is none or it is older than MAX_AGE.
+function Bargains.GetScannedAt()
+  local scannedAt = Hits().scannedAt
+  if scannedAt and time() - scannedAt <= Bargains.MAX_AGE then
+    return scannedAt
+  end
+end
+
 -- The items of the last full scan that a filter left out because of their quality or levels, although the price and
 -- the category matched ({ itemId, price, quality, itemLevel, requiredLevel }, cheapest first), and why.
 function Bargains.GetLeftOut(id)

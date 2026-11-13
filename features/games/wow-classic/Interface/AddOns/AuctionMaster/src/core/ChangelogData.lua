@@ -4,6 +4,17 @@ local addonName, AM = ...
 AM.ChangelogMarkdown = [====[
 # Changelog
 
+## 11.6.5
+
+- Full scan: Added a full scan button to the footer of every auction house tab, showing the progress and how old the last scan is
+- Full scan: No longer starts by itself when the auction house opens, with the option to switch that back on (`Scan when the auction house opens`)
+- Forever: Prices, recipes and bags are now kept separately for each ruleset
+
+## 11.6.4
+
+- Chat: New option to choose how many chat messages AuctionMaster writes, from quiet to detailed
+- Logo: Fixed the missing letters on the AuctionMaster logo
+
 ## 11.6.3
 
 - Full scan: Stops waiting sooner when the auction house does not answer, and starts again by itself as soon as the server allows it
@@ -180,6 +191,8 @@ AM.ChangelogMarkdown = [====[
 
 -- Chat message per version and language (enUS is the fallback).
 AM.ChangelogAnnounce = {
+  ["11.6.5"] = { enUS = "Full Scan button on every auction house tab, automatic scan off by default", deDE = "Komplettscan-Button auf jedem Tab des Auktionshauses, automatischer Scan standardmäßig aus" },
+  ["11.6.4"] = { silent = true },
   ["11.6.3"] = { silent = true },
   ["11.6.2"] = { silent = true },
   ["11.6.1"] = { silent = true },

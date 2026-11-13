@@ -3,7 +3,7 @@
 ## Notes: Auction house selling and price statistics tool for WoW.
 ## Author: Udorn
 ## X-License: All Rights Reserved
-## Version: v11.6.3
+## Version: v11.6.5
 ## X-Curse-Project-ID: 5762
 ## X-Localizations: enUS, deDE
 ## Category: Auctions
@@ -34,6 +34,7 @@ src/ui/Widgets.lua
 src/ui/Native.lua
 src/ui/Attachment.lua
 src/ui/MainWindow.lua
+src/ui/ScanButton.lua
 src/scan/Scan.lua
 src/scan/ItemSearch.lua
 src/api/API.lua

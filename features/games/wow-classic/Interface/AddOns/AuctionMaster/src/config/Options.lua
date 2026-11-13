@@ -122,16 +122,36 @@ local function CreateMainPanel()
   return panel
 end
 
--- The "Display" page: what AuctionMaster shows in the game's own windows and tooltips.
-local function CreateDisplayPanel()
+-- The "General" page: the full scan, and what AuctionMaster shows in the game's own windows, tooltips and the chat.
+local function CreateGeneralPanel()
   local panel = CreateFrame("Frame", nil, SettingsPanel)
-  panel.name = L["OPTIONS_DISPLAY"]
+  panel.name = L["OPTIONS_GENERAL"]
 
   local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
   title:SetPoint("TOPLEFT", 16, -16)
-  title:SetText(L["OPTIONS_DISPLAY"])
+  title:SetText(L["OPTIONS_GENERAL"])
 
-  local tooltipHeader = CreateHeader(panel, L["OPTIONS_TOOLTIP"], title, 0, -20)
+  -- Whether the full scan starts by itself when the auction house opens (off by default).
+  local scanHeader = CreateHeader(panel, L["OPTIONS_SCAN"], title, 0, -20)
+  local autoScanCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+  autoScanCheck:SetPoint("TOPLEFT", scanHeader, "BOTTOMLEFT", -4, -16)
+  local autoScanLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+  autoScanLabel:SetPoint("LEFT", autoScanCheck, "RIGHT", 4, 0)
+  autoScanLabel:SetText(L["OPTIONS_AUTO_SCAN"])
+  autoScanCheck:SetScript("OnClick", function(self)
+    AM.Scan.SetAutoEnabled(self:GetChecked())
+  end)
+  autoScanCheck:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(L["OPTIONS_AUTO_SCAN"], 1, 1, 1)
+    GameTooltip:AddLine(L["OPTIONS_AUTO_SCAN_TOOLTIP"], nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  autoScanCheck:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+
+  local tooltipHeader = CreateHeader(panel, L["OPTIONS_TOOLTIP"], autoScanCheck, 4, -16)
 
   -- How much market data item tooltips show.
   local tooltipLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -228,11 +248,35 @@ local function CreateDisplayPanel()
     GameTooltip:Hide()
   end)
 
+  -- How much AuctionMaster writes to the chat.
+  local chatHeader = CreateHeader(panel, L["OPTIONS_CHAT"], levelingCheck, 4, -16)
+  local chatLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+  chatLabel:SetPoint("TOPLEFT", chatHeader, "BOTTOMLEFT", 0, -24)
+  chatLabel:SetText(L["OPTIONS_CHAT_LEVEL"])
+  local chatDropdown = CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate")
+  chatDropdown:SetWidth(120)
+  chatDropdown:SetPoint("LEFT", chatLabel, "RIGHT", 12, 0)
+  chatDropdown:SetupMenu(function(_, root)
+    for _, level in ipairs(AM.Chat.LEVELS) do
+      -- each choice explains itself in a tooltip of its own
+      local radio = root:CreateRadio(L["OPTIONS_CHAT_LEVEL_" .. strupper(level)], function()
+        return AM.Chat.GetLevel() == level
+      end, function()
+        AM.Chat.SetLevel(level)
+      end)
+      radio:SetTooltip(function(tooltip)
+        GameTooltip_AddNormalLine(tooltip, L["OPTIONS_CHAT_LEVEL_" .. strupper(level) .. "_TOOLTIP"])
+      end)
+    end
+  end)
+
   local function Refresh()
+    autoScanCheck:SetChecked(AM.Scan.IsAutoEnabled())
     disenchantCheck:SetChecked(AM.Disenchant.IsTooltipEnabled())
     levelingCheck:SetChecked(AM.Leveling.IsEnabled())
     tooltipDropdown:GenerateMenu()
     priceDropdown:GenerateMenu()
+    chatDropdown:GenerateMenu()
   end
   panel:SetScript("OnShow", Refresh)
   panel.OnRefresh = Refresh
@@ -508,7 +552,7 @@ AM.Locale.OnReady(function()
   if HAS_OPTIONS and HAS_LAYOUT then
     category = Settings.RegisterCanvasLayoutCategory(CreateMainPanel(), addonName)
     -- The subpages are listed alphabetically in the language of the client.
-    local subpages = { CreateDisplayPanel(), CreateMarketPanel(), CreateSellPanel() }
+    local subpages = { CreateGeneralPanel(), CreateMarketPanel(), CreateSellPanel() }
     table.sort(subpages, function(a, b)
       return strcmputf8i(a.name, b.name) < 0
     end)

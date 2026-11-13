@@ -11,7 +11,6 @@ local UI = AM.Theme.ui
 
 local PADDING = 8
 local GAP = 6
-local BAR_HEIGHT = 22
 local FOOTER_HEIGHT = 22
 local FOOTER_PAD = 0 -- below the footer: as in the auction house, the buttons fill the narrow strip below the list
 local BUTTON_PADDING = 10
@@ -66,13 +65,6 @@ local function Search(itemId)
   end
 end
 
--- Greyed out while a scan runs and until the server allows the next one.
-local function UpdateScanButton()
-  if view then
-    view.scan:SetEnabled(not AM.Scan.IsRunning() and AM.Scan.GetWaitSeconds() <= 0)
-  end
-end
-
 -- "Scanning 6,849 / 11,046" while the auctions are read, "Scanning..." until the server has answered.
 local function ScanText()
   local read, total = AM.Scan.GetProgress()
@@ -82,16 +74,14 @@ local function ScanText()
   return L["BARGAINS_SCANNING_COUNT"]:format(AM.FormatCount(read), AM.FormatCount(total))
 end
 
--- The footer text: the search or scan that runs, else when the last full scan was.
+-- The footer text: the search or scan that runs, else nothing.
 local function UpdateAge()
-  local last = AM.Database.GetGlobalObject("scan").lastSuccess
   if AM.BargainScan.IsRunning() then
     view.age:SetText(Widgets.Color(UI.gold, L["BARGAINS_SEARCHING"]:format(AM.BargainScan.GetProgress())))
   elseif AM.Scan.IsRunning() then
     view.age:SetText(Widgets.Color(UI.gold, ScanText())) -- the count
   else
-    view.age:SetText(Widgets.Color(UI.gold, last and L["BARGAINS_LAST_SCAN"]:format("") or L["BARGAINS_NO_SCAN"])
-      .. (last and Widgets.Color(UI.text, FormatAge(last)) or ""))
+    view.age:SetText("")
   end
 end
 
@@ -163,6 +153,9 @@ local function ResetRow(row)
   row.price:ClearAllPoints()
   row.maxLine:Hide()
   row.maxLine:ClearAllPoints()
+  if row.search then
+    row.search:Hide()
+  end
   row:SetAlpha(1)
   row:EnableMouse(false)
 end
@@ -263,9 +256,6 @@ local function SetupFilterRule(row, item)
   local sub, found = description and Widgets.Color(GREY, description) or "", nil
   if hits then
     found = #hits > 0 and Widgets.Color(UI.gain, tostring(#hits)) or Widgets.Color(GREY, L["BARGAINS_NONE"])
-  else
-    sub = Widgets.Color(GREY, description and (description .. " - " .. L["BARGAINS_NOT_SCANNED"])
-      or L["BARGAINS_NOT_SCANNED"])
   end
   -- the fold toggle only where there is something to fold
   local nameLeft = 34
@@ -315,6 +305,36 @@ local function SetupLeftOut(row, item)
   row.name:SetPoint("RIGHT", row.price, "LEFT", -4, 0)
 end
 
+-- The search of the items, on the right of their header: only items are searched, filters wait for a full scan, so
+-- the button sits with the items and nowhere near the filters. It searches all items of the active rules, or stops
+-- the search that runs. Made the first time a row shows the header.
+local function SetupSearchButton(row)
+  if not row.search then
+    row.search = Widgets.CreateButton(row, L["BARGAINS_SEARCH"], true, function()
+      if AM.BargainScan.IsRunning() then
+        AM.BargainScan.Stop()
+      else
+        AM.BargainScan.Start()
+      end
+    end)
+    row.search:SetHeight(HEIGHT.header - 4)
+    row.search:SetPoint("RIGHT", -4, 0)
+    -- all items are searched in one go, so the time is the same for all of them: it is told here instead of in the rows
+    Widgets.SetTooltip(row.search, function()
+      local searched = Bargains.GetLastSearched()
+      return searched and L["BARGAINS_SEARCHED_AT"]:format(FormatAge(searched)) or L["BARGAINS_SEARCH_ITEMS"]
+    end)
+  end
+  local any = false
+  for _, rule in ipairs(Bargains.GetRules("item")) do
+    any = any or rule.active
+  end
+  local searching = AM.BargainScan.IsRunning()
+  row.search:SetLabel(searching and L["BARGAINS_SEARCH_STOP"] or L["BARGAINS_SEARCH"], BUTTON_PADDING)
+  row.search:SetEnabled(any and (searching or not AM.Scan.IsRunning()))
+  row.search:Show()
+end
+
 local function SetupRow(row, item)
   ResetRow(row)
   row.name:SetFontObject(GameFontHighlightSmall)
@@ -324,6 +344,16 @@ local function SetupRow(row, item)
     row.name:SetTextColor(1, 0.82, 0)
     row.name:SetText(item.text)
     row.name:SetPoint("LEFT", 12, 0)
+    if item.search then
+      SetupSearchButton(row)
+    elseif item.scan then
+      -- filters are only checked by a full scan: how old the one they show is, or that they need one
+      local scannedAt = Bargains.GetScannedAt()
+      row.price:SetPoint("RIGHT", -8, 0)
+      row.price:SetText(scannedAt and Widgets.Color(UI.text, L["BARGAINS_FULL_SCAN_AGO"]:format(FormatAge(scannedAt)))
+        or Widgets.Color(GREY, L["BARGAINS_NEEDS_SCAN"]))
+      row.price:Show()
+    end
   elseif item.type == "item" then
     SetupItemRule(row, item)
   elseif item.type == "filter" then
@@ -380,14 +410,15 @@ local function BuildItems()
     return items
   end
   if #itemRules > 0 then
-    items[#items + 1] = { type = "header", height = HEIGHT.header, text = L["BARGAINS_ITEMS"] .. " (" .. #itemRules .. ")" }
+    items[#items + 1] = { type = "header", height = HEIGHT.header, text = L["BARGAINS_ITEMS"] .. " (" .. #itemRules .. ")",
+      search = true }
     for i, rule in ipairs(itemRules) do
       items[#items + 1] = { type = "item", height = HEIGHT.rule, rule = rule, stripe = i % 2 == 0 }
     end
   end
   if #filterRules > 0 then
     items[#items + 1] = { type = "header", height = HEIGHT.header,
-      text = L["BARGAINS_FILTERS"] .. " (" .. #filterRules .. ")" }
+      text = L["BARGAINS_FILTERS"] .. " (" .. #filterRules .. ")", scan = true }
     for i, rule in ipairs(filterRules) do
       items[#items + 1] = { type = "filter", height = HEIGHT.rule, rule = rule, stripe = i % 2 == 0 }
       for j, hit in ipairs(rule.active and not IsFolded(rule.id) and Bargains.GetFilterHits(rule.id) or {}) do
@@ -1096,7 +1127,7 @@ function BargainsPanel.Create(parent)
     BargainsPanel.Edit(nil)
   end)
   view.new = new
-  new:SetPoint("TOPLEFT", PADDING, -PADDING)
+  new:SetHeight(FOOTER_HEIGHT - 2) -- the strip below the list is as narrow as the auction house's
   new:SetLabel(L["BARGAINS_NEW"], BUTTON_PADDING) -- as wide as its text, which is longer in some languages
   new:SetMotionScriptsWhileDisabled(true) -- else a greyed out button shows no tooltip
   Widgets.SetTooltip(new, function()
@@ -1104,55 +1135,30 @@ function BargainsPanel.Create(parent)
         and L["BARGAINS_LIMIT_ALL"]:format(Bargains.MAX_ITEM_RULES, Bargains.MAX_FILTER_RULES)
       or L["BARGAINS_NEW"]
   end)
-  view.scan = Widgets.CreateSecondaryButton(main, L["BARGAINS_FULL_SCAN"], function()
-    AM.Scan.Start()
-  end)
-  view.scan:SetPoint("TOPRIGHT", -PADDING, -PADDING)
-  view.scan:SetLabel(L["BARGAINS_FULL_SCAN"], BUTTON_PADDING)
-  -- the server allows a full scan every 15 minutes: greyed out until then, the tooltip says when it is possible again
-  view.scan:SetMotionScriptsWhileDisabled(true) -- else a greyed out button shows no tooltip
-  Widgets.SetTooltip(view.scan, function()
-    local wait = AM.Scan.GetWaitSeconds()
-    return wait > 0 and L["BARGAINS_SCAN_WAIT"]:format(("%d:%02d"):format(math.floor(wait / 60), wait % 60))
-      or L["BARGAINS_FULL_SCAN"]
-  end)
-  local sinceUpdate = 0
+  local sinceUpdate, sinceRedraw = 0, 0
   view:SetScript("OnUpdate", function(_, elapsed)
     sinceUpdate = sinceUpdate + elapsed
     if sinceUpdate < 1 then
       return
     end
+    sinceRedraw = sinceRedraw + sinceUpdate
     sinceUpdate = 0
-    UpdateScanButton()
-    UpdateAge() -- the count, or the minutes since the last scan
-    if GameTooltip:GetOwner() == view.scan and GameTooltip:IsShown() then
-      view.scan:GetScript("OnEnter")(view.scan) -- the countdown
+    UpdateAge() -- the count of the search or scan that runs
+    if sinceRedraw >= 30 then
+      -- the age of the full scan on the filter header, and the results that ran out
+      sinceRedraw = 0
+      BargainsPanel.Update()
     end
   end)
 
-  -- searches all items of the active rules, or stops the search that runs
-  view.search = Widgets.CreateButton(main, L["BARGAINS_SEARCH_ITEMS"], true, function()
-    if AM.BargainScan.IsRunning() then
-      AM.BargainScan.Stop()
-    else
-      AM.BargainScan.Start()
-    end
-  end)
-  view.search:SetPoint("BOTTOMRIGHT", -PADDING, FOOTER_PAD - 1)
-  view.search:SetHeight(FOOTER_HEIGHT - 2) -- the strip below the list is as narrow as the auction house's
-  view.search:SetLabel(L["BARGAINS_SEARCH_ITEMS"], BUTTON_PADDING)
-  -- all items are searched in one go, so the time is the same for all of them: it is told here instead of in the rows
-  Widgets.SetTooltip(view.search, function()
-    local searched = Bargains.GetLastSearched()
-    return searched and L["BARGAINS_SEARCHED_AT"]:format(FormatAge(searched)) or L["BARGAINS_SEARCH_ITEMS"]
-  end)
+  new:SetPoint("BOTTOMRIGHT", -PADDING, FOOTER_PAD - 1)
   view.age = Widgets.CreateText(main, "GameFontHighlightSmall")
   view.age:SetPoint("LEFT", main, "BOTTOMLEFT", PADDING, FOOTER_PAD + FOOTER_HEIGHT / 2 - 2)
-  view.age:SetPoint("RIGHT", view.search, "LEFT", -GAP, 0)
+  view.age:SetPoint("RIGHT", new, "LEFT", -GAP, 0)
   view.age:SetJustifyH("LEFT")
+  view.age:SetWordWrap(false)
 
-  view.list = AM.Attachment.CreateList(main, PADDING + BAR_HEIGHT + GAP, FOOTER_PAD + FOOTER_HEIGHT, CreateRow,
-    SetupRow)
+  view.list = AM.Attachment.CreateList(main, PADDING, FOOTER_PAD + FOOTER_HEIGHT, CreateRow, SetupRow)
 
   view.editor = CreateEditor(view)
   view.editor:SetPoint("TOPLEFT", 8, -PADDING) -- the sides of the list
@@ -1167,14 +1173,6 @@ function BargainsPanel.Update()
   end
   view.list.SetItems(BuildItems())
   UpdateAge()
-  UpdateScanButton()
-  local any = false
-  for _, rule in ipairs(Bargains.GetRules("item")) do
-    any = any or rule.active
-  end
-  local searching = AM.BargainScan.IsRunning()
-  view.search:SetLabel(searching and L["BARGAINS_SEARCH_STOP"] or L["BARGAINS_SEARCH_ITEMS"], BUTTON_PADDING)
-  view.search:SetEnabled(any and (searching or not AM.Scan.IsRunning()))
   view.new:SetEnabled(not (Bargains.IsFull("item") and Bargains.IsFull("filter")))
 end
 

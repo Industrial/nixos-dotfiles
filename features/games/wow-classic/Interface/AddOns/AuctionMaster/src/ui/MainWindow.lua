@@ -20,7 +20,7 @@ local Widgets = AM.Widgets
 
 local UI = AM.Theme.ui
 
-local BORDER_INSET = 7 -- border of the auction house frame
+local CORNER_WIDTH = 10 -- how far the game's corner piece at the top right of the gold display reaches beyond it
 local SIDE_INSET = 4 -- how far our window reaches into it on the left and right, to cover its inner edge
 local TITLE_HEIGHT = 23 -- its title bar
 local FOOTER_HEIGHT = 32
@@ -38,7 +38,7 @@ local TAB_TEMPLATES = { "AuctionHouseFrameDisplayModeTabTemplate", "AuctionHouse
   "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate" }
 
 local views = {}
-local frame, content, footerFrame, footerText, switchButton
+local frame, content, footerFrame, switchButton
 local activeView
 local tabButton
 local savedTab, savedTitle -- what the auction house showed before our view, put back when it goes away
@@ -75,39 +75,16 @@ function MainWindow.IsShown()
   return frame ~= nil and frame:IsVisible()
 end
 
--- How long ago the scan was: "less than a minute ago", else in minutes (and hours, days), e.g. "2 min ago".
-local function FormatAge(timestamp)
-  local age = time() - timestamp
-  if age < 60 then
-    return L["MAIN_AGO_NOW"]
-  end
-  return L["MAIN_AGO"]:format(SecondsToTime(age, true))
-end
-
-local function CountStacks()
-  local count = 0
-  AM.ItemStore.ForEach(function(_, _, _, stacks)
-    count = count + (stacks or 0)
-  end)
-  return count
-end
-
-local function UpdateFooter()
-  local last = AM.Database.GetGlobalObject("scan").lastSuccess
-  local text = Widgets.Color(UI.gold, L["MAIN_LAST_SCAN"]) .. " "
-  if last then
-    text = text .. Widgets.Color(UI.text, FormatAge(last)) .. " |cff835e33·|r " .. AM.FormatCount(CountStacks()) .. " " .. Widgets.Color(UI.text, L["MAIN_AUCTIONS"])
-  else
-    text = text .. Widgets.Color(UI.text, L["MAIN_NEVER"])
-  end
-  footerText:SetText(text)
+-- The strip at the bottom of the window, right of the gold display, once built. The scan button (AM.ScanButton) moves
+-- onto it while the window is shown.
+function MainWindow.GetFooter()
+  return footerFrame
 end
 
 function MainWindow.Refresh()
   if not frame or not frame:IsVisible() then
     return
   end
-  UpdateFooter()
   if activeView.refresh then
     activeView.refresh()
   end
@@ -197,9 +174,39 @@ local function ShowStar()
   starAlpha, starMouse = nil, nil
 end
 
+-- The frames of the game's views, below our window. Their parts in the strip of the footer (e.g. the cancel button
+-- of the Auctions view) would show beside the gold display, so they are made invisible while our window is shown:
+-- only their alpha is changed, and given back as it was.
+local VIEW_KEYS = { "SearchBar", "CategoriesList", "BrowseResultsFrame", "WoWTokenResults", "CommoditiesBuyFrame",
+  "ItemBuyFrame", "ItemSellFrame", "ItemSellList", "CommoditiesSellFrame", "CommoditiesSellList", "WoWTokenSellFrame",
+  "AuctionsFrame" }
+local viewAlphas -- frame -> its alpha before, while hidden
+
+local function HideViews()
+  if viewAlphas then
+    return
+  end
+  viewAlphas = {}
+  for _, key in ipairs(VIEW_KEYS) do
+    local view = AuctionHouseFrame[key]
+    if type(view) == "table" and view.SetAlpha then
+      viewAlphas[view] = view:GetAlpha()
+      view:SetAlpha(0)
+    end
+  end
+end
+
+local function ShowViews()
+  for view, alpha in pairs(viewAlphas or {}) do
+    view:SetAlpha(alpha)
+  end
+  viewAlphas = nil
+end
+
 -- Our view takes the place of the game's: its tab looks selected and the title says whose view it is.
 local function TakeOver()
   HideStar()
+  HideViews()
   savedTab = nil
   for _, tab in ipairs(GetNativeTabs()) do
     if not tab:IsEnabled() then
@@ -219,6 +226,7 @@ end
 -- itself, which does nothing there, does it need to be selected again, together with the title.
 local function GiveBack()
   ShowStar()
+  ShowViews()
   SetTabSelected(tabButton, false)
   if savedTab and not IsNativeTabSelected() then
     SetTabSelected(savedTab, true)
@@ -232,16 +240,17 @@ local function GiveBack()
 end
 
 -- The strip of the game's own footer (gold display, buttons of its views) stays: our window ends above it and the
--- text and the switch button take the free space right of the gold display, over the buttons of the game's view
--- below. The measures are taken from the game's frame, with fallbacks.
+-- scan button and the switch button take the free space right of the gold display, over the buttons of the game's
+-- view below. The measures are taken from the game's frame, with fallbacks.
 local function MeasureNativeFooter(house)
-  local height, left = FOOTER_HEIGHT, 175
+  local height, left = FOOTER_HEIGHT, 189
   local money = house.MoneyFrameBorder
   if money and money:GetTop() and house:GetBottom() then
     height = money:GetTop() - house:GetBottom() + 2
   end
+  -- the strip starts right of the frame around the gold display and its corner piece, which stay visible
   if money and money:GetRight() and house:GetLeft() then
-    left = money:GetRight() - house:GetLeft() - 4
+    left = money:GetRight() - house:GetLeft() + CORNER_WIDTH
   end
   return height, left
 end
@@ -276,42 +285,15 @@ local function CreateFooter(house, left)
     end
   end
   footer:SetFrameLevel(HighestLevel(house) + 1)
-  footer:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", left + BORDER_INSET - SIDE_INSET, 0)
+  footer:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", left - SIDE_INSET, 0)
   -- reaches further to the right and down than our window, to cover the edge of the game's buttons below
   -- as far right as the window above (SIDE_INSET): further in, the inner edge of the game's frame shows beside the strip
   footer:SetPoint("BOTTOMRIGHT", house, "BOTTOMRIGHT", -SIDE_INSET, FOOTER_OVERHANG + 1)
-  footer:EnableMouse(true) -- a button of the game's view below is covered
-  local background = footer:CreateTexture(nil, "BACKGROUND")
-  background:SetAllPoints()
-  background:SetColorTexture(UI.body[1], UI.body[2], UI.body[3])
-  local rock
-  if AM.Native.IsClassicSkin() then
-    background:SetColorTexture(unpack(AM.Native.CLASSIC_BODY))
-  else
-    rock = AM.Native.AddFrameBackground(footer)
-  end
+  -- No background: the game's own footer with its frames shows through. The game's view below is made invisible
+  -- while our window is shown (HideViews), the strip only keeps its buttons there from being clicked.
+  footer:EnableMouse(true)
   footer:Hide()
   footerFrame = footer
-  -- A UI addon that restyles the game's windows gives the strip its flat color in place of ours and the rock. The
-  -- color stays opaque, whatever the addon's panels are: the buttons of the game's view below must not shine through.
-  AM.Compat.OnSkin(house, function(skin)
-    local r, g, b = skin.GetPanelColor()
-    background:SetColorTexture(r, g, b, 1)
-    if rock then
-      rock:Hide()
-    end
-  end)
-  footerText = Widgets.CreateText(footer, "GameFontHighlightSmall")
-  footerText:SetPoint("LEFT", 8, 0)
-  -- the age counts up while the window is open
-  local elapsed = 0
-  footer:SetScript("OnUpdate", function(_, seconds)
-    elapsed = elapsed + seconds
-    if elapsed >= 5 then
-      elapsed = 0
-      UpdateFooter()
-    end
-  end)
 
   switchButton = Widgets.CreateButton(footer, "", false, function()
     MainWindow.Select(GetOtherView().id)
@@ -457,7 +439,7 @@ end
 -- Shows the window on the view, the one shown last if there is none given.
 function MainWindow.Show(id)
   if not IsAuctionHouseOpen() then
-    AM.Print(L["MAIN_OPEN_AUCTION_HOUSE"])
+    AM.Print(L["MAIN_OPEN_AUCTION_HOUSE"], "quiet")
     return
   end
   Install()
