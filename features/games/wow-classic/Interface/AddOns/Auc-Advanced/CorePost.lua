@@ -171,6 +171,7 @@ local ErrorText = {
 	FailSlot = "Unable to place item in the Auction slot",
 	FailStart = "Failed to start auction",
 	FailMultisell = "Multisell failed to post all requested stacks",
+	RetailSingleOnly = "Only one stack can be posted at a time on this client; use a stack size of 1 or post individually",
 	QueueBusy = "The posting queue is currently busy",
 }
 lib.ErrorText = ErrorText -- Deprecated: we don't want to give other modules direct access to the table
@@ -492,6 +493,61 @@ function lib.PostAuction(sig, size, bid, buyout, duration, multiple)
 	return request.id
 end
 
+--[[ PRIVATE: RetailPost(request)
+	Post directly through C_AuctionHouse. The classic ClickAuctionSellItemButton /
+	GetAuctionSellItemInfo "auction slot" does not exist on this client, so
+	LoadAuctionSlot + StartAuction can never work here. Must be called from
+	within an OnClick handler: PostItem/PostCommodity are hwevent protected.
+--]]
+function private.RetailPost(request)
+	local c = C_AuctionHouse
+	if not c then return nil, "FailStart" end
+	local bag, slot = private.SelectStack(request)
+	if not bag then return nil, slot or "NotFound" end
+	local itemLoc = ItemLocation:CreateFromBagAndSlot(bag, slot)
+	local ok, valid = pcall(function() return itemLoc and itemLoc:IsValid() end)
+	if not (ok and valid) then return nil, "FailSlot" end
+
+	local duration = request.duration -- GetRequest already validated it to 1-3
+	local size = request.count or 1
+	local stacks = request.stacks or 1
+	local status = c.GetItemCommodityStatus and c.GetItemCommodityStatus(itemLoc)
+	local commodity = Enum and Enum.ItemCommodityStatus and status == Enum.ItemCommodityStatus.Commodity
+
+	-- This client stores AH prices in whole gold only; copper is silently rejected.
+	local bid, buyout = request.bid, request.buy
+	if c.SupportsCopperValues and not c.SupportsCopperValues() then
+		local GOLD = 10000
+		bid = math.ceil(bid / GOLD) * GOLD
+		buyout = math.ceil(buyout / GOLD) * GOLD
+		if buyout > 0 and bid >= buyout then
+			return nil, "InvalidBuyout"
+		end
+	end
+
+	if commodity then
+		-- PostCommodity takes a per-unit price and one quantity for the whole lot.
+		if not c.PostCommodity then return nil, "FailStart" end
+		if buyout <= 0 then return nil, "InvalidBuyout" end
+		local quantity = size * stacks
+		local unitPrice = buyout / size
+		local needs = c.PostCommodity(itemLoc, duration, quantity, unitPrice)
+		if needs and c.ConfirmPostCommodity then
+			c.ConfirmPostCommodity(itemLoc, duration, quantity, unitPrice)
+		end
+	else
+		-- Non-commodity: one auction per stack. Several separate stacks need the
+		-- multisell flow, which cannot run from a single hardware event.
+		if not c.PostItem then return nil, "FailStart" end
+		if stacks > 1 then return nil, "RetailSingleOnly" end
+		local needs = c.PostItem(itemLoc, duration, size, bid, buyout)
+		if needs and c.ConfirmPostItem then
+			c.ConfirmPostItem(itemLoc, duration, size, bid, buyout)
+		end
+	end
+	return true
+end
+
 --[[ PostAuctionClick(sig, size, bid, buyout, duration, multiple)
 	As PostAuction, except that this function will attempt to post the auction immediately if possible
 	May only be called from an OnClick handler
@@ -500,6 +556,15 @@ function lib.PostAuctionClick(sig, size, bid, buyout, duration, multiple)
 	local request, failure, extra = private.GetRequest(sig, size, bid, buyout, duration, multiple)
 	if not request then
 		return nil, failure
+	end
+
+	-- WoW Forever: bypass the classic auction-slot machinery entirely.
+	if AucAdvanced.IsRetailAH then
+		request.sig = sig
+		request.count = size
+		local posted, reason = private.RetailPost(request)
+		if not posted then return nil, reason or "FailStart" end
+		return request.id
 	end
 
 	request.sig = sig;

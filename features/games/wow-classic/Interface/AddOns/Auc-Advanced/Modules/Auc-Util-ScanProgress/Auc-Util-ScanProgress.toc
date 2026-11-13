@@ -6,7 +6,7 @@
 ## ExcludeLoadGameType: standard, classic
 ## Dependencies: Auc-Advanced
 ##
-## Version: 4.0.4
+## Version: 4.0.5
 ## Revision: $Id: Auc-Util-ScanProgress.toc 6749 2022-01-25 11:42:44Z none $
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer

@@ -5,7 +5,7 @@
 ## Notes: Shift+right-click to easily buyout an auction with no confirmation box!
 ## Dependencies: Auc-Advanced
 ##
-## Version: 4.0.4
+## Version: 4.0.5
 ## Revision: $Id: Auc-Util-EasyBuyout.toc 6745 2022-01-25 11:42:44Z none $
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer

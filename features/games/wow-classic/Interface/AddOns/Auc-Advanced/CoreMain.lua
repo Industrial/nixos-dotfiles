@@ -63,6 +63,65 @@ if not GetItemInfo then
 	end
 end
 
+-- Compatibility shim: GetItemCount may not exist in WoW Forever (replaced by C_Item.GetItemCount)
+if not GetItemCount and C_Item and C_Item.GetItemCount then
+	GetItemCount = function(item, ...)
+		return C_Item.GetItemCount(item, ...)
+	end
+end
+
+-- Compatibility shims: globals removed on modern clients, restored through
+-- their namespaced equivalents. These are real replacements: the caller gets
+-- the value/behaviour it expects, not a nil guard or a no-op stub.
+if not GetItemIcon and C_Item then
+	GetItemIcon = C_Item.GetItemIconByID
+end
+if not GetAddOnMetadata and C_AddOns then
+	GetAddOnMetadata = C_AddOns.GetAddOnMetadata
+end
+if not GetContainerNumSlots and C_Container then
+	GetContainerNumSlots = C_Container.GetContainerNumSlots
+end
+if not GetSpellLink and C_Spell then
+	GetSpellLink = C_Spell.GetSpellLink
+end
+if not GetSpellSubtext and C_Spell then
+	GetSpellSubtext = C_Spell.GetSpellSubtext
+end
+if not GetSpellInfo and C_Spell and C_Spell.GetSpellInfo then
+	-- C_Spell.GetSpellInfo returns a SpellInfo table; the legacy global
+	-- returned name, rank, icon, castTime, minRange, maxRange, spellID.
+	-- Accept both shapes so the shim is correct on either API revision.
+	GetSpellInfo = function(spell, ...)
+		local a, b, c, d, e, f, g = C_Spell.GetSpellInfo(spell, ...)
+		if type(a) == "table" then
+			local i = a
+			return i.name, nil, i.iconID, i.castTime, i.minRange, i.maxRange, i.spellID
+		end
+		return a, b, c, d, e, f, g
+	end
+end
+if not GetMerchantItemInfo and C_MerchantFrame and C_MerchantFrame.GetItemInfo then
+	-- C_MerchantFrame.GetItemInfo returns a MerchantItemInfo table; Auctioneer's
+	-- callers expect the legacy tuple name, texture, price, quantity,
+	-- numAvailable, isUsable, extendedCost.
+	GetMerchantItemInfo = function(index)
+		local info = C_MerchantFrame.GetItemInfo(index)
+		if not info then return nil end
+		return info.name, info.texture, info.price, info.stackCount,
+			info.numAvailable, info.isUsable, info.hasExtendedCost
+	end
+end
+if not CanSendAuctionQuery and C_AuctionHouse and C_AuctionHouse.IsThrottledMessageSystemReady then
+	CanSendAuctionQuery = function()
+		local ready = C_AuctionHouse.IsThrottledMessageSystemReady()
+		return ready, ready
+	end
+end
+if not CancelSell and C_AuctionHouse then
+	CancelSell = C_AuctionHouse.CancelSell
+end
+
 -- Compatibility shim: GetItemQualityColor may not exist in WoW Forever
 if not GetItemQualityColor then
 	local qualityColors = {
@@ -197,109 +256,88 @@ if not AuctionFrameBrowse then
 	AuctionFrameBrowse.selectedSubSubCategoryIndex = nil
 end
 
--- Compatibility shim: GetAuctionSellItemInfo may not exist in retail
+-- Resolves the item currently being sold. Both sell frames derive from
+-- AuctionHouseSellFrameMixin, whose :GetItem() returns an ItemLocation (not a
+-- data table, which is what the old shims incorrectly assumed).
+local function GetRetailSellItemLocation()
+	local f = AuctionHouseFrame
+	if not f then return nil end
+	local loc = f.ItemSellFrame and f.ItemSellFrame:GetItem()
+	if loc and loc.IsValid and loc:IsValid() then return loc end
+	loc = f.CommoditiesSellFrame and f.CommoditiesSellFrame:GetItem()
+	if loc and loc.IsValid and loc:IsValid() then return loc end
+	return nil
+end
+
+-- Compatibility shim: GetAuctionSellItemInfo may not exist in retail.
+-- Rebuild the classic 10-value tuple from the modern sell ItemLocation.
 if not GetAuctionSellItemInfo and C_AuctionHouse then
 	GetAuctionSellItemInfo = function()
-		-- In retail, the sell item is managed by the AuctionHouseFrame's ItemSellFrame
-		-- Try to get info from the current sell context
-		if AuctionHouseFrame and AuctionHouseFrame.ItemSellFrame then
-			local item = AuctionHouseFrame.ItemSellFrame:GetItem()
-			if item then
-				local itemName = item.itemName or ""
-				local texture = item.icon or 0
-				local count = item.count or 1
-				local quality = item.quality or 1
-				local price = item.buyoutAmount or 0
-				local pricePerUnit = item.unitPrice or 0
-				local stackCount = item.count or 1
-				local totalCount = item.count or 1
-				local itemID = item.itemID or 0
-				return itemName, texture, count, quality, true, price, pricePerUnit, stackCount, totalCount, itemID
-			end
-		end
-		return nil
+		local loc = GetRetailSellItemLocation()
+		if not loc then return nil end
+		local link = C_Item.GetItemLink(loc)
+		if not link then return nil end
+		local name, _, quality, _, _, _, _, _, _, texture = GetItemInfo(link)
+		local itemID = C_Item.GetItemID(loc)
+		local stack = C_Item.GetStackCount and C_Item.GetStackCount(loc) or 1
+		return name, texture, stack, quality, true, 0, 0, stack, stack, itemID
 	end
 end
 
--- Compatibility shim: GetAuctionDeposit may not exist in retail
+-- Compatibility shim: GetAuctionDeposit may not exist in retail.
+-- duration arrives as the 1-3 auction duration code (already validated by
+-- private.GetRequest), which is exactly what the C_AuctionHouse deposit
+-- calculators expect. They need a real ItemLocation / itemID, not zeros.
 if not GetAuctionDeposit and C_AuctionHouse then
-	GetAuctionDeposit = function(duration, minBid, buyoutPrice)
-		-- Use C_AuctionHouse to calculate deposit
-		-- Duration: classic uses 1/2/3 (12h/24h/48h), retail uses hours
-		local durationHours = (duration == 1 and 12) or (duration == 2 and 24) or 48
-		if C_AuctionHouse.CalculateCommodityDeposit then
-			return C_AuctionHouse.CalculateCommodityDeposit(0, 0, durationHours) or 0
+	GetAuctionDeposit = function(duration, minBid, buyoutPrice, count, stackNumber)
+		local c = C_AuctionHouse
+		local quantity = (tonumber(count) or 1) * (tonumber(stackNumber) or 1)
+		local loc = GetRetailSellItemLocation()
+		if not loc then return 0 end
+		local status = c.GetItemCommodityStatus and c.GetItemCommodityStatus(loc)
+		if Enum and Enum.ItemCommodityStatus and status == Enum.ItemCommodityStatus.Commodity then
+			local itemID = C_Item.GetItemID(loc)
+			if itemID and c.CalculateCommodityDeposit then
+				return c.CalculateCommodityDeposit(itemID, duration, quantity) or 0
+			end
+		end
+		if c.CalculateItemDeposit then
+			return c.CalculateItemDeposit(loc, duration, quantity) or 0
 		end
 		return 0
 	end
 end
 
--- Compatibility shim: PlaceAuctionBid may not exist in retail
+-- Compatibility shim: PlaceAuctionBid may not exist in retail. Replicate
+-- results expose no auctionID, so route the request through AucAdvanced.Buy,
+-- which runs the item search and calls C_AuctionHouse.PlaceBid with the
+-- authoritative auctionID from the search results.
 if not PlaceAuctionBid and C_AuctionHouse then
 	PlaceAuctionBid = function(listType, index, bid)
-		local auctionID
-		if listType == "bidder" then
-			local info = C_AuctionHouse.GetBidInfo(index)
-			auctionID = info and info.auctionID
-		else
-			local info = C_AuctionHouse.GetReplicateItemInfo(index)
-			auctionID = info and info.auctionID
-		end
-		if auctionID then
-			C_AuctionHouse.PlaceBid(auctionID, bid or 0)
+		local link = C_AuctionHouse.GetReplicateItemLink(index)
+		if not link then return end
+		local info = {C_AuctionHouse.GetReplicateItemInfo(index)}
+		if AucAdvanced.Buy and AucAdvanced.Buy.QueueBuy then
+			AucAdvanced.Buy.QueueBuy(link, info[14] or "", info[3] or 1,
+				info[8] or 0, info[10] or 0, bid or info[10] or 0, "PlaceAuctionBid")
 		end
 	end
 end
 
--- Compatibility shim: PostAuction may not exist in retail
+-- Compatibility shim: PostAuction may not exist in retail. Post the item
+-- currently in the modern sell frame through the working retail pipeline,
+-- instead of returning a stub failure. CoreScan wraps this global to fire
+-- "newauc" processors, so it must actually post.
 if not PostAuction and C_AuctionHouse then
 	PostAuction = function(minBid, buyoutPrice, runTime, count, stackNumber)
-		-- In retail, the item should already be set up in the sell frame
-		-- Get the item info from the sell frame
-		local name, texture, countSlotted = GetAuctionSellItemInfo()
-		if not name then return end
-		if not count then count = countSlotted end
-
-		-- Map duration: classic uses 1/2/3 (12h/24h/48h), retail uses hours
-		local durationHours = (runTime == 1 and 12) or (runTime == 2 and 24) or 48
-
-		-- Try to get the item from the retail sell frame
-		if AuctionHouseFrame and AuctionHouseFrame.ItemSellFrame then
-			local item = AuctionHouseFrame.ItemSellFrame:GetItem()
-			if item and item.itemLocation and item.itemLocation:IsValid() then
-				local itemCommodityStatus = C_AuctionHouse.GetItemCommodityStatus(item.itemLocation)
-				if itemCommodityStatus == Enum.ItemCommodityStatus.Commodity then
-					-- API: PostCommodity(ItemLocation, duration, quantity, unitPrice) - duration: 1=12h, 2=24h, 3=48h
-					C_AuctionHouse.PostCommodity(item.itemLocation, runTime, count, buyoutPrice)
-				else
-					-- API: PostItem(ItemLocation, duration, quantity, buyoutAmount, bidAmount)
-					C_AuctionHouse.PostItem(item.itemLocation, runTime, count, buyoutPrice, minBid)
-				end
-				return
-			end
-		end
-
-		-- Fallback: try to find the locked item in bags (classic-compatible)
-		for bagID = 0, 4 do
-			for slot = 1, C_Container.GetContainerNumSlots(bagID) do
-				local info = C_Container.GetContainerItemInfo(bagID, slot)
-				if info and info.isLocked then
-					local link = C_Container.GetContainerItemLink(bagID, slot)
-					if link and strfind(link, name, 1, true) then
-						local itemLoc = ItemLocation:CreateFromBagAndSlot(bagID, slot)
-						if itemLoc:IsValid() then
-							local itemCommodityStatus = C_AuctionHouse.GetItemCommodityStatus(itemLoc)
-							if itemCommodityStatus == Enum.ItemCommodityStatus.Commodity then
-								C_AuctionHouse.PostCommodity(itemLoc, count, buyoutPrice, durationHours)
-							else
-								C_AuctionHouse.PostItem(itemLoc, count, durationHours, buyoutPrice, minBid)
-							end
-							return
-						end
-					end
-				end
-			end
-		end
+		local loc = GetRetailSellItemLocation()
+		local link = loc and C_Item.GetItemLink(loc)
+		local sig = link and AucAdvanced.API and AucAdvanced.API.GetSigFromLink(link)
+		if not sig then return false, "FailSlot" end
+		local ok = AucAdvanced.Post.PostAuctionClick(sig, tonumber(count) or 1,
+			minBid, buyoutPrice, runTime, tonumber(stackNumber) or 1)
+		if not ok then return false, "FailStart" end
+		return true
 	end
 end
 

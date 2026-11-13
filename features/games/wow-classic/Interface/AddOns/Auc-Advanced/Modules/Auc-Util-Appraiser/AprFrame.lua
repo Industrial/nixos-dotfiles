@@ -1552,7 +1552,12 @@ function private.CreateFrames()
 		-- lifted out as a separate function, as it was getting increasingly unwieldy
 		if dryRun then
 			aucPrint(" - ".._TRANS('APPR_Help_PretendingPostStacks'):format(numstacks, stack, AucAdvanced.Coins(bidVal, true), AucAdvanced.Coins(buyVal, true)))--Pretending to post {{%d}} stacks of {{%d}} at {{%s}} min and {{%s}} buyout per stack
-		elseif singleclick then
+		elseif singleclick or AucAdvanced.IsRetailAH then
+			-- WoW Forever: both single and batch posts must go through the
+			-- OnClick retail path. The classic global PostAuction cannot carry
+			-- an item signature here, and the C_AuctionHouse post APIs are
+			-- hwevent protected. PostBySig is called from the Post button's
+			-- OnClick handler, so the hardware event is available.
 			local success, reason = AucAdvanced.Post.PostAuctionClick(sig, stack, bidVal, buyVal, duration, numstacks)
 			if success then
 				if stack > 1 then
@@ -1703,7 +1708,7 @@ function private.CreateFrames()
 		aucPrint("-----------------------------------")
 		if dryRun then
 			aucPrint(_TRANS('APPR_Help_PretendedItems'):format(totalNum))--Pretended {{%d}} items
-		elseif singleclick then
+		elseif singleclick or AucAdvanced.IsRetailAH then
 			aucPrint(_TRANS('APPR_Help_PostedItems'):format(totalNum))--Posted {{%d}} items
 		else
 			aucPrint(_TRANS('APPR_Help_QueuedUpItems'):format(totalNum))--Queued up {{%d}} items

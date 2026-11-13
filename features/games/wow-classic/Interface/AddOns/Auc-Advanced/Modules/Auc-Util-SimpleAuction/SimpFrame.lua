@@ -1334,35 +1334,39 @@ function private.CreateFrames()
 	frame.options:AddOption("undercut", "Undercut competitors")
 	frame.options:AddOption("remember", "Remember fixed price")
 
-	function frame.ClickBagHook(_,_,self,button)
+	-- Alt+click a bag item to load it into the Post frame's item slot. On WoW Forever the classic Stubby hook on
+	-- ContainerFrameItemButton_OnModifiedClick is gone (it replaced a secure-path global with a tainted wrapper).
+	-- The modern client routes modified bag clicks through HandleModifiedItemClick(link, itemLocation), which is
+	-- hooked securely below (the same pattern AprFrame uses). Requiring itemLocation keeps this to bag clicks;
+	-- chat links have their own hook further down.
+	function frame.ClickBagHook(link, itemLocation)
 		if not (frame:IsVisible() and get("util.simpleauc.clickhook")) then return end
-		local bag = self:GetParent():GetID()
-		local slot = self:GetID()
-		local link = C_Container.GetContainerItemLink(bag, slot)
-		local _, size = C_Container.GetContainerItemInfo(bag, slot)
-		if link then
-			if (button == "LeftButton") and (IsAltKeyDown()) then
-				private.LoadItemLink(link, size)
-				--see if double clicking to auto post is allowed
-				if (not get("util.simpleauc.clickhook.doubleclick")) then return end
+		if not (link and itemLocation and itemLocation.IsValid and itemLocation:IsValid()) then return end
+		if GetMouseButtonClicked() ~= "LeftButton" or not IsAltKeyDown() then return end
+		local bag, slot = itemLocation:GetBagAndSlot()
+		if not (bag and slot) then return end
+		local info = C_Container.GetContainerItemInfo(bag, slot)
+		local size = type(info) == "table" and info.stackCount or nil
+		link = C_Container.GetContainerItemLink(bag, slot) or link
+		private.LoadItemLink(link, size)
+		--see if double clicking to auto post is allowed
+		if (not get("util.simpleauc.clickhook.doubleclick")) then return end
 
-				if not private.clickdata then private.clickdata = {} end
-				local last = private.clickdata
-				local now = GetTime()
-				if last[1] == bag and last[2] == slot and now - last[3] < 0.5 then
-					-- Is a double click
-					aucPrint("Auto auctioning double-alt-clicked item")
-					if not frame.options.remember:GetChecked() then
-						frame.options.undercut:SetChecked(true)
-					end
-					private.CheckUpdate()
-					private.PostAuction()
-				end
-				last[1] = bag
-				last[2] = slot
-				last[3] = now
+		if not private.clickdata then private.clickdata = {} end
+		local last = private.clickdata
+		local now = GetTime()
+		if last[1] == bag and last[2] == slot and now - last[3] < 0.5 then
+			-- Is a double click
+			aucPrint("Auto auctioning double-alt-clicked item")
+			if not frame.options.remember:GetChecked() then
+				frame.options.undercut:SetChecked(true)
 			end
+			private.CheckUpdate()
+			private.PostAuction()
 		end
+		last[1] = bag
+		last[2] = slot
+		last[3] = now
 	end
 
 	local tabTemplate = AucAdvanced.GetAHTabTemplate()
@@ -1619,7 +1623,12 @@ function private.CreateFrames()
 		end
 	end
 
-	-- Forever: classic bag-click shortcut hook removed (dead code, taint risk).
+	-- Secure post-hook: alt+clicking a bag item loads it into the Post item slot.
+	-- hooksecurefunc does not replace the global with a tainted wrapper, so the
+	-- protected bag click path stays clean. AprFrame hooks the same global for
+	-- its own alt+click feature; both post-hooks run and each gates on its own
+	-- settings/visibility.
+	hooksecurefunc("HandleModifiedItemClick", frame.ClickBagHook)
 
 
 	for i = 1, NUM_CHAT_WINDOWS do

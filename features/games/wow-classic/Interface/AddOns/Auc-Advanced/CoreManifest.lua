@@ -48,6 +48,59 @@
 		This should, in most cases, avoid large (and confusing) error cascades.
 ]]
 
+-- Compatibility: WoW Forever (1.60.1) removed the LE_ITEM_CLASS_* /
+-- LE_INVENTORY_TYPE_* globals and the un-namespaced item-class helpers.
+-- CoreConst.lua consumes these at load time to build the AH category tables,
+-- so they have to exist before that file runs. CoreManifest is the first
+-- Auctioneer file loaded. The IDs are the stable Enum.ItemClass /
+-- Enum.InventoryType values; the C_ functions are the real replacements.
+LE_ITEM_CLASS_CONSUMABLE       = LE_ITEM_CLASS_CONSUMABLE       or 0
+LE_ITEM_CLASS_CONTAINER        = LE_ITEM_CLASS_CONTAINER        or 1
+LE_ITEM_CLASS_WEAPON           = LE_ITEM_CLASS_WEAPON           or 2
+LE_ITEM_CLASS_GEM              = LE_ITEM_CLASS_GEM              or 3
+LE_ITEM_CLASS_ARMOR            = LE_ITEM_CLASS_ARMOR            or 4
+LE_ITEM_CLASS_ITEM_ENHANCEMENT = LE_ITEM_CLASS_ITEM_ENHANCEMENT or 8
+LE_ITEM_CLASS_TRADEGOODS       = LE_ITEM_CLASS_TRADEGOODS       or 7
+LE_ITEM_CLASS_RECIPE           = LE_ITEM_CLASS_RECIPE           or 9
+LE_ITEM_CLASS_QUESTITEM        = LE_ITEM_CLASS_QUESTITEM        or 12
+LE_ITEM_CLASS_MISCELLANEOUS    = LE_ITEM_CLASS_MISCELLANEOUS    or 15
+LE_ITEM_CLASS_GLYPH            = LE_ITEM_CLASS_GLYPH            or 16
+LE_ITEM_CLASS_BATTLEPET        = LE_ITEM_CLASS_BATTLEPET        or 17
+LE_ITEM_CLASS_WOWTOKEN         = LE_ITEM_CLASS_WOWTOKEN         or 18
+
+LE_INVENTORY_TYPE_HEAD_TYPE      = LE_INVENTORY_TYPE_HEAD_TYPE      or 1
+LE_INVENTORY_TYPE_NECK_TYPE      = LE_INVENTORY_TYPE_NECK_TYPE      or 2
+LE_INVENTORY_TYPE_SHOULDER_TYPE  = LE_INVENTORY_TYPE_SHOULDER_TYPE  or 3
+LE_INVENTORY_TYPE_BODY_TYPE      = LE_INVENTORY_TYPE_BODY_TYPE      or 4
+LE_INVENTORY_TYPE_CHEST_TYPE     = LE_INVENTORY_TYPE_CHEST_TYPE     or 5
+LE_INVENTORY_TYPE_WAIST_TYPE     = LE_INVENTORY_TYPE_WAIST_TYPE     or 6
+LE_INVENTORY_TYPE_LEGS_TYPE      = LE_INVENTORY_TYPE_LEGS_TYPE      or 7
+LE_INVENTORY_TYPE_FEET_TYPE      = LE_INVENTORY_TYPE_FEET_TYPE      or 8
+LE_INVENTORY_TYPE_WRIST_TYPE     = LE_INVENTORY_TYPE_WRIST_TYPE     or 9
+LE_INVENTORY_TYPE_HAND_TYPE      = LE_INVENTORY_TYPE_HAND_TYPE      or 10
+LE_INVENTORY_TYPE_FINGER_TYPE    = LE_INVENTORY_TYPE_FINGER_TYPE    or 11
+LE_INVENTORY_TYPE_TRINKET_TYPE   = LE_INVENTORY_TYPE_TRINKET_TYPE   or 12
+LE_INVENTORY_TYPE_CLOAK_TYPE     = LE_INVENTORY_TYPE_CLOAK_TYPE     or 16
+LE_INVENTORY_TYPE_HOLDABLE_TYPE  = LE_INVENTORY_TYPE_HOLDABLE_TYPE  or 23
+
+if not GetItemClassInfo and C_Item then
+	GetItemClassInfo = C_Item.GetItemClassInfo
+end
+if not GetItemSubClassInfo and C_Item then
+	GetItemSubClassInfo = C_Item.GetItemSubClassInfo
+end
+if not GetItemInventorySlotInfo and C_Item then
+	GetItemInventorySlotInfo = C_Item.GetItemInventorySlotInfo
+end
+if not GetAuctionItemSubClasses and C_AuctionHouse and C_AuctionHouse.GetAuctionItemSubClasses then
+	-- The namespaced API returns a list; the legacy global returned varargs.
+	GetAuctionItemSubClasses = function(classID, ...)
+		local results = {C_AuctionHouse.GetAuctionItemSubClasses(classID, ...)}
+		if type(results[1]) == "table" and #results == 1 then return unpack(results[1]) end
+		return unpack(results)
+	end
+end
+
 AucAdvanced = {
 	Modules = {Filter={}, Match={}, Stat={}, Util={}},
 	Data = {},
@@ -104,7 +157,7 @@ end
 lib.CoreFileCheckIn("CoreManifest") -- check CoreManifest in as early as possible
 
 -- Version checking
-lib.Version="4.0.4";
+lib.Version="4.0.5";
 if lib.Version:byte(1) == 60 then -- 60 = '<'
 	lib.Version = DEV_VERSION
 end

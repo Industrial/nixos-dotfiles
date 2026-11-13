@@ -20,7 +20,7 @@
 ## Category-zhTW: 拍賣
 ## SavedVariables: AucAdvancedStat_iLevelData
 ##
-## Version: 4.0.4
+## Version: 4.0.5
 ## Revision: $Id: Auc-Stat-iLevel.toc 6765 2022-01-25 11:42:44Z none $
 ## Author: Norganna's AddOns
 ## X-Part-Of: Auctioneer
