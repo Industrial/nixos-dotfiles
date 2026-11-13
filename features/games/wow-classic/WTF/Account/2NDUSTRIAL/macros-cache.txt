@@ -27,6 +27,6 @@ VER 3 0000000000000006 "Upkeep Health" "INV_MISC_QUESTIONMARK"
 /use [combat] Greater Healing Potion; Stormwind Brie
 END
 VER 3 0000000000000007 "Upkeep Mana" "INV_MISC_QUESTIONMARK"
-#showtooltip [combat] item:3385; item:1708
-/use [combat] Lesser Mana Potion; Sweet Nectar
+#showtooltip [nocombat] item:1708
+/use [nocombat] Sweet Nectar
 END

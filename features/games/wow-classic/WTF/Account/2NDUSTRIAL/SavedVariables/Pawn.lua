@@ -9,10 +9,10 @@ PawnCommon = {
 ["Debug"] = false,
 ["ColorTooltipBorder"] = true,
 ["ShowTooltipIcons"] = true,
+["ShowSpecIcons"] = true,
+["ShowSocketingAdvisor"] = true,
 ["Scales"] = {
 },
-["ShowSocketingAdvisor"] = true,
-["ShowSpecIcons"] = true,
 ["IgnoreGemsWhileLeveling"] = true,
 ["ButtonPosition"] = 2,
 ["Digits"] = 1,

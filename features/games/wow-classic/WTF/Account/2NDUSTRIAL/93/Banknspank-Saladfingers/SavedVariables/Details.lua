@@ -173,8 +173,9 @@ _detalhes_database = {
 ["show_options"] = false,
 ["ignored_cooldowns"] = {
 },
-["height"] = 18,
 ["framme_locked"] = false,
+["cooldowns"] = {
+},
 ["own_frame"] = {
 ["defensive-raid"] = false,
 ["ofensive"] = false,
@@ -182,8 +183,7 @@ _detalhes_database = {
 ["utility"] = false,
 ["defensive-personal"] = false,
 },
-["cooldowns"] = {
-},
+["height"] = 18,
 ["show_conditions"] = {
 ["only_inside_instance"] = true,
 ["only_in_group"] = true,
@@ -209,14 +209,9 @@ _detalhes_database = {
 },
 ["arena_data_compressed"] = {
 },
-["announce_prepots"] = {
-["enabled"] = false,
-["channel"] = "SELF",
-["reverse"] = false,
-},
+["last_realversion"] = 172,
 ["arena_data_index_selected"] = 1,
-["character_data"] = {
-["logons"] = 33,
+["damage_meter_sessions"] = {
 },
 ["local_instances_config"] = {
 {
@@ -255,7 +250,8 @@ _detalhes_database = {
 },
 },
 ["auto_combatlog"] = false,
-["damage_meter_session_info"] = {
+["character_data"] = {
+["logons"] = 35,
 },
 ["cached_talents"] = {
 },
@@ -284,7 +280,11 @@ _detalhes_database = {
 ["custom"] = "",
 ["next"] = "",
 },
-["last_instance_time"] = 0,
+["announce_prepots"] = {
+["enabled"] = false,
+["channel"] = "SELF",
+["reverse"] = false,
+},
 ["active_profile"] = "Banknspank-CAMWOW EU4 Realm 1 PvE",
 ["mythic_dungeon_currentsaved"] = {
 ["dungeon_name"] = "",
@@ -297,15 +297,13 @@ _detalhes_database = {
 ["dungeon_zone_id"] = 0,
 ["previous_boss_killed_at"] = 0,
 },
-["nick_tag_cache"] = {
-["nextreset"] = 1795291964,
-["last_version"] = 16,
+["damage_meter_session_info"] = {
 },
 ["data_harvested_for_charts"] = {
 },
-["announce_firsthit"] = {
-["enabled"] = true,
-["channel"] = "SELF",
+["nick_tag_cache"] = {
+["nextreset"] = 1795291964,
+["last_version"] = 16,
 },
 ["apocalypes_info"] = {
 },
@@ -319,29 +317,32 @@ _detalhes_database = {
 ["evoker_show_realtimedps"] = false,
 ["inverse_deathlog_mplus"] = false,
 },
-["last_day"] = "12",
+["announce_firsthit"] = {
+["enabled"] = true,
+["channel"] = "SELF",
+},
 ["plugin_database"] = {
 ["DETAILS_PLUGIN_TINY_THREAT"] = {
 ["enabled"] = true,
 ["only_my_group"] = false,
 ["animate"] = false,
-["disable_gouge"] = false,
+["updatespeed"] = 1,
 ["hide_pull_bar"] = false,
-["author"] = "Terciob",
+["useclasscolors"] = false,
 ["playercolor"] = {
 1,
 1,
 1,
 },
 ["usefocus"] = false,
-["updatespeed"] = 1,
+["disable_gouge"] = false,
 ["playSound"] = false,
 ["showamount"] = false,
 ["useplayercolor"] = false,
 ["absolute_mode"] = false,
 ["show_party_pets"] = false,
 ["playSoundFile"] = "Details Threat Warning Volume 3",
-["useclasscolors"] = false,
+["author"] = "Terciob",
 },
 ["DETAILS_PLUGIN_COMPARETWO_WINDOW"] = {
 ["enabled"] = true,
@@ -397,7 +398,10 @@ _detalhes_database = {
 0.5,
 },
 ["scale"] = 1,
-["arrow_anchor_y"] = 0,
+["main_frame_size"] = {
+299.9999694824219,
+500,
+},
 ["minimap"] = {
 ["minimapPos"] = 160,
 ["radius"] = 160,
@@ -418,22 +422,6 @@ _detalhes_database = {
 ["square_amount"] = 5,
 ["enabled"] = false,
 ["arrow_size"] = 10,
-["y"] = 0,
-["row_spacement"] = 21,
-["main_frame_color"] = {
-0,
-0,
-0,
-0.2,
-},
-["row_color"] = {
-0.1,
-0.1,
-0.1,
-0.4,
-},
-["arrow_texture"] = "Interface\\CHATFRAME\\ChatFrameExpandArrow",
-["use_spark"] = true,
 ["per_second"] = {
 ["enabled"] = false,
 ["point"] = "CENTER",
@@ -445,24 +433,40 @@ _detalhes_database = {
 ["update_speed"] = 0.05,
 ["attribute_type"] = 1,
 },
+["row_spacement"] = 21,
+["main_frame_color"] = {
+0,
+0,
+0,
+0.2,
+},
+["author"] = "Terciob",
+["arrow_texture"] = "Interface\\CHATFRAME\\ChatFrameExpandArrow",
+["y"] = 0,
+["font_size"] = 10,
 ["x"] = -0.00018310546875,
 ["font_face"] = "Friz Quadrata TT",
 ["square_size"] = 32,
-["font_size"] = 10,
-["author"] = "Terciob",
+["use_spark"] = true,
+["row_color"] = {
+0.1,
+0.1,
+0.1,
+0.4,
+},
 ["main_frame_locked"] = false,
-["main_frame_size"] = {
-299.9999694824219,
-500,
+["arrow_anchor_y"] = 0,
 },
 },
+["coach"] = {
+["enabled"] = false,
+["welcome_panel_pos"] = {
 },
-["mythic_plus_log"] = {
+["last_coach_name"] = false,
 },
+["last_day"] = "13",
 ["on_death_menu"] = false,
 ["ignore_nicktag"] = false,
-["damage_meter_sessions"] = {
-},
 ["apocalypse_hashes"] = {
 },
 ["SoloTablesSaved"] = {
@@ -472,10 +476,11 @@ _detalhes_database = {
 ["combat_id"] = 0,
 ["savedStyles"] = {
 },
-["last_realversion"] = 172,
 ["benchmark_db"] = {
 ["frame"] = {
 },
+},
+["mythic_plus_log"] = {
 },
 ["announce_deaths"] = {
 ["enabled"] = false,
@@ -545,6 +550,28 @@ _detalhes_database = {
 ["frags_total"] = 0,
 ["voidzone_damage"] = 0,
 },
+["player_last_events"] = {
+},
+["frags_need_refresh"] = false,
+["overall_refreshed"] = true,
+["amountCasts"] = {
+},
+["instance_type"] = "none",
+["zoneName"] = "Eastern Kingdoms",
+["data_fim"] = "21:14:55",
+["cleu_timeline"] = {
+},
+["trinketProcs"] = {
+},
+["aura_timeline"] = {
+},
+["compressed_charts"] = {
+},
+["data_inicio"] = 0,
+["end_time"] = 432848.914,
+["mapId"] = 0,
+["raid_roster"] = {
+},
 ["totals_grupo"] = {
 0,
 0,
@@ -566,20 +593,12 @@ _detalhes_database = {
 ["dead"] = 0,
 },
 },
-["frags_need_refresh"] = false,
-["overall_refreshed"] = true,
-["amountCasts"] = {
+["is_challenge"] = false,
+["spells_cast_timeline"] = {
 },
-["instance_type"] = "none",
-["zoneName"] = "Eastern Kingdoms",
-["data_fim"] = "21:14:55",
-["cleu_timeline"] = {
-},
-["trinketProcs"] = {
-},
-["aura_timeline"] = {
-},
-["compressed_charts"] = {
+["combat_counter"] = 1,
+["overall_enemy_name"] = "Unknown",
+["frags"] = {
 },
 ["PhaseData"] = {
 {
@@ -595,20 +614,6 @@ _detalhes_database = {
 ["damage"] = {
 },
 },
-["end_time"] = 432848.914,
-["mapId"] = 0,
-["raid_roster"] = {
-},
-["player_last_events"] = {
-},
-["is_challenge"] = false,
-["spells_cast_timeline"] = {
-},
-["combat_counter"] = 1,
-["overall_enemy_name"] = "Unknown",
-["data_inicio"] = 0,
-["frags"] = {
-},
 ["start_time"] = 0,
 ["TimeData"] = {
 },
@@ -621,18 +626,13 @@ _detalhes_database = {
 },
 },
 },
-["coach"] = {
-["enabled"] = false,
-["welcome_panel_pos"] = {
-},
-["last_coach_name"] = false,
-},
-["arena_data_headers"] = {
-},
 ["announce_damagerecord"] = {
 ["enabled"] = true,
 ["channel"] = "SELF",
 },
+["arena_data_headers"] = {
+},
+["last_instance_time"] = 0,
 ["announce_cooldowns"] = {
 ["enabled"] = false,
 ["ignored_cooldowns"] = {

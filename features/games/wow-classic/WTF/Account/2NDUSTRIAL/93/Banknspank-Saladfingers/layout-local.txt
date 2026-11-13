@@ -17,6 +17,6 @@ Frame: BetterBagsBagBackpack
 FrameLevel: 500
 Anchor: CENTER
 X: -600
-Y: 167
+Y: 198
 W: 300
-H: 213
+H: 274
