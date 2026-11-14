@@ -1165,26 +1165,6 @@
         "type": "github"
       }
     },
-    "redox": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1794446767,
-        "narHash": "sha256-YjWx1jaai0hUhFiJAaMhwZlc9e2zJOolCkzORfT8zAg=",
-        "owner": "Industrial",
-        "repo": "redox",
-        "rev": "0315644ed57c145c00af25ccea011592be731300",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Industrial",
-        "repo": "redox",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
         "assay": "assay",
@@ -1206,8 +1186,8 @@
         "nu-scripts": "nu-scripts",
         "oomkiller-src": "oomkiller-src",
         "quickshell": "quickshell",
-        "redox": "redox",
-        "stylix": "stylix"
+        "stylix": "stylix",
+        "voltaic": "voltaic"
       }
     },
     "stylix": {
@@ -1454,6 +1434,26 @@
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
+        "type": "github"
+      }
+    },
+    "voltaic": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1794695931,
+        "narHash": "sha256-WYXSm5B1JBUAj0k8aujrXtCdCRH/tv37bLgcyluUzVo=",
+        "owner": "Industrial",
+        "repo": "voltaic",
+        "rev": "55c0ecb0c6095b9bef3988dcd0d5e8648a8181a9",
+        "type": "github"
+      },
+      "original": {
+        "owner": "Industrial",
+        "repo": "voltaic",
         "type": "github"
       }
     },

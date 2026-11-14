@@ -19,7 +19,7 @@
     ../features/programming/cursor
     ../features/programming/devenv
     ../features/programming/emerald
-    ../features/programming/redox
+    ../features/programming/voltaic
     ../features/programming/docker-compose
     ../features/programming/git
     ../features/programming/gitkraken

@@ -1,7 +1,7 @@
 {
   "mcpServers": {
-    "redox": {
-      "command": "redox-mcp",
+    "voltaic": {
+      "command": "voltaic-mcp",
       "args": []
     },
     "git": {

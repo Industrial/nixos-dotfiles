@@ -1,6 +1,6 @@
 {
-  "redox.server.enable": true,
-  "redox.server.path": "redox-lsp",
+  "voltaic.server.enable": true,
+  "voltaic.server.path": "voltaic-lsp",
   "[javascript]": {
     "editor.defaultFormatter": "biomejs.biome"
   },

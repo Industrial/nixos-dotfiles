@@ -56,8 +56,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    redox = {
-      url = "github:Industrial/redox";
+    voltaic = {
+      url = "github:Industrial/voltaic";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
