@@ -15,7 +15,7 @@ when one of them is in the way.
 |---|---|---|
 | Login shell | `features/cli/nushell` | `users.users.<name>.shell`, one writer (ADR-0005) |
 | Generated init | `features/cli/shell-init` | writes `$nu.data-dir/vendor/autoload` at build time |
-| Prompt | `features/cli/starship` | `starship.toml`, declared |
+| Prompt | `features/cli/starship` | unconfigured: starship's own default `$all` prompt |
 | Multiplexer | `features/cli/zellij` | `clear-defaults=true` keymap, four generated layouts |
 | Terminals | `features/window-manager/{alacritty,ghostty}` | |
 | Fallback shell | `features/cli/fish` | on `/etc/shells`, not in `/etc/passwd` |
