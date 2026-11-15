@@ -42,7 +42,7 @@ $nu.data-dir/vendor/autoload/
   10-starship.nu                        starship init nu, run at build time
   20-zoxide.nu                          zoxide init nushell --cmd cd
   30-carapace.nu                        carapace _carapace nushell
-  40-atuin.nu                           atuin init nu
+  40-atuin.nu                           atuin init nu --disable-up-arrow
   52-git-completions.nu                 nu_scripts, copied from the pinned flake input
   53-make-completions.nu
   54-nix-completions.nu

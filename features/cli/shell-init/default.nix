@@ -87,9 +87,14 @@ with lib; let
       command = "${pkgs.carapace}/bin/carapace _carapace nushell";
       home = settings.userdir;
     };
+    # `--disable-up-arrow`: atuin's generated init otherwise appends an `atuin_up_arrow`
+    # keybinding on the bare Up key, whose `until` chain falls through to
+    # `atuin search --shell-up-key-binding`. That takes Up away from recalling the previous
+    # line and turns it into a search UI. Up stays Nushell's own history-previous; Ctrl-R is
+    # still atuin's, which is where history search belongs.
     atuin = {
       filename = "40-atuin.nu";
-      command = "${pkgs.atuin}/bin/atuin init nu";
+      command = "${pkgs.atuin}/bin/atuin init nu --disable-up-arrow";
     };
   };
 

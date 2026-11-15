@@ -78,7 +78,8 @@ start); the third was a second, divergent writer of the same symlinks.
 | Alt-C | jump to a directory (fd → fzf, depth-bounded) | `config.nu` |
 | Alt-S | **sessionizer** — project → zellij session | `config.nu` |
 | Ctrl-P / Ctrl-N | previous / next history line | `config.nu` |
-| Ctrl-R, ↑ | history search / history up | atuin (`40-atuin.nu`) |
+| Ctrl-R | history search | atuin (`40-atuin.nu`) |
+| ↑ | previous line — Nushell's own, *not* atuin's search UI | `--disable-up-arrow` in `features/cli/shell-init` |
 
 `FZF_DEFAULT_OPTS` in `features/cli/fzf` supplies the height, layout, border and preview
 for all of the fzf bindings; none of them restate those flags.

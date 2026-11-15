@@ -162,6 +162,12 @@ in
     runsCarapaceInit = assay.eq (nixpkgsLib.hasInfix "/bin/carapace _carapace nushell" src) true;
     runsAtuinInit = assay.eq (nixpkgsLib.hasInfix "/bin/atuin init nu" src) true;
 
+    # Up recalls the previous line. atuin's init binds the bare Up key to its own search UI
+    # unless told not to, and that binding lands in the generated file, after config.nu, so
+    # nothing in config.nu can take it back.
+    atuinDoesNotTakeTheUpArrow =
+      assay.eq (nixpkgsLib.hasInfix "atuin init nu --disable-up-arrow" src) true;
+
     # Generated at build time, so a renamed subcommand fails the build rather than the prompt.
     generationIsABuildStep = assay.eq (nixpkgsLib.hasInfix "pkgs.runCommand" src) true;
     emptyInitFailsTheBuild = assay.eq (nixpkgsLib.hasInfix "test -s" src) true;
