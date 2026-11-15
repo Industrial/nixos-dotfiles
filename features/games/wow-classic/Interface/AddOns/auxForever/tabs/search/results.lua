@@ -85,6 +85,8 @@ do
         update_start_stop()
         update_continuation()
         update_done()
+        -- 0.8.4: another search's results are another queue (tabs/search/rapid_buy.lua)
+        do ((rapid_forget or pass))() end
     end
 
     function new_search(filter_string, mode)
@@ -395,7 +397,9 @@ function M.update_live()
     -- auxForever: a purchase talks to the auction house too. A live round during a trade good's
     -- price quote ended it with "Internal auction error" (Tyler, 0.4.1), so rounds wait while the
     -- buy bar is buying, and a round under way is held and carries on afterwards.
-    local buying = buy_bar.busy() or aux.bid_in_progress()
+    -- 0.8.4: a Rapid Buy read wants the one scanner too, so a round is held for it and carries on
+    -- afterwards (rapid_busy, tabs/search/rapid_buy.lua)
+    local buying = buy_bar.busy() or aux.bid_in_progress() or (rapid_busy or pass)()
     if buying and not held_for_buying and search and search.active and search.mode == LIVE_MODE and not search.live_held and scan.is_scanning() then
         held_for_buying = true
         hold_live()
@@ -723,6 +727,8 @@ function M.execute(_, resume, mode)
         search.mode = mode
         search.fast, search.full_reason = fast, full_reason
         search.open, search.pending_open = {}, nil
+        -- 0.8.4: a new search reads everything again, so Rapid Buy's own reads go with it
+        do ((rapid_forget or pass))() end
         search.recipe = recipe
         if mode ~= LIVE_MODE then
             search.sort_type = 'unitprice'
@@ -1025,5 +1031,12 @@ do
             checked = nil
             buy_bar.clear()
         end
+    end
+
+    -- 0.8.4: the row the player clicked themselves, if any. Rapid Buy
+    -- (tabs/search/rapid_buy.lua) stands down while there is one: a row the player chose owns the
+    -- buy bar, and the panel takes it back when the row is let go.
+    function M.selected_record()
+        return checked
     end
 end

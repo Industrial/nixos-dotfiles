@@ -381,9 +381,10 @@ do
     local popup = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
     gui.set_panel_style(popup)
     popup:SetFrameStrata('DIALOG')
-    -- 354: the left column is the taller one since 0.8.3 (Window, Posting, Buying, and the reload
-    -- note when a theme is waiting); the tooltip column on the right ends a little above it
-    gui.set_size(popup, WIDTH, 354)
+    -- 384: the left column is the taller one since 0.8.3 (Window, Posting, Buying, and the reload
+    -- note when a theme is waiting); the tooltip column on the right ends a little above it.
+    -- 0.8.4 added Rapid Buy to Buying, a row of 30.
+    gui.set_size(popup, WIDTH, 384)
     popup:SetPoint('TOPRIGHT', btn, 'BOTTOMRIGHT', 0, -4)
     popup:EnableMouse(true)
     popup:Hide()
@@ -531,9 +532,9 @@ do
 
     -- left column: Buying (0.8.3). It follows Posting down when a reload is waiting (see refresh).
     local buying = CreateFrame('Frame', nil, popup)
-    gui.set_size(buying, COLUMN, 108)
+    gui.set_size(buying, COLUMN, 138)
     section(buying, 0, 0, 'BUYING')
-    local auto_confirm_switch, standing_buy_switch, disenchant_deals_switch
+    local auto_confirm_switch, standing_buy_switch, search_buy_switch, disenchant_deals_switch
     do
         local r = row(buying, 0, -16, 32, 'Confirm trade goods for me', 'One press instead of two',
             {'A trade good is bought in two steps: aux asks the auction house what the units really cost, then pays it. Only the first step needs a key press, so with this on the price pays itself the moment it comes back at or under the price shown.',
@@ -557,7 +558,18 @@ do
         end
     end
     do
-        local r = row(buying, 0, -78, 30, 'Disenchant deals', nil,
+        local r = row(buying, 0, -78, 30, 'Rapid Buy panel', nil,
+            {'A panel beside the window while the Search tab shows its results. It queues every result the search found, keeps the cheapest one armed, and reads the rest of the queue ahead of the press, so sweeping a filter is one press per purchase and no waiting between them.',
+             'The same key as Standing Buy, under Key Bindings, auxForever.'})
+        search_buy_switch = gui.switch(r)
+        search_buy_switch:SetPoint('RIGHT', 0, 0)
+        search_buy_switch.on_click = function()
+            account_data.search_buy = not account_data.search_buy
+            refresh_settings()
+        end
+    end
+    do
+        local r = row(buying, 0, -108, 30, 'Disenchant deals', nil,
             {"The Sniper also counts an item that disenchants into more than it costs as a deal, the same rule as the Search tab's disenchant-profit filter.",
              'Needs price history for the materials.'})
         disenchant_deals_switch = gui.switch(r)
@@ -639,6 +651,7 @@ do
         buying:SetPoint('TOPLEFT', LEFT_X, pending and -232 or -204)
         auto_confirm_switch:SetChecked(account_data.auto_confirm and true or false)
         standing_buy_switch:SetChecked(account_data.standing_buy and true or false)
+        search_buy_switch:SetChecked(account_data.search_buy and true or false)
         disenchant_deals_switch:SetChecked(account_data.sniper_disenchant and true or false)
         for _, switch in ipairs(tooltip_switches) do
             switch:SetChecked(character_data.tooltip[switch.key] and true or false)

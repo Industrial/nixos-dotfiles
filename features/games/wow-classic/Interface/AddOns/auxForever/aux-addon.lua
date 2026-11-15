@@ -112,6 +112,10 @@ function event.AUX_LOADED()
         -- 0.8.3: the Standing Buy panel beside the window. It keeps the best deal armed, so one key
         -- press buys it without finding and clicking its row (tabs/sniper/standing_buy.lua).
         standing_buy = true,
+        -- 0.8.4: the Rapid Buy panel beside the window while the Search tab's results are shown. It
+        -- queues every result, keeps the cheapest one armed, and reads the queue ahead of the press
+        -- (tabs/search/rapid_buy.lua).
+        search_buy = true,
         -- 0.8.3: a trade good's purchase confirms itself once the auction house quotes a price at or
         -- under the one shown. ConfirmCommoditiesPurchase needs no hardware event (only the Start
         -- does), so it is the one step of a purchase aux may take by itself, and it halves the

@@ -163,6 +163,10 @@ function SlashCmdList.AUX(command)
         aux.account_data.standing_buy = not aux.account_data.standing_buy
         aux.refresh_settings()
         aux.print('standing buy panel ' .. status(aux.account_data.standing_buy) .. ': set its key under Key Bindings, auxForever')
+    elseif arguments[1] == 'rapid' and arguments[2] == 'buy' then
+        aux.account_data.search_buy = not aux.account_data.search_buy
+        aux.refresh_settings()
+        aux.print('rapid buy panel ' .. status(aux.account_data.search_buy) .. ': the Search results queue, same key as standing buy (Key Bindings, auxForever)')
     elseif arguments[1] == 'disenchant' and arguments[2] == 'deals' then
         aux.account_data.sniper_disenchant = not aux.account_data.sniper_disenchant
         require('aux.tabs.sniper').settings_changed()
@@ -182,6 +186,7 @@ function SlashCmdList.AUX(command)
         aux.print('- undercut [' .. status(aux.account_data.post_undercut) .. ']')
         aux.print('- confirm [' .. status(aux.account_data.auto_confirm) .. '] (confirm trade goods for me)')
         aux.print('- standing buy [' .. status(aux.account_data.standing_buy) .. '] (the Sniper buy panel)')
+        aux.print('- rapid buy [' .. status(aux.account_data.search_buy) .. '] (the Search buy panel)')
         aux.print('- disenchant deals [' .. status(aux.account_data.sniper_disenchant) .. ']')
         aux.print('- opacity [' .. aux.color.blue(floor(aux.account_data.background_opacity * 100 + .5) .. '%') .. ']')
 		aux.print('- tooltip value [' .. status(tooltip_settings.value) .. ']')
