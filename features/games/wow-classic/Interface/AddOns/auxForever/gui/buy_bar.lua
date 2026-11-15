@@ -237,6 +237,23 @@ local function reset(text, color)
     end
 end
 
+-- Pays a quote that came back at or under the price shown. ConfirmCommoditiesPurchase is the one
+-- part of a purchase that needs no hardware event (StartCommoditiesPurchase, below, does), so this
+-- may also run from the quote's own event, which is what "Confirm trade goods for me" does. What
+-- makes that safe is the check in the listener below: a quote above the estimate has already been
+-- cancelled and never reaches here, so this never pays more than the bar showed.
+local function confirm_quote()
+    if mode ~= COMMODITY or state ~= QUOTED or not current then
+        return
+    end
+    if current.quote_total > GetMoney() then
+        return
+    end
+    state = BUYING
+    t0 = GetTime()
+    C_AuctionHouse.ConfirmCommoditiesPurchase(current.item_id, current.quote_quantity)
+end
+
 local function request_quote()
     local n = quantity()
     local total, _, count = estimate(n)
@@ -255,6 +272,12 @@ local function request_quote()
         end
         current.quote_total = quote_total
         state = QUOTED
+        -- 0.8.3: with "Confirm trade goods for me" on (Settings, aux.account_data.auto_confirm) a
+        -- quote at or under the price shown pays itself, so a trade good costs one press instead of
+        -- two. The bar shows "Buying..." at its next redraw.
+        if aux.account_data.auto_confirm then
+            confirm_quote()
+        end
     end)
     listen('COMMODITY_PRICE_UNAVAILABLE', function()
         reset({'That price is no longer available', 'Nothing was bought. Listings refreshed.'}, aux.color.red)
@@ -458,14 +481,62 @@ function M.busy()
     return state ~= IDLE
 end
 
+-- 0.8.3, for the Standing Buy control (tabs/sniper/standing_buy.lua) ----------------------------
+
+-- Sets how many units of a trade good the bar buys, so a snipe can take every unit judged a deal
+-- instead of the stack the bar offers by default. Does nothing once a purchase has started, like
+-- the quantity chips and the Quantity box.
+function M.set_buy_quantity(n)
+    if mode ~= COMMODITY or not current or not n or n < 1 or state ~= IDLE then
+        return
+    end
+    set_quantity(n)
+    other_input:SetText(tostring(n))
+    other_input.overlay:SetText(other_input.formatter(other_input:GetText()))
+    other_input:ClearFocus()
+    update()
+end
+
+-- How many units the bar is set to buy, so the control can tell whether it still needs setting
+function M.buy_quantity()
+    return mode == COMMODITY and current and current.quantity or nil
+end
+
+-- Whether pressing the bar's own Buy button right now would buy something. The Standing Buy control
+-- shows and enables itself from this, so the two can never disagree about what is buyable: there is
+-- one answer to "can this be bought", and both read it.
+function M.ready()
+    if mode == COMMODITY then
+        if state == IDLE then
+            local n = quantity()
+            local total, _, count = estimate(n)
+            return n >= 1 and count == n and total <= GetMoney()
+        end
+        -- QUOTED: the next press confirms. QUOTING and BUYING are the server's turn.
+        return state == QUOTED and current.quote_total <= GetMoney()
+    elseif mode == ITEM then
+        return can_buy_item()
+    end
+    return false
+end
+
+-- What the next press would cost, for the Standing Buy control's label. nil when nothing is buyable.
+function M.ready_total()
+    if not ready() then
+        return
+    end
+    if mode == COMMODITY then
+        return state == QUOTED and current.quote_total or (estimate(quantity()))
+    end
+    return current.record.buyout_price
+end
+
 function M.primary_click()
     if mode == COMMODITY then
         if state == IDLE then
             request_quote()
-        elseif state == QUOTED and current.quote_total <= GetMoney() then
-            state = BUYING
-            t0 = GetTime()
-            C_AuctionHouse.ConfirmCommoditiesPurchase(current.item_id, current.quote_quantity)
+        elseif state == QUOTED then
+            confirm_quote()
         end
     elseif mode == ITEM and can_buy_item() then
         current.on_buy()

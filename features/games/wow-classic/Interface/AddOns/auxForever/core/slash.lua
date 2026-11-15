@@ -154,6 +154,20 @@ function SlashCmdList.AUX(command)
         aux.print('auxForever matches the cheapest price by default. Undercut mode (the goblin on the Post tab) goes one step below it.')
         aux.print('For gear, buyers pick the listing themselves.')
         aux.print('Undercut mode [' .. status(aux.account_data.post_undercut) .. '] - /aux undercut on|off (it starts off each time the auction house opens)')
+    -- 0.8.3: the Buying settings, also in the Settings menu
+    elseif arguments[1] == 'confirm' or (arguments[1] == 'auto' and arguments[2] == 'confirm') then
+        aux.account_data.auto_confirm = not aux.account_data.auto_confirm
+        aux.refresh_settings()
+        aux.print('confirm trade goods for me ' .. status(aux.account_data.auto_confirm) .. ': a price at or under the one shown pays itself, so a trade good costs one press instead of two')
+    elseif arguments[1] == 'standing' and arguments[2] == 'buy' then
+        aux.account_data.standing_buy = not aux.account_data.standing_buy
+        aux.refresh_settings()
+        aux.print('standing buy panel ' .. status(aux.account_data.standing_buy) .. ': set its key under Key Bindings, auxForever')
+    elseif arguments[1] == 'disenchant' and arguments[2] == 'deals' then
+        aux.account_data.sniper_disenchant = not aux.account_data.sniper_disenchant
+        require('aux.tabs.sniper').settings_changed()
+        aux.refresh_settings()
+        aux.print('disenchant deals ' .. status(aux.account_data.sniper_disenchant))
     elseif arguments[1] == 'clear' and arguments[2] == 'post' then
         aux.faction_data.post = {}
         aux.print('Post data cleared.')
@@ -166,6 +180,9 @@ function SlashCmdList.AUX(command)
         aux.print('- post bid [' .. aux.color.blue(aux.account_data.post_bid or 'off') .. ']')
         aux.print('- post duration [' .. aux.color.blue(info.duration_hours(aux.account_data.post_duration) .. 'h') .. ']')
         aux.print('- undercut [' .. status(aux.account_data.post_undercut) .. ']')
+        aux.print('- confirm [' .. status(aux.account_data.auto_confirm) .. '] (confirm trade goods for me)')
+        aux.print('- standing buy [' .. status(aux.account_data.standing_buy) .. '] (the Sniper buy panel)')
+        aux.print('- disenchant deals [' .. status(aux.account_data.sniper_disenchant) .. ']')
         aux.print('- opacity [' .. aux.color.blue(floor(aux.account_data.background_opacity * 100 + .5) .. '%') .. ']')
 		aux.print('- tooltip value [' .. status(tooltip_settings.value) .. ']')
 		aux.print('- tooltip percent [' .. status(tooltip_settings.usually) .. ']')

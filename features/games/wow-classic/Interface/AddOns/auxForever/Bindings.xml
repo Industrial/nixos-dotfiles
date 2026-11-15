@@ -1,0 +1,10 @@
+<Bindings>
+	<!-- auxForever 0.8.3: the Standing Buy key. A key press is a hardware event, which is the only
+	     way the auction house takes a purchase from an addon, so this is how a snipe is bought with
+	     the hand on the keyboard. It presses the panel's own button; what the press then does is in
+	     tabs/sniper/standing_buy.lua, which also decides whether there is anything to buy. That
+	     button lives on UIParent and is always there, so the binding is never "not set up yet". -->
+	<Binding name="AUXFOREVER_STANDING_BUY" header="AUXFOREVER">
+		auxForeverStandingBuy:Click('LeftButton')
+	</Binding>
+</Bindings>

@@ -5,6 +5,7 @@ local info = require 'aux.util.info'
 local money = require 'aux.util.money'
 local scan = require 'aux.core.scan'
 local history = require 'aux.core.history'
+local disenchant = require 'aux.core.disenchant'
 local buy_bar = require 'aux.gui.buy_bar'
 
 local tab = aux.tab 'Sniper'
@@ -91,16 +92,28 @@ deals_changed = false -- the table is redrawn soon (throttled) while a round fin
 -- and after Forever launched prices fell faster than it follows: a material listed by hundreds at
 -- one price showed as "4% of usual", and a "deal" bought there could only be relisted at a loss.
 -- When today's market is lower, the deal is judged against it instead, and the reason is 'market'.
-function M.judge(unit_price, usual, vendor, days, percent, min_profit, market)
+-- 0.8.3: disenchant_value is what the item disenchants into, in copper per item (nil for anything
+-- that cannot be disenchanted, and while the Disenchant deals setting is off). An item worth more
+-- in materials than it costs is a deal with the reason 'disenchant' -- the Search tab's
+-- disenchant-profit filter, as a rule the Sniper applies to the whole auction house.
+function M.judge(unit_price, usual, vendor, days, percent, min_profit, market, disenchant_value)
     vendor = vendor or 0
     if not unit_price or unit_price <= 0 then
         return
     end
     local reference = usual and usual > 0 and max(usual, vendor) or nil
+    if vendor > 0 and unit_price < vendor and vendor - unit_price >= min_profit then
+        return 'vendor', vendor - unit_price, reference and aux.round(100 * unit_price / reference) or nil
+    end
+    -- Checked after the vendor price, which is the surer profit, and before the usual price, so a
+    -- cheap green is found without waiting MIN_DAYS for price history of its own. It needs no days
+    -- of the item's own history because the value rests on the price history of the materials:
+    -- with no history they are worth nothing, and nothing is a deal.
+    if disenchant_value and disenchant_value > 0 and disenchant_value - unit_price >= min_profit then
+        return 'disenchant', disenchant_value - unit_price, reference and aux.round(100 * unit_price / reference) or nil
+    end
     if vendor > 0 and unit_price < vendor then
-        if vendor - unit_price >= min_profit then
-            return 'vendor', vendor - unit_price, reference and aux.round(100 * unit_price / reference) or nil
-        end
+        -- below vendor price, but neither selling it back nor disenchanting it makes min_profit
         return
     end
     if not reference or (days or 0) < MIN_DAYS then
@@ -192,8 +205,42 @@ end
 -- - the days counted are days of complete looks only (history.value_and_complete_days), so a usual
 --   price resting on a few old asking prices cannot make a deal.
 POOR = 0
+UNCOMMON = 2
+
+-- 0.8.3: item ID -> what it disenchants into in copper, or false for an item that cannot be (or is
+-- not worth working out). item_facts below runs for every item of every round and is written to
+-- build no tables, while disenchant.value builds one per call and reads the price history of each
+-- material it can give. So the answer is worked out once per item and kept for the visit, and only
+-- for gear that can be disenchanted at all -- which the quality and slot rule out for the trade
+-- goods that are most of the auction house. Wiped with the other judging caches.
+local de_values = {}
+local function item_disenchant_value(item_id, quality, slot, level)
+    -- with no price history the materials are worth nothing, and a nothing remembered now would
+    -- stand for the rest of the visit
+    if not aux.account_data.sniper_disenchant or not history.loaded() then
+        return
+    end
+    local known = de_values[item_id]
+    if known ~= nil then
+        return known or nil
+    end
+    if (quality or 0) < UNCOMMON then
+        -- common, poor, and every trade good: most of the auction house, answered from here on by
+        -- the lookup above
+        de_values[item_id] = false
+        return
+    end
+    if not slot or slot == '' or (level or 0) == 0 then
+        -- the game has not loaded this item yet: not remembered, because it may be gear after all
+        return
+    end
+    local value = disenchant.value(slot, quality, level)
+    de_values[item_id] = value and value > 0 and value or false
+    return de_values[item_id] or nil
+end
+
 function M.item_facts(key, item_id)
-    local name, _, quality, _, _, _, _, _, _, _, sell_price = GetItemInfo(item_id)
+    local name, _, quality, level, _, _, _, _, slot, _, sell_price = GetItemInfo(item_id)
     if not name then
         -- the game drops item data now and then; aux's own saved item list still has the vendor price
         info.request_item(item_id)
@@ -201,7 +248,7 @@ function M.item_facts(key, item_id)
         if not saved then
             return
         end
-        quality, sell_price = saved.quality, saved.sell_price
+        quality, sell_price, level, slot = saved.quality, saved.sell_price, saved.level, saved.slot
     end
     if quality == POOR then
         return nil, 0, 0
@@ -210,7 +257,7 @@ function M.item_facts(key, item_id)
     if days > history_days then
         history_days = days
     end
-    return usual, sell_price or 0, days
+    return usual, sell_price or 0, days, item_disenchant_value(item_id, quality, slot, level)
 end
 
 -- auxForever (0.6 build 9, Tyler): the most days of complete looks any item has, seen while judging
@@ -238,18 +285,18 @@ local function settings()
 end
 
 function M.judge_record(record, market)
-    local usual, vendor, days = item_facts(record.price_key or record.item_key, record.item_id)
+    local usual, vendor, days, de = item_facts(record.price_key or record.item_key, record.item_id)
     if usual == nil and vendor == nil then
         if not record.deal_key then
             return
         end
         -- a deal already found keeps the facts it was judged with while the game reloads the item
         -- (without this, every deal could vanish from the table at once and come back later)
-        usual, vendor, days = record.deal_history, record.deal_vendor, record.deal_days
+        usual, vendor, days, de = record.deal_history, record.deal_vendor, record.deal_days, record.deal_disenchant
     end
     local percent, min_profit = settings()
     -- a deal already found is judged again (shown_deals) with the market it was found with
-    return judge(ceil(record.unit_buyout_price), usual, vendor, days, percent, min_profit, market or record.deal_market)
+    return judge(ceil(record.unit_buyout_price), usual, vendor, days, percent, min_profit, market or record.deal_market, de)
 end
 
 local function find_deal(key)
@@ -339,8 +386,9 @@ function check_item(item_key, key, price, other_keys)
         end
     end
     -- the usual price is only shown when it rests on enough history to be trusted
-    local usual, vendor, days = item_facts(cheapest.price_key or cheapest.item_key, cheapest.item_id)
+    local usual, vendor, days, de = item_facts(cheapest.price_key or cheapest.item_key, cheapest.item_id)
     cheapest.deal_history, cheapest.deal_vendor, cheapest.deal_days = usual, vendor, days
+    cheapest.deal_disenchant = de
     if (days or 0) < MIN_DAYS then
         usual = nil
     end
@@ -582,6 +630,9 @@ end
 function M.settings_changed()
     aux.wipe(known)
     aux.wipe(markets)
+    -- 0.8.3: Disenchant deals may have been turned on or off, and a Full scan may have moved what
+    -- the materials are worth
+    aux.wipe(de_values)
     update_deals()
 end
 
@@ -685,6 +736,8 @@ function aux.event.CLOSE()
     next_round_at = nil
     -- review H-008, finding 5: markets read are for this visit only
     aux.wipe(markets)
+    -- 0.8.3: and so is what the materials were worth, which a Full scan moves
+    aux.wipe(de_values)
 end
 
 function tab.OPEN()
@@ -916,6 +969,92 @@ function M.click_deal(record)
     if record and record == checked then
         listing:SetSelectedRecord()
     end
+end
+
+-- 0.8.3: the buy queue --------------------------------------------------------------------------
+--
+-- Every deal that can still be bought, the best first. The Standing Buy control
+-- (tabs/sniper/standing_buy.lua) keeps the head of it selected, so the buy bar is always armed on
+-- the best deal and one key press buys it, instead of the player finding and clicking a row first.
+--
+-- Why it goes through the selection instead of calling place_bid itself: a gear auction can only be
+-- bought while its own item search is the last one the client made (scan.last_read_is, which is why
+-- refresh_deal reads it again), and that read is a server request, which no hardware event can wait
+-- for. Selecting a deal is what already makes that read, holds the rounds while it stands (holding)
+-- and arms the buy bar with the right auction ID or tiers. So the queue picks the target, the path
+-- that already works arms it, and the key press only presses Buy.
+
+-- how many units of a deal are worth buying: every tier judged a deal for a trade good, one otherwise
+function M.deal_units(record)
+    if not record.commodity then
+        return 1
+    end
+    local units = 0
+    for _, tier in ipairs(record.deal_tiers or {record}) do
+        units = units + (tier.count or 0)
+    end
+    return units
+end
+
+-- what those units cost altogether
+function M.deal_cost(record)
+    if not record.commodity then
+        return record.buyout_price or 0
+    end
+    local total = 0
+    for _, tier in ipairs(record.deal_tiers or {record}) do
+        total = total + (tier.count or 0) * (tier.commodity_unit_price or 0)
+    end
+    return total
+end
+
+-- A deal the player could buy now: still listed, not already bought, and affordable. A deal read
+-- minutes ago is queued all the same, because selecting it reads it again (refresh_deal) and a
+-- purchase can never cost more than shown: a trade good's price is confirmed against the server's
+-- quote, and an auction ID that has sold is refused by the auction house.
+function M.buyable_deal(record)
+    if not record or record.deal_gone or record.deal_bought then
+        return false
+    end
+    local cost = deal_cost(record)
+    return cost > 0 and cost <= GetMoney()
+end
+
+-- The deals to buy, most profit first: profit per item times the units of the deal, so a hundred
+-- cheap units beat one item with a bigger margin. Ties go to the one found first. A deal from a
+-- looser setting is left out the same way the table leaves it out (judge_record, as shown_deals).
+function M.queue()
+    local out, worth = {}, {}
+    for _, deal in ipairs(deals) do
+        if buyable_deal(deal) and judge_record(deal) then
+            tinsert(out, deal)
+            worth[deal] = (deal.deal_profit or 0) * deal_units(deal)
+        end
+    end
+    sort(out, function(a, b)
+        if worth[a] ~= worth[b] then
+            return worth[a] > worth[b]
+        end
+        return (a.deal_found or 0) < (b.deal_found or 0)
+    end)
+    return out
+end
+
+-- the deal the buy bar is armed on, if any
+function M.selected_deal()
+    return checked
+end
+
+-- Selects a deal as a click on its row would. update_selection runs every frame anyway; calling it
+-- here arms the buy bar in this frame rather than the next one.
+function M.select_deal(record)
+    listing:SetSelectedRecord(record)
+    update_selection()
+end
+
+function M.deselect_deal()
+    listing:SetSelectedRecord()
+    update_selection()
 end
 
 -- 0.8.2 build 7 (H-010, finding 3): the rounds go on while a deal is selected, so new deals and

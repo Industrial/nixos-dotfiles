@@ -105,6 +105,18 @@ function event.AUX_LOADED()
         sniper_profit = 500,
         sniper_sound = true,
         sniper_ignored = {},
+        -- 0.8.3: deals from what an item disenchants into, the Search tab's disenchant-profit rule
+        -- as a reason of its own on the Sniper (tabs/sniper/core.lua, judge). It costs no request:
+        -- the materials' prices come from the price history aux already keeps.
+        sniper_disenchant = true,
+        -- 0.8.3: the Standing Buy panel beside the window. It keeps the best deal armed, so one key
+        -- press buys it without finding and clicking its row (tabs/sniper/standing_buy.lua).
+        standing_buy = true,
+        -- 0.8.3: a trade good's purchase confirms itself once the auction house quotes a price at or
+        -- under the one shown. ConfirmCommoditiesPurchase needs no hardware event (only the Start
+        -- does), so it is the one step of a purchase aux may take by itself, and it halves the
+        -- presses a trade good costs. Off by default: it spends gold without a second press.
+        auto_confirm = false,
         replicate_time = 0,
         window = {},
         background_opacity = 1,
@@ -197,6 +209,14 @@ do
         return locked
     end
 
+	-- 0.8.3: called once a purchase has settled and place_bid will take another one, with whether it
+	-- went through. The Standing Buy control arms its next target from this instead of watching
+	-- bid_in_progress every frame, so the button is live again the moment the server answers.
+	local idle_handlers = {}
+	function M.on_bid_idle(f)
+		tinsert(idle_handlers, f)
+	end
+
 	-- Forever: bids and buyouts go through C_AuctionHouse.PlaceBid with the auction's ID.
 	-- Must be called from a click handler (hardware event).
 	function M.place_bid(auction_id, amount, on_success, on_failure)
@@ -248,6 +268,8 @@ do
 			else
 				do (on_failure or pass)(result) end
 			end
+			-- after the handlers above, so a listener sees the bought deal already marked gone
+			for _, f in ipairs(idle_handlers) do f(result == true) end
 		end)
 	end
 end

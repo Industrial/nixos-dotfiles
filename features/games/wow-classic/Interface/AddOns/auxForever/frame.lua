@@ -381,8 +381,9 @@ do
     local popup = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
     gui.set_panel_style(popup)
     popup:SetFrameStrata('DIALOG')
-    -- 322: the tooltip column's rows (Usually added in 0.8.2) plus the padding
-    gui.set_size(popup, WIDTH, 322)
+    -- 354: the left column is the taller one since 0.8.3 (Window, Posting, Buying, and the reload
+    -- note when a theme is waiting); the tooltip column on the right ends a little above it
+    gui.set_size(popup, WIDTH, 354)
     popup:SetPoint('TOPRIGHT', btn, 'BOTTOMRIGHT', 0, -4)
     popup:EnableMouse(true)
     popup:Hide()
@@ -528,6 +529,47 @@ do
     -- can have bids, few sellers set one, and gear is one item per auction, so "per stack" means
     -- nothing (Tyler: "does the stack option even make any sense?"). The chat command stays.
 
+    -- left column: Buying (0.8.3). It follows Posting down when a reload is waiting (see refresh).
+    local buying = CreateFrame('Frame', nil, popup)
+    gui.set_size(buying, COLUMN, 108)
+    section(buying, 0, 0, 'BUYING')
+    local auto_confirm_switch, standing_buy_switch, disenchant_deals_switch
+    do
+        local r = row(buying, 0, -16, 32, 'Confirm trade goods for me', 'One press instead of two',
+            {'A trade good is bought in two steps: aux asks the auction house what the units really cost, then pays it. Only the first step needs a key press, so with this on the price pays itself the moment it comes back at or under the price shown.',
+             'It never pays more than the price shown: a higher one is still refused.'})
+        auto_confirm_switch = gui.switch(r)
+        auto_confirm_switch:SetPoint('RIGHT', 0, 0)
+        auto_confirm_switch.on_click = function()
+            account_data.auto_confirm = not account_data.auto_confirm
+            refresh_settings()
+        end
+    end
+    do
+        local r = row(buying, 0, -48, 30, 'Standing Buy panel', nil,
+            {'A panel beside the window while the Sniper tab is open. It keeps the best deal armed, so one key press, click or turn of the mouse wheel buys it.',
+             'Set the key under Key Bindings, auxForever.'})
+        standing_buy_switch = gui.switch(r)
+        standing_buy_switch:SetPoint('RIGHT', 0, 0)
+        standing_buy_switch.on_click = function()
+            account_data.standing_buy = not account_data.standing_buy
+            refresh_settings()
+        end
+    end
+    do
+        local r = row(buying, 0, -78, 30, 'Disenchant deals', nil,
+            {"The Sniper also counts an item that disenchants into more than it costs as a deal, the same rule as the Search tab's disenchant-profit filter.",
+             'Needs price history for the materials.'})
+        disenchant_deals_switch = gui.switch(r)
+        disenchant_deals_switch:SetPoint('RIGHT', 0, 0)
+        disenchant_deals_switch.on_click = function()
+            account_data.sniper_disenchant = not account_data.sniper_disenchant
+            -- every item is judged again with the new rule
+            require('aux.tabs.sniper').settings_changed()
+            refresh_settings()
+        end
+    end
+
     -- right column: the tooltip lines, also /aux tooltip ... (a player on CurseForge asked for the
     -- chat settings in this menu, FB-008). Kept per character, like the chat commands.
     local TOOLTIP_LINES = {
@@ -593,6 +635,11 @@ do
         if pending then reload_button:Show() else reload_button:Hide() end
         posting:ClearAllPoints()
         posting:SetPoint('TOPLEFT', LEFT_X, pending and -176 or -148)
+        buying:ClearAllPoints()
+        buying:SetPoint('TOPLEFT', LEFT_X, pending and -232 or -204)
+        auto_confirm_switch:SetChecked(account_data.auto_confirm and true or false)
+        standing_buy_switch:SetChecked(account_data.standing_buy and true or false)
+        disenchant_deals_switch:SetChecked(account_data.sniper_disenchant and true or false)
         for _, switch in ipairs(tooltip_switches) do
             switch:SetChecked(character_data.tooltip[switch.key] and true or false)
         end
