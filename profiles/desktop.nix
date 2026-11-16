@@ -10,7 +10,6 @@
 }: {
   imports = [
     ../features/desktop/claude-desktop
-    ../features/network/tor
     ../features/nixos/window-manager
     ../features/window-manager/alacritty
     ../features/window-manager/ghostty
