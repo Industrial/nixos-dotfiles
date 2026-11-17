@@ -23,8 +23,8 @@ VER 3 0000000000000005 "Upkeep Buffs" "INV_MISC_QUESTIONMARK"
 /click idAutomationUpkeepBuffsButton
 END
 VER 3 0000000000000006 "Upkeep Health" "INV_MISC_QUESTIONMARK"
-#showtooltip [combat] item:1710; item:1707
-/use [combat] Greater Healing Potion; Stormwind Brie
+#showtooltip [combat] item:1710; item:4607
+/use [combat] Greater Healing Potion; Delicious Cave Mold
 END
 VER 3 0000000000000007 "Upkeep Mana" "INV_MISC_QUESTIONMARK"
 #showtooltip [nocombat] item:1708

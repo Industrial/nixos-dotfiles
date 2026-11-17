@@ -22,7 +22,8 @@ BetterBagsDB = {
 },
 ["global"] = {
 ["changelog"] = {
-["lastSeen"] = 1794073051,
+["autoOpen"] = false,
+["lastSeen"] = 1794767511,
 },
 },
 ["profileKeys"] = {
@@ -100,7 +101,6 @@ true,
 ["name"] = "Hearthstones",
 },
 },
-["nextSectionSortSplit"] = true,
 ["searchRuleVersion"] = 2,
 ["customCategoryFilters"] = {
 ["Low iLvl"] = {
@@ -118,28 +118,29 @@ true,
 ["groupCounter"] = {
 1,
 },
+["itemLevelColor"] = {
+["maxItemLevelByCharacter"] = {
+["Skelf-Classic Beta PvE 2"] = 10,
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = 49,
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = 41,
+},
+},
+["nextSectionSortSplit"] = true,
 ["positions"] = {
 {
-["y"] = 81.20281982421875,
-["x"] = -400.940185546875,
+["y"] = -84.02256774902344,
+["x"] = -556.0156860351562,
 ["point"] = "CENTER",
 ["scale"] = 1,
 },
 [0] = {
-["y"] = 118.1918640136719,
-["x"] = -549.9925537109375,
+["y"] = 143.4848785400391,
+["x"] = -756.383544921875,
 ["point"] = "CENTER",
 ["scale"] = 1,
 },
 },
 ["showBagButton"] = false,
-["itemLevelColor"] = {
-["maxItemLevelByCharacter"] = {
-["Skelf-Classic Beta PvE 2"] = 10,
-["Banknspank-CAMWOW EU4 Realm 1 PvE"] = 49,
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = 40,
-},
-},
 ["__bankDefaultTabsFixed"] = true,
 ["firstTimeMenu"] = false,
 ["__groupsScopedByKind"] = true,
@@ -167,8 +168,8 @@ BetterBagsPerfDB = {
 ["traceCalls"] = true,
 ["timelineFrames"] = 18000,
 ["pauseGC"] = false,
-["worstFrames"] = 10,
 ["maxNodes"] = 5000,
+["worstFrames"] = 10,
 ["calibrate"] = true,
 ["spikeThresholdMs"] = 16,
 ["traceArgs"] = true,

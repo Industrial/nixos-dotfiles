@@ -10,11 +10,11 @@ TomTomDB = {
 ["Default"] = {
 ["arrow"] = {
 ["position"] = {
-"CENTER",
+"TOP",
 nil,
-"CENTER",
-0.0005357268964871764,
--96.42876434326172,
+"TOP",
+21.99252891540527,
+-1.69182562828064,
 },
 },
 ["block"] = {
@@ -117,37 +117,6 @@ TomTomWaypointsM = {
 ["world"] = true,
 },
 },
-[1434] = {
-["1434:480900000:202000000:Shadowmaw Panther"] = {
-1434,
-0.4809000000000001,
-0.202,
-["arrivaldistance"] = 15,
-["crazy"] = true,
-["persistent"] = true,
-["minimap"] = true,
-["cleardistance"] = 10,
-["title"] = "Shadowmaw Panther",
-["from"] = "Questie",
-["callbacks"] = {
-["distance"] = {
-[10] = nil --[[ skipped inline function ]],
-[15] = nil --[[ skipped inline function ]],
-},
-["world"] = {
-["onclick"] = nil --[[ skipped inline function ]],
-["tooltip_update"] = nil --[[ skipped inline function ]],
-["tooltip_show"] = nil --[[ skipped inline function ]],
-},
-["minimap"] = {
-["onclick"] = nil --[[ skipped inline function ]],
-["tooltip_update"] = nil --[[ skipped inline function ]],
-["tooltip_show"] = nil --[[ skipped inline function ]],
-},
-},
-["world"] = true,
-},
-},
 [1420] = {
 ["1420:851000000:314000000:Scarlet Monastery - Library"] = {
 1420,
@@ -222,6 +191,37 @@ TomTomWaypointsM = {
 ["silent"] = true,
 ["cleardistance"] = 10,
 ["title"] = "Scarlet Monastery - Graveyard",
+["from"] = "?",
+["callbacks"] = {
+["distance"] = {
+[10] = nil --[[ skipped inline function ]],
+[15] = nil --[[ skipped inline function ]],
+},
+["world"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+["minimap"] = {
+["onclick"] = nil --[[ skipped inline function ]],
+["tooltip_update"] = nil --[[ skipped inline function ]],
+["tooltip_show"] = nil --[[ skipped inline function ]],
+},
+},
+["minimap"] = true,
+["world"] = true,
+},
+["1420:851000000:314000000:Scarlet Monastery - Cathedral"] = {
+1420,
+0.851,
+0.314,
+["arrivaldistance"] = 15,
+["crazy"] = true,
+["persistent"] = true,
+["desc"] = "Scarlet Monastery - Cathedral",
+["silent"] = true,
+["cleardistance"] = 10,
+["title"] = "Scarlet Monastery - Cathedral",
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {

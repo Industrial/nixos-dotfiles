@@ -14,22 +14,22 @@ WowFExportarDB = {
 [9058] = true,
 [2152] = true,
 ["Slitherskin Mackerel"] = true,
-[2540] = true,
+[2881] = true,
 ["Linen Bandage"] = true,
 ["Light Leather"] = true,
-["Camp Chair"] = true,
+["Basic Campfire"] = true,
 [1229517] = true,
 [2538] = true,
 [9059] = true,
 [7126] = true,
-["Basic Campfire"] = true,
-["Camp Tent"] = true,
+["Camp Chair"] = true,
+["Handstitched Leather Cloak"] = true,
 ["Handstitched Leather Boots"] = true,
 ["Handstitched Leather Vest"] = true,
 [2149] = true,
 ["Herb Baked Egg"] = true,
-[1229737] = true,
-["Handstitched Leather Cloak"] = true,
+["Light Armor Kit"] = true,
+["Camp Tent"] = true,
 [3275] = true,
 ["Charred Wolf Meat"] = true,
 ["Handstitched Leather Bracers"] = true,
@@ -37,10 +37,10 @@ WowFExportarDB = {
 [8604] = true,
 [2539] = true,
 [1230117] = true,
-["Light Armor Kit"] = true,
+[1229737] = true,
 [7752] = true,
 ["Roasted Boar Meat"] = true,
-[2881] = true,
+[2540] = true,
 ["First Aid Kit"] = true,
 ["Spiced Wolf Meat"] = true,
 },
@@ -49,7 +49,7 @@ WowFExportarDB = {
 ["costosEntrenador"] = {
 ["HUNTER"] = {
 [1513] = 1080,
-["Freezing Trap available"] = 2100,
+["Freezing Trap available"] = 14400,
 ["Serpent Sting available"] = 9900,
 ["Track Humanoids unavailable"] = 400,
 [5042] = 9000,
@@ -68,7 +68,7 @@ WowFExportarDB = {
 ["Mail unavailable"] = 14400,
 [14280] = 34200,
 [14284] = 11700,
-["Great Stamina available"] = 50,
+["Great Stamina available"] = 0,
 [20903] = 32400,
 [14304] = 25200,
 [1299445] = 14400,
@@ -78,22 +78,23 @@ WowFExportarDB = {
 [13813] = 9900,
 ["Fire Resistance available"] = 396,
 [19434] = 2100,
-[24552] = 25,
+[24552] = 0,
 ["Track Dragonkin unavailable"] = 27000,
 [19506] = 14400,
 [23099] = 0,
 ["Wing Clip unavailable"] = 37800,
-[14919] = 3240,
+["Track Giants available"] = 14400,
+[14919] = 0,
 ["Raptor Strike unavailable"] = 34200,
 ["Aspect of the Beast available"] = 6840,
 ["Freezing Trap unavailable"] = 37800,
 [3111] = 2100,
-["Bite available"] = 10,
+["Bite available"] = 0,
 ["Distracting Shot available"] = 540,
 [781] = 1890,
-[4188] = 10,
-[4190] = 25,
-[4192] = 2520,
+[4188] = 0,
+[4190] = 0,
+[4192] = 0,
 [4194] = 5760,
 ["Beast Lore unavailable"] = 6480,
 [3127] = 200,
@@ -105,8 +106,8 @@ WowFExportarDB = {
 ["Dual Wield available"] = 2100,
 [13550] = 1440,
 [13554] = 27000,
-[24545] = 1,
-[24553] = 2520,
+[24545] = 0,
+[24553] = 0,
 [15630] = 14400,
 [3661] = 6750,
 [3662] = 11700,
@@ -114,6 +115,7 @@ WowFExportarDB = {
 ["Aspect of the Monkey available"] = 100,
 [2649] = 0,
 ["Aspect of the Cheetah unavailable"] = 2100,
+["Aspect of the Pack available"] = 14400,
 [13159] = 14400,
 [13163] = 100,
 [1310785] = 26100,
@@ -147,7 +149,7 @@ WowFExportarDB = {
 ["Dash available"] = 0,
 ["Multi-Shot unavailable"] = 1440,
 ["Track Demons unavailable"] = 9000,
-[17257] = 10,
+[17257] = 0,
 ["Track Undead available"] = 1440,
 ["Track Elementals unavailable"] = 7400,
 [20906] = 37800,
@@ -183,7 +185,7 @@ WowFExportarDB = {
 [14322] = 35100,
 [14326] = 6840,
 [8737] = 14400,
-["Aspect of the Hawk available"] = 6750,
+["Aspect of the Hawk available"] = 13500,
 ["Feign Death available"] = 6840,
 [14917] = 0,
 [14921] = 9000,
@@ -200,129 +202,131 @@ WowFExportarDB = {
 ["Raptor Strike available"] = 180,
 ["Mend Pet unavailable"] = 37800,
 [24445] = 6480,
-["Wing Clip available"] = 600,
+["Wing Clip available"] = 13500,
 [19878] = 9000,
 [24493] = 396,
 [13544] = 37800,
 [13552] = 9900,
-[24549] = 5,
+[24549] = 0,
 ["Serpent Sting unavailable"] = 35100,
 [15632] = 37800,
 [24629] = 7560,
-["Summon Hawk available"] = 11700,
-["Explosive Trap available"] = 9900,
-["Track Hidden unavailable"] = 6480,
+["Volley available"] = 14400,
+["Track Hidden available"] = 6480,
 ["Nature Resistance available"] = 396,
 [3034] = 11700,
-["Track Elementals available"] = 6660,
+["Track Hidden unavailable"] = 6480,
 [14320] = 13500,
+["Flare available"] = 9000,
+["Track Elementals available"] = 6660,
+["Rapid Fire available"] = 7400,
 ["Scare Beast unavailable"] = 25200,
 [13161] = 6840,
 [13165] = 400,
-["Track Hidden available"] = 6480,
+["Mail available"] = 14400,
 ["Aimed Shot available"] = 11700,
 [20190] = 34200,
 [1462] = 6480,
-[14310] = 14400,
-["Hunter's Mark available"] = 6300,
+["Hunter's Mark available"] = 14400,
+["Trueshot Aura unavailable"] = 37800,
 [7371] = 0,
 ["Summon Hawk unavailable"] = 37800,
-["Trueshot Aura unavailable"] = 37800,
+[20900] = 6750,
 [24555] = 5760,
-[1293525] = 11700,
 [24503] = 3240,
 [24497] = 1440,
+[24488] = 396,
 [1978] = 100,
-[14316] = 20700,
 [20902] = 20700,
 [24444] = 3240,
 [24504] = 6480,
 ["Shell Shield available"] = 0,
+["Growl available"] = 0,
 ["Eagle Eye unavailable"] = 1200,
 [14271] = 35100,
 ["Aspect of the Monkey unavailable"] = 100,
 [14279] = 25200,
 [24446] = 396,
 [14287] = 37800,
-["Arcane Shot unavailable"] = 37800,
+["Counterattack unavailable"] = 33300,
 [14295] = 35100,
 [19879] = 27000,
 [20909] = 19800,
-["Counterattack unavailable"] = 33300,
+["Arcane Shot unavailable"] = 37800,
 [24502] = 1440,
-[24550] = 10,
+[24550] = 0,
 [14319] = 6750,
 ["Sniper Shot unavailable"] = 35100,
 ["Viper Sting available"] = 11700,
 ["Aspect of the Wild unavailable"] = 34200,
 ["Track Giants unavailable"] = 14400,
 ["Concussive Shot available"] = 200,
-[14323] = 6300,
 ["Track Humanoids available"] = 360,
 ["Frost Resistance available"] = 396,
-[4189] = 15,
+[4189] = 0,
 [5116] = 200,
-["Track Undead unavailable"] = 1440,
 [19883] = 360,
+["Track Undead unavailable"] = 1440,
 [14302] = 6660,
+["Nature Resistance unavailable"] = 6480,
 [24630] = 9000,
-["Frost Trap unavailable"] = 7500,
 [24501] = 6480,
 [24505] = 1440,
 [14263] = 9000,
-[14283] = 6750,
+[19884] = 1440,
 ["Rapid Fire unavailable"] = 7400,
+["Aspect of the Hawk unavailable"] = 35100,
 ["Scare Beast available"] = 1080,
 [14918] = 0,
-["Aspect of the Hawk unavailable"] = 35100,
 [24448] = 3240,
 [2974] = 600,
-["Fire Resistance unavailable"] = 6480,
-[4191] = 50,
+["Aspect of the Beast unavailable"] = 37800,
+[4191] = 0,
+[1494] = 9,
 [1299348] = 9000,
 [1002] = 1080,
-[1494] = 9,
-[4187] = 5,
+[14324] = 14400,
 [13795] = 1350,
 [20736] = 540,
+[4187] = 0,
 ["Frost Resistance unavailable"] = 6480,
 [1242634] = 6840,
-[14324] = 14400,
+["Fire Resistance unavailable"] = 6480,
 [1495] = 1350,
-["Aspect of the Beast unavailable"] = 37800,
 [14267] = 13500,
 [20901] = 11700,
+[14283] = 6750,
 ["Shadow Resistance unavailable"] = 6480,
-[19884] = 1440,
 [23992] = 396,
 [14303] = 11700,
+["Frost Trap unavailable"] = 7500,
 [1499] = 2100,
-["Nature Resistance unavailable"] = 6480,
 [5118] = 2100,
 [1543] = 9000,
 [14311] = 37800,
 ["Distracting Shot unavailable"] = 37800,
 [14327] = 25200,
+[14323] = 6300,
 ["Arcane Resistance unavailable"] = 6480,
-["Natural Armor available"] = 25,
+["Natural Armor available"] = 0,
 [24439] = 1440,
 [24447] = 1440,
 ["Feign Death unavailable"] = 7600,
-["Growl available"] = 0,
 [19882] = 14400,
+[14316] = 20700,
 [19880] = 6660,
 [20910] = 33300,
-[24488] = 396,
+[1293525] = 11700,
 ["Mend Pet available"] = 11700,
 [13549] = 400,
 [13553] = 19800,
-[20900] = 6750,
+[14310] = 14400,
 ["Growl unavailable"] = 9000,
 [1510] = 14400,
-[24551] = 15,
-["Rapid Fire available"] = 7400,
-["Flare available"] = 9000,
+[24551] = 0,
 [26064] = 0,
+["Explosive Trap available"] = 9900,
+["Summon Hawk available"] = 11700,
 [15629] = 6840,
 ["Mongoose Bite unavailable"] = 35100,
 },
@@ -350,38 +354,38 @@ WowFExportarDB = {
 ["tramos"] = {
 {
 ["id"] = 1,
-["costo"] = 0,
 ["hasta"] = 11,
+["costo"] = 0,
 ["desde"] = 1,
 },
 {
 ["id"] = 38,
-["costo"] = 1,
 ["hasta"] = 21,
+["costo"] = 1,
 ["desde"] = 11,
 },
 {
 ["id"] = 11,
-["costo"] = 1,
 ["hasta"] = 32,
+["costo"] = 1,
 ["desde"] = 21,
 },
 {
 ["id"] = 45,
-["costo"] = 1,
 ["hasta"] = 41,
+["costo"] = 1,
 ["desde"] = 32,
 },
 {
 ["id"] = 47,
-["costo"] = 2,
 ["hasta"] = 49,
+["costo"] = 2,
 ["desde"] = 41,
 },
 {
 ["id"] = 28,
-["costo"] = 3,
 ["hasta"] = 60,
+["costo"] = 3,
 ["desde"] = 49,
 },
 },
@@ -393,44 +397,44 @@ WowFExportarDB = {
 ["tramos"] = {
 {
 ["id"] = 12,
-["costo"] = 0,
 ["hasta"] = 11,
+["costo"] = 0,
 ["desde"] = 1,
 },
 {
 ["id"] = 40,
-["costo"] = 1,
 ["hasta"] = 19,
+["costo"] = 1,
 ["desde"] = 11,
 },
 {
 ["id"] = 10,
-["costo"] = 1,
 ["hasta"] = 31,
+["costo"] = 1,
 ["desde"] = 19,
 },
 {
 ["id"] = 33,
-["costo"] = 1.5,
 ["hasta"] = 51,
+["costo"] = 1.5,
 ["desde"] = 31,
 },
 {
 ["id"] = 46,
-["costo"] = 4,
 ["hasta"] = 56,
+["costo"] = 4,
 ["desde"] = 51,
 },
 {
 ["id"] = 4,
-["costo"] = 5.5,
 ["hasta"] = 59,
+["costo"] = 5.5,
 ["desde"] = 56,
 },
 {
 ["id"] = 440,
-["costo"] = 10.2,
 ["hasta"] = 60,
+["costo"] = 10.2,
 ["desde"] = 59,
 },
 },
@@ -447,61 +451,7 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 06:30",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 35,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "legible",
-["combate"] = "si",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 12:46",
-["clase"] = "MAGE",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 1,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "nil",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 21:18",
+["fecha"] = "2026-11-15 23:07",
 ["clase"] = "MAGE",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
@@ -513,12 +463,12 @@ WowFExportarDB = {
 ["cdNuevo"] = "legible",
 ["auraUtil"] = "nil",
 ["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
 ["casteoObjetivo"] = "nil",
-["version"] = "4.66",
 ["auraNombre"] = "nil",
 ["casteo"] = "nil",
 ["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
+["version"] = "4.66",
 ["auraNueva"] = "nil",
 ["combate"] = "no",
 ["poder"] = "secreto",
@@ -528,24 +478,24 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 21:22",
+["fecha"] = "2026-11-15 23:44",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 35,
+["nivel"] = 39,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
 ["cdNuevo"] = "legible",
 ["combate"] = "no",
 ["rango"] = "nil",
+["version"] = "4.66",
 ["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
 ["auraNombre"] = "nil",
 ["casteo"] = "nil",
 ["usableViejo"] = "no existe",
-["version"] = "4.66",
+["casteoObjetivo"] = "nil",
 ["auraNueva"] = "nil",
 ["auraUtil"] = "nil",
 ["poder"] = "secreto",
@@ -555,17 +505,98 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 21:25",
+["fecha"] = "2026-11-15 23:45",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 35,
+["nivel"] = 39,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
 ["cdNuevo"] = "legible",
 ["combate"] = "si",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-15 23:54",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-15 23:54",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "si",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 00:30",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
 ["rango"] = "nil",
 ["asistidoSiguiente"] = "nil",
 ["casteoObjetivo"] = "nil",
@@ -576,13 +607,94 @@ WowFExportarDB = {
 ["auraNueva"] = "legible",
 ["auraUtil"] = "nil",
 ["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 00:50",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 00:51",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 01:05",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "si",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
 ["guidObjetivo"] = "legible",
 ["idEvento"] = "sin ver",
 },
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 22:57",
+["fecha"] = "2026-11-16 04:31",
 ["clase"] = "MAGE",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
@@ -594,12 +706,12 @@ WowFExportarDB = {
 ["cdNuevo"] = "legible",
 ["auraUtil"] = "nil",
 ["rango"] = "nil",
-["version"] = "4.66",
 ["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
 ["auraNombre"] = "nil",
 ["casteo"] = "nil",
 ["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
+["version"] = "4.66",
 ["auraNueva"] = "nil",
 ["combate"] = "no",
 ["poder"] = "secreto",
@@ -609,24 +721,24 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 23:15",
+["fecha"] = "2026-11-16 04:31",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 36,
+["nivel"] = 39,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
 ["cdNuevo"] = "legible",
 ["combate"] = "no",
 ["rango"] = "nil",
-["casteoObjetivo"] = "nil",
 ["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
 ["auraNombre"] = "nil",
 ["casteo"] = "nil",
 ["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
 ["auraNueva"] = "nil",
 ["auraUtil"] = "nil",
 ["poder"] = "secreto",
@@ -636,93 +748,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 23:16",
+["fecha"] = "2026-11-16 04:32",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 36,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "si",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-12 23:52",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 36,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "legible",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 00:14",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 36,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 00:48",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 36,
+["nivel"] = 39,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -744,12 +775,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 01:13",
+["fecha"] = "2026-11-16 08:47",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 36,
+["nivel"] = 39,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -762,7 +793,7 @@ WowFExportarDB = {
 ["casteo"] = "nil",
 ["usableViejo"] = "no existe",
 ["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
+["auraNueva"] = "nil",
 ["combate"] = "no",
 ["poder"] = "secreto",
 ["guidObjetivo"] = "nil",
@@ -771,12 +802,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 01:14",
+["fecha"] = "2026-11-16 08:47",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 36,
+["nivel"] = 39,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -798,12 +829,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:13",
-["clase"] = "MAGE",
+["fecha"] = "2026-11-17 01:50",
+["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 1,
+["nivel"] = 40,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -825,12 +856,39 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:28",
+["fecha"] = "2026-11-17 02:33",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 37,
+["nivel"] = 40,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "si",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 07:32",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -852,12 +910,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:28",
+["fecha"] = "2026-11-17 07:33",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 37,
+["nivel"] = 40,
 ["asistido"] = "existe",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -879,12 +937,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:30",
+["fecha"] = "2026-11-17 10:32",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 37,
+["nivel"] = 40,
 ["casteoObjetivo"] = "nil",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -897,7 +955,7 @@ WowFExportarDB = {
 ["casteo"] = "nil",
 ["usableViejo"] = "no existe",
 ["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
+["auraNueva"] = "nil",
 ["auraUtil"] = "nil",
 ["poder"] = "secreto",
 ["guidObjetivo"] = "nil",
@@ -906,39 +964,12 @@ WowFExportarDB = {
 {
 ["vidaObjetivo"] = "secreto",
 ["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:32",
+["fecha"] = "2026-11-17 10:35",
 ["clase"] = "HUNTER",
 ["placas"] = "legible",
 ["auraVieja"] = "no existe",
 ["brillo"] = "sin ver",
-["nivel"] = 37,
-["casteoObjetivo"] = "nil",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["asistido"] = "existe",
-["combate"] = "si",
-["rango"] = "nil",
-["cdNuevo"] = "legible",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:37",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 37,
+["nivel"] = 40,
 ["auraUtil"] = "nil",
 ["modo"] = "?",
 ["cdViejo"] = "no existe",
@@ -953,33 +984,6 @@ WowFExportarDB = {
 ["version"] = "4.66",
 ["auraNueva"] = "legible",
 ["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-13 03:37",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 37,
-["auraUtil"] = "nil",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["rango"] = "nil",
-["asistido"] = "existe",
-["cdNuevo"] = "legible",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "legible",
-["combate"] = "si",
 ["poder"] = "secreto",
 ["guidObjetivo"] = "nil",
 ["idEvento"] = "sin ver",
@@ -999,301 +1003,77 @@ WowFExportarDB = {
 114.2857284545898,
 },
 ["preciosSubasta"] = {
-[6547] = {
-["t"] = 1794089571,
-["p"] = 300,
-},
-[2512] = {
-["p"] = 1,
-["t"] = 1794536396,
-},
-[6551] = {
-["p"] = 500,
-["t"] = 1794029773,
-},
-[2515] = {
-["p"] = 1,
-["t"] = 1794536398,
-},
-[2516] = {
-["p"] = 1,
-["t"] = 1794536394,
-},
-[6559] = {
-["p"] = 700,
-["t"] = 1794443189,
-},
-[7072] = {
-["p"] = 149,
-["t"] = 1794484733,
-},
-[1015] = {
-["p"] = 440,
-["t"] = 1794075467,
-},
-[6565] = {
-["p"] = 500,
-["t"] = 1794443087,
-},
-[3033] = {
-["p"] = 3,
-["t"] = 1794536417,
-},
-[11082] = {
-["p"] = 1365,
-["t"] = 1794536651,
-},
-[4537] = {
-["p"] = 30,
-["t"] = 1794536595,
-},
-[6585] = {
-["p"] = 600,
-["t"] = 1794443089,
-},
-[6591] = {
-["t"] = 1794452161,
-["p"] = 1150,
-},
-[5571] = {
-["p"] = 250,
-["t"] = 1794484697,
-},
-[6595] = {
-["t"] = 1794452138,
-["p"] = 1200,
-},
-[3047] = {
-["t"] = 1794452179,
-["p"] = 1100,
-},
-[6603] = {
-["t"] = 1794155479,
-["p"] = 3000,
-},
-[6605] = {
-["t"] = 1794452145,
-["p"] = 1000,
-},
-[765] = {
-["p"] = 16,
-["t"] = 1794536516,
-},
-[1529] = {
-["t"] = 1794359532,
-["p"] = 700,
-},
-[6613] = {
-["t"] = 1794452150,
-["p"] = 1000,
-},
-[6615] = {
-["t"] = 1794452147,
-["p"] = 1000,
-},
-[249428] = {
-["p"] = 457,
-["t"] = 1794354629,
-},
-[3575] = {
-["p"] = 368,
-["t"] = 1794441508,
-},
-[3576] = {
-["t"] = 1794441165,
-["p"] = 215,
-},
-[3577] = {
-["t"] = 1794520727,
-["p"] = 745,
-},
-[4593] = {
-["p"] = 7,
-["t"] = 1794536469,
-},
-[769] = {
-["p"] = 32,
-["t"] = 1794536597,
-},
-[897] = {
-["t"] = 1794155568,
-["p"] = 2700,
-},
-[8176] = {
-["p"] = 3500,
-["t"] = 1794459396,
-},
-[8178] = {
-["t"] = 1794521448,
-["p"] = 305,
-},
-[4603] = {
-["t"] = 1794521627,
-["p"] = 18,
-},
-[4605] = {
-["p"] = 6,
-["t"] = 1794536463,
-},
-[15330] = {
-["p"] = 1800,
-["t"] = 1794443190,
-},
-[5635] = {
-["p"] = 48,
-["t"] = 1794215771,
-},
-[1288] = {
-["p"] = 185,
-["t"] = 1794485121,
-},
-[774] = {
-["p"] = 15,
-["t"] = 1794536506,
-},
-[10288] = {
-["p"] = 12000,
-["t"] = 1794443203,
-},
-[2070] = {
-["p"] = 1,
-["t"] = 1794536388,
-},
-[8256] = {
-["p"] = 15400,
-["t"] = 1794459385,
-},
-[217495] = {
-["p"] = 199,
-["t"] = 1794485137,
-},
-[9801] = {
-["p"] = 7000,
-["t"] = 1794443211,
-},
-[9809] = {
-["p"] = 4500,
-["t"] = 1794443194,
-},
-[2589] = {
-["p"] = 25,
-["t"] = 1794536549,
-},
-[9817] = {
-["p"] = 1900,
+[15249] = {
+["p"] = 3900,
 ["t"] = 1794443195,
 },
-[2591] = {
-["p"] = 18,
-["t"] = 1794536518,
-},
-[2592] = {
-["p"] = 127,
-["t"] = 1794461094,
-},
-[1299] = {
-["p"] = 500,
-["t"] = 1794366973,
-},
-[2596] = {
-["t"] = 1794514730,
-["p"] = 482,
-},
-[779] = {
-["p"] = 18,
-["t"] = 1794459136,
-},
-[17119] = {
-["p"] = 6,
-["t"] = 1794536447,
-},
-[10404] = {
-["p"] = 1000,
-["t"] = 1794442213,
-},
-[4701] = {
-["p"] = 300,
-["t"] = 1794029908,
-},
-[2101] = {
-["t"] = 1794060173,
-["p"] = 100,
-},
-[783] = {
-["p"] = 199,
-["t"] = 1794215776,
-},
-[10939] = {
-["p"] = 260,
-["t"] = 1794459587,
-},
-[785] = {
-["p"] = 29,
-["t"] = 1794536587,
-},
-[7282] = {
-["p"] = 595,
-["t"] = 1794485177,
-},
-[7286] = {
+[5075] = {
 ["p"] = 25,
-["t"] = 1794536534,
-},
-[787] = {
-["p"] = 7,
-["t"] = 1794536481,
-},
-[6787] = {
-["p"] = 500,
-["t"] = 1794367006,
-},
-[4234] = {
-["t"] = 1794520732,
-["p"] = 214,
-},
-[4238] = {
-["t"] = 1794521478,
-["p"] = 200,
-},
-[10512] = {
-["p"] = 6,
-["t"] = 1794536455,
-},
-[789] = {
-["p"] = 2000,
-["t"] = 1794155164,
-},
-[6290] = {
-["p"] = 7,
-["t"] = 1794536467,
+["t"] = 1794536536,
 },
 [279276] = {
 ["p"] = 11,
 ["t"] = 1794536490,
 },
-[6811] = {
-["p"] = 25,
-["t"] = 1794484381,
+[5095] = {
+["p"] = 9,
+["t"] = 1794536485,
 },
-[6308] = {
-["p"] = 21,
-["t"] = 1794536527,
+[8176] = {
+["p"] = 3500,
+["t"] = 1794459396,
 },
-[1326] = {
-["p"] = 10,
-["t"] = 1794536488,
+[4096] = {
+["p"] = 607,
+["t"] = 1794485182,
 },
-[2140] = {
-["t"] = 1794521429,
-["p"] = 1390,
+[11285] = {
+["p"] = 12,
+["t"] = 1794536492,
 },
-[4278] = {
-["p"] = 1000,
-["t"] = 1794291212,
+[8256] = {
+["p"] = 15400,
+["t"] = 1794459385,
+},
+[2070] = {
+["p"] = 1,
+["t"] = 1794536388,
+},
+[2078] = {
+["t"] = 1794782122,
+["p"] = 1069,
+},
+[6206] = {
+["t"] = 1794643925,
+["p"] = 1250,
+},
+[15489] = {
+["t"] = 1794643791,
+["p"] = 545,
+},
+[5207] = {
+["p"] = 1079,
+["t"] = 1794484489,
+},
+[3135] = {
+["t"] = 1794648467,
+["p"] = 500,
+},
+[4232] = {
+["p"] = 199,
+["t"] = 1794546595,
+},
+[6290] = {
+["p"] = 7,
+["t"] = 1794536467,
 },
 [17056] = {
 ["p"] = 33,
 ["t"] = 1794485515,
+},
+[2140] = {
+["t"] = 1794643790,
+["p"] = 527,
 },
 [3169] = {
 ["p"] = 18,
@@ -1303,725 +1083,1417 @@ WowFExportarDB = {
 ["p"] = 6,
 ["t"] = 1794536439,
 },
+[5319] = {
+["p"] = 6900,
+["t"] = 1794443199,
+},
+[4304] = {
+["t"] = 1794648465,
+["p"] = 680,
+},
+[6358] = {
+["p"] = 33,
+["t"] = 1794485507,
+},
+[6362] = {
+["p"] = 6,
+["t"] = 1794536461,
+},
+[3185] = {
+["p"] = 12000,
+["t"] = 1794443197,
+},
+[2166] = {
+["t"] = 1794643922,
+["p"] = 1233,
+},
+[3193] = {
+["t"] = 1794781089,
+["p"] = 2064,
+},
+[3195] = {
+["t"] = 1794642990,
+["p"] = 1363,
+},
+[3199] = {
+["t"] = 1794782107,
+["p"] = 2249,
+},
+[3201] = {
+["t"] = 1794642908,
+["p"] = 4493,
+},
+[6418] = {
+["t"] = 1794452176,
+["p"] = 2000,
+},
+[9775] = {
+["t"] = 1794643777,
+["p"] = 400,
+},
+[9783] = {
+["t"] = 1794782033,
+["p"] = 800,
+},
+[9799] = {
+["t"] = 1794643913,
+["p"] = 1200,
+},
+[9815] = {
+["t"] = 1794781083,
+["p"] = 1656,
+},
+[6450] = {
+["p"] = 200,
+["t"] = 1794485125,
+},
+[9831] = {
+["t"] = 1794782114,
+["p"] = 1232,
+},
+[6458] = {
+["p"] = 29,
+["t"] = 1794536591,
+},
+[6470] = {
+["p"] = 29,
+["t"] = 1794485675,
+},
+[4428] = {
+["p"] = 330,
+["t"] = 1794484795,
+},
+[252819] = {
+["t"] = 1794643935,
+["p"] = 1300,
+},
+[10918] = {
+["t"] = 1794647798,
+["p"] = 100,
+},
+[15018] = {
+["t"] = 1794643858,
+["p"] = 899,
+},
+[6518] = {
+["p"] = 155,
+["t"] = 1794443213,
+},
+[5503] = {
+["p"] = 52,
+["t"] = 1794485674,
+},
+[6530] = {
+["p"] = 27,
+["t"] = 1794536571,
+},
+[6538] = {
+["t"] = 1794782101,
+["p"] = 486,
+},
+[4496] = {
+["p"] = 200,
+["t"] = 1794443212,
+},
+[6546] = {
+["t"] = 1794643876,
+["p"] = 1000,
+},
+[5527] = {
+["t"] = 1794521477,
+["p"] = 95,
+},
+[6554] = {
+["t"] = 1794643801,
+["p"] = 600,
+},
+[2258] = {
+["t"] = 1794643851,
+["p"] = 800,
+},
+[6562] = {
+["t"] = 1794643938,
+["p"] = 1329,
+},
+[213564] = {
+["p"] = 37,
+["t"] = 1794484413,
+},
+[6570] = {
+["t"] = 1794648319,
+["p"] = 494,
+},
+[17057] = {
+["p"] = 7,
+["t"] = 1794536480,
+},
+[6578] = {
+["t"] = 1794643011,
+["p"] = 1299,
+},
+[4536] = {
+["p"] = 10,
+["t"] = 1794485467,
+},
+[4540] = {
+["p"] = 2,
+["t"] = 1794536410,
+},
+[5571] = {
+["p"] = 250,
+["t"] = 1794484697,
+},
+[6598] = {
+["t"] = 1794782142,
+["p"] = 2423,
+},
+[6602] = {
+["p"] = 1000,
+["t"] = 1794459377,
+},
+[15250] = {
+["t"] = 1794643008,
+["p"] = 6890,
+},
+[4564] = {
+["t"] = 1794643811,
+["p"] = 700,
+},
+[6614] = {
+["t"] = 1794452135,
+["p"] = 1200,
+},
+[12213] = {
+["t"] = 1794643776,
+["p"] = 333,
+},
+[15306] = {
+["t"] = 1794643850,
+["p"] = 800,
+},
+[4592] = {
+["p"] = 8,
+["t"] = 1794536482,
+},
+[15330] = {
+["p"] = 1800,
+["t"] = 1794443190,
+},
+[4604] = {
+["p"] = 2,
+["t"] = 1794546577,
+},
+[5635] = {
+["p"] = 48,
+["t"] = 1794215771,
+},
+[2316] = {
+["p"] = 407,
+["t"] = 1794484793,
+},
+[2318] = {
+["p"] = 35,
+["t"] = 1794536661,
+},
+[2320] = {
+["t"] = 1794521611,
+["p"] = 12,
+},
+[4656] = {
+["p"] = 3,
+["t"] = 1794536414,
+},
+[6714] = {
+["t"] = 1794647799,
+["p"] = 119,
+},
+[15474] = {
+["t"] = 1794648315,
+["p"] = 400,
+},
+[3369] = {
+["t"] = 1794643841,
+["p"] = 25,
+},
+[3371] = {
+["p"] = 4,
+["t"] = 1794536419,
+},
+[1177] = {
+["p"] = 10,
+["t"] = 1794536487,
+},
+[1178] = {
+["p"] = 10,
+["t"] = 1794536486,
+},
+[1179] = {
+["p"] = 27,
+["t"] = 1794536567,
+},
+[1181] = {
+["p"] = 25,
+["t"] = 1794536557,
+},
+[17058] = {
+["p"] = 6,
+["t"] = 1794536449,
+},
+[3421] = {
+["t"] = 1794643781,
+["p"] = 449,
+},
+[38] = {
+["t"] = 1794643805,
+["p"] = 600,
+},
+[1212] = {
+["p"] = 21,
+["t"] = 1794536527,
+},
+[6890] = {
+["p"] = 25,
+["t"] = 1794485499,
+},
+[1220] = {
+["p"] = 2200,
+["t"] = 1794075454,
+},
+[3465] = {
+["p"] = 15,
+["t"] = 1794536502,
+},
+[255007] = {
+["p"] = 22,
+["t"] = 1794536528,
+},
+[9776] = {
+["t"] = 1794782045,
+["p"] = 525,
+},
+[2450] = {
+["p"] = 94,
+["t"] = 1794461081,
+},
+[9792] = {
+["t"] = 1794782117,
+["p"] = 818,
+},
+[11846] = {
+["p"] = 30,
+["t"] = 1794536595,
+},
+[2456] = {
+["p"] = 15,
+["t"] = 1794536508,
+},
+[2458] = {
+["p"] = 22,
+["t"] = 1794536528,
+},
+[9832] = {
+["t"] = 1794155579,
+["p"] = 2200,
+},
+[9848] = {
+["t"] = 1794452147,
+["p"] = 2100,
+},
+[282655] = {
+["t"] = 1794452166,
+["p"] = 1000,
+},
+[5967] = {
+["t"] = 1794643933,
+["p"] = 1300,
+},
+[252452] = {
+["t"] = 1794643904,
+["p"] = 1086,
+},
+[12006] = {
+["p"] = 9800,
+["t"] = 1794443191,
+},
+[8953] = {
+["t"] = 1794643906,
+["p"] = 1100,
+},
+[1251] = {
+["p"] = 10,
+["t"] = 1794536486,
+},
+[8069] = {
+["p"] = 5,
+["t"] = 1794536425,
+},
+[14124] = {
+["t"] = 1794643861,
+["p"] = 900,
+},
+[7074] = {
+["p"] = 32,
+["t"] = 1794536597,
+},
+[14172] = {
+["t"] = 1794781055,
+["p"] = 828,
+},
+[15211] = {
+["t"] = 1794642962,
+["p"] = 1910,
+},
+[159] = {
+["p"] = 9,
+["t"] = 1794536485,
+},
+[15259] = {
+["t"] = 1794782127,
+["p"] = 3290,
+},
+[1274] = {
+["p"] = 19,
+["t"] = 1794536520,
+},
+[12238] = {
+["p"] = 6,
+["t"] = 1794536445,
+},
+[3577] = {
+["t"] = 1794520727,
+["p"] = 745,
+},
+[5116] = {
+["p"] = 300,
+["t"] = 1794484481,
+},
+[1288] = {
+["p"] = 185,
+["t"] = 1794485121,
+},
+[10288] = {
+["p"] = 12000,
+["t"] = 1794443203,
+},
+[2580] = {
+["p"] = 100,
+["t"] = 1794442216,
+},
+[2584] = {
+["p"] = 180,
+["t"] = 1794485360,
+},
+[18610] = {
+["t"] = 1794643907,
+["p"] = 1149,
+},
+[2592] = {
+["p"] = 117,
+["t"] = 1794546604,
+},
+[2596] = {
+["p"] = 447,
+["t"] = 1794546630,
+},
+[15491] = {
+["t"] = 1794648319,
+["p"] = 500,
+},
+[15499] = {
+["t"] = 1794643787,
+["p"] = 500,
+},
+[271675] = {
+["t"] = 1794643870,
+["p"] = 1000,
+},
+[7282] = {
+["t"] = 1794643125,
+["p"] = 597,
+},
+[7286] = {
+["p"] = 25,
+["t"] = 1794536534,
+},
+[6267] = {
+["t"] = 1794648364,
+["p"] = 160,
+},
+[2632] = {
+["t"] = 1794643949,
+["p"] = 1500,
+},
+[6291] = {
+["p"] = 19,
+["t"] = 1794536520,
+},
+[6299] = {
+["p"] = 30,
+["t"] = 1794536595,
+},
+[6303] = {
+["p"] = 15,
+["t"] = 1794536512,
+},
+[1326] = {
+["p"] = 10,
+["t"] = 1794536488,
+},
+[6359] = {
+["p"] = 27,
+["t"] = 1794536563,
+},
+[13757] = {
+["p"] = 18,
+["t"] = 1794536519,
+},
+[2678] = {
+["p"] = 4,
+["t"] = 1794536421,
+},
+[2680] = {
+["p"] = 14,
+["t"] = 1794536500,
+},
+[2682] = {
+["p"] = 27,
+["t"] = 1794459159,
+},
+[4357] = {
+["p"] = 19,
+["t"] = 1794536521,
+},
+[3719] = {
+["t"] = 1794460400,
+["p"] = 1400,
+},
+[9753] = {
+["t"] = 1794647805,
+["p"] = 300,
+},
+[4373] = {
+["t"] = 1794643936,
+["p"] = 1300,
+},
+[7446] = {
+["p"] = 15900,
+["t"] = 1794443204,
+},
+[9777] = {
+["t"] = 1794643848,
+["p"] = 770,
+},
+[4389] = {
+["p"] = 1450,
+["t"] = 1794290870,
+},
+[9801] = {
+["t"] = 1794781240,
+["p"] = 700,
+},
+[255663] = {
+["p"] = 8,
+["t"] = 1794536484,
+},
+[9817] = {
+["p"] = 1900,
+["t"] = 1794443195,
+},
+[250932] = {
+["p"] = 33,
+["t"] = 1794485515,
+},
+[264018] = {
+["p"] = 2000,
+["t"] = 1794443209,
+},
+[5472] = {
+["p"] = 12,
+["t"] = 1794536492,
+},
+[6511] = {
+["p"] = 200,
+["t"] = 1794029769,
+},
+[3775] = {
+["p"] = 33,
+["t"] = 1794536598,
+},
+[7554] = {
+["t"] = 1794781088,
+["p"] = 2239,
+},
+[6539] = {
+["t"] = 1794643854,
+["p"] = 820,
+},
+[6543] = {
+["t"] = 1794648271,
+["p"] = 265,
+},
+[6547] = {
+["t"] = 1794643907,
+["p"] = 1169,
+},
+[6551] = {
+["t"] = 1794782120,
+["p"] = 403,
+},
+[6559] = {
+["t"] = 1794643867,
+["p"] = 1000,
+},
+[6563] = {
+["t"] = 1794647980,
+["p"] = 300,
+},
+[15172] = {
+["p"] = 7100,
+["t"] = 1794459375,
+},
+[2778] = {
+["p"] = 189,
+["t"] = 1794484618,
+},
+[14181] = {
+["t"] = 1794643919,
+["p"] = 1200,
+},
+[263513] = {
+["p"] = 2000,
+["t"] = 1794443201,
+},
+[5568] = {
+["p"] = 5,
+["t"] = 1794536435,
+},
+[5572] = {
+["p"] = 300,
+["t"] = 1794485141,
+},
+[6603] = {
+["t"] = 1794155479,
+["p"] = 3000,
+},
+[4561] = {
+["t"] = 1794782389,
+["p"] = 305,
+},
+[4569] = {
+["t"] = 1794782411,
+["p"] = 604,
+},
+[1401] = {
+["p"] = 14,
+["t"] = 1794536496,
+},
+[15284] = {
+["t"] = 1794155424,
+["p"] = 3300,
+},
+[3829] = {
+["p"] = 2400,
+["t"] = 1794290840,
+},
+[4593] = {
+["p"] = 7,
+["t"] = 1794536469,
+},
+[3835] = {
+["t"] = 1794643942,
+["p"] = 1400,
+},
+[4605] = {
+["p"] = 6,
+["t"] = 1794536463,
+},
+[15348] = {
+["t"] = 1794452153,
+["p"] = 1000,
+},
+[11288] = {
+["p"] = 200,
+["t"] = 1794442236,
+},
+[12359] = {
+["p"] = 1798,
+["t"] = 1794441555,
+},
+[2842] = {
+["p"] = 330,
+["t"] = 1794029798,
+},
+[8315] = {
+["p"] = 29900,
+["t"] = 1794443205,
+},
+[2852] = {
+["p"] = 100,
+["t"] = 1794459393,
+},
+[15508] = {
+["t"] = 1794643951,
+["p"] = 1500,
+},
+[2862] = {
+["p"] = 5,
+["t"] = 1794536433,
+},
+[4701] = {
+["p"] = 300,
+["t"] = 1794029908,
+},
+[2866] = {
+["p"] = 600,
+["t"] = 1794484509,
+},
+[2868] = {
+["p"] = 509,
+["t"] = 1794526427,
+},
+[6787] = {
+["p"] = 500,
+["t"] = 1794367006,
+},
+[2886] = {
+["p"] = 8,
+["t"] = 1794536481,
+},
+[10513] = {
+["p"] = 9,
+["t"] = 1794536484,
+},
+[724] = {
+["p"] = 33,
+["t"] = 1794485514,
+},
+[6811] = {
+["p"] = 25,
+["t"] = 1794484381,
+},
+[727] = {
+["t"] = 1794781062,
+["p"] = 1340,
+},
+[729] = {
+["p"] = 270,
+["t"] = 1794029893,
+},
+[15732] = {
+["t"] = 1794782108,
+["p"] = 3499,
+},
+[730] = {
+["p"] = 16,
+["t"] = 1794536516,
+},
+[731] = {
+["p"] = 27,
+["t"] = 1794536565,
+},
+[732] = {
+["p"] = 6,
+["t"] = 1794536457,
+},
+[2928] = {
+["p"] = 30,
+["t"] = 1794485510,
+},
+[13758] = {
+["p"] = 15,
+["t"] = 1794536510,
+},
+[2934] = {
+["p"] = 14,
+["t"] = 1794536498,
+},
+[4865] = {
+["p"] = 32,
+["t"] = 1794536598,
+},
+[1475] = {
+["t"] = 1794089585,
+["p"] = 82,
+},
+[1476] = {
+["p"] = 9,
+["t"] = 1794536486,
+},
+[4877] = {
+["p"] = 20,
+["t"] = 1794536526,
+},
+[9778] = {
+["t"] = 1794643908,
+["p"] = 1188,
+},
+[9786] = {
+["t"] = 1794648316,
+["p"] = 400,
+},
+[6947] = {
+["p"] = 5,
+["t"] = 1794536429,
+},
+[2970] = {
+["p"] = 400,
+["t"] = 1794029910,
+},
+[16060] = {
+["t"] = 1794643946,
+["p"] = 1498,
+},
+[12040] = {
+["p"] = 7400,
+["t"] = 1794443096,
+},
+[1510] = {
+["t"] = 1794521463,
+["p"] = 150,
+},
+[247754] = {
+["p"] = 37,
+["t"] = 1794484412,
+},
+[3022] = {
+["t"] = 1794643947,
+["p"] = 1500,
+},
+[6048] = {
+["t"] = 1794648739,
+["p"] = 220,
+},
+[10050] = {
+["p"] = 14600,
+["t"] = 1794290965,
+},
+[3030] = {
+["p"] = 3,
+["t"] = 1794536412,
+},
+[247755] = {
+["p"] = 25,
+["t"] = 1794536542,
+},
+[7095] = {
+["t"] = 1794648241,
+["p"] = 400,
+},
+[5057] = {
+["p"] = 8,
+["t"] = 1794536483,
+},
+[11137] = {
+["t"] = 1794520775,
+["p"] = 989,
+},
+[6096] = {
+["t"] = 1794643800,
+["p"] = 600,
+},
+[247884] = {
+["p"] = 12,
+["t"] = 1794536493,
+},
+[12208] = {
+["t"] = 1794643771,
+["p"] = 248,
+},
+[18294] = {
+["t"] = 1794643869,
+["p"] = 1000,
+},
+[8178] = {
+["t"] = 1794781276,
+["p"] = 2299,
+},
+[769] = {
+["p"] = 32,
+["t"] = 1794536597,
+},
+[774] = {
+["p"] = 15,
+["t"] = 1794536506,
+},
+[5165] = {
+["p"] = 1,
+["t"] = 1794536400,
+},
+[2075] = {
+["t"] = 1794648213,
+["p"] = 399,
+},
+[2077] = {
+["t"] = 1794782103,
+["p"] = 5056,
+},
+[2079] = {
+["t"] = 1794643923,
+["p"] = 1237,
+},
+[777] = {
+["p"] = 28,
+["t"] = 1794536579,
+},
+[15485] = {
+["t"] = 1794781270,
+["p"] = 340,
+},
+[779] = {
+["p"] = 18,
+["t"] = 1794459136,
+},
+[5205] = {
+["p"] = 31,
+["t"] = 1794536596,
+},
+[2101] = {
+["t"] = 1794060173,
+["p"] = 100,
+},
+[783] = {
+["p"] = 199,
+["t"] = 1794215776,
+},
+[6268] = {
+["t"] = 1794648705,
+["p"] = 300,
+},
+[4234] = {
+["p"] = 218,
+["t"] = 1794546587,
+},
+[4238] = {
+["t"] = 1794521478,
+["p"] = 200,
+},
+[789] = {
+["t"] = 1794782117,
+["p"] = 1960,
+},
+[790] = {
+["t"] = 1794642997,
+["p"] = 2014,
+},
+[6316] = {
+["p"] = 10,
+["t"] = 1794536487,
+},
+[4278] = {
+["p"] = 1000,
+["t"] = 1794291212,
+},
+[6336] = {
+["t"] = 1794782387,
+["p"] = 303,
+},
 [3172] = {
 ["p"] = 18,
 ["t"] = 1794536517,
 },
-[3173] = {
-["p"] = 39,
-["t"] = 1794484413,
-},
-[3174] = {
-["p"] = 16,
-["t"] = 1794536517,
-},
-[241650] = {
-["p"] = 3999,
-["t"] = 1794443199,
+[14726] = {
+["p"] = 800,
+["t"] = 1794155181,
 },
 [4306] = {
-["t"] = 1794520764,
-["p"] = 196,
-},
-[1081] = {
-["p"] = 49,
-["t"] = 1794485094,
-},
-[3181] = {
-["p"] = 23,
-["t"] = 1794536530,
-},
-[3182] = {
-["p"] = 900,
-["t"] = 1794075484,
+["p"] = 199,
+["t"] = 1794546600,
 },
 [4314] = {
 ["p"] = 400,
 ["t"] = 1794366332,
 },
 [3184] = {
-["t"] = 1794521443,
-["p"] = 1390,
-},
-[6362] = {
-["p"] = 6,
-["t"] = 1794536461,
-},
-[2675] = {
-["p"] = 28,
-["t"] = 1794536561,
-},
-[2678] = {
-["p"] = 4,
-["t"] = 1794536421,
-},
-[2679] = {
-["p"] = 6,
-["t"] = 1794536441,
-},
-[2680] = {
-["p"] = 14,
-["t"] = 1794536500,
-},
-[3192] = {
-["t"] = 1794521465,
-["p"] = 493,
-},
-[6889] = {
-["p"] = 20,
-["t"] = 1794536526,
-},
-[3195] = {
-["t"] = 1794521449,
-["p"] = 1371,
-},
-[3196] = {
-["t"] = 1794521476,
-["p"] = 1377,
-},
-[7919] = {
-["t"] = 1794452172,
-["p"] = 3500,
-},
-[2687] = {
-["p"] = 25,
-["t"] = 1794536538,
-},
-[3199] = {
-["p"] = 2300,
-["t"] = 1794354622,
-},
-[3201] = {
-["p"] = 4500,
-["t"] = 1794443095,
-},
-[4865] = {
-["p"] = 32,
-["t"] = 1794536598,
-},
-[4358] = {
-["p"] = 35,
-["t"] = 1794484410,
-},
-[3719] = {
-["t"] = 1794460400,
-["p"] = 1400,
-},
-[247786] = {
-["p"] = 5,
-["t"] = 1794536431,
-},
-[6418] = {
-["t"] = 1794452176,
-["p"] = 2000,
-},
-[7446] = {
-["p"] = 15900,
-["t"] = 1794443204,
-},
-[3728] = {
-["t"] = 1794520766,
-["p"] = 420,
-},
-[10285] = {
-["p"] = 999,
-["t"] = 1794485236,
-},
-[9782] = {
-["t"] = 1793985684,
-["p"] = 9000,
-},
-[6947] = {
-["p"] = 5,
-["t"] = 1794536429,
-},
-[11846] = {
-["p"] = 30,
-["t"] = 1794536595,
-},
-[9806] = {
-["t"] = 1794452142,
-["p"] = 1000,
-},
-[4404] = {
-["p"] = 26,
-["t"] = 1794485503,
-},
-[6450] = {
-["p"] = 200,
-["t"] = 1794485125,
-},
-[17057] = {
-["p"] = 7,
-["t"] = 1794536480,
-},
-[6458] = {
-["p"] = 29,
-["t"] = 1794536591,
-},
-[255007] = {
-["p"] = 22,
-["t"] = 1794536528,
-},
-[7484] = {
-["t"] = 1794452172,
-["p"] = 3900,
-},
-[3239] = {
-["p"] = 4,
-["t"] = 1794536423,
-},
-[4428] = {
-["p"] = 330,
-["t"] = 1794484795,
-},
-[940] = {
-["t"] = 1794362139,
-["p"] = 800000,
-},
-[118] = {
-["p"] = 20,
-["t"] = 1794536524,
-},
-[814] = {
-["p"] = 25,
-["t"] = 1794536545,
-},
-[5472] = {
-["p"] = 12,
-["t"] = 1794536492,
-},
-[10940] = {
-["p"] = 79,
-["t"] = 1794536661,
-},
-[5997] = {
-["p"] = 5,
-["t"] = 1794536427,
-},
-[3770] = {
-["p"] = 25,
-["t"] = 1794536553,
-},
-[6512] = {
-["p"] = 200,
-["t"] = 1794443080,
-},
-[6518] = {
-["p"] = 155,
-["t"] = 1794443213,
-},
-[818] = {
-["p"] = 110,
-["t"] = 1794030155,
-},
-[12006] = {
-["p"] = 9800,
-["t"] = 1794443191,
-},
-[7552] = {
-["t"] = 1794452160,
-["p"] = 4000,
-},
-[8067] = {
-["p"] = 1,
-["t"] = 1794536386,
-},
-[8069] = {
-["p"] = 5,
-["t"] = 1794536425,
-},
-[6540] = {
-["t"] = 1794521428,
-["p"] = 430,
-},
-[6542] = {
-["p"] = 300,
-["t"] = 1794443079,
-},
-[6548] = {
-["t"] = 1794060128,
-["p"] = 300,
-},
-[6550] = {
-["p"] = 300,
-["t"] = 1794443085,
-},
-[6552] = {
-["t"] = 1794521472,
-["p"] = 600,
-},
-[6554] = {
-["p"] = 300,
-["t"] = 1794443083,
-},
-[2771] = {
-["p"] = 216,
-["t"] = 1794461079,
-},
-[6316] = {
-["p"] = 10,
-["t"] = 1794536487,
-},
-[6560] = {
-["p"] = 1400,
-["t"] = 1794029901,
-},
-[7073] = {
-["p"] = 7,
-["t"] = 1794536471,
-},
-[6564] = {
-["p"] = 600,
-["t"] = 1794443085,
-},
-[10050] = {
-["p"] = 14600,
-["t"] = 1794290965,
-},
-[6568] = {
-["p"] = 8999,
-["t"] = 1794443089,
-},
-[6570] = {
-["p"] = 400,
-["t"] = 1794459395,
-},
-[11084] = {
-["t"] = 1794452291,
-["p"] = 3750,
-},
-[5527] = {
-["t"] = 1794521477,
-["p"] = 95,
-},
-[6576] = {
-["p"] = 600,
-["t"] = 1794443090,
-},
-[4561] = {
-["t"] = 1794521460,
-["p"] = 400,
-},
-[17058] = {
-["p"] = 6,
-["t"] = 1794536449,
-},
-[3530] = {
-["p"] = 28,
-["t"] = 1794536583,
-},
-[14174] = {
-["t"] = 1794060133,
-["p"] = 600,
-},
-[4542] = {
-["p"] = 25,
-["t"] = 1794536551,
-},
-[13757] = {
-["p"] = 18,
-["t"] = 1794536519,
-},
-[5568] = {
-["p"] = 5,
-["t"] = 1794536435,
-},
-[6592] = {
-["p"] = 3200,
-["t"] = 1794443193,
-},
-[5572] = {
-["p"] = 300,
-["t"] = 1794485141,
-},
-[6358] = {
-["p"] = 33,
-["t"] = 1794485507,
-},
-[1510] = {
-["t"] = 1794521463,
-["p"] = 150,
-},
-[6600] = {
-["t"] = 1794452142,
-["p"] = 1100,
-},
-[6602] = {
-["p"] = 1000,
-["t"] = 1794459377,
-},
-[6604] = {
-["t"] = 1794452145,
-["p"] = 1200,
-},
-[4562] = {
-["t"] = 1794521437,
-["p"] = 295,
-},
-[5075] = {
-["p"] = 25,
-["t"] = 1794536536,
-},
-[2287] = {
-["p"] = 8,
-["t"] = 1794536482,
-},
-[4757] = {
-["p"] = 20,
-["t"] = 1794485484,
-},
-[6614] = {
-["t"] = 1794452135,
-["p"] = 1200,
-},
-[3823] = {
-["p"] = 659,
-["t"] = 1794290882,
-},
-[11176] = {
-["t"] = 1794514747,
-["p"] = 2891,
-},
-[3731] = {
-["t"] = 1794520777,
-["p"] = 170,
-},
-[10998] = {
-["p"] = 440,
-["t"] = 1794536659,
-},
-[10620] = {
-["t"] = 1794460744,
-["p"] = 1190,
-},
-[279956] = {
-["p"] = 24,
-["t"] = 1794459148,
-},
-[15284] = {
-["t"] = 1794155424,
-["p"] = 3300,
-},
-[2584] = {
-["p"] = 180,
-["t"] = 1794485360,
-},
-[832] = {
-["t"] = 1794060127,
-["p"] = 400,
-},
-[2299] = {
-["p"] = 17500,
-["t"] = 1794443205,
-},
-[4592] = {
-["p"] = 8,
-["t"] = 1794536482,
-},
-[12238] = {
-["p"] = 6,
-["t"] = 1794536445,
-},
-[3835] = {
-["p"] = 1800,
-["t"] = 1794485359,
-},
-[961] = {
-["p"] = 6,
-["t"] = 1794536453,
-},
-[2304] = {
-["p"] = 15,
-["t"] = 1794536504,
-},
-[5095] = {
-["p"] = 9,
-["t"] = 1794536485,
-},
-[4604] = {
-["p"] = 2,
-["t"] = 1794536404,
-},
-[248823] = {
-["p"] = 40000,
-["t"] = 1794443207,
-},
-[2632] = {
-["t"] = 1794521472,
-["p"] = 604,
-},
-[15211] = {
-["t"] = 1794521421,
-["p"] = 1900,
-},
-[2078] = {
-["t"] = 1794521458,
-["p"] = 2080,
-},
-[2778] = {
-["p"] = 189,
-["t"] = 1794484618,
-},
-[15348] = {
-["t"] = 1794452153,
-["p"] = 1000,
-},
-[4096] = {
-["p"] = 607,
-["t"] = 1794485182,
-},
-[4564] = {
-["t"] = 1794521460,
-["p"] = 607,
-},
-[2315] = {
-["p"] = 305,
-["t"] = 1794484768,
-},
-[2316] = {
-["p"] = 407,
-["t"] = 1794484793,
-},
-[4570] = {
-["p"] = 920,
-["t"] = 1794485090,
-},
-[2318] = {
-["p"] = 35,
-["t"] = 1794536661,
-},
-[255723] = {
-["t"] = 1794441192,
-["p"] = 1400,
-},
-[2320] = {
-["t"] = 1794521611,
-["p"] = 12,
-},
-[2321] = {
-["t"] = 1794460796,
-["p"] = 100,
-},
-[3736] = {
-["t"] = 1794520761,
-["p"] = 588,
-},
-[4541] = {
-["p"] = 6,
-["t"] = 1794536451,
-},
-[2835] = {
-["p"] = 10,
-["t"] = 1794536479,
-},
-[3829] = {
-["p"] = 2400,
-["t"] = 1794290840,
-},
-[4813] = {
-["p"] = 33,
-["t"] = 1794485516,
-},
-[3860] = {
-["p"] = 1000,
-["t"] = 1794441517,
-},
-[5165] = {
-["p"] = 1,
-["t"] = 1794536400,
-},
-[9795] = {
-["t"] = 1794452175,
-["p"] = 900,
-},
-[9799] = {
-["p"] = 1000,
-["t"] = 1794459374,
-},
-[3864] = {
-["t"] = 1794520717,
-["p"] = 889,
-},
-[4656] = {
-["p"] = 3,
-["t"] = 1794536414,
-},
-[3340] = {
-["p"] = 33,
-["t"] = 1794485514,
-},
-[3185] = {
-["p"] = 12000,
-["t"] = 1794443197,
-},
-[159] = {
-["p"] = 9,
-["t"] = 1794536485,
-},
-[4338] = {
-["p"] = 730,
-["t"] = 1794461085,
-},
-[250932] = {
-["p"] = 33,
-["t"] = 1794485515,
-},
-[777] = {
-["p"] = 28,
-["t"] = 1794536579,
-},
-[11288] = {
-["p"] = 200,
-["t"] = 1794442236,
-},
-[2851] = {
-["p"] = 100,
-["t"] = 1794459385,
-},
-[2852] = {
-["p"] = 100,
-["t"] = 1794459393,
-},
-[422] = {
-["p"] = 25,
-["t"] = 1794536540,
-},
-[279968] = {
-["p"] = 15,
-["t"] = 1794459129,
-},
-[279962] = {
-["p"] = 2,
-["t"] = 1794536408,
-},
-[5207] = {
-["p"] = 1079,
-["t"] = 1794484489,
-},
-[2857] = {
-["p"] = 198,
-["t"] = 1794484480,
-},
-[4232] = {
-["p"] = 200,
-["t"] = 1794461086,
-},
-[2865] = {
-["p"] = 578,
-["t"] = 1794485175,
-},
-[252022] = {
-["p"] = 11,
-["t"] = 1794536490,
-},
-[1177] = {
-["p"] = 10,
-["t"] = 1794536487,
-},
-[2862] = {
-["p"] = 5,
-["t"] = 1794536433,
-},
-[1178] = {
-["p"] = 10,
-["t"] = 1794536486,
-},
-[4536] = {
-["p"] = 10,
-["t"] = 1794485467,
-},
-[1179] = {
-["p"] = 27,
-["t"] = 1794536567,
-},
-[2866] = {
-["p"] = 600,
-["t"] = 1794484509,
-},
-[15017] = {
-["t"] = 1794521420,
-["p"] = 5000,
-},
-[2868] = {
-["p"] = 509,
-["t"] = 1794526427,
-},
-[4708] = {
-["p"] = 500,
-["t"] = 1794366982,
-},
-[899] = {
-["p"] = 1400,
-["t"] = 1794215779,
-},
-[3382] = {
-["p"] = 24,
-["t"] = 1794536532,
-},
-[2519] = {
-["p"] = 1,
-["t"] = 1794536392,
+["t"] = 1794782055,
+["p"] = 1389,
+},
+[25] = {
+["t"] = 1794643853,
+["p"] = 800,
 },
 [249427] = {
 ["p"] = 754,
 ["t"] = 1794215751,
 },
-[9848] = {
-["t"] = 1794452147,
-["p"] = 2100,
+[3192] = {
+["t"] = 1794782130,
+["p"] = 4500,
 },
-[3371] = {
-["p"] = 4,
-["t"] = 1794536419,
+[4338] = {
+["t"] = 1794648270,
+["p"] = 660,
 },
-[9838] = {
-["t"] = 1794452140,
-["p"] = 1200,
+[3196] = {
+["t"] = 1794782394,
+["p"] = 1370,
 },
-[11083] = {
-["t"] = 1794520764,
-["p"] = 403,
+[3198] = {
+["t"] = 1794781194,
+["p"] = 2725,
 },
-[2977] = {
-["p"] = 500,
-["t"] = 1794029767,
+[4358] = {
+["p"] = 35,
+["t"] = 1794484410,
 },
-[11995] = {
-["p"] = 8000,
-["t"] = 1794443198,
+[249428] = {
+["p"] = 457,
+["t"] = 1794354629,
 },
-[3041] = {
-["t"] = 1794155412,
+[7435] = {
+["p"] = 10000,
+["t"] = 1794443214,
+},
+[7443] = {
+["p"] = 2400,
+["t"] = 1794443095,
+},
+[9779] = {
+["t"] = 1794782129,
+["p"] = 328,
+},
+[9787] = {
+["t"] = 1794648318,
+["p"] = 469,
+},
+[9795] = {
+["t"] = 1794452175,
+["p"] = 900,
+},
+[4398] = {
+["t"] = 1794643923,
+["p"] = 1239,
+},
+[7471] = {
+["t"] = 1794452135,
 ["p"] = 4000,
 },
-[14047] = {
-["t"] = 1794361866,
-["p"] = 1550,
+[6452] = {
+["p"] = 28,
+["t"] = 1794536575,
 },
-[4594] = {
-["p"] = 11,
-["t"] = 1794536491,
+[2207] = {
+["t"] = 1794643851,
+["p"] = 800,
 },
-[6269] = {
-["t"] = 1794521415,
+[5465] = {
+["p"] = 12,
+["t"] = 1794536493,
+},
+[10938] = {
+["p"] = 93,
+["t"] = 1794459592,
+},
+[814] = {
+["p"] = 25,
+["t"] = 1794536545,
+},
+[6512] = {
+["t"] = 1794782047,
 ["p"] = 190,
 },
-[723] = {
-["p"] = 129,
-["t"] = 1794029894,
+[10978] = {
+["t"] = 1794452296,
+["p"] = 329,
+},
+[818] = {
+["p"] = 110,
+["t"] = 1794030155,
+},
+[7559] = {
+["t"] = 1794643936,
+["p"] = 1300,
+},
+[6540] = {
+["t"] = 1794782127,
+["p"] = 422,
+},
+[5525] = {
+["p"] = 20,
+["t"] = 1794536521,
+},
+[6552] = {
+["t"] = 1794782044,
+["p"] = 590,
+},
+[6556] = {
+["t"] = 1794643921,
+["p"] = 1220,
+},
+[6560] = {
+["t"] = 1794781349,
+["p"] = 4000,
+},
+[6564] = {
+["p"] = 600,
+["t"] = 1794443085,
+},
+[6568] = {
+["t"] = 1794782135,
+["p"] = 916,
+},
+[14167] = {
+["t"] = 1794782062,
+["p"] = 357,
+},
+[6580] = {
+["t"] = 1794642840,
+["p"] = 1308,
+},
+[4542] = {
+["p"] = 25,
+["t"] = 1794536551,
+},
+[6592] = {
+["p"] = 3200,
+["t"] = 1794443193,
+},
+[3300] = {
+["p"] = 10,
+["t"] = 1794536488,
+},
+[6600] = {
+["t"] = 1794452142,
+["p"] = 1100,
+},
+[6604] = {
+["t"] = 1794782050,
+["p"] = 1190,
+},
+[414] = {
+["p"] = 6,
+["t"] = 1794536443,
+},
+[4566] = {
+["t"] = 1794643863,
+["p"] = 900,
+},
+[4570] = {
+["t"] = 1794782134,
+["p"] = 915,
+},
+[3314] = {
+["t"] = 1794643856,
+["p"] = 875,
+},
+[14271] = {
+["p"] = 10000,
+["t"] = 1794459378,
+},
+[15310] = {
+["t"] = 1794643798,
+["p"] = 599,
+},
+[2299] = {
+["p"] = 17500,
+["t"] = 1794443205,
+},
+[832] = {
+["t"] = 1794060127,
+["p"] = 400,
+},
+[4606] = {
+["p"] = 25,
+["t"] = 1794536559,
+},
+[2315] = {
+["p"] = 305,
+["t"] = 1794484768,
+},
+[3340] = {
+["p"] = 33,
+["t"] = 1794485514,
+},
+[2319] = {
+["p"] = 100,
+["t"] = 1794546598,
+},
+[2321] = {
+["t"] = 1794460796,
+["p"] = 100,
+},
+[10307] = {
+["t"] = 1794643955,
+["p"] = 1500,
+},
+[15494] = {
+["t"] = 1794643901,
+["p"] = 829,
+},
+[422] = {
+["p"] = 25,
+["t"] = 1794536540,
+},
+[8389] = {
+["t"] = 1794643935,
+["p"] = 1300,
+},
+[3382] = {
+["p"] = 24,
+["t"] = 1794536532,
+},
+[279956] = {
+["p"] = 24,
+["t"] = 1794459148,
+},
+[849] = {
+["t"] = 1794643778,
+["p"] = 400,
+},
+[6796] = {
+["t"] = 1794643852,
+["p"] = 800,
+},
+[1705] = {
+["p"] = 612,
+["t"] = 1794354632,
+},
+[274077] = {
+["t"] = 1794643810,
+["p"] = 700,
+},
+[854] = {
+["t"] = 1794643872,
+["p"] = 1000,
+},
+[1708] = {
+["t"] = 1794441183,
+["p"] = 150,
+},
+[858] = {
+["p"] = 27,
+["t"] = 1794536569,
+},
+[4814] = {
+["p"] = 7,
+["t"] = 1794536475,
+},
+[1722] = {
+["p"] = 75000,
+["t"] = 1794443212,
+},
+[6888] = {
+["p"] = 16,
+["t"] = 1794536514,
+},
+[7919] = {
+["t"] = 1794452172,
+["p"] = 3500,
+},
+[864] = {
+["p"] = 9900,
+["t"] = 1794443208,
+},
+[865] = {
+["t"] = 1794782131,
+["p"] = 5089,
+},
+[15870] = {
+["t"] = 1794647805,
+["p"] = 300,
+},
+[3464] = {
+["p"] = 31,
+["t"] = 1794536596,
+},
+[9756] = {
+["t"] = 1794782047,
+["p"] = 289,
+},
+[9764] = {
+["t"] = 1794782029,
+["p"] = 299,
+},
+[3470] = {
+["p"] = 6,
+["t"] = 1794536465,
+},
+[9780] = {
+["p"] = 400,
+["t"] = 1794443208,
+},
+[9788] = {
+["t"] = 1794643873,
+["p"] = 1000,
+},
+[9796] = {
+["p"] = 1200,
+["t"] = 1794443092,
+},
+[3478] = {
+["t"] = 1794520721,
+["p"] = 169,
+},
+[279968] = {
+["p"] = 15,
+["t"] = 1794459129,
+},
+[15007] = {
+["t"] = 1794647797,
+["p"] = 100,
+},
+[10939] = {
+["p"] = 260,
+["t"] = 1794459587,
+},
+[5997] = {
+["p"] = 5,
+["t"] = 1794536427,
 },
 [13041] = {
 ["t"] = 1794452168,
 ["p"] = 6000,
 },
-[2886] = {
-["p"] = 8,
-["t"] = 1794536481,
+[8067] = {
+["p"] = 1,
+["t"] = 1794536386,
+},
+[7048] = {
+["t"] = 1794452168,
+["p"] = 900,
+},
+[3530] = {
+["p"] = 28,
+["t"] = 1794536583,
+},
+[247786] = {
+["p"] = 5,
+["t"] = 1794536431,
+},
+[7072] = {
+["p"] = 149,
+["t"] = 1794484733,
+},
+[2519] = {
+["p"] = 1,
+["t"] = 1794536392,
+},
+[255715] = {
+["t"] = 1794648814,
+["p"] = 575,
+},
+[211854] = {
+["t"] = 1794441185,
+["p"] = 200,
+},
+[15223] = {
+["t"] = 1794643056,
+["p"] = 2373,
+},
+[7108] = {
+["t"] = 1794648686,
+["p"] = 300,
+},
+[255716] = {
+["p"] = 28,
+["t"] = 1794536581,
+},
+[248683] = {
+["t"] = 1794648314,
+["p"] = 850,
+},
+[241650] = {
+["t"] = 1794643934,
+["p"] = 1300,
+},
+[12202] = {
+["t"] = 1794648124,
+["p"] = 586,
+},
+[250346] = {
+["t"] = 1794643850,
+["p"] = 800,
+},
+[3576] = {
+["t"] = 1794441165,
+["p"] = 215,
+},
+[9197] = {
+["t"] = 1794643868,
+["p"] = 1000,
+},
+[897] = {
+["t"] = 1794155568,
+["p"] = 2700,
+},
+[3590] = {
+["t"] = 1794643783,
+["p"] = 499,
+},
+[899] = {
+["p"] = 1400,
+["t"] = 1794215779,
+},
+[9253] = {
+["t"] = 1794648496,
+["p"] = 299,
 },
 [2581] = {
 ["p"] = 20,
 ["t"] = 1794536522,
+},
+[2589] = {
+["p"] = 25,
+["t"] = 1794536549,
+},
+[2591] = {
+["p"] = 18,
+["t"] = 1794536518,
+},
+[15479] = {
+["t"] = 1794643807,
+["p"] = 650,
+},
+[15487] = {
+["t"] = 1794643848,
+["p"] = 670,
+},
+[10404] = {
+["t"] = 1794643950,
+["p"] = 1500,
+},
+[3206] = {
+["t"] = 1794782396,
+["p"] = 4572,
+},
+[3047] = {
+["t"] = 1794452179,
+["p"] = 1100,
+},
+[6536] = {
+["t"] = 1794782146,
+["p"] = 479,
+},
+[15268] = {
+["t"] = 1794782123,
+["p"] = 1019,
+},
+[17119] = {
+["p"] = 6,
+["t"] = 1794536447,
+},
+[248688] = {
+["t"] = 1794648313,
+["p"] = 100,
+},
+[9811] = {
+["t"] = 1794782124,
+["p"] = 724,
+},
+[15212] = {
+["t"] = 1794782049,
+["p"] = 3432,
+},
+[6269] = {
+["t"] = 1794780880,
+["p"] = 190,
+},
+[6179] = {
+["t"] = 1794643953,
+["p"] = 1500,
+},
+[1015] = {
+["p"] = 440,
+["t"] = 1794075467,
 },
 [4235] = {
 ["t"] = 1794520730,
@@ -2031,550 +2503,862 @@ WowFExportarDB = {
 ["p"] = 112,
 ["t"] = 1794459415,
 },
-[5772] = {
-["t"] = 1794521639,
-["p"] = 800,
-},
-[13758] = {
-["p"] = 15,
-["t"] = 1794536510,
-},
-[11284] = {
-["p"] = 11,
-["t"] = 1794536489,
-},
 [6289] = {
 ["p"] = 6,
 ["t"] = 1794536459,
 },
-[6291] = {
-["p"] = 19,
-["t"] = 1794536520,
-},
-[1705] = {
-["p"] = 612,
-["t"] = 1794354632,
+[6575] = {
+["t"] = 1794782057,
+["p"] = 430,
 },
 [4251] = {
 ["t"] = 1793985596,
 ["p"] = 1100,
 },
-[2970] = {
-["p"] = 400,
-["t"] = 1794029910,
+[2449] = {
+["p"] = 39,
+["t"] = 1794536585,
 },
-[6299] = {
-["p"] = 30,
-["t"] = 1794536595,
+[6612] = {
+["t"] = 1794782119,
+["p"] = 1110,
 },
-[2842] = {
-["p"] = 330,
-["t"] = 1794029798,
+[7455] = {
+["t"] = 1794781136,
+["p"] = 5935,
 },
-[6303] = {
-["p"] = 15,
-["t"] = 1794536512,
-},
-[1708] = {
-["t"] = 1794441183,
-["p"] = 150,
-},
-[414] = {
-["p"] = 6,
-["t"] = 1794536443,
-},
-[2456] = {
-["p"] = 15,
-["t"] = 1794536508,
-},
-[9788] = {
-["t"] = 1794521465,
-["p"] = 310,
-},
-[2965] = {
-["p"] = 200,
-["t"] = 1794029761,
-},
-[2453] = {
-["t"] = 1794520715,
-["p"] = 83,
+[3186] = {
+["t"] = 1794782148,
+["p"] = 4435,
 },
 [6317] = {
 ["t"] = 1794521535,
 ["p"] = 3,
 },
-[252028] = {
-["p"] = 1,
-["t"] = 1794536390,
+[15230] = {
+["t"] = 1794782120,
+["p"] = 2744,
 },
-[6452] = {
-["p"] = 28,
-["t"] = 1794536575,
+[15231] = {
+["t"] = 1794782385,
+["p"] = 5029,
 },
-[732] = {
-["p"] = 6,
-["t"] = 1794536457,
-},
-[14167] = {
-["t"] = 1794521423,
-["p"] = 354,
-},
-[730] = {
-["p"] = 16,
-["t"] = 1794536516,
-},
-[858] = {
-["p"] = 27,
-["t"] = 1794536569,
-},
-[247755] = {
-["p"] = 25,
-["t"] = 1794536542,
-},
-[2928] = {
-["p"] = 30,
-["t"] = 1794485510,
-},
-[731] = {
-["p"] = 27,
-["t"] = 1794536565,
+[9812] = {
+["t"] = 1794782146,
+["p"] = 565,
 },
 [6337] = {
 ["t"] = 1794521463,
 ["p"] = 244,
 },
-[7443] = {
-["p"] = 2400,
-["t"] = 1794443095,
-},
-[5319] = {
-["p"] = 6900,
-["t"] = 1794443199,
-},
-[11137] = {
-["t"] = 1794520775,
-["p"] = 989,
-},
-[9756] = {
-["t"] = 1794521430,
-["p"] = 292,
-},
-[4814] = {
-["p"] = 7,
-["t"] = 1794536475,
-},
-[14726] = {
-["p"] = 800,
-["t"] = 1794155181,
-},
-[252030] = {
-["p"] = 7,
-["t"] = 1794536477,
-},
-[1722] = {
-["p"] = 75000,
-["t"] = 1794443212,
-},
-[15249] = {
-["p"] = 3900,
-["t"] = 1794443195,
-},
-[9748] = {
-["t"] = 1794521475,
-["p"] = 273,
-},
-[6359] = {
-["p"] = 27,
-["t"] = 1794536563,
-},
-[264018] = {
-["p"] = 2000,
-["t"] = 1794443209,
-},
-[1468] = {
-["t"] = 1794060152,
-["p"] = 65,
-},
-[1212] = {
-["p"] = 21,
-["t"] = 1794536527,
-},
-[252031] = {
-["p"] = 7,
-["t"] = 1794536473,
-},
-[6373] = {
-["p"] = 35,
-["t"] = 1794484409,
-},
-[2934] = {
-["p"] = 14,
-["t"] = 1794536498,
-},
-[211854] = {
-["t"] = 1794441185,
-["p"] = 200,
-},
-[3464] = {
-["p"] = 31,
-["t"] = 1794536596,
-},
-[6888] = {
-["p"] = 16,
-["t"] = 1794536514,
-},
-[6890] = {
-["p"] = 25,
-["t"] = 1794485499,
-},
-[263513] = {
-["p"] = 2000,
-["t"] = 1794443201,
-},
-[252032] = {
-["p"] = 30,
-["t"] = 1794536593,
-},
-[729] = {
-["p"] = 270,
-["t"] = 1794029893,
-},
-[252671] = {
-["p"] = 25,
-["t"] = 1794536547,
-},
-[1401] = {
-["p"] = 14,
-["t"] = 1794536496,
-},
-[6361] = {
-["p"] = 8,
-["t"] = 1794536483,
-},
-[14271] = {
-["p"] = 10000,
-["t"] = 1794459378,
-},
-[1475] = {
-["t"] = 1794089585,
-["p"] = 82,
-},
-[1220] = {
-["p"] = 2200,
-["t"] = 1794075454,
-},
-[1476] = {
-["p"] = 9,
-["t"] = 1794536486,
-},
-[4357] = {
-["p"] = 19,
-["t"] = 1794536521,
-},
-[4359] = {
-["p"] = 95,
-["t"] = 1794029894,
-},
-[864] = {
-["p"] = 9900,
-["t"] = 1794443208,
-},
-[15241] = {
-["p"] = 3100,
-["t"] = 1794443192,
-},
-[247754] = {
-["p"] = 37,
-["t"] = 1794484412,
-},
-[3465] = {
-["p"] = 15,
-["t"] = 1794536502,
-},
-[7435] = {
-["p"] = 10000,
-["t"] = 1794443214,
-},
-[267474] = {
-["p"] = 2,
-["t"] = 1794536406,
-},
-[11285] = {
-["p"] = 12,
-["t"] = 1794536492,
-},
-[2447] = {
-["p"] = 27,
-["t"] = 1794485505,
-},
-[3470] = {
-["p"] = 6,
-["t"] = 1794536465,
-},
-[2449] = {
-["p"] = 39,
-["t"] = 1794536585,
-},
-[2450] = {
-["p"] = 94,
-["t"] = 1794461081,
-},
-[5057] = {
-["p"] = 8,
-["t"] = 1794536483,
-},
-[2580] = {
-["p"] = 100,
-["t"] = 1794442216,
-},
-[9780] = {
-["p"] = 400,
-["t"] = 1794443208,
-},
-[4389] = {
-["p"] = 1450,
-["t"] = 1794290870,
-},
-[2455] = {
-["p"] = 25,
-["t"] = 1794536589,
-},
-[3478] = {
-["t"] = 1794520721,
-["p"] = 169,
-},
-[9796] = {
-["p"] = 1200,
-["t"] = 1794443092,
-},
-[2458] = {
-["p"] = 22,
-["t"] = 1794536528,
-},
-[12359] = {
-["p"] = 1798,
-["t"] = 1794441555,
-},
-[247884] = {
-["p"] = 12,
-["t"] = 1794536493,
-},
-[15944] = {
-["p"] = 511,
-["t"] = 1794484471,
-},
-[7471] = {
-["t"] = 1794452135,
-["p"] = 4000,
-},
-[724] = {
-["p"] = 33,
-["t"] = 1794485514,
-},
-[4540] = {
-["p"] = 2,
-["t"] = 1794536410,
-},
-[2681] = {
-["p"] = 13,
-["t"] = 1794536494,
-},
-[9832] = {
-["t"] = 1794155579,
-["p"] = 2200,
-},
-[3013] = {
-["p"] = 25,
-["t"] = 1794536555,
-},
-[255663] = {
-["p"] = 8,
-["t"] = 1794536484,
-},
-[4606] = {
-["p"] = 25,
-["t"] = 1794536559,
-},
-[8315] = {
-["p"] = 29900,
-["t"] = 1794443205,
-},
-[6470] = {
-["p"] = 29,
-["t"] = 1794485675,
-},
-[4775] = {
-["p"] = 28,
-["t"] = 1794536577,
-},
-[282655] = {
-["t"] = 1794452166,
-["p"] = 1000,
-},
-[1181] = {
-["p"] = 25,
-["t"] = 1794536557,
-},
-[15172] = {
-["p"] = 7100,
-["t"] = 1794459375,
-},
-[5966] = {
-["t"] = 1794452160,
-["p"] = 1750,
-},
-[5205] = {
-["p"] = 31,
-["t"] = 1794536596,
-},
-[10513] = {
-["p"] = 9,
-["t"] = 1794536484,
-},
-[4496] = {
-["p"] = 200,
-["t"] = 1794443212,
-},
-[1274] = {
-["p"] = 19,
-["t"] = 1794536520,
-},
-[5465] = {
-["p"] = 12,
-["t"] = 1794536493,
-},
-[2319] = {
-["t"] = 1794520739,
-["p"] = 97,
-},
-[4569] = {
-["t"] = 1794521444,
-["p"] = 1008,
-},
-[3030] = {
-["p"] = 3,
-["t"] = 1794536412,
-},
-[4567] = {
-["t"] = 1794521474,
-["p"] = 1046,
-},
-[2997] = {
-["t"] = 1794434201,
-["p"] = 252,
-},
-[10938] = {
-["p"] = 93,
-["t"] = 1794459592,
-},
-[2841] = {
-["t"] = 1794520712,
-["p"] = 175,
-},
-[3300] = {
-["p"] = 10,
-["t"] = 1794536488,
-},
-[255716] = {
-["p"] = 28,
-["t"] = 1794536581,
-},
-[213564] = {
-["p"] = 37,
-["t"] = 1794484413,
-},
-[15259] = {
-["p"] = 3300,
-["t"] = 1794485241,
-},
-[6511] = {
-["p"] = 200,
-["t"] = 1794029769,
-},
-[5525] = {
-["p"] = 20,
-["t"] = 1794536521,
-},
-[117] = {
-["p"] = 5,
-["t"] = 1794536437,
-},
-[5116] = {
-["p"] = 300,
-["t"] = 1794484481,
-},
-[10978] = {
-["t"] = 1794452296,
-["p"] = 329,
-},
-[1251] = {
-["p"] = 10,
-["t"] = 1794536486,
-},
-[2682] = {
-["p"] = 27,
-["t"] = 1794459159,
-},
-[5503] = {
-["p"] = 52,
-["t"] = 1794485674,
-},
-[6562] = {
-["p"] = 600,
-["t"] = 1794443088,
-},
-[6529] = {
-["p"] = 27,
-["t"] = 1794536573,
-},
-[4877] = {
-["p"] = 20,
-["t"] = 1794536526,
-},
-[2075] = {
-["p"] = 380,
-["t"] = 1794485120,
+[10620] = {
+["t"] = 1794460744,
+["p"] = 1190,
 },
 [8068] = {
 ["p"] = 2,
 ["t"] = 1794536402,
 },
-[7048] = {
-["t"] = 1794452168,
-["p"] = 900,
+[15222] = {
+["t"] = 1794782392,
+["p"] = 1214,
 },
-[12040] = {
-["p"] = 7400,
-["t"] = 1794443096,
+[281017] = {
+["t"] = 1794648466,
+["p"] = 500,
+},
+[2304] = {
+["p"] = 15,
+["t"] = 1794536504,
+},
+[2457] = {
+["t"] = 1794648123,
+["p"] = 490,
+},
+[6361] = {
+["p"] = 8,
+["t"] = 1794536483,
+},
+[281018] = {
+["t"] = 1794643941,
+["p"] = 1394,
+},
+[2675] = {
+["p"] = 28,
+["t"] = 1794536561,
+},
+[6373] = {
+["p"] = 35,
+["t"] = 1794484409,
+},
+[2679] = {
+["p"] = 6,
+["t"] = 1794536441,
+},
+[2681] = {
+["p"] = 13,
+["t"] = 1794536494,
+},
+[9747] = {
+["t"] = 1794781124,
+["p"] = 222,
+},
+[2447] = {
+["p"] = 27,
+["t"] = 1794485505,
+},
+[2687] = {
+["p"] = 25,
+["t"] = 1794536538,
+},
+[6397] = {
+["t"] = 1794643912,
+["p"] = 1200,
+},
+[4355] = {
+["t"] = 1794643909,
+["p"] = 1199,
+},
+[4359] = {
+["p"] = 95,
+["t"] = 1794029894,
+},
+[15932] = {
+["t"] = 1794781118,
+["p"] = 1220,
+},
+[9749] = {
+["t"] = 1794782048,
+["p"] = 272,
+},
+[9757] = {
+["t"] = 1794643871,
+["p"] = 1000,
+},
+[9765] = {
+["t"] = 1794648523,
+["p"] = 450,
+},
+[9789] = {
+["t"] = 1794781160,
+["p"] = 737,
+},
+[9781] = {
+["t"] = 1794643088,
+["p"] = 980,
+},
+[4387] = {
+["t"] = 1794643857,
+["p"] = 895,
+},
+[7417] = {
+["t"] = 1794782111,
+["p"] = 2899,
+},
+[117] = {
+["p"] = 5,
+["t"] = 1794536437,
+},
+[3736] = {
+["t"] = 1794520761,
+["p"] = 588,
+},
+[8952] = {
+["t"] = 1794643946,
+["p"] = 1499,
+},
+[3740] = {
+["t"] = 1794782105,
+["p"] = 2448,
+},
+[4537] = {
+["p"] = 30,
+["t"] = 1794536595,
+},
+[7484] = {
+["t"] = 1794452172,
+["p"] = 3900,
+},
+[4419] = {
+["t"] = 1794643789,
+["p"] = 500,
+},
+[10998] = {
+["p"] = 440,
+["t"] = 1794536659,
+},
+[9869] = {
+["t"] = 1794782109,
+["p"] = 2200,
+},
+[9763] = {
+["t"] = 1794782030,
+["p"] = 334,
+},
+[3224] = {
+["t"] = 1794643937,
+["p"] = 1300,
+},
+[248823] = {
+["p"] = 40000,
+["t"] = 1794443207,
+},
+[15016] = {
+["t"] = 1794643786,
+["p"] = 500,
+},
+[279962] = {
+["p"] = 2,
+["t"] = 1794536408,
+},
+[10940] = {
+["p"] = 79,
+["t"] = 1794536661,
+},
+[9827] = {
+["t"] = 1794643930,
+["p"] = 1294,
+},
+[118] = {
+["p"] = 20,
+["t"] = 1794536524,
+},
+[9793] = {
+["t"] = 1794643928,
+["p"] = 1275,
+},
+[11995] = {
+["p"] = 8000,
+["t"] = 1794443198,
+},
+[12184] = {
+["t"] = 1794648364,
+["p"] = 120,
+},
+[9784] = {
+["t"] = 1794642924,
+["p"] = 531,
+},
+[6529] = {
+["p"] = 27,
+["t"] = 1794536573,
+},
+[7552] = {
+["t"] = 1794452160,
+["p"] = 4000,
+},
+[250354] = {
+["t"] = 1794643924,
+["p"] = 1240,
+},
+[267474] = {
+["p"] = 2,
+["t"] = 1794536406,
 },
 [6541] = {
-["p"] = 1900,
-["t"] = 1794485360,
+["t"] = 1794648771,
+["p"] = 495,
 },
-[6530] = {
-["p"] = 27,
-["t"] = 1794536571,
+[6545] = {
+["t"] = 1794781343,
+["p"] = 876,
 },
-[7074] = {
-["p"] = 32,
-["t"] = 1794536597,
+[6553] = {
+["t"] = 1794782046,
+["p"] = 518,
 },
-[3775] = {
+[252022] = {
+["p"] = 11,
+["t"] = 1794536490,
+},
+[5772] = {
+["p"] = 780,
+["t"] = 1794546578,
+},
+[2771] = {
+["t"] = 1794648036,
+["p"] = 219,
+},
+[6565] = {
+["t"] = 1794648467,
+["p"] = 500,
+},
+[11084] = {
+["t"] = 1794452291,
+["p"] = 3750,
+},
+[6573] = {
+["t"] = 1794782058,
+["p"] = 936,
+},
+[6577] = {
+["t"] = 1794643868,
+["p"] = 1000,
+},
+[9806] = {
+["t"] = 1794452142,
+["p"] = 1000,
+},
+[6585] = {
+["t"] = 1794782144,
+["p"] = 550,
+},
+[13890] = {
+["t"] = 1794647799,
+["p"] = 150,
+},
+[15224] = {
+["t"] = 1794782101,
+["p"] = 2683,
+},
+[15232] = {
+["t"] = 1794782116,
+["p"] = 6108,
+},
+[6537] = {
+["t"] = 1794643919,
+["p"] = 1200,
+},
+[15248] = {
+["t"] = 1794782378,
+["p"] = 1789,
+},
+[6617] = {
+["t"] = 1794643945,
+["p"] = 1489,
+},
+[6613] = {
+["t"] = 1794452150,
+["p"] = 1000,
+},
+[4571] = {
+["t"] = 1794782113,
+["p"] = 977,
+},
+[4575] = {
+["t"] = 1794781305,
+["p"] = 4498,
+},
+[4404] = {
+["p"] = 26,
+["t"] = 1794485503,
+},
+[6582] = {
+["t"] = 1794643903,
+["p"] = 1050,
+},
+[6595] = {
+["t"] = 1794452138,
+["p"] = 1200,
+},
+[3832] = {
+["t"] = 1794643873,
+["p"] = 1000,
+},
+[9768] = {
+["t"] = 1794643912,
+["p"] = 1200,
+},
+[2455] = {
+["p"] = 25,
+["t"] = 1794536589,
+},
+[4603] = {
+["t"] = 1794521627,
+["p"] = 18,
+},
+[961] = {
+["p"] = 6,
+["t"] = 1794536453,
+},
+[2819] = {
+["t"] = 1794782061,
+["p"] = 3820,
+},
+[6605] = {
+["t"] = 1794452145,
+["p"] = 1000,
+},
+[6542] = {
+["t"] = 1794643902,
+["p"] = 1020,
+},
+[11284] = {
+["p"] = 11,
+["t"] = 1794536489,
+},
+[3770] = {
+["p"] = 25,
+["t"] = 1794536553,
+},
+[1529] = {
+["p"] = 776,
+["t"] = 1794546591,
+},
+[10285] = {
+["p"] = 999,
+["t"] = 1794485236,
+},
+[1929] = {
+["t"] = 1794643943,
+["p"] = 1400,
+},
+[2835] = {
+["p"] = 10,
+["t"] = 1794536479,
+},
+[3860] = {
+["p"] = 1000,
+["t"] = 1794441517,
+},
+[6615] = {
+["t"] = 1794452147,
+["p"] = 1000,
+},
+[3864] = {
+["t"] = 1794520717,
+["p"] = 889,
+},
+[2546] = {
+["t"] = 1794643808,
+["p"] = 695,
+},
+[11082] = {
+["p"] = 1365,
+["t"] = 1794536651,
+},
+[4708] = {
+["p"] = 500,
+["t"] = 1794366982,
+},
+[6117] = {
+["t"] = 1794643862,
+["p"] = 900,
+},
+[2851] = {
+["p"] = 100,
+["t"] = 1794459385,
+},
+[3575] = {
+["p"] = 368,
+["t"] = 1794441508,
+},
+[4813] = {
 ["p"] = 33,
-["t"] = 1794536598,
+["t"] = 1794485516,
+},
+[2857] = {
+["p"] = 198,
+["t"] = 1794484480,
+},
+[4594] = {
+["p"] = 11,
+["t"] = 1794536491,
+},
+[14168] = {
+["t"] = 1794643911,
+["p"] = 1200,
+},
+[252028] = {
+["p"] = 1,
+["t"] = 1794536390,
+},
+[2865] = {
+["p"] = 578,
+["t"] = 1794485175,
+},
+[15114] = {
+["t"] = 1794643779,
+["p"] = 400,
+},
+[6569] = {
+["t"] = 1794782129,
+["p"] = 1040,
+},
+[217495] = {
+["p"] = 199,
+["t"] = 1794485137,
+},
+[9805] = {
+["t"] = 1794780860,
+["p"] = 700,
+},
+[9809] = {
+["t"] = 1794781235,
+["p"] = 1850,
+},
+[14561] = {
+["t"] = 1794643915,
+["p"] = 1200,
+},
+[1299] = {
+["p"] = 500,
+["t"] = 1794366973,
+},
+[264210] = {
+["t"] = 1794643874,
+["p"] = 1000,
+},
+[264218] = {
+["t"] = 1794643874,
+["p"] = 1000,
+},
+[264084] = {
+["t"] = 1794643948,
+["p"] = 1500,
+},
+[11151] = {
+["t"] = 1794643869,
+["p"] = 1000,
+},
+[4582] = {
+["t"] = 1794643864,
+["p"] = 927,
+},
+[252797] = {
+["t"] = 1794643914,
+["p"] = 1200,
+},
+[15210] = {
+["t"] = 1794643369,
+["p"] = 820,
+},
+[252030] = {
+["p"] = 7,
+["t"] = 1794536477,
+},
+[3731] = {
+["t"] = 1794520777,
+["p"] = 170,
+},
+[785] = {
+["p"] = 29,
+["t"] = 1794536587,
+},
+[4775] = {
+["p"] = 28,
+["t"] = 1794536577,
+},
+[17029] = {
+["t"] = 1794643853,
+["p"] = 800,
+},
+[787] = {
+["p"] = 7,
+["t"] = 1794536481,
+},
+[10512] = {
+["p"] = 6,
+["t"] = 1794536455,
+},
+[248613] = {
+["t"] = 1794643849,
+["p"] = 795,
+},
+[252031] = {
+["p"] = 7,
+["t"] = 1794536473,
+},
+[14123] = {
+["t"] = 1794643813,
+["p"] = 760,
+},
+[6308] = {
+["p"] = 21,
+["t"] = 1794536527,
+},
+[792] = {
+["t"] = 1794643803,
+["p"] = 600,
+},
+[279957] = {
+["t"] = 1794643812,
+["p"] = 750,
+},
+[252671] = {
+["p"] = 25,
+["t"] = 1794536547,
+},
+[264078] = {
+["t"] = 1794643809,
+["p"] = 698,
+},
+[6586] = {
+["t"] = 1794643846,
+["p"] = 600,
+},
+[252032] = {
+["p"] = 30,
+["t"] = 1794536593,
+},
+[3173] = {
+["p"] = 39,
+["t"] = 1794484413,
+},
+[3174] = {
+["p"] = 16,
+["t"] = 1794536517,
+},
+[1081] = {
+["p"] = 49,
+["t"] = 1794485094,
+},
+[6889] = {
+["p"] = 20,
+["t"] = 1794536526,
+},
+[3181] = {
+["p"] = 23,
+["t"] = 1794536530,
+},
+[3182] = {
+["p"] = 900,
+["t"] = 1794075484,
+},
+[2841] = {
+["t"] = 1794520712,
+["p"] = 175,
+},
+[5466] = {
+["t"] = 1794648368,
+["p"] = 500,
+},
+[277501] = {
+["t"] = 1794643861,
+["p"] = 900,
+},
+[4560] = {
+["t"] = 1794643786,
+["p"] = 500,
+},
+[11083] = {
+["t"] = 1794520764,
+["p"] = 403,
+},
+[3728] = {
+["t"] = 1794520766,
+["p"] = 420,
+},
+[19484] = {
+["t"] = 1794647798,
+["p"] = 100,
+},
+[252899] = {
+["t"] = 1794643953,
+["p"] = 1500,
+},
+[253910] = {
+["t"] = 1794643913,
+["p"] = 1200,
+},
+[15912] = {
+["t"] = 1794782052,
+["p"] = 1143,
+},
+[9782] = {
+["t"] = 1794782135,
+["p"] = 1100,
+},
+[4567] = {
+["t"] = 1794781057,
+["p"] = 1022,
+},
+[2965] = {
+["p"] = 200,
+["t"] = 1794029761,
+},
+[15944] = {
+["p"] = 511,
+["t"] = 1794484471,
+},
+[3239] = {
+["p"] = 4,
+["t"] = 1794536423,
+},
+[940] = {
+["t"] = 1794362139,
+["p"] = 800000,
+},
+[15120] = {
+["t"] = 1794643917,
+["p"] = 1200,
+},
+[9838] = {
+["t"] = 1794452140,
+["p"] = 1200,
+},
+[2977] = {
+["p"] = 500,
+["t"] = 1794029767,
+},
+[2515] = {
+["p"] = 1,
+["t"] = 1794536398,
+},
+[2512] = {
+["p"] = 1,
+["t"] = 1794536396,
+},
+[20747] = {
+["t"] = 1794643934,
+["p"] = 1300,
+},
+[5966] = {
+["t"] = 1794452160,
+["p"] = 1750,
+},
+[765] = {
+["p"] = 16,
+["t"] = 1794536516,
+},
+[6550] = {
+["p"] = 300,
+["t"] = 1794443085,
+},
+[15017] = {
+["t"] = 1794521420,
+["p"] = 5000,
+},
+[281015] = {
+["t"] = 1794643918,
+["p"] = 1200,
+},
+[6576] = {
+["t"] = 1794643845,
+["p"] = 580,
+},
+[2997] = {
+["t"] = 1794434201,
+["p"] = 252,
+},
+[6591] = {
+["t"] = 1794452161,
+["p"] = 1150,
+},
+[14174] = {
+["t"] = 1794782398,
+["p"] = 360,
+},
+[4562] = {
+["t"] = 1794781288,
+["p"] = 1095,
+},
+[2287] = {
+["p"] = 8,
+["t"] = 1794536482,
+},
+[4757] = {
+["p"] = 20,
+["t"] = 1794485484,
+},
+[3823] = {
+["p"] = 659,
+["t"] = 1794290882,
+},
+[11176] = {
+["t"] = 1794514747,
+["p"] = 2891,
+},
+[3013] = {
+["p"] = 25,
+["t"] = 1794536555,
+},
+[14090] = {
+["t"] = 1794648622,
+["p"] = 255,
+},
+[2073] = {
+["t"] = 1794780866,
+["p"] = 741,
+},
+[2516] = {
+["p"] = 1,
+["t"] = 1794536394,
+},
+[14114] = {
+["t"] = 1794648183,
+["p"] = 399,
+},
+[255723] = {
+["t"] = 1794643809,
+["p"] = 700,
+},
+[4541] = {
+["p"] = 6,
+["t"] = 1794536451,
+},
+[7073] = {
+["p"] = 7,
+["t"] = 1794536471,
+},
+[6548] = {
+["t"] = 1794648758,
+["p"] = 274,
+},
+[14047] = {
+["t"] = 1794361866,
+["p"] = 1550,
+},
+[3033] = {
+["p"] = 3,
+["t"] = 1794536417,
+},
+[723] = {
+["p"] = 129,
+["t"] = 1794029894,
+},
+[2453] = {
+["t"] = 1794520715,
+["p"] = 83,
+},
+[9748] = {
+["t"] = 1794782139,
+["p"] = 269,
+},
+[3041] = {
+["t"] = 1794155412,
+["p"] = 4000,
+},
+[1468] = {
+["t"] = 1794060152,
+["p"] = 65,
+},
+[7109] = {
+["t"] = 1794643774,
+["p"] = 290,
+},
+[15241] = {
+["t"] = 1794782133,
+["p"] = 2999,
+},
+[15307] = {
+["t"] = 1794643951,
+["p"] = 1500,
 },
 },
-["ultimo"] = "Derpnschmerp-CAMWOW EU4 Realm 1 PvE",
-["favorAviso"] = {
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = true,
+["habArma"] = {
+},
+["retratos"] = {
 },
 ["libroCombate"] = "Rotacion",
-["reinicio"] = {
+["personajes"] = {
 ["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
-["veces"] = 0,
+["reino"] = "CAMWOW EU4 Realm 1 PvE",
+["nombre"] = "Banknspank",
+["momento"] = 1794799903,
+["texto"] = "WF1;nombre=Banknspank;raza=Gnome;clase=MAGE;nivel=1;habilidades=Enchanting:60/75;atributos=15,23,19,28,22;salud=51;mana=252;equipo=4=6096,5=56,7=1395,8=55,16=35;faccion=Alliance;oro=174289;talentos=",
+["clase"] = "MAGE",
+["nivel"] = 1,
+["fecha"] = "2026-11-16 04:31",
 },
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-["veces"] = 0,
+["reino"] = "CAMWOW EU4 Realm 1 PvE",
+["nombre"] = "Derpnschmerp",
+["momento"] = 1794908405,
+["texto"] = "WF1;nombre=Derpnschmerp;raza=Human;clase=HUNTER;nivel=40;habilidades=Leatherworking:29/75,Skinning:225/225,First Aid:39/75,Fishing:99/150,Cooking:70/75;atributos=55,161,88,69,77;salud=1667;mana=1860;equipo=1=6204,2=12020,3=3560,4=859,5=6603,6=6719,7=15456,8=10748,9=897,10=9832,11=281304,12=270053,15=14593,16=3210,18=15286;faccion=Alliance;oro=278180;talentos=",
+["fecha"] = "2026-11-17 10:40",
+["clase"] = "HUNTER",
+["nivel"] = 40,
 },
 },
 ["avisos"] = {
@@ -2585,11 +3369,11 @@ WowFExportarDB = {
 ["rot"] = {
 "Frost Armor",
 },
+["ver"] = 2,
 ["ext"] = {
 ["FG Varita"] = {
 },
 },
-["ver"] = 2,
 },
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
 ["macros"] = {
@@ -2644,31 +3428,19 @@ WowFExportarDB = {
 },
 },
 },
-["retratos"] = {
+["favorAviso"] = {
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = true,
 },
-["personajes"] = {
+["reinicio"] = {
 ["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
-["reino"] = "CAMWOW EU4 Realm 1 PvE",
-["nombre"] = "Banknspank",
-["momento"] = 1794536685,
-["fecha"] = "2026-11-13 03:24",
-["nivel"] = 1,
-["clase"] = "MAGE",
-["texto"] = "WF1;nombre=Banknspank;raza=Gnome;clase=MAGE;nivel=1;habilidades=Enchanting:60/75;atributos=15,23,19,26,22;salud=51;mana=220;equipo=4=6096,5=56,7=1395,8=55,16=35;faccion=Alliance;oro=132371;talentos=",
+["veces"] = 0,
 },
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-["reino"] = "CAMWOW EU4 Realm 1 PvE",
-["nombre"] = "Derpnschmerp",
-["momento"] = 1794538593,
-["texto"] = "WF1;nombre=Derpnschmerp;raza=Human;clase=HUNTER;nivel=37;habilidades=Leatherworking:29/75,Skinning:225/225,First Aid:39/75,Fishing:97/150,Cooking:70/75;atributos=53,149,112,75,100;salud=1518;mana=1860;equipo=1=6204,3=4140,4=859,5=6603,6=6719,7=15456,8=277226,9=897,10=9832,11=281304,12=270053,15=2805,16=3210,18=15286;faccion=Alliance;oro=214833;talentos=",
-["fecha"] = "2026-11-13 03:56",
-["clase"] = "HUNTER",
-["nivel"] = 37,
+["veces"] = 0,
 },
 },
 ["version"] = 2,
-["habArma"] = {
-},
+["ultimo"] = "Derpnschmerp-CAMWOW EU4 Realm 1 PvE",
 ["libroPestana"] = "Mazmorras",
 ["notasVistas"] = "4.66#423873",
 ["xpReal"] = {
@@ -2711,6 +3483,10 @@ WowFExportarDB = {
 [1275] = {
 ["xp"] = 2400,
 ["nivel"] = 24,
+},
+[7070] = {
+["xp"] = 6750,
+["nivel"] = 39,
 },
 },
 }

@@ -173,9 +173,9 @@ _detalhes_database = {
 ["show_options"] = false,
 ["ignored_cooldowns"] = {
 },
-["framme_locked"] = false,
 ["cooldowns"] = {
 },
+["height"] = 18,
 ["own_frame"] = {
 ["defensive-raid"] = false,
 ["ofensive"] = false,
@@ -183,7 +183,7 @@ _detalhes_database = {
 ["utility"] = false,
 ["defensive-personal"] = false,
 },
-["height"] = 18,
+["framme_locked"] = false,
 ["show_conditions"] = {
 ["only_inside_instance"] = true,
 ["only_in_group"] = true,
@@ -209,51 +209,24 @@ _detalhes_database = {
 },
 ["arena_data_compressed"] = {
 },
-["last_realversion"] = 172,
+["announce_damagerecord"] = {
+["enabled"] = true,
+["channel"] = "SELF",
+},
 ["arena_data_index_selected"] = 1,
+["coach"] = {
+["enabled"] = false,
+["welcome_panel_pos"] = {
+},
+["last_coach_name"] = false,
+},
+["on_death_menu"] = false,
+["auto_combatlog"] = false,
 ["damage_meter_sessions"] = {
 },
-["local_instances_config"] = {
-{
-["modo"] = 2,
-["sub_attribute"] = 1,
-["horizontalSnap"] = false,
-["verticalSnap"] = false,
-["isLocked"] = false,
-["is_open"] = true,
-["sub_atributo_last"] = {
-1,
-1,
-1,
-1,
-1,
-},
-["snap"] = {
-},
-["segment"] = 0,
-["mode"] = 2,
-["attribute"] = 1,
-["pos"] = {
-["normal"] = {
-["y"] = -143.796875,
-["x"] = 1002.630615234375,
-["w"] = 309.9999694824219,
-["h"] = 158,
-},
-["solo"] = {
-["y"] = 2,
-["x"] = 1,
-["w"] = 300,
-["h"] = 200,
-},
-},
-},
-},
-["auto_combatlog"] = false,
-["character_data"] = {
-["logons"] = 35,
-},
-["cached_talents"] = {
+["announce_firsthit"] = {
+["enabled"] = true,
+["channel"] = "SELF",
 },
 ["last_instance_id"] = 0,
 ["data_harvest_for_charsts"] = {
@@ -286,25 +259,14 @@ _detalhes_database = {
 ["reverse"] = false,
 },
 ["active_profile"] = "Banknspank-CAMWOW EU4 Realm 1 PvE",
-["mythic_dungeon_currentsaved"] = {
-["dungeon_name"] = "",
-["started"] = false,
-["segment_id"] = 0,
-["ej_id"] = 0,
-["started_at"] = 0,
-["run_id"] = 0,
-["level"] = 0,
-["dungeon_zone_id"] = 0,
-["previous_boss_killed_at"] = 0,
+["last_day"] = "16",
+["cached_talents"] = {
 },
-["damage_meter_session_info"] = {
+["benchmark_db"] = {
+["frame"] = {
 },
-["data_harvested_for_charts"] = {
 },
-["nick_tag_cache"] = {
-["nextreset"] = 1795291964,
-["last_version"] = 16,
-},
+["last_realversion"] = 172,
 ["apocalypes_info"] = {
 },
 ["combat_log"] = {
@@ -317,9 +279,21 @@ _detalhes_database = {
 ["evoker_show_realtimedps"] = false,
 ["inverse_deathlog_mplus"] = false,
 },
-["announce_firsthit"] = {
-["enabled"] = true,
-["channel"] = "SELF",
+["ignore_nicktag"] = false,
+["mythic_plus_log"] = {
+},
+["mythic_dungeon_currentsaved"] = {
+["dungeon_name"] = "",
+["started"] = false,
+["segment_id"] = 0,
+["ej_id"] = 0,
+["started_at"] = 0,
+["run_id"] = 0,
+["level"] = 0,
+["dungeon_zone_id"] = 0,
+["previous_boss_killed_at"] = 0,
+},
+["damage_meter_session_info"] = {
 },
 ["plugin_database"] = {
 ["DETAILS_PLUGIN_TINY_THREAT"] = {
@@ -458,15 +432,10 @@ _detalhes_database = {
 ["arrow_anchor_y"] = 0,
 },
 },
-["coach"] = {
-["enabled"] = false,
-["welcome_panel_pos"] = {
+["nick_tag_cache"] = {
+["nextreset"] = 1795291964,
+["last_version"] = 16,
 },
-["last_coach_name"] = false,
-},
-["last_day"] = "13",
-["on_death_menu"] = false,
-["ignore_nicktag"] = false,
 ["apocalypse_hashes"] = {
 },
 ["SoloTablesSaved"] = {
@@ -476,11 +445,8 @@ _detalhes_database = {
 ["combat_id"] = 0,
 ["savedStyles"] = {
 },
-["benchmark_db"] = {
-["frame"] = {
-},
-},
-["mythic_plus_log"] = {
+["last_instance_time"] = 0,
+["data_harvested_for_charts"] = {
 },
 ["announce_deaths"] = {
 ["enabled"] = false,
@@ -626,13 +592,47 @@ _detalhes_database = {
 },
 },
 },
-["announce_damagerecord"] = {
-["enabled"] = true,
-["channel"] = "SELF",
+["character_data"] = {
+["logons"] = 43,
 },
 ["arena_data_headers"] = {
 },
-["last_instance_time"] = 0,
+["local_instances_config"] = {
+{
+["modo"] = 2,
+["sub_attribute"] = 1,
+["horizontalSnap"] = false,
+["verticalSnap"] = false,
+["isLocked"] = false,
+["is_open"] = true,
+["sub_atributo_last"] = {
+1,
+1,
+1,
+1,
+1,
+},
+["snap"] = {
+},
+["segment"] = 0,
+["mode"] = 2,
+["attribute"] = 1,
+["pos"] = {
+["normal"] = {
+["y"] = -143.796875,
+["x"] = 1002.630615234375,
+["w"] = 309.9999694824219,
+["h"] = 158,
+},
+["solo"] = {
+["y"] = 2,
+["x"] = 1,
+["w"] = 300,
+["h"] = 200,
+},
+},
+},
+},
 ["announce_cooldowns"] = {
 ["enabled"] = false,
 ["ignored_cooldowns"] = {

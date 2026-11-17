@@ -12,9 +12,9 @@ BetterBags_WorldEvents: disabled
 BigWigs: disabled
 BigWigs_CommonAuras: disabled
 BigWigs_Classic: disabled
-BigWigs_Core: disabled
-BigWigs_Options: disabled
-BigWigs_Plugins: disabled
+BigWigs_Core: enabled
+BigWigs_Options: enabled
+BigWigs_Plugins: enabled
 !BugGrabber: enabled
 BugSack: enabled
 Clique: disabled

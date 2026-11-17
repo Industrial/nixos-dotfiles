@@ -3,6 +3,10 @@ VER 3 0100000000000007 "AS" "134400"
 /use [@mouseover,exists,harm]Arcane Shot
 /use Arcane Shot
 END
+VER 3 010000000000000B "AS" "134400"
+#showtooltip
+/use Aimed Shot
+END
 VER 3 0100000000000004 "ATK" "132317"
 #showtooltip
 /use !Shoot
@@ -14,6 +18,10 @@ END
 VER 3 0100000000000005 "MP" "134400"
 #showtooltip
 /use Mend Pet
+END
+VER 3 010000000000000C "MS" "134400"
+#showtooltip
+/use Multi-Shot
 END
 VER 3 010000000000000A "SH" "134400"
 #showtooltip

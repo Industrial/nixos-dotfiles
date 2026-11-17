@@ -35,11 +35,7 @@ _detalhes_global = {
 ["boss_wipe_min_time"] = 20,
 ["plater"] = {
 ["realtime_dps_enabled"] = false,
-["damage_taken_anchor"] = {
-["y"] = 0,
-["x"] = 0,
-["side"] = 7,
-},
+["realtime_dps_size"] = 12,
 ["realtime_dps_player_shadow"] = true,
 ["damage_taken_enabled"] = false,
 ["realtime_dps_player_size"] = 12,
@@ -55,8 +51,12 @@ _detalhes_global = {
 ["x"] = 0,
 ["side"] = 7,
 },
-["realtime_dps_size"] = 12,
 ["damage_taken_shadow"] = true,
+["damage_taken_anchor"] = {
+["y"] = 0,
+["x"] = 0,
+["side"] = 7,
+},
 ["damage_taken_color"] = {
 1,
 1,
@@ -273,7 +273,7 @@ _detalhes_global = {
 ["Banknspank-CAMWOW EU4 Realm 1 PvE"] = "Banknspank-CAMWOW EU4 Realm 1 PvE",
 },
 ["report_where"] = "SAY",
-["latest_spell_pool_access"] = 1794536023,
+["latest_spell_pool_access"] = 1794780427,
 ["spell_pool"] = {
 },
 ["arena_debug"] = false,
@@ -308,7 +308,7 @@ _detalhes_global = {
 ["width"] = 231,
 },
 },
-["latest_encounter_spell_pool_access"] = 1794536023,
+["latest_encounter_spell_pool_access"] = 1794780427,
 ["parser_options"] = {
 ["tank_avoidance"] = false,
 ["shield_overheal"] = false,
@@ -329,21 +329,22 @@ _detalhes_global = {
 ["bar_texture"] = "You Are the Best!",
 },
 ["got_first_run"] = true,
-["tutorial"] = {
-["unlock_button"] = 0,
-["main_help_button"] = 35,
-["logons"] = 35,
-["version_announce"] = 0,
-["ctrl_click_close_tutorial"] = false,
-["alert_frames"] = {
-false,
-false,
-false,
-false,
-false,
-false,
+["slash_me_used"] = false,
+["item_level_pool"] = {
 },
-["bookmark_tutorial"] = false,
+["show_warning_id1"] = true,
+["keystone_alts_cache"] = {
+},
+["aura_tracker_frame"] = {
+["scaletable"] = {
+["scale"] = 1,
+},
+["position"] = {
+},
+},
+["all_switch_config"] = {
+["scale"] = 1,
+["font_size"] = 10,
 },
 ["switchSaved"] = {
 ["slots"] = 6,
@@ -373,22 +374,6 @@ false,
 ["sub_atributo"] = 3,
 },
 },
-},
-["auto_change_to_standard"] = true,
-["keystone_alts_cache"] = {
-},
-["slash_me_used"] = false,
-["all_switch_config"] = {
-["scale"] = 1,
-["font_size"] = 10,
-},
-["data_wipes_exp"] = {
-["9"] = false,
-["14"] = false,
-["13"] = false,
-["12"] = false,
-["11"] = false,
-["10"] = false,
 },
 ["__profiles"] = {
 ["Skelf-Classic Beta PvE 2"] = {
@@ -1263,8 +1248,6 @@ false,
 ["switch_damager_in_combat"] = false,
 ["segmento"] = 0,
 ["StatusBarSaved"] = {
-["center"] = "DETAILS_STATUSBAR_PLUGIN_CLOCK",
-["right"] = "DETAILS_STATUSBAR_PLUGIN_PDPS",
 ["options"] = {
 ["DETAILS_STATUSBAR_PLUGIN_PDPS"] = {
 ["textColor"] = {
@@ -1311,7 +1294,9 @@ false,
 ["textYMod"] = 1,
 },
 },
+["right"] = "DETAILS_STATUSBAR_PLUGIN_PDPS",
 ["left"] = "DETAILS_STATUSBAR_PLUGIN_PSEGMENT",
+["center"] = "DETAILS_STATUSBAR_PLUGIN_CLOCK",
 },
 ["bg_alpha"] = 0.6901,
 ["menu_anchor_down"] = {
@@ -1440,28 +1425,28 @@ false,
 ["segments_amount"] = 25,
 ["overall_clear_pvp"] = true,
 ["deny_score_messages"] = false,
-["minimum_combat_time"] = 5,
+["overall_clear_logout"] = false,
 ["skin"] = "Minimalistic",
 ["override_spellids"] = true,
+["font_sizes"] = {
+["menus"] = 10,
+},
+["minimum_combat_time"] = 5,
 ["new_window_size"] = {
 ["height"] = 158,
 ["width"] = 310,
 },
+["memory_threshold"] = 3,
 ["realtimedps_always_arena"] = false,
+["segments_amount_to_save"] = 15,
+["cloud_capture"] = true,
+["damage_taken_everything"] = false,
+["scroll_speed"] = 2,
 ["window_clamp"] = {
 -8,
 0,
 21,
 -14,
-},
-["memory_threshold"] = 3,
-["overall_clear_logout"] = false,
-["segments_amount_to_save"] = 15,
-["cloud_capture"] = true,
-["damage_taken_everything"] = false,
-["scroll_speed"] = 2,
-["font_sizes"] = {
-["menus"] = 10,
 },
 ["chat_tab_embed"] = {
 ["enabled"] = false,
@@ -1471,7 +1456,9 @@ false,
 ["single_window"] = false,
 },
 ["deadlog_events"] = 32,
-["total_abbreviation"] = 2,
+["hotcorner_topleft"] = {
+["hide"] = false,
+},
 ["close_shields"] = false,
 ["class_coords"] = {
 ["HUNTER"] = {
@@ -1597,7 +1584,7 @@ false,
 },
 ["animation_speed_triggertravel"] = 5,
 ["disable_alldisplays_window"] = false,
-["trash_auto_remove"] = false,
+["total_abbreviation"] = 2,
 ["segments_boss_wipes_keep_best_performance"] = true,
 ["class_colors"] = {
 ["HUNTER"] = {
@@ -1717,9 +1704,7 @@ false,
 ["damage"] = "red",
 },
 ["clear_graphic"] = true,
-["hotcorner_topleft"] = {
-["hide"] = false,
-},
+["trash_auto_remove"] = false,
 ["segments_auto_erase"] = 1,
 ["options_group_edit"] = true,
 ["broadcaster_enabled"] = false,
@@ -2764,18 +2749,19 @@ false,
 },
 ["overall_clear_pvp"] = true,
 ["deny_score_messages"] = false,
-["realtimedps_always_arena"] = false,
+["minimum_combat_time"] = 5,
 ["skin"] = "Minimalistic",
 ["override_spellids"] = true,
+["new_window_size"] = {
+["height"] = 158,
+["width"] = 310,
+},
+["realtimedps_always_arena"] = false,
 ["window_clamp"] = {
 -8,
 0,
 21,
 -14,
-},
-["overall_clear_logout"] = false,
-["font_sizes"] = {
-["menus"] = 10,
 },
 ["chat_tab_embed"] = {
 ["enabled"] = false,
@@ -2784,18 +2770,17 @@ false,
 ["tab_name"] = "",
 ["single_window"] = false,
 },
-["minimum_combat_time"] = 5,
+["overall_clear_logout"] = false,
 ["broadcaster_enabled"] = false,
 ["cloud_capture"] = true,
 ["damage_taken_everything"] = false,
 ["scroll_speed"] = 2,
-["new_window_size"] = {
-["height"] = 158,
-["width"] = 310,
+["font_sizes"] = {
+["menus"] = 10,
 },
 ["memory_threshold"] = 3,
 ["deadlog_events"] = 32,
-["trash_auto_remove"] = false,
+["total_abbreviation"] = 2,
 ["close_shields"] = false,
 ["class_coords"] = {
 ["HUNTER"] = {
@@ -2921,9 +2906,7 @@ false,
 },
 ["segments_auto_erase"] = 1,
 ["disable_alldisplays_window"] = false,
-["hotcorner_topleft"] = {
-["hide"] = false,
-},
+["trash_auto_remove"] = false,
 ["segments_boss_wipes_keep_best_performance"] = true,
 ["class_colors"] = {
 ["HUNTER"] = {
@@ -2936,10 +2919,10 @@ false,
 0.61,
 0.43,
 },
-["ROGUE"] = {
-1,
+["PALADIN"] = {
 0.96,
-0.41,
+0.55,
+0.73,
 },
 ["MAGE"] = {
 0.41,
@@ -2981,10 +2964,10 @@ false,
 0.372,
 0.905,
 },
-["PALADIN"] = {
-0.96,
-0.55,
-0.73,
+["SHAMAN"] = {
+0,
+0.44,
+0.87,
 },
 ["UNKNOW"] = {
 0.2,
@@ -3028,10 +3011,10 @@ false,
 0.5764,
 0.498,
 },
-["SHAMAN"] = {
-0,
-0.44,
-0.87,
+["ROGUE"] = {
+1,
+0.96,
+0.41,
 },
 },
 ["death_log_colors"] = {
@@ -3043,7 +3026,9 @@ false,
 ["damage"] = "red",
 },
 ["clear_graphic"] = true,
-["total_abbreviation"] = 2,
+["hotcorner_topleft"] = {
+["hide"] = false,
+},
 ["animation_speed_triggertravel"] = 5,
 ["options_group_edit"] = true,
 ["segments_amount_to_save"] = 15,
@@ -3427,7 +3412,7 @@ false,
 ["boss_mods_timers"] = {
 ["encounter_timers_bw"] = {
 },
-["latest_boss_mods_access"] = 1794536023,
+["latest_boss_mods_access"] = 1794780427,
 ["encounter_timers_dbm"] = {
 },
 },
@@ -3443,17 +3428,26 @@ false,
 ["realm_sync"] = true,
 ["class_time_played"] = {
 [0] = {
-["MAGE"] = 11816.6650000005,
+["MAGE"] = 18480.91200000048,
 ["DRUID"] = 15091.7009999998,
 },
 },
-["show_warning_id1"] = true,
-["aura_tracker_frame"] = {
-["scaletable"] = {
-["scale"] = 1,
+["spell_category_latest_save"] = 0,
+["tutorial"] = {
+["unlock_button"] = 0,
+["main_help_button"] = 43,
+["logons"] = 43,
+["version_announce"] = 0,
+["ctrl_click_close_tutorial"] = false,
+["alert_frames"] = {
+false,
+false,
+false,
+false,
+false,
+false,
 },
-["position"] = {
-},
+["bookmark_tutorial"] = false,
 },
 ["exit_errors"] = {
 },
@@ -3464,7 +3458,7 @@ false,
 ["scale"] = 1,
 },
 },
-["spell_category_latest_save"] = 0,
+["auto_change_to_standard"] = true,
 ["mythic_plus"] = {
 ["make_overall_boss_only"] = false,
 ["mythicrun_chart_frame"] = {
@@ -3493,7 +3487,7 @@ false,
 0.0549,
 0.934,
 },
-["latest_npcid_pool_access"] = 1794536023,
+["latest_npcid_pool_access"] = 1794780427,
 ["run_code"] = {
 ["on_groupchange"] = "\n-- this code runs when the player enter or leave a group",
 ["on_zonechanged"] = "\n-- when the player changes zone, this code will run",
@@ -3506,7 +3500,13 @@ false,
 },
 ["createauraframe"] = {
 },
-["item_level_pool"] = {
+["data_wipes_exp"] = {
+["9"] = false,
+["14"] = false,
+["13"] = false,
+["12"] = false,
+["11"] = false,
+["10"] = false,
 },
 ["spell_category_latest_query"] = 0,
 ["transcriptor_frame"] = {
@@ -3630,11 +3630,11 @@ false,
 ["damage_scroll_auto_open"] = true,
 }
 __details_backup = {
-["_exit_error"] = {
-},
 ["_instance_backup"] = {
 },
 ["_general_logs"] = {
+},
+["_exit_error"] = {
 },
 }
 __details_debug = {

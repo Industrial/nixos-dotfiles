@@ -81,9 +81,9 @@ Bartender4DB = {
 ["Banknspank Saladfingers"] = {
 ["actionbars"] = {
 {
-["WoW10Layout"] = true,
-["padding"] = 1.9,
 ["version"] = 3,
+["padding"] = 1.9,
+["WoW10Layout"] = true,
 ["position"] = {
 ["y"] = 51,
 ["x"] = -595.5,
@@ -92,8 +92,8 @@ Bartender4DB = {
 },
 {
 ["enabled"] = false,
-["WoW10Layout"] = true,
 ["version"] = 3,
+["WoW10Layout"] = true,
 ["position"] = {
 ["y"] = -223.9999237060547,
 ["x"] = -284.5003662109375,
@@ -123,8 +123,8 @@ Bartender4DB = {
 ["version"] = 3,
 },
 {
-["WoW10Layout"] = true,
 ["version"] = 3,
+["WoW10Layout"] = true,
 ["position"] = {
 ["y"] = 118,
 ["x"] = 4,
@@ -132,8 +132,8 @@ Bartender4DB = {
 },
 },
 {
-["WoW10Layout"] = true,
 ["version"] = 3,
+["WoW10Layout"] = true,
 ["position"] = {
 ["y"] = 118,
 ["x"] = -570,
@@ -198,19 +198,19 @@ Bartender4DB = {
 },
 },
 {
+["skin"] = {
+["Zoom"] = true,
+},
+["version"] = 3,
 ["position"] = {
 ["y"] = 186,
 ["x"] = -4,
 ["point"] = "BOTTOM",
 },
-["flyoutDirection"] = "LEFT",
-["skin"] = {
-["Zoom"] = true,
-},
 ["padding"] = 1,
 ["rows"] = 2,
 ["WoW10Layout"] = true,
-["version"] = 3,
+["flyoutDirection"] = "LEFT",
 },
 {
 ["enabled"] = false,
@@ -229,8 +229,8 @@ Bartender4DB = {
 ["skin"] = {
 ["Zoom"] = true,
 },
-["padding"] = 1,
 ["rows"] = 2,
+["padding"] = 1,
 ["WoW10Layout"] = true,
 ["position"] = {
 ["y"] = 94,
@@ -619,13 +619,13 @@ Bartender4DB = {
 ["profiles"] = {
 ["Banknspank Saladfingers"] = {
 ["enabled"] = true,
+["artLayout"] = "MODERNARTCLASSIC",
+["version"] = 3,
 ["position"] = {
 ["y"] = 57,
 ["x"] = -600,
 ["point"] = "BOTTOM",
 },
-["version"] = 3,
-["artLayout"] = "MODERNARTCLASSIC",
 },
 ["Skelf Onyourshelf"] = {
 ["position"] = {
