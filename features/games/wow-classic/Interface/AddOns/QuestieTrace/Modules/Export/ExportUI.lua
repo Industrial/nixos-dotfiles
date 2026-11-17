@@ -289,8 +289,8 @@ end
 --- Show the export window, populated with the current export string.
 --- If there is nothing to export, displays a warning and hides the input elements.
 --- After successfully encoding the payload, the live session is saved (if present)
---- so its events are persisted and the saved-session counter increments. A new
---- session is then started so subsequent events don't mutate the payload snapshot
+--- so its events are persisted and the saved-session counter increments. If a capture
+--- was running, a new session is then started so subsequent events don't mutate the payload snapshot
 --- that was encoded and displayed. This guarantees that DeleteReportedSessions()
 --- will delete only the exact data that was shown, not a version polluted by later events.
 function Core.ShowExportWindow()
@@ -338,6 +338,7 @@ function Core.ShowExportWindow()
       -- would otherwise increment the counter past the watermark.
       local liveSession = type(QuestieTraceCharacter) == "table" and QuestieTraceCharacter.currentSession or nil
       if liveSession then
+        local wasRunning = Core.GetCaptureState() == "running"
         local savedSessions = QuestieTraceCharacter.sessions
         local lastBefore = type(savedSessions) == "table" and savedSessions[#savedSessions] or nil
         Core.SaveCapture()
@@ -348,7 +349,10 @@ function Core.ShowExportWindow()
         savedSessions = QuestieTraceCharacter.sessions
         local lastAfter = type(savedSessions) == "table" and savedSessions[#savedSessions] or nil
         local savedRecord = lastAfter ~= lastBefore and lastAfter or nil
-        Core.StartCapture()
+        -- Only continue recording if the player was recording; a stopped capture stays stopped.
+        if wasRunning then
+          Core.StartCapture()
+        end
         if savedRecord then
           for i = 1, #sourceSessions do
             if sourceSessions[i] == liveSession then

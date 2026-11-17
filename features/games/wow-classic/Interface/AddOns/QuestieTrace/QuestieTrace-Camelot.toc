@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: QuestieTrace
-## Version: 1.10.0
+## Version: 1.11.0
 ## Author: Logon/TheCrux(BreakBB)
 ## Notes: Data collection addon for Questie
 ## Notes-deDE: Datensammlungs-Addon für Questie
@@ -28,7 +28,6 @@
 ## SavedVariables: QuestieTrace, QuestieTraceDumps
 ## SavedVariablesPerCharacter: QuestieTraceCharacter
 ## IconTexture: Interface\AddOns\QuestieTrace\icon.png
-## X-Curse-Project-ID: 1695789
 
 Libs/LibStub/LibStub.lua
 Libs/LibDeflate/LibDeflate.lua
@@ -75,5 +74,7 @@ Modules/Export/Encoding.lua
 Modules/Export/Export.lua
 Modules/Export/ExportUI.lua
 Modules/Export/ExportReminder.lua
+
+Modules/API.lua
 
 QuestieTrace.lua

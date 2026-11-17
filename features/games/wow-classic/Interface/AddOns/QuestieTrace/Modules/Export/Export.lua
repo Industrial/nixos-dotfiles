@@ -202,9 +202,10 @@ end
 ---
 --- Saved sessions are removed from QuestieTraceCharacter.sessions[]. If a live
 --- (running or stopped-unsaved) session was included in the payload, it is
---- discarded (never saved) and a fresh capture is started immediately (since
---- consent is required for export), so future events land in a new, distinct
---- session rather than one that no longer exists.
+--- discarded (never saved). If it was running, a fresh capture is started
+--- immediately (since consent is required for export), so future events land
+--- in a new, distinct session rather than one that no longer exists. A stopped
+--- capture stays stopped.
 ---
 --- Note: Core.ShowExportWindow() already rotates the live session when encoding
 --- succeeds: it saves the live session and replaces it in `sourceSessions` with
@@ -227,8 +228,11 @@ function Core.DeleteReportedSessions(sourceSessions)
     ---@type SessionRecord
     local session = sourceSessions[i]
     if session == liveSession then
+      local wasRunning = Core.GetCaptureState() == "running"
       Core.DiscardCapture()
-      Core.StartCapture()
+      if wasRunning then
+        Core.StartCapture()
+      end
     elseif savedSessions then
       for j = #savedSessions, 1, -1 do
         if savedSessions[j] == session then

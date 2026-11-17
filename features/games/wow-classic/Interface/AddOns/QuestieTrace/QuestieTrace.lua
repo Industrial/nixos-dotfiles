@@ -313,6 +313,8 @@ local function EncodePlainSessions()
   end
 end
 
+local savedVariablesReady = false
+
 --- Ensure SavedVariables tables exist and match the current schema version.
 local function EnsureSavedVariables()
   ---@type table?
@@ -377,6 +379,14 @@ local function EnsureSavedVariables()
       QuestieTraceCharacter.currentSession = nil
     end
   end
+
+  savedVariablesReady = true
+end
+
+--- Whether the SavedVariables were initialized on PLAYER_LOGIN, so a capture can be started.
+---@return boolean
+function Core.IsReady()
+  return savedVariablesReady
 end
 
 ---------------------------------------------------------------------------
