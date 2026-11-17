@@ -1,9 +1,11 @@
-local M, I, COMPAT, _, T = {}, {}, select(4, GetBuildInfo()), ...
-local EV, XU, noop = T.Evie, T.exUI, function() end
-local MODERN, CI_4E = COMPAT > 10e4, COMPAT > 160e2 and COMPAT < 2e4
+local COMPAT, _, T = select(4, GetBuildInfo()), ...
+local EV, XU, L = T.Evie, T.exUI, T.L
+assert(EV and XU and L and 1, "Incompatible library bundle")
+local MODERN, CI_4E, SECRETS = COMPAT > 10e4, COMPAT > 160e2 and COMPAT < 2e4, COMPAT > 12e4 or COMPAT > 160e2 and COMPAT < 2e4
+local M, I, noop = {}, {}, function() end
 T.TenSettings = M
 
-do -- EscapeCallback
+do -- M.EscapeCallback
 	local getInfo, setInfo do
 		local info = {}
 		function getInfo(k)
@@ -37,6 +39,17 @@ do -- EscapeCallback
 		f1:SetScript("OnKeyDown", noop)
 	end
 end
+local panelinfo_set, panelinfo_get do
+	local panelProps = {}
+	function panelinfo_set(panel, prop, val)
+		local t = panelProps[panel] or {}
+		panelProps[panel], t[prop] = t, val
+	end
+	function panelinfo_get(panel, prop)
+		local t = panelProps[panel]
+		return t and t[prop]
+	end
+end
 do -- TenSettingsFrame
 	local WINDOW_PADDING_H, WINDOW_PADDING_TOP, WINDOW_ACTIONS_HEIGHT, WINDOW_PADDING_BOTTOM = 10, 30, 30, 15
 	local IW_PADDING_TOP, IW_PADDING_RIGHT, IW_PADDING_BOTTOM, IW_PADDING_LEFT = 24, 4, 5, 8
@@ -55,7 +68,7 @@ do -- TenSettingsFrame
 	local TenSettingsFrame, notifyTenant = CreateFrame("Frame", "TenSettingsFrame", UIParent, "SettingsFrameTemplate") do
 		TenSettingsFrame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
 		TenSettingsFrame:SetPoint("CENTER", 0, 50)
-		TenSettingsFrame.NineSlice.Text:SetText(OPTIONS)
+		TenSettingsFrame.NineSlice.Text:SetText(L("Options", OPTIONS))
 		TenSettingsFrame:SetFrameStrata("HIGH")
 		TenSettingsFrame:SetToplevel(true)
 		TenSettingsFrame:Hide()
@@ -75,22 +88,22 @@ do -- TenSettingsFrame
 		local cancel = CreateFrame("Button", nil, TenSettingsFrame.WindowArea, "UIPanelButtonTemplate")
 		cancel:SetSize(110, 24)
 		cancel:SetPoint("BOTTOMRIGHT", IW_PADDING_RIGHT-WINDOW_PADDING_H, WINDOW_PADDING_BOTTOM-IW_PADDING_BOTTOM)
-		cancel:SetText(CANCEL)
+		cancel:SetText(L("Cancel", CANCEL))
 		TenSettingsFrame.Cancel = cancel
 		local save = CreateFrame("Button", nil, TenSettingsFrame.WindowArea, "UIPanelButtonTemplate")
 		save:SetSize(110, 24)
 		save:SetPoint("RIGHT", cancel, "LEFT", -4, 0)
-		save:SetText(OKAY)
+		save:SetText(L("Okay", OKAY))
 		TenSettingsFrame.Save = save
 		local defaults = CreateFrame("Button", nil, TenSettingsFrame.WindowArea, "UIPanelButtonTemplate")
 		defaults:SetSize(110, 24)
-		defaults:SetPoint("BOTTOMLEFT", WINDOW_PADDING_H - IW_PADDING_LEFT, WINDOW_PADDING_BOTTOM-IW_PADDING_BOTTOM)
-		defaults:SetText(DEFAULTS)
+		defaults:SetPoint("BOTTOMLEFT", WINDOW_PADDING_H - IW_PADDING_LEFT + 1, WINDOW_PADDING_BOTTOM-IW_PADDING_BOTTOM)
+		defaults:SetText(L("Defaults", DEFAULTS))
 		TenSettingsFrame.Reset = defaults
 		local revert = CreateFrame("Button", nil, TenSettingsFrame.WindowArea, "UIPanelButtonTemplate") do
 			revert:SetSize(110, 24)
 			revert:SetPoint("LEFT", defaults, "RIGHT", 4, 0)
-			revert:SetText(REVERT)
+			revert:SetText(L"Revert...")
 			local drop = XU:Create("DropDown", nil, revert)
 			drop:SetAllPoints()
 			drop:Hide()
@@ -115,7 +128,7 @@ do -- TenSettingsFrame
 				return (date("%I:%M:%S %p", time()-td):gsub("^0(%d)", "%1"))
 			end
 			function drop:initialize()
-				local info, text = {func=performRevert, notCheckable=1, justifyH="CENTER"}, revert.optionText or "%2$s"
+				local info, text = {func=performRevert, notCheckable=1, justifyH="CENTER"}, L"%d |4minute:minutes; ago (%s)"
 				local now, numEntries, numArchives, firstTime = GetServerTime(), I.undo:GetState()
 				for i=1, numArchives + (numEntries > 0 and 1 or 0) do
 					local isCancel = i > numArchives
@@ -149,7 +162,7 @@ do -- TenSettingsFrame
 			end)
 		end
 	end
-	local ConfusableResetDialog, crd_show, CRD_QUESTION_TEXT = CreateFrame("Frame", nil) do
+	local ConfusableResetDialog, crd_show = CreateFrame("Frame", nil) do
 		local d, t, tenant = ConfusableResetDialog
 		d:Hide()
 		d:SetSize(460, 105)
@@ -164,22 +177,23 @@ do -- TenSettingsFrame
 		t:SetPoint("TOP", -15, -8)
 		t:SetWidth(410)
 		t, d.Question = d:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"), t
+		t:SetText(L"You can cancel or revert to previous settings later.")
 		t:SetPoint("BOTTOM", -15, 38)
 		t:SetWidth(410)
 		t, d.Hint = CreateFrame("Button", nil, d, "UIPanelButtonTemplate", 2), t
 		t:SetSize(150, 24)
 		t:SetPoint("BOTTOM", -150, 6)
-		t:SetText(ALL_SETTINGS)
+		t:SetText(L("All Settings", ALL_SETTINGS))
 		t:SetScript("OnClick", onResetButtonClick)
 		t, d.AllSet = CreateFrame("Button", nil, d, "UIPanelButtonTemplate", 0), t
 		t:SetSize(130, 24)
 		t:SetPoint("BOTTOM", 0, 6)
-		t:SetText(CANCEL)
+		t:SetText(L("Cancel", CANCEL))
 		t:SetScript("OnClick", onResetButtonClick)
 		t, d.Cancel = CreateFrame("Button", nil, d, "UIPanelButtonTemplate", 1), t
 		t:SetSize(150, 24)
 		t:SetPoint("BOTTOM", 150, 6)
-		t:SetText(CURRENT_SETTINGS)
+		t:SetText(L("These Settings", CURRENT_SETTINGS))
 		t:SetScript("OnClick", onResetButtonClick)
 		d.OnlyThese = t
 		d:SetScript("OnHide", function(self)
@@ -187,7 +201,7 @@ do -- TenSettingsFrame
 			tenant = nil
 		end)
 		function crd_show(forTenant, thisName, rootName)
-			local qt, cc = CRD_QUESTION_TEXT or CONFIRM_RESET_INTERFACE_SETTINGS, NORMAL_FONT_COLOR_CODE
+			local qt, cc = L"Do you want to reset all %s settings to their defaults, or only the settings in the %s category?", NORMAL_FONT_COLOR_CODE
 			ConfusableResetDialog.Question:SetFormattedText(qt, cc .. tostring(rootName) .. "|r", cc .. tostring(thisName) .. "|r")
 			tenant = forTenant
 			M:ShowFrameOverlay(TenSettingsFrame.WindowArea, ConfusableResetDialog)
@@ -260,7 +274,7 @@ do -- TenSettingsFrame
 	
 	local containers = {}
 	local container_notifications, container_notifications_internal = {}, {} do
-		local function container_notify_panels(self, notification, ...)
+		local function container_notifyPanels(self, notification, ...)
 			local ci = containers[self]
 			local onlyNotifyCurrentPanel = (...) == "current-panel-only"
 			I.HandlePanelNotification(notification)
@@ -276,9 +290,14 @@ do -- TenSettingsFrame
 		end
 		for s in ("okay cancel default refresh"):gmatch("%S+") do
 			container_notifications[s] = function(self, ...)
-				container_notify_panels(self, s, ...)
+				container_notifyPanels(self, s, ...)
 			end
 		end
+	end
+	local function container_syncEscapeText(ci)
+		local pc = panelinfo_get(ci.currentPanel, "canvasEscapeCommand")
+		local ht = pc and pc ~= "" and L"Type %s in chat to open this panel outside the game's Options UI."
+		ci.canvasEscapeHint:SetText(ht and ht:format("|cffa0ff00" .. pc .. "|r") or "")
 	end
 	local function container_setTenant(ci, newPanel)
 		if ci.currentPanel == newPanel then return end
@@ -307,6 +326,7 @@ do -- TenSettingsFrame
 		if newPanel.refresh and ci.f:IsShown() then
 			securecall(newPanel.refresh, newPanel)
 		end
+		container_syncEscapeText(ci)
 		return true
 	end
 	local function container_selectTab(self, button)
@@ -335,8 +355,13 @@ do -- TenSettingsFrame
 		if cf:GetParent() ~= self then
 			cf:ClearAllPoints()
 			cf:SetParent(self)
-			cf:SetPoint("CENTER", -5, 0)
+			cf:SetPoint("CENTER", -5, 10)
 			cf:Show()
+			local ceh = ci.canvasEscapeHint
+			ceh:ClearAllPoints()
+			ceh:SetPoint("TOPLEFT", cf, "BOTTOMLEFT", 4, -4)
+			ceh:SetPoint("TOPRIGHT", cf, "BOTTOMRIGHT", -4, -4)
+			container_syncEscapeText(ci)
 		end
 	end
 	local function container_new(name, rootPanel, opts)
@@ -372,7 +397,11 @@ do -- TenSettingsFrame
 		t:Hide()
 		t:SetScript("OnShow", container_onCanvasShow)
 		t.OnCommit, t.OnDefault, t.OnRefresh, t.OnCancel = cf.OnCommit, cf.OnDefault, cf.OnRefresh, cf.OnCancel
-		containers[t], ci.canvas = ci, t
+		t, containers[t], ci.canvas = t:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall"), ci, t
+		t:SetTextColor(0.65, 0.65, 0.65)
+		t:SetMaxLines(1)
+		t:SetJustifyH("LEFT")
+		ci.canvasEscapeHint = t
 		if type(opts) == "table" then
 			ci.forceRootVersion = opts.forceRootVersion
 			ci.rootTabText = opts.tabText
@@ -414,24 +443,27 @@ do -- TenSettingsFrame
 		end
 	end
 	local function settings_show(newTenant)
-		if currentSettingsTenant then
+		local noop = newTenant == currentSettingsTenant
+		if currentSettingsTenant and not noop then
 			currentSettingsTenant:Hide()
 			currentSettingsTenant:ClearAllPoints()
 			currentSettingsTenant = nil
 		end
-		newTenant:ClearAllPoints()
-		newTenant:SetParent(TenSettingsFrame.ContentArea)
-		newTenant:SetPoint("TOP")
-		currentSettingsTenant = newTenant
-		securecall(newTenant.OnRefresh, newTenant)
-		newTenant:Show()
 		if not TenSettingsFrame:IsShown() then
 			TenSettingsFrame:ClearAllPoints()
 			TenSettingsFrame:SetPoint("CENTER", 0, 50)
+			TenSettingsFrame:Show()
 		end
+		currentSettingsTenant = newTenant
+		newTenant:ClearAllPoints()
+		newTenant:SetParent(TenSettingsFrame.ContentArea)
+		newTenant:SetPoint("TOP")
+		if not noop then
+			securecall(newTenant.OnRefresh, newTenant)
+			PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
+		end
+		newTenant:Show()
 		I.OnUndoStateChange()
-		TenSettingsFrame:Show()
-		PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 	end
 	local function settings_hide(dismissCommit, skipSound)
 		if dismissCommit and currentSettingsTenant and currentSettingsTenant.OnCommit then
@@ -507,11 +539,28 @@ do -- TenSettingsFrame
 		settings_hide()
 	end)
 
+	local function settings_move_panel(panel, l, b)
+		if l and b and not (SECRETS and issecretvalue(l)) and TenSettingsFrame:IsVisible() then
+			local l2, b2 = panel:GetRect()
+			local p, r, rp, ox, oy = TenSettingsFrame:GetPoint()
+			TenSettingsFrame:SetPoint(p, r, rp, ox + (l-l2), oy + (b-b2))
+		end
+	end
 	local function openSettingsPanel(panel)
 		local ci = containers[panel]
 		if SettingsPanel:IsVisible() then
+			local detach = panel:IsVisible() and not InCombatLockdown()
+			               and not SettingsPanel:HasUnappliedSettings()
+			               and not (EditModeManagerFrame and EditModeManagerFrame:IsEditModeActive())
 			container_setTenant(ci, panel)
-			Settings.OpenToCategory(ci.brID)
+			if detach then
+				local l, b = panel:GetRect()
+				settings_show(ci.f)
+				HideUIPanel(SettingsPanel)
+				settings_move_panel(panel, l, b)
+			else
+				Settings.OpenToCategory(ci.brID)
+			end
 		else
 			container_setTenant(ci, panel)
 			settings_show(ci.f)
@@ -550,13 +599,46 @@ do -- TenSettingsFrame
 		local nEntries, nArchives = I.undo:GetState()
 		TenSettingsFrame.Revert:SetEnabled(nEntries > 0 or nArchives > 0)
 	end
-	function M:Localize(t)
-		CRD_QUESTION_TEXT = t.RESET_QUESTION
-		ConfusableResetDialog.AllSet:SetText(t.DEFAULTS_ALL or ALL_SETTINGS)
-		ConfusableResetDialog.OnlyThese:SetText(t.DEFAULTS_VISIBLE or CURRENT_SETTINGS)
-		TenSettingsFrame.Revert:SetText(t.REVERT or REVERT)
-		TenSettingsFrame.Revert.optionText = t.REVERT_OPTION_LABEL
-		ConfusableResetDialog.Hint:SetText(t.REVERT_CANCEL_HINT or "")
+	function M:SetCanvasEscapeCommand(panel, cmd)
+		local ci = containers[panel]
+		if ci then
+			panelinfo_set(panel, "canvasEscapeCommand", cmd)
+		end
+		if ci and ci.currentPanel == panel and ci.canvas:IsVisible() then
+			container_syncEscapeText(ci)
+		end
+	end
+	function M:SetBookmarkImpl(panel, prefix, get, set)
+		panelinfo_set(panel, "bookmarkPrefix", prefix)
+		panelinfo_set(panel, "bookmarkGet", get)
+		panelinfo_set(panel, "bookmarkSet", set)
+	end
+	function M:GetActiveBookmark(panel)
+		local ci = containers[panel]
+		local cip = ci and ci.currentPanel
+		local bg = cip and panelinfo_get(cip, "bookmarkGet")
+		bg = bg and securecall(bg, cip)
+		local bp = bg and panelinfo_get(cip, "bookmarkPrefix")
+		return bp and (bp .. "\30" .. bg) or nil, cip, TenSettingsFrame:IsVisible()
+	end
+	function M:OpenToBookmark(panel, bookmarkData, l, b)
+		local ci = containers[panel]
+		if not ci or type(bookmarkData) ~= "string" then
+			return false
+		end
+		local prefix, dat = bookmarkData:match("^([^\30]+)\30?(.-)$")
+		for i=0, dat and ci and #ci.tabs or -1 do
+			local cip = i == 0 and ci.root or ci.tabs[ci.tabs[i]]
+			if cip and panelinfo_get(cip, "bookmarkPrefix") == prefix then
+				local nf = panelinfo_get(cip, "bookmarkSet")
+				openSettingsPanel(cip)
+				if nf then
+					securecall(nf, cip, dat)
+				end
+				settings_move_panel(cip, l, b)
+				return true
+			end
+		end
 	end
 end
 
@@ -694,18 +776,24 @@ do -- M:ShowFrameOverlay(self, overlayFrame)
 			end
 		end)
 	end
-	function M:ShowFrameOverlay(self, overlayFrame)
-		if occupant and occupant ~= overlayFrame then occupant:Hide() end
+	function I:UpdateFrameOverlaySize(overlayFrame, force)
+		if occupant ~= overlayFrame and not force then return end
+		local self = container:GetParent()
 		local cw, ch = overlayFrame:GetSize()
 		local w2, h2 = self:GetSize()
-		local w, h, isRefresh = cw + 24, ch + 24, occupant == overlayFrame
-		local frameLevel = (math.ceil(self:GetFrameLevel()/500)+1)*500
-		w2, h2, occupant = w2 > w and (w-w2)/2 or 0, h2 > h and (h-h2)/2 or 0
+		local w, h = cw + 24, ch + 24
+		w2, h2 = w2 > w and (w-w2)/2 or 0, h2 > h and (h-h2)/2 or 0
 		container:SetSize(w, h)
 		container:SetHitRectInsets(w2, w2, h2, h2)
+	end
+	function M:ShowFrameOverlay(self, overlayFrame)
+		if occupant and occupant ~= overlayFrame then occupant:Hide() end
+		local isRefresh = occupant == overlayFrame
+		local frameLevel = (math.ceil(self:GetFrameLevel()/500)+1)*500
 		container:SetParent(self)
 		container:SetPoint("CENTER")
 		container:SetFrameLevel(frameLevel)
+		I:UpdateFrameOverlaySize(overlayFrame, true)
 		container.fader:ClearAllPoints()
 		local oaf, omd, omt, omr, omb, oml = I.GetOverlayDefaults(self)
 		oaf, omd = oaf or self, type(omd) == "number" and omd or 2
@@ -760,6 +848,10 @@ do -- M:Show{Prompt,Alert,Copy}Overlay(...)
 		promptInfo.editBox:SetScript("OnEnterPressed", function() promptInfo.accept:Click() end)
 		promptInfo.editBox:SetScript("OnEscapePressed", function() promptInfo.cancel:Click() end)
 	end
+	local function updatePromptFrameHeight()
+		promptFrame:SetHeight(55 + math.max(20, promptInfo.prompt:GetStringHeight()) + ( promptInfo.editBox:IsShown() and 30 or 0) + (promptInfo.detail:GetText() ~= "" and math.max(promptInfo.detail:GetStringHeight() or 0, 20) or 0))
+		I:UpdateFrameOverlaySize(promptFrame)
+	end
 	function M:ShowPromptOverlay(frame, title, prompt, explainText, acceptText, callback, editBoxWidth, cancelText, editText)
 		local showEditBox, editBox = editBoxWidth ~= false, promptInfo.editBox
 		editText = showEditBox and type(editText) == "string" and editText or ""
@@ -773,18 +865,19 @@ do -- M:Show{Prompt,Alert,Copy}Overlay(...)
 		editBox:HighlightText(0, #editText)
 		editBox:SetShown(editBoxWidth ~= false)
 		editBox:SetWidth(math.max(40, math.min(1, editBoxWidth or 0.50) * 380))
-		promptFrame:SetHeight(55 + math.max(20, promptInfo.prompt:GetStringHeight()) + (editBoxWidth ~= false and 30 or 0) + ((explainText or "") ~= "" and 20 or 0))
+		updatePromptFrameHeight()
+		C_Timer.After(0, updatePromptFrameHeight)
 		promptInfo.cancel:ClearAllPoints()
 		promptInfo.accept:ClearAllPoints()
 		if acceptText ~= false then
-			promptInfo.accept:SetText(acceptText or ACCEPT)
-			promptInfo.cancel:SetText(cancelText or CANCEL)
+			promptInfo.accept:SetText(acceptText or L("Accept", ACCEPT))
+			promptInfo.cancel:SetText(cancelText or L("Cancel", CANCEL))
 			promptInfo.cancel:SetPoint("BOTTOMLEFT", promptFrame, "BOTTOM", 5, 2)
 			promptInfo.accept:SetPoint("BOTTOMRIGHT", promptFrame, "BOTTOM", -5, 2)
 			promptInfo.accept:Show()
 		else
 			promptInfo.accept:Hide()
-			promptInfo.cancel:SetText(cancelText or OKAY)
+			promptInfo.cancel:SetText(cancelText or L("Okay", OKAY))
 			promptInfo.cancel:SetPoint("BOTTOM", 5, 2)
 		end
 		promptInfo.cancel:SetWidth(math.max(125, 25+promptInfo.cancel:GetFontString():GetStringWidth()))

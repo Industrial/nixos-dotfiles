@@ -1,12 +1,12 @@
-local _, T = ...
+local COMPAT, _, T = select(4,GetBuildInfo()), ...
 if T.TenEnv then T.TenEnv() end
 
 local AB, ORI, EV, L, PC, XU, config, KR = T.ActionBook, OPie.UI, T.Evie, T.L, T.OPieCore, T.exUI, T.config, nil
 AB, KR = AB and AB:compatible(2, 14), AB and AB:compatible("Kindred", 1, 34)
 assert(ORI and EV and L and PC and XU and config and AB and KR, "Incompatible library bundle")
-local COMPAT = select(4,GetBuildInfo())
-local MODERN, CF_WRATH = COMPAT >= 10e4, COMPAT < 10e4 and COMPAT >= 3e4
-local MODERN_QL = MODERN or (COMPAT > 160e2 and COMPAT < 2e4)
+local MODERN, CI_4E = COMPAT >= 12e4, COMPAT < 2e4 and COMPAT > 160e2
+local CF_WRATH = COMPAT < 12e4 and COMPAT >= 3e4
+local MODERN_QL = MODERN or CI_4E
 local GameTooltip = T.NotGameTooltip or GameTooltip
 
 local exclude, questItems = PC:RegisterPVar("AutoQuestExclude", {}), {}
@@ -33,12 +33,6 @@ if MODERN_QL or CF_WRATH then
 		end
 		local function have3(iid)
 			return C_Item.GetItemCount(iid) > 2, false, false, 4
-		end
-		local function have10(iid)
-			return C_Item.GetItemCount(iid) > 9, false, false, 4
-		end
-		local function have100(iid)
-			return C_Item.GetItemCount(iid) > 99, false, false, 4
 		end
 		local function have1_lv80()
 			if (UnitLevel("player") or 0) >= 80 then
@@ -134,17 +128,6 @@ if MODERN_QL or CF_WRATH then
 			[245611]=have1, -- wriggling pinnacale cache [11.2]
 			[255676]=have1, -- phase diver's cache [11.2]
 			[247820]=have1, -- cache of k'areshi treasures [11.2 sign of the warrior]
-			-- Legion Remix
-			[242617]=c1, -- curious simulacrum
-			[237812]=have1, [239303]=have1, [245553]=have1, [256763]=have1, -- cache of infinite treasure/heroic/armory
-			[248247]=have1, [251821]=have1, -- cache of infinite power
-			[253224]=have10, -- mote of a broken time
-			[254267]=have100, -- fragmented memento
-			[246812]=c1, [246815]=c1, [246814]=c1, [246813]=c1, -- minor/lesser//greater bronze cache
-			[245925]=c1, [249891]=c1, -- artifactium sand
-			[246936]=c1, [246937]=c1, -- epoch memento
-			[152102]=have1, [152103]=have1, [152104]=have1, [152105]=have1,
-			[152106]=have1, [152107]=have1, [152108]=have1, -- paragon boxes
 			-- Midnight
 			[255825]=onPreyHunt, -- disarmed trap
 			[268297]=c1, -- bag o' gold
@@ -377,7 +360,7 @@ local function syncRing(_, event, upId)
 
 	local ns = C_Container.GetContainerNumSlots
 	local giid = C_Container.GetContainerItemID
-	for bag=0,MODERN and 5 or 4 do
+	for bag=0,(MODERN or CI_4E) and 5 or 4 do
 		for slot=1, ns(bag) or 0 do
 			local iid = giid(bag, slot)
 			local include, startsQuestMark, qiCat = IsQuestItem(iid, bag, slot)

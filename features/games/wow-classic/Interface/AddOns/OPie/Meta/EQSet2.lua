@@ -1,5 +1,6 @@
 local COMPAT, _, T = select(4, GetBuildInfo()), ...
-if COMPAT < 3e4 then return end
+local CI_4E = COMPAT < 2e4 and COMPAT > 160e2
+if not (CI_4E or COMPAT > 3e4) then return end
 
 local EV, XU, AB = T.Evie, T.exUI, T.ActionBook:compatible(2, 45)
 assert(EV and XU and AB and 1, "Incompatible library bundle")

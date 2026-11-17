@@ -36,17 +36,6 @@ end
 
 local KR = T.ActionBook:compatible("Kindred",1,0)
 
-if TS and TS.Localize then
-	TS:Localize({
-		REVERT=L"Revert...",
-		REVERT_OPTION_LABEL=L"%d |4minute:minutes; ago (%s)",
-		RESET_QUESTION=L"Do you want to reset all %s settings to their defaults, or only the settings in the %s category?",
-		REVERT_CANCEL_HINT=L"You can cancel or revert to previous settings later.",
-		DEFAULTS_ALL=L("All Settings", ALL_SETTINGS),
-		DEFAULTS_VISIBLE=L("These Settings", CURRENT_SETTINGS),
-	})
-end
-
 do -- config.ui
 	config.ui = {}
 	function config.ui.HideTooltip(self)
@@ -147,16 +136,15 @@ do -- config.bind
 		PADRSTICKUP=1, PADRSTICKDOWN=1, PADRSTICKLEFT=1, PADRSTICKRIGHT=1,
 		PADLSTICKUP=1, PADLSTICKDOWN=1, PADLSTICKLEFT=1, PADLSTICKRIGHT=1,
 	}
+	local function IsGamePadModifierInput(key)
+		return key == GetCVar("GamePadEmulateAlt") or key == GetCVar("GamePadEmulateCtrl") or key == GetCVar("GamePadEmulateShift")
+	end
 	local function SetBind(self, bind)
 		if bind == "ESCAPE" then
 			return Deactivate(self)
 		elseif unbindableKeys[bind] then
 			return
-		elseif bind and bind:match("PAD") and (
-		         bind == GetCVar("GamePadEmulateAlt") or
-		         bind == GetCVar("GamePadEmulateCtrl") or
-		         bind == GetCVar("GamePadEmulateShift")
-		       ) then
+		elseif bind and bind:match("PAD") and IsGamePadModifierInput(bind) then
 			return
 		end
 		Deactivate(self)

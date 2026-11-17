@@ -321,7 +321,7 @@ securecall(function() -- self(de)buff:name, own(de)buff:name, (de)buff:name, cle
 		buff="HELPFUL", debuff="HARMFUL",
 	}
 	local function checkAura(name, args, target)
-		if MODERN and C_Secrets.ShouldAurasBeSecret() then
+		if SECRETS and C_Secrets.ShouldAurasBeSecret() then
 			return "lockdown"
 		end
 		target = (name == "selfbuff" or name == "selfdebuff") and "player" or target or "target"
@@ -353,6 +353,9 @@ securecall(function() -- self(de)buff:name, own(de)buff:name, (de)buff:name, cle
 	KR:SetNonSecureConditional("buff", checkAura)
 	KR:SetNonSecureConditional("ownbuff", checkAura)
 	KR:SetNonSecureConditional("cleanse", function(_, _, target)
+		if SECRETS and C_Secrets.ShouldAurasBeSecret() then
+			return "lockdown"
+		end
 		target = target or "target"
 		return UnitIsFriend("player", target) and select(2,C_UnitAuras.GetAuraSlots(target, MODERN and "HARMFUL RAID_PLAYER_DISPELLABLE" or "HARMFUL RAID", 1)) ~= nil
 	end)
@@ -615,7 +618,7 @@ securecall(function() -- pet:stable id; havepet:stable id
 	KR:SetStateConditionalValue("havepet", false)
 	EV.PLAYER_LOGIN, EV.PET_STABLE_UPDATE, EV.PET_INFO_UPDATE, EV.LOCALPLAYER_PET_RENAMED = syncPet, syncPet, syncPet, syncPet
 end)
-securecall(function() -- game:modern/remix/era/sod/classic + era/hc
+securecall(function() -- game:modern/remix/era/sod/forever/fresh/classic + hc
 	KR:SetStateConditionalValue("game", "daze")
 	function EV.PLAYER_LOGIN()
 		local s
@@ -625,6 +628,11 @@ securecall(function() -- game:modern/remix/era/sod/classic + era/hc
 			    season == st.SeasonOfDiscovery and "sod" or
 			    (season == st.Fresh or season == st.FreshHardcore) and "fresh" or
 			    "era"
+			if C_GameRules.IsHardcoreActive() then
+				s = s and s .. "/hc" or "hc"
+			end
+		elseif CI_4E then
+			s = "forever"
 			if C_GameRules.IsHardcoreActive() then
 				s = s and s .. "/hc" or "hc"
 			end

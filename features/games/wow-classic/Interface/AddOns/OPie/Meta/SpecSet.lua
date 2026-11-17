@@ -116,7 +116,7 @@ do -- EditorUI
 	function drop:text()
 		local name = getCurrentValue()
 		local _, ico = C_EquipmentSet.GetEquipmentSetInfo(name and C_EquipmentSet.GetEquipmentSetID(name) or -1)
-		drop:SetText(name == false and NONE or ((ico and "|T" .. ico .. ":0|t " or "|cffb0b0b0") .. name))
+		drop:SetText(name == false and L("GS:None", NONE) or ((ico and "|T" .. ico .. ":0|t " or "|cffb0b0b0") .. name))
 	end
 	function drop:set(name)
 		if name == mySpecName then
@@ -138,7 +138,7 @@ do -- EditorUI
 	function drop:initialize()
 		local value = getCurrentValue()
 		local inf, hadSpec = {func=self.set, minWidth=self:GetWidth()-40}, false
-		inf.text, inf.arg1, inf.checked = NONE, false, value == false
+		inf.text, inf.arg1, inf.checked = L("GS:None", NONE), false, value == false
 		UIDropDownMenu_AddButton(inf)
 		for _, id in pairs(C_EquipmentSet.GetEquipmentSetIDs()) do
 			local n, ico = C_EquipmentSet.GetEquipmentSetInfo(id)

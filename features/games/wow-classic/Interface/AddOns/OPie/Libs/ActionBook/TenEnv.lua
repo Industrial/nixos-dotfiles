@@ -53,7 +53,12 @@ function env.GetSpellCharges(id)
 		return ci.currentCharges, ci.maxCharges, ci.cooldownStartTime, ci.cooldownDuration, ci.chargeModRate, ci.isActive
 	end
 end
-env.GetSpellSubtext = C_Spell.GetSpellSubtext
+function env.GetSpellSubtext(id, rt)
+	if id and rt and type(rt) == "string" and type(id) == "string" then
+		id = id .. "(" .. rt .. ")"
+	end
+	return C_Spell.GetSpellSubtext(id)
+end
 env.IsPassiveSpell = C_Spell.IsSpellPassive
 env.IsSpellInRange = C_Spell.IsSpellInRange
 env.IsUsableSpell = C_Spell.IsSpellUsable

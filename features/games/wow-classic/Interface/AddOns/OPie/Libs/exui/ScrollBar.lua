@@ -1,6 +1,7 @@
-local _, T = ...
+local COMPAT, _, T = select(4, GetBuildInfo()), ...
 local XU, ScrollBar, iSB, type = T.exUI, {}, {}, type
 local assert, getWidgetData, newWidgetData, setWidgetData, AddObjectMethods, CallObjectScript = XU:GetImpl()
+local CI_4E = COMPAT < 2e4 and COMPAT > 160e2
 
 local HOLD_ACTION_DELAY, PAGE_DELAY, STEPPER_REPEAT_DELAY = 0.15, 0.25, 1/3
 local MIN_ANIMATION_FRAMERATE, ANIMATION_TARGET_DURATION = 45, 0.2
@@ -35,17 +36,17 @@ local STYLES, DEFAULT_STYLE = {}, "minimal" do
 		trackMid = {"a", "!minimal-scrollbar-track-middle", asize=1},
 		trackTop = {"a", "minimal-scrollbar-track-top", asize=1},
 		trackBot = {"a", "minimal-scrollbar-track-bottom", asize=1},
-		thumb = {w=8, h=20, midOfsAbsolute=true, midOfsT=8, midOfsB=10, asize=1},
+		thumb = {w=8, h=20, midOfsAbsolute=true, midOfsT=8, midOfsB=CI_4E and 6 or 10, asize=1},
 		thumbS = {w=8, h=20, midOfsAbsolute=true, midOfsT=8, midOfsB=6, asize=1},
 		smallThumbThreshold = 32,
 		thumbTop  = {"a", "minimal-scrollbar-thumb-top"},
 		thumbTopH = {"a", "minimal-scrollbar-thumb-top-over"},
 		thumbTopP = {"a", "minimal-scrollbar-thumb-top-down"},
-		thumbBot  = {"a", "minimal-scrollbar-thumb-bottom"},
+		thumbBot  = {"a", CI_4E and "minimal-scrollbar-small-thumb-bottom" or "minimal-scrollbar-thumb-bottom"},
 		thumbBotS = {"a", "minimal-scrollbar-small-thumb-bottom"},
-		thumbBotH = {"a", "minimal-scrollbar-thumb-bottom-over"},
+		thumbBotH = {"a", CI_4E and "minimal-scrollbar-small-thumb-bottom-down" or "minimal-scrollbar-thumb-bottom-over"},
 		thumbBotHS = {"a", "minimal-scrollbar-small-thumb-bottom-over"},
-		thumbBotP = {"a", "minimal-scrollbar-thumb-bottom-down"},
+		thumbBotP = {"a", CI_4E and "minimal-scrollbar-small-thumb-bottom-down" or "minimal-scrollbar-thumb-bottom-down"},
 		thumbBotPS = {"a", "minimal-scrollbar-small-thumb-bottom-down"},
 		thumbMid  = {"a", "minimal-scrollbar-thumb-middle", tch=715},
 		thumbMidH = {"a", "minimal-scrollbar-thumb-middle-over"},

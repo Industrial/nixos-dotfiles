@@ -19,7 +19,7 @@ local OPC_Options = {
 	{ "section", caption=L"Behavior" },
 		{"bool", "UseDefaultBindings", caption=L"Use default ring bindings"},
 		{"bool", "DeclutterOnOpen", caption=L"Hide toasts on ring open"},
-		{"bool", "DuckRingBinds", caption=L"Duck ring bindings with main UI"},
+		{"bool", "DuckRingBinds", caption=L"Do not open invisible rings"},
 		{"bool", "HideStanceBar", caption=L"Hide stance bar", globalOnly=true},
 		{"bool", "PerCharRotationStore", caption=L"Per-character ring rotations", globalOnly=true},
 		{"range", "RingScale", 0.1, 2, caption=L"Ring scale", valueFormat="%0.1f"},
@@ -28,8 +28,8 @@ local OPC_Options = {
 		{"bool", "ShowKeys", caption=L"Per-slice bindings", depOn="SliceBinding", depValue=true, otherwise=false},
 		{"bool", "ShowCooldowns", caption=L"Show cooldown numbers", depIndicatorFeature="CooldownNumbers"},
 		{"bool", "ShowRecharge", caption=L"Show recharge numbers", depIndicatorFeature="CooldownNumbers"},
-		{"twof", "UseGameTooltip", caption=L"Show tooltips:"},
 		{"bool", "ShowShortLabels", caption=L"Show slice labels", depIndicatorFeature="ShortLabels"},
+		{"twof", "UseGameTooltip", caption=L"Show tooltips:"},
 	{ "section", caption=L"Animation"},
 		{"bool", "XTAnimation", caption=L"Animate transitions"},
 		{"bool", "MISpinOnHide", caption=L"Outward spiral on hide", depOn="XTAnimation", depValue=true, otherwise=false},
@@ -52,12 +52,12 @@ local OPC_OptionDomain = XU:Create("DropDown", nil, frame)
 local OPC_AlterOption, OPC_AlterOptionW, OPC_AlterOptionQ, OPC_BlockInput
 local OPC_UpdateControlReqs, OPC_UpdateViewport, OPC_IsViewDirty, OR_CurrentOptionsDomain
 
-local widgetControl, optionControl = {}, {} do -- Widget construction
+local widgetControl, optionControl, optionsScrollBar = {}, {} do -- Widget construction
 	local controlViewport = CreateFrame("Frame", nil, frame)
 	controlViewport:SetPoint("TOPLEFT", 0, -115)
 	controlViewport:SetPoint("BOTTOMRIGHT", -30, 8)
 	controlViewport:SetClipsChildren(true)
-	local optionsScrollBar = XU:Create("ScrollBar", nil, frame)
+	optionsScrollBar = XU:Create("ScrollBar", nil, frame)
 	optionsScrollBar:SetPoint("TOPLEFT", controlViewport, "TOPRIGHT", 2, 8)
 	optionsScrollBar:SetPoint("BOTTOMLEFT", controlViewport, "BOTTOMRIGHT", 2, -8)
 	optionsScrollBar:SetWheelScrollTarget(controlViewport, 0, -2, -8, -8)
@@ -758,9 +758,19 @@ do -- OPC_Profile:initialize
 		if ns > 1 then
 			UIDropDownMenu_AddButton(info)
 		end
-		info.text, info.minWidth, info.func, info.arg1, info.disabled = L"Create a new profile", self:GetWidth()-40, OPC_Profile_new, nil, nil
+		info.func, info.arg1, info.disabled = OPC_Profile_delete
+		if curProfile == "default" then
+			info.tooltipTitle, info.tooltipText = L"Restore default settings",
+				(L"The %s profile can only restored to its default configuration, not deleted."):format("|cffffffff" .. L"default" .. "|r") .. " " ..
+				L"It is used when no other profile applies, for example on new characters."
+			info.text, info.tooltipOnButton = "|cffe86000" .. info.tooltipTitle, true
+		else
+			info.text = "|cffd88000" .. L"Delete current profile"
+		end
 		UIDropDownMenu_AddButton(info)
-		info.text, info.func = curProfile ~= "default" and L"Delete current profile" or L"Restore default settings", OPC_Profile_delete
+		info.tooltipTitle, info.tooltipText, info.tooltipOnButton = nil
+		UIDropDownMenu_AddSeparator()
+		info.text, info.minWidth, info.func = L"Create a new profile", self:GetWidth()-40, OPC_Profile_new
 		UIDropDownMenu_AddButton(info)
 	end
 end
@@ -862,6 +872,7 @@ function frame.refresh()
 	securecall(refreshControls)
 	OPC_BlockInput = false
 	config.checkSVState(frame)
+	TS:SetCanvasEscapeCommand(frame, "/opie options")
 end
 local function resetView()
 	OR_CurrentOptionsDomain = nil
@@ -878,6 +889,22 @@ frame:SetScript("OnHide", function()
 		OR_CurrentOptionsDomain, frame.resetOnHide = nil
 	end
 end)
+local function saveBookmark()
+	return optionsScrollBar:GetValue() .. "\30" .. (OR_CurrentOptionsDomain or "")
+end
+local function showBookmark(_, dat)
+	local ofs, dom = dat:match("^(%-?%d+%.?%d*)\30([^\30]*)")
+	if dom and dom ~= "" and PC:GetRingInfo(dom) then
+		OR_CurrentOptionsDomain = dom
+	else
+		OR_CurrentOptionsDomain = nil
+	end
+	if ofs and (dom == "") == (OR_CurrentOptionsDomain == nil) then
+		optionsScrollBar:SetValue(ofs+0, true)
+	end
+	frame.refresh()
+end
+TS:SetBookmarkImpl(frame, "opt", saveBookmark, showBookmark)
 
 function EV:OPIE_PROFILE_SWITCHED(_new, _old)
 	if frame:IsVisible() then

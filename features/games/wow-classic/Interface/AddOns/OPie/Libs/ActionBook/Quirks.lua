@@ -4,7 +4,8 @@ if T.TenEnv then T.TenEnv() end
 
 local EV, WR, AB, KR, RW, IM = T.Evie, T.Ware, T.ActionBook:compatible(2,38), T.ActionBook:compatible("Kindred", 1,36), T.ActionBook:compatible("Rewire", 1,27), T.ActionBook:compatible("Imp", 1,11)
 assert(EV and WR and AB and KR and RW and IM and 1, "Incompatible library bundle")
-local MODERN, CI_ERA, CF_CATA = COMPAT >= 10e4, COMPAT < 160e2, COMPAT < 10e4 and COMPAT > 4e4
+local MODERN, CI_ERA, CI_4E = COMPAT >= 12e4, COMPAT < 160e2, COMPAT < 2e4 and COMPAT > 160e2
+local CF_CATA = COMPAT < 10e4 and COMPAT > 4e4
 local playerClass, _, playerRace = UnitClassBase("player"), UnitRace("player")
 
 securecall(function() -- weirdly-persistent Druid Incarnations + Celestial Alignment
@@ -194,7 +195,7 @@ securecall(function() -- failing ability disambiguation
 	end
 end)
 securecall(function() -- failing profession rank disambiguation
-	if not MODERN then
+	if not (MODERN or CI_4E) then
 		return
 	end
 	local activeSet, reserveSet, pendingSync = {}, {}
@@ -246,9 +247,12 @@ securecall(function() -- failing profession rank disambiguation
 		if changed then
 			AB:NotifyObservers("spell")
 		end
-		return e ~= "CHAT_MSG_SKILL" and "remove"
+		if e == "PLAYER_LOGIN" then
+			C_Timer.After(0.5, syncProf)
+			return "remove"
+		end
 	end
-	EV.PLAYER_LOGIN, EV.CHAT_MSG_SKILL = syncProf, syncProf
+	EV.PLAYER_LOGIN, EV.CHAT_MSG_SKILL, EV.SKILL_LINES_CHANGED = syncProf, syncProf, syncProf
 end)
 securecall(function() -- missing usability conditions for Garrison/Dalaran Hearthstone toys
 	if not MODERN then
@@ -295,26 +299,13 @@ securecall(function() -- /ping's option parsing is silly
 	RW:RegisterCommand(SLASH_PING1, true, false, f)
 end)
 securecall(function() -- /equipset {not a set name} errors
-	if not MODERN then
-		-- Classic lacks the SABT action
-		return
-	end
-	local function uniqueName(prefix)
-		local bni, bn = 1 repeat
-			bn, bni = prefix .. bni, bni + 1
-		until _G[bn] == nil and GetClickFrame(bn) == nil
-		return bn
-	end
-	-- TODO: should anonymize this: RW/PY has a /click delegation mechanism
-	local f = CreateFrame("Button", uniqueName("ABEquipSetQuirk!"), nil, "SecureActionButtonTemplate")
+	local f = CreateFrame("Button", nil, nil, "SecureActionButtonTemplate")
 	f:SetAttribute("type", "equipmentset")
 	f:SetAttribute("useOnKeyDown", false)
-	f:SetAttribute("DoEquipCommand", SLASH_CLICK1 .. " " .. f:GetName())
 	f:SetAttribute("RunSlashCmd", [[-- AB_EquipSetQuirk_Run 
 		local cmd, v = ...
 		if v and v ~= "" then
-			self:SetAttribute("equipmentset", v)
-			return self:GetAttribute("DoEquipCommand"), "notified-click", v
+			return nil, "notified-click", v
 		end
 	]])
 	f:SetAttribute("RunSlashCmd-PreClick", [[-- AB_EquipSetQuirk_PreRun 

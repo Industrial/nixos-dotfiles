@@ -25,12 +25,12 @@ V =
       "Mostrar sólo al equipar", "Indumentaria", "Atuendos", "Hablidad de mascota", "Habilidades de mascota", "Marcador del mundo", "Marcador del mundo", "Marcadores del mundo", "Costas del Ventajo", "Mostrar un sustituto cuando no esté disponible",
       "Hechizo", "Juegete", "Juguetes", "Paneles de interfaz de usuario", "Desbloquear apariencia al cambiar", "Usa de nuevo para permitir que esta apariencia se reemplace con una Situación", "Usa de nuevo para prevenir que esta apariencia se reemplace por una Situación", "Usar el rango más alto conocido", "Habilidades de area",
     }
-    or C == "frFR" and { -- 45/49 (91%)
-      "Compétences", z, "Également utiliser l'élément avec le même nom", "Apparence verrouillée", "Apparence déverrouillée", "Mascotte de combat", "Mascottes de combat", "Calendrier", z, "Macro personnalisée",
+    or C == "frFR" and { -- 48/49 (97%)
+      "Compétences", "Action", "Également utiliser l'élément avec le même nom", "Apparence verrouillée", "Apparence déverrouillée", "Mascotte de combat", "Mascottes de combat", "Calendrier", "Inter-Faction", "Macro personnalisée",
       "Monture draconique", "Set d'équipement", "Emplacement d'équipement", "Équipement de sets", "Équipés", "Bouton d'action supplémentaire", "Montures volantes", "Cap Fondateur", "Menu de jeu", "Monture terrestre",
       z, "Fenêtre", "Objet", "Objets", "Macro", "Macros", "Divers", "Monture", "Montures", "Nouvelle Macro",
       "Afficher seulement quand équipé", "Tenue", "Tenues", "Compétence du Familier", "Compétences du familier", "Marqueur de Raid", "Marqueur de Terrain", "Marqueurs de Raid", "Rivages de Tranchevent", "Afficher un remplacement quand indisponible",
-      "Sort", "Jouet", "Jouets", "Fenêtres de l'interface", z, "Réactivez pour permettre le remplacement de cette tenue par une situation.", "Réactivez pour empêcher le remplacement de cette apparence par une situation.", "Utiliser le rang le plus élevé connu", "Compétences de zone",
+      "Sort", "Jouet", "Jouets", "Fenêtres de l'interface", "Débloquer l'apparence lors du changement", "Réactivez pour permettre le remplacement de cette tenue par une situation.", "Réactivez pour empêcher le remplacement de cette apparence par une situation.", "Utiliser le rang le plus élevé connu", "Compétences de zone",
     }
     or C == "itIT" and { -- 42/49 (85%)
       "Abilità", z, "Usa anche gli oggetti con lo stesso nome", "Aspetto non modificabile", "Aspetto modificabile", "Mascotte", "Mascotte", "Calendario", z, "Macro Personalizzate",
@@ -46,12 +46,12 @@ V =
       "착용 시에만 표시", "의상", "의상", "소환수 능력", "소환수 능력", "공격대 징표", "공격대 바닥 징표", "공격대 징표", "칼끝바람 해안", "사용 불가능할 때 점선으로 표시",
       "주문", "장난감", "장난감", "UI 메뉴", z, "이 모양을 상황으로 대체하려면 다시 사용하세요.", "이 표시가 상황으로 대체되는 것을 방지하려면 다시 사용하세요.", "가장 높은 등급 기술 사용", "지역 기술",
     }
-    or C == "ruRU" and { -- 43/49 (87%)
-      "Способности", z, "Использовать предметы с таким же именем", z, z, "Боевой питомец", "Боевые питомцы", "Календарь", z, "Пользовательские макросы",
+    or C == "ruRU" and { -- 49/49 (100%)
+      "Способности", "Действие", "Использовать предметы с таким же именем", "Внешний вид заблокирован", "Внешний вид разблокирован", "Боевой питомец", "Боевые питомцы", "Календарь", "Меж фракционный", "Пользовательские макросы",
       "Средство передвижения для полётов на драконе", "Комплект экипировки", "Ячейка экипировки", "Комплекты экипировки", "Надето", "Дополнительная кнопка действия", "Воздушные средства передвижения", "Лагерь Основателя", "Главное меню", "Наземные средства передвижения",
-      z, "Панель интерфейса", "Предмет", "Предметы", "Макрос", "Макросы", "Разное", "Средство передвижения", "Средства передвижения", "Новый Макрос",
+      "Жильё", "Панель интерфейса", "Предмет", "Предметы", "Макрос", "Макросы", "Разное", "Средство передвижения", "Средства передвижения", "Новый Макрос",
       "Показывать только если надет", "Снаряжение", "Модели", "Способности питомца", "Способности питомцев", "Рейдовая метка", "Метка рейда", "Рейдовые метки", "Берега Колючего Ветра", "Всегда показывать этот фрагмент",
-      "Заклинание", "Игрушки", "Игрушки", "Панели пользовательского интерфейса", z, "Используйте ещё раз, чтобы разрешить изменять этот облик по ситуации.", "Используйте ещё раз, чтобы запретить изменять этот облик по ситуации.", "Использовать наивысший изученный ранг", "Способности местности",
+      "Заклинание", "Игрушки", "Игрушки", "Панели пользовательского интерфейса", "Разблокировать внешний вид при переключении", "Используйте ещё раз, чтобы разрешить изменять этот облик по ситуации.", "Используйте ещё раз, чтобы запретить изменять этот облик по ситуации.", "Использовать наивысший изученный ранг", "Способности местности",
     }
     or C == "zhCN" and { -- 49/49 (100%)
       "技能", "动作条动作", "同时使用同名物品", "外观已锁定", "外观已解锁", "战斗宠物", "战斗宠物", "日历", "跨阵营", "自定义宏",
@@ -67,12 +67,12 @@ V =
       "只有裝備在身上時才顯示", "服裝", "套裝", "寵物技能", "寵物技能", "團隊標記圖示", "團隊世界標記圖示", "團隊標記圖示", "烈風海岸", "無法使用時顯示暫代圖示",
       "技能", "玩具", "玩具", "介面視窗", z, "再次使用來允許此外觀由情境替換。", "再次使用來避免此外觀由情境替換。", "使用已學會的最高等級", "區域能力",
     }
-    or C == "ptBR" and { -- 45/49 (91%)
-      "Habilidades", z, "Também usar itens com o mesmo nome", "Aparência bloqueada", "Aparência desbloqueado", "Batalha de mascote", "Mascotes de batalha", "Calendário", z, "Macro Personalizada",
+    or C == "ptBR" and { -- 49/49 (100%)
+      "Habilidades", "Ação", "Também usar itens com o mesmo nome", "Aparência bloqueada", "Aparência desbloqueado", "Batalha de mascote", "Mascotes de batalha", "Calendário", "Entre facções", "Macro Personalizada",
       "Montaria de Dragonaria", "Conjunto de equipamento", "Slot de Equipamento", "Conjuntos de equipamentos", "Equipado", "Botão de ação extra", "Montaria Voadora", "Marco do Fundador", "Menu do Jogo", "Montaria Terrestre",
-      z, "Painel de Interface", "Item", "Itens", "Macro", "Macros", "Variados", "Montaria", "Montarias", "Novo Macro",
+      "Moradia", "Painel de Interface", "Item", "Itens", "Macro", "Macros", "Variados", "Montaria", "Montarias", "Novo Macro",
       "Apenas mostrar quando equipado", "Roupa", "Conjuntos", "Habilidade de Mascote", "Habilidades de Mascote", "Marcadores de Raide", "Marcadores Globais de Raide", "Marcadores de raide", "Costa dos Ventos Cortantes", "Sempre mostrar essa fatia quando indisponível",
-      "Feitiço", "Brinquedo", "Brinquedos", "Painéis de UI", z, "Use novamente para permitir substituir esta aparência por uma Situação.", "Use novamente para prevenir que esta aparência seja substituído por uma Situação.", "Usar o mais alto ranque conhecido", "Habilidades da Zona",
+      "Feitiço", "Brinquedo", "Brinquedos", "Painéis de UI", "Desbloquear ao trocar de aparência", "Use novamente para permitir substituir esta aparência por uma Situação.", "Use novamente para prevenir que esta aparência seja substituído por uma Situação.", "Usar o mais alto ranque conhecido", "Habilidades da Zona",
     } or nil
 
 K = V and {

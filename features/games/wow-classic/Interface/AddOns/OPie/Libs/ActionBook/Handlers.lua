@@ -2,11 +2,11 @@ local COMPAT, _, T = select(4,GetBuildInfo()), ...
 if T.SkipLocalActionBook then return end
 if T.TenEnv then T.TenEnv() end
 
-local MODERN, CI_ERA, CI_4E = COMPAT > 12e4 or nil, COMPAT < 160e2 or nil, COMPAT > 160e2 and COMPAT < 2e4
+local MODERN, CI_ERA, CI_4E = COMPAT > 12e4 or nil, COMPAT < 160e2 or nil, COMPAT > 160e2 and COMPAT < 2e4 or nil
 local SECRETS = COMPAT > 12e4 or COMPAT > 160e2 and COMPAT < 2e4 or nil
 local CF_CLASSIC = not MODERN or nil
 local CF_WRATH, CF_CATA, CF_MISTS = CF_CLASSIC and COMPAT > 3e4 or nil, CF_CLASSIC and COMPAT > 4e4 or nil, CF_CLASSIC and COMPAT > 5e4 or nil
-local MODERN_MOUNTS, MODERN_BATTLEPETS = MODERN or CF_WRATH, MODERN or CF_MISTS
+local MODERN_MOUNTS, MODERN_BATTLEPETS = MODERN or CF_WRATH or CI_4E, MODERN or CF_MISTS
 local EV = T.Evie
 local AB = T.ActionBook:compatible(2,53)
 local RW = T.ActionBook:compatible("Rewire", 1,27)
@@ -14,9 +14,9 @@ local KR = T.ActionBook:compatible("Kindred", 1,14)
 local IM = T.ActionBook:compatible("Imp", 1,0)
 assert(EV and AB and RW and KR and IM and 1, "Incompatible library bundle")
 local L = T.ActionBook.L
-local FORCED_MOUNT_SPELLS = {}
+local smatch = string.match
+local FORCED_MOUNT_SPELLS, RAND_MOUNT_SID = {}, 150544
 local spellFeedback, itemHint, toyHint, mountHint
-local RAND_MOUNT_SID = 150544
 
 local NormalizeInRange = {[0]=0, 1, [true]=1, [false]=0}
 local _, CLASS = UnitClass("player")
@@ -50,7 +50,7 @@ local getCachedItemName, peekCachedItemName do
 		end
 	end
 	function getCachedItemName(ident)
-		local iid = tonumber(ident) or tonumber(type(ident) == "string" and ident:match("item:(%d+)"))
+		local iid = tonumber(ident) or tonumber(type(ident) == "string" and smatch(ident, "item:(%d+)"))
 		if iid then
 			local c, f = itemNames[iid], C_Item.GetItemInfo(iid)
 			itemNames[iid] = f or c or false
@@ -58,7 +58,7 @@ local getCachedItemName, peekCachedItemName do
 		end
 	end
 	function peekCachedItemName(ident)
-		return itemNames[tonumber(ident) or tonumber(type(ident) == "string" and ident:match("item:(%d+)"))]
+		return itemNames[tonumber(ident) or tonumber(type(ident) == "string" and smatch(ident, "item:(%d+)"))]
 	end
 end
 local getTradeSkillItemQuality, pQualityAtlasOverride if MODERN then
@@ -290,7 +290,7 @@ securecall(function() -- spell: spell ID + mount spell ID
 	local getSpellIDFromName = CI_ERA and function(n)
 		return (select(7, GetSpellInfo(n or "")))
 	end or function(n)
-		return tonumber(((GetSpellLink(n) or ""):match("spell:(%d+)")))
+		return tonumber((smatch(GetSpellLink(n) or "", "spell:(%d+)")))
 	end
 	local RUNE_BASESPELL_CACHE, RUNE_SPELLS = {}, {} if CI_ERA then
 		for sid in ("399967 417346 399954 417347 415450 417345 399966 417348 415449"):gmatch("%d+") do
@@ -497,7 +497,7 @@ securecall(function() -- item: items ID/inventory slot
 		else
 			return
 		end
-		local iid, cdLeft, cdLength, cdEnabled = (link and tonumber(link:match("item:([x%x]+)"))) or itemIdMap[ident]
+		local iid, cdLeft, cdLength, cdEnabled = (link and tonumber((smatch(link, "item:([x%x]+)")))) or itemIdMap[ident]
 		if MODERN and iid and PlayerHasToy(iid) and C_Item.GetItemCount(iid) == 0 then
 			return toyHint(iid, nil, target)
 		elseif iid then
@@ -566,7 +566,7 @@ securecall(function() -- item: items ID/inventory slot
 		end
 	end)
 	RW:SetCommandHint(SLASH_EQUIP_TO_SLOT1, 70, function(_, _, clause)
-		local item = clause and clause:match("^%s*%d+%s+(.*)")
+		local item = clause and smatch(clause, "^%s*%d+%s+(.*)")
 		if item then
 			return RW:GetCommandAction(SLASH_EQUIP1, item)
 		end
@@ -586,7 +586,7 @@ securecall(function() -- peq: slot token
 		back="BACKSLOT", tabard="TABARDSLOT",
 	}
 	for tk, sk in pairs(slots) do
-		local sn, suf, ok, slot = _G[sk], tk:match("%d+$"), pcall(GetInventorySlotInfo, sk)
+		local sn, suf, ok, slot = _G[sk], smatch(tk, "%d+$"), pcall(GetInventorySlotInfo, sk)
 		slots[tk] = ok and slot and {sk, sn and suf and (sn .. " " .. suf) or sn or sk} or nil
 		if ok and slot then
 			RW:SetCastAlias(tk, tostring(slot), false)
@@ -654,7 +654,7 @@ securecall(function() -- macrotext
 		if isItemReturn then
 			return checkCountReturn(90, itemHint(link, nil, target, nil, bag, slot))
 		end
-		local sid = clause:match("^spell:(%d+)$")
+		local sid = smatch(clause, "^spell:(%d+)$")
 		if sid or not tonumber(clause, 10) then
 			return checkReturn(true, spellFeedback(sid or clause, target))
 		end
@@ -662,7 +662,7 @@ securecall(function() -- macrotext
 	RW:SetCommandHint("/cast", 100, function(_, _, clause, target, _, _, msg)
 		if not clause or clause == "" then return end
 		local sex = DoesSpellExist(clause) and not tonumber(clause, 10)
-		local sid = not sex and clause:match("^spell:(%d+)$")
+		local sid = not sex and smatch(clause, "^spell:(%d+)$")
 		if sex or sid then
 			return checkReturn(true, spellFeedback(sid or clause, target))
 		else
@@ -724,7 +724,7 @@ securecall(function() -- macrotext
 		local getNextCast do -- (kind, v, target) -> (v, target)
 			local senv = GetManagedEnvironment(f)
 			local uenv = setmetatable({qsState={}, crState={}, newtable=function() return {} end}, {__index=senv})
-			local initF = setfenv(loadstring("return function(isRand, v)\n" .. f:GetAttribute("RunSlashCmd"):match("[^\n]+@init_clause_start.-@init_clause_end") .. "\nreturn iv end"), {})
+			local initF = setfenv(loadstring("return function(isRand, v)\n" .. smatch(f:GetAttribute("RunSlashCmd"), "[^\n]+@init_clause_start.-@init_clause_end") .. "\nreturn iv end"), {})
 			initF = setfenv(initF(), uenv)
 			function getNextCast(k, c, target)
 				local t1, ucache, tv, i, v, vt = senv[k][c], uenv[k]
@@ -917,7 +917,7 @@ securecall(function() -- battlepet: pet ID, species ID
 	end)
 end)
 securecall(function() -- equipmentset: equipment sets by name
-	if not (MODERN or CF_WRATH) then
+	if not (MODERN or CF_WRATH or CI_4E) then
 		return
 	end
 	local setMap = {}
@@ -951,7 +951,7 @@ securecall(function() -- equipmentset: equipment sets by name
 	local function createEquipSet(name)
 		local sid = type(name) == "string" and C_EquipmentSet.GetEquipmentSetID(name)
 		if not sid then return end
-		if not setMap[name] and (MODERN or name:match("^[^%[;%]]*$")) then
+		if not setMap[name] and (MODERN or smatch(name, "^[^%[;%]]*$")) then
 			setMap[name] = AB:CreateActionSlot(equipmentsetHint, name, equipSetActionSpec(name))
 		end
 		return setMap[name]
@@ -996,7 +996,7 @@ securecall(function() -- raidmark
 	end
 	local tmcMark = {}
 	local function parseRaidMark(clause)
-		local d = string.match('^[!~].-(%d+)')
+		local d = smatch(clause, '^[!~].-(%d+)')
 		local r = d and d+0 or false
 		tmcMark[clause] = r
 		return r
@@ -1010,7 +1010,7 @@ securecall(function() -- raidmark
 	end)
 end)
 securecall(function() -- worldmarker
-	if not (MODERN or CF_CATA) then
+	if not (MODERN or CF_CATA or CI_4E) then
 		return
 	end
 	local wmPHS = SECRETS and AB:ReservePartialHintSuffix({active=IsRaidMarkerActive})
@@ -1640,19 +1640,20 @@ securecall(function() -- uipanel: token
 		talents={TALENTS_BUTTON, icon="Interface/Icons/Ability_Marksmanship", gn=CF_CLASSIC and "PlayerTalentFrame", tw=CF_CLASSIC and TalentMicroButton, req=function() return (UnitLevel("player") or 0) >= 10 end},
 		achievements={ACHIEVEMENTS, atlas="UI-HUD-MicroMenu-Achievements-Up", gn="AchievementFrame", tw=AchievementMicroButton, tcr=1},
 		quests={QUESTLOG_BUTTON, icon="Interface/Icons/INV_Misc_Book_08", gw=MODERN and QuestMapFrame or QuestLogFrame, tw=QuestLogMicroButton},
-		groupfinder={DUNGEONS_BUTTON, icon=MODERN and "Interface/Icons/LEVELUPICON-LFD" or "Interface/LFGFrame/BattlenetWorking0", gw=PVEFrame, tw=LFDMicroButton},
-		collections=MODERN and {COLLECTIONS, icon="Interface/Icons/INV_Box_01", gn="CollectionsJournal", tw=CollectionsMicroButton},
+		groupfinder={DUNGEONS_BUTTON, icon=MODERN and "Interface/Icons/LEVELUPICON-LFD" or "Interface/LFGFrame/BattlenetWorking0", gw=PVEFrame, gn=CI_4E and "LFDParentFrame" or nil, tw=LFDMicroButton},
+		collections=(MODERN or CI_4E or CF_CATA) and {COLLECTIONS, icon="Interface/Icons/INV_Box_01", gn="CollectionsJournal", tw=CollectionsMicroButton},
 		adventureguide=MODERN and {ADVENTURE_JOURNAL, icon="Interface/EncounterJournal/UI-EJ-PortraitIcon", gn="EncounterJournal", tw=EJMicroButton},
-		guild=MODERN and {GUILD_AND_COMMUNITIES, icon="Interface/Icons/INV_Shirt_GuildTabard_01", gn="CommunitiesFrame", tw=GuildMicroButton}
-		              or {title=GUILD, icon="Interface/Icons/INV_Shirt_GuildTabard_01", gw=GuildFrame, ow=FriendsFrameTab3, cw=FriendsFrameCloseButton, req=IsInGuild},
-		map={WORLD_MAP, icon=CF_WRATH and "Interface/Icons/Inv_Misc_Map08" or "Interface/Worldmap/WorldMap-Icon", gw=WorldMapFrame, tw=MODERN and MinimapCluster.ZoneTextButton or MiniMapWorldMapButton or WorldMapMicroButton},
-		social={SOCIAL_BUTTON, icon=MODERN and "Interface/Icons/UI_Chat" or "Interface/Icons/INV_Scroll_03", gw=FriendsFrame, tw=MODERN and QuickJoinToastButton or FriendsMicroButton},
+		guild=(MODERN or CI_4E) and {GUILD_AND_COMMUNITIES, icon="Interface/Icons/INV_Shirt_GuildTabard_01", gn="CommunitiesFrame", tw=GuildMicroButton}
+		                         or {title=GUILD, icon="Interface/Icons/INV_Shirt_GuildTabard_01", gw=GuildFrame, ow=FriendsFrameTab3, cw=FriendsFrameCloseButton, req=IsInGuild},
+		map={WORLD_MAP, icon=CF_WRATH and "Interface/Icons/Inv_Misc_Map08" or "Interface/Worldmap/WorldMap-Icon", gw=WorldMapFrame, tw=(MODERN or CI_4E) and MinimapCluster.ZoneTextButton or MiniMapWorldMapButton or WorldMapMicroButton},
+		social={SOCIAL_BUTTON, icon=MODERN and "Interface/Icons/UI_Chat" or "Interface/Icons/INV_Scroll_03", gw=CI_4E and SocialUIFrame or FriendsFrame, tw=(MODERN or CI_4E) and QuickJoinToastButton or FriendsMicroButton},
 		calendar={L"Calendar", icon="Interface/Icons/Spell_Holy_BorrowedTime", gn="CalendarFrame", tw=GameTimeFrame},
 		options={OPTIONS, icon=MODERN and "Interface/Icons/Misc_RnRWrenchButtonRight" or "Interface/Icons/INV_Misc_Wrench_01", gw=SettingsPanel, noduck=1, open=function() Settings.OpenToCategory(nil) end},
 		macro={MACROS, icon="Interface/Icons/INV_Misc_Note_06", gn="MacroFrame", tmt=SLASH_MACRO1, cw=closeButton(MacroFrame), postmt=pyCLICK .. "csp 1\n" .. pyCLICK .. "cgm 1"},
 		profs=MODERN and {TRADE_SKILLS, icon="interface/icons/inv_pick_02", tw=ProfessionMicroButton},
 		gamemenu={L"Game Menu", icon=CF_CLASSIC and "Interface/Icons/INV_Misc_PunchCards_Red", atlas="UI-HUD-MicroMenu-GameMenu-Up", gw=GameMenuFrame, noduck=1, pre=function() return not GameMenuFrame:IsShown() or nil end, post=function() RatingMenuFrame:Show() RatingMenuFrame:Hide() PlaySound(SOUNDKIT.IG_MAINMENU_OPEN) end},
 		vault=MODERN and {DELVES_GREAT_VAULT_LABEL, icon="Interface/Icons/INV_Cape_Special_Treasure_C_01", gn="WeeklyRewardsFrame", skipCloseSound=169062, req=function() return UnitLevel("player") == 90 end, tip=ShowVaultTip, open=openPanelFallback, preload="Blizzard_WeeklyRewards"},
+		legacy=CI_4E and {LEGACY_BUTTON, atlas="Legacy-up-c60", gn="LegacySystemFrame", tw=LegacyMicroButton, req=function() return 0 < (C_MajorFactions.GetCurrentRenownLevel(2802) or 0) end},
 		csp={gw=SettingsPanel, cpreamble=true, cw=closeButton(SettingsPanel, "csp")},
 		cgm={gw=GameMenuFrame, cpreamble=true, cw=closeButton(GameMenuFrame, "cgm")},
 		csf={pre=function() return StoreFrame_IsShown and StoreFrame_SetShown and StoreFrame_IsShown() and StoreFrame_SetShown(false) end, cpreamble=true},
@@ -1718,7 +1719,7 @@ securecall(function() -- uipanel: token
 		end)
 		ex:SetScript("PostClick", function(_, b)
 			local i, bp, pm = panels[b]
-			bp = i and i.cpreamble and b or b:match("^post%-(.*)")
+			bp = i and i.cpreamble and b or smatch(b, "^post%-(.*)")
 			i = panels[bp]
 			pm = i and i.postMessage
 			if pm ~= nil and i.post then
@@ -1810,6 +1811,11 @@ securecall(function() -- uipanel: token
 			function panels.currency.req()
 				return GetCurrencyListSize() > 0
 			end
+		elseif CI_4E then
+			panels.spellbook.gn = "PlayerSpellsFrame"
+			panels.achievements = nil
+			panels.currency = nil
+			panels.reputation = nil
 		else -- era
 			panels.achievements = nil
 			panels.groupfinder = nil
@@ -1973,7 +1979,7 @@ securecall(function() -- outfit: id
 		tip:SetText(HIGHLIGHT_FONT_COLOR_CODE .. (name or ""))
 		tip:AddLine(HIGHLIGHT_FONT_COLOR_CODE .. SPELL_CAST_TIME_INSTANT)
 		local dt = C_Spell.GetSpellDescription(id == 0 and CTO_SID or UTO_SID)
-		dt = dt and dt:match("^[^\r\n]+")
+		dt = dt and smatch(dt, "^[^\r\n]+")
 		if dt then
 			tip:AddLine(dt, nil, nil, nil, true)
 		end
