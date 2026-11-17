@@ -156,7 +156,22 @@ function private.HookAH()
 	private.buttons.getall.tex:SetPoint("BOTTOMRIGHT", private.buttons.getall, "BOTTOMRIGHT", -4,2)
 	private.buttons.getall:SetScript("OnEnter", function()
 			GameTooltip:SetOwner(private.buttons.getall, "ANCHOR_TOPRIGHT")
-			GameTooltip:SetText("Click here to do a fast getall scan of the auction house")
+			-- The button is disabled while the server's 15-minute throttle is
+			-- active, so the cooldown message in StartRetailScan can never be
+			-- triggered from here. Explain the greyed-out state instead of
+			-- leaving users thinking the button is simply broken.
+			local cooldown = AucAdvanced.Scan.GetAllCooldown and AucAdvanced.Scan.GetAllCooldown() or 0
+			if cooldown > 0 then
+				local mins = math.floor(cooldown / 60)
+				local secs = math.floor(cooldown % 60)
+				GameTooltip:SetText(("Auctioneer: GetAll scan available in %d:%02d"):format(mins, secs))
+				GameTooltip:AddLine("The server allows one full scan every 15 minutes (account-wide).", 1, 1, 1, true)
+			elseif AucAdvanced.Scan.IsScanning() then
+				GameTooltip:SetText("Auctioneer: a scan is already in progress")
+			else
+				GameTooltip:SetText("Click here to do a fast getall scan of the auction house")
+			end
+			GameTooltip:Show()
 		end)
 	private.buttons.getall:SetScript("OnLeave", function()
 			GameTooltip:Hide()

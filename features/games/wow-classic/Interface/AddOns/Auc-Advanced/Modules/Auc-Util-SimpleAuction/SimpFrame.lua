@@ -670,7 +670,8 @@ function private.IconClicked()
 	local objType, _, itemLink = GetCursorInfo()
 	local size
 	if CursorHasItem() and frame.CursorItemBag and frame.CursorItemSlot then
-		_, size = C_Container.GetContainerItemInfo(frame.CursorItemBag, frame.CursorItemSlot)
+		local info = C_Container.GetContainerItemInfo(frame.CursorItemBag, frame.CursorItemSlot)
+		size = info and info.stackCount or nil
 	end
 	frame.CursorItemBag = nil
 	frame.CursorItemSlot = nil
@@ -918,7 +919,7 @@ function private.PostAuction()
 			return
 		end
 		-- Find the item in bags
-		for bagID = 0, 4 do
+		for bagID = 0, NUM_TOTAL_BAG_FRAMES do
 			for slot = 1, C_Container.GetContainerNumSlots(bagID) do
 				local info = C_Container.GetContainerItemInfo(bagID, slot)
 				if info and not info.isLocked then

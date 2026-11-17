@@ -456,11 +456,15 @@ function lib.vendorAction(autovendor)
 --~ 	end
 	empty(lib.vendorlist) --this needs to be cleared on every vendor open
 --~ 	local  ignoredItemsFound --used to alert players that some vendor items were skipped
-	for bag=0,4 do
+	for bag=0,NUM_TOTAL_BAG_FRAMES do
 		for slot=1,C_Container.GetContainerNumSlots(bag) do
 			if (C_Container.GetContainerItemLink(bag,slot)) then
 				local itemLink = C_Container.GetContainerItemLink(bag,slot)
-				local texture, itemCount, locked, _, lootable = C_Container.GetContainerItemInfo(bag, slot) --items that have been vedored but are still in players bag (lag) will be locked by server.
+				local info = C_Container.GetContainerItemInfo(bag, slot) --items that have been vedored but are still in players bag (lag) will be locked by server.
+				local texture = info and info.iconFileID
+				local itemCount = info and info.stackCount or 1
+				local locked = info and info.isLocked
+				local lootable = info and info.hasLoot
 				if itemLink and not locked then
 					if not itemCount then itemCount = 1 end
 					local linkType, itemID, _, _, _, _ = decode(itemLink)
@@ -629,13 +633,13 @@ end
 --User buttons
 function lib.customAction(button)
 	MailFrameTab_OnClick(nil, 2)
-	for bag=0,4 do
+	for bag=0,NUM_TOTAL_BAG_FRAMES do
 		for slot=1,C_Container.GetContainerNumSlots(bag) do
 			if (C_Container.GetContainerItemLink(bag,slot)) then
 				local itemLink = C_Container.GetContainerItemLink(bag,slot)
-				local itemCount = C_Container.GetContainerItemInfo(bag, slot)
+				local info = C_Container.GetContainerItemInfo(bag, slot)
+				local itemCount = info and info.stackCount or 1
 				if (itemLink == nil) then return end
-				if itemCount == nil then itemCount = 1 end
 
 
 				local itemName, _, itemRarity, _, _, _, _, _, _, _ = GetItemInfo(itemLink)
@@ -660,13 +664,13 @@ end
 --Consolidate function to read all bags
 function lib.scanBags(actionFunction)
 	MailFrameTab_OnClick(nil, 2)
-	for bag=0,4 do
+	for bag=0,NUM_TOTAL_BAG_FRAMES do
 		for slot=1,C_Container.GetContainerNumSlots(bag) do
 			if (C_Container.GetContainerItemLink(bag,slot)) then
-				local itemLink, itemCount = C_Container.GetContainerItemLink(bag,slot)
+				local itemLink = C_Container.GetContainerItemLink(bag,slot)
 				if (itemLink == nil) then return end
-				if itemCount == nil then _, itemCount = C_Container.GetContainerItemInfo(bag, slot) end
-				if itemCount == nil then itemCount = 1 end
+				local info = C_Container.GetContainerItemInfo(bag, slot)
+				local itemCount = info and info.stackCount or 1
 				local linkType, itemID, _, _, _, _ = decode(itemLink)
 				if linkType == "item" then
 					local itemName = GetItemInfo(itemLink)

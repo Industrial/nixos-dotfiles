@@ -4,7 +4,7 @@
 ## ExcludeLoadGameType: standard, classic
 ## Dependencies: Auc-Advanced
 ##
-## Version: 4.0.5
+## Version: 4.0.8
 ## Revision: $Id$
 ## URL: http://auctioneeraddon.com/
 ## Author: Norganna's AddOns

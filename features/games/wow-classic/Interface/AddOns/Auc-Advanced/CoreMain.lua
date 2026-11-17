@@ -70,6 +70,13 @@ if not GetItemCount and C_Item and C_Item.GetItemCount then
 	end
 end
 
+-- Compatibility shim: inventory scans must include the reagent bag (bag index
+-- 5). Some Forever builds expose only NUM_BAG_FRAMES (4 regular bags); provide
+-- the client's total so every 0..total loop reaches bag 5.
+if not NUM_TOTAL_BAG_FRAMES then
+	NUM_TOTAL_BAG_FRAMES = (NUM_BAG_FRAMES or 4) + (NUM_REAGENTBAG_FRAMES or 1)
+end
+
 -- Compatibility shims: globals removed on modern clients, restored through
 -- their namespaced equivalents. These are real replacements: the caller gets
 -- the value/behaviour it expects, not a nil guard or a no-op stub.
@@ -735,7 +742,7 @@ local function OnEvent(self, event, arg1, arg2, ...)
 	elseif event == "AUCTION_OWNED_LIST_UPDATE" then
 		internal.Scan.NotifyOwnedListUpdated()
 	elseif (event == "ITEM_LOCK_CHANGED" and arg2) or event == "BAG_UPDATE" then
-		if arg1 >= 0 and arg1 <= 4 then
+		if arg1 >= 0 and arg1 <= NUM_TOTAL_BAG_FRAMES then
 			ScheduleMessage("inventory", 0.15) -- collect multiple events for same bag change using a slight delay
 		end
 	elseif event == "GET_ITEM_INFO_RECEIVED" then

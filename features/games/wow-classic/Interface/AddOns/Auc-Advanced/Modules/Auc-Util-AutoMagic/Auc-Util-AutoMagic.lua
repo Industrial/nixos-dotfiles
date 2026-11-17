@@ -429,7 +429,7 @@ function lib.populateDataSheet()
 		autosellframe.resultlist.sheet:SetData(autoselldata, style) --Set the GUI scrollsheet
 
 	for k, v in pairs(bagcontents) do bagcontents[k] = nil; end  --Reset table to ensure fresh data.
-	for bag=0,4 do
+	for bag=0,NUM_TOTAL_BAG_FRAMES do
 		for slot=1,C_Container.GetContainerNumSlots(bag) do
 			if (C_Container.GetContainerItemLink(bag,slot)) then
 				local itemLink = C_Container.GetContainerItemLink(bag,slot)
@@ -438,7 +438,8 @@ function lib.populateDataSheet()
 				if linkType == "item" then
 					local btmRule = "~"
 					if BtmScan then
-						local _,itemCount = C_Container.GetContainerItemInfo(bag,slot)
+						local info = C_Container.GetContainerItemInfo(bag,slot)
+						local itemCount = info and info.stackCount or 1
 						local reason, bids
 						local id, suffix, enchant, seed = BtmScan.BreakLink(itemLink)
 						local sig = ("%d:%d:%d"):format(id, suffix, enchant)

@@ -111,7 +111,11 @@ function addonLoaded(hookArgs, event, addOnName)
 	frame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
 
 	frame:SetScript("OnEvent", function(_, event, unit, spell)
-		if unit == "player" and type(spell) == "string" and spell:find("item:") then
+		-- WoW Forever passes some spellcast args as secret values. They report
+		-- type() == "string" but cannot be indexed/searched; skip them instead
+		-- of throwing "attempt to index local 'spell' (a secret string value)".
+		if unit == "player" and type(spell) == "string"
+			and not (issecretvalue and issecretvalue(spell)) and spell:find("item:") then
 			SetItemRef(spell)
 		end
 	end)

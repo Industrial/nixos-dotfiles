@@ -76,7 +76,7 @@ function private.CreateFrames()
 		local ItemList = frame.list
 		wipe(ItemList)
 
-		for bag=0, NUM_BAG_FRAMES do
+		for bag=0, NUM_TOTAL_BAG_FRAMES do
 			for slot=1,C_Container.GetContainerNumSlots(bag) do
 				local link = C_Container.GetContainerItemLink(bag,slot)
 				if link then

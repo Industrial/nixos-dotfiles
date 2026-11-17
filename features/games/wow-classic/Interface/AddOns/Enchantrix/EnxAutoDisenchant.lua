@@ -255,7 +255,8 @@ end
 -- check one bag (to save time when we know something moved in just this bag)
 local function findItemInOneBag(bag, findLink)
 	for slot = 1, C_Container.GetContainerNumSlots(bag) do
-		local _, count = C_Container.GetContainerItemInfo(bag, slot)
+		local info = C_Container.GetContainerItemInfo(bag, slot)
+		local count = info and info.stackCount or 0
     	local link = C_Container.GetContainerItemLink(bag, slot)
 		if link and (not findLink or link == findLink) then
 			if not findLink and link == auto_de_prompt.link
@@ -280,7 +281,7 @@ end
 -- check all bags for disenchantable items
 local function findItemInBags(findLink)
 	debugSpam("scanning bags")
-	for bag = 0, 4 do
+	for bag = 0, NUM_TOTAL_BAG_FRAMES do
 		local link, bag, slot, value, spell = findItemInOneBag(bag, findLink)
 		if (spell) then
 			return link, bag, slot, value, spell
@@ -301,7 +302,7 @@ local function beginScan(bag)
 	hidePrompt()		-- we can't hide the UI during combat
 
 	local link, outBag, slot, value, spell
-	if (bag and bag >= 0 and bag <= 4) then	-- exclude bank bags, we can't DE from the bank
+	if (bag and bag >= 0 and bag <= NUM_TOTAL_BAG_FRAMES) then	-- exclude bank bags, we can't DE from the bank
 		link, outBag, slot, value, spell = findItemInOneBag(bag)
 	else
 		link, outBag, slot, value, spell = findItemInBags()
@@ -525,7 +526,8 @@ function showPrompt(link, bag, slot, value, spell)
 
     --debugSpam(link ..",".. bag ..",".. slot ..",".. value ..",".. spell)
 
-	local _, count = C_Container.GetContainerItemInfo(bag, slot)
+	local info = C_Container.GetContainerItemInfo(bag, slot)
+	local count = info and info.stackCount or 0
 
 	auto_de_prompt.link, auto_de_prompt.bag, auto_de_prompt.slot, auto_de_prompt.count = link, bag, slot, count
 	auto_de_prompt.time = GetTime()		-- not yet used

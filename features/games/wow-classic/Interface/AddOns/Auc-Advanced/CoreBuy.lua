@@ -169,6 +169,15 @@ function lib.CancelBuyQueue(prompt)
 	end
 	private.Searching = nil
 	wipe(private.BuyRequests)
+	if AucAdvanced.IsRetailAH then
+		-- Abandon the in-flight item search as well; otherwise its results
+		-- would still open a buy prompt after the queue was cleared.
+		private.RetailBuy.request = nil
+		private.RetailBuy.commodity = nil
+		private.updateFrame:UnregisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
+		private.updateFrame:UnregisterEvent("COMMODITY_SEARCH_RESULTS_UPDATED")
+		private.updateFrame:Hide()
+	end
 	private.QueueReport()
 end
 
@@ -248,6 +257,41 @@ function private.StartRetailBuy(request)
 	return true
 end
 
+-- Forever: the retail buy engine can run only ONE item search at a time
+-- (private.RetailBuy.request), and the actual purchase needs a hardware event
+-- (the prompt's Yes button). Keep a real FIFO queue so successive buyouts are
+-- not silently dropped, and so GetQueueStatus()/the SearchUI counter work.
+function private.RetailQueueDrop(req)
+	if not req then return end
+	for i, r in ipairs(private.BuyRequests) do
+		if r == req then
+			private.QueueRemove(i)
+			return true
+		end
+	end
+end
+
+-- Drop a failed request and leave the update frame running so OnUpdate can
+-- start the next queued item.
+function private.RetailQueueFail(req)
+	private.RetailQueueDrop(req)
+	private.updateFrame:Show()
+end
+
+function private.RetailQueueAdvance()
+	if private.RetailBuy.request or private.CurRequest then return end
+	if private.RetailBuy.commodity then return end -- wait for the pending confirm
+	if #private.BuyRequests == 0 then return end
+	if not (AuctionHouseFrame and AuctionHouseFrame:IsShown()) then return end
+	local ready = C_AuctionHouse.IsThrottledMessageSystemReady and C_AuctionHouse.IsThrottledMessageSystemReady()
+	if ready == false then return end -- retry next frame when the AH throttle clears
+	local head = private.BuyRequests[1]
+	local ok = private.StartRetailBuy(head)
+	if not ok then
+		private.RetailQueueFail(head)
+	end
+end
+
 function private.RetailProcessResults()
 	local rb = private.RetailBuy
 	if not rb.request then return end
@@ -291,6 +335,7 @@ function private.OnRetailSearchResults(itemKey)
 	private.updateFrame:Hide()
 	if not match then
 		aucPrint("Auctioneer: No matching auction found for "..req.link.." (search results: "..n..")")
+		private.RetailQueueFail(req)
 		return
 	end
 	req.auctionID = match.auctionID
@@ -319,12 +364,16 @@ function private.OnRetailSearchResults(itemKey)
 		end
 		if buyout > 0 and bidAmount >= buyout then
 			aucPrint("Auctioneer: Cannot bid on "..req.link..": the minimum bid has reached the buyout price. Use Buyout instead.")
+			private.RetailQueueFail(req)
 			return
 		end
 		req.price = bidAmount
 	end
 	local _, _, _, _, _, _, _, _, _, texture = GetItemInfo(req.link)
 	req.texture = texture
+	-- The prompt is now the active item; remove it from the pending queue so
+	-- QueueReport()/GetQueueStatus() count it via the prompt instead of twice.
+	private.RetailQueueDrop(req)
 	private.PromptPurchase(req)
 end
 
@@ -340,11 +389,13 @@ function private.OnRetailCommodityResults(itemID)
 	-- request must never be silently turned into a purchase.
 	if req.isbid then
 		aucPrint("Auctioneer: "..req.link.." is a commodity and cannot be bid on. Use Buyout instead.")
+		private.RetailQueueFail(req)
 		return
 	end
 	local c = C_AuctionHouse
 	if not (c.StartCommoditiesPurchase and c.ConfirmCommoditiesPurchase) then
 		aucPrint("Auctioneer: Commodity purchase API unavailable on this client: "..req.link)
+		private.RetailQueueFail(req)
 		return
 	end
 	-- Commodities are bought by itemID + quantity at the current lowest
@@ -355,6 +406,7 @@ function private.OnRetailCommodityResults(itemID)
 	req.index = 0
 	local _, _, _, _, _, _, _, _, _, texture = GetItemInfo(req.link)
 	req.texture = texture
+	private.RetailQueueDrop(req)
 	private.PromptPurchase(req)
 end
 
@@ -408,8 +460,15 @@ function lib.QueueBuy(link, seller, count, minbid, buyout, price, reason, nosear
 	}
 
 	-- Forever: C_AuctionHouse item-search purchase path. The classic
-	-- query/StartScan pipeline does not exist on this client.
-	return private.StartRetailBuy(request)
+	-- query/StartScan pipeline does not exist on this client. Enqueue the
+	-- request first - StartRetailBuy has a single in-flight slot, so calling
+	-- it directly would silently discard every buyout queued while busy.
+	private.QueueInsert(request)
+	-- Arm the OnUpdate driver even when the AH is currently closed; the queue
+	-- resumes as soon as AuctionHouseFrame is shown.
+	private.updateFrame:Show()
+	private.RetailQueueAdvance()
+	return true
 end
 
 -- Another helper for QueueBuy
@@ -676,13 +735,17 @@ end
 --Cancels the current auction
 --Also sends out a Callback with a callback string of "<link>;<price>;<count>"
 function private.CancelPurchase()
+	local cancelled = private.CurRequest
 	local CallBackString = strjoin(";", tostringall(private.CurRequest.link, private.CurRequest.price, private.CurRequest.count))
 	AucAdvanced.SendProcessorMessage("bidcancelled", CallBackString)
+	-- Cancelling the prompt skips that purchase; advance to the next queued one.
+	private.RetailQueueDrop(cancelled)
 	private.HidePrompt()
 	if private.Searching and not private.QueueFind("querysig", private.Searching) then
 		private.Searching = nil
 	end
 	-- Forever: the C_AuctionHouse item-search path has no browsable page to rescan.
+	private.updateFrame:Show()
 end
 
 function private.PerformPurchase()
@@ -692,10 +755,12 @@ function private.PerformPurchase()
 	local price = private.CurRequest.price
 	if type(price)~="number" then
 		aucPrint(highlight.."Cancelling bid: invalid price: "..type(price)..":"..tostring(price))
+		private.RetailQueueFail(private.CurRequest)
 		private.HidePrompt()
 		return
 	elseif type(index) ~= "number" then
 		aucPrint(highlight.."Cancelling bid: invalid index: "..type(index)..":"..tostring(index))
+		private.RetailQueueFail(private.CurRequest)
 		private.HidePrompt()
 		return
 	end
@@ -707,6 +772,7 @@ function private.PerformPurchase()
 		-- reach the buyout, which the modern AH treats as an instant purchase.
 		if req.isbid and (req.retailBuyout or 0) > 0 and price >= req.retailBuyout then
 			aucPrint("Auctioneer: Refusing to bid on "..req.link.." at or above its buyout price; use Buyout instead.")
+			private.RetailQueueFail(req)
 			private.HidePrompt()
 			return
 		end
@@ -719,7 +785,11 @@ function private.PerformPurchase()
 		if #private.PendingBids == 1 then
 			private.updateFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 		end
+		-- The purchase was placed from a real click. Remove only this request
+		-- and let OnUpdate start the next queued item's item search.
+		private.RetailQueueDrop(req)
 		private.HidePrompt()
+		private.updateFrame:Show()
 		return
 	end
 	-- Retail commodity: start the two-step purchase. StartCommoditiesPurchase
@@ -745,7 +815,9 @@ function private.PerformPurchase()
 		if C_Timer and C_Timer.After then
 			C_Timer.After(0.75, private.RetailConfirmCommodity)
 		end
+		private.RetailQueueDrop(req)
 		private.HidePrompt()
+		private.updateFrame:Show()
 		return
 	end
 	local link = GetAuctionItemLink("list", index)
@@ -846,26 +918,36 @@ function private.DeactivateEvents()
 end
 
 local function OnUpdate(self, elapsed)
-	-- Retail: poll for the search results instead of relying solely on the
-	-- named events (which may not fire for throttled queries on this client).
-	if private.RetailBuy.request then
-		local rb = private.RetailBuy
-		rb.waited = (rb.waited or 0) + elapsed
-		rb.poll = (rb.poll or 0) + elapsed
-		if rb.poll >= 0.25 then
-			rb.poll = 0
-			private.RetailProcessResults()
+	-- Forever (C_AuctionHouse): run one item search at a time, taken from the
+	-- real buy queue. The purchase itself still happens on the prompt's Yes
+	-- button, since PlaceBid/StartCommoditiesPurchase need a hardware event.
+	if AucAdvanced.IsRetailAH then
+		if private.RetailBuy.request then
+			local rb = private.RetailBuy
+			rb.waited = (rb.waited or 0) + elapsed
+			rb.poll = (rb.poll or 0) + elapsed
+			if rb.poll >= 0.25 then
+				rb.poll = 0
+				private.RetailProcessResults()
+			end
+			if private.RetailBuy.request and rb.waited > 15 then
+				local timedOut = private.RetailBuy.request
+				private.RetailBuy.request = nil
+				private.updateFrame:UnregisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
+				private.updateFrame:UnregisterEvent("COMMODITY_SEARCH_RESULTS_UPDATED")
+				local ready = C_AuctionHouse.IsThrottledMessageSystemReady and C_AuctionHouse.IsThrottledMessageSystemReady()
+				aucPrint("Auctioneer: AH item search timed out for item "..tostring(rb.itemID).." (throttleReady="..tostring(ready)..")")
+				private.RetailQueueFail(timedOut)
+			end
+			return
 		end
-		if private.RetailBuy.request and rb.waited > 15 then
-			private.RetailBuy.request = nil
-			private.updateFrame:UnregisterEvent("ITEM_SEARCH_RESULTS_UPDATED")
-			private.updateFrame:UnregisterEvent("COMMODITY_SEARCH_RESULTS_UPDATED")
-			private.updateFrame:Hide()
-			local ready = C_AuctionHouse.IsThrottledMessageSystemReady and C_AuctionHouse.IsThrottledMessageSystemReady()
-			aucPrint("Auctioneer: AH item search timed out for item "..tostring(rb.itemID).." (throttleReady="..tostring(ready)..")")
+		private.RetailQueueAdvance()
+		if #private.BuyRequests == 0 and not private.CurRequest then
+			private.DeactivateEvents()
 		end
 		return
 	end
+	-- Classic fallback (unused on WoW Forever).
 	if not (private.Searching or private.CurRequest) then
 		if #private.BuyRequests > 0 then
 			private.PushSearch()

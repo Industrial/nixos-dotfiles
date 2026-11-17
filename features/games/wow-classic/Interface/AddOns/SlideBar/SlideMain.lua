@@ -1,3 +1,10 @@
+-- WoW Forever compat: InterfaceOptionsFrame_OpenToCategory was replaced by
+-- Settings.OpenToCategory. Accept a category id or a panel name.
+local InterfaceOptionsFrame_OpenToCategory = InterfaceOptionsFrame_OpenToCategory or function(panel)
+	if not (Settings and Settings.OpenToCategory) then return end
+	local id = type(panel) == "table" and (panel.categoryID or panel.name) or panel
+	if id then Settings.OpenToCategory(id) end
+end
 --[[
 	Slidebar AddOn for World of Warcraft (tm)
 	Version: 2.5.6771 (SwimmingSeadragon)

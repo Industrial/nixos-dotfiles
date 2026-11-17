@@ -501,10 +501,15 @@ function private.StartRetailScan(name, minUseLevel, maxUseLevel, isUsable, quali
 	end
 
 	-- Retail: GetAll (ReplicateItems) has a 15-minute account-wide throttle.
-	-- Only start the clock once data actually arrives: a throttled or failed
-	-- request must not lock the button for another 15 minutes.
-	if private.retailScanLast then
-		local remaining = RETAIL_SCAN_COOLDOWN - (time() - private.retailScanLast)
+	-- The server starts that clock at the REQUEST, not at completion, and it
+	-- survives /reload and relog. Persist the request time in AucAdvancedData
+	-- so an interrupted or repeated scan cannot fire a request the server will
+	-- silently ignore (leaving the scan stuck at 0%). Also honour the last
+	-- successful completion time.
+	local lastRequest = math.max(private.retailScanLast or 0,
+		type(AucAdvancedData) == "table" and tonumber(AucAdvancedData.ForeverReplicateRequested) or 0)
+	if lastRequest > 0 then
+		local remaining = RETAIL_SCAN_COOLDOWN - (time() - lastRequest)
 		if remaining > 0 then
 			local mins = floor(remaining / 60)
 			local secs = remaining % 60
@@ -564,8 +569,14 @@ function private.StartRetailScan(name, minUseLevel, maxUseLevel, isUsable, quali
 	private.retailScanProgressTime = GetTime()
 	private.retailScanProgressMsg = 0
 	private.retailScanWaitMsg = 0
+	private.retailScanWaitNotified = nil
 
-	-- Initiate the replicate request (retail equivalent of GetAll)
+	-- Initiate the replicate request (retail equivalent of GetAll).
+	-- Persist the request time first: the throttle starts here even if the
+	-- scan is cancelled, interrupted, or followed by a /reload.
+	if type(AucAdvancedData) == "table" then
+		AucAdvancedData.ForeverReplicateRequested = time()
+	end
 	C_AuctionHouse.ReplicateItems()
 	private.UpdateScanProgress(nil, 0, 0, 0, 1, 1, query)
 end
@@ -728,7 +739,7 @@ function private.FinishRetailScan(incomplete, reason)
 
 	private.curScan = curScan
 	if #curScan > 0 then
-		private.retailScanLast = time() -- only successful requests start the throttle
+		private.retailScanLast = time() -- record the successful completion time
 	end
 	lib.ProgressBars("GetAllProgressBar", 100, false)
 	private.UpdateScanProgress(nil, num, #curScan, GetTime() - private.scanStarted, 2, 1, private.curQuery)
@@ -838,10 +849,12 @@ function lib.IsPaused()
 end
 
 -- Remaining seconds on the retail GetAll (ReplicateItems) throttle.
--- Returns 0 on Classic or when no successful scan has been recorded.
+-- Based on the persisted request time and the last successful completion.
 function lib.GetAllCooldown()
-	if not private.retailScanLast then return 0 end
-	local remaining = RETAIL_SCAN_COOLDOWN - (time() - private.retailScanLast)
+	local lastRequest = math.max(private.retailScanLast or 0,
+		type(AucAdvancedData) == "table" and tonumber(AucAdvancedData.ForeverReplicateRequested) or 0)
+	if lastRequest <= 0 then return 0 end
+	local remaining = RETAIL_SCAN_COOLDOWN - (time() - lastRequest)
 	return remaining > 0 and remaining or 0
 end
 
@@ -3504,9 +3517,13 @@ function private.OnUpdate(me, dur)
 			-- The AH can take minutes to answer. Let the user know we are alive.
 			if private.retailScanNum == 0 then
 				private.retailScanWaitMsg = (private.retailScanWaitMsg or 0) + dur
-				if private.retailScanWaitMsg >= 60 then
-					private.retailScanWaitMsg = 0
-					aucPrint(("Auctioneer: Still waiting for the AH replicate list (%d s)..."):format(
+				-- Print once, not every 60s for the whole 15-minute wait. Give
+				-- the actual reason: the server allows one full scan per 15
+				-- minutes account-wide, so a request made after a /reload,
+				-- relog or character switch is silently ignored.
+				if private.retailScanWaitMsg >= 60 and not private.retailScanWaitNotified then
+					private.retailScanWaitNotified = true
+					aucPrint(("Auctioneer: Still waiting for the AH replicate list (%d s). The server allows one full scan every 15 minutes (account-wide); a scan after a /reload, relog or character switch is silently ignored. Hover the GetAll button for the remaining cooldown."):format(
 						floor(GetTime() - private.scanStarted)))
 				end
 			end

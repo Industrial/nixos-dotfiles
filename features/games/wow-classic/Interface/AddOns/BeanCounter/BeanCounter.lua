@@ -216,7 +216,7 @@ function lib.OnLoad(addon)
 			local name, texture, countSlotted, quality, canUse, price = GetAuctionSellItemInfo()
 			if not name then return end
 			if not count then count = countSlotted end
-			for bagID = 0, 4 do
+			for bagID = 0, NUM_TOTAL_BAG_FRAMES do
 				for slot = 1, C_Container.GetContainerNumSlots(bagID) do
 					local info = C_Container.GetContainerItemInfo(bagID, slot)
 					if info and not info.isLocked then

@@ -1,3 +1,8 @@
+-- WoW Forever compat: the global SetDesaturation was replaced by the
+-- texture method SetDesaturated.
+local SetDesaturation = SetDesaturation or function(texture, desaturate)
+	if texture and texture.SetDesaturated then texture:SetDesaturated(desaturate and true or false) end
+end
 --[[
 	Auctioneer Addon for World of Warcraft(tm).
 	Version: 2.5.6767 (SwimmingSeadragon)

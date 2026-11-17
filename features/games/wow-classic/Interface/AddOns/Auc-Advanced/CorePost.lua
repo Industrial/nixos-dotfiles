@@ -1,3 +1,6 @@
+-- WoW Forever compat: the error-handler getter is geterrorhandler(), not
+-- GetErrorHandler(). Keep the original call site working.
+local GetErrorHandler = GetErrorHandler or geterrorhandler
 --[[
 	Auctioneer
 	Version: 2.5.6733 (SwimmingSeadragon)
@@ -646,7 +649,8 @@ function lib.IsAuctionable(bag, slot)
 		return false, "Token"
 	end
 
-	local _,_,_,_,_,lootable = C_Container.GetContainerItemInfo(bag, slot)
+	local info = C_Container.GetContainerItemInfo(bag, slot)
+	local lootable = info and info.hasLoot
 	if lootable then
 		return false, "Lootable"
 	end
@@ -690,7 +694,7 @@ function lib.CountAvailableItems(sig)
     local totalCount, unpostableCount = 0, 0
     local unpostableError
 
-    for bag = 0, NUM_BAG_FRAMES do
+    for bag = 0, NUM_TOTAL_BAG_FRAMES do
         local slots = C_Container.GetContainerNumSlots(bag)
         for slot = 1, slots do
             local link = C_Container.GetContainerItemLink(bag, slot)
@@ -762,7 +766,7 @@ do --[[ Deposit Cost Calculator ]]--
 				end
 				-- Try item deposit (for non-commodity items)
 				-- CalculateItemDeposit needs an ItemLocation, so find the item in bags
-				for bagID = 0, 4 do
+				for bagID = 0, NUM_TOTAL_BAG_FRAMES do
 					for slot = 1, C_Container.GetContainerNumSlots(bagID) do
 						local bagLink = C_Container.GetContainerItemLink(bagID, slot)
 						if bagLink and bagLink:match("item:"..itemID..":") then
@@ -915,14 +919,15 @@ do
 
 		-- count items in bags (only for locked sigs)
 		local sigcounts = {}
-		for bag = 0, NUM_BAG_FRAMES do
+		for bag = 0, NUM_TOTAL_BAG_FRAMES do
 			for slot = 1, C_Container.GetContainerNumSlots(bag) do
 				local link = C_Container.GetContainerItemLink(bag, slot)
 				if link then
 					local sig = GetSigFromLink(link)
 					if lockedsigs[sig] then
-						local _, count = C_Container.GetContainerItemInfo(bag, slot)
-						if not count or count < 1 then count = 1 end
+						local info = C_Container.GetContainerItemInfo(bag, slot)
+						local count = info and info.stackCount or 0
+						if count < 1 then count = 1 end
 						sigcounts[sig] = (sigcounts[sig] or 0) + count
 					end
 				end
@@ -1041,7 +1046,7 @@ function private.SelectStack(request)
 		Otherwise use the first stack found
 	--]]
 
-	for bag = 0, NUM_BAG_FRAMES do
+	for bag = 0, NUM_TOTAL_BAG_FRAMES do
 		for slot = 1, C_Container.GetContainerNumSlots(bag) do
 			local link = C_Container.GetContainerItemLink(bag, slot)
 			if link and GetSigFromLink(link) == sig and lib.IsAuctionable(bag, slot) then

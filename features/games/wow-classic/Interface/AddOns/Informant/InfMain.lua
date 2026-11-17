@@ -764,7 +764,7 @@ local function updateSellPricesFromMerchant()
 	if (not InformantLocalUpdates.items) then InformantLocalUpdates.items = {} end
 	local tt = Informant_ScanTooltip
 
-	for bag = 0, NUM_BAG_FRAMES do
+	for bag = 0, NUM_TOTAL_BAG_FRAMES do
 		for slot = 1, GetContainerNumSlots(bag) do
 			local scanningLink = C_Container.GetContainerItemLink(bag, slot)
 			if (scanningLink) then

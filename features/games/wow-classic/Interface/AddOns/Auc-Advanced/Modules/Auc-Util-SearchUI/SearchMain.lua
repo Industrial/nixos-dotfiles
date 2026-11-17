@@ -1,3 +1,9 @@
+-- WoW Forever compat: GetMouseFocus was removed in favour of GetMouseFoci,
+-- which returns the list of frames under the cursor (topmost first).
+local GetMouseFocus = GetMouseFocus or function()
+	local foci = GetMouseFoci and GetMouseFoci()
+	return foci and foci[1] or WorldFrame
+end
 --[[
 	Auctioneer - Search UI
 	Version: 2.5.6750 (SwimmingSeadragon)
@@ -1438,7 +1444,19 @@ function private.MakeGuiConfig()
 			if not itemName then
 				return
 			end
-			C_AuctionHouse.SendBrowseQuery({searchString = itemName})
+			-- Forever (C_AuctionHouse): SendBrowseQuery requires a complete
+			-- AuctionHouseBrowseQuery struct. Passing only searchString is
+			-- rejected by the client with "bad argument #2 ... [sorts]".
+			-- Supply the default price+name sort used by Blizzard's browse UI.
+			-- Numeric sort orders (0=Price, 1=Name) avoid depending on
+			-- Enum.AuctionHouseSortOrder being present on this client.
+			C_AuctionHouse.SendBrowseQuery({
+				searchString = itemName,
+				sorts = {
+					{ sortOrder = 0, reverseSort = false },
+					{ sortOrder = 1, reverseSort = false },
+				},
+			})
 		end
 	end
 	--records the column width changes
@@ -2053,6 +2071,15 @@ function lib.SearchItem(searcherName, item, nodupes, skipresults)
 		end
 
 		local cost
+		-- Forever (C_AuctionHouse): commodity auctions and buyout-only item
+		-- auctions have no bid at all. Their replicate rows carry minBid = 0 and
+		-- curBid = 0, and RetailBuildItemData's next-bid fallback of 1 copper
+		-- made every searcher offer them as a 1c "bid" that cannot be placed.
+		-- Reject "bid" results for unbiddable auctions here, at the single point
+		-- all searchers flow through, so no searcher has to know about it.
+		local unbiddable = (item[Const.MINBID] or 0) <= 0
+			and (item[Const.CURBID] or 0) <= 0
+			and (item[Const.PRICE] or 0) <= 1
 		if type(buyorbid) == "string" then
 			if reason then
 				item["reason"] = reason..":"..buyorbid
@@ -2064,6 +2091,9 @@ function lib.SearchItem(searcherName, item, nodupes, skipresults)
 				if item[Const.AMHIGH] then
 					return false, "Bid blocked: Already high bidder"
 				end
+				if unbiddable then
+					return false, "Bid blocked: Auction is buyout-only"
+				end
 				cost = item[Const.PRICE]
 			else
 				cost = item[Const.BUYOUT]
@@ -2073,10 +2103,13 @@ function lib.SearchItem(searcherName, item, nodupes, skipresults)
 			if item[Const.BUYOUT] and item[Const.BUYOUT] > 0 then
 				cost = item[Const.BUYOUT]
 			elseif item[Const.PRICE] and item[Const.PRICE] > 0 then
-				cost = item[Const.PRICE]
 				if item[Const.AMHIGH] then
 					return false, "Bid blocked: Already high bidder"
 				end
+				if unbiddable then
+					return false, "Bid blocked: Auction is buyout-only"
+				end
+				cost = item[Const.PRICE]
 			end
 		end
 		if not value then
