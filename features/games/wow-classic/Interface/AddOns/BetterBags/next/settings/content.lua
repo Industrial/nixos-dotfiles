@@ -276,13 +276,21 @@ local function importCategories(ctx)
     say(L:G("Import Categories"), L:G("Paste a category configuration string to import first."))
     return
   end
+  local data, message = db:ReadImport(text)
+  if data == nil then
+    say(L:G("Import Categories"), L:G("The categories could not be imported: ") .. tostring(message))
+    return
+  end
+  -- One category (#1250) is added to yours, as the Categories page asks.
+  if data.category then
+    categoryEditor:AskImport(owner(), data.category, function()
+      area:SetText("")
+    end)
+    return
+  end
   ask(L:G("Import Categories"), L:G("This replaces your categories with the ones imported. Continue?"), L:G("Import"),
     "Primary", function()
-      local ok, message = db:ImportSettings(text)
-      if not ok then
-        say(L:G("Import Categories"), L:G("The categories could not be imported: ") .. tostring(message))
-        return
-      end
+      db:ApplyImport(data)
       area:SetText("")
       offerReload(L:G("Categories Imported"), L:G("Your categories were imported. Reload the UI to apply them?"))
     end)
@@ -305,54 +313,84 @@ local function tabSection(title, keywords, block)
   }
 end
 
--- bagPage defines a bag's page: its layout, items, categories and their order, its settings bound to it.
+-- generalTab is a bag's General tab: its switch, which leaves the bag to Blizzard's own window when off (asked: "all the
+-- enable/disable toggles in general need to move to a general tab in each respective bag menu").
+---@param title string Its section's title: the window the switch is for.
+---@param setting string
+---@return NextSettingsTabDef
+local function generalTab(title, setting)
+  return { id = "general", title = L:G("General"), sections = { { title = title, rows = { { setting = setting } } } } }
+end
+
+-- sizeTab is a bag's Size tab (docs/next-appearance-size.md): BetterBags Next's, each bag sized by its own (asked: "every
+-- appearance -> size option needs to become per-bag, and move to a size tab in each respective bag"). The classic bags
+-- size themselves on their Layout tab.
+---@return NextSettingsTabDef
+local function sizeTab()
+  return { id = "size", title = L:G("Size"), design = "next", sections = {
+    { title = L:G("Size"), rows = { { setting = 'nextIconScale' }, { setting = 'nextBagScale' },
+      { setting = 'nextAutosize' }, { setting = 'nextFitNamesWhileOpen' } } },
+  } }
+end
+
+-- bagPage defines a bag's page: its switch (general, when it has one), its layout and size, items, categories and their
+-- order, its settings bound to it.
 ---@param id string
 ---@param bag SettingBag
+---@param general? NextSettingsTabDef
 ---@param shown? fun(): boolean
 ---@param design? BagDesign
-local function bagPage(id, bag, shown, design)
+local function bagPage(id, bag, general, shown, design)
   local name = string.lower(bag.name)
   table.insert(BAG_PAGES, { id = id, bag = bag })
+  local tabs = {
+    { id = "layout", title = L:G("Layout"), sections = {
+      { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' }, { setting = 'itemOrderThen' },
+        { setting = 'itemOrderLast' } } },
+      { title = L:G("Sections"), design = "next", rows = {
+        { setting = 'sectionColumns' }, { setting = 'sectionCompact' }, { setting = 'sectionGap' }, { setting = 'sectionFill' },
+        { setting = 'sectionSpan' }, { setting = 'sectionWideRows' },
+      } },
+      { title = L:G("Tabs"), rows = { { setting = 'enableGroups' }, { setting = 'hideEmptyGroups' } } },
+      { title = L:G("Slots"), rows = { { setting = 'showAllFreeSpace' }, { setting = 'preserveGaps' } } },
+      -- Only the classic bags read these (frames/bag.lua, frames/bagcanvas.lua, frames/section.lua).
+      { title = L:G("Window"), design = "classic", rows = {
+        { setting = 'resizableWindow' }, { setting = 'snapToContent' }, { setting = 'itemsPerRow' },
+        { setting = 'columns' }, { setting = 'opacity' }, { setting = 'scale' },
+      } },
+      { title = L:G("Sections"), design = "classic", rows = { { setting = 'fullSectionNames' } } },
+    } },
+    sizeTab(),
+    { id = "items", title = L:G("Items"), sections = {
+      -- Keystones are retail's (Mythic+).
+      { title = L:G("Item Level"), rows = { { setting = 'itemLevel' }, { setting = 'itemLevelColor' },
+        { setting = 'keystoneLevel', hidden = function() return not addon.isRetail end } } },
+      { title = L:G("Quality"), rows = { { setting = 'glowIntensity' } } },
+      { title = L:G("Stacking"), rows = {
+        { setting = 'markRecentItems' }, { setting = 'newItemFlash' }, { setting = 'mergeStacks' },
+        { setting = 'mergeUnstackable' }, { setting = 'dontMergePartial' }, { setting = 'dontMergeTransmog' },
+        { setting = 'unmergeAtShop' },
+      } },
+    } },
+    { id = "categories", title = L:G("Categories"), sections = {
+      { title = L:G("Automatic"), note = L:G("(Blizzard's item categories)"), rows = {
+        { setting = 'filterEquipmentLocation' }, { setting = 'filterExpansion' }, { setting = 'filterGearSet' },
+        { setting = 'filterRecentItems' }, { setting = 'filterTradeSkill' }, { setting = 'filterType' },
+        { setting = 'filterSubtype' },
+      } },
+    } },
+    -- Categories are defined on the Categories page; a bag orders them (category-lifecycle.md §6).
+    { id = "order", title = L:G("Order"), sections = { tabSection(L:G("Category Order"),
+      { "category", "categories", "pinned", "pin", "order", "reorder", "custom" },
+      function(parent, window) return bagCategories:Create(parent, window, bag) end) } },
+  }
+  if general ~= nil then
+    table.insert(tabs, 1, general)
+  end
   pages:Define({
     id = id, group = L:G("Bags"), title = L:G(bag.name), bag = bag, shown = shown, design = design,
     description = format(L:G("How the %s lays out, shows and sorts its items."), name),
-    tabs = {
-      { id = "layout", title = L:G("Layout"), sections = {
-        { title = L:G("Order"), rows = { { setting = 'sectionOrder' }, { setting = 'itemOrder' } } },
-        { title = L:G("Sections"), design = "next", rows = {
-          { setting = 'sectionColumns' }, { setting = 'sectionCompact' }, { setting = 'sectionFill' }, { setting = 'sectionSpan' },
-          { setting = 'sectionWideRows' },
-        } },
-        { title = L:G("Tabs"), rows = { { setting = 'enableGroups' } } },
-        { title = L:G("Slots"), rows = { { setting = 'showAllFreeSpace' }, { setting = 'preserveGaps' } } },
-        -- Only the classic bags read these (frames/bag.lua, frames/bagcanvas.lua, frames/section.lua).
-        { title = L:G("Window"), design = "classic", rows = {
-          { setting = 'resizableWindow' }, { setting = 'snapToContent' }, { setting = 'itemsPerRow' },
-          { setting = 'columns' }, { setting = 'opacity' }, { setting = 'scale' },
-        } },
-        { title = L:G("Sections"), design = "classic", rows = { { setting = 'fullSectionNames' } } },
-      } },
-      { id = "items", title = L:G("Items"), sections = {
-        { title = L:G("Item Level"), rows = { { setting = 'itemLevel' }, { setting = 'itemLevelColor' } } },
-        { title = L:G("Quality"), rows = { { setting = 'glowIntensity' } } },
-        { title = L:G("Stacking"), rows = {
-          { setting = 'markRecentItems' }, { setting = 'newItemFlash' }, { setting = 'mergeStacks' },
-          { setting = 'mergeUnstackable' }, { setting = 'dontMergePartial' }, { setting = 'dontMergeTransmog' },
-          { setting = 'unmergeAtShop' },
-        } },
-      } },
-      { id = "categories", title = L:G("Categories"), sections = {
-        { title = L:G("Automatic"), note = L:G("(Blizzard's item categories)"), rows = {
-          { setting = 'filterEquipmentLocation' }, { setting = 'filterExpansion' }, { setting = 'filterGearSet' },
-          { setting = 'filterRecentItems' }, { setting = 'filterTradeSkill' }, { setting = 'filterType' },
-          { setting = 'filterSubtype' },
-        } },
-      } },
-      -- Categories are defined on the Categories page; a bag orders them (category-lifecycle.md §6).
-      { id = "order", title = L:G("Order"), sections = { tabSection(L:G("Category Order"),
-        { "category", "categories", "pinned", "pin", "order", "reorder", "custom" },
-        function(parent, window) return bagCategories:Create(parent, window, bag) end) } },
-    },
+    tabs = tabs,
   })
 end
 
@@ -379,9 +417,24 @@ function content:Init()
     id = "general", group = L:G("BetterBags"), title = L:G("General"),
     description = L:G("How BetterBags works in every bag."),
     tabs = { { id = "main", title = L:G("General"), sections = {
+      -- Each bag's switch is on its own page (generalTab): Enable Bank Bags, Enable Vendor Window, Enable Guild Bank Window.
       { title = L:G("Bags"), rows = {
-        { setting = 'nextEnabled' }, { setting = 'enableBankBags' }, { setting = 'showBagButton' },
-        { setting = 'clampBagsToScreen' }, { setting = 'bagFading', design = "classic" }, { setting = 'animateItemMovement', design = "classic" },
+        { setting = 'nextEnabled' }, { setting = 'showBagButton' }, { setting = 'clampBagsToScreen' },
+        { setting = 'bagFading', design = "classic" }, { setting = 'animateItemMovement', design = "classic" },
+      } },
+      -- What the backpack does at each interaction (interaction-bags.md), for the interactions the client has: the
+      -- Warband bank and the guild bank where there is one, Void Storage on Cataclysm and Mists Classic (patch 4.3.0 to
+      -- 11.2.0 on retail), the Scrapper on retail (8.0.1), Item Upgrade on retail and Mists Classic. WoW: Forever runs
+      -- retail's code in Vanilla's world (camelot-forever.md).
+      { title = L:G("Interactions"), rows = {
+        { setting = 'interactionTrade' }, { setting = 'interactionBank' },
+        { setting = 'interactionWarbank', hidden = function() return not addon.hasWarbank end },
+        { setting = 'interactionVendor' }, { setting = 'interactionMail' }, { setting = 'interactionAuctionHouse' },
+        { setting = 'interactionGuildBank', hidden = function() return not addon.hasGuildBank end },
+        { setting = 'interactionVoidStorage', hidden = function() return not (addon.isCata or addon.isMists) end },
+        { setting = 'interactionScrapper', hidden = function() return not (addon.isRetail and not addon.isForever) end },
+        { setting = 'interactionItemUpgrade',
+          hidden = function() return not ((addon.isRetail and not addon.isForever) or addon.isMists) end },
       } },
       -- Only the classic bags' search box makes a category on Enter (frames/search.lua).
       { title = L:G("Search"), rows = { { setting = 'inBagSearch' }, { setting = 'enterToMakeCategory', design = "classic" } } },
@@ -392,9 +445,8 @@ function content:Init()
   pages:Define({
     id = "appearance", group = L:G("BetterBags"), title = L:G("Appearance"),
     description = L:G("How BetterBags looks. A theme you pick shows at once; Apply Theme keeps it."),
-    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs. Size and Animation
-    -- are BetterBags Next's: the classic bags size themselves on each bag's page (docs/next-appearance-size.md), and
-    -- have none of its effects.
+    -- BetterBags Next's themes draw its bags and this window; the classic bags' themes draw theirs. Animation is BetterBags
+    -- Next's: the classic bags have none of its effects. Each bag is sized on its own page (sizeTab).
     tabs = { { id = "theme", title = L:G("Theme"), sections = {
       { title = L:G("Theme"), design = "next", rows = { {
         title = L:G("Theme"), keywords = { "theme", "look", "skin", "appearance", "style" },
@@ -415,9 +467,6 @@ function content:Init()
           title = L:G("Settings Window Theme"), keywords = { "theme", "settings", "window" },
           block = function(parent) return themes:Create(parent, sonataNext) end,
         } } },
-    } }, { id = "size", title = L:G("Size"), design = "next", sections = {
-      { title = L:G("Size"), rows = { { setting = 'nextIconScale' }, { setting = 'nextBagScale' },
-        { setting = 'nextAutosize' }, { setting = 'nextFitNamesWhileOpen' } } },
     } }, { id = "animation", title = L:G("Animation"), design = "next", sections = {
       -- Each effect on or off on any theme (next-themes.md §20); the classic bags have none of them.
       { title = L:G("Effects"), rows = { { setting = 'nextSparkles' }, { setting = 'nextShimmer' },
@@ -461,7 +510,9 @@ function content:Init()
   })
   -- Every category, defined once (category-lifecycle.md §6), for both designs.
   local automationOptions = categoryEditor:AutomationOptions()
+  local depositOptions = categoryEditor:DepositOptions()
   local recentOptions = categoryEditor:RecentOptions()
+  local itemOrderOptions = categoryEditor:ItemOrderOptions()
   pages:Define({
     id = "categories", group = L:G("BetterBags"), title = L:G("Categories"),
     description = L:G("Your categories: a rule, items you add, or both. Each bag uses those you choose."),
@@ -470,26 +521,46 @@ function content:Init()
     heading = function() return categoryEditor:Heading() end,
     actions = function(parent, window) return categoryEditor:CreateActions(parent, window) end,
     tabs = {
-      { id = "settings", title = L:G("Settings"), sections = { tabSection(L:G("Category Settings"),
+      -- A Blizzard category chosen shows what it is and a button that makes it yours, instead of every tab (asked,
+      -- issue #1278: "help text + button to convert to a permanent managed category").
+      { id = "blizzard", title = L:G("Blizzard Category"), shown = function() return categoryEditor:BlizzardChosen() end,
+        sections = { tabSection(L:G("Blizzard Category"), { "blizzard", "convert", "built-in", "category" },
+          function(parent, window) return categoryEditor:CreateBlizzardTab(parent, window) end) } },
+      { id = "settings", title = L:G("Settings"), shown = function() return categoryEditor:SettingsTabShown() end,
+        sections = { tabSection(L:G("Category Settings"),
         { "category", "categories", "custom", "priority", "color", "group by", "bags", "used in" },
         function(parent, window) return categoryEditor:CreateSettingsTab(parent, window, shownBags) end) } },
       { id = "rule", title = L:G("Search Rule"), shown = function() return categoryEditor:RuleTabShown() end,
         sections = { tabSection(L:G("Search Rule"), { "rule", "search rule", "search category", "search", "query" },
           function(parent, window) return categoryEditor:CreateRuleTab(parent, window, shownBags) end) } },
-      { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:ItemsTabShown() end,
+      { id = "items", title = L:G("Added Items"), shown = function() return categoryEditor:AddedItemsTabShown() end,
         sections = { tabSection(L:G("Added Items"), { "items", "added", "manual", "drag" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags) end) } },
       -- Items the category never takes, whatever adds or matches them (docs/next-batch-2.md §2).
       { id = "ignored", title = L:G("Ignored Items"), shown = function() return categoryEditor:ItemsTabShown() end,
         sections = { tabSection(L:G("Ignored Items"), { "ignored", "ignore", "exclude", "never" },
           function(parent, window) return categoryEditor:CreateItemsTab(parent, window, shownBags, "ignored") end) } },
-      -- What the category does on its own (automation.md §5), drawn as settings rows like every page's.
+      -- What the category does on its own (automation.md §5), drawn as settings rows like every page's. Nothing in a
+      -- gear set is sold, destroyed or deposited (Automation:BlockedReason), so a gear set's has no such rows.
       { id = "automation", title = L:G("Automation"), shown = function() return categoryEditor:AutomationTabShown() end,
         sections = {
-          { title = L:G("Merchants"), rows = {
+          { title = L:G("Merchants"), hidden = function() return categoryEditor:GearSetChosen() end, rows = {
             { option = automationOptions[1] }, { option = automationOptions[2] }, { option = automationOptions[3] },
           } },
+          -- Where there is no Warbank, the bank is the only place to deposit.
+          { title = L:G("Bank"), hidden = function() return categoryEditor:GearSetChosen() end, rows = {
+            { option = depositOptions[1] },
+            { option = depositOptions[2], hidden = function() return not addon.hasWarbank end },
+          } },
           { title = L:G("Recent Items"), rows = { { option = recentOptions[1] } } },
+        } },
+      -- Its items' own order (item-sort.md §5), chosen with the dropdowns a bag's Layout tab has.
+      { id = "order", title = L:G("Item Order"), shown = function() return categoryEditor:ItemOrderTabShown() end,
+        sections = {
+          { title = L:G("Order"), rows = {
+            { option = itemOrderOptions[1] }, { option = itemOrderOptions[2] }, { option = itemOrderOptions[3] },
+            { option = itemOrderOptions[4] },
+          } },
         } },
     },
   })
@@ -534,11 +605,41 @@ function content:Init()
       } },
     },
   })
+  -- BetterBags Next's Food & Drink bar (food-drink.md §5): whether it is out, what it picks, and how it shows. A right
+  -- click on the bar's card opens it.
+  pages:Define({
+    id = "fooddrink", group = L:G("BetterBags"), title = L:G("Food & Drink"), design = "next",
+    description = L:G("Your food and drink on two buttons that stay on screen: right-click one to eat or drink it."),
+    tabs = {
+      { id = "display", title = L:G("Display"), sections = {
+        { title = L:G("Food & Drink Bar"), rows = { { setting = 'nextFoodDrinkBar' }, { setting = 'nextFoodDrinkPick' } } },
+        { title = L:G("Bar"), rows = { { setting = 'nextFoodDrinkLayout' }, { setting = 'nextFoodDrinkGrow' },
+          { setting = 'nextFoodDrinkScale' }, { setting = 'nextFoodDrinkBackground' },
+          { setting = 'nextFoodDrinkHideInCombat' } } },
+      } },
+    },
+  })
+  -- The backpack is always BetterBags': it has no switch, and so no General tab. The bank's switch is the classic bags'
+  -- too (Enable Bank Bags); BetterBags Next's guild bank and vendor stand in for Blizzard's frames (next-bagsystem.md
+  -- §11g), which the classic bags leave to Blizzard.
   bagPage("backpack", { name = 'Backpack', kind = const.BAG_KIND.BACKPACK })
-  bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK })
+  -- Beside the bank's switch, what its Deposit All Warbound Items takes, where there is a Warbank (warbank-deposit.md).
+  local bankGeneral = generalTab(L:G("Bank Window"), 'enableBankBags')
+  table.insert(bankGeneral.sections, { title = L:G("Warbank"), rows = {
+    { setting = 'bankAutoDepositReagents', hidden = function() return not addon.hasWarbank end },
+  } })
+  bagPage("bank", { name = 'Bank', kind = const.BAG_KIND.BANK }, bankGeneral)
   -- BetterBags Next's guild bank (guild-bank.md §5), on a client with one; the classic bags have none.
-  bagPage("guild", { name = 'Guild Bank', kind = const.BAG_KIND.GUILD }, function() return addon.hasGuildBank == true end,
-    "next")
+  bagPage("guild", { name = 'Guild Bank', kind = const.BAG_KIND.GUILD },
+    generalTab(L:G("Guild Bank Window"), 'nextGuildBank'), function() return addon.hasGuildBank == true end, "next")
+  -- BetterBags Next's vendor (next-vendor.md): its switch and its Size tab. It shows a merchant's items, filed in no
+  -- category, so it is not a bag a category is used in (BAG_PAGES, shownBags). Its kind is UNDEFINED (next/vendor.lua).
+  pages:Define({
+    id = "vendor", group = L:G("Bags"), title = L:G("Vendor"), design = "next",
+    bag = { name = 'Vendor', kind = const.BAG_KIND.UNDEFINED },
+    description = L:G("Whether BetterBags Next shows vendors in its own window, and how big it is."),
+    tabs = { generalTab(L:G("Vendor Window"), 'nextVendor'), sizeTab() },
+  })
   pages:Define({
     id = "profiles", group = L:G("Profiles"), title = L:G("Profiles"),
     description = L:G("Your settings, saved under a name and shared by the characters that use it."),
@@ -571,7 +672,8 @@ function content:Init()
       } },
       { id = "transfer", title = L:G("Import / Export"), sections = {
         { title = L:G("Export"), rows = {
-          { text = L:G("Export your categories to a string you can share. Only categories are included, no other settings.") },
+          { text = L:G("Export your categories to a string you can share. Only categories are included, no other settings. "
+            .. "To share one category, use Export on its page under Categories.") },
           { buttons = { { text = L:G("Export Categories"), style = "Primary", onClick = exportCategories } } },
           { title = L:G("Export Categories"), keywords = { "export", "share" }, block = function(parent)
             self.exportArea = rows:CreateArea(parent, { height = 120, help = L:G("Export your categories, then copy them with Ctrl+C.") })
@@ -579,7 +681,8 @@ function content:Init()
           end },
         } },
         { title = L:G("Import"), rows = {
-          { text = L:G("Paste a category configuration string and import it. It replaces your categories.") },
+          { text = L:G("Paste a category configuration string and import it. A string of your categories replaces "
+            .. "them; a string of one category is added to them.") },
           { title = L:G("Import Categories"), keywords = { "import", "share" }, block = function(parent)
             self.importArea = rows:CreateArea(parent, { height = 120, help = L:G("Paste a string here with Ctrl+V.") })
             return self.importArea
@@ -593,6 +696,7 @@ function content:Init()
     id = "quickfind", group = L:G("Integrations"), title = L:G("QuickFind"),
     description = L:G("Your items, searchable from the QuickFind addon."),
     tabs = { { id = "main", title = L:G("QuickFind"), sections = {
+      { title = L:G("QuickFind"), rows = { { setting = 'quickFind' } } },
       { title = L:G("How it works"), rows = {
         { text = L:G("BetterBags integrates with the QuickFind addon to make your items searchable.") },
         { text = L:G("All items in your backpack and bank are registered as a QuickFind source, tagged with their type, category and location.") },
@@ -610,10 +714,18 @@ function content:OnEnable()
       settings:Refresh(ctx)
     end
   end)
-  -- A bag's Compact Sections, Fill Order, Wide Sections Span Columns and Wide Column Limit are off at one column, and its
-  -- Fill Order while it is compact.
+  -- A bag's Compact Sections, Gap Between Sections, Fill Order, Wide Sections Span Columns and Wide Column Limit are off at
+  -- one column, and its Fill Order while it is compact.
   events:RegisterMessage('next/SectionColumnsChanged', function(ctx)
     if settings:IsShown() then
+      settings:Refresh(ctx)
+    end
+  end)
+  -- Include Tradeable Reagents is the client's own setting (warbank-deposit.md): the classic bank's menu, Blizzard's own
+  -- bank or the console may change it while it shows. CVAR_UPDATE names the CVar changed (ConsoleDocumentation.lua), after
+  -- the event's own name (core/events.lua).
+  events:RegisterEvent('CVAR_UPDATE', function(ctx, _, name)
+    if name == "bankAutoDepositReagents" and settings:IsShown() then
       settings:Refresh(ctx)
     end
   end)

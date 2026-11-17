@@ -160,6 +160,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = mono(13, "Text"),
     SettingsText = mono(12, "Muted"),
     SettingsLink = mono(12, "Gold"),
+    SettingsLead = mono(15, "Text"),
     CurrencyCapped = mono(12, "Capped", true),
     CurrencyNone = mono(12, "Muted"),
     CurrencyName = mono(12, "Text"),
@@ -262,6 +263,7 @@ sonataNext:RegisterTheme({
 
   Tabs = {
     -- HUD boxes: a solid fill, an edge round each, the selected one lit with dark text.
+    Fill = "Tab",
     Fade = 1,
     Edge = { Color = "Lavender", Alpha = 0.75, Size = 1 },
     SelectedEdge = { Color = "Gold", Alpha = 1, Size = 1 },
@@ -314,6 +316,8 @@ sonataNext:RegisterTheme({
     Highlight = { 0.3, 1, 0.5, 0.15 },
     CardFill = { 0.3, 1, 0.5, 0.04 },
     CardHover = { 0.3, 1, 0.5, 0.1 },
+    -- A guild bank log's move in cyan: this theme's Gold is a green, a deposit's color.
+    LogIcons = { Move = { Color = "Cyan" } },
   },
 
   Currency = {

@@ -122,12 +122,10 @@ local function bagKindFromBagID(bagid)
 	return const.BAG_KIND.BACKPACK
 end
 
--- Size of the small family-bag glyph drawn in the center of a specialized empty slot. The
--- source atlas is large (e.g. Mobile-Herbalism is 128x128); this sizes it well under the
--- 37x37 slot so it reads as an icon and not a slot background.
+-- Size of the small bag-type glyph drawn in the center of a specialized empty slot. The
+-- glyph files are 64 x 64 (tools/textures/next_icons.py); this sizes them well under the
+-- 37x37 slot so they read as an icon and not a slot background.
 local FAMILY_ICON_SIZE = 24
--- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
-local FAMILY_ICON_ALPHA = 0.4
 
 -- An empty container slot's art on WoW: Forever 1.60.1.70790, which removed ItemSlotBackgroundCombinedBagsTemplate
 -- (Mainline/ContainerFrame.xml) and draws its own empty slots in this atlas
@@ -148,7 +146,9 @@ end
 
 -- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
 -- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
--- and is stored on the decoration itself so it survives across draws and theme swaps.
+-- and is stored on the decoration itself so it survives across draws and theme swaps. Its color
+-- and alpha are the theme's (ItemButton.FamilyIcon): the glyph files are white, and a theme with
+-- light empty slots draws them darker (issue #1327).
 ---@param decoration ItemButton
 ---@return Texture
 local function getFamilyIconTexture(decoration)
@@ -156,9 +156,9 @@ local function getFamilyIconTexture(decoration)
 		local tex = decoration:CreateTexture(nil, "OVERLAY")
 		tex:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
 		tex:SetPoint("CENTER", decoration, "CENTER", 0, 0)
-		tex:SetAlpha(FAMILY_ICON_ALPHA)
 		tex:Hide()
 		decoration.BetterBagsFamilyIcon = tex
+		elements:DrawFamilyIcon(decoration)
 	end
 	return decoration.BetterBagsFamilyIcon
 end
@@ -177,7 +177,8 @@ end
 -- Each button records in item.drawState the inputs of its last full draw. A redraw whose
 -- inputs all match skips the setters: the decoration still shows what they would set. The
 -- inputs are the item's itemHash (item ID, enchant, gems, bonus IDs, binding, item level
--- and stats), every other ItemData field the setters read, the data phase's draw generation
+-- and stats), every other ItemData field the setters read, the junk mark (Blizzard's
+-- UpdateJunkItem reads whether a vendor is open itself), the data phase's draw generation
 -- (a new one after every wipe sweep and restyling recalculation), the button style generation (RestyleButtons: settings
 -- the setters read, such as glow intensity, changed with no new data), and the decoration
 -- and theme generation the button was drawn with. ResetVisuals (a release or a change
@@ -232,6 +233,7 @@ function itemFrame.itemProto:DrawInputChanged(decoration, data)
 	if s.matches ~= searchMatch(data) then return "matches" end
 	if s.isUpgrade ~= data.isUpgrade then return "isUpgrade" end
 	if s.itemContextMatchResult ~= data.itemContextMatchResult then return "itemContextMatchResult" end
+	if s.junkMarked ~= data.junkMarked then return "junkMarked" end
 	return nil
 end
 
@@ -270,6 +272,7 @@ local function recordItemDraw(item, decoration, data)
 	s.matches = searchMatch(data)
 	s.isUpgrade = data.isUpgrade
 	s.itemContextMatchResult = data.itemContextMatchResult
+	s.junkMarked = data.junkMarked
 	s.valid = true
 end
 
@@ -498,6 +501,22 @@ function itemFrame.itemProto:ShowItemLevel(data)
 	self.ilvlText:Show()
 end
 
+-- ShowKeystoneLevel shows a keystone's level where gear shows its item level, in Blizzard's color for
+-- that level with Show Item Level Color on.
+---@param data ItemData
+function itemFrame.itemProto:ShowKeystoneLevel(data)
+	self.blank = false
+	local level = data.itemInfo.keystoneLevel
+	self.ilvlText:SetText(tostring(level))
+	if database:GetItemLevelOptions(self.kind).color then
+		local r, g, b = C_ChallengeMode.GetKeystoneLevelRarityColor(level):GetRGB()
+		self.ilvlText:SetTextColor(r, g, b, 1)
+	else
+		self.ilvlText:SetTextColor(1, 1, 1, 1)
+	end
+	self.ilvlText:Show()
+end
+
 ---@param data ItemData
 function itemFrame.itemProto:DrawItemLevel(data)
 	self.blank = false
@@ -512,6 +531,16 @@ function itemFrame.itemProto:DrawItemLevel(data)
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
 	local mergeOpts = database:GetStackingOptions(self.kind)
 	local ilvl = data.itemInfo.currentItemLevel
+
+	-- A keystone's level has its own setting, Show Keystone Level, whatever Show Item Level says.
+	if data.itemInfo.keystoneLevel ~= nil then
+		if ilvlOpts.keystone then
+			self:ShowKeystoneLevel(data)
+		else
+			self.ilvlText:Hide()
+		end
+		return
+	end
 
 	if not ilvlOpts.enabled then
 		self.ilvlText:Hide()
@@ -574,10 +603,22 @@ function itemFrame.itemProto:SetStaticItemFromData(ctx, data)
 	self:SetItemFromData(ctx, data)
 end
 
+---@return boolean
+local function itemContextActive()
+	local util = _G.ItemButtonUtil
+	return util ~= nil and util.GetItemContext ~= nil and util.GetItemContext() ~= nil
+end
+
 ---@param item ItemButton|Item
 ---@return integer
 function itemFrame.GetItemContextMatchResult(item)
 	local data = item and (item._itemData or (item.GetItemData and item:GetItemData()) or item.currentData)
+	-- A spell targeting an item (Feed Pet, an enchant, a sharpening stone) starts and ends with no bag
+	-- refresh, so what the refresh worked out is stale while one is active, and once one ends if it was
+	-- worked out during it (item-drawing.md §8).
+	if data and (data.itemContextResolvedInContext or itemContextActive()) then
+		return items:ResolveItemContextMatchResult(data)
+	end
 	if data and data.itemContextMatchResult then
 		return data.itemContextMatchResult
 	end
@@ -644,7 +685,14 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	if self.button.SetHasItem then self.button:SetHasItem(data.itemInfo.itemIcon) end
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
+	local hadContextMatch = decoration.GetItemContextMatchResult ~= nil
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
+	-- Blizzard signs an item button up for ItemContextChanged only as it shows with GetItemContextMatchResult
+	-- set (ItemButtonMixin:PostOnShow); a free slot drawn as an item in place does not show again, and would
+	-- never hear a spell's targeting start or end (item-drawing.md §8). One callback per owner: signing up twice is harmless.
+	if not hadContextMatch and decoration.OnItemContextChanged and decoration:IsVisible() then
+		ItemButtonUtil.RegisterCallback(ItemButtonUtil.Event.ItemContextChanged, decoration.OnItemContextChanged, decoration)
+	end
 	setIcon(decoration, data.itemInfo.itemIcon)
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
 	local quality = data.itemInfo.itemQuality
@@ -663,7 +711,11 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(isQuestItem, questID, isActive) end
 	elements:DrawItemQuest(decoration, questInfo)
-	if not self.staticData then
+	if self.staticData then
+		-- No new-item glow on a static draw: on a button pointed at a bag slot (the Food & Drink bar's), Blizzard's own
+		-- UpdateNewItem, which ResetVisuals calls, lights it for a slot the client flags new (item-drawing.md).
+		self:ClearFlashItem(ctx)
+	else
 		self:UpdateNewItem(ctx, data)
 	end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue) end
@@ -968,6 +1020,8 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	-- A theme's quest art comes off too (the Classic clients' buttons have no UpdateQuestItem).
+	elements:DrawItemQuest(decoration, nil)
 	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
 	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
@@ -990,12 +1044,13 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
 
-	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph atlas,
-	-- drawn centered and semi-transparent. Generic bags leave it nil, so the overlay stays hidden.
+	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph file,
+	-- drawn centered in the theme's color, smooth at a third of its size (TRILINEAR, as the
+	-- header glyphs). Generic bags leave it nil, so the overlay stays hidden.
 	local familyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon
 	local familyTexture = getFamilyIconTexture(decoration)
 	if familyIcon then
-		familyTexture:SetAtlas(familyIcon)
+		familyTexture:SetTexture(familyIcon, nil, nil, "TRILINEAR")
 		familyTexture:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
 		familyTexture:Show()
 	else
@@ -1106,6 +1161,8 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	-- A theme's quest art comes off too (the Classic clients' buttons have no UpdateQuestItem).
+	elements:DrawItemQuest(decoration, nil)
 	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
 	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
@@ -1299,6 +1356,8 @@ function itemFrame:_DoCreate(_, bagID)
 
 	---@class ItemButton
 	local button = CreateFrame("ItemButton", name, parent, "ContainerFrameItemButtonTemplate")
+	-- WoW: Forever's gamepad cursor lands on this button, X right-clicks it (integrations/gamepad.lua).
+	button.bbGamepad = "item"
 
 	-- Install special handlers for themed interaction textures.
 	-- Use plain HookScript (not addon.HookScript) to avoid creating contexts during
@@ -1407,6 +1466,18 @@ local function initializeSlotButton(button, holder, bagID, slotID)
 	else
 		button:Initialize(bagID, slotID)
 	end
+end
+
+-- SetSlot points a button made for no slot of its own at a bag slot, and again at another (the Food & Drink bar's,
+-- food-drink.md §3): its holder, its interaction button and its decoration, as GetButton does once for a slot's own
+-- button. Classic's container button reads its bag from its parent's ID.
+---@param ctx Context
+---@param bagID number
+---@param slotID number
+function itemFrame.itemProto:SetSlot(ctx, bagID, slotID)
+	self.frame:SetID(bagID)
+	initializeSlotButton(self.button, self.frame, bagID, slotID)
+	initializeSlotButton(self:GetDecoration(ctx), self.frame, bagID, slotID)
 end
 
 ---@param ctx Context

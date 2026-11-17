@@ -36,6 +36,9 @@ local bagButton = addon:GetModule('BagButton')
 ---@class NextCurrencyStrip: AceModule
 local currencyStrip = addon:GetModule('NextCurrencyStrip')
 
+---@class NextFoodDrinkBar: AceModule
+local foodDrinkBar = addon:GetModule('NextFoodDrinkBar')
+
 local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 
 -- NextBag is BetterBagsNext's backpack (next.md): the panel on the right of the screen
@@ -45,20 +48,21 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 local nextBag = addon:NewModule('NextBag')
 
 ---@class NextBackpack: NextPanelFrame
----@field sortButton Button
+---@field anchorButton Button Its anchor (docs/next-bag-anchor.md): shown, locked, free.
 ---@field sizeButton Button Switches every panel between full and small (UpdateSizeButton).
 ---@field closeButton Button
 ---@field settingsButton Button
 ---@field behavior {SwitchToGroup: fun(self: any, ctx: Context, id: number)}
 ---@field helper BackpackBehaviorProto The classic behavior, for its group dialogs.
 ---@field currencyStrip NextCurrencyStripFrame The currencies at the bottom, where the free slots were (currency.md).
+---@field foodDrinkBar NextFoodDrinkBarFrame The Food & Drink bar, which comes out of it and is put away in it (food-drink.md).
 local bagProto = nextPanel:Extend({}, 'NextBackpack')
 bagProto.watchesCooldowns = true
+bagProto.categorizes = true
 
 ---@param ctx Context
 ---@return NextBackpack
 function nextBag:Create(ctx)
-  local _ = ctx
   ---@type NextBackpack
   local b = nextPanel:Create(bagProto, {
     kind = const.BAG_KIND.BACKPACK,
@@ -77,6 +81,7 @@ function nextBag:Create(ctx)
       b:SwitchToGroup(ectx, id)
     end,
   }
+  b.foodDrinkBar = foodDrinkBar:Create(ctx, b)
   return b
 end
 
@@ -106,19 +111,22 @@ function bagProto:FooterWidth()
   return self.currencyStrip:MinWidth()
 end
 
--- Deactivate switches the backpack off with BetterBags Next (next.md §11): its currency tracker hides with it.
+-- Deactivate switches the backpack off with BetterBags Next (next.md §11): its currency tracker and its Food & Drink
+-- bar hide with it.
 ---@param ctx Context
 function bagProto:Deactivate(ctx)
   self.currencyStrip.tracker:SetActive(ctx, false)
+  self.foodDrinkBar:SetActive(ctx, false)
   nextPanel.proto.Deactivate(self, ctx)
 end
 
--- Activate catches the backpack up when BetterBags Next is switched back on: its currency tracker shows again where
--- it was left, when it was out.
+-- Activate catches the backpack up when BetterBags Next is switched back on: its currency tracker and its Food & Drink
+-- bar show again where they were left, when they were out.
 ---@param ctx Context
 function bagProto:Activate(ctx)
   nextPanel.proto.Activate(self, ctx)
   self.currencyStrip.tracker:SetActive(ctx, true)
+  self.foodDrinkBar:SetActive(ctx, true)
 end
 
 ---@return NextHeaderButton[]
@@ -128,8 +136,8 @@ function bagProto:GetHeaderButtons()
     { key = "closeButton", tooltip = L:G("Close"), onClick = function(ctx) self:Hide(ctx) end },
     { key = "settingsButton", tooltip = L:G("Open Options Screen"), menuLast = true,
       onClick = function(ctx) events:SendMessage(ctx, "config/Open") end },
-    { key = "sortButton", tooltip = L:G("Sort Bags"),
-      onClick = function(ctx) self:Sort(ctx) end },
+    -- The anchor (docs/next-bag-anchor.md), where the sort button was: a right click on the title sorts (OnTitleRightClick).
+    self:AnchorButton(),
     -- Show Blizzard Bags (asked: "the 'Switch to Classic Bags' icon now becomes 'Show Blizzard Bags'";
     -- docs/next-batch-2.md §4). The way back to the classic bags is in the settings and /bb next.
     { key = "bagsButton", tooltipFunc = function() self:BagsTooltip() end, label = L:G("Show Blizzard Bags"),
@@ -137,12 +145,18 @@ function bagProto:GetHeaderButtons()
       menuTooltip = function() return L:G("Your bags in the tabs, to swap them, and your items bag by bag.") end,
       onClick = function(ctx) self:ToggleBlizzardBags(ctx) end },
     -- Small mode (docs/next-small-mode.md): every BetterBags Next panel full height or small and
-    -- movable. Its icon is its state's (SizeIconKey).
-    { key = "sizeButton", iconKey = self:SizeIconKey(), tooltipFunc = function() self:SizeTooltip() end,
-      label = L:G("Small Bags"), checked = function() return self:IsSmall() end,
-      menuTooltip = function() return L:G("Smaller bags you can move anywhere: drag a bag by its title.") end,
-      onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end },
+    -- movable (SizeEntry, every panel's switch). Its icon is its state's (SizeIconKey).
+    self:sizeButtonSpec(),
   }
+end
+
+-- sizeButtonSpec is the size button: the switch every panel's menu offers (SizeEntry), with its icon and its tooltip.
+---@private
+---@return NextHeaderButton
+function bagProto:sizeButtonSpec()
+  local spec = self:SizeEntry()
+  spec.key, spec.iconKey, spec.tooltipFunc = "sizeButton", self:SizeIconKey(), function() self:SizeTooltip() end
+  return spec
 end
 
 -- SizeIconKey is the size button's icon for the panel's size (Header.Buttons.Icons): sizeButtonFull
@@ -259,10 +273,17 @@ function bagProto:BagSlotTooltip(invID, hasBag, empty)
   GameTooltip:AddLine(L:G("Drop a bag here to put it in this slot."), nil, nil, nil, true)
 end
 
--- RefreshTabs lists the backpack's groups as tabs, in their order, with a last one to make a
--- group, and selects the active one. With groups off there are no tabs. Showing Blizzard's bags, it
--- lists the bag slots (ListBags).
-function bagProto:RefreshTabs()
+-- ListsGroups says whether the rail lists the backpack's groups: groups on, its bags not shown.
+---@return boolean
+function bagProto:ListsGroups()
+  return not self:ShowsBlizzardBags() and database:GetGroupsEnabled(self.kind)
+end
+
+-- RefreshTabs lists the backpack's groups as tabs, in their order, but those Hide Empty Groups leaves out (ShownTabs),
+-- with a last one to make a group, and selects the active one; with animate they glide. With groups off there are no
+-- tabs. Showing Blizzard's bags, it lists the bag slots (ListBags).
+---@param animate? boolean
+function bagProto:RefreshTabs(animate)
   if self:ShowsBlizzardBags() then
     self:ListBags()
     return
@@ -283,8 +304,8 @@ function bagProto:RefreshTabs()
     fixed = true,
     tooltip = { L:G("New Group..."), L:G("Click to create a new group for organizing categories.") },
   })
-  self.tabs:SetTabs(entries)
-  self.tabs:Select(self:GetCurrentTabID())
+  self.tabs:SetTabs(self:ShownTabs(entries), animate)
+  self.tabs:Select(self:GetCurrentTabID(), animate)
   self.tabs.frame:Show()
 end
 
@@ -368,11 +389,11 @@ function bagProto:WatchKind()
       self:RefreshTabs()
     end
   end)
-  events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+  events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
     if kind ~= self.kind then
       return
     end
-    if database:GetActiveGroup(self.kind) == groupID then
+    if wasActive then
       self:SwitchToGroup(ctx, 1)
     end
     self:RefreshTabs()
@@ -380,6 +401,11 @@ function bagProto:WatchKind()
   events:RegisterMessage("groups/EnabledChanged", function(_, kind)
     if kind == self.kind then
       self:RefreshTabs()
+    end
+  end)
+  events:RegisterMessage("groups/HideEmptyChanged", function(_, kind)
+    if kind == self.kind then
+      self:FollowGroups(true)
     end
   end)
 end
@@ -396,8 +422,8 @@ function bagProto:Sort(ctx)
   events:SendMessage(ctx, "bags/SortBackpack")
 end
 
--- OnTitleRightClick sorts the backpack, as its sort button does (asked: "right click the title of the backpack to
--- sort it").
+-- OnTitleRightClick sorts the backpack (asked: "right click the title of the backpack to sort it"), the way to sort it now
+-- that its anchor button stands where its sort button was (docs/next-bag-anchor.md).
 ---@param ctx Context
 function bagProto:OnTitleRightClick(ctx)
   self:Sort(ctx)
@@ -406,4 +432,10 @@ end
 ---@return string
 function bagProto:TitleRightClickHint()
   return L:G("Right-click to sort your bags.")
+end
+
+-- TitleRightClickLabel names the sort, as the original bags' button's right click did (frames/menubutton.lua).
+---@return string
+function bagProto:TitleRightClickLabel()
+  return L:G("Sort Bags")
 end

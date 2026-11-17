@@ -44,6 +44,9 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field fixed? boolean It never moves, nor does a moved tab pass it (the tab that makes a group or buys one).
 ---@field block? string The tabs it moves among: those of the same block, next to each other (the bank's own
 --- groups and its Warbank's). A block's gap stays above whichever of its tabs is first.
+---@field foot? boolean It hangs at the rail's foot (listed after the others): the foot's last tab ends where the content
+--- does, the footer's height above the body's bottom, never over the tabs above it. It is chosen as any tab is, and
+--- never moves (the guild bank's views).
 
 ---@class (exact) NextTab
 ---@field id number
@@ -66,10 +69,12 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field bag? boolean
 ---@field fixed? boolean
 ---@field block? string
+---@field foot? boolean It hangs at the rail's foot.
 ---@field movable boolean The player can move it (the rail has a reorder handler, and it is not fixed,
---- a purchase tab or draggable).
+--- a purchase tab, draggable or at the foot).
 ---@field yKey table The key of its slide up or down (NextTween), apart from its hover slide.
 ---@field yTarget? number Where it is sliding to.
+---@field fadeKey table The key of its fade in or out as it is listed or no longer is (SetTabs, animated).
 
 -- NextTabMove is a tab being moved; NextLift fills in where it was grabbed and its scale.
 ---@class NextTabMove: NextLifted
@@ -86,13 +91,17 @@ local nextTabs = addon:NewModule('NextTabs')
 ---@field tabs NextTab[]
 ---@field pool NextTab[] Ordinary tabs not in use, hidden.
 ---@field securePool NextTab[] Purchase tabs not in use, hidden.
+---@field leaving NextTab[] Tabs no longer listed, fading out, taking no clicks, before they go back to the pool (SetTabs).
 ---@field selected? number
+---@field topEnd number How far down the tabs above the foot reach, the spacing after the last included; 0 with none.
 ---@field dropTarget? number The tab a dragged section would drop on (next.md §7).
 ---@field entries NextTabEntry[] What SetTabs was last given, laid out again by a theme (ApplyStyle).
 ---@field onClick? fun(ctx: Context, id: number, button: string)
 ---@field onDrag? fun(ctx: Context, id: number)
 ---@field onResize? fun(ctx: Context) Runs after the tabs are set, which can change the rail's width.
 ---@field onReorder? fun(ctx: Context, ids: number[]) Runs when a tab moved lands in a new place, with every tab's id in the new order.
+---@field onLand? fun(ctx: Context) Runs once a tab moved has landed, wherever it did (after onReorder when it moved), or
+--- was put back as the rail hid.
 ---@field moving? NextTabMove The tab being moved.
 ---@field gaps table<string, number> Each block's gap, above its first tab.
 local railProto = {}
@@ -138,11 +147,21 @@ function nextTabs:Create(body, side)
   rail.entries = {}
   rail.pool = {}
   rail.securePool = {}
+  rail.leaving = {}
   rail.gaps = {}
+  rail.topEnd = 0
   rail:styleRail()
-  -- A tab being moved goes back to its place when the rail hides (its panel closed).
-  addon.HookScript(rail.frame, "OnHide", function()
+  -- A tab being moved goes back to its place when the rail hides (its panel closed), as if it had landed there.
+  addon.HookScript(rail.frame, "OnHide", function(ctx)
+    local moving = rail.moving ~= nil
     rail:CancelMove()
+    if moving and rail.onLand then
+      rail.onLand(ctx)
+    end
+  end)
+  -- The foot hangs from the body's bottom.
+  addon.HookScript(body, "OnSizeChanged", function()
+    rail:PlaceFoot()
   end)
   return rail
 end
@@ -160,7 +179,7 @@ function nextTabs:Ordered(entries, saved)
     rank[id] = i
   end
   local function moves(entry)
-    return not entry.fixed and entry.secure == nil
+    return not entry.fixed and entry.secure == nil and not entry.foot
   end
   local out, i = {}, 1
   while i <= #entries do
@@ -239,11 +258,13 @@ function railProto:styleTab(tab)
   self:placeContent(tab)
 end
 
--- placeContent puts a tab's name and icon on whole pixels (docs/next-pixel-perfect.md): the name the padding
--- in from its edge side, the icon after the name's text (its width rounded up), each by its corner,
--- centered on the tab's height by its font's height and its own. Anchored by their middles they would
--- sit between two pixels on a tab an odd number of pixels tall. Its name's width changes with its text
--- and its state's font (paint), so it is placed again then.
+-- placeContent puts a tab's icon and name on whole pixels (docs/next-pixel-perfect.md), each by its corner on
+-- the body's side, centered on the tab's height by its own height (the name by its font's): the icon the
+-- padding in from that side, the name past the icon and its gap (the padding in, with no icon). Next to the
+-- body, every icon down the rail is in one column; after the name it moved out with the name's width (asked:
+-- "the icon for shown bag tabs, should be on the right of the text (so they align top to bottom)"). Anchored by
+-- their middles they would sit between two pixels on a tab an odd number of pixels tall. Its name's width
+-- changes with its text and its state's font (paint), so it is placed again then.
 ---@private
 ---@param tab NextTab
 function railProto:placeContent(tab)
@@ -260,15 +281,18 @@ function railProto:placeContent(tab)
   local _, fontHeight = text:GetFont()
   local textTop = -pixel:Floor(button, (height - (fontHeight or 0)) / 2)
   local iconTop = -pixel:Floor(button, (height - icon:GetHeight()) / 2)
-  local iconX = pad + pixel:Ceil(button, text:GetStringWidth()) + gap
+  local textX = pad
+  if icon:IsShown() then
+    textX = pad + pixel:Length(button, style.TAB_ICON) + gap
+  end
   text:ClearAllPoints()
   icon:ClearAllPoints()
   if self.side == "LEFT" then
-    pixel:Point(text, "TOPLEFT", button, "TOPLEFT", pad, textTop)
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", iconX, iconTop)
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", pad, iconTop)
+    pixel:Point(text, "TOPLEFT", button, "TOPLEFT", textX, textTop)
   else
-    pixel:Point(text, "TOPRIGHT", button, "TOPRIGHT", -pad, textTop)
-    icon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -iconX, iconTop)
+    icon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -pad, iconTop)
+    pixel:Point(text, "TOPRIGHT", button, "TOPRIGHT", -textX, textTop)
   end
 end
 
@@ -279,7 +303,7 @@ end
 function railProto:ApplyStyle(ctx)
   local _ = ctx
   self:styleRail()
-  for _, list in ipairs({ self.tabs, self.pool, self.securePool }) do
+  for _, list in ipairs({ self.tabs, self.pool, self.securePool, self.leaving }) do
     for _, tab in ipairs(list) do
       self:styleTab(tab)
       self:paint(tab)
@@ -305,6 +329,13 @@ end
 ---@param fn fun(ctx: Context, ids: number[])
 function railProto:SetReorderHandler(fn)
   self.onReorder = fn
+end
+
+-- SetLandHandler sets what runs once a tab moved has landed, wherever it did, or was put back as the rail hid: its owner
+-- held off listing the tabs again while it moved, which would have put it back (Hide Empty Groups, groups.md §3).
+---@param fn fun(ctx: Context)
+function railProto:SetLandHandler(fn)
+  self.onLand = fn
 end
 
 -- SetResizeHandler sets what runs after the tabs are set (their widths can have changed).
@@ -338,6 +369,8 @@ function railProto:newTab(secure)
     button = CreateFrame("Button", nil, self.frame)
     button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   end
+  -- WoW: Forever's gamepad cursor lands on it (integrations/gamepad.lua).
+  button.bbGamepad = "tab"
   local bg = button:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints()
   bg:SetColorTexture(1, 1, 1, 1)
@@ -355,7 +388,7 @@ function railProto:newTab(secure)
   icon:Hide()
   ---@type NextTab
   local tab = { id = 0, button = button, text = text, icon = icon, bg = bg, glow = glow, highlight = highlight,
-    edge = edge, slide = 0, y = 0, secure = secure, movable = false, yKey = {} }
+    edge = edge, slide = 0, y = 0, secure = secure, movable = false, yKey = {}, fadeKey = {} }
   self:styleTab(tab)
   if not secure then
     addon.SetScript(button, "OnClick", function(ctx, _, mouseButton)
@@ -449,8 +482,49 @@ function railProto:release(tab)
   tab.hovered = false
   tab.highlight:Hide()
   tab.slide = 0
+  if not tab.secure then
+    tween:Stop(tab.fadeKey)
+    tab.button:SetAlpha(1)
+    tab.button:EnableMouse(true)
+  end
   tab.button:Hide()
   table.insert(tab.secure and self.securePool or self.pool, tab)
+end
+
+-- fade fades a tab to alpha (NextTween, Time.Interaction), then calls done.
+---@private
+---@param tab NextTab
+---@param alpha number
+---@param done? fun()
+function railProto:fade(tab, alpha, done)
+  tween:Play(tab.fadeKey, {
+    duration = style.Time.Interaction,
+    from = tab.button:GetAlpha(),
+    to = alpha,
+    ease = style:Ease("Glide"),
+    onUpdate = function(v)
+      tab.button:SetAlpha(v)
+    end,
+    onDone = done,
+  })
+end
+
+-- fadeOut fades a tab no longer listed out where it is, taking no clicks, then puts it away.
+---@private
+---@param tab NextTab
+function railProto:fadeOut(tab)
+  tab.button:EnableMouse(false)
+  tween:Stop(tab.yKey)
+  tab.yTarget = nil
+  self:fade(tab, 0, function()
+    for i, t in ipairs(self.leaving) do
+      if t == tab then
+        table.remove(self.leaving, i)
+        self:release(tab)
+        return
+      end
+    end
+  end)
 end
 
 -- take returns a pooled tab of the right kind, or a new one.
@@ -462,59 +536,125 @@ function railProto:take(secure)
   return table.remove(pool) or self:newTab(secure)
 end
 
--- SetTabs shows a tab per entry, in order, reusing the tabs it has: each entry takes the next tab
--- it had of the same kind (ordinary or purchase), so kept tabs are never hidden in between.
+-- SetTabs shows a tab per entry, in order, reusing the tabs it has: an entry takes its id's tab when it had one (one
+-- fading out comes back), else the next tab it had of the same kind (ordinary or purchase), so kept tabs are never hidden
+-- in between. With animate, on a rail that shows (Hide Empty Groups, groups.md §3; asked: "showing all sections when
+-- dragging a section, animate it"), the tabs that stay slide to their new places, a tab coming in fades in at its own,
+-- one no longer listed fades out where it is, taking no clicks, before it goes back to the pool, and the bar glides with
+-- the selected tab.
 ---@param entries NextTabEntry[]
-function railProto:SetTabs(entries)
+---@param animate? boolean
+function railProto:SetTabs(entries, animate)
   self:CancelMove()
+  animate = animate == true and self.frame:IsVisible()
   self.entries = entries
   local had = { [false] = {}, [true] = {} }
+  local byID = { [false] = {}, [true] = {} }
   for _, tab in ipairs(self.tabs) do
     table.insert(had[tab.secure], tab)
+    byID[tab.secure][tab.id] = byID[tab.secure][tab.id] or tab
   end
-  local taken = { [false] = 1, [true] = 1 }
+  local wasLeaving = {}
+  for _, tab in ipairs(self.leaving) do
+    wasLeaving[tab] = true
+    byID[tab.secure][tab.id] = byID[tab.secure][tab.id] or tab
+  end
+  local claimed, fresh = {}, {}
   self.tabs = {}
   for i, entry in ipairs(entries) do
-    local secure = entry.secure ~= nil
-    local tab = had[secure][taken[secure]]
-    if tab ~= nil then
-      had[secure][taken[secure]] = false
-      taken[secure] = taken[secure] + 1
+    local tab = byID[entry.secure ~= nil][entry.id]
+    if tab ~= nil and not claimed[tab] then
+      claimed[tab] = true
+      self.tabs[i] = tab
     else
+      table.insert(fresh, i)
+    end
+  end
+  local spare = { [false] = {}, [true] = {} }
+  for secure, list in pairs(had) do
+    for _, tab in ipairs(list) do
+      if not claimed[tab] then
+        table.insert(spare[secure], tab)
+      end
+    end
+  end
+  -- A tab coming in, gliding, is one of its own: what goes out fades out apart from it.
+  local came = {}
+  for _, i in ipairs(fresh) do
+    local secure = entries[i].secure ~= nil
+    local tab = not animate and table.remove(spare[secure], 1) or nil
+    if tab == nil then
       tab = self:take(secure)
+      came[tab] = true
     end
     self.tabs[i] = tab
   end
-  for _, kind in pairs(had) do
-    for _, tab in ipairs(kind) do
-      if tab then
+  local leaving = {}
+  for _, tab in ipairs(self.leaving) do
+    if not claimed[tab] then
+      if animate then
+        table.insert(leaving, tab)
+      else
         self:release(tab)
       end
     end
   end
+  for _, list in pairs(spare) do
+    for _, tab in ipairs(list) do
+      if animate and not tab.secure then
+        self:fadeOut(tab)
+        table.insert(leaving, tab)
+      else
+        self:release(tab)
+      end
+    end
+  end
+  self.leaving = leaving
 
-  local y = 0
+  local y, above = 0, 0
   self.gaps = {}
   for i, entry in ipairs(entries) do
     local tab = self.tabs[i]
-    if i > 1 then
-      y = y + step(self)
+    local slides = animate and not came[tab] and not entry.foot
+    if not entry.foot then
+      if above > 0 then
+        y = y + step(self)
+      end
+      above = above + 1
+      y = y + pixel:Snap(self.frame, entry.gap or 0)
+      if entry.block ~= nil and self.gaps[entry.block] == nil then
+        self.gaps[entry.block] = entry.gap or 0
+      end
+      if not slides then
+        tab.y = y
+      end
     end
-    y = y + pixel:Snap(self.frame, entry.gap or 0)
-    if entry.block ~= nil and self.gaps[entry.block] == nil then
-      self.gaps[entry.block] = entry.gap or 0
+    if not slides then
+      tween:Stop(tab.yKey)
+      tab.yTarget = nil
     end
-    tween:Stop(tab.yKey)
-    tab.yTarget = nil
+    if wasLeaving[tab] then
+      tab.button:EnableMouse(true)
+    end
+    if animate and (came[tab] or wasLeaving[tab]) then
+      if came[tab] then
+        tab.button:SetAlpha(0)
+      end
+      self:fade(tab, 1)
+    elseif wasLeaving[tab] then
+      tween:Stop(tab.fadeKey)
+      tab.button:SetAlpha(1)
+    end
     tab.id = entry.id
-    tab.y = y
     tab.accent = entry.accent
     tab.tooltip = entry.tooltip
     tab.draggable = entry.draggable
     tab.bag = entry.bag
     tab.fixed = entry.fixed
     tab.block = entry.block
+    tab.foot = entry.foot
     tab.movable = self.onReorder ~= nil and entry.secure == nil and not entry.fixed and not entry.draggable
+      and not entry.foot
     if entry.secure ~= nil then
       tab.button:SetAttribute("overrideBankType", entry.secure)
     elseif entry.draggable or tab.movable then
@@ -537,13 +677,51 @@ function railProto:SetTabs(entries)
     tab.width = pixel:Ceil(tab.button, math.min(style.TAB_MAX_WIDTH, math.max(style.TAB_MIN_WIDTH, width)))
     tab.button:SetWidth(tab.width)
     self:placeContent(tab)
-    self:place(tab)
+    if slides then
+      self:slideY(tab, y, true)
+    elseif not entry.foot then
+      self:place(tab)
+    end
     tab.button:Show()
   end
-  self.frame:SetHeight(#entries > 0 and (y + step(self)) or 1)
-  self:Select(self.selected)
+  self.topEnd = above > 0 and (y + step(self)) or 0
+  self:PlaceFoot()
+  self:Select(self.selected, animate)
   if self.onResize then
     self.onResize(context:New("NextTabs_Resize"))
+  end
+end
+
+-- PlaceFoot hangs the foot's tabs from the body's bottom: their last tab ends where the content does, the footer's height
+-- above it (NextPanel:ContentBottom), so they stay there as the body changes height; on a body too short, right under the
+-- tabs above, the group gap between. The rail is as tall as its tabs stacked (an autosized panel fits it, FittedHeight):
+-- its height never follows the body's.
+function railProto:PlaceFoot()
+  local frame = self.frame
+  local foot = {}
+  for _, tab in ipairs(self.tabs) do
+    if tab.foot then
+      table.insert(foot, tab)
+    end
+  end
+  local s = step(self)
+  local high = self.topEnd > 0 and (self.topEnd + pixel:Snap(frame, style.TAB_GROUP_GAP)) or 0
+  if #foot == 0 then
+    frame:SetHeight(self.topEnd > 0 and self.topEnd or 1)
+    return
+  end
+  frame:SetHeight(high + #foot * s)
+  local room = pixel:Floor(frame, self.body:GetHeight()) - pixel:Snap(frame, style.CONTENT_TOP) - pixel:Snap(frame, style.FOOTER)
+  local top = math.max(high, room - (#foot * s - pixel:Length(frame, style.TAB_SPACING)))
+  for i, tab in ipairs(foot) do
+    tween:Stop(tab.yKey)
+    tab.yTarget = nil
+    tab.y = top + (i - 1) * s
+    self:place(tab)
+    if tab.id == self.selected and self.indicator:IsShown() then
+      tween:Stop(self.indicator)
+      self:moveIndicator(-tab.y)
+    end
   end
 end
 
@@ -692,7 +870,8 @@ function railProto:Pulse(id)
   })
 end
 
--- Select makes id's tab the selected one; with animate the bar glides to it.
+-- Select makes id's tab the selected one, wherever it hangs (at the foot too, or where it is sliding to); with animate the
+-- bar glides to it.
 ---@param id? number
 ---@param animate? boolean
 function railProto:Select(id, animate)
@@ -701,7 +880,7 @@ function railProto:Select(id, animate)
   for _, tab in ipairs(self.tabs) do
     self:paint(tab)
     if tab.id == id then
-      target = -tab.y
+      target = -(tab.yTarget or tab.y)
       accent = tab.accent
     end
   end
@@ -794,7 +973,10 @@ function railProto:layout(withRoom)
     end
   end
   for i, tab in ipairs(self.tabs) do
-    if state ~= nil and tab == state.tab then
+    if tab.foot then
+      -- The foot hangs from the body's bottom (PlaceFoot), and no tab moves into it.
+      ys[tab] = tab.y
+    elseif state ~= nil and tab == state.tab then
       if not withRoom then
         ys[tab] = put(tab.block)
       elseif lastOfBlock == nil then
@@ -1005,6 +1187,9 @@ function railProto:landMove(ctx)
   end
   if state.index ~= state.start and self.onReorder then
     self.onReorder(ctx, ids)
+  end
+  if self.onLand then
+    self.onLand(ctx)
   end
 end
 

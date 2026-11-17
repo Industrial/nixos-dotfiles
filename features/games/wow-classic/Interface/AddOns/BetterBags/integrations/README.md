@@ -7,10 +7,13 @@ The integrations module provides seamless compatibility with popular World of Wa
 - [Overview](#overview)
 - [Supported Integrations](#supported-integrations)
   - [ConsolePort](#consoleport-consoleportlua)
+  - [WoW: Forever's Gamepad Interface](#wow-forevers-gamepad-interface-gamepadlua)
   - [Masque](#masque-masquelua)
   - [Pawn](#pawn-pawnlua)
   - [SimpleItemLevel](#simpleitemlevel-simpleitemlevellua)
   - [Profession Shopping List](#profession-shopping-list-professionshoppinglistlua)
+  - [TradeSkillMaster](#tradeskillmaster-tradeskillmasterlua)
+  - [QuickFind](#quickfind-quickfindlua)
 - [Integration Architecture](#integration-architecture)
 - [Usage](#usage)
 - [Adding New Integrations](#adding-new-integrations)
@@ -50,13 +53,40 @@ Provides gamepad/controller support through the ConsolePort addon.
 | `Select(frame)` | Set cursor to frame | `Frame` | - |
 | `Active()` | Check if enabled | - | `boolean` |
 
+### WoW: Forever's Gamepad Interface (`gamepad.lua`)
+
+Puts BetterBags' bag windows in Blizzard's own gamepad UI on WoW: Forever (issue #1180, `.claude/rules/gamepad.md`).
+It is not a third-party addon: it is Blizzard's `Blizzard_GamepadSmartNavigation` and `Blizzard_GamepadSharedUtility`,
+loaded on every Forever client; elsewhere the module does nothing.
+
+**Features (while the gamepad interface style is in use; the player can switch styles at any time):**
+- Every open bag window (both designs' backpack and bank, BetterBags Next's vendor and guild bank) joins Blizzard's
+  window list a frame after it opens and leaves it as it starts to close: the d-pad cursor moves over its buttons, the
+  triggers move between windows (Blizzard's trigger hints show)
+- The cursor lands only on buttons the windows mark (`bbGamepad`: item, vendor, guild, tab); a native `ScrollFrame` in
+  each window's scroll box keeps Blizzard's navigation off the addon-built box (`Scrollbox:SetGamepad`), and the box
+  scrolls to the selected button (`Scrollbox:ScrollIntoView`)
+- A presses the button, X right-clicks the selected item through a secure button (use, sell, move, place), B puts back an
+  item held or closes the window; Blizzard's input legend under the window says which
+- The radial menu's Bags toggles the backpack; its Character entry opens it (never closing one already open)
+- Blizzard's bank, merchant and guild bank frames BetterBags stands in for are taken out of Blizzard's window list
+- In combat the windows leave Blizzard's window list (as the combat restriction comes, while Blizzard still takes the
+  calls) and join again after it: no bag navigation with the gamepad in combat, and no call Blizzard would refuse
+
+**Methods:**
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `Add(window)` | Take in a bag window (`frame`, `scroll`, `Show`, `Hide`, `IsShown`, `IsClosing`); `BagSystem` calls it for every window it makes | `table` | `"added"`, `"already"`, `"unavailable"` |
+| `Update()` | Bring Blizzard's window list and every window in line (run a frame after any change) | - | windows in the list |
+| `Dump()` | What it knows, for `/bbdb`'s dump (`debugDumpExtras.gamepad`) | - | `table` |
+
 ### Masque (`masque.lua`)
 
 Integrates with Masque for custom button skinning.
 
 **Features:**
 - Custom button skins for item buttons
-- Separate groups for Backpack, Bank and BetterBags Next's Vendor
+- Separate groups for Backpack, Bank and BetterBags Next's Vendor, Guild Bank and Food & Drink bar
 - Respects the theme's `Masque = false` (`Sonata:UsesMasque()`), taking buttons out of their groups when such a theme is applied
 - Dynamic button registration/removal
 - Blend mode fixes for proper display
@@ -72,6 +102,10 @@ Integrates with Masque for custom button skinning.
 - `BetterBags/Bank` - All bank item buttons
 - `BetterBags/Vendor` - BetterBags Next's vendor buttons (`next/vendorbutton.lua`): their square
   button, with its parts named (`Icon`, `IconBorder`, `Count`, `Highlight`), as an `Item` button
+- `BetterBags/Guild Bank` - BetterBags Next's guild bank buttons (`next/guildbutton.lua`)
+- `BetterBags/Food & Drink` - BetterBags Next's Food & Drink bar (`next/fooddrinkbar.lua`): BetterBags' own item
+  buttons, skinned on `item/NewButton` and `item/Updated` as the bags' are, in this group because they say so
+  (`item.masqueGroup`, `.claude/rules/food-drink.md` §3)
 
 **Event Handlers:**
 - `item/NewButton` - Register new item buttons
@@ -164,6 +198,50 @@ EventRegistry "ProfessionShoppingList.OnTrackedRecipesChanged"
 - Retries on `ADDON_LOADED` when Profession Shopping List loads after BetterBags
 - Sends `shoppingList/Changed` when the tracked recipes change
 
+### TradeSkillMaster (`tradeskillmaster.lua`)
+
+Swaps BetterBags Next's vendor and TradeSkillMaster's own vendor window, one at a time, as TSM swaps its window with
+Blizzard's merchant frame (`.claude/rules/tradeskillmaster.md`, issue #1315).
+
+**Features:**
+- At a vendor, whichever TSM saved last opens: TSM's window alone, or BetterBags Next's vendor
+- A TradeSkillMaster button on the vendor opens TSM's window, and the vendor slides out with the visit still open
+- TSM's own WoW UI button brings the vendor back; closing TSM's window ends the visit
+
+**Key Components:**
+```lua
+-- TSM's API: only whether its vendor window is up
+TSM_API.IsUIVisible("VENDORING")
+-- TSM's own, read as v4.15.6 has them (it has no API to show the window)
+TradeSkillMasterDB["g@ @vendoringUIContext@showDefault"] -- false: its window is its choice
+-- its switch button on MerchantFrame (a Button carrying TSMSetScript), clicked to open its window
+```
+
+**Behavior:**
+- Nothing without TSM: `TSM_API` absent, the button hidden, nothing followed
+- While a vendor is open it looks at TSM's window every frame (`Follow`, `Look`) and tells the vendor what changed
+- `NextUIPanels:Retake` keeps the merchant frame out of Blizzard's panel layout after TSM writes its width there
+
+### QuickFind (`quickfind.lua`)
+
+Makes the items in the backpack and bank findable from the QuickFind addon (`.claude/rules/quickfind.md`).
+
+**Features:**
+- Every item of both bags is a QuickFind entry, tagged with its type, subtype, category, equipment slot and
+  location ("Backpack", "Bank")
+- Enter on one opens its bag, switches to the tab that holds it and searches for its name (In-Bag Search on)
+
+**Key Components:**
+```lua
+-- QuickFind's API (QuickFind/API.lua): register only; a source cannot be taken back
+QuickFind:RegisterSource({ name = 'BetterBags Items', get = function() return quickfind:GetItemResults() end })
+```
+
+**Behavior:**
+- Registers its source whenever QuickFind is loaded, so **Enable QuickFind Integration** (the QuickFind
+  settings page, on by default) switches at once: while it is off the source is empty (`GetItemResults`) and
+  no login message is printed
+
 ## Integration Architecture
 
 ### Automatic Detection
@@ -200,16 +278,17 @@ end)
 
 Integrations are automatic and require no configuration:
 
-1. **Install the third-party addon** (ConsolePort, Masque, Pawn, or SimpleItemLevel)
+1. **Install the third-party addon** (ConsolePort, Masque, Pawn, SimpleItemLevel, Profession Shopping List, TradeSkillMaster, or QuickFind)
 2. **Load BetterBags** - Integration automatically detects and activates
 3. **Check chat** - Confirmation message appears when integration loads
 
 ### Disabling Integrations
 
-While there's no built-in disable option, integrations can be prevented by:
+Integrations can be prevented by:
 - Not installing the third-party addon
 - Disabling the third-party addon
 - For Masque: Using a theme with `Masque = false`
+- For QuickFind: **Enable QuickFind Integration** off, on its settings page (at once)
 
 ## Adding New Integrations
 

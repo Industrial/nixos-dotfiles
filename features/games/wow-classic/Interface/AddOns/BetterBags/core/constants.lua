@@ -310,12 +310,14 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
--- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the small glyph drawn, centered and semi-transparent,
--- in the empty slots of any specialized (non-zero bag family) bag: reagent bags, quivers,
--- soul/herb/enchanting bags, etc. Values in this system are texture ATLAS names (drawn via
--- Texture:SetAtlas), not file paths. Mobile-Herbalism is present on both retail and classic
--- clients, so it is a safe cross-version default.
-const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
+-- The glyphs drawn, small, centered and faint, in the empty slots of a specialized (non-zero bag
+-- family) bag: BetterBags' own files (tools/textures/next_icons.py, item-drawing.md §11), drawn
+-- with Texture:SetTexture.
+local BAG_TYPE_GLYPHS = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\"
+
+-- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the glyph of a specialized bag whose family has none of its
+-- own: the reagent bag's.
+const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = BAG_TYPE_GLYPHS .. "reagentbag.png"
 
 -- On retail the dedicated Reagent Bag (bag id 5) is identified by id, not by a bag-family bit
 -- (C_Container.GetContainerNumFreeSlots reports family 0 for it), so it is keyed in
@@ -323,12 +325,26 @@ const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
 -- bags keep their real numeric family bits.
 const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
 
--- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value (see ITEM_BAG_FAMILY), or the symbolic
--- REAGENT_BAG_FAMILY_KEY, to a distinct overlay atlas name. Families with no explicit entry
--- fall back to EMPTY_SLOT_FAMILY_ICON_DEFAULT (resolved by items:GetEmptySlotFamilyIcon).
--- Empty by default — every specialized bag shares the default glyph for now; add per-family
--- atlases here to differentiate them.
-const.EMPTY_SLOT_FAMILY_ICON = {}
+-- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value, or the symbolic REAGENT_BAG_FAMILY_KEY, to
+-- its glyph: every family a bag holds (warcraft.wiki.gg ItemFamily: the quiver and ammo pouch, the
+-- profession bags, the keyring, the tackle box and the cooking bag). Resolved by
+-- items:GetEmptySlotFamilyIcon.
+const.EMPTY_SLOT_FAMILY_ICON = {
+  [1] = BAG_TYPE_GLYPHS .. "quiver.png",
+  [2] = BAG_TYPE_GLYPHS .. "ammopouch.png",
+  [4] = BAG_TYPE_GLYPHS .. "soulbag.png",
+  [8] = BAG_TYPE_GLYPHS .. "leatherworking.png",
+  [16] = BAG_TYPE_GLYPHS .. "inscription.png",
+  [32] = BAG_TYPE_GLYPHS .. "herb.png",
+  [64] = BAG_TYPE_GLYPHS .. "enchanting.png",
+  [128] = BAG_TYPE_GLYPHS .. "engineering.png",
+  [256] = BAG_TYPE_GLYPHS .. "keyring.png",
+  [512] = BAG_TYPE_GLYPHS .. "gem.png",
+  [1024] = BAG_TYPE_GLYPHS .. "mining.png",
+  [32768] = BAG_TYPE_GLYPHS .. "tacklebox.png",
+  [65536] = BAG_TYPE_GLYPHS .. "cooking.png",
+  [const.REAGENT_BAG_FAMILY_KEY] = BAG_TYPE_GLYPHS .. "reagentbag.png",
+}
 
 ---@enum WindowKind
 const.WINDOW_KIND = {
@@ -371,13 +387,41 @@ const.SEARCH_CATEGORY_GROUP_BY = {
   EXPANSION = 3,
 }
 
+-- The Item Order a profile saved before an order was a list of keys (profile.itemSort), which DB:MigrateItemOrders
+-- turns into the keys it sorted by.
 ---@enum ItemSortType
 const.ITEM_SORT_TYPE = {
   ALPHABETICALLY_THEN_QUALITY = 1,
   QUALITY_THEN_ALPHABETICALLY = 2,
   ITEM_LEVEL = 3,
   EXPANSION = 4,
+  SELL_PRICE_STACK = 5,
+  SELL_PRICE_EACH = 6,
+  UPGRADE_TRACK = 7,
 }
+
+-- The keys an item order is made of (util/sort.lua, item-sort.md §1), as saved: an order is a list of them, the first
+-- deciding, each next one breaking the ties of those before it.
+---@enum ItemOrderKey
+const.ITEM_ORDER_KEY = {
+  QUALITY = "quality",
+  NAME = "name",
+  ITEM_LEVEL = "itemLevel",
+  UPGRADE_TRACK = "upgradeTrack",
+  EQUIPMENT_SLOT = "equipmentSlot",
+  ITEM_TYPE = "itemType",
+  EXPANSION = "expansion",
+  COUNT = "count",
+  SELL_PRICE_STACK = "sellPriceStack",
+  SELL_PRICE_EACH = "sellPriceEach",
+}
+
+-- The most keys an item order has: Item Order, Then By and And Then By.
+const.ITEM_ORDER_DEPTH = 3
+
+-- A bag's item order until one is chosen: Quality.
+---@type ItemOrderKey[]
+const.DEFAULT_ITEM_ORDER = { const.ITEM_ORDER_KEY.QUALITY }
 
 ---@enum ExpansionType
 const.EXPANSION_TYPE = {
@@ -726,7 +770,17 @@ const.DATABASE_DEFAULTS = {
     animateItemMovement = false,
     -- Whether every bag is kept on the screen (window.md §3a): off, bags may be moved off it.
     clampBagsToScreen = false,
+    -- What the backpack does at each interaction BetterBags follows (General > Interactions, interaction-bags.md),
+    -- by the interaction's name in Enum.PlayerInteractionType: "openClose" opens it with the interaction's window and
+    -- closes it with it, "open" only opens it, "none" leaves it as it is. These are the only names there are.
+    interactionBags = { TradePartner = "openClose", Banker = "openClose", AccountBanker = "openClose",
+      Merchant = "openClose", MailInfo = "openClose", Auctioneer = "openClose", GuildBanker = "openClose",
+      VoidStorageBanker = "openClose", ScrappingMachine = "openClose", ItemUpgrade = "openClose" },
     nextEnabled = false,
+    -- Whether BetterBags Next's vendor and guild bank stand in for Blizzard's merchant and guild bank frames (Enable
+    -- Vendor Window, Enable Guild Bank Window; next-bagsystem.md §11g); off, Blizzard's frame shows the vendor or the guild bank.
+    nextVendorEnabled = true,
+    nextGuildBankEnabled = true,
     -- How BetterBags Next's backpack and its companion (the bank or a vendor) sit: "apart" on
     -- opposite edges, chained "left" (the companion at the left edge, the backpack beside it) or
     -- "right" (the backpack at the right edge, the companion beside it). next.md §12.
@@ -734,21 +788,27 @@ const.DATABASE_DEFAULTS = {
     -- The order the player moved each BetterBags Next tab rail's tabs to, by rail ("backpack", "bank",
     -- "bankTabs", "guild", "vendor"): tab ids, those not in it after them (docs/next-batch-2.md §5).
     nextTabOrder = {},
-    -- BetterBags Next's Size tab (docs/next-appearance-size.md), in percent: item buttons at the theme's
-    -- icon size times nextIconScale; small panels at nextBagScale (full panels are always at 100).
-    nextIconScale = 100,
-    nextBagScale = 100,
-    -- Whether a small panel follows what it shows while it is open, widening when a section's name or its title would be
-    -- cut short and narrowing back once it fits (next.md §14g); off, it fits as it opens and as a grip is let go.
-    nextFitNamesWhileOpen = false,
-    -- Whether a small panel is as tall as what it shows (Autosize Bags, next-small-autosize.md), growing and shrinking with it
-    -- while open; off, it is the height the player gave it, or a share of the screen.
-    nextAutosize = true,
+    -- Each BetterBags Next bag's Size tab (its settings page, docs/next-appearance-size.md), by its kind, the vendor's under
+    -- UNDEFINED (next/vendor.lua): its item buttons at the theme's icon size times iconScale and its small panel at bagScale,
+    -- in percent (a full panel is always at 100); whether its small panel follows what it shows while it is open, widening
+    -- when a section's name or its title would be cut short and narrowing back once it fits (fitNamesWhileOpen, next.md
+    -- §14g; off, it fits as it opens and as a grip is let go); and whether it is as tall as what it shows (autosize,
+    -- next-small-autosize.md), growing and shrinking with it while open (off, the height the player gave it, or a share of
+    -- the screen). The vendor is not autosized until turned on (asked).
+    nextSizeOptions = {
+      [const.BAG_KIND.BACKPACK] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [const.BAG_KIND.BANK] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [const.BAG_KIND.GUILD] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = true },
+      [const.BAG_KIND.UNDEFINED] = { iconScale = 100, bagScale = 100, fitNamesWhileOpen = false, autosize = false },
+    },
     -- BetterBags Next's panels: "small" movable ones, the default, or "full" height on the screen's
-    -- edges (docs/next-small-mode.md); where each kind's small panel was left (its top left), and the
+    -- edges (docs/next-small-mode.md); where each kind's small panel was left before it held its bottom corner (its top
+    -- left, read once), the corner it holds (docs/next-bag-anchor.md), its anchor ("free" saves nothing), and the
     -- size the player gave it with its grips (next.md §14g).
     nextSize = "small",
     nextSmallPlaces = {},
+    nextSmallCorners = {},
+    nextAnchorStates = {},
     nextSmallSizes = {},
     -- Which small panel anchors a chained pair: "apart", "backpack" or "companion" (the one the
     -- other was dropped beside).
@@ -770,6 +830,11 @@ const.DATABASE_DEFAULTS = {
     nextCurrency = { capBars = false, gains = true, hideEmpty = true, itemsEverywhere = true, layout = "row",
       scale = 100, background = true, hideInCombat = false, growX = "left", growY = "down" },
     nextCurrencyTracker = { out = false },
+    -- BetterBags Next's Food & Drink bar (.claude/rules/food-drink.md): which item level it picks, how it shows (these are
+    -- the only names there are), and whether it is out and where it was left.
+    nextFoodDrink = { pick = "highest", layout = "row", growX = "left", growY = "down", scale = 100, background = true,
+      hideInCombat = true },
+    nextFoodDrinkBar = { out = false },
     showBagButton = true,
     enableBankBag = true,
     showBankTabs = false,
@@ -778,6 +843,8 @@ const.DATABASE_DEFAULTS = {
     showGuildBankTabs = false,
     debug = false,
     inBagSearch = true,
+    -- Whether the items in the backpack and bank can be found from the QuickFind addon (quickfind.md).
+    quickFindEnabled = true,
     categorySell = false,
     showKeybindWarning = true,
     enterToMakeCategory = true,
@@ -818,6 +885,11 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.GUILD] = true,
     },
     nextSectionCompact = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
+    },
+    nextSectionGap = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
       [const.BAG_KIND.GUILD] = false,
@@ -872,15 +944,18 @@ const.DATABASE_DEFAULTS = {
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
         enabled = true,
-        color = true
+        color = true,
+        keystone = true
       },
       [const.BAG_KIND.BANK] = {
         enabled = true,
-        color = true
+        color = true,
+        keystone = true
       },
       [const.BAG_KIND.GUILD] = {
         enabled = true,
-        color = true
+        color = true,
+        keystone = true
       },
     },
     itemLevelColor = {
@@ -945,20 +1020,10 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
       },
     },
-    itemSort = {
-      [const.BAG_KIND.BACKPACK] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      },
-      [const.BAG_KIND.BANK] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      },
-      [const.BAG_KIND.GUILD] = {
-        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
-      },
-    },
+    -- Each bag's item order in each view, chosen (DB:GetItemOrder): a list of ITEM_ORDER_KEY, by kind, then view. An
+    -- order not chosen is DEFAULT_ITEM_ORDER, never a default here: AceDB strips a default's entries one by one.
+    ---@type table<BagKind, table<BagView, ItemOrderKey[]>>
+    itemOrder = {},
     customSectionSort = {
       ---@type table<string, number>
       [const.BAG_KIND.BACKPACK] = {},
@@ -1048,6 +1113,10 @@ const.DATABASE_DEFAULTS = {
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>
     ephemeralCategoryFilters = {},
+    -- Each equipment set's category, by the set's ID: what the player set for it and the name it last had (DB:GetGearSet,
+    -- category-lifecycle.md §12).
+    ---@type table<number, GearSetRecord>
+    gearSets = {},
     ---@type table<number, string>
     customCategoryIndex = {},
     categoryFilters = {
@@ -1125,6 +1194,13 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = true,
       [const.BAG_KIND.GUILD] = false,
     },
+    -- Hide Empty Groups: a bag leaves out the tab of a group with nothing in it (groups.md §3).
+    ---@type table<BagKind, boolean>
+    hideEmptyGroups = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.GUILD] = false,
+    },
     -- Profile system migration flag
     __profileSystemMigrated = false,
     -- Bank categories scoped by bankType migration flag
@@ -1137,6 +1213,9 @@ const.DATABASE_DEFAULTS = {
     -- The newest changelog release the player has seen (its id), and whether the changelog
     -- opens by itself on login when there is a release they have not seen.
     changelog = { lastSeen = 0, autoOpen = true },
+    -- What each /bbdb dump read of the character's equipment sets, kept across dumps, characters and profiles
+    -- (DB:AddDebugEquipmentSets).
+    debugEquipmentSets = {},
   },
   char = {}
 }

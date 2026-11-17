@@ -14,8 +14,13 @@ Every setting defined once: its kind (toggle, dropdown, slider), name, descripti
 choices or range, how it is read and written, and what it sends so the bags show it (`bags/Redraw` for
 what only changes how the bags look, `bags/Rederive` for what the data phase reads, `bags/FullRefreshAll`
 for what a bag read depends on). A bag's settings are bound to a bag when asked for:
-`catalog:Get(id, bag)`. The window builds its rows from it; `spec/config/settings_effects_spec.lua`
-checks what each setting sends.
+`catalog:Get(id, bag)`, the bags being the backpack, the bank, the guild bank and BetterBags Next's vendor
+(`catalog:Bags()`). A bag's setting is the bags' that hold items unless it names its kinds (`only`): each bag's
+switch is its own (Enable Bank Bags, Enable Vendor Window, Enable Guild Bank Window), and each bag's Size tab is
+every bag's, the vendor's too (`.claude/rules/next-bag-settings.md`). The window builds its rows from it;
+`spec/config/settings_effects_spec.lua` checks what each setting sends. Most read and write the profile; Include
+Tradeable Reagents (the bank's) is the client's own `bankAutoDepositReagents` CVar, kept per character, which a
+Warbank deposit reads (`.claude/rules/warbank-deposit.md`).
 
 ### config.lua (`Config`)
 
@@ -25,7 +30,8 @@ design the bags switch to (`bags/DesignChanged`).
 Chat commands:
 - `/bb` opens the settings window; `/bb changelog` opens What's New; `/bb next` switches between the
   classic bags and BetterBags Next.
-- `/bbanchor` shows the bags' anchors (the classic bags; BetterBags Next has none).
+- `/bbanchor` shows the classic bags' anchors. BetterBags Next's bags show theirs from their header's anchor button
+  (`.claude/rules/next-bag-anchor.md` §30b).
 - `/bbdb` turns debug mode on and off.
 
 ### plugin.lua

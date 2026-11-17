@@ -30,6 +30,7 @@ sonataNext:RegisterTheme({
     Lavender = { 0.78, 0.72, 1.0, 1 },
     Text = { 0.96, 0.95, 1.0, 1 },
     Muted = { 0.62, 0.58, 0.78, 1 },
+    -- A tab's fill for a theme whose Tabs.Fill names it (Default's tabs are the search box's).
     Tab = { 0.09, 0.08, 0.16, 0.92 },
     TabSelected = { 0.18, 0.15, 0.32, 0.96 },
     -- A move waiting to be confirmed (the dock): its card, and the scrim dimming the panel behind it.
@@ -76,18 +77,25 @@ sonataNext:RegisterTheme({
     -- alpha, in the style of Blizzard's settings gear.
     IconSettings = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\settings.png",
     IconClose = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\close.png",
-    IconSort = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\sort.png",
+    -- The anchor button's (docs/next-bag-anchor.md): free, its anchor shown, locked.
+    IconAnchor = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\anchor.png",
+    IconAnchorShown = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\anchorshown.png",
+    IconLock = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\lock.png",
     IconBags = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\bags.png",
     IconSmall = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\small.png",
     IconFull = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\full.png",
     IconBankTabs = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\banktabs.png",
     IconDeposit = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\deposit.png",
+    -- Out of the guild bank, in its log (deposit's arrow turned to rise out of the tray).
+    IconWithdraw = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\withdraw.png",
     IconDepositGold = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\depositgold.png",
     IconWithdrawGold = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\withdrawgold.png",
     IconFilter = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\filter.png",
     IconSellJunk = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\selljunk.png",
     IconRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\repair.png",
     IconGuildRepair = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\guildrepair.png",
+    -- The vendor's TradeSkillMaster button: two arrows passing, one window for the other.
+    IconSwap = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\swap.png",
     -- The controls' glyphs: a dropdown's chevron, a menu's check, the search box's magnifier, a plus.
     IconChevron = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\chevron.png",
     IconBack = "Interface\\AddOns\\BetterBags\\textures\\next\\icons\\back.png",
@@ -108,7 +116,7 @@ sonataNext:RegisterTheme({
     SectionRecent = { Size = 14, Color = "Gold", Shadow = true },
     SectionFree = { Size = 13, Color = "Muted" },
     Count = { Size = 11, Color = "Muted" },
-    Tab = { Size = 12, Color = "Muted" },
+    Tab = { Size = 12, Color = "Lavender" },
     TabSelected = { Size = 12, Color = "White", Shadow = true },
     Footer = { Size = 12, Color = "Muted" },
     -- "Nothing here yet" over an empty tab.
@@ -151,7 +159,8 @@ sonataNext:RegisterTheme({
     TopTabSelected = { Size = 13, Color = "White", Shadow = true },
     -- The settings window (next-settings.md): the brand, the sidebar's headings and pages (under the
     -- pointer, chosen), the version; a page's title and description; a section's title and note; a
-    -- setting's name; text on a page (a paragraph, "nothing found"); a search result's page.
+    -- setting's name; text on a page (a paragraph, "nothing found"); a search result's page; a lead
+    -- paragraph, larger, that a tab is about (a Blizzard category's explanation).
     SettingsBrand = { Size = 20, Color = "White", Shadow = true },
     SettingsNavGroup = { Size = 11, Color = "Gold" },
     SettingsNav = { Size = 13, Color = "Muted" },
@@ -165,6 +174,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Size = 13, Color = "Text" },
     SettingsText = { Size = 12, Color = "Muted" },
     SettingsLink = { Size = 12, Color = "Gold" },
+    SettingsLead = { Size = 15, Color = "Text" },
     -- The currencies at the bottom of the backpack and on the tracker dragged out of it (currency.md): a count, one at a
     -- cap, one you have none of; a name (the tracker's list); a gain rising off it and a loss sinking; "+N" (what does
     -- not fit).
@@ -330,12 +340,20 @@ sonataNext:RegisterTheme({
     Edge = { Color = "Lavender", Alpha = 0.35, Size = 1, Full = false },
     -- Lit while a section from the other bag would drop on it.
     DropGlow = { Color = "Lavender", Alpha = 0.12, BlendMode = "ADD" },
+    -- A full panel docked to its screen edge: false reaches the screen's top and bottom; a margin keeps its art (its Frame's
+    -- pieces and its bag button, where they reach past its body) that far clear of each, the same gap seen at both.
+    DockMargin = false,
   },
 
   Header = {
     Title = { Font = "Title" },
     -- Behind the title while the pointer is over it.
     TitleGlow = { Texture = "Glow", Color = "Gold", Alpha = 0.3, X = 24, Y = 14, BlendMode = "ADD" },
+    -- Where an item dropped to put it in a category goes (the category picker, issue #1270): the title ("Title"), or the
+    -- bag button ("Menu", a theme with Buttons.Menu), or nowhere (false). On the title, Highlight lights behind it while
+    -- an item is held over it, X past the title's text on each side and Y above and below it; the bag button lights its
+    -- own Highlight.
+    ItemDrop = { Target = "Title", Highlight = { Texture = "Glow", Color = "Gold", Alpha = 0.6, X = 32, Y = 16, BlendMode = "ADD" } },
     -- The ribbon running from the title out of the window: a line and its glow, lines above and below
     -- it at an offset, fainter the further out ({ offset, alpha }).
     Ribbon = {
@@ -391,13 +409,16 @@ sonataNext:RegisterTheme({
     -- on the right, from Start below the body's top; false: no art). Pinned puts a button by its key at a corner
     -- of the body ({ Point, X, Y }:
     -- TOPRIGHT and the rest, or TOPOUTER and the rest by side, mirrored as ornaments are), apart from the row
-    -- or the rail (none here).
+    -- or the rail (none here). Backdrop (none here) draws every button on a backdrop: its Fill, its Edge, and HoverEdge
+    -- in place of the edge under the pointer while enabled; an icon's own Backdrop (false: none) wins.
     Buttons = { Color = "ButtonIcon", HoverColor = "White", ArtColor = "ButtonIcon", ArtHoverColor = "White",
-      DisabledAlpha = 0.3, Scale = 1, Rail = false,
+      DisabledAlpha = 0.3, Scale = 1, Rail = false, Backdrop = false,
       Icons = {
         settingsButton = { Texture = "IconSettings" },
         closeButton = { Texture = "IconClose" },
-        sortButton = { Texture = "IconSort" },
+        anchorButtonFree = { Texture = "IconAnchor" },
+        anchorButtonShown = { Texture = "IconAnchorShown" },
+        anchorButtonLocked = { Texture = "IconLock" },
         bagsButton = { Texture = "IconBags" },
         sizeButtonFull = { Texture = "IconSmall" },
         sizeButtonSmall = { Texture = "IconFull" },
@@ -409,6 +430,7 @@ sonataNext:RegisterTheme({
         sellJunkButton = { Texture = "IconSellJunk" },
         repairAllButton = { Texture = "IconRepair" },
         guildRepairButton = { Texture = "IconGuildRepair" },
+        tsmButton = { Texture = "IconSwap" },
       } },
   },
 
@@ -445,13 +467,17 @@ sonataNext:RegisterTheme({
   },
 
   Tabs = {
-    -- Colors, or art (drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels).
-    Fill = "Tab",
+    -- Colors, or art (drawn for the backpack's tabs, sticking out to the left, mirrored on the other panels). The search
+    -- box's fill, lighter than the body: a tab beside a small panel stands over the world, not over the panel.
+    Fill = "SearchFill",
     SelectedFill = "TabSelected",
-    -- A colored tab fades out toward its far end, to this share of its alpha.
-    Fade = 0.35,
+    -- A colored tab fades out toward its far end, to this share of its alpha (1: solid, its name on its fill).
+    Fade = 1,
     Font = "Tab",
     SelectedFont = "TabSelected",
+    -- Round each tab (false: none), as round a small panel (Panel.Edge) and the search box; the selected one's in gold.
+    Edge = { Color = "Lavender", Alpha = 0.35, Size = 1 },
+    SelectedEdge = { Color = "Gold", Alpha = 0.9, Size = 1 },
     -- Lit on a tab a dragged section would drop on (Drop), and flashing on one that received one
     -- (Pulse, fading from).
     Glow = { Color = "Lavender", BlendMode = "ADD", Drop = 0.3, Pulse = 0.8 },
@@ -649,6 +675,18 @@ sonataNext:RegisterTheme({
     CardHover = { 1, 1, 1, 0.07 },
     StackFont = "Stack",
     DurabilityHeight = 3,
+    -- A guild bank log entry's action, before who did it on its card's bottom line (guild-bank.md §5; asked: "an icon,
+    -- not text ... color coded ... so humans can quickly scan it"): a glyph (Texture or Atlas) as large as a price's
+    -- coins, tinted by which way it went: in Gain's color, out in Danger's, moved between tabs in Gold's.
+    LogIcons = {
+      Deposit = { Texture = "IconDeposit", Color = "Gain" },
+      Withdraw = { Texture = "IconWithdraw", Color = "Danger" },
+      Move = { Texture = "IconBankTabs", Color = "Gold" },
+      DepositGold = { Texture = "IconDepositGold", Color = "Gain" },
+      WithdrawGold = { Texture = "IconWithdrawGold", Color = "Danger" },
+      Repair = { Texture = "IconGuildRepair", Color = "Danger" },
+      BuyTab = { Texture = "IconBankTabs", Color = "Danger" },
+    },
   },
 
   -- The settings window (next-settings.md): a page per entry down its sidebar, tabs across a page,
@@ -727,6 +765,8 @@ sonataNext:RegisterTheme({
       GroupFont = "SettingsSection", Font = "SettingsLabel", NoteFont = "SettingsSectionNote",
       LabelFont = "SettingsText", TextFont = "SettingsText", SectionFont = "SettingsSection",
       HintFont = "SettingsSectionNote",
+      -- A Blizzard category's tab: its explanation in LeadFont, at most LeadWidth wide.
+      LeadFont = "SettingsLead", LeadWidth = 480,
     },
     -- A bag's categories, on its Order tab: over its Fill, Pad inside; rows RowHeight tall (headings
     -- GroupHeight), Indent in; the light under the pointer; the fonts. A dragged row is lifted as a bag's
@@ -870,6 +910,13 @@ sonataNext:RegisterTheme({
       HoverFill = { Color = "Lavender", Alpha = 0.14 },
       Font = "MenuItem", SelectedFont = "MenuItemSelected",
       Check = { Texture = "IconCheck", Color = "Gold", Size = 12 },
+      -- A menu to find a choice in by typing (the category picker): at least Width wide, MaxRows rows before it scrolls
+      -- (a long list read at a glance); its head (an icon IconSize square in an item grid cell's edge, its text in
+      -- HeadFont and a note under it in NoteFont) and its field, each Gap above what follows; a choice's dot Dot square
+      -- before its name, and its note at its right in NoteFont; the glyphs where the check goes on the choice that makes
+      -- a new category (NewIcon) and the one that takes the item back to where it belongs (BackIcon).
+      Picker = { Width = 280, MaxRows = 18, Gap = 8, IconSize = 32, Dot = 8, HeadFont = "DialogTitle", NoteFont = "ControlMuted",
+        NewIcon = { Texture = "IconPlus", Color = "Gold" }, BackIcon = { Texture = "IconBack", Color = "Lavender" } },
     },
     -- A color swatch: Size square, its edge idle and under the pointer.
     Swatch = {

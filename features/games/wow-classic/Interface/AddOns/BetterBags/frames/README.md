@@ -80,12 +80,16 @@ Individual item button implementation with full WoW item functionality.
 **Key Features:**
 - Item display with icon, count, quality
 - Item level display
+- A keystone's level in the same place, by its own setting (Show Keystone Level), in Blizzard's color for that level with Show Item Level Color on (`ShowKeystoneLevel`; `.claude/rules/keystone-level.md`)
 - Item level colors refresh when max item level changes
 - Cooldown tracking
 - Search highlighting
 - Upgrade indicator
+- Junk coin at a vendor (Blizzard's `UpdateJunkItem`), redrawn when a vendor opens or closes through the sweep's junk mark (`data.junkMarked`, one of the inputs a skipped redraw compares; `.claude/rules/item-drawing.md` §7b)
+- Dimming what does not fit Blizzard's item context (`itemFrame.GetItemContextMatchResult`): the answer the sweep worked out (`data.itemContextMatchResult`), except while a spell targets an item (Feed Pet, an enchant, a sharpening stone) or after one the sweep's answer was worked out under, when Blizzard is asked again, since those start and end with no bag refresh (`.claude/rules/item-drawing.md` §8)
 - Stack management
-- Free slot display
+- WoW: Forever's gamepad cursor lands on the interaction button (`bbGamepad = "item"`), never on the decoration behind it; X right-clicks it (`.claude/rules/gamepad.md` §5)
+- Free slot display: a specialized bag's empty slots draw its bag type's glyph (a quiver's arrow, a herb bag's sprig, the keyring's key, ...; BetterBags' own files from `tools/textures/next_icons.py`), small, centered and faint in the item button theme's color (`ItemButton.FamilyIcon`: white at 0.4 unless the theme says otherwise), the reagent bag's for a bag type with none (`.claude/rules/item-drawing.md` §11)
 
 **Main Class:**
 ```lua
@@ -112,7 +116,7 @@ Container for grouping items into categorized sections.
 **Key Features:**
 - Category-based item grouping
 - Drag-and-drop category assignment (backpack and bank, with cross-type constraints)
-- Item drops on the title: with Shift the item is added to the section's category; without Shift the drop goes to the title's bag window (`bag:PlaceCursorItem()`)
+- Item drops on the title: with Shift the item is added to the section's category (a Blizzard category is first made the player's with `categories:Convert`, as BetterBags Next's header does); without Shift the drop goes to the title's bag window (`bag:PlaceCursorItem()`)
 - Right-click section actions
 - Automatic sorting
 
@@ -128,6 +132,8 @@ The `sectionFrame` module tracks three module-level fields during a drag:
 - `draggingCategory` — name of the category being dragged
 - `draggingKind` — `BagKind` of the source section (backpack or bank)
 - `draggingBankType` — `bankType` of the active bank group at drag start (nil for backpack drags)
+
+While a section is dragged, every group's tab of both bags shows, so a category can be dropped on a group Hide Empty Groups hides (`RevealGroupTabs(true)` at the drag's start, `RevealGroupTabs(false)` once it is dropped and assigned: each bag's `behavior:RevealGroups`, `.claude/rules/groups.md` §3).
 
 **Main Class:**
 ```lua
@@ -239,7 +245,8 @@ Right-click context menu system.
 - Anchor controls
 - Character bank tabs toggle (retail)
 - Bank tab purchases
-- Sort operations
+- Sort operations (Sort Bank only sorts; Clean Up Warbank)
+- The Warbank's item deposit, with a Warbank: Deposit All Warbound Items (the bank's deposit, which asks first when a refund would end) and Include tradeable reagents (the client's `bankAutoDepositReagents` CVar), Blizzard's button and checkbox in Blizzard's words (`.claude/rules/warbank-deposit.md`)
 
 ### Tabs (`tabs.lua`)
 
@@ -257,6 +264,7 @@ Tab management for bank views.
 - Drag-to-reorder with cross-section drag constraint
 - Icon-only tab minimum width enforcement (50px)
 - Functional disable state (`SetTabsDisabled`) available for external use
+- WoW: Forever's gamepad cursor lands on a tab's decoration, which takes its clicks (`bbGamepad = "tab"`, `.claude/rules/gamepad.md` §5)
 
 **Tab Disable State:**
 
@@ -392,6 +400,10 @@ Frame anchoring and positioning system.
 - Automatic quadrant detection
 - Draggable anchors
 - Position persistence
+
+`Anchor:CreateSquare(name, label)` makes the anchor as it shows: a blue square 72 across, its label at its top and where it
+is at its bottom, over everything. The classic bags' anchor (`Anchor:New`) and BetterBags Next's (`.claude/rules/next-bag-anchor.md`
+§30c) both use it, so they look the same; each wires its own dragging and saving.
 
 ### Money Frame (`money.lua`)
 

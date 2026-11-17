@@ -414,6 +414,19 @@ function sectionFrame:HideDragGhost()
   end
 end
 
+-- RevealGroupTabs shows every group's tab of both bags while a section is dragged (on), so it can be dropped on an empty
+-- one, and hides the empty ones again once it is dropped (Hide Empty Groups, groups.md §3).
+---@param on boolean
+function sectionFrame:RevealGroupTabs(on)
+  local ctx = context:New("RevealGroupTabs")
+  local bags = addon.Bags or {}
+  for _, bag in ipairs({ bags.Backpack or false, bags.Bank or false }) do
+    if bag and bag.behavior then
+      bag.behavior:RevealGroups(ctx, on)
+    end
+  end
+end
+
 -- ResetTabHighlights puts every tab of both bags back in its state after a drag ends.
 function sectionFrame:ResetTabHighlights()
   local tabs = addon:GetModule("Tabs")
@@ -478,6 +491,15 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   ---@cast itemID number
   if cursorType ~= "item" then return end
   local category = section:GetTitle()
+  -- A gear set's category takes its set's items, as BetterBags Next's header says (category-lifecycle.md §12).
+  if categories:IsGearSet(category) then
+    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
+    return
+  end
+  -- A Blizzard category's title makes it yours first, as BetterBags Next's header does (category-lifecycle.md §11).
+  if not categories:DoesCategoryExist(category) then
+    categories:Convert(ctx, category)
+  end
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
   events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
@@ -660,10 +682,12 @@ function sectionFrame:_DoCreate()
     sectionFrame.draggingBankType = bankType
     sectionFrame.dragTargetTab = nil
     sectionFrame:ShowDragGhost(category)
+    sectionFrame:RevealGroupTabs(true)
   end)
 
   title:SetScript("OnDragStop", function()
-    if sectionFrame.draggingCategory then
+    local dragging = sectionFrame.draggingCategory ~= nil
+    if dragging then
       -- Perform the drop if we have a valid target
       sectionFrame:PerformDrop()
     end
@@ -673,6 +697,9 @@ function sectionFrame:_DoCreate()
     sectionFrame.dragTargetTab = nil
     sectionFrame:HideDragGhost()
     sectionFrame:ResetTabHighlights()
+    if dragging then
+      sectionFrame:RevealGroupTabs(false)
+    end
   end)
 
   addon.SetScript(title, "OnClick", function(ctx, _, e)

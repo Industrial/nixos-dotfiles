@@ -39,6 +39,9 @@ local nextPanel = addon:GetModule('NextPanel')
 ---@class NextPixel: AceModule
 local pixel = addon:GetModule('NextPixel')
 
+---@class NextDialog: AceModule
+local nextDialog = addon:GetModule('NextDialog')
+
 -- NextBank is BetterBagsNext's bank (next.md §6): the backpack's panel mirrored on the left of the
 -- screen (next/panel.lua). It does what the classic retail, WoW: Forever and Classic banks do,
 -- reusing their code wherever it is not drawing: the groups and the Warbank, Blizzard's bank tabs
@@ -54,7 +57,7 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 ---@field settingsButton Button
 ---@field bankTabsButton? Button Retail: switches between groups and Blizzard's bank tabs.
 ---@field depositButton? Button Retail with a Warbank.
----@field sortButton? Button Where the client can sort the bank.
+---@field anchorButton Button Its anchor (docs/next-bag-anchor.md): shown, locked, free.
 ---@field purchaseBankButton? Button Retail: shown while the character owns no character bank tab.
 ---@field bankTab number The bank tab the bank shows: what deposits, drops and the backpack's grey-out go by.
 ---@field blizzardBankTab? number The Blizzard bank tab shown, in tab mode.
@@ -63,6 +66,7 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 ---@field wipeWhenHidden boolean The bank closed while the panel slid out: clear it once hidden.
 ---@field endingInteraction boolean It is ending the bank interaction.
 local bankProto = nextPanel:Extend({}, 'NextBankPanel')
+bankProto.categorizes = true
 
 ---@return BankSlots?
 local function bankSlots()
@@ -83,6 +87,9 @@ function nextBank:Create(ctx)
     openSound = SOUNDKIT.IG_MAINMENU_OPEN,
     closeSound = SOUNDKIT.IG_MAINMENU_CLOSE,
     chainRole = "companion",
+    standIn = "BankFrame",
+    -- The Warband banker opens it too, on a client with one (core/hooks.lua).
+    interactions = addon.hasWarbank and { "Banker", "AccountBanker" } or { "Banker" },
   })
   b.bankTab = const.BANK_TAB.BANK
   b.wipeWhenHidden = false
@@ -94,6 +101,10 @@ function nextBank:Create(ctx)
     end,
     SwitchToBlizzardTab = function(_, ectx, bagIndex)
       b:SwitchToBlizzardTab(ectx, bagIndex)
+    end,
+    -- The menu button's Shift right click (BagMenuButton:Sort), from a right click on the title.
+    DepositWarboundItems = function()
+      b:DepositWarboundItems()
     end,
   }
   b:BuildPurchaseBankButton()
@@ -113,13 +124,65 @@ function bankProto:GetHeaderButtons()
       onClick = function(ctx) self:ToggleBankTabs(ctx) end })
   end
   if addon.hasWarbank then
-    table.insert(buttons, { key = "depositButton", tooltip = L:G("Deposit Warbank Items"),
-      onClick = function() C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account) end })
+    table.insert(buttons, { key = "depositButton", tooltip = ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL,
+      onClick = function() self:DepositWarboundItems() end })
   end
-  if (C_Container and C_Container.SortBankBags) or _G.SortBankBags then
-    table.insert(buttons, { key = "sortButton", tooltip = L:G("Sort Bank"), onClick = function(ctx) self:Sort(ctx) end })
-  end
+  -- The anchor (docs/next-bag-anchor.md), where the sort button was: a right click on the title sorts (OnTitleRightClick).
+  table.insert(buttons, self:AnchorButton())
   return buttons
+end
+
+-- DepositWarboundItems puts every warbound item in the bags into the Warbank (BankBehavior:DepositWarbound): at once,
+-- or, when that would end a refund, once the player accepts Blizzard's question (its button's, BankFrame.lua), asked in
+-- the dialog over the bank. Nothing is asked, or deposited, over a dialog another window shows: there is one dialog,
+-- and showing it again would replace that one unanswered.
+function bankProto:DepositWarboundItems()
+  bankBehavior:DepositWarbound(function(deposit)
+    if nextDialog:IsShown() then
+      return
+    end
+    nextDialog:Show(self.frame, {
+      title = ACCOUNT_BANK_DEPOSIT_BUTTON_LABEL,
+      text = ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM,
+      buttons = {
+        { text = L:G("Cancel"), onClick = function() end },
+        { text = L:G("Deposit"), style = "Danger", onClick = function() deposit() end },
+      },
+    })
+  end)
+end
+
+-- CanSort says the client can sort the bank (SortBankBags).
+---@return boolean
+function bankProto:CanSort()
+  return ((C_Container and C_Container.SortBankBags) or _G.SortBankBags) and true or false
+end
+
+-- OnTitleRightClick sorts the bank, as the backpack's title sorts it (docs/next-bag-anchor.md: the anchor button stands where
+-- its sort button was), on a client that can.
+---@param ctx Context
+function bankProto:OnTitleRightClick(ctx)
+  if self:CanSort() then
+    self:Sort(ctx)
+  end
+end
+
+---@return string?
+function bankProto:TitleRightClickHint()
+  if self:CanSort() then
+    return L:G("Right-click to sort the bank.")
+  end
+  return nil
+end
+
+-- TitleRightClickLabel names the sort, as the original bank's button's right click did (frames/menubutton.lua), where the
+-- client can sort the bank.
+---@return string?
+function bankProto:TitleRightClickLabel()
+  if self:CanSort() then
+    return L:G("Sort Bank")
+  end
+  return nil
 end
 
 -- CreateMoney makes the money frame the classic bank shows: the Warbank's gold on retail with a
@@ -265,9 +328,18 @@ function bankProto:TabData(bagIndex)
   return nil
 end
 
+-- ListsGroups says whether the rail lists the bank's groups from data split by group: groups on, and the Bank Tabs
+-- setting off. Classic has no Bank Tabs mode, but a setting left on splits its data by bag (data/items.lua).
+---@return boolean
+function bankProto:ListsGroups()
+  return not database:GetShowBankTabs() and database:GetGroupsEnabled(self.kind)
+end
+
 -- RefreshTabs lists Blizzard's bank tabs in tab mode, else the bank's groups (none while groups
--- are off), and selects the one shown.
-function bankProto:RefreshTabs()
+-- are off) but those Hide Empty Groups leaves out (ShownTabs), the gap above the first Warbank group
+-- shown, and selects the one shown; with animate they glide.
+---@param animate? boolean
+function bankProto:RefreshTabs(animate)
   if self:InTabMode() then
     self:ListBankTabs()
     return
@@ -287,21 +359,28 @@ function bankProto:RefreshTabs()
   local byID = function(a, b) return a.id < b.id end
   table.sort(bank, byID)
   table.sort(warbank, byID)
-  local entries = self:OrderedTabs(bank)
-  for i, entry in ipairs(self:OrderedTabs(warbank)) do
-    if i == 1 and #bank > 0 then
-      entry.gap = style.TAB_GROUP_GAP
-    end
-    table.insert(entries, entry)
+  local listed = self:OrderedTabs(bank)
+  for _, entry in ipairs(self:OrderedTabs(warbank)) do
+    table.insert(listed, entry)
   end
-  table.insert(entries, {
+  table.insert(listed, {
     id = 0,
     name = "+",
     fixed = true,
     tooltip = { L:G("Create New Group Tab"), L:G("Click to create a new group tab for organizing your items.") },
   })
-  self.tabs:SetTabs(entries)
-  self.tabs:Select(self:GetCurrentTabID())
+  local entries = self:ShownTabs(listed)
+  local bankShown = false
+  for _, entry in ipairs(entries) do
+    if entry.block == "bank" then
+      bankShown = true
+    elseif entry.block == "warbank" then
+      entry.gap = bankShown and style.TAB_GROUP_GAP or nil
+      break
+    end
+  end
+  self.tabs:SetTabs(entries, animate)
+  self.tabs:Select(self:GetCurrentTabID(), animate)
   self.tabs.frame:Show()
 end
 
@@ -604,9 +683,13 @@ function bankProto:EndBankInteraction()
 end
 
 -- Hide slides the panel out; on retail it ends the bank interaction at once, as the classic
--- bank's hook on its Hide does.
+-- bank's hook on its Hide does. Its own question (a Warbank deposit's) closes at once, answering
+-- Cancel, as the bank it was asked of is gone.
 ---@param ctx Context
 function bankProto:Hide(ctx)
+  if nextDialog:IsShown() and nextDialog.owner == self.frame then
+    nextDialog:Hide()
+  end
   nextPanel.proto.Hide(self, ctx)
   if addon.isRetail then
     self:EndBankInteraction()
@@ -687,11 +770,11 @@ function bankProto:WatchKind()
       self:RefreshTabs()
     end
   end)
-  events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+  events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
     if kind ~= self.kind then
       return
     end
-    if database:GetActiveGroup(self.kind) == groupID then
+    if wasActive then
       local default = groups:GetDefaultBankGroup()
       if default then
         self:SwitchToGroup(ctx, default.id)
@@ -702,6 +785,11 @@ function bankProto:WatchKind()
   events:RegisterMessage("groups/EnabledChanged", function(_, kind)
     if kind == self.kind then
       self:RefreshTabs()
+    end
+  end)
+  events:RegisterMessage("groups/HideEmptyChanged", function(_, kind)
+    if kind == self.kind then
+      self:FollowGroups(true)
     end
   end)
 end

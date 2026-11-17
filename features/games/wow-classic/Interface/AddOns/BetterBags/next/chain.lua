@@ -18,6 +18,12 @@ local style = addon:GetModule('NextStyle')
 ---@class NextTween: AceModule
 local tween = addon:GetModule('NextTween')
 
+-- uiPanels is NextUIPanels (next/uipanels.lua, which loads after this file and reads the chain).
+---@return NextUIPanels
+local function uiPanels()
+  return addon:GetModule('NextUIPanels')
+end
+
 -- NextChain keeps BetterBags Next's backpack and its companion (the bank or the vendor, whichever
 -- is open) apart on opposite edges of the screen, or chained together on one (next.md §12). Each
 -- bag keeps its orientation: the backpack faces left, its companion right. Chained "left", the
@@ -78,35 +84,39 @@ function chain:Register(panel, role)
     self.watching = true
     events:RegisterEvent("UI_SCALE_CHANGED", function(ctx) self:Update(ctx, true) end)
     events:RegisterEvent("DISPLAY_SIZE_CHANGED", function(ctx) self:Update(ctx, true) end)
-    events:RegisterMessage("next/ScalesChanged", function(ctx) self:ScalesChanged(ctx) end)
+    events:RegisterMessage("next/ScalesChanged", function(ctx, kind) self:ScalesChanged(ctx, kind) end)
     events:RegisterMessage("next/FitNamesChanged", function(ctx) self:FitNamesChanged(ctx) end)
     events:RegisterMessage("next/AutosizeChanged", function(ctx) self:AutosizeChanged(ctx) end)
     events:RegisterMessage("bags/ClampChanged", function(ctx) self:ClampChanged(ctx) end)
   end
 end
 
--- ScalesChanged applies the Size tab's scales (docs/next-appearance-size.md, next/ScalesChanged from its
--- sliders): the item buttons' size, then every panel (ApplyScales), then where the panels rest, a small
--- one refitted to the screen (Update, snapping).
+-- ScalesChanged applies a bag's Size tab's scales (docs/next-appearance-size.md, next/ScalesChanged from its sliders,
+-- with its kind; none for every bag): that bag's panel draws its buttons at its Icon Scale (ApplyScales), then every
+-- panel rests where it does now, a small one refitted to the screen at its Bag Scale (Update, snapping): a chained
+-- partner is placed from the panel that changed.
 ---@param ctx Context
-function chain:ScalesChanged(ctx)
-  style:SetIconScale(database:GetNextIconScale())
+---@param kind? BagKind
+function chain:ScalesChanged(ctx, kind)
   for _, panel in ipairs(self:Panels()) do
-    panel:ApplyScales(ctx)
+    if kind == nil or panel.kind == kind then
+      panel:ApplyScales(ctx)
+    end
   end
   self:Update(ctx, true)
 end
 
--- FitNamesChanged follows Fit Names While Open (next/FitNamesChanged from its switch, next.md §14g): every open small panel
--- is fitted again to what it shows now (Update, snapping: FitSmall); a closed one is fitted as it opens.
+-- FitNamesChanged follows a bag's Fit Names While Open (next/FitNamesChanged from its switch, next.md §14g): every open
+-- small panel is fitted again to what it shows now (Update, snapping: FitSmall), the bag that changed by its new choice,
+-- a chained partner placed from it; a closed one is fitted as it opens.
 ---@param ctx Context
 function chain:FitNamesChanged(ctx)
   self:Update(ctx, true)
 end
 
--- AutosizeChanged follows Autosize Bags (next/AutosizeChanged from its switch, next-small-autosize.md): every open small panel
--- takes the height it has now at once, what it shows or the height the player gave it (Update, snapping: FitSmall); a closed
--- one takes it as it opens.
+-- AutosizeChanged follows a bag's Autosize (next/AutosizeChanged from its switch, next-small-autosize.md): every open small
+-- panel takes the height it has now at once, what it shows or the height the player gave it, each by its own bag's choice
+-- (Update, snapping: FitSmall); a closed one takes it as it opens.
 ---@param ctx Context
 function chain:AutosizeChanged(ctx)
   self:Update(ctx, true)
@@ -143,7 +153,8 @@ function chain:ClampChanged(ctx)
     panel:ApplyClamp()
     if on and isOpen(panel) and isSmall(panel) then
       panel:FitSmall()
-      database:SetNextSmallPlace(panel.kind, panel.placeX, panel.placeY)
+      local _, _, side, edge = panel:HeldCorner()
+      panel:SetCorner(panel:CornerOf(panel.placeX, panel.placeY, side, edge))
     end
   end
 end
@@ -236,13 +247,25 @@ function chain:SmallGap(a, b)
   return math.max(style.Small.MinGap * s, tabs)
 end
 
+-- free says panel's anchor is free (docs/next-bag-anchor.md): a bag whose anchor shows or is locked holds its own place, and
+-- the small chain never sits it beside a partner, whichever bag set the layout (another companion dropped beside the
+-- backpack sets "backpack" for every companion).
+---@param panel NextPanelFrame
+---@return boolean
+local function free(panel)
+  return panel:AnchorState() == "free"
+end
+
 -- SmallAnchorOf returns the bag a small panel sits beside, when the small chain makes it the chained
 -- one: the backpack for a companion (layout "backpack", open or not: a companion opens beside where
--- it was left), the open companion for the backpack (layout "companion").
+-- it was left), the open companion for the backpack (layout "companion"). Never for an anchored bag (free).
 ---@param panel NextPanelFrame
 ---@return NextPanelFrame?
 function chain:SmallAnchorOf(panel)
   local layout = self:SmallLayout()
+  if not free(panel) then
+    return nil
+  end
   if layout == "backpack" and panel.chainRole == "companion" then
     return self.backpack
   end
@@ -252,9 +275,10 @@ function chain:SmallAnchorOf(panel)
   return nil
 end
 
--- ChainedPlace is where panel sits beside anchor, whose top left is ax, ay: a companion left of the
--- backpack, the backpack right of a companion, the gap between them, their tops aligned. Each is as
--- wide as the player made it (next.md §14g).
+-- ChainedPlace is where panel's top left sits beside anchor, whose top left is ax, ay: a companion left of the
+-- backpack, the backpack right of a companion, the gap between them, lined up by the edge the anchor holds (its bottom, or
+-- its top where its anchor square gave it a top corner: docs/next-bag-anchor.md), each growing away from it on its own. Each
+-- is as wide and as tall as it is now (next.md §14g).
 ---@param panel NextPanelFrame
 ---@param anchor NextPanelFrame
 ---@param ax number
@@ -262,10 +286,14 @@ end
 ---@return number x, number y
 function chain:ChainedPlace(panel, anchor, ax, ay)
   local gap = self:SmallGap(panel, anchor)
-  if panel.chainRole == "companion" then
-    return ax - gap - panel:BodyWidth() * panel:Scale(), ay
+  local y = ay
+  if anchor:HeldEdge() ~= "TOP" then
+    y = ay - anchor:SmallHeight() * anchor:Scale() + panel:SmallHeight() * panel:Scale()
   end
-  return ax + anchor:BodyWidth() * anchor:Scale() + gap, ay
+  if panel.chainRole == "companion" then
+    return ax - gap - panel:BodyWidth() * panel:Scale(), y
+  end
+  return ax + anchor:BodyWidth() * anchor:Scale() + gap, y
 end
 
 -- ChainedSide is the side of a small panel its chained partner is on, where a grip would push the
@@ -292,7 +320,8 @@ function chain:UpdateGrips()
 end
 
 -- SmallPair returns the anchor and the chained bag when the small chain chains them and both are open
--- and small.
+-- and small: in layout "backpack", the backpack and the first open companion it chains (an anchored one is not chained,
+-- free); in layout "companion", the open companion and the backpack, unless the backpack is anchored.
 ---@return NextPanelFrame? anchor, NextPanelFrame? chained
 function chain:SmallPair()
   local backpack = self.backpack
@@ -306,9 +335,14 @@ function chain:SmallPair()
   end
   local layout = self:SmallLayout()
   if layout == "backpack" then
-    return backpack, companion
+    for _, open in ipairs(self.companions) do
+      if isOpen(open) and free(open) then
+        return backpack, open
+      end
+    end
+    return nil, nil
   end
-  if layout == "companion" then
+  if layout == "companion" and free(backpack) then
     return companion, backpack
   end
   return nil, nil
@@ -351,14 +385,15 @@ end
 -- Dropped runs when the player lets go of a small bag at x, y: dropped beside its open partner's
 -- facing side (its inner side within Small.SnapReach of its spot, its top within Small.SnapRise), it
 -- chains to it, the partner the anchor, and Dropped returns its spot. A pair that would not fit on
--- the screen does not chain.
+-- the screen does not chain, nor a bag whose anchor shows or is locked (docs/next-bag-anchor.md: anchored, it holds its
+-- own place).
 ---@param panel NextPanelFrame
 ---@param x number
 ---@param y number
 ---@return number? x, number? y
 function chain:Dropped(panel, x, y)
   local partner = self:Partner(panel)
-  if partner == nil or not isSmall(partner) then
+  if partner == nil or not isSmall(partner) or panel:AnchorState() ~= "free" then
     return nil, nil
   end
   local px, py = partner:SmallPlace()
@@ -375,21 +410,27 @@ function chain:Dropped(panel, x, y)
 end
 
 -- Released runs once as a small panel closes (Hide; OnHidden for a hide Escape makes at once): the open small backpack chained
--- beside it, a companion (layout "companion"), keeps where it stands, its place saved there. In that layout the backpack hangs
--- from a companion only while one is open, and then reads its own place: its anchor's glides and refits, and its own glide into
--- its spot, moved it without saving, so its next height glide took it back to where it was dropped (next-small-autosize.md). Its
--- top saved is its spot's, beside the companion's top, not one Autosize Bags raised it to keep its bottom on the screen
--- (clampPlace), so it still goes back down to it as it shrinks. The backpack closing is never open itself; beside another
--- companion still open it reads its spot from that one, and saving it changes nothing. A close that ends part way through a
--- switch to small (PrepareResize finishes it) is a full panel's: nothing is saved (a backpack never small has no place yet).
+-- beside it, a companion (layout "companion"), keeps where it stands, its place saved there (the corner it holds,
+-- docs/next-bag-anchor.md). In that layout the backpack hangs from a companion only while one is open, and then reads its own
+-- place: its anchor's glides and refits, and its own glide into its spot, moved it without saving, so its next height glide
+-- took it back to where it was dropped (next-small-autosize.md). Its bottom saved is its spot's, beside the companion's bottom,
+-- not one Autosize Bags pushed down to keep its top on the screen (clampPlace), so it still goes back up to it as it shrinks.
+-- The backpack closing is never open itself; beside another companion still open it reads its spot from that one, and saving
+-- it changes nothing. A close that ends part way through a switch to small (PrepareResize finishes it) is a full panel's:
+-- nothing is saved (a backpack never small has no place yet), nor for an anchored backpack, which is chained to none (free).
+-- Where it stands is its place at rest and its size at rest (CornerOf), never a size part way through a glide (found by the
+-- bug review: a close mid-glide saved the glide's height, and the backpack jumped at its next height change); its spot's
+-- bottom is the companion's bottom where it is now (the spot's top less the backpack's height as ChainedPlace read it).
 ---@param panel NextPanelFrame
 function chain:Released(panel)
   local backpack = self.backpack
-  if not isSmall(panel) or self:SmallLayout() ~= "companion" or not isOpen(backpack) then
+  if not isSmall(panel) or self:SmallLayout() ~= "companion" or not isOpen(backpack) or not free(backpack) then
     return
   end
   local _, spot = self:ChainedPlace(backpack, panel, panel:LivePlace())
-  database:SetNextSmallPlace(backpack.kind, backpack.placeX, math.min(backpack.placeY, spot))
+  local spotBottom = spot - backpack:SmallHeight() * backpack:Scale()
+  local x, y, side, edge = backpack:CornerOf(backpack.placeX, backpack.placeY)
+  backpack:SetCorner(x, math.max(y, spotBottom), side, edge)
 end
 
 -- Detach lets a small bag go of its anchor as the player starts to drag it away; its partner braids
@@ -403,6 +444,26 @@ function chain:Detach(panel)
   database:SetNextSmallChain("apart")
   self:UpdateCoupling()
   return true
+end
+
+-- Unchain lets a small bag go of the small chain where the chain would sit it beside a partner, as its anchor shows
+-- (docs/next-bag-anchor.md: anchoring the chained bag unchains it, as dragging it does): a companion beside the backpack
+-- (layout "backpack"), the backpack beside a companion (layout "companion"), whether that partner is open or not. It returns
+-- whether it did. A bag already anchored is chained to none (free), and unchaining it would let go of another companion's
+-- chain (found by the second bug review: locking a shown bank set "apart", a vendor beside the backpack let go).
+---@param panel NextPanelFrame
+---@return boolean
+function chain:Unchain(panel)
+  if not free(panel) then
+    return false
+  end
+  local layout = self:SmallLayout()
+  if (layout == "backpack" and panel.chainRole == "companion") or (layout == "companion" and panel.chainRole == "backpack") then
+    database:SetNextSmallChain("apart")
+    self:UpdateCoupling()
+    return true
+  end
+  return false
 end
 
 -- Follower returns the open small bag chained to panel, when panel anchors the small pair: it moves
@@ -499,17 +560,31 @@ function chain:ExitOffset(panel)
   return panel:HiddenOffset()
 end
 
+-- opensBackpack says whether one of the interactions a companion opens at opens the backpack too
+-- (interaction-bags.md): one that leaves it alone does not.
+---@param panel NextPanelFrame
+---@return boolean
+local function opensBackpack(panel)
+  for _, name in ipairs(panel.interactions) do
+    if database:GetInteractionBags(name) ~= "none" then
+      return true
+    end
+  end
+  return false
+end
+
 -- WaitsForAnchor says whether panel, opening, waits for its anchor out of sight: a companion
 -- chained to the backpack (layout "right") while the backpack is closed. A companion opens only at
 -- a bank or a vendor, whose interaction opens the backpack a frame later (addon.OpenInteractionWindow
 -- sends bags/OpenClose later), so it would otherwise open alone at its own edge and then fly across
--- the screen. The backpack opens after its companion, so it never waits.
+-- the screen. The backpack opens after its companion, so it never waits; nor does a companion whose
+-- interactions leave the backpack alone.
 ---@param panel NextPanelFrame
 ---@return boolean
 function chain:WaitsForAnchor(panel)
   local backpack = self.backpack
   return panel.chainRole == "companion" and ANCHOR_ROLE[self:Layout()] == "backpack" and backpack ~= nil
-    and not isOpen(backpack) and self:Distance(backpack, panel) >= 0
+    and not isOpen(backpack) and self:Distance(backpack, panel) >= 0 and opensBackpack(panel)
 end
 
 -- Anchor returns the open anchor of panel when panel is the chained bag of the layout.
@@ -571,7 +646,8 @@ function chain:Panels()
 end
 
 -- Update sends every open bag to where it rests now (flying, or at once with snap: the screen
--- changed), then couples or uncouples the pair.
+-- changed), then couples or uncouples the pair, and tells Blizzard's panel manager where they rest
+-- (NextUIPanels).
 ---@param ctx Context
 ---@param snap? boolean
 function chain:Update(ctx, snap)
@@ -622,6 +698,7 @@ function chain:Update(ctx, snap)
     end
   end
   self:UpdateCoupling()
+  uiPanels():Update()
 end
 
 -- Arrived runs when a bag has come to rest after a slide or a flight: a chained bag beside its
@@ -804,6 +881,13 @@ end
 ---@return string
 function chain:Tooltip(panel)
   if isSmall(panel) then
+    -- Held (docs/next-bag-anchor.md): locked, or chained beside a locked bag.
+    if panel:AnchorState() == "locked" then
+      return L:G("Locked in place: unlock it with its anchor button.")
+    end
+    if panel:Held() then
+      return format(L:G("Locked beside the %s."), self:SmallAnchorOf(panel).label)
+    end
     return L:G("Drag to move it.")
   end
   local partner = self:Partner(panel)

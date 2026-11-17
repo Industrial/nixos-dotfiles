@@ -15,6 +15,9 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -41,6 +44,9 @@ local scrollbox = addon:GetModule('Scrollbox')
 
 ---@class NextScrollBar: AceModule
 local nextScrollBar = addon:GetModule('NextScrollBar')
+
+---@class NextControls: AceModule
+local controls = addon:GetModule('NextControls')
 
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
@@ -122,6 +128,9 @@ local nextDock = addon:GetModule('NextDock')
 
 ---@class NextChain: AceModule
 local chain = addon:GetModule('NextChain')
+
+---@class NextUIPanels: AceModule
+local uiPanels = addon:GetModule('NextUIPanels')
 
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
@@ -241,6 +250,8 @@ end
 ---@field closeSound number
 ---@field noDrag? boolean Its sections are not dragged, and nothing is dropped on it (the vendor).
 ---@field chainRole "backpack"|"companion" What it is in the chain (next.md §12).
+---@field standIn? string The global name of the frame of Blizzard's it stands in for, shown and never seen (next-uipanels.md).
+---@field interactions? string[] A companion's: the interactions it opens at, by their names in Enum.PlayerInteractionType (interaction-bags.md).
 
 ---@class (exact) NextHeaderButton
 ---@field key string The field the button is kept in on the panel, and its icon's key in the theme (Header.Buttons.Icons).
@@ -256,6 +267,8 @@ end
 ---@class NextPanelFrame
 ---@field kind BagKind
 ---@field side NextSide
+---@field standIn? string The global name of the frame of Blizzard's it stands in for (NextPanelOptions).
+---@field interactions? string[] A companion's: the interactions it opens at (NextPanelOptions).
 ---@field openSound number
 ---@field closeSound number
 ---@field frame Frame The panel.
@@ -269,8 +282,9 @@ end
 ---@field ribbonLines Texture[] The ribbon and its glow lines.
 ---@field ribbonLength number How far the ribbon reaches from the body: full length, or the middle of
 --- the gap while coupled.
----@field titleButton Button Over the title: a click chains (next.md §12).
+---@field titleButton Button Over the title: a click chains (next.md §12); an item dropped on it opens the category picker, where the theme takes it there (Header.ItemDrop).
 ---@field titleGlow Texture Behind the title, lit while the pointer is over it.
+---@field itemDropGlow Texture Behind the title, lit while an item it would take is held over it (Header.ItemDrop.Highlight).
 ---@field braid NextBraid This bag's half of the braid while coupled.
 ---@field knotSparkles NextSparkleEmitter Bursts from the knot as the pair couples.
 ---@field sparkSpread number How far out from the body the ribbon's sparkles are born.
@@ -307,11 +321,16 @@ end
 ---@field drawOnClose boolean
 ---@field drawPendingOnShow boolean
 ---@field lastSlotInfo? SlotInfo
+---@field groupTabs? table<number, table> The last data drawn that had tabs (SlotInfo.tabs): what Hide Empty Groups reads.
+---@field revealGroups? boolean A section is being dragged: every group's tab shows (RevealGroups).
+---@field tabsHidden? table<number, boolean> The groups whose tabs the rail left out when it last listed them (ShownTabs).
+---@field tabsListed? number[] Every tab the rail last listed, those left out included, in order (ShownTabs).
 ---@field drawnButtons table<Item, boolean>
 ---@field claims? table<Item, boolean>
 ---@field loaded boolean
 ---@field bankTab? number
 ---@field watchesCooldowns? boolean It refreshes its buttons' cooldowns (the backpack).
+---@field categorizes? boolean An item dropped on its title (or bag button) goes in a category (the backpack, the bank).
 ---@field size NextSize "full" height on its screen edge, or "small" and movable (docs/next-small-mode.md).
 ---@field edges Texture[] A small panel's 1-pixel lavender edge, all round.
 ---@field mover Frame A small panel's title row, dragged to move it.
@@ -334,6 +353,9 @@ end
 ---@field namesOwed? boolean Its names asked for another width while it was busy (FollowNames): it tries again each frame until it follows (followLater).
 ---@field namesKey table The tween key that tries, a frame on, what its names asked for while it was busy (followLater).
 ---@field heightKey table The tween key that fits its height a frame after it was laid out, and each frame it waits (heightLater).
+---@field dockTop number How far it stands in from the screen's top docked, before whole pixels (styleBody, DockInsets).
+---@field dockBottom number How far it stands in from the screen's bottom docked (styleBody, DockInsets).
+---@field tabsKey table The tween key that places it for its tabs a frame after they changed, and each frame it waits (tabsLater).
 ---@field released? boolean Its close (Hide) has saved the place of the backpack beside it (chain:Released): its slide's end does not again. Cleared as it hides and as it opens.
 ---@field contentHeight? number How tall what it shows was laid out last, in its own units: its scroll box's FitHeight (Autosize Bags, FittedHeight).
 ---@field glideCut? boolean Its size glide is being ended early (endSizeGlide): its end settles no chain.
@@ -410,6 +432,8 @@ function nextPanel:Create(proto, opts)
   p.kind = opts.kind
   p.label = opts.title
   p.side = opts.side
+  p.standIn = opts.standIn
+  p.interactions = opts.interactions
   p.openSound = opts.openSound
   p.closeSound = opts.closeSound
   p.offset = 0
@@ -423,6 +447,7 @@ function nextPanel:Create(proto, opts)
   p.sizeGlideKey = {}
   p.namesKey = {}
   p.heightKey = {}
+  p.tabsKey = {}
   p.size = database:GetNextSize()
   p:BuildPanel(opts.name)
   p:BuildMover()
@@ -437,6 +462,8 @@ function nextPanel:Create(proto, opts)
   sonataNext:RegisterWidget(p)
   p:Watch()
   p.content:SetHeaderHandler(p)
+  -- Its buttons at its own bag's Icon Scale (its page's Size tab), read each time it lays out.
+  p.content:SetIconSource(function() return database:GetNextIconScale(p.kind) end)
   if not opts.noDrag then
     p.content:SetColumnSource(function() return p:SectionColumns() end)
     nextDrag:Register(p)
@@ -479,11 +506,11 @@ function panelProto:MovingParts()
   return skip
 end
 
--- PixelState says what a pixel check report needs to know of the panel's state: its size and its scales.
+-- PixelState says what a pixel check report needs to know of the panel's state: its size and its bag's scales.
 ---@return string
 function panelProto:PixelState()
   return string.format("%s, Bag Scale %d%%, Icon Scale %d%%", self:IsSmall() and "small" or "full",
-    database:GetNextBagScale(), database:GetNextIconScale())
+    database:GetNextBagScale(self.kind), database:GetNextIconScale(self.kind))
 end
 
 -- PixelLayout describes the panel's column for a pixel check report (data-driven.md): the canvas (its anchor, where
@@ -556,12 +583,14 @@ function nextPanel:SetSize(ctx, size)
       table.insert(morphing, panel)
     end
   end
-  -- Autosized (next-small-autosize.md), every panel switching to small takes the height of what it shows there before any works
-  -- out where it glides to: a bag chained beside another is placed from that one's top, centered for its height where it was
-  -- never moved.
-  if size == "small" and database:GetNextAutosize() then
+  -- Every panel switching to small whose bag is autosized (next-small-autosize.md) takes the height of what it shows there
+  -- before any works out where it glides to: a bag chained beside another is placed from that one's top, centered for its
+  -- height where it was never moved.
+  if size == "small" then
     for _, panel in ipairs(morphing) do
-      panel:PrepareHeight()
+      if database:GetNextAutosize(panel.kind) then
+        panel:PrepareHeight()
+      end
     end
   end
   for _, panel in ipairs(morphing) do
@@ -570,6 +599,8 @@ function nextPanel:SetSize(ctx, size)
   for _, panel in ipairs(chain:Panels()) do
     panel:UpdateSizeButton()
   end
+  -- A full companion moves Blizzard's panels past it, a small one does not (next-uipanels.md): at once, as it switches.
+  uiPanels:Update()
   return "switched"
 end
 
@@ -590,8 +621,16 @@ function panelProto:HiddenOffset()
   return -self:Outward() * (style.WIDTH + style.OVERREACH)
 end
 
--- setOffset puts the panel x from where it rests: from its screen edge, top to bottom; a small
--- panel, x along from its place, fading as it leaves it (its slide in and out).
+-- DockInsets is how far a full panel stands in from the screen's top and from its bottom: as its theme was last drawn
+-- (styleBody: Panel.DockMargin, its art kept that far clear of each), rounded up to whole pixels of the screen; none for a theme
+-- whose full panels reach both.
+---@return number top, number bottom
+function panelProto:DockInsets()
+  return pixel:Ceil(UIParent, self.dockTop), pixel:Ceil(UIParent, self.dockBottom)
+end
+
+-- setOffset puts the panel x from where it rests: from its screen edge, from the screen's top to its bottom less its dock
+-- insets (DockInsets); a small panel, x along from its place, fading as it leaves it (its slide in and out).
 ---@private
 ---@param x number
 function panelProto:setOffset(x)
@@ -614,12 +653,13 @@ function panelProto:setOffset(x)
     return
   end
   x = pixel:SnapIn(unit, x)
+  local top, bottom = self:DockInsets()
   if self.side == "LEFT" then
-    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, 0)
-    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, 0)
+    frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, -top)
+    frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", x, bottom)
   else
-    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, 0)
-    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, 0)
+    frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", x, -top)
+    frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", x, bottom)
   end
 end
 
@@ -1752,6 +1792,9 @@ function panelProto:BuildPanel(name)
     edge:Hide()
     table.insert(self.edges, edge)
   end
+  -- Rings outlining the border (Panel.Edge.Outlines: ElvUI's black lines inside and outside it outside its pixel mode),
+  -- shown, faded and masked with it.
+  self.edgeOutlines = controls:CreateOutlines(frame, "BORDER", 1, body)
 
   local glow = frame:CreateTexture(nil, "BORDER")
   glow:SetAllPoints(self.body)
@@ -1802,6 +1845,14 @@ function panelProto:styleBody()
       end
     end
   end
+  -- A ring made now takes the corner masks already on the edges (shapeCorners puts each on only once).
+  for _, line in ipairs(controls:PlaceOutlines(self.edgeOutlines, E and E.Outlines)) do
+    for _, mask in pairs(self.cornerMasks or {}) do
+      if mask.applied then
+        line:AddMaskTexture(mask)
+      end
+    end
+  end
   self:paintEdges(1)
   local G = P.DropGlow
   if G then
@@ -1824,6 +1875,20 @@ function panelProto:styleBody()
   self.glass:Style()
   -- Mirrored, as its ornaments are, on a panel whose inner side is on the right.
   self.frameArt:Apply(P.Frame, self.side == "LEFT")
+  -- How far it stands in from the screen's top and from its bottom docked (DockInsets, Panel.DockMargin): its art past its body
+  -- there (its frame's pieces, and the bag button of every panel, so docked panels line up), on the client played, in whole
+  -- pixels of the grid a docked panel is drawn on as its art is drawn (found by the bug review: measured off it, the gaps seen
+  -- above and below were a pixel apart at some UI scales), and the margin more, so the gap seen is the margin at both (asked of
+  -- the Plain theme: "equal on both sides").
+  if type(P.DockMargin) == "number" then
+    local unit = pixel:UnitAt(UIParent:GetEffectiveScale())
+    local frameTop, frameBottom = nextFrameArt:Reach(P.Frame, unit)
+    local menuTop, menuBottom = nextMenuButton:Reach(style.Theme.Header.Buttons.Menu, unit)
+    self.dockTop = math.max(frameTop, menuTop) + P.DockMargin
+    self.dockBottom = math.max(frameBottom, menuBottom) + P.DockMargin
+  else
+    self.dockTop, self.dockBottom = 0, 0
+  end
 end
 
 -- The masks that round a corner (tools/textures/next_masks.py), one image for each corner, cut round at it and opaque
@@ -1856,6 +1921,11 @@ function panelProto:shapeCorners()
   local parts = { self.fill, self.wash, self.dropGlow, self.rail }
   for _, edge in ipairs(self.edges) do
     table.insert(parts, edge)
+  end
+  for _, ring in ipairs(self.edgeOutlines.rings) do
+    for _, side in ipairs({ "Top", "Bottom", "Left", "Right" }) do
+      table.insert(parts, ring[side])
+    end
   end
   local rounded, count = {}, 0
   for _, side in ipairs(CORNER_ORDER) do
@@ -1917,6 +1987,7 @@ function panelProto:paintEdges(strength)
   for _, edge in ipairs(self.edges) do
     edge:SetVertexColor(r, g, b, a * strength)
   end
+  controls:ColorOutlines(self.edgeOutlines, strength)
 end
 
 -- EdgeAlphaFor is how strong the border is at a size: 1 where the theme draws it (a small panel's,
@@ -1981,13 +2052,13 @@ function panelProto:takeScale()
 end
 
 -- Scale is the scale the panel is drawn at for its size (docs/next-appearance-size.md): a small panel's
--- Bag Scale, 1 for a full panel docked to its screen edge (asked: "bag scale should just not apply when
--- docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
+-- bag's Bag Scale (its page's Size tab), 1 for a full panel docked to its screen edge (asked: "bag scale should just not
+-- apply when docked to the side"). A small panel's size is in its own units, as its content is laid out; its place
 -- is on the screen, in UIParent's: on screen it is its size times this.
 ---@return number
 function panelProto:Scale()
   if self:IsSmall() then
-    return database:GetNextBagScale() / 100
+    return database:GetNextBagScale(self.kind) / 100
   end
   return 1
 end
@@ -2097,7 +2168,7 @@ end
 function panelProto:RestingHeight()
   local s, unit = self:Scale(), self:PixelUnit()
   local h
-  if database:GetNextAutosize() then
+  if database:GetNextAutosize(self.kind) then
     h = self:FittedHeight()
   else
     local _, saved = database:GetNextSmallSize(self.kind)
@@ -2326,13 +2397,14 @@ function panelProto:ContentBottom()
   return style.FOOTER
 end
 
--- Height is how tall the panel is: the screen's height, or a small panel's.
+-- Height is how tall the panel is: the screen's height less its dock insets (DockInsets), or a small panel's.
 ---@return number
 function panelProto:Height()
   if self:IsSmall() then
     return self:SmallHeight()
   end
-  return UIParent:GetHeight()
+  local top, bottom = self:DockInsets()
+  return UIParent:GetHeight() - top - bottom
 end
 
 -- Width is how wide the panel's frame is: its body and its feather, or a small panel's body alone.
@@ -2418,11 +2490,29 @@ function panelProto:SparkSpreadBase()
   return self:IsSmall() and style.Small.SparkSpread or (R and R.Spread or 0)
 end
 
+-- TabReach is how far a small panel reaches past its body on its inner side, in its own units: a side rail standing outside the
+-- body (Header.Buttons.Rail.Outside), then its tabs while the rail shows, its widest tab and the hover slide (as chain:SmallGap
+-- counts them). Groups off hide the rail and keep its tabs (RefreshTabs): the strip alone then.
+---@return number
+function panelProto:TabReach()
+  local rail = self.tabs
+  local widest = rail:Width()
+  if not rail.frame:IsShown() or widest == 0 then
+    return style.RAIL_OUT
+  end
+  return style.RAIL_OUT + widest + style.TAB_HOVER
+end
+
 -- clampPlace keeps a small panel's place (its top left) on the screen while the bags are clamped to it
--- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale; always on whole pixels of
+-- (Clamp Bags to Screen, window.md §3a), its size there its own times its scale, and its tabs past its inner side (TabReach;
+-- reported, #1248: "dragging or placing a small backpack near the screen edge clips tabs off-screen"); always on whole pixels of
 -- the screen (docs/next-pixel-perfect.md: its size is whole pixels at its scale, so its far edges are too). With
--- Autosize Bags on, its bottom stays on the screen either way: its top at least its height up (asked: "move the bag up just
--- enough"), so it grows up from the screen's bottom, and goes back down to where it was left as it shrinks.
+-- Autosize Bags on, all of its height stays on the screen either way: a bag holding its bottom (HeldCorner) grows up, so its
+-- top is pushed down no further than the screen's top (the mirror of "move the bag up just enough", asked when it held its
+-- top); one holding its top (from its anchor square) grows down, and is pushed up no further than keeps its bottom on the
+-- screen; either goes back to where it was left as it shrinks. The bag beside an open anchor hangs from it, never kept on the
+-- screen by itself: it stopped at the screen's edge while the client moved the anchor the player dragged past it, the pair
+-- apart (#1267, reported: "dragging the windows around causes them to become misaligned with each other").
 ---@private
 ---@param x number
 ---@param y number
@@ -2430,58 +2520,152 @@ end
 function panelProto:clampPlace(x, y)
   local s = self:Scale()
   if not database:GetClampBagsToScreen() then
-    if database:GetNextAutosize() then
-      y = math.max(y, math.min(UIParent:GetHeight(), self:SmallHeight() * s))
+    local _, chained = chain:SmallPair()
+    if database:GetNextAutosize(self.kind) and chained ~= self then
+      local screen = UIParent:GetHeight()
+      y = math.max(math.min(y, screen), math.min(screen, self:SmallHeight() * s))
     end
     return pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
   end
-  -- A side rail outside the body (Header.Buttons.Rail.Outside) stays on the screen too, on the inner side.
-  local strip = style.RAIL_OUT * s
-  local left, right = strip, 0
+  -- What it reaches past its body stays on the screen too, on the inner side, in whole pixels past it (its clamp rect takes the
+  -- reach exactly, ApplyClamp, and must not stand past the screen's edge). Where the screen cannot hold both, its body stays on it.
+  local reach = pixel:Ceil(UIParent, self:TabReach() * s)
+  local left, right = reach, 0
   if self.side == "LEFT" then
-    left, right = 0, strip
+    left, right = 0, reach
   end
-  x = pixel:Snap(UIParent, math.max(left, math.min(UIParent:GetWidth() - self:SmallWidth() * s - right, x)))
+  local far = UIParent:GetWidth() - self:SmallWidth() * s
+  x = pixel:Snap(UIParent, math.max(0, math.min(far, math.max(left, math.min(far - right, x)))))
   y = pixel:Snap(UIParent, math.max(self:SmallHeight() * s, math.min(UIParent:GetHeight(), y)))
   return x, y
 end
 
--- leftPlace is the place a grip let go or a Shift-click saves for a small panel at x, y on the screen: there, but with Autosize
--- Bags on, for a top raised above the one saved to keep its bottom on the screen (clampPlace), which keeps the one saved (neither
--- moves its top), so it goes back down to it as it shrinks. A top Clamp Bags to Screen keeps under the one saved is where it is,
--- as it always was.
+-- HeldCorner is the corner a small panel holds (docs/next-bag-anchor.md; asked: "always auto-grow the bag based on it's bottom
+-- half quadrant", then "let's do the 4 quadrant anchoring"): one of its four corners on the screen, where it was placed, and
+-- which, its side ("LEFT" or "RIGHT") and its edge ("TOP" only from its anchor square, AnchorDragged; else "BOTTOM"); never
+-- placed, its own side's bottom corner (the backpack's right, a companion's left) the margin in from its edge, its bottom where
+-- a bag of the default height centered on the screen has it.
+---@return number x, number y, NextSmallSide side, NextSmallEdge edge
+function panelProto:HeldCorner()
+  local x, y, side, edge = database:GetNextSmallCorner(self.kind)
+  if x ~= nil then
+    return x, y, side, edge
+  end
+  local s, unit = self:Scale(), self:PixelUnit()
+  local screen = UIParent:GetHeight()
+  local default = math.min(pixel:FloorIn(unit, screen / s),
+    pixel:LengthIn(unit, math.max(self:MinHeight(), math.floor(screen * style.Small.Height)))) * s
+  y = (screen - default) / 2
+  if self.side == "RIGHT" then
+    return UIParent:GetWidth() - style.Small.Margin, y, "RIGHT", "BOTTOM"
+  end
+  return style.Small.Margin, y, "LEFT", "BOTTOM"
+end
+
+-- HeldEdge is the edge a small panel keeps still as it grows: chained, its anchor's (they line up by it, chain:ChainedPlace);
+-- else its corner's.
+---@return NextSmallEdge
+function panelProto:HeldEdge()
+  local anchor = chain:SmallAnchorOf(self)
+  if anchor ~= nil then
+    return anchor:HeldEdge()
+  end
+  return (select(4, self:HeldCorner()))
+end
+
+-- CornerOf is the corner a small panel whose top left is x, y on the screen holds at its size at rest (the size it takes, not
+-- one part way through a glide: its place is where it rests too), by side and edge; with no side, the half of the screen its
+-- middle is on (where it is placed); with no edge, its bottom (a bag dragged by its title holds a bottom corner: asked, "when
+-- dragging by title bar == left/right anchor only").
+---@param x number
+---@param y number
+---@param side? NextSmallSide
+---@param edge? NextSmallEdge
+---@return number x, number y, NextSmallSide side, NextSmallEdge edge
+function panelProto:CornerOf(x, y, side, edge)
+  local s = self:Scale()
+  local w = (self.smallWidth or style.BODY_WIDTH) * s
+  local h = (self.smallHeight or math.floor(UIParent:GetHeight() * style.Small.Height)) * s
+  if side == nil then
+    side = x + w / 2 < UIParent:GetWidth() / 2 and "LEFT" or "RIGHT"
+  end
+  edge = edge or "BOTTOM"
+  return side == "RIGHT" and x + w or x, edge == "TOP" and y or y - h, side, edge
+end
+
+-- SetCorner saves the corner a small panel holds, and puts its anchor square there (PlaceSquare).
+---@param x number
+---@param y number
+---@param side NextSmallSide
+---@param edge NextSmallEdge
+function panelProto:SetCorner(x, y, side, edge)
+  database:SetNextSmallCorner(self.kind, x, y, side, edge)
+  self:PlaceSquare()
+end
+
+-- SavePlace saves where a small panel was placed with its top left at x, y on the screen: the bottom corner it holds there, on
+-- the half of the screen its middle is on (a drop, by its title: left or right only).
+---@param x number
+---@param y number
+function panelProto:SavePlace(x, y)
+  self:SetCorner(self:CornerOf(x, y))
+end
+
+-- saveSized saves where a grip let go or a Shift-click left a small panel whose top left is x, y on the screen: the corner it
+-- holds kept (sizing it across the middle of the screen flips neither its side nor its edge), its held edge there; with Autosize
+-- Bags on, its height bounces back to what it shows from the edge it holds, which is kept where clampPlace pushed it to keep
+-- all of it on the screen (a bottom pushed down, a top pushed up: it goes back as it shrinks), and saved where Clamp Bags to
+-- Screen moved it the other way (an edge saved past the screen's). A chained bag saves its spot.
 ---@private
 ---@param x number
 ---@param y number
----@return number x, number y
-function panelProto:leftPlace(x, y)
-  if database:GetNextAutosize() and chain:SmallAnchorOf(self) == nil then
-    local _, saved = database:GetNextSmallPlace(self.kind)
-    if saved ~= nil and saved < y then
-      return x, saved
-    end
+function panelProto:saveSized(x, y)
+  local _, heldY, side, edge = self:HeldCorner()
+  local cx, cy = self:CornerOf(x, y, side, edge)
+  if database:GetNextAutosize(self.kind) and chain:SmallAnchorOf(self) == nil then
+    cy = edge == "TOP" and math.min(cy, heldY) or math.max(cy, heldY)
   end
-  return x, y
+  self:SetCorner(cx, cy, side, edge)
 end
 
--- SmallPlace is where a small panel sits: chained (docs/next-small-mode.md), beside its anchor where
--- the anchor is now (LivePlace); else where the player left it, else a margin in from its own screen
--- edge (the backpack's right, a companion's left), centered; on the screen either way.
+-- adoptPlace takes over where a small panel was left before it held its bottom corner (nextSmallPlaces: its top left), once,
+-- as it shows: the corner it holds where it is now, at the height it shows, so it does not move; the old place is cleared.
+---@private
+function panelProto:adoptPlace()
+  if database:GetNextSmallCorner(self.kind) ~= nil then
+    return
+  end
+  local x, y = database:GetNextSmallPlace(self.kind)
+  if x == nil then
+    return
+  end
+  self:SavePlace(self:clampPlace(x, y))
+  database:ClearNextSmallPlace(self.kind)
+end
+
+-- SmallPlace is where a small panel's top left sits: chained (docs/next-small-mode.md), beside its anchor where the anchor is
+-- now (LivePlace); else from the corner it holds (HeldCorner) at its size now, so it grows away from its held edge and its
+-- held side (up from a bottom corner, down from a top one); on the screen either way. A place saved before it held a corner
+-- (a top left) stands until it shows (adoptPlace).
 ---@return number x, number y
 function panelProto:SmallPlace()
   local anchor = chain:SmallAnchorOf(self)
   if anchor ~= nil then
     return self:clampPlace(chain:ChainedPlace(self, anchor, anchor:LivePlace()))
   end
-  local x, y = database:GetNextSmallPlace(self.kind)
-  if x == nil then
-    local s = self:Scale()
-    y = (UIParent:GetHeight() + self:SmallHeight() * s) / 2
-    if self.side == "RIGHT" then
-      x = UIParent:GetWidth() - self:SmallWidth() * s - style.Small.Margin
-    else
-      x = style.Small.Margin
+  if database:GetNextSmallCorner(self.kind) == nil then
+    local lx, ly = database:GetNextSmallPlace(self.kind)
+    if lx ~= nil then
+      return self:clampPlace(lx, ly)
     end
+  end
+  local x, y, side, edge = self:HeldCorner()
+  local s = self:Scale()
+  if side == "RIGHT" then
+    x = x - self:SmallWidth() * s
+  end
+  if edge ~= "TOP" then
+    y = y + self:SmallHeight() * s
   end
   return self:clampPlace(x, y)
 end
@@ -2603,6 +2787,7 @@ function panelProto:ApplyGeometry()
   for _, edge in ipairs(self.edges) do
     edge:SetShown(edgeShown)
   end
+  controls:ShowOutlines(self.edgeOutlines, edgeShown)
   self.ribbonLength = pixel:LengthIn(unit, self:RibbonBase())
   for _, line in ipairs(self.ribbonLines) do
     line:SetWidth(self.ribbonLength)
@@ -2615,6 +2800,9 @@ function panelProto:ApplyGeometry()
   self:UpdateGrips()
   self:FitTitle()
   if small then
+    if frame:IsShown() then
+      self:adoptPlace()
+    end
     self.placeX, self.placeY = self:SmallPlace()
     self.docked = false
     self.outerFeather:Hide()
@@ -2632,12 +2820,76 @@ function panelProto:ApplyGeometry()
   self.glass:Layout()
   -- Its corners rounded at the size it has now.
   self:shapeCorners()
+  -- Its anchor for its size: a full-size bag has none (docs/next-bag-anchor.md).
+  self:UpdateAnchor()
 end
 
 -- ApplyClamp clamps a small panel to the screen while the bags are clamped to it (Clamp Bags to Screen,
--- window.md §3a); a full panel rests at its screen edge and is never clamped.
+-- window.md §3a); a full panel rests at its screen edge and is never clamped. Its clamp rect takes in what it reaches past its
+-- inner side (TabReach, in its own units: a negative left or a positive right keeps that much more of it on the screen,
+-- warcraft.wiki.gg Frame:SetClampRectInsets), so the client keeps its tabs on the screen as the player drags it, as clampPlace
+-- does where it is placed.
 function panelProto:ApplyClamp()
-  self.frame:SetClampedToScreen(self:IsSmall() and database:GetClampBagsToScreen())
+  local frame, reach = self.frame, self:TabReach()
+  frame:SetClampedToScreen(self:IsSmall() and database:GetClampBagsToScreen())
+  if self.side == "LEFT" then
+    frame:SetClampRectInsets(0, reach, 0, 0)
+  else
+    frame:SetClampRectInsets(-reach, 0, 0, 0)
+  end
+end
+
+-- FollowTabs keeps an open small panel where its place puts it as its tabs change while the bags are clamped to it (Clamp Bags to
+-- Screen, #1248): its place keeps its tabs on the screen (SmallPlace, through clampPlace), so tabs that grow at the screen's edge
+-- push it in and tabs that shrink or hide let it back to where it was left; it glides there (GlideTo), saving nothing, as a bag
+-- glides into its spot. Left off its place, the next thing that placed it from there moved it (found by the bug review: Autosize
+-- Bags' height glide slid it sideways as items came in). A bag chained beside its anchor is the chain's to place: its rail hangs
+-- into the gap between the bags (chain:SmallGap), and the chain settles it beside its anchor (chain:Update, the rail's resize
+-- handler). An anchor follows its own, as the anchor of a pair too wide for where it stands (dropped against the screen's edge,
+-- the bag beside it held on the screen over it) faces the edge with its tabs (found by the second bug review); the bag beside it
+-- stays held there (its spot is past the edge by the anchor's tabs and more). Asked with later (its tabs were just set: the rail
+-- shows after them, RefreshTabs), or while something moves, sizes or places it (Settled), it tries again a frame on, each frame,
+-- until it can (tabsLater), as FollowHeight does: a try while it waits is checks alone. Its clamp rect is its caller's
+-- (ApplyClamp). It returns what it did, for profiler traces: "closed" (not an open small panel), "off", "chained", "owed" (it
+-- waits), "placed" (it is where its place puts it) or "gliding".
+---@param later? boolean
+---@return string
+function panelProto:FollowTabs(later)
+  if not self:IsSmall() or not self.frame:IsShown() or self.closing then
+    return "closed"
+  end
+  if not database:GetClampBagsToScreen() then
+    return "off"
+  end
+  if chain:SmallAnchorOf(self) ~= nil then
+    return "chained"
+  end
+  if later or not self:Settled() then
+    self:tabsLater()
+    return "owed"
+  end
+  local x, y = self:SmallPlace()
+  local half = pixel:Unit(UIParent) / 2
+  if math.abs(x - self.placeX) < half and math.abs(y - self.placeY) < half then
+    return "placed"
+  end
+  self:GlideTo()
+  return "gliding"
+end
+
+-- tabsLater tries FollowTabs again a frame on (a zero-length tween, tabsKey), never at once, as heightLater does for
+-- FollowHeight: it stops once the bag is where its place puts it, closes, is chained, or the setting is turned off.
+---@private
+function panelProto:tabsLater()
+  tween:Play(self.tabsKey, {
+    duration = 0,
+    from = 0,
+    to = 1,
+    onUpdate = function() end,
+    onDone = function()
+      self:FollowTabs()
+    end,
+  })
 end
 
 -- FitSmall sizes a small panel for the screen as it is now and puts it at its place, kept on the
@@ -2648,8 +2900,10 @@ end
 function panelProto:FitSmall()
   self:endSizeGlide()
   self:takeScale()
+  -- Its tabs may have been set, shown or hidden while it was closed (ApplyClamp).
+  self:ApplyClamp()
   local width, height, fitted = self:SmallSize()
-  if self.restingWidth ~= fitted and database:GetNextAutosize() then
+  if self.restingWidth ~= fitted and database:GetNextAutosize(self.kind) then
     self.smallWidth, self.restingWidth = width, fitted
     render:RenderNow(self.root, { ctx = context:New("NextPanelFit") })
     height = self:RestingHeight()
@@ -2657,6 +2911,7 @@ function panelProto:FitSmall()
   local changed = self.frame:GetWidth() ~= width or self.frame:GetHeight() ~= height or self.restingWidth ~= fitted
   self.smallWidth, self.smallHeight, self.restingWidth = width, height, fitted
   self.frame:SetSize(width, height)
+  self:adoptPlace()
   self.placeX, self.placeY = self:SmallPlace()
   self.spotMoved = nil
   self:setOffset(self.offset)
@@ -2679,7 +2934,8 @@ function panelProto:BodyRect()
   if self.side == "RIGHT" then
     left = UIParent:GetWidth() - style.WIDTH + self.offset
   end
-  return left + self:BodyLeft(), UIParent:GetHeight(), UIParent:GetHeight(), style.BODY_WIDTH, 1
+  local top = self:DockInsets()
+  return left + self:BodyLeft(), UIParent:GetHeight() - top, self:Height(), style.BODY_WIDTH, 1
 end
 
 -- PrepareResize switches the panel's size (nextPanel:SetSize). Not shown (a closing one finishes
@@ -2779,6 +3035,7 @@ function panelProto:Morph()
   for _, edge in ipairs(edges) do
     edge:SetShown(bordered)
   end
+  controls:ShowOutlines(self.edgeOutlines, bordered)
   -- The frame is the body plus the feather at full size: only the body's width glides.
   local bodyLeft, extra = self:BodyLeft(), self:Width() - self:BodyWidth()
   local at = { x = from.x, y = from.y, h = from.h, w = from.w, scale = from.scale, ribbon = from.ribbon,
@@ -2931,11 +3188,12 @@ function panelProto:BuildMover()
 end
 
 -- StartMove starts moving a small panel with the mouse, finishing its opening slide first. A full
--- panel, one closing, or a press with something on the cursor (a drop, not a move) does not move.
--- It returns whether it did.
+-- panel, one closing, one held (Held: locked, docs/next-bag-anchor.md), or a press with something on the cursor (a drop,
+-- not a move) does not move. It returns whether it did.
 ---@return boolean
 function panelProto:StartMove()
-  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or GetCursorInfo() ~= nil then
+  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or self.anchorDragging
+    or GetCursorInfo() ~= nil or self:Held() then
     return false
   end
   self:endMorph()
@@ -2947,23 +3205,32 @@ function panelProto:StartMove()
   self.frame:SetUserPlaced(false)
   self.moving = true
   -- Chained (docs/next-small-mode.md): dragging the other bag lets it go of its anchor; dragging the
-  -- anchor, its open partner follows it every frame.
+  -- anchor, its open partner follows it every frame. Its anchor square, shown, follows it too, on the corner it would hold
+  -- where it is (asked: the bag and the square move together).
   chain:Detach(self)
   local follower = chain:Follower(self)
+  local square = self:SquareShown() and self.anchorSquare or nil
   if follower ~= nil then
     -- A glide into its spot ends where it was going: from now on its spot follows the anchor.
     tween:Stop(follower, true)
+  end
+  if follower ~= nil or square ~= nil then
     self.mover:SetScript("OnUpdate", function()
-      follower.placeX, follower.placeY = follower:SmallPlace()
-      follower.spotMoved = nil
-      follower:setOffset(0)
+      if follower ~= nil then
+        follower.placeX, follower.placeY = follower:SmallPlace()
+        follower.spotMoved = nil
+        follower:setOffset(0)
+      end
+      if square ~= nil then
+        self:PlaceSquare(self:CornerOf(self:LivePlace()))
+      end
     end)
   end
   return true
 end
 
--- StopMove ends a move: the panel's new place, kept on the screen, is saved for its kind, and it is
--- anchored there again (the client anchors a moved frame to the nearest corner of the screen).
+-- StopMove ends a move: the panel's new place, kept on the screen, is saved for its kind (the corner it holds there,
+-- SavePlace), and it is anchored there again (the client anchors a moved frame to the nearest corner of the screen).
 function panelProto:StopMove()
   if not self.moving then
     return
@@ -2973,6 +3240,8 @@ function panelProto:StopMove()
   frame:StopMovingOrSizing()
   local x, y = frame:GetLeft(), frame:GetTop()
   self.moving = false
+  -- The edge it held as it was dragged (its partner was carried by it): the drop saves a bottom corner.
+  local edge = self:HeldEdge()
   if x ~= nil and y ~= nil then
     -- Where the client left it, on the screen (its edges are in its own units).
     local s = lift:ScaleOf(frame)
@@ -2982,20 +3251,261 @@ function panelProto:StopMove()
     self.placeX, self.placeY = x, y
     self.offset = 0
     if sx ~= nil then
-      database:SetNextSmallPlace(self.kind, sx, sy)
+      self:SavePlace(sx, sy)
       self:GlideTo()
       return
     end
-    database:SetNextSmallPlace(self.kind, x, y)
+    self:SavePlace(x, y)
   end
   self:setOffset(0)
-  -- An anchor let go: its partner settles beside where it was dropped, its place saved too.
+  -- An anchor let go: its partner settles beside where it was dropped, its place saved too. Where the drop changed the edge
+  -- the pair lines up by (an anchor that held a top corner holds a bottom one once dropped, and its partner, carried by their
+  -- tops on the way, lines up by their bottoms now), it glides there (SettleSpot), as a bag dropped beside its partner does;
+  -- else it is placed on its spot at once, moving with the anchor (a drop the screen's edge moved, clampPlace).
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    local fx, fy = follower:SmallPlace()
+    if self:HeldEdge() ~= edge then
+      follower:SettleSpot()
+    else
+      follower.placeX, follower.placeY = fx, fy
+      follower.spotMoved = nil
+      follower:setOffset(0)
+    end
+    follower:SavePlace(fx, fy)
+  end
+end
+
+-- The anchor button's states (docs/next-bag-anchor.md), each the next a click gives, its icon (Header.Buttons.Icons), what a
+-- click does next (its tooltip's title, its entry in a theme's bag button menu) and how.
+local ANCHOR_NEXT = { free = "shown", shown = "locked", locked = "free" }
+local ANCHOR_ICONS = { free = "anchorButtonFree", shown = "anchorButtonShown", locked = "anchorButtonLocked" }
+local ANCHOR_LABELS = { free = "Show Bag Anchor", shown = "Lock Bag", locked = "Unlock Bag" }
+local ANCHOR_HINTS = {
+  free = "Show this bag's anchor: drag it to place the bag to the pixel. The bag grows away from its corner.",
+  shown = "Hide the anchor and lock the bag where it is: it can't be moved or resized until it is unlocked.",
+  locked = "Release the anchor: the bag can be moved and resized again.",
+}
+
+-- AnchorState is the bag's anchor (docs/next-bag-anchor.md): "free" (it moves and sizes), "shown" (its anchor square shows,
+-- and drags it), or "locked" (it neither moves nor sizes), saved for its kind.
+---@return NextAnchorState
+function panelProto:AnchorState()
+  return database:GetNextAnchorState(self.kind)
+end
+
+-- Held says a small panel neither moves nor resizes (asked: "lock the anchor and bags so they can't be dragged"; "resize is
+-- locked too"): its anchor is locked, or the bag it sits beside, chained, is locked (that bag holds it).
+---@return boolean
+function panelProto:Held()
+  if not self:IsSmall() then
+    return false
+  end
+  if self:AnchorState() == "locked" then
+    return true
+  end
+  local anchor = chain:SmallAnchorOf(self)
+  return anchor ~= nil and anchor:AnchorState() == "locked"
+end
+
+-- AnchorButton is the anchor button's header button (the backpack's and the bank's, where the sort button was: their titles
+-- sort them on a right click): its icon its state's, its tooltip and its menu entry what a click does next.
+---@return NextHeaderButton
+function panelProto:AnchorButton()
+  return {
+    key = "anchorButton", iconKey = self:AnchorIconKey(),
+    tooltipFunc = function()
+      local state = self:AnchorState()
+      GameTooltip:SetText(L:G(ANCHOR_LABELS[state]), 1, 1, 1, 1, true)
+      GameTooltip:AddLine(L:G(ANCHOR_HINTS[state]), nil, nil, nil, true)
+    end,
+    label = function() return L:G(ANCHOR_LABELS[self:AnchorState()]) end,
+    menuTooltip = function() return L:G(ANCHOR_HINTS[self:AnchorState()]) end,
+    onClick = function(ctx) self:CycleAnchor(ctx) end,
+  }
+end
+
+---@return string
+function panelProto:AnchorIconKey()
+  return ANCHOR_ICONS[self:AnchorState()]
+end
+
+-- CycleAnchor is the anchor button's click (asked: "basically, tri-state button"): free, then shown, then locked, then free
+-- again. It returns the state it set.
+---@param ctx Context
+---@return NextAnchorState
+function panelProto:CycleAnchor(ctx)
+  local _ = ctx
+  local state = ANCHOR_NEXT[self:AnchorState()]
+  self:SetAnchorState(state)
+  return state
+end
+
+-- SetAnchorState sets the bag's anchor and shows it (UpdateAnchor). Anchored, a bag the small chain would sit beside its
+-- partner is let go of the chain where it stands (asked: anchoring the chained bag unchains it, as dragging it does), its
+-- place saved there: its place at rest (a glide of its size sets it where it ends; its frame part way there would put the
+-- corner off by what is left of the glide); a bag chained beside it is held while it is locked, its grips hidden with its own
+-- (chain:UpdateGrips). Freed where the chain sits it beside a partner (another companion's drop chains every companion), it
+-- glides into its spot there, as a bag opened in that layout does (SettleSpot: once nothing else places it), and the pair
+-- braids once it arrives.
+---@param state NextAnchorState
+function panelProto:SetAnchorState(state)
+  if state ~= "free" and self:IsSmall() and chain:Unchain(self) then
+    self:SavePlace(self.placeX, self.placeY)
+  end
+  database:SetNextAnchorState(self.kind, state)
+  self:UpdateAnchor()
+  chain:UpdateGrips()
+  if state == "free" and self:IsSmall() and self.frame:IsShown() and not self.closing then
+    self:SettleSpot()
+  end
+end
+
+-- SquareShown says the bag's anchor square shows: its anchor shown, the bag small, open and not closing.
+---@return boolean
+function panelProto:SquareShown()
+  return self:IsSmall() and self.frame:IsShown() and not self.closing and self:AnchorState() == "shown"
+end
+
+-- UpdateAnchor shows the bag's anchor as it is now: its button only while the bag is small (a full-size bag rests at its
+-- screen edge: nothing to anchor), its icon its state's; its square on the corner it holds while it shows (SquareShown),
+-- else hidden, a drag of it ended; its grips (UpdateGrips: hidden while it is held).
+function panelProto:UpdateAnchor()
+  local button = self.anchorButton
+  if button ~= nil then
+    local small = self:IsSmall()
+    if button:IsShown() ~= small then
+      button:SetShown(small)
+      self:LayoutHeader()
+    end
+    self:SetHeaderIcon(button, self:AnchorIconKey())
+  end
+  if self:SquareShown() then
+    self:anchorSquareFrame():Show()
+    self:PlaceSquare()
+  elseif self.anchorSquare ~= nil then
+    self:StopAnchorDrag()
+    self.anchorSquare:Hide()
+  end
+  self:UpdateGrips()
+end
+
+-- anchorSquareFrame is the bag's anchor square (docs/next-bag-anchor.md): the classic bags' (Anchor:CreateSquare, one look for
+-- both designs), labeled with the bag's name, kept on the screen, made the first time it shows. Dragged with the left button,
+-- the bag follows it; a right click hides it, as on the classic one (the bag still anchored: locked).
+---@private
+---@return AnchorSquare
+function panelProto:anchorSquareFrame()
+  local square = self.anchorSquare
+  if square ~= nil then
+    return square
+  end
+  square = addon:GetModule('Anchor'):CreateSquare(nil, self.label)
+  pixel:Size(square, square:GetWidth(), square:GetHeight())
+  square:SetClampedToScreen(true)
+  square:EnableMouse(true)
+  addon.SetScript(square, "OnDragStart", function()
+    self:StartAnchorDrag()
+  end)
+  addon.SetScript(square, "OnDragStop", function()
+    self:StopAnchorDrag()
+  end)
+  addon.SetScript(square, "OnMouseDown", function(_, _, button)
+    if button == "RightButton" then
+      self:SetAnchorState("locked")
+    end
+  end)
+  self.anchorSquare = square
+  return square
+end
+
+-- PlaceSquare puts the bag's anchor square's corner on a corner, x, y on the screen (the corner the bag holds, HeldCorner, when
+-- none is given), its same corner by side and edge, on whole pixels from the screen's bottom left, and says where. Nothing
+-- while the square is not made, or the player drags it (the client moves it).
+---@param x? number
+---@param y? number
+---@param side? NextSmallSide
+---@param edge? NextSmallEdge
+function panelProto:PlaceSquare(x, y, side, edge)
+  local square = self.anchorSquare
+  if square == nil or self.anchorDragging then
+    return
+  end
+  if x == nil then
+    x, y, side, edge = self:HeldCorner()
+  end
+  x, y = pixel:Snap(UIParent, x), pixel:Snap(UIParent, y)
+  square:ClearAllPoints()
+  local point = (edge == "TOP" and "TOP" or "BOTTOM") .. (side == "RIGHT" and "RIGHT" or "LEFT")
+  pixel:Point(square, point, UIParent, "BOTTOMLEFT", x, y)
+  square.positionLabel:SetText(string.format("%dx %dy", x, y))
+end
+
+-- StartAnchorDrag starts dragging the bag's anchor square (the classic anchor's drag: the client moves it), the bag following
+-- it every frame (AnchorDragged). Its slides and glides end first, its partner's glide into its spot too. A panel not small,
+-- closing, moved or sized does not drag. It returns whether it did.
+---@return boolean
+function panelProto:StartAnchorDrag()
+  if not self:SquareShown() or self.anchorDragging or self.moving or self.sizing ~= nil then
+    return false
+  end
+  self:endMorph()
+  self:endSizeGlide()
+  tween:Stop(self, true)
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    tween:Stop(follower, true)
+  end
+  local square = self.anchorSquare
+  square:StartMoving()
+  self.anchorDragging = true
+  square:SetScript("OnUpdate", function()
+    self:AnchorDragged()
+  end)
+  return true
+end
+
+-- AnchorDragged follows the square a frame of its drag: the corner the bag holds is the square's same corner, in the quadrant
+-- of the screen the square's middle is in (the classic anchor's; asked: "let's do the 4 quadrant anchoring ... top anchors only
+-- work when you drag via the box"), on whole pixels, saved; the bag is placed from it, the bag chained beside it beside it.
+function panelProto:AnchorDragged()
+  local square = self.anchorSquare
+  local left, bottom, top = square:GetLeft(), square:GetBottom(), square:GetTop()
+  if left == nil or bottom == nil or top == nil then
+    return
+  end
+  local width = square:GetWidth()
+  local side = left + width / 2 < UIParent:GetWidth() / 2 and "LEFT" or "RIGHT"
+  local edge = (bottom + top) / 2 < UIParent:GetHeight() / 2 and "BOTTOM" or "TOP"
+  local x = pixel:Snap(UIParent, side == "RIGHT" and left + width or left)
+  local y = pixel:Snap(UIParent, edge == "TOP" and top or bottom)
+  database:SetNextSmallCorner(self.kind, x, y, side, edge)
+  square.positionLabel:SetText(string.format("%dx %dy", x, y))
+  self.placeX, self.placeY = self:SmallPlace()
+  self:setOffset(0)
   local follower = chain:Follower(self)
   if follower ~= nil then
     follower.placeX, follower.placeY = follower:SmallPlace()
     follower.spotMoved = nil
     follower:setOffset(0)
-    database:SetNextSmallPlace(follower.kind, follower.placeX, follower.placeY)
+  end
+end
+
+-- StopAnchorDrag ends a drag of the bag's anchor square: where it was let go is the corner the bag holds, the square anchored
+-- there on whole pixels, the bag chained beside it saved where it is.
+function panelProto:StopAnchorDrag()
+  if not self.anchorDragging then
+    return
+  end
+  local square = self.anchorSquare
+  square:SetScript("OnUpdate", nil)
+  square:StopMovingOrSizing()
+  self:AnchorDragged()
+  self.anchorDragging = false
+  self:PlaceSquare()
+  local follower = chain:Follower(self)
+  if follower ~= nil then
+    follower:SavePlace(follower.placeX, follower.placeY)
   end
 end
 
@@ -3114,12 +3624,14 @@ end
 
 -- UpdateGrips shows a small panel's grips, but for the one on the side its chained partner is on
 -- (chain:ChainedSide), which would push the partner (asked: "disable it on the side it's chained on,
--- if it's chained"). A grip being dragged stays until it is let go.
+-- if it's chained"), and none while it is held (Held: locked, "resize is locked too"). A grip being dragged stays until it
+-- is let go.
 function panelProto:UpdateGrips()
   local small = self:IsSmall()
   local chained = small and chain:ChainedSide(self) or nil
+  local held = self:Held()
   for side, grip in pairs(self.grips) do
-    grip:SetShown(small and (side ~= chained or self.sizing == side))
+    grip:SetShown(small and (self.sizing == side or (side ~= chained and not held)))
   end
 end
 
@@ -3133,7 +3645,8 @@ end
 ---@param side "LEFT"|"RIGHT"
 ---@return boolean
 function panelProto:StartSizing(side)
-  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or GetCursorInfo() ~= nil then
+  if not self:IsSmall() or self.closing or self.moving or self.sizing ~= nil or self.anchorDragging
+    or GetCursorInfo() ~= nil or self:Held() then
     return false
   end
   self:endMorph()
@@ -3208,7 +3721,7 @@ function panelProto:StopSizing()
   frame:StopMovingOrSizing()
   local x, y, w, h = frame:GetLeft(), frame:GetTop(), frame:GetWidth(), frame:GetHeight()
   local from, side = self.sizingFrom, self.sizing
-  local autosize = database:GetNextAutosize()
+  local autosize = database:GetNextAutosize(self.kind)
   self:recordSizing("let go")
   self.content:SetInstant(false)
   -- Sizing placed everything at once, which leaves nothing to glide from: in columns the snap moves them, by hundreds of
@@ -3239,16 +3752,31 @@ function panelProto:StopSizing()
     -- its partner: the side across from the grip stays where it is, on the screen, and is its spot.
     local s = lift:ScaleOf(frame)
     local left = side == "LEFT" and x + w - self.smallWidth or x
-    -- From the top it was left at, so a raised bag the grip made shorter goes back down (leftPlace).
-    self.placeX, self.placeY = self:clampPlace(self:leftPlace(left * s, y * s))
-    database:SetNextSmallPlace(self.kind, self:leftPlace(self.placeX, self.placeY))
+    -- Its top where it was let go (a grip sizes it from its bottom); autosized, from the edge it holds (its height bounces back
+    -- from it), so a bag pushed off that edge that the grip made shorter goes back (saveSized); chained, its spot, level with
+    -- its partner by the edge they line up by.
+    local top = y * s
+    if chain:SmallAnchorOf(self) ~= nil then
+      top = select(2, self:SmallPlace())
+    elseif autosize then
+      local _, heldY, _, edge = self:HeldCorner()
+      top = edge == "TOP" and heldY or heldY + self.smallHeight * self:Scale()
+    end
+    self.placeX, self.placeY = self:clampPlace(left * s, top)
+    self:saveSized(self.placeX, self.placeY)
   end
   self:UpdateGrips()
-  -- Autosized, its height can change where its width does not, and its top with it (its bottom kept on the screen,
-  -- clampPlace).
+  -- The grip moved its bottom (Autosize Bags off: the height it was let go at stays), which the bag chained beside it is level
+  -- with: that bag glides level once nothing else places it (SettleSpot), left where it was while the grip was dragged.
+  local follower = chain:Follower(self)
+  if follower ~= nil and not autosize and math.abs(h - from[2]) >= 0.5 then
+    follower:SettleSpot()
+  end
+  -- Its top glides where its place moved it: autosized, its height can change where its width does not, its top with it
+  -- over the bottom it holds; chained, back level with its partner.
   local unit = self:PixelUnit()
   local toY = y ~= nil and pixel:SnapIn(unit, self.placeY / self:Scale()) or nil
-  local rises = autosize and toY ~= nil and math.abs(toY - y) > unit / 2
+  local rises = toY ~= nil and math.abs(toY - y) > unit / 2
   local refits = autosize and math.abs(h - self:SmallHeight()) >= 0.5
   if x ~= nil and y ~= nil and (math.abs(w - self:SmallWidth()) >= 0.5 or refits or rises) then
     -- Snapped wider for a name, the screen's edge can put its place back (Clamp Bags to Screen): both its edges move.
@@ -3374,8 +3902,20 @@ end
 ---@private
 ---@return boolean
 function panelProto:busy()
-  return self.sizing ~= nil or self.sizeGliding or self.moving or self.morph ~= nil or tween:IsPlaying(self)
-    or self.content.drag ~= nil
+  return self.sizing ~= nil or self.sizeGliding or self.moving or self.anchorDragging or self.morph ~= nil
+    or tween:IsPlaying(self) or self.content.drag ~= nil
+end
+
+-- SettleSpot glides a small bag into the spot the chain gives it (chain:Settle) now, when nothing else places it; else it is
+-- owed the glide (spotMoved), which what places it pays as it ends: its open slide and a size switch (chain:Arrived), its size
+-- glide (chain:Update), as chain:Update leaves a busy bag to them. A glide started on top replaced its open slide, whose end
+-- says it has shown, or fought its size glide or switch for its frame (found by the third bug review).
+function panelProto:SettleSpot()
+  if self:busy() then
+    self.spotMoved = true
+    return
+  end
+  chain:Settle(self)
 end
 
 -- Settled says nothing moves, sizes or places a small panel now (busy), and it is on its place: a Glitch burst shoves it off
@@ -3412,7 +3952,7 @@ function panelProto:FollowNames(later)
   if not self:IsSmall() or not self.frame:IsShown() or self.closing or self.opening then
     return "closed"
   end
-  if not database:GetNextFitNamesWhileOpen() then
+  if not database:GetNextFitNamesWhileOpen(self.kind) then
     return "off"
   end
   local partner = chainedPartner(self)
@@ -3487,7 +4027,7 @@ function panelProto:FollowHeight(later)
   if not self:IsSmall() or not self.frame:IsShown() or self.closing then
     return "closed"
   end
-  if not database:GetNextAutosize() then
+  if not database:GetNextAutosize(self.kind) then
     return "off"
   end
   local partner = chainedPartner(self)
@@ -3532,16 +4072,19 @@ function panelProto:heightLater()
 end
 
 -- ResetSize glides a small panel back to its default size (asked: "shift + left click the grip to
--- reset to default size (animated, of course)"): the corner across from the grip stays still, the
--- right grip keeping its top left and the left grip its top right, and the default size follows the
--- screen again. Its content reflows on the way, at once, as it does while a grip is dragged. It returns
--- what it did, for profiler traces: "resetting", "default" (it is the default size already) or
--- "closing".
+-- reset to default size (animated, of course)"): the edge it holds stays (HeldEdge: its bottom, or its top from its anchor
+-- square), and so does the side across from the grip, the right grip keeping its left and the left grip its right; the
+-- default size follows the screen again. Its content reflows on the way, at once, as it does while a grip is
+-- dragged. It returns what it did, for profiler traces: "resetting", "default" (it is the default size already),
+-- "closing" or "locked" (held: it neither moves nor resizes, docs/next-bag-anchor.md).
 ---@param side "LEFT"|"RIGHT"
 ---@return string
 function panelProto:ResetSize(side)
   if self.closing then
     return "closing"
+  end
+  if self:Held() then
+    return "locked"
   end
   if database:GetNextSmallSize(self.kind) == nil then
     return "default"
@@ -3555,12 +4098,21 @@ function panelProto:ResetSize(side)
   database:SetNextSmallSize(self.kind, nil, nil)
   local w1, h1, fitted = self:SmallSize()
   self.smallWidth, self.smallHeight, self.restingWidth = w1, h1, fitted
-  -- Places on the screen, sizes in its own units.
+  -- Places on the screen, sizes in its own units. The edge it holds where it stands (chained, the one it lines up with its
+  -- partner by); autosized and apart, the one it holds.
   local s = self:Scale()
-  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, y0)
+  local heldY = select(2, self:HeldCorner())
+  local held = database:GetNextAutosize(self.kind) and chain:SmallAnchorOf(self) == nil
+  local toTop
+  if self:HeldEdge() == "TOP" then
+    toTop = held and heldY or y0
+  else
+    toTop = (held and heldY or y0 - h0 * s) + h1 * s
+  end
+  local x1, y1 = self:clampPlace(side == "LEFT" and x0 + (w0 - w1) * s or x0, toTop)
   self.placeX, self.placeY = x1, y1
   self.offset = 0
-  database:SetNextSmallPlace(self.kind, self:leftPlace(x1, y1))
+  self:saveSized(x1, y1)
   self.keptScroll = self.scroll.scrollBox:GetDerivedScrollOffset()
   self.sizeGliding = true
   self.content:SetInstant(true)
@@ -3705,7 +4257,7 @@ end
 -- with (asked: "if you drag and drop an item onto a category header, it becomes an Added Item in that
 -- category"; docs/next-batch-2.md §8). Where the item lands without being added (Items:NaturalCategory)
 -- decides what Categories:FileItem does; the item goes back to its slot and the bags are recalculated.
--- A plugin's category and a gear set take nothing: it says why, the item staying on the cursor. It
+-- A plugin's category and a gear set's take nothing: it says why, the item staying on the cursor. It
 -- returns what it did.
 ---@param ctx Context
 ---@param section NextSection
@@ -3716,15 +4268,15 @@ function panelProto:FileCursorItem(ctx, section)
     return "ignored"
   end
   local name = section.name
-  if name:sub(1, 6) == "Gear: " and categories:GetCategoryByName(name) == nil then
-    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
-    return "gear set"
-  end
   local data = cursorItemData(itemID)
   local natural = data and items:NaturalCategory(ctx, data) or nil
   local result = categories:FileItem(ctx, itemID, name, natural)
   if result == "plugin" then
     print("BetterBags: " .. format(L:G("A plugin fills %s: items can't be added to it."), name))
+    return result
+  end
+  if result == "gear set" then
+    print("BetterBags: " .. L:G("Gear sets are made in the Equipment Manager."))
     return result
   end
   ClearCursor()
@@ -3744,6 +4296,39 @@ function panelProto:onHeaderItem(ctx, section)
     return
   end
   sectionFrame:OnTitleClickOrDrop(ctx, self:titleAdapter(section))
+end
+
+-- ItemDropTarget names where this panel takes an item to put it in a category (issue #1270): the theme's
+-- Header.ItemDrop.Target ("Title", or "Menu" for its bag button), on a panel that files items (the backpack, the bank);
+-- nil anywhere else.
+---@return "Title"|"Menu"|nil
+function panelProto:ItemDropTarget()
+  local D = style.Theme.Header.ItemDrop
+  if not self.categorizes or type(D) ~= "table" then
+    return nil
+  end
+  return D.Target
+end
+
+-- PickCategory takes the item on the cursor to the category picker (NextCategoryPicker) under anchor: what the bags
+-- hold of it and where it lands without its category by hand are read first, as a header drop reads them, then the item
+-- goes back to its slot while the player picks. Only an item: a merchant's (buying by drag) or anything else stays on
+-- the cursor. It returns what it did.
+---@param ctx Context
+---@param anchor Frame
+---@return "picking"|"ignored"
+function panelProto:PickCategory(ctx, anchor)
+  local cursorType, itemID, link = GetCursorInfo()
+  if cursorType ~= "item" or not itemID then
+    return "ignored"
+  end
+  local data = cursorItemData(itemID)
+  local natural = data and items:NaturalCategory(ctx, data) or nil
+  ClearCursor()
+  GameTooltip:Hide()
+  self:lightItemDrop(false)
+  addon:GetModule('NextCategoryPicker'):Open(ctx, anchor, { itemID = itemID, link = link, data = data, natural = natural })
+  return "picking"
 end
 
 -- OnHeaderClick takes an item clicked onto a header (onHeaderItem), and moves a section to the open
@@ -3771,8 +4356,9 @@ function panelProto:OnHeaderReceiveDrag(ctx, section)
 end
 
 -- SectionColumns is how many columns of sections this bag is set to, how they fill, whether wide sections span
--- them and whether they are compact (next.md §7a, §7b). Show Bags (a bag's slots, or a guild tab's, in order) is one column.
----@return number count, string? fill, boolean? span, number? wideRows, boolean? compact
+-- them, whether they are compact and whether a cell stands between sections side by side (next-columns.md §7a, §7b,
+-- §7c). Show Bags (a bag's slots, or a guild tab's, in order) is one column.
+---@return number count, string? fill, boolean? span, number? wideRows, boolean? compact, boolean? apart
 function panelProto:SectionColumns()
   -- The logout stripped the settings these read (initialization.md).
   if addon.loggingOut or database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
@@ -3780,7 +4366,7 @@ function panelProto:SectionColumns()
   end
   return database:GetNextSectionColumns(self.kind), database:GetNextSectionFill(self.kind),
     database:GetNextSectionSpan(self.kind), database:GetNextSectionWideRows(self.kind),
-    database:GetNextSectionCompact(self.kind)
+    database:GetNextSectionCompact(self.kind), database:GetNextSectionGap(self.kind)
 end
 
 -- OnHeaderEnter tells what a header does.
@@ -3862,6 +4448,11 @@ function panelProto:headerButton(spec)
   local button = CreateFrame("Button", nil, self.frame)
   -- Above a small panel's mover, which lies over the title row, and the overlay, whose frame art they sit on.
   button:SetFrameLevel(self.overlay:GetFrameLevel() + 3)
+  -- Its backdrop, for a theme that draws one (Header.Buttons.Backdrop: ElvUI's square buttons), under its icon.
+  button.fill = button:CreateTexture(nil, "BACKGROUND")
+  button.fill:SetAllPoints(button)
+  button.fill:Hide()
+  button.edge = controls:CreateEdge(button)
   local icon = button:CreateTexture(nil, "ARTWORK")
   button.icon = icon
   -- Drawn over the icon while hovered (an icon's Highlight).
@@ -3997,6 +4588,14 @@ function panelProto:PaintHeaderIcon(button)
   if H ~= nil then
     button.highlight:SetVertexColor(1, 1, 1, H.Alpha or 1)
   end
+  -- Its backdrop (Backdrop, false in Default; its icon's own Backdrop wins, false for none), the edge lit under the
+  -- pointer while enabled, as ElvUI lights its buttons.
+  local F = own.Backdrop
+  if F == nil then
+    F = B.Backdrop
+  end
+  controls:Paint(button.fill, F and F.Fill or false)
+  controls:PaintEdge(button.edge, F and ((button.hover and enabled and F.HoverEdge) or F.Edge) or false)
 end
 
 -- SetHeaderButtonEnabled enables or disables a header button, its icon drawn for it (PaintHeaderIcon).
@@ -4261,17 +4860,19 @@ function panelProto:styleHeader()
     self.cloud.swell = 0
   end
 
-  local glow, G = self.titleGlow, H.TitleGlow
-  glow:ClearAllPoints()
-  if G then
-    local alpha = glow:GetAlpha()
-    style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
-    glow:SetAlpha(alpha)
-    glow:Show()
-  else
-    tween:Stop(glow)
-    glow:SetAlpha(0)
-    glow:Hide()
+  for _, part in ipairs({ { self.titleGlow, H.TitleGlow }, { self.itemDropGlow, self:itemDropGlowSpec() } }) do
+    local glow, G = part[1], part[2]
+    glow:ClearAllPoints()
+    if G then
+      local alpha = glow:GetAlpha()
+      style:Paint(glow, { Texture = G.Texture, Color = G.Color, BlendMode = G.BlendMode or "ADD" })
+      glow:SetAlpha(alpha)
+      glow:Show()
+    else
+      tween:Stop(glow)
+      glow:SetAlpha(0)
+      glow:Hide()
+    end
   end
 
   self:styleBraid()
@@ -4422,18 +5023,21 @@ function panelProto:placeTitleRow()
   local half = pixel:Floor(body, join:GetWidth() / 2)
   join:ClearAllPoints()
   join:SetPoint("TOPLEFT", body, corner, -half, -(middle - pixel:Floor(body, join:GetHeight() / 2)))
-  local glow, G = self.titleGlow, H.TitleGlow
-  if G then
-    local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
-    local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
-    local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
-    glow:ClearAllPoints()
-    if left then
-      glow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - gx), -(top - gy))
-    else
-      glow:SetPoint("TOPLEFT", body, "TOPLEFT", inset - gx, -(top - gy))
+  -- The title's glow and the item drop's, each X past the title's text on each side and Y above and below it.
+  for _, part in ipairs({ { self.titleGlow, H.TitleGlow }, { self.itemDropGlow, self:itemDropGlowSpec() } }) do
+    local glow, G = part[1], part[2]
+    if G then
+      local gx, gy = pixel:Snap(body, G.X), pixel:Snap(body, G.Y)
+      local inset = pixel:Snap(body, self:TitleStart()) + self:titleShift()
+      local width = pixel:Ceil(body, self:titleWidth()) + 2 * gx
+      glow:ClearAllPoints()
+      if left then
+        glow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -(inset - gx), -(top - gy))
+      else
+        glow:SetPoint("TOPLEFT", body, "TOPLEFT", inset - gx, -(top - gy))
+      end
+      glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
     end
-    glow:SetSize(math.max(pixel:Unit(body), width), (fontHeight or 0) + 2 * gy)
   end
   -- The title's button covers its text, 8 past it across and 6 above and below, hung from the body by the title's
   -- own numbers, never from the title: a title showing a secret has secret anchoring, and so would every region
@@ -4457,17 +5061,30 @@ function panelProto:BuildTitleButton()
   local glow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
   glow:SetAlpha(0)
   self.titleGlow = glow
+  local dropGlow = frame:CreateTexture(nil, "ARTWORK", nil, -3)
+  dropGlow:SetAlpha(0)
+  self.itemDropGlow = dropGlow
 
   -- Placed with the title (placeTitleRow).
   local button = CreateFrame("Button", nil, frame)
   button:SetFrameLevel(frame:GetFrameLevel() + 55)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   addon.SetScript(button, "OnClick", function(ctx, _, mouse)
+    if mouse == "LeftButton" and GetCursorInfo() == "item" and self:ItemDropTarget() == "Title" then
+      self:PickCategory(ctx, button)
+      return
+    end
     if mouse == "RightButton" then
       self:OnTitleRightClick(ctx)
       return
     end
     chain:Click(ctx, self)
+  end)
+  -- An item dropped on the title goes in a category, where the theme takes it there (Header.ItemDrop).
+  addon.SetScript(button, "OnReceiveDrag", function(ctx)
+    if self:ItemDropTarget() == "Title" then
+      self:PickCategory(ctx, button)
+    end
   end)
   -- Dragging the title moves a small panel, as its title row does.
   button:RegisterForDrag("LeftButton")
@@ -4478,8 +5095,14 @@ function panelProto:BuildTitleButton()
     self:StopMove()
   end)
   addon.SetScript(button, "OnEnter", function()
+    local point = self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT"
+    if GetCursorInfo() == "item" and self:ItemDropTarget() == "Title" then
+      self:lightItemDrop(true)
+      addon:GetModule('NextCategoryPicker'):Hint(button, point)
+      return
+    end
     self:lightTitle(true)
-    GameTooltip:SetOwner(button, self.side == "LEFT" and "ANCHOR_BOTTOMRIGHT" or "ANCHOR_BOTTOMLEFT")
+    GameTooltip:SetOwner(button, point)
     GameTooltip:SetText(self.label)
     GameTooltip:AddLine(chain:Tooltip(self), 1, 1, 1, true)
     local hint = self:TitleRightClickHint()
@@ -4490,9 +5113,41 @@ function panelProto:BuildTitleButton()
   end)
   addon.SetScript(button, "OnLeave", function()
     self:lightTitle(false)
+    self:lightItemDrop(false)
     GameTooltip:Hide()
   end)
   self.titleButton = button
+end
+
+-- itemDropGlowSpec is the glow behind the title while an item it would take is held over it (Header.ItemDrop.Highlight),
+-- for a theme that takes the item on the title; none otherwise.
+---@private
+---@return table?
+function panelProto:itemDropGlowSpec()
+  local D = style.Theme.Header.ItemDrop
+  if type(D) ~= "table" or D.Target ~= "Title" then
+    return nil
+  end
+  return D.Highlight or nil
+end
+
+-- lightItemDrop fades the title's item drop glow in while an item it would take is held over it, and out after.
+---@private
+---@param on boolean
+function panelProto:lightItemDrop(on)
+  local glow, D = self.itemDropGlow, self:itemDropGlowSpec()
+  if not D then
+    return
+  end
+  tween:Play(glow, {
+    duration = style.Time.Hover,
+    from = glow:GetAlpha(),
+    to = on and D.Alpha or 0,
+    ease = style:Ease("Hover"),
+    onUpdate = function(v)
+      glow:SetAlpha(v)
+    end,
+  })
 end
 
 -- OnTitleRightClick runs a right click on the title: nothing, unless its kind says otherwise (the backpack sorts).
@@ -4505,6 +5160,44 @@ end
 ---@return string?
 function panelProto:TitleRightClickHint()
   return nil
+end
+
+-- TitleRightClickLabel names what a right click on the title does, as an action: the bag button's tooltip line (it runs the
+-- same right click) and its menu's entry for it (MenuEntries); nil when it does nothing.
+---@return string?
+function panelProto:TitleRightClickLabel()
+  return nil
+end
+
+-- SizeEntry is the switch between full and small bags (docs/next-small-mode.md), one for every bag (nextPanel:SetSize), as a
+-- header button's spec without its button: the backpack's size button (next/bag.lua) and the entry a bag button's menu lists on
+-- a panel without one (MenuEntries).
+---@return table
+function panelProto:SizeEntry()
+  return {
+    label = L:G("Small Bags"),
+    checked = function() return self:IsSmall() end,
+    menuTooltip = function() return L:G("Smaller bags you can move anywhere: drag a bag by its title.") end,
+    onClick = function(ctx) nextPanel:SetSize(ctx, self:IsSmall() and "full" or "small") end,
+  }
+end
+
+-- MenuEntries is what a bag button's menu (Header.Buttons.Menu, NextMenuButton) lists after the header's row, none of it a
+-- header button: what a right click on the title does (the backpack's and the bank's sort), and the switch to small bags on a
+-- panel with no size button of its own, so every bag's menu has it (asked of the Plain theme: "add the missing button
+-- interactions to the plain drop down menu ... minimize/maximize bags, etc, whatever is missing"). Each is a header button's
+-- spec without its button (label, checked, menuTooltip, onClick).
+---@return table[]
+function panelProto:MenuEntries()
+  local entries = {}
+  local sort = self:TitleRightClickLabel()
+  if sort ~= nil then
+    table.insert(entries, { label = sort, onClick = function(ctx) self:OnTitleRightClick(ctx) end })
+  end
+  if self.sizeButton == nil then
+    table.insert(entries, self:SizeEntry())
+  end
+  return entries
 end
 
 ---@private
@@ -4919,6 +5612,8 @@ function panelProto:BuildSearch()
     end
     table.insert(self.searchEdges, edge)
   end
+  -- Rings outlining its edge (Search.Edge.Outlines), at their own alpha.
+  self.searchOutlines = controls:CreateOutlines(sf.frame, "BORDER")
   local help = t.Instructions
   help:SetJustifyH("LEFT")
   self.searchBox = sf
@@ -4986,6 +5681,7 @@ function panelProto:styleSearch()
     end
   end
   self.searchEdgeAlpha = E and E.Idle or 0
+  controls:PaintOutlines(self.searchOutlines, E and E.Outlines)
   style:SetTemplateFont(t.Instructions, S.HelpFont)
   -- A theme may keep the template's own color for its help (HelpColor: InputBoxInstructionsTemplate's 0.35 gray).
   if S.HelpColor then
@@ -5272,9 +5968,9 @@ function panelProto:styleFooter()
     end
     m.frame:ClearAllPoints()
     if left then
-      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMLEFT", body, "BOTTOMLEFT", style.PAD, style.FOOTER_COINS)
     else
-      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_MONEY)
+      pixel:Point(m.frame, "BOTTOMRIGHT", body, "BOTTOMRIGHT", -style.PAD, style.FOOTER_COINS)
     end
   end
 end
@@ -5449,17 +6145,94 @@ function panelProto:BuildTabs()
   self.tabs:SetReorderHandler(function(ctx, ids)
     self:OnTabsReordered(ctx, ids)
   end)
+  -- The groups it leaves out may have changed while a tab was moved (FollowGroups holds off then).
+  self.tabs:SetLandHandler(function()
+    self:FollowGroups(true)
+  end)
   -- Chained, the gap between the bags follows their tabs' widths (next.md §12); autosized, its height follows the rail's
-  -- (FollowHeight, a frame on: the rail is shown after its tabs are set).
+  -- (FollowHeight, a frame on: the rail is shown after its tabs are set); clamped, its clamp rect takes in the rail's tabs at once
+  -- (ApplyClamp) and it goes where its place puts it with them (FollowTabs, a frame on too).
   self.tabs:SetResizeHandler(function(ctx)
     chain:Update(ctx)
     self:FollowHeight(true)
+    self:ApplyClamp()
+    self:FollowTabs(true)
+  end)
+  -- Shown (groups turned on: after its tabs are set, which follows them), its clamp rect takes them in at once; hidden (groups
+  -- turned off, its tabs kept and not set again), it lets them go and follows.
+  addon.HookScript(self.tabs.frame, "OnShow", function()
+    self:ApplyClamp()
+  end)
+  addon.HookScript(self.tabs.frame, "OnHide", function()
+    self:ApplyClamp()
+    self:FollowTabs(true)
   end)
   self:RefreshTabs()
 end
 
--- RefreshTabs lists the kind's tabs.
-function panelProto:RefreshTabs()
+-- RefreshTabs lists the kind's tabs; with animate they glide to their new places (NextTabs:SetTabs).
+---@param animate? boolean
+function panelProto:RefreshTabs(animate)
+  local _ = animate
+end
+
+-- ListsGroups says whether the rail lists the bag's groups (not its bag slots nor Blizzard's bank tabs, and not with
+-- groups off): the tabs Hide Empty Groups leaves out are groups' (groups.md §3).
+---@return boolean
+function panelProto:ListsGroups()
+  return false
+end
+
+-- HiddenGroups returns the groups whose tabs the rail leaves out (Groups:HiddenGroups): none while a section is dragged
+-- (RevealGroups) or while the rail lists no groups; else the empty ones of the last data drawn that had tabs, never the
+-- group shown.
+---@return table<number, boolean>
+function panelProto:HiddenGroups()
+  if self.revealGroups or not self:ListsGroups() then
+    return {}
+  end
+  return groups:HiddenGroups(self.kind, self.groupTabs, self:GetCurrentTabID())
+end
+
+-- ShownTabs returns the entries of the tabs the rail shows: every tab given (each in the order shown) but the groups it
+-- leaves out (HiddenGroups). It records which those were (tabsHidden), to list the tabs again only when that changes
+-- (FollowGroups), and every tab given (tabsListed), so a move among those shown keeps the others' places (OnTabsReordered).
+---@param entries NextTabEntry[]
+---@return NextTabEntry[]
+function panelProto:ShownTabs(entries)
+  local hidden = self:HiddenGroups()
+  self.tabsHidden = hidden
+  self.tabsListed = {}
+  local shown = {}
+  for _, entry in ipairs(entries) do
+    table.insert(self.tabsListed, entry.id)
+    if not hidden[entry.id] then
+      table.insert(shown, entry)
+    end
+  end
+  return shown
+end
+
+-- FollowGroups lists the tabs again when the groups the rail leaves out changed (a draw emptied a group or filled one, the
+-- group shown changed, a drag began or ended), gliding with animate. Never while a tab is moved, which listing them puts
+-- back: it follows once the tab has landed (the rail's land handler).
+---@param animate boolean
+function panelProto:FollowGroups(animate)
+  if not self:ListsGroups() or self.tabs.moving ~= nil then
+    return
+  end
+  if self.tabsHidden == nil or not groups:SameGroups(self:HiddenGroups(), self.tabsHidden) then
+    self:RefreshTabs(animate)
+  end
+end
+
+-- RevealGroups shows every group's tab while a section is dragged (on), so it can be dropped on an empty one, and leaves
+-- the empty ones out again once the drag ends (asked: "agree with showing all sections when dragging a section, animate
+-- it"), the tabs gliding either way.
+---@param on boolean
+function panelProto:RevealGroups(on)
+  self.revealGroups = on
+  self:FollowGroups(true)
 end
 
 -- TabOrderKey names the rail the order of the tabs shown is saved under (database:GetNextTabOrder), nil
@@ -5479,7 +6252,7 @@ function panelProto:OrderedTabs(entries)
 end
 
 -- OnTabsReordered saves the order a tab was moved to (asked: "make sure it saves"; docs/next-batch-2.md
--- §5) and lists the tabs again in it.
+-- §5) and lists the tabs again in it. The groups the rail leaves out keep their places among the others (withLeftOut).
 ---@param ctx Context
 ---@param ids number[]
 function panelProto:OnTabsReordered(ctx, ids)
@@ -5488,8 +6261,33 @@ function panelProto:OnTabsReordered(ctx, ids)
   if key == nil then
     return
   end
+  if self:ListsGroups() and self.tabsListed ~= nil then
+    ids = self:withLeftOut(ids)
+  end
   database:SetNextTabOrder(key, ids)
   self:RefreshTabs()
+end
+
+-- withLeftOut puts the tabs the rail left out back among the ids of the tabs it shows (a move's new order), where they
+-- were listed (tabsListed): each place a tab shown held takes the next of ids.
+---@private
+---@param ids number[]
+---@return number[]
+function panelProto:withLeftOut(ids)
+  local shown = {}
+  for _, id in ipairs(ids) do
+    shown[id] = true
+  end
+  local out, at = {}, 1
+  for _, id in ipairs(self.tabsListed) do
+    if shown[id] then
+      table.insert(out, ids[at])
+      at = at + 1
+    else
+      table.insert(out, id)
+    end
+  end
+  return out
 end
 
 -- OnTabClicked runs a click on a tab.
@@ -5722,6 +6520,8 @@ function panelProto:Show(ctx, slotInfo, onShown)
   end
   self:startEffects()
   self.menuButton:Paint()
+  -- Its anchor square shows with it (docs/next-bag-anchor.md).
+  self:UpdateAnchor()
   addon.TriggerItemContextChanged()
   chain:Update(ctx)
   return drew
@@ -5742,6 +6542,8 @@ function panelProto:Hide(ctx)
   addon.ForceHideBlizzardBags()
   PlaySound(self.closeSound)
   self.closing = true
+  -- Its anchor square leaves at once, a drag of it ended (docs/next-bag-anchor.md).
+  self:UpdateAnchor()
   -- A bag that hangs from it only while it is open stays where it stands, saved once for this close.
   chain:Released(self)
   self.released = true
@@ -5878,6 +6680,7 @@ function panelProto:OnHidden(ctx)
   nextDock:PanelHidden(self)
   self:StopMove()
   self:StopSizing()
+  self:StopAnchorDrag()
   self:endSizeGlide()
   -- Hidden at once (Escape), a bag that hangs from it only while it is open stays where it stands, as Hide has it. Not again at
   -- the end of Hide's slide, which hides it too: in the slide's 0.24 s its top can move (a glide the close cut short ends where it
@@ -5890,6 +6693,10 @@ function panelProto:OnHidden(ctx)
   -- leaves it open with no Show to clear the mark.
   self.released = nil
   self.closing = false
+  -- Its anchor square hides with it, after its close is over: a parent's hide (Alt+Z) part way through the close leaves it open
+  -- (found by the bug review: shown again with no Show, its square stayed hidden), and a parent's hide hides both and shows
+  -- both again.
+  self:UpdateAnchor()
   self:stopBursts()
   tween:Stop(self)
   tween:Stop(self.spark)
@@ -5961,6 +6768,11 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback? fun()
 function panelProto:Draw(ctx, slotInfo, callback)
+  -- The rail goes by the last data split by group that had tabs: data never read (the bank's until it is read as it
+  -- opens) has none, and the Show Bags view's and Bank Tabs mode's tabs are bags (data/items.lua, ItemBelongsToTab).
+  if slotInfo.tabs ~= nil and self:ListsGroups() then
+    self.groupTabs = slotInfo.tabs
+  end
   if not self.frame:IsShown() then
     self.lastSlotInfo = slotInfo
     self.drawPendingOnShow = true
@@ -5985,6 +6797,8 @@ function panelProto:Draw(ctx, slotInfo, callback)
   self.drawnButtons = claims
   self.claims = nil
   self.lastSlotInfo = slotInfo
+  -- The groups it leaves out follow what it holds and the group it shows (Hide Empty Groups), gliding unless it is opening.
+  self:FollowGroups(not self.opening)
   -- Before it is laid out: how narrow a small panel goes keeps room for its footer's text (MinWidth), and it follows what it
   -- shows first (FollowNames).
   local free = format(L:G("%d free slots"), self.content.freeTotal)

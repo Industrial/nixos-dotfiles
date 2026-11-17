@@ -227,6 +227,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Copy = "GameFontNormal" },
     SettingsText = { Copy = "GameFontHighlightSmall" },
     SettingsLink = { Copy = "GameFontNormal" },
+    SettingsLead = { Copy = "GameFontHighlight" },
   },
 
   -- Default's sizes (asked: "scale for Plain should be the same as our Default"), but what the frame's art fixes.
@@ -261,6 +262,10 @@ sonataNext:RegisterTheme({
     Wash = false,
     Edge = false,
     DropGlow = { Color = "Gold", Alpha = 0.12, BlendMode = "ADD" },
+    -- Docked at full height, Blizzard's frame (16 above its body, 3 below; 8 below on WoW: Forever, none past it on Classic)
+    -- and the bag button (17 above) stood past the screen's top and bottom. Asked: the bag button "in a better place ... equal
+    -- on both sides", the gap seen (8 agreed): the art kept 8 clear of each.
+    DockMargin = 8,
   },
 
   Header = {
@@ -274,6 +279,9 @@ sonataNext:RegisterTheme({
       -- The header's actions in the bag button's menu; only the close button (pinned, in Clients) stays in the header.
       Menu = BAG_BUTTON,
     },
+    -- An item dropped on the bag button goes in a category (asked: "in the case of Plain, the bag button"), as the
+    -- original bags' button made a category of one.
+    ItemDrop = { Target = "Menu" },
   },
 
   -- The bag search box as Blizzard draws it (BagSearchBoxTemplate's InputBoxVisualTemplate border), 20 in and 10 from the
@@ -303,6 +311,8 @@ sonataNext:RegisterTheme({
     Fade = 1,
     Font = "Tab",
     SelectedFont = "TabSelected",
+    Edge = false,
+    SelectedEdge = false,
     Glow = { Color = "Gold", BlendMode = "ADD", Drop = 0.3, Pulse = 0.8 },
     Indicator = false,
     Highlight = LIST_HOVER,

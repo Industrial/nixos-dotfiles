@@ -11,6 +11,7 @@ The utilities module provides essential helper functions, data structures, and a
   - [Cursor Placement](#cursor-placement-cursorplacementlua)
   - [Movement Flow Detection](#movement-flow-detection-movementflowlua)
   - [Query Parser](#query-parser-querylua)
+  - [Serialization](#serialization-serializationlua)
   - [Sorting System](#sorting-system-sortlua)
 - [Data Structures](#data-structures)
   - [Interval Tree](#interval-tree-treesintervaltreelua)
@@ -182,6 +183,18 @@ A complete lexer and parser for search query syntax, supporting complex boolean 
 "NOT soulbound AND tradeable"
 ```
 
+### Serialization (`serialization.lua`)
+
+The text a player shares their categories, or one category, as (`DB:ExportSettings`, `DB:ExportCategory`, `DB:ReadImport`; `.claude/rules/import-export.md`).
+Pasted text is untrusted, so it is read as data and never run.
+
+| Function | Description | Returns |
+|----------|-------------|---------|
+| `Encode(value)` | CBOR, compressed with Deflate, in Base64 (`C_EncodingUtil`, every client) | `string` |
+| `Decode(text)` | Reads what `Encode` wrote; refuses text that is not Base64, not compressed, not CBOR or not a table | `table` or `nil, reason` |
+| `DecodeLegacy(text)` | Reads a `!BB` string exported before #1317 (Base64 of a Lua table constructor) with a parser for exactly what the old writer wrote | `table` or `nil, reason` |
+| `DeepCopy(value)` | A copy of a table and everything in it, metatables included | `any` |
+
 ### Sorting System (`sort.lua`)
 
 Comprehensive sorting algorithms for both sections and items.
@@ -197,21 +210,37 @@ SECTION_SORT_TYPE = {
 }
 ```
 
-**Item Sorting:**
-```lua
-ITEM_SORT_TYPE = {
-  ALPHABETICALLY_THEN_QUALITY = 1,
-  QUALITY_THEN_ALPHABETICALLY = 2,
-  ITEM_LEVEL = 3
-}
-```
+**Item Orders** (`.claude/rules/item-sort.md`): an order is a list of keys (`const.ITEM_ORDER_KEY`), the first deciding,
+each next one breaking the ties of those before it, then the name (when not one of them), the bigger pile and the GUID.
+A bag has one in each view (`DB:GetItemOrder`, chosen with Item Order, Then By and And Then By on its Layout tab); a
+category may have its own (`Categories:ItemOrderOf`, its Item Order tab).
+
+| Key | Name in the dropdowns | Order |
+|-----|-----------------------|-------|
+| `name` | Name | A to Z |
+| `quality` | Quality | highest first |
+| `itemLevel` | Item Level | current item level, highest first |
+| `upgradeTrack` | Upgrade Track | the item level the track upgrades to, highest first; no track last (offered only where the client has `C_Item.GetItemUpgradeInfo`) |
+| `equipmentSlot` | Equipment Slot | the character sheet's order, then weapons, then what is equipped elsewhere; not equipment last |
+| `itemType` | Item Type | class ID, then subclass ID |
+| `expansion` | Expansion | oldest first |
+| `count` | Count | the count the button shows, highest first |
+| `sellPriceStack` | Sell Price (Stack) | what the stack the button shows sells for (`items:SellPriceOf` times its count), highest first |
+| `sellPriceEach` | Sell Price (Each) | what one sells for, highest first |
 
 **Key Functions:**
 
 | Function | Description | Parameters | Returns |
 |----------|-------------|------------|---------|
 | `GetSectionSortFunction(kind, view)` | Get section sort function | `BagKind`, `BagView` | `function` |
-| `GetItemSortFunction(kind, view)` | Get item sort function | `BagKind`, `BagView` | `function` |
+| `GetItemDataSortFunction(kind, view)` | What the data pipeline sorts a bag's items with: each category's own order where it has one, else the bag's | `BagKind`, `BagView` | `function` |
+| `ItemDataComparator(order)` | The comparison of two items' data an order makes | `ItemOrderKey[]` | `function` |
+| `ItemOrderKeys()` | The keys an order is chosen from on this client, in the dropdowns' order | - | `ItemOrderKey[]` |
+| `OffersItemOrderKey(key)` | Whether this client offers a key | `ItemOrderKey` | `boolean` |
+| `ItemOrderKeyName(key)` | A key's name in the dropdowns | `ItemOrderKey` | `string` |
+| `ItemOrderChoices(order, tier)` | What a tier's dropdown lists: every key for the first, None and the keys not taken above for a later one | `ItemOrderKey[]`, `number` | `string[]` |
+| `ItemOrderChoice(order, tier)` | What a tier's dropdown shows | `ItemOrderKey[]`, `number` | `string` |
+| `WithItemOrderChoice(order, tier, choice)` | A new order with a tier set: a key leaves the tier below that had it, None takes a later tier out | `ItemOrderKey[]`, `number`, `string` | `ItemOrderKey[]` |
 | `SortSectionsByPriority(kind, a, b)` | Priority-based section sort | `BagKind`, `Section`, `Section` | `boolean, boolean` |
 
 **Sort Algorithms:**
@@ -221,13 +250,11 @@ ITEM_SORT_TYPE = {
 - Size-based (ascending/descending) with item count
 - Custom priority pinning
 
-**Items:**
-- Quality → Name → Count → GUID
-- Name → Quality → Count → GUID
-- Item Level → Name → Count → GUID
+The sell price is Auto Sell's: the item's link's price once loaded, else its base item's, and 0 for an item no merchant buys (`hasNoValue`), so those go last.
 
 **Special Cases:**
-- Free slots always sort last
+- Free slots and gaps always sort last; two items either of which lacks its data are left unordered
+- Slot order (Show Bags, `SortItemDataBySlot`): by bag, then slot, the backpack's keyring (Classic Era, WoW: Forever) after every bag
 - Recent Items section always first
 - Fill-width sections sort separately
 - Invalid data handling
@@ -327,14 +354,15 @@ end
 
 ### Sorting Example
 ```lua
--- Get appropriate sort function
-local sortFunc = sort:GetItemSortFunction(
+-- The backpack's items, each category's by its own order where it has one
+local sortFunc = sort:GetItemDataSortFunction(
   const.BAG_KIND.BACKPACK,
   const.BAG_VIEW.SECTION_GRID
 )
+table.sort(itemDataList, sortFunc)
 
--- Sort items
-table.sort(items, sortFunc)
+-- Gear by slot, then item level
+table.sort(gear, sort:ItemDataComparator({ const.ITEM_ORDER_KEY.EQUIPMENT_SLOT, const.ITEM_ORDER_KEY.ITEM_LEVEL }))
 ```
 
 ### Interval Tree Example
@@ -387,10 +415,25 @@ movementFlow:AtNPCShopWindow(): boolean
 QueryParser:Query(input: string): QueryNode?
 ```
 
+### Serialization Module
+```lua
+serialization:Encode(value: table): string
+serialization:Decode(text: string): table?, string?
+serialization:DecodeLegacy(text: string): table?, string?
+serialization:DeepCopy(value: any): any
+```
+
 ### Sort Module
 ```lua
 sort:GetSectionSortFunction(kind: BagKind, view: BagView): function
-sort:GetItemSortFunction(kind: BagKind, view: BagView): function
+sort:GetItemDataSortFunction(kind: BagKind, view: BagView): function
+sort:ItemDataComparator(order: ItemOrderKey[]): function
+sort:ItemOrderKeys(): ItemOrderKey[]
+sort:OffersItemOrderKey(key: ItemOrderKey): boolean
+sort:ItemOrderKeyName(key: ItemOrderKey): string
+sort:ItemOrderChoices(order: ItemOrderKey[], tier: number): string[]
+sort:ItemOrderChoice(order: ItemOrderKey[], tier: number): string
+sort:WithItemOrderChoice(order: ItemOrderKey[], tier: number, choice: string): ItemOrderKey[]
 ```
 
 ### Trees Module

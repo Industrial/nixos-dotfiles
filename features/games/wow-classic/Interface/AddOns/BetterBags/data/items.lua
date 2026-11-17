@@ -96,6 +96,8 @@ local async = addon:GetModule("Async")
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
 ---@field drawGeneration number The kind's draw generation when this sweep ran (see items:Init).
+---@field itemContextResolvedInContext? boolean Its itemContextMatchResult was worked out while an item context was active (Feed Pet, an enchant), so it holds only while one is; set in Phase 6.
+---@field junkMarked? boolean Blizzard's junk coin shows on it (UpdateJunkItem): poor, sells for something, a vendor open; set in Phase 6.
 ---@field harvestIncomplete boolean True when the client had no item info at harvest; never reused.
 ---@field rawItemName string|nil The client's ContainerItemInfo.itemName, before fallbacks (see ReuseHarvestedSlot).
 ---@field rawIconFileID number|nil The client's ContainerItemInfo.iconFileID, before fallbacks.
@@ -122,6 +124,18 @@ end
 ---@return number?
 local function guildTabOf(bagid)
   return const.GUILD_BANK_BAGS and const.GUILD_BANK_BAGS[bagid]
+end
+
+-- The bag family of keys, which only the keyring holds (const.EMPTY_SLOT_FAMILY_ICON).
+local KEYRING_FAMILY = 256
+
+-- isBackpackKeyring says whether a bag is the keyring the backpack reads (Classic Era, WoW: Forever; keyring.md):
+-- live retail's enum has a Keyring member and no keyring, and on the Classic clients -1 is the bank.
+---@param bagid number
+---@return boolean
+local function isBackpackKeyring(bagid)
+  return Enum.BagIndex ~= nil and Enum.BagIndex.Keyring ~= nil and bagid == Enum.BagIndex.Keyring
+    and const.BACKPACK_BAGS[bagid] ~= nil
 end
 
 -- drawsEmptySlotsInPlace says whether the slot-order view (Show Bags, a bank or guild tab by itself)
@@ -333,8 +347,8 @@ end
 
 -- contextSignature is what grey-out (ResolveItemContextMatchResult) reads besides the item, or nil
 -- when kept grey-out cannot stand. With no item context (ItemButtonUtil.GetItemContext, every
--- client) it reads whether the bank is open, whether it shows a Warbank tab, and whether the Auction
--- House is open. While a context is
+-- client) it reads whether the bank is open, whether it shows a Warbank tab, whether the Auction
+-- House is open, and whether the guild bank is open. While a context is
 -- active, Blizzard's answer can depend on more than the context (the spell being cast for Enchanting,
 -- CheckItemCondition, ReplaceBonusTree or JumpUpgradeTrack; the recipe while recrafting:
 -- ItemButtonUtil.GetItemContextMatchResultForItem), so it is worked out on every refresh, as before.
@@ -353,6 +367,14 @@ function items:contextSignature()
     warbank = accountBankStart ~= nil and bank.bankTab >= accountBankStart
   end
   return tostring(addon.atBank == true) .. "|" .. tostring(warbank) .. "|" .. tostring(addon.atAuctionHouse == true)
+    .. "|" .. tostring(addon.atGuildBank == true)
+end
+
+-- vendorOpen says whether a vendor is open as Blizzard's UpdateJunkItem reads it when it shows the junk coin:
+-- MerchantFrame:IsShown() (BetterBags Next's vendor keeps that frame shown, under a hidden parent).
+---@return boolean
+local function vendorOpen()
+  return MerchantFrame ~= nil and MerchantFrame:IsShown() == true
 end
 
 -- categoryStamp is what an item's own category was worked out under, besides the item and its
@@ -518,6 +540,12 @@ function items:ResolveItemContextMatchResult(data)
     end
     -- What cannot be posted dims while the Auction House is open, as what the Warbank refuses does there.
     if addon.atAuctionHouse and data.isAuctionable == false then
+      return mismatch
+    end
+    -- What the guild bank refuses dims while it is open (#768). Blizzard has no item context for the guild bank, so
+    -- this is BetterBags' own rule; a client without the check (TBC Anniversary, Mists) dims nothing there.
+    if addon.atGuildBank and C_Bank and C_Bank.IsItemAllowedInBankType
+      and not C_Bank.IsItemAllowedInBankType(Enum.BankType.Guild, itemLocation) then
       return mismatch
     end
 
@@ -1255,6 +1283,7 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
   local totalItems = 0
   local stamp = self:categoryStamp(kind)
   local contextSig = self:contextSignature()
+  local atVendor = vendorOpen()
 
   -- An empty slot is named after its bag and colored by the bag's type. Both are the same
   -- for every slot of a bag, so each bag is looked up once per sweep (never kept across
@@ -1315,6 +1344,11 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       currentItem.itemInfo = currentItem.itemInfo or {}
       currentItem.itemInfo.emptySlotName = name
       local bagFamily = emptySlotsByBag and emptySlotsByBag[bagid] and emptySlotsByBag[bagid].family
+      -- The keyring is not free space, so Phase5 leaves it out of emptySlotsByBag: its slots are given the keys'
+      -- family here.
+      if isBackpackKeyring(bagid) then
+        bagFamily = KEYRING_FAMILY
+      end
       currentItem.itemInfo.emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(bagFamily)
       currentItem.itemInfo.itemQuality = details.quality or const.ITEM_QUALITY.Common
     end
@@ -1347,14 +1381,22 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
       -- and Skip Recent Items sees it).
       if d.category ~= stamp then
         d.ownCategory = self:GetCategory(ctx, currentItem, true, true)
+        -- Its Blizzard category, wherever it shows: a category of yours of that name becomes one made from it once the
+        -- read commits (Categories:ConvertNamed, category-lifecycle.md §11). None for an item read before its data
+        -- loaded, whose expansion reads 0 (data-loader.md §19): it is read again once loaded.
+        d.blizzard = not currentItem.harvestIncomplete and self:BlizzardCategory(currentItem) or nil
         d.category, d.base, d.final = stamp, nil, nil
         currentItem.itemInfo.category = d.ownCategory
         d.indexPending = true
       end
       if contextSig == nil or d.context ~= contextSig then
         currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
+        currentItem.itemContextResolvedInContext = contextSig == nil
         d.context = contextSig
       end
+      -- From the quality and no-value flag the draw hands UpdateJunkItem, so it agrees with the coin drawn.
+      currentItem.junkMarked = atVendor and currentItem.itemInfo.itemQuality == const.ITEM_QUALITY.Poor
+        and not (currentItem.containerInfo and currentItem.containerInfo.hasNoValue)
     end
     -- Kept verdicts are reused inside (caches.md §2). The search indexes the arrow: a kept item
     -- whose arrow changed is compared with its search entry again (search-indexing.md §11).
@@ -1599,7 +1641,7 @@ end
 function items:SkipRecent(ctx, item, category)
   -- Not on a guess: a rule can take an item with no upgrade state yet (NOT upgrade = true), and what this
   -- ends cannot be given back when the answer says otherwise.
-  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category) then
+  if item.upgradeUnknown or not (item.stackRecent or self:IsNewItem(item)) or not categories:SkipsRecentOf(category, item.kind) then
     return false
   end
   item.stackRecent = nil
@@ -1766,6 +1808,28 @@ function items:MarkDrawOnClose(kind)
   end
 end
 
+-- OutOfOrder returns the slot keys of the first two items of one category in ordered, gaps aside, that
+-- sortFunc puts the other way round, or nil when each category's items are in order. A section shows
+-- its category's items in the order of the list (Phase10_PartitionIntoTabs), so only those are compared.
+---@param ordered ItemData[]
+---@param sortFunc fun(a: ItemData, b: ItemData): boolean
+---@return string? earlier
+---@return string? later
+function items:OutOfOrder(ordered, sortFunc)
+  local previous = {}
+  for _, item in ipairs(ordered) do
+    if not item.isItemGap then
+      local category = item.itemInfo.category or ""
+      local before = previous[category]
+      if before and sortFunc(item, before) then
+        return before.slotkey, item.slotkey
+      end
+      previous[category] = item
+    end
+  end
+  return nil
+end
+
 -- BuildOrderedItems computes the ordered item list for a sweep, holding a
 -- persistent empty gap wherever a displayed icon has left the bag, by diffing the
 -- previously committed layout (previousSortedItems) against this sweep's displayed
@@ -1890,19 +1954,19 @@ function items:BuildOrderedItems(ctx, kind, visibleItemsBySlotKey, emptySlotByBa
     end
   end
   local sortModule = addon:GetModule("Sort", true)
-  if sortModule and sortModule.GetItemDataSortFunction then
-    local sortFunc = sortModule:GetItemDataSortFunction(kind, view)
-    if sortFunc then
-      table.sort(newItems, sortFunc)
-    end
+  local sortFunc = sortModule and sortModule.GetItemDataSortFunction and sortModule:GetItemDataSortFunction(kind, view)
+  if sortFunc then
+    table.sort(newItems, sortFunc)
   end
   for _, item in ipairs(newItems) do
     table.insert(result, item)
   end
 
-  -- A kept rehashed item holds its old position, which can be out of sort order (its
-  -- category or sort keys may have changed), so closing the bag re-sorts it too.
-  if emittedGap or keptRehashed then
+  -- Kept items hold their old positions and new ones go last, which can be out of sort
+  -- order: a rehashed item's category or sort keys, or a sort key outside the hash (a
+  -- stack's count, which Sell Price (Stack) sorts by). Closing the bag re-sorts them.
+  local outOfOrder = sortFunc ~= nil and self:OutOfOrder(result, sortFunc) ~= nil
+  if emittedGap or keptRehashed or outOfOrder then
     self:MarkDrawOnClose(kind)
   end
 
@@ -2218,6 +2282,17 @@ function items:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, pre
   end
   realSlotInfo.sortedCategories = categoryOrder
 
+  -- A category of yours named as a Blizzard category these items have becomes one made from it (category-lifecycle.md
+  -- §11; asked: "i would prefer hidden changes to non-uniform behavior"). A change queues a recalculation.
+  local blizzard = {}
+  for _, item in pairs(realSlotInfo.itemsBySlotKey) do
+    local name = item.derived and item.derived.blizzard
+    if name then
+      blizzard[name] = true
+    end
+  end
+  categories:ConvertNamed(ctx, blizzard)
+
   local ev = "items/RefreshBackpack/Done"
   if kind == const.BAG_KIND.BANK then
     ev = "items/RefreshBank/Done"
@@ -2275,8 +2350,9 @@ function items:RunRefresh(ectx, kind)
   -- equipmentSets:GetItemSets. Rebuilding it here (same frame as the harvest)
   -- keeps gear-set labels correct as items are looted, moved, equipped, or the
   -- active set changes; without it the map only reflects login state, so looted
-  -- items inherit stale set labels and moved set items lose theirs.
-  equipmentSets:Update()
+  -- items inherit stale set labels and moved set items lose theirs. It also makes each
+  -- set's category (category-lifecycle.md §12) before the items are given theirs.
+  equipmentSets:Update(ectx)
 
   local bagList = self:Phase1_DetermineBags(ectx, kind)
   -- A wipe re-reads every slot; any other read keeps the committed item of each slot whose
@@ -2793,6 +2869,11 @@ function items:Harvest(kind, bagList, includeEquipment, previousItems, rereadEqu
   -- 1. Sweep physical container bags
   for bagid in pairs(bagList) do
     local size = C_Container.GetContainerNumSlots(bagid)
+    -- The keyring (Classic Era, WoW: Forever) reports about 32 slots, but the game opens only GetKeyRingSize()'s
+    -- (every key is in one of them); Blizzard's bags padlock the rest (ContainerFrame_GetContainerNumSlots).
+    if bagid == Enum.BagIndex.Keyring and const.BACKPACK_BAGS[bagid] ~= nil then
+      size = GetKeyRingSize()
+    end
     if size and size > 0 then
       for slotid = 1, size do
         local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
@@ -3152,10 +3233,10 @@ function items:GetBagTypeFromBagID(bagid)
   end
 end
 
--- GetEmptySlotFamilyIcon returns the small centered overlay icon for an empty slot that
--- belongs to a specialized bag, keyed by the bag's family bit value (see
--- const.ITEM_BAG_FAMILY). Generic bags (family 0 or nil) return nil, meaning no overlay.
--- A specialized family with no per-family override falls back to the shared default glyph.
+-- GetEmptySlotFamilyIcon returns the glyph file drawn in an empty slot that belongs to a
+-- specialized bag, keyed by the bag's family bit value (const.EMPTY_SLOT_FAMILY_ICON). Generic
+-- bags (family 0 or nil) return nil, meaning no glyph. A family with no glyph of its own draws
+-- the reagent bag's.
 ---@param family number|nil
 ---@return string|nil
 function items:GetEmptySlotFamilyIcon(family)
@@ -3188,6 +3269,20 @@ function items:ReadLinkInfo(itemLink)
   end
   local name, _, _, _, minLevel, _, _, stackSize, _, _, sellPrice, _, _, bindType = C_Item.GetItemInfo(itemLink)
   return minLevel, stackSize, sellPrice, bindType, name ~= nil
+end
+
+-- SellPriceOf is what a vendor pays for one of an item, in copper: the item in the slot's price (its link's,
+-- in its traits) once its data has loaded, else its base item's; 0 for one no merchant buys (the slot's
+-- hasNoValue, which a price can disagree with). Auto Sell's total and the Sell Price item orders
+-- (util/sort.lua) read it, so both go by the same price.
+---@param data ItemData
+---@return number
+function items:SellPriceOf(data)
+  if data.containerInfo and data.containerInfo.hasNoValue then
+    return 0
+  end
+  local traits = data.itemInfo.traits
+  return (traits and traits.sellPrice) or data.itemInfo.sellPrice or 0
 end
 
 -- SlotLevelsOf works out an equipment item's slot values (search-indexing.md §16): the lowest item
@@ -3462,6 +3557,20 @@ function items:OnCharacterStateChanged(petJournal)
   end
 end
 
+-- topOfTrack is the item level an item on an upgrade track reaches at its track's last rank, from the
+-- level it is at and its rank: each rank adds 3 item levels, 4 from a level of 12 modulo 13 (Midnight's
+-- Hero track: 305, 308, 311, 315, 318, 321).
+---@param level number
+---@param rank number
+---@param ranks number
+---@return number
+local function topOfTrack(level, rank, ranks)
+  for _ = rank + 1, ranks do
+    level = level + (level % 13 == 12 and 4 or 3)
+  end
+  return level
+end
+
 -- ReadItemTraits reads what the search knows of an item beyond its name and type
 -- (search-indexing.md §10), from the slot's link: what it is, its upgrade track, its stats, its
 -- crafting tier. minLevel, stackSize and sellPrice are its link's (ReadLinkInfo). Call it only once
@@ -3521,6 +3630,13 @@ function items:ReadItemTraits(itemID, itemLink, minLevel, stackSize, sellPrice)
       traits.upgradeLevel = upgrade.currentLevel
       traits.upgradeMax = upgrade.maxLevel
       traits.upgradeMaxItemLevel = upgrade.maxItemLevel
+      -- Midnight's client answers 0 for the item level the track reaches.
+      if upgrade.maxItemLevel == 0 then
+        local level = C_Item.GetDetailedItemLevelInfo(itemLink)
+        if level then
+          traits.upgradeMaxItemLevel = topOfTrack(level, upgrade.currentLevel, upgrade.maxLevel)
+        end
+      end
     end
   end
   -- The stats' names (GetItemStats keys are global strings: ITEM_MOD_HASTE_RATING_SHORT is "Haste").
@@ -3887,10 +4003,23 @@ function items:ItemInfoOf(props, slot)
     currentItemCount = slot.currentItemCount,
     category = "",
     currentItemLevel = slot.currentItemLevel,
+    keystoneLevel = self:KeystoneLevel(props.itemLink),
     equipmentSets = slot.equipmentSets,
     tooltipText = slot.tooltipText or "",
     tooltipMarks = slot.tooltipMarks,
   } --[[@as ItemInfo]]
+end
+
+-- KeystoneLevel returns a keystone's level, the third value of its link
+-- (keystone:itemID:challengeModeID:level:affixes, warcraft.wiki.gg Hyperlinks), the same for every
+-- keystone item; nil for any other link.
+---@param link? string
+---@return number?
+function items:KeystoneLevel(link)
+  if link == nil then
+    return nil
+  end
+  return tonumber(string.match(link, "|Hkeystone:%d+:%d+:(%d+)"))
 end
 
 -- FinishItemData ends a read of an item, for every kind of slot: the highest item level seen (item
@@ -4212,11 +4341,6 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
     end
   end
 
-  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
-  if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
-    return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
-  end
-
   if not data.kind then
     return L:G("Everything")
   end
@@ -4232,7 +4356,7 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
   local customCategory, customPriority, customFilter = categories:GetCustomCategory(ctx, data.kind, data, withoutAdded)
 
   -- An item added by hand to a category of yours stays there, whatever the order (category-lifecycle.md
-  -- §7). A plugin's item lists compete with rules by priority, the list winning a tie.
+  -- §7). A plugin's item lists and gear sets (§12) compete with rules by priority, the list winning a tie.
   if searchCategory and customCategory then
     if (customFilter and customFilter.save) or (customPriority or 10) <= (searchPriority or 10) then
       return self:GroupedCategory(ctx, customCategory, customFilter, data)
@@ -4248,6 +4372,45 @@ function items:GetCategory(ctx, data, own, ignoreRecent, withoutAdded)
     return self:GroupedCategory(ctx, customCategory, customFilter, data)
   end
 
+  return self:BuiltInCategory(data)
+end
+
+-- BuiltInCategory returns the category an item no category of yours or a plugin's takes shows in: Blizzard's
+-- (BlizzardCategory), or Everything, where an item with no category goes, for one that a category of yours of that
+-- name ignores where the bag uses it: it has no other Blizzard category (category-lifecycle.md §11).
+---@param data ItemData
+---@return string
+function items:BuiltInCategory(data)
+  local name = self:BlizzardCategory(data)
+  local owner = categories:CategoryIn(name, data.kind)
+  if owner and owner.ignoredItems and owner.ignoredItems[data.itemInfo.itemID] then
+    return L:G("Everything")
+  end
+  return name
+end
+
+-- KnowsBlizzardCategory says whether Blizzard's data gives an item in the bags read a category of this name
+-- (BlizzardCategory), wherever the item shows now: a category of yours made or renamed with it is one made from it
+-- (category-lifecycle.md §11). An item read before its data loaded names none (data-loader.md §19).
+---@param name string
+---@return boolean
+function items:KnowsBlizzardCategory(name)
+  for _, slotInfo in pairs(self.slotInfo or {}) do
+    for _, data in pairs(slotInfo.itemsBySlotKey or {}) do
+      if not data.isItemEmpty and data.itemInfo and not data.harvestIncomplete and self:BlizzardCategory(data) == name then
+        return true
+      end
+    end
+  end
+  return false
+end
+
+-- BlizzardCategory returns the category Blizzard's item data names for an item no category of yours takes: Junk for
+-- poor quality, else its equipment location, else its type, subtype, trade skill and expansion as the bag's filters
+-- say, joined with " - ".
+---@param data ItemData
+---@return string
+function items:BlizzardCategory(data)
   local quality = data.containerInfo and data.containerInfo.quality
   if quality == const.ITEM_QUALITY.Poor then
     return L:G("Junk")

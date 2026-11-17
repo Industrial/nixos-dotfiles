@@ -12,6 +12,9 @@ local events = addon:GetModule('Events')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
@@ -69,6 +72,9 @@ local pixel = addon:GetModule('NextPixel')
 ---@class NextSettingsItemsTab: AceModule
 local itemsTab = addon:GetModule('NextSettingsItemsTab')
 
+---@class Sort: AceModule
+local sort = addon:GetModule('Sort')
+
 -- NextSettingsCategories is the Categories page (next-settings.md §5, category-lifecycle.md §6), where
 -- every category is defined once: one kind of category, a rule, items added by hand, or both. The page
 -- shows its own list in the window's sidebar (pages.lua sidebar): every category, yours and the plugins',
@@ -80,11 +86,17 @@ local itemsTab = addon:GetModule('NextSettingsItemsTab')
 -- - Search Rule: its search, Apply Search Rule, and the Search Results (counted beside their name as it
 --   is typed) as items, those showing in another category saying where.
 -- - Automation: what it does with your backpack's items on its own (automation.md): Auto Sell, and
---   Destroy What Can't Be Sold, which needs Auto Sell on, as settings rows (AutomationOptions).
+--   Destroy What Can't Be Sold, which needs Auto Sell on (AutomationOptions), and Auto Deposit, into the
+--   bank or the Warbank (DepositOptions), as settings rows.
 -- - Added Items: the items added to it by hand, as a grid that holds thousands (NextItemGrid), filtered
 --   by name; an item dropped anywhere on it is added, a right click removes one, Remove All asks first.
+-- - Item Order: Own Item Order, and the three dropdowns a bag's Layout tab chooses its item order with
+--   (ItemOrderOptions, item-sort.md §5), as settings rows.
 -- A plugin's category can be used in bags, colored, ordered and automated; its rule (when it has one)
--- and its items show read-only.
+-- and its items show read-only. A gear set's (category-lifecycle.md §12) is made by the Equipment Manager:
+-- no Added Items, Auto Sell or Auto Deposit. Under the categories, a heading and the Blizzard categories the backpack
+-- shows now, in the same list (category-lifecycle.md §11): one chosen shows what it is and Convert to
+-- Category, which makes it yours.
 ---@class NextSettingsCategories: AceModule
 ---@field selected? string The category chosen.
 ---@field pendingRule? string A search to make a new category of, the next time the list shows.
@@ -108,6 +120,11 @@ local NAME_OF_GROUP_BY = {
 
 -- What a category does on its own (automation.md), in its heading's line.
 local DOES = { sell = L:G("Sells at merchants"), destroy = L:G("Sells, destroys the rest") }
+local DEPOSITS = { bank = L:G("Deposits in the bank"), warbank = L:G("Deposits in the Warbank") }
+
+-- The banks Deposit Into chooses from, in the dropdown's order, and what each saves (categories:DepositOf).
+local BANK_NAMES = { L:G("Bank"), L:G("Warbank") }
+local DEPOSIT_OF_NAME = { [L:G("Bank")] = "bank", [L:G("Warbank")] = "warbank" }
 
 -- The messages that say a bag's items were read (data/items.lua Phase11): the list counts again.
 local BAG_READ = { 'items/RefreshBackpack/Done', 'items/RefreshBank/Done', 'items/RefreshGuildBank/Done' }
@@ -176,21 +193,43 @@ local function describe(filter)
     what = L:G("Nothing in it yet")
   end
   local line = what
-  if isPlugins(filter) then
+  if filter.gearSet ~= nil then
+    -- Its items are its set's, whatever was added (category-lifecycle.md §12).
+    line = L:G("Made by the Equipment Manager")
+  elseif isPlugins(filter) then
     line = L:G("Made by a plugin") .. " · " .. line
+  elseif filter.blizzard then
+    -- Blizzard's items show in it whatever was added: nothing added is not nothing in it.
+    line = L:G("Converted from Blizzard") .. " · " .. (what == L:G("Nothing in it yet") and L:G("Nothing added yet") or what)
   end
   if DOES[filter.automation] then
     line = line .. " · " .. DOES[filter.automation]
   end
+  -- Where there is no Warbank, Auto Deposit puts everything in the bank (Automation:DepositList).
+  local deposit = filter.deposit
+  if deposit == "warbank" and not addon.hasWarbank then
+    deposit = "bank"
+  end
+  if DEPOSITS[deposit] then
+    line = line .. " · " .. DEPOSITS[deposit]
+  end
   return line
 end
 
--- isShownIn says whether a section name is a category's own or one of its group by's.
+-- isShownIn says whether a section name is a category's own or one of its group by's. A Blizzard category, and one
+-- made from it, never groups: a longer Blizzard name ("Consumable - Potion") is not one of its sections.
 ---@param name string
 ---@param category string
 ---@return boolean
 local function isShownIn(name, category)
-  return category == name or category:sub(1, #name + 3) == name .. " - "
+  if category == name then
+    return true
+  end
+  if category:sub(1, #name + 3) ~= name .. " - " then
+    return false
+  end
+  local filter = categories:GetCategoryByName(name)
+  return filter ~= nil and not filter.blizzard
 end
 
 -- ordered returns every category's name in their order (categories:GetOrder: not a group by's
@@ -207,15 +246,66 @@ local function ordered(needle)
   return names
 end
 
+-- eachBlizzard calls fn with the Blizzard category of every item the backpack shows in one (asked, issue #1278: "only
+-- for categories currently visible in the backpack"), until fn returns true: a section no category has, holding items
+-- where BetterBags puts what no category takes (Items:BuiltInCategory). Not Recent Items or a gear set, nor a category
+-- just deleted or renamed, whose items keep its name until the bags are recalculated. Only the items the backpack's
+-- sections show (a stack's largest pile, not those it hides: SlotInfo:GetVisibleItems), none in Show Bags, whose
+-- sections are the bags.
+---@param fn fun(name: string): boolean?
+local function eachBlizzard(fn)
+  local kind = const.BAG_KIND.BACKPACK
+  local slotInfo = items.slotInfo and items.slotInfo[kind]
+  if slotInfo == nil or database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return
+  end
+  for _, data in pairs(slotInfo.visibleItemsBySlotKey or slotInfo.itemsBySlotKey or {}) do
+    local name = not data.isItemEmpty and data.itemInfo and data.itemInfo.category
+    if name and name ~= "" and items:BuiltInCategory(data) == name and not categories:DoesCategoryExist(name) then
+      if fn(name) then
+        return
+      end
+    end
+  end
+end
+
+-- blizzardNames returns the Blizzard categories the backpack shows, by name, those whose name has needle.
+---@param needle string
+---@return string[]
+local function blizzardNames(needle)
+  local set, names = {}, {}
+  eachBlizzard(function(name)
+    if not set[name] and (needle == "" or name:lower():find(needle, 1, true)) then
+      set[name] = true
+      table.insert(names, name)
+    end
+  end)
+  table.sort(names)
+  return names
+end
+
 -- Chosen returns the category chosen.
 ---@return CustomCategoryFilter?
 function editor:Chosen()
   return self.selected and categories:GetCategoryByName(self.selected) or nil
 end
 
+-- BlizzardChosen says whether the one chosen is a Blizzard category the backpack shows.
+---@return boolean
+function editor:BlizzardChosen()
+  local found = false
+  if self.selected ~= nil then
+    eachBlizzard(function(name)
+      found = name == self.selected
+      return found
+    end)
+  end
+  return found
+end
+
 -- EnsureChosen chooses the first category when none is, or the one chosen is gone.
 function editor:EnsureChosen()
-  if self:Chosen() ~= nil then
+  if self:Chosen() ~= nil or self:BlizzardChosen() then
     return
   end
   self.selected = ordered()[1]
@@ -247,9 +337,40 @@ end
 function editor:Heading()
   local filter = self:Chosen()
   if filter == nil then
+    if self:BlizzardChosen() then
+      return self.selected, L:G("Made by Blizzard")
+    end
     return L:G("Categories"), L:G("Make a category to sort your items your way.")
   end
   return self.selected, describe(filter)
+end
+
+-- SettingsTabShown says whether the Settings tab shows: for anything but a Blizzard category, which shows what it is
+-- instead (BlizzardHelp, Convert).
+---@return boolean
+function editor:SettingsTabShown()
+  return not self:BlizzardChosen()
+end
+
+-- BlizzardHelp says what the Blizzard category chosen is, and what making it yours does.
+---@return string
+function editor:BlizzardHelp()
+  return format(L:G("%s is a built-in category that BetterBags creates from Blizzard's item types. Convert it to your "
+    .. "own category to customize it. Its items will still show up in it, and you'll be able to change its color, hide "
+    .. "it, auto-sell or auto-deposit its items, add or ignore items, and give it a search rule. Converted categories "
+    .. "can't be grouped."), self.selected or "")
+end
+
+-- Convert makes the Blizzard category chosen yours (Categories:Convert), the bags recalculated, and shows it.
+---@param ctx Context
+function editor:Convert(ctx)
+  local name = self.selected
+  if name == nil then
+    return
+  end
+  categories:Convert(ctx, name)
+  rederive(ctx)
+  self:Choose(ctx, name)
 end
 
 -- RuleTabShown says whether the Search Rule tab shows: for your categories, and a plugin's with a rule.
@@ -259,10 +380,25 @@ function editor:RuleTabShown()
   return filter ~= nil and (not isPlugins(filter) or categories:RuleOf(filter) ~= nil)
 end
 
--- ItemsTabShown says whether the Added Items tab shows: while a category is chosen.
+-- ItemsTabShown says whether the Ignored Items tab shows: while a category is chosen.
 ---@return boolean
 function editor:ItemsTabShown()
   return self:Chosen() ~= nil
+end
+
+-- GearSetChosen says whether the one chosen is a gear set's category (category-lifecycle.md §12): its items are its
+-- set's, and nothing in a set is sold, destroyed or deposited (Automation:BlockedReason), so it has no Added Items and
+-- no such settings.
+---@return boolean
+function editor:GearSetChosen()
+  local filter = self:Chosen()
+  return filter ~= nil and filter.gearSet ~= nil
+end
+
+-- AddedItemsTabShown says whether the Added Items tab shows: while a category is chosen, not a gear set's.
+---@return boolean
+function editor:AddedItemsTabShown()
+  return self:Chosen() ~= nil and not self:GearSetChosen()
 end
 
 -- AutomationTabShown says whether the Automation tab shows: while a category is chosen, a plugin's too
@@ -305,7 +441,7 @@ function editor:AutomationOptions()
     {
       kind = "toggle",
       title = L:G("Confirm Auto Sell"),
-      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next). Turned off, it is sold as soon as the vendor opens."),
+      description = L:G("At a vendor, this category's section waits there to be sold with a double click (BetterBags Next's vendor window; without it, sell it by right-clicking its title). Turned off, it is sold as soon as the vendor opens."),
       keywords = { "automation", "sell", "confirm", "vendor", "merchant" },
       disabled = function() return not sells() end,
       get = function()
@@ -329,6 +465,111 @@ function editor:AutomationOptions()
       set = function(ctx, on) save(ctx, on and "destroy" or "sell") end,
     },
   }
+end
+
+-- DepositOptions returns the Automation tab's Bank settings (automation.md §7), a section of their own,
+-- independent of the merchant settings: Auto Deposit (on saves "bank"), and Deposit Into, the bank or the
+-- Warbank, disabled while Auto Deposit is off. Each saves at once and shows the page's rows again.
+---@return NextSettingsOption[]
+function editor:DepositOptions()
+  local function deposit()
+    local filter = self:Chosen()
+    return filter and filter.deposit
+  end
+  local function save(ctx, value)
+    if self.selected then
+      categories:UpdateCategory(ctx, self.selected, { deposit = value })
+    end
+    settings:Refresh(ctx)
+  end
+  return {
+    {
+      kind = "toggle",
+      title = L:G("Auto Deposit"),
+      description = L:G("Deposit this category's items in your bank when you open it. Hold Shift to keep them."),
+      keywords = { "automation", "deposit", "bank", "warbank", "store" },
+      get = function() return deposit() ~= nil end,
+      set = function(ctx, on) save(ctx, on and "bank" or false) end,
+    },
+    {
+      kind = "dropdown",
+      title = L:G("Deposit Into"),
+      description = L:G("The bank Auto Deposit puts this category's items in: yours, or the Warbank. Items the Warbank does not take stay in your bags."),
+      keywords = { "automation", "deposit", "bank", "warbank", "account" },
+      items = BANK_NAMES,
+      disabled = function() return deposit() == nil end,
+      get = function() return deposit() == "warbank" and L:G("Warbank") or L:G("Bank") end,
+      set = function(ctx, name) save(ctx, DEPOSIT_OF_NAME[name]) end,
+    },
+  }
+end
+
+-- ItemOrderTabShown says whether the Item Order tab shows: while a category is chosen, a plugin's too.
+---@return boolean
+function editor:ItemOrderTabShown()
+  return self:Chosen() ~= nil
+end
+
+-- ItemOrderOptions returns the Item Order tab's settings (item-sort.md §5): Own Item Order, which gives the chosen
+-- category an order of its own, the default to start from, or takes it away (its items follow the order of the bag they
+-- are in), and the three dropdowns a bag's Layout tab chooses its order with (config/catalog.lua: the Sort module's
+-- choices, each a tier of the order), off while it has none. Each saves at once and shows the page's rows again.
+---@return NextSettingsOption[]
+function editor:ItemOrderOptions()
+  local function order()
+    local filter = self:Chosen()
+    return filter and filter.itemOrder
+  end
+  -- What the dropdowns show: its order, or the one Own Item Order starts it with.
+  local function shown()
+    return order() or const.DEFAULT_ITEM_ORDER
+  end
+  local function save(ctx, value)
+    if self.selected then
+      categories:UpdateCategory(ctx, self.selected, { itemOrder = value })
+    end
+    settings:Refresh(ctx)
+  end
+  local options = {
+    {
+      kind = "toggle",
+      title = L:G("Own Item Order"),
+      description = L:G("Order this category's items its own way, in every bag it is used in. Turned off, they follow "
+        .. "the Item Order of the bag they are in (its Layout tab)."),
+      keywords = { "sort", "order", "items", "item order", "own" },
+      get = function() return order() ~= nil end,
+      set = function(ctx, on) save(ctx, on and { unpack(const.DEFAULT_ITEM_ORDER) } or false) end,
+    },
+  }
+  local tiers = {
+    { title = L:G("Item Order"), description = L:G("What this category's items are ordered by first. Items still "
+      .. "equal go by name, then the bigger pile."),
+      keywords = { "sort", "order", "items", "quality", "item level", "slot", "type", "count", "name", "sell price" } },
+    { title = L:G("Then By"), description = L:G("What its items the Item Order holds equal are ordered by; None for "
+      .. "nothing more. Items still equal go by name, then the bigger pile."),
+      keywords = { "sort", "order", "items", "then", "tie", "second" } },
+    { title = L:G("And Then By"), description = L:G("What its items still equal after Then By are ordered by; None for "
+      .. "nothing more. Items still equal go by name, then the bigger pile."),
+      keywords = { "sort", "order", "items", "then", "tie", "third" } },
+  }
+  for tier, def in ipairs(tiers) do
+    table.insert(options, {
+      kind = "dropdown",
+      title = def.title,
+      description = def.description,
+      keywords = def.keywords,
+      itemsFunction = function() return sort:ItemOrderChoices(shown(), tier) end,
+      disabled = function() return order() == nil or #shown() < tier - 1 end,
+      get = function() return sort:ItemOrderChoice(shown(), tier) end,
+      set = function(ctx, choice)
+        local current = order()
+        if current then
+          save(ctx, sort:WithItemOrderChoice(current, tier, choice))
+        end
+      end,
+    })
+  end
+  return options
 end
 
 -- RecentOptions returns the Automation tab's Recent Items settings (docs/next-batch-2.md §1), a section of
@@ -403,6 +644,125 @@ local function askNewCategory(owner, rule)
   end)
 end
 
+-- freeName returns name and the first number from 2 no category's name has: "Herbs (2)".
+---@param name string
+---@return string
+local function freeName(name)
+  local n = 2
+  while categories:DoesCategoryExist(format("%s (%d)", name, n)) do
+    n = n + 1
+  end
+  return format("%s (%d)", name, n)
+end
+
+-- AskImport adds a category shared as text (#1250: Import Categories with a string of one, content.lua), asking in the
+-- dialog every question is asked in. A name no category has asks whether to import it; one of yours asks whether to
+-- replace it (asking again, saying what stays) or keep both, naming the one imported; a plugin's, or a group by's
+-- section, can only be kept beside. The last question says how many of its items move to it from your other
+-- categories, and, for one that groups, when its Group By goes: it becomes a converted category, as Rename says
+-- (category-lifecycle.md §11). Once it is imported, done is called, and it says so, with a button showing it on this
+-- page.
+---@param owner Frame The window its dialogs show over.
+---@param shared CustomCategoryFilter
+---@param done fun(ctx: Context, name: string)
+function editor:AskImport(owner, shared, done)
+  local title = L:G("Import Category")
+  local function moving(name)
+    local moves = categories:MovesOnImport(shared, name)
+    if moves == 0 then
+      return ""
+    elseif moves == 1 then
+      return " " .. L:G("1 of its items is in another category of yours now, and moves to it.")
+    end
+    return " " .. format(L:G("%d of its items are in other categories of yours now, and move to it."), moves)
+  end
+  -- ungrouped says its Group By goes, imported as target: a new category with a Blizzard category's name, or one made
+  -- from a Blizzard category it replaces (replacing), never groups.
+  local groups = shared.groupBy ~= nil and shared.groupBy ~= GROUP_BY.NONE
+  local function ungrouped(target, replacing)
+    local converts = replacing and replacing.blizzard or (replacing == nil and items:KnowsBlizzardCategory(target))
+    if not groups or not converts then
+      return ""
+    end
+    return " " .. format(L:G("'%s' is a built-in Blizzard category, so the one imported is a converted category. "
+      .. "Converted categories can't be grouped, so its Group By will be turned off."), target)
+  end
+  local function import(ctx, name, replace)
+    if not categories:ImportCategory(ctx, shared, name, replace) then
+      local why = replace and L:G("The category '%s' could not be imported: it was deleted meanwhile.")
+        or L:G("The category '%s' could not be imported: a category of that name was made meanwhile.")
+      nextDialog:Show(owner, { title = title, text = format(why, name),
+        buttons = { { text = L:G("OK"), onClick = function() end } } })
+      return
+    end
+    done(ctx, name)
+    nextDialog:Show(owner, {
+      title = L:G("Category Imported"), text = format(L:G("'%s' is one of your categories now."), name),
+      buttons = {
+        { text = L:G("OK"), onClick = function() end },
+        { text = L:G("Show Category"), style = "Primary", onClick = function()
+          self:Show(name)
+          settings:Open("categories")
+        end },
+      },
+    })
+  end
+  local name = shared.name
+  local existing = categories:GetCategoryByName(name)
+  if existing == nil then
+    nextDialog:Show(owner, {
+      title = title, text = format(L:G("Import the category '%s'?"), name) .. moving(nil) .. ungrouped(name),
+      buttons = {
+        { text = L:G("Cancel"), onClick = function() end },
+        { text = L:G("Import"), style = "Primary", onClick = function(ctx) import(ctx, name, false) end },
+      },
+    })
+    return
+  end
+  local buttons = {
+    { text = L:G("Cancel"), onClick = function() end },
+    { text = L:G("Keep Both"), onClick = function()
+      askName(owner, title, L:G("Name the category imported:") .. moving(nil), L:G("Import"), freeName(name), nil,
+        function(ctx, chosen)
+          local warning = ungrouped(chosen)
+          if warning == "" then
+            import(ctx, chosen, false)
+            return
+          end
+          nextDialog:Show(owner, {
+            title = title, text = strtrim(warning),
+            buttons = {
+              { text = L:G("Cancel"), onClick = function() end },
+              { text = L:G("Import"), style = "Primary", onClick = function(c) import(c, chosen, false) end },
+            },
+          })
+        end)
+    end },
+  }
+  local text
+  if existing.isGroupBySubcategory then
+    text = format(L:G("'%s' is a section the category '%s' groups into. Keep both, naming the one imported?"), name,
+      existing.groupByParent or name:match("^(.-) %- ") or name)
+  elseif isPlugins(existing) then
+    text = format(L:G("A plugin's category is named '%s'. Keep both, naming the one imported?"), name)
+  else
+    text = format(L:G("You already have a category named '%s'. Replace it with the one imported, or keep both?"), name)
+    table.insert(buttons, { text = L:G("Replace"), style = "Danger", onClick = function()
+      nextDialog:Show(owner, {
+        title = title,
+        text = format(L:G("Replace the category '%s' with the one imported? Its rule, items, bags and color become the "
+          .. "imported ones; its place in the list, what it does on its own and each bag's pins and tabs stay."), name)
+          .. moving(name) .. ungrouped(name, existing),
+        buttons = {
+          { text = L:G("Cancel"), onClick = function() end },
+          { text = L:G("Replace"), style = "Danger", onClick = function(ctx) import(ctx, name, true) end },
+        },
+      })
+    end })
+  end
+  nextDialog:Show(owner, { title = title, text = text, buttons = buttons })
+end
+
 -- bagItemsOf calls fn with every item in the bags given (their committed items), with its bag.
 ---@param bags SettingBag[]
 ---@param fn fun(bag: SettingBag, slotkey: string, data: ItemData)
@@ -417,20 +777,31 @@ local function bagItemsOf(bags, fn)
   end
 end
 
+-- holds says whether an item shown in a bag under a name is that name's: a category of yours holds the items of the
+-- bags that use it (elsewhere a section of its name is Blizzard's, category-lifecycle.md §11), a Blizzard category
+-- every item of its name.
+---@param name string
+---@param bag SettingBag
+---@return boolean
+local function holds(name, bag)
+  return categories:GetCategoryByName(name) == nil or categories:CategoryIn(name, bag.kind) ~= nil
+end
+
 -- matchingCounts returns how many items each category holds in bags, as its Settings tab's Current Items
 -- in this Group lists them: each item once, its group by's sections with it (isShownIn: an item in
--- "Potions - Flask" counts for Potions). One pass: an item counts for its category and for every name
--- that category is a section of.
+-- "Potions - Flask" counts for Potions), in the bags that use it (holds). One pass: an item counts for its
+-- category and for every name that category is a section of.
 ---@param bags SettingBag[]
 ---@return table<string, number>
 local function matchingCounts(bags)
   local seen, counts = {}, {}
-  bagItemsOf(bags, function(_, _, data)
+  bagItemsOf(bags, function(bag, _, data)
     local id = data.itemInfo.itemID
-    local name = data.itemInfo.category
+    local category = data.itemInfo.category
+    local name = category
     while name ~= nil and name ~= "" do
       seen[name] = seen[name] or {}
-      if not seen[name][id] then
+      if not seen[name][id] and isShownIn(name, category) and holds(name, bag) then
         seen[name][id] = true
         counts[name] = (counts[name] or 0) + 1
       end
@@ -464,13 +835,24 @@ local byName = itemsTab.ByName
 ---@field content Frame
 ---@field newCategory NextButtonFrame
 ---@field bags fun(): SettingBag[] The bags the settings show.
----@field entries table[] { name }, in their order
+---@field entries table[] { name } for each category in their order, then { header = true, title } and { name, blizzard = true } for each Blizzard category
+---@field managed number How many of the entries are categories (the ones that can be dragged), before the Blizzard ones.
 ---@field rows NextCategoryListRow[] The rows of the entries, in the same order.
----@field byName table<string, NextCategoryListRow> Each category's own row: moved in the order, it slides.
+---@field byName table<string|table, NextCategoryListRow> Each category's own row (moved in the order, it slides), and the heading's.
 ---@field free NextCategoryListRow[] Rows no category has, hidden, to reuse.
 ---@field drag NextListReorderList Arranges the rows; dragging one moves its category in the order.
 local listProto = {}
 addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextCategoryList')
+
+-- The Blizzard categories' heading's row is kept under a table of its own, a key no category's name can be.
+local HEADING = {}
+
+-- keyOf returns the key of the row an entry has: its category's name, or the heading's.
+---@param entry table
+---@return string|table
+local function keyOf(entry)
+  return entry.header and HEADING or entry.name
+end
 
 -- CreateList makes the page's list (pages.lua sidebar).
 ---@param parent Frame
@@ -480,8 +862,8 @@ addon:GetModule('Perf'):RegisterPrototype(listProto, 'NextCategoryList')
 function editor:CreateList(parent, owner, bags)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextCategoryList
-  local list = setmetatable({ frame = frame, owner = owner, bags = bags, entries = {}, rows = {}, byName = {},
-    free = {} }, { __index = listProto })
+  local list = setmetatable({ frame = frame, owner = owner, bags = bags, entries = {}, managed = 0, rows = {},
+    byName = {}, free = {} }, { __index = listProto })
   list.filter = nextInput:Create(frame, {
     help = L:G("Find a category"),
     onChange = function() list:RefreshRows() end,
@@ -501,29 +883,43 @@ function editor:CreateList(parent, owner, bags)
   list.bar = nextScrollBar:Create(box)
   list.bar:Bind(box)
   list.box, list.content = box, content
+  -- A category lands among the categories, never among Blizzard's under them: they have no place in the order.
   list.drag = reorder:Create({
     box = box, content = content,
     entries = function() return list.entries end,
-    rowOf = function(entry) return list.byName[entry.name].frame end,
-    heightOf = function() return pixel:Length(frame, style.Theme.Settings.Categories.RowHeight) end,
+    rowOf = function(entry) return list.byName[keyOf(entry)].frame end,
+    heightOf = function(entry)
+      local K = style.Theme.Settings.Categories
+      return pixel:Length(frame, entry.header and K.GroupHeight or K.RowHeight)
+    end,
+    last = function() return list.managed end,
     onDrop = function(name, after) list:Drop(name, after) end,
   })
   list.newCategory = nextButton:Create(frame, {
     text = L:G("New Category"), onClick = function() askNewCategory(owner) end,
   })
-  -- A category changed (made, renamed, deleted, edited): the page shows it again, another one chosen for
-  -- one that is gone.
-  events:RegisterMessage('categories/Changed', function(ctx)
+  -- A category changed (made, renamed, deleted, edited): the page shows it again, a renamed one still chosen (a gear
+  -- set's follows its set, category-lifecycle.md §12), another one chosen for one that is gone.
+  events:RegisterMessage('categories/Changed', function(ctx, newName, oldName)
+    if oldName ~= nil and editor.selected == oldName then
+      editor.selected = newName
+    end
     if frame:IsVisible() then
       editor:EnsureChosen()
       settings:Reselect(ctx)
     end
   end)
-  -- A bag's items were read: what each category holds may have changed.
+  -- A bag's items were read: what each category holds may have changed, and the Blizzard category chosen may
+  -- have left the backpack, another one chosen for it.
   for _, message in ipairs(BAG_READ) do
-    events:RegisterMessage(message, function()
+    events:RegisterMessage(message, function(ctx)
       if frame:IsVisible() then
+        local chosen = editor.selected
+        editor:EnsureChosen()
         list:RefreshRows()
+        if editor.selected ~= chosen then
+          settings:Reselect(ctx)
+        end
       end
     end)
   end
@@ -587,11 +983,22 @@ function listProto:Refresh(ctx)
   end
 end
 
--- RefreshRows lists the categories whose name has the filter's text, in their order.
+-- RefreshRows lists the categories whose name has the filter's text, in their order, then under a heading the
+-- Blizzard categories the backpack shows whose name has it, by name, in the same list (asked, issue #1278: "it's one
+-- big scroll list, not two").
 function listProto:RefreshRows()
+  local needle = strtrim(self.filter:GetText() or ""):lower()
   local entries = {}
-  for _, name in ipairs(ordered(strtrim(self.filter:GetText() or ""):lower())) do
+  for _, name in ipairs(ordered(needle)) do
     table.insert(entries, { name = name })
+  end
+  self.managed = #entries
+  local blizzard = blizzardNames(needle)
+  if #blizzard > 0 then
+    table.insert(entries, { header = true, title = L:G("Blizzard Categories") })
+    for _, name in ipairs(blizzard) do
+      table.insert(entries, { name = name, blizzard = true })
+    end
   end
   self.entries = entries
   self:layoutRows()
@@ -604,7 +1011,8 @@ end
 ---@param after number
 function listProto:Drop(name, after)
   local shown = {}
-  for i, entry in ipairs(self.entries) do
+  for i = 1, self.managed do
+    local entry = self.entries[i]
     if entry.name == name then
       if i <= after then
         after = after - 1
@@ -636,15 +1044,16 @@ function listProto:RowFor(name)
   return self.byName[name]
 end
 
--- rowFor returns a category's own row, taking one no category has, or making one, the first time.
+-- rowFor returns an entry's own row, taking one no entry has, or making one, the first time.
 ---@private
----@param name string
+---@param entry table
 ---@return NextCategoryListRow
-function listProto:rowFor(name)
-  local row = self.byName[name]
+function listProto:rowFor(entry)
+  local key = keyOf(entry)
+  local row = self.byName[key]
   if row == nil then
     row = table.remove(self.free) or self:newRow()
-    self.byName[name] = row
+    self.byName[key] = row
   end
   return row
 end
@@ -687,16 +1096,18 @@ function listProto:newRow()
     row.hovered = false
     self:paintRow(row)
   end)
+  -- A Blizzard category has no place in the order to drag it to.
   addon.SetScript(frame, "OnDragStart", function()
-    if row.entry and row.entry.name then
+    if row.entry and row.entry.name and not row.entry.blizzard then
       self.drag:Start(row.entry.name)
     end
   end)
   return row
 end
 
--- layoutRows shows each category listed in its own row, RowHeight tall, saying how many of the shown bags'
--- items it holds (asked: "x items matching"), and puts the rows of those no longer listed away; the list's arrangement places them (NextListReorder: a row that moved slides).
+-- layoutRows shows each entry listed in its own row: a category RowHeight tall, saying how many of the shown bags'
+-- items it holds (asked: "x items matching"), a Blizzard category marked as Blizzard's, the heading GroupHeight tall;
+-- and puts the rows of those no longer listed away; the list's arrangement places them (NextListReorder: a row that moved slides).
 ---@private
 function listProto:layoutRows()
   local K = style.Theme.Settings.Categories
@@ -704,16 +1115,24 @@ function listProto:layoutRows()
   local counts = matchingCounts(self.bags())
   self.rows = {}
   for i, entry in ipairs(self.entries) do
-    local row = self:rowFor(entry.name)
-    listed[entry.name] = true
+    local row = self:rowFor(entry)
+    listed[keyOf(entry)] = true
     self.rows[i] = row
     row.entry = entry
-    row.frame:SetHeight(pixel:Length(self.frame, K.RowHeight))
-    local filter = categories:GetCategoryByName(entry.name)
-    row.label:SetText(entry.name)
-    row.detail:SetText(count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching")))
-    local c = filter and filter.color or GOLD
-    row.dot:SetColorTexture(c[1], c[2], c[3], 1)
+    row.frame:EnableMouse(entry.header ~= true)
+    if entry.header then
+      row.frame:SetHeight(pixel:Length(self.frame, K.GroupHeight))
+      row.label:SetText(string.upper(entry.title))
+      row.detail:SetText("")
+    else
+      row.frame:SetHeight(pixel:Length(self.frame, K.RowHeight))
+      local filter = categories:GetCategoryByName(entry.name)
+      row.label:SetText(entry.name)
+      local matching = count(counts[entry.name] or 0, L:G("%d item matching"), L:G("%d items matching"))
+      row.detail:SetText(entry.blizzard and (L:G("Blizzard") .. " · " .. matching) or matching)
+      local c = filter and filter.color or GOLD
+      row.dot:SetColorTexture(c[1], c[2], c[3], 1)
+    end
     row.frame:Show()
     self:paintRow(row)
   end
@@ -728,7 +1147,8 @@ function listProto:layoutRows()
   self.drag:Arrange()
 end
 
--- paintRow draws a row: its category chosen, under the pointer, or neither.
+-- paintRow draws a row: its category chosen, under the pointer, or neither; the heading as a bag's Order tab draws
+-- its headings, its name above its bottom.
 ---@private
 ---@param row NextCategoryListRow
 function listProto:paintRow(row)
@@ -736,12 +1156,16 @@ function listProto:paintRow(row)
   local entry = row.entry
   row.label:ClearAllPoints()
   row.detail:ClearAllPoints()
-  if entry == nil then
+  if entry == nil or entry.header then
     row.fill:Hide()
     row.hover:Hide()
     row.indicator:Hide()
     row.dot:Hide()
     row.detail:Hide()
+    if entry ~= nil then
+      style:SetFont(row.label, K.GroupFont)
+      pixel:Point(row.label, "BOTTOMLEFT", row.frame, "BOTTOMLEFT", pixel:Snap(row.frame, SB.Pad), pixel:Snap(row.frame, 4))
+    end
     return
   end
   local chosen = entry.name == editor.selected
@@ -778,17 +1202,18 @@ function listProto:paintRow(row)
 end
 
 ---------------------------------------------------------------------------------------------------
--- Rename and Delete, in the header.
+-- Export, Rename and Delete, in the header.
 
 ---@class NextCategoryActions
 ---@field frame Frame
 ---@field owner Frame
+---@field export NextButtonFrame
 ---@field rename NextButtonFrame
 ---@field delete NextButtonFrame
 local actionsProto = {}
 addon:GetModule('Perf'):RegisterPrototype(actionsProto, 'NextCategoryActions')
 
--- CreateActions makes the page's buttons (pages.lua actions): Rename and Delete, for your categories.
+-- CreateActions makes the page's buttons (pages.lua actions): Export, Rename and Delete, for your categories.
 ---@param parent Frame
 ---@param owner Frame The window its dialogs show over.
 ---@return NextCategoryActions
@@ -796,6 +1221,7 @@ function editor:CreateActions(parent, owner)
   local frame = CreateFrame("Frame", nil, parent)
   ---@type NextCategoryActions
   local actions = setmetatable({ frame = frame, owner = owner }, { __index = actionsProto })
+  actions.export = nextButton:Create(frame, { text = L:G("Export"), onClick = function() actions:ShowExport() end })
   actions.rename = nextButton:Create(frame, { text = L:G("Rename"), onClick = function() actions:AskRename() end })
   actions.delete = nextButton:Create(frame, {
     text = L:G("Delete"), style = "Danger", onClick = function() actions:AskDelete() end,
@@ -816,8 +1242,11 @@ function actionsProto:Style()
   self.delete.frame:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 0, 0)
   self.rename.frame:ClearAllPoints()
   self.rename.frame:SetPoint("TOPRIGHT", self.delete.frame, "TOPLEFT", -gap, 0)
+  self.export.frame:ClearAllPoints()
+  self.export.frame:SetPoint("TOPRIGHT", self.rename.frame, "TOPLEFT", -gap, 0)
   local shown = self.rename.frame:IsShown()
-  local width = shown and (self.rename.frame:GetWidth() + gap + self.delete.frame:GetWidth()) or pixel:Unit(self.frame)
+  local width = shown and (self.export.frame:GetWidth() + gap + self.rename.frame:GetWidth() + gap
+    + self.delete.frame:GetWidth()) or pixel:Unit(self.frame)
   self.frame:SetSize(width, pixel:Length(self.frame, B.Height))
 end
 
@@ -827,30 +1256,72 @@ function actionsProto:Refresh(ctx)
   local _ = ctx
   local filter = editor:Chosen()
   local yours = filter ~= nil and not isPlugins(filter)
+  self.export.frame:SetShown(yours)
   self.rename.frame:SetShown(yours)
   self.delete.frame:SetShown(yours)
   self:Style()
 end
 
--- AskRename renames the chosen category, keeping it chosen, or says why it cannot.
+-- ShowExport shows the chosen category as text to share (#1250, DB:ExportCategory), selected to copy, in the dialog
+-- every question is asked in: what it is, never what it does on its own, which whoever imports it chooses.
+function actionsProto:ShowExport()
+  local name = editor.selected
+  if name == nil then
+    return
+  end
+  nextDialog:Show(self.owner, {
+    title = L:G("Export Category"),
+    text = format(L:G("Copy the category '%s' with Ctrl+C to share it. What it does on its own (Auto Sell, Auto "
+      .. "Deposit) stays here: whoever imports it chooses their own."), name),
+    input = { text = database:ExportCategory(name), help = L:G("Category string") },
+    buttons = { { text = L:G("Close"), onClick = function() end } },
+  })
+end
+
+-- AskRename renames the chosen category, keeping it chosen, or says why it cannot. Renaming one made from a Blizzard
+-- category makes it a new category (asked: "accept with a warning that it's making a new category technically").
 function actionsProto:AskRename()
   local current = editor.selected
   if current == nil then
     return
   end
-  askName(self.owner, L:G("Rename Category"), format(L:G("Rename the category '%s' to:"), current), L:G("Rename"),
+  local filter = editor:Chosen()
+  local text = format(L:G("Rename the category '%s' to:"), current)
+  if filter and filter.blizzard then
+    text = format(L:G("Renaming '%s' turns it into a separate category. Blizzard's items will go back to the built-in "
+      .. "'%s' category, and only your changes move to the new name. Rename it to:"), current, current)
+  end
+  local function rename(ctx, name)
+    if not categories:RenameCategory(ctx, current, name) then
+      nextDialog:Show(self.owner, {
+        title = L:G("Rename Category"), text = format(L:G("The category '%s' could not be renamed."), current),
+        buttons = { { text = L:G("OK"), onClick = function() end } },
+      })
+      return
+    end
+    editor:Choose(ctx, name)
+  end
+  askName(self.owner, L:G("Rename Category"), text, L:G("Rename"),
     current, current, function(ctx, name)
       if name == current then
         return
       end
-      if not categories:RenameCategory(ctx, current, name) then
+      -- Named after a Blizzard category, it becomes a converted one, which can't be grouped (category-lifecycle.md §11):
+      -- one that groups says so first.
+      local groups = filter and filter.groupBy ~= nil and filter.groupBy ~= GROUP_BY.NONE
+      if groups and items:KnowsBlizzardCategory(name) then
         nextDialog:Show(self.owner, {
-          title = L:G("Rename Category"), text = format(L:G("The category '%s' could not be renamed."), current),
-          buttons = { { text = L:G("OK"), onClick = function() end } },
+          title = L:G("Rename Category"),
+          text = format(L:G("'%s' is a built-in Blizzard category, so renaming to it converts this category. Converted "
+            .. "categories can't be grouped, so its Group By will be turned off."), name),
+          buttons = {
+            { text = L:G("Cancel"), onClick = function() end },
+            { text = L:G("Rename"), style = "Primary", onClick = function(c) rename(c, name) end },
+          },
         })
         return
       end
-      editor:Choose(ctx, name)
+      rename(ctx, name)
     end)
 end
 
@@ -939,6 +1410,91 @@ end
 ---@param height number
 local function placeTab(tab, x, y, width, height)
   itemsTab:PlaceTab(tab, x, y, width, height)
+end
+
+-- The Blizzard tab: what a Blizzard category is and the button that makes it yours, centered in the whole tab
+-- (asked, issue #1278: the text "bigger", the button "in the middle of that panel entirely").
+
+---@class NextCategoryBlizzardTab
+---@field frame Frame
+---@field wide boolean
+---@field text FontString
+---@field convert NextButtonFrame
+---@field width? number
+---@field height? number
+local blizzardTabProto = {}
+addon:GetModule('Perf'):RegisterPrototype(blizzardTabProto, 'NextCategoryBlizzardTab')
+
+---@param parent Frame
+---@param owner Frame
+---@return NextCategoryBlizzardTab
+function editor:CreateBlizzardTab(parent, owner)
+  local _ = owner
+  local tab = makeTab(parent, blizzardTabProto, {})
+  tab.text = style:CreateText(tab.frame, style.Theme.Settings.Categories.LeadFont)
+  tab.text:SetJustifyH("CENTER")
+  tab.text:SetWordWrap(true)
+  tab.convert = nextButton:Create(tab.frame, {
+    text = L:G("Convert to Category"), onClick = function(ctx) editor:Convert(ctx) end,
+  })
+  tab:Style()
+  return tab
+end
+
+-- Style draws the tab from the theme, its button sized for it first: it is centered by its width, and themes restyle
+-- their widgets in no set order.
+function blizzardTabProto:Style()
+  style:SetFont(self.text, style.Theme.Settings.Categories.LeadFont)
+  self.convert:Style()
+  if self.width then
+    self:layout()
+  end
+end
+
+---@param width number
+---@return number
+function blizzardTabProto:Measure(width)
+  local _ = width
+  return tabHeight(self.frame)
+end
+
+---@param x number
+---@param y number
+---@param width number
+---@param height number
+function blizzardTabProto:Place(x, y, width, height)
+  placeTab(self, x, y, width, height)
+  self:layout()
+end
+
+-- Refresh says what the Blizzard category chosen is.
+---@param ctx? Context
+function blizzardTabProto:Refresh(ctx)
+  local _ = ctx
+  self.text:SetText(editor:BlizzardHelp())
+  if self.width then
+    self:layout()
+  end
+end
+
+-- layout centers the text, at most LeadWidth wide, and the button under it, two FieldGaps apart, across the tab and
+-- together down it, in whole pixels (docs/next-pixel-perfect.md).
+---@private
+function blizzardTabProto:layout()
+  local frame = self.frame
+  local K = style.Theme.Settings.Categories
+  local m = metricsOf(frame)
+  local width = pixel:Floor(frame, math.max(1, math.min(self.width - 2 * m.pad, K.LeadWidth)))
+  self.text:SetWidth(width)
+  local textHeight = pixel:Ceil(frame, self.text:GetStringHeight())
+  local button = self.convert.frame
+  local gap = 2 * m.gap
+  local top = pixel:Middle(frame, self.height, textHeight + gap + button:GetHeight())
+  self.text:ClearAllPoints()
+  pixel:Point(self.text, "TOPLEFT", frame, "TOPLEFT", pixel:Middle(frame, self.width, width), -top)
+  button:ClearAllPoints()
+  pixel:Point(button, "TOPLEFT", frame, "TOPLEFT", pixel:Middle(frame, self.width, button:GetWidth()),
+    -(top + textHeight + gap))
 end
 
 -- The Settings tab.
@@ -1133,8 +1689,9 @@ function settingsTabProto:Refresh(ctx)
   for _, part in ipairs({ self.labels.bags, self.labels.hide, self.labels.color, self.swatch.frame, self.resetColor.frame, self.labels.inBags, self.inBags, self.grid.frame }) do
     part:SetShown(filter ~= nil)
   end
+  -- A category made from a Blizzard category never groups (asked, issue #1278).
   for _, part in ipairs({ self.labels.groupBy, self.groupBy.frame, self.groupByHint }) do
-    part:SetShown(yours)
+    part:SetShown(yours and not filter.blizzard)
   end
   if filter ~= nil then
     local c = filter.color
@@ -1147,15 +1704,15 @@ function settingsTabProto:Refresh(ctx)
   end
 end
 
--- showInBags shows what of your bags shows in a category now (its group by's sections too): how many
--- items in each bag, and the items, one cell per item with how many there are.
+-- showInBags shows what of your bags shows in a category now (its group by's sections too), in the bags
+-- that use it (holds): how many items in each bag, and the items, one cell per item with how many there are.
 ---@private
 ---@param name string
 function settingsTabProto:showInBags(name)
   local perBag, order, byItem, list = {}, {}, {}, {}
   bagItemsOf(self.bags(), function(bag, _, data)
     local info = data.itemInfo
-    if not isShownIn(name, info.category or "") then
+    if not isShownIn(name, info.category or "") or not holds(name, bag) then
       return
     end
     if perBag[bag.kind] == nil then

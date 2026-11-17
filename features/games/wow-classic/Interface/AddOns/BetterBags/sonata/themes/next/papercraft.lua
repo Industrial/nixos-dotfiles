@@ -191,18 +191,22 @@ sonataNext:RegisterTheme({
     -- The glyphs, drawn by hand: what every button and control draws them with.
     IconSettings = TEXTURES .. "icon_settings.png",
     IconClose = TEXTURES .. "icon_close.png",
-    IconSort = TEXTURES .. "icon_sort.png",
+    IconAnchor = TEXTURES .. "icon_anchor.png",
+    IconAnchorShown = TEXTURES .. "icon_anchorshown.png",
+    IconLock = TEXTURES .. "icon_lock.png",
     IconBags = TEXTURES .. "icon_bags.png",
     IconSmall = TEXTURES .. "icon_small.png",
     IconFull = TEXTURES .. "icon_full.png",
     IconBankTabs = TEXTURES .. "icon_banktabs.png",
     IconDeposit = TEXTURES .. "icon_deposit.png",
+    IconWithdraw = TEXTURES .. "icon_withdraw.png",
     IconDepositGold = TEXTURES .. "icon_depositgold.png",
     IconWithdrawGold = TEXTURES .. "icon_withdrawgold.png",
     IconFilter = TEXTURES .. "icon_filter.png",
     IconSellJunk = TEXTURES .. "icon_selljunk.png",
     IconRepair = TEXTURES .. "icon_repair.png",
     IconGuildRepair = TEXTURES .. "icon_guildrepair.png",
+    IconSwap = TEXTURES .. "icon_swap.png",
     IconChevron = TEXTURES .. "icon_chevron.png",
     IconBack = TEXTURES .. "icon_back.png",
     IconCheck = TEXTURES .. "icon_check.png",
@@ -260,6 +264,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = hand(15, "Ink"),
     SettingsText = hand(15, "InkSoft"),
     SettingsLink = hand(15, "PencilBlue"),
+    SettingsLead = hand(18, "Ink"),
     CurrencyCapped = hand(15, "Capped"),
     CurrencyNone = hand(15, "InkMuted"),
     CurrencyName = hand(14, "Ink"),
@@ -331,9 +336,12 @@ sonataNext:RegisterTheme({
       doodle("DoodleStar", "PencilRed", 0.5, "BOTTOMOUTER", 148, -152, 18, "Full"),
       doodle("DoodlePlane", "InkSoft", 0.5, "BOTTOMINNER", 40, -236, 96, "Full"),
       doodle("DoodleMug", "InkSoft", 0.55, "BOTTOMOUTER", 134, -44, 46, "Full"),
-      -- A note to self, in English.
-      { Texture = "NoteNeed", Point = "BOTTOMINNER", X = 104, Y = -52, Width = 200, Height = 100, Color = "InkSoft",
-        Alpha = 0.7, Locales = ENGLISH, Sizes = "Full", Layer = "ARTWORK", SubLevel = 1 },
+      -- A note to self, in English: its art is not flipped across the screen, where it would read backwards (issue #1328).
+      -- Cropped to the blank its writing has on the left (20 of its 256 pixels), so the writing is as far from the inner
+      -- side on either.
+      { Texture = "NoteNeed", TexCoords = { 0, 202 / 256, 0, 1 }, Point = "BOTTOMINNER", X = 104, Y = -52,
+        Width = 200 * 202 / 256, Height = 100, Color = "InkSoft", Alpha = 0.7, Locales = ENGLISH, Sizes = "Full",
+        Mirror = false, Layer = "ARTWORK", SubLevel = 1 },
       -- Tape holding it to the screen, over its inner edge, and across its corners on a small bag.
       tape("TapeLeft", "TapeTan", "TOPINNER", -58, 16, 96, 48),
       tape("TapeRight", "TapeBlue", "BOTTOMINNER", -48, -110, 96, 48),
@@ -402,6 +410,8 @@ sonataNext:RegisterTheme({
   Tabs = {
     Fill = { Texture = "TabScrap", Color = "White" },
     SelectedFill = { Texture = "TabScrapChosen", Color = "White" },
+    Edge = false,
+    SelectedEdge = false,
     Indicator = false,
     Glow = { Color = "PencilBlue", BlendMode = "BLEND", Drop = 0.3, Pulse = 0.5 },
   },
@@ -468,6 +478,8 @@ sonataNext:RegisterTheme({
     Highlight = { 0.3, 0.48, 0.71, 0.14 },
     CardFill = { 0.18, 0.16, 0.14, 0.045 },
     CardHover = { 0.18, 0.16, 0.14, 0.09 },
+    -- A guild bank log's move in blue pencil: this theme's Gold is its red pencil, a withdrawal's color.
+    LogIcons = { Move = { Color = "PencilBlue" } },
   },
 
   -- The settings window as a larger sheet: the pages down its side on a shade of it, marked in a highlighter's blue.
@@ -608,6 +620,8 @@ sonataNext:RegisterTheme({
     Highlight = { Texture = TEXTURES .. "item_light.png", VertexColor = { 0.3, 0.48, 0.71, 0.26 }, BlendMode = "BLEND" },
     Pushed = { Texture = TEXTURES .. "item_light.png", VertexColor = { 0.18, 0.16, 0.14, 0.26 }, BlendMode = "BLEND" },
     EmptySlot = { Texture = TEXTURES .. "item_empty.png" },
+    -- A specialized bag's glyph in ink: Default's white vanished on the light empty slot (issue #1327).
+    FamilyIcon = { Color = { 0.18, 0.16, 0.14, 0.4 } },
     Count = { Font = { Object = "NumberFontNormal", Path = PATRICK, Size = 15, Flags = "OUTLINE" },
       Points = { { Point = "BOTTOMRIGHT", X = -4, Y = 4 } } },
     ItemLevel = { Font = { Object = "NumberFontNormal", Path = PATRICK, Size = 15, Flags = "OUTLINE" } },

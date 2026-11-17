@@ -42,12 +42,14 @@ local DEFAULT_WIDTH = 200
 ---@class (exact) NextInputOptions
 ---@field text? string
 ---@field help? string Shown while it is empty and not focused.
----@field width? number
+---@field width? number|fun(): number A function is read again every time it restyles (a width a theme gives).
 ---@field numeric? boolean Digits only (EditBox:SetNumeric).
 ---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
 ---@field onEnter? fun(ctx: Context, text: string)
 ---@field commitOnBlur? boolean Losing focus with its text changed commits it too (calls onEnter), as Enter does.
+---@field onArrow? fun(ctx: Context, key: string) An arrow key pressed while it is focused ("UP", "DOWN", "LEFT", "RIGHT").
+---@field onEscape? fun(ctx: Context) Escape pressed, after it put its text back and let go of focus.
 ---@field icon? fun(): {Texture: string, Size: number, Color: string} An icon inside its left edge (the settings' magnifier), read from the theme every time it is styled.
 
 ---@class NextInputFrame
@@ -65,6 +67,7 @@ addon:GetModule('Perf'):RegisterPrototype(inputProto, 'NextInputFrame')
 ---@class (exact) NextTextAreaOptions
 ---@field height number
 ---@field help? string
+---@field maxLetters? number
 ---@field onChange? fun(ctx: Context, text: string, userInput: boolean)
 
 ---@class NextTextAreaFrame
@@ -76,6 +79,7 @@ addon:GetModule('Perf'):RegisterPrototype(inputProto, 'NextInputFrame')
 ---@field editBox EditBox
 ---@field help FontString
 ---@field opts NextTextAreaOptions
+---@field readOnly? boolean It shows its text and takes no typing (SetReadOnly).
 local areaProto = {}
 addon:GetModule('Perf'):RegisterPrototype(areaProto, 'NextTextAreaFrame')
 
@@ -96,7 +100,7 @@ function nextInput:Create(parent, opts)
   opts = opts or {}
   local frame = CreateFrame("EditBox", nil, parent)
   frame:SetAutoFocus(false)
-  pixel:Width(frame, opts.width or DEFAULT_WIDTH)
+  pixel:Width(frame, type(opts.width) == "function" and opts.width() or opts.width or DEFAULT_WIDTH)
   if opts.numeric then
     frame:SetNumeric(true)
   end
@@ -120,8 +124,18 @@ function nextInput:Create(parent, opts)
   addon.SetScript(frame, "OnLeave", function() f:SetHovered(false) end)
   addon.SetScript(frame, "OnEditFocusGained", function() f:OnFocus(true) end)
   addon.SetScript(frame, "OnEditFocusLost", function() f:OnFocus(false) end)
-  addon.SetScript(frame, "OnEscapePressed", function() f:Cancel() end)
+  addon.SetScript(frame, "OnEscapePressed", function(ctx)
+    f:Cancel()
+    if opts.onEscape then
+      opts.onEscape(ctx)
+    end
+  end)
   addon.SetScript(frame, "OnEnterPressed", function(ctx) f:Commit(ctx) end)
+  addon.SetScript(frame, "OnArrowPressed", function(ctx, _, key)
+    if opts.onArrow then
+      opts.onArrow(ctx, key)
+    end
+  end)
   addon.SetScript(frame, "OnTextChanged", function(ctx, _, userInput) f:OnTextChanged(ctx, userInput) end)
   table.insert(self.all, f)
   sonataNext:RegisterWidget(self)
@@ -137,7 +151,7 @@ function inputProto:Style()
   local I = controls:Theme("Input")
   local frame = self.frame
   pixel:Height(frame, I.Height)
-  pixel:Width(frame, frame:GetWidth())
+  pixel:Width(frame, type(self.opts.width) == "function" and self.opts.width() or frame:GetWidth())
   -- Its text and help start after its icon, when it has one: it lays out its own room for it, so no
   -- restyle of another widget can put its text over the icon.
   local pad = pixel:Length(frame, I.Padding)
@@ -274,6 +288,9 @@ function nextInput:CreateArea(parent, opts)
   editBox:SetMultiLine(true)
   editBox:SetAutoFocus(false)
   editBox:SetCountInvisibleLetters(false)
+  if opts.maxLetters then
+    editBox:SetMaxLetters(opts.maxLetters)
+  end
   editBox.scrollable = true
   local help = frame:CreateFontString(nil, "ARTWORK")
   local view = CreateScrollBoxLinearView()
@@ -291,7 +308,11 @@ function nextInput:CreateArea(parent, opts)
   style:SetFont(editBox, controls:Theme("Input").Font)
   style:SetFont(help, controls:Theme("Input").HelpFont)
   help:SetText(opts.help or "")
-  addon.SetScript(box, "OnMouseDown", function() editBox:SetFocus() end)
+  addon.SetScript(box, "OnMouseDown", function()
+    if not area.readOnly then
+      editBox:SetFocus()
+    end
+  end)
   addon.SetScript(editBox, "OnEditFocusGained", function() area:OnFocus(true) end)
   addon.SetScript(editBox, "OnEditFocusLost", function() area:OnFocus(false) end)
   addon.SetScript(editBox, "OnEscapePressed", function() editBox:ClearFocus() end)
@@ -357,6 +378,18 @@ function areaProto:SetEnabled(enabled)
     self.editBox:ClearFocus()
   end
   self.frame:SetAlpha(enabled and 1 or controls:Theme("Button").DisabledAlpha)
+  self:Paint()
+end
+
+-- SetReadOnly shows the text to be read, drawn as ever, and takes no typing nor focus (a guild bank tab's info text for a
+-- member who may not edit it, as Blizzard's Info tab shows it).
+---@param readOnly boolean
+function areaProto:SetReadOnly(readOnly)
+  self.readOnly = readOnly
+  self.editBox:SetEnabled(not readOnly)
+  if readOnly then
+    self.editBox:ClearFocus()
+  end
   self:Paint()
 end
 

@@ -109,6 +109,7 @@ sonataNext:RegisterTheme({
     SettingsLabel = { Color = "Ink" },
     SettingsText = { Color = "InkSoft" },
     SettingsLink = { Color = "Seal" },
+    SettingsLead = { Color = "Ink" },
   },
 
   Panel = {
@@ -140,7 +141,10 @@ sonataNext:RegisterTheme({
   },
 
   Tabs = {
+    Fill = "Tab",
     Fade = 0.6,
+    Edge = false,
+    SelectedEdge = false,
     Glow = { Color = "Seal", BlendMode = "BLEND", Drop = 0.15, Pulse = 0.35 },
     Indicator = { Color = "Seal" },
   },
@@ -252,5 +256,7 @@ sonataNext:RegisterTheme({
     -- Cards inked faintly on the paper.
     CardFill = { 46 / 255, 31 / 255, 15 / 255, 0.06 },
     CardHover = { 46 / 255, 31 / 255, 15 / 255, 0.08 },
+    -- A guild bank log's move in brown ink: Default's pale Gold measured 1.3 to one on this paper.
+    LogIcons = { Move = { Color = "InkSoft" } },
   },
 })

@@ -42,6 +42,9 @@ local nextDock = addon:GetModule('NextDock')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class NextStyle: AceModule
 local style = addon:GetModule('NextStyle')
 
@@ -89,6 +92,10 @@ local PROMPTS = { "CONFIRM_PURCHASE_TOKEN_ITEM", "CONFIRM_PURCHASE_ITEM_DELAYED"
 ---@field offered table<string, boolean> The backpack categories docked in it this visit (OfferAutomation).
 ---@field toBuy NextVendorPurchase[] What the shopping list buys here, as last drawn (profession-shopping-list.md).
 ---@field listOffered boolean Its Shopping List was docked in it this visit (OfferShoppingList).
+---@field off? boolean Switched off (Deactivate): it answers no merchant, Blizzard's merchant frame shows the vendor.
+---@field buybackKeys? string[] What buyback held when it last looked (NoteBuyback), newest first.
+---@field tsmButton Button Opens TradeSkillMaster's vendor window in its place (SwitchToTSM), shown with TSM loaded.
+---@field aside? boolean During a visit: TradeSkillMaster's vendor window shows it in the vendor's place (StepAside).
 local vendorProto = nextPanel:Extend({}, 'NextVendorPanel')
 -- A vendor's name can be any length: it is cut short to the room its header buttons leave at either
 -- size (FitTitle).
@@ -99,6 +106,12 @@ vendorProto.fitsTitle = true
 ---@return ProfessionShoppingListIntegration
 local function shoppingList()
   return addon:GetModule('ProfessionShoppingList')
+end
+
+-- tradeSkillMaster is the TradeSkillMaster integration (integrations/tradeskillmaster.lua, which loads after this file).
+---@return TradeSkillMasterIntegration
+local function tradeSkillMaster()
+  return addon:GetModule('TradeSkillMaster')
 end
 
 -- shoppingListName names the section of what a shopping list buys here.
@@ -128,6 +141,8 @@ function nextVendor:Create(ctx)
     closeSound = SOUNDKIT.IG_CHARACTER_INFO_CLOSE,
     noDrag = true,
     chainRole = "companion",
+    standIn = "MerchantFrame",
+    interactions = { "Merchant" },
   })
   v.tab = TAB_BUY
   v.atMerchant = false
@@ -192,6 +207,8 @@ function vendorProto:GetHeaderButtons()
   table.insert(buttons, { key = "guildRepairButton", tooltipFunc = function() self:RepairTooltip(true) end,
     label = L:G("Repair With Guild Funds"), menuTooltip = function() return self:RepairText(true) end,
     onClick = function() self:RepairAll(true) end })
+  table.insert(buttons, { key = "tsmButton", tooltip = L:G("Switch to TradeSkillMaster's vendor window"),
+    label = L:G("TradeSkillMaster"), onClick = function(ctx) self:SwitchToTSM(ctx) end })
   return buttons
 end
 
@@ -240,8 +257,10 @@ end
 
 -- UpdateHeader shows what the vendor offers and enables what can be done: the filter (retail,
 -- unless a game rule turns it off), the repair buttons at a vendor that repairs (the guild's when
--- the guild pays), Sell Junk with junk in the bags.
+-- the guild pays), Sell Junk with junk in the bags, TradeSkillMaster with TSM loaded once its switch is there.
 function vendorProto:UpdateHeader()
+  self.tsmButton:SetShown(tradeSkillMaster():Available())
+  self:SetHeaderButtonEnabled(self.tsmButton, tradeSkillMaster():CanSwitch())
   if self.filterButton then
     local disabled = C_GameRules and C_GameRules.IsGameRuleActive and Enum.GameRule
       and Enum.GameRule.MerchantFilterDisabled and C_GameRules.IsGameRuleActive(Enum.GameRule.MerchantFilterDisabled)
@@ -283,6 +302,39 @@ function vendorProto:OnTabClicked(ctx, id, button)
   self:Draw(ctx)
 end
 
+-- buybackKeys lists what buyback holds, newest first, each by what is read as soon as it is sold (its name and link can
+-- arrive later).
+---@return string[]
+local function buybackKeys()
+  local keys = {}
+  for _, entry in ipairs(merchant:ReadBuyback()) do
+    table.insert(keys, tostring(entry.texture) .. ":" .. entry.quantity .. ":" .. entry.price)
+  end
+  return keys
+end
+
+-- NoteBuyback flashes the Buyback tab when something was sold since it last looked: buyback holds more, or as many
+-- but not the same (it keeps the last 12, the oldest dropped, and only a sale adds to it). Buying back takes one out.
+-- It returns what it saw: "sold", "bought back", "unchanged", or "hidden".
+---@return string
+function vendorProto:NoteBuyback()
+  if not self.frame:IsShown() then
+    return "hidden"
+  end
+  local was, now = self.buybackKeys or {}, buybackKeys()
+  self.buybackKeys = now
+  if #now < #was then
+    return "bought back"
+  end
+  for i = 1, #now do
+    if now[i] ~= was[i] then
+      self.tabs:Pulse(TAB_BUYBACK)
+      return "sold"
+    end
+  end
+  return "unchanged"
+end
+
 -- TabOrderKey saves the order of the vendor's tabs.
 ---@return string
 function vendorProto:TabOrderKey()
@@ -294,13 +346,14 @@ function vendorProto:GetCurrentTabID()
   return self.tab
 end
 
--- OnShowing sets the vendor up as it opens: its name, the Buy tab, its tabs and header, and a draw
--- once it shows.
+-- OnShowing sets the vendor up as it opens: its name, the Buy tab, its tabs and header, what buyback
+-- holds (NoteBuyback), and a draw once it shows.
 ---@param ctx Context
 function vendorProto:OnShowing(ctx)
   local _ = ctx
   self:SetTitle(UnitName("npc") or L:G("Vendor"))
   self.tab = TAB_BUY
+  self.buybackKeys = buybackKeys()
   self:RefreshTabs()
   self:UpdateHeader()
   self.lastSlotInfo = self.lastSlotInfo or {}
@@ -308,9 +361,14 @@ function vendorProto:OnShowing(ctx)
 end
 
 -- OnMerchantShow opens the vendor (MERCHANT_SHOW), resetting the filter as Blizzard's merchant
--- frame does on every open.
+-- frame does on every open. Switched off, it opens nothing: Blizzard's merchant frame shows the vendor.
+-- While TradeSkillMaster's own vendor window is TSM's saved choice, TSM shows this vendor a frame later and the vendor
+-- stays out of its way (aside); either way it follows TSM's window until the vendor closes (FollowTSM).
 ---@param ctx Context
 function vendorProto:OnMerchantShow(ctx)
+  if self.off then
+    return
+  end
   self.atMerchant = true
   self.closeRequested = false
   self.offered = {}
@@ -318,15 +376,24 @@ function vendorProto:OnMerchantShow(ctx)
   if ResetSetMerchantFilter then
     ResetSetMerchantFilter()
   end
-  self:Show(ctx)
+  self.aside = tradeSkillMaster():ChoosesWindow()
+  tradeSkillMaster():Follow(function(c) self:FollowTSM(c) end)
+  if not self.aside then
+    self:Show(ctx)
+  end
 end
 
 -- OnMerchantClosed hides the vendor (MERCHANT_CLOSED), puts the cursor back and closes Blizzard's
--- purchase prompts, as Blizzard's merchant frame does when it hides.
+-- purchase prompts, as Blizzard's merchant frame does when it hides. Switched off, it leaves them to
+-- Blizzard's frame, whose own OnHide does it.
 ---@param ctx Context
 function vendorProto:OnMerchantClosed(ctx)
+  if self.off then
+    return
+  end
   self.atMerchant = false
   self.closeRequested = false
+  tradeSkillMaster():Stop()
   nextDock:SendBackBorrowed(self)
   ResetCursor()
   for _, which in ipairs(PROMPTS) do
@@ -335,14 +402,78 @@ function vendorProto:OnMerchantClosed(ctx)
   self:Hide(ctx)
 end
 
--- Hide slides the panel out, ending the vendor visit at once when the panel is what closes.
+-- Hide slides the panel out, ending the vendor visit at once when the panel is what closes; stepping aside for
+-- TradeSkillMaster's window ends nothing.
 ---@param ctx Context
 function vendorProto:Hide(ctx)
   nextPanel.proto.Hide(self, ctx)
-  if self.atMerchant and not self.closeRequested then
+  if self.atMerchant and not self.closeRequested and not self.aside then
     self.closeRequested = true
     CloseMerchant()
   end
+end
+
+-- StepAside slides the vendor out for TradeSkillMaster's window, the visit going on: Blizzard's merchant frame stays
+-- shown to Blizzard's code, so a right click on a bag item still sells. What waits in its dock from the backpack goes
+-- back at once, as when the merchant closes; its own Shopping List leaves with it (OnHidden).
+---@param ctx Context
+function vendorProto:StepAside(ctx)
+  self.aside = true
+  nextDock:SendBackBorrowed(self)
+  self:Hide(ctx)
+end
+
+-- StepBack brings the vendor back from TradeSkillMaster's window as it opens: on Buy, drawn again, and what waits for the
+-- player docked in it again.
+---@param ctx Context
+function vendorProto:StepBack(ctx)
+  self.aside = false
+  self.offered = {}
+  self.listOffered = false
+  self:Show(ctx)
+end
+
+-- FollowTSM follows TradeSkillMaster's vendor window while a vendor is open (TradeSkillMaster:Follow): the vendor steps
+-- aside as TSM's window shows, and comes back as it hides by its WoW UI button (TSM's saved choice then Blizzard's
+-- frame); closed by its own close button or Escape, the visit ends and the vendor stays away. Its TradeSkillMaster button
+-- is enabled once TSM's switch button is there. It returns what it did, for profiler traces: "aside", "back" or "same".
+---@param ctx Context
+---@return string
+function vendorProto:FollowTSM(ctx)
+  if not self.atMerchant or self.closeRequested then
+    return "same"
+  end
+  local tsm, did = tradeSkillMaster(), "same"
+  if tsm:WindowShown() then
+    if not self.aside then
+      self:StepAside(ctx)
+      did = "aside"
+    end
+  elseif self.aside and not tsm:ChoosesWindow() then
+    self:StepBack(ctx)
+    did = "back"
+  end
+  if self:IsShown() and not self.closing then
+    self:UpdateHeader()
+  end
+  return did
+end
+
+-- SwitchToTSM opens TradeSkillMaster's vendor window from the vendor's TradeSkillMaster button, as TSM's own switch on
+-- Blizzard's merchant frame does, and the vendor steps aside once it shows: at once when it showed in the click, through
+-- what follows TSM's window (TradeSkillMaster:Look, which tells FollowTSM), else a frame later. Only during a visit: the
+-- button shows through the close's slide, and TSM's switch would open its window with no merchant. It returns what TSM
+-- did (TradeSkillMaster:OpenWindow), or "closed".
+---@param ctx Context
+---@return string
+function vendorProto:SwitchToTSM(ctx)
+  local _ = ctx
+  if not self.atMerchant or self.closeRequested or self.closing then
+    return "closed"
+  end
+  local did = tradeSkillMaster():OpenWindow()
+  tradeSkillMaster():Look()
+  return did
 end
 
 -- EndVisitLater ends the vendor visit a frame later, when it is still open then: for a hide from
@@ -360,18 +491,29 @@ function vendorProto:EndVisitLater()
 end
 
 -- OnHidden ends the vendor visit a frame later when the panel hid some other way than closing
--- (Escape hides it directly).
+-- (Escape hides it directly), never once it stepped aside for TradeSkillMaster's window.
 ---@param ctx Context
 function vendorProto:OnHidden(ctx)
   nextPanel.proto.OnHidden(self, ctx)
-  self:EndVisitLater()
+  if not self.aside then
+    self:EndVisitLater()
+  end
 end
 
--- Activate has nothing to catch up on: BetterBags Next is switched only away from a vendor, and
+-- Deactivate switches the vendor off, with BetterBags Next or by itself (Enable Vendor Window, next-bagsystem.md §11g): it hides
+-- at once and lets go of its buttons, and answers no merchant until Activate.
+---@param ctx Context
+function vendorProto:Deactivate(ctx)
+  self.off = true
+  nextPanel.proto.Deactivate(self, ctx)
+end
+
+-- Activate switches the vendor on again. It has nothing to catch up on: it is switched only away from a vendor, and
 -- the next vendor that opens draws everything (OnShowing).
 ---@param ctx Context
 function vendorProto:Activate(ctx)
   local _ = ctx
+  self.off = false
 end
 
 -- OnClosed does nothing: the vendor has no Recent Items.
@@ -607,11 +749,11 @@ function vendorProto:OfferAutomation(ctx)
   for _, section in ipairs(canvas.order) do
     if section.kind == "category" and not self.offered[section.name] and not canvas:IsAway(section)
       and not canvas:IsLeaving(section) then
-      local items = nextDrag:SectionItems(section)
+      local list = nextDrag:SectionItems(section)
       local phase
-      if buys and #automation:SaleOffer(ctx, items) > 0 then
+      if buys and #automation:SaleOffer(ctx, list) > 0 then
         phase = "confirm"
-      elseif #automation:DestroyLeft(ctx, items) > 0 then
+      elseif #automation:DestroyLeft(ctx, list) > 0 then
         phase = "destroy"
       end
       if phase then
@@ -696,16 +838,17 @@ end
 -- (SaleOf), sold as it docks when buyback keeps all of it, else once double-clicked; of a category Auto
 -- Sell offers (automation), what it sells (Automation:SaleOffer), once double-clicked. The seller sells
 -- it one item at a time while the card says how far it is; once it ends the section flies into the
--- vendor, or goes back to the backpack with what the merchant did not take (refused items stay in the
--- bags until a merchant buys them; asked). Then, for a category, what is left to destroy, glowing in the
--- theme's destroy color, one item per click (Automation:DestroyNext; a double click is two clicks,
--- OnDoubleClick blocking the second OnClick, warcraft.wiki.gg). A right click stops what is left of a
--- sale (cancel).
+-- vendor, or goes back to the backpack with what the sale left in the bags: what the merchant did not
+-- take (refused items stay in the bags until a merchant buys them; asked), and what it left out (no
+-- merchant buys it, an equipment set, a refundable purchase). Then, for a category, what is left to
+-- destroy, glowing in the theme's destroy color, one item per click (Automation:DestroyNext; a double
+-- click is two clicks, OnDoubleClick blocking the second OnClick, warcraft.wiki.gg). A right click stops
+-- what is left of a sale (cancel).
 ---@param section NextSection
 ---@param opts {automation?: boolean, phase?: "confirm"|"destroy"}
 ---@return NextDockOffer
 function vendorProto:SectionOffer(section, opts)
-  local function items()
+  local function sectionItems()
     return nextDrag:SectionItems(section)
   end
   local function ctxOf()
@@ -713,10 +856,10 @@ function vendorProto:SectionOffer(section, opts)
   end
   local function saleOf(ctx)
     if not opts.automation then
-      return self:SaleOf(items())
+      return self:SaleOf(sectionItems())
     end
     local sale = {}
-    for _, entry in ipairs(automation:SaleOffer(ctx, items())) do
+    for _, entry in ipairs(automation:SaleOffer(ctx, sectionItems())) do
       table.insert(sale, entry.data)
     end
     return sale
@@ -727,15 +870,40 @@ function vendorProto:SectionOffer(section, opts)
   end
   local offer, job, total, entry = {}, nil, 0, nil
   local function destroyLeft(ctx)
-    return opts.automation and #automation:DestroyLeft(ctx, items()) > 0
+    return opts.automation and #automation:DestroyLeft(ctx, sectionItems()) > 0
   end
-  -- after says what follows a sale: what is left to destroy, else the section goes.
+  -- leftBehind says whether a sale left any of the section's items in the bags: one of them, or a pile
+  -- its virtual stack hides, that it did not sell (refused, never sent, or left out of it: no merchant
+  -- buys it, an equipment set, a refundable purchase) and whose slot still holds an item. WithStacks
+  -- names every pile of the same item: one on a button of its own (at a merchant each one, unmergeAtShop)
+  -- can be another section's, and one hidden is the section's only under a root that is.
+  local function leftBehind(sold)
+    local list, own, soldSlots = sectionItems(), {}, {}
+    for _, data in ipairs(list) do
+      own[data.bagid .. "_" .. data.slotid] = true
+    end
+    for _, item in ipairs(sold.sold) do
+      soldSlots[item.bag .. "_" .. item.slot] = true
+    end
+    local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
+    local visible = slotInfo:GetVisibleItems()
+    for _, data in ipairs(sectionFrame:WithStacks(list)) do
+      local key = data.bagid .. "_" .. data.slotid
+      local ours = own[key] or (visible[key] == nil and own[slotInfo.stacks:GetStackInfo(data.itemHash).rootItem])
+      if ours and not soldSlots[key] and C_Container.GetContainerItemInfo(data.bagid, data.slotid) ~= nil then
+        return true
+      end
+    end
+    return false
+  end
+  -- after says what follows a sale: what is left to destroy, else the section goes back to the backpack
+  -- with what the sale left in the bags, else it flies into the vendor.
   local function after(sold)
     if destroyLeft(ctxOf()) then
       phase = "destroy"
       return "stay"
     end
-    if sold == nil or sold.unsold > 0 then
+    if sold == nil or leftBehind(sold) then
       return "back"
     end
     return "moved"
@@ -762,8 +930,8 @@ function vendorProto:SectionOffer(section, opts)
     return true
   end
   local function destroyOne(ctx)
-    automation:DestroyNext(ctx, items())
-    if #automation:DestroyLeft(ctx, items()) > 0 then
+    automation:DestroyNext(ctx, sectionItems())
+    if #automation:DestroyLeft(ctx, sectionItems()) > 0 then
       return "stay"
     end
     return "moved"
@@ -788,7 +956,7 @@ function vendorProto:SectionOffer(section, opts)
           or L:G("You can buy them back."),
         L:G("Double-click to sell · Right-click to cancel")
     end
-    local n = #automation:DestroyLeft(ctx, items())
+    local n = #automation:DestroyLeft(ctx, sectionItems())
     return format(n == 1 and L:G("Destroy %d item") or L:G("Destroy %d items"), n), L:G("No merchant buys these."),
       L:G("Click to destroy next · Right-click to cancel")
   end
@@ -825,7 +993,7 @@ function vendorProto:SectionOffer(section, opts)
     if phase ~= "destroy" then
       return
     end
-    local next = automation:DestroyLeft(ctxOf(), items())[1]
+    local next = automation:DestroyLeft(ctxOf(), sectionItems())[1]
     if next == nil then
       return
     end
@@ -1003,7 +1171,11 @@ end
 function vendorProto:WatchKind()
   events:RegisterEvent("MERCHANT_SHOW", function(ctx) self:OnMerchantShow(ctx) end)
   events:RegisterEvent("MERCHANT_CLOSED", function(ctx) self:OnMerchantClosed(ctx) end)
-  events:RegisterEvent("MERCHANT_UPDATE", function(ctx) self:Refresh(ctx) end)
+  -- A sale changes buyback with MERCHANT_UPDATE: Blizzard's last sold item is drawn again on it (MerchantItemBuybackButton_OnLoad).
+  events:RegisterEvent("MERCHANT_UPDATE", function(ctx)
+    self:NoteBuyback()
+    self:Refresh(ctx)
+  end)
   events:RegisterEvent("MERCHANT_FILTER_ITEM_UPDATE", function(ctx) self:Refresh(ctx) end)
   for _, event in ipairs({ "UPDATE_INVENTORY_DURABILITY", "PLAYER_MONEY", "BAG_UPDATE_DELAYED" }) do
     events:RegisterEvent(event, function(ctx)

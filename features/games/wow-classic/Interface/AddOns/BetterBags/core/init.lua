@@ -48,6 +48,9 @@ local search = addon:GetModule('Search')
 ---@class ConsolePort: AceModule
 local consoleport = addon:GetModule('ConsolePort')
 
+---@class Gamepad: AceModule
+local gamepad = addon:GetModule('Gamepad')
+
 ---@class Pawn: AceModule
 local pawn = addon:GetModule('Pawn')
 
@@ -194,6 +197,7 @@ function addon:OnInitialize()
   addon:GetModule('Seller'):Init()
   addon:GetModule('Automation'):Init()
   addon:GetModule('Currencies'):Init()
+  addon:GetModule('FoodDrink'):Init()
 
   -- 4. Themes and Presentation Frames
   addon:GetModule('Render'):Init()
@@ -232,6 +236,8 @@ function addon:OnInitialize()
 
   -- 5. Integrations
   consoleport:Init()
+  -- WoW: Forever's gamepad interface: before the bags are made, which are handed to it as they are.
+  gamepad:Init()
 
   applyCompat()
   self:HideBlizzardBags()
@@ -427,6 +433,7 @@ function addon:OnEnable()
   addon:GetModule('Seller'):Enable()
   addon:GetModule('Automation'):Enable()
   addon:GetModule('Currencies'):Enable()
+  addon:GetModule('FoodDrink'):Enable()
   views:Enable()
   async:Enable()
   form:Enable()
@@ -434,6 +441,7 @@ function addon:OnEnable()
   addon:GetModule('NextSettingsContent'):Enable()
 
   consoleport:Enable()
+  gamepad:Enable()
   quickfind:Enable()
   addon:GetModule('ProfessionShoppingList'):Enable()
 

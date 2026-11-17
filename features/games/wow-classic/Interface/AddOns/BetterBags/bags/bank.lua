@@ -90,6 +90,40 @@ function bank:SuppressBlizzardBankPanel()
 	BankPanel:Show()
 end
 
+-- WarboundDepositEndsRefunds says whether depositing every warbound item would put one in the Warbank that can
+-- still be refunded, ending its refund: Blizzard's Deposit All Warbound Items button asks first then
+-- (BankPanelItemDepositButtonMixin:GetItemDepositConfirmationPopup, BankFrame.lua), looking in the bags as it does.
+---@return boolean
+function bank:WarboundDepositEndsRefunds()
+	return ItemUtil.IteratePlayerInventory(function(itemLocation)
+		return C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) and C_Item.CanBeRefunded(itemLocation)
+	end)
+end
+
+-- DepositWarbound puts every warbound item in the bags into the Warbank, as Blizzard's Deposit All Warbound Items
+-- does (with its Include tradeable reagents setting, the bankAutoDepositReagents CVar): at once, or, when that would
+-- end a refund, only once the player accepts the question ask shows, which calls deposit then.
+---@param ask fun(deposit: fun())
+function bank:DepositWarbound(ask)
+	local function deposit()
+		C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+	end
+	if self:WarboundDepositEndsRefunds() then
+		ask(deposit)
+	else
+		deposit()
+	end
+end
+
+-- DepositWarboundItems is the classic bank's Warbank deposit (its menu, its menu button's Shift right click), asking
+-- Blizzard's own question first when a refund would end: the popup its button shows, which deposits once accepted
+-- (StaticPopupDialogs.ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM, BankFrame.lua).
+function bank.proto:DepositWarboundItems()
+	bank:DepositWarbound(function()
+		StaticPopup_Show("ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM", nil, nil, { bankType = Enum.BankType.Account })
+	end)
+end
+
 -- OnShow sets the bank up and shows its window; onShown runs once the window has finished showing.
 ---@param ctx Context
 ---@param onShown? fun()
@@ -350,16 +384,29 @@ function bank.proto:RegisterEvents()
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
+	events:RegisterMessage("groups/Deleted", function(ctx, _, _, kind, wasActive)
 		if kind ~= const.BAG_KIND.BANK then return end
-		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
-		if activeGroup == groupID then
+		if wasActive then
 			local defaultBankGroup = groups:GetDefaultBankGroup()
 			if defaultBankGroup then
 				behavior:SwitchToGroup(ctx, defaultBankGroup.id)
 			end
 		end
 		behavior:GenerateGroupTabs(ctx)
+	end)
+
+	-- Hide Empty Groups (groups.md §3): the tabs follow what the bank drew, and the setting.
+	events:RegisterMessage("bag/Rendered", function(ctx, rendered, slotInfo)
+		if rendered ~= behavior.bag then return end
+		if slotInfo.tabs ~= nil and behavior:ListsGroups() then
+			behavior.groupTabs = slotInfo.tabs
+		end
+		behavior:FollowGroups(ctx)
+	end)
+	events:RegisterMessage("groups/HideEmptyChanged", function(ctx, kind)
+		if kind == const.BAG_KIND.BANK then
+			behavior:FollowGroups(ctx)
+		end
 	end)
 end
 
@@ -380,16 +427,64 @@ end
 --- Bank Tab Methods
 -------
 
+-- ListsGroups says whether the bank's data is split by group (items:Phase10_PartitionIntoTabs): groups on, and neither
+-- Blizzard's bank tabs nor the Show Bags view, whose tabs are bags.
+---@return boolean
+function bank.proto:ListsGroups()
+	return database:GetGroupsEnabled(const.BAG_KIND.BANK) and not database:GetShowBankTabs()
+		and database:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_ALL_BAGS
+end
+
+-- HiddenGroups returns the groups whose tabs the bank leaves out (Groups:HiddenGroups, Hide Empty Groups): none while a
+-- section is dragged (RevealGroups) or its data is not split by group; else the empty ones of the last data split by
+-- group that had tabs, never the group shown.
+---@return table<number, boolean>
+function bank.proto:HiddenGroups()
+	if self.revealGroups or not self:ListsGroups() then
+		return {}
+	end
+	return groups:HiddenGroups(const.BAG_KIND.BANK, self.groupTabs, database:GetActiveGroup(const.BAG_KIND.BANK))
+end
+
+-- FollowGroups lists the tabs again when the groups the bank leaves out changed (a draw emptied a group or filled one,
+-- the group shown changed, a drag began or ended), while its data is split by group.
+---@param ctx Context
+function bank.proto:FollowGroups(ctx)
+	if not self:ListsGroups() then
+		return
+	end
+	if self.tabsHidden == nil or not groups:SameGroups(self:HiddenGroups(), self.tabsHidden) then
+		self:GenerateGroupTabs(ctx)
+	end
+end
+
+-- RevealGroups shows every group's tab while a section is dragged (on), so it can be dropped on an empty one, and hides
+-- the empty ones again once it is dropped.
+---@param ctx Context
+---@param on boolean
+function bank.proto:RevealGroups(ctx, on)
+	self.revealGroups = on
+	self:FollowGroups(ctx)
+end
+
+-- GenerateGroupTabs creates tabs for all groups, hiding those Hide Empty Groups leaves out (HiddenGroups). Skipped (groups
+-- off), it records none (tabsHidden nil): the next draw split by group generates them (FollowGroups).
 ---@param ctx Context
 function bank.proto:GenerateGroupTabs(ctx)
 	if not database:GetGroupsEnabled(const.BAG_KIND.BANK) then
+		self.tabsHidden = nil
 		self.bag.tabs.frame:Hide()
 		return
 	end
+	local hidden = self:HiddenGroups()
+	self.tabsHidden = hidden
 
 	-- Keep group tabs hidden when the bank tab slots panel is active so
-	-- both UI elements are never visible simultaneously on open.
-	if self.bag.slots and database:GetShowBankTabs() then
+	-- both UI elements are never visible simultaneously on open, and while it
+	-- fades out once turned off (Window:IsClosing): the draw that asks for
+	-- comes then, and the panel shows them again once it has hidden
+	-- (BankSlots:OnClose).
+	if self.bag.slots and (database:GetShowBankTabs() or self.bag.slots.window:IsClosing()) then
 		self.bag.tabs.frame:Hide()
 	else
 		self.bag.tabs.frame:Show()
@@ -398,12 +493,15 @@ function bank.proto:GenerateGroupTabs(ctx)
 	local allGroups = groups:GetAllGroups(const.BAG_KIND.BANK)
 
 	for groupID, group in pairs(allGroups) do
-		if not self.bag.tabs:TabExistsByID(groupID) then
+		local exists = self.bag.tabs:TabExistsByID(groupID)
+		if not exists then
 			self.bag.tabs:AddTab(ctx, group.name, groupID)
-		else
-			if self.bag.tabs:GetTabNameByID(groupID) ~= group.name then
-				self.bag.tabs:RenameTabByID(ctx, groupID, group.name)
-			end
+		elseif self.bag.tabs:GetTabNameByID(groupID) ~= group.name then
+			self.bag.tabs:RenameTabByID(ctx, groupID, group.name)
+		end
+		if hidden[groupID] then
+			self.bag.tabs:HideTabByID(groupID)
+		elseif exists then
 			self.bag.tabs:ShowTabByID(groupID)
 		end
 	end
@@ -546,6 +644,9 @@ function bank.proto:ShowDeleteGroupConfirm(groupID)
 		function()
 			local ctx = context:New("DeleteGroup")
 			groups:DeleteGroup(ctx, const.BAG_KIND.BANK, groupID)
+			-- Its categories are the default group's now, and which tab a category is on is worked
+			-- out when the bank is recalculated.
+			events:SendMessage(ctx, 'bags/Rederive', { backpack = false, bank = true, resetLayout = true })
 		end,
 		function() end
 	)

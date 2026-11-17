@@ -3,9 +3,9 @@
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
 ## Author: Cidan
-## Version: v0.9.2
+## Version: v0.9.4
 ## SavedVariables: BetterBagsDB, BetterBagsPerfDB
-## X-Date: 2026-11-07T17:36:49Z
+## X-Date: 2026-11-17T04:05:12Z
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
@@ -96,6 +96,7 @@ sonata\themes\next\halloween.lua
 sonata\themes\next\makeitso.lua
 sonata\themes\next\papercraft.lua
 sonata\themes\next\gw2.lua
+sonata\themes\next\elvui.lua
 sonata\themes\next\parchment.lua
 sonata\themes\next\plain.lua
 sonata\themes\next\quiet.lua
@@ -122,6 +123,7 @@ data\refresh.lua
 data\seller.lua
 data\automation.lua
 data\currencies.lua
+data\fooddrink.lua
 data\changelogdata.lua
 data\changelog.lua
 
@@ -205,7 +207,9 @@ next\dockcard.lua
 next\dock.lua
 next\drag.lua
 next\chain.lua
+next\uipanels.lua
 next\ornaments.lua
+next\categorypicker.lua
 next\menubutton.lua
 next\glitch.lua
 next\rain.lua
@@ -221,8 +225,10 @@ next\sheen.lua
 next\panel.lua
 next\currencydrag.lua
 next\currencyentry.lua
+next\screencard.lua
 next\currencytracker.lua
 next\currencystrip.lua
+next\fooddrinkbar.lua
 next\bag.lua
 next\bank.lua
 next\merchant.lua
@@ -249,8 +255,10 @@ next\settings\currencies.lua
 next\settings\content.lua
 
 integrations\consoleport.lua
+integrations\gamepad.lua
 integrations\pawn.lua
 integrations\professionshoppinglist.lua
+integrations\tradeskillmaster.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
 integrations\quickfind.lua

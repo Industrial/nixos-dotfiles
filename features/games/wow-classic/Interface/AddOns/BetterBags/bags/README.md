@@ -75,7 +75,9 @@ Implements `BackpackBehavior` for the player's inventory bags.
 - Group tab management with right-click context menu (Rename/Delete)
 
 **Group Tab Context Menu:**
-Right-clicking any user-created tab (ID > 1) shows a context menu with Rename and Delete options. The default "Backpack" tab (ID 1) does not show a context menu. Both `groups:RenameGroup` and `groups:DeleteGroup` are called with `const.BAG_KIND.BACKPACK` as the `kind` argument.
+Right-clicking any user-created tab (ID > 1) shows a context menu with Rename and Delete options. The default "Backpack" tab (ID 1) does not show a context menu. Both `groups:RenameGroup` and `groups:DeleteGroup` are called with `const.BAG_KIND.BACKPACK` as the `kind` argument. Deleting the group shown switches the backpack to Backpack (`groups/Deleted` carries `wasActive`), and the confirmation then recalculates the backpack (`bags/Rederive`) so the deleted group's categories appear on the Backpack tab (`.claude/rules/groups.md` §1). `GenerateGroupTabs` selects the active group's tab, Backpack only when the active group is gone, so listing the tabs again never moves the bag off the group it shows (§2).
+
+**Hide Empty Groups:** with the backpack's setting on, `GenerateGroupTabs` hides the tab of every group with nothing in the data last drawn (`HiddenGroups`, `Groups:HiddenGroups`), never Backpack nor the group shown. The behavior follows each draw (`bag/Rendered`) and the setting (`groups/HideEmptyChanged`), listing the tabs again only when the groups left out change (`FollowGroups`), and shows every group's tab while a section is dragged (`RevealGroups`, from `SectionFrame`) (`.claude/rules/groups.md` §3). The bank's behavior does the same, never hiding its Bank and Warbank groups, nor any while it shows Blizzard's bank tabs. Both list their tabs from data split by group only (`ListsGroups`), and keep the tab bar hidden while their slots panel shows or, for the bank, fades out (`Window:IsClosing`): the draw that turning it off asks for comes during the fade, and the panel shows the bar once it has hidden.
 
 ### bank.lua
 
@@ -90,7 +92,10 @@ Implements `BankBehavior` for the player's bank (retail version).
 - Group tab management with right-click context menu (Rename/Delete)
 
 **Bank Group Tab Context Menu:**
-Right-clicking any user-created bank tab (non-default, ID > 0) shows a context menu with Rename and Delete options. Default bank groups (those with `isDefault = true`) do not show the context menu. Rename uses the `GroupDialog` module (pre-filled with the current name). Delete uses the `Question` module's `YesNo` dialog.
+Right-clicking any user-created bank tab (non-default, ID > 0) shows a context menu with Rename and Delete options. Default bank groups (those with `isDefault = true`) do not show the context menu. Rename uses the `GroupDialog` module (pre-filled with the current name). Delete uses the `Question` module's `YesNo` dialog. Deleting the group shown switches the bank to the character bank's default group (its bank type, title and items), and the confirmation then recalculates the bank (`bags/Rederive`) so the deleted group's categories appear on the default group's tab (`.claude/rules/groups.md` §1).
+
+**The Warbank's item deposit:**
+`BankBehavior:DepositWarbound(ask)` is every Warbank deposit BetterBags makes, Blizzard's Deposit All Warbound Items (`C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)`): at once, or, when an item it would put in the Warbank can still be refunded (`BankBehavior:WarboundDepositEndsRefunds`, Blizzard's own check), only once the player accepts the question `ask` shows. The classic bank's `bank.proto:DepositWarboundItems()` asks with Blizzard's own popup (`ACCOUNT_BANK_DEPOSIT_ALL_NO_REFUND_CONFIRM`), which `BankPanel:SetBankType` closes when the bank's tab switches or the bank closes (`SwitchToBankAndWipe`), as at Blizzard's bank; BetterBags Next's bank asks in its own dialog. The bank's menu and its menu button's Shift right click deposit through it (`.claude/rules/warbank-deposit.md`).
 
 **Bank Slots Panel Persistence (`showBankTabs`):**
 The bank tab slots panel (Blizzard bank tabs with icons) can be toggled via the context menu. When toggled, `database:SetShowBankTabs(true/false)` persists the preference. On bank open (`OnShow`), if `GetShowBankTabs()=true`, the group tabs are hidden and the slots panel is shown.

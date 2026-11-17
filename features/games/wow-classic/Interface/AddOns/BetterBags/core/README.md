@@ -42,10 +42,10 @@ Contains all constant values, enumerations, and configuration defaults used thro
 - **Bag Lists**: `BACKPACK_BAGS`, `BANK_BAGS`, `ACCOUNT_BANK_BAGS` and their variants: which container IDs each bag window reads. On WoW: Forever the keyring (`Enum.BagIndex.Keyring`, -1) is a backpack bag while `C_ActionBar.ShouldShowKeyring()` is true, with no bag slot button (`.claude/rules/camelot-forever.md` §7)
 - **Bank Tabs**: Definitions for different bank tab types
 - **View Modes**: `BAG_VIEW` (ONE_BAG, SECTION_GRID, LIST, SECTION_ALL_BAGS)
-- **Sort Types**: `SECTION_SORT_TYPE`, `ITEM_SORT_TYPE`
+- **Sort Types**: `SECTION_SORT_TYPE`; `ITEM_ORDER_KEY`, the keys an item order is a list of (`DEFAULT_ITEM_ORDER`, at most `ITEM_ORDER_DEPTH`; `.claude/rules/item-sort.md`); `ITEM_SORT_TYPE`, the seven orders a profile saved before, which `DB:MigrateItemOrders` turns into keys
 - **Item Quality**: Quality levels and color mappings
 - **Expansions**: Expansion type mappings
-- **Bag Families**: Specialty bag type definitions
+- **Bag Families**: Specialty bag type definitions, and `EMPTY_SLOT_FAMILY_ICON`: each bag family's glyph file for its empty slots (`EMPTY_SLOT_FAMILY_ICON_DEFAULT`, the reagent bag's, for a family with none; `.claude/rules/item-drawing.md` §11)
 - **UI Offsets**: Layout constants for UI positioning
 - **Database Defaults**: Default configuration values
 
@@ -73,7 +73,24 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Category Management**: Custom category creation, deletion, and item assignment
 - **Filter Settings**: Category filters, stacking options, sorting preferences
 - **Item Settings**: Item level display, new item marking, item locking, and per-character max item level tracking (emits `itemLevel/MaxChanged` for color refresh)
-- **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`), pinned order (`customSectionSort`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name. Migrations never drop a pin because its category has no stored filter: built-in categories have none (issue #1107, `.claude/rules/category-lifecycle.md` §3)
+- **Interactions**: what the backpack does at each interaction, by its name in `Enum.PlayerInteractionType`
+  (`GetInteractionBags`, `SetInteractionBags`: `"openClose"` by default, `"open"`, `"none"`;
+  `.claude/rules/interaction-bags.md`)
+- **Design and Integration Switches**: `GetNextEnabled`; BetterBags Next's vendor and guild bank windows
+  (`GetNextVendorEnabled`, `GetNextGuildBankEnabled`, `.claude/rules/next-bagsystem.md` §11g); the QuickFind
+  integration (`GetQuickFindEnabled`, `.claude/rules/quickfind.md`); each on by default but BetterBags Next
+- **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`), pinned order (`customSectionSort`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name. Migrations never drop a pin because its category has no stored filter: built-in categories have none (issue #1107, `.claude/rules/category-lifecycle.md` §3). `SplitSizeOptions` gives every BetterBags Next bag, the vendor too, the Size tab settings the player chose when one set sized every bag (`nextIconScale`, `nextBagScale`, `nextFitNamesWhileOpen`, `nextAutosize`, now `nextSizeOptions[kind]`), leaving each bag its own default where none was chosen, and drops the old keys; it runs after a profile copy too (`.claude/rules/next-bag-settings.md` §4)
+
+### bagsystem.lua
+
+Makes the bags in one of the two designs, the classic bags or BetterBags Next, each in an event scope of its own,
+and switches between them without a reload (`Switch`, `.claude/rules/next-bagsystem.md` §11). With BetterBags Next
+in use, its vendor and guild bank, which stand in for Blizzard's merchant and guild bank frames, are each switched
+off and on at once (`SetVendorEnabled`, `SetGuildBankEnabled`, §11g): off, the panel answers nothing and Blizzard's
+frame shows the vendor or the guild bank. Every switch is refused in the places a frame would change hands open
+(at a vendor, at the guild bank; the design switch also in combat and at the bank). Every bag window it makes is handed
+to the gamepad support as it is made (`Gamepad:Add`, `integrations/gamepad.lua`, `.claude/rules/gamepad.md`), which
+`init.lua` starts before the bags are made.
 
 ### events.lua
 
@@ -102,7 +119,10 @@ Manages UI hooks and interaction with the default Blizzard interface.
 #### Key Features
 
 - Intercepts bag toggle commands
-- Handles NPC interaction windows (vendor, bank, mail, etc.)
+- Handles NPC interaction windows (vendor, bank, mail, etc.): each opens the backpack and closes it again, only
+  opens it, or leaves it alone, as the player picks per interaction (`DB:GetInteractionBags`, General >
+  Interactions, `.claude/rules/interaction-bags.md`); every one recalculates the bags for the window as it opens
+  and closes
 - Forces hiding of Blizzard bag frames
 - Manages button highlight states
 - Coordinates bag opening/closing with game events

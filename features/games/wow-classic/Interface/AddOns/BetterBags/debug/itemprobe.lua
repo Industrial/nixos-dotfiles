@@ -77,6 +77,23 @@ local function field(tbl, name)
   return tbl and tbl[name]
 end
 
+-- bankAllowed records whether each bank takes the item, by its Enum.BankType name: Blizzard's own code asks
+-- C_Bank.IsItemAllowedInBankType only of the bank and the Warbank, and BetterBags asks it of the guild bank too
+-- (item-drawing.md §8). Nothing on a client without the check.
+---@param location ItemLocationMixin
+---@return table<string, table>?
+local function bankAllowed(location)
+  local check, types = field(_G.C_Bank, "IsItemAllowedInBankType"), _G.Enum and _G.Enum.BankType
+  if type(check) ~= "function" or types == nil then
+    return nil
+  end
+  local out = {}
+  for name, bankType in pairs(types) do
+    out[name] = ask(check, bankType, location)
+  end
+  return out
+end
+
 -- probeItem records what the client says about an item, wherever it is (location).
 ---@param itemID number
 ---@param link? string
@@ -103,6 +120,7 @@ local function probeItem(itemID, link, location)
     scrappable = ask(item.CanScrapItem, location),
     auctionable = ask(field(_G.C_AuctionHouse, "IsSellItemValid"), location, false),
     legacyAuctionHouse = ask(_G.IsUsingLegacyAuctionClient),
+    bankAllowed = bankAllowed(location),
     stats = ask(item.GetItemStats or _G.GetItemStats, link),
     reagentQuality = ask(field(trade, "GetItemReagentQualityByItemInfo"), link),
     craftedQuality = ask(field(trade, "GetItemCraftedQualityByItemInfo"), link),
@@ -283,6 +301,51 @@ function itemProbe:Sample()
     end
   end
   return sample
+end
+
+-- EquipmentSets records every equipment set the client lists for the character (C_EquipmentSet): their IDs in the
+-- client's order, and for each, every value each API answered, its locations unpacked by whichever of
+-- EquipmentManager_UnpackLocation and EquipmentManager_GetLocationData the client has, and the bag/slot map BetterBags
+-- built from them (EquipmentSets.bagAndSlotToSet). Issue #1333: dumps across a relog, a set deleted and another
+-- character show whether a set keeps its ID.
+---@return table
+function itemProbe:EquipmentSets()
+  local api = _G.C_EquipmentSet
+  local out = {
+    count = ask(field(api, "GetNumEquipmentSets")),
+    ids = ask(field(api, "GetEquipmentSetIDs")),
+    sets = {},
+  }
+  local ids = out.ids and out.ids[1]
+  if type(ids) == "table" then
+    for order, id in ipairs(ids) do
+      local set = {
+        order = order,
+        info = ask(field(api, "GetEquipmentSetInfo"), id),
+        itemIDs = ask(field(api, "GetItemIDs"), id),
+        locations = ask(field(api, "GetItemLocations"), id),
+        spec = ask(field(api, "GetEquipmentSetAssignedSpec"), id),
+      }
+      local name = set.info and set.info[1]
+      if type(name) == "string" then
+        set.idOfName = ask(field(api, "GetEquipmentSetID"), name)
+      end
+      local locations = set.locations and set.locations[1]
+      if type(locations) == "table" then
+        set.unpacked = {}
+        for slot, location in pairs(locations) do
+          set.unpacked[slot] = {
+            unpack = ask(_G.EquipmentManager_UnpackLocation, location),
+            data = ask(_G.EquipmentManager_GetLocationData, location),
+          }
+        end
+      end
+      out.sets[id] = set
+    end
+  end
+  local equipmentSets = addon:GetModule('EquipmentSets', true)
+  out.map = clean(equipmentSets and equipmentSets.bagAndSlotToSet)
+  return out
 end
 
 -- Client describes the client the probes are taken on.
