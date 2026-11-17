@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ]]
 local MAJOR_VERSION = "LibActionButton-1.0"
-local MINOR_VERSION = 168
+local MINOR_VERSION = 170
 
 if not LibStub then error(MAJOR_VERSION .. " requires LibStub.") end
 local lib, oldversion = LibStub:NewLibrary(MAJOR_VERSION, MINOR_VERSION)
@@ -1035,7 +1035,7 @@ if Feat_UseCustomFlyout then
 				local numSlots = 0
 				data = data .. ("LAB_FlyoutInfo[%d] = newtable();LAB_FlyoutInfo[%d].slots = newtable();\n"):format(flyoutID, flyoutID)
 				for slotID, slotInfo in ipairs(info.slots) do
-					data = data .. ("LAB_FlyoutInfo[%d].slots[%d] = newtable();LAB_FlyoutInfo[%d].slots[%d].spellID = %d;LAB_FlyoutInfo[%d].slots[%d].isKnown = %s;\n"):format(flyoutID, slotID, flyoutID, slotID, slotInfo.spellID, flyoutID, slotID, slotInfo.isKnown and "true" or "nil")
+					data = data .. ("LAB_FlyoutInfo[%d].slots[%d] = newtable();LAB_FlyoutInfo[%d].slots[%d].spellID = %d;LAB_FlyoutInfo[%d].slots[%d].isKnown = %s;\n"):format(flyoutID, slotID, flyoutID, slotID, slotInfo.spellID, flyoutID, slotID, (slotInfo.isKnown and not slotInfo.isLowerRank) and "true" or "nil")
 					numSlots = numSlots + 1
 				end
 
@@ -1078,6 +1078,34 @@ if Feat_UseCustomFlyout then
 		InSync = false
 	end
 
+	-- flag lower ranks of known spells, so that only the highest known rank is shown
+	-- based on SpellFlyoutMixin:Toggle in SpellFlyout.lua, which hides lower ranks on action bars
+	local function UpdateFlyoutSlotRanks(slots, numSlots)
+		if not WoWForever then return end
+
+		local prevSlot
+		for slotID = 1, numSlots do
+			local slot = slots[slotID]
+			if slot then
+				slot.isLowerRank = nil
+				if slot.isKnown then
+					slot.spellLevel = C_Spell.GetSpellLevelLearned(slot.spellID) or 0
+					if prevSlot and slot.spellName and prevSlot.spellName == slot.spellName then
+						-- ranks are sorted in ascending order, replace the previous slot with the higher rank
+						if prevSlot.spellLevel < slot.spellLevel then
+							prevSlot.isLowerRank = true
+							prevSlot = slot
+						else
+							slot.isLowerRank = true
+						end
+					else
+						prevSlot = slot
+					end
+				end
+			end
+		end
+	end
+
 	-- discover all possible flyouts
 	function DiscoverFlyoutSpells()
 		-- 300 is a safe upper limit in 10.0.2, the highest known spell is 229
@@ -1086,7 +1114,7 @@ if Feat_UseCustomFlyout then
 			if success and numSlots then
 				lib.FlyoutInfo[flyoutID] = { numSlots = numSlots, isKnown = isKnown, slots = {} }
 				for slotID = 1, numSlots do
-					local spellID, overrideSpellID, isKnownSlot = GetFlyoutSlotInfo(flyoutID, slotID)
+					local spellID, overrideSpellID, isKnownSlot, spellName = GetFlyoutSlotInfo(flyoutID, slotID)
 
 					-- hide empty pet slots from the flyout
 					local petIndex, petName = GetCallPetSpellInfo(spellID)
@@ -1094,8 +1122,9 @@ if Feat_UseCustomFlyout then
 						isKnownSlot = false
 					end
 
-					lib.FlyoutInfo[flyoutID].slots[slotID] = { spellID = spellID, overrideSpellID = overrideSpellID, isKnown = isKnownSlot }
+					lib.FlyoutInfo[flyoutID].slots[slotID] = { spellID = spellID, overrideSpellID = overrideSpellID, isKnown = isKnownSlot, spellName = spellName }
 				end
+				UpdateFlyoutSlotRanks(lib.FlyoutInfo[flyoutID].slots, numSlots)
 			end
 		end
 
@@ -1114,7 +1143,7 @@ if Feat_UseCustomFlyout then
 			if success and numSlots then
 				data.isKnown = isKnown
 				for slotID = 1, numSlots do
-					local spellID, overrideSpellID, isKnownSlot = GetFlyoutSlotInfo(flyoutID, slotID)
+					local spellID, overrideSpellID, isKnownSlot, spellName = GetFlyoutSlotInfo(flyoutID, slotID)
 
 					-- hide empty pet slots from the flyout
 					local petIndex, petName = GetCallPetSpellInfo(spellID)
@@ -1125,7 +1154,9 @@ if Feat_UseCustomFlyout then
 					data.slots[slotID].spellID = spellID
 					data.slots[slotID].overrideSpellID = overrideSpellID
 					data.slots[slotID].isKnown = isKnownSlot
+					data.slots[slotID].spellName = spellName
 				end
+				UpdateFlyoutSlotRanks(data.slots, numSlots)
 			end
 		end
 
@@ -1374,6 +1405,7 @@ function InitializeEventHandler()
 
 	lib.eventFrame:RegisterEvent("PLAYER_ENTER_COMBAT")
 	lib.eventFrame:RegisterEvent("PLAYER_LEAVE_COMBAT")
+	lib.eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 	lib.eventFrame:RegisterEvent("START_AUTOREPEAT_SPELL")
 	lib.eventFrame:RegisterEvent("STOP_AUTOREPEAT_SPELL")
 	lib.eventFrame:RegisterUnitEvent("UNIT_INVENTORY_CHANGED", "player")
@@ -1580,10 +1612,11 @@ function OnEvent(frame, event, arg1, ...)
 				StopFlash(button)
 			end
 		end
-
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		-- run flyout updates that were queued during combat lockdown
 		if Feat_UseCustomFlyout and FlyoutUpdateQueued then
-			UpdateFlyoutSpells()
 			FlyoutUpdateQueued = nil
+			UpdateFlyoutSpells()
 		end
 	elseif event == "START_AUTOREPEAT_SPELL" then
 		for button in next, ActiveButtons do
@@ -1919,27 +1952,33 @@ function Generic:UpdateAction(force)
 		self.action = self._state_type == "action" and action or 0
 		if self.action ~= 0 then
 			-- track button by its action
-			if ButtonsByAction[self.action] == nil then
-				ButtonsByAction[self.action] = {}
+			local buttons = ButtonsByAction[self.action]
+			if buttons == nil then
+				buttons = {}
+				ButtonsByAction[self.action] = buttons
 			end
-			ButtonsByAction[self.action][self] = true
+
+			-- enable range checks only once per action, to keep the calls balanced with the disable below
+			if next(buttons) == nil then
+				C_ActionBar.EnableActionRangeCheck(self.action, true)
+			end
+			buttons[self] = true
 
 			if self.config.actionButtonUI then
 				C_ActionBar.RegisterActionUIButton(self, self.action, self.cooldown)
 			else
 				C_ActionBar.UnregisterActionUIButton(self)
 			end
-
-			C_ActionBar.EnableActionRangeCheck(self.action, true)
 		else
 			C_ActionBar.UnregisterActionUIButton(self)
 		end
 
 		-- stop tracking under the previous action
-		if previousAction ~= self.action and ButtonsByAction[previousAction] then
-			ButtonsByAction[previousAction][self] = nil
+		local previousButtons = ButtonsByAction[previousAction]
+		if previousAction ~= self.action and previousButtons and previousButtons[self] then
+			previousButtons[self] = nil
 
-			if next(ButtonsByAction[previousAction]) == nil then
+			if next(previousButtons) == nil then
 				C_ActionBar.EnableActionRangeCheck(previousAction, false)
 			end
 		end
@@ -2076,6 +2115,8 @@ function Update(self)
 	UpdateAssistedCombatRotationFrame(self)
 
 	UpdatedAssistedHighlightFrame(self)
+
+	UpdateRangeIndicator(self, self:IsInRange())
 
 	if GameTooltip_GetOwnerForbidden() == self then
 		UpdateTooltip(self)
