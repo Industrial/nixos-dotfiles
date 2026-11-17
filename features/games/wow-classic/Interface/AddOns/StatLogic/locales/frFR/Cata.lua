@@ -2174,20 +2174,6 @@ L["augmente de %s le maximum de points de vie de tous les membres du groupe se t
 L["augmente le score de coup critique de %s pendant %s min"] = { { Stats.MeleeCritRating, Stats.RangedCritRating, Stats.SpellCritRating, }, false, } -- s84378
 L["augmente le temps entre les attaques en mêlée et à distance d'un ennemi de %s% et le temps d'incantation de %s% en plus de réduire sa vitesse de déplacement de %s% pendant %s s"] = { { Stats.SpellHaste, }, false, false, false, reduction = true } -- s110907
 L["votre technique arme langue de feu confère un bonus de %s à la puissance des sorts"] = { { Stats.SpellDamage, }, } -- s461993
-L["vous apprend à enchanter de manière permanente une cape pour augmenter votre score de coup critique de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.CritRating, }, false, } -- i52737
-L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre score de coup critique de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.CritRating, }, false, } -- i52738
-L["vous apprend à enchanter de manière permanente une pièce d'armure de torse pour augmenter toutes vos caractéristiques de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.AllStats, }, false, } -- i52739
-L["vous apprend à enchanter de manière permanente une pièce d'armure de torse pour augmenter l'endurance de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Stamina, }, false, } -- i52740
-L["vous apprend à enchanter de manière permanente des bottes pour augmenter légèrement votre vitesse de déplacement et votre agilité de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Agility, }, false, } -- i64411
-L["vous apprend à enchanter de manière permanente des bottes pour augmenter légèrement votre vitesse de déplacement et votre score de maîtrise de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.MasteryRating, }, false, } -- i64412
-L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre score de hâte de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.HasteRating, }, false, } -- i64413
-L["vous apprend à enchanter de manière permanente des gants pour augmenter votre score de maîtrise de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.MasteryRating, }, false, } -- i64414
-L["vous apprend à enchanter de manière permanente des gants pour augmenter votre force de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Strength, }, false, } -- i64415
-L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre agilité de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Agility, }, false, } -- i68787
-L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre force de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Strength, }, false, } -- i68788
-L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre intelligence de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Intellect, }, false, } -- i68789
-L["vous apprend à enchanter de manière permanente une cape pour augmenter votre agilité de %s"] = { { Stats.Agility, }, } -- i71714
-L["vous apprend à enchanter de manière permanente un anneau. ce dernier augmente toutes les caractéristiques de %s"] = { { Stats.AllStats, }, } -- i186683
 L["vous apprend à enchanter de manière permanente une pièce d'armure de torse pour augmenter votre mana de %s"] = { { Stats.Mana, }, } -- i6342
 L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre esprit de %s"] = { { Stats.Spirit, }, } -- i6344
 L["vous apprend à enchanter de manière permanente une cape pour conférer %s points d'armure supplémentaires"] = { { Stats.Armor, }, } -- i6345
@@ -2196,6 +2182,7 @@ L["vous apprend à enchanter de manière permanente une arme de mêlée à deux 
 L["vous apprend à enchanter de manière permanente des bottes pour augmenter votre endurance de %s"] = { { Stats.Stamina, }, } -- i6376
 L["vous apprend à enchanter de manière permanente des bottes pour augmenter votre agilité de %s"] = { { Stats.Agility, }, } -- i6377
 L["vous apprend à enchanter de manière permanente une arme de mêlée à deux mains pour augmenter votre esprit de %s"] = { { Stats.Spirit, }, } -- i11038
+L["vous apprend à enchanter de manière permanente une cape pour augmenter votre agilité de %s"] = { { Stats.Agility, }, } -- i11039
 L["vous apprend à enchanter de manière permanente un bouclier pour augmenter votre armure de %s"] = { { Stats.Armor, }, } -- i11081
 L["vous apprend à enchanter de manière permanente une cape pour augmenter votre résistance à l'ombre de %s"] = { { Stats.ShadowResistance, }, } -- i11098
 L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre score d'esquive de %s"] = { { Stats.DodgeRating, }, } -- i11163
@@ -2242,6 +2229,7 @@ L["vous apprend à enchanter de manière permanente des bottes pour augmenter vo
 L["vous apprend à enchanter de manière permanente des bottes pour augmenter votre endurance de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Stamina, }, false, } -- i22543
 L["vous apprend à enchanter de manière permanente des bottes pour augmenter votre agilité de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Agility, }, false, } -- i22544
 L["vous apprend à enchanter de manière permanente des bottes pour augmenter le score de toucher et le score de coup critique de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.HitRating, Stats.CritRating, }, false, } -- i22545
+L["vous apprend à enchanter de manière permanente une pièce d'armure de torse pour augmenter toutes vos caractéristiques de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.AllStats, }, false, } -- i22547
 L["vous apprend à enchanter de manière permanente une cape pour augmenter toutes vos résistances de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.FireResistance, Stats.NatureResistance, Stats.FrostResistance, Stats.ShadowResistance, Stats.ArcaneResistance, }, false, } -- i22548
 L["vous apprend à enchanter de manière permanente une arme de mêlée pour augmenter votre intelligence de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Intellect, }, false, } -- i22551
 L["vous apprend à enchanter de manière permanente une arme de mêlée pour infliger %s points de dégâts supplémentaires. nécessite un objet de niveau %s ou supérieur"] = { { Stats.AverageWeaponDamage, }, false, } -- i22552
@@ -2251,6 +2239,18 @@ L["vous apprend à enchanter de manière permanente une arme de mêlée pour aug
 L["vous apprend à enchanter de manière permanente une arme de mêlée à deux mains pour augmenter votre agilité de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Agility, }, false, } -- i22556
 L["vous apprend à enchanter de manière permanente une arme de mêlée pour augmenter les dégâts infligés par vos sorts des arcanes et de feu de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.FireDamage, Stats.ArcaneDamage, }, false, } -- i22560
 L["vous apprend à enchanter de manière permanente une arme de mêlée pour augmenter vos dégâts des sorts de givre et d'ombre de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.FrostDamage, Stats.ShadowDamage, }, false, } -- i22561
+L["vous apprend à enchanter de manière permanente une cape pour augmenter votre score de coup critique de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.CritRating, }, false, } -- i52737
+L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre score de coup critique de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.CritRating, }, false, } -- i52738
+L["vous apprend à enchanter de manière permanente une pièce d'armure de torse pour augmenter l'endurance de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Stamina, }, false, } -- i52740
+L["vous apprend à enchanter de manière permanente des bottes pour augmenter légèrement votre vitesse de déplacement et votre agilité de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Agility, }, false, } -- i64411
+L["vous apprend à enchanter de manière permanente des bottes pour augmenter légèrement votre vitesse de déplacement et votre score de maîtrise de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.MasteryRating, }, false, } -- i64412
+L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre score de hâte de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.HasteRating, }, false, } -- i64413
+L["vous apprend à enchanter de manière permanente des gants pour augmenter votre score de maîtrise de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.MasteryRating, }, false, } -- i64414
+L["vous apprend à enchanter de manière permanente des gants pour augmenter votre force de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Strength, }, false, } -- i64415
+L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre agilité de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Agility, }, false, } -- i68787
+L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre force de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Strength, }, false, } -- i68788
+L["vous apprend à enchanter de manière permanente des brassards pour augmenter votre intelligence de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.Intellect, }, false, } -- i68789
+L["vous apprend à enchanter de manière permanente un anneau. ce dernier augmente toutes les caractéristiques de %s"] = { { Stats.AllStats, }, } -- i186683
 L["vous apprend à enchanter de manière permanente une pièce d'armure de torse pour augmenter votre score de résilience de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.ResilienceRating, }, false, } -- i28270
 L["vous apprend à enchanter de manière permanente des gants pour augmenter votre score de toucher de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.HitRating, }, false, } -- i28271
 L["vous apprend à enchanter de manière permanente des gants pour augmenter votre puissance des sorts de %s. nécessite un objet de niveau %s ou supérieur"] = { { Stats.SpellPower, }, false, } -- i28272
