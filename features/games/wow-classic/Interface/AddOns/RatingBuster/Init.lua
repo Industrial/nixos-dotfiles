@@ -7,7 +7,7 @@ local _, addon = ...
 RatingBuster = LibStub("AceAddon-3.0"):NewAddon("RatingBuster", "AceConsole-3.0", "AceEvent-3.0", "AceBucket-3.0")
 RatingBuster.title = "Rating Buster"
 --@non-debug@
-RatingBuster.version = "2.9.8"
+RatingBuster.version = "2.10.0"
 --@end-non-debug@
 --[==[@debug@
 RatingBuster.version = "(development)"
