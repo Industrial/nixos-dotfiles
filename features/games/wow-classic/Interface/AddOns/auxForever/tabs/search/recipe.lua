@@ -13,7 +13,7 @@ local gui = require 'aux.gui'
 -- Nothing is read or kept before the click. (Shift-click is Blizzard's "track recipe", which aux
 -- cannot stop, so it is not used.)
 
-local AUCTION_CUT = .05
+local AUCTION_CUT = aux.AUCTION_CUT -- one number for every tab (aux-addon.lua)
 
 -- the recipe ID of a recipe link (the profession window's recipe links are not item links)
 function M.recipe_id_from_link(link)
@@ -349,7 +349,7 @@ function M.recipe_cost_tooltip(tooltip, parts)
         local dim = age and age >= history.OLD_DAYS
         local share = share_of_usual(gross / output.count, output.item_id .. ':0')
         tooltip:AddDoubleLine(name .. ' sells for', money.to_string(gross, true) .. share .. '  ' .. (dim and aux.color.label.disabled or aux.color.label.enabled)('seen ' .. (history.age_text(age) or '?')), 1, 1, 1, 1, 1, 1)
-        tooltip:AddDoubleLine('After the 5% auction house cut', money.to_string(net, true), r, g, b, 1, 1, 1)
+        tooltip:AddDoubleLine('After the ' .. AUCTION_CUT * 100 .. '% auction house cut', money.to_string(net, true), r, g, b, 1, 1, 1)
         local label, amount = profit_parts(parts, total, missing)
         tooltip:AddDoubleLine(label, amount, 1, 1, 1, 1, 1, 1)
     end

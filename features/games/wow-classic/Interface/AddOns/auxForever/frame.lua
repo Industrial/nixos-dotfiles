@@ -328,13 +328,17 @@ do
                     status_bar:set_text(format('Full scan: waiting for the auction house, %d:%02d so far. A search now would stop it.', floor(seconds / 60), seconds % 60))
                 end
             end,
-            on_auction = function(auction_record, total)
-                count = count + 1
-                status_bar:update_status(count / total, 0)
-                local percent = floor(count / total * 100)
-                if percent ~= shown_percent then
-                    shown_percent = percent
-                    status_bar:set_text(format('Full scan: reading auctions, %d%%', percent))
+            -- 0.8.2.1 (FB-027): how far the read is, once per pause of the scan (no auction record is
+            -- built for a Full scan any more, and the bar was redrawn for every auction)
+            on_progress = function(done, total)
+                count = done
+                if total > 0 then
+                    status_bar:update_status(done / total, 0)
+                    local percent = floor(done / total * 100)
+                    if percent ~= shown_percent then
+                        shown_percent = percent
+                        status_bar:set_text(format('Full scan: reading auctions, %d%%', percent))
+                    end
                 end
             end,
             on_abort = function()
@@ -381,10 +385,8 @@ do
     local popup = CreateFrame('Frame', nil, frame, 'BackdropTemplate')
     gui.set_panel_style(popup)
     popup:SetFrameStrata('DIALOG')
-    -- 384: the left column is the taller one since 0.8.3 (Window, Posting, Buying, and the reload
-    -- note when a theme is waiting); the tooltip column on the right ends a little above it.
-    -- 0.8.4 added Rapid Buy to Buying, a row of 30.
-    gui.set_size(popup, WIDTH, 384)
+    -- 322: the tooltip column's rows (Usually added in 0.8.2) plus the padding
+    gui.set_size(popup, WIDTH, 358) -- 322 until the crate switch (build 7)
     popup:SetPoint('TOPRIGHT', btn, 'BOTTOMRIGHT', 0, -4)
     popup:EnableMouse(true)
     popup:Hide()
@@ -530,58 +532,6 @@ do
     -- can have bids, few sellers set one, and gear is one item per auction, so "per stack" means
     -- nothing (Tyler: "does the stack option even make any sense?"). The chat command stays.
 
-    -- left column: Buying (0.8.3). It follows Posting down when a reload is waiting (see refresh).
-    local buying = CreateFrame('Frame', nil, popup)
-    gui.set_size(buying, COLUMN, 138)
-    section(buying, 0, 0, 'BUYING')
-    local auto_confirm_switch, standing_buy_switch, search_buy_switch, disenchant_deals_switch
-    do
-        local r = row(buying, 0, -16, 32, 'Confirm trade goods for me', 'One press instead of two',
-            {'A trade good is bought in two steps: aux asks the auction house what the units really cost, then pays it. Only the first step needs a key press, so with this on the price pays itself the moment it comes back at or under the price shown.',
-             'It never pays more than the price shown: a higher one is still refused.'})
-        auto_confirm_switch = gui.switch(r)
-        auto_confirm_switch:SetPoint('RIGHT', 0, 0)
-        auto_confirm_switch.on_click = function()
-            account_data.auto_confirm = not account_data.auto_confirm
-            refresh_settings()
-        end
-    end
-    do
-        local r = row(buying, 0, -48, 30, 'Standing Buy panel', nil,
-            {'A panel beside the window while the Sniper tab is open. It keeps the best deal armed, so one key press, click or turn of the mouse wheel buys it.',
-             'Set the key under Key Bindings, auxForever.'})
-        standing_buy_switch = gui.switch(r)
-        standing_buy_switch:SetPoint('RIGHT', 0, 0)
-        standing_buy_switch.on_click = function()
-            account_data.standing_buy = not account_data.standing_buy
-            refresh_settings()
-        end
-    end
-    do
-        local r = row(buying, 0, -78, 30, 'Rapid Buy panel', nil,
-            {'A panel beside the window while the Search tab shows its results. It queues every result the search found, keeps the cheapest one armed, and reads the rest of the queue ahead of the press, so sweeping a filter is one press per purchase and no waiting between them.',
-             'The same key as Standing Buy, under Key Bindings, auxForever.'})
-        search_buy_switch = gui.switch(r)
-        search_buy_switch:SetPoint('RIGHT', 0, 0)
-        search_buy_switch.on_click = function()
-            account_data.search_buy = not account_data.search_buy
-            refresh_settings()
-        end
-    end
-    do
-        local r = row(buying, 0, -108, 30, 'Disenchant deals', nil,
-            {"The Sniper also counts an item that disenchants into more than it costs as a deal, the same rule as the Search tab's disenchant-profit filter.",
-             'Needs price history for the materials.'})
-        disenchant_deals_switch = gui.switch(r)
-        disenchant_deals_switch:SetPoint('RIGHT', 0, 0)
-        disenchant_deals_switch.on_click = function()
-            account_data.sniper_disenchant = not account_data.sniper_disenchant
-            -- every item is judged again with the new rule
-            require('aux.tabs.sniper').settings_changed()
-            refresh_settings()
-        end
-    end
-
     -- right column: the tooltip lines, also /aux tooltip ... (a player on CurseForge asked for the
     -- chat settings in this menu, FB-008). Kept per character, like the chat commands.
     local TOOLTIP_LINES = {
@@ -594,6 +544,8 @@ do
         {'merchant_buy', 'Vendor buy price', nil, 'What a vendor sells it for, once you have seen it at one.'},
         {'disenchant_value', 'Disenchant value', nil, 'What its disenchant materials are worth.'},
         {'disenchant_distribution', 'Disenchants into', nil, 'Which materials it can give, and how likely each is.'},
+        -- 0.8.2.1 build 7 (FB-041, suggested by user_tdsvrjvpe8rufw54): the crate lines had no switch
+        {'crate', 'Waylaid Crates', 'Cheapest fill price', 'Under a Waylaid Crate: what each bundle it asks for costs, the cheapest in gold, and how many you already have.'},
         {'money_icons', 'Coin icons', 'Gold, silver and copper coins', 'Show prices in tooltips with gold, silver and copper coins instead of text.'},
     }
     local tooltip_title = section(popup, RIGHT_X, -34, 'TOOLTIP LINES')
@@ -647,12 +599,6 @@ do
         if pending then reload_button:Show() else reload_button:Hide() end
         posting:ClearAllPoints()
         posting:SetPoint('TOPLEFT', LEFT_X, pending and -176 or -148)
-        buying:ClearAllPoints()
-        buying:SetPoint('TOPLEFT', LEFT_X, pending and -232 or -204)
-        auto_confirm_switch:SetChecked(account_data.auto_confirm and true or false)
-        standing_buy_switch:SetChecked(account_data.standing_buy and true or false)
-        search_buy_switch:SetChecked(account_data.search_buy and true or false)
-        disenchant_deals_switch:SetChecked(account_data.sniper_disenchant and true or false)
         for _, switch in ipairs(tooltip_switches) do
             switch:SetChecked(character_data.tooltip[switch.key] and true or false)
         end

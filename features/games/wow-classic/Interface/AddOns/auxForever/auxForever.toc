@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Author: shirsig
 ## Title: auxForever
-## Version: forever-0.8.4
+## Version: forever-0.8.2.1
 ## Notes: aux by shirsig, re-imagined by a fan
 ## SavedVariables: aux
 
@@ -44,11 +44,9 @@ tabs\search\quick.lua
 tabs\search\builder.lua
 tabs\search\recipe.lua
 tabs\search\crate.lua
-tabs\search\rapid_buy.lua
 
 tabs\sniper\core.lua
 tabs\sniper\frame.lua
-tabs\sniper\standing_buy.lua
 
 tabs\post\core.lua
 tabs\post\frame.lua

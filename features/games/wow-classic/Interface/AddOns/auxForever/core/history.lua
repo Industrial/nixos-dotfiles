@@ -39,6 +39,68 @@ function aux.event.PLAYER_LOGIN()
 	data = aux.faction_data.history
 	aux.faction_data.price_keys_since = aux.faction_data.price_keys_since or today()
 	price_keys_since = aux.faction_data.price_keys_since
+	aux.coro_thread(forget_old_prices)
+end
+
+-- 0.8.2.1 (outside review 2026-11-10, R-10; Tyler, 2026-11-10: "Yes"): prices of items aux has not
+-- seen at the auction house for FORGET_DAYS days are forgotten. Every item ever seen kept its line
+-- forever, and since 0.8 each gear ending is an item of its own; all of it loads at every login.
+-- Once a day at most, at login, in a thread that pauses by the clock. "Seen" is the day of a line's
+-- newest price, not the day it was last read (a tooltip or a Sniper round reads a line and moves
+-- its day on without having seen the item).
+M.FORGET_DAYS = 90
+
+-- the day number a saved line's newest price is from, without unpacking the line; nil if unreadable
+function M.last_seen_day(str)
+	local day = tonumber(strmatch(str, '^(%d+)#'))
+	if not day then
+		return
+	end
+	if day > 1e7 then
+		-- a 0.4 line: when its day ended (a timestamp), today's lowest, then the past lows with
+		-- the time each day ended
+		local next_push, daily_min, point_time = strmatch(str, '^(%d+)#(%d*)#%d*@?(%d*)')
+		local seen = daily_min ~= '' and tonumber(next_push) or tonumber(point_time)
+		return seen and day_of_time(seen - 43200) or nil
+	end
+	local low, market, point_day = strmatch(str, '^%d+#(%d*)#(%d*)#%d*#(%d*)')
+	if not low then
+		return
+	end
+	if low ~= '' or market ~= '' then
+		return day
+	end
+	return tonumber(point_day)
+end
+
+-- must run inside a coroutine (it pauses). now: today's day number (given by tests). Returns how
+-- many lines were forgotten, or nil when it already ran today.
+function M.forget_old_prices(now)
+	now = now or today()
+	if not data or aux.faction_data.history_trimmed == now then
+		return
+	end
+	aux.faction_data.history_trimmed = now
+	-- the keys first, in one go: the walk below pauses, and a table must not gain keys (a scan
+	-- recording a new item) while it is walked
+	local keys, n = {}, 0
+	for key in pairs(data) do
+		n = n + 1
+		keys[n] = key
+	end
+	local forgotten = 0
+	for i = 1, n do
+		local key = keys[i]
+		local str = data[key]
+		local seen = type(str) == 'string' and last_seen_day(str)
+		if seen and now - seen > FORGET_DAYS then
+			data[key] = nil
+			value_cache[key] = nil
+			forgotten = forgotten + 1
+		end
+		aux.coro_slice(i, 500)
+	end
+	return forgotten
 end
 
 -- the price history is read once the saved variables load (PLAYER_LOGIN); before that every price is unknown
@@ -180,12 +242,17 @@ local function today_min_table()
 end
 
 function M.process_auction(auction_record)
-	local unit_buyout_price = ceil(auction_record.buyout_price / auction_record.count)
+	process_price(auction_record.price_key or auction_record.item_key, auction_record.buyout_price, auction_record.count)
+end
+
+-- the same from plain numbers: a price key, a buyout and how many it is for (0.8.2.1: the Full scan
+-- reads these without building an auction record)
+function M.process_price(key, buyout_price, count)
+	local unit_buyout_price = ceil(buyout_price / count)
 	if unit_buyout_price <= 0 then
 		return
 	end
 	local mins = today_min_table()
-	local key = auction_record.price_key or auction_record.item_key
 	local known = mins[key]
 	if known and unit_buyout_price >= known then
 		return
@@ -437,18 +504,22 @@ function M.new_collector()
 end
 
 function M.collect(collector, record)
-	local units = record_units(record)
 	local key = record.price_key or record.item_key
 	if (record.buyout_price or 0) <= 0 or not key then
 		return
 	end
+	collect_price(collector, key, ceil(record.buyout_price / max(1, record.count or 1)), record_units(record))
+end
+
+-- the same from plain numbers: a unit price and how many units are listed at it
+function M.collect_price(collector, key, unit_price, units)
 	local flat = collector.items[key]
 	if not flat then
 		flat = {}
 		collector.items[key] = flat
 		collector.count = collector.count + 1
 	end
-	tinsert(flat, ceil(record.buyout_price / max(1, record.count or 1)))
+	tinsert(flat, unit_price)
 	tinsert(flat, units)
 end
 
@@ -464,9 +535,9 @@ function M.finish_collector(collector, each)
 			record_view(key, flat)
 		end
 		done = done + 1
-		if done % 200 == 0 then
-			aux.coro_wait()
-		end
+		-- by the clock (0.8.2.1, R-07): 200 items a frame made single long frames at the end of a
+		-- Full scan
+		aux.coro_slice(done, 200)
 	end
 	collector.items, collector.count, collector.partial = {}, 0, {}
 end

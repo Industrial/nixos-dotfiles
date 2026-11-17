@@ -139,21 +139,23 @@ function process_item(item_id)
     end
 
     local itemstring = 'item:' .. item_id
-    local name, quality = save_item(item_id)
+    local name, quality, listed = save_item(item_id)
     if name then
         local tooltip = tooltip('link', itemstring)
-        if auctionable(tooltip, quality) then
+        -- a name already offered for autocompletion is not added again (0.8.2.1, R-13)
+        if auctionable(tooltip, quality) and not listed then
             tinsert(aux.account_data.auctionable_items, strlower(name))
         end
         return true
     end
 end
 
--- writes an item the game knows into aux's item list; returns its name and quality, or nil when
--- the game has not loaded the item yet
+-- writes an item the game knows into aux's item list; returns its name, its quality and whether an
+-- item of that name was in the list already, or nil when the game has not loaded the item yet
 function save_item(item_id)
     local name, link, quality, level, requirement, class, subclass, max_stack, slot, texture, sell_price = GetItemInfo('item:' .. item_id)
     if name then
+        local listed = aux.account_data.item_ids[strlower(name)] ~= nil
         aux.account_data.item_ids[strlower(name)] = item_id
         aux.account_data.items[item_id] = persistence.write(items_schema, {
             name = name,
@@ -168,7 +170,7 @@ function save_item(item_id)
             texture = texture,
             sell_price = sell_price,
         })
-        return name, quality
+        return name, quality, listed
     end
 end
 
@@ -231,6 +233,11 @@ end
 
 function on_get_item_info_received(item_id, success)
     if success then
+        -- known already: nothing to do. 0.8.2.1 (outside review, R-13): looked at first; a thread was
+        -- made for every item the game loads, all game long, only to find this out.
+        if aux.account_data.items[item_id] or aux.account_data.unused_item_ids[item_id] then
+            return
+        end
         aux.coro_thread(function()
             if not aux.account_data.items[item_id] and not aux.account_data.unused_item_ids[item_id] then
                 process_item(item_id)

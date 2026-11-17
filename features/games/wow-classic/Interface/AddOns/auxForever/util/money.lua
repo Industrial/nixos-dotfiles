@@ -121,10 +121,18 @@ function M.to_string(money, pad, trim, color, no_color)
 	return text
 end
 
+-- the most a price can be: 9,999,999g 99s 99c, the game's own limit for a bid
+-- (MAXIMUM_BID_PRICE in Blizzard's code) when it gives one
+local function highest()
+	return type(MAXIMUM_BID_PRICE) == 'number' and MAXIMUM_BID_PRICE or 99999999999
+end
+
 function M.from_string(value)
-	local number = tonumber(value)
-	if number and number >= 0 then
-		return number * COPPER_PER_GOLD
+	-- a plain number is gold. 0.8.2.1 (outside review, R-15): only digits with an optional decimal
+	-- point. Anything the language reads as a number was taken: "inf" gave an endless price, "0x10"
+	-- 16g and "1e3" 1,000g.
+	if strfind(value, '^%s*%d+%.?%d*%s*$') or strfind(value, '^%s*%.%d+%s*$') then
+		return min(highest(), tonumber(value) * COPPER_PER_GOLD)
 	end
 
 	value = gsub(gsub(strlower(value), '|c%x%x%x%x%x%x%x%x', ''), FONT_COLOR_CODE_CLOSE, '')
@@ -139,7 +147,7 @@ function M.from_string(value)
 	value = gsub(value, '%d*%.?%d+c', '', 1)
 	if strfind(value, '%S') then return end
 
-	return from_gsc(gold or 0, silver or 0, copper or 0)
+	return min(highest(), from_gsc(gold or 0, silver or 0, copper or 0))
 end
 
 function M.format_number(num, pad, color)

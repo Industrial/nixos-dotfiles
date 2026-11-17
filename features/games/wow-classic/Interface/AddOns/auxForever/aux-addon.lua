@@ -7,6 +7,11 @@ function M.print(...)
 	DEFAULT_CHAT_FRAME:AddMessage(LIGHTYELLOW_FONT_COLOR_CODE .. '<auxForever> ' .. join(map({...}, tostring), ' '))
 end
 
+-- The share of a sale the auction house keeps, in one place for every tab (0.8.2.1, outside review
+-- R-20; it was written in three files). 5% is Outside in docs/forever-auction-house.md (section 4):
+-- guides say so, and it has not been checked against a sale's mail yet (experiment E1).
+M.AUCTION_CUT = .05
+
 local event_frame = CreateFrame'Frame'
 for _, event in pairs{'ADDON_LOADED', 'PLAYER_LOGIN', 'AUCTION_HOUSE_SHOW', 'AUCTION_HOUSE_CLOSED'} do
 	event_frame:RegisterEvent(event)
@@ -35,13 +40,30 @@ do
             end
 		elseif event == 'PLAYER_LOGIN' then
 			for _, f in ipairs(handlers2) do f(arg1, ...) end
-            sort(account_data.auctionable_items, function(a, b) return strlen(a) < strlen(b) or (strlen(a) == strlen(b) and a < b) end)
+            sort_item_names(account_data.auctionable_items)
             print('loaded. aux by shirsig, re-imagined by a fan. /aux for help')
             print(full_scan_reminder(account_data.replicate_time, time()))
 		else
 			_M[event](arg1, ...)
 		end
 	end)
+end
+
+-- The item names for autocompletion, shortest first. 0.8.2.1 (outside review, R-13): the whole list
+-- (tens of thousands of names) was sorted at every login and /reload; it is sorted only when a name
+-- was added since (they are added at the end), which one pass over the list tells.
+local function name_before(a, b)
+    return strlen(a) < strlen(b) or (strlen(a) == strlen(b) and a < b)
+end
+
+function M.sort_item_names(names)
+    for i = 2, #names do
+        if name_before(names[i], names[i - 1]) then
+            sort(names, name_before)
+            return true
+        end
+    end
+    return false
 end
 
 -- auxForever (0.5): the second line at login and after /reload. Tooltip prices and recipe costs come
@@ -71,6 +93,7 @@ end
 TOOLTIP_DEFAULTS = {
     value = true,
     usually = true,
+    crate = true, -- 0.8.2.1 build 7 (FB-041): the Waylaid Crate lines, now with a switch
     merchant_sell = true,
     merchant_buy = false,
     daily = false,
@@ -105,22 +128,6 @@ function event.AUX_LOADED()
         sniper_profit = 500,
         sniper_sound = true,
         sniper_ignored = {},
-        -- 0.8.3: deals from what an item disenchants into, the Search tab's disenchant-profit rule
-        -- as a reason of its own on the Sniper (tabs/sniper/core.lua, judge). It costs no request:
-        -- the materials' prices come from the price history aux already keeps.
-        sniper_disenchant = true,
-        -- 0.8.3: the Standing Buy panel beside the window. It keeps the best deal armed, so one key
-        -- press buys it without finding and clicking its row (tabs/sniper/standing_buy.lua).
-        standing_buy = true,
-        -- 0.8.4: the Rapid Buy panel beside the window while the Search tab's results are shown. It
-        -- queues every result, keeps the cheapest one armed, and reads the queue ahead of the press
-        -- (tabs/search/rapid_buy.lua).
-        search_buy = true,
-        -- 0.8.3: a trade good's purchase confirms itself once the auction house quotes a price at or
-        -- under the one shown. ConfirmCommoditiesPurchase needs no hardware event (only the Start
-        -- does), so it is the one step of a purchase aux may take by itself, and it halves the
-        -- presses a trade good costs. Off by default: it spends gold without a second press.
-        auto_confirm = false,
         replicate_time = 0,
         window = {},
         background_opacity = 1,
@@ -213,14 +220,6 @@ do
         return locked
     end
 
-	-- 0.8.3: called once a purchase has settled and place_bid will take another one, with whether it
-	-- went through. The Standing Buy control arms its next target from this instead of watching
-	-- bid_in_progress every frame, so the button is live again the moment the server answers.
-	local idle_handlers = {}
-	function M.on_bid_idle(f)
-		tinsert(idle_handlers, f)
-	end
-
 	-- Forever: bids and buyouts go through C_AuctionHouse.PlaceBid with the auction's ID.
 	-- Must be called from a click handler (hardware event).
 	function M.place_bid(auction_id, amount, on_success, on_failure)
@@ -272,8 +271,6 @@ do
 			else
 				do (on_failure or pass)(result) end
 			end
-			-- after the handlers above, so a listener sees the bought deal already marked gone
-			for _, f in ipairs(idle_handlers) do f(result == true) end
 		end)
 	end
 end

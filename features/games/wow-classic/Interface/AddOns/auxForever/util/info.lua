@@ -93,6 +93,18 @@ function M.container_item(bag, slot)
     end
 end
 
+-- 0.8.2.1 (outside review, R-11): a bag slot's price key and how many it holds, from its link alone.
+-- For counting an item in the bags: container_item also reads the slot's tooltip and asks the game
+-- whether it can be sold, which a count does not need. nil for an empty slot.
+function M.container_price_key(bag, slot)
+    local link = C_Container.GetContainerItemLink(bag, slot)
+    if not link then
+        return
+    end
+    local container_info = C_Container.GetContainerItemInfo(bag, slot)
+    return link_price_key(link), type(container_info) == 'table' and container_info.stackCount or 1
+end
+
 do
     local open = false
     function aux.event.AUX_LOADED()
@@ -343,6 +355,39 @@ function M.replicate_record(index)
     record.sale_status = sale_status
     signatures(record)
     return record
+end
+
+-- 0.8.2.1 (outside review 2026-11-10, R-08, FB-027): what a Full scan needs of one listing: its
+-- price key, its buyout, how many it is for and its item ID. The scan built a whole auction record
+-- for each of 200,000 listings (a parsed link, about 25 fields, two signature texts) only to read
+-- these and drop it. The reader keeps each item's price keys while one scan lasts, so an ending
+-- is worked out once per item and name, not once per listing. Returns nil and the item ID while the
+-- game has not loaded the listing or its item yet (the item's own name tells the ending).
+function M.replicate_reader()
+    local keys = {} -- item ID -> {[full name, or 0 without a link] = price key}
+    return function(index)
+        local _, _, count, _, _, _, _, _, _, buyout_price, _, _, _, _, _, _, item_id, has_all_info = C_AuctionHouse.GetReplicateItemInfo(index)
+        if not has_all_info or not item_id then
+            return nil, item_id
+        end
+        local of_item = keys[item_id]
+        if not of_item then
+            if not GetItemInfo(item_id) then
+                return nil, item_id
+            end
+            learn_item(item_id)
+            of_item = {}
+            keys[item_id] = of_item
+        end
+        local link = C_AuctionHouse.GetReplicateItemLink(index)
+        local name = link and strmatch(link, '|h%[(.-)%]|h') or 0
+        local key = of_item[name]
+        if not key then
+            key = price_key(item_id, name ~= 0 and name or nil)
+            of_item[name] = key
+        end
+        return key, buyout_price or 0, max(1, count or 1), item_id
+    end
 end
 
 -- One of the player's own auctions (C_AuctionHouse.GetOwnedAuctionInfo)

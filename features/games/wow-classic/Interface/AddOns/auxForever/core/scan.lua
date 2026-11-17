@@ -52,6 +52,15 @@ function M.timing_report(t, total, stopped)
         format_seconds(t.browse), format_seconds(t.answer), format_seconds(t.throttle), format_seconds(t.item_data), format_seconds(other)))
     tinsert(lines, format('Answers: %d on time, %d after the 1s fallback, %d timed out (20s each), %d dropped and resent',
         t.event, t.cached, t.timeout, t.dropped))
+    -- 0.8.2.1 build 2 (outside review, R-05): the game has an event of its own for "results arrived"
+    -- (AUCTION_HOUSE_NEW_RESULTS_RECEIVED, made for addons: Code, Blizzard's documentation, build
+    -- 70888; not seen in game). aux does not act on it yet. Counted here so that one /aux debug
+    -- line says whether it also comes for the answers aux takes after its 1 second wait; if it
+    -- does, aux can wait for it instead of guessing.
+    if (t.requests or 0) > 0 then
+        tinsert(lines, format('The game announced %d of %d answers itself, %d of the %d taken after the 1s fallback',
+            t.signal or 0, t.requests, t.cached_signal or 0, t.cached))
+    end
     if #t.slow > 0 then
         sort(t.slow, function(a, b) return a.seconds > b.seconds end)
         local parts = {}
@@ -79,7 +88,7 @@ end
 
 function M.new_timing()
     return {t0 = GetTime(), items = 0, event = 0, cached = 0, timeout = 0, dropped = 0,
-        browse = 0, answer = 0, throttle = 0, item_data = 0, slow = {}}
+        browse = 0, answer = 0, throttle = 0, item_data = 0, slow = {}, requests = 0, signal = 0, cached_signal = 0}
 end
 
 local function timing_finish(stopped)
@@ -206,15 +215,48 @@ function M.abort()
     end
 end
 
+-- What a finished scan hands to on_complete (outside review 2026-11-10, R-01 and R-02): how it went,
+-- so the caller does not take part of the auction house for all of it.
+--   no_list       an item list was asked for and the auction house did not answer
+--   partial_list  an item list arrived only in part (a request for more of it failed)
+--   unread        how many single items could not be read (nil: none)
+--   full          the Full scan's timings (replicate)
 function complete()
     local on_complete = state.params.on_complete
-    local unread, quiet, result = state.unread, state.params.quiet, state.result
+    local unread, quiet, result = state.unread, state.params.quiet, state.result or {}
+    result.unread = unread
     state = nil
     timing_finish()
-    if unread and not quiet then
-        aux.print(unread_text(unread))
+    if not quiet then
+        if result.partial_list then
+            aux.print(PARTIAL_LIST_TEXT)
+        end
+        if unread then
+            aux.print(unread_text(unread))
+        end
     end
     do (on_complete or pass)(result) end
+end
+
+M.PARTIAL_LIST_TEXT = 'The auction house sent only part of the item list (it was slow to answer), so some items are missing. Search again (on the Post tab: Refresh) to read them all.'
+
+-- whether a finished scan saw everything it asked for (result: what on_complete is handed)
+function M.saw_everything(result)
+    return not (result and (result.no_list or result.partial_list or result.unread))
+end
+
+-- an item list that did not arrive, or only in part, is noted on the scan's result
+local function note_list(results, whole)
+    state.result = state.result or {}
+    if not results then
+        state.result.no_list = true
+        -- quiet scans (Sniper rounds, the Auctions tab's check) say nothing in chat
+        if not state.params.quiet then
+            aux.print('the auction house did not respond to the search')
+        end
+    elseif not whole then
+        state.result.partial_list = true
+    end
 end
 
 -- auxForever (0.7.1, FB-014): an item the search could not read (the auction house did not
@@ -289,6 +331,14 @@ function request(send, events, match, cached)
             dropped = true
         end)
         state.listener_ids[drop_id] = true
+        -- only counted, and only while the timing log is on (see timing_report)
+        local signalled, signal_id
+        if timing then
+            signal_id = aux.event_listener('AUCTION_HOUSE_NEW_RESULTS_RECEIVED', function()
+                signalled = true
+            end)
+            state.listener_ids[signal_id] = true
+        end
         local wait = listen(events, match)
         send()
         local received = wait(TIMEOUT, function(elapsed)
@@ -296,13 +346,24 @@ function request(send, events, match, cached)
         end)
         aux.kill_listener(drop_id)
         state.listener_ids[drop_id] = nil
+        if signal_id then
+            aux.kill_listener(signal_id)
+            state.listener_ids[signal_id] = nil
+        end
         timing_add('answer', GetTime() - t_answer)
+        timing_add('requests')
+        if signalled then
+            timing_add('signal')
+        end
         if received then
             timing_add('event')
             return received
         elseif not dropped then
             local from_cache = cached and cached() or false
             timing_add(from_cache and 'cached' or 'timeout')
+            if from_cache and signalled then
+                timing_add('cached_signal')
+            end
             return from_cache
         end
         timing_add('dropped')
@@ -389,7 +450,9 @@ function browse_query(blizzard_query)
 end
 
 -- auxForever: the item list of a query, one entry per item with only itemKey, totalQuantity,
--- minPrice and containsOwnerItem. Returns nil if the auction house did not answer.
+-- minPrice and containsOwnerItem. Returns nil if the auction house did not answer, and as a second
+-- value whether the whole list arrived: when a request for more of it fails, what came so far is
+-- returned with false (it used to pass as the whole list, R-02).
 -- 0.8.2 build 3 (review H-008, finding 6): the item key of the last item search sent (nil after an
 -- item list). In 0.4.1 a gear deal could not be bought once other items had been searched after it
 -- (Seen); the Sniper reads a gear deal again first unless its own search was the last one.
@@ -406,13 +469,15 @@ function browse_results(blizzard_query)
     if not answer or answer == 'AUCTION_HOUSE_BROWSE_FAILURE' then
         return
     end
+    local whole = true
     while not C_AuctionHouse.HasFullBrowseResults() do
         answer = request(function() C_AuctionHouse.RequestMoreBrowseResults() end, events)
         if not answer or answer == 'AUCTION_HOUSE_BROWSE_FAILURE' then
+            whole = false
             break
         end
     end
-    return C_AuctionHouse.GetBrowseResults()
+    return C_AuctionHouse.GetBrowseResults(), whole
 end
 
 -- Returns the list of item keys matching the query, or nil if the auction house did not answer.
@@ -745,40 +810,89 @@ function replicate()
 
     -- auxForever (0.5): each item's prices are gathered while the list is read and recorded once at
     -- the end (core/history.lua); the gathered numbers are dropped after that
+    -- 0.8.2.1 (outside review 2026-11-10, R-07 to R-09, FB-027):
+    -- - the read pauses by the clock (aux.coro_due), not every 100 auctions
+    -- - without an on_auction callback no auction record is built: info.replicate_reader gives the
+    --   price key, buyout and count, which is all the price history takes. on_progress(done, total)
+    --   says how far it is, once per pause (the bar was redrawn for every auction).
+    -- - listings the game has not loaded yet are asked about a share at a time, going round, not
+    --   all of them every frame
     local collector = history.new_collector()
-    local pending = {}
-    for index = 0, count - 1 do
-        local record, item_id = info.replicate_record(index)
-        if record then
-            process_auction(record, nil, count, collector)
-            check_aborted(scan_state)
+    local on_auction, on_progress = state.params.on_auction, state.params.on_progress or pass
+    local read = info.replicate_reader()
+    local pending, waiting, done = {}, {}, 0
+    -- reads one listing; false while the game has not loaded it
+    local function take(index, first)
+        local item_id
+        if on_auction then
+            local record
+            record, item_id = info.replicate_record(index)
+            if record then
+                process_auction(record, nil, count, collector)
+                done = done + 1
+                return true
+            end
         else
+            local key, buyout, units
+            key, buyout, units, item_id = read(index)
+            if key then
+                if buyout > 0 then
+                    history.process_price(key, buyout, units)
+                    history.collect_price(collector, key, ceil(buyout / units), units)
+                end
+                done = done + 1
+                return true
+            end
+            item_id = buyout -- read returns nil and the item ID
+        end
+        if first then
             pending[index] = item_id or true
+            tinsert(waiting, index)
             if item_id then
                 info.request_item(item_id)
             end
         end
-        if index % 100 == 0 then
+        return false
+    end
+    for index = 0, count - 1 do
+        take(index, true)
+        check_aborted(scan_state)
+        if aux.coro_due(index, 100) then
+            on_progress(done, count)
+            check_aborted(scan_state)
             aux.coro_wait()
         end
     end
+    on_progress(done, count)
+    check_aborted(scan_state)
     result.full.reading = GetTime() - t_reading
     -- items the client had not cached yet
     local t1 = GetTime()
-    while next(pending) and GetTime() - t1 < 30 do
+    local at_index = 1
+    while #waiting > 0 and GetTime() - t1 < 30 do
         aux.coro_wait()
-        local processed = 0
-        for index in pairs(pending) do
-            local record = info.replicate_record(index)
-            if record then
+        for i = 1, min(#waiting, 200) do
+            if at_index > #waiting then
+                at_index = 1
+            end
+            local index = waiting[at_index]
+            if take(index) then
                 pending[index] = nil
-                process_auction(record, nil, count, collector)
-                processed = processed + 1
-                if processed >= 100 then break end
+                waiting[at_index] = waiting[#waiting]
+                waiting[#waiting] = nil
+            else
+                at_index = at_index + 1
+            end
+            check_aborted(scan_state)
+            if aux.coro_due(i, 200) then
+                break
             end
         end
+        on_progress(done, count)
+        check_aborted(scan_state)
     end
     result.full.items = GetTime() - t1
+    result.full.recorded = done
     -- an item with auctions that never loaded was not seen completely: no market price for it
     for _, item_id in pairs(pending) do
         if item_id ~= true then
@@ -830,13 +944,14 @@ function scan()
             scan_item_keys(get_query().item_keys)
         elseif state.params.fast or state.params.on_item_list then
             local t_browse = GetTime()
-            local results = browse_results(get_query().blizzard_query or empty)
+            local results, whole = browse_results(get_query().blizzard_query or empty)
             timing_add('browse', GetTime() - t_browse)
             if timing then
                 timing.answer = max(0, timing.answer - (GetTime() - t_browse))
             end
+            note_list(results, whole)
             if not results then
-                aux.print('the auction house did not respond to the search')
+                -- said by note_list
             elseif state.params.on_item_list then
                 state.params.on_item_list(results)
             else
@@ -844,12 +959,13 @@ function scan()
             end
         else
             local t_browse = GetTime()
-            local results = browse_results(get_query().blizzard_query or empty)
+            local results, whole = browse_results(get_query().blizzard_query or empty)
             timing_add('browse', GetTime() - t_browse)
             -- the item list's own request time is counted as item list, not as server answers
             if timing and results then
                 timing.answer = max(0, timing.answer - (GetTime() - t_browse))
             end
+            note_list(results, whole)
             if results then
                 -- 0.8: params.skip_key leaves out items the caller needs only the lowest price of,
                 -- which the item list already gives (the Post tab's other gear endings: one search
@@ -861,8 +977,6 @@ function scan()
                     end
                 end
                 scan_item_keys(item_keys)
-            else
-                aux.print('the auction house did not respond to the search')
             end
         end
         check_aborted(scan_state)

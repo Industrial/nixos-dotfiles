@@ -170,8 +170,9 @@ function extend_tooltip(tooltip, link, quantity, data)
     end
 
     -- auxForever (0.8, FB-020): a Waylaid Crate lists its bundles and what each costs. Its tooltip
-    -- is read once per item (kept by the crate code), so other items cost one table lookup.
-    local bundles = search_tab.crate_bundles(item_id, function() return search_tab.tooltip_texts(tooltip, data) end)
+    -- is read once per item (kept by the crate code), so other items cost one table lookup. Its
+    -- switch: "Waylaid Crates" in Settings, /aux tooltip crate (0.8.2.1 build 7, FB-041).
+    local bundles = settings.crate ~= false and search_tab.crate_bundles(item_id, function() return search_tab.tooltip_texts(tooltip, data) end)
     if bundles then
         search_tab.add_crate_lines(tooltip, bundles, settings.money_icons)
     end

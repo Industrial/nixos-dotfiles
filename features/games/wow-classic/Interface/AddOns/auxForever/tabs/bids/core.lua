@@ -39,8 +39,17 @@ function M.scan_auctions()
 end
 
 function place_bid(buyout)
-    local record = listing:GetSelection().record
+    -- nothing selected (the row was let go or left the list): nothing to bid on. The buttons stayed
+    -- lit from the last selection and a click raised an error (outside review 2026-11-10, R-04)
+    local selection = listing:GetSelection()
+    local record = selection and selection.record
+    if not record then
+        return
+    end
     local amount = buyout and record.buyout_price or record.bid_price
+    if not amount or amount <= 0 then
+        return
+    end
     aux.place_bid(record.auction_id, amount, function()
         aux.query_bids()
     end)
@@ -62,7 +71,11 @@ function on_update()
     end
     next_buttons = GetTime() + .2
     local selection = listing:GetSelection()
-    if selection then
+    if not selection then
+        -- the buttons follow the selection: with none, neither can be pressed (R-04)
+        bid_button:Disable()
+        buyout_button:Disable()
+    else
         if aux.bid_in_progress() then
             bid_button:Disable()
             buyout_button:Disable()

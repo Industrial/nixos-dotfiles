@@ -41,7 +41,9 @@ M.filters = {
         input_type = 'string',
         validator = function(name)
             return function(auction_record)
-                return strlower(info.item(auction_record.item_id).name) == name
+                -- an item the game has dropped the data of matches nothing (it raised an error)
+                local item_info = info.item(auction_record.item_id)
+                return item_info ~= nil and strlower(item_info.name) == name
             end
         end
     },
@@ -164,7 +166,8 @@ M.filters = {
         input_type = 'money',
         validator = function(amount)
             return function(auction_record)
-                local vendor_price = info.item(auction_record.item_id).sell_price
+                local item_info = info.item(auction_record.item_id)
+                local vendor_price = item_info and item_info.sell_price
                 return vendor_price and vendor_price * auction_record.count - auction_record.bid_price >= amount
             end
         end
@@ -174,7 +177,8 @@ M.filters = {
         input_type = 'money',
         validator = function(amount)
             return function(auction_record)
-                local vendor_price = info.item(auction_record.item_id).sell_price
+                local item_info = info.item(auction_record.item_id)
+                local vendor_price = item_info and item_info.sell_price
                 return auction_record.buyout_price > 0 and vendor_price and vendor_price * auction_record.count - auction_record.buyout_price >= amount
             end
         end
@@ -346,7 +350,9 @@ function M.parse_filter_string(str)
     return { components = filter, blizzard = blizzard_filter_parser(), post = post_filter }
 end
 
-function M.query(filter_string)
+-- no_items: leave the item names out of the suggestions (the search bar's completion looks through
+-- them itself, without building a list of all of them at every key press)
+function M.query(filter_string, no_items)
     local filter, error, suggestions = parse_filter_string(filter_string)
 
     if not filter then
@@ -365,9 +371,12 @@ function M.query(filter_string)
 
     if polish_notation_counter > 0 then
         local suggestions = {}
-        for key in ipairs(filters) do
+        -- 0.8.2.1 (outside review, R-16): pairs. The conditions are kept by name, so ipairs found
+        -- none and nothing was offered after "and/", "or/" or "not/" but those three words.
+        for key in pairs(filters) do
             tinsert(suggestions, strlower(key))
         end
+        sort(suggestions)
         tinsert(suggestions, 'and')
         tinsert(suggestions, 'or')
         tinsert(suggestions, 'not')
@@ -381,7 +390,7 @@ function M.query(filter_string)
         full_reason = full_reason(filter),
         tooltip_text = uses_tooltip(filter) or nil,
         exact = filter.blizzard.exact and true or nil,
-    }, _M.suggestions(filter)
+    }, _M.suggestions(filter, no_items)
 end
 
 function M.queries(filter_string)
@@ -398,7 +407,7 @@ function M.queries(filter_string)
     return queries
 end
 
-function suggestions(filter)
+function suggestions(filter, no_items)
     local suggestions = {}
 
     if filter.blizzard.name and aux.size(filter.blizzard) == 1 then tinsert(suggestions, 'exact') end
@@ -446,7 +455,7 @@ function suggestions(filter)
     end
 
     -- item names
-    if #filter.components == 0 then
+    if #filter.components == 0 and not no_items then
 	    for _, name in ipairs(aux.account_data.auctionable_items) do
             tinsert(suggestions, name .. '/exact')
         end

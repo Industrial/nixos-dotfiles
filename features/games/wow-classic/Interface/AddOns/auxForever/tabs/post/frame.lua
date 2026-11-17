@@ -63,9 +63,10 @@ do
 	        if button == 'LeftButton' then
 	            update_item(self.item_record)
 	        elseif button == 'RightButton' then
+	            -- the ID is read first: leaving the Post tab clears the selection
+	            local item_id = self.item_record.item_id
 	            aux.set_tab(1)
-	            search_tab.set_filter(strlower(info.item(self.item_record.item_id).name) .. '/exact')
-	            search_tab.execute(nil, false)
+	            search_tab.search_item(item_id)
 	        end
 	    end,
 	    function(item_record)
@@ -156,7 +157,7 @@ buyout_listing:SetHandler('OnLeave', hide_hint)
 -- text, and a note on how the price was chosen. Right, a receipt: total, the auction house cut,
 -- what you get, the vendor comparison (a red warning when a vendor pays more), the deposit, Post.
 -- The widgets keep the names the posting logic in core.lua uses.
-AUCTION_CUT = .05 -- the auction house keeps 5% of a sale
+AUCTION_CUT = aux.AUCTION_CUT -- the share of a sale the auction house keeps (aux-addon.lua)
 local LEFT_X = 12 -- the left column
 local COUNT_X, DURATION_X = 99, 72 -- where the Count field and the Duration buttons start
 local PRICE_X = 247 -- the middle column
@@ -388,7 +389,7 @@ do
         GameTooltip:AddLine('Match lowest or undercut?')
         -- the newest listing selling first is not confirmed on Forever (E6 in docs/forever-auction-house.md)
         GameTooltip:AddLine('Matching the lowest price keeps prices from sliding. On the modern auction house the newest listing at a price is said to sell first, so matching may sell as fast as going below it. Not yet confirmed on Forever.', 1, 1, 1, true)
-        GameTooltip:AddLine('Undercut goes one step below: 1 copper for trade goods, 1 silver for gear. It stays on until the auction house closes, and starts off each time it opens.', 1, 1, 1, true)
+        GameTooltip:AddLine('Undercut goes 1 copper below the lowest listing. It stays on until the auction house closes, and starts off each time it opens.', 1, 1, 1, true)
         GameTooltip:AddLine('/aux undercut for more', .6, .6, .6)
         GameTooltip:Show()
     end)

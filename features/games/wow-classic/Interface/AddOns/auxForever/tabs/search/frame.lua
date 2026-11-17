@@ -204,8 +204,7 @@ do
     local function search_cursor_item()
         local type, item_id = GetCursorInfo()
         if type == 'item' then
-            set_filter(strlower(info.item(item_id).name) .. '/exact')
-            execute(nil, false)
+            search_item(item_id)
             ClearCursor()
         end
     end
@@ -266,8 +265,7 @@ do
     btn:SetPoint('LEFT', aux.status_bar, 'RIGHT', 5, 0)
     btn:SetText('Clear')
     btn:SetScript('OnClick', function()
-        while tremove(current_search().records) do end
-        current_search().table:SetDatabase()
+        clear_results(current_search())
         current_search().complete = false
         update_done()
     end)
@@ -492,8 +490,7 @@ for _ = 1, 5 do
 			    end
 		    end
 	    elseif button == 'RightButton' then
-		    set_filter(strlower(info.item(row.record.item_id).name) .. '/exact')
-		    execute(nil, false)
+		    search_item(row.record.item_id)
 	    end
     end)
     table:SetHandler('OnSelectionChanged', function(rt, datum)

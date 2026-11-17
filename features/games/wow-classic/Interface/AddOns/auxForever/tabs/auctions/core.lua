@@ -149,12 +149,23 @@ function M.check_prices()
             local mine = record.contains_own or (record.own_count or 0) > 0
             entry.at_price[price] = (entry.at_price[price] or 0) + max(1, (record.seller_count or 1) - (mine and 1 or 0))
         end,
-        on_complete = function()
+        on_complete = function(result)
+            -- 0.8.2.1 (outside review, R-02): when part of the answer is missing (the item list did
+            -- not fully arrive, or an item could not be read), an item nothing was found for is not
+            -- "Lowest" or "Only one listed": it keeps what the last check said, or "Not checked",
+            -- and the next time the tab opens it is checked again
+            local whole = scan.saw_everything(result)
             for key in pairs(wanted) do
-                checks[key] = found[key] or {at_price = {}}
+                if whole then
+                    checks[key] = found[key] or {at_price = {}}
+                else
+                    checks[key] = found[key] or checks[key]
+                end
             end
             checking = nil
-            checked_at = time()
+            if whole then
+                checked_at = time()
+            end
             listing:UpdateRows()
         end,
         on_abort = function()

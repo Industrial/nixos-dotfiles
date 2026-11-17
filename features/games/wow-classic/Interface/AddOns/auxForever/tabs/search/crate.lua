@@ -157,8 +157,10 @@ end
 function M.add_crate_lines(tooltip, bundles, money_icons)
     local rows, cheapest = crate_costs(bundles)
     tooltip:AddLine(' ')
-    tooltip:AddLine('Cheapest way to fill it', 1, 1, 1)
-    tooltip:AddLine('Latest prices, less what is in your bags', aux.color.label.enabled())
+    -- 0.8.2.1 (Tyler, 2026-11-16): "Cheapest fill price", was "Cheapest way to fill it"
+    tooltip:AddLine('Cheapest fill price', 1, 1, 1)
+    -- 0.8.2.1 build 7 (FB-042, user_tdsvrjvpe8rufw54: "unnecessary text"): the line "Latest
+    -- prices, less what is in your bags" is gone; the rows say "in bags" where it applies
     for i, row in ipairs(rows) do
         local left = row.count .. ' ' .. row.name
         local right
@@ -237,13 +239,24 @@ end
 
 -- each bundle priced from a crate search's results: {name, count, have, need, cost, short} (short:
 -- how many are missing from the auction house), and the index of the cheapest complete bundle
-function M.crate_live_costs(parts, records)
+-- folded: the auctions the search counted without keeping (S-08, tabs/search/results.lua); they are
+-- listed too, at their row's price
+function M.crate_live_costs(parts, records, folded)
     local listings = {}
     for _, record in ipairs(records or empty) do
         if not record.own and (record.buyout_price or 0) > 0 and record.name then
             local key = strlower(record.name)
             listings[key] = listings[key] or {}
             tinsert(listings[key], {unit = record.unit_buyout_price, units = history.record_units(record)})
+        end
+    end
+    for _, entries in pairs(folded or empty) do
+        for _, entry in pairs(entries) do
+            if entry.name and (entry.unit_price or 0) > 0 then
+                local key = strlower(entry.name)
+                listings[key] = listings[key] or {}
+                tinsert(listings[key], {unit = entry.unit_price, units = entry.units})
+            end
         end
     end
     local rows, cheapest = {}, nil
@@ -268,7 +281,7 @@ end
 local GAP = '   '
 function M.crate_summary(search)
     local parts = search.recipe
-    local rows, cheapest = crate_live_costs(parts, search.records)
+    local rows, cheapest = crate_live_costs(parts, search.records, search.folded)
     local text = aux.color.accent.background('Crate') .. '  ' .. (parts.name or '?') .. GAP
     local function bundle_text(row)
         local s = row.count .. ' ' .. row.name

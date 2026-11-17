@@ -350,151 +350,8 @@ M.search_columns = {
     },
 }
 
-M.auctions_columns = {
-    requirement_column(),
-    item_level_column(),
-    {
-        title = 'Item',
-        width = .32,
-        init = item_column_init,
-        fill = item_column_fill,
-        cmp = function(record_a, record_b, desc)
-            return sort_util.compare(record_a.name, record_b.name, desc)
-        end,
-    },
-    quantity_column('Quantity'),
-    {
-        title = 'Time\nLeft',
-        width = .04,
-        align = 'CENTER',
-        fill = function(cell, record)
-            if record.sale_status == 1 then
-                cell.text:SetText('?')
-            else
-                cell.text:SetText(TIME_LEFT_STRINGS[record.duration or 0] or '?')
-            end
-        end,
-        cmp = function(record_a, record_b, desc)
-            if record_a.sale_status == 1 and record_b.sale_status == 1 then
-                return sort_util.EQ
-            elseif record_a.sale_status == 1 then
-                return sort_util.GT
-            elseif record_b.sale_status == 1 then
-                return sort_util.LT
-            else
-                return sort_util.compare(record_a.duration, record_b.duration, desc)
-            end
-        end,
-    },
-    {
-        title = {'Auction Bid\n(per item)', 'Auction Bid\n(per stack)'},
-        bid = true,
-        width = .125,
-        align = 'RIGHT',
-        toggle = 'price_per_unit',
-        fill = function(cell, record)
-            if record.sale_status == 1 and price_per_unit then
-                cell.text:SetText('?')
-                return
-            end
-            local price
-            if record.high_bidder then
-                price = price_per_unit and ceil(record.high_bid / record.count) or record.high_bid
-            else
-                price = price_per_unit and ceil(record.start_price / record.count) or record.start_price
-            end
-            cell.text:SetText(money.to_string(price, true))
-        end,
-        cmp = function(record_a, record_b, desc)
-            if price_per_unit then
-                if record_a.sale_status == 1 and record_b.sale_status == 1 then
-                    return sort_util.EQ
-                elseif record_a.sale_status == 1 then
-                    return sort_util.GT
-                elseif record_b.sale_status == 1 then
-                    return sort_util.LT
-                end
-            end
-            local price_a
-            if record_a.high_bidder then
-                price_a = price_per_unit and record_a.high_bid / record_a.count or record_a.high_bid
-            else
-                price_a = price_per_unit and record_a.start_price / record_b.count or record_a.start_price
-            end
-            local price_b
-            if record_b.sale_status == 1 and price_per_unit then
-                price_b = math.huge
-            elseif record_b.high_bidder then
-                price_b = price_per_unit and record_b.high_bid / record_b.count or record_b.high_bid
-            else
-                price_b = price_per_unit and record_b.start_price / record_b.count or record_b.start_price
-            end
-            return sort_util.compare(price_a, price_b, desc)
-        end,
-    },
-    {
-        title = {'Auction Buyout\n(per item)', 'Auction Buyout\n(per stack)'},
-        width = .125,
-        align = 'RIGHT',
-        toggle = 'price_per_unit',
-        fill = function(cell, record)
-            if record.sale_status == 1 and price_per_unit then
-                cell.text:SetText('?')
-                return
-            end
-            local price = price_per_unit and ceil(record.unit_buyout_price) or record.buyout_price
-            cell.text:SetText(price > 0 and money.to_string(price, true) or '---')
-        end,
-        cmp = function(record_a, record_b, desc)
-            if price_per_unit then
-                if record_a.sale_status == 1 and record_b.sale_status == 1 then
-                    return sort_util.EQ
-                elseif record_a.sale_status == 1 then
-                    return sort_util.GT
-                elseif record_b.sale_status == 1 then
-                    return sort_util.LT
-                end
-            end
-
-            local price_a = price_per_unit and record_a.unit_buyout_price or record_a.buyout_price
-            local price_b = price_per_unit and record_b.unit_buyout_price or record_b.buyout_price
-            price_a = price_a > 0 and price_a or (desc and -math.huge or math.huge)
-            price_b = price_b > 0 and price_b or (desc and -math.huge or math.huge)
-
-            return sort_util.compare(price_a, price_b, desc)
-        end,
-    },
-    {
-        title = 'Status',
-        width = .21,
-        align = 'CENTER',
-        fill = function(cell, record)
-            local text
-            if not record.high_bidder then
-                text = aux.color.red'No Bids'
-            elseif record.sale_status == 1 then
-                text = aux.color.blue'Sold: ' .. record.high_bidder
-            else
-                text = aux.color.green'Bid: ' .. record.high_bidder
-            end
-            cell.text:SetText(text)
-        end,
-        cmp = function(record_a, record_b, desc)
-            local status_order = sort_util.compare(status_code(record_a), status_code(record_b), desc)
-            if status_order ~= sort_util.EQ then
-                return status_order
-            elseif not record_a.high_bidder and not record_b.high_bidder then
-                return sort_util.EQ
-            elseif not record_a.high_bidder then
-                return sort_util.GT
-            elseif not record_b.high_bidder then
-                return sort_util.LT
-            else
-                return sort_util.compare(record_a.high_bidder, record_b.high_bidder, desc)
-            end
-        end,
-    },
-}
+-- (the Auctions tab has its own columns since 0.4, tabs/auctions/frame.lua; the old list that stood
+-- here was unused and is gone, 0.8.2.1)
 
 M.bids_columns = {
     requirement_column(),
@@ -697,7 +554,15 @@ local methods = {
         if row.record then
 	        GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
             local key = row.record.browse_key
-            if key and GameTooltip.SetItemKey then
+            -- 0.8.2.1 build 7 (FB-045, karrier_user_slouyac50poxg707: "of shadow protection" and
+            -- "of healing" without their stat): a fast row has no link of its own. As Blizzard's
+            -- item display does (Code, Blizzard_AuctionHouseSharedTemplates.lua, branch forever), a
+            -- real link of one of the item key's auctions comes first when the game has one, then
+            -- the item key, which shows the suffix of most endings
+            local sample = key and C_AuctionHouse.GetItemKeySampleLink and C_AuctionHouse.GetItemKeySampleLink(key)
+            if type(sample) == 'string' and sample ~= '' then
+                GameTooltip:SetHyperlink(sample)
+            elseif key and GameTooltip.SetItemKey then
                 -- auxForever: a fast mode row has no link of its own; this shows its suffix too
                 GameTooltip:SetItemKey(key.itemID, key.itemLevel or 0, key.itemSuffix or 0, row.record.requirement or 0)
             else
@@ -843,6 +708,7 @@ local methods = {
                     named[record.owner] = true
                     sellers = sellers + 1
                 end
+                child.sellers = sellers
                 if sellers > 1 then child.record.group_sellers = sellers end
                 -- the same price as the previous row (identical, or another seller or time left), so
                 -- it adds to that row's count. Forever: one record can stand for a bucket of identical
@@ -853,15 +719,42 @@ local methods = {
             elseif not self.rowInfo.single_item and not self.one_row_each and prevRecord and group(record) == group(prevRecord) then
                 -- it's the same base item as the previous row so insert a new auction
                 start_row(record)
-                tinsert(self.rowInfo[#self.rowInfo].children, { count = record.auction_count or 1, record = record })
+                tinsert(self.rowInfo[#self.rowInfo].children, { count = record.auction_count or 1, record = record, named = named, sellers = sellers })
                 if self.expanded[self.rowInfo[#self.rowInfo].expandKey] then
                     self.rowInfo.numDisplayRows = self.rowInfo.numDisplayRows + 1
                 end
             else
                 -- it's a different base item from the previous row
                 start_row(record)
-                tinsert(self.rowInfo, { item_key = record.item_key, expandKey = group(record), children = {{ count = record.auction_count or 1, record = record }} })
+                tinsert(self.rowInfo, { item_key = record.item_key, expandKey = group(record), children = {{ count = record.auction_count or 1, record = record, named = named, sellers = sellers }} })
                 self.rowInfo.numDisplayRows = self.rowInfo.numDisplayRows + 1
+            end
+        end
+
+        -- 0.8.2.1 build 6 (outside review S-08, Tyler, 2026-11-11: "yes"): a search keeps about 20
+        -- real auctions per price row and counts the rest (folded, from tabs/search/results.lua).
+        -- They add to the row's "For sale" and "N sellers" here, so the row says what is listed.
+        local folded = self.folded
+        if folded and next(folded) then
+            for _, row in ipairs(self.rowInfo) do
+                for _, child in ipairs(row.children) do
+                    local entries = folded[child.record.price_group]
+                    if entries then
+                        local sellers = child.sellers or 1
+                        for _, entry in pairs(entries) do
+                            child.count = child.count + entry.auctions
+                            sellers = sellers + entry.unnamed
+                            for owner in pairs(entry.named) do
+                                if not child.named[owner] then
+                                    child.named[owner] = true
+                                    sellers = sellers + 1
+                                end
+                            end
+                        end
+                        child.record.group_sellers = sellers > 1 and sellers or nil
+                        child.record.group_count = child.count
+                    end
+                end
             end
         end
 
@@ -1072,9 +965,14 @@ local methods = {
         self:SetSelectedRecord()
     end,
 
-    SetDatabase = function(self, database)
+    -- folded: what a search counted without keeping (S-08); given with the records, cleared by
+    -- records given without it, kept by a call with no records
+    SetDatabase = function(self, database, folded)
         if database and database ~= self.records then
             self.records = database
+        end
+        if database then
+            self.folded = folded
         end
 
         local prevSelectedIndex

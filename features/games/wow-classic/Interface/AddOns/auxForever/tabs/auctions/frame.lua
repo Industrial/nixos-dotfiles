@@ -135,9 +135,9 @@ listing:SetHandler('OnClick', function(row, button)
             cancel_button:Click()
 		end
 	elseif button == 'RightButton' then
+		local item_id = row.record.item_id
 		aux.set_tab(1)
-		search_tab.set_filter(strlower(info.item(row.record.item_id).name) .. '/exact')
-		search_tab.execute(nil, false)
+		search_tab.search_item(item_id)
 	end
 end)
 
@@ -226,7 +226,9 @@ local function selection_text(record)
     elseif status == 'lowest' then
         return 'Yours is the cheapest.'
     elseif status == 'sold' then
-        return 'The money is in your mailbox.'
+        -- the money comes by mail after a sale; how soon is not known on Forever (experiment E1 in
+        -- docs/forever-auction-house.md), so this does not say it is there already
+        return 'Sold. The money comes by mail.'
     elseif status == 'cancelled' then
         return 'Cancelled. It comes back by mail.'
     elseif status == 'cancelling' then

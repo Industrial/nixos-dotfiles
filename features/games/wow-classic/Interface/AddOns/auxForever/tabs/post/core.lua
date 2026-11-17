@@ -158,6 +158,8 @@ function tab.OPEN()
     update_inventory_records(true)
     refresh = true
     update_post_done()
+    -- the Post button shows at once whether it can be pressed (nothing is selected yet)
+    validate_parameters()
 end
 
 function tab.CLOSE()
@@ -336,7 +338,9 @@ end
 
 local NOT_POSTED = {
     gone = 'Not posted: the item is no longer in your bags.',
-    locked = 'Not posted: the item is on your mouse pointer, or in a trade or the mail.',
+    -- 0.8.2.1 build 7 (FB-046, karrier_user_slouyac50poxg707: "when it is not"): the game locks an
+    -- item for more reasons than these three, so the message names the others it can be
+    locked = 'Not posted: the game is holding this item. Try again in a moment.',
     damaged = 'Not posted: this item must be repaired first.',
     invalid = 'Not posted: the auction house does not accept this item.',
     refused = 'Not posted: the auction house refused it.',
@@ -345,6 +349,14 @@ local NOT_POSTED = {
     unchanged = 'Not posted, as far as aux can tell: the item is still in your bags.',
 }
 M.NOT_POSTED = NOT_POSTED
+M.LOCKED_DETAIL = 'The item may be on your mouse pointer, in a trade or the mail, or a post from a moment ago may still be on its way.'
+
+-- empties Blizzard's own Sell tab, which locks the item it holds, while aux covers it
+function M.release_blizzard_post_item()
+    if AuctionHouseFrame and AuctionHouseFrame.ClearPostItem and not aux.blizzard_frame_shown() then
+        AuctionHouseFrame:ClearPostItem()
+    end
+end
 
 -- why no bag slot with the item can be posted (find_item_location found none)
 function M.missing_item_reason(item_key)
@@ -366,12 +378,14 @@ function M.missing_item_reason(item_key)
 end
 
 -- how many of the item are in the bags, postable or not
+-- 0.8.2.1 (outside review, R-11): from the slots' links alone (info.container_price_key). This runs
+-- on every bag change while a post waits for its answer, and read a hidden tooltip for every slot.
 function M.bag_count(item_key)
     local count = 0
     for slot in info.inventory() do
-        local item_info = info.container_item(unpack(slot))
-        if item_info and item_info.price_key == item_key then
-            count = count + (item_info.count or 1)
+        local key, held = info.container_price_key(unpack(slot))
+        if key == item_key then
+            count = count + (held or 1)
         end
     end
     return count
@@ -432,6 +446,14 @@ end
 -- Forever: commodities are posted as one listing of (stack size x stack count) units at a unit price;
 -- other items are posted as one auction per item.
 function post_auction()
+    -- 0.8.2.1 (found by the random player of tests/fuzz_test.lua): a click posts only when Post may
+    -- be pressed right now. The button is faded five times a second, so for a moment it could
+    -- still be lit after the selection was gone (leaving the tab clears it): an error, or a post
+    -- the tab would have refused.
+    if not selected_item or disabled_reason() then
+        validate_parameters()
+        return
+    end
     local item_key = selected_item.key
 
     local stack_size = stack_size_input:GetNumber()
@@ -439,8 +461,21 @@ function post_auction()
     local duration = duration_dropdown:GetIndex()
 
     local location = find_item_location(item_key)
+    if not location and missing_item_reason(item_key) == 'locked' then
+        -- 0.8.2.1 build 7 (FB-046): Blizzard's Sell tab, open but invisible under aux, locks the
+        -- item it holds. aux empties it after a bag right-click, but a bag addon can hand it the
+        -- item another way (the player uses Bagnon). Let it go, unless the player has Blizzard's
+        -- window up, and look again.
+        release_blizzard_post_item()
+        location = find_item_location(item_key)
+    end
     if not location then
-        show_post_message(NOT_POSTED[missing_item_reason(item_key)])
+        local reason = missing_item_reason(item_key)
+        show_post_message(NOT_POSTED[reason])
+        if reason == 'locked' then
+            -- the reasons in chat: the Post tab's message has room for two short lines
+            aux.print(LOCKED_DETAIL)
+        end
         return
     end
 
@@ -541,9 +576,6 @@ function M.price_note_text()
     elseif aux.account_data.post_undercut then
         local step = price_step() == 1 and '1 copper' or '1 silver'
         note = aux.color.gold(step .. ' below the lowest listing (') .. money.to_string(selection.unit_price, true) .. aux.color.gold(')')
-        if price_step() > 1 then
-            note = note .. aux.color.gold('. Gear is priced in whole silver')
-        end
     else
         note = aux.color.label.enabled('Same as the lowest listing')
     end
@@ -740,11 +772,15 @@ function deposit_amount()
     return 0
 end
 
--- Forever: gear and other items that are not trade goods are priced in whole silver (no gear
--- listing ever shows copper); trade goods ("commodities") can use copper when the auction house
--- supports copper values. Prices are rounded down, so the price shown is the price posted.
+-- Prices are whole copper when the auction house supports copper values (Forever does), for every
+-- item. Until 0.8.2.1 build 7 gear was kept in whole silver, because every gear listing seen was
+-- and Tyler's 10s 50c post in Blizzard's window did not go through (2026-10-19). Players then
+-- posted gear at copper prices in Blizzard's window (FB-044, sarrathsilentstrider: a white axe at
+-- 1s 89c), and Blizzard's Sell window shows the copper box for gear and does not round it (Code,
+-- branch forever): aux does not refuse what Blizzard's window allows. If the server ever refuses,
+-- the post says so. Prices are rounded down, so the price shown is the price posted.
 function M.price_step()
-    if selected_item and selected_item.commodity and C_AuctionHouse.SupportsCopperValues() then
+    if C_AuctionHouse.SupportsCopperValues() then
         return 1
     end
     return 100
@@ -762,7 +798,7 @@ function M.undercut(record, stack_size, bid)
     if record.historical_value or record.other_ending or record.own or not aux.account_data.post_undercut then
         return record.unit_price
     else
-        -- one step below: 1 copper for trade goods, 1 silver for gear
+        -- one step below: 1 copper (1 silver only where copper values are not supported)
         local step = price_step()
         return max(step, round_price(record.unit_price) - step)
     end
@@ -911,6 +947,10 @@ end
 function refresh_entries()
 	if selected_item then
         local item_key = selected_item.key
+        -- kept for the read below: leaving the Post tab clears selected_item while a gear item's
+        -- listings are still on their way, and the read then raised an error at each answer (found
+        -- by the random player of tests/fuzz_test.lua, 0.8.2.1)
+        local item_id = selected_item.item_id
 		set_bid_selection()
         set_buyout_selection()
         auto_price_key = item_key
@@ -962,7 +1002,7 @@ function refresh_entries()
 			-- post took quite a long time"). A version whose name has not loaded yet is read.
 			skip_key = not by_key and function(result)
 			    local key_of_result = info.item_key_price_key(result.itemKey)
-			    if not key_of_result or key_of_result == item_key or result.itemKey.itemID ~= selected_item.item_id then
+			    if not key_of_result or key_of_result == item_key or result.itemKey.itemID ~= item_id then
 			        return false
 			    end
 			    -- a version with only your own listing is not suggested back to you (review H-004, note 8)
@@ -979,7 +1019,7 @@ function refresh_entries()
                     record_auction(auction_record)
 				-- the cheapest other ending, to suggest a price when nobody sells this one (Tyler,
 				-- build 5: "we need to give them a price to post at anyway")
-				elseif auction_record.item_id == selected_item.item_id and not auction_record.own and (auction_record.unit_buyout_price or 0) > 0 then
+				elseif auction_record.item_id == item_id and not auction_record.own and (auction_record.unit_buyout_price or 0) > 0 then
 				    local unit = ceil(auction_record.unit_buyout_price)
 				    if not other_endings_lowest or unit < other_endings_lowest then
 				        other_endings_lowest = unit
@@ -998,11 +1038,18 @@ function refresh_entries()
                 refresh = true
                 update_post_done()
 			end,
-			on_complete = function()
+			on_complete = function(result)
                 aux.status_bar:update_status(1, 1)
                 bid_records[item_key] = bid_records[item_key] or {}
                 buyout_records[item_key] = buyout_records[item_key] or {}
-                listings_ready[item_key] = true
+                -- 0.8.2.1 (outside review, R-02): a read that missed part of the listings (the item
+                -- list did not fully arrive, or an item could not be read) is like a stopped one: no
+                -- price is picked from it and nothing says "None for sale". Refresh reads again.
+                if scan.saw_everything(result) or listings_ready[item_key] then
+                    listings_ready[item_key] = true
+                else
+                    listings_stopped[item_key] = true
+                end
                 refresh = true
                 update_post_done()
             end,

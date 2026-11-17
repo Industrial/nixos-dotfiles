@@ -52,13 +52,11 @@ local function price_text(record, amount)
     return money.to_string(amount, true)
 end
 
--- the price a deal was judged against: what a vendor pays, what it disenchants into, today's market,
--- or the usual price (shown only when it rests on enough history, as before)
+-- the price a deal was judged against: what a vendor pays, today's market, or the usual price (shown
+-- only when it rests on enough history, as before)
 function M.compared_price(record)
     if record.deal_reason == 'vendor' then
         return record.deal_vendor
-    elseif record.deal_reason == 'disenchant' then
-        return record.deal_disenchant
     elseif record.deal_reason == 'market' then
         return record.deal_market
     end
@@ -149,10 +147,6 @@ M.columns = {
             local basis = record.deal_reason == 'market' and ' of market' or ' of usual'
             if record.deal_reason == 'vendor' then
                 cell.text:SetText(record.deal_gone and aux.color.label.disabled('below vendor') or aux.color.blue('below vendor'))
-            elseif record.deal_reason == 'disenchant' then
-                -- 0.8.3: worth more in materials than it costs. Like below vendor it is not a
-                -- percentage of anything, so it names itself instead.
-                cell.text:SetText(record.deal_gone and aux.color.label.disabled('disenchant') or aux.color.yellow('disenchant'))
             elseif record.deal_gone or not record.deal_percent then
                 cell.text:SetText(aux.color.label.disabled((record.deal_percent or '?') .. '%' .. basis))
             else
@@ -192,9 +186,9 @@ listing:SetHandler('OnClick', function(row, button)
     if button == 'LeftButton' then
         click_deal(row.record)
     elseif button == 'RightButton' then
+        local item_id = row.record.item_id
         aux.set_tab(1)
-        search_tab.set_filter(strlower(info.item(row.record.item_id).name) .. '/exact')
-        search_tab.execute(nil, false)
+        search_tab.search_item(item_id)
     end
 end)
 

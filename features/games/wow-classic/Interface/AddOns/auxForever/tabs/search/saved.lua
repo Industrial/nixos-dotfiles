@@ -12,8 +12,13 @@ StaticPopupDialogs.AUX_REMOVE_FAVORITE_CONFIRMATION = {
     timeout = 0,
     hideOnEscape = 1,
     preferredIndex = STATICPOPUP_NUMDIALOGS,
-    OnAccept = function(self, index)
-        tremove(favorite_searches, index)
+    -- 0.8.2.1 (outside review, R-20): the favorite itself, not its row number, which can change while
+    -- the question is open (a reorder then removed another one)
+    OnAccept = function(self, search)
+        local index = aux.key(favorite_searches, search)
+        if index then
+            tremove(favorite_searches, index)
+        end
         update_search_listings()
     end
 }
@@ -24,7 +29,6 @@ StaticPopupDialogs.AUX_RENAME_FAVORITE = {
     button2 = 'Cancel',
 	maxLetters = 50,
     hasEditBox = 1,
-    editBoxWidth = editBoxWidth ,
     timeout = 0,
     hideOnEscape = 1,
     preferredIndex = STATICPOPUP_NUMDIALOGS,
@@ -139,7 +143,7 @@ handlers = {
 				tinsert(favorite_searches, 1, data.search)
                 update_search_listings()
 			elseif st == favorite_searches_listing then
-                aux.show_popup('AUX_REMOVE_FAVORITE_CONFIRMATION', nil, nil, data.index)
+                aux.show_popup('AUX_REMOVE_FAVORITE_CONFIRMATION', nil, nil, data.search)
             end
         end
 	end,
