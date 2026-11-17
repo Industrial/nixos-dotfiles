@@ -13,7 +13,7 @@
 ## Notes-koKR: Questie 데이터베이스
 ## Notes-zhCN: Questie 数据库
 ## Notes-zhTW: Questie 資料庫
-## Version: 1.0.16
+## Version: 1.1.1
 ## Category: Quests
 ## Category-deDE: Quests
 ## Category-esES: Misiones
@@ -29,7 +29,7 @@
 ## X-Contract-Version: 4
 ## X-Flavor: TBC
 ## X-Mode: baked
-## X-BUILD-COMMIT: a444a6418113ae0fce5d30c897674132e756ba1d
+## X-BUILD-COMMIT: 4dbb82440a27856f8dccf57094a5d792cdc7cc9b
 ## X-BUILD-TIME: 2023-11-14T22:13:20Z
 
 src\config.lua

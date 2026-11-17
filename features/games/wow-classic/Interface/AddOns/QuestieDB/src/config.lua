@@ -186,6 +186,9 @@ config.ownedCorrections = {
   { owned = 'Forever', file = 'Forever/traces/foreverNpcTraces.lua', module = 'ForeverNpcTraces', datatype = 'Npc', static = {'Load'}, generated = true, window = 'Forever' },
   { owned = 'Forever', file = 'Forever/traces/foreverItemTraces.lua', module = 'ForeverItemTraces', datatype = 'Item', static = {'Load'}, generated = true, window = 'Forever' },
   { owned = 'Forever', file = 'Forever/traces/foreverObjectTraces.lua', module = 'ForeverObjectTraces', datatype = 'Object', static = {'Load'}, generated = true, window = 'Forever' },
+  -- Quest relations inferred from traces (exclusiveTo, preQuest*, nextQuestInChain); slotOffset
+  -- places them after foreverQuestTraces.lua and still before authored forever*Fixes.lua.
+  { owned = 'Forever', file = 'Forever/traces/foreverQuestRelationTraces.lua', module = 'ForeverQuestRelationTraces', datatype = 'Quest', static = {'Load'}, generated = true, window = 'Forever', slotOffset = 1 },
   -- Authored Forever corrections follow legacy, generated base and trace data; Dynamic precedence is unchanged.
   { owned = 'Forever', file = 'Forever/foreverQuestFixes.lua', module = 'ForeverQuestFixes', datatype = 'Quest', static = {'Load'}, dynamic = {'LoadDynamic'}, window = 'Forever' },
   { owned = 'Forever', file = 'Forever/foreverNPCFixes.lua', module = 'ForeverNpcFixes', datatype = 'Npc', static = {'Load'}, dynamic = {'LoadDynamic'}, window = 'Forever' },

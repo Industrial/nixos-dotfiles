@@ -136,6 +136,10 @@ function register.FromManifest(flavor, moduleFor)
       -- they applied *before* Era's faction fixes at 120. Deriving the window from the file's
       -- own expansion makes that class of mistake unrepresentable.
       local window = spec.window or register.WindowFor(spec)
+      -- Within a window, generated sets sit below authored ones. slotOffset skips that many
+      -- slots past same-band peers that would otherwise claim the same load order; it must
+      -- exceed the peer's function count (e.g. quest relation traces after quest traces).
+      local band = (spec.generated and 1 or 10) + (spec.slotOffset or 0)
 
       if registerStatics then
         for offset, functionName in ipairs(spec.static or {}) do
@@ -143,7 +147,7 @@ function register.FromManifest(flavor, moduleFor)
             local entry = registry.RegisterCorrection(registry.OWNER, spec.datatype,
               spec.file .. ":" .. functionName,
               wrap(module, functionName, spec.datatype),
-              order[window .. "Static"] + (spec.generated and 1 or 10) + offset)
+              order[window .. "Static"] + band + offset)
             entry.expansions = spec.expansions
             entry.minExpansionOrder = spec.minExpansionOrder
             -- Expansion-gated files start in their minimum expansion. Only ungated Era files
@@ -160,7 +164,7 @@ function register.FromManifest(flavor, moduleFor)
           local entry = registry.RegisterRuntimeCorrection(registry.OWNER, spec.datatype,
             spec.file .. ":" .. functionName,
             wrap(module, functionName, spec.datatype),
-            order[window .. "Dynamic"] + (spec.generated and 1 or 10) + offset)
+            order[window .. "Dynamic"] + band + offset)
           entry.expansions = spec.expansions
           entry.minExpansionOrder = spec.minExpansionOrder
           entry.options = spec.options
