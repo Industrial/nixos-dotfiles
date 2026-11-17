@@ -1,10 +1,10 @@
 
 TomTomDB = {
 ["profileKeys"] = {
-["Derpnschmerp Gorkndork"] = "Default",
+["Völundr Industrial"] = "Default",
 ["Banknspank Saladfingers"] = "Default",
 ["Skelf Onyourshelf"] = "Default",
-["Völundr Industrial"] = "Default",
+["Derpnschmerp Gorkndork"] = "Default",
 },
 ["profiles"] = {
 ["Default"] = {
@@ -17,6 +17,11 @@ nil,
 -1.69182562828064,
 },
 },
+["paste"] = {
+["button"] = {
+["showInCompartment"] = true,
+},
+},
 ["block"] = {
 ["enable"] = false,
 ["position"] = {
@@ -27,23 +32,18 @@ nil,
 -100,
 },
 },
-["paste"] = {
-["button"] = {
-["showInCompartment"] = true,
-},
-},
 },
 },
 }
 TomTomWaypointsM = {
-["global"] = {
-["pinFlagsLive"] = true,
-},
 ["profileKeys"] = {
-["Derpnschmerp Gorkndork"] = "Derpnschmerp Gorkndork",
+["Völundr Industrial"] = "Skelf Onyourshelf",
 ["Banknspank Saladfingers"] = "Banknspank Saladfingers",
 ["Skelf Onyourshelf"] = "Skelf Onyourshelf",
-["Völundr Industrial"] = "Skelf Onyourshelf",
+["Derpnschmerp Gorkndork"] = "Derpnschmerp Gorkndork",
+},
+["global"] = {
+["pinFlagsLive"] = true,
 },
 ["profiles"] = {
 ["Skelf Onyourshelf"] = {
@@ -180,17 +180,17 @@ TomTomWaypointsM = {
 ["minimap"] = true,
 ["world"] = true,
 },
-["1420:851000000:314000000:Scarlet Monastery - Graveyard"] = {
+["1420:851000000:314000000:Scarlet Monastery - Cathedral"] = {
 1420,
 0.851,
 0.314,
 ["arrivaldistance"] = 15,
 ["crazy"] = true,
 ["persistent"] = true,
-["desc"] = "Scarlet Monastery - Graveyard",
+["desc"] = "Scarlet Monastery - Cathedral",
 ["silent"] = true,
 ["cleardistance"] = 10,
-["title"] = "Scarlet Monastery - Graveyard",
+["title"] = "Scarlet Monastery - Cathedral",
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {
@@ -211,17 +211,17 @@ TomTomWaypointsM = {
 ["minimap"] = true,
 ["world"] = true,
 },
-["1420:851000000:314000000:Scarlet Monastery - Cathedral"] = {
+["1420:851000000:314000000:Scarlet Monastery - Graveyard"] = {
 1420,
 0.851,
 0.314,
 ["arrivaldistance"] = 15,
 ["crazy"] = true,
 ["persistent"] = true,
-["desc"] = "Scarlet Monastery - Cathedral",
+["desc"] = "Scarlet Monastery - Graveyard",
 ["silent"] = true,
 ["cleardistance"] = 10,
-["title"] = "Scarlet Monastery - Cathedral",
+["title"] = "Scarlet Monastery - Graveyard",
 ["from"] = "?",
 ["callbacks"] = {
 ["distance"] = {

@@ -11,41 +11,205 @@ WowFExportarDB = {
 },
 ["recetasSabidas"] = {
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-[9058] = true,
+["Light Leather"] = true,
 [2152] = true,
 ["Slitherskin Mackerel"] = true,
-[2881] = true,
-["Linen Bandage"] = true,
-["Light Leather"] = true,
-["Basic Campfire"] = true,
-[1229517] = true,
-[2538] = true,
 [9059] = true,
-[7126] = true,
-["Camp Chair"] = true,
-["Handstitched Leather Cloak"] = true,
-["Handstitched Leather Boots"] = true,
+["Linen Bandage"] = true,
+[9058] = true,
+[2540] = true,
 ["Handstitched Leather Vest"] = true,
+[2538] = true,
+[2881] = true,
+[7126] = true,
+[7752] = true,
+[1229737] = true,
+["Handstitched Leather Boots"] = true,
+[1229517] = true,
 [2149] = true,
-["Herb Baked Egg"] = true,
+[1230117] = true,
 ["Light Armor Kit"] = true,
-["Camp Tent"] = true,
-[3275] = true,
+["Handstitched Leather Cloak"] = true,
 ["Charred Wolf Meat"] = true,
+[3275] = true,
 ["Handstitched Leather Bracers"] = true,
 [1229432] = true,
 [8604] = true,
 [2539] = true,
-[1230117] = true,
-[1229737] = true,
-[7752] = true,
+["Herb Baked Egg"] = true,
+["Camp Tent"] = true,
+["Basic Campfire"] = true,
 ["Roasted Boar Meat"] = true,
-[2540] = true,
+["Camp Chair"] = true,
 ["First Aid Kit"] = true,
 ["Spiced Wolf Meat"] = true,
 },
 },
 ["idiomaVisto"] = 1,
+["panel"] = {
+["y"] = -91.67345428466797,
+["x"] = -510.0863342285156,
+["relativo"] = "TOPRIGHT",
+["punto"] = "TOPRIGHT",
+["plegado"] = true,
+},
+["xpReal"] = {
+[214] = {
+["xp"] = 2950,
+["nivel"] = 21,
+},
+[2928] = {
+["xp"] = 4400,
+["nivel"] = 22,
+},
+[1101] = {
+["xp"] = 7950,
+["nivel"] = 32,
+},
+[2930] = {
+["xp"] = 6550,
+["nivel"] = 26,
+},
+[2398] = {
+["xp"] = 550,
+["nivel"] = 36,
+},
+[2931] = {
+["xp"] = 230,
+["nivel"] = 26,
+},
+[166] = {
+["xp"] = 6200,
+["nivel"] = 21,
+},
+[2040] = {
+["xp"] = 3700,
+["nivel"] = 22,
+},
+[98815] = {
+["xp"] = 1150,
+["nivel"] = 24,
+},
+[7070] = {
+["xp"] = 6750,
+["nivel"] = 39,
+},
+[1275] = {
+["xp"] = 2400,
+["nivel"] = 24,
+},
+},
+["opciones"] = {
+["letra"] = 1.1,
+["iconoTam"] = 1,
+["tamano"] = 1,
+["iconoAlfa"] = 1,
+["popupTam"] = 1,
+["fondo"] = 1,
+["raresTam"] = 1,
+},
+["caza"] = {
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
+},
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
+},
+},
+["planZonas"] = {
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
+["fac"] = "A",
+["tramos"] = {
+{
+["id"] = 1,
+["desde"] = 1,
+["hasta"] = 11,
+["costo"] = 0,
+},
+{
+["id"] = 38,
+["desde"] = 11,
+["hasta"] = 21,
+["costo"] = 1,
+},
+{
+["id"] = 11,
+["desde"] = 21,
+["hasta"] = 32,
+["costo"] = 1,
+},
+{
+["id"] = 45,
+["desde"] = 32,
+["hasta"] = 41,
+["costo"] = 1,
+},
+{
+["id"] = 47,
+["desde"] = 41,
+["hasta"] = 49,
+["costo"] = 2,
+},
+{
+["id"] = 28,
+["desde"] = 49,
+["hasta"] = 60,
+["costo"] = 3,
+},
+},
+["nivel"] = 1,
+["v"] = "39:23422",
+},
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
+["fac"] = "A",
+["tramos"] = {
+{
+["id"] = 12,
+["desde"] = 1,
+["hasta"] = 11,
+["costo"] = 0,
+},
+{
+["id"] = 40,
+["desde"] = 11,
+["hasta"] = 19,
+["costo"] = 1,
+},
+{
+["id"] = 10,
+["desde"] = 19,
+["hasta"] = 31,
+["costo"] = 1,
+},
+{
+["id"] = 33,
+["desde"] = 31,
+["hasta"] = 51,
+["costo"] = 1.5,
+},
+{
+["id"] = 46,
+["desde"] = 51,
+["hasta"] = 56,
+["costo"] = 4,
+},
+{
+["id"] = 4,
+["desde"] = 56,
+["hasta"] = 59,
+["costo"] = 5.5,
+},
+{
+["id"] = 440,
+["desde"] = 59,
+["hasta"] = 60,
+["costo"] = 10.2,
+},
+},
+["nivel"] = 1,
+["v"] = "39:23422",
+},
+},
+["notasVistas"] = "4.66#423873",
+["libroPestana"] = "Mazmorras",
 ["costosEntrenador"] = {
 ["HUNTER"] = {
 [1513] = 1080,
@@ -213,10 +377,10 @@ WowFExportarDB = {
 [24629] = 7560,
 ["Volley available"] = 14400,
 ["Track Hidden available"] = 6480,
-["Nature Resistance available"] = 396,
-[3034] = 11700,
+["Summon Hawk available"] = 11700,
+["Explosive Trap available"] = 9900,
 ["Track Hidden unavailable"] = 6480,
-[14320] = 13500,
+[26064] = 0,
 ["Flare available"] = 9000,
 ["Track Elementals available"] = 6660,
 ["Rapid Fire available"] = 7400,
@@ -227,3118 +391,121 @@ WowFExportarDB = {
 ["Aimed Shot available"] = 11700,
 [20190] = 34200,
 [1462] = 6480,
-["Hunter's Mark available"] = 14400,
-["Trueshot Aura unavailable"] = 37800,
+["Growl unavailable"] = 9000,
+[14310] = 14400,
 [7371] = 0,
 ["Summon Hawk unavailable"] = 37800,
 [20900] = 6750,
 [24555] = 5760,
-[24503] = 3240,
-[24497] = 1440,
+["Mend Pet available"] = 11700,
+[1293525] = 11700,
 [24488] = 396,
 [1978] = 100,
-[20902] = 20700,
-[24444] = 3240,
-[24504] = 6480,
-["Shell Shield available"] = 0,
+[19880] = 6660,
+[14316] = 20700,
+[19882] = 14400,
 ["Growl available"] = 0,
+["Shell Shield available"] = 0,
 ["Eagle Eye unavailable"] = 1200,
 [14271] = 35100,
 ["Aspect of the Monkey unavailable"] = 100,
 [14279] = 25200,
 [24446] = 396,
 [14287] = 37800,
-["Counterattack unavailable"] = 33300,
+[24439] = 1440,
 [14295] = 35100,
 [19879] = 27000,
 [20909] = 19800,
 ["Arcane Shot unavailable"] = 37800,
 [24502] = 1440,
-[24550] = 0,
+["Track Giants unavailable"] = 14400,
 [14319] = 6750,
 ["Sniper Shot unavailable"] = 35100,
 ["Viper Sting available"] = 11700,
 ["Aspect of the Wild unavailable"] = 34200,
-["Track Giants unavailable"] = 14400,
+[24550] = 0,
 ["Concussive Shot available"] = 200,
-["Track Humanoids available"] = 360,
-["Frost Resistance available"] = 396,
-[4189] = 0,
-[5116] = 200,
-[19883] = 360,
+[14323] = 6300,
+[14327] = 25200,
+["Distracting Shot unavailable"] = 37800,
+[14311] = 37800,
+[1543] = 9000,
 ["Track Undead unavailable"] = 1440,
-[14302] = 6660,
+[5118] = 2100,
 ["Nature Resistance unavailable"] = 6480,
 [24630] = 9000,
-[24501] = 6480,
-[24505] = 1440,
-[14263] = 9000,
+["Frost Trap unavailable"] = 7500,
+[14303] = 11700,
+[23992] = 396,
 [19884] = 1440,
-["Rapid Fire unavailable"] = 7400,
-["Aspect of the Hawk unavailable"] = 35100,
+[14283] = 6750,
+[20901] = 11700,
 ["Scare Beast available"] = 1080,
 [14918] = 0,
-[24448] = 3240,
-[2974] = 600,
+[14267] = 13500,
 ["Aspect of the Beast unavailable"] = 37800,
-[4191] = 0,
-[1494] = 9,
+[2974] = 600,
+["Fire Resistance unavailable"] = 6480,
+[1242634] = 6840,
 [1299348] = 9000,
 [1002] = 1080,
 [14324] = 14400,
-[13795] = 1350,
-[20736] = 540,
 [4187] = 0,
+[20736] = 540,
+[13795] = 1350,
 ["Frost Resistance unavailable"] = 6480,
-[1242634] = 6840,
-["Fire Resistance unavailable"] = 6480,
+[1494] = 9,
+[4191] = 0,
 [1495] = 1350,
-[14267] = 13500,
-[20901] = 11700,
-[14283] = 6750,
+[24448] = 3240,
+["Aspect of the Hawk unavailable"] = 35100,
+["Rapid Fire unavailable"] = 7400,
 ["Shadow Resistance unavailable"] = 6480,
-[23992] = 396,
-[14303] = 11700,
-["Frost Trap unavailable"] = 7500,
+[14263] = 9000,
+[24505] = 1440,
+[24501] = 6480,
 [1499] = 2100,
-[5118] = 2100,
-[1543] = 9000,
-[14311] = 37800,
-["Distracting Shot unavailable"] = 37800,
-[14327] = 25200,
-[14323] = 6300,
+[14302] = 6660,
+[19883] = 360,
+[5116] = 200,
+[4189] = 0,
+["Frost Resistance available"] = 396,
+["Track Humanoids available"] = 360,
 ["Arcane Resistance unavailable"] = 6480,
 ["Natural Armor available"] = 0,
-[24439] = 1440,
+["Counterattack unavailable"] = 33300,
 [24447] = 1440,
 ["Feign Death unavailable"] = 7600,
-[19882] = 14400,
-[14316] = 20700,
-[19880] = 6660,
+[24504] = 6480,
+[24444] = 3240,
+[20902] = 20700,
 [20910] = 33300,
-[1293525] = 11700,
-["Mend Pet available"] = 11700,
+[24497] = 1440,
+[24503] = 3240,
 [13549] = 400,
 [13553] = 19800,
-[14310] = 14400,
-["Growl unavailable"] = 9000,
+["Trueshot Aura unavailable"] = 37800,
+["Hunter's Mark available"] = 14400,
 [1510] = 14400,
 [24551] = 0,
-[26064] = 0,
-["Explosive Trap available"] = 9900,
-["Summon Hawk available"] = 11700,
+[14320] = 13500,
+[3034] = 11700,
+["Nature Resistance available"] = 396,
 [15629] = 6840,
 ["Mongoose Bite unavailable"] = 35100,
 },
 },
-["bienvenida"] = 1,
-["opciones"] = {
-["letra"] = 1.1,
-["iconoTam"] = 1,
-["tamano"] = 1,
-["iconoAlfa"] = 1,
-["popupTam"] = 1,
-["fondo"] = 1,
-["raresTam"] = 1,
-},
-["caza"] = {
-["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
-},
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-},
-},
-["planZonas"] = {
-["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
-["v"] = "39:23422",
-["nivel"] = 1,
-["tramos"] = {
-{
-["id"] = 1,
-["hasta"] = 11,
-["costo"] = 0,
-["desde"] = 1,
-},
-{
-["id"] = 38,
-["hasta"] = 21,
-["costo"] = 1,
-["desde"] = 11,
-},
-{
-["id"] = 11,
-["hasta"] = 32,
-["costo"] = 1,
-["desde"] = 21,
-},
-{
-["id"] = 45,
-["hasta"] = 41,
-["costo"] = 1,
-["desde"] = 32,
-},
-{
-["id"] = 47,
-["hasta"] = 49,
-["costo"] = 2,
-["desde"] = 41,
-},
-{
-["id"] = 28,
-["hasta"] = 60,
-["costo"] = 3,
-["desde"] = 49,
-},
-},
-["fac"] = "A",
-},
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-["v"] = "39:23422",
-["nivel"] = 1,
-["tramos"] = {
-{
-["id"] = 12,
-["hasta"] = 11,
-["costo"] = 0,
-["desde"] = 1,
-},
-{
-["id"] = 40,
-["hasta"] = 19,
-["costo"] = 1,
-["desde"] = 11,
-},
-{
-["id"] = 10,
-["hasta"] = 31,
-["costo"] = 1,
-["desde"] = 19,
-},
-{
-["id"] = 33,
-["hasta"] = 51,
-["costo"] = 1.5,
-["desde"] = 31,
-},
-{
-["id"] = 46,
-["hasta"] = 56,
-["costo"] = 4,
-["desde"] = 51,
-},
-{
-["id"] = 4,
-["hasta"] = 59,
-["costo"] = 5.5,
-["desde"] = 56,
-},
-{
-["id"] = 440,
-["hasta"] = 60,
-["costo"] = 10.2,
-["desde"] = 59,
-},
-},
-["fac"] = "A",
-},
-},
-["avisosFab"] = {
-["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
-},
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-},
-},
-["diagCombate"] = {
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-15 23:07",
-["clase"] = "MAGE",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 1,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "nil",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-15 23:44",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "nil",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-15 23:45",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "si",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-15 23:54",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-15 23:54",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["combate"] = "si",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 00:30",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 00:50",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "legible",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 00:51",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 01:05",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "si",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 04:31",
-["clase"] = "MAGE",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 1,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "nil",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 04:31",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "nil",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 04:32",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "si",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 08:47",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "nil",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-16 08:47",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 39,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["casteoObjetivo"] = "nil",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "legible",
-["combate"] = "si",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-17 01:50",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 40,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "no",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "nil",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-17 02:33",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 40,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["combate"] = "si",
-["rango"] = "nil",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "legible",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-17 07:32",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 40,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "nil",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-17 07:33",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 40,
-["asistido"] = "existe",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["cdNuevo"] = "legible",
-["auraUtil"] = "nil",
-["rango"] = "nil",
-["version"] = "4.66",
-["asistidoSiguiente"] = "nil",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["casteoObjetivo"] = "nil",
-["auraNueva"] = "legible",
-["combate"] = "si",
-["poder"] = "secreto",
-["guidObjetivo"] = "legible",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-17 10:32",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 40,
-["casteoObjetivo"] = "nil",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["asistido"] = "existe",
-["combate"] = "no",
-["rango"] = "nil",
-["cdNuevo"] = "legible",
-["version"] = "4.66",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["auraNueva"] = "nil",
-["auraUtil"] = "nil",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-{
-["vidaObjetivo"] = "secreto",
-["usableNuevo"] = "legible",
-["fecha"] = "2026-11-17 10:35",
-["clase"] = "HUNTER",
-["placas"] = "legible",
-["auraVieja"] = "no existe",
-["brillo"] = "sin ver",
-["nivel"] = 40,
-["auraUtil"] = "nil",
-["modo"] = "?",
-["cdViejo"] = "no existe",
-["asistidoSiguiente"] = "nil",
-["casteoObjetivo"] = "nil",
-["rango"] = "nil",
-["asistido"] = "existe",
-["cdNuevo"] = "legible",
-["auraNombre"] = "nil",
-["casteo"] = "nil",
-["usableViejo"] = "no existe",
-["version"] = "4.66",
-["auraNueva"] = "legible",
-["combate"] = "no",
-["poder"] = "secreto",
-["guidObjetivo"] = "nil",
-["idEvento"] = "sin ver",
-},
-},
-["panel"] = {
-["y"] = -91.67345428466797,
-["x"] = -510.0863342285156,
-["relativo"] = "TOPRIGHT",
-["plegado"] = true,
-["punto"] = "TOPRIGHT",
-},
-["libroPos"] = {
-"CENTER",
-"CENTER",
--43.60906982421875,
-114.2857284545898,
-},
-["preciosSubasta"] = {
-[15249] = {
-["p"] = 3900,
-["t"] = 1794443195,
-},
-[5075] = {
-["p"] = 25,
-["t"] = 1794536536,
-},
-[279276] = {
-["p"] = 11,
-["t"] = 1794536490,
-},
-[5095] = {
-["p"] = 9,
-["t"] = 1794536485,
-},
-[8176] = {
-["p"] = 3500,
-["t"] = 1794459396,
-},
-[4096] = {
-["p"] = 607,
-["t"] = 1794485182,
-},
-[11285] = {
-["p"] = 12,
-["t"] = 1794536492,
-},
-[8256] = {
-["p"] = 15400,
-["t"] = 1794459385,
-},
-[2070] = {
-["p"] = 1,
-["t"] = 1794536388,
-},
-[2078] = {
-["t"] = 1794782122,
-["p"] = 1069,
-},
-[6206] = {
-["t"] = 1794643925,
-["p"] = 1250,
-},
-[15489] = {
-["t"] = 1794643791,
-["p"] = 545,
-},
-[5207] = {
-["p"] = 1079,
-["t"] = 1794484489,
-},
-[3135] = {
-["t"] = 1794648467,
-["p"] = 500,
-},
-[4232] = {
-["p"] = 199,
-["t"] = 1794546595,
-},
-[6290] = {
-["p"] = 7,
-["t"] = 1794536467,
-},
-[17056] = {
-["p"] = 33,
-["t"] = 1794485515,
-},
-[2140] = {
-["t"] = 1794643790,
-["p"] = 527,
-},
-[3169] = {
-["p"] = 18,
-["t"] = 1794459135,
-},
-[3171] = {
-["p"] = 6,
-["t"] = 1794536439,
-},
-[5319] = {
-["p"] = 6900,
-["t"] = 1794443199,
-},
-[4304] = {
-["t"] = 1794648465,
-["p"] = 680,
-},
-[6358] = {
-["p"] = 33,
-["t"] = 1794485507,
-},
-[6362] = {
-["p"] = 6,
-["t"] = 1794536461,
-},
-[3185] = {
-["p"] = 12000,
-["t"] = 1794443197,
-},
-[2166] = {
-["t"] = 1794643922,
-["p"] = 1233,
-},
-[3193] = {
-["t"] = 1794781089,
-["p"] = 2064,
-},
-[3195] = {
-["t"] = 1794642990,
-["p"] = 1363,
-},
-[3199] = {
-["t"] = 1794782107,
-["p"] = 2249,
-},
-[3201] = {
-["t"] = 1794642908,
-["p"] = 4493,
-},
-[6418] = {
-["t"] = 1794452176,
-["p"] = 2000,
-},
-[9775] = {
-["t"] = 1794643777,
-["p"] = 400,
-},
-[9783] = {
-["t"] = 1794782033,
-["p"] = 800,
-},
-[9799] = {
-["t"] = 1794643913,
-["p"] = 1200,
-},
-[9815] = {
-["t"] = 1794781083,
-["p"] = 1656,
-},
-[6450] = {
-["p"] = 200,
-["t"] = 1794485125,
-},
-[9831] = {
-["t"] = 1794782114,
-["p"] = 1232,
-},
-[6458] = {
-["p"] = 29,
-["t"] = 1794536591,
-},
-[6470] = {
-["p"] = 29,
-["t"] = 1794485675,
-},
-[4428] = {
-["p"] = 330,
-["t"] = 1794484795,
-},
-[252819] = {
-["t"] = 1794643935,
-["p"] = 1300,
-},
-[10918] = {
-["t"] = 1794647798,
-["p"] = 100,
-},
-[15018] = {
-["t"] = 1794643858,
-["p"] = 899,
-},
-[6518] = {
-["p"] = 155,
-["t"] = 1794443213,
-},
-[5503] = {
-["p"] = 52,
-["t"] = 1794485674,
-},
-[6530] = {
-["p"] = 27,
-["t"] = 1794536571,
-},
-[6538] = {
-["t"] = 1794782101,
-["p"] = 486,
-},
-[4496] = {
-["p"] = 200,
-["t"] = 1794443212,
-},
-[6546] = {
-["t"] = 1794643876,
-["p"] = 1000,
-},
-[5527] = {
-["t"] = 1794521477,
-["p"] = 95,
-},
-[6554] = {
-["t"] = 1794643801,
-["p"] = 600,
-},
-[2258] = {
-["t"] = 1794643851,
-["p"] = 800,
-},
-[6562] = {
-["t"] = 1794643938,
-["p"] = 1329,
-},
-[213564] = {
-["p"] = 37,
-["t"] = 1794484413,
-},
-[6570] = {
-["t"] = 1794648319,
-["p"] = 494,
-},
-[17057] = {
-["p"] = 7,
-["t"] = 1794536480,
-},
-[6578] = {
-["t"] = 1794643011,
-["p"] = 1299,
-},
-[4536] = {
-["p"] = 10,
-["t"] = 1794485467,
-},
-[4540] = {
-["p"] = 2,
-["t"] = 1794536410,
-},
-[5571] = {
-["p"] = 250,
-["t"] = 1794484697,
-},
-[6598] = {
-["t"] = 1794782142,
-["p"] = 2423,
-},
-[6602] = {
-["p"] = 1000,
-["t"] = 1794459377,
-},
-[15250] = {
-["t"] = 1794643008,
-["p"] = 6890,
-},
-[4564] = {
-["t"] = 1794643811,
-["p"] = 700,
-},
-[6614] = {
-["t"] = 1794452135,
-["p"] = 1200,
-},
-[12213] = {
-["t"] = 1794643776,
-["p"] = 333,
-},
-[15306] = {
-["t"] = 1794643850,
-["p"] = 800,
-},
-[4592] = {
-["p"] = 8,
-["t"] = 1794536482,
-},
-[15330] = {
-["p"] = 1800,
-["t"] = 1794443190,
-},
-[4604] = {
-["p"] = 2,
-["t"] = 1794546577,
-},
-[5635] = {
-["p"] = 48,
-["t"] = 1794215771,
-},
-[2316] = {
-["p"] = 407,
-["t"] = 1794484793,
-},
-[2318] = {
-["p"] = 35,
-["t"] = 1794536661,
-},
-[2320] = {
-["t"] = 1794521611,
-["p"] = 12,
-},
-[4656] = {
-["p"] = 3,
-["t"] = 1794536414,
-},
-[6714] = {
-["t"] = 1794647799,
-["p"] = 119,
-},
-[15474] = {
-["t"] = 1794648315,
-["p"] = 400,
-},
-[3369] = {
-["t"] = 1794643841,
-["p"] = 25,
-},
-[3371] = {
-["p"] = 4,
-["t"] = 1794536419,
-},
-[1177] = {
-["p"] = 10,
-["t"] = 1794536487,
-},
-[1178] = {
-["p"] = 10,
-["t"] = 1794536486,
-},
-[1179] = {
-["p"] = 27,
-["t"] = 1794536567,
-},
-[1181] = {
-["p"] = 25,
-["t"] = 1794536557,
-},
-[17058] = {
-["p"] = 6,
-["t"] = 1794536449,
-},
-[3421] = {
-["t"] = 1794643781,
-["p"] = 449,
-},
-[38] = {
-["t"] = 1794643805,
-["p"] = 600,
-},
-[1212] = {
-["p"] = 21,
-["t"] = 1794536527,
-},
-[6890] = {
-["p"] = 25,
-["t"] = 1794485499,
-},
-[1220] = {
-["p"] = 2200,
-["t"] = 1794075454,
-},
-[3465] = {
-["p"] = 15,
-["t"] = 1794536502,
-},
-[255007] = {
-["p"] = 22,
-["t"] = 1794536528,
-},
-[9776] = {
-["t"] = 1794782045,
-["p"] = 525,
-},
-[2450] = {
-["p"] = 94,
-["t"] = 1794461081,
-},
-[9792] = {
-["t"] = 1794782117,
-["p"] = 818,
-},
-[11846] = {
-["p"] = 30,
-["t"] = 1794536595,
-},
-[2456] = {
-["p"] = 15,
-["t"] = 1794536508,
-},
-[2458] = {
-["p"] = 22,
-["t"] = 1794536528,
-},
-[9832] = {
-["t"] = 1794155579,
-["p"] = 2200,
-},
-[9848] = {
-["t"] = 1794452147,
-["p"] = 2100,
-},
-[282655] = {
-["t"] = 1794452166,
-["p"] = 1000,
-},
-[5967] = {
-["t"] = 1794643933,
-["p"] = 1300,
-},
-[252452] = {
-["t"] = 1794643904,
-["p"] = 1086,
-},
-[12006] = {
-["p"] = 9800,
-["t"] = 1794443191,
-},
-[8953] = {
-["t"] = 1794643906,
-["p"] = 1100,
-},
-[1251] = {
-["p"] = 10,
-["t"] = 1794536486,
-},
-[8069] = {
-["p"] = 5,
-["t"] = 1794536425,
-},
-[14124] = {
-["t"] = 1794643861,
-["p"] = 900,
-},
-[7074] = {
-["p"] = 32,
-["t"] = 1794536597,
-},
-[14172] = {
-["t"] = 1794781055,
-["p"] = 828,
-},
-[15211] = {
-["t"] = 1794642962,
-["p"] = 1910,
-},
-[159] = {
-["p"] = 9,
-["t"] = 1794536485,
-},
-[15259] = {
-["t"] = 1794782127,
-["p"] = 3290,
-},
-[1274] = {
-["p"] = 19,
-["t"] = 1794536520,
-},
-[12238] = {
-["p"] = 6,
-["t"] = 1794536445,
-},
-[3577] = {
-["t"] = 1794520727,
-["p"] = 745,
-},
-[5116] = {
-["p"] = 300,
-["t"] = 1794484481,
-},
-[1288] = {
-["p"] = 185,
-["t"] = 1794485121,
-},
-[10288] = {
-["p"] = 12000,
-["t"] = 1794443203,
-},
-[2580] = {
-["p"] = 100,
-["t"] = 1794442216,
-},
-[2584] = {
-["p"] = 180,
-["t"] = 1794485360,
-},
-[18610] = {
-["t"] = 1794643907,
-["p"] = 1149,
-},
-[2592] = {
-["p"] = 117,
-["t"] = 1794546604,
-},
-[2596] = {
-["p"] = 447,
-["t"] = 1794546630,
-},
-[15491] = {
-["t"] = 1794648319,
-["p"] = 500,
-},
-[15499] = {
-["t"] = 1794643787,
-["p"] = 500,
-},
-[271675] = {
-["t"] = 1794643870,
-["p"] = 1000,
-},
-[7282] = {
-["t"] = 1794643125,
-["p"] = 597,
-},
-[7286] = {
-["p"] = 25,
-["t"] = 1794536534,
-},
-[6267] = {
-["t"] = 1794648364,
-["p"] = 160,
-},
-[2632] = {
-["t"] = 1794643949,
-["p"] = 1500,
-},
-[6291] = {
-["p"] = 19,
-["t"] = 1794536520,
-},
-[6299] = {
-["p"] = 30,
-["t"] = 1794536595,
-},
-[6303] = {
-["p"] = 15,
-["t"] = 1794536512,
-},
-[1326] = {
-["p"] = 10,
-["t"] = 1794536488,
-},
-[6359] = {
-["p"] = 27,
-["t"] = 1794536563,
-},
-[13757] = {
-["p"] = 18,
-["t"] = 1794536519,
-},
-[2678] = {
-["p"] = 4,
-["t"] = 1794536421,
-},
-[2680] = {
-["p"] = 14,
-["t"] = 1794536500,
-},
-[2682] = {
-["p"] = 27,
-["t"] = 1794459159,
-},
-[4357] = {
-["p"] = 19,
-["t"] = 1794536521,
-},
-[3719] = {
-["t"] = 1794460400,
-["p"] = 1400,
-},
-[9753] = {
-["t"] = 1794647805,
-["p"] = 300,
-},
-[4373] = {
-["t"] = 1794643936,
-["p"] = 1300,
-},
-[7446] = {
-["p"] = 15900,
-["t"] = 1794443204,
-},
-[9777] = {
-["t"] = 1794643848,
-["p"] = 770,
-},
-[4389] = {
-["p"] = 1450,
-["t"] = 1794290870,
-},
-[9801] = {
-["t"] = 1794781240,
-["p"] = 700,
-},
-[255663] = {
-["p"] = 8,
-["t"] = 1794536484,
-},
-[9817] = {
-["p"] = 1900,
-["t"] = 1794443195,
-},
-[250932] = {
-["p"] = 33,
-["t"] = 1794485515,
-},
-[264018] = {
-["p"] = 2000,
-["t"] = 1794443209,
-},
-[5472] = {
-["p"] = 12,
-["t"] = 1794536492,
-},
-[6511] = {
-["p"] = 200,
-["t"] = 1794029769,
-},
-[3775] = {
-["p"] = 33,
-["t"] = 1794536598,
-},
-[7554] = {
-["t"] = 1794781088,
-["p"] = 2239,
-},
-[6539] = {
-["t"] = 1794643854,
-["p"] = 820,
-},
-[6543] = {
-["t"] = 1794648271,
-["p"] = 265,
-},
-[6547] = {
-["t"] = 1794643907,
-["p"] = 1169,
-},
-[6551] = {
-["t"] = 1794782120,
-["p"] = 403,
-},
-[6559] = {
-["t"] = 1794643867,
-["p"] = 1000,
-},
-[6563] = {
-["t"] = 1794647980,
-["p"] = 300,
-},
-[15172] = {
-["p"] = 7100,
-["t"] = 1794459375,
-},
-[2778] = {
-["p"] = 189,
-["t"] = 1794484618,
-},
-[14181] = {
-["t"] = 1794643919,
-["p"] = 1200,
-},
-[263513] = {
-["p"] = 2000,
-["t"] = 1794443201,
-},
-[5568] = {
-["p"] = 5,
-["t"] = 1794536435,
-},
-[5572] = {
-["p"] = 300,
-["t"] = 1794485141,
-},
-[6603] = {
-["t"] = 1794155479,
-["p"] = 3000,
-},
-[4561] = {
-["t"] = 1794782389,
-["p"] = 305,
-},
-[4569] = {
-["t"] = 1794782411,
-["p"] = 604,
-},
-[1401] = {
-["p"] = 14,
-["t"] = 1794536496,
-},
-[15284] = {
-["t"] = 1794155424,
-["p"] = 3300,
-},
-[3829] = {
-["p"] = 2400,
-["t"] = 1794290840,
-},
-[4593] = {
-["p"] = 7,
-["t"] = 1794536469,
-},
-[3835] = {
-["t"] = 1794643942,
-["p"] = 1400,
-},
-[4605] = {
-["p"] = 6,
-["t"] = 1794536463,
-},
-[15348] = {
-["t"] = 1794452153,
-["p"] = 1000,
-},
-[11288] = {
-["p"] = 200,
-["t"] = 1794442236,
-},
-[12359] = {
-["p"] = 1798,
-["t"] = 1794441555,
-},
-[2842] = {
-["p"] = 330,
-["t"] = 1794029798,
-},
-[8315] = {
-["p"] = 29900,
-["t"] = 1794443205,
-},
-[2852] = {
-["p"] = 100,
-["t"] = 1794459393,
-},
-[15508] = {
-["t"] = 1794643951,
-["p"] = 1500,
-},
-[2862] = {
-["p"] = 5,
-["t"] = 1794536433,
-},
-[4701] = {
-["p"] = 300,
-["t"] = 1794029908,
-},
-[2866] = {
-["p"] = 600,
-["t"] = 1794484509,
-},
-[2868] = {
-["p"] = 509,
-["t"] = 1794526427,
-},
-[6787] = {
-["p"] = 500,
-["t"] = 1794367006,
-},
-[2886] = {
-["p"] = 8,
-["t"] = 1794536481,
-},
-[10513] = {
-["p"] = 9,
-["t"] = 1794536484,
-},
-[724] = {
-["p"] = 33,
-["t"] = 1794485514,
-},
-[6811] = {
-["p"] = 25,
-["t"] = 1794484381,
-},
-[727] = {
-["t"] = 1794781062,
-["p"] = 1340,
-},
-[729] = {
-["p"] = 270,
-["t"] = 1794029893,
-},
-[15732] = {
-["t"] = 1794782108,
-["p"] = 3499,
-},
-[730] = {
-["p"] = 16,
-["t"] = 1794536516,
-},
-[731] = {
-["p"] = 27,
-["t"] = 1794536565,
-},
-[732] = {
-["p"] = 6,
-["t"] = 1794536457,
-},
-[2928] = {
-["p"] = 30,
-["t"] = 1794485510,
-},
-[13758] = {
-["p"] = 15,
-["t"] = 1794536510,
-},
-[2934] = {
-["p"] = 14,
-["t"] = 1794536498,
-},
-[4865] = {
-["p"] = 32,
-["t"] = 1794536598,
-},
-[1475] = {
-["t"] = 1794089585,
-["p"] = 82,
-},
-[1476] = {
-["p"] = 9,
-["t"] = 1794536486,
-},
-[4877] = {
-["p"] = 20,
-["t"] = 1794536526,
-},
-[9778] = {
-["t"] = 1794643908,
-["p"] = 1188,
-},
-[9786] = {
-["t"] = 1794648316,
-["p"] = 400,
-},
-[6947] = {
-["p"] = 5,
-["t"] = 1794536429,
-},
-[2970] = {
-["p"] = 400,
-["t"] = 1794029910,
-},
-[16060] = {
-["t"] = 1794643946,
-["p"] = 1498,
-},
-[12040] = {
-["p"] = 7400,
-["t"] = 1794443096,
-},
-[1510] = {
-["t"] = 1794521463,
-["p"] = 150,
-},
-[247754] = {
-["p"] = 37,
-["t"] = 1794484412,
-},
-[3022] = {
-["t"] = 1794643947,
-["p"] = 1500,
-},
-[6048] = {
-["t"] = 1794648739,
-["p"] = 220,
-},
-[10050] = {
-["p"] = 14600,
-["t"] = 1794290965,
-},
-[3030] = {
-["p"] = 3,
-["t"] = 1794536412,
-},
-[247755] = {
-["p"] = 25,
-["t"] = 1794536542,
-},
-[7095] = {
-["t"] = 1794648241,
-["p"] = 400,
-},
-[5057] = {
-["p"] = 8,
-["t"] = 1794536483,
-},
-[11137] = {
-["t"] = 1794520775,
-["p"] = 989,
-},
-[6096] = {
-["t"] = 1794643800,
-["p"] = 600,
-},
-[247884] = {
-["p"] = 12,
-["t"] = 1794536493,
-},
-[12208] = {
-["t"] = 1794643771,
-["p"] = 248,
-},
-[18294] = {
-["t"] = 1794643869,
-["p"] = 1000,
-},
-[8178] = {
-["t"] = 1794781276,
-["p"] = 2299,
-},
-[769] = {
-["p"] = 32,
-["t"] = 1794536597,
-},
-[774] = {
-["p"] = 15,
-["t"] = 1794536506,
-},
-[5165] = {
-["p"] = 1,
-["t"] = 1794536400,
-},
-[2075] = {
-["t"] = 1794648213,
-["p"] = 399,
-},
-[2077] = {
-["t"] = 1794782103,
-["p"] = 5056,
-},
-[2079] = {
-["t"] = 1794643923,
-["p"] = 1237,
-},
-[777] = {
-["p"] = 28,
-["t"] = 1794536579,
-},
-[15485] = {
-["t"] = 1794781270,
-["p"] = 340,
-},
-[779] = {
-["p"] = 18,
-["t"] = 1794459136,
-},
-[5205] = {
-["p"] = 31,
-["t"] = 1794536596,
-},
-[2101] = {
-["t"] = 1794060173,
-["p"] = 100,
-},
-[783] = {
-["p"] = 199,
-["t"] = 1794215776,
-},
-[6268] = {
-["t"] = 1794648705,
-["p"] = 300,
-},
-[4234] = {
-["p"] = 218,
-["t"] = 1794546587,
-},
-[4238] = {
-["t"] = 1794521478,
-["p"] = 200,
-},
-[789] = {
-["t"] = 1794782117,
-["p"] = 1960,
-},
-[790] = {
-["t"] = 1794642997,
-["p"] = 2014,
-},
-[6316] = {
-["p"] = 10,
-["t"] = 1794536487,
-},
-[4278] = {
-["p"] = 1000,
-["t"] = 1794291212,
-},
-[6336] = {
-["t"] = 1794782387,
-["p"] = 303,
-},
-[3172] = {
-["p"] = 18,
-["t"] = 1794536517,
-},
-[14726] = {
-["p"] = 800,
-["t"] = 1794155181,
-},
-[4306] = {
-["p"] = 199,
-["t"] = 1794546600,
-},
-[4314] = {
-["p"] = 400,
-["t"] = 1794366332,
-},
-[3184] = {
-["t"] = 1794782055,
-["p"] = 1389,
-},
-[25] = {
-["t"] = 1794643853,
-["p"] = 800,
-},
-[249427] = {
-["p"] = 754,
-["t"] = 1794215751,
-},
-[3192] = {
-["t"] = 1794782130,
-["p"] = 4500,
-},
-[4338] = {
-["t"] = 1794648270,
-["p"] = 660,
-},
-[3196] = {
-["t"] = 1794782394,
-["p"] = 1370,
-},
-[3198] = {
-["t"] = 1794781194,
-["p"] = 2725,
-},
-[4358] = {
-["p"] = 35,
-["t"] = 1794484410,
-},
-[249428] = {
-["p"] = 457,
-["t"] = 1794354629,
-},
-[7435] = {
-["p"] = 10000,
-["t"] = 1794443214,
-},
-[7443] = {
-["p"] = 2400,
-["t"] = 1794443095,
-},
-[9779] = {
-["t"] = 1794782129,
-["p"] = 328,
-},
-[9787] = {
-["t"] = 1794648318,
-["p"] = 469,
-},
-[9795] = {
-["t"] = 1794452175,
-["p"] = 900,
-},
-[4398] = {
-["t"] = 1794643923,
-["p"] = 1239,
-},
-[7471] = {
-["t"] = 1794452135,
-["p"] = 4000,
-},
-[6452] = {
-["p"] = 28,
-["t"] = 1794536575,
-},
-[2207] = {
-["t"] = 1794643851,
-["p"] = 800,
-},
-[5465] = {
-["p"] = 12,
-["t"] = 1794536493,
-},
-[10938] = {
-["p"] = 93,
-["t"] = 1794459592,
-},
-[814] = {
-["p"] = 25,
-["t"] = 1794536545,
-},
-[6512] = {
-["t"] = 1794782047,
-["p"] = 190,
-},
-[10978] = {
-["t"] = 1794452296,
-["p"] = 329,
-},
-[818] = {
-["p"] = 110,
-["t"] = 1794030155,
-},
-[7559] = {
-["t"] = 1794643936,
-["p"] = 1300,
-},
-[6540] = {
-["t"] = 1794782127,
-["p"] = 422,
-},
-[5525] = {
-["p"] = 20,
-["t"] = 1794536521,
-},
-[6552] = {
-["t"] = 1794782044,
-["p"] = 590,
-},
-[6556] = {
-["t"] = 1794643921,
-["p"] = 1220,
-},
-[6560] = {
-["t"] = 1794781349,
-["p"] = 4000,
-},
-[6564] = {
-["p"] = 600,
-["t"] = 1794443085,
-},
-[6568] = {
-["t"] = 1794782135,
-["p"] = 916,
-},
-[14167] = {
-["t"] = 1794782062,
-["p"] = 357,
-},
-[6580] = {
-["t"] = 1794642840,
-["p"] = 1308,
-},
-[4542] = {
-["p"] = 25,
-["t"] = 1794536551,
-},
-[6592] = {
-["p"] = 3200,
-["t"] = 1794443193,
-},
-[3300] = {
-["p"] = 10,
-["t"] = 1794536488,
-},
-[6600] = {
-["t"] = 1794452142,
-["p"] = 1100,
-},
-[6604] = {
-["t"] = 1794782050,
-["p"] = 1190,
-},
-[414] = {
-["p"] = 6,
-["t"] = 1794536443,
-},
-[4566] = {
-["t"] = 1794643863,
-["p"] = 900,
-},
-[4570] = {
-["t"] = 1794782134,
-["p"] = 915,
-},
-[3314] = {
-["t"] = 1794643856,
-["p"] = 875,
-},
-[14271] = {
-["p"] = 10000,
-["t"] = 1794459378,
-},
-[15310] = {
-["t"] = 1794643798,
-["p"] = 599,
-},
-[2299] = {
-["p"] = 17500,
-["t"] = 1794443205,
-},
-[832] = {
-["t"] = 1794060127,
-["p"] = 400,
-},
-[4606] = {
-["p"] = 25,
-["t"] = 1794536559,
-},
-[2315] = {
-["p"] = 305,
-["t"] = 1794484768,
-},
-[3340] = {
-["p"] = 33,
-["t"] = 1794485514,
-},
-[2319] = {
-["p"] = 100,
-["t"] = 1794546598,
-},
-[2321] = {
-["t"] = 1794460796,
-["p"] = 100,
-},
-[10307] = {
-["t"] = 1794643955,
-["p"] = 1500,
-},
-[15494] = {
-["t"] = 1794643901,
-["p"] = 829,
-},
-[422] = {
-["p"] = 25,
-["t"] = 1794536540,
-},
-[8389] = {
-["t"] = 1794643935,
-["p"] = 1300,
-},
-[3382] = {
-["p"] = 24,
-["t"] = 1794536532,
-},
-[279956] = {
-["p"] = 24,
-["t"] = 1794459148,
-},
-[849] = {
-["t"] = 1794643778,
-["p"] = 400,
-},
-[6796] = {
-["t"] = 1794643852,
-["p"] = 800,
-},
-[1705] = {
-["p"] = 612,
-["t"] = 1794354632,
-},
-[274077] = {
-["t"] = 1794643810,
-["p"] = 700,
-},
-[854] = {
-["t"] = 1794643872,
-["p"] = 1000,
-},
-[1708] = {
-["t"] = 1794441183,
-["p"] = 150,
-},
-[858] = {
-["p"] = 27,
-["t"] = 1794536569,
-},
-[4814] = {
-["p"] = 7,
-["t"] = 1794536475,
-},
-[1722] = {
-["p"] = 75000,
-["t"] = 1794443212,
-},
-[6888] = {
-["p"] = 16,
-["t"] = 1794536514,
-},
-[7919] = {
-["t"] = 1794452172,
-["p"] = 3500,
-},
-[864] = {
-["p"] = 9900,
-["t"] = 1794443208,
-},
-[865] = {
-["t"] = 1794782131,
-["p"] = 5089,
-},
-[15870] = {
-["t"] = 1794647805,
-["p"] = 300,
-},
-[3464] = {
-["p"] = 31,
-["t"] = 1794536596,
-},
-[9756] = {
-["t"] = 1794782047,
-["p"] = 289,
-},
-[9764] = {
-["t"] = 1794782029,
-["p"] = 299,
-},
-[3470] = {
-["p"] = 6,
-["t"] = 1794536465,
-},
-[9780] = {
-["p"] = 400,
-["t"] = 1794443208,
-},
-[9788] = {
-["t"] = 1794643873,
-["p"] = 1000,
-},
-[9796] = {
-["p"] = 1200,
-["t"] = 1794443092,
-},
-[3478] = {
-["t"] = 1794520721,
-["p"] = 169,
-},
-[279968] = {
-["p"] = 15,
-["t"] = 1794459129,
-},
-[15007] = {
-["t"] = 1794647797,
-["p"] = 100,
-},
-[10939] = {
-["p"] = 260,
-["t"] = 1794459587,
-},
-[5997] = {
-["p"] = 5,
-["t"] = 1794536427,
-},
-[13041] = {
-["t"] = 1794452168,
-["p"] = 6000,
-},
-[8067] = {
-["p"] = 1,
-["t"] = 1794536386,
-},
-[7048] = {
-["t"] = 1794452168,
-["p"] = 900,
-},
-[3530] = {
-["p"] = 28,
-["t"] = 1794536583,
-},
-[247786] = {
-["p"] = 5,
-["t"] = 1794536431,
-},
-[7072] = {
-["p"] = 149,
-["t"] = 1794484733,
-},
-[2519] = {
-["p"] = 1,
-["t"] = 1794536392,
-},
-[255715] = {
-["t"] = 1794648814,
-["p"] = 575,
-},
-[211854] = {
-["t"] = 1794441185,
-["p"] = 200,
-},
-[15223] = {
-["t"] = 1794643056,
-["p"] = 2373,
-},
-[7108] = {
-["t"] = 1794648686,
-["p"] = 300,
-},
-[255716] = {
-["p"] = 28,
-["t"] = 1794536581,
-},
-[248683] = {
-["t"] = 1794648314,
-["p"] = 850,
-},
-[241650] = {
-["t"] = 1794643934,
-["p"] = 1300,
-},
-[12202] = {
-["t"] = 1794648124,
-["p"] = 586,
-},
-[250346] = {
-["t"] = 1794643850,
-["p"] = 800,
-},
-[3576] = {
-["t"] = 1794441165,
-["p"] = 215,
-},
-[9197] = {
-["t"] = 1794643868,
-["p"] = 1000,
-},
-[897] = {
-["t"] = 1794155568,
-["p"] = 2700,
-},
-[3590] = {
-["t"] = 1794643783,
-["p"] = 499,
-},
-[899] = {
-["p"] = 1400,
-["t"] = 1794215779,
-},
-[9253] = {
-["t"] = 1794648496,
-["p"] = 299,
-},
-[2581] = {
-["p"] = 20,
-["t"] = 1794536522,
-},
-[2589] = {
-["p"] = 25,
-["t"] = 1794536549,
-},
-[2591] = {
-["p"] = 18,
-["t"] = 1794536518,
-},
-[15479] = {
-["t"] = 1794643807,
-["p"] = 650,
-},
-[15487] = {
-["t"] = 1794643848,
-["p"] = 670,
-},
-[10404] = {
-["t"] = 1794643950,
-["p"] = 1500,
-},
-[3206] = {
-["t"] = 1794782396,
-["p"] = 4572,
-},
-[3047] = {
-["t"] = 1794452179,
-["p"] = 1100,
-},
-[6536] = {
-["t"] = 1794782146,
-["p"] = 479,
-},
-[15268] = {
-["t"] = 1794782123,
-["p"] = 1019,
-},
-[17119] = {
-["p"] = 6,
-["t"] = 1794536447,
-},
-[248688] = {
-["t"] = 1794648313,
-["p"] = 100,
-},
-[9811] = {
-["t"] = 1794782124,
-["p"] = 724,
-},
-[15212] = {
-["t"] = 1794782049,
-["p"] = 3432,
-},
-[6269] = {
-["t"] = 1794780880,
-["p"] = 190,
-},
-[6179] = {
-["t"] = 1794643953,
-["p"] = 1500,
-},
-[1015] = {
-["p"] = 440,
-["t"] = 1794075467,
-},
-[4235] = {
-["t"] = 1794520730,
-["p"] = 999,
-},
-[4239] = {
-["p"] = 112,
-["t"] = 1794459415,
-},
-[6289] = {
-["p"] = 6,
-["t"] = 1794536459,
-},
-[6575] = {
-["t"] = 1794782057,
-["p"] = 430,
-},
-[4251] = {
-["t"] = 1793985596,
-["p"] = 1100,
-},
-[2449] = {
-["p"] = 39,
-["t"] = 1794536585,
-},
-[6612] = {
-["t"] = 1794782119,
-["p"] = 1110,
-},
-[7455] = {
-["t"] = 1794781136,
-["p"] = 5935,
-},
-[3186] = {
-["t"] = 1794782148,
-["p"] = 4435,
-},
-[6317] = {
-["t"] = 1794521535,
-["p"] = 3,
-},
-[15230] = {
-["t"] = 1794782120,
-["p"] = 2744,
-},
-[15231] = {
-["t"] = 1794782385,
-["p"] = 5029,
-},
-[9812] = {
-["t"] = 1794782146,
-["p"] = 565,
-},
-[6337] = {
-["t"] = 1794521463,
-["p"] = 244,
-},
-[10620] = {
-["t"] = 1794460744,
-["p"] = 1190,
-},
-[8068] = {
-["p"] = 2,
-["t"] = 1794536402,
-},
-[15222] = {
-["t"] = 1794782392,
-["p"] = 1214,
-},
-[281017] = {
-["t"] = 1794648466,
-["p"] = 500,
-},
-[2304] = {
-["p"] = 15,
-["t"] = 1794536504,
-},
-[2457] = {
-["t"] = 1794648123,
-["p"] = 490,
-},
-[6361] = {
-["p"] = 8,
-["t"] = 1794536483,
-},
-[281018] = {
-["t"] = 1794643941,
-["p"] = 1394,
-},
-[2675] = {
-["p"] = 28,
-["t"] = 1794536561,
-},
-[6373] = {
-["p"] = 35,
-["t"] = 1794484409,
-},
-[2679] = {
-["p"] = 6,
-["t"] = 1794536441,
-},
-[2681] = {
-["p"] = 13,
-["t"] = 1794536494,
-},
-[9747] = {
-["t"] = 1794781124,
-["p"] = 222,
-},
-[2447] = {
-["p"] = 27,
-["t"] = 1794485505,
-},
-[2687] = {
-["p"] = 25,
-["t"] = 1794536538,
-},
-[6397] = {
-["t"] = 1794643912,
-["p"] = 1200,
-},
-[4355] = {
-["t"] = 1794643909,
-["p"] = 1199,
-},
-[4359] = {
-["p"] = 95,
-["t"] = 1794029894,
-},
-[15932] = {
-["t"] = 1794781118,
-["p"] = 1220,
-},
-[9749] = {
-["t"] = 1794782048,
-["p"] = 272,
-},
-[9757] = {
-["t"] = 1794643871,
-["p"] = 1000,
-},
-[9765] = {
-["t"] = 1794648523,
-["p"] = 450,
-},
-[9789] = {
-["t"] = 1794781160,
-["p"] = 737,
-},
-[9781] = {
-["t"] = 1794643088,
-["p"] = 980,
-},
-[4387] = {
-["t"] = 1794643857,
-["p"] = 895,
-},
-[7417] = {
-["t"] = 1794782111,
-["p"] = 2899,
-},
-[117] = {
-["p"] = 5,
-["t"] = 1794536437,
-},
-[3736] = {
-["t"] = 1794520761,
-["p"] = 588,
-},
-[8952] = {
-["t"] = 1794643946,
-["p"] = 1499,
-},
-[3740] = {
-["t"] = 1794782105,
-["p"] = 2448,
-},
-[4537] = {
-["p"] = 30,
-["t"] = 1794536595,
-},
-[7484] = {
-["t"] = 1794452172,
-["p"] = 3900,
-},
-[4419] = {
-["t"] = 1794643789,
-["p"] = 500,
-},
-[10998] = {
-["p"] = 440,
-["t"] = 1794536659,
-},
-[9869] = {
-["t"] = 1794782109,
-["p"] = 2200,
-},
-[9763] = {
-["t"] = 1794782030,
-["p"] = 334,
-},
-[3224] = {
-["t"] = 1794643937,
-["p"] = 1300,
-},
-[248823] = {
-["p"] = 40000,
-["t"] = 1794443207,
-},
-[15016] = {
-["t"] = 1794643786,
-["p"] = 500,
-},
-[279962] = {
-["p"] = 2,
-["t"] = 1794536408,
-},
-[10940] = {
-["p"] = 79,
-["t"] = 1794536661,
-},
-[9827] = {
-["t"] = 1794643930,
-["p"] = 1294,
-},
-[118] = {
-["p"] = 20,
-["t"] = 1794536524,
-},
-[9793] = {
-["t"] = 1794643928,
-["p"] = 1275,
-},
-[11995] = {
-["p"] = 8000,
-["t"] = 1794443198,
-},
-[12184] = {
-["t"] = 1794648364,
-["p"] = 120,
-},
-[9784] = {
-["t"] = 1794642924,
-["p"] = 531,
-},
-[6529] = {
-["p"] = 27,
-["t"] = 1794536573,
-},
-[7552] = {
-["t"] = 1794452160,
-["p"] = 4000,
-},
-[250354] = {
-["t"] = 1794643924,
-["p"] = 1240,
-},
-[267474] = {
-["p"] = 2,
-["t"] = 1794536406,
-},
-[6541] = {
-["t"] = 1794648771,
-["p"] = 495,
-},
-[6545] = {
-["t"] = 1794781343,
-["p"] = 876,
-},
-[6553] = {
-["t"] = 1794782046,
-["p"] = 518,
-},
-[252022] = {
-["p"] = 11,
-["t"] = 1794536490,
-},
-[5772] = {
-["p"] = 780,
-["t"] = 1794546578,
-},
-[2771] = {
-["t"] = 1794648036,
-["p"] = 219,
-},
-[6565] = {
-["t"] = 1794648467,
-["p"] = 500,
-},
-[11084] = {
-["t"] = 1794452291,
-["p"] = 3750,
-},
-[6573] = {
-["t"] = 1794782058,
-["p"] = 936,
-},
-[6577] = {
-["t"] = 1794643868,
-["p"] = 1000,
-},
-[9806] = {
-["t"] = 1794452142,
-["p"] = 1000,
-},
-[6585] = {
-["t"] = 1794782144,
-["p"] = 550,
-},
-[13890] = {
-["t"] = 1794647799,
-["p"] = 150,
-},
-[15224] = {
-["t"] = 1794782101,
-["p"] = 2683,
-},
-[15232] = {
-["t"] = 1794782116,
-["p"] = 6108,
-},
-[6537] = {
-["t"] = 1794643919,
-["p"] = 1200,
-},
-[15248] = {
-["t"] = 1794782378,
-["p"] = 1789,
-},
-[6617] = {
-["t"] = 1794643945,
-["p"] = 1489,
-},
-[6613] = {
-["t"] = 1794452150,
-["p"] = 1000,
-},
-[4571] = {
-["t"] = 1794782113,
-["p"] = 977,
-},
-[4575] = {
-["t"] = 1794781305,
-["p"] = 4498,
-},
-[4404] = {
-["p"] = 26,
-["t"] = 1794485503,
-},
-[6582] = {
-["t"] = 1794643903,
-["p"] = 1050,
-},
-[6595] = {
-["t"] = 1794452138,
-["p"] = 1200,
-},
-[3832] = {
-["t"] = 1794643873,
-["p"] = 1000,
-},
-[9768] = {
-["t"] = 1794643912,
-["p"] = 1200,
-},
-[2455] = {
-["p"] = 25,
-["t"] = 1794536589,
-},
-[4603] = {
-["t"] = 1794521627,
-["p"] = 18,
-},
-[961] = {
-["p"] = 6,
-["t"] = 1794536453,
-},
-[2819] = {
-["t"] = 1794782061,
-["p"] = 3820,
-},
-[6605] = {
-["t"] = 1794452145,
-["p"] = 1000,
-},
-[6542] = {
-["t"] = 1794643902,
-["p"] = 1020,
-},
-[11284] = {
-["p"] = 11,
-["t"] = 1794536489,
-},
-[3770] = {
-["p"] = 25,
-["t"] = 1794536553,
-},
-[1529] = {
-["p"] = 776,
-["t"] = 1794546591,
-},
-[10285] = {
-["p"] = 999,
-["t"] = 1794485236,
-},
-[1929] = {
-["t"] = 1794643943,
-["p"] = 1400,
-},
-[2835] = {
-["p"] = 10,
-["t"] = 1794536479,
-},
-[3860] = {
-["p"] = 1000,
-["t"] = 1794441517,
-},
-[6615] = {
-["t"] = 1794452147,
-["p"] = 1000,
-},
-[3864] = {
-["t"] = 1794520717,
-["p"] = 889,
-},
-[2546] = {
-["t"] = 1794643808,
-["p"] = 695,
-},
-[11082] = {
-["p"] = 1365,
-["t"] = 1794536651,
-},
-[4708] = {
-["p"] = 500,
-["t"] = 1794366982,
-},
-[6117] = {
-["t"] = 1794643862,
-["p"] = 900,
-},
-[2851] = {
-["p"] = 100,
-["t"] = 1794459385,
-},
-[3575] = {
-["p"] = 368,
-["t"] = 1794441508,
-},
-[4813] = {
-["p"] = 33,
-["t"] = 1794485516,
-},
-[2857] = {
-["p"] = 198,
-["t"] = 1794484480,
-},
-[4594] = {
-["p"] = 11,
-["t"] = 1794536491,
-},
-[14168] = {
-["t"] = 1794643911,
-["p"] = 1200,
-},
-[252028] = {
-["p"] = 1,
-["t"] = 1794536390,
-},
-[2865] = {
-["p"] = 578,
-["t"] = 1794485175,
-},
-[15114] = {
-["t"] = 1794643779,
-["p"] = 400,
-},
-[6569] = {
-["t"] = 1794782129,
-["p"] = 1040,
-},
-[217495] = {
-["p"] = 199,
-["t"] = 1794485137,
-},
-[9805] = {
-["t"] = 1794780860,
-["p"] = 700,
-},
-[9809] = {
-["t"] = 1794781235,
-["p"] = 1850,
-},
-[14561] = {
-["t"] = 1794643915,
-["p"] = 1200,
-},
-[1299] = {
-["p"] = 500,
-["t"] = 1794366973,
-},
-[264210] = {
-["t"] = 1794643874,
-["p"] = 1000,
-},
-[264218] = {
-["t"] = 1794643874,
-["p"] = 1000,
-},
-[264084] = {
-["t"] = 1794643948,
-["p"] = 1500,
-},
-[11151] = {
-["t"] = 1794643869,
-["p"] = 1000,
-},
-[4582] = {
-["t"] = 1794643864,
-["p"] = 927,
-},
-[252797] = {
-["t"] = 1794643914,
-["p"] = 1200,
-},
-[15210] = {
-["t"] = 1794643369,
-["p"] = 820,
-},
-[252030] = {
-["p"] = 7,
-["t"] = 1794536477,
-},
-[3731] = {
-["t"] = 1794520777,
-["p"] = 170,
-},
-[785] = {
-["p"] = 29,
-["t"] = 1794536587,
-},
-[4775] = {
-["p"] = 28,
-["t"] = 1794536577,
-},
-[17029] = {
-["t"] = 1794643853,
-["p"] = 800,
-},
-[787] = {
-["p"] = 7,
-["t"] = 1794536481,
-},
-[10512] = {
-["p"] = 6,
-["t"] = 1794536455,
-},
-[248613] = {
-["t"] = 1794643849,
-["p"] = 795,
-},
-[252031] = {
-["p"] = 7,
-["t"] = 1794536473,
-},
-[14123] = {
-["t"] = 1794643813,
-["p"] = 760,
-},
-[6308] = {
-["p"] = 21,
-["t"] = 1794536527,
-},
-[792] = {
-["t"] = 1794643803,
-["p"] = 600,
-},
-[279957] = {
-["t"] = 1794643812,
-["p"] = 750,
-},
-[252671] = {
-["p"] = 25,
-["t"] = 1794536547,
-},
-[264078] = {
-["t"] = 1794643809,
-["p"] = 698,
-},
-[6586] = {
-["t"] = 1794643846,
-["p"] = 600,
-},
-[252032] = {
-["p"] = 30,
-["t"] = 1794536593,
-},
-[3173] = {
-["p"] = 39,
-["t"] = 1794484413,
-},
-[3174] = {
-["p"] = 16,
-["t"] = 1794536517,
-},
-[1081] = {
-["p"] = 49,
-["t"] = 1794485094,
-},
-[6889] = {
-["p"] = 20,
-["t"] = 1794536526,
-},
-[3181] = {
-["p"] = 23,
-["t"] = 1794536530,
-},
-[3182] = {
-["p"] = 900,
-["t"] = 1794075484,
-},
-[2841] = {
-["t"] = 1794520712,
-["p"] = 175,
-},
-[5466] = {
-["t"] = 1794648368,
-["p"] = 500,
-},
-[277501] = {
-["t"] = 1794643861,
-["p"] = 900,
-},
-[4560] = {
-["t"] = 1794643786,
-["p"] = 500,
-},
-[11083] = {
-["t"] = 1794520764,
-["p"] = 403,
-},
-[3728] = {
-["t"] = 1794520766,
-["p"] = 420,
-},
-[19484] = {
-["t"] = 1794647798,
-["p"] = 100,
-},
-[252899] = {
-["t"] = 1794643953,
-["p"] = 1500,
-},
-[253910] = {
-["t"] = 1794643913,
-["p"] = 1200,
-},
-[15912] = {
-["t"] = 1794782052,
-["p"] = 1143,
-},
-[9782] = {
-["t"] = 1794782135,
-["p"] = 1100,
-},
-[4567] = {
-["t"] = 1794781057,
-["p"] = 1022,
-},
-[2965] = {
-["p"] = 200,
-["t"] = 1794029761,
-},
-[15944] = {
-["p"] = 511,
-["t"] = 1794484471,
-},
-[3239] = {
-["p"] = 4,
-["t"] = 1794536423,
-},
-[940] = {
-["t"] = 1794362139,
-["p"] = 800000,
-},
-[15120] = {
-["t"] = 1794643917,
-["p"] = 1200,
-},
-[9838] = {
-["t"] = 1794452140,
-["p"] = 1200,
-},
-[2977] = {
-["p"] = 500,
-["t"] = 1794029767,
-},
-[2515] = {
-["p"] = 1,
-["t"] = 1794536398,
-},
-[2512] = {
-["p"] = 1,
-["t"] = 1794536396,
-},
-[20747] = {
-["t"] = 1794643934,
-["p"] = 1300,
-},
-[5966] = {
-["t"] = 1794452160,
-["p"] = 1750,
-},
-[765] = {
-["p"] = 16,
-["t"] = 1794536516,
-},
-[6550] = {
-["p"] = 300,
-["t"] = 1794443085,
-},
-[15017] = {
-["t"] = 1794521420,
-["p"] = 5000,
-},
-[281015] = {
-["t"] = 1794643918,
-["p"] = 1200,
-},
-[6576] = {
-["t"] = 1794643845,
-["p"] = 580,
-},
-[2997] = {
-["t"] = 1794434201,
-["p"] = 252,
-},
-[6591] = {
-["t"] = 1794452161,
-["p"] = 1150,
-},
-[14174] = {
-["t"] = 1794782398,
-["p"] = 360,
-},
-[4562] = {
-["t"] = 1794781288,
-["p"] = 1095,
-},
-[2287] = {
-["p"] = 8,
-["t"] = 1794536482,
-},
-[4757] = {
-["p"] = 20,
-["t"] = 1794485484,
-},
-[3823] = {
-["p"] = 659,
-["t"] = 1794290882,
-},
-[11176] = {
-["t"] = 1794514747,
-["p"] = 2891,
-},
-[3013] = {
-["p"] = 25,
-["t"] = 1794536555,
-},
-[14090] = {
-["t"] = 1794648622,
-["p"] = 255,
-},
-[2073] = {
-["t"] = 1794780866,
-["p"] = 741,
-},
-[2516] = {
-["p"] = 1,
-["t"] = 1794536394,
-},
-[14114] = {
-["t"] = 1794648183,
-["p"] = 399,
-},
-[255723] = {
-["t"] = 1794643809,
-["p"] = 700,
-},
-[4541] = {
-["p"] = 6,
-["t"] = 1794536451,
-},
-[7073] = {
-["p"] = 7,
-["t"] = 1794536471,
-},
-[6548] = {
-["t"] = 1794648758,
-["p"] = 274,
-},
-[14047] = {
-["t"] = 1794361866,
-["p"] = 1550,
-},
-[3033] = {
-["p"] = 3,
-["t"] = 1794536417,
-},
-[723] = {
-["p"] = 129,
-["t"] = 1794029894,
-},
-[2453] = {
-["t"] = 1794520715,
-["p"] = 83,
-},
-[9748] = {
-["t"] = 1794782139,
-["p"] = 269,
-},
-[3041] = {
-["t"] = 1794155412,
-["p"] = 4000,
-},
-[1468] = {
-["t"] = 1794060152,
-["p"] = 65,
-},
-[7109] = {
-["t"] = 1794643774,
-["p"] = 290,
-},
-[15241] = {
-["t"] = 1794782133,
-["p"] = 2999,
-},
-[15307] = {
-["t"] = 1794643951,
-["p"] = 1500,
-},
-},
+["ultimo"] = "Derpnschmerp-CAMWOW EU4 Realm 1 PvE",
+["version"] = 2,
 ["habArma"] = {
 },
-["retratos"] = {
+["reinicio"] = {
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
+["veces"] = 0,
+},
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
+["veces"] = 0,
+},
 },
 ["libroCombate"] = "Rotacion",
 ["personajes"] = {
@@ -3346,17 +513,17 @@ WowFExportarDB = {
 ["reino"] = "CAMWOW EU4 Realm 1 PvE",
 ["nombre"] = "Banknspank",
 ["momento"] = 1794799903,
-["texto"] = "WF1;nombre=Banknspank;raza=Gnome;clase=MAGE;nivel=1;habilidades=Enchanting:60/75;atributos=15,23,19,28,22;salud=51;mana=252;equipo=4=6096,5=56,7=1395,8=55,16=35;faccion=Alliance;oro=174289;talentos=",
-["clase"] = "MAGE",
-["nivel"] = 1,
 ["fecha"] = "2026-11-16 04:31",
+["nivel"] = 1,
+["clase"] = "MAGE",
+["texto"] = "WF1;nombre=Banknspank;raza=Gnome;clase=MAGE;nivel=1;habilidades=Enchanting:60/75;atributos=15,23,19,28,22;salud=51;mana=252;equipo=4=6096,5=56,7=1395,8=55,16=35;faccion=Alliance;oro=174289;talentos=",
 },
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
 ["reino"] = "CAMWOW EU4 Realm 1 PvE",
 ["nombre"] = "Derpnschmerp",
-["momento"] = 1794908405,
-["texto"] = "WF1;nombre=Derpnschmerp;raza=Human;clase=HUNTER;nivel=40;habilidades=Leatherworking:29/75,Skinning:225/225,First Aid:39/75,Fishing:99/150,Cooking:70/75;atributos=55,161,88,69,77;salud=1667;mana=1860;equipo=1=6204,2=12020,3=3560,4=859,5=6603,6=6719,7=15456,8=10748,9=897,10=9832,11=281304,12=270053,15=14593,16=3210,18=15286;faccion=Alliance;oro=278180;talentos=",
-["fecha"] = "2026-11-17 10:40",
+["momento"] = 1794911218,
+["texto"] = "WF1;nombre=Derpnschmerp;raza=Human;clase=HUNTER;nivel=40;habilidades=Leatherworking:29/75,Skinning:225/225,First Aid:39/75,Fishing:99/150,Cooking:70/75;atributos=55,161,88,69,77;salud=1667;mana=1860;equipo=1=6204,2=12020,3=3560,4=859,5=6603,6=6719,7=15456,8=10748,9=897,10=9832,11=281304,12=270053,15=14593,16=3210,18=15286;faccion=Alliance;oro=306427;talentos=",
+["fecha"] = "2026-11-17 11:26",
 ["clase"] = "HUNTER",
 ["nivel"] = 40,
 },
@@ -3369,11 +536,11 @@ WowFExportarDB = {
 ["rot"] = {
 "Frost Armor",
 },
-["ver"] = 2,
 ["ext"] = {
 ["FG Varita"] = {
 },
 },
+["ver"] = 2,
 },
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
 ["macros"] = {
@@ -3428,65 +595,2898 @@ WowFExportarDB = {
 },
 },
 },
+["retratos"] = {
+},
 ["favorAviso"] = {
 ["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = true,
 },
-["reinicio"] = {
-["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
-["veces"] = 0,
+["preciosSubasta"] = {
+[15249] = {
+["t"] = 1794443195,
+["p"] = 3900,
 },
-["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
-["veces"] = 0,
+[5075] = {
+["t"] = 1794536536,
+["p"] = 25,
 },
+[279276] = {
+["t"] = 1794536490,
+["p"] = 11,
 },
-["version"] = 2,
-["ultimo"] = "Derpnschmerp-CAMWOW EU4 Realm 1 PvE",
-["libroPestana"] = "Mazmorras",
-["notasVistas"] = "4.66#423873",
-["xpReal"] = {
-[214] = {
-["xp"] = 2950,
-["nivel"] = 21,
+[5095] = {
+["t"] = 1794536485,
+["p"] = 9,
+},
+[8176] = {
+["t"] = 1794459396,
+["p"] = 3500,
+},
+[4096] = {
+["t"] = 1794485182,
+["p"] = 607,
+},
+[11285] = {
+["t"] = 1794536492,
+["p"] = 12,
+},
+[8256] = {
+["t"] = 1794459385,
+["p"] = 15400,
+},
+[2070] = {
+["t"] = 1794536388,
+["p"] = 1,
+},
+[2078] = {
+["p"] = 1069,
+["t"] = 1794782122,
+},
+[6206] = {
+["p"] = 1250,
+["t"] = 1794643925,
+},
+[15489] = {
+["p"] = 545,
+["t"] = 1794643791,
+},
+[5207] = {
+["t"] = 1794484489,
+["p"] = 1079,
+},
+[3135] = {
+["p"] = 500,
+["t"] = 1794648467,
+},
+[4232] = {
+["t"] = 1794546595,
+["p"] = 199,
+},
+[6290] = {
+["t"] = 1794536467,
+["p"] = 7,
+},
+[17056] = {
+["t"] = 1794485515,
+["p"] = 33,
+},
+[2140] = {
+["p"] = 527,
+["t"] = 1794643790,
+},
+[3169] = {
+["t"] = 1794459135,
+["p"] = 18,
+},
+[3171] = {
+["t"] = 1794536439,
+["p"] = 6,
+},
+[5319] = {
+["t"] = 1794443199,
+["p"] = 6900,
+},
+[4304] = {
+["p"] = 680,
+["t"] = 1794648465,
+},
+[6358] = {
+["t"] = 1794485507,
+["p"] = 33,
+},
+[6362] = {
+["t"] = 1794536461,
+["p"] = 6,
+},
+[3185] = {
+["t"] = 1794443197,
+["p"] = 12000,
+},
+[2166] = {
+["p"] = 1233,
+["t"] = 1794643922,
+},
+[3193] = {
+["p"] = 2064,
+["t"] = 1794781089,
+},
+[3195] = {
+["p"] = 1363,
+["t"] = 1794642990,
+},
+[3199] = {
+["p"] = 2249,
+["t"] = 1794782107,
+},
+[3201] = {
+["p"] = 4493,
+["t"] = 1794642908,
+},
+[6418] = {
+["p"] = 2000,
+["t"] = 1794452176,
+},
+[9775] = {
+["p"] = 400,
+["t"] = 1794643777,
+},
+[9783] = {
+["p"] = 800,
+["t"] = 1794782033,
+},
+[9799] = {
+["p"] = 1200,
+["t"] = 1794643913,
+},
+[9815] = {
+["p"] = 1656,
+["t"] = 1794781083,
+},
+[6450] = {
+["t"] = 1794485125,
+["p"] = 200,
+},
+[9831] = {
+["p"] = 1232,
+["t"] = 1794782114,
+},
+[6458] = {
+["t"] = 1794536591,
+["p"] = 29,
+},
+[6470] = {
+["t"] = 1794485675,
+["p"] = 29,
+},
+[4428] = {
+["t"] = 1794484795,
+["p"] = 330,
+},
+[252819] = {
+["p"] = 1300,
+["t"] = 1794643935,
+},
+[10918] = {
+["p"] = 100,
+["t"] = 1794647798,
+},
+[15018] = {
+["p"] = 899,
+["t"] = 1794643858,
+},
+[6518] = {
+["t"] = 1794443213,
+["p"] = 155,
+},
+[5503] = {
+["t"] = 1794485674,
+["p"] = 52,
+},
+[6530] = {
+["t"] = 1794536571,
+["p"] = 27,
+},
+[6538] = {
+["p"] = 486,
+["t"] = 1794782101,
+},
+[4496] = {
+["t"] = 1794443212,
+["p"] = 200,
+},
+[6546] = {
+["p"] = 1000,
+["t"] = 1794643876,
+},
+[5527] = {
+["p"] = 95,
+["t"] = 1794521477,
+},
+[6554] = {
+["p"] = 600,
+["t"] = 1794643801,
+},
+[2258] = {
+["p"] = 800,
+["t"] = 1794643851,
+},
+[6562] = {
+["p"] = 1329,
+["t"] = 1794643938,
+},
+[213564] = {
+["t"] = 1794484413,
+["p"] = 37,
+},
+[6570] = {
+["p"] = 494,
+["t"] = 1794648319,
+},
+[17057] = {
+["t"] = 1794536480,
+["p"] = 7,
+},
+[6578] = {
+["p"] = 1299,
+["t"] = 1794643011,
+},
+[4536] = {
+["t"] = 1794485467,
+["p"] = 10,
+},
+[4540] = {
+["t"] = 1794536410,
+["p"] = 2,
+},
+[5571] = {
+["t"] = 1794484697,
+["p"] = 250,
+},
+[6598] = {
+["p"] = 2423,
+["t"] = 1794782142,
+},
+[6602] = {
+["t"] = 1794459377,
+["p"] = 1000,
+},
+[15250] = {
+["p"] = 6890,
+["t"] = 1794643008,
+},
+[4564] = {
+["p"] = 700,
+["t"] = 1794643811,
+},
+[6614] = {
+["p"] = 1200,
+["t"] = 1794452135,
+},
+[12213] = {
+["p"] = 333,
+["t"] = 1794643776,
+},
+[15306] = {
+["p"] = 800,
+["t"] = 1794643850,
+},
+[4592] = {
+["t"] = 1794536482,
+["p"] = 8,
+},
+[15330] = {
+["t"] = 1794443190,
+["p"] = 1800,
+},
+[4604] = {
+["t"] = 1794546577,
+["p"] = 2,
+},
+[5635] = {
+["t"] = 1794215771,
+["p"] = 48,
+},
+[2316] = {
+["t"] = 1794484793,
+["p"] = 407,
+},
+[2318] = {
+["t"] = 1794536661,
+["p"] = 35,
+},
+[2320] = {
+["p"] = 12,
+["t"] = 1794521611,
+},
+[4656] = {
+["t"] = 1794536414,
+["p"] = 3,
+},
+[6714] = {
+["p"] = 119,
+["t"] = 1794647799,
+},
+[15474] = {
+["p"] = 400,
+["t"] = 1794648315,
+},
+[3369] = {
+["p"] = 25,
+["t"] = 1794643841,
+},
+[3371] = {
+["t"] = 1794536419,
+["p"] = 4,
+},
+[1177] = {
+["t"] = 1794536487,
+["p"] = 10,
+},
+[1178] = {
+["t"] = 1794536486,
+["p"] = 10,
+},
+[1179] = {
+["t"] = 1794536567,
+["p"] = 27,
+},
+[1181] = {
+["t"] = 1794536557,
+["p"] = 25,
+},
+[17058] = {
+["t"] = 1794536449,
+["p"] = 6,
+},
+[3421] = {
+["p"] = 449,
+["t"] = 1794643781,
+},
+[38] = {
+["p"] = 600,
+["t"] = 1794643805,
+},
+[1212] = {
+["t"] = 1794536527,
+["p"] = 21,
+},
+[6890] = {
+["t"] = 1794485499,
+["p"] = 25,
+},
+[1220] = {
+["t"] = 1794075454,
+["p"] = 2200,
+},
+[3465] = {
+["t"] = 1794536502,
+["p"] = 15,
+},
+[255007] = {
+["t"] = 1794536528,
+["p"] = 22,
+},
+[9776] = {
+["p"] = 525,
+["t"] = 1794782045,
+},
+[2450] = {
+["t"] = 1794461081,
+["p"] = 94,
+},
+[9792] = {
+["p"] = 818,
+["t"] = 1794782117,
+},
+[11846] = {
+["t"] = 1794536595,
+["p"] = 30,
+},
+[2456] = {
+["t"] = 1794536508,
+["p"] = 15,
+},
+[2458] = {
+["t"] = 1794536528,
+["p"] = 22,
+},
+[9832] = {
+["p"] = 2200,
+["t"] = 1794155579,
+},
+[9848] = {
+["p"] = 2100,
+["t"] = 1794452147,
+},
+[282655] = {
+["p"] = 1000,
+["t"] = 1794452166,
+},
+[5967] = {
+["p"] = 1300,
+["t"] = 1794643933,
+},
+[252452] = {
+["p"] = 1086,
+["t"] = 1794643904,
+},
+[12006] = {
+["t"] = 1794443191,
+["p"] = 9800,
+},
+[8953] = {
+["p"] = 1100,
+["t"] = 1794643906,
+},
+[1251] = {
+["t"] = 1794536486,
+["p"] = 10,
+},
+[8069] = {
+["t"] = 1794536425,
+["p"] = 5,
+},
+[14124] = {
+["p"] = 900,
+["t"] = 1794643861,
+},
+[7074] = {
+["t"] = 1794536597,
+["p"] = 32,
+},
+[14172] = {
+["p"] = 828,
+["t"] = 1794781055,
+},
+[15211] = {
+["p"] = 1910,
+["t"] = 1794642962,
+},
+[159] = {
+["t"] = 1794536485,
+["p"] = 9,
+},
+[15259] = {
+["p"] = 3290,
+["t"] = 1794782127,
+},
+[1274] = {
+["t"] = 1794536520,
+["p"] = 19,
+},
+[12238] = {
+["t"] = 1794536445,
+["p"] = 6,
+},
+[3577] = {
+["p"] = 745,
+["t"] = 1794520727,
+},
+[5116] = {
+["t"] = 1794484481,
+["p"] = 300,
+},
+[1288] = {
+["t"] = 1794485121,
+["p"] = 185,
+},
+[10288] = {
+["t"] = 1794443203,
+["p"] = 12000,
+},
+[2580] = {
+["t"] = 1794442216,
+["p"] = 100,
+},
+[2584] = {
+["t"] = 1794485360,
+["p"] = 180,
+},
+[18610] = {
+["p"] = 1149,
+["t"] = 1794643907,
+},
+[2592] = {
+["t"] = 1794546604,
+["p"] = 117,
+},
+[2596] = {
+["t"] = 1794546630,
+["p"] = 447,
+},
+[15491] = {
+["p"] = 500,
+["t"] = 1794648319,
+},
+[15499] = {
+["p"] = 500,
+["t"] = 1794643787,
+},
+[271675] = {
+["p"] = 1000,
+["t"] = 1794643870,
+},
+[7282] = {
+["p"] = 597,
+["t"] = 1794643125,
+},
+[7286] = {
+["t"] = 1794536534,
+["p"] = 25,
+},
+[6267] = {
+["p"] = 160,
+["t"] = 1794648364,
+},
+[2632] = {
+["p"] = 1500,
+["t"] = 1794643949,
+},
+[6291] = {
+["t"] = 1794536520,
+["p"] = 19,
+},
+[6299] = {
+["t"] = 1794536595,
+["p"] = 30,
+},
+[6303] = {
+["t"] = 1794536512,
+["p"] = 15,
+},
+[1326] = {
+["t"] = 1794536488,
+["p"] = 10,
+},
+[6359] = {
+["t"] = 1794536563,
+["p"] = 27,
+},
+[13757] = {
+["t"] = 1794536519,
+["p"] = 18,
+},
+[2678] = {
+["t"] = 1794536421,
+["p"] = 4,
+},
+[2680] = {
+["t"] = 1794536500,
+["p"] = 14,
+},
+[2682] = {
+["t"] = 1794459159,
+["p"] = 27,
+},
+[4357] = {
+["t"] = 1794536521,
+["p"] = 19,
+},
+[3719] = {
+["p"] = 1400,
+["t"] = 1794460400,
+},
+[9753] = {
+["p"] = 300,
+["t"] = 1794647805,
+},
+[4373] = {
+["p"] = 1300,
+["t"] = 1794643936,
+},
+[7446] = {
+["t"] = 1794443204,
+["p"] = 15900,
+},
+[9777] = {
+["p"] = 770,
+["t"] = 1794643848,
+},
+[4389] = {
+["t"] = 1794290870,
+["p"] = 1450,
+},
+[9801] = {
+["p"] = 700,
+["t"] = 1794781240,
+},
+[255663] = {
+["t"] = 1794536484,
+["p"] = 8,
+},
+[9817] = {
+["t"] = 1794443195,
+["p"] = 1900,
+},
+[250932] = {
+["t"] = 1794485515,
+["p"] = 33,
+},
+[264018] = {
+["t"] = 1794443209,
+["p"] = 2000,
+},
+[5472] = {
+["t"] = 1794536492,
+["p"] = 12,
+},
+[6511] = {
+["t"] = 1794029769,
+["p"] = 200,
+},
+[3775] = {
+["t"] = 1794536598,
+["p"] = 33,
+},
+[7554] = {
+["p"] = 2239,
+["t"] = 1794781088,
+},
+[6539] = {
+["p"] = 820,
+["t"] = 1794643854,
+},
+[6543] = {
+["p"] = 265,
+["t"] = 1794648271,
+},
+[6547] = {
+["p"] = 1169,
+["t"] = 1794643907,
+},
+[6551] = {
+["p"] = 403,
+["t"] = 1794782120,
+},
+[6559] = {
+["p"] = 1000,
+["t"] = 1794643867,
+},
+[6563] = {
+["p"] = 300,
+["t"] = 1794647980,
+},
+[15172] = {
+["t"] = 1794459375,
+["p"] = 7100,
+},
+[2778] = {
+["t"] = 1794484618,
+["p"] = 189,
+},
+[14181] = {
+["p"] = 1200,
+["t"] = 1794643919,
+},
+[263513] = {
+["t"] = 1794443201,
+["p"] = 2000,
+},
+[5568] = {
+["t"] = 1794536435,
+["p"] = 5,
+},
+[5572] = {
+["t"] = 1794485141,
+["p"] = 300,
+},
+[6603] = {
+["p"] = 3000,
+["t"] = 1794155479,
+},
+[4561] = {
+["p"] = 305,
+["t"] = 1794782389,
+},
+[4569] = {
+["p"] = 604,
+["t"] = 1794782411,
+},
+[1401] = {
+["t"] = 1794536496,
+["p"] = 14,
+},
+[15284] = {
+["p"] = 3300,
+["t"] = 1794155424,
+},
+[3829] = {
+["t"] = 1794290840,
+["p"] = 2400,
+},
+[4593] = {
+["t"] = 1794536469,
+["p"] = 7,
+},
+[3835] = {
+["p"] = 1400,
+["t"] = 1794643942,
+},
+[4605] = {
+["t"] = 1794536463,
+["p"] = 6,
+},
+[15348] = {
+["p"] = 1000,
+["t"] = 1794452153,
+},
+[11288] = {
+["t"] = 1794442236,
+["p"] = 200,
+},
+[12359] = {
+["t"] = 1794441555,
+["p"] = 1798,
+},
+[2842] = {
+["t"] = 1794029798,
+["p"] = 330,
+},
+[8315] = {
+["t"] = 1794443205,
+["p"] = 29900,
+},
+[2852] = {
+["t"] = 1794459393,
+["p"] = 100,
+},
+[15508] = {
+["p"] = 1500,
+["t"] = 1794643951,
+},
+[2862] = {
+["t"] = 1794536433,
+["p"] = 5,
+},
+[4701] = {
+["t"] = 1794029908,
+["p"] = 300,
+},
+[2866] = {
+["t"] = 1794484509,
+["p"] = 600,
+},
+[2868] = {
+["t"] = 1794526427,
+["p"] = 509,
+},
+[6787] = {
+["t"] = 1794367006,
+["p"] = 500,
+},
+[2886] = {
+["t"] = 1794536481,
+["p"] = 8,
+},
+[10513] = {
+["t"] = 1794536484,
+["p"] = 9,
+},
+[724] = {
+["t"] = 1794485514,
+["p"] = 33,
+},
+[6811] = {
+["t"] = 1794484381,
+["p"] = 25,
+},
+[727] = {
+["p"] = 1340,
+["t"] = 1794781062,
+},
+[729] = {
+["t"] = 1794029893,
+["p"] = 270,
+},
+[15732] = {
+["p"] = 3499,
+["t"] = 1794782108,
+},
+[730] = {
+["t"] = 1794536516,
+["p"] = 16,
+},
+[731] = {
+["t"] = 1794536565,
+["p"] = 27,
+},
+[732] = {
+["t"] = 1794536457,
+["p"] = 6,
 },
 [2928] = {
-["xp"] = 4400,
-["nivel"] = 22,
+["t"] = 1794485510,
+["p"] = 30,
 },
-[1101] = {
-["xp"] = 7950,
-["nivel"] = 32,
+[13758] = {
+["t"] = 1794536510,
+["p"] = 15,
 },
-[2930] = {
-["xp"] = 6550,
-["nivel"] = 26,
+[2934] = {
+["t"] = 1794536498,
+["p"] = 14,
 },
-[2398] = {
-["xp"] = 550,
-["nivel"] = 36,
+[4865] = {
+["t"] = 1794536598,
+["p"] = 32,
 },
-[2931] = {
-["xp"] = 230,
-["nivel"] = 26,
+[1475] = {
+["p"] = 82,
+["t"] = 1794089585,
 },
-[166] = {
-["xp"] = 6200,
-["nivel"] = 21,
+[1476] = {
+["t"] = 1794536486,
+["p"] = 9,
 },
-[2040] = {
-["xp"] = 3700,
-["nivel"] = 22,
+[4877] = {
+["t"] = 1794536526,
+["p"] = 20,
 },
-[98815] = {
-["xp"] = 1150,
-["nivel"] = 24,
+[9778] = {
+["p"] = 1188,
+["t"] = 1794643908,
 },
-[1275] = {
-["xp"] = 2400,
-["nivel"] = 24,
+[9786] = {
+["p"] = 400,
+["t"] = 1794648316,
 },
-[7070] = {
-["xp"] = 6750,
+[6947] = {
+["t"] = 1794536429,
+["p"] = 5,
+},
+[2970] = {
+["t"] = 1794029910,
+["p"] = 400,
+},
+[16060] = {
+["p"] = 1498,
+["t"] = 1794643946,
+},
+[12040] = {
+["t"] = 1794443096,
+["p"] = 7400,
+},
+[1510] = {
+["p"] = 150,
+["t"] = 1794521463,
+},
+[247754] = {
+["t"] = 1794484412,
+["p"] = 37,
+},
+[3022] = {
+["p"] = 1500,
+["t"] = 1794643947,
+},
+[6048] = {
+["p"] = 220,
+["t"] = 1794648739,
+},
+[10050] = {
+["t"] = 1794290965,
+["p"] = 14600,
+},
+[3030] = {
+["t"] = 1794536412,
+["p"] = 3,
+},
+[247755] = {
+["t"] = 1794536542,
+["p"] = 25,
+},
+[7095] = {
+["p"] = 400,
+["t"] = 1794648241,
+},
+[5057] = {
+["t"] = 1794536483,
+["p"] = 8,
+},
+[11137] = {
+["p"] = 989,
+["t"] = 1794520775,
+},
+[6096] = {
+["p"] = 600,
+["t"] = 1794643800,
+},
+[247884] = {
+["t"] = 1794536493,
+["p"] = 12,
+},
+[12208] = {
+["p"] = 248,
+["t"] = 1794643771,
+},
+[18294] = {
+["p"] = 1000,
+["t"] = 1794643869,
+},
+[8178] = {
+["p"] = 2299,
+["t"] = 1794781276,
+},
+[769] = {
+["t"] = 1794536597,
+["p"] = 32,
+},
+[774] = {
+["t"] = 1794536506,
+["p"] = 15,
+},
+[5165] = {
+["t"] = 1794536400,
+["p"] = 1,
+},
+[2075] = {
+["p"] = 399,
+["t"] = 1794648213,
+},
+[2077] = {
+["p"] = 5056,
+["t"] = 1794782103,
+},
+[2079] = {
+["p"] = 1237,
+["t"] = 1794643923,
+},
+[777] = {
+["t"] = 1794536579,
+["p"] = 28,
+},
+[15485] = {
+["p"] = 340,
+["t"] = 1794781270,
+},
+[779] = {
+["t"] = 1794459136,
+["p"] = 18,
+},
+[5205] = {
+["t"] = 1794536596,
+["p"] = 31,
+},
+[2101] = {
+["p"] = 100,
+["t"] = 1794060173,
+},
+[783] = {
+["t"] = 1794215776,
+["p"] = 199,
+},
+[6268] = {
+["p"] = 300,
+["t"] = 1794648705,
+},
+[4234] = {
+["t"] = 1794546587,
+["p"] = 218,
+},
+[4238] = {
+["p"] = 200,
+["t"] = 1794521478,
+},
+[789] = {
+["p"] = 1960,
+["t"] = 1794782117,
+},
+[790] = {
+["p"] = 2014,
+["t"] = 1794642997,
+},
+[6316] = {
+["t"] = 1794536487,
+["p"] = 10,
+},
+[4278] = {
+["t"] = 1794291212,
+["p"] = 1000,
+},
+[6336] = {
+["p"] = 303,
+["t"] = 1794782387,
+},
+[3172] = {
+["t"] = 1794536517,
+["p"] = 18,
+},
+[14726] = {
+["t"] = 1794155181,
+["p"] = 800,
+},
+[4306] = {
+["t"] = 1794546600,
+["p"] = 199,
+},
+[4314] = {
+["t"] = 1794366332,
+["p"] = 400,
+},
+[3184] = {
+["p"] = 1389,
+["t"] = 1794782055,
+},
+[25] = {
+["p"] = 800,
+["t"] = 1794643853,
+},
+[249427] = {
+["t"] = 1794215751,
+["p"] = 754,
+},
+[3192] = {
+["p"] = 4500,
+["t"] = 1794782130,
+},
+[4338] = {
+["p"] = 660,
+["t"] = 1794648270,
+},
+[3196] = {
+["p"] = 1370,
+["t"] = 1794782394,
+},
+[3198] = {
+["p"] = 2725,
+["t"] = 1794781194,
+},
+[4358] = {
+["t"] = 1794484410,
+["p"] = 35,
+},
+[249428] = {
+["t"] = 1794354629,
+["p"] = 457,
+},
+[7435] = {
+["t"] = 1794443214,
+["p"] = 10000,
+},
+[7443] = {
+["t"] = 1794443095,
+["p"] = 2400,
+},
+[9779] = {
+["p"] = 328,
+["t"] = 1794782129,
+},
+[9787] = {
+["p"] = 469,
+["t"] = 1794648318,
+},
+[9795] = {
+["p"] = 900,
+["t"] = 1794452175,
+},
+[4398] = {
+["p"] = 1239,
+["t"] = 1794643923,
+},
+[7471] = {
+["p"] = 4000,
+["t"] = 1794452135,
+},
+[6452] = {
+["t"] = 1794536575,
+["p"] = 28,
+},
+[2207] = {
+["p"] = 800,
+["t"] = 1794643851,
+},
+[5465] = {
+["t"] = 1794536493,
+["p"] = 12,
+},
+[10938] = {
+["t"] = 1794459592,
+["p"] = 93,
+},
+[814] = {
+["t"] = 1794536545,
+["p"] = 25,
+},
+[6512] = {
+["p"] = 190,
+["t"] = 1794782047,
+},
+[10978] = {
+["p"] = 329,
+["t"] = 1794452296,
+},
+[818] = {
+["t"] = 1794030155,
+["p"] = 110,
+},
+[7559] = {
+["p"] = 1300,
+["t"] = 1794643936,
+},
+[6540] = {
+["p"] = 422,
+["t"] = 1794782127,
+},
+[5525] = {
+["t"] = 1794536521,
+["p"] = 20,
+},
+[6552] = {
+["p"] = 590,
+["t"] = 1794782044,
+},
+[6556] = {
+["p"] = 1220,
+["t"] = 1794643921,
+},
+[6560] = {
+["p"] = 4000,
+["t"] = 1794781349,
+},
+[6564] = {
+["t"] = 1794443085,
+["p"] = 600,
+},
+[6568] = {
+["p"] = 916,
+["t"] = 1794782135,
+},
+[14167] = {
+["p"] = 357,
+["t"] = 1794782062,
+},
+[6580] = {
+["p"] = 1308,
+["t"] = 1794642840,
+},
+[4542] = {
+["t"] = 1794536551,
+["p"] = 25,
+},
+[6592] = {
+["t"] = 1794443193,
+["p"] = 3200,
+},
+[3300] = {
+["t"] = 1794536488,
+["p"] = 10,
+},
+[6600] = {
+["p"] = 1100,
+["t"] = 1794452142,
+},
+[6604] = {
+["p"] = 1190,
+["t"] = 1794782050,
+},
+[414] = {
+["t"] = 1794536443,
+["p"] = 6,
+},
+[4566] = {
+["p"] = 900,
+["t"] = 1794643863,
+},
+[4570] = {
+["p"] = 915,
+["t"] = 1794782134,
+},
+[3314] = {
+["p"] = 875,
+["t"] = 1794643856,
+},
+[14271] = {
+["t"] = 1794459378,
+["p"] = 10000,
+},
+[15310] = {
+["p"] = 599,
+["t"] = 1794643798,
+},
+[2299] = {
+["t"] = 1794443205,
+["p"] = 17500,
+},
+[832] = {
+["p"] = 400,
+["t"] = 1794060127,
+},
+[4606] = {
+["t"] = 1794536559,
+["p"] = 25,
+},
+[2315] = {
+["t"] = 1794484768,
+["p"] = 305,
+},
+[3340] = {
+["t"] = 1794485514,
+["p"] = 33,
+},
+[2319] = {
+["t"] = 1794546598,
+["p"] = 100,
+},
+[2321] = {
+["p"] = 100,
+["t"] = 1794460796,
+},
+[10307] = {
+["p"] = 1500,
+["t"] = 1794643955,
+},
+[15494] = {
+["p"] = 829,
+["t"] = 1794643901,
+},
+[422] = {
+["t"] = 1794536540,
+["p"] = 25,
+},
+[8389] = {
+["p"] = 1300,
+["t"] = 1794643935,
+},
+[3382] = {
+["t"] = 1794536532,
+["p"] = 24,
+},
+[279956] = {
+["t"] = 1794459148,
+["p"] = 24,
+},
+[849] = {
+["p"] = 400,
+["t"] = 1794643778,
+},
+[6796] = {
+["p"] = 800,
+["t"] = 1794643852,
+},
+[1705] = {
+["t"] = 1794354632,
+["p"] = 612,
+},
+[274077] = {
+["p"] = 700,
+["t"] = 1794643810,
+},
+[854] = {
+["p"] = 1000,
+["t"] = 1794643872,
+},
+[1708] = {
+["p"] = 150,
+["t"] = 1794441183,
+},
+[858] = {
+["t"] = 1794536569,
+["p"] = 27,
+},
+[4814] = {
+["t"] = 1794536475,
+["p"] = 7,
+},
+[1722] = {
+["t"] = 1794443212,
+["p"] = 75000,
+},
+[6888] = {
+["t"] = 1794536514,
+["p"] = 16,
+},
+[7919] = {
+["p"] = 3500,
+["t"] = 1794452172,
+},
+[864] = {
+["t"] = 1794443208,
+["p"] = 9900,
+},
+[865] = {
+["p"] = 5089,
+["t"] = 1794782131,
+},
+[15870] = {
+["p"] = 300,
+["t"] = 1794647805,
+},
+[3464] = {
+["t"] = 1794536596,
+["p"] = 31,
+},
+[9756] = {
+["p"] = 289,
+["t"] = 1794782047,
+},
+[9764] = {
+["p"] = 299,
+["t"] = 1794782029,
+},
+[3470] = {
+["t"] = 1794536465,
+["p"] = 6,
+},
+[9780] = {
+["t"] = 1794443208,
+["p"] = 400,
+},
+[9788] = {
+["p"] = 1000,
+["t"] = 1794643873,
+},
+[9796] = {
+["t"] = 1794443092,
+["p"] = 1200,
+},
+[3478] = {
+["p"] = 169,
+["t"] = 1794520721,
+},
+[279968] = {
+["t"] = 1794459129,
+["p"] = 15,
+},
+[15007] = {
+["p"] = 100,
+["t"] = 1794647797,
+},
+[10939] = {
+["t"] = 1794459587,
+["p"] = 260,
+},
+[5997] = {
+["t"] = 1794536427,
+["p"] = 5,
+},
+[13041] = {
+["p"] = 6000,
+["t"] = 1794452168,
+},
+[8067] = {
+["t"] = 1794536386,
+["p"] = 1,
+},
+[7048] = {
+["p"] = 900,
+["t"] = 1794452168,
+},
+[3530] = {
+["t"] = 1794536583,
+["p"] = 28,
+},
+[247786] = {
+["t"] = 1794536431,
+["p"] = 5,
+},
+[7072] = {
+["t"] = 1794484733,
+["p"] = 149,
+},
+[2519] = {
+["t"] = 1794536392,
+["p"] = 1,
+},
+[255715] = {
+["p"] = 575,
+["t"] = 1794648814,
+},
+[211854] = {
+["p"] = 200,
+["t"] = 1794441185,
+},
+[15223] = {
+["p"] = 2373,
+["t"] = 1794643056,
+},
+[7108] = {
+["p"] = 300,
+["t"] = 1794648686,
+},
+[255716] = {
+["t"] = 1794536581,
+["p"] = 28,
+},
+[248683] = {
+["p"] = 850,
+["t"] = 1794648314,
+},
+[241650] = {
+["p"] = 1300,
+["t"] = 1794643934,
+},
+[12202] = {
+["p"] = 586,
+["t"] = 1794648124,
+},
+[250346] = {
+["p"] = 800,
+["t"] = 1794643850,
+},
+[3576] = {
+["p"] = 215,
+["t"] = 1794441165,
+},
+[9197] = {
+["p"] = 1000,
+["t"] = 1794643868,
+},
+[897] = {
+["p"] = 2700,
+["t"] = 1794155568,
+},
+[3590] = {
+["p"] = 499,
+["t"] = 1794643783,
+},
+[899] = {
+["t"] = 1794215779,
+["p"] = 1400,
+},
+[9253] = {
+["p"] = 299,
+["t"] = 1794648496,
+},
+[2581] = {
+["t"] = 1794536522,
+["p"] = 20,
+},
+[2589] = {
+["t"] = 1794536549,
+["p"] = 25,
+},
+[2591] = {
+["t"] = 1794536518,
+["p"] = 18,
+},
+[15479] = {
+["p"] = 650,
+["t"] = 1794643807,
+},
+[15487] = {
+["p"] = 670,
+["t"] = 1794643848,
+},
+[10404] = {
+["p"] = 1500,
+["t"] = 1794643950,
+},
+[15307] = {
+["p"] = 1500,
+["t"] = 1794643951,
+},
+[15241] = {
+["p"] = 2999,
+["t"] = 1794782133,
+},
+[6536] = {
+["p"] = 479,
+["t"] = 1794782146,
+},
+[1468] = {
+["p"] = 65,
+["t"] = 1794060152,
+},
+[3041] = {
+["p"] = 4000,
+["t"] = 1794155412,
+},
+[248688] = {
+["p"] = 100,
+["t"] = 1794648313,
+},
+[9748] = {
+["p"] = 269,
+["t"] = 1794782139,
+},
+[2453] = {
+["p"] = 83,
+["t"] = 1794520715,
+},
+[6269] = {
+["p"] = 190,
+["t"] = 1794780880,
+},
+[723] = {
+["t"] = 1794029894,
+["p"] = 129,
+},
+[3033] = {
+["t"] = 1794536417,
+["p"] = 3,
+},
+[4235] = {
+["p"] = 999,
+["t"] = 1794520730,
+},
+[4239] = {
+["t"] = 1794459415,
+["p"] = 112,
+},
+[6289] = {
+["t"] = 1794536459,
+["p"] = 6,
+},
+[14047] = {
+["p"] = 1550,
+["t"] = 1794361866,
+},
+[4251] = {
+["p"] = 1100,
+["t"] = 1793985596,
+},
+[6548] = {
+["p"] = 274,
+["t"] = 1794648758,
+},
+[6612] = {
+["p"] = 1110,
+["t"] = 1794782119,
+},
+[4541] = {
+["t"] = 1794536451,
+["p"] = 6,
+},
+[255723] = {
+["p"] = 700,
+["t"] = 1794643809,
+},
+[6317] = {
+["p"] = 3,
+["t"] = 1794521535,
+},
+[15230] = {
+["p"] = 2744,
+["t"] = 1794782120,
+},
+[2516] = {
+["t"] = 1794536394,
+["p"] = 1,
+},
+[2073] = {
+["p"] = 741,
+["t"] = 1794780866,
+},
+[10620] = {
+["p"] = 1190,
+["t"] = 1794460744,
+},
+[6337] = {
+["p"] = 244,
+["t"] = 1794521463,
+},
+[3013] = {
+["t"] = 1794536555,
+["p"] = 25,
+},
+[11176] = {
+["p"] = 2891,
+["t"] = 1794514747,
+},
+[281017] = {
+["p"] = 500,
+["t"] = 1794648466,
+},
+[3823] = {
+["t"] = 1794290882,
+["p"] = 659,
+},
+[4757] = {
+["t"] = 1794485484,
+["p"] = 20,
+},
+[6361] = {
+["t"] = 1794536483,
+["p"] = 8,
+},
+[281018] = {
+["p"] = 1394,
+["t"] = 1794643941,
+},
+[2675] = {
+["t"] = 1794536561,
+["p"] = 28,
+},
+[6373] = {
+["t"] = 1794484409,
+["p"] = 35,
+},
+[2679] = {
+["t"] = 1794536441,
+["p"] = 6,
+},
+[2681] = {
+["t"] = 1794536494,
+["p"] = 13,
+},
+[2287] = {
+["t"] = 1794536482,
+["p"] = 8,
+},
+[4562] = {
+["p"] = 1095,
+["t"] = 1794781288,
+},
+[2687] = {
+["t"] = 1794536538,
+["p"] = 25,
+},
+[6397] = {
+["p"] = 1200,
+["t"] = 1794643912,
+},
+[4355] = {
+["p"] = 1199,
+["t"] = 1794643909,
+},
+[4359] = {
+["t"] = 1794029894,
+["p"] = 95,
+},
+[14174] = {
+["p"] = 360,
+["t"] = 1794782398,
+},
+[9749] = {
+["p"] = 272,
+["t"] = 1794782048,
+},
+[9757] = {
+["p"] = 1000,
+["t"] = 1794643871,
+},
+[9765] = {
+["p"] = 450,
+["t"] = 1794648523,
+},
+[6591] = {
+["p"] = 1150,
+["t"] = 1794452161,
+},
+[9781] = {
+["p"] = 980,
+["t"] = 1794643088,
+},
+[9789] = {
+["p"] = 737,
+["t"] = 1794781160,
+},
+[7417] = {
+["p"] = 2899,
+["t"] = 1794782111,
+},
+[117] = {
+["t"] = 1794536437,
+["p"] = 5,
+},
+[3736] = {
+["p"] = 588,
+["t"] = 1794520761,
+},
+[6576] = {
+["p"] = 580,
+["t"] = 1794643845,
+},
+[3740] = {
+["p"] = 2448,
+["t"] = 1794782105,
+},
+[281015] = {
+["p"] = 1200,
+["t"] = 1794643918,
+},
+[7484] = {
+["p"] = 3900,
+["t"] = 1794452172,
+},
+[4419] = {
+["p"] = 500,
+["t"] = 1794643789,
+},
+[10998] = {
+["t"] = 1794536659,
+["p"] = 440,
+},
+[9869] = {
+["p"] = 2200,
+["t"] = 1794782109,
+},
+[6550] = {
+["t"] = 1794443085,
+["p"] = 300,
+},
+[765] = {
+["t"] = 1794536516,
+["p"] = 16,
+},
+[248823] = {
+["t"] = 1794443207,
+["p"] = 40000,
+},
+[15016] = {
+["p"] = 500,
+["t"] = 1794643786,
+},
+[279962] = {
+["t"] = 1794536408,
+["p"] = 2,
+},
+[10940] = {
+["t"] = 1794536661,
+["p"] = 79,
+},
+[9827] = {
+["p"] = 1294,
+["t"] = 1794643930,
+},
+[118] = {
+["t"] = 1794536524,
+["p"] = 20,
+},
+[2512] = {
+["t"] = 1794536396,
+["p"] = 1,
+},
+[11995] = {
+["t"] = 1794443198,
+["p"] = 8000,
+},
+[2515] = {
+["t"] = 1794536398,
+["p"] = 1,
+},
+[9784] = {
+["p"] = 531,
+["t"] = 1794642924,
+},
+[7552] = {
+["p"] = 4000,
+["t"] = 1794452160,
+},
+[6529] = {
+["t"] = 1794536573,
+["p"] = 27,
+},
+[15120] = {
+["p"] = 1200,
+["t"] = 1794643917,
+},
+[267474] = {
+["t"] = 1794536406,
+["p"] = 2,
+},
+[6541] = {
+["p"] = 495,
+["t"] = 1794648771,
+},
+[6545] = {
+["p"] = 876,
+["t"] = 1794781343,
+},
+[940] = {
+["p"] = 800000,
+["t"] = 1794362139,
+},
+[6553] = {
+["p"] = 518,
+["t"] = 1794782046,
+},
+[3239] = {
+["t"] = 1794536423,
+["p"] = 4,
+},
+[2771] = {
+["p"] = 219,
+["t"] = 1794648036,
+},
+[6565] = {
+["p"] = 500,
+["t"] = 1794648467,
+},
+[11084] = {
+["p"] = 3750,
+["t"] = 1794452291,
+},
+[6573] = {
+["p"] = 936,
+["t"] = 1794782058,
+},
+[6577] = {
+["p"] = 1000,
+["t"] = 1794643868,
+},
+[15944] = {
+["t"] = 1794484471,
+["p"] = 511,
+},
+[6585] = {
+["p"] = 550,
+["t"] = 1794782144,
+},
+[2965] = {
+["t"] = 1794029761,
+["p"] = 200,
+},
+[15224] = {
+["p"] = 2683,
+["t"] = 1794782101,
+},
+[15232] = {
+["p"] = 6108,
+["t"] = 1794782116,
+},
+[4567] = {
+["p"] = 1022,
+["t"] = 1794781057,
+},
+[15248] = {
+["p"] = 1789,
+["t"] = 1794782378,
+},
+[4571] = {
+["p"] = 977,
+["t"] = 1794782113,
+},
+[6613] = {
+["p"] = 1000,
+["t"] = 1794452150,
+},
+[6617] = {
+["p"] = 1489,
+["t"] = 1794643945,
+},
+[4575] = {
+["p"] = 4498,
+["t"] = 1794781305,
+},
+[4404] = {
+["t"] = 1794485503,
+["p"] = 26,
+},
+[253910] = {
+["p"] = 1200,
+["t"] = 1794643913,
+},
+[252899] = {
+["p"] = 1500,
+["t"] = 1794643953,
+},
+[3832] = {
+["p"] = 1000,
+["t"] = 1794643873,
+},
+[9768] = {
+["p"] = 1200,
+["t"] = 1794643912,
+},
+[3728] = {
+["p"] = 420,
+["t"] = 1794520766,
+},
+[4603] = {
+["p"] = 18,
+["t"] = 1794521627,
+},
+[961] = {
+["t"] = 1794536453,
+["p"] = 6,
+},
+[2819] = {
+["p"] = 3820,
+["t"] = 1794782061,
+},
+[11083] = {
+["p"] = 403,
+["t"] = 1794520764,
+},
+[4560] = {
+["p"] = 500,
+["t"] = 1794643786,
+},
+[11284] = {
+["t"] = 1794536489,
+["p"] = 11,
+},
+[277501] = {
+["p"] = 900,
+["t"] = 1794643861,
+},
+[5466] = {
+["p"] = 500,
+["t"] = 1794648368,
+},
+[10285] = {
+["t"] = 1794485236,
+["p"] = 999,
+},
+[1929] = {
+["p"] = 1400,
+["t"] = 1794643943,
+},
+[2835] = {
+["t"] = 1794536479,
+["p"] = 10,
+},
+[3860] = {
+["t"] = 1794441517,
+["p"] = 1000,
+},
+[2841] = {
+["p"] = 175,
+["t"] = 1794520712,
+},
+[3864] = {
+["p"] = 889,
+["t"] = 1794520717,
+},
+[3182] = {
+["t"] = 1794075484,
+["p"] = 900,
+},
+[3181] = {
+["t"] = 1794536530,
+["p"] = 23,
+},
+[4708] = {
+["t"] = 1794366982,
+["p"] = 500,
+},
+[1081] = {
+["t"] = 1794485094,
+["p"] = 49,
+},
+[2851] = {
+["t"] = 1794459385,
+["p"] = 100,
+},
+[3174] = {
+["t"] = 1794536517,
+["p"] = 16,
+},
+[3173] = {
+["t"] = 1794484413,
+["p"] = 39,
+},
+[2857] = {
+["t"] = 1794484480,
+["p"] = 198,
+},
+[4594] = {
+["t"] = 1794536491,
+["p"] = 11,
+},
+[6586] = {
+["p"] = 600,
+["t"] = 1794643846,
+},
+[252028] = {
+["t"] = 1794536390,
+["p"] = 1,
+},
+[2865] = {
+["t"] = 1794485175,
+["p"] = 578,
+},
+[264078] = {
+["p"] = 698,
+["t"] = 1794643809,
+},
+[6569] = {
+["p"] = 1040,
+["t"] = 1794782129,
+},
+[279957] = {
+["p"] = 750,
+["t"] = 1794643812,
+},
+[792] = {
+["p"] = 600,
+["t"] = 1794643803,
+},
+[6308] = {
+["t"] = 1794536527,
+["p"] = 21,
+},
+[14561] = {
+["p"] = 1200,
+["t"] = 1794643915,
+},
+[14123] = {
+["p"] = 760,
+["t"] = 1794643813,
+},
+[264210] = {
+["p"] = 1000,
+["t"] = 1794643874,
+},
+[248613] = {
+["p"] = 795,
+["t"] = 1794643849,
+},
+[10512] = {
+["t"] = 1794536455,
+["p"] = 6,
+},
+[787] = {
+["t"] = 1794536481,
+["p"] = 7,
+},
+[17029] = {
+["p"] = 800,
+["t"] = 1794643853,
+},
+[252797] = {
+["p"] = 1200,
+["t"] = 1794643914,
+},
+[15210] = {
+["p"] = 820,
+["t"] = 1794643369,
+},
+[252030] = {
+["t"] = 1794536477,
+["p"] = 7,
+},
+[785] = {
+["t"] = 1794536587,
+["p"] = 29,
+},
+[3731] = {
+["p"] = 170,
+["t"] = 1794520777,
+},
+[4775] = {
+["t"] = 1794536577,
+["p"] = 28,
+},
+[4582] = {
+["p"] = 927,
+["t"] = 1794643864,
+},
+[11151] = {
+["p"] = 1000,
+["t"] = 1794643869,
+},
+[264084] = {
+["p"] = 1500,
+["t"] = 1794643948,
+},
+[264218] = {
+["p"] = 1000,
+["t"] = 1794643874,
+},
+[252031] = {
+["t"] = 1794536473,
+["p"] = 7,
+},
+[1299] = {
+["t"] = 1794366973,
+["p"] = 500,
+},
+[9809] = {
+["p"] = 1850,
+["t"] = 1794781235,
+},
+[9805] = {
+["p"] = 700,
+["t"] = 1794780860,
+},
+[217495] = {
+["t"] = 1794485137,
+["p"] = 199,
+},
+[252671] = {
+["t"] = 1794536547,
+["p"] = 25,
+},
+[15114] = {
+["p"] = 400,
+["t"] = 1794643779,
+},
+[14168] = {
+["p"] = 1200,
+["t"] = 1794643911,
+},
+[252032] = {
+["t"] = 1794536593,
+["p"] = 30,
+},
+[4813] = {
+["t"] = 1794485516,
+["p"] = 33,
+},
+[3575] = {
+["t"] = 1794441508,
+["p"] = 368,
+},
+[6117] = {
+["p"] = 900,
+["t"] = 1794643862,
+},
+[6889] = {
+["t"] = 1794536526,
+["p"] = 20,
+},
+[11082] = {
+["t"] = 1794536651,
+["p"] = 1365,
+},
+[2546] = {
+["p"] = 695,
+["t"] = 1794643808,
+},
+[6615] = {
+["p"] = 1000,
+["t"] = 1794452147,
+},
+[1529] = {
+["t"] = 1794546591,
+["p"] = 776,
+},
+[3770] = {
+["t"] = 1794536553,
+["p"] = 25,
+},
+[6542] = {
+["p"] = 1020,
+["t"] = 1794643902,
+},
+[6605] = {
+["p"] = 1000,
+["t"] = 1794452145,
+},
+[2455] = {
+["t"] = 1794536589,
+["p"] = 25,
+},
+[19484] = {
+["p"] = 100,
+["t"] = 1794647798,
+},
+[6595] = {
+["p"] = 1200,
+["t"] = 1794452138,
+},
+[6582] = {
+["p"] = 1050,
+["t"] = 1794643903,
+},
+[15912] = {
+["p"] = 1143,
+["t"] = 1794782052,
+},
+[9782] = {
+["p"] = 1100,
+["t"] = 1794782135,
+},
+[6537] = {
+["p"] = 1200,
+["t"] = 1794643919,
+},
+[13890] = {
+["p"] = 150,
+["t"] = 1794647799,
+},
+[9806] = {
+["p"] = 1000,
+["t"] = 1794452142,
+},
+[5772] = {
+["t"] = 1794546578,
+["p"] = 780,
+},
+[252022] = {
+["t"] = 1794536490,
+["p"] = 11,
+},
+[250354] = {
+["p"] = 1240,
+["t"] = 1794643924,
+},
+[9838] = {
+["p"] = 1200,
+["t"] = 1794452140,
+},
+[2977] = {
+["t"] = 1794029767,
+["p"] = 500,
+},
+[12184] = {
+["p"] = 120,
+["t"] = 1794648364,
+},
+[9793] = {
+["p"] = 1275,
+["t"] = 1794643928,
+},
+[20747] = {
+["p"] = 1300,
+["t"] = 1794643934,
+},
+[5966] = {
+["p"] = 1750,
+["t"] = 1794452160,
+},
+[3224] = {
+["p"] = 1300,
+["t"] = 1794643937,
+},
+[9763] = {
+["p"] = 334,
+["t"] = 1794782030,
+},
+[15017] = {
+["p"] = 5000,
+["t"] = 1794521420,
+},
+[4537] = {
+["t"] = 1794536595,
+["p"] = 30,
+},
+[8952] = {
+["p"] = 1499,
+["t"] = 1794643946,
+},
+[2997] = {
+["p"] = 252,
+["t"] = 1794434201,
+},
+[4387] = {
+["p"] = 895,
+["t"] = 1794643857,
+},
+[15932] = {
+["p"] = 1220,
+["t"] = 1794781118,
+},
+[2447] = {
+["t"] = 1794485505,
+["p"] = 27,
+},
+[9747] = {
+["p"] = 222,
+["t"] = 1794781124,
+},
+[2457] = {
+["p"] = 490,
+["t"] = 1794648123,
+},
+[2304] = {
+["t"] = 1794536504,
+["p"] = 15,
+},
+[15222] = {
+["p"] = 1214,
+["t"] = 1794782392,
+},
+[8068] = {
+["t"] = 1794536402,
+["p"] = 2,
+},
+[14090] = {
+["p"] = 255,
+["t"] = 1794648622,
+},
+[9812] = {
+["p"] = 565,
+["t"] = 1794782146,
+},
+[15231] = {
+["p"] = 5029,
+["t"] = 1794782385,
+},
+[14114] = {
+["p"] = 399,
+["t"] = 1794648183,
+},
+[3186] = {
+["p"] = 4435,
+["t"] = 1794782148,
+},
+[7455] = {
+["p"] = 5935,
+["t"] = 1794781136,
+},
+[7073] = {
+["t"] = 1794536471,
+["p"] = 7,
+},
+[2449] = {
+["t"] = 1794536585,
+["p"] = 39,
+},
+[6575] = {
+["p"] = 430,
+["t"] = 1794782057,
+},
+[1015] = {
+["t"] = 1794075467,
+["p"] = 440,
+},
+[6179] = {
+["p"] = 1500,
+["t"] = 1794643953,
+},
+[15212] = {
+["p"] = 3432,
+["t"] = 1794782049,
+},
+[9811] = {
+["p"] = 724,
+["t"] = 1794782124,
+},
+[17119] = {
+["t"] = 1794536447,
+["p"] = 6,
+},
+[15268] = {
+["p"] = 1019,
+["t"] = 1794782123,
+},
+[7109] = {
+["p"] = 290,
+["t"] = 1794643774,
+},
+[3047] = {
+["p"] = 1100,
+["t"] = 1794452179,
+},
+[3206] = {
+["p"] = 4572,
+["t"] = 1794782396,
+},
+},
+["libroPos"] = {
+"CENTER",
+"CENTER",
+-43.60906982421875,
+114.2857284545898,
+},
+["diagCombate"] = {
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-15 23:45",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
 ["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["combate"] = "si",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-15 23:54",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-15 23:54",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "si",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 00:30",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 00:50",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 00:51",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 01:05",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "si",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 04:31",
+["clase"] = "MAGE",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 1,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "nil",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 04:31",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "nil",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 04:32",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["combate"] = "si",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 08:47",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "nil",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-16 08:47",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 39,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "si",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 01:50",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "nil",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 02:33",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["casteoObjetivo"] = "nil",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["combate"] = "si",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 07:32",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "no",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "nil",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 07:33",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["combate"] = "si",
+["rango"] = "nil",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "legible",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 10:32",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["asistido"] = "existe",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["cdNuevo"] = "legible",
+["auraUtil"] = "nil",
+["rango"] = "nil",
+["version"] = "4.66",
+["asistidoSiguiente"] = "nil",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["casteoObjetivo"] = "nil",
+["auraNueva"] = "nil",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 10:35",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["casteoObjetivo"] = "nil",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["asistido"] = "existe",
+["combate"] = "no",
+["rango"] = "nil",
+["cdNuevo"] = "legible",
+["version"] = "4.66",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["auraNueva"] = "legible",
+["auraUtil"] = "nil",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 10:41",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["auraUtil"] = "nil",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["rango"] = "nil",
+["asistido"] = "existe",
+["cdNuevo"] = "legible",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["combate"] = "no",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
+},
+{
+["vidaObjetivo"] = "secreto",
+["usableNuevo"] = "legible",
+["fecha"] = "2026-11-17 10:54",
+["clase"] = "HUNTER",
+["placas"] = "legible",
+["auraVieja"] = "no existe",
+["brillo"] = "sin ver",
+["nivel"] = 40,
+["auraUtil"] = "nil",
+["modo"] = "?",
+["cdViejo"] = "no existe",
+["asistidoSiguiente"] = "nil",
+["casteoObjetivo"] = "nil",
+["rango"] = "nil",
+["asistido"] = "existe",
+["cdNuevo"] = "legible",
+["auraNombre"] = "nil",
+["casteo"] = "nil",
+["usableViejo"] = "no existe",
+["version"] = "4.66",
+["auraNueva"] = "legible",
+["combate"] = "si",
+["poder"] = "secreto",
+["guidObjetivo"] = "nil",
+["idEvento"] = "sin ver",
 },
 },
+["avisosFab"] = {
+["Banknspank-CAMWOW EU4 Realm 1 PvE"] = {
+},
+["Derpnschmerp-CAMWOW EU4 Realm 1 PvE"] = {
+},
+},
+["bienvenida"] = 1,
 }

@@ -1,7 +1,7 @@
 
 BugGrabberDB = {
-["session"] = 224,
 ["lastSanitation"] = 3,
+["session"] = 225,
 ["errors"] = {
 {
 ["message"] = "...nterface/AddOns/idAutomation/src/lib/HookManager.lua:114: Usage: hooksecurefunc([table,] \"function\", hookfunc)",
@@ -29,8 +29,8 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Binding header IDAUTOMATION was attempted to be loaded more than once. Source: Interface/AddOns/idAutomation/Bindings.xml",
-["session"] = 5,
 ["time"] = 1791890884,
+["session"] = 5,
 ["counter"] = 3,
 },
 {
@@ -67,20 +67,20 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/ShoppingOperation.lua:1 .../LibTSMSystem/Source/Operation/ShoppingOperation.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["session"] = 17,
 ["time"] = 1792025866,
+["session"] = 17,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/SniperOperation.lua:1 ...er/LibTSMSystem/Source/Operation/SniperOperation.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["session"] = 17,
 ["time"] = 1792025866,
+["session"] = 17,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/VendoringOperation.lua:1 ...LibTSMSystem/Source/Operation/VendoringOperation.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["session"] = 17,
 ["time"] = 1792025866,
+["session"] = 17,
 ["counter"] = 1,
 },
 {
@@ -189,8 +189,8 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/idAutomation/idAutomation.xml:1 Interface/AddOns/idAutomation/idAutomation.xml(99:32): error: not well-formed (invalid token)",
-["session"] = 83,
 ["time"] = 1794079211,
+["session"] = 83,
 ["counter"] = 1,
 },
 {
@@ -275,8 +275,8 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: GetAuraDataByIndex(): Auras cannot be accessed when secret while tainted by 'ModernMapMarkers'\nLua Taint: ModernMapMarkers\n|cffffd200Stack:|r\n[C]: in function 'secureexecuterange'\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:1054: in function <.../AddOns/Blizzard_EditMode/Shared/EditModeManager.lua:1050>\n[C]: in function 'pcall'\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:1050: in function 'InvokeOnAnyEditModeSystemAnchorChanged'\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:1036: in function 'UpdateLayoutInfo'\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:206: in function <.../AddOns/Blizzard_EditMode/Shared/EditModeManager.lua:192>\n",
-["time"] = 1794157366,
 ["session"] = 110,
+["time"] = 1794157366,
 ["counter"] = 1,
 },
 {
@@ -321,20 +321,20 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/MailingOperation.lua:1 ...r/LibTSMSystem/Source/Operation/MailingOperation.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["time"] = 1794160116,
 ["session"] = 111,
+["time"] = 1794160116,
 ["counter"] = 3,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/WoWPro/WoWPro_Trade.lua:1 Interface/AddOns/WoWPro/WoWPro_Trade.lua:359: attempt to index local 'spellInfo' (a nil value)",
-["time"] = 1794160223,
 ["session"] = 112,
+["time"] = 1794160223,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: ...zzard_EditMode/Mainline/EditModeManagerOverrides.lua:89: attempt to perform arithmetic on a nil value\n|cffffd200Stack:|r\n[C]: in function 'secureexecuterange'\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:95: in function 'ShowSystemSelections' with args (self=EditModeManagerFrame <EditModeManager.xml:4>)\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:103: in function 'EnterEditMode' with args (self=EditModeManagerFrame <EditModeManager.xml:4>)\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:130: in function <.../AddOns/Blizzard_EditMode/Shared/EditModeManager.lua:128> with args (self=EditModeManagerFrame <EditModeManager.xml:4>)\n[C]: in function 'Show'\n[Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:498: in function 'SetUIPanel' with args (self=Frame <UIParentPanelManager.lua:152>, key=\"center\", frame=EditModeManagerFrame <EditModeManager.xml:4>, skipSetPoint=nil)\n[Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:294: in function 'ShowUIPanel' with args (self=Frame <UIParentPanelManager.lua:152>, frame=EditModeManagerFrame <EditModeManager.xml:4>, force=nil, contextKey=nil)\n[Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:129: in function <...UIParentPanelManager/Shared/UIParentPanelManager.lua:124> with args (self=Frame <UIParentPanelManager.lua:152>, attribute=\"panel-show\")\n[C]: in function 'SetAttribute'\n[Interface/AddOns/Blizzard_UIParentPanelManager/Shared/UIParentPanelManager.lua]:900: in function 'ShowUIPanel' with args (frame=EditModeManagerFrame <EditModeManager.xml:4>, force=nil, contextKey=nil)\n[Interface/AddOns/Blizzard_EditMode/Shared/EditModeManager.lua]:171: in function <.../AddOns/Blizzard_EditMode/Shared/EditModeManager.lua:171>\n[tail call]: ?\n[C]: in function 'securecallfunction'\n[Interface/AddOns/Blizzard_Menu/Menu.lua]:934: in function 'Pick' with args (self=<table>, menuInputContext=2, menuInputButtonName=\"LeftButton\")\n[Interface/AddOns/Blizzard_Menu/MenuTemplates.lua]:137: in function <Interface/AddOns/Blizzard_Menu/MenuTemplates.lua:131> with args (button=Button <Menu.lua:1150>, buttonName=\"LeftButton\")\n",
-["time"] = 1794160610,
 ["session"] = 112,
+["time"] = 1794160610,
 ["counter"] = 2,
 },
 {
@@ -395,50 +395,50 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/Libs/AceConfig-3.0/AceConfig-3.0.xml:7 Error loading Interface/AddOns/Questie/Libs/AceConfig-3.0/AceConfig-3.0.lua",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:21 Couldn't open Interface/AddOns/Questie/Libs/AceComm-3.0/AceComm-3.0.xml",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:23 Couldn't open Interface/AddOns/Questie/Libs/LibSharedMedia-3.0/lib.xml",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:24 Couldn't open Interface/AddOns/Questie/Libs/AceGUI-3.0-SharedMediaWidgets/widget.xml",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:26 Error loading Interface/AddOns/Questie/Libs/LibDataBroker-1.1/LibDataBroker-1.1.lua",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:27 Error loading Interface/AddOns/Questie/Libs/LibDBIcon-1.0/LibDBIcon-1.0.lua",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:29 Error loading Interface/AddOns/Questie/Libs/Krowi_WorldMapButtons/Krowi_WorldMapButtons.lua",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/Questie/embeds.xml:32 Couldn't open Interface/AddOns/Questie/Libs/LibUIDropDownMenu/LibUIDropDownMenu.xml",
-["session"] = 115,
 ["time"] = 1794162092,
+["session"] = 115,
 ["counter"] = 1,
 },
 {
@@ -603,62 +603,62 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMTypes/Source/Settings/Classes/Types.lua:1 ...Master/LibTSMTypes/Source/Settings/Classes/Types.lua:8: attempt to index local 'LibTSMTypes' (a nil value)",
-["session"] = 149,
 ["time"] = 1794359669,
+["session"] = 149,
 ["counter"] = 6,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMTypes/Source/Settings/Classes/Migration.lua:1 ...er/LibTSMTypes/Source/Settings/Classes/Migration.lua:8: attempt to index local 'LibTSMTypes' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 8,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMTypes/Source/Settings/Classes/Schema.lua:1 ...aster/LibTSMTypes/Source/Settings/Classes/Schema.lua:8: attempt to index local 'LibTSMTypes' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 8,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMTypes/Source/Settings/Classes/View.lua:1 ...lMaster/LibTSMTypes/Source/Settings/Classes/View.lua:8: attempt to index local 'LibTSMTypes' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 8,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMTypes/Source/Settings/Classes/DB.lua:1 ...illMaster/LibTSMTypes/Source/Settings/Classes/DB.lua:8: attempt to index local 'LibTSMTypes' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 9,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMTypes/Source/Settings/Settings.lua:1 ...SkillMaster/LibTSMTypes/Source/Settings/Settings.lua:8: attempt to index local 'LibTSMTypes' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 9,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Core.lua:1 ...AddOns/TradeSkillMaster/LibTSMSystem/Source/Core.lua:8: attempt to call a nil value",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 9,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/Classes/Util.lua:1 ...aster/LibTSMSystem/Source/Operation/Classes/Util.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 9,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/AuctioningOperation.lua:1 ...ibTSMSystem/Source/Operation/AuctioningOperation.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 9,
 },
 {
 ["message"] = "LUA_WARNING: Interface/AddOns/TradeSkillMaster/LibTSMSystem/Source/Operation/CraftingOperation.lua:1 .../LibTSMSystem/Source/Operation/CraftingOperation.lua:8: attempt to index local 'LibTSMSystem' (a nil value)",
-["time"] = 1794359669,
 ["session"] = 149,
+["time"] = 1794359669,
 ["counter"] = 9,
 },
 {
@@ -879,8 +879,8 @@ BugGrabberDB = {
 },
 {
 ["message"] = "LUA_WARNING: Binding header AUXFOREVER was attempted to be loaded more than once. Source: Interface/AddOns/auxForever/Bindings.xml",
-["session"] = 222,
 ["time"] = 1794897180,
+["session"] = 222,
 ["counter"] = 10,
 },
 {
