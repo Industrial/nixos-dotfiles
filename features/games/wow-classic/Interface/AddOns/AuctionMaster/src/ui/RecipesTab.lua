@@ -375,8 +375,10 @@ local function UpdateDropdowns()
       return a.value == nil
     elseif a.count ~= b.count then
       return a.count > b.count
+    elseif a.label ~= b.label then
+      return a.label < b.label
     end
-    return a.label < b.label
+    return a.value < b.value
   end)
   settings.who = found and settings.who or nil
   ui.characterDropdown.SetChoices(choices, settings.who)

@@ -425,18 +425,15 @@ function Scan.HasTimedOut()
   return state == TIMED_OUT
 end
 
--- Whether the addon starts a scan by itself when the auction house opens (global object "settings", off unless the
--- player switched it on: stored as true or nil).
+-- Whether the addon starts a scan by itself when the auction house opens.
+AM.Settings.Define("autoScan", false)
+
 function Scan.IsAutoEnabled()
-  return AM.Database.GetGlobalObject("settings").autoScan == true
+  return AM.Settings.Get("autoScan")
 end
 
 function Scan.SetAutoEnabled(enabled)
-  if enabled then
-    AM.Database.GetGlobalObject("settings").autoScan = true
-  else
-    AM.Database.GetGlobalObject("settings").autoScan = nil
-  end
+  AM.Settings.Set("autoScan", enabled)
 end
 
 -- Seconds until the server allows the next full scan, 0 if it does.

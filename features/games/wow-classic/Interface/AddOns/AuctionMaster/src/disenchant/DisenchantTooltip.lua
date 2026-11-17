@@ -30,20 +30,15 @@ local function GetName(itemId)
   return name
 end
 
--- Whether item tooltips show the disenchant block: on unless switched off in the options (global object
--- "settings").
+-- Whether item tooltips show the disenchant block.
+AM.Settings.Define("disenchantTooltip", true)
+
 function Disenchant.IsTooltipEnabled()
-  return AM.Database.GetGlobalObject("settings").disenchantTooltip ~= false
+  return AM.Settings.Get("disenchantTooltip")
 end
 
 function Disenchant.SetTooltipEnabled(enabled)
-  -- nil is on; not "(not enabled) and false or nil", which is nil for both
-  local settings = AM.Database.GetGlobalObject("settings")
-  if enabled then
-    settings.disenchantTooltip = nil
-  else
-    settings.disenchantTooltip = false
-  end
+  AM.Settings.Set("disenchantTooltip", enabled)
 end
 
 AM.Tooltip.AddItemCallback(function(tooltip, itemId, location)

@@ -1,9 +1,9 @@
 local addonName, AM = ...
 
--- How much the addon writes to the chat, chosen in the options (global object "settings"). Every message has a level:
+-- How much the addon writes to the chat, chosen in the options. Every message has a level:
 --   "quiet"    the answer to something the player did (a click, a command). Shown at every setting: "Quiet" never
 --              hides the feedback to an action, and never shows anything that happened by itself.
---   "normal"   what the player should know without asking (the default, stored as nil).
+--   "normal"   what the player should know without asking (the default).
 --   "detailed" progress and confirmations.
 -- A message is shown when its level is not above the chosen one.
 AM.Chat = {}
@@ -13,12 +13,16 @@ Chat.LEVELS = { "quiet", "normal", "detailed" }
 
 local RANK = { quiet = 1, normal = 2, detailed = 3 }
 
+AM.Settings.Define("chatLevel", "normal")
+
 function Chat.GetLevel()
-  return AM.Database.GetGlobalObject("settings").chatLevel or "normal"
+  return AM.Settings.Get("chatLevel")
 end
 
 function Chat.SetLevel(level)
-  AM.Database.GetGlobalObject("settings").chatLevel = level ~= "normal" and RANK[level] and level or nil
+  if RANK[level] then
+    AM.Settings.Set("chatLevel", level)
+  end
 end
 
 -- True if a message of this level is shown at the chosen setting.

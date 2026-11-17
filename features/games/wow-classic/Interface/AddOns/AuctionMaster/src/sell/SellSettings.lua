@@ -27,7 +27,8 @@ function SellSettings.SetNumber(key, value)
   AM.Events.Fire(key:find("^undercut") and "OWN_AUCTIONS_CHANGED" or "PRICES_CHANGED")
 end
 
--- Items the player never wants to sell, by itemDbKey (the global object "sellIgnored": itemDbKey -> true; equipment of
+-- Items the player never wants to sell, by itemDbKey (the faction object "sellIgnored", each auction house its own and
+-- starting with the account-wide list of older versions: itemDbKey -> true; equipment of
 -- another level is another item). The Sell tab hides them unless the filter "show ignored items" is on (kept in
 -- "sellSettings" like the numbers).
 -- The list used to be by itemId (a number). On first access a numeric key becomes the itemDbKey of the item where the
@@ -37,7 +38,7 @@ end
 local ignoredMigrated = {}
 
 local function Ignored()
-  local ignored = AM.Database.GetGlobalObject("sellIgnored")
+  local ignored = AM.Database.GetFactionObjectFromGlobal("sellIgnored")
   if not ignoredMigrated[ignored] then
     ignoredMigrated[ignored] = true
     local old = {}

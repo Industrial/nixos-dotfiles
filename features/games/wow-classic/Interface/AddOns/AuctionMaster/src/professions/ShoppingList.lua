@@ -7,7 +7,8 @@ local addonName, AM = ...
 -- the reagents of its recipes are summed up and compared with what the character using the window carries. The
 -- recipes are stored together with their name, icon and reagents as of adding them: the classic profession API
 -- only answers while the profession window is open.
--- The global object "shoppingList" holds the lists, "shoppingPanel" the state of the view (collapsed
+-- The faction object "shoppingList" holds the lists (one set per auction house), the global object "shoppingPanel"
+-- the state of the view (collapsed
 -- sections), so that it can be reset without losing the lists.
 AM.ShoppingList = {}
 local ShoppingList = AM.ShoppingList
@@ -50,10 +51,42 @@ local function Migrate(data)
   end
 end
 
+-- The lists were account-wide before they were kept per auction house (the faction object "shoppingList"). Each list
+-- of the old global object moves to the auction house of its crafter as soon as that is known here
+-- (ProfessionScanner.GetHouseGuids). The others wait in the global object for
+-- their own auction house, which is deleted once it is empty. Checked once per session (a change of auction house
+-- means a new login).
+local globalChecked
+local function AdoptGlobalLists(data)
+  globalChecked = true
+  local global = AM.Database.GetGlobalObject("shoppingList")
+  if global.lists then
+    Migrate(global)
+  end
+  local old = global.crafters
+  if old and next(old) then
+    local here = AM.ProfessionScanner.GetHouseGuids()
+    data.crafters = data.crafters or {}
+    for guid, list in pairs(old) do
+      if here[guid] then
+        data.crafters[guid] = data.crafters[guid] or list
+        old[guid] = nil
+      end
+    end
+    if global.activeGuid and here[global.activeGuid] then
+      data.activeGuid = data.activeGuid or global.activeGuid
+      global.activeGuid = nil
+    end
+  end
+  if not (old and next(old)) then
+    AM.Database.ResetGlobalObject("shoppingList")
+  end
+end
+
 function ShoppingList.GetData()
-  local data = AM.Database.GetGlobalObject("shoppingList")
-  if data.lists then
-    Migrate(data)
+  local data = AM.Database.GetFactionObject("shoppingList")
+  if not globalChecked then
+    AdoptGlobalLists(data)
   end
   return data
 end
@@ -80,7 +113,7 @@ local GetList = ShoppingList.GetList
 -- the current one, each { guid, name, class (file name, may be nil), count (recipes on the list) }, sorted by name.
 -- Ignored characters are left out (their lists are kept for when they are not), the current one is never.
 function ShoppingList.GetCrafters()
-  local characters = AM.Database.GetGlobalObject("characters")
+  local characters = AM.ProfessionScanner.GetCharacters()
   local guids = { [UnitGUID("player")] = true }
   for guid, list in pairs(GetData().crafters or {}) do
     if #list.recipes > 0 and not AM.ProfessionScanner.IsCharacterIgnored(guid) then
@@ -105,14 +138,17 @@ function ShoppingList.GetCrafters()
     end
   end
   table.sort(crafters, function(a, b)
-    return a.name < b.name
+    if a.name ~= b.name then
+      return a.name < b.name
+    end
+    return a.guid < b.guid
   end)
   return crafters
 end
 
 -- Name and class of a crafter as { guid, name, class }.
 function ShoppingList.GetCrafter(guid)
-  local character = AM.Database.GetGlobalObject("characters")[guid]
+  local character = AM.ProfessionScanner.GetCharacters()[guid]
   if type(character) == "table" then
     return { guid = guid, name = AM.RecipeList.GetCharacterName(character), class = character.class }
   end
@@ -236,7 +272,7 @@ local function AddOtherStock(itemIds, owned, need, counted)
     numCounted = numCounted + 1
   end
   local candidates = {}
-  for guid in pairs(AM.Database.GetGlobalObject("characters")) do
+  for guid in pairs(AM.ProfessionScanner.GetCharacters()) do
     if not counted[guid] and not AM.ProfessionScanner.IsCharacterIgnored(guid) then
       local stock = CountStored(itemIds, guid)
       if stock > 0 then
@@ -755,7 +791,7 @@ function ShoppingList.RemoveCrafter(guid)
   if data.activeGuid == guid then
     data.activeGuid = nil
   end
-  AM.Database.GetGlobalObject("characters")[guid] = nil
+  AM.ProfessionScanner.GetCharacters()[guid] = nil
   AM.ProfessionScanner.ForgetCharacter(guid)
   AM.Inventory.ForgetCharacter(guid)
   AM.Mailbox.ForgetCharacter(guid)

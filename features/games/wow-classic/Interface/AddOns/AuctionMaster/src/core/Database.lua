@@ -3,7 +3,9 @@ local addonName, AM = ...
 -- Access to the saved variables (AuctionMasterDB). Code never touches AuctionMasterDB
 -- directly but asks for a named object, either account-wide (GetGlobalObject) or one per
 -- auction house of the current character (GetFactionObject: its faction, on Forever also its
--- rule set), as prices differ between the auction houses and merchants.
+-- rule set), as prices differ between the auction houses and merchants. Everything about the game world (prices,
+-- recipes, characters and their bags, mail, lists) is a faction object; a global object is only for what is the same
+-- on every auction house of the account (preferences, window states). In doubt, a faction object (see CLAUDE.md).
 --
 -- An object is stored as { version, data } and the data table is what the caller gets. The
 -- version defaults to 1 and is meant to drive migrations once an object's shape changes.
@@ -45,7 +47,7 @@ end
 -- Same as GetGlobalObject, but separate for each auction house: the faction of the current character, on Forever
 -- also its rule set ("Horde-16"). Forever data from before the rule set was part of the key lies under the faction
 -- alone and is taken over by the first rule set that asks for it.
-function Database.GetFactionObject(name, defaultValue)
+local function GetFactionContainer()
   local faction = UnitFactionGroup("player") or "Neutral"
   local factions = AuctionMasterDB.factions
   local key = faction
@@ -57,7 +59,57 @@ function Database.GetFactionObject(name, defaultValue)
     end
   end
   factions[key] = factions[key] or {}
-  return GetObject(factions[key], name, defaultValue)
+  return factions[key]
+end
+
+function Database.GetFactionObject(name, defaultValue)
+  return GetObject(GetFactionContainer(), name, defaultValue)
+end
+
+-- For an object that used to be account-wide and is now kept per auction house under the same name: moves the
+-- entries of the old account-wide object whose key claim(key) accepts into the faction object (an entry it already
+-- has wins). The others wait there for their own auction house; the account-wide object is deleted once it is empty.
+function Database.AdoptGlobalEntries(name, claim)
+  local global = AuctionMasterDB.global[name]
+  if not global then
+    return
+  end
+  local old = global.data or {}
+  local house = Database.GetFactionObject(name)
+  for key, value in pairs(old) do
+    if claim(key) then
+      if house[key] == nil then
+        house[key] = value
+      end
+      old[key] = nil
+    end
+  end
+  if next(old) == nil then
+    AuctionMasterDB.global[name] = nil
+  end
+end
+
+local function DeepCopy(value)
+  if type(value) ~= "table" then
+    return value
+  end
+  local copy = {}
+  for key, entry in pairs(value) do
+    copy[key] = DeepCopy(entry)
+  end
+  return copy
+end
+
+-- Same as GetFactionObject, for an object that used to be account-wide while nothing tells which auction house its
+-- data belongs to (the player's own rules and lists): an auction house that has no such object yet starts with a copy
+-- of the account-wide one, which stays for the auction houses still to come.
+function Database.GetFactionObjectFromGlobal(name)
+  local container = GetFactionContainer()
+  local global = AuctionMasterDB.global[name]
+  if container[name] == nil and global and global.data then
+    return GetObject(container, name, DeepCopy(global.data))
+  end
+  return GetObject(container, name)
 end
 
 -- Deletes the account-wide object name, it starts afresh the next time it is requested.

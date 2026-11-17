@@ -15,6 +15,8 @@ local UI = AM.Theme.ui
 
 local WIDTH, HEIGHT = 340, 420
 local CHARACTER_HEIGHT, PROFESSION_HEIGHT = 30, 24
+-- the widest a name may get so the x after it still fits next to the scroll bar
+local NAME_MAX_WIDTH = 190
 local PENCIL_ICON = "Interface\\AddOns\\" .. addonName .. "\\assets\\pencil"
 
 local frame, list, empty
@@ -53,7 +55,6 @@ local function CreateRow(parent)
   row.remove = Widgets.CreateRemoveButton(row, L["SHOPPING_CRAFTER_REMOVE_TOOLTIP"], function()
     AM.ShoppingList.ConfirmRemoveCrafter(row.item.guid)
   end)
-  row.remove:SetPoint("RIGHT", -8, 0)
   return row
 end
 
@@ -83,7 +84,11 @@ local function SetupRow(row, item)
   end
   row.icon:SetPoint("LEFT", row.check, "RIGHT", 2, 0)
   row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-  row.name:SetPoint("RIGHT", row.remove, "LEFT", -6, 0)
+  -- the x follows right after the name; a long name is cut so the x stays inside the row
+  row.name:SetWidth(0)
+  row.name:SetWidth(math.min(row.name:GetStringWidth(), NAME_MAX_WIDTH))
+  row.remove:ClearAllPoints()
+  row.remove:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
 end
 
 local function CreateWindow()

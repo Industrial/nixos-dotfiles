@@ -20,28 +20,29 @@ local function IsSellable(itemId, location)
   return true
 end
 
--- How much of the market data the tooltip shows, chosen in the options (global object "settings"): "full" (the
--- default, stored as nil), "compact" (two lines) or "off".
+-- How much of the market data the tooltip shows: "full" (the default), "compact" (two lines) or "off".
 AM.Tooltip.MARKET_MODES = { "full", "compact", "off" }
+AM.Settings.Define("marketTooltip", "full")
 
 function AM.Tooltip.GetMarketMode()
-  return AM.Database.GetGlobalObject("settings").marketTooltip or "full"
+  return AM.Settings.Get("marketTooltip")
 end
 
 function AM.Tooltip.SetMarketMode(mode)
-  AM.Database.GetGlobalObject("settings").marketTooltip = mode ~= "full" and mode or nil
+  AM.Settings.Set("marketTooltip", mode)
 end
 
--- Which prices the tooltip shows (global object "settings"): "stack" (the default, stored as nil) for the whole
--- stack, "single" for a single item. Holding Alt shows the other kind.
+-- Which prices the tooltip shows: "stack" (the default) for the whole stack, "single" for a single item. Holding Alt
+-- shows the other kind.
 AM.Tooltip.PRICE_MODES = { "stack", "single" }
+AM.Settings.Define("priceTooltip", "stack")
 
 function AM.Tooltip.GetPriceMode()
-  return AM.Database.GetGlobalObject("settings").priceTooltip or "stack"
+  return AM.Settings.Get("priceTooltip")
 end
 
 function AM.Tooltip.SetPriceMode(mode)
-  AM.Database.GetGlobalObject("settings").priceTooltip = mode ~= "stack" and mode or nil
+  AM.Settings.Set("priceTooltip", mode)
 end
 
 -- Nothing is known of an item before the first full scan (unless it was searched): the tooltip says so, instead of

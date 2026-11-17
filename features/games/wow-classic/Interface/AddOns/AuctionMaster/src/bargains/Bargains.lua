@@ -4,8 +4,10 @@ local L = AM.L
 -- Bargains: what the player is looking for at a good price. A rule is either a specific item, which is found by
 -- searching it in the auction house (the searches of ItemSearch, from the Bargains panel or anywhere else) or by a full
 -- scan, or a filter
--- (category, levels, quality), which is matched against every auction of a full scan. The rules are kept in the global
--- object "bargains"; what was found is kept in the faction object "bargainHits" so that it survives until the next scan:
+-- (category, levels, quality), which is matched against every auction of a full scan. The rules are kept in the faction
+-- object "bargains" (each auction house has its own prices, so its own rules; the account-wide rules of older versions
+-- are where each starts); what was found is kept in the faction object "bargainHits" so that it survives until the next
+-- scan:
 --   filters  ruleId -> list of { itemId, price, count }, the cheapest items that matched (price per item)
 --   scannedAt  time of the scan the filter hits are from
 --   items    ruleId -> { low, searchedAt }, the lowest price per item when the item was searched last
@@ -36,7 +38,7 @@ local CHECK_SECONDS = 0.5
 local REJECTED_LOGGED = 60
 
 local function Data()
-  local data = AM.Database.GetGlobalObject("bargains")
+  local data = AM.Database.GetFactionObjectFromGlobal("bargains")
   data.rules = data.rules or {}
   data.nextId = data.nextId or 1
   return data

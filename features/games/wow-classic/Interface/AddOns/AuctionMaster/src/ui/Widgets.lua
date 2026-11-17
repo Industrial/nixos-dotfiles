@@ -146,23 +146,39 @@ function Widgets.CreateIconButton(parent, text, size, onClick)
   return button
 end
 
--- A small, muted "×" without a background that brightens under the cursor, for removing an entry of a list.
+-- The game's clear button of a search box (the round "x" of SearchBoxTemplate, half transparent, full under the
+-- cursor), for removing an entry of a list. Falls back to a grey "×" where the atlas is missing.
 function Widgets.CreateRemoveButton(parent, tooltip, onClick)
   local button = CreateFrame("Button", nil, parent)
   button:SetSize(16, 16)
-  local text = button:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  text:SetPoint("CENTER", 0, 1)
-  text:SetText("×")
-  text:SetTextColor(0.3, 0.3, 0.3)
+  local icon
+  if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo("common-search-clearbutton") then
+    icon = button:CreateTexture(nil, "ARTWORK")
+    icon:SetAtlas("common-search-clearbutton")
+    icon:SetSize(10, 10)
+  else
+    icon = button:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    icon:SetText("×")
+    icon:SetTextColor(1, 1, 1)
+  end
+  icon:SetPoint("CENTER")
+  icon:SetAlpha(0.5)
   button:SetScript("OnEnter", function(self)
-    text:SetTextColor(0.55, 0.55, 0.55)
+    icon:SetAlpha(1)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(tooltip, 1, 1, 1)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
-    text:SetTextColor(0.3, 0.3, 0.3)
+    icon:SetAlpha(0.5)
     GameTooltip_Hide()
+  end)
+  -- pressed in, like the game's clear button
+  button:SetScript("OnMouseDown", function()
+    icon:SetPoint("CENTER", 1, -1)
+  end)
+  button:SetScript("OnMouseUp", function()
+    icon:SetPoint("CENTER", 0, 0)
   end)
   button:SetScript("OnClick", onClick)
   return button

@@ -13,23 +13,61 @@ AM.ProfessionScanner = ProfessionScanner
 local SCAN_DELAY = 0.5
 local scanPending = false
 
--- Characters are kept by their GUID, which survives a rename. The global object "characters" maps
--- the GUID to { name, realm, class } (class being the class file, e.g. "MAGE") for showing it.
+-- The GUIDs of the characters of the current auction house (guid -> true): the current one and those with recipes,
+-- bags or mail recorded for it. Decides which entries of the objects that used to be account-wide belong here.
+function ProfessionScanner.GetHouseGuids()
+  local guids = { [UnitGUID("player")] = true }
+  for _, recipes in pairs(AM.Database.GetFactionObject("recipes")) do
+    for _, recipe in ipairs(recipes) do
+      for _, guid in ipairs(recipe.crafters) do
+        guids[guid] = true
+      end
+    end
+  end
+  for _, name in ipairs({ "inventory", "mail" }) do
+    for guid in pairs(AM.Database.GetFactionObject(name)) do
+      guids[guid] = true
+    end
+  end
+  return guids
+end
+
+-- Objects keyed by GUID that were account-wide and are kept per auction house now: their old entries move over once
+-- per session (a change of auction house means a new login).
+local adopted = {}
+local function GetHouseObject(name)
+  if not adopted[name] then
+    adopted[name] = true
+    local here = ProfessionScanner.GetHouseGuids()
+    AM.Database.AdoptGlobalEntries(name, function(guid)
+      return here[guid]
+    end)
+  end
+  return AM.Database.GetFactionObject(name)
+end
+
+-- Characters are kept by their GUID, which survives a rename. The faction object "characters" maps the GUID to
+-- { name, realm, class } (class being the class file, e.g. "MAGE") for showing it, for the characters of the current
+-- auction house.
+function ProfessionScanner.GetCharacters()
+  return GetHouseObject("characters")
+end
+
 local function GetCharacter()
   local guid = UnitGUID("player")
   local name, realm = UnitFullName("player")
   if not realm or realm == "" then
     realm = GetNormalizedRealmName()
   end
-  AM.Database.GetGlobalObject("characters")[guid] = { name = name, realm = realm, class = select(2, UnitClass("player")) }
+  ProfessionScanner.GetCharacters()[guid] = { name = name, realm = realm, class = select(2, UnitClass("player")) }
   return guid
 end
 
--- A character or single professions of it can be ignored (the global object "ignored": GUID -> { all = true,
+-- A character or single professions of it can be ignored (the faction object "ignored": GUID -> { all = true,
 -- [skillLine] = true }). Its recipes stay recorded but do not count: the character is no crafter of them, as if
 -- it did not know them. Ignoring the whole character also covers recipes that have no profession stored.
 local function GetIgnored()
-  return AM.Database.GetGlobalObject("ignored")
+  return GetHouseObject("ignored")
 end
 
 function ProfessionScanner.IsCharacterIgnored(guid)
@@ -97,7 +135,7 @@ end
 -- professions = { { skillLine, name, icon, ignored } sorted by name } }, sorted by name. Professions are the ones
 -- the recipes are recorded under (those that have a stored name), ignored ones included.
 function ProfessionScanner.GetKnownProfessions()
-  local characters = AM.Database.GetGlobalObject("characters")
+  local characters = AM.ProfessionScanner.GetCharacters()
   local names = AM.Database.GetGlobalObject("professions")
   local icons = AM.Database.GetGlobalObject("professionIcons")
   local byGuid, list = {}, {}
@@ -127,11 +165,18 @@ function ProfessionScanner.GetKnownProfessions()
   for _, known in ipairs(list) do
     known.seen = nil
     table.sort(known.professions, function(a, b)
-      return a.name < b.name
+      if a.name ~= b.name then
+        return a.name < b.name
+      end
+      return a.skillLine < b.skillLine
     end)
   end
+  -- by GUID among equal names, so that namesakes keep their order on every refresh
   table.sort(list, function(a, b)
-    return a.name < b.name
+    if a.name ~= b.name then
+      return a.name < b.name
+    end
+    return a.guid < b.guid
   end)
   return list
 end

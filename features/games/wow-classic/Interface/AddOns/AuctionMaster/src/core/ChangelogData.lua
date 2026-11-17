@@ -4,6 +4,11 @@ local addonName, AM = ...
 AM.ChangelogMarkdown = [====[
 # Changelog
 
+## 11.6.6
+
+- Shopping list: Lists, crafters and their hidden professions are now kept separately for each faction and Forever ruleset, so only the characters of the current auction house show up
+- Bargains and Sell: Bargain rules and items never to sell are now kept separately for each faction and Forever ruleset, each starting with your current ones
+
 ## 11.6.5
 
 - Full scan: Added a full scan button to the footer of every auction house tab, showing the progress and how old the last scan is
@@ -191,6 +196,7 @@ AM.ChangelogMarkdown = [====[
 
 -- Chat message per version and language (enUS is the fallback).
 AM.ChangelogAnnounce = {
+  ["11.6.6"] = { silent = true },
   ["11.6.5"] = { enUS = "Full Scan button on every auction house tab, automatic scan off by default", deDE = "Komplettscan-Button auf jedem Tab des Auktionshauses, automatischer Scan standardmäßig aus" },
   ["11.6.4"] = { silent = true },
   ["11.6.3"] = { silent = true },

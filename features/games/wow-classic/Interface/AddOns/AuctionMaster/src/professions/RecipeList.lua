@@ -59,7 +59,7 @@ end
 -- a character is { guid, name, class (file name, may be nil), count (entries) }, sorted by the number of entries (most first), then by name,
 -- and a profession is { skillLine, name, icon (nil if unknown), count (entries) }, sorted by name.
 function RecipeList.Build()
-  local characters = AM.Database.GetGlobalObject("characters")
+  local characters = AM.ProfessionScanner.GetCharacters()
   local entries, byGuid = {}, {}
   local hasScan = AM.ItemStore.HasScan()
   -- An item listed on average less often than this per scan (ItemStore's avgCount) is rarely listed.
@@ -118,8 +118,10 @@ function RecipeList.Build()
   table.sort(list, function(a, b)
     if a.count ~= b.count then
       return a.count > b.count
+    elseif a.name ~= b.name then
+      return a.name < b.name
     end
-    return a.name < b.name
+    return a.guid < b.guid
   end)
   -- the professions of the entries, sorted by name (recipes read before the profession was stored have none)
   local names = AM.Database.GetGlobalObject("professions")
@@ -141,7 +143,10 @@ function RecipeList.Build()
     end
   end
   table.sort(professions, function(a, b)
-    return a.name < b.name
+    if a.name ~= b.name then
+      return a.name < b.name
+    end
+    return a.skillLine < b.skillLine
   end)
   return entries, list, professions
 end

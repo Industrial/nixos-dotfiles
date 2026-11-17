@@ -116,20 +116,15 @@ local function ReadClassic()
   return candidates
 end
 
--- Whether the profession windows show the suggestions: on unless switched off in the options (global object
--- "settings").
+-- Whether the profession windows show the suggestions.
+AM.Settings.Define("leveling", true)
+
 function Leveling.IsEnabled()
-  return AM.Database.GetGlobalObject("settings").leveling ~= false
+  return AM.Settings.Get("leveling")
 end
 
 function Leveling.SetEnabled(enabled)
-  -- nil is on; not "enabled and nil or false", which is false for both
-  local settings = AM.Database.GetGlobalObject("settings")
-  if enabled then
-    settings.leveling = nil
-  else
-    settings.leveling = false
-  end
+  AM.Settings.Set("leveling", enabled)
   AM.CraftList.Update()
   AM.CraftPanel.Update()
 end
