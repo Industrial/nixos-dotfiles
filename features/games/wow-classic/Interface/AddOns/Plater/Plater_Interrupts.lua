@@ -100,9 +100,13 @@ end
 
 --hidden cooldown frame running the interrupt cooldown, its OnCooldownDone is the ready moment
 local cooldownTracker = CreateFrame("cooldown", "PlaterInterruptCooldownTracker", UIParent, "CooldownFrameTemplate")
+--the template is anchored to all points of UIParent
+cooldownTracker:ClearAllPoints()
 cooldownTracker:SetSize(1, 1)
 cooldownTracker:SetPoint("topleft", UIParent, "topleft", 0, 0)
 cooldownTracker:SetAlpha(0)
+cooldownTracker:SetDrawEdge(false)
+cooldownTracker:SetDrawBling(false)
 cooldownTracker:Show()
 
 --the interrupt is ready again: sound and refresh of every plate
@@ -246,28 +250,28 @@ function Interrupts.CreatePlateWidgets(unitFrame) --private
 	local castBar = unitFrame.castBar
 	local sparkParent = castBar
 
-	--midnight: cast and cooldown times are secret, so the client places the spark. a transparent bar starts at
-	--the edge of the cast fill, is scaled to the cast duration and filled to the remaining cooldown, its fill
-	--edge is where the cast fill will be when the interrupt is ready. it sits in a frame clipped to the cast bar,
-	--a ready point after the cast end is cut off
+	--midnight: spark at the end of the ready bar, which stays unclipped (a clipped fill stops at the clip edge)
 	if (IS_WOW_PROJECT_MIDNIGHT) then
 		local clipFrame = CreateFrame("frame", nil, castBar)
 		clipFrame:SetAllPoints()
 		clipFrame:SetClipsChildren(true)
 
-		local readyBar = CreateFrame("statusbar", nil, clipFrame)
+		local castSnapshotBar = CreateFrame("statusbar", nil, clipFrame)
+		castSnapshotBar:SetAllPoints()
+		castSnapshotBar:SetStatusBarTexture([[Interface\Buttons\WHITE8X8]])
+		castSnapshotBar:GetStatusBarTexture():SetAlpha(0)
+		castBar.InterruptCastSnapshotBar = castSnapshotBar
+
+		local readyBar = CreateFrame("statusbar", nil, castBar)
 		readyBar:SetStatusBarTexture([[Interface\Buttons\WHITE8X8]])
 		readyBar:GetStatusBarTexture():SetAlpha(0)
 		readyBar:Hide()
-		--runs only while shown, which is only while the interrupt is on cooldown (durationObject is set)
-		readyBar:SetScript("OnUpdate", function(self)
-			self:SetValue(durationObject:GetRemainingDuration())
-		end)
 		castBar.InterruptReadyBar = readyBar
-		sparkParent = readyBar
+		sparkParent = castSnapshotBar
 
 		--midnight: the texture can't be swapped by a secret, it is a texture over the cast fill whose alpha follows them
-		local textureOverlay = castBar:CreateTexture(nil, "artwork", nil, -5)
+		--the cast fill is drawn at artwork 0
+		local textureOverlay = castBar:CreateTexture(nil, "artwork", nil, 1)
 		textureOverlay:Hide()
 		castBar.InterruptTextureOverlay = textureOverlay
 	end
@@ -389,7 +393,6 @@ function Interrupts.UpdateCastBar(castBar) --private
 	local isReadyInTime = readyAt and readyAt < castBar.spellEndTime
 
 	local color
-	local isOutOfRange = false
 	local isRangeSecret = false
 	local secretInRange
 	if (isNotReady) then
@@ -410,7 +413,6 @@ function Interrupts.UpdateCastBar(castBar) --private
 			secretInRange = inRange
 		elseif (inRange == false) then
 			color = profile.cast_statusbar_color_interrupt_out_of_range
-			isOutOfRange = true
 		end
 	end
 
@@ -419,7 +421,8 @@ function Interrupts.UpdateCastBar(castBar) --private
 		color = nil
 	end
 
-	local wantsTexture = (isNotReady or isOutOfRange or isRangeSecret) and profile.cast_statusbar_interrupt_texture ~= ""
+	--out of range is only a color, the texture marks the interrupt not ready (in or out of range)
+	local wantsTexture = isNotReady and profile.cast_statusbar_interrupt_texture ~= ""
 
 	--classic: the texture goes first, the color is applied on top of it. midnight uses an overlay, see below
 	if (not IS_WOW_PROJECT_MIDNIGHT) then
@@ -454,21 +457,16 @@ function Interrupts.UpdateCastBar(castBar) --private
 		end
 	end
 
-	--midnight: the overlay takes the bar's color, its alpha hides it on non interruptible casts and, with a secret
-	--range result, in range. it is stretched over the fill, so a texture with a horizontal pattern is squeezed
+	--midnight: the overlay takes the bar's color, its alpha hides it on non interruptible casts.
+	--it is stretched over the fill, so a texture with a horizontal pattern is squeezed
 	if (IS_WOW_PROJECT_MIDNIGHT) then
 		local textureOverlay = castBar.InterruptTextureOverlay
 		if (wantsTexture) then
 			local castFill = castBar:GetStatusBarTexture()
 			local r, g, b = castFill:GetVertexColor()
-			local alpha = 1
-			if (isRangeSecret) then
-				alpha = C_CurveUtil.EvaluateColorValueFromBoolean(secretInRange, 0, 1)
-			end
-
 			textureOverlay:SetTexture(LibSharedMedia:Fetch("statusbar", profile.cast_statusbar_interrupt_texture))
 			textureOverlay:SetAllPoints(castFill)
-			textureOverlay:SetVertexColor(r, g, b, alpha)
+			textureOverlay:SetVertexColor(r, g, b, 1)
 			if (type(castBar.notInterruptible) ~= "nil") then
 				textureOverlay:SetAlphaFromBoolean(castBar.notInterruptible, 0, 1)
 			else
@@ -490,37 +488,49 @@ function Interrupts.UpdateCastBar(castBar) --private
 		--the cast test has no duration object, nor a real cooldown
 		local castDuration = castBar.durationObject
 		if (isNotReady and isOnCooldown and castDuration and profile.cast_statusbar_interrupt_spark_enabled) then
-			local castFill = castBar:GetStatusBarTexture()
-			readyBar:ClearAllPoints()
-			readyBar:SetWidth(castBar:GetWidth())
-			readyBar:SetMinMaxValues(0, castDuration:GetTotalDuration())
-			readyBar:SetValue(durationObject:GetRemainingDuration())
-			spark:ClearAllPoints()
-			spark:SetSize(CONST_SPARK_WIDTH, castBar:GetHeight())
+			--laid out again only when the cast or the cooldown changes, both come with a new duration object
+			if (readyBar.CastDuration ~= castDuration or readyBar.CooldownDuration ~= durationObject) then
+				readyBar.CastDuration = castDuration
+				readyBar.CooldownDuration = durationObject
 
-			--channels drain to the left (empowered casts fill like casts)
-			if (castBar.channeling and not castBar.empowered) then
-				readyBar:SetReverseFill(true)
-				readyBar:SetPoint("topright", castFill, "topright")
-				readyBar:SetPoint("bottomright", castFill, "bottomright")
-				spark:SetPoint("center", readyBar:GetStatusBarTexture(), "left")
-			else
-				readyBar:SetReverseFill(false)
-				readyBar:SetPoint("topleft", castFill, "topright")
-				readyBar:SetPoint("bottomleft", castFill, "bottomright")
-				spark:SetPoint("center", readyBar:GetStatusBarTexture(), "right")
+				local castSnapshotBar = castBar.InterruptCastSnapshotBar
+				local snapshotFill = castSnapshotBar:GetStatusBarTexture()
+				local totalDuration = castDuration:GetTotalDuration()
+				castSnapshotBar:SetMinMaxValues(0, totalDuration)
+				readyBar:ClearAllPoints()
+				readyBar:SetWidth(castBar:GetWidth())
+				readyBar:SetMinMaxValues(0, totalDuration)
+				readyBar:SetValue(durationObject:GetRemainingDuration())
+				spark:ClearAllPoints()
+				spark:SetSize(CONST_SPARK_WIDTH, castBar:GetHeight())
+
+				--channels drain to the left (empowered casts fill like casts)
+				if (castBar.channeling and not castBar.empowered) then
+					castSnapshotBar:SetValue(castDuration:GetRemainingDuration())
+					readyBar:SetReverseFill(true)
+					readyBar:SetPoint("topright", snapshotFill, "topright")
+					readyBar:SetPoint("bottomright", snapshotFill, "bottomright")
+					spark:SetPoint("center", readyBar:GetStatusBarTexture(), "left")
+				else
+					castSnapshotBar:SetValue(castDuration:GetElapsedDuration())
+					readyBar:SetReverseFill(false)
+					readyBar:SetPoint("topleft", snapshotFill, "topright")
+					readyBar:SetPoint("bottomleft", snapshotFill, "bottomright")
+					spark:SetPoint("center", readyBar:GetStatusBarTexture(), "right")
+				end
 			end
 
 			--no spark on non interruptible casts
 			if (type(castBar.notInterruptible) ~= "nil") then
-				readyBar:SetAlphaFromBoolean(castBar.notInterruptible, 0, 1)
+				spark:SetAlphaFromBoolean(castBar.notInterruptible, 0, 1)
 			else
-				readyBar:SetAlpha(1)
+				spark:SetAlpha(1)
 			end
 
 			readyBar:Show()
 			spark:Show()
 		else
+			readyBar.CastDuration = nil
 			readyBar:Hide()
 			spark:Hide()
 		end

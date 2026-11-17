@@ -82,10 +82,10 @@ local GetSpecializationInfo = C_SpecializationInfo and C_SpecializationInfo.GetS
 
 local IS_WOW_PROJECT_MAINLINE = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 local IS_WOW_PROJECT_NOT_MAINLINE = WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE
-local IS_WOW_PROJECT_CLASSIC_ERA = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 local IS_WOW_PROJECT_CLASSIC_WRATH = DF.IsWotLKWow()
 local IS_WOW_PROJECT_CLASSIC_MOP = DF.IsPandaWow()
 local IS_WOW_PROJECT_MIDNIGHT = DF.IsAddonApocalypseWow()
+local IS_WOW_PROJECT_FOREVER = DF.IsForeverWow()
 local IS_WOW_PROJECT_MIDNIGHT_API = DF.IsMidnightWowAPI()
 local IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS = C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo("CustomAuraContainerTemplate") and true or false
 
@@ -97,6 +97,7 @@ local LibSharedMedia = LibStub:GetLibrary ("LibSharedMedia-3.0") -- https://www.
 local LCG = LibStub:GetLibrary("LibCustomGlow-1.0") -- https://github.com/Stanzilla/LibCustomGlow
 local LibRangeCheck = LibStub:GetLibrary ("LibRangeCheck-3.0") -- https://github.com/WeakAuras/LibRangeCheck-3.0
 local LibTranslit = LibStub:GetLibrary ("LibTranslit-1.0") -- https://github.com/Vardex/LibTranslit
+local LibCustomNames = LibStub:GetLibrary ("CustomNames", true) -- https://www.curseforge.com/wow/addons/libcustomnames
 local LDB = LibStub ("LibDataBroker-1.1", true)
 local LDBIcon = LDB and LibStub ("LibDBIcon-1.0", true)
 
@@ -460,6 +461,7 @@ Plater.AnchorNamesByPhraseId = {
 	--store translit option
 	local DB_USE_NAME_TRANSLIT = false
 	local TRANSLIT_MARK = "*"
+	local DB_USE_CUSTOM_NAMES = false
 	
 	--store the npc id cache
 	local DB_NPCIDS_CACHE = {}
@@ -966,7 +968,7 @@ Plater.AnchorNamesByPhraseId = {
 			local isInRange = rangeChecker (plateFrame [MEMBER_UNITID] or unitFrame [MEMBER_UNITID])
 			--print(isInRange, issecretvalue(isInRange))
 
-			if (IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isInRange)) then
+			if (issecretvalue(isInRange)) then
 				unitFrame.IsInRange = isInRange -- this might complicate things...
 				
 				unitFrame:SetAlphaFromBoolean (isInRange, nameplateAlpha * inRangeAlpha * (notTheTarget and overallRangeCheckAlpha or 1), (unitIsTarget and inRangeAlpha or overallRangeCheckAlpha) * nameplateAlpha * (notTheTarget and alphaMultiplier or 1))
@@ -1587,8 +1589,8 @@ Plater.AnchorNamesByPhraseId = {
 		["clampTargetNameplateToScreen"] = true,
 		["nameplateTargetRadialPosition"] = true,
 		["nameplateSelectedAlpha"] = true,
-		["nameplateNotSelectedAlpha"] = (IS_WOW_PROJECT_NOT_MAINLINE),
-		["nameplateRemovalAnimation"] = (IS_WOW_PROJECT_NOT_MAINLINE),
+		["nameplateNotSelectedAlpha"] = true,
+		["nameplateRemovalAnimation"] = true,
 		["nameplateMinAlpha"] = true,
 		["nameplateMinAlphaDistance"] = true,
 		["nameplateShowDebuffsOnFriendly"] = true,
@@ -1778,7 +1780,8 @@ Plater.AnchorNamesByPhraseId = {
 
 	--> place most used data into local upvalues to save process time
 	--> scripts need to call this function if they change something in the profile ~refresh ~db ~upvalues
-	function Plater.RefreshDBUpvalues()
+	--isProfileUnchanged: the profile is the same as on the last refresh, the aura button skins are not marked outdated
+	function Plater.RefreshDBUpvalues(isProfileUnchanged)
 		local profile = Plater.db.profile
 
 		DB_AURA_ENABLED = profile.aura_enabled
@@ -1853,12 +1856,14 @@ Plater.AnchorNamesByPhraseId = {
 		DB_CAPTURED_SPELLS = PlaterDB.captured_spells
 		
 		DB_USE_NAME_TRANSLIT = profile.use_name_translit
+		--custom names only apply while the CustomNames addon is loaded
+		DB_USE_CUSTOM_NAMES = LibCustomNames ~= nil and profile.use_custom_names
 
 		--refresh lists
 		Plater.RefreshDBLists()
 
 		--refresh auras
-		Plater.RefreshAuraCache() --on Plater_Auras.lua
+		Plater.RefreshAuraCache(isProfileUnchanged) --on Plater_Auras.lua
 		Plater.RefreshAuraDBUpvalues() --on Plater_Auras.lua
 		Plater.UpdateAuraCache() --on Plater_Auras.lua
 
@@ -1932,6 +1937,7 @@ Plater.AnchorNamesByPhraseId = {
 			end
 		end
 		
+		platerInternal.Interrupts.RefreshConfig()
 		Plater.IncreaseRefreshID()
 		Plater.FireRefreshDBCallback()
 	end
@@ -2200,9 +2206,9 @@ Plater.AnchorNamesByPhraseId = {
 					--Plater.ScheduleUpdateForNameplate (plateFrame, unit)
 					
 					Plater.RunScheduledUpdate({unitId = unit}) -- do this now
-					if plateFrame.unitFrame.PlaterOnScreen then -- should no longer be needed
-						Plater.CreateOrUpdateAuraContainers(plateFrame.unitFrame, unit, true) -- maybe still need this
-					end
+					--if plateFrame.unitFrame.PlaterOnScreen then -- should no longer be needed
+					--	Plater.CreateOrUpdateAuraContainers(plateFrame.unitFrame, unit, true) -- maybe still need this
+					--end
 				end
 			elseif NAMEPLATES_ON_SCREEN_CACHE[unit] then
 				-- no nameplate anymore, hide it
@@ -2228,9 +2234,9 @@ Plater.AnchorNamesByPhraseId = {
 			local plateFrame = C_NamePlate.GetNamePlateForUnit (unit, issecure())
 			if (plateFrame) then
 				Plater.ScheduleUpdateForNameplate (plateFrame)
-				if plateFrame.unitFrame.PlaterOnScreen then
-					Plater.CreateOrUpdateAuraContainers(plateFrame.unitFrame, unit) -- might still need this
-				end
+				--if plateFrame.unitFrame.PlaterOnScreen then
+				--	Plater.CreateOrUpdateAuraContainers(plateFrame.unitFrame, unit) -- might still need this
+				--end
 			elseif NAMEPLATES_ON_SCREEN_CACHE[unit] then
 				-- no nameplate anymore (e.g. became a forbidden friendly plate), hide it
 				Plater.RunFunctionForEvent ("NAME_PLATE_UNIT_REMOVED", unit)
@@ -2264,6 +2270,15 @@ Plater.AnchorNamesByPhraseId = {
 			C_Timer.After (1, Plater.DispatchTalentUpdateHookEvent)
 		end,
 		
+		--registered by platerInternal.Interrupts.RefreshConfig while the interrupt cooldown is in use
+		SPELL_UPDATE_COOLDOWN = function()
+			platerInternal.Interrupts.OnCooldownUpdate()
+		end,
+		
+		SPELLS_CHANGED = function()
+			platerInternal.Interrupts.Refresh()
+		end,
+		
 		GROUP_ROSTER_UPDATE = function()
 			if (platerInternal.last_GROUP_ROSTER_UPDATE + 2) > GetTime() or platerInternal.has_GROUP_ROSTER_UPDATE_Scheduled then
 				if not platerInternal.has_GROUP_ROSTER_UPDATE_Scheduled then
@@ -2281,6 +2296,10 @@ Plater.AnchorNamesByPhraseId = {
 		end,
 		
 		UNIT_PET = function(_, unit)
+			if (unit == "player") then
+				platerInternal.Interrupts.Refresh()
+			end
+			
 			for _, plateFrame in ipairs (Plater.GetAllShownPlates()) do
 				---@cast plateFrame plateframe
 				if plateFrame.unitFrame and plateFrame.unitFrame.PlaterOnScreen then
@@ -2293,6 +2312,13 @@ Plater.AnchorNamesByPhraseId = {
 		end,
 
 		PLAYER_REGEN_DISABLED = function()
+			--/plater profcombat. the dispatcher opened this event's span while profiling was off, so it is opened again here
+			if (platerInternal.CombatProfiling == "next") then
+				platerInternal.CombatProfiling = "running"
+				Plater.EnableProfiling(true)
+				Plater.StartLogPerformanceCore("Plater-Core", "Events", "PLAYER_REGEN_DISABLED")
+			end
+
 			PLAYER_IN_COMBAT = true
 
 			Plater.RefreshAutoToggle(PLAYER_IN_COMBAT)
@@ -2374,6 +2400,13 @@ Plater.AnchorNamesByPhraseId = {
 				platerInternal.OpenOptionspanelAfterCombat = nil
 				C_Timer.NewTimer (1.5, function() Plater.OpenOptionsPanel(unpack(OpenOptionspanelAfterCombat)) end )
 			end
+
+			--the span is closed before profiling stops, the dispatcher's own end call after this logs nothing
+			if (platerInternal.CombatProfiling == "running") then
+				platerInternal.CombatProfiling = nil
+				Plater.EndLogPerformanceCore("Plater-Core", "Events", "PLAYER_REGEN_ENABLED")
+				Plater.DisableProfiling()
+			end
 		end,
 
 		FRIENDLIST_UPDATE = function()
@@ -2447,9 +2480,13 @@ Plater.AnchorNamesByPhraseId = {
 
 		PLAYER_FOCUS_CHANGED = function()
 			Plater.OnPlayerTargetChanged()
+			platerInternal.Interrupts.UpdateAllPlates()
 		end,
 		PLAYER_TARGET_CHANGED = function()
 			Plater.OnPlayerTargetChanged()
+			if (Plater.db.profile.interrupt_cd_icon_only_target) then
+				platerInternal.Interrupts.UpdateAllPlates()
+			end
 		end,
 
 		PLAYER_UPDATE_RESTING = function()
@@ -2464,17 +2501,30 @@ Plater.AnchorNamesByPhraseId = {
 				local plateFrame = C_NamePlate.GetNamePlateForUnit (unitID)
 				if (plateFrame and plateFrame.unitFrame.PlaterOnScreen) then
 					local unitFrame = plateFrame.unitFrame
-					local unitName = UnitName (unitID)
+					local unitName, unitSurname = UnitName (unitID)
+					--forever: the friend list holds the full name (name and surname)
+					local unitFullName = unitName
+					if (IS_WOW_PROJECT_FOREVER and unitSurname) then
+						unitFullName = unitName .. Constants.CharacterNameSeparatorConsts.CHARACTERNAME_SURNAME_SEPARATOR .. unitSurname
+					end
 					local unitNameTranslit = unitName
-					if DB_USE_NAME_TRANSLIT and (not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(unitName))) then
-						unitNameTranslit = LibTranslit:Transliterate(unitName, TRANSLIT_MARK)
+					if (IS_WOW_PROJECT_FOREVER and DB_PLATE_CONFIG[plateFrame.actorType].show_surname) then
+						unitNameTranslit = unitFullName
+					end
+					if DB_USE_CUSTOM_NAMES then
+						unitNameTranslit = LibCustomNames.UnitName (unitID)
+					end
+					if DB_USE_NAME_TRANSLIT and not issecretvalue(unitNameTranslit) then
+						unitNameTranslit = LibTranslit:Transliterate(unitNameTranslit, TRANSLIT_MARK)
 					end
 					plateFrame [MEMBER_NAME] = unitNameTranslit
 					plateFrame [MEMBER_NAMELOWER] = (IS_WOW_PROJECT_MIDNIGHT and plateFrame [MEMBER_NAME] or "") or lower (plateFrame [MEMBER_NAME])
 					plateFrame.unitNameInternal = unitName
+					plateFrame.unitFullNameInternal = unitFullName
 					unitFrame [MEMBER_NAME] = plateFrame [MEMBER_NAME]
 					unitFrame [MEMBER_NAMELOWER] = plateFrame [MEMBER_NAMELOWER]
 					unitFrame.unitNameInternal = unitName
+					unitFrame.unitFullNameInternal = unitFullName
 					
 					if (plateFrame.IsSelf) then
 						--name isn't shown in the personal bar
@@ -2656,7 +2706,7 @@ Plater.AnchorNamesByPhraseId = {
 		end,
 		
 		ADDON_LOADED = function(_, addOnName, containsBindings)
-			if addonName == "BigWigs" or addonName == "DBM-Core" then
+			if addOnName == "BigWigs" or addOnName == "DBM-Core" then
 				Plater.RegisterBossModAuras()
 			end
 		end,
@@ -2769,14 +2819,12 @@ Plater.AnchorNamesByPhraseId = {
 				---@cast plateFrame plateframe
 				if plateFrame.unitFrame.PlaterOnScreen then
 					local guid
-					if IS_WOW_PROJECT_MIDNIGHT and (issecretvalue(arg1) or issecretvalue(arg2)) then
+					if issecretvalue(arg1) or issecretvalue(arg2) then
 						Plater.UpdateSoftInteractTarget(plateFrame, true) -- just update if any secret...
-					elseif IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame [MEMBER_GUID]) then
+					elseif not issecretvalue(plateFrame [MEMBER_GUID]) then
 						guid = plateFrame [MEMBER_GUID]
-					elseif IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
+					elseif not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
 						guid = plateFrame.unitFrame [MEMBER_GUID]
-					elseif not IS_WOW_PROJECT_MIDNIGHT then
-						guid = plateFrame [MEMBER_GUID]
 					end
 					if guid then
 						if guid == arg1 or guid == arg2 then
@@ -2792,12 +2840,10 @@ Plater.AnchorNamesByPhraseId = {
 				---@cast plateFrame plateframe
 				if plateFrame.unitFrame.PlaterOnScreen then
 					local guid
-					if IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame [MEMBER_GUID]) then
+					if not issecretvalue(plateFrame [MEMBER_GUID]) then
 						guid = plateFrame [MEMBER_GUID]
-					elseif IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
+					elseif not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
 						guid = plateFrame.unitFrame [MEMBER_GUID]
-					elseif not IS_WOW_PROJECT_MIDNIGHT then
-						guid = plateFrame [MEMBER_GUID]
 					end
 					if guid then
 						if guid == arg1 or guid == arg2 then
@@ -2813,12 +2859,10 @@ Plater.AnchorNamesByPhraseId = {
 				---@cast plateFrame plateframe
 				if plateFrame.unitFrame.PlaterOnScreen then
 					local guid
-					if IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame [MEMBER_GUID]) then
+					if not issecretvalue(plateFrame [MEMBER_GUID]) then
 						guid = plateFrame [MEMBER_GUID]
-					elseif IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
+					elseif not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
 						guid = plateFrame.unitFrame [MEMBER_GUID]
-					elseif not IS_WOW_PROJECT_MIDNIGHT then
-						guid = plateFrame [MEMBER_GUID]
 					end
 					if guid then
 						if guid == arg1 or guid == arg2 then
@@ -2845,8 +2889,8 @@ Plater.AnchorNamesByPhraseId = {
 				}
 				
 				local healthBarOptions = {
-					ShowHealingPrediction = false,
-					ShowShields = false,
+					ShowHealingPrediction = Plater.db.profile.show_health_prediction,
+					ShowShields = Plater.db.profile.show_shield_prediction,
 				}
 				
 				local castBarOptions = {
@@ -2946,6 +2990,9 @@ Plater.AnchorNamesByPhraseId = {
 				newUnitFrame.castBar:SetHook("OnShow", Plater.CastBarOnShow_Hook)
 				hooksecurefunc(newUnitFrame.castBar, "OnEvent", Plater.CastBarOnEvent_Hook)
 				hooksecurefunc(newUnitFrame.castBar, "OnTick", Plater.CastBarOnTick_Hook)
+				
+				--interrupt cooldown icon and cast bar spark
+				platerInternal.Interrupts.CreatePlateWidgets(newUnitFrame)
 				
 				newUnitFrame.HasHooksRegistered = true
 				
@@ -3057,7 +3104,7 @@ Plater.AnchorNamesByPhraseId = {
 				
 			--> target overlay (the texture added above the nameplate when the unit is selected)
 				unitFrame.targetOverlayTexture = healthBar:CreateTexture (nil, "artwork")
-				unitFrame.targetOverlayTexture:SetDrawLayer ("artwork", 2)
+				unitFrame.targetOverlayTexture:SetDrawLayer ("artwork", 3)
 				unitFrame.targetOverlayTexture:SetBlendMode ("ADD")
 				unitFrame.targetOverlayTexture:SetAllPoints()
 				unitFrame.targetOverlayTexture:Hide()
@@ -3253,7 +3300,7 @@ Plater.AnchorNamesByPhraseId = {
 				--blizzard hid the plate without a NAME_PLATE_UNIT_REMOVED (e.g. mind control ending), unload it
 				onTickFrame:SetScript ("OnHide", function (self)
 					local plateFrame = self.PlateFrame
-					if (plateFrame.unitFrame.PlaterOnScreen and not plateFrame:IsShown()) then
+					if (plateFrame.unitFrame.PlaterOnScreen and not plateFrame:IsShown() and not plateFrame.isDesigner) then
 						Plater.RunFunctionForEvent ("NAME_PLATE_UNIT_REMOVED", plateFrame.unitFrame [MEMBER_UNITID], plateFrame)
 					end
 				end)
@@ -3570,9 +3617,34 @@ Plater.AnchorNamesByPhraseId = {
 				--Plater.SetAnchor(unitFrame.softInteractIconFrame, unitFrame.softInteractIcon.anchor or { side = 8, x = 0, y = 18, }, unitFrame.PlateFrame)
 			
 
-				if PixelUtil.SetRoundLayoutToNearestPixelRecursively then
-					PixelUtil.SetRoundLayoutToNearestPixelRecursively(unitFrame, true)
+				--whole pixel layout where the client has it, and no texture sharpening, it shimmers while the plate scales
+				local hasRoundLayout = PixelUtil.SetRoundLayoutToNearestPixelRecursively ~= nil
+				local setPixelLayout
+				setPixelLayout = function(frame)
+					if (hasRoundLayout) then
+						frame:SetRoundLayoutToNearestPixel(true)
+					end
+
+					for _, region in ipairs({frame:GetRegions()}) do
+						if (hasRoundLayout) then
+							region:SetRoundLayoutToNearestPixel(true)
+						end
+
+						if (region.SetSnapToPixelGrid) then
+							region:SetSnapToPixelGrid(false)
+							region:SetTexelSnappingBias(0)
+						end
+					end
+
+					--aura containers (marked by frameInfo) are skipped, their blizzard aura buttons are forbidden to addon code
+					for _, child in ipairs({frame:GetChildren()}) do
+						if (not child.frameInfo) then
+							setPixelLayout(child)
+						end
+					end
 				end
+
+				setPixelLayout(unitFrame)
 
 			--> name plate created hook
 				if (HOOK_NAMEPLATE_CREATED.ScriptAmount > 0) then
@@ -3907,7 +3979,9 @@ Plater.AnchorNamesByPhraseId = {
 			Plater.AddToAuraUpdate(unitID, plateFrame.unitFrame)
 			
 			--set the unit
+			Plater.StartLogPerformanceCore("Plater-Core", "Update", "SetUnit - unitFrame")
 			unitFrame:SetUnit (unitID)
+			Plater.EndLogPerformanceCore("Plater-Core", "Update", "SetUnit - unitFrame")
 			
 			--reset performance unit
 			unitFrame.isPerformanceUnit = nil
@@ -4011,10 +4085,22 @@ Plater.AnchorNamesByPhraseId = {
 			end
 			
 			--cache values
-			local unitName = UnitName (unitID) or ""
+			local unitName, unitSurname = UnitName (unitID)
+			unitName = unitName or ""
+			--forever: the friend list holds the full name (name and surname)
+			local unitFullName = unitName
+			if (IS_WOW_PROJECT_FOREVER and unitSurname) then
+				unitFullName = unitName .. Constants.CharacterNameSeparatorConsts.CHARACTERNAME_SURNAME_SEPARATOR .. unitSurname
+			end
 			local unitNameTranslit = unitName
-			if DB_USE_NAME_TRANSLIT and (not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(unitName))) then
-				unitNameTranslit = LibTranslit:Transliterate(unitName, TRANSLIT_MARK)
+			if (IS_WOW_PROJECT_FOREVER and DB_PLATE_CONFIG[plateFrame.actorType].show_surname) then
+				unitNameTranslit = unitFullName
+			end
+			if DB_USE_CUSTOM_NAMES then
+				unitNameTranslit = LibCustomNames.UnitName (unitID) or ""
+			end
+			if DB_USE_NAME_TRANSLIT and not issecretvalue(unitNameTranslit) then
+				unitNameTranslit = LibTranslit:Transliterate(unitNameTranslit, TRANSLIT_MARK)
 			end
 			plateFrame [MEMBER_NAME] = unitNameTranslit
 			plateFrame [MEMBER_NAMELOWER] = (IS_WOW_PROJECT_MIDNIGHT and plateFrame [MEMBER_NAME] or "") or lower (plateFrame [MEMBER_NAME])
@@ -4022,6 +4108,7 @@ Plater.AnchorNamesByPhraseId = {
 			plateFrame.namePlateIsBossMob = UnitIsBossMob and UnitIsBossMob(unitID)
 			plateFrame.namePlateIsLieutenant = UnitIsLieutenant and UnitIsLieutenant(unitID)
 			plateFrame.unitNameInternal = unitName
+			plateFrame.unitFullNameInternal = unitFullName
 
 			--clear name schedules
 			unitFrame.ScheduleNameUpdate = nil
@@ -4035,6 +4122,7 @@ Plater.AnchorNamesByPhraseId = {
 			unitFrame.namePlateIsBossMob = plateFrame.namePlateIsBossMob
 			unitFrame.namePlateIsLieutenant = plateFrame.namePlateIsLieutenant
 			unitFrame.unitNameInternal = unitName
+			unitFrame.unitFullNameInternal = unitFullName
 			unitFrame [MEMBER_UNITID] = unitID
 			unitFrame.namePlateThreatPercent = 0
 			unitFrame.namePlateThreatIsTanking = nil
@@ -4234,6 +4322,8 @@ Plater.AnchorNamesByPhraseId = {
 			--widget container update
 			if IS_WOW_PROJECT_MAINLINE then
 				plateFrame.unitFrame.WidgetContainer = plateFrame.UnitFrame.WidgetContainer
+				--ensure right owner, not nil...
+				plateFrame.unitFrame.WidgetContainerOwner = plateFrame.UnitFrame
 				if plateFrame.unitFrame.WidgetContainer then
 					plateFrame.unitFrame.WidgetContainer:ClearAllPoints()
 					plateFrame.unitFrame.WidgetContainer:SetParent(plateFrame)
@@ -4423,7 +4513,8 @@ Plater.AnchorNamesByPhraseId = {
 				-- remove widgets
 				if IS_WOW_PROJECT_MAINLINE and plateFrame.unitFrame.WidgetContainer then
 					plateFrame.unitFrame.WidgetContainer:SetIgnoreParentScale(false)
-					plateFrame.unitFrame.WidgetContainer:SetParent(plateFrame.UnitFrame)
+					plateFrame.unitFrame.WidgetContainer:SetScale(1)
+					plateFrame.unitFrame.WidgetContainer:SetParent(plateFrame.unitFrame.WidgetContainerOwner)
 					plateFrame.unitFrame.WidgetContainer:ClearAllPoints()
 					plateFrame.unitFrame.WidgetContainer:SetPoint('TOP', plateFrame.castBar, 'BOTTOM')
 				end
@@ -4633,10 +4724,17 @@ function Plater.InitializeSavedVariables()
 end
 
 function Plater.OnInit() --private --~oninit ~init
+	--one reload only: /plater profnext sets it and this load consumes it. runs first so the whole init is measured
+	if (PlaterDB.perf_next_reload) then
+		PlaterDB.perf_next_reload = nil
+		Plater.EnableProfiling(true)
+		Plater.LogPerformanceSpanUntilNow("Plater-Core", "Init", "FileLoad", platerInternal.FileLoadStartTime)
+	end
+
+	Plater.StartLogPerformanceCore("Plater-Core", "Init", "OnInit")
+
 	LibStub ("AceDBOptions-3.0"):GetOptionsTable (Plater.db, true) -- register this now, to ensure no default "realm", "char - realm" profiles are shown in profiles management
 
-	Plater.StartPreCreateAuraContainers()
-	
 	-- Inspired by and mostly copied from https://github.com/Cidan/BetterBags/pull/934/, thanks Cidan
 	-- PatchWerk breaks WoW addons by patching _G functions and overwriting addon code.
 	-- Detect it early and force the user to disable it.
@@ -4686,6 +4784,7 @@ function Plater.OnInit() --private --~oninit ~init
 	Plater.InitializeSavedVariables()
 	Plater.RefreshDBUpvalues()
 	Plater.RefreshAuarasCurves()
+	Plater.StartPreCreateAuraContainers()
 
 	C_Timer.After(0, function()
 		platerInternal.CreatePerformanceUnits(Plater)
@@ -4696,6 +4795,7 @@ function Plater.OnInit() --private --~oninit ~init
 		if not mediaType or type(mediaType) ~= 'string' then return end
 		if mediaType:lower() == 'font' then
 			Plater.UpdateBlizzardNameplateFonts(key, true)
+			platerInternal.Auras.OnFontRegistered(key)
 		end
 	end)
 	
@@ -4840,7 +4940,7 @@ function Plater.OnInit() --private --~oninit ~init
 			SetCVar ("nameplateMinAlpha", 0.90135484)
 			SetCVar ("nameplateMinAlphaDistance", -10^5.2)
 			SetCVar ("nameplateSelectedAlpha", 1)
-			SetCVar ("nameplateNotSelectedAlpha", 1)
+			SetCVar ("nameplateNotSelectedAlpha", -1)
 			SetCVar ("nameplateRemovalAnimation", DB_USE_QUICK_HIDE and 0 or 1)
 			SetCVar ("nameplateShowFriendlyBuffs", 0)
 			SetCVar ("nameplateShowPersonalCooldowns", 0)
@@ -4950,7 +5050,7 @@ function Plater.OnInit() --private --~oninit ~init
 		Plater.EventHandlerFrame:RegisterEvent ("QUEST_LOG_UPDATE")
 		Plater.EventHandlerFrame:RegisterEvent ("UNIT_QUEST_LOG_CHANGED")
 		if IS_WOW_PROJECT_MAINLINE then
-			Plater.EventHandlerFrame:RegisterEvent ("PLAYER_SPECIALIZATION_CHANGED")
+			Plater.EventHandlerFrame:RegisterUnitEvent ("PLAYER_SPECIALIZATION_CHANGED", "player") --fires for group members too
 			Plater.EventHandlerFrame:RegisterEvent (C_Traits and "TRAIT_CONFIG_UPDATED" or "PLAYER_TALENT_UPDATE")
 		elseif IS_WOW_PROJECT_CLASSIC_WRATH or IS_WOW_PROJECT_CLASSIC_MOP then
 			Plater.EventHandlerFrame:RegisterEvent ("ACTIVE_TALENT_GROUP_CHANGED")
@@ -5176,7 +5276,11 @@ function Plater.OnInit() --private --~oninit ~init
 							end
 							--TextureLoadingGroupMixin.AddTexture({ textures = self }, "explicitIsPlayer")
 						end
-						TextureLoadingGroupMixin.AddTexture({ textures = self.optionTable }, "colorNameBySelection")
+						if Plater.db.profile.use_advanced_default_coloring then
+							TextureLoadingGroupMixin.AddTexture({ textures = self.optionTable }, "colorNameBySelection")
+						else
+							TextureLoadingGroupMixin.RemoveTexture({ textures = self.optionTable }, "colorNameBySelection")
+						end
 					--end
 				end)
 
@@ -5386,6 +5490,7 @@ function Plater.OnInit() --private --~oninit ~init
 			Plater.DoCastBarTest(castNoInterrupt, castTime)
 
 			Plater.IsTestRunning = true
+			platerInternal.Interrupts.UpdateAllPlates()
 		end
 
 		function platerInternal.CastBar.StartTestCastBarForNameplate(plateFrame)
@@ -5544,6 +5649,7 @@ function Plater.OnInit() --private --~oninit ~init
 			Plater.IsTestRunning = nil
 			Plater.IsShowingCastBarTest = false
 			Plater.CastBarTestFrame:SetScript("OnUpdate", nil)
+			platerInternal.Interrupts.UpdateAllPlates()
 		end
 	
 		--> when the option to show the target of the cast is enabled, this function update the text settings but not the target name
@@ -5672,7 +5778,7 @@ function Plater.OnInit() --private --~oninit ~init
 					end
 
 					--print(icon:GetHeight(), issecretvalue(icon:GetHeight()))
-					if IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(icon:GetHeight()) then
+					if not issecretvalue(icon:GetHeight()) then
 						icon:SetWidth(icon:GetHeight())
 					else
 						icon:SetWidth(height)
@@ -5848,7 +5954,7 @@ function Plater.OnInit() --private --~oninit ~init
 						return
 					end
 
-					if not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(self.SpellName)) then
+					if not issecretvalue(self.SpellName) then
 						-- if we are starting a cast but it is an immediate chained cast, then needs to trigger OnHide and OnShow again afterwards
 						local globalScriptObject = SCRIPT_CASTBAR_TRIGGER_CACHE[self.SpellName]
 						if (globalScriptObject and (self.casting or self.channeling) and not self.IsInterrupted) then
@@ -5917,7 +6023,7 @@ function Plater.OnInit() --private --~oninit ~init
 					self.castColorTexture:Hide()
 
 					--cast color (from options tab Cast Colors)
-					if not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(self.spellID)) then
+					if not issecretvalue(self.spellID) then
 						local castColors = profile.cast_colors
 						local customColor = castColors[self.spellID]
 						if (customColor) then
@@ -5970,6 +6076,13 @@ function Plater.OnInit() --private --~oninit ~init
 					if not IS_WOW_PROJECT_MIDNIGHT and (unitFrame.ActorType == "enemynpc" and event == "UNIT_SPELLCAST_CHANNEL_START" and (not DB_CAPTURED_SPELLS[self.spellID] or DB_CAPTURED_SPELLS[self.spellID].isChanneled == nil or not DB_CAPTURED_CASTS[self.spellID] or DB_CAPTURED_CASTS[self.spellID].isChanneled == nil)) then
 						parserFunctions.SPELL_CAST_SUCCESS (nil, "SPELL_CAST_SUCCESS", nil, unitFrame[MEMBER_GUID], unitFrame.unitNameInternal, 0x00000040, nil, nil, nil, nil, nil, self.spellID, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 					end
+
+					--interrupt not ready / out of range tint, after the per spell color
+					platerInternal.Interrupts.UpdateCastBar(self)
+
+				elseif (event == "UNIT_SPELLCAST_INTERRUPTIBLE" or event == "UNIT_SPELLCAST_NOT_INTERRUPTIBLE") then
+					--the cast bar recolored itself
+					platerInternal.Interrupts.UpdateCastBar(self)
 
 				elseif (event == "UNIT_SPELLCAST_INTERRUPTED") then
 					local unitCast = unit
@@ -6079,7 +6192,10 @@ function Plater.OnInit() --private --~oninit ~init
 								end
 
 								if (canShowTargetName) then
-									if DB_USE_NAME_TRANSLIT and (not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(targetName))) then
+									if DB_USE_CUSTOM_NAMES then
+										targetName = LibCustomNames.UnitName (self.unit .. "target") or ""
+									end
+									if DB_USE_NAME_TRANSLIT and not issecretvalue(targetName) then
 										targetName = LibTranslit:Transliterate(targetName, TRANSLIT_MARK)
 									end
 									
@@ -6104,7 +6220,10 @@ function Plater.OnInit() --private --~oninit ~init
 					
 					self.ThrottleUpdate = self.unitFrame.PlateFrame.OnTickFrame.ThrottleUpdate + DB_TICK_THROTTLE
 
-					if not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(self.SpellName)) then
+					--range color and plate updates resetting the texture, before scripts so they can still recolor
+					platerInternal.Interrupts.UpdateCastBar(self)
+
+					if not issecretvalue(self.SpellName) then
 						--get the script object of the aura which will be showing in this icon frame
 						local globalScriptObject = SCRIPT_CASTBAR_TRIGGER_CACHE[self.SpellName]
 
@@ -6404,8 +6523,9 @@ function Plater.OnInit() --private --~oninit ~init
 			Plater.FullRefreshAllPlates()
 		end)
 	
+		--the profile has not changed since OnInit, so the aura buttons built behind the loading screen keep their skin
 		for i = 1, 3 do
-			C_Timer.After (i, Plater.RefreshDBUpvalues)
+			C_Timer.After (i, function() Plater.RefreshDBUpvalues(true) end)
 		end
 		
 	if CastingBarFrame then
@@ -6479,6 +6599,8 @@ function Plater.OnInit() --private --~oninit ~init
 	elseif SettingsPanel then
 		SettingsPanel:HookScript('OnHide',Plater.UpdatePlateClickSpace)
 	end
+
+	Plater.EndLogPerformanceCore("Plater-Core", "Init", "OnInit")
 end
 
 
@@ -6566,8 +6688,16 @@ end
 	end
 	
 	--internal function to change the health bar color
-	function Plater.ChangeHealthBarColor_Internal (healthBar, r, g, b, a, forceNoLerp, force) --private
+	--isBadThreatColor is true when the color comes from the threat coloring in a bad threat state, any other color clears it
+	function Plater.ChangeHealthBarColor_Internal (healthBar, r, g, b, a, forceNoLerp, force, isBadThreatColor) --private
 		a = a or 1
+		isBadThreatColor = isBadThreatColor or false
+		if (healthBar.isBadThreatColor ~= isBadThreatColor) then
+			healthBar.isBadThreatColor = isBadThreatColor
+			--the per aura healthbar colors can give way to bad threat colors
+			platerInternal.Auras.UpdateAuraColorThreat(healthBar.unitFrame)
+		end
+		
 		if force or (r ~= healthBar.R or g ~= healthBar.G or b ~= healthBar.B or a ~= healthBar.A) then
 			healthBar.R, healthBar.G, healthBar.B, healthBar.A = r, g, b, a
 			if (not DB_LERP_COLOR or forceNoLerp) then -- ~lerpcolor
@@ -6999,27 +7129,35 @@ end
 	
 	-- default blizzard plate shenanigans
 	function Plater.UpdateBaseNameplateOptions()
-		if IS_WOW_PROJECT_MIDNIGHT_API then
-			if Plater.db.profile.hide_realm_name_on_blizzard then
-				TextureLoadingGroupMixin.RemoveTexture({ textures = NamePlateFriendlyFrameOptions }, "updateNameUsesGetUnitName")
-			else
-				TextureLoadingGroupMixin.AddTexture({ textures = NamePlateFriendlyFrameOptions }, "updateNameUsesGetUnitName")
-			end
-			return 
+		if Plater.db.profile.hide_realm_name_on_blizzard then
+			TextureLoadingGroupMixin.RemoveTexture({ textures = NamePlateFriendlyFrameOptions }, "updateNameUsesGetUnitName")
+		else
+			TextureLoadingGroupMixin.AddTexture({ textures = NamePlateFriendlyFrameOptions }, "updateNameUsesGetUnitName")
 		end
+
 		if GetCVarBool ("nameplateShowOnlyNames") or Plater.db.profile.saved_cvars.nameplateShowOnlyNames == "1" then
 			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "hideHealthbar")
 			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "hideCastbar")
-			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameBySelection")
-			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameWithExtendedColors")
 			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "hideHealthbar")
 			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "hideCastbar")
-			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameBySelection")
-			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameWithExtendedColors")
 			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "hideHealthbar")
 			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "hideCastbar")
-			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameBySelection")
-			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameWithExtendedColors")
+
+			if Plater.db.profile.use_advanced_default_coloring then
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameWithExtendedColors")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameWithExtendedColors")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameWithExtendedColors")
+			else
+				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameWithExtendedColors")
+				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameWithExtendedColors")
+				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameWithExtendedColors")
+			end
 			
 			TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "showLevel")
 			TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "showLevel")
@@ -7033,29 +7171,40 @@ end
 			TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "hideCastbar")
 			
 			
-			if not IS_WOW_PROJECT_MAINLINE then
-				--other defaults
+			--other defaults
+			if Plater.db.profile.use_advanced_default_coloring then
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameWithExtendedColors")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameWithExtendedColors")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameBySelection")
+				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameWithExtendedColors")
+			else
 				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameBySelection")
 				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "colorNameWithExtendedColors")
 				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameBySelection")
 				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "colorNameWithExtendedColors")
 				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameBySelection")
 				TextureLoadingGroupMixin.RemoveTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "colorNameWithExtendedColors")
-				
-				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "showLevel")
-				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "showLevel")
-				TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "showLevel")
 			end
+				
+			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFrameSetUpOptions }, "showLevel")
+			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateFriendlyFrameOptions }, "showLevel")
+			TextureLoadingGroupMixin.AddTexture({ textures = DefaultCompactNamePlateEnemyFrameOptions }, "showLevel")
 
 		end
-		if not IS_WOW_PROJECT_MAINLINE then
-			for _, plateFrame in pairs(C_NamePlate.GetNamePlates(true)) do
-				if (plateFrame and plateFrame.UnitFrame and plateFrame.UnitFrame.CastBar) then
-					if GetCVarBool ("nameplateShowOnlyNames") or Plater.db.profile.saved_cvars.nameplateShowOnlyNames == "1" then
-						TextureLoadingGroupMixin.RemoveTexture({ textures = plateFrame.UnitFrame.CastBar }, "showCastbar")
-					else
-						TextureLoadingGroupMixin.AddTexture({ textures = plateFrame.UnitFrame.CastBar }, "showCastbar")
-					end
+
+		for _, plateFrame in pairs(C_NamePlate.GetNamePlates(true)) do
+			if (plateFrame and plateFrame.UnitFrame and plateFrame.UnitFrame.CastBar) then
+				if GetCVarBool ("nameplateShowOnlyNames") or Plater.db.profile.saved_cvars.nameplateShowOnlyNames == "1" then
+					TextureLoadingGroupMixin.RemoveTexture({ textures = plateFrame.UnitFrame.CastBar }, "showCastbar")
+				else
+					TextureLoadingGroupMixin.AddTexture({ textures = plateFrame.UnitFrame.CastBar }, "showCastbar")
+				end
+				if Plater.db.profile.use_advanced_default_coloring then
+					TextureLoadingGroupMixin.AddTexture({ textures = plateFrame.UnitFrame.optionTable }, "colorNameBySelection")
+				else
+					TextureLoadingGroupMixin.RemoveTexture({ textures = plateFrame.UnitFrame.optionTable }, "colorNameBySelection")
 				end
 			end
 		end
@@ -7359,7 +7508,7 @@ end
 			end
 			
 			local isSoftInteract = UnitIsUnit(tickFrame.unit, "softinteract")
-			if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isSoftInteract) then isSoftInteract = false end --MIDNIGHT!!
+			if issecretvalue(isSoftInteract) then isSoftInteract = false end --MIDNIGHT!!
 			unitFrame.isSoftInteract = isSoftInteract
 			unitFrame.PlateFrame.isSoftInteract = isSoftInteract
 			unitFrame.isSoftInteractObject = isSoftInteract and (unitFrame.PlateFrame.isObject or unitFrame.isObject)
@@ -7612,17 +7761,17 @@ end
 		if (DB_AGGRO_CHANGE_HEALTHBAR_COLOR) then
 			if (not self.DenyColorChange) then --tagged from a script
 				if not self.hasUnitTypeColor then
-					Plater.ChangeHealthBarColor_Internal (self.healthBar, r, g, b, a)
+					Plater.ChangeHealthBarColor_Internal (self.healthBar, r, g, b, a, nil, nil, not self.isGoodAggroState)
 
 				elseif self.InCombat and not self.isGoodAggroState or (Plater.db.profile.unit_type_coloring_no_override_threat and self.isGoodAggroState) then
-					Plater.ChangeHealthBarColor_Internal (self.healthBar, r, g, b, a)
+					Plater.ChangeHealthBarColor_Internal (self.healthBar, r, g, b, a, nil, nil, not self.isGoodAggroState)
 
 				elseif Plater.db.profile.unit_type_coloring_enabled and (self.isGoodAggroState or not self.InCombat) and (Plater.ZoneInstanceType == "party" or Plater.ZoneInstanceType == "raid") then
 					-- reset
 					Plater.FindAndSetNameplateColor (self)
 
 				else
-					Plater.ChangeHealthBarColor_Internal (self.healthBar, r, g, b, a) -- fallback, just in case
+					Plater.ChangeHealthBarColor_Internal (self.healthBar, r, g, b, a, nil, nil, not self.isGoodAggroState) -- fallback, just in case
 				end
 			end
 		--elseif Plater.db.profile.unit_type_coloring_enabled and (Plater.ZoneInstanceType == "party" or Plater.ZoneInstanceType == "raid") then
@@ -7956,7 +8105,7 @@ end
 		local unitID = plateFrame [MEMBER_UNITID] or unitFrame [MEMBER_UNITID]
 		
 		local isSoftInteract = UnitIsUnit(unitID, "softinteract")
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isSoftInteract) then isSoftInteract = false end --MIDNIGHT!!
+		if issecretvalue(isSoftInteract) then isSoftInteract = false end --MIDNIGHT!!
 		local reaction = UnitReaction (unitID, "player")
 		local isObject = (IS_WOW_PROJECT_MAINLINE and UnitIsGameObject(unitID)) or reaction == nil
 		local isSoftInteractObject = isObject and isSoftInteract
@@ -8020,7 +8169,7 @@ end
 		local unitFrame = plateFrame.unitFrame
 		--if IS_WOW_PROJECT_MIDNIGHT then return true end --MIDNIGHT!!
 		local isFocus = UnitIsUnit ("focus", unitFrame [MEMBER_UNITID])
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isFocus) then isFocus = false end
+		if issecretvalue(isFocus) then isFocus = false end
 		if (isFocus) then
 			if profile.focus_indicator_enabled then
 				--this is a rare call, no need to cache these values
@@ -8036,7 +8185,7 @@ end
 		end
 
 		local isTarget = UnitIsUnit ("target", unitFrame [MEMBER_UNITID])
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isTarget) then isTarget = false end
+		if issecretvalue(isTarget) then isTarget = false end
 		if (isTarget) then
 			plateFrame [MEMBER_TARGET] = true
 			unitFrame [MEMBER_TARGET] = true
@@ -8112,13 +8261,13 @@ end
 		--Plater.PlayerHasTarget = Plater.PlayerCurrentTargetGUID and true
 		Plater.PlayerHasTarget = type(Plater.PlayerCurrentTargetGUID) ~= "nil"
 		local selfTarget = UnitIsUnit("player", "target")
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(selfTarget) then selfTarget = false end --MIDNIGHT!!
+		if issecretvalue(selfTarget) then selfTarget = false end --MIDNIGHT!!
 		Plater.PlayerHasTargetNonSelf = Plater.PlayerHasTarget and not selfTarget
 		Plater.PlayerCurrentFocusTargetGUID = UnitGUID ("focus")
 		--Plater.PlayerHasFocusTarget = Plater.PlayerCurrentFocusTargetGUID and true
 		Plater.PlayerHasFocusTarget = type(Plater.PlayerCurrentFocusTargetGUID) ~= "nil"
-		local selfFocus = UnitIsUnit("player", "target")
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(selfFocus) then selfFocus = false end --MIDNIGHT!!
+		local selfFocus = UnitIsUnit("player", "focus")
+		if issecretvalue(selfFocus) then selfFocus = false end --MIDNIGHT!!
 		Plater.PlayerHasFocusTargetNonSelf = Plater.PlayerHasFocusTarget and not selfFocus and true
 		
 		for index, plateFrame in ipairs (Plater.GetAllShownPlates()) do
@@ -8357,7 +8506,7 @@ end
 				DF:SetFontColor (nameFontString, unpack(Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_guild_color))
 				plateFrame.isFriend = true
 				
-			elseif (Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color and (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame.unitNameInternal) or not IS_WOW_PROJECT_MIDNIGHT) and Plater.FriendsCache [plateFrame.unitNameInternal]) then
+			elseif (Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color and not issecretvalue(plateFrame.unitFullNameInternal) and Plater.FriendsCache [plateFrame.unitFullNameInternal]) then
 				--is regular friend
 				DF:SetFontColor (nameFontString, unpack(Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color))
 				--DF:SetFontOutline (nameFontString, plateConfigs.actorname_text_shadow)
@@ -8557,7 +8706,7 @@ end
 			DF:SetFontColor (guildString, unpack(Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_guild_color))
 			plateFrame.isFriend = true
 		
-		elseif (Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color and (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame.unitNameInternal) or not IS_WOW_PROJECT_MIDNIGHT) and Plater.FriendsCache [plateFrame.unitNameInternal]) then
+		elseif (Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color and not issecretvalue(plateFrame.unitFullNameInternal) and Plater.FriendsCache [plateFrame.unitFullNameInternal]) then
 			--is regular friend
 			DF:SetFontColor (nameString, unpack(Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color))
 			DF:SetFontColor (guildString, unpack(Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color))
@@ -8872,7 +9021,7 @@ end
 			wrap = true -- force wrapping
 		end
 		local name = plateFrame [MEMBER_NAME] or plateFrame.unitFrame [MEMBER_NAME] or ""
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(name) then
+		if issecretvalue(name) then
 			-- do we try to refresh? is it worth?
 			plateFrame.unitFrame.isRenamed = true -- force it
 			nameString:ClearText()
@@ -9313,6 +9462,7 @@ end
 		end
 		
 		castBar:SetStatusBarTexture (DB_TEXTURE_CASTBAR)
+		platerInternal.Interrupts.UpdatePlate (unitFrame)
 		
 		--update all texts in the nameplate
 		Plater.UpdatePlateText (plateFrame, DB_PLATE_CONFIG [actorType], shouldForceRefresh or plateFrame.PreviousUnitType ~= actorType or unitFrame.RefreshID < PLATER_REFRESH_ID)
@@ -9589,7 +9739,7 @@ end
 		local icon = plateFrame.unitFrame.PlaterRaidTargetFrame.RaidTargetIcon
 		
 		if (index and not plateFrame.IsSelf) then
-			if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(index) then
+			if issecretvalue(index) then
 				--Plater.RaidTargetFontString = Plater.RaidTargetFontString or UIParent:CreateFontString(nil, nil, "GameFontNormal")
 				--Plater.RaidTargetFontString:SetFormattedText("Interface\\TargetingFrame\\UI-RaidTargetingIcon_%d.blp", index)
 				--icon:SetTexture(Plater.RaidTargetFontString:GetText())
@@ -10341,7 +10491,7 @@ end
 
 	function Plater.CheckHighlight (self)
 		local isMouseOver = UnitIsUnit ("mouseover", self.unit)
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isMouseOver) then isMouseOver = false end
+		if issecretvalue(isMouseOver) then isMouseOver = false end
 		if (isMouseOver) then
 			self.HighlightTexture:Show()
 		else
@@ -10665,14 +10815,14 @@ end
 	end
 
 	function Plater.GetNpcIDFromGUID (guid) --private
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(guid) then return 0 end --MIDNIGHT!!
+		if issecretvalue(guid) then return 0 end --MIDNIGHT!!
 		local npcID = select (6, strsplit ("-", guid))
 		return tonumber (npcID or "0") or 0
 	end
 
 	function Plater.GetNpcID (plateFrame) --private
 		local npcId = plateFrame [MEMBER_GUID]
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(npcId) then return end --MIDNIGHT!!
+		if issecretvalue(npcId) then return end --MIDNIGHT!!
 		if (npcId and npcId ~= "") then
 			npcId = select (6, strsplit ("-", npcId))
 			if (npcId) then
@@ -10701,7 +10851,7 @@ end
 		elseif IS_WOW_PROJECT_MIDNIGHT then
 			local unitID = plateFrame.unitFrame [MEMBER_UNITID]
 			local isPet = UnitIsMinion(unitID) or UnitIsOtherPlayersPet(unitID) or UnitIsUnit("pet", unitID)
-			if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(isPet) then return "normal" end --MIDNIGHT!!
+			if issecretvalue(isPet) then return "normal" end --MIDNIGHT!!
 			if isPet then
 				return "pet"
 			end
@@ -10916,6 +11066,9 @@ end
 							name = petOwnerTable.ownerName or name
 							sourceGUID = petOwnerTable.ownerGUID or sourceGUID
 						end
+						if DB_USE_CUSTOM_NAMES then
+							name = LibCustomNames.Get (name)
+						end
 						if DB_USE_NAME_TRANSLIT then
 							name = LibTranslit:Transliterate(name, TRANSLIT_MARK)
 						end
@@ -10926,7 +11079,7 @@ end
 		end,
 		
 		SPELL_CAST_SUCCESS = function (time, token, hidding, sourceGUID, sourceName, sourceFlag, sourceFlag2, targetGUID, targetName, targetFlag, targetFlag2, spellID, spellName, spellType, amount, overKill, school, resisted, blocked, absorbed, isCritical)
-			if IS_WOW_PROJECT_MIDNIGHT and (issecretvalue(spellID) or issecretvalue(sourceGUID)) then return end --MIDNIGHT!!
+			if issecretvalue(spellID) or issecretvalue(sourceGUID) then return end --MIDNIGHT!!
 			if ((tonumber(spellID) or 0) > 0 and (not DB_CAPTURED_SPELLS[spellID] or DB_CAPTURED_SPELLS[spellID].isChanneled == nil or not DB_CAPTURED_CASTS[spellID] or DB_CAPTURED_CASTS[spellID].isChanneled == nil)) then -- check isChanneled to ensure update of already existing data
 				if (not platerInternal.HasFriendlyAffiliation[sourceGUID]) then
 					if (not sourceFlag or bit.band(sourceFlag, 0x60) ~= 0) then --is neutral or hostile
@@ -11097,8 +11250,8 @@ end
 		
 		local petName,text1
 		local cbMode = tonumber(GetCVar("colorblindMode")) or 0
-		if IS_WOW_PROJECT_MAINLINE then
-			if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(serial) then return end
+		if IS_WOW_PROJECT_MIDNIGHT_API and C_TooltipInfo then
+			if issecretvalue(serial) then return end
 			local tooltipData = C_TooltipInfo.GetHyperlink ("unit:" .. serial or "")
 			if tooltipData then
 				local lines = tooltipData.lines
@@ -11122,7 +11275,7 @@ end
 		local isOtherPet = false
 		local ownerName
 		
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(text1) then return end
+		if issecretvalue(text1) then return end
 		if (text1 and text1 ~= "") then
 			local pName = GetUnitName ("player", true)
 			local playerName = pName:gsub ("%-.*", "") --remove realm name
@@ -11137,7 +11290,7 @@ end
 			end
 		end
 		
-		if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(petName) then return end
+		if issecretvalue(petName) then return end
 		if (isPlayerPet or isOtherPet) and petName then
 			local entry = {ownerGUID = IS_WOW_PROJECT_MIDNIGHT and UnitOwnerGUID(unitID) or isPlayerPet and UnitGUID("player") or ownerName and UnitExists(ownerName) and UnitGUID(ownerName) or nil, ownerName = ownerName, petName = petName, time = time()}
 			
@@ -11299,23 +11452,21 @@ end
 	function Plater.GetActorSubName (plateFrame) --private
 		local cbMode = tonumber(GetCVar("colorblindMode")) or 0
 		local subTitle = ""
-		if IS_WOW_PROJECT_MAINLINE then
+		if IS_WOW_PROJECT_MIDNIGHT_API and C_TooltipInfo then
 			local guid
-			if IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame [MEMBER_GUID]) then
+			if not issecretvalue(plateFrame [MEMBER_GUID]) then
 				guid = plateFrame [MEMBER_GUID]
-			elseif IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
+			elseif not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
 				guid = plateFrame.unitFrame [MEMBER_GUID]
-			elseif IS_WOW_PROJECT_MIDNIGHT then
-				return
 			else
-				guid = plateFrame [MEMBER_GUID]
+				return
 			end
 			local tooltipData = C_TooltipInfo.GetHyperlink("unit:" .. (guid or ""))
 			if tooltipData then
 				local line = tooltipData.lines and tooltipData.lines[2 + cbMode]
 				subTitle = line and line.leftText or ""
 				--the tooltip hands back a secret string when the unit is restricted, and comparing one throws
-				if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(subTitle) then return end --MIDNIGHT!!
+				if issecretvalue(subTitle) then return end --MIDNIGHT!!
 			end
 		else
 			local GameTooltipFrame = PlaterScanTooltip or CreateFrame ("GameTooltip", "PlaterScanTooltip", nil, "GameTooltipTemplate")
@@ -11334,14 +11485,12 @@ end
 
 	function Plater.IsQuestObjective (plateFrame)
 		local guid
-		if IS_WOW_PROJECT_MIDNIGHT_API and not issecretvalue(plateFrame [MEMBER_GUID]) then
+		if not issecretvalue(plateFrame [MEMBER_GUID]) then
 			guid = plateFrame [MEMBER_GUID]
-		elseif IS_WOW_PROJECT_MIDNIGHT_API and not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
+		elseif not issecretvalue(plateFrame.unitFrame [MEMBER_GUID]) then
 			guid = plateFrame.unitFrame [MEMBER_GUID]
-		elseif IS_WOW_PROJECT_MIDNIGHT_API then
-			return
 		else
-			guid = plateFrame [MEMBER_GUID]
+			return
 		end
 		if (not guid) then
 			return
@@ -11375,7 +11524,7 @@ end
 				local tooltipData = C_TooltipInfo.GetHyperlink ("unit:" .. guid)
 				if tooltipData then
 					for _, line in ipairs(tooltipData.lines or {}) do
-						if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(line.type) then break end
+						if issecretvalue(line.type) then break end
 						if line.type == Enum.TooltipDataLineType.QuestObjective or line.type == Enum.TooltipDataLineType.QuestTitle or line.type == Enum.TooltipDataLineType.QuestPlayer then
 							--only add actual quest tooltip lines
 							ScanQuestTextCache [#ScanQuestTextCache + 1] = line.leftText or ""
@@ -11845,7 +11994,7 @@ end
 	
 	--return if the unit is in the friends list
 	function Plater.IsUnitInFriendsList (unitFrame)
-		return Plater.FriendsCache [unitFrame.unitNameInternal]
+		return Plater.FriendsCache [unitFrame.unitFullNameInternal]
 	end
 	
 	--> api version of the tap denied function

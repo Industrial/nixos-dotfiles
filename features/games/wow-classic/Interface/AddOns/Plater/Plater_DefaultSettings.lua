@@ -1,5 +1,8 @@
 local addonName, platerInternal = ...
 
+--first plater file with code, /plater profnext logs the file loading from here to Plater.OnInit
+platerInternal.FileLoadStartTime = debugprofilestop()
+
 --details! framework
 local DF = _G ["DetailsFramework"]
 if (not DF) then
@@ -28,7 +31,6 @@ LibSharedMedia:Register ("statusbar", "PlaterHighlight", [[Interface\AddOns\Plat
 LibSharedMedia:Register ("statusbar", "PlaterFocus", [[Interface\AddOns\Plater\images\overlay_indicator_1]])
 LibSharedMedia:Register ("statusbar", "PlaterChess", [[Interface\AddOns\Plater\images\overlay_indicator_2]])
 LibSharedMedia:Register ("statusbar", "PlaterHealth", [[Interface\AddOns\Plater\images\nameplate_health_texture]])
-LibSharedMedia:Register ("statusbar", "testbar", [[Interface\AddOns\Plater\images\testbar.tga]])
 LibSharedMedia:Register ("statusbar", "You Are Beautiful!", [[Interface\AddOns\Plater\images\regular_white]])
 LibSharedMedia:Register ("statusbar", "PlaterBackground 2", [[Interface\AddOns\Plater\images\noise_background]])
 
@@ -145,6 +147,8 @@ PLATER_DEFAULT_SETTINGS = {
 
 		--store the cast colors customized by the user
 		cast_colors = {}, --[spellId] = {[1] = color, [2] = enabled, [3] = custom spell name}
+		aura_colors = {}, --[spellId or spell name] = {[1] = enabled, [2] = color, [3] = track by name, [4] = only mine, [5] = priority, [6] = pandemic color or false}
+		aura_colors_no_override_bad_threat = true, --bad threat colors take priority over the per aura healthbar colors
 		cast_color_settings = { --these are settings for the original cast color settings
 			enabled = false,
 			width = 6,
@@ -168,6 +172,7 @@ PLATER_DEFAULT_SETTINGS = {
 
 		hide_realm_name_on_blizzard = true,
 		hide_friendly_npc_healthbar = false,
+		use_advanced_default_coloring = true,
 		
 		--> offset of the whole nameplate
 		global_offset_y = 0,
@@ -187,6 +192,7 @@ PLATER_DEFAULT_SETTINGS = {
 				only_thename = false,
 				click_through = true,
 				show_guild_name = false,
+				show_surname = true,
 				
 				fixed_class_color = {0, 1, 0, 1},
 				
@@ -197,6 +203,9 @@ PLATER_DEFAULT_SETTINGS = {
 				mana = {100, 3},
 				mana_incombat = {100, 3},
 				buff_frame_y_offset = 10,
+				show_buffs = true,
+				show_debuffs = true,
+				show_buff_special = true,
 				castbar_offset_x = 0,
 				castbar_offset = 0,
 				
@@ -263,6 +272,7 @@ PLATER_DEFAULT_SETTINGS = {
 				enabled = true,
 				module_enabled = true,
 				show_guild_name = false,
+				show_surname = true,
 				
 				use_playerclass_color = true,
 				fixed_class_color = {1, .4, .1, 1},
@@ -276,6 +286,9 @@ PLATER_DEFAULT_SETTINGS = {
 				mana_incombat = {100, 4},
 				
 				buff_frame_y_offset = 0,
+				show_buffs = true,
+				show_debuffs = true,
+				show_buff_special = true,
 				castbar_offset_x = 0,
 				castbar_offset = 0,
 				
@@ -365,6 +378,9 @@ PLATER_DEFAULT_SETTINGS = {
 				mana_incombat = {100, 4},
 				
 				buff_frame_y_offset = 0,
+				show_buffs = true,
+				show_debuffs = true,
+				show_buff_special = true,
 				castbar_offset_x = 0,
 				castbar_offset = 0,
 				
@@ -454,6 +470,9 @@ PLATER_DEFAULT_SETTINGS = {
 				mana_incombat = {100, 4},
 				
 				buff_frame_y_offset = 0,
+				show_buffs = true,
+				show_debuffs = true,
+				show_buff_special = true,
 				castbar_offset_x = 0,
 				castbar_offset = 0,
 				
@@ -688,6 +707,7 @@ PLATER_DEFAULT_SETTINGS = {
 		enable_masque_support = false,
 		
 		use_name_translit = false,
+		use_custom_names = false,
 		
 		use_player_combat_state = false,
 		
@@ -874,6 +894,21 @@ PLATER_DEFAULT_SETTINGS = {
 		
 		aura_timer = true,
 		aura_timer_pandemic_color = true,
+		aura_pandemic_glow = false,
+		aura_pandemic_glow_color = {1, 0.3, 0.15, 1},
+		aura_pandemic_glow_type = "glow",
+		aura_pandemic_glow_pulse = true,
+		aura_pandemic_glow_flash = true,
+		aura_dispel_glow = false,
+		aura_dispel_glow_color = {0.2, 0.7, 1, 1},
+		aura_dispel_glow_type = "glow",
+		aura_dispel_glow_color_by_type = false,
+		aura_dispel_glow_size = 1,
+		aura_dispel_glow_pixel_lines = 8,
+		aura_dispel_glow_pixel_length = 10,
+		aura_dispel_glow_pixel_thickness = 2,
+		aura_dispel_glow_pixel_speed = 0.25,
+		aura_dispel_glow_pixel_offset = 0,
 		aura_timer_decimals = false,
 		aura_timer_text_size = 15,
 		aura_timer_text_font = "Arial Narrow",
@@ -967,6 +1002,10 @@ PLATER_DEFAULT_SETTINGS = {
 		aura_show_debuff_by_the_unit = true,
 		aura_show_aura_by_other_npcs = true,
 		aura_border_colors_by_type = false,
+		aura_border_colors_split = false,
+		aura_border_colors_by_type_debuff = true,
+		aura_border_colors_by_type_buff = false,
+		aura_border_colors_by_type_dispellable = false,
 		aura_show_crowdcontrol = false,
 		aura_show_offensive_cd = false,
 		aura_show_defensive_cd = false,
@@ -3115,6 +3154,30 @@ PLATER_DEFAULT_SETTINGS = {
 		cast_statusbar_spark_color = {1, 1, 1, 1},
 
 		cast_statusbar_interrupt_anim = true,
+		--interrupt cooldown (Plater_Interrupts.lua)
+		interrupt_cd_icon_enabled = true,
+		interrupt_cd_icon_hide_when_ready = true,
+		interrupt_cd_icon_only_casters = true,
+		interrupt_cd_icon_only_target = true,
+		interrupt_cd_icon_only_focus = true,
+		interrupt_cd_icon_size = 20,
+		interrupt_cd_icon_anchor = {side = 2, x = -2, y = 0},
+		interrupt_cd_icon_swipe_color = {0, 0, 0, 0.9},
+		interrupt_cd_icon_show_text = true,
+		interrupt_cd_icon_text_size = 11,
+		interrupt_cd_icon_border_size = 1,
+		interrupt_cd_icon_border_color = {0, 0, 0, 1},
+		interrupt_cd_sound = "",
+		cast_statusbar_interrupt_not_ready_enabled = true,
+		cast_statusbar_color_interrupt_not_ready = {.3, .3, 1, .96},
+		cast_statusbar_interrupt_not_ready_priority = true,
+		cast_statusbar_interrupt_ready_in_time_enabled = false,
+		cast_statusbar_color_interrupt_ready_in_time = {.5, 0, 1, .96},
+		cast_statusbar_interrupt_ready_in_time_grace = 0.5,
+		cast_statusbar_interrupt_spark_enabled = false,
+		cast_statusbar_interrupt_range_enabled = false,
+		cast_statusbar_color_interrupt_out_of_range = {1, .55, 0, .96},
+		cast_statusbar_interrupt_texture = "",
 		
 		indicator_faction = true,
 		indicator_friendlyfaction = false,

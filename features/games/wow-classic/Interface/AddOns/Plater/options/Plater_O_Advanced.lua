@@ -417,7 +417,7 @@ function platerInternal.CreateAdvancedOptions()
             name = "Movement Speed" .. CVarIcon,
             desc = "How fast the nameplate moves (when stacking is enabled).\n\n|cFFFFFFFFDefault: 0.025|r\n\n|cFFFFFFFFRecommended: >=0.02|r" .. CVarDesc,
             nocombat = true,
-            hidden = IS_WOW_PROJECT_MIDNIGHT,
+            hidden = not C_CVar.GetCVarInfo(CVAR_MOVEMENT_SPEED),
         },
         {
             type = "range",
@@ -1291,6 +1291,16 @@ function platerInternal.CreateAdvancedOptions()
             get = function() return Plater.db.profile.show_health_prediction end,
             set = function (self, fixedparam, value)
                 Plater.db.profile.show_health_prediction = value
+                if (IS_WOW_PROJECT_MIDNIGHT) then
+                    for _, plateFrame in ipairs(Plater.GetAllShownPlates()) do
+                        local healthBar = plateFrame.unitFrame.healthBar
+                        healthBar.Settings.ShowHealingPrediction = value
+                        if (healthBar.unit) then
+                            healthBar:UpdatePredictionEvents()
+                            healthBar:UpdateHealPrediction()
+                        end
+                    end
+                end
             end,
             name = "Show Health Prediction/Absorption",
             desc = "Show an extra bar for health prediction and heal absorption.",
@@ -1300,6 +1310,16 @@ function platerInternal.CreateAdvancedOptions()
             get = function() return Plater.db.profile.show_shield_prediction end,
             set = function (self, fixedparam, value)
                 Plater.db.profile.show_shield_prediction = value
+                if (IS_WOW_PROJECT_MIDNIGHT) then
+                    for _, plateFrame in ipairs(Plater.GetAllShownPlates()) do
+                        local healthBar = plateFrame.unitFrame.healthBar
+                        healthBar.Settings.ShowShields = value
+                        if (healthBar.unit) then
+                            healthBar:UpdatePredictionEvents()
+                            healthBar:UpdateHealPrediction()
+                        end
+                    end
+                end
             end,
             name = "Show Shield Prediction",
             desc = "Show an extra bar for shields (e.g. Power Word: Shield from priests) absorption.",
@@ -1326,6 +1346,19 @@ function platerInternal.CreateAdvancedOptions()
             end,
             name = "Name translit",
             desc = "Use LibTranslit to translit names. Changed names will be tagged with a '*'",
+        },
+
+        {
+            type = "toggle",
+            get = function() return Plater.db.profile.use_custom_names end,
+            set = function (self, fixedparam, value)
+                Plater.db.profile.use_custom_names = value
+                Plater.RefreshDBUpvalues()
+                Plater.FullRefreshAllPlates()
+            end,
+            name = "Custom Names",
+            desc = "Show the names set in the CustomNames addon on nameplates and cast bar targets.",
+            hidden = not LibStub:GetLibrary("CustomNames", true),
         },
 
         {

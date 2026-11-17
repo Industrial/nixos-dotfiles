@@ -1,3 +1,12 @@
+# r88
+
+## Fixes
+
+- `C_EncodingUtil` Deflate method 0 with level 0/default can produce a compressed stream that the same client refuses to decompress. LibCompress now substitutes Deflate's `OptimizeForSpeed` level for any default or level 0 request, keeping Deflate selected instead of rejecting it or falling back to another codec.
+- Zlib-family compression candidates are checked with a local round trip before `:Compress()` returns one, so a broken candidate is not handed to callers.
+- LibCompressTest probes the exact PhotoFinger edge payload directly through `C_EncodingUtil`, warns when Deflate 0/0 is still defective, and notes when the workaround can be removed.
+- The TOC compatibility list includes retail interface `120105` and `120107` while keeping the older values.
+
 # r87
 
 ## Deflate family, through C_EncodingUtil

@@ -16,6 +16,7 @@ local IS_WOW_PROJECT_CLASSIC_WRATH = IS_WOW_PROJECT_NOT_MAINLINE and ClassicExpa
 --local IS_WOW_PROJECT_CLASSIC_CATACLYSM = IS_WOW_PROJECT_NOT_MAINLINE and ClassicExpansionAtLeast and LE_EXPANSION_CATACLYSM and ClassicExpansionAtLeast(LE_EXPANSION_CATACLYSM)
 local IS_WOW_PROJECT_MIDNIGHT = DF.IsAddonApocalypseWow()
 local IS_WOW_PROJECT_MIDNIGHT_API = DF.IsMidnightWowAPI()
+local IS_WOW_PROJECT_FOREVER = DF.IsForeverWow()
 local IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS = C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo("CustomAuraContainerTemplate") and true or false
 
 local PixelUtil = PixelUtil or DFPixelUtil
@@ -511,7 +512,7 @@ function Plater.OpenOptionsPanel(pageNumber, bIgnoreLazyLoad)
 
 		{name = "ColorManagement",			text = "OPTIONS_TABNAME_NPC_COLORNAME"},
 		{name = "CastColorManagement",		text = "OPTIONS_TABNAME_CASTCOLORS"},
-		{name = "DebuffLastEvent",			text = "OPTIONS_TABNAME_BUFF_LIST"},
+		{name = "DebuffLastEvent",			text = IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS and "Aura Colors" or "OPTIONS_TABNAME_BUFF_LIST"}, --localize-me
 		{name = "AnimationPanel",			text = "OPTIONS_TABNAME_ANIMATIONS"},
 		{name = "Automation",				text = "OPTIONS_TABNAME_AUTO", createOnDemandFunc = platerInternal.CreateAutomationOptions},
 		{name = "ProfileManagement",		text = "OPTIONS_TABNAME_PROFILES"},
@@ -1876,12 +1877,13 @@ local debuff_options = {
 		get = function() return Plater.db.profile.aura_consolidate end,
 		set = function (self, fixedparam, value) 
 			Plater.db.profile.aura_consolidate = value
+			Plater.RefreshDBUpvalues()
 			Plater.UpdateAllPlates()
 		end,
 		name = "OPTIONS_STACK_SIMILAR_AURAS",
-		desc = "OPTIONS_STACK_SIMILAR_AURAS_DESC",
+		desc = IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS and "Show a single icon for debuffs you can apply several copies of to one target (e.g. Blood Plague)." or "OPTIONS_STACK_SIMILAR_AURAS_DESC",
 		id = "auras_general_stack_similar_aura",
-		hidden = IS_WOW_PROJECT_MIDNIGHT_API,
+		hidden = IS_WOW_PROJECT_MIDNIGHT_API and not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
 	},
 	{
 		type = "toggle",
@@ -2448,6 +2450,52 @@ local debuff_options = {
 	},
 	
 	{type = "blank"},
+	{type = "label", get = function() return "Auras per Row:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.auras_per_row_auto end,
+		set = function (self, fixedparam, value) 
+			Plater.db.profile.auras_per_row_auto = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Automatic",
+		desc = "When enabled auras are split into rows automatically according to healthbar width when growing left/right. Mods can overwrite the amount.",
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.auras_per_row_amount end,
+		set = function (self, fixedparam, value) 
+			Plater.db.profile.auras_per_row_amount = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 1,
+		max = 10,
+		step = 1,
+		name = "Auras per Row 1",
+		desc = "Auras per Row if auto-mode is disabled for Aura Frame 1.",
+	},
+		{
+		type = "range",
+		get = function() return Plater.db.profile.auras_per_row_amount2 end,
+		set = function (self, fixedparam, value) 
+			Plater.db.profile.auras_per_row_amount2 = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 1,
+		max = 10,
+		step = 1,
+		name = "Auras per Row 2",
+		desc = "Auras per Row if auto-mode is disabled for Aura Frame 2.",
+	},
+	
+	{type = "blank"},
 
 	{type = "label", get = function() return "Stack Counter:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
 
@@ -2580,11 +2628,12 @@ local debuff_options = {
 		set = function (self, r, g, b, a) 
 			local color = Plater.db.profile.aura_border_colors.steal_or_purge
 			color[1], color[2], color[3], color[4] = r, g, b, a
+			Plater.RefreshDBUpvalues()
 			Plater.UpdateAllPlates()
 		end,
 		name = "Dispellable Buffs Border Color",
 		desc = "Dispellable Buffs Border Color",
-		hidden = IS_WOW_PROJECT_MIDNIGHT,
+		hidden = IS_WOW_PROJECT_MIDNIGHT and not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
 	},
 	{
 		type = "color",
@@ -2613,11 +2662,12 @@ local debuff_options = {
 		set = function (self, r, g, b, a) 
 			local color = Plater.db.profile.aura_border_colors.is_buff
 			color[1], color[2], color[3], color[4] = r, g, b, a
+			Plater.RefreshDBUpvalues()
 			Plater.UpdateAllPlates()
 		end,
 		name = "Buffs Border Color",
 		desc = "Buffs Border Color",
-		hidden = IS_WOW_PROJECT_MIDNIGHT,
+		hidden = IS_WOW_PROJECT_MIDNIGHT and not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
 	},
 		--border color is debuff
 	{
@@ -2630,11 +2680,12 @@ local debuff_options = {
 		set = function (self, r, g, b, a) 
 			local color = Plater.db.profile.aura_border_colors.is_debuff
 			color[1], color[2], color[3], color[4] = r, g, b, a
+			Plater.RefreshDBUpvalues()
 			Plater.UpdateAllPlates()
 		end,
 		name = "Debuffs Border Color",
 		desc = "Debuffs Border Color",
-		hidden = IS_WOW_PROJECT_MIDNIGHT,
+		hidden = IS_WOW_PROJECT_MIDNIGHT and not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
 	},
 	--border color is offensive
 	{
@@ -2702,6 +2753,62 @@ local debuff_options = {
 		end,
 		name = "Use type based aura border colors",
 		desc = "Use the Blizzard debuff type colors for borders",
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_border_colors_split end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_border_colors_split = value
+			Plater.RefreshDBUpvalues()
+			Plater.UpdateAllPlates()
+			Plater.RefreshAuras()
+		end,
+		name = "Split border colors by aura category",
+		desc = "Color the borders of debuffs, buffs and dispellable buffs separately, using the 'Debuffs', 'Buffs' and 'Dispellable Buffs' border colors. Replaces 'Use type based aura border colors'.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_border_colors_by_type_debuff end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_border_colors_by_type_debuff = value
+			Plater.RefreshDBUpvalues()
+			Plater.UpdateAllPlates()
+			Plater.RefreshAuras()
+		end,
+		name = "Type based colors: Debuffs",
+		desc = "When split, debuffs with a dispel type use the dispel type colors. Otherwise the 'Debuffs Border Color' is used.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_border_colors_by_type_buff end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_border_colors_by_type_buff = value
+			Plater.RefreshDBUpvalues()
+			Plater.UpdateAllPlates()
+			Plater.RefreshAuras()
+		end,
+		name = "Type based colors: Buffs",
+		desc = "When split, buffs with a dispel type use the dispel type colors. Otherwise the 'Buffs Border Color' is used.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_border_colors_by_type_dispellable end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_border_colors_by_type_dispellable = value
+			Plater.RefreshDBUpvalues()
+			Plater.UpdateAllPlates()
+			Plater.RefreshAuras()
+		end,
+		name = "Type based colors: Dispellable Buffs",
+		desc = "When split, buffs you can steal or purge use the dispel type colors if they have a dispel type. Otherwise the 'Dispellable Buffs Border Color' is used.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
 	},
 	{
 		type = "color",
@@ -2835,51 +2942,6 @@ local debuff_options = {
 	
 	{type = "breakline"},
 	
-	{type = "label", get = function() return "Auras per Row:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
-	{
-		type = "toggle",
-		boxfirst = true,
-		get = function() return Plater.db.profile.auras_per_row_auto end,
-		set = function (self, fixedparam, value) 
-			Plater.db.profile.auras_per_row_auto = value
-			Plater.RefreshDBUpvalues()
-			Plater.RefreshAuras()
-			Plater.UpdateAllPlates()
-		end,
-		name = "Automatic",
-		desc = "When enabled auras are split into rows automatically according to healthbar width when growing left/right. Mods can overwrite the amount.",
-	},
-	{
-		type = "range",
-		get = function() return Plater.db.profile.auras_per_row_amount end,
-		set = function (self, fixedparam, value) 
-			Plater.db.profile.auras_per_row_amount = value
-			Plater.RefreshDBUpvalues()
-			Plater.RefreshAuras()
-			Plater.UpdateAllPlates()
-		end,
-		min = 1,
-		max = 10,
-		step = 1,
-		name = "Auras per Row 1",
-		desc = "Auras per Row if auto-mode is disabled for Aura Frame 1.",
-	},
-		{
-		type = "range",
-		get = function() return Plater.db.profile.auras_per_row_amount2 end,
-		set = function (self, fixedparam, value) 
-			Plater.db.profile.auras_per_row_amount2 = value
-			Plater.RefreshDBUpvalues()
-			Plater.RefreshAuras()
-			Plater.UpdateAllPlates()
-		end,
-		min = 1,
-		max = 10,
-		step = 1,
-		name = "Auras per Row 2",
-		desc = "Auras per Row if auto-mode is disabled for Aura Frame 2.",
-	},
-	
 	{type = "break"},
 	{type = "label", get = function() return "Aura Timer:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
 	
@@ -2911,6 +2973,98 @@ local debuff_options = {
 		--hidden = not IS_WOW_PROJECT_MIDNIGHT,
 	},
 	
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_pandemic_glow end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_pandemic_glow = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Pandemic glow",
+		desc = "Glow around the aura while recasting it keeps the remaining time (pandemic window).",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "color",
+		boxfirst = true,
+		get = function()
+			local color = Plater.db.profile.aura_pandemic_glow_color
+			return {color[1], color[2], color[3], color[4]}
+		end,
+		set = function (self, r, g, b, a)
+			local color = Plater.db.profile.aura_pandemic_glow_color
+			color[1], color[2], color[3], color[4] = r, g, b, a
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Pandemic glow color",
+		desc = "Color of the pandemic glow.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "select",
+		get = function() return Plater.db.profile.aura_pandemic_glow_type end,
+		values = function()
+			local onSelectGlowType = function(_, _, value)
+				Plater.db.profile.aura_pandemic_glow_type = value
+				Plater.RefreshDBUpvalues()
+				Plater.RefreshAuras()
+				Plater.UpdateAllPlates()
+			end
+
+			local glowTypes = {
+				{label = "Glow", value = "glow", onclick = onSelectGlowType},
+			}
+
+			--the icon glows of LibOrbitGlow, including the ones of installed glow packs. plater builds them from the registry, which
+			--works for a flipbook atlas or a glow with only a loop phase, glows of an engine are built by code of the library
+			local LibOrbitGlow = LibStub:GetLibrary("LibOrbitGlow-1.0")
+			for _, glowName in ipairs(LibOrbitGlow:GetGlowList()) do
+				local glowInfo = LibOrbitGlow:GetGlowInfo(glowName)
+				if (glowInfo.atlas or glowInfo.loopOnly) then
+					glowTypes[#glowTypes + 1] = {label = glowName, value = glowName, onclick = onSelectGlowType}
+				end
+			end
+
+			return glowTypes
+		end,
+		name = "Pandemic glow type",
+		desc = "How the pandemic glow looks. Pulse only applies to Glow.\n\nInstall the addon Orbit: Media for additional glows.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_pandemic_glow_pulse end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_pandemic_glow_pulse = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Pandemic glow pulse",
+		desc = "Pulse the glow while the pandemic window is open.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_pandemic_glow_flash end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_pandemic_glow_flash = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Pandemic glow flash",
+		desc = "Flash the glow once when the pandemic window opens.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+
 	{
 		type = "toggle",
 		boxfirst = true,
@@ -3039,6 +3193,182 @@ local debuff_options = {
 		desc = "OPTIONS_YOFFSET_DESC",
 	},
 	
+	{type = "blank", hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS},
+	{type = "label", get = function() return "Dispel Healthbar Glow:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE"), hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_dispel_glow end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow = value
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Dispel glow",
+		desc = "Glow around the nameplate while the unit has an aura you can dispel, purge or soothe.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "select",
+		get = function() return Plater.db.profile.aura_dispel_glow_type end,
+		values = function()
+			local onSelectGlowType = function(_, _, value)
+				Plater.db.profile.aura_dispel_glow_type = value
+				Plater.RefreshDBUpvalues()
+				Plater.RefreshAuras()
+				Plater.UpdateAllPlates()
+			end
+
+			local glowTypes = {
+				{label = "Glow", value = "glow", onclick = onSelectGlowType},
+				{label = "Pulsing Glow", value = "pulse", onclick = onSelectGlowType},
+				{label = "Ants", value = "ants", onclick = onSelectGlowType},
+				{label = "Border", value = "border", onclick = onSelectGlowType},
+				{label = "Pixel Glow", value = "pixel", onclick = onSelectGlowType},
+			}
+
+			--the status bar glows of LibOrbitGlow, including the ones of installed glow packs
+			local LibOrbitGlow = LibStub:GetLibrary("LibOrbitGlow-1.0")
+			for _, glowName in ipairs(LibOrbitGlow:GetStatusBarGlowList()) do
+				glowTypes[#glowTypes + 1] = {label = LibOrbitGlow:GetStatusBarGlowInfo(glowName).label, value = glowName, onclick = onSelectGlowType}
+			end
+
+			return glowTypes
+		end,
+		name = "Dispel glow type",
+		desc = "How the dispel glow looks.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "color",
+		boxfirst = true,
+		get = function()
+			local color = Plater.db.profile.aura_dispel_glow_color
+			return {color[1], color[2], color[3], color[4]}
+		end,
+		set = function (self, r, g, b, a)
+			local color = Plater.db.profile.aura_dispel_glow_color
+			color[1], color[2], color[3], color[4] = r, g, b, a
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Dispel glow color",
+		desc = "Color of the dispel glow.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "toggle",
+		boxfirst = true,
+		get = function() return Plater.db.profile.aura_dispel_glow_color_by_type end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_color_by_type = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		name = "Dispel glow color by type",
+		desc = "Color the dispel glow by the dispel type of the aura (magic, curse, disease, poison, enrage, ...), using the aura border dispel type colors. Auras without a type use the dispel glow color. The pixel glow and the ants only get the enrage color, all other types use the dispel glow color.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.aura_dispel_glow_size end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_size = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 0.5,
+		max = 3,
+		step = 0.1,
+		usedecimals = true,
+		name = "Dispel glow size",
+		desc = "Size of the glow, the pulsing glow and the ants, and thickness of the border. Not used by the pixel glow.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.aura_dispel_glow_pixel_lines end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_pixel_lines = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 1,
+		max = 30,
+		step = 1,
+		name = "Pixel glow lines",
+		desc = "Number of lines of the pixel glow.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.aura_dispel_glow_pixel_length end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_pixel_length = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 1,
+		max = 40,
+		step = 1,
+		name = "Pixel glow length",
+		desc = "Length of the lines of the pixel glow. Lines are never longer than the height of the glow.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.aura_dispel_glow_pixel_thickness end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_pixel_thickness = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 1,
+		max = 10,
+		step = 1,
+		name = "Pixel glow thickness",
+		desc = "Thickness of the lines of the pixel glow.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.aura_dispel_glow_pixel_speed end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_pixel_speed = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = 0.05,
+		max = 2,
+		step = 0.05,
+		usedecimals = true,
+		name = "Pixel glow speed",
+		desc = "Rounds per second the lines of the pixel glow go around the health bar.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
+	{
+		type = "range",
+		get = function() return Plater.db.profile.aura_dispel_glow_pixel_offset end,
+		set = function (self, fixedparam, value)
+			Plater.db.profile.aura_dispel_glow_pixel_offset = value
+			Plater.RefreshDBUpvalues()
+			Plater.RefreshAuras()
+			Plater.UpdateAllPlates()
+		end,
+		min = -5,
+		max = 10,
+		step = 1,
+		name = "Pixel glow offset",
+		desc = "Position of the lines of the pixel glow and the ants. At 0 they are on the border of the health bar, negative values move them inwards.",
+		hidden = not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS,
+	},
 	{type = "blank"},
 	{type = "label", get = function() return "Swipe Animation:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
 	{
@@ -4544,7 +4874,8 @@ do
 			desc = "OPTIONS_CASTBAR_HIDEBLIZZARD",
 		},
 
-		{type = "breakline"},
+		--{type = "breakline"},
+		{type = "break"},
 		
 		--life size
 		{type = "label", get = function() return "Health Bar:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
@@ -4635,6 +4966,8 @@ do
 			name = "OPTIONS_HEIGHT",
 			desc = "OPTIONS_POWERBAR_HEIGHT",
 		},
+
+		{type = "breakline"},
 		
 		--cast bar settings
 		--{type = "blank"},
@@ -6009,6 +6342,19 @@ local relevance_options = {
 			nocombat = true,
 			hidden = not IS_WOW_PROJECT_MIDNIGHT_API,
 		},
+		{
+			type = "toggle",
+			boxfirst = true,
+			get = function() return Plater.db.profile.use_advanced_default_coloring end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.use_advanced_default_coloring = value
+				Plater.UpdateBaseNameplateOptions()
+				if not InCombatLockdown() then SetCVar("UnitNameFriendlyPlayerName", GetCVar("UnitNameFriendlyPlayerName")) end
+			end,
+			name = "Use blizzard advanced name colors",
+			desc = "Enable the advanced coloring mode for names on blizzard nameplates.",
+			nocombat = true,
+		},
 		
 		{
 			type = "toggle",
@@ -6163,29 +6509,6 @@ local relevance_options = {
 		
 		{
 			type = "range",
-			get = function() return tonumber (GetCVar ("nameplateOverlapV")) end,
-			set = function (self, fixedparam, value) 
-				if (not InCombatLockdown()) then
-					SetCVar ("nameplateOverlapV", value)
-				else
-					Plater:Msg (L["OPTIONS_ERROR_CVARMODIFY"])
-				end
-			end,
-			min = 0.2,
-			max = 2.5,
-			step = 0.05,
-			thumbscale = 1.7,
-			usedecimals = true,
-			name = "OPTIONS_NAMEPLATES_OVERLAP",
-			desc = "OPTIONS_NAMEPLATES_OVERLAP_DESC",
-			nocombat = true,
-			hidden = IS_WOW_PROJECT_MIDNIGHT_API,
-		},
-		
-		{type = "blank", hidden = not IS_WOW_PROJECT_MIDNIGHT_API},
-		
-		{
-			type = "range",
 			get = function() return tonumber (GetCVar (CVAR_CULLINGDISTANCE)) end,
 			set = function (self, fixedparam, value) 
 				if (not InCombatLockdown()) then
@@ -6195,13 +6518,13 @@ local relevance_options = {
 				end
 			end,
 			min = IS_WOW_PROJECT_MIDNIGHT_API and 0 or 20, --20y for tbc and classic
-			max = (IS_WOW_PROJECT_MIDNIGHT_API and 60) or ((IS_WOW_PROJECT_CLASSIC_TBC or IS_WOW_PROJECT_CLASSIC_WRATH) and 41) or 20, --41y for tbc, 20y for classic era
+			--max = (IS_WOW_PROJECT_FOREVER and 45) or (IS_WOW_PROJECT_MIDNIGHT_API and 60) or ((IS_WOW_PROJECT_CLASSIC_TBC or IS_WOW_PROJECT_CLASSIC_WRATH) and 41) or 20, --41y for tbc, 20y for classic erased
+			max = select(2, C_CVar.GetCVarInfo(CVAR_CULLINGDISTANCE)) or 0,
 			step = 1,
 			name = "View Distance" .. CVarIcon,
 			desc = "How far you can see nameplates (in yards)." .. CVarDesc,
 			nocombat = true,
 		},
-		
 		{
 			type = "range",
 			get = function() return tonumber (GetCVar ("nameplatePlayerMaxDistance")) or 0 end,
@@ -6213,11 +6536,48 @@ local relevance_options = {
 				end
 			end,
 			min = 0,
-			max = (IS_WOW_PROJECT_MIDNIGHT_API and 60) or ((IS_WOW_PROJECT_CLASSIC_TBC or IS_WOW_PROJECT_CLASSIC_WRATH) and 0) or 0, --not available for classic/wrath
+			--max = (IS_WOW_PROJECT_FOREVER and 45) or (IS_WOW_PROJECT_MIDNIGHT_API and 60) or ((IS_WOW_PROJECT_CLASSIC_TBC or IS_WOW_PROJECT_CLASSIC_WRATH) and 0) or 0, --not available for classic/wrapModeHorizontal
+			max = select(2, C_CVar.GetCVarInfo("nameplatePlayerMaxDistance")) or 0,
 			step = 1,
 			name = "Player View Distance" .. CVarIcon,
 			desc = "How far you can see player nameplates (in yards)." .. CVarDesc,
 			nocombat = true,
+		},
+		{
+			type = "range",
+			get = function() return tonumber (GetCVar ("nameplateMaxVerticalDistance")) or 0 end,
+			set = function (self, fixedparam, value) 
+				if (not InCombatLockdown()) then
+					SetCVar ("nameplateMaxVerticalDistance", value)
+				else
+					Plater:Msg (L["OPTIONS_ERROR_CVARMODIFY"])
+				end
+			end,
+			min = 0,
+			max = select(2, C_CVar.GetCVarInfo("nameplateMaxVerticalDistance")) or 0,
+			step = 1,
+			name = "Vertical View Distance" .. CVarIcon,
+			desc = "How far you can see player nameplates (in yards) above and below you." .. CVarDesc,
+			nocombat = true,
+			hidden = not C_CVar.GetCVarInfo("nameplateMaxVerticalDistance")
+		},
+		{
+			type = "range",
+			get = function() return tonumber (GetCVar ("nameplateMaxVerticalDistanceAtMaxRange")) or 0 end,
+			set = function (self, fixedparam, value) 
+				if (not InCombatLockdown()) then
+					SetCVar ("nameplateMaxVerticalDistanceAtMaxRange", value)
+				else
+					Plater:Msg (L["OPTIONS_ERROR_CVARMODIFY"])
+				end
+			end,
+			min = 0,
+			max = select(2, C_CVar.GetCVarInfo("nameplateMaxVerticalDistanceAtMaxRange")) or 0,
+			step = 1,
+			name = "Vertical Max View Distance" .. CVarIcon,
+			desc = "How far you can see player nameplates (in yards) above and below you." .. CVarDesc,
+			nocombat = true,
+			hidden = not C_CVar.GetCVarInfo("nameplateMaxVerticalDistanceAtMaxRange")
 		},
 
 		{type = "blank"},
@@ -6285,8 +6645,6 @@ local relevance_options = {
 			name = "OPTIONS_BORDER_THICKNESS",
 			desc = "OPTIONS_BORDER_THICKNESS",
 		},
-
-		{type = "blank"},
 
 		{ --global healthbar width
 			type = "range",
@@ -6517,43 +6875,7 @@ local relevance_options = {
 
 		{type = "blank"},
 
-		{
-			type = "toggle",
-			boxfirst = true,
-			get = function() return Plater.db.profile.honor_blizzard_plate_alpha end,
-			set = function (self, fixedparam, value) 
-				Plater.db.profile.honor_blizzard_plate_alpha = value
-				Plater.UpdateAllPlates()
-			end,
-			name = "Use Blizzard's Nameplate Alpha",
-			desc = "Use the 'occluded' and other blizzard nameplate alpha values from blizzard settings.\n\nThis setting only works with 'Use custom strata channels' enabled.",
-			id = "transparency_blizzard_alpha",
-		},
-
-		{
-			type = "range",
-			get = function() return tonumber (GetCVar ("nameplateOccludedAlphaMult")) end,
-			set = function (self, fixedparam, value) 
-				if (not InCombatLockdown()) then
-					SetCVar ("nameplateOccludedAlphaMult", value)
-				else
-					Plater:Msg (L["OPTIONS_ERROR_CVARMODIFY"])
-				end
-			end,
-			min = 0,
-			max = 1,
-			step = 0.1,
-			thumbscale = 1.7,
-			usedecimals = true,
-			name = "Occluded Alpha Multiplier" .. CVarIcon,
-			desc = "Alpha multiplyer for 'occluded' plates (when they are not in line of sight)." .. CVarDesc,
-			nocombat = true,
-			disableif = function() return not Plater.db.profile.honor_blizzard_plate_alpha end,
-		},		
-
-		{type = "blank"},
-
-		{type = "label", get = function() return "General:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+		--{type = "label", get = function() return "General:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
 		{
 			type = "toggle",
 			boxfirst = true,
@@ -6606,6 +6928,60 @@ local relevance_options = {
 			usedecimals = true,
 			disableif = function() return not Plater.db.profile.not_affecting_combat_enabled end,
 		},
+
+		{
+			type = "toggle",
+			boxfirst = true,
+			get = function() return Plater.db.profile.honor_blizzard_plate_alpha end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.honor_blizzard_plate_alpha = value
+				Plater.UpdateAllPlates()
+			end,
+			name = "Use Blizzard's Nameplate Alpha",
+			desc = "Use the 'occluded' and other blizzard nameplate alpha values from blizzard settings.\n\nThis setting only works with 'Use custom strata channels' enabled.",
+			id = "transparency_blizzard_alpha",
+		},
+
+		{
+			type = "range",
+			get = function() return tonumber (GetCVar ("nameplateOccludedAlphaMult")) end,
+			set = function (self, fixedparam, value) 
+				if (not InCombatLockdown()) then
+					SetCVar ("nameplateOccludedAlphaMult", value)
+				else
+					Plater:Msg (L["OPTIONS_ERROR_CVARMODIFY"])
+				end
+			end,
+			min = 0,
+			max = 1,
+			step = 0.1,
+			thumbscale = 1.7,
+			usedecimals = true,
+			name = "Occluded Alpha Multiplier" .. CVarIcon,
+			desc = "Blizzard alpha multiplyer for 'occluded' plates (when they are not in line of sight)." .. CVarDesc,
+			nocombat = true,
+			--disableif = function() return not Plater.db.profile.honor_blizzard_plate_alpha end,
+		},
+		{
+			type = "range",
+			get = function() return tonumber (GetCVar ("namePlateNotSelectedAlpha")) end,
+			set = function (self, fixedparam, value) 
+				if (not InCombatLockdown()) then
+					SetCVar ("namePlateNotSelectedAlpha", value)
+				else
+					Plater:Msg (L["OPTIONS_ERROR_CVARMODIFY"])
+				end
+			end,
+			min = -1,
+			max = 1,
+			step = 0.1,
+			thumbscale = 1.7,
+			usedecimals = true,
+			name = "Non-target Alpha Multiplier" .. CVarIcon,
+			desc = "Blizzard alpha multiplyer for not targeted plates. -1 disables this feature." .. CVarDesc,
+			nocombat = true,
+			--disableif = function() return not Plater.db.profile.honor_blizzard_plate_alpha end,
+		},	
 
 		{type = "blank"},
 		
@@ -7353,6 +7729,17 @@ end
 		},
 		{
 			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlyplayer.show_surname end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlyplayer.show_surname = value
+				Plater.FullRefreshAllPlates()
+			end,
+			name = "Show Surname",
+			desc = "Show the first name and the surname of the player.",
+			hidden = not IS_WOW_PROJECT_FOREVER,
+		},
+		{
+			type = "toggle",
 			get = function() return Plater.db.profile.plate_config.friendlyplayer.click_through end,
 			set = function (self, fixedparam, value) 
 				Plater.db.profile.plate_config.friendlyplayer.click_through = value
@@ -7364,6 +7751,36 @@ end
 
 		{type = "blank"},
 		{type = "label", get = function() return "Aura Frame:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlyplayer.show_debuffs end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlyplayer.show_debuffs = value
+				platerInternal.Auras.RefreshActorTypeAuras("friendlyplayer")
+			end,
+			name = "Show Debuffs",
+			desc = "Show debuffs on these nameplates.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlyplayer.show_buffs end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlyplayer.show_buffs = value
+				platerInternal.Auras.RefreshActorTypeAuras("friendlyplayer")
+			end,
+			name = "Show Buffs",
+			desc = "Show buffs on these nameplates.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlyplayer.show_buff_special end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlyplayer.show_buff_special = value
+				platerInternal.Auras.RefreshActorTypeAuras("friendlyplayer")
+			end,
+			name = "Show Buff Special",
+			desc = "Show the auras of the buff special frame on these nameplates.",
+		},
 		--y offset
 		{
 			type = "range",
@@ -7410,82 +7827,6 @@ end
 			usedecimals = true,
 			name = "OPTIONS_YOFFSET",
 			desc = "OPTIONS_YOFFSET_DESC",
-		},
-		
-		{type = "blank"},
-		{type = "label", get = function() return "Player Name Text Colors" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
-		--player name color
-		{
-			type = "toggle",
-			get = function() return Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_class_color end,
-			set = function (self, fixedparam, value) 
-				Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_class_color = value
-				Plater.UpdateAllPlates()
-			end,
-			name = "Use Class Colors",
-			desc = "Player name/guild text uses the class color instead of the selected color. Guild or Friend colors will overwrite this, if used.",
-		},
-		{
-			type = "toggle",
-			get = function() return Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color end,
-			set = function (self, fixedparam, value) 
-				Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color = value
-				Plater.UpdateAllPlates()
-			end,
-			name = "Use Friends Colors",
-			desc = "Player name/guild text uses the selected friend color, if the player is on your friend list.",
-		},
-		{
-			type = "toggle",
-			get = function() return Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_guild_color end,
-			set = function (self, fixedparam, value) 
-				Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_guild_color = value
-				Plater.UpdateAllPlates()
-			end,
-			name = "Use Guild Colors",
-			desc = "Player name/guild text uses the selected guild color, if it is a guild mate.",
-		},
-		{
-			type = "color",
-			get = function()
-				local color = Plater.db.profile.plate_config.friendlyplayer.actorname_text_color
-				return {color[1], color[2], color[3], color[4]}
-			end,
-			set = function (self, r, g, b, a) 
-				local color = Plater.db.profile.plate_config.friendlyplayer.actorname_text_color
-				color[1], color[2], color[3], color[4] = r, g, b, a
-				Plater.UpdateAllPlates()
-			end,
-			name = "OPTIONS_COLOR",
-			desc = "The color of the text, if neither class, friend or guild colors are used.",
-		},
-		{
-			type = "color",
-			get = function()
-				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color
-				return {color[1], color[2], color[3], color[4]}
-			end,
-			set = function (self, r, g, b, a) 
-				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color
-				color[1], color[2], color[3], color[4] = r, g, b, a
-				Plater.UpdateAllPlates()
-			end,
-			name = "Friend Color",
-			desc = "Use this color for name/guild texts if the player is your friend.",
-		},
-		{
-			type = "color",
-			get = function()
-				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_guild_color
-				return {color[1], color[2], color[3], color[4]}
-			end,
-			set = function (self, r, g, b, a) 
-				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_guild_color
-				color[1], color[2], color[3], color[4] = r, g, b, a
-				Plater.UpdateAllPlates()
-			end,
-			name = "Guild Color",
-			desc = "Use this color for name/guild texts if the player is in your guild.",
 		},
 		
 		{type = "breakline"},
@@ -8262,6 +8603,81 @@ end
 			name = "OPTIONS_YOFFSET",
 			desc = "OPTIONS_YOFFSET_DESC",
 		},
+		{type = "blank"},
+		{type = "label", get = function() return "Player Name Text Colors" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+		--player name color
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_class_color end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_class_color = value
+				Plater.UpdateAllPlates()
+			end,
+			name = "Use Class Colors",
+			desc = "Player name/guild text uses the class color instead of the selected color. Guild or Friend colors will overwrite this, if used.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_friends_color = value
+				Plater.UpdateAllPlates()
+			end,
+			name = "Use Friends Colors",
+			desc = "Player name/guild text uses the selected friend color, if the player is on your friend list.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_guild_color end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_use_guild_color = value
+				Plater.UpdateAllPlates()
+			end,
+			name = "Use Guild Colors",
+			desc = "Player name/guild text uses the selected guild color, if it is a guild mate.",
+		},
+		{
+			type = "color",
+			get = function()
+				local color = Plater.db.profile.plate_config.friendlyplayer.actorname_text_color
+				return {color[1], color[2], color[3], color[4]}
+			end,
+			set = function (self, r, g, b, a) 
+				local color = Plater.db.profile.plate_config.friendlyplayer.actorname_text_color
+				color[1], color[2], color[3], color[4] = r, g, b, a
+				Plater.UpdateAllPlates()
+			end,
+			name = "OPTIONS_COLOR",
+			desc = "The color of the text, if neither class, friend or guild colors are used.",
+		},
+		{
+			type = "color",
+			get = function()
+				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color
+				return {color[1], color[2], color[3], color[4]}
+			end,
+			set = function (self, r, g, b, a) 
+				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_friend_color
+				color[1], color[2], color[3], color[4] = r, g, b, a
+				Plater.UpdateAllPlates()
+			end,
+			name = "Friend Color",
+			desc = "Use this color for name/guild texts if the player is your friend.",
+		},
+		{
+			type = "color",
+			get = function()
+				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_guild_color
+				return {color[1], color[2], color[3], color[4]}
+			end,
+			set = function (self, r, g, b, a) 
+				local color = Plater.db.profile.plate_config [ACTORTYPE_FRIENDLY_PLAYER].actorname_guild_color
+				color[1], color[2], color[3], color[4] = r, g, b, a
+				Plater.UpdateAllPlates()
+			end,
+			name = "Guild Color",
+			desc = "Use this color for name/guild texts if the player is in your guild.",
+		},
 		
 		
 
@@ -8358,10 +8774,51 @@ end
 			name = "Show Guild Name",
 			desc = "Show Guild Name",
 		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.enemyplayer.show_surname end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.enemyplayer.show_surname = value
+				Plater.FullRefreshAllPlates()
+			end,
+			name = "Show Surname",
+			desc = "Show the first name and the surname of the player.",
+			hidden = not IS_WOW_PROJECT_FOREVER,
+		},
 		
 		{type = "blank"},
 		
 		{type = "label", get = function() return "Aura Frame:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.enemyplayer.show_debuffs end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.enemyplayer.show_debuffs = value
+				platerInternal.Auras.RefreshActorTypeAuras("enemyplayer")
+			end,
+			name = "Show Debuffs",
+			desc = "Show debuffs on these nameplates.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.enemyplayer.show_buffs end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.enemyplayer.show_buffs = value
+				platerInternal.Auras.RefreshActorTypeAuras("enemyplayer")
+			end,
+			name = "Show Buffs",
+			desc = "Show buffs on these nameplates.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.enemyplayer.show_buff_special end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.enemyplayer.show_buff_special = value
+				platerInternal.Auras.RefreshActorTypeAuras("enemyplayer")
+			end,
+			name = "Show Buff Special",
+			desc = "Show the auras of the buff special frame on these nameplates.",
+		},
 		--y offset
 		{
 			type = "range",
@@ -9335,6 +9792,36 @@ end
 		{type = "blank"},
 		
 		{type = "label", get = function() return "Aura Frame:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlynpc.show_debuffs end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlynpc.show_debuffs = value
+				platerInternal.Auras.RefreshActorTypeAuras("friendlynpc")
+			end,
+			name = "Show Debuffs",
+			desc = "Show debuffs on these nameplates.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlynpc.show_buffs end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlynpc.show_buffs = value
+				platerInternal.Auras.RefreshActorTypeAuras("friendlynpc")
+			end,
+			name = "Show Buffs",
+			desc = "Show buffs on these nameplates.",
+		},
+		{
+			type = "toggle",
+			get = function() return Plater.db.profile.plate_config.friendlynpc.show_buff_special end,
+			set = function (self, fixedparam, value) 
+				Plater.db.profile.plate_config.friendlynpc.show_buff_special = value
+				platerInternal.Auras.RefreshActorTypeAuras("friendlynpc")
+			end,
+			name = "Show Buff Special",
+			desc = "Show the auras of the buff special frame on these nameplates.",
+		},
 		--y offset
 		{
 			type = "range",
@@ -10416,6 +10903,36 @@ end
 			
 			{type = "blank"},
 			{type = "label", get = function() return "Aura Frame:" end, text_template = DF:GetTemplate ("font", "ORANGE_FONT_TEMPLATE")},
+			{
+				type = "toggle",
+				get = function() return Plater.db.profile.plate_config.enemynpc.show_debuffs end,
+				set = function (self, fixedparam, value) 
+					Plater.db.profile.plate_config.enemynpc.show_debuffs = value
+					platerInternal.Auras.RefreshActorTypeAuras("enemynpc")
+				end,
+				name = "Show Debuffs",
+				desc = "Show debuffs on these nameplates.",
+			},
+			{
+				type = "toggle",
+				get = function() return Plater.db.profile.plate_config.enemynpc.show_buffs end,
+				set = function (self, fixedparam, value) 
+					Plater.db.profile.plate_config.enemynpc.show_buffs = value
+					platerInternal.Auras.RefreshActorTypeAuras("enemynpc")
+				end,
+				name = "Show Buffs",
+				desc = "Show buffs on these nameplates.",
+			},
+			{
+				type = "toggle",
+				get = function() return Plater.db.profile.plate_config.enemynpc.show_buff_special end,
+				set = function (self, fixedparam, value) 
+					Plater.db.profile.plate_config.enemynpc.show_buff_special = value
+					platerInternal.Auras.RefreshActorTypeAuras("enemynpc")
+				end,
+				name = "Show Buff Special",
+				desc = "Show the auras of the buff special frame on these nameplates.",
+			},
 			--y offset
 			{
 				type = "range",

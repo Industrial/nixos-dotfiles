@@ -1,10 +1,7 @@
 @cont1nuity:
-- Some general performance improvements.
-- Mind Controls should no longer have enemy nameplates lingering when they switch to friendly again.
-- More WoW Forever compatibility.
-- Re-enable resources for WoW Forever.
-- Fixing some aura skinning issues.
-
-@Terciob:
-- Designer updates.
+- New option to enable blizzard nameplates 'advanced coloring'.
+- Some improvements to pixel perfect layout.
+- Fixing some issues with the 'Interrupt not ready' features.
+- Fixing friends coloring.
+- Fixing range checking for Forever.
 

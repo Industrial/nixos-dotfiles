@@ -18,6 +18,7 @@ local min = _G.min
 local max = _G.max
 local abs = _G.abs
 local G_CreateFrame = _G.CreateFrame
+local LibOrbitGlow = LibStub:GetLibrary("LibOrbitGlow-1.0")
 
 
 local CreateFrame = function (frameType , name, parent, template, id)
@@ -47,6 +48,33 @@ local GetAuraSlots = _G.C_UnitAuras and _G.C_UnitAuras.GetAuraSlots
 local GetAuraDataByAuraInstanceID = _G.C_UnitAuras and _G.C_UnitAuras.GetAuraDataByAuraInstanceID
 local BackdropTemplateMixin = _G.BackdropTemplateMixin
 local BUFF_MAX_DISPLAY_PLATER = nil -- don't limit.
+--size of the pandemic glow relative to the aura icon
+local CONST_PANDEMIC_GLOW_SCALE = 1.4
+--size of a LibOrbitGlow pandemic glow without a scale of its own, the default of the library
+local CONST_PANDEMIC_ORBIT_SCALE = 1.4
+--flipbook layout of a LibOrbitGlow glow pack texture without one of its own (rows, columns, frames), the default of the library
+local CONST_PANDEMIC_ORBIT_ROWS = 6
+local CONST_PANDEMIC_ORBIT_COLUMNS = 5
+local CONST_PANDEMIC_ORBIT_FRAMES = 30
+--the dispel glow texture is drawn in texture pixels, this brings it down to nameplate size
+local CONST_DISPEL_GLOW_SCALE = 0.6
+--thickness of the dispel border style, in dispel glow units (scaled by CONST_DISPEL_GLOW_SCALE)
+local CONST_DISPEL_BORDER_SIZE = 3
+--the dispel ants style: amount of dots, seconds for one round and the size of a dot in health bar pixels at glow size 1
+local CONST_DISPEL_ANTS_AMOUNT = 16
+local CONST_DISPEL_ANTS_DURATION = 6
+local CONST_DISPEL_ANTS_SIZE = 3
+--lines of the dispel pixel glow, the max of its lines option
+local CONST_DISPEL_PIXEL_MAX_LINES = 30
+--size of the mask showing the dispel pixel glow, in dispel glow units. a square far bigger than any health bar
+local CONST_DISPEL_PIXEL_MASK_SIZE = 4000
+--aura container sets (one per nameplate, 3 containers each) for the 40 nameplates max plus a spare. built with their aura groups
+--behind the loading screen, each costs ~40ms and ~100 aura buttons
+local CONST_MAX_AURA_CONTAINER_SETS = 41
+--height of a slot frame of the per aura healthbar colors, more than twice the height of any health bar. the masks are half of it
+local CONST_AURA_COLOR_SLOT_HEIGHT = 400
+--width of the masks of the per aura healthbar colors, wider than any health bar
+local CONST_AURA_COLOR_MASK_WIDTH = 2000
 
 local DB_AURA_GROW_DIRECTION
 local DB_AURA_GROW_DIRECTION2
@@ -201,6 +229,14 @@ local MANUAL_TRACKING_BUFFS = {}
 local MANUAL_TRACKING_DEBUFFS = {}
 local AUTO_TRACKING_EXTRA_BUFFS = {}
 local AUTO_TRACKING_EXTRA_DEBUFFS = {}
+--spell names used by the per aura healthbar colors, expandAuraCaches() resolves them into spell ids
+local AURA_COLORS = {}
+
+--debuffs the player can apply several copies of to one target under the same spell id
+--with 'aura_consolidate' enabled, the aura containers show a single icon for each of them
+local CONSOLIDATED_DEBUFFS = {
+	[55078] = true, --blood plague
+}
 
 --blacklists
 local DB_DEBUFF_BANNED
@@ -240,6 +276,7 @@ local spellBlacklist = { -- some spells just crash PTR/beta clients... add them 
 -- Spell Caches
 local expandAuraCaches
 local lazyBuildSpellCache
+local spellCacheCallbacks = {}
 -- Spell Cache init
 lazyBuildSpellCache = function(start)
 	platerInternal.Auras.spellCachesLoading = true
@@ -282,6 +319,28 @@ lazyBuildSpellCache = function(start)
 		platerInternal.Auras.spellCachesLoaded = true
 		platerInternal.Auras.spellCachesLoading = false
 		expandAuraCaches()
+
+		for _, callback in ipairs(spellCacheCallbacks) do
+			callback()
+		end
+
+		wipe(spellCacheCallbacks)
+	end
+end
+
+--builds the spell cache when it isn't built yet. 'callback' runs once the cache is ready
+function platerInternal.Auras.InitSpellCache(callback)
+	if (platerInternal.Auras.spellCachesLoaded) then
+		callback()
+		return
+	end
+
+	spellCacheCallbacks[#spellCacheCallbacks+1] = callback
+
+	if (not platerInternal.Auras.spellCachesLoading) then
+		--the sweep starts on the next frame, the flag keeps expandAuraCaches() from scheduling a second one
+		platerInternal.Auras.spellCachesLoading = true
+		C_Timer.After(0, lazyBuildSpellCache)
 	end
 end
 --lazyBuildSpellCache()
@@ -292,7 +351,7 @@ function expandAuraCaches()
 	local toLowerCase = string.lower
 	local allIDsByName = platerInternal.Auras.spellCaches.allIDsByName
 	local missing = {}
-	local containersToExtend = DB_TRACK_METHOD == 0x1 and {DB_DEBUFF_BANNED, DB_BUFF_BANNED, SPECIAL_AURAS_AUTO_ADDED, SPECIAL_AURAS_USER_LIST, SPECIAL_AURAS_USER_LIST_MINE, AUTO_TRACKING_EXTRA_BUFFS, AUTO_TRACKING_EXTRA_DEBUFFS} or {SPECIAL_AURAS_AUTO_ADDED, SPECIAL_AURAS_USER_LIST, SPECIAL_AURAS_USER_LIST_MINE, MANUAL_TRACKING_BUFFS, MANUAL_TRACKING_DEBUFFS}
+	local containersToExtend = DB_TRACK_METHOD == 0x1 and {DB_DEBUFF_BANNED, DB_BUFF_BANNED, SPECIAL_AURAS_AUTO_ADDED, SPECIAL_AURAS_USER_LIST, SPECIAL_AURAS_USER_LIST_MINE, AUTO_TRACKING_EXTRA_BUFFS, AUTO_TRACKING_EXTRA_DEBUFFS, AURA_COLORS} or {SPECIAL_AURAS_AUTO_ADDED, SPECIAL_AURAS_USER_LIST, SPECIAL_AURAS_USER_LIST_MINE, MANUAL_TRACKING_BUFFS, MANUAL_TRACKING_DEBUFFS, AURA_COLORS}
 	for _, container in pairs (containersToExtend) do
 		local containerCopy = DF.table.copy({}, container or {})
 		for id, val in pairs(containerCopy) do
@@ -316,7 +375,7 @@ function expandAuraCaches()
 		C_Timer.After(0, function()
 			--clean spell cache
 			local copy = DF.table.copy({}, DB_AURA_NAME_CACHE)
-			local toCheck = {DB_DEBUFF_BANNED, DB_BUFF_BANNED, SPECIAL_AURAS_AUTO_ADDED, SPECIAL_AURAS_USER_LIST, SPECIAL_AURAS_USER_LIST_MINE, AUTO_TRACKING_EXTRA_BUFFS, AUTO_TRACKING_EXTRA_DEBUFFS, MANUAL_TRACKING_BUFFS, MANUAL_TRACKING_DEBUFFS}
+			local toCheck = {DB_DEBUFF_BANNED, DB_BUFF_BANNED, SPECIAL_AURAS_AUTO_ADDED, SPECIAL_AURAS_USER_LIST, SPECIAL_AURAS_USER_LIST_MINE, AUTO_TRACKING_EXTRA_BUFFS, AUTO_TRACKING_EXTRA_DEBUFFS, MANUAL_TRACKING_BUFFS, MANUAL_TRACKING_DEBUFFS, AURA_COLORS}
 			local fullList = {}
 			for _, cache in pairs (toCheck) do
 				for id in pairs(cache) do
@@ -847,12 +906,41 @@ function Plater.Auras.SetIconConfigOutdated()
 	containerConfigCache.auraFrameOptionIndex = containerConfigCache.auraFrameOptionIndex + 1
 	Plater.EndLogPerformanceCore("Plater-Core", "Update", "SetIconConfigOutdated")
 end
+--marks the aura button skins outdated when a font used by the aura texts is registered with LibSharedMedia.
+--the containers pre-built in OnInit can be skinned before a media addon registers the font, DF:SetFontFace then keeps the template font
+function platerInternal.Auras.OnFontRegistered(fontName) --private
+	local profile = Plater.db.profile
+	local isAuraFont = fontName == profile.aura_stack_font or fontName == profile.aura_timer_text_font
+	local isExtraIconFont = fontName == profile.extra_icon_stack_font or fontName == profile.extra_icon_timer_font or fontName == profile.extra_icon_caster_font
+	if (isAuraFont or isExtraIconFont) then
+		Plater.Auras.SetIconConfigOutdated()
+	end
+end
 function Plater.Auras.SetContainerFiltersOutdated()
 	Plater.StartLogPerformanceCore("Plater-Core", "Update", "SetContainerFiltersOutdated")
 	containerConfigCache.candidateFilterIndex = containerConfigCache.candidateFilterIndex + 1
 	containerConfigCache.auraFilterIndex = containerConfigCache.auraFilterIndex + 1
 	Plater.EndLogPerformanceCore("Plater-Core", "Update", "SetContainerFiltersOutdated")
 end
+
+--adds a debuff to the list shown as a single icon while 'aura_consolidate' is enabled, can be called by mods
+---@param spellId number
+function Plater.Auras.AddConsolidatedDebuff(spellId)
+	if (type(spellId) ~= "number") then
+		error("Plater.Auras.AddConsolidatedDebuff: spellId must be a number.", 2)
+	end
+
+	--a mod may call this from a hook that runs on every nameplate update
+	if (CONSOLIDATED_DEBUFFS[spellId]) then
+		return
+	end
+
+	CONSOLIDATED_DEBUFFS[spellId] = true
+	Plater.Auras.SetContainerFiltersOutdated()
+	Plater.Auras.SetIconConfigOutdated()
+	Plater.UpdateAllPlates()
+end
+
 local function getCandidateFilters(frameName, force)
 	Plater.StartLogPerformanceCore("Plater-Core", "Update", "getCandidateFilters")
 	local profile = Plater.db.profile
@@ -923,6 +1011,17 @@ local function getCandidateFilters(frameName, force)
 				DF.table.copy(filters.mainFilter.excludeSpellIDs, MANUAL_TRACKING_DEBUFFS)
 			end
 		end
+
+		--consolidated debuffs are shown by their own single frame groups, see getAuraFilters
+		if (profile.aura_consolidate) then
+			for spellId in pairs(CONSOLIDATED_DEBUFFS) do
+				filters.additionalInclude.includeSpellIDs[spellId] = nil
+
+				if (DB_AURA_SHOW_DEBUFF_BYPLAYER or DB_AURA_SHOW_AS_BLIZZARD) then
+					filters.mainFilter.excludeSpellIDs[spellId] = true
+				end
+			end
+		end
 	elseif frameName == "Secondary" then
 		if DB_TRACK_METHOD == 1 then
 			DF.table.copy(filters.mainFilter.excludeSpellIDs, DB_BUFF_BANNED)
@@ -961,6 +1060,13 @@ local function getCandidateFilters(frameName, force)
 			DF.table.copy(filters.additionalInclude.excludeSpellIDs, MANUAL_TRACKING_BUFFS)
 			DF.table.copy(filters.additionalInclude.excludeSpellIDs, MANUAL_TRACKING_DEBUFFS)
 		end
+
+		--consolidated debuffs are shown by their own single frame groups, see getAuraFilters
+		if (profile.aura_consolidate) then
+			for spellId in pairs(CONSOLIDATED_DEBUFFS) do
+				filters.additionalInclude.includeSpellIDs[spellId] = nil
+			end
+		end
 	end
 
 	containerConfigCache.candidateFilters[frameName] = filters
@@ -972,7 +1078,10 @@ end
 local function getAuraFilters(frameName, actorType, force)
 	Plater.StartLogPerformanceCore("Plater-Core", "Update", "getAuraFilters")
 
-	if not actorType then return {} end
+	if not actorType then
+		Plater.EndLogPerformanceCore("Plater-Core", "Update", "getAuraFilters")
+		return {}
+	end
 
 	local isPlayer = actorType == "enemyplayer" or actorType == "friendlyplayer"
 	local canAssist = actorType == "friendlynpc" or actorType == "friendlyplayer"
@@ -998,6 +1107,52 @@ local function getAuraFilters(frameName, actorType, force)
 		local pFilters = {}
 		local nFilters = {}
 		local mainFilterString = nil
+
+		--consolidated debuffs get one single frame group each, the container keeps the top sorted copy and drops the rest
+		if (frameName ~= "Secondary" and type == "debuffs" and not canAssist and Plater.db.profile.aura_consolidate) then
+			for spellId in pairs(CONSOLIDATED_DEBUFFS) do
+				local candidate = {includeSpellIDs = {[spellId] = true}}
+				local filterString = "HARMFUL|PLAYER"
+				local isTracked = false
+				local isSpecialAura = SPECIAL_AURAS_AUTO_ADDED[spellId] or SPECIAL_AURAS_USER_LIST[spellId]
+
+				if (frameName == "ExtraIconFrame") then
+					isTracked = isSpecialAura
+
+					--an 'only mine' special aura is in both user lists, anything else is shown from any caster
+					if (not SPECIAL_AURAS_USER_LIST_MINE[spellId]) then
+						filterString = "HARMFUL"
+						candidate.excludeSpellIDs = allCandidates.additionalInclude.excludeSpellIDs
+					end
+
+				elseif (DB_TRACK_METHOD == 0x2) then
+					isTracked = MANUAL_TRACKING_DEBUFFS[spellId]
+
+				elseif (AUTO_TRACKING_EXTRA_DEBUFFS[spellId]) then
+					--the extra tracking list shows a debuff from any caster
+					isTracked = true
+					filterString = "HARMFUL"
+
+				--special auras are shown on the buff special frame instead
+				elseif (not DB_DEBUFF_BANNED[spellId] and not isSpecialAura) then
+					isTracked = DB_AURA_SHOW_DEBUFF_BYPLAYER or DB_AURA_SHOW_AS_BLIZZARD
+
+					--same restriction as the 'as blizzard' groups below
+					if (not DB_AURA_SHOW_DEBUFF_BYPLAYER) then
+						candidate.nameplateShowPersonal = true
+					end
+				end
+
+				if (isTracked) then
+					table.insert(filters, {
+						filterString = filterString,
+						candidateFilters = candidate,
+						maxFrameCount = 1,
+					})
+				end
+			end
+		end
+
 		if DB_TRACK_METHOD == 0x2 and frameName ~= "ExtraIconFrame" then
 			--manual tracking shortcut.
 			if frameName == "Main" and type == "debuffs" and not canAssist then
@@ -1006,6 +1161,19 @@ local function getAuraFilters(frameName, actorType, force)
 					candidateFilters = allCandidates.additionalInclude
 				})
 			elseif ((frameName == "Main" and not DB_AURA_SEPARATE_BUFFS) or (frameName == "Secondary" and DB_AURA_SEPARATE_BUFFS)) and type == "buffs" and canAssist then
+				table.insert(filters, {
+					filterString = "HELPFUL",
+					candidateFilters = allCandidates.additionalInclude
+				})
+
+			--spell IDs may not be matched for debuffs on friends and buffs on enemies. the container rejects what
+			--it may not match, so these two groups show the listed spells that are never secret and nothing else
+			elseif frameName == "Main" and type == "debuffs" and canAssist then
+				table.insert(filters, {
+					filterString = "HARMFUL",
+					candidateFilters = allCandidates.additionalInclude
+				})
+			elseif ((frameName == "Main" and not DB_AURA_SEPARATE_BUFFS) or (frameName == "Secondary" and DB_AURA_SEPARATE_BUFFS)) and type == "buffs" and not canAssist then
 				table.insert(filters, {
 					filterString = "HELPFUL",
 					candidateFilters = allCandidates.additionalInclude
@@ -1188,6 +1356,7 @@ local function getAuraFilters(frameName, actorType, force)
 					filterString = "HARMFUL|PLAYER",
 					candidateFilters = {
 						includeSpellIDs = SPECIAL_AURAS_USER_LIST_MINE,
+						excludeSpellIDs = Plater.db.profile.aura_consolidate and CONSOLIDATED_DEBUFFS or nil, --shown by their own groups
 						--excludeSpellIDs = SPECIAL_AURAS_USER_LIST,
 					}
 				})
@@ -1404,7 +1573,353 @@ function Plater.Auras.ClearAuraFrameUpdateCallback(callbackType)
 	platerInternal.Auras.initAndUpdateAuraFrameOverrides[callbackType] = nil
 end
 
+--dispel type id (the curve x value) to profile color key. it is a step curve, so each color holds until the next id:
+--the ids between the named types (stealth, invisibility, ...) get the untyped color
+local BORDER_DISPEL_CURVE_KEYS = {[0] = "none", [1] = "magic", [2] = "curse", [3] = "disease", [4] = "poison", [5] = "none", [9] = "enrage", [10] = "none", [11] = "bleed", [12] = "none"}
+
+--one curve per border option instead of a color map: every AddDispelTypeTexture call securecopies its options per button,
+--and a map of ColorMixin tables made that copy the most expensive part of creating an aura button
+local function buildBorderColorCurve(typeColors, byType, untypedColor)
+	local curve = C_CurveUtil.CreateColorCurve()
+	curve:SetType(Enum.LuaCurveType.Step)
+	for dispelTypeId, key in pairs(BORDER_DISPEL_CURVE_KEYS) do
+		curve:AddPoint(dispelTypeId, CreateColor(unpack(byType and key ~= "none" and typeColors[key] or untypedColor)))
+	end
+	return curve
+end
+
+local BORDER_COLOR_KEYS = {"none", "magic", "curse", "disease", "poison", "bleed", "enrage", "is_debuff", "is_buff", "steal_or_purge"}
+
+--every profile value the color maps are built from, to rebuild them only when one of these changed
+local function getAuraBorderOptionsSignature(profile, isExtra, colors)
+	local split = not isExtra and profile.aura_border_colors_split
+	local byType = isExtra and profile.extra_icon_aura_border_colors_by_type or not isExtra and profile.aura_border_colors_by_type
+	if not split and not byType then
+		return "" --no color maps at all
+	end
+	local parts = {tostring(split)}
+	if split then
+		parts[2] = tostring(profile.aura_border_colors_by_type_debuff)
+		parts[3] = tostring(profile.aura_border_colors_by_type_buff)
+		parts[4] = tostring(profile.aura_border_colors_by_type_dispellable)
+	end
+	for _, key in ipairs(BORDER_COLOR_KEYS) do
+		local color = colors[key]
+		parts[#parts + 1] = color and table.concat(color, ",") or ""
+	end
+	return table.concat(parts, ";")
+end
+
+local function getAuraBorderOptions(frameName)
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
+	local cached = containerConfigCache.auraBorderOptions[frameName]
+	if cached and cached.optionIndex == containerConfigCache.auraBorderOptionIndex then
+		Plater.EndLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
+		return cached
+	end
+
+	local profile = Plater.db.profile
+	local isExtra = frameName == "ExtraIconFrame"
+	local colors = isExtra and profile.extra_icon_dispel_type_colors or profile.aura_border_colors
+	local signature = getAuraBorderOptionsSignature(profile, isExtra, colors)
+	if cached and cached.signature == signature then
+		cached.optionIndex = containerConfigCache.auraBorderOptionIndex
+		Plater.EndLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
+		return cached
+	end
+
+	local style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset
+	local borderOptions = {optionIndex = containerConfigCache.auraBorderOptionIndex, signature = signature}
+
+	if not isExtra and profile.aura_border_colors_split then
+		local stealable = Enum.CustomAuraButtonDispelTypeStealableFilter
+		borderOptions[1] = { --debuffs
+			showWhenHarmful = true, showWhenHelpful = false, showWithoutDispelType = true, style = style,
+			customDispelColorCurve = buildBorderColorCurve(colors, profile.aura_border_colors_by_type_debuff, colors.is_debuff),
+		}
+		borderOptions[2] = { --buffs
+			showWhenHarmful = false, showWhenHelpful = true, showWithoutDispelType = true, style = style,
+			stealableFilter = stealable.NotStealable,
+			customDispelColorCurve = buildBorderColorCurve(colors, profile.aura_border_colors_by_type_buff, colors.is_buff),
+		}
+		borderOptions[3] = { --steal or purge
+			showWhenHarmful = false, showWhenHelpful = true, showWithoutDispelType = true, style = style,
+			stealableFilter = stealable.Stealable,
+			customDispelColorCurve = buildBorderColorCurve(colors, profile.aura_border_colors_by_type_dispellable, colors.steal_or_purge),
+		}
+	elseif isExtra and profile.extra_icon_aura_border_colors_by_type or not isExtra and profile.aura_border_colors_by_type then
+		borderOptions[1] = { --fallback default
+			showWhenHarmful = true, showWhenHelpful = true, showWithoutDispelType = true, style = style,
+			customDispelColorCurve = buildBorderColorCurve(colors, true, colors.none),
+		}
+	end
+
+	containerConfigCache.auraBorderOptions[frameName] = borderOptions
+
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
+	return borderOptions
+end
+
+local function applyAuraBorders(auraButton, frameName, borderOptions, borderThickness, auraWidth, auraHeight)
+	local profile = Plater.db.profile
+	local defaultColor = frameName ~= "ExtraIconFrame" and profile.aura_border_colors.default or profile.extra_icon_dispel_type_colors.default
+	local borders = auraButton.Borders
+
+	--false while the border is disabled, turning it back on registers again
+	local activeBorderOptions = borderThickness > 0 and borderOptions
+	local shouldRegister = auraButton.activeBorderOptions ~= activeBorderOptions
+	if (shouldRegister) then
+		auraButton:ClearDispelTypeTextures()
+		auraButton.activeBorderOptions = activeBorderOptions
+	end
+
+	for i = 1, math.max(#borderOptions, #borders, 1) do
+		local border = borders[i]
+		if not border then
+			border = auraButton:CreateTexture(nil, "overlay")
+			border:SetTexture([[Interface\AddOns\Plater\images\IconBorderWhite]])
+			border:SetTextureSliceMargins(8, 8, 8, 8)
+			border:SetAllPoints()
+			borders[i] = border
+		end
+		border:SetSize(auraWidth, auraHeight)
+
+		local borderOption = activeBorderOptions and borderOptions[i]
+		if (borderOption) then
+			border:SetScale(borderThickness / 8)
+			if (shouldRegister) then
+				auraButton:AddDispelTypeTexture(border, borderOption)
+			end
+
+		elseif (i == 1 and borderThickness > 0) then
+			--no option set, static border in the default color
+			border:SetScale(borderThickness / 8)
+			border:SetVertexColor(defaultColor[1], defaultColor[2], defaultColor[3], defaultColor[4])
+			border:Show()
+
+		else
+			border:Hide()
+		end
+	end
+	auraButton.Border = borders[1] --compatibility
+end
+
+--pulsing glow around the aura while a recast keeps its remaining time (pandemic window, 12.1.5).
+--blizzard shows the texture and plays the animation, plater only registers them
+local applyPandemicGlow = function(auraButton, auraWidth, auraHeight)
+	local profile = Plater.db.profile
+	local isEnabled = profile.aura_pandemic_glow
+	local glowColor = profile.aura_pandemic_glow_color
+	local glowWidth = auraWidth * CONST_PANDEMIC_GLOW_SCALE
+	local glowHeight = auraHeight * CONST_PANDEMIC_GLOW_SCALE
+	local pandemicGlow = auraButton.PandemicGlow
+	--"glow" is plater's own glow, any other value is the name of a LibOrbitGlow glow
+	local isOrbitGlow = profile.aura_pandemic_glow_type ~= "glow"
+	local isGlowEnabled = isEnabled and not isOrbitGlow
+
+	if (not pandemicGlow) then
+		if (not isEnabled) then
+			return
+		end
+
+		--desaturated, the color comes from the profile
+		pandemicGlow = auraButton:CreateTexture(nil, "overlay", nil, 7)
+		pandemicGlow:SetTexture([[Interface\SpellActivationOverlay\IconAlert]])
+		pandemicGlow:SetTexCoord(0.00781250, 0.50781250, 0.27734375, 0.52734375)
+		pandemicGlow:SetDesaturated(true)
+		pandemicGlow:SetBlendMode("ADD")
+		pandemicGlow:SetPoint("center")
+		pandemicGlow:Hide()
+		auraButton.PandemicGlow = pandemicGlow
+
+		--a registered animation group cannot get more animations, so it is complete before registering
+		local pulseAnimation = pandemicGlow:CreateAnimationGroup()
+		pulseAnimation:SetLooping("BOUNCE")
+		local alphaAnimation = pulseAnimation:CreateAnimation("Alpha")
+		alphaAnimation:SetFromAlpha(1)
+		alphaAnimation:SetToAlpha(0.3)
+		alphaAnimation:SetDuration(0.5)
+		auraButton.PandemicPulse = pulseAnimation
+	end
+
+	pandemicGlow:SetSize(glowWidth, glowHeight)
+	pandemicGlow:SetVertexColor(glowColor[1], glowColor[2], glowColor[3], glowColor[4])
+
+	--registering the same region or animation twice is an assert error. with nothing registered the button
+	--stops computing the pandemic window
+	if (isGlowEnabled and not auraButton.hasPandemicGlow) then
+		auraButton:AddPandemicRegion(pandemicGlow)
+		auraButton.hasPandemicGlow = true
+
+	elseif (not isGlowEnabled and auraButton.hasPandemicGlow) then
+		auraButton:RemovePandemicRegion(pandemicGlow)
+		pandemicGlow:Hide()
+		auraButton.hasPandemicGlow = false
+	end
+
+	--blizzard only stops the animations it knows about, so a pulse removed while playing is stopped here
+	local isPulseEnabled = isGlowEnabled and profile.aura_pandemic_glow_pulse
+	if (isPulseEnabled and not auraButton.hasPandemicPulse) then
+		auraButton:AddPandemicActiveAnimation(auraButton.PandemicPulse)
+		auraButton.hasPandemicPulse = true
+
+	elseif (not isPulseEnabled and auraButton.hasPandemicPulse) then
+		auraButton:RemovePandemicActiveAnimation(auraButton.PandemicPulse)
+		auraButton.PandemicPulse:Stop()
+		auraButton.hasPandemicPulse = false
+	end
+
+	--a LibOrbitGlow glow, built from its registry as flipbooks of plater's own: blizzard shows them and plays their animations inside
+	--the window only. the glows of the library keep playing on every button, also hidden (7000 looping flipbooks cost 130 -> 100 fps).
+	--a glow is a flipbook atlas (one layer) or glow pack textures for the loop phase, a tinted body and a near white core when layered
+	local orbitGlowName = profile.aura_pandemic_glow_type
+	--a glow pack that is no longer installed leaves a name without info
+	local orbitGlowInfo = isEnabled and isOrbitGlow and LibOrbitGlow:GetGlowInfo(orbitGlowName)
+	local pandemicLayers = auraButton.PandemicLayers
+
+	if (orbitGlowInfo and not pandemicLayers) then
+		pandemicLayers = {}
+		for i = 1, 2 do
+			local layer = auraButton:CreateTexture(nil, "overlay", nil, 5 + i)
+			layer:SetPoint("center")
+			layer:Hide()
+
+			--a registered animation group cannot get more animations, so it is complete before registering
+			local loopAnimation = layer:CreateAnimationGroup()
+			loopAnimation:SetLooping("REPEAT")
+			layer.flipBookAnimation = loopAnimation:CreateAnimation("FlipBook")
+			layer.flipBookAnimation:SetDuration(1)
+			layer.loopAnimation = loopAnimation
+			pandemicLayers[i] = layer
+		end
+		auraButton.PandemicLayers = pandemicLayers
+	end
+
+	if (pandemicLayers) then
+		local layerPaths = orbitGlowInfo and not orbitGlowInfo.atlas and LibOrbitGlow:GetResolvedPaths(orbitGlowName)
+		local layerCount = 0
+		if (orbitGlowInfo) then
+			layerCount = orbitGlowInfo.atlas and 1 or #layerPaths
+		end
+
+		for index, layer in ipairs(pandemicLayers) do
+			local isLayerEnabled = index <= layerCount
+			if (isLayerEnabled) then
+				local glowScale = orbitGlowInfo.scale or CONST_PANDEMIC_ORBIT_SCALE
+				local rows = orbitGlowInfo.rows or CONST_PANDEMIC_ORBIT_ROWS
+				local columns = orbitGlowInfo.cols or CONST_PANDEMIC_ORBIT_COLUMNS
+				local frames = orbitGlowInfo.frames or CONST_PANDEMIC_ORBIT_FRAMES
+				local red, green, blue, alpha = glowColor[1], glowColor[2], glowColor[3], glowColor[4]
+
+				if (orbitGlowInfo.atlas) then
+					layer:SetAtlas(orbitGlowInfo.atlas)
+					layer:SetDesaturated(orbitGlowInfo.desaturated ~= false)
+					layer:SetBlendMode(orbitGlowInfo.blendMode or "ADD")
+					--the layout of a flipbook atlas comes with the atlas, a missing atlas has no info
+					local atlasInfo = C_Texture.GetAtlasInfo(orbitGlowInfo.atlas)
+					if (atlasInfo) then
+						rows = orbitGlowInfo.rows or atlasInfo.flipBookRows
+						columns = orbitGlowInfo.cols or atlasInfo.flipBookColumns
+						frames = orbitGlowInfo.frames or atlasInfo.flipBookFrames
+					end
+
+				elseif (orbitGlowInfo.layered and index == 2) then
+					layer:SetTexture(layerPaths[index])
+					layer:SetDesaturated(false)
+					layer:SetBlendMode(orbitGlowInfo.coreBlend or "ADD")
+					red, green, blue, alpha = 0.6 + 0.4 * red, 0.6 + 0.4 * green, 0.6 + 0.4 * blue, 1
+
+				elseif (orbitGlowInfo.layered) then
+					layer:SetTexture(layerPaths[index])
+					layer:SetDesaturated(false)
+					layer:SetBlendMode(orbitGlowInfo.bodyBlend or "BLEND")
+
+				else
+					layer:SetTexture(layerPaths[index])
+					layer:SetDesaturated(false)
+					layer:SetBlendMode(orbitGlowInfo.blendMode or "ADD")
+				end
+
+				layer:SetSize(auraWidth * glowScale, auraHeight * glowScale)
+				layer:SetVertexColor(red, green, blue, alpha)
+				layer.flipBookAnimation:SetFlipBookRows(rows)
+				layer.flipBookAnimation:SetFlipBookColumns(columns)
+				layer.flipBookAnimation:SetFlipBookFrames(frames)
+			end
+
+			if (isLayerEnabled and not layer.isPandemicRegion) then
+				auraButton:AddPandemicRegion(layer)
+				auraButton:AddPandemicActiveAnimation(layer.loopAnimation)
+				layer.isPandemicRegion = true
+
+			elseif (not isLayerEnabled and layer.isPandemicRegion) then
+				auraButton:RemovePandemicRegion(layer)
+				auraButton:RemovePandemicActiveAnimation(layer.loopAnimation)
+				layer.loopAnimation:Stop()
+				layer:Hide()
+				layer.isPandemicRegion = false
+			end
+		end
+	end
+
+	--one flash when the window opens. the texture does not keep the alpha 0 it is given once the animation is
+	--registered, so it is a pandemic region as well, and the animation holds its final alpha 0 for the rest of the window
+	local isFlashEnabled = isEnabled and profile.aura_pandemic_glow_flash
+	local pandemicFlash = auraButton.PandemicFlash
+
+	if (not pandemicFlash) then
+		if (not isFlashEnabled) then
+			return
+		end
+
+		pandemicFlash = auraButton:CreateTexture(nil, "overlay", nil, 7)
+		pandemicFlash:SetTexture([[Interface\SpellActivationOverlay\IconAlert]])
+		pandemicFlash:SetTexCoord(0.00781250, 0.50781250, 0.27734375, 0.52734375)
+		pandemicFlash:SetDesaturated(true)
+		pandemicFlash:SetBlendMode("ADD")
+		pandemicFlash:SetPoint("center")
+		pandemicFlash:Hide()
+		auraButton.PandemicFlash = pandemicFlash
+
+		local flashAnimation = pandemicFlash:CreateAnimationGroup()
+		flashAnimation:SetToFinalAlpha(true)
+		local fadeInAnimation = flashAnimation:CreateAnimation("Alpha")
+		fadeInAnimation:SetOrder(1)
+		fadeInAnimation:SetFromAlpha(0)
+		fadeInAnimation:SetToAlpha(1)
+		fadeInAnimation:SetDuration(0.1)
+		local fadeOutAnimation = flashAnimation:CreateAnimation("Alpha")
+		fadeOutAnimation:SetOrder(2)
+		fadeOutAnimation:SetFromAlpha(1)
+		fadeOutAnimation:SetToAlpha(0)
+		fadeOutAnimation:SetDuration(0.4)
+		local growAnimation = flashAnimation:CreateAnimation("Scale")
+		growAnimation:SetOrder(2)
+		growAnimation:SetScaleFrom(1, 1)
+		growAnimation:SetScaleTo(1.4, 1.4)
+		growAnimation:SetDuration(0.4)
+		auraButton.PandemicFlashAnimation = flashAnimation
+	end
+
+	if (isFlashEnabled and not auraButton.hasPandemicFlash) then
+		auraButton:AddPandemicRegion(pandemicFlash)
+		auraButton:AddPandemicEnterAnimation(auraButton.PandemicFlashAnimation)
+		auraButton.hasPandemicFlash = true
+
+	elseif (not isFlashEnabled and auraButton.hasPandemicFlash) then
+		auraButton:RemovePandemicRegion(pandemicFlash)
+		auraButton:RemovePandemicEnterAnimation(auraButton.PandemicFlashAnimation)
+		pandemicFlash:Hide()
+		auraButton.hasPandemicFlash = false
+	end
+
+	pandemicFlash:SetSize(glowWidth, glowHeight)
+	pandemicFlash:SetVertexColor(glowColor[1], glowColor[2], glowColor[3], glowColor[4])
+end
+
 local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame")
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - create")
 	--DevTool:AddData(newIcon, "initAuraFrame")
 	local profile = Plater.db.profile
 
@@ -1465,7 +1980,9 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 	auraButton.TimerText = auraButton.Cooldown:CreateFontString (nil, "overlay", "NumberFontNormal")
 	auraButton.TimerText:SetPoint ("center")
 	--auraButton.TimerText = auraButton.Cooldown:GetRegions()
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - create")
 
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - durationtext")
 	if profile.aura_timer then
 		local durationTextOptions = {
 			textFormatter = timeFormatter,
@@ -1481,17 +1998,24 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 		auraButton:ClearDurationText()
 	end
 
-	if auraButton.SetCasterName and frameName == "ExtraIconFrame" then
+	if frameName == "ExtraIconFrame" then
 		auraButton.Desc = auraButton:CreateFontString(nil, "overlay", "GameFontNormal")
-        auraButton.Desc:SetPoint("bottom", auraButton, "top", 0, 2)
-        auraButton.Desc:SetText("")
+		auraButton.Desc:SetPoint("bottom", auraButton, "top", 0, 2)
+		auraButton.Desc:SetText("")
 		DF:SetFontSize(auraButton.Desc, Plater.db.profile.extra_icon_caster_size)
 		DF:SetFontFace(auraButton.Desc, Plater.db.profile.extra_icon_caster_font)
 		DF:SetFontOutline(auraButton.Desc, "SLUG")
-		auraButton:SetCasterName(auraButton.Desc, {showRealmName = false, useClassColors = true})
 	end
 
+	if auraButton.SetCasterName and frameName == "ExtraIconFrame" and Plater.db.profile.extra_icon_caster_name then
+		auraButton:SetCasterName(auraButton.Desc, {showRealmName = false, useClassColors = true})
+	elseif auraButton.ClearCasterName then
+		auraButton:ClearCasterName()
+	end
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - durationtext")
 
+
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - fonts")
 	--sizes and position:
 	local auraWidth
 	local auraHeight
@@ -1557,60 +2081,19 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 		DF:SetFontFace (timerLabel, profile.extra_icon_timer_font)
 		Plater.SetAnchor (timerLabel, profile.aura_timer_text_anchor) --TODO
 	end
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - fonts")
 
 	-- switch to proper border, keep compatibility
-	auraButton.Border = auraButton:CreateTexture(nil, "overlay")
-	--auraButton.Border:SetAllPoints()
-	auraButton.Border:SetTexture([[Interface\AddOns\Plater\images\IconBorderWhite]])
-	local band = 8
-	local offset = 0
-	auraButton.Border:SetTextureSliceMargins(band, band, band, band)
-	--auraButton.Border:SetPoint("TOPLEFT",     auraButton.Icon, "TOPLEFT",     -band * offset,  band * offset)
-	--auraButton.Border:SetPoint("BOTTOMRIGHT", auraButton.Icon, "BOTTOMRIGHT",  band * offset, -band * offset)
-	auraButton.Border:SetAllPoints()
-	if borderThickness > 0 then
-		auraButton.Border:SetScale(borderThickness / band)
-		auraButton.Border:Show()
-	else
-		auraButton.Border:Hide()
-	end
-	local defaultColor = frameName ~= "ExtraIconFrame" and Plater.db.profile.aura_border_colors.default or Plater.db.profile.extra_icon_dispel_type_colors.default
-    auraButton.Border:SetVertexColor(defaultColor[1], defaultColor[2], defaultColor[3], defaultColor[4])
-
-	if frameName ~= "ExtraIconFrame" and Plater.db.profile.aura_border_colors_by_type or frameName == "ExtraIconFrame" and Plater.db.profile.extra_icon_aura_border_colors_by_type then
-		local borderOptions = {
-			showIcon = false,
-			showWhenHarmful = true,
-			showWhenHelpful = true,
-			showWithoutDispelType = true,
-			style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset,
-			customDispelColorMap = frameName ~= "ExtraIconFrame" and {
-				["None"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.none)),
-				["Magic"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.magic)),
-				["Curse"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.curse)),
-				["Disease"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.disease)),
-				["Poison"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.poison)),
-				["Bleed"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.bleed)),
-				["Enrage"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.enrage)),
-			} or {
-				["None"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.none)),
-				["Magic"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.magic)),
-				["Curse"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.curse)),
-				["Disease"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.disease)),
-				["Poison"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.poison)),
-				["Bleed"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.bleed)),
-				["Enrage"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.enrage)),
-			}
-		}
-		--C_AuraContainerUtil.ProcessCustomAuraButtonDispelTypeTextureOptions(borderOptions)
-		if auraButton.SetAuraBorder then
-			auraButton:SetAuraBorder(auraButton.Border, borderOptions)
-		else
-			auraButton:AddDispelTypeTexture(auraButton.Border, borderOptions)
-		end
-	end
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - applyAuraBorders")
+	auraButton.Borders = {}
+	applyAuraBorders(auraButton, frameName, getAuraBorderOptions(frameName), borderThickness, auraWidth, auraHeight)
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - applyAuraBorders")
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - applyPandemicGlow")
+	applyPandemicGlow(auraButton, auraWidth, auraHeight)
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - applyPandemicGlow")
 
 
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - size")
 	--PixelUtil.SetSize(auraButton.Border, auraWidth, auraHeight)
 	--PixelUtil.SetSize(auraButton, auraWidth, auraHeight)
 	auraButton:SetSize(auraWidth, auraHeight)
@@ -1621,6 +2104,12 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 	auraButton:SetScale(1)
 
 	Plater.UpdateIconAspecRatio (auraButton)
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame - size")
+
+	--the pass in the nameplate created event skips aura containers, so the buttons get it here
+	if (PixelUtil.SetRoundLayoutToNearestPixelRecursively) then
+		PixelUtil.SetRoundLayoutToNearestPixelRecursively(auraButton, true)
+	end
 
 	auraButton.frameName = frameName
 	auraButton.frameKey = frameKey
@@ -1628,6 +2117,7 @@ local function initAuraFrame(auraButton, frameName, frameKey, auraContainer)
 
 	tinsert(auraContainer.auraButtons, auraButton)
 
+	Plater.EndLogPerformanceCore("Plater-Core", "Update", "initAuraFrame")
 	return auraButton
 end
 
@@ -1752,6 +2242,12 @@ function reSkinAuraButtons(auraButtons, options)
 			Plater.SetFontOutlineAndShadow (timerLabel, profile.extra_icon_timer_outline)
 			DF:SetFontFace (timerLabel, profile.extra_icon_timer_font)
 			Plater.SetAnchor (timerLabel, profile.aura_timer_text_anchor) --TODO
+
+			if auraButton.SetCasterName and Plater.db.profile.extra_icon_caster_name then
+				auraButton:SetCasterName(auraButton.Desc, {showRealmName = false, useClassColors = true})
+			elseif auraButton.ClearCasterName then
+				auraButton:ClearCasterName()
+			end
 		end
 
 		--PixelUtil.SetSize(auraButton.Border, auraWidth, auraHeight)
@@ -1763,31 +2259,8 @@ function reSkinAuraButtons(auraButtons, options)
 		auraButton.CountFrame:SetSize(auraWidth, auraHeight)
 		auraButton:SetScale(1)
 
-		local band = 8
-		if borderThickness > 0 then
-			auraButton.Border:SetScale(borderThickness / band)
-			auraButton.Border:Show()
-		else
-			auraButton.Border:Hide()
-		end
-
-		local defaultColor = frameName ~= "ExtraIconFrame" and Plater.db.profile.aura_border_colors.default or Plater.db.profile.extra_icon_dispel_type_colors.default
-    	auraButton.Border:SetVertexColor(defaultColor[1], defaultColor[2], defaultColor[3], defaultColor[4])
-
-		if frameName ~= "ExtraIconFrame" and Plater.db.profile.aura_border_colors_by_type or frameName == "ExtraIconFrame" and Plater.db.profile.extra_icon_aura_border_colors_by_type then
-			if auraButton.SetAuraBorder then
-				auraButton:SetAuraBorder(auraButton.Border, options.borderOptions)
-			else
-				auraButton:ClearDispelTypeTextures()
-				auraButton:AddDispelTypeTexture(auraButton.Border, options.borderOptions)
-			end
-		else
-			if auraButton.ClearAuraBorder then
-				auraButton:ClearAuraBorder()
-			else
-				auraButton:ClearDispelTypeTextures()
-			end
-		end
+		applyAuraBorders(auraButton, frameName, options.borderOptions, borderThickness, auraWidth, auraHeight)
+		applyPandemicGlow(auraButton, auraWidth, auraHeight)
 
 		auraButton.Cooldown:SetEdgeTexture (profile.aura_cooldown_edge_texture)
 		auraButton.Cooldown:SetReverse (profile.aura_cooldown_reverse)
@@ -1850,50 +2323,11 @@ local function getAuraFrameOptions(frameName, key, auraContainer)
 	return auraFrameOptions
 end
 
-local function getAuraBorderOptions(frameName)
-	Plater.StartLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
-	local cachedAuraBorderOptions = containerConfigCache.auraBorderOptions[frameName]
-	if cachedAuraBorderOptions and cachedAuraBorderOptions.optionIndex == containerConfigCache.containerFullOptionIndex then
-		Plater.EndLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
-		return cachedAuraBorderOptions
-	end
-	local borderOptions = {
-		showIcon = false,
-		showWhenHarmful = true,
-		showWhenHelpful = true,
-		showWithoutDispelType = true,
-		style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset,
-		customDispelColorMap = frameName ~= "ExtraIconFrame" and {
-			["None"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.none)),
-			["Magic"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.magic)),
-			["Curse"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.curse)),
-			["Disease"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.disease)),
-			["Poison"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.poison)),
-			["Bleed"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.bleed)),
-			["Enrage"] = CreateColor(unpack(Plater.db.profile.aura_border_colors.enrage)),
-		} or {
-			["None"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.none)),
-			["Magic"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.magic)),
-			["Curse"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.curse)),
-			["Disease"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.disease)),
-			["Poison"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.poison)),
-			["Bleed"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.bleed)),
-			["Enrage"] = CreateColor(unpack(Plater.db.profile.extra_icon_dispel_type_colors.enrage)),
-		},
-		optionIndex = containerConfigCache.auraBorderOptionIndex,
-	}
-
-	containerConfigCache.auraBorderOptions[frameName] = borderOptions
-
-	Plater.EndLogPerformanceCore("Plater-Core", "Update", "getAuraBorderOptions")
-	return borderOptions
-end
-
 local function getFullAuraOptions(frameName, key, auraContainer, actorType, force)
 	Plater.StartLogPerformanceCore("Plater-Core", "Update", "getFullAuraOptions")
 	local cachedAuraOptions = actorType and containerConfigCache.containerFullOptions[actorType][frameName]
 	if not force and cachedAuraOptions and cachedAuraOptions.optionIndex == containerConfigCache.containerFullOptionIndex then
-		cachedAuraOptions.initializeFrame = function(auraButton) initAuraFrame(auraButton, frameName, key, auraContainer) end -- this needs to be up to date!
+		cachedAuraOptions.auraFrameOptions.initializeFrame = function(auraButton) initAuraFrame(auraButton, frameName, key, auraContainer) end -- this needs to be up to date!
 		Plater.EndLogPerformanceCore("Plater-Core", "Update", "getFullAuraOptions")
 		return cachedAuraOptions
 	end
@@ -1925,9 +2359,11 @@ local function getFullAuraOptions(frameName, key, auraContainer, actorType, forc
 end
 
 local allocIndex = 1
-local function createAuraContainers(unitFrame)
+--buildGroups gives the container as many aura groups as the actor type that uses the most, a plate taking it then only switches filters.
+--without it the container gets its groups when a plate takes it
+local function createAuraContainers(unitFrame, buildGroups)
 	if not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS then return end
-	if not unitFrame and allocIndex > 121 then return end
+	if not unitFrame and allocIndex > CONST_MAX_AURA_CONTAINER_SETS then return end
 	for _, frameInfo in pairs (auraFramesSetup) do
 		local auraContainer = CreateFrame("AuraContainer", "PlaterAuraContainer" .. allocIndex .. frameInfo.frameName, unitFrame or UIParent, "CustomAuraContainerTemplate")
 		auraContainer:SetSize(1, 1)
@@ -1946,6 +2382,16 @@ local function createAuraContainers(unitFrame)
 		auraContainer.index = allocIndex
 
 		local options = getFullAuraOptions(frameInfo.name, frameInfo.key, auraContainer, nil)
+		if (buildGroups) then
+			--friendly players use the friendly npc filters
+			for _, actorType in ipairs({"enemynpc", "friendlynpc", "enemyplayer"}) do
+				local actorOptions = getFullAuraOptions(frameInfo.name, frameInfo.key, auraContainer, actorType)
+				if (#actorOptions.auraFilters > #options.auraFilters) then
+					options = actorOptions
+				end
+			end
+		end
+
 		auraContainer.activeOptions = options
 		auraContainer.groups = {}
 		auraContainer.auraButtons = {}
@@ -1968,6 +2414,9 @@ local function createAuraContainers(unitFrame)
 		--SetAuraLayoutPadding
 
 		auraContainer:SetEnabled(false)
+
+		--the buttons were just created with the current config, the plate taking this container does not need to reskin them
+		auraContainer.configIndex = containerConfigCache.containerConfigIndex
 
 		--DevTool:AddData(auraContainer, "create - "..allocIndex)
 	end
@@ -1995,17 +2444,30 @@ end
 
 local function preCreateAuraContainers()
 	if not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS then return end
-	if allocIndex > 121 then return end
+	if allocIndex > CONST_MAX_AURA_CONTAINER_SETS then return end
+	Plater.StartLogPerformanceCore("Plater-Core", "Init", "PreCreateAuraContainers")
 	local curTime = debugprofilestop()
 	local endTime = curTime + 100
-	while curTime < endTime and allocIndex <= 121 do
+	while curTime < endTime and allocIndex <= CONST_MAX_AURA_CONTAINER_SETS do
 		createAuraContainers()
 		curTime = debugprofilestop()
 	end
+	Plater.EndLogPerformanceCore("Plater-Core", "Init", "PreCreateAuraContainers")
 	C_Timer.After(0, preCreateAuraContainers)
 end
 function Plater.StartPreCreateAuraContainers()
 	if not IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS then return end
+
+	--runs behind the loading screen. the plates shown after it take these sets and only switch their filters,
+	--building the groups there instead froze the first frame for 1-2s
+	if (DB_AURA_ENABLED) then
+		Plater.StartLogPerformanceCore("Plater-Core", "Init", "CreateAuraContainersAtLogin")
+		while (allocIndex <= CONST_MAX_AURA_CONTAINER_SETS) do
+			createAuraContainers(nil, true)
+		end
+		Plater.EndLogPerformanceCore("Plater-Core", "Init", "CreateAuraContainersAtLogin")
+	end
+
 	C_Timer.After(0, preCreateAuraContainers)
 end
 
@@ -2061,6 +2523,648 @@ function platerInternal.Auras.CreateOldAuraContainers(unitFrame)
 	unitFrame.BuffFrame.ExtraIconFrame = unitFrame.ExtraIconFrame
 end
 
+--places a part of a dispel pixel glow line on the edge of the glow frame where 'distance' lies, distances run clockwise from
+--the top left corner. the part ends at the next corner at the latest, returns its length
+local placeDispelPixelGlowPart = function(part, glowFrame, width, height, thickness, distance, length)
+	if (distance < width) then
+		length = min(length, width - distance)
+		part:SetPoint("topleft", glowFrame, "topleft", distance, 0)
+		part:SetSize(length, thickness)
+
+	elseif (distance < width + height) then
+		distance = distance - width
+		length = min(length, height - distance)
+		part:SetPoint("topleft", glowFrame, "topleft", width - thickness, -distance)
+		part:SetSize(thickness, length)
+
+	elseif (distance < 2 * width + height) then
+		distance = distance - width - height
+		length = min(length, width - distance)
+		part:SetPoint("topleft", glowFrame, "topleft", width - distance - length, thickness - height)
+		part:SetSize(length, thickness)
+
+	else
+		distance = distance - 2 * width - height
+		length = min(length, height - distance)
+		part:SetPoint("topleft", glowFrame, "topleft", 0, distance + length - height)
+		part:SetSize(thickness, length)
+	end
+
+	return length
+end
+
+--OnUpdate of the dispel pixel glow: moves its lines along the inner edge of the glow frame. every slot of the dispel glow
+--has its own set of lines, all sets are at the same place
+local moveDispelPixelGlowLines = function(glowFrame, elapsed)
+	--the size of the glow frame is secret (it hangs off the aura container and its lines have a mask on the slot frame),
+	--the health bar has the same scale and the glow frame is 'offset' bigger on every side. a negative offset can make it
+	--smaller than nothing on a thin health bar
+	local width, height = glowFrame.healthBar:GetSize()
+	width = max(1, width + 2 * glowFrame.offset)
+	height = max(1, height + 2 * glowFrame.offset)
+	local perimeter = 2 * (width + height)
+	local thickness = glowFrame.thickness
+	local lineAmount = glowFrame.lineAmount
+	local lineSets = glowFrame.lineSets
+	--no longer than the shorter side, so a line goes around one corner at most and has two parts
+	local length = min(glowFrame.length, width, height)
+	glowFrame.progress = (glowFrame.progress + elapsed * glowFrame.speed) % 1
+
+	for setIndex = 1, #lineSets do
+		local lineSet = lineSets[setIndex]
+		for i = 1, lineAmount do
+			local distance = ((glowFrame.progress + (i - 1) / lineAmount) % 1) * perimeter
+			local firstLength = placeDispelPixelGlowPart(lineSet.firstParts[i], glowFrame, width, height, thickness, distance, length)
+			local secondPart = lineSet.secondParts[i]
+			if (firstLength < length) then
+				placeDispelPixelGlowPart(secondPart, glowFrame, width, height, thickness, (distance + firstLength) % perimeter, length - firstLength)
+				secondPart:Show()
+			else
+				secondPart:Hide()
+			end
+		end
+	end
+end
+
+--shows the LibOrbitGlow status bar glow picked as dispel glow style, or hides it. the library takes the size of the health bar
+--when it shows a glow, so this runs again when the health bar changes size. the glows are on a frame of the container and the
+--slot masks show them, so this works while the slot frames are locked
+local updateDispelGlowOutlines = function(container)
+	local profile = Plater.db.profile
+	local glowType = profile.aura_dispel_glow_type
+	local isOutline = LibOrbitGlow:IsStatusBarGlowRegistered(glowType)
+	local outlineFrame = container.OutlineFrame
+	--the outline frame has the scale of the health bar, so the library gets the size in its units
+	local barWidth, barHeight = container.PixelGlowFrame.healthBar:GetSize()
+	outlineFrame:SetScale(1 / (CONST_DISPEL_GLOW_SCALE * profile.aura_dispel_glow_size))
+
+	for _, glowSlot in ipairs(container.GlowSlots) do
+		if (isOutline) then
+			--like the pixel glow lines, colored by type only the enrage slot gets its own color
+			local isEnrageColor = glowSlot.isEnrage and profile.aura_dispel_glow_color_by_type
+			local color = isEnrageColor and profile.aura_border_colors.enrage or profile.aura_dispel_glow_color
+			--returns nil and keeps the glow as it is while the health bar has no size yet
+			LibOrbitGlow.StatusBar:Show(outlineFrame, {glow = glowType, key = glowSlot.slotKey, color = color, width = barWidth, height = barHeight})
+		else
+			LibOrbitGlow.StatusBar:Hide(outlineFrame, glowSlot.slotKey)
+		end
+	end
+
+	container.isOutline = isOutline
+end
+
+--shows the dispel glow style picked in the profile and colors it. the styles belong to aura slot frames, which can be
+--locked while auras are secret. there is no event for the end of that, so a locked glow is tried again every second
+local applyDispelGlowStyle
+applyDispelGlowStyle = function(container)
+	for _, glowSlot in ipairs(container.GlowSlots) do
+		if (not glowSlot.slotFrame:CanBeAccessedInContext() or not glowSlot.glow:CanBeAccessedInContext()) then
+			container.glowColorTimer = C_Timer.NewTimer(1, function() applyDispelGlowStyle(container) end)
+			return
+		end
+	end
+
+	local profile = Plater.db.profile
+	local glowColor = profile.aura_dispel_glow_color
+
+	--colored by type, the regions of the style in use are dispel type textures: blizzard shows them and colors them from
+	--the dispel type of the aura in the slot. auras without a type get the glow color
+	local dispelTypeOptions
+	if (profile.aura_dispel_glow_color_by_type) then
+		dispelTypeOptions = {
+			showAlways = true,
+			style = Enum.CustomAuraButtonDispelTypeTextureStyle.PreserveAsset,
+			customDispelColorCurve = buildBorderColorCurve(profile.aura_border_colors, true, glowColor),
+		}
+	end
+
+	local glowType = profile.aura_dispel_glow_type
+	local glowSize = profile.aura_dispel_glow_size
+	local lineAmount = profile.aura_dispel_glow_pixel_lines
+	if (glowType == "ants") then
+		lineAmount = CONST_DISPEL_ANTS_AMOUNT
+	end
+
+	for _, glowSlot in ipairs(container.GlowSlots) do
+		local slotFrame = glowSlot.slotFrame
+		--a cleared texture keeps the state blizzard gave it, so every region is set again below
+		slotFrame:ClearDispelTypeTextures()
+
+		for styleName, regions in pairs(glowSlot.styles) do
+			local isStyleInUse = styleName == glowType
+			for _, region in ipairs(regions) do
+				if (isStyleInUse and dispelTypeOptions) then
+					slotFrame:AddDispelTypeTexture(region, dispelTypeOptions)
+				else
+					region:SetShown(isStyleInUse)
+					region:SetVertexColor(glowColor[1], glowColor[2], glowColor[3], glowColor[4])
+				end
+			end
+		end
+
+		--the lines are outside of the slot frame, so they can't be dispel type textures. colored by type, the lines of the
+		--enrage slot get the enrage color, the other slot covers several types and keeps the glow color
+		local lineColor = (glowSlot.isEnrage and dispelTypeOptions) and profile.aura_border_colors.enrage or glowColor
+		local lineSet = glowSlot.lineSet
+		--the OnUpdate shows the second parts of the lines in use when they go around a corner
+		for i = 1, CONST_DISPEL_PIXEL_MAX_LINES do
+			local firstPart = lineSet.firstParts[i]
+			local secondPart = lineSet.secondParts[i]
+			firstPart:SetShown(i <= lineAmount)
+			firstPart:SetVertexColor(lineColor[1], lineColor[2], lineColor[3], lineColor[4])
+			secondPart:SetVertexColor(lineColor[1], lineColor[2], lineColor[3], lineColor[4])
+			if (i > lineAmount) then
+				secondPart:Hide()
+			end
+		end
+	end
+
+	--the container scale sets the thickness of the glow and the border, a region scale would move their anchor offsets
+	--without the slice margins of the glow. the frame of the lines keeps the scale of the health bar
+	container:SetScale(CONST_DISPEL_GLOW_SCALE * glowSize)
+	local pixelGlowFrame = container.PixelGlowFrame
+	pixelGlowFrame:SetScale(1 / (CONST_DISPEL_GLOW_SCALE * glowSize))
+
+	--the pixel glow and the ants are both moving lines, the ants are square lines of the glow size
+	local isPixelGlow = glowType == "pixel" or glowType == "ants"
+	pixelGlowFrame:SetShown(isPixelGlow)
+	if (isPixelGlow) then
+		local speed = profile.aura_dispel_glow_pixel_speed
+		local length = profile.aura_dispel_glow_pixel_length
+		local thickness = profile.aura_dispel_glow_pixel_thickness
+		if (glowType == "ants") then
+			speed = 1 / CONST_DISPEL_ANTS_DURATION
+			thickness = max(1, floor(CONST_DISPEL_ANTS_SIZE * glowSize + 0.5))
+			length = thickness
+		end
+
+		--the lines run along the inner edge of the glow frame. at profile offset 0 they are outside of the health bar on its
+		--border, so the offset of the frame is the profile offset plus their thickness
+		local offset = profile.aura_dispel_glow_pixel_offset + thickness
+		pixelGlowFrame:SetPoint("topleft", container, "topleft", -offset, offset)
+		pixelGlowFrame:SetPoint("bottomright", container, "bottomright", offset, -offset)
+		pixelGlowFrame.offset = offset
+		pixelGlowFrame.lineAmount = lineAmount
+		pixelGlowFrame.speed = speed
+		pixelGlowFrame.length = length
+		pixelGlowFrame.thickness = thickness
+	end
+
+	updateDispelGlowOutlines(container)
+
+	container.configIndex = containerConfigCache.containerConfigIndex
+	container.glowColorTimer = nil
+end
+
+--adds an aura slot of the dispel glow with every glow style. 'candidateFilters' picks the auras of the slot, 'isEnrage' marks
+--the slot of enrage effects, whose lines get the enrage color. the engine shows the slot frame while such an aura is on the unit
+local addDispelGlowSlot = function(container, slotKey, candidateFilters, isEnrage)
+	local index = #container.GlowSlots + 1
+	local pixelGlowFrame = container.PixelGlowFrame
+
+	container:AddAuraSlot(slotKey, "HELPFUL|RAID_PLAYER_DISPELLABLE", {
+		candidateFilters = candidateFilters,
+		--the slot frame is locked while auras are secret, so everything it needs is done in here
+		initializeFrame = function(slotFrame)
+			--the slot frame is a button, it takes no mouse input so it does not take the clicks on the health bar
+			slotFrame:SetMouseMotionEnabled(false)
+			slotFrame:SetMouseClickEnabled(false)
+
+			--the slot frame runs no addon scripts and takes no other parent, so the moving lines of the pixel glow are outside of it.
+			--a mask standing on top of the slot frame shows them: hidden, the slot frame has no height and the mask is one mask size
+			--below the lines, shown it covers them. the slot frame stands on a foot frame far below the health bar.
+			--an anchor to a collapsed frame loses its offset, so all anchors to the slot frame are without one
+			local footFrame = CreateFrame("frame", container:GetName() .. "PixelGlowFoot" .. index, container.maskFrame, "DisableUntrustedLayoutScriptsTemplate")
+			footFrame:SetSize(1, 1)
+			footFrame:SetPoint("bottomleft", container, "bottomleft", -CONST_DISPEL_PIXEL_MASK_SIZE / 2, -CONST_DISPEL_PIXEL_MASK_SIZE * 1.5)
+			slotFrame:SetSize(1, CONST_DISPEL_PIXEL_MASK_SIZE)
+			slotFrame:SetCollapsesLayout(true)
+			slotFrame:SetPoint("bottomleft", footFrame, "bottomleft", 0, 0)
+
+			local pixelGlowMask = container.maskFrame:CreateMaskTexture()
+			--stretched this far, linear filtering fades the outer half pixel of the 8x8 texture to black over hundreds of pixels
+			pixelGlowMask:SetTexture([[Interface\BUTTONS\WHITE8X8]], "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE", "NEAREST")
+			pixelGlowMask:SetSize(CONST_DISPEL_PIXEL_MASK_SIZE, CONST_DISPEL_PIXEL_MASK_SIZE)
+			pixelGlowMask:SetPoint("bottomleft", slotFrame, "topleft", 0, 0)
+
+			--every style is built here since the slot frame is locked afterwards, applyDispelGlowStyle shows the one in use.
+			--animations are registered as aura shown animations: blizzard plays them when the slot shows and stops them when it hides
+
+			--the texture is black with the glow around a hollow bar, the bar starts 38 pixels from the sides and 24 from top and bottom.
+			--sliced, so the glow keeps its thickness on every health bar size
+			local createGlowTexture = function()
+				local glow = slotFrame:CreateTexture(nil, "overlay")
+				glow:SetTexture([[Interface\AddOns\Plater\images\nameplate_glow]])
+				glow:SetTextureSliceMargins(44, 30, 44, 30)
+				glow:SetBlendMode("ADD")
+				glow:SetPoint("topleft", container, "topleft", -38, 24)
+				glow:SetPoint("bottomright", container, "bottomright", 38, -24)
+				return glow
+			end
+
+			local glow = createGlowTexture()
+
+			local pulseGlow = createGlowTexture()
+			local pulseAnimation = pulseGlow:CreateAnimationGroup()
+			pulseAnimation:SetLooping("BOUNCE")
+			local alphaAnimation = pulseAnimation:CreateAnimation("Alpha")
+			alphaAnimation:SetFromAlpha(1)
+			alphaAnimation:SetToAlpha(0.2)
+			alphaAnimation:SetDuration(0.5)
+			slotFrame:AddAuraShownAnimation(pulseAnimation)
+
+			--four solid lines around the health bar
+			local borderTop = slotFrame:CreateTexture(nil, "overlay")
+			borderTop:SetPoint("topleft", container, "topleft", -CONST_DISPEL_BORDER_SIZE, CONST_DISPEL_BORDER_SIZE)
+			borderTop:SetPoint("bottomright", container, "topright", CONST_DISPEL_BORDER_SIZE, 0)
+			local borderBottom = slotFrame:CreateTexture(nil, "overlay")
+			borderBottom:SetPoint("topleft", container, "bottomleft", -CONST_DISPEL_BORDER_SIZE, 0)
+			borderBottom:SetPoint("bottomright", container, "bottomright", CONST_DISPEL_BORDER_SIZE, -CONST_DISPEL_BORDER_SIZE)
+			local borderLeft = slotFrame:CreateTexture(nil, "overlay")
+			borderLeft:SetPoint("topleft", container, "topleft", -CONST_DISPEL_BORDER_SIZE, 0)
+			borderLeft:SetPoint("bottomright", container, "bottomleft", 0, 0)
+			local borderRight = slotFrame:CreateTexture(nil, "overlay")
+			borderRight:SetPoint("topleft", container, "topright", 0, 0)
+			borderRight:SetPoint("bottomright", container, "bottomright", CONST_DISPEL_BORDER_SIZE, 0)
+
+			local borders = {borderTop, borderBottom, borderLeft, borderRight}
+			for _, border in ipairs(borders) do
+				border:SetColorTexture(1, 1, 1, 1)
+			end
+
+			--the lines of this slot for the pixel and the ants styles. every line has two parts, one for each side of the corner it
+			--goes around. the mask can only be added in here. the enrage lines are drawn above the others
+			local lineSet = {firstParts = {}, secondParts = {}}
+			local createLinePart = function()
+				local part = pixelGlowFrame:CreateTexture(nil, "overlay", nil, isEnrage and 1 or 0)
+				part:SetColorTexture(1, 1, 1, 1)
+				part:AddMaskTexture(pixelGlowMask)
+				return part
+			end
+
+			for i = 1, CONST_DISPEL_PIXEL_MAX_LINES do
+				lineSet.firstParts[i] = createLinePart()
+				lineSet.secondParts[i] = createLinePart()
+			end
+
+			pixelGlowFrame.lineSets[index] = lineSet
+
+			--the LibOrbitGlow status bar glow of this slot, shown by the mask like the lines. the library creates its textures on the
+			--first Show and the mask can only be added in here. its default glow has both layers, so both exist from now on
+			local outline = LibOrbitGlow.StatusBar:Show(container.OutlineFrame, {key = slotKey, width = 1, height = 1})
+			outline.body:AddMaskTexture(pixelGlowMask)
+			outline.core:AddMaskTexture(pixelGlowMask)
+			LibOrbitGlow.StatusBar:Hide(container.OutlineFrame, slotKey)
+
+			container.GlowSlots[index] = {
+				slotFrame = slotFrame,
+				glow = glow,
+				lineSet = lineSet,
+				slotKey = slotKey,
+				isEnrage = isEnrage,
+				--keys are the values of the aura_dispel_glow_type profile key, except "pixel", "ants" and the LibOrbitGlow styles
+				styles = {
+					glow = {glow},
+					pulse = {pulseGlow},
+					border = borders,
+				},
+			}
+
+			applyDispelGlowStyle(container)
+		end,
+	})
+end
+
+--makes the nameplate glow while the unit has an aura the player can dispel, purge or soothe. the auras are secret, so aura
+--slots do the work, one for enrage effects and one for everything else. 'unit' is nil when the nameplate is removed
+local updateDispelGlow = function(unitFrame, unit)
+	local profile = Plater.db.profile
+	local isEnabled = unit and profile.aura_dispel_glow
+	local container = unitFrame.DispelGlowFrame
+
+	if (not container) then
+		if (not isEnabled) then
+			return
+		end
+
+		container = CreateFrame("AuraContainer", "$parentDispelGlowFrame", unitFrame.healthBar, "CustomAuraContainerTemplate")
+		container:SetScale(CONST_DISPEL_GLOW_SCALE)
+		container:SetAllPoints()
+		container:SetEnabled(false)
+		--with the preview on, the container reads the edit mode source instead of the unit's auras
+		container:SetEditModePreviewEnabled(false)
+		container.GlowSlots = {}
+		unitFrame.DispelGlowFrame = container
+
+		--owns the masks of the pixel glow and the foot frames of the slots, this template is what allows anchoring them to the slot frames
+		container.maskFrame = CreateFrame("frame", container:GetName() .. "PixelGlowMask", container, "DisableUntrustedLayoutScriptsTemplate")
+		container.maskFrame:SetAllPoints()
+
+		--the frame of the pixel and the ants styles, its options are in health bar pixels instead of dispel glow units
+		local pixelGlowFrame = CreateFrame("frame", container:GetName() .. "PixelGlow", container)
+		pixelGlowFrame:Hide()
+		pixelGlowFrame.lineSets = {}
+		pixelGlowFrame.progress = 0
+		pixelGlowFrame.healthBar = unitFrame.healthBar
+		pixelGlowFrame:SetScript("OnUpdate", moveDispelPixelGlowLines)
+		container.PixelGlowFrame = pixelGlowFrame
+
+		--the frame of the LibOrbitGlow status bar glows, scaled to health bar units by updateDispelGlowOutlines
+		local outlineFrame = CreateFrame("frame", container:GetName() .. "Outline", container)
+		outlineFrame:SetPoint("topleft", container, "topleft", 0, 0)
+		outlineFrame:SetPoint("bottomright", container, "bottomright", 0, 0)
+		container.OutlineFrame = outlineFrame
+
+		addDispelGlowSlot(container, "dispel", {excludeDispelTypes = {Enrage = true}}, false)
+		addDispelGlowSlot(container, "enrage", {includeDispelTypes = {Enrage = true}}, true)
+
+		--the outline styles take the health bar size when shown, the health bar changes size with the actor type
+		unitFrame.healthBar:HookScript("OnSizeChanged", function()
+			if (container.isOutline) then
+				updateDispelGlowOutlines(container)
+			end
+		end)
+	end
+
+	if (not isEnabled) then
+		--a slot keeps its last state while the container is disabled, so the container is hidden as well
+		container:SetEnabled(false)
+		container:Hide()
+		return
+	end
+
+	if (container.configIndex ~= containerConfigCache.containerConfigIndex and not container.glowColorTimer) then
+		applyDispelGlowStyle(container)
+	end
+
+	--buffs are removed from enemies and debuffs from friends. without the split a debuff on an enemy matches as well
+	local filterString = UnitCanAssist("player", unit) and "HARMFUL|RAID_PLAYER_DISPELLABLE" or "HELPFUL|RAID_PLAYER_DISPELLABLE"
+	container:SetAuraSlotFilterString("dispel", filterString)
+	container:SetAuraSlotFilterString("enrage", filterString)
+	container:SetEnabled(true)
+	container:SetUnit(unit)
+	container:Show()
+end
+
+--per aura healthbar colors ~auracolor
+--creates a mask of the per aura healthbar colors with its bottom edge on the top edge of 'anchorFrame'.
+--it covers the health bar while that bottom edge is 10 below the bottom of the bar, any other position is a slot height away from the bar.
+--with 'pillarName' the mask sits one slot height higher, on top of a frame of that name, which is returned too.
+--an anchor to a collapsed frame loses its offset, so the height is added by that frame instead of an offset
+local createAuraColorMask = function(maskFrame, anchorFrame, pillarName)
+	if (pillarName) then
+		local pillarFrame = CreateFrame("Frame", pillarName, maskFrame, "DisableUntrustedLayoutScriptsTemplate")
+		pillarFrame:SetSize(1, CONST_AURA_COLOR_SLOT_HEIGHT)
+		pillarFrame:SetPoint("bottomleft", anchorFrame, "topleft", 0, 0)
+		anchorFrame = pillarFrame
+	end
+
+	local mask = maskFrame:CreateMaskTexture()
+	--stretched this far, linear filtering fades the outer half pixel of the 8x8 texture to black over 125 pixels, a fade across the whole bar
+	mask:SetTexture([[Interface\BUTTONS\WHITE8X8]], "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE", "NEAREST")
+	mask:SetSize(CONST_AURA_COLOR_MASK_WIDTH, CONST_AURA_COLOR_SLOT_HEIGHT / 2)
+	mask:SetPoint("bottomleft", anchorFrame, "topleft", 0, 0)
+	return mask, anchorFrame
+end
+
+--creates one color of the per aura healthbar colors: a copy of the bar texture directly above it, below every other texture of the health bar
+local createAuraColorTint = function(healthBar)
+	local tint = healthBar:CreateTexture(nil, "artwork", nil, 2)
+	tint:SetTexture(healthBar.barTexture:GetTexture())
+	tint:SetPoint("topleft", healthBar.barTexture, "topleft", 0, 0)
+	tint:SetPoint("bottomright", healthBar.barTexture, "bottomright", 0, 0)
+	return tint
+end
+
+--builds the slots of the per aura healthbar colors from the profile, ordered by priority. the result is cached until the aura filters change
+local getAuraColorSlots = function()
+	if (containerConfigCache.auraColorSlotsIndex == containerConfigCache.candidateFilterIndex) then
+		return containerConfigCache.auraColorSlots
+	end
+
+	local entries = {}
+	for spellId, colorTable in pairs(Plater.db.profile.aura_colors) do
+		if (colorTable[1]) then
+			entries[#entries+1] = {spellId, colorTable}
+		end
+	end
+
+	--higher priority first, equal priorities are ordered by the spell key to keep the result stable
+	table.sort(entries, function(entry1, entry2)
+		local priority1 = entry1[2][5]
+		local priority2 = entry2[2][5]
+		if (priority1 ~= priority2) then
+			return priority1 > priority2
+		end
+
+		return tostring(entry1[1]) < tostring(entry2[1])
+	end)
+
+	local colorSlots = {}
+	local slot
+	for _, entry in ipairs(entries) do
+		local spellId = entry[1]
+		local colorTable = entry[2]
+		local colorName = colorTable[2]
+		local pandemicColorName = colorTable[6]
+		local playerFilter = colorTable[4] and "|PLAYER" or ""
+
+		--entries following each other with the same colors and caster filter share a slot
+		local isSameSlot = slot and slot.colorName == colorName and slot.pandemicColorName == pandemicColorName and slot.playerFilter == playerFilter
+		if (not isSameSlot) then
+			slot = {spellIds = {}, colorName = colorName, pandemicColorName = pandemicColorName, playerFilter = playerFilter}
+			colorSlots[#colorSlots+1] = slot
+		end
+
+		slot.spellIds[spellId] = true
+
+		--a string key is a spell name, a number key tracked by name uses its spell name
+		local spellName
+		if (type(spellId) == "string") then
+			spellName = spellId
+
+		elseif (colorTable[3]) then
+			spellName = GetSpellInfo(spellId)
+		end
+
+		--tracked by name: add all spell ids with that name, expandAuraCaches() resolved them
+		local sameNameIds = spellName and DB_AURA_NAME_CACHE[string.lower(spellName)]
+		if (sameNameIds) then
+			for _, sameNameId in pairs(sameNameIds) do
+				slot.spellIds[sameNameId] = true
+			end
+		end
+	end
+
+	containerConfigCache.auraColorSlots = colorSlots
+	containerConfigCache.auraColorSlotsIndex = containerConfigCache.candidateFilterIndex
+	return colorSlots
+end
+
+--shows the per aura healthbar colors of the used slots, hidden while the health bar shows a bad threat state color and those take priority
+function platerInternal.Auras.UpdateAuraColorThreat(unitFrame)
+	local container = unitFrame.AuraColorFrame
+	--the container is created with the first color of a plate
+	if (not container) then
+		return
+	end
+
+	local isBadThreatShown = Plater.db.profile.aura_colors_no_override_bad_threat and unitFrame.healthBar.isBadThreatColor
+	for index, tint in ipairs(container.tints) do
+		local isShown = tint.isSlotUsed and not isBadThreatShown
+		tint:SetShown(isShown)
+		container.pandemicTints[index]:SetShown(isShown)
+	end
+end
+
+--creates and updates the hidden aura container which colors the health bar while a configured aura is active. 'unit' is nil when the nameplate is removed
+local updateAuraColorContainer = function(unitFrame, unit)
+	local colorSlots = getAuraColorSlots()
+	local healthBar = unitFrame.healthBar
+	local barTexture = healthBar.barTexture
+	local container = unitFrame.AuraColorFrame
+
+	if (not container) then
+		if (not unit or #colorSlots == 0) then
+			return
+		end
+
+		container = CreateFrame("AuraContainer", "$parentAuraColorFrame", healthBar, "CustomAuraContainerTemplate")
+		container:SetAllPoints()
+		container:SetEnabled(false)
+		--the colors are no edit mode element: with the preview on, the container reads the edit mode source instead of the unit's auras
+		container:SetEditModePreviewEnabled(false)
+		--owns the masks, this template is what allows anchoring them to the slot frames
+		container.maskFrame = CreateFrame("Frame", "$parentAuraColorMasks", healthBar, "DisableUntrustedLayoutScriptsTemplate")
+		container.maskFrame:SetAllPoints()
+		container.slotFrames = {}
+		container.tints = {}
+		container.pandemicTints = {}
+		unitFrame.AuraColorFrame = container
+
+		--the colors copy the bar art on every change of it. the first nameplate added gets here before the skin sets the bar texture
+		hooksecurefunc(barTexture, "SetTexture", function(_, texture)
+			for index, tint in ipairs(container.tints) do
+				tint:SetTexture(texture)
+				container.pandemicTints[index]:SetTexture(texture)
+			end
+		end)
+	end
+
+	if (container.filterIndex ~= containerConfigCache.candidateFilterIndex) then
+		--after login a slot frame is locked as soon as its initializeFrame returns, and so is everything anchored to it.
+		--so a new slot never uses anything of an older slot: it is added at the base of the stack, the slots added before it stand on top of it.
+		--a slot is never removed, the stack only grows
+		for index = #container.slotFrames + 1, #colorSlots do
+			--a texture is drawn only where all of its masks cover it, each mask checks one condition. a texture takes at most 3 masks,
+			--the colors already end at the bar fill and need no mask of the health bar.
+			--the color and the pandemic color of a slot, the masks keep only one of the two on the bar
+			local tint = createAuraColorTint(healthBar)
+			local pandemicTint = createAuraColorTint(healthBar)
+			container.tints[index] = tint
+			container.pandemicTints[index] = pandemicTint
+
+			--the slot stands on this frame, which never hides and is no slot frame. it starts at the base of the stack,
+			--the next slot moves it on top of itself
+			local footFrame = CreateFrame("Frame", container:GetName() .. "Foot" .. index, container.maskFrame, "DisableUntrustedLayoutScriptsTemplate")
+			footFrame:SetSize(1, 1)
+			footFrame:SetPoint("bottomleft", healthBar, "bottomleft", -10, -10 - CONST_AURA_COLOR_SLOT_HEIGHT)
+
+			container.slotFrames[index] = container:AddAuraSlot(tostring(index), "HARMFUL", {
+				--of several matching auras the player's own and then the one expiring first decides about the pandemic color
+				sortMethod = AuraContainerSortMethod.Expiration,
+				sortDirection = AuraContainerSortDirection.Normal,
+				--the slot frame is locked once this returns, so everything anchored to it is done in here
+				initializeFrame = function(slotFrame)
+					--the slot frame is a button, it stays one pixel wide and doesn't take the mouse
+					slotFrame:SetMouseMotionEnabled(false)
+					slotFrame:SetMouseClickEnabled(false)
+					slotFrame:SetSize(1, CONST_AURA_COLOR_SLOT_HEIGHT)
+					--a frame anchored to a hidden slot takes the anchor of the slot instead, but only one level deep, so foot frames and
+					--slots take turns. the foot frame of the slot added before this one moves on top of this slot: it rises by one slot height
+					--while this slot is shown, and so does everything standing on it
+					slotFrame:SetCollapsesLayout(true)
+					slotFrame:SetPoint("bottomleft", footFrame, "bottomleft", 0, 0)
+
+					--the foot frame of the base slot only has the health bar as anchor, nothing locked depends on it yet
+					if (container.baseFootFrame) then
+						container.baseFootFrame:SetPoint("bottomleft", slotFrame, "topleft", 0, 0)
+					end
+
+					container.baseFootFrame = footFrame
+
+					--no slot below this one is shown: one slot height above its foot frame it is still at the base of the stack
+					local noneBelowMask = createAuraColorMask(container.maskFrame, footFrame, container:GetName() .. "NoneBelow" .. index)
+					tint:AddMaskTexture(noneBelowMask)
+					pandemicTint:AddMaskTexture(noneBelowMask)
+
+					--with no slot below, this slot is shown: its top edge is one slot height above the base of the stack
+					local isShownMask = createAuraColorMask(container.maskFrame, slotFrame)
+					tint:AddMaskTexture(isShownMask)
+					pandemicTint:AddMaskTexture(isShownMask)
+
+					--the engine shows this frame while the aura of the slot is in its pandemic window, hidden it has no height
+					local pandemicFrame = CreateFrame("Frame", container:GetName() .. "Pandemic" .. index, slotFrame, "DisableUntrustedLayoutScriptsTemplate")
+					pandemicFrame:SetSize(1, CONST_AURA_COLOR_SLOT_HEIGHT)
+					pandemicFrame:SetCollapsesLayout(true)
+					pandemicFrame:SetPoint("bottomleft", healthBar, "bottomleft", -10, -10 - CONST_AURA_COLOR_SLOT_HEIGHT)
+					slotFrame:AddPandemicRegion(pandemicFrame)
+
+					--outside the pandemic window the pandemic frame is hidden and the color is shown, inside the window the pandemic color
+					tint:AddMaskTexture(createAuraColorMask(container.maskFrame, pandemicFrame, container:GetName() .. "OutsidePandemic" .. index))
+					pandemicTint:AddMaskTexture(createAuraColorMask(container.maskFrame, pandemicFrame))
+				end,
+			})
+		end
+
+		--the lower a slot in the stack, the higher its priority: the last slot is at the base and takes the first color slot.
+		--surplus slots are disabled, a disabled slot is cleared and hidden by the engine
+		local slotCount = #container.slotFrames
+		for index = 1, slotCount do
+			local slotKey = tostring(index)
+			local slot = colorSlots[slotCount - index + 1]
+			container:SetAuraSlotEnabled(slotKey, slot ~= nil)
+
+			if (slot) then
+				container:SetAuraSlotCandidateFilters(slotKey, {includeSpellIDs = slot.spellIds})
+				container.tints[index]:SetVertexColor(DF:ParseColors(slot.colorName))
+				--without a pandemic color the bar keeps its color inside the pandemic window
+				container.pandemicTints[index]:SetVertexColor(DF:ParseColors(slot.pandemicColorName or slot.colorName))
+			end
+		end
+
+		container.filterIndex = containerConfigCache.candidateFilterIndex
+	end
+
+	local hasColors = #colorSlots > 0
+	local isPerformanceUnit = unitFrame.isPerformanceUnitAura
+	local isActive = unit and hasColors and not isPerformanceUnit
+	local slotCount = #container.slotFrames
+	if (isActive) then
+		--spell id filters only apply to debuffs on non-assistable units and buffs on assistable ones
+		local filterString = UnitCanAssist("player", unit, true, true) and "HELPFUL" or "HARMFUL"
+		for index = 1, slotCount do
+			local slot = colorSlots[slotCount - index + 1]
+			if (slot) then
+				container:SetAuraSlotFilterString(tostring(index), filterString .. slot.playerFilter)
+			end
+		end
+
+		container:SetEnabled(true)
+		container:SetUnit(unit)
+		container:UpdateAllAuras()
+	else
+		container:SetEnabled(false)
+	end
+
+	--a slot keeps its last state while the container is disabled, so the colors are hidden by hand
+	for index, tint in ipairs(container.tints) do
+		tint.isSlotUsed = isActive and colorSlots[slotCount - index + 1] ~= nil or false
+	end
+
+	platerInternal.Auras.UpdateAuraColorThreat(unitFrame)
+end
+
 function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFilters, forceLayout)
 	Plater.StartLogPerformanceCore("Plater-Core", "Update", "CreateOrUpdateAuraContainers")
 	if IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS and unit ~= "player" then
@@ -2095,9 +3199,21 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 
 		-- update
 		local auraActorType = unitFrame.ActorType == "friendlyplayer" and "friendlynpc" or unitFrame.ActorType -- shared friendly filters
+		--aura types disabled in the options tab of the actor type take the disable path
+		local plateConfig = unitFrame.ActorType ~= "player" and Plater.db.profile.plate_config[unitFrame.ActorType]
 		for _, frameInfo in pairs (auraFramesSetup) do
 			local auraContainer = unitFrame[frameInfo.key]
-			if DB_AURA_ENABLED and unit then
+			local isContainerShown = true
+			if (plateConfig and frameInfo.key == "ExtraIconFrame") then
+				isContainerShown = plateConfig.show_buff_special
+			elseif (plateConfig and frameInfo.key == "BuffFrame2") then
+				isContainerShown = plateConfig.show_buffs
+			elseif (plateConfig) then
+				--the main container holds the buffs too while they are not on the second buff frame
+				isContainerShown = plateConfig.show_debuffs or (not DB_AURA_SEPARATE_BUFFS and plateConfig.show_buffs)
+			end
+
+			if DB_AURA_ENABLED and unit and isContainerShown then
 				if forceFull then
 					forceLayout = true
 					forceFilters = true
@@ -2124,7 +3240,9 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 							--if DevTool then DevTool:AddData({hasGroup = auraContainer:HasAuraGroup(groupName), auraContainer = auraContainer, unitFrame = unitFrame}, "update-" .. frameInfo.key .. "-" .. (unit or "nil") .. "-" .. groupName) end
 							if not auraContainer.groups[groupName] then
 								options.auraFrameOptions.candidateFilters = filter.candidateFilters
+								Plater.StartLogPerformanceCore("Plater-Core", "Update", "updatefilters - AddAuraGroup")
 								auraContainer:AddAuraGroup(groupName, filter.filterString, options.auraFrameOptions)
+								Plater.EndLogPerformanceCore("Plater-Core", "Update", "updatefilters - AddAuraGroup")
 								auraContainer.groups[groupName] = true
 							end
 
@@ -2133,13 +3251,15 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 								auraContainer:SetAuraGroupFilterString(groupName, filter.filterString)
 
 								if shouldUpdate or forceLayout then
-									auraContainer:SetAuraGroupMaxFrameCount(groupName, options.auraFrameOptions.maxFrameCount)
+									auraContainer:SetAuraGroupMaxFrameCount(groupName, filter.maxFrameCount or options.auraFrameOptions.maxFrameCount)
 									auraContainer:SetAuraGroupSortMethod(groupName, options.auraFrameOptions.sortMethod, options.auraFrameOptions.sortDirection)
 									auraContainer:SetAuraGroupLayout(groupName, options.auraFrameOptions.layout)
 								end
+
+								--enabled last, a group that was disabled is not parsed with its old filters
+								auraContainer:SetAuraGroupEnabled(groupName, true)
 							else
-								auraContainer:SetAuraGroupFilterString(groupName, "")
-								auraContainer:SetAuraGroupMaxFrameCount(groupName, 0)
+								auraContainer:SetAuraGroupEnabled(groupName, false)
 							end
 
 							index = index + 1
@@ -2148,8 +3268,7 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 						while (auraContainer.groups["group"..index]) do
 							--disable surplus
 							--if DevTool then DevTool:AddData({hasGroup = auraContainer:HasAuraGroup(groupName), auraContainer = auraContainer, unitFrame = unitFrame}, "disable-" .. frameInfo.key .. "-" .. (unit or "nil") .. "-" .. "group"..index) end
-							auraContainer:SetAuraGroupMaxFrameCount("group"..index, 0)
-							auraContainer:SetAuraGroupFilterString("group"..index, "")
+							auraContainer:SetAuraGroupEnabled("group"..index, false)
 							index = index + 1
 						end
 						Plater.EndLogPerformanceCore("Plater-Core", "Update", "CreateOrUpdateAuraContainers - updatefilters")
@@ -2192,6 +3311,9 @@ function Plater.CreateOrUpdateAuraContainers(unitFrame, unit, forceFull, forceFi
 			--if DevTool then DevTool:AddData({auraContainer = auraContainer, unitFrame = unitFrame, debugstack = debugstack()}, "update - " .. (unit or "nil")) end
 		end
 
+		updateDispelGlow(unitFrame, unit)
+		updateAuraColorContainer(unitFrame, unit)
+
 	elseif not unitFrame.BuffFrame then -- old API
 		platerInternal.Auras.CreateOldAuraContainers(unitFrame)
 	end
@@ -2215,8 +3337,8 @@ function Plater.RemoveFromAuraUpdate (unit, unitFrame)
 end
 
 function Plater.AddToAuraUpdate (unit, unitFrame)
-	Plater.StartLogPerformanceCore("Plater-Core", "Update", "AddToAuraUpdate")
 	if not unit or not unitFrame then return end
+	Plater.StartLogPerformanceCore("Plater-Core", "Update", "AddToAuraUpdate")
 	if IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS then
 		Plater.CreateOrUpdateAuraContainers(unitFrame, unit)
 		--Plater.CreateOrUpdateAuraContainers(unitFrame, unit, false, true)
@@ -2561,6 +3683,21 @@ end
 			Plater.Masque.BossModIconFrame:ReSkin()
 		end
 	end
+
+	--refreshes the aura containers of the plates of one actor type after its show_buffs / show_debuffs / show_buff_special changed
+	function platerInternal.Auras.RefreshActorTypeAuras(actorType) --private
+		for _, plateFrame in ipairs(Plater.GetAllShownPlates()) do
+			local unitFrame = plateFrame.unitFrame
+			if (unitFrame.ActorType == actorType and unitFrame.PlaterOnScreen and not unitFrame.isPerformanceUnitAura) then
+				if (IS_WOW_PROJECT_MIDNIGHT_API_WITH_AURA_CONTAINERS) then
+					Plater.CreateOrUpdateAuraContainers(unitFrame, unitFrame.unit)
+				else
+					UnitAuraEventHandlerData[unitFrame.unit] = {hasBuff = true, hasDebuff = true}
+					Plater.NameplateTick(plateFrame.OnTickFrame, 1)
+				end
+			end
+		end
+	end
 	
 	--stack auras with the same name and change the stack text above the icon to indicate how many auras with the same name the unit has
 	--self is BuffFrame
@@ -2678,7 +3815,7 @@ end
 		if (unitFrame.IsNeutralOrHostile and not unitFrame.IsSelf) then --and unitFrame.InCombat --removed for debug on training dummies
 			if (InCombatLockdown()) then
 				local unitGUID = unitFrame[MEMBER_GUID]
-				if IS_WOW_PROJECT_MIDNIGHT and issecretvalue(unitGUID) then return end
+				if issecretvalue(unitGUID) then return end
 				local unitExtraAurasSpellIds = EXTRAAURAS_GUIDS[unitGUID]
 
 				--does the mob shown in the nameplate has an extra aura added to it?
@@ -2765,6 +3902,13 @@ end
 			local amountFramesShown = #iconFrameContainer
 			
 			
+			--aura types hidden in the options tab of the actor type. the personal bar has its own toggles
+			--and the designer preview plate has no actor type
+			local actorType = self.unitFrame.ActorType
+			local plateConfig = actorType ~= "player" and profile.plate_config[actorType]
+			local isBuffHidden = plateConfig and not plateConfig.show_buffs
+			local isDebuffHidden = plateConfig and not plateConfig.show_debuffs
+
 			-- still sort by auraInstanceID for some consistency
 			local iconFrameContainerCopy = {}
 			local index = 0
@@ -2772,7 +3916,12 @@ end
 				if icon:IsShown() then
 					-- some more filtering doing here, as cannot be done earlier for midnight without larger rework...
 					local isPermanentToFilter = IS_WOW_PROJECT_MIDNIGHT and not icon.Cooldown:IsShown() and Plater.db.profile.debuff_hide_permanent or false
-					if not isPermanentToFilter then
+					local isTypeHidden = isDebuffHidden
+					if (icon.isBuff) then
+						isTypeHidden = isBuffHidden
+					end
+
+					if not isPermanentToFilter and not isTypeHidden then
 						index = index + 1
 						iconFrameContainerCopy[index] = icon
 					else
@@ -3806,7 +4955,7 @@ end
 				
 				if auraIconFrame:IsShown() then
 					local spellName = auraIconFrame.SpellName
-					if not IS_WOW_PROJECT_MIDNIGHT or (IS_WOW_PROJECT_MIDNIGHT and not issecretvalue(spellName) and not issecretvalue(auraIconFrame.Duration)) then
+					if not issecretvalue(spellName) and not issecretvalue(auraIconFrame.Duration) then
 						--get the script object of the aura which will be showing in this icon frame
 						local globalScriptObject = SCRIPT_AURA_TRIGGER_CACHE[spellName]
 						
@@ -3891,6 +5040,14 @@ end
 	--~special ~auraspecial self is BuffFrame
 	function Plater.AddExtraIcon (self, spellName, icon, applications, debuffType, duration, expirationTime, sourceUnit, isStealable, nameplateShowPersonal, spellId, isBuff, filter, id, modRate)
 		Plater.StartLogPerformanceCore("Plater-Core", "Update", "UpdateAuras - AddExtraIcon")
+
+		--buff special hidden in the options tab of the actor type, the personal bar has no such toggle
+		local actorType = self.unitFrame.ActorType
+		local plateConfig = actorType ~= "player" and Plater.db.profile.plate_config[actorType]
+		if (plateConfig and not plateConfig.show_buff_special) then
+			Plater.EndLogPerformanceCore("Plater-Core", "Update", "UpdateAuras - AddExtraIcon")
+			return
+		end
 		
 		local sourceUnitName, sourceUnitClass
 		local borderColor
@@ -5062,7 +6219,8 @@ end
 		end
     end
 
-	function Plater.RefreshAuraCache()
+	--isProfileUnchanged: the profile is the same as on the last refresh, the aura button skins are still valid
+	function Plater.RefreshAuraCache(isProfileUnchanged)
 		Plater.StartLogPerformanceCore("Plater-Core", "Update", "RefreshAuraCache")
 
 		local profile = Plater.db.profile
@@ -5101,7 +6259,9 @@ end
 
 		Plater.MaxAurasPerRow = floor(profile.plate_config.enemynpc.health_incombat[1] / (profile.aura_width + DB_AURA_PADDING))
 		Plater.Auras.SetContainerFiltersOutdated()
-		Plater.Auras.SetIconConfigOutdated()
+		if (not isProfileUnchanged) then
+			Plater.Auras.SetIconConfigOutdated()
+		end
 
 		Plater.EndLogPerformanceCore("Plater-Core", "Update", "RefreshAuraCache")
     end
@@ -5260,6 +6420,23 @@ end
 						DB_DEBUFF_BANNED [spellName] = true
 					else
 						DB_DEBUFF_BANNED [spellId] = true
+					end
+				end
+			end
+
+		--> per aura healthbar colors, only the spell names: expandAuraCaches() resolves them into spell ids
+			wipe (AURA_COLORS)
+			for spellId, colorTable in pairs (profile.aura_colors) do
+				if (colorTable [1]) then
+					--a string key is a spell name, a number key tracked by name uses its spell name
+					if (type (spellId) == "string") then
+						AURA_COLORS [spellId] = true
+
+					elseif (colorTable [3]) then
+						local spellName = GetSpellInfo (spellId)
+						if (spellName) then
+							AURA_COLORS [spellName] = true
+						end
 					end
 				end
 			end

@@ -255,6 +255,20 @@ function SlashCmdList.PLATER (msg, editbox)
 
 		return
 
+	elseif (msg == "profnext") then
+		--login is over before a command can be typed, so the profiler is asked for one reload ahead and Plater.OnInit starts it
+		PlaterDB.perf_next_reload = true
+		Plater:Msg("Plater will start profiling on the next reload.")
+
+		return
+
+	elseif (msg == "profcombat") then
+		--started and stopped by PLAYER_REGEN_DISABLED / PLAYER_REGEN_ENABLED in Plater.lua
+		platerInternal.CombatProfiling = "next"
+		Plater:Msg("Plater will profile the next combat.")
+
+		return
+
 	elseif (msg == "profstop") then
 		Plater.DisableProfiling()
 
@@ -305,6 +319,8 @@ function SlashCmdList.PLATER (msg, editbox)
 		usage = usage .. "\n|cffffaeae/plater|r : Open the Plater options window"
 		usage = usage .. "\n|cffffaeae/plater|r |cffffff33version|r: print Plater version information"
 		usage = usage .. "\n|cffffaeae/plater|r |cffffff33profstart|r: Start Plater profiling"
+		usage = usage .. "\n|cffffaeae/plater|r |cffffff33profnext|r: Start Plater profiling on the next reload"
+		usage = usage .. "\n|cffffaeae/plater|r |cffffff33profcombat|r: Profile the next combat, from entering to leaving it"
 		usage = usage .. "\n|cffffaeae/plater|r |cffffff33profstop|r: Stop Plater profiling"
 		usage = usage .. "\n|cffffaeae/plater|r |cffffff33profprint|r: Print gathered profiling information"
 		usage = usage .. "\n|cffffaeae/plater|r |cffffff33add|r: Adds the targeted unit to the NPC Cache"

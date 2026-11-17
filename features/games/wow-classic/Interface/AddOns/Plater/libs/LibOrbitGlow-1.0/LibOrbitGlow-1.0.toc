@@ -2,7 +2,7 @@
 ## Title: LibOrbitGlow-1.0
 ## Notes: Animated frame-glow engine + media-pack glow registry (proc / pandemic highlights).
 ## Author: MoONSHO7
-## Version: LibOrbitUI-1.15
+## Version: 6a9e081
 ## X-Category: Libraries
 ## X-License: MIT
 ## X-Website: https://github.com/MoONSHO7/Orbit-Libs

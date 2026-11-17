@@ -8,6 +8,38 @@ function Plater.GetChangelogTable()
 	if (not Plater.ChangeLogTable) then
 		Plater.ChangeLogTable = {
 
+			{1794744555, "Backend Change", "Nov 13th, 2026", "New option to enable blizzard nameplates 'advanced coloring'.", "cont1nuity"},
+			{1794744555, "Backend Change", "Nov 11th, 2026", "Some improvements to pixel perfect layout.", "cont1nuity"},
+			{1794744555, "Bug Fix", "Nov 10th, 2026", "Fixing some issues with the 'Interrupt not ready' features.", "cont1nuity"},
+			{1794744555, "Bug Fix", "Nov 9th, 2026", "Fixing friends coloring.", "cont1nuity"},
+			{1794744555, "Bug Fix", "Nov 8th, 2026", "Fixing range checking for Forever.", "cont1nuity"},
+			
+			{1793822733, "New Feature", "Nov 4th, 2026", "Adding 'interrupt not ready coloring' feature.", "cont1nuity"},
+			{1793822733, "Bug Fix", "Nov 1st, 2026", "Fixing some issues around search layout and designer errors.", "cont1nuity"},
+			{1793822733, "Bug Fix", "Oct 29th, 2026", "Fixing some rune display issues.", "cont1nuity"},
+			{1793822733, "Bug Fix", "Oct 29th, 2026", "Fixing oversized widgets.", "cont1nuity"},
+			{1793822733, "New Feature", "Oct 29th, 2026", "Adding options to disable aura tracking per unit type.", "cont1nuity"},
+			
+			{1793183085, "Backend Change", "Oct 20th, 2026", "Adding option for Aura Colors to not override threat.", "cont1nuity"},
+			{1793183085, "Bug Fix", "Oct 20th, 2026", "Fixing fonts on auras not applying correctly.", "cont1nuity"},
+			{1793183085, "New Feature", "Oct 19th, 2026", "Adding support for LibOrbitGlow and 'Orbit: Media' glow types.", "cont1nuity"},
+			{1793183085, "New Feature", "Oct 18th, 2026", "Adding last name support for WoW Forever.", "cont1nuity"},
+			{1793183085, "Backend Change", "Oct 16th, 2026", "Better handling and more options for aura coloring.", "cont1nuity"},
+			{1793183085, "Backend Change", "Oct 16th, 2026", "Some slight improvements to performance.", "cont1nuity"},
+			{1793183085, "Backend Change", "Oct 16th, 2026", "Adding CVar options for some clients.", "cont1nuity"},
+			{1793183085, "New Feature", "Oct 15th, 2026", "Adding more dispel glow types and colors.", "cont1nuity"},
+			{1793183085, "New Feature", "Oct 15th, 2026", "Add support for the CustomNames addon.", "cont1nuity"},
+			
+			{1792002304, "Bug Fix", "Oct 15th, 2026", "Fixing error for classic versions.", "cont1nuity"},
+			{1792002304, "Bug Fix", "Oct 14th, 2026", "Fixing error with pixel API.", "cont1nuity"},
+			{1792002304, "Backend Change", "Oct 14th, 2026", "Bit of performance tuning on aura containers.", "cont1nuity"},
+			{1792002304, "New Feature", "Oct 14th, 2026", "Add dispel glow option to glow the nameplate when something can be dispelled/purged/soothed.", "cont1nuity"},
+			{1792002304, "New Feature", "Oct 13th, 2026", "Add pandemic glow options for auras.", "cont1nuity"},
+			{1792002304, "Backend Change", "Oct 13th, 2026", "Re-enable the aura consolidation, mainly for Blood Plague for DKs.", "cont1nuity"},
+			{1792002304, "Backend Change", "Oct 12th, 2026", "Adding more aura coloring options.", "cont1nuity"},
+			{1792002304, "Bug Fix", "Oct 12th, 2026", "Fixing caster name option for buff special.", "cont1nuity"},
+			{1792002304, "Backend Change", "Oct 12th, 2026", "More performance logging in profiling.", "cont1nuity"},
+
 			{1791537615, "Backend Change", "Oct 7th, 2026", "Some general performance improvements.", "cont1nuity"},
 			{1791537615, "Bug Fix", "Oct 7th, 2026", "Mind Controls should no longer have enemy nameplates lingering when they switch to friendly again.", "cont1nuity"},
 			{1791537615, "Backend Change", "Oct 4th, 2026", "Designer updates.", "Terciob"},

@@ -1538,6 +1538,42 @@ function designer.CreateSettings(parentFrame)
                         updateAllPlatesOnly()
                     end,
                 },
+
+                {type = "blank"},
+                {type = "label", get = function() return "Pandemic Glow" end, text_template = detailsFramework:GetTemplate("font", "ORANGE_FONT_TEMPLATE")},
+
+                {
+                    key = "aura_pandemic_glow",
+                    label = "Enabled",
+                    desc = "Glow around the aura while recasting it keeps the remaining time (pandemic window).",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_pandemic_glow,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_pandemic_glow_color",
+                    label = "Color",
+                    desc = "Color of the pandemic glow.",
+                    widget = "color",
+                    default = Plater.db.profile.aura_pandemic_glow_color,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_pandemic_glow_pulse",
+                    label = "Pulse",
+                    desc = "Pulse the glow while the pandemic window is open.",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_pandemic_glow_pulse,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_pandemic_glow_flash",
+                    label = "Flash",
+                    desc = "Flash the glow once when the pandemic window opens.",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_pandemic_glow_flash,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
             }
         end)(),
 
@@ -1807,6 +1843,38 @@ function designer.CreateSettings(parentFrame)
                     desc = "Use the Blizzard debuff type colors for borders.",
                     widget = "toggle",
                     default = Plater.db.profile.aura_border_colors_by_type,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_border_colors_split",
+                    label = "Split border colors by aura category",
+                    desc = "Color the borders of debuffs, buffs and dispellable buffs separately. Replaces 'Use type based aura border colors'.",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_border_colors_split,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_border_colors_by_type_debuff",
+                    label = "Type based colors: Debuffs",
+                    desc = "When split, debuffs with a dispel type use the dispel type colors.",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_border_colors_by_type_debuff,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_border_colors_by_type_buff",
+                    label = "Type based colors: Buffs",
+                    desc = "When split, buffs with a dispel type use the dispel type colors.",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_border_colors_by_type_buff,
+                    setter = function(auras, value) refreshAuraDBAndIcons() end,
+                },
+                {
+                    key = "aura_border_colors_by_type_dispellable",
+                    label = "Type based colors: Dispellable Buffs",
+                    desc = "When split, buffs you can steal or purge use the dispel type colors if they have a dispel type.",
+                    widget = "toggle",
+                    default = Plater.db.profile.aura_border_colors_by_type_dispellable,
                     setter = function(auras, value) refreshAuraDBAndIcons() end,
                 },
             }

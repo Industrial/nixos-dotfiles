@@ -5,14 +5,14 @@
 -- Authors: Galmok of European Stormrage (Horde); JJSheets (former author)
 -- Email : galmok@gmail.com and sheets.jeff@gmail.com
 -- Licence: GPL version 2 (General Public License)
--- Revision: r87
--- Date: 2026-10-03
-----------------------------------------------------------------------------------
+-- Revision: r88
+-- Date: 2026-11-07
+--------------------------------------------------------------------------------
 
 
 -- 90000 keeps the numbering of the old 90000 + $Revision$ scheme, so copies of this
 -- library already in the wild (90083 and lower) are superseded
-local MAJOR, MINOR = "LibCompress", 90087
+local MAJOR, MINOR = "LibCompress", 90088
 local LibCompress = LibStub:NewLibrary(MAJOR, MINOR)
 
 if not LibCompress then return end
@@ -357,13 +357,32 @@ local function applyFilterBits(result, filter)
 	return string_char(string_byte(result) + filterToBits(filter))..string_sub(result, 2)
 end
 
+-- Blizzard's zlib binding is not trusted blindly: on the exact editor payload it can
+-- produce a raw Deflate stream that its own decoder rejects. The low 6 bits of the header
+-- say whether the candidate is one of the zlib containers; the pure Lua coders are left
+-- to their own round trip.
+local function candidateRoundTrips(data, candidate)
+	if type(candidate) ~= "string" or #candidate == 0 then
+		return false
+	end
+	local header = string_byte(candidate)
+	if not header then
+		return false
+	end
+	if bit_band(header, 63) < 4 or bit_band(header, 63) > 6 then
+		return true
+	end
+	local ok, back = pcall(LibCompress.Decompress, LibCompress, candidate)
+	return ok and back == data
+end
+
 local function compressWithFilter(data, filter, coderFn)
 	if filter == FILTER_AUTO then
 		local result
 		local candidates = { FILTER_NONE, FILTER_SUB, FILTER_RLE }
 		for i = 1, 3 do
 			local candidate = compressWithFilter(data, candidates[i], coderFn)
-			if candidate and (not result or #candidate < #result) then
+			if candidate and candidateRoundTrips(data, candidate) and (not result or #candidate < #result) then
 				result = candidate
 			end
 		end
@@ -378,7 +397,11 @@ local function compressWithFilter(data, filter, coderFn)
 		end
 		payload = filtered
 	end
-	return coderFn(payload, filter)
+	local result = coderFn(payload, filter)
+	if result and not candidateRoundTrips(data, result) then
+		return nil, "Compressed data failed the local round trip"
+	end
+	return result
 end
 --------------------------------------------------------------------------------
 -- LZW codec
@@ -1195,6 +1218,15 @@ local levelsByName = {
 	optimizeforsize		= COMPLEVEL_SIZE,
 }
 
+-- Deflate method 0 with C_EncodingUtil level 0 has been seen on 12.1.5 to produce a
+-- compressed stream that C_EncodingUtil.DecompressString rejects with "internal
+-- decompression error". Deflate itself is not the problem: method 0 with level 1 and
+-- level 2 round-trip fine. Translate the default/speed level request to level 1 for
+-- Deflate only, so a caller asking for level 0 still gets Deflate and not another codec.
+-- Remove this flag and the level substitution when LibCompressTest no longer warns that
+-- direct C_EncodingUtil Deflate 0/0 is defective.
+LibCompress.DEFLATE_LEVEL0_WORKAROUND = true
+
 local function resolveLevel(level)
 	if level == nil then
 		return COMPLEVEL_DEFAULT
@@ -1219,6 +1251,10 @@ end
 -- complete header byte itself, including the prefilter bits
 local function makeZlibCoder(blizzardMethod, codec, compressionLevel)
 	local name = codecNames[codec]
+	local apiLevel = compressionLevel
+	if blizzardMethod == COMPMETHOD_DEFLATE and apiLevel == COMPLEVEL_DEFAULT then
+		apiLevel = COMPLEVEL_SPEED
+	end
 	return function(payload, filterUsed)
 		local header = string_char(codec + filterToBits(filterUsed))
 		if #payload == 0 then
@@ -1226,7 +1262,7 @@ local function makeZlibCoder(blizzardMethod, codec, compressionLevel)
 			-- consistently, so an empty payload is simply a bare header byte
 			return header
 		end
-		local ok, compressed = pcall(C_EncodingUtil.CompressString, payload, blizzardMethod, compressionLevel)
+		local ok, compressed = pcall(C_EncodingUtil.CompressString, payload, blizzardMethod, apiLevel)
 		if not ok or not compressed then
 			return nil, name.." compression failed"
 		end
@@ -1465,7 +1501,12 @@ function LibCompress:Compress(data, capability, filter, level)
 	local result
 	for i = 1, #codecs do
 		local candidate = compressWithFilter(data, filterid, codecs[i])
-		if candidate and (not result or #candidate < #result) then
+		local usable = candidate and candidateRoundTrips(data, candidate)
+		if not usable and filterid ~= FILTER_AUTO and capabilityid >= CAPABILITY_CURRENT and hasEncodingUtil then
+			candidate = compressWithFilter(data, FILTER_AUTO, codecs[i])
+			usable = candidate and candidateRoundTrips(data, candidate)
+		end
+		if usable and (not result or #candidate < #result) then
 			result = candidate
 		end
 	end
