@@ -4,6 +4,9 @@ local function GetCostByItemID(itemID, multiplier)
   local auctionPrice = Auctionator.API.v1.GetAuctionPriceByItemID(AUCTIONATOR_L_REAGENT_SEARCH, itemID)
 
   local unitPrice = vendorPrice or auctionPrice
+  if vendorPrice and auctionPrice and vendorPrice > 5 * auctionPrice then
+    unitPrice = auctionPrice
+  end
 
   if unitPrice ~= nil then
     return multiplier * unitPrice
