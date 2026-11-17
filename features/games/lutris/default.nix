@@ -58,8 +58,21 @@ in {
   ];
 
   programs = {
+    # GameMode is off: on drakkar both of its privileged helpers are no-ops.
+    # The governor is already `performance` (amd-pstate-epp) and
+    # /proc/sys/kernel/split_lock_mitigate is already 0, so gamemoded spent
+    # every 5s reaper tick asking pkexec for root to write values already set.
+    # Worse, `nixos-rebuild switch` does not restart systemd *user* services,
+    # so a long-lived gamemoded kept exec'ing the previous generation's
+    # libexec/ paths. polkit matches pkexec requests by exact executable path,
+    # so no com.feralinteractive.GameMode.* action matched and pkexec fell back
+    # to org.freedesktop.policykit.exec (auth_admin) — an endless, unanswerable
+    # password dialog.
+    #
+    # Re-enabling needs a polkit rule granting the GameMode actions to the
+    # `gamemode` group; do not paper over it with a sudo/password grant.
     gamemode = {
-      enable = true;
+      enable = false;
     };
 
     steam = {
