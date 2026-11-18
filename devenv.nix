@@ -2,10 +2,54 @@
 {
   inputs,
   pkgs,
+  lib,
+  config,
   ...
 }: let
   system = pkgs.stdenv.hostPlatform.system;
   assayPkgs = inputs.assay.packages.${system};
+
+  # THE SHELL'S TOOLCHAIN WITHOUT ENTERING THE SHELL.
+  #
+  # Git hooks used to run `devenv shell -- <cmd>`, and entering a devenv shell
+  # runs the git-hooks task (`prek run -a`), whose hooks entered the shell
+  # again: unbounded recursion. On 2026-11-18 it reached 16+ concurrent prek
+  # processes, and prek's tree-wide stash/restore reverted 153 dirty files.
+  #
+  # `with-devenv <cmd>` gives <cmd> what the shell would: config.packages on
+  # PATH and config.env exported. It is a plain store binary, so starting it
+  # evaluates nothing and runs no enterShell, no tasks and no hooks. Two
+  # deliberate gaps:
+  #   - enterShell side effects do not run. Here that is only install-git-hooks.
+  #   - dotenv values are NOT baked in, because the store is world-readable. The
+  #     repo's .env is sourced at run time instead, if it exists.
+  # DEVENV_TASKS / DEVENV_TASK_FILE are left out too. They serialise the task
+  # graph, which contains the git-hooks tasks, which contain the hook entries
+  # below, which reference this wrapper: infinite recursion at eval time. A hook
+  # has no use for the shell's task graph anyway.
+  dotenvNames = builtins.attrNames (config.dotenv.resolved or {});
+  excluded = dotenvNames ++ ["DEVENV_TASKS" "DEVENV_TASK_FILE"];
+  exportable = lib.filterAttrs (n: v:
+    !(builtins.elem n excluded)
+    && (builtins.isString v || builtins.isInt v || builtins.isPath v || lib.isDerivation v))
+  config.env;
+  withDevenv = pkgs.writeShellApplication {
+    name = "with-devenv";
+    runtimeInputs = config.packages;
+    # Exported values may legitimately expand unset variables; allow it.
+    bashOptions = ["errexit" "pipefail"];
+    text = ''
+      ${lib.concatStrings (lib.mapAttrsToList (n: v: "export ${n}=${lib.escapeShellArg (toString v)}\n") exportable)}
+      if [ -f "''${DEVENV_ROOT:-.}/.env" ]; then
+        set -a
+        # shellcheck disable=SC1091
+        . "''${DEVENV_ROOT:-.}/.env"
+        set +a
+      fi
+      exec "$@"
+    '';
+  };
+  hookCmd = cmd: "${withDevenv}/bin/with-devenv ${cmd}";
 in {
   imports = [./.cursor/nix];
 
@@ -83,7 +127,7 @@ in {
       description = "Run deepsec process on outgoing commits; blocks push on findings";
       pass_filenames = false;
       always_run = true;
-      entry = "devenv shell -- bin/git-hooks/deepsec-pre-push";
+      entry = hookCmd "bin/git-hooks/deepsec-pre-push";
     };
     moon-test = {
       enable = true;
@@ -92,10 +136,24 @@ in {
       description = "Run moon :test --affected on changed files";
       pass_filenames = false;
       always_run = true;
-      entry = "devenv shell -- moon run dotfiles:test --affected";
+      entry = hookCmd "moon run dotfiles:test --affected";
     };
     moon-coverage = {
       enable = false;
     };
+
+    # The shared git-hooks-prek feature names its pre-commit/pre-push scripts
+    # bare, so they resolve only inside an entered shell. Git runs hooks from
+    # wherever it was invoked (an agent, Paseo, an editor), so give them the
+    # shell's toolchain explicitly.
+    pre-commit.entry = lib.mkForce (hookCmd "pre-commit");
+    pre-push.entry = lib.mkForce (hookCmd "pre-push");
   };
+
+  # A stable path to the wrapper for agents and scripts outside the shell:
+  # `.devenv/with-devenv <cmd>`, or `bin/with-devenv <cmd>`, which falls back
+  # to `devenv shell --` until the link exists.
+  enterShell = lib.mkAfter ''
+    ln -sfn ${withDevenv}/bin/with-devenv "$DEVENV_DOTFILE/with-devenv"
+  '';
 }

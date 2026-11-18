@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Run a command with the devenv toolchain (packages on PATH, env exported)
+# without entering `devenv shell`.
+#
+# Entering the shell runs the git-hooks task (`prek run -a`). Hooks that
+# themselves entered the shell made that recursive; see the comment above
+# `withDevenv` in devenv.nix. This calls the store wrapper that devenv.nix
+# builds and links at .devenv/with-devenv on every shell entry. Until that
+# link exists (fresh clone, no shell entered yet) it falls back to
+# `devenv shell --`, which is correct, only slower.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+wrapper="$root/.devenv/with-devenv"
+
+if [[ $# -eq 0 ]]; then
+  echo "usage: bin/with-devenv <command> [args...]" >&2
+  exit 64
+fi
+
+if [[ -x "$wrapper" ]]; then
+  exec "$wrapper" "$@"
+fi
+exec devenv shell -- "$@"
