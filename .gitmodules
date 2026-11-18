@@ -1,6 +1,3 @@
-[submodule ".cursor"]
-	path = .cursor
-	url = https://github.com/Industrial/cursor-setup
 [submodule "features/games/wow-classic/Interface/AddOns/idAutomation"]
 	path = features/games/wow-classic/Interface/AddOns/idAutomation
 	url = git@github.com:Industrial/idAutomation.git
