@@ -84,7 +84,7 @@ commit() { # commit <message> <paths...>: pathspec-limited, never runs hooks
   if [ "${#all[@]}" -eq 0 ] || git diff --cached --quiet -- "${all[@]}"; then say "  (nothing to commit for: ${msg%%$'\n'*})"; return 0; fi
   printf '%s\n\nPart of pln-mwlwzmof-blzg78 (bin/drop-cursor-setup in ~/.dotfiles).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n' "$msg" > "$STATE/msg"
   git commit -q --no-verify -F "$STATE/msg" --only -- "${all[@]}"
-  git show --stat --format='  committed %h %s' HEAD | sed '/^$/d' | head -40
+  git show --stat --format='  committed %h %s' HEAD | sed '/^$/d' | head -40 || true
 }
 
 # ---- classify ---------------------------------------------------------------
@@ -97,7 +97,9 @@ fi
 IMPORTS=0
 grep -Eqs '(^|[^a-z/])\./\.cursor/nix|^\s*-\s*\.cursor/nix' devenv.yaml devenv.nix && IMPORTS=1
 CLAUDE_KIND=none
-is_submodule .claude-setup && CLAUDE_KIND=submodule
+if is_submodule .claude-setup; then CLAUDE_KIND=submodule
+elif [ -n "$(git ls-files -- .claude-setup | head -1)" ]; then CLAUDE_KIND=tracked # a committed copy, not a live submodule
+fi
 
 step "repo: $REPO"
 say "  .cursor: $CURSOR_KIND · imports .cursor/nix: $IMPORTS · .claude-setup: $CLAUDE_KIND"
@@ -139,7 +141,7 @@ check_sub() { # check_sub <path>: refuse when a submodule holds work that remova
 }
 # Never remove the .claude-setup that ~/.claude itself resolves into: in
 # ~/.dotfiles it is the host-wide harness, not a per-project copy.
-if [ "$CLAUDE_KIND" = submodule ] && [ "$KEEP_CLAUDE" = 0 ]; then
+if [ "$CLAUDE_KIND" != none ] && [ "$KEEP_CLAUDE" = 0 ]; then
   here="$(cd .claude-setup && pwd -P)"
   case "$(readlink -f "$HOME/.claude")/" in
     "$here"/*) die 2 ".claude-setup here is the host-wide harness (~/.claude -> $(readlink -f "$HOME/.claude")); re-run with --keep-claude-setup" ;;
@@ -377,12 +379,13 @@ host-wide ~/.claude harness." .cursor .gitmodules .cursorignore
 fi
 
 # ---- 6 claude --------------------------------------------------------------------
-if [ "$CLAUDE_KIND" = submodule ] && [ "$KEEP_CLAUDE" = 0 ]; then
+if [ "$CLAUDE_KIND" != none ] && [ "$KEEP_CLAUDE" = 0 ]; then
   step "6 claude"
   links=""
   [ -L .claude ] && [[ "$(readlink .claude)" == *claude-setup* ]] && { git rm -q -f .claude; links=".claude"; }
-  remove_submodule .claude-setup
-  commit "chore: remove the per-project .claude-setup submodule
+  if [ "$CLAUDE_KIND" = submodule ]; then remove_submodule .claude-setup
+  else git rm -r -q -f .claude-setup; rm -rf .claude-setup; fi
+  commit "chore: remove the per-project .claude-setup
 
 ~/.claude (the ~/.dotfiles harness) applies to every repo on this host, so a
 per-project copy only drifts from it." .claude-setup .gitmodules $links
