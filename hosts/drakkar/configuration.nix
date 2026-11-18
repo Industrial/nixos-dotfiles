@@ -14,12 +14,22 @@
     ../../profiles/development.nix
     ../../profiles/gaming.nix
 
-    # OpenHands Agent Canvas, drakkar only. profiles/ai.nix carries it as a commented
-    # opt-in because muninn imports that profile as well; this is the desktop, so this is
-    # where it lands. Run it on demand as `agent-canvas` (binds 127.0.0.1:8000, state in
-    # ~/.openhands). First start fetches the Python backend from PyPI via uvx — see the
-    # feature's header for why that is not hermetic and what the alternative costs.
-    ../../features/ai/openhands
+    # OpenHands Agent Canvas, drakkar only — DISABLED in favour of
+    # features/ai/paseo (profiles/ai.nix), which is now the single browser surface
+    # over this host's coding agents. Agent Canvas is the same category: a web UI
+    # driving agent CLIs, on 127.0.0.1:8000.
+    #
+    # Commented rather than deleted, because its feature carries findings worth
+    # keeping — the PYTHONPATH collision this repo's devenv shell causes for any
+    # uv/venv tool, and the CLAUDE_CODE_EXECUTABLE fix for the agent SDK's
+    # generic-linux `claude`. Read that header before re-enabling anything that
+    # drives Claude Code through uvx.
+    #
+    # Paseo is preferred over it on three counts: packaged in nixpkgs rather than
+    # pulled from a third-party flake, hermetic rather than fetching its backend
+    # from PyPI on first run, and a declarative service rather than a
+    # run-it-yourself CLI.
+    # ../../features/ai/openhands
 
     ../../features/fleet/comin.nix
     ../../features/fleet/nix-remote-builder-server.nix
