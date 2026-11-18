@@ -1,15 +1,18 @@
 # Agent Instructions
 
-## Cursor config (submodule)
+## Dev environment
 
-`.cursor/` is the [Industrial/cursor-setup](https://github.com/Industrial/cursor-setup) submodule. After clone:
+The devenv modules this repo uses are vendored in `nix/devenv-modules/`
+(formerly the `.cursor` submodule, Industrial/cursor-setup) and enabled with
+`local.features.*` in root `devenv.nix`. Agent tooling (lean-ctx, roam-code,
+maestro, claude-code, context7) is **not** in the devenv: it comes from the
+host, `features/ai/*`.
 
-```bash
-git submodule update --init --recursive .cursor
-devenv shell   # imports `.cursor/nix` — lean-ctx, roam, maestro, serena, assay, moon, …
-```
-
-Shared tooling is provisioned via `cursor.features.*` in root `devenv.nix` (same pattern as other Industrial repos; no separate top-level `nix/` facade).
+Run toolchain commands with `bin/with-devenv <cmd>` (e.g.
+`bin/with-devenv assay run .`). It gives the command the shell's packages and
+env without entering `devenv shell`. Git hooks run through the same wrapper,
+and entering the shell no longer runs them. Previously, shell entry ran
+`prek run -a`, and hooks that re-entered the shell recursed.
 
 ## Git pre-push (deepsec)
 
