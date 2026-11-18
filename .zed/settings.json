@@ -1,0 +1,21 @@
+{
+  "//": "Zed project settings for this repo. Tracked in git, and it overrides ~/.config/zed/settings.json whenever this folder is the open project. features/programming/zed seeds the user-level file; this one carries only what is specific to .dotfiles.",
+
+  "//agent": "Pins the Claude Code agent to THIS repo's Claude configuration rather than whatever the user-level one happens to be. CLAUDE_CONFIG_DIR is set to .claude here, which is a tracked symlink to .claude-setup/.claude - the submodule that carries the MCP servers (lean-ctx, roam-code, maestro, context7), the id-workflow plugin and the mode guards. Claude Code already prefers a project's .claude over the user-level one, so this is belt and braces; it earns its place by making the intent explicit and by surviving the ~/.claude -> .dotfiles/.claude -> .claude-setup/.claude symlink chain being rearranged, at which point the native precedence alone would start resolving somewhere else.",
+
+  "//command": "The command is repeated as a bare name rather than inherited, because project settings may replace this object outright instead of merging into the user-level one. Repeating it means the agent works either way. A bare name and not a store path: features/programming/zed installs claude-agent-acp system-wide, so PATH stays current across version bumps - a pinned store path in a tracked file would break for everyone else on the next bump.",
+
+  "agent_servers": {
+    "Claude Code": {
+      "type": "custom",
+      "command": "claude-agent-acp",
+      "args": [],
+      "env": {
+        "CLAUDE_CONFIG_DIR": "/home/tom/.dotfiles/.claude"
+      }
+    }
+  },
+
+  "//direnv": "This repo's toolchains live in a devenv shell, not on the global PATH, so the agent and the language servers need the environment direnv exports. Restated here because project settings are what a fresh clone reads first.",
+  "load_direnv": "direct"
+}

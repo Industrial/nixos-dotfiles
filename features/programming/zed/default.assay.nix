@@ -24,8 +24,15 @@ let
       taplo = "/taplo";
       ruff = "/ruff";
       nodejs_22 = "/nodejs";
+      claude-agent-acp = "/claude-agent-acp";
     };
   };
+
+  # The project-scoped counterpart. These two files are a pair: the user-level
+  # seed declares the agent, and this one points it at this repo's Claude
+  # configuration. Asserting both here is what keeps the split honest.
+  projectSettings = builtins.fromJSON (builtins.readFile ./../../../.zed/settings.json);
+  projectAgent = projectSettings.agent_servers."Claude Code";
   packages = mod.environment.systemPackages;
   activation = mod.system.activationScripts.zedSettingsSeed.text;
   activationHas = needle: lib.hasInfix needle activation;
@@ -69,6 +76,48 @@ in
     documentsNushellReason = assay.eq (hasText "nushell") true;
 
     telemetryOff = assay.eq (hasText "metrics = false;") true;
+
+    # CLAUDE CODE AS AN EXTERNAL AGENT.
+    #
+    # type must be "custom", never "registry": the registry's prebuilt
+    # claude-agent-acp is glibc-dynamic (interpreter /lib64/ld-linux-x86-64.so.2)
+    # and its musl build wants /lib/ld-musl-x86_64.so.1 — neither exists on NixOS,
+    # so the registry agent exits 127. nixpkgs' build is the only one that runs.
+    declaresClaudeAgent = assay.eq (activationHas ''"Claude Code"'') true;
+    agentIsCustomNotRegistry = assay.eq (activationHas ''"type":"custom"'') true;
+    agentIsNotFromRegistry = assay.eq (activationHas ''"type":"registry"'') false;
+    installsAcpWrapper = assay.eq (builtins.elem "/claude-agent-acp" packages) true;
+
+    # The command is a bare name on purpose. This settings file is seeded once and
+    # then owned by the user, so a store path baked in would go stale at the next
+    # claude-agent-acp bump and break once the old path is collected.
+    agentCommandIsBareName = assay.eq (activationHas ''"command":"claude-agent-acp"'') true;
+    agentCommandIsNotAStorePath = assay.eq (activationHas ''"command":"/nix/store'') false;
+
+    # No CLAUDE_CONFIG_DIR at the user level: pinning it here would force this
+    # repo's Claude configuration onto every other project opened in Zed. The
+    # project-scoped override belongs in .zed/settings.json, and the claim below
+    # checks that file carries it.
+    userSettingsDoNotPinConfigDir = assay.eq (activationHas "CLAUDE_CONFIG_DIR") false;
+
+    # THE PROJECT-OVER-SYSTEM CLAIMS. .zed/settings.json is what makes this repo's
+    # Claude setup win when .dotfiles is the open project.
+    projectPinsRepoClaudeConfig =
+      assay.eq projectAgent.env.CLAUDE_CONFIG_DIR "/home/tom/.dotfiles/.claude";
+    # It must repeat command and type rather than rely on inheriting them: project
+    # settings may replace the object outright instead of merging, and an entry
+    # carrying only `env` would then lose the command entirely.
+    projectRepeatsCommand = assay.eq projectAgent.command "claude-agent-acp";
+    projectRepeatsType = assay.eq projectAgent.type "custom";
+    # Same store-path argument as the user-level file, and stronger here: this one
+    # is tracked, so a pinned path would break for every other clone.
+    projectCommandIsNotAStorePath =
+      assay.eq (lib.hasPrefix "/nix/store" projectAgent.command) false;
+    # The repo's toolchains are in a devenv shell, so a fresh clone needs direnv
+    # loading from the first read of the project file.
+    projectKeepsDirenvDirect = assay.eq projectSettings.load_direnv "direct";
+    # The target has to exist, or the pin silently points at nothing.
+    repoClaudeConfigExists = assay.eq (builtins.pathExists ./../../../.claude) true;
 
     # Nix and TOML are Zed extensions, not built-in languages. Without these two
     # the languages.* and lsp.* blocks parse fine and do nothing at all — no

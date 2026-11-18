@@ -73,6 +73,43 @@
     # See note 3 in the header: "direct", not "shell_hook", because nushell.
     load_direnv = "direct";
 
+    # CLAUDE CODE AS AN EXTERNAL AGENT, AND WHY NOT FROM THE REGISTRY.
+    #
+    # Zed talks to Claude Code over ACP through a wrapper, and its own ACP
+    # registry offers this as `claude-acp` (type = "registry"). That path is
+    # broken on NixOS, verified rather than assumed: the registry downloads
+    #
+    #   claude-agent-acp-linux-x64.tar.gz  ->  ELF, dynamically linked,
+    #                                          interpreter /lib64/ld-linux-x86-64.so.2
+    #
+    # which is stub-ld here, so the agent exits 127 and the thread reports
+    # nothing useful. The musl build is no better — it wants
+    # /lib/ld-musl-x86_64.so.1, equally absent. This is the same failure
+    # features/ai/cloudcli documents for the vendored claude CLI.
+    #
+    # nixpkgs has `claude-agent-acp`, built with buildNpmPackage from source and
+    # already wrapped with CLAUDE_CODE_EXECUTABLE pointing at nixpkgs claude-code
+    # — the same shape cloudcli's package.nix arrives at by hand. So the agent is
+    # declared type = "custom" against that, and the registry entry is left out.
+    #
+    # `command` IS A BARE NAME, NOT A STORE PATH, and that is deliberate. This
+    # settings file is seeded once and then owned by the user (see the header), so
+    # it is never rewritten by a later switch. A store path baked in here would go
+    # stale on the next claude-agent-acp bump and break outright once the old path
+    # is garbage-collected. A bare name resolves through PATH, which the
+    # systemPackages entry below keeps populated and current.
+    #
+    # No CLAUDE_CONFIG_DIR at this level: Claude Code already prefers a project's
+    # own .claude over the user-level one, and pinning it here would force this
+    # repo's configuration onto every other project opened in Zed. The per-project
+    # override lives in .zed/settings.json instead — see that file.
+    agent_servers."Claude Code" = {
+      type = "custom";
+      command = "claude-agent-acp";
+      args = [];
+      env = {};
+    };
+
     # ZED SHIPS NO NIX OR TOML SUPPORT. Both are extensions, and without them
     # every `languages.Nix`, `languages.TOML`, `lsp.nixd` and `lsp.taplo` key
     # below is inert — the settings parse, the grammars never load, the servers
@@ -176,6 +213,13 @@ in {
     taplo
     ruff
     nodejs_22
+
+    # The ACP wrapper the "Claude Code" agent above resolves from PATH. nixpkgs
+    # builds it from source and wires CLAUDE_CODE_EXECUTABLE to nixpkgs
+    # claude-code, which is what makes it work here at all — the registry's
+    # prebuilt binary cannot run on NixOS. Installing it is also what keeps the
+    # bare `command` name resolvable after a version bump.
+    claude-agent-acp
   ];
 
   system.activationScripts.zedSettingsSeed = {
