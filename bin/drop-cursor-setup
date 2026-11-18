@@ -174,7 +174,7 @@ say "  drop agent-tool modules:${DROP_MODULES:- (none)}"
 say "  plans to move: ${#PLANS[@]}"
 say "  mcp wrapper scripts: ${WRAPPERS:-none}"
 say "  other references to .cursor/ (config/executable files):"
-git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' ':!.cursor' 2>/dev/null | sed 's/^/    /' | head -40 || true
+git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' ':!.cursor' ':!bin/drop-cursor-setup' ':!bin/drop-cursor-setup.d' 2>/dev/null | sed 's/^/    /' | head -40 || true
 
 [ "$APPLY" = 1 ] || { say; say "report only (re-run with --apply)"; exit 0; }
 
@@ -377,7 +377,7 @@ fi
 
 # ---- verify --------------------------------------------------------------------
 step "verify"
-left="$(git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' 2>/dev/null || true)"
+left="$(git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' ':!bin/drop-cursor-setup' ':!bin/drop-cursor-setup.d' 2>/dev/null || true)"
 [ -z "$left" ] || { say "$left" | sed 's/^/  still references .cursor: /'; say "  (fix by hand; spec AC 3)"; }
 [ -z "$(git ls-files .cursor | head -1)" ] || die 6 ".cursor is still tracked"
 if [ -f devenv.nix ]; then
