@@ -24,6 +24,13 @@
       bash
       git
       jq
+
+      # The interpreter the uvx-launched MCP servers (fetch, git, time in
+      # .mcp.json) run on. Without a system python, uv downloads a generic-linux
+      # CPython that NixOS cannot exec (stub-ld, exit 127), and the servers die
+      # with "Connection closed". .mcp.json pins UV_PYTHON_PREFERENCE=only-system
+      # and UV_PYTHON_DOWNLOADS=never so uv picks this one.
+      python3
     ];
   };
 }
