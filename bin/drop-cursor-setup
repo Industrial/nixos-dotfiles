@@ -356,7 +356,11 @@ if [ "$NEED_HOOKS" = 1 ]; then
       s==3 && /^      - '--'\$/ { s=0; next }
       { s=0; print }" "$m" > "$STATE/moon.tmp" && cat "$STATE/moon.tmp" > "$m"
   done
-  # prek configs that are a plain file rather than devenv's generated symlink
+  # prek configs that are a plain file rather than devenv's generated symlink.
+  # Commit the config only where HEAD already tracks it as a regular file: an
+  # untracked one is devenv's store symlink and must never be committed.
+  hook_cfg=()
+  [ "$(git ls-tree HEAD -- .pre-commit-config.yaml | awk '{print $1}')" = 100644 ] && hook_cfg=(.pre-commit-config.yaml)
   if [ -f .pre-commit-config.yaml ] && [ ! -L .pre-commit-config.yaml ]; then
     if tracked .pre-commit-config.yaml; then
       # committed by hand: route its shell-entering entries through the wrapper
@@ -379,7 +383,7 @@ d05ab115):
 - Hook entries entered the shell again (devenv shell -- ..., or bare script
   names only resolvable inside it), which recursed. They now call
   config.local.withDevenv, a store binary with the shell's packages and env.
-bin/with-devenv exposes the same wrapper to scripts and agents." nix/devenv-modules devenv.nix bin/with-devenv moon.yml .moon .pre-commit-config.yaml
+bin/with-devenv exposes the same wrapper to scripts and agents." nix/devenv-modules devenv.nix bin/with-devenv moon.yml .moon "${hook_cfg[@]}"
 fi
 
 # ---- 3 agents -------------------------------------------------------------------
