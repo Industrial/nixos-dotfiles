@@ -1,0 +1,398 @@
+#!/usr/bin/env bash
+# drop-cursor-setup — remove a repo's .cursor/ (Industrial/cursor-setup) setup.
+#
+#   bin/drop-cursor-setup <repo>                       report only; changes nothing
+#   bin/drop-cursor-setup <repo> --apply               migrate, committing step by step
+#   bin/drop-cursor-setup <repo> --apply --keep-agent-tools --keep-claude-setup
+#   bin/drop-cursor-setup --inventory                  list every .cursor/ under the code roots
+#
+# Mission pln-mwlwzmof-blzg78 (.maestro/missions/drop-cursor-setup.plan.md).
+#
+# What --apply does, one pathspec-limited --no-verify commit per step:
+#   1 vendor   copy the modules the repo references from .cursor/nix into
+#              nix/devenv-modules/ (+ lib/, devenv.yaml with the shared inputs),
+#              rename cursor.features -> local.features, repoint imports
+#   2 hooks    add the with-devenv wrapper + the no-hooks-on-shell-entry fix,
+#              route hook entries and moon tasks through it, add bin/with-devenv
+#   3 agents   (unless --keep-agent-tools) drop agent-tool modules; .mcp.json
+#              servers started via scripts/*-mcp-wrapper.sh call bare commands
+#   4 plans    .cursor/plans/* -> .maestro/missions/
+#   5 cursor   remove the .cursor submodule or tracked directory
+#   6 claude   (unless --keep-claude-setup) remove the .claude-setup submodule
+#
+# Exit codes: 0 ok · 2 usage · 3 foreign uncommitted edits in a file this tool
+# must change · 4 a reference it cannot rewrite safely (fix by hand, re-run) ·
+# 5 a submodule holds unpushed or uncommitted work · 6 verification failed.
+#
+# It never runs `devenv shell` before step 2 has landed: with the old
+# git-hooks-prek module, shell entry runs every hook across the repo.
+set -euo pipefail
+
+TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TPL="$TOOL_DIR/drop-cursor-setup.d"
+AGENT_MODULES="program-lean-ctx program-roam-code program-roam-code-pypi program-maestro program-claude-code program-context7 program-omniroute program-hermes program-paperclip"
+CRITICAL="devenv.nix devenv.yaml .gitmodules .mcp.json moon.yml"
+
+say() { printf '%s\n' "$*"; }
+step() { printf '\n== %s\n' "$*"; }
+die() { local c=$1; shift; printf 'ERROR: %s\n' "$*" >&2; exit "$c"; }
+
+inventory() {
+  local root
+  for root in /data/Code /home/tom/Code /home/tom/.dotfiles; do
+    [ -d "$root" ] || continue
+    find "$root" -maxdepth 5 \( -name node_modules -o -name .devenv -o -name .direnv -o -name target -o -name .git \) -prune -o -name .cursor -print 2>/dev/null
+  done | sort -u
+}
+
+[ "${1:-}" = "--inventory" ] && { inventory; exit 0; }
+[ $# -ge 1 ] || die 2 "usage: bin/drop-cursor-setup <repo> [--apply] [--keep-agent-tools] [--keep-claude-setup]"
+
+REPO="$(cd "$1" && pwd)"; shift
+APPLY=0 KEEP_AGENTS=0 KEEP_CLAUDE=0
+for a in "$@"; do
+  case "$a" in
+    --apply) APPLY=1 ;;
+    --keep-agent-tools) KEEP_AGENTS=1 ;;
+    --keep-claude-setup) KEEP_CLAUDE=1 ;;
+    *) die 2 "unknown flag: $a" ;;
+  esac
+done
+cd "$REPO"
+git rev-parse --show-toplevel >/dev/null 2>&1 || die 2 "$REPO is not a git repo"
+[ "$(git rev-parse --show-toplevel)" = "$REPO" ] || die 2 "$REPO is not a repo root"
+STATE="$REPO/.tmp/drop-cursor-setup"
+GITDIR="$(git rev-parse --absolute-git-dir)"
+
+is_submodule() { git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{print $2}' | grep -qx "$1"; }
+submodule_name() { git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk -v p="$1" '$2==p{sub(/^submodule\./,"",$1); sub(/\.path$/,"",$1); print $1}'; }
+commit() { # commit <message> <paths...>: pathspec-limited, never runs hooks
+  local msg=$1 p; shift
+  local add=() all=()
+  for p in "$@"; do
+    # stage what still exists; commit that plus anything HEAD has (deletions)
+    if [ -e "$p" ] || [ -L "$p" ] || tracked "$p"; then add+=("$p"); all+=("$p")
+    elif [ -n "$(git ls-tree --name-only HEAD -- "$p" 2>/dev/null)" ]; then all+=("$p"); fi
+  done
+  [ "${#add[@]}" -eq 0 ] || git add -A -- "${add[@]}"
+  if [ "${#all[@]}" -eq 0 ] || git diff --cached --quiet -- "${all[@]}"; then say "  (nothing to commit for: ${msg%%$'\n'*})"; return 0; fi
+  printf '%s\n\nPart of pln-mwlwzmof-blzg78 (bin/drop-cursor-setup in ~/.dotfiles).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n' "$msg" > "$STATE/msg"
+  git commit -q --no-verify -F "$STATE/msg" --only -- "${all[@]}"
+  git show --stat --format='  committed %h %s' HEAD | sed '/^$/d' | head -40
+}
+
+# ---- classify ---------------------------------------------------------------
+CURSOR_KIND=none
+if is_submodule .cursor; then CURSOR_KIND=submodule
+elif [ -n "$(git ls-files .cursor | head -1)" ]; then CURSOR_KIND=tracked
+elif [ -e .cursor ]; then CURSOR_KIND=untracked
+elif [ -n "$(git ls-tree --name-only HEAD -- .cursor 2>/dev/null)" ]; then CURSOR_KIND=pending-removal # removed by a stopped run, not committed
+fi
+IMPORTS=0
+grep -Eqs '(^|[^a-z/])\./\.cursor/nix|^\s*-\s*\.cursor/nix' devenv.yaml devenv.nix && IMPORTS=1
+CLAUDE_KIND=none
+is_submodule .claude-setup && CLAUDE_KIND=submodule
+
+step "repo: $REPO"
+say "  .cursor: $CURSOR_KIND · imports .cursor/nix: $IMPORTS · .claude-setup: $CLAUDE_KIND"
+say "  flags: apply=$APPLY keep-agent-tools=$KEEP_AGENTS keep-claude-setup=$KEEP_CLAUDE"
+
+if [ "$CURSOR_KIND" = none ] && { [ "$CLAUDE_KIND" = none ] || [ "$KEEP_CLAUDE" = 1 ]; }; then
+  say "  already migrated: nothing to do"; exit 0
+fi
+
+# ---- preflight --------------------------------------------------------------
+step "preflight"
+dirty_critical="$(git status --porcelain -- $CRITICAL 2>/dev/null || true)"
+# A stopped run's own .cursor removal is not a foreign edit: accept .gitmodules
+# when it is exactly HEAD's copy minus the .cursor section.
+if [ "$CURSOR_KIND" = pending-removal ] && printf '%s\n' "$dirty_critical" | grep -q ' \.gitmodules$'; then
+  mkdir -p "$STATE"
+  git show HEAD:.gitmodules > "$STATE/gitmodules.expected" 2>/dev/null || true
+  sec="$(git config -f "$STATE/gitmodules.expected" --get-regexp '^submodule\..*\.path$' | awk '$2==".cursor"{sub(/\.path$/,"",$1); print $1}')"
+  [ -n "$sec" ] && git config -f "$STATE/gitmodules.expected" --remove-section "$sec"
+  if [ ! -e .gitmodules ] && [ ! -s "$STATE/gitmodules.expected" ] || diff -q "$STATE/gitmodules.expected" .gitmodules >/dev/null 2>&1; then
+    dirty_critical="$(printf '%s\n' "$dirty_critical" | grep -v ' \.gitmodules$' || true)"
+  fi
+fi
+if [ -n "$dirty_critical" ]; then
+  say "$dirty_critical" | sed 's/^/  foreign edit: /'
+  die 3 "uncommitted edits in files this tool must change; commit or wait for their owner"
+fi
+check_sub() { # check_sub <path>: refuse when a submodule holds work that removal would lose
+  local p=$1 st ahead
+  [ -e "$p/.git" ] || { say "  $p: not checked out"; return 0; }
+  if ! git -C "$p" rev-parse HEAD >/dev/null 2>&1; then say "  $p: broken gitfile (no repository); removal is safe"; return 0; fi
+  # Untracked plans are copied out in step 4; untracked devenv state is regenerated.
+  st="$(git -C "$p" status --porcelain --untracked-files=all |
+    grep -v -E '^\?\? (plans/|(.*/)?\.devenv/|(.*/)?\.direnv/|(.*/)?devenv\.lock$|(.*/)?\.devenv\.flake\.nix$)' || true)"
+  ahead="$(git -C "$p" log --oneline HEAD --not --remotes 2>/dev/null | head -5 || true)"
+  [ -z "$st" ] || { say "$st" | sed "s|^|  $p dirty: |"; return 1; }
+  [ -z "$ahead" ] || { say "$ahead" | sed "s|^|  $p unpushed: |"; return 1; }
+  say "  $p: clean, no unpushed commits"
+}
+# Never remove the .claude-setup that ~/.claude itself resolves into: in
+# ~/.dotfiles it is the host-wide harness, not a per-project copy.
+if [ "$CLAUDE_KIND" = submodule ] && [ "$KEEP_CLAUDE" = 0 ]; then
+  here="$(cd .claude-setup && pwd -P)"
+  case "$(readlink -f "$HOME/.claude")/" in
+    "$here"/*) die 2 ".claude-setup here is the host-wide harness (~/.claude -> $(readlink -f "$HOME/.claude")); re-run with --keep-claude-setup" ;;
+  esac
+fi
+blocked=0
+[ "$CURSOR_KIND" = submodule ] && { check_sub .cursor || blocked=1; }
+[ "$CLAUDE_KIND" = submodule ] && [ "$KEEP_CLAUDE" = 0 ] && { check_sub .claude-setup || blocked=1; }
+[ "$blocked" = 0 ] || die 5 "a submodule holds work that removing it would lose"
+say "  critical files clean: $CRITICAL"
+
+# ---- plan what will happen -----------------------------------------------------
+# Each step is gated on its own committed result, so a re-run after a stop
+# (exit 3/4/5) resumes where it left off instead of redoing or skipping work.
+D=nix/devenv-modules
+tracked() { [ -n "$(git ls-files -- "$1" | head -1)" ]; }
+NEED_VENDOR=0; [ "$IMPORTS" = 1 ] && ! tracked "$D/devenv.nix" && NEED_VENDOR=1
+NEED_HOOKS=0; { [ "$NEED_VENDOR" = 1 ] || tracked "$D/devenv.nix"; } && ! tracked "$D/with-devenv.nix" && NEED_HOOKS=1
+candidates="$AGENT_MODULES"
+[ -d .cursor/nix/features ] && candidates="$candidates $(find .cursor/nix/features -maxdepth 1 -name '*.nix' ! -name '*.assay.nix' -printf '%f\n' | sed 's/\.nix$//' | sort -u | tr '\n' ' ')"
+MODULES=""
+if [ -f devenv.nix ]; then
+  for n in $(printf '%s\n' $candidates | sort -u); do
+    if grep -Eq "features\.${n}([^a-z0-9-]|\$)|^[[:space:]]*${n}[[:space:]]*=[[:space:]]*\{" devenv.nix; then MODULES="$MODULES $n"; fi
+  done
+fi
+KEEP_MODULES="" DROP_MODULES=""
+for n in $MODULES; do
+  if [ "$KEEP_AGENTS" = 0 ] && [[ " $AGENT_MODULES " == *" $n "* ]]; then DROP_MODULES="$DROP_MODULES $n"; else KEEP_MODULES="$KEEP_MODULES $n"; fi
+done
+PLANS=()
+[ -d .cursor/plans ] && while IFS= read -r p; do PLANS+=("$p"); done < <(find .cursor/plans -maxdepth 1 -type f | sort)
+WRAPPERS="$(git ls-files 'scripts/*-mcp-wrapper.sh' 2>/dev/null || true)"
+
+step "plan"
+say "  vendor into nix/devenv-modules:${KEEP_MODULES:- (none)}"
+say "  drop agent-tool modules:${DROP_MODULES:- (none)}"
+say "  plans to move: ${#PLANS[@]}"
+say "  mcp wrapper scripts: ${WRAPPERS:-none}"
+say "  other references to .cursor/ (config/executable files):"
+git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' ':!.cursor' 2>/dev/null | sed 's/^/    /' | head -40 || true
+
+[ "$APPLY" = 1 ] || { say; say "report only (re-run with --apply)"; exit 0; }
+
+mkdir -p "$STATE"
+git check-ignore -q "$STATE/probe" || say "  note: .tmp/ is not gitignored here; state goes to $STATE (never committed: commits are pathspec-limited)"
+
+# ---- baseline (eval only: no shell entry) -----------------------------------------
+step "baseline: devenv eval packages"
+if [ -f "$STATE/packages.before.json" ]; then
+  say "  reusing $(jq '.packages|length' "$STATE/packages.before.json") packages recorded by an earlier run"
+elif [ -f devenv.nix ]; then
+  devenv eval packages > "$STATE/packages.before.json" 2>"$STATE/eval.before.err" || { rm -f "$STATE/packages.before.json"; tail -20 "$STATE/eval.before.err"; die 6 "devenv does not evaluate on HEAD; not migrating a broken baseline"; }
+  say "  $(jq '.packages|length' "$STATE/packages.before.json") packages"
+fi
+
+# ---- 1 vendor -----------------------------------------------------------------
+if [ "$NEED_VENDOR" = 1 ]; then
+  step "1 vendor"
+  # a stopped earlier attempt may have left uncommitted copies; start clean
+  tracked "$D" || rm -rf nix/devenv-modules
+  mkdir -p "$D/features"
+  cp -r .cursor/nix/lib "$D/lib"
+  cp .cursor/nix/devenv.yaml "$D/devenv.yaml"
+  for n in $KEEP_MODULES; do
+    cp ".cursor/nix/features/$n.nix" "$D/features/"
+    [ -f ".cursor/nix/features/$n.assay.nix" ] && cp ".cursor/nix/features/$n.assay.nix" "$D/features/"
+    # helper directories a module reads (templates, wrappers, package files)
+    for dir in $(grep -o -E '\./[a-z0-9-]+/' ".cursor/nix/features/$n.nix" | sort -u | tr -d './'); do
+      [ -d ".cursor/nix/features/$dir" ] && cp -r ".cursor/nix/features/$dir" "$D/features/"
+    done
+  done
+  {
+    printf '# Shared devenv modules, vendored from Industrial/cursor-setup by bin/drop-cursor-setup.\n'
+    printf '# Only the modules this repo references are here. Namespace: local.features.*\n'
+    printf '{\n  imports = [\n'
+    for n in $KEEP_MODULES; do printf '    ./features/%s.nix\n' "$n"; done
+    printf '  ];\n}\n'
+  } > "$D/devenv.nix"
+  printf '# `imports = [ ./nix/devenv-modules ]` resolves this file.\n{imports = [./devenv.nix];}\n' > "$D/default.nix"
+  # namespace rename everywhere it is used
+  grep -rl 'cursor\.features\|options\.cursor\b\|\.cursor\.features' "$D" | while read -r f; do sed -i 's/\bcursor\.features\b/local.features/g' "$f"; done
+  sed -i 's/\bcursor\.features\b/local.features/g' devenv.nix devenv.yaml
+  sed -i -E 's/^(\s*)cursor = \{/\1local = {/' devenv.nix
+  # imports and path references
+  sed -i 's#\./\.cursor/nix#./nix/devenv-modules#g; s#\.cursor/nix/#nix/devenv-modules/#g; s#\.cursor/nix#nix/devenv-modules#g' devenv.nix devenv.yaml
+  # Nix code still on the old namespace would fail evaluation: stop. Prose is reported.
+  other_ns="$(git grep -l -E '\bcursor\.features\b' -- '*.nix' ':!.cursor' ':!nix/devenv-modules' ':!.maestro' ':!history' ':!docs' 2>/dev/null || true)"
+  [ -z "$other_ns" ] || { say "$other_ns" | sed 's/^/  still uses cursor.features: /'; die 4 "rename cursor.features in the .nix files above by hand, then re-run"; }
+  git grep -l -E '\bcursor\.features\b' -- ':!*.nix' ':!.cursor' ':!.maestro' ':!history' ':!docs' 2>/dev/null | sed 's/^/  note: prose still mentions cursor.features: /' || true
+  commit "build(devenv): vendor shared devenv modules into nix/devenv-modules
+
+Copied from the .cursor submodule (Industrial/cursor-setup), only the modules
+this repo references:${KEEP_MODULES}. Option namespace cursor.features ->
+local.features. Shared inputs move with them in nix/devenv-modules/devenv.yaml.
+Behaviour is unchanged; the .cursor directory is removed in a later commit." nix/devenv-modules devenv.nix devenv.yaml
+fi
+
+# ---- 2 hooks ------------------------------------------------------------------
+if [ "$NEED_HOOKS" = 1 ]; then
+  step "2 hooks"
+  cp "$TPL/with-devenv.nix" "$D/with-devenv.nix"
+  sed -i 's#^  imports = \[#  imports = [\n    ./with-devenv.nix#' "$D/devenv.nix"
+  if [ -f "$D/features/git-hooks-prek.nix" ]; then
+    cp "$TPL/no-hooks-on-shell-entry.nix" "$D/no-hooks-on-shell-entry.nix"
+    sed -i 's#^    ./with-devenv.nix#    ./with-devenv.nix\n    ./no-hooks-on-shell-entry.nix#' "$D/devenv.nix"
+    sed -i -E 's#entry = "(pre-commit|pre-push)";#entry = "${config.local.withDevenv}/bin/with-devenv \1";#' "$D/features/git-hooks-prek.nix"
+  fi
+  # repo-level hook entries that re-enter the shell
+  if grep -q 'entry = "devenv shell -- ' devenv.nix; then
+    grep -Eq '^\s*config,' devenv.nix || grep -Eq '\bconfig\b.*\.\.\.' devenv.nix || die 4 "devenv.nix hook entries use 'devenv shell --' but the module takes no 'config' argument; add it by hand, re-run"
+    sed -i -E 's#entry = "devenv shell -- #entry = "${config.local.withDevenv}/bin/with-devenv #' devenv.nix
+  fi
+  mkdir -p bin
+  [ -e bin/with-devenv ] || install -m755 "$TPL/bin-with-devenv" bin/with-devenv
+  # moon tasks that nest a shell entry
+  for m in moon.yml .moon/tasks/*.yml; do
+    [ -f "$m" ] || continue
+    awk "
+      /^    command: 'devenv'\$/ { print \"    command: 'bin/with-devenv'\"; s=1; next }
+      s==1 && /^    args:\$/ { print; s=2; next }
+      s==2 && /^      - 'shell'\$/ { s=3; next }
+      s==3 && /^      - '--'\$/ { s=0; next }
+      { s=0; print }" "$m" > "$STATE/moon.tmp" && cat "$STATE/moon.tmp" > "$m"
+  done
+  commit "fix(dev): git hooks run through with-devenv, and shell entry no longer runs them
+
+Two defects in the shared git-hooks setup, fixed as in ~/.dotfiles (f870ecd4,
+d05ab115):
+- devenv runs devenv:enterShell in --mode all, which pulled in enterTest and
+  through it devenv:git-hooks:run (prek run -a): every devenv shell ran every
+  hook, and prek's tree-wide stash ran with it. That edge is cut.
+- Hook entries entered the shell again (devenv shell -- ..., or bare script
+  names only resolvable inside it), which recursed. They now call
+  config.local.withDevenv, a store binary with the shell's packages and env.
+bin/with-devenv exposes the same wrapper to scripts and agents." nix/devenv-modules devenv.nix bin/with-devenv moon.yml .moon
+fi
+
+# ---- 3 agents -------------------------------------------------------------------
+if [ "$KEEP_AGENTS" = 0 ]; then
+  step "3 agents"
+  for n in $DROP_MODULES; do
+    sed -i -E "/^\s*local\.features\.${n}\.enable\s*=\s*(true|false);\s*(#.*)?\$/d" devenv.nix
+    if grep -Eq "features\.${n}([^a-z0-9-]|\$)|^[[:space:]]*${n}[[:space:]]*=" devenv.nix; then die 4 "devenv.nix still references ${n} (nested form or other use); remove it by hand, re-run"; fi
+  done
+  if [ -n "$WRAPPERS" ]; then
+    for w in $WRAPPERS; do
+      # Rewrite the .mcp.json entry only where one actually starts this wrapper.
+      if [ -f .mcp.json ] && jq -e --arg w "./$w" --arg w2 "$w" '[.mcpServers[]? | select(.command==$w or .command==$w2)] | length > 0' .mcp.json >/dev/null; then
+        cmdline="$(grep -E '^\s*exec devenv shell -- ' "$w" | head -1 | sed -E 's/^\s*exec devenv shell -- //; s/ "\$@"\s*$//')"
+        [ -n "$cmdline" ] || die 4 "$w has no 'exec devenv shell -- <cmd>' line; rewrite its .mcp.json entry by hand"
+        read -r -a parts <<< "$cmdline"
+        args_json="$(printf '%s\n' "${parts[@]:1}" | jq -R . | jq -s 'map(select(length>0))')"
+        jq --arg w "./$w" --arg w2 "$w" --arg c "${parts[0]}" --argjson a "$args_json" \
+          '(.mcpServers[] | select(.command==$w or .command==$w2)) |= (.command=$c | .args=$a | (if .description then .description |= sub("via devenv";"from the system profile") else . end))' \
+          .mcp.json > "$STATE/mcp.json" && cat "$STATE/mcp.json" > .mcp.json
+      fi
+      if git grep -q -F "$(basename "$w")" -- ':!'"$w" ':!.cursor' ':!.maestro' ':!history' ':!docs' 2>/dev/null; then
+        say "  $w is still referenced elsewhere; keeping it"
+      else
+        git rm -q "$w"
+      fi
+    done
+  fi
+  commit "build(devenv): agent tooling comes from the host, not the repo devenv
+
+Dropped:${DROP_MODULES:- none}. lean-ctx, roam-code, maestro, claude-code,
+context7, omniroute and hermes are installed system-wide (~/.dotfiles
+features/ai/*). Every repo shipping its own lean-ctx build meant each rewrote
+the shared ~/.claude hooks to its own store path on MCP start. .mcp.json
+servers call the bare commands." nix/devenv-modules devenv.nix .mcp.json scripts
+fi
+
+# ---- 4 plans --------------------------------------------------------------------
+if [ "${#PLANS[@]}" -gt 0 ]; then
+  step "4 plans"
+  mkdir -p .maestro/missions
+  versioned=0
+  for p in "${PLANS[@]}"; do
+    if git ls-files --error-unmatch "$p" >/dev/null 2>&1; then versioned=$((versioned + 1))
+    elif [ "$CURSOR_KIND" = submodule ] && git -C .cursor ls-files --error-unmatch "${p#.cursor/}" >/dev/null 2>&1; then versioned=$((versioned + 1)); fi
+  done
+  PLANS_LOCAL=0
+  if git check-ignore -q .maestro/missions/probe.plan.md; then
+    # Plans that were never versioned may stay local; versioned ones must not vanish from git.
+    [ "$versioned" = 0 ] || die 4 ".maestro/missions is gitignored here but $versioned plan(s) are versioned; fix .gitignore, re-run"
+    PLANS_LOCAL=1
+  fi
+  for p in "${PLANS[@]}"; do
+    dest=".maestro/missions/$(basename "$p")"
+    [ -e "$dest" ] && dest=".maestro/missions/$(basename "$p" | sed -E 's/(\.[a-z]+)$/-cursor\1/')"
+    if [ "$CURSOR_KIND" = tracked ] && git ls-files --error-unmatch "$p" >/dev/null 2>&1; then git mv "$p" "$dest"; else cp -p "$p" "$dest"; fi
+  done
+  if [ "$PLANS_LOCAL" = 1 ]; then
+    say "  ${#PLANS[@]} unversioned plan(s) copied to .maestro/missions (gitignored here, as they were before)"
+  else
+  commit "chore: move plans from .cursor/plans to .maestro/missions
+
+${#PLANS[@]} plan files. .cursor/ is being removed; Maestro keeps plans beside
+the mission overlays (.maestro/plans is deprecated since maestro 0.100.x)." .maestro/missions .cursor/plans
+  fi
+fi
+
+# ---- 5 cursor --------------------------------------------------------------------
+step "5 cursor"
+remove_submodule() { # remove_submodule <path>
+  local p=$1 name; name="$(submodule_name "$p")"
+  git submodule deinit -q -f -- "$p" 2>/dev/null || true
+  git rm -q -f --cached "$p" 2>/dev/null || true
+  rm -rf "$p"
+  git config -f .gitmodules --remove-section "submodule.$name" 2>/dev/null || true
+  [ -s .gitmodules ] || git rm -q -f .gitmodules 2>/dev/null || rm -f .gitmodules
+  rm -rf "$GITDIR/modules/$name"
+  git config --remove-section "submodule.$name" 2>/dev/null || true
+}
+case "$CURSOR_KIND" in
+  submodule) remove_submodule .cursor ;;
+  tracked) git rm -r -q -f .cursor; rm -rf .cursor ;;
+  untracked) say "  untracked .cursor left for leaf-ide-state" ;;
+esac
+[ -e .cursorignore ] && git rm -q -f .cursorignore 2>/dev/null || true
+if [ "$CURSOR_KIND" != untracked ] && [ "$CURSOR_KIND" != none ]; then
+  commit "chore: remove the .cursor setup
+
+Its devenv modules are vendored in nix/devenv-modules, its plans are in
+.maestro/missions, and its Cursor-IDE agent config is superseded by the
+host-wide ~/.claude harness." .cursor .gitmodules .cursorignore
+fi
+
+# ---- 6 claude --------------------------------------------------------------------
+if [ "$CLAUDE_KIND" = submodule ] && [ "$KEEP_CLAUDE" = 0 ]; then
+  step "6 claude"
+  links=""
+  [ -L .claude ] && [[ "$(readlink .claude)" == *claude-setup* ]] && { git rm -q -f .claude; links=".claude"; }
+  remove_submodule .claude-setup
+  commit "chore: remove the per-project .claude-setup submodule
+
+~/.claude (the ~/.dotfiles harness) applies to every repo on this host, so a
+per-project copy only drifts from it." .claude-setup .gitmodules $links
+fi
+
+# ---- verify --------------------------------------------------------------------
+step "verify"
+left="$(git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' 2>/dev/null || true)"
+[ -z "$left" ] || { say "$left" | sed 's/^/  still references .cursor: /'; say "  (fix by hand; spec AC 3)"; }
+[ -z "$(git ls-files .cursor | head -1)" ] || die 6 ".cursor is still tracked"
+if [ -f devenv.nix ]; then
+  devenv eval packages > "$STATE/packages.after.json" 2>"$STATE/eval.after.err" || { tail -20 "$STATE/eval.after.err"; die 6 "devenv no longer evaluates"; }
+  if [ -f "$STATE/packages.before.json" ]; then
+    jq -r '.packages[]' "$STATE/packages.before.json" | sort > "$STATE/b"; jq -r '.packages[]' "$STATE/packages.after.json" | sort > "$STATE/a"
+    added="$(comm -13 "$STATE/b" "$STATE/a")"; removed="$(comm -23 "$STATE/b" "$STATE/a")"
+    say "  packages: $(wc -l < "$STATE/b") -> $(wc -l < "$STATE/a")"
+    [ -z "$removed" ] || say "$removed" | sed 's#^/nix/store/[a-z0-9]*-#  removed: #'
+    [ -z "$added" ] || { say "$added" | sed 's#^/nix/store/[a-z0-9]*-#  ADDED: #'; die 6 "vendoring changed the package set (additions are unexpected)"; }
+  fi
+fi
+if tracked "$D/with-devenv.nix"; then
+  devenv build git-hooks.configFile > "$STATE/hooks.build" 2>&1 || { tail -20 "$STATE/hooks.build"; die 6 "hook config does not build"; }
+  say "  hook config builds"
+fi
+say
+say "migrated. Next: one shell entry with a prek watch, the repo's test gate via bin/with-devenv, push with hooks."
