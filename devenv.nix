@@ -61,13 +61,6 @@ in {
   # rust-analyzer, clippy, rustfmt and the cargo-* helpers are still cargo's.
   local.features.program-blaze.enable = true;
   local.features.program-moon.enable = true;
-  local.features.program-lean-ctx.enable = true;
-  local.features.program-roam-code.enable = false;
-  local.features.program-roam-code-pypi.enable = true;
-  local.features.program-claude-code.enable = true;
-  local.features.program-maestro.enable = true;
-  local.features.program-context7.enable = true;
-  local.features.program-omniroute.enable = true;
   local.features.program-assay.enable = true;
   local.features.packages-base.enable = true;
   local.features.packages-formatters.enable = true;
