@@ -70,6 +70,26 @@ in
 
     telemetryOff = assay.eq (hasText "metrics = false;") true;
 
+    # Zed 1.28.1 renamed features.edit_prediction_provider to
+    # edit_predictions.provider and flags the old spelling with "Your settings
+    # file uses deprecated settings". The first version of this feature shipped
+    # the old key, so both halves are asserted: the new one present, the old one
+    # gone. A seeded config makes this worth pinning — a wrong key here follows
+    # the file into $HOME and is not fixed by the next deploy.
+    # Asserted against the RENDERED JSON, not the source text: the writeText stub
+    # puts the real settings document into the activation script, and the source
+    # comment legitimately names the old key while explaining the rename. A
+    # substring check on the source would therefore false-fail — the same trap the
+    # cloudcli suite hit matching on paths its comments mention.
+    rendersCurrentEditPredictionKey =
+      assay.eq (activationHas ''"edit_predictions":{"provider":"none"}'') true;
+    rendersNoDeprecatedFeaturesKey = assay.eq (activationHas ''"features"'') false;
+
+    # relative_line_numbers is a boolean in 1.28.1 even though the docs on `main`
+    # describe a string enum. Pinned so a docs-led "fix" has to argue with the
+    # binary's own "Expected relative_line_numbers to be a boolean" first.
+    relativeLineNumbersIsBoolean = assay.eq (hasText "relative_line_numbers = true;") true;
+
     # Seeded, not symlinked: Zed's settings UI writes this file back, and a store
     # symlink would make saving fail. The inverse of the helix feature, on purpose,
     # so these three claims are what stop someone "harmonising" the two later.

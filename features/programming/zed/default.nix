@@ -113,12 +113,25 @@
     # Nothing in this repo is wired to a Zed-hosted model, and leaving the
     # provider unset means the panel does not prompt for credentials on open.
     # Claude Code stays the agent surface — see features/ai/claude-code.
-    features.edit_prediction_provider = "none";
+    #
+    # `edit_predictions.provider`, NOT `features.edit_prediction_provider`. The
+    # latter is what the first version of this file shipped, and Zed 1.28.1 flags
+    # it with "Your settings file uses deprecated settings"; the binary carries a
+    # migrate_edit_prediction_provider_to_edit_predictions transform for exactly
+    # this rename. Checked against the installed binary rather than the docs,
+    # which describe `main` — see the note on relative_line_numbers below.
+    edit_predictions.provider = "none";
 
     vim_mode = false;
     buffer_font_family = "Zed Plex Mono";
     ui_font_size = 16;
     buffer_font_size = 14;
+    # A boolean, pinned to the installed version on purpose. Zed's docs on `main`
+    # document this as the string enum "enabled"/"disabled", but 1.28.1 still
+    # carries the assertion "Expected relative_line_numbers to be a boolean" — so
+    # taking the published docs at face value here would have broken a setting
+    # that currently works. Revisit when zed-editor in nixpkgs crosses that
+    # change; until then the docs and this file disagree for a reason.
     relative_line_numbers = true;
     format_on_save = "on";
     terminal.shell = "system";
