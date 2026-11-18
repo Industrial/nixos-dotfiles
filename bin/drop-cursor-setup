@@ -22,7 +22,8 @@
 #
 # Exit codes: 0 ok · 2 usage · 3 foreign uncommitted edits in a file this tool
 # must change · 4 a reference it cannot rewrite safely (fix by hand, re-run) ·
-# 5 a submodule holds unpushed or uncommitted work · 6 verification failed.
+# 5 a submodule holds unpushed commits · 6 verification failed · 7 a carried
+# foreign edit did not re-apply cleanly (patches kept in .tmp/drop-cursor-setup).
 #
 # It never runs `devenv shell` before step 2 has landed: with the old
 # git-hooks-prek module, shell entry runs every hook across the repo.
@@ -123,21 +124,51 @@ if [ "$CURSOR_KIND" = pending-removal ] && printf '%s\n' "$dirty_critical" | gre
     dirty_critical="$(printf '%s\n' "$dirty_critical" | grep -v ' \.gitmodules$' || true)"
   fi
 fi
+# Foreign uncommitted edits in a file this tool rewrites. Recent ones block
+# (someone may be mid-edit). Stale ones (older than CARRY_MIN_AGE_H, default 72h)
+# are CARRIED: saved as patches, the file reset to HEAD for the migration's
+# own commits, then re-applied with a 3-way merge, so they end up exactly as
+# uncommitted edits again. Patches persist in $STATE until re-applied.
+CARRY=()
 if [ -n "$dirty_critical" ]; then
-  say "$dirty_critical" | sed 's/^/  foreign edit: /'
-  die 3 "uncommitted edits in files this tool must change; commit or wait for their owner"
+  fresh=""
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    f="${line:3}"
+    age=$(( ($(date +%s) - $(stat -c %Y "$f" 2>/dev/null || date +%s)) / 3600 ))
+    if [ "$age" -ge "${CARRY_MIN_AGE_H:-72}" ]; then
+      CARRY+=("$f"); say "  stale foreign edit, ${age}h old, carried through: $line"
+    else fresh="$fresh$line (${age}h old)"$'\n'; fi
+  done <<< "$dirty_critical"
+  if [ -n "$fresh" ]; then
+    printf '%s' "$fresh" | sed 's/^/  foreign edit: /'
+    die 3 "recent uncommitted edits in files this tool must change; commit or wait for their owner"
+  fi
 fi
-check_sub() { # check_sub <path>: refuse when a submodule holds work that removal would lose
+SUB_BACKUP=()
+check_sub() { # check_sub <path>: refuse only for unpushed commits; local files are backed up
   local p=$1 st ahead
   [ -e "$p/.git" ] || { say "  $p: not checked out"; return 0; }
   if ! git -C "$p" rev-parse HEAD >/dev/null 2>&1; then say "  $p: broken gitfile (no repository); removal is safe"; return 0; fi
+  git -C "$p" fetch -q 2>/dev/null || true # stale remote-tracking refs make pushed commits look unpushed
   # Untracked plans are copied out in step 4; untracked devenv state is regenerated.
   st="$(git -C "$p" status --porcelain --untracked-files=all |
     grep -v -E '^\?\? (plans/|(.*/)?\.devenv/|(.*/)?\.direnv/|(.*/)?devenv\.lock$|(.*/)?\.devenv\.flake\.nix$)' || true)"
   ahead="$(git -C "$p" log --oneline HEAD --not --remotes 2>/dev/null | head -5 || true)"
-  [ -z "$st" ] || { say "$st" | sed "s|^|  $p dirty: |"; return 1; }
   [ -z "$ahead" ] || { say "$ahead" | sed "s|^|  $p unpushed: |"; return 1; }
-  say "  $p: clean, no unpushed commits"
+  if [ -n "$st" ]; then
+    say "$st" | sed "s|^|  $p local change, backed up before removal: |" | head -n 20
+    SUB_BACKUP+=("$p")
+  else say "  $p: clean, no unpushed commits"; fi
+}
+backup_sub() { # backup_sub <path>: tracked diff + untracked files into $STATE/backup/<path>
+  local p=$1 dest="$STATE/backup/$1" f
+  [ -e "$p/.git" ] && git -C "$p" rev-parse HEAD >/dev/null 2>&1 || return 0
+  mkdir -p "$dest"
+  git -C "$p" diff --binary > "$dest.tracked.diff" || true
+  git -C "$p" ls-files --others --exclude-standard | grep -v -E '(^|/)(\.devenv|\.direnv)/|devenv\.lock$' |
+    while IFS= read -r f; do mkdir -p "$dest/$(dirname "$f")" && cp -p "$p/$f" "$dest/$f"; done
+  say "  backed up $p local changes to $dest (+ .tracked.diff)"
 }
 # Never remove the .claude-setup that ~/.claude itself resolves into: in
 # ~/.dotfiles it is the host-wide harness, not a per-project copy.
@@ -151,7 +182,7 @@ blocked=0
 [ "$CURSOR_KIND" = submodule ] && { check_sub .cursor || blocked=1; }
 [ "$CLAUDE_KIND" = submodule ] && [ "$KEEP_CLAUDE" = 0 ] && { check_sub .claude-setup || blocked=1; }
 [ "$blocked" = 0 ] || die 5 "a submodule holds work that removing it would lose"
-say "  critical files clean: $CRITICAL"
+[ "${#CARRY[@]}" -gt 0 ] || say "  critical files clean: $CRITICAL"
 
 # ---- plan what will happen -----------------------------------------------------
 # Each step is gated on its own committed result, so a re-run after a stop
@@ -192,6 +223,23 @@ git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**
 
 mkdir -p "$STATE"
 git check-ignore -q "$STATE/probe" || say "  note: .tmp/ is not gitignored here; state goes to $STATE (never committed: commits are pathspec-limited)"
+
+# submodule work that removal would delete: keep a copy
+for p in "${SUB_BACKUP[@]}"; do backup_sub "$p"; done
+
+# stale foreign edits: set aside so the migration commits only its own changes
+if [ "${#CARRY[@]}" -gt 0 ]; then
+  step "carry: set aside ${#CARRY[@]} stale foreign edit(s)"
+  if [ -e "$STATE/carry.staged.patch" ] || [ -e "$STATE/carry.unstaged.patch" ]; then
+    die 4 "carry patches from an earlier run are still pending in $STATE; re-apply or remove them first"
+  fi
+  git diff --cached --binary -- "${CARRY[@]}" > "$STATE/carry.staged.patch"
+  git diff --binary -- "${CARRY[@]}" > "$STATE/carry.unstaged.patch"
+  printf '%s\n' "${CARRY[@]}" > "$STATE/carry.files"
+  git reset -q -- "${CARRY[@]}"
+  git checkout -q HEAD -- "${CARRY[@]}" 2>/dev/null || true
+  say "  saved to $STATE/carry.{staged,unstaged}.patch; files reset to HEAD"
+fi
 
 # ---- baseline (eval only: no shell entry) -----------------------------------------
 step "baseline: devenv eval packages"
@@ -435,6 +483,36 @@ fi
 if tracked "$D/with-devenv.nix"; then
   devenv build git-hooks.configFile > "$STATE/hooks.build" 2>&1 || { tail -20 "$STATE/hooks.build"; die 6 "hook config does not build"; }
   say "  hook config builds"
+fi
+
+# ---- carry back ------------------------------------------------------------------
+# Put the set-aside foreign edits back as they were: staged parts staged,
+# unstaged parts unstaged, on top of the migrated files.
+if [ -s "$STATE/carry.staged.patch" ] || [ -s "$STATE/carry.unstaged.patch" ]; then
+  step "carry back"
+  conflict=0
+  if [ -s "$STATE/carry.staged.patch" ]; then
+    git apply --3way --index "$STATE/carry.staged.patch" 2>"$STATE/carry.err" || conflict=1
+  fi
+  if [ -s "$STATE/carry.unstaged.patch" ]; then
+    staged_files="$(git diff --cached --name-only)"
+    if ! git apply "$STATE/carry.unstaged.patch" 2>>"$STATE/carry.err"; then
+      # context moved: merge 3-way, then unstage what only the unstaged patch touched
+      git apply --3way "$STATE/carry.unstaged.patch" 2>>"$STATE/carry.err" || conflict=1
+      git apply --numstat "$STATE/carry.unstaged.patch" | awk '{print $3}' | while IFS= read -r f; do
+        printf '%s\n' "$staged_files" | grep -qx "$f" || git restore -q --staged -- "$f" 2>/dev/null || true
+      done
+    fi
+  fi
+  if [ "$conflict" = 1 ]; then
+    sed 's/^/  /' "$STATE/carry.err"
+    die 7 "a carried edit did not re-apply cleanly; resolve the conflict markers, then remove $STATE/carry.*.patch"
+  fi
+  mapfile -t carried < "$STATE/carry.files" 2>/dev/null || carried=()
+  [ "${#carried[@]}" -eq 0 ] || git status --porcelain -- "${carried[@]}" | sed "s/^/  restored: /"
+  for k in staged unstaged; do
+    if [ -e "$STATE/carry.$k.patch" ]; then mv "$STATE/carry.$k.patch" "$STATE/carry.$k.patch.applied"; fi
+  done
 fi
 say
 say "migrated. Next: one shell entry with a prek watch, the repo's test gate via bin/with-devenv, push with hooks."

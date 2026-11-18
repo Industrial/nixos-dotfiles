@@ -55,6 +55,27 @@ check "repo without .cursor is a no-op" 0 "$TOOL" "$E" --apply
 grep -q "already migrated" "$T/test.out" && { pass=$((pass + 1)); echo "PASS no-op says 'already migrated'"; } || { fail=$((fail + 1)); echo "FAIL no-op message"; }
 
 rm -rf "$R" "$E"
+
+# FULL=1: a stale foreign edit is carried through a real --apply (minutes: devenv eval)
+if [ "${FULL:-0}" = 1 ]; then
+    C="$T/test-carry"
+    fresh "$C"
+    printf '\n# foreign stale edit (carry test)\n' >> "$C/devenv.nix"
+    touch -d '5 days ago' "$C/devenv.nix"
+    check "stale foreign edit is carried through --apply" 0 "$TOOL" "$C" --apply --keep-claude-setup
+    if git -C "$C" log -p 6d7d1c4f..HEAD -- devenv.nix | grep -q 'carry test'; then
+        fail=$((fail + 1)); echo "FAIL the carried edit leaked into a commit"
+else pass=$((pass + 1)); echo "PASS no commit contains the carried edit"; fi
+    if tail -n 2 "$C/devenv.nix" | grep -q 'carry test' && git -C "$C" diff --name-only | grep -qx devenv.nix &&
+    ! git -C "$C" diff --cached --name-only | grep -qx devenv.nix; then
+        pass=$((pass + 1)); echo "PASS the edit is back, unstaged, on top of the migrated file"
+else fail=$((fail + 1)); echo "FAIL the carried edit was not restored as an unstaged change"; fi
+    if git -C "$C" show HEAD:devenv.nix | grep -q 'local.features'; then
+        pass=$((pass + 1)); echo "PASS the committed devenv.nix is migrated"
+else fail=$((fail + 1)); echo "FAIL committed devenv.nix not migrated"; fi
+    rm -rf "$C"
+fi
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]
