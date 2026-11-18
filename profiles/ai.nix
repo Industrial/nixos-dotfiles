@@ -17,6 +17,11 @@
   imports = [
     # ../features/ai/anythingllm-desktop
     ../features/ai/claude-code
+    # CloudCLI — browser front end for the Claude Code sessions this host already
+    # has. Lives in the profile rather than per-host, unlike openhands below: it
+    # reads ~/.claude in place, so it is useful wherever claude-code is, and both
+    # drakkar and muninn import this profile. Binds 127.0.0.1:3001.
+    ../features/ai/cloudcli
     # ../features/ai/litellm
     # ../features/ai/lmstudio
     # ../features/ai/n8n
