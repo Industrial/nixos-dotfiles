@@ -1,4 +1,4 @@
-# Consumer devenv: enable shared `.cursor/nix` features; keep project-only packages/hooks here.
+# Consumer devenv: enable shared `nix/devenv-modules` features; keep project-only packages/hooks here.
 {
   inputs,
   pkgs,
@@ -51,31 +51,31 @@
   };
   hookCmd = cmd: "${withDevenv}/bin/with-devenv ${cmd}";
 in {
-  imports = [./.cursor/nix];
+  imports = [./nix/devenv-modules];
 
   name = "dotfiles";
 
-  # Shared programs / packages from Industrial/cursor-setup (.cursor/nix).
+  # Shared programs / packages from Industrial/cursor-setup (nix/devenv-modules).
   # blaze is the default Rust build/check/run/test command (see moon.yml). It
   # ships its own toolchain, so languages-rust and packages-rust-dev stay on:
   # rust-analyzer, clippy, rustfmt and the cargo-* helpers are still cargo's.
-  cursor.features.program-blaze.enable = true;
-  cursor.features.program-moon.enable = true;
-  cursor.features.program-lean-ctx.enable = true;
-  cursor.features.program-roam-code.enable = false;
-  cursor.features.program-roam-code-pypi.enable = true;
-  cursor.features.program-claude-code.enable = true;
-  cursor.features.program-maestro.enable = true;
-  cursor.features.program-context7.enable = true;
-  cursor.features.program-omniroute.enable = true;
-  cursor.features.program-assay.enable = true;
-  cursor.features.packages-base.enable = true;
-  cursor.features.packages-formatters.enable = true;
-  cursor.features.packages-rust-dev.enable = true;
-  cursor.features.languages-javascript.enable = true;
-  cursor.features.languages-rust.enable = true;
-  cursor.features.dotenv.enable = true;
-  cursor.features.git-hooks-prek.enable = true;
+  local.features.program-blaze.enable = true;
+  local.features.program-moon.enable = true;
+  local.features.program-lean-ctx.enable = true;
+  local.features.program-roam-code.enable = false;
+  local.features.program-roam-code-pypi.enable = true;
+  local.features.program-claude-code.enable = true;
+  local.features.program-maestro.enable = true;
+  local.features.program-context7.enable = true;
+  local.features.program-omniroute.enable = true;
+  local.features.program-assay.enable = true;
+  local.features.packages-base.enable = true;
+  local.features.packages-formatters.enable = true;
+  local.features.packages-rust-dev.enable = true;
+  local.features.languages-javascript.enable = true;
+  local.features.languages-rust.enable = true;
+  local.features.dotenv.enable = true;
+  local.features.git-hooks-prek.enable = true;
 
   # Project-only packages (not in shared features).
   packages = with pkgs; [

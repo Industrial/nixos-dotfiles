@@ -1,8 +1,8 @@
-# Shared Industrial features: `.cursor/nix` (cursor-setup submodule).
+# Shared Industrial features: `nix/devenv-modules` (cursor-setup submodule).
 # Project-only flake inputs stay here.
 imports:
-  - ./.cursor/nix
-# claude-code is unfree; permit it explicitly (cursor.features.program-claude-code).
+  - ./nix/devenv-modules
+# claude-code is unfree; permit it explicitly (local.features.program-claude-code).
 nixpkgs:
   permittedUnfreePackages:
     - claude-code
