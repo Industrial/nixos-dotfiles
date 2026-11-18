@@ -1,4 +1,4 @@
-local MAJ, REV, COMPAT, _, T = 1, 18, select(4,GetBuildInfo()), ...
+local MAJ, REV, COMPAT, _, T = 1, 19, select(4,GetBuildInfo()), ...
 if T.SkipLocalActionBook then return end
 local _GG = _G
 if T.TenEnv then T.TenEnv() end
@@ -53,7 +53,7 @@ local GetModernTalentSpells do
 	end
 	function GetModernTalentSpells()
 		local s
-		if MODERN then
+		if MODERN or CI_4E then
 			local cid = C_ClassTalents.GetActiveConfigID()
 			if not cid then
 				local spec = GetSpecializationInfo(GetSpecialization())

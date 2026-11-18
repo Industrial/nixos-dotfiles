@@ -11,7 +11,6 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 
 local ROW_HEIGHT = AM.Native.ROW_HEIGHT -- as in the lists of the auction house
 local DETAIL_WIDTH = 278
-local MENU_MAX_HEIGHT = 400 -- of a dropdown menu before it scrolls
 -- Columns from the right edge of a row: width of each. The name takes up the rest.
 local COLUMN_ORDER = { "inAH", "profit", "market", "lowest", "cost", "crafter" }
 -- wide enough for prices in the font of the auction house's rows (14 pt)
@@ -119,12 +118,32 @@ local function Compare(a, b)
   return a.key < b.key
 end
 
+-- Without a character filter each recipe once, at its crafter (RecipeList.MarkCrafters); with one every recipe the
+-- character knows.
+local function IsShownFor(entry, who)
+  if who then
+    return entry.guid == who
+  end
+  return entry.primary
+end
+
+-- The number of recipes, each once.
+local function CountRecipes()
+  local count = 0
+  for _, entry in ipairs(entries) do
+    if entry.primary then
+      count = count + 1
+    end
+  end
+  return count
+end
+
 local function Filter()
   local settings = GetSettings()
   local query = ui.query or ""
   visible = {}
   for _, entry in ipairs(entries) do
-    if (not settings.who or entry.guid == settings.who)
+    if IsShownFor(entry, settings.who)
       and (not settings.profession or entry.skillLine == settings.profession)
       and (query == "" or (entry.name and entry.name:lower():find(query, 1, true)))
       and (not IsFilterOn(settings, "hideLoss") or entry.advice ~= "loss")
@@ -282,48 +301,8 @@ end
 
 local CLASS_ICONS = "Interface\\GLUES\\CHARACTERCREATE\\UI-CHARACTERCREATE-CLASSES"
 
--- The text of a dropdown choice: icon, label and, in the menu, the number of recipes behind it.
-local function ChoiceText(choice, withCount)
-  local text = choice.label
-  if choice.icon then
-    local c = choice.iconCoords
-    local icon = c and ("|T%s:16:16:0:0:256:256:%d:%d:%d:%d|t "):format(choice.icon, c[1] * 256, c[2] * 256,
-      c[3] * 256, c[4] * 256) or ("|T%s:16|t "):format(choice.icon)
-    text = icon .. text
-  end
-  if withCount and choice.count then
-    text = text .. " |cff9d9d9d" .. choice.count .. "|r"
-  end
-  return text
-end
-
--- A dropdown of the game (WowStyle1DropdownTemplate) with a radio menu. SetChoices takes { value, label, count,
--- icon, iconCoords } entries (the first one, with a nil value, stands for "all") and the selected value; onSelect
--- gets the value picked. dropdown.button is the frame to place.
 local function CreateDropdown(width, onSelect)
-  local dropdown = { choices = {} }
-  local button = CreateFrame("DropdownButton", nil, ui.filters, "WowStyle1DropdownTemplate")
-  button:SetWidth(width)
-  button:SetSelectionTranslator(function(selection)
-    return ChoiceText(selection.data, false)
-  end)
-  button:SetupMenu(function(_, root)
-    for _, choice in ipairs(dropdown.choices) do
-      root:CreateRadio(ChoiceText(choice, true), function()
-        return choice.value == dropdown.selected
-      end, function()
-        onSelect(choice.value)
-      end, choice)
-    end
-    root:SetScrollMode(MENU_MAX_HEIGHT)
-  end)
-  dropdown.button = button
-
-  function dropdown.SetChoices(choices, selected)
-    dropdown.choices, dropdown.selected = choices, selected
-    button:GenerateMenu()
-  end
-  return dropdown
+  return Widgets.CreateDropdown(ui.filters, width, onSelect)
 end
 
 -- Profession and character dropdowns. A value that has no recipes any more cannot stay selected.
@@ -344,7 +323,7 @@ local function UpdateDropdowns()
     ui.charactersButton:SetPoint("LEFT", ui.characterDropdown.button, "RIGHT", 0, 0)
   end
 
-  local choices, found = { { label = L["RECIPES_ALL_PROFESSIONS"], count = #entries } }, false
+  local choices, found = { { label = L["RECIPES_ALL_PROFESSIONS"], count = CountRecipes() } }, false
   for _, profession in ipairs(professions) do
     choices[#choices + 1] = { value = profession.skillLine, label = profession.name, icon = profession.icon,
       count = profession.count }
@@ -358,7 +337,9 @@ local function UpdateDropdowns()
   for _, entry in ipairs(entries) do
     if not settings.profession or entry.skillLine == settings.profession then
       counts[entry.guid] = (counts[entry.guid] or 0) + 1
-      total = total + 1
+      if entry.primary then
+        total = total + 1
+      end
     end
   end
   choices, found = { { label = L["RECIPES_ALL"], count = total } }, false
@@ -756,6 +737,6 @@ AM.MainWindow.RegisterTab({
   refresh = Refresh,
   count = function()
     EnsureBuilt()
-    return #entries
+    return CountRecipes()
   end,
 })

@@ -28,7 +28,8 @@ local function LastSuccess()
   return AM.Scan.GetLastSuccess()
 end
 
--- "Last scan: just now", else the age in its largest unit: "Last scan: 12 Min ago", "Last scan: 3 Hr ago".
+-- "Just now", else the age in its largest unit: "12 Min ago", "3 Hr ago". Short, so it stays clear of the game's bid
+-- input (Buy tab and Auctions tab, items that can be bid on), which shares the bottom strip with it.
 local function FormatAge(timestamp)
   local age = time() - timestamp
   if age < 60 then

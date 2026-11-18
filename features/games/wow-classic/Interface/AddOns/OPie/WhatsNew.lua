@@ -1,7 +1,7 @@
 local _, T = ...
 
 function T.WhatsNewData(vh, uv, li)
-	vh("v8.10.3")
+	vh("v8.10.4")
 	uv("Compatibility improvements for WoW: Forever.")
 	vh("v8.10")
 	uv("<tt>/pingspell</tt> and <tt>/pingitem</tt> now provide feedback when used in OPie macros.")

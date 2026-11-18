@@ -1,6 +1,6 @@
 ## Interface: 11509, 20506, 38002, 50504
 ## Title: QuestieTrace
-## Version: 1.11.0
+## Version: 1.12.0
 ## Author: Logon/TheCrux(BreakBB)
 ## Notes: Data collection addon for Questie
 ## Notes-deDE: Datensammlungs-Addon für Questie

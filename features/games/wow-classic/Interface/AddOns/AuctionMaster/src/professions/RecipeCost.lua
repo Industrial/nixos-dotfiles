@@ -149,8 +149,7 @@ end
 -- the auction price already reduced by the auction house cut. The auction price is the lowest one
 -- of the latest scan (basis "lowest", what it most likely sells for), or the market price (basis
 -- "market") while no auction is listed. Nil if there is no price.
-local function GetOutputValue(itemId)
-  local itemDbKey = AM.ItemDbKey.ForCrafted(itemId)
+local function GetValue(itemDbKey, itemId)
   local market = itemDbKey and AM.ItemStore.GetMarketPrice(itemDbKey)
   local lowest = itemDbKey and AM.ItemStore.Get(itemDbKey)
   local auction = lowest or (market and market.price)
@@ -168,8 +167,27 @@ local function GetOutputValue(itemId)
   return nil
 end
 
+local function GetOutputValue(itemId)
+  return GetValue(AM.ItemDbKey.ForCrafted(itemId), itemId)
+end
+
 function RecipeCost.IsStale(age)
   return age ~= nil and age > STALE_SECONDS
+end
+
+-- What one of the item (itemDbKey) sells for now, in copper: the auction price after the cut (as GetValue), or what a
+-- merchant pays when that is more. An auction price older than a day does not count (nothing is guessed from old
+-- data): then only the merchant's price, nil without one.
+function RecipeCost.GetSellValue(itemDbKey)
+  local itemId = itemDbKey and AM.ItemDbKey.GetItemId(itemDbKey)
+  local value = itemId and GetValue(itemDbKey, itemId)
+  if not value then
+    return nil
+  end
+  if value.source == "market" and RecipeCost.IsStale(value.age) then
+    return value.vendor
+  end
+  return math.floor(value.price)
 end
 
 -- Returns for one craft of the recipe:

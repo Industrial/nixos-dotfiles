@@ -13,7 +13,7 @@
 ## Notes-koKR: Questie 데이터베이스
 ## Notes-zhCN: Questie 数据库
 ## Notes-zhTW: Questie 資料庫
-## Version: 1.1.1
+## Version: 1.1.2
 ## Category: Quests
 ## Category-deDE: Quests
 ## Category-esES: Misiones
@@ -29,7 +29,7 @@
 ## X-Contract-Version: 4
 ## X-Flavor: Wrath
 ## X-Mode: baked
-## X-BUILD-COMMIT: 4dbb82440a27856f8dccf57094a5d792cdc7cc9b
+## X-BUILD-COMMIT: e1652ce62113c152da682baf2d6fb85f1396bcfb
 ## X-BUILD-TIME: 2023-11-14T22:13:20Z
 
 src\config.lua
@@ -9009,7 +9009,7 @@ src\support\eraToForever.lua
 ## X-Quest-1918-3: gYEZMcE=
 ## X-Quest-1918-8: gVhTQnJpbmcgdGhlIEJlZm91bGVkIFdhdGVyIEdsb2JlIHRvIE1hc3RvayBXcmlsZWhpc3MgYXQgU3BsaW50ZXJ0cmVlIFBvc3QsIEFzaGVudmFsZS4=
 ## X-Quest-1918-26: gYIYTBgZ
-## X-Quest-1918-S: qAFUVGhlIEJlZm91bGVkIEVsZW1lbnQEFwUYGwYZArILGUAYERkBSxYZAzhBcBoCAACG
+## X-Quest-1918-S: qQFUVGhlIEJlZm91bGVkIEVsZW1lbnQEFwUYGwYZArILGUAYERkBSxYZAzgYIhgZQXAaAgAAhg==
 ## X-Quest-1919-2: gYMZAUgZBMwZHJA=
 ## X-Quest-1919-3: gYEZFXk=
 ## X-Quest-1919-8: gVgmU3BlYWsgd2l0aCBKZW5uZWEgQ2Fubm9uIGluIFN0b3Jtd2luZC4=
@@ -61412,9 +61412,8 @@ src\support\eraToForever.lua
 ## X-Npc-3474-S: pwFLTGFrb3RhJ21hbmkEFgUWCREMDw1CQUhBcBjA
 ## X-Npc-3475-7: oRGBgvtAS+4UeuFHrvtAMTCj1wo9cQ==
 ## X-Npc-3475-S: pgFJRWNoZXlha2VlBBAFEAkRDBhCQXAYQA==
-## X-Npc-3476-7: oRGPghg/+0BKMzMzMzMzgvtAT7MzMzMzM/tASRmZmZmZmoL7QE+zMzMzMzP7QEqzMzMzMzOC+0BPszMzMzMz+0BKzMzMzMzNgvtAT8zMzMzMzftASrMzMzMzM4L7QE/MzMzMzM37QErMzMzMzM2CGEAYNIL7QFAMzMzMzM37QElMzMzMzM2C+0BQGZmZmZma+0BJMzMzMzMzgvtAUCZmZmZmZvtASMzMzMzMzYL7QFAmZmZmZmb7QElmZmZmZmaC+0BQTMzMzMzN+0BHzMzMzMzNgvtAUFmZmZmZmvtAR5mZmZmZmoL7QFBmZmZmZmb7QEdmZmZmZmaC+0BQZmZmZmZm+0BH5mZmZmZm
-## X-Npc-3476-8: oRGBioL7QE/GZmZmZmb7QEpcKPXCj1yC+0BP6uFHrhR7+0BJ1mZmZmZmgvtAUAeuFHrhSPtASVCj1wo9cYL7QFA9cKPXCj37QEi4UeuFHriC+0BQP1wo9cKP+0BIY9cKPXCkgvtAUD1wo9cKPftASLhR64UeuIL7QFAHrhR64Uj7QElQo9cKPXGC+0BP6uFHrhR7+0BJ1mZmZmZmgvtAT8ZmZmZmZvtASlwo9cKPXIL7QE/D1wo9cKT7QErszMzMzM0=
-## X-Npc-3476-S: pgFJSXNoYSBBd2FrBBgbBRgbCREMEEFwGMA=
+## X-Npc-3476-7: oRGDgvtAT8ZmZmZmZvtASvhR64UeuIL7QFBfXCj1wo/7QEeXCj1wo9eC+0BQCPXCj1wp+0BJb1wo9cKP
+## X-Npc-3476-S: pgFJSXNoYSBBd2FrBBgbBRgbCREMEEFwGEA=
 ## X-Npc-3477-7: oRGBgvtASZCj1wo9cftAPPXCj1wo9g==
 ## X-Npc-3477-S: qQFESHJhcQQSBRIJEQwYHQ1BSA5WQmxhY2tzbWl0aGluZyBTdXBwbGllcw8ZEIJBcBhA
 ## X-Npc-3478-7: oRGBgvtASaZmZmZmZvtAPOj1wo9cKQ==
@@ -185428,7 +185427,8 @@ src\support\eraToForever.lua
 ## X-Object-164689-3: gRkO2g==
 ## X-Object-164689-4: oRkGMYGCICA=
 ## X-Object-164689-S: owFYIU1vbnVtZW50IG9mIEZyYW5jbG9ybiBGb3JnZXdyaWdodAUZBjFBcAw=
-## X-Object-164690-S: gVFLcm9tJ3phcidzIEJhbm5lcg==
+## X-Object-164690-4: oRGBgvtARkPXCj1wpPtAPCZmZmZmZg==
+## X-Object-164690-S: owFRS3JvbSd6YXIncyBCYW5uZXIFEUFwCA==
 ## X-Object-164699-S: gUxSb2FyaW5nIEZpcmU=
 ## X-Object-164700-S: gUxSb2FyaW5nIEZpcmU=
 ## X-Object-164701-S: gUxSb2FyaW5nIEZpcmU=

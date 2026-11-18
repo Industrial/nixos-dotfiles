@@ -11,7 +11,8 @@ AM.MerchantScanner = MerchantScanner
 
 -- Returns price, quantity, hasExtendedCost, numAvailable of the merchant item at index, nil
 -- if the slot is empty or not purchasable. Retail returns a table, older clients a tuple.
-local function GetMerchantItem(index)
+-- Price is for quantity items (one stack as the merchant sells it). Also read by the ledger.
+function MerchantScanner.GetMerchantItem(index)
   if C_MerchantFrame and C_MerchantFrame.GetItemInfo then
     local info = C_MerchantFrame.GetItemInfo(index)
     if not info or not info.isPurchasable then
@@ -32,7 +33,7 @@ local function Scan()
   local stock = AM.Database.GetFactionObject("vendorStock")
 
   for index = 1, GetMerchantNumItems() do
-    local price, quantity, hasExtendedCost, numAvailable = GetMerchantItem(index)
+    local price, quantity, hasExtendedCost, numAvailable = MerchantScanner.GetMerchantItem(index)
     local link = GetMerchantItemLink(index)
     if link and price and price > 0 and not hasExtendedCost then
       local itemId = C_Item.GetItemInfoInstant(link)

@@ -13,54 +13,18 @@ AM.ProfessionScanner = ProfessionScanner
 local SCAN_DELAY = 0.5
 local scanPending = false
 
--- The GUIDs of the characters of the current auction house (guid -> true): the current one and those with recipes,
--- bags or mail recorded for it. Decides which entries of the objects that used to be account-wide belong here.
-function ProfessionScanner.GetHouseGuids()
-  local guids = { [UnitGUID("player")] = true }
-  for _, recipes in pairs(AM.Database.GetFactionObject("recipes")) do
-    for _, recipe in ipairs(recipes) do
-      for _, guid in ipairs(recipe.crafters) do
-        guids[guid] = true
-      end
-    end
-  end
-  for _, name in ipairs({ "inventory", "mail" }) do
-    for guid in pairs(AM.Database.GetFactionObject(name)) do
-      guids[guid] = true
-    end
-  end
-  return guids
-end
-
 -- Objects keyed by GUID that were account-wide and are kept per auction house now: their old entries move over once
 -- per session (a change of auction house means a new login).
 local adopted = {}
 local function GetHouseObject(name)
   if not adopted[name] then
     adopted[name] = true
-    local here = ProfessionScanner.GetHouseGuids()
+    local here = AM.Characters.GetHouseGuids()
     AM.Database.AdoptGlobalEntries(name, function(guid)
       return here[guid]
     end)
   end
   return AM.Database.GetFactionObject(name)
-end
-
--- Characters are kept by their GUID, which survives a rename. The faction object "characters" maps the GUID to
--- { name, realm, class } (class being the class file, e.g. "MAGE") for showing it, for the characters of the current
--- auction house.
-function ProfessionScanner.GetCharacters()
-  return GetHouseObject("characters")
-end
-
-local function GetCharacter()
-  local guid = UnitGUID("player")
-  local name, realm = UnitFullName("player")
-  if not realm or realm == "" then
-    realm = GetNormalizedRealmName()
-  end
-  ProfessionScanner.GetCharacters()[guid] = { name = name, realm = realm, class = select(2, UnitClass("player")) }
-  return guid
 end
 
 -- A character or single professions of it can be ignored (the faction object "ignored": GUID -> { all = true,
@@ -135,7 +99,6 @@ end
 -- professions = { { skillLine, name, icon, ignored } sorted by name } }, sorted by name. Professions are the ones
 -- the recipes are recorded under (those that have a stored name), ignored ones included.
 function ProfessionScanner.GetKnownProfessions()
-  local characters = AM.ProfessionScanner.GetCharacters()
   local names = AM.Database.GetGlobalObject("professions")
   local icons = AM.Database.GetGlobalObject("professionIcons")
   local byGuid, list = {}, {}
@@ -143,11 +106,11 @@ function ProfessionScanner.GetKnownProfessions()
     for _, entry in ipairs(recipes) do
       local skillLine = entry.skillLine
       for _, guid in ipairs(entry.crafters) do
-        local character = characters[guid]
-        if type(character) == "table" then
+        local name, class = AM.Characters.Get(guid)
+        if name then
           local known = byGuid[guid]
           if not known then
-            known = { guid = guid, name = AM.RecipeList.GetCharacterName(character), class = character.class,
+            known = { guid = guid, name = name, class = class,
               ignored = ProfessionScanner.IsCharacterIgnored(guid), professions = {}, seen = {} }
             byGuid[guid] = known
             list[#list + 1] = known
@@ -338,7 +301,7 @@ local function Scan()
     return
   end
   local recipes = AM.Database.GetFactionObject("recipes")
-  local character = GetCharacter()
+  local character = AM.Characters.RecordCurrent()
   if AM.ShoppingList.IsRetail() then
     ScanRetail(recipes, character)
   elseif GetNumTradeSkills then

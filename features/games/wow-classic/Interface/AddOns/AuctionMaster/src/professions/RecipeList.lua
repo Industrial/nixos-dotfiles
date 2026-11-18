@@ -1,7 +1,9 @@
 local addonName, AM = ...
 
 -- The recipes of all characters of the faction for the Recipes tab (see RecipesTab.lua): one entry per
--- recipe and character knowing it, with cost, value and profit at the prices of the latest scan. No UI.
+-- recipe and character knowing it, with cost, value and profit at the prices of the latest scan. Of the characters
+-- knowing a recipe one is its crafter (MarkCrafters), so the list without a character filter shows each recipe once.
+-- No UI.
 AM.RecipeList = {}
 local RecipeList = AM.RecipeList
 
@@ -40,11 +42,45 @@ local function CopyReagents(reagents)
   return copy
 end
 
-function RecipeList.GetCharacterName(character)
-  if character.realm and character.realm ~= GetNormalizedRealmName() then
-    return character.name .. "-" .. character.realm
+-- Marks one entry per recipe as `primary`: the one of the character playing (`playerGuid`) if they know it, else of
+-- the character who knows the most recipes of that profession (recipes without a profession count as one), then the
+-- most recipes overall, then by name and guid. All other entries of the recipe get `primary = false`.
+function RecipeList.MarkCrafters(entries, playerGuid)
+  local perProfession, overall = {}, {}
+  for _, entry in ipairs(entries) do
+    local profession = entry.skillLine or 0
+    local counts = perProfession[profession]
+    if not counts then
+      counts = {}
+      perProfession[profession] = counts
+    end
+    counts[entry.guid] = (counts[entry.guid] or 0) + 1
+    overall[entry.guid] = (overall[entry.guid] or 0) + 1
   end
-  return character.name
+  local function Better(a, b)
+    if (a.guid == playerGuid) ~= (b.guid == playerGuid) then
+      return a.guid == playerGuid
+    end
+    local counts = perProfession[a.skillLine or 0]
+    if counts[a.guid] ~= counts[b.guid] then
+      return counts[a.guid] > counts[b.guid]
+    elseif overall[a.guid] ~= overall[b.guid] then
+      return overall[a.guid] > overall[b.guid]
+    elseif a.crafter ~= b.crafter then
+      return a.crafter < b.crafter
+    end
+    return a.guid < b.guid
+  end
+  local best = {}
+  for _, entry in ipairs(entries) do
+    local current = best[entry.recipeId]
+    if not current or Better(entry, current) then
+      best[entry.recipeId] = entry
+    end
+  end
+  for _, entry in ipairs(entries) do
+    entry.primary = best[entry.recipeId] == entry
+  end
 end
 
 -- Returns the entries and the characters that know recipes. An entry is
@@ -56,10 +92,10 @@ end
 --   advice     see GetAdvice
 --   rare       true if the item is listed less than the "rareCount" setting times per scan on average, or never (after a scan)
 --   skillLine  id of the profession (nil if not read yet)
+--   primary    true for the one crafter of the recipe shown without a character filter, see MarkCrafters
 -- a character is { guid, name, class (file name, may be nil), count (entries) }, sorted by the number of entries (most first), then by name,
--- and a profession is { skillLine, name, icon (nil if unknown), count (entries) }, sorted by name.
+-- and a profession is { skillLine, name, icon (nil if unknown), count (recipes, each once) }, sorted by name.
 function RecipeList.Build()
-  local characters = AM.ProfessionScanner.GetCharacters()
   local entries, byGuid = {}, {}
   local hasScan = AM.ItemStore.HasScan()
   -- An item listed on average less often than this per scan (ItemStore's avgCount) is rarely listed.
@@ -87,14 +123,13 @@ function RecipeList.Build()
     for _, recipe in ipairs(recipes) do
       local result
       for _, guid in ipairs(AM.ProfessionScanner.GetActiveCrafters(recipe)) do
-        local character = characters[guid]
-        -- an earlier version stored the bare name, it is replaced when that character scans again
-        if type(character) == "table" then
+        local characterName, class = AM.Characters.Get(guid)
+        if characterName then
           result = result or AM.RecipeCost.Calculate({ id = recipe.id, outputItemId = itemId,
             outputCount = recipe.outputCount, reagents = recipe.reagents })
           local entry = byGuid[guid]
           if not entry then
-            entry = { guid = guid, name = RecipeList.GetCharacterName(character), class = character.class, count = 0 }
+            entry = { guid = guid, name = characterName, class = class, count = 0 }
             byGuid[guid] = entry
           end
           entry.count = entry.count + 1
@@ -111,6 +146,7 @@ function RecipeList.Build()
       end
     end
   end
+  RecipeList.MarkCrafters(entries, UnitGUID("player"))
   local list = {}
   for _, character in pairs(byGuid) do
     list[#list + 1] = character
@@ -129,7 +165,7 @@ function RecipeList.Build()
   local professions, bySkillLine = {}, {}
   for _, entry in ipairs(entries) do
     local skillLine = entry.skillLine
-    if skillLine and names[skillLine] then
+    if entry.primary and skillLine and names[skillLine] then
       local profession = bySkillLine[skillLine]
       if not profession then
         local icon = icons[skillLine] or (C_TradeSkillUI and C_TradeSkillUI.GetTradeSkillTexture

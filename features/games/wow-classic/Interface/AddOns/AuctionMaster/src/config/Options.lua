@@ -316,6 +316,20 @@ StaticPopupDialogs["AUCTIONMASTER_RESET_MARKET_PRICES"] = {
   hideOnEscape = true,
 }
 
+-- Deletes only the ledger of the current faction, after asking.
+StaticPopupDialogs["AUCTIONMASTER_RESET_LEDGER"] = {
+  text = "",
+  button1 = YES,
+  button2 = NO,
+  OnAccept = function()
+    AM.Ledger.Reset()
+  end,
+  timeout = 0,
+  whileDead = true,
+  hideOnEscape = true,
+  showAlert = true,
+}
+
 -- The game opens its popups near the top of the screen, far from the settings page. Ours is
 -- moved to the middle of the settings window. Only this one popup frame is moved, while it is
 -- showing our dialog; the game positions it again the next time it shows anything.
@@ -514,6 +528,80 @@ local function CreateSellPanel()
   return panel
 end
 
+-- The "Ledger" page.
+local function CreateLedgerPanel()
+  local panel = CreateFrame("Frame", nil, SettingsPanel)
+  panel.name = L["OPTIONS_LEDGER"]
+
+  local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
+  title:SetPoint("TOPLEFT", 16, -16)
+  title:SetText(L["OPTIONS_LEDGER"])
+
+  -- Whether the ledger has its tab in the auction house; the bookings go on either way.
+  local tabCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+  tabCheck:SetPoint("TOPLEFT", title, "BOTTOMLEFT", -4, -20)
+  local tabLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+  tabLabel:SetPoint("LEFT", tabCheck, "RIGHT", 4, 0)
+  tabLabel:SetText(L["OPTIONS_SHOW_TAB"])
+  tabCheck:SetScript("OnClick", function(self)
+    AM.MainWindow.SetTabShown("ledger", self:GetChecked())
+  end)
+  tabCheck:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(L["OPTIONS_SHOW_TAB"], 1, 1, 1)
+    GameTooltip:AddLine(L["OPTIONS_LEDGER_TAB_TOOLTIP"], nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  tabCheck:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+
+  -- How many days every entry is kept before it is combined into its day.
+  local keepLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+  keepLabel:SetPoint("TOPLEFT", tabCheck, "BOTTOMLEFT", 4, -16)
+  keepLabel:SetText(L["OPTIONS_LEDGER_KEEP"])
+  local keepDropdown = CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate")
+  keepDropdown:SetWidth(120)
+  keepDropdown:SetPoint("LEFT", keepLabel, "RIGHT", 12, 0)
+  keepDropdown:SetupMenu(function(_, root)
+    for _, days in ipairs(AM.Ledger.KEEP_DAYS) do
+      root:CreateRadio(L["OPTIONS_LEDGER_DAYS"]:format(days), function()
+        return AM.Ledger.GetKeepDays() == days
+      end, function()
+        AM.Ledger.SetKeepDays(days)
+      end)
+    end
+  end)
+  keepDropdown:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText(L["OPTIONS_LEDGER_KEEP"], 1, 1, 1)
+    GameTooltip:AddLine(L["OPTIONS_LEDGER_KEEP_TOOLTIP"], nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  keepDropdown:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+
+  -- Only the ledger of the current faction is cleared, and only after confirming.
+  local resetButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  resetButton:SetSize(190, 22)
+  resetButton:SetPoint("TOPLEFT", keepLabel, "BOTTOMLEFT", 0, -24)
+  resetButton:SetText(L["OPTIONS_RESET_LEDGER"])
+  resetButton:SetScript("OnClick", function()
+    ShowConfirm("AUCTIONMASTER_RESET_LEDGER")
+  end)
+
+  local function Refresh()
+    tabCheck:SetChecked(AM.MainWindow.IsTabShown("ledger"))
+    keepDropdown:GenerateMenu()
+  end
+  panel:SetScript("OnShow", Refresh)
+  panel.OnRefresh = Refresh
+  panel:Hide()
+  HideDefaultsWhileShown(panel)
+  return panel
+end
+
 function Options.Open()
   if category then
     Settings.OpenToCategory(category:GetID())
@@ -549,10 +637,11 @@ end
 AM.Locale.OnReady(function()
   StaticPopupDialogs["AUCTIONMASTER_RESET_MARKET"].text = L["OPTIONS_RESET_CONFIRM"]
   StaticPopupDialogs["AUCTIONMASTER_RESET_MARKET_PRICES"].text = L["OPTIONS_RESET_PRICES_CONFIRM"]
+  StaticPopupDialogs["AUCTIONMASTER_RESET_LEDGER"].text = L["OPTIONS_RESET_LEDGER_CONFIRM"]
   if HAS_OPTIONS and HAS_LAYOUT then
     category = Settings.RegisterCanvasLayoutCategory(CreateMainPanel(), addonName)
     -- The subpages are listed alphabetically in the language of the client.
-    local subpages = { CreateGeneralPanel(), CreateMarketPanel(), CreateSellPanel() }
+    local subpages = { CreateGeneralPanel(), CreateMarketPanel(), CreateSellPanel(), CreateLedgerPanel() }
     table.sort(subpages, function(a, b)
       return strcmputf8i(a.name, b.name) < 0
     end)

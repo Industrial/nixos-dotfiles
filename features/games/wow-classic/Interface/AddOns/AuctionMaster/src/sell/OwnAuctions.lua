@@ -138,15 +138,26 @@ end
 
 -- The order the list shows its entries in: indexes 1..count by rank (getRank(index)), highest first, entries of the same
 -- rank in the order the game gave them, so the sorting chosen in the list's header stays the second criterion.
-function OwnAuctions.BuildSortOrder(count, getRank)
-  local order, ranks = {}, {}
+-- getPrevious(index) (optional) gives the position the entry had in the last order shown, nil if it was not in it:
+-- entries of the same rank then keep that order (a canceled auction or a refill of the list does not shuffle the
+-- others) and new ones follow in the game's order.
+function OwnAuctions.BuildSortOrder(count, getRank, getPrevious)
+  local order, ranks, previous = {}, {}, {}
   for index = 1, count do
     order[index] = index
     ranks[index] = getRank(index)
+    previous[index] = getPrevious and getPrevious(index) or nil
   end
   table.sort(order, function(a, b)
     if ranks[a] ~= ranks[b] then
       return ranks[a] > ranks[b]
+    end
+    local known = previous[a] ~= nil
+    if known ~= (previous[b] ~= nil) then
+      return known
+    end
+    if known and previous[a] ~= previous[b] then
+      return previous[a] < previous[b]
     end
     return a < b
   end)

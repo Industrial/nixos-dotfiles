@@ -12,6 +12,27 @@ local changelogData = addon:NewModule('ChangelogData')
 
 changelogData.releases = {
   {
+    id = 1794969338,
+    version = "v0.9.5",
+    channel = "release",
+    date = "2026-11-18",
+    headline = "Adds a searchable in-game Help to the settings window and fixes backpack items dimming at the guild bank.",
+    entries = {
+      {
+        category = "New",
+        title = "Searchable in-game Help in the settings window",
+        details = "A new Help page in the settings window offers 80 searchable articles on everything BetterBags does, complete with links and the settings themselves. Open it with /bb help followed by optional search words, or find articles under Help Articles in settings search.",
+        clients = {},
+      },
+      {
+        category = "Fixed",
+        title = "Backpack items no longer dim at the guild bank",
+        details = "Backpack items are no longer dimmed while the guild bank is open. Previously, every item in your backpack, including tradable inks that the guild bank accepts, was greyed out during a guild bank visit.",
+        clients = {},
+      },
+    },
+  },
+  {
     id = 1794888800,
     version = "v0.9.4",
     channel = "release",
@@ -532,21 +553,6 @@ changelogData.releases = {
         category = "Fixed",
         title = "Lua error on logout or UI reload",
         details = "Fixed an issue where bag frame scripts running during logout or interface reloads could trigger an error referencing views.",
-        clients = {},
-      },
-    },
-  },
-  {
-    id = 1793067850,
-    version = "v0.8.8",
-    channel = "release",
-    date = "2026-10-27",
-    headline = "Fixes a Lua error that could occur when entering instances or teleporting.",
-    entries = {
-      {
-        category = "Fixed",
-        title = "Lua error when entering instances or teleporting",
-        details = "Fixed an issue where changing zones, teleporting, or entering instances could trigger a GetItemGUID Lua error while items were unloading during a loading screen.",
         clients = {},
       },
     },

@@ -15,6 +15,7 @@ local addonName, AM = ...
 --                     profession ignored, a character deleted)
 --   "BARGAINS_CHANGED"  a bargain rule changed, or a scan or a search found bargains (Bargains)
 --   "BARGAIN_SCAN_CHANGED"  the search of the bargain items started, advanced or ended (BargainScan)
+--   "LEDGER_CHANGED"  an event was added to the ledger (Ledger)
 --   "MAIN_WINDOW_VISIBILITY"  our window in the auction house was shown or hidden (MainWindow), so the views
 --                     of the game know whether they are covered
 AM.Events = {}

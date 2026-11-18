@@ -4,15 +4,15 @@ RatingBusterDB = {
 },
 ["profileKeys"] = {
 ["Banknspank Saladfingers"] = "Mage",
-["Derpnschmerp Gorkndork"] = "Warlock",
 ["Völundr Industrial"] = "Warlock",
+["Derpnschmerp Gorkndork"] = "Warlock",
 },
 ["profiles"] = {
 ["Hunter"] = {
 },
-["Warlock"] = {
-},
 ["Mage"] = {
+},
+["Warlock"] = {
 },
 },
 }

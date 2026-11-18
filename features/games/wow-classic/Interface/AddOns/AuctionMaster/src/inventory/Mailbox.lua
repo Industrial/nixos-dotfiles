@@ -111,7 +111,7 @@ local function FindRecipient(recipient)
   local wanted = Normalize(recipient)
   local own = Normalize(GetNormalizedRealmName())
   local byName
-  for guid, character in pairs(AM.ProfessionScanner.GetCharacters()) do
+  for guid, character in pairs(AM.Characters.GetAll()) do
     if type(character) == "table" and character.name then
       local name, realm = Normalize(character.name), Normalize(character.realm)
       if wanted == name .. realm then

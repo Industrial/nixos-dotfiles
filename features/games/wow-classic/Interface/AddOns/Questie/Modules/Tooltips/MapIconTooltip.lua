@@ -352,7 +352,7 @@ function MapIconTooltip.ShowOnTooltip(self, Tooltip, owner, icons)
                     -- Apply color through AddLine args so description wrapping cannot split color escape sequences.
                     tooltipRows:AddDescription(REPUTATION_ICON_TEXTURE .. " " .. rewardString, indentTwo, Questie:ColorizeRGB("reputationBlue"))
                 end
-                
+
                 if shift and Questie.db.profile.enableTooltipsBreadcrumbQuests then
                     local breadcrumbs = QuestieDB.QueryQuestSingle(questData.questId, "breadcrumbs")
                     if breadcrumbs then
@@ -391,11 +391,15 @@ function MapIconTooltip.ShowOnTooltip(self, Tooltip, owner, icons)
                 if shift and Questie.db.profile.enableTooltipsNextInChain then
                     local DoableStates = QuestieDB.DoableStates
                     local nextQuestId = QuestieDB.QueryQuestSingle(questData.questId, "nextQuestInChain")
+                    if nextQuestId == 0 then nextQuestId = QuestieDB.QueryQuestSingle(questData.questId, "breadcrumbForQuestId") or 0 end
                     if nextQuestId > 0 and (not QuestieCorrections.hiddenQuests[nextQuestId]) then
                         local _, _, returnReason = QuestieDB.IsDoableVerbose(nextQuestId, false, true, true)
                         local firstInChain = true;
-                        while nextQuestId ~= nil and (not QuestieCorrections.hiddenQuests[nextQuestId]) and (returnReason ~= DoableStates.WRONG_RACE and returnReason ~= DoableStates.WRONG_CLASS and
+                        local visitedQuestIds = {}
+                        while nextQuestId > 0 and (not visitedQuestIds[nextQuestId]) and (not QuestieCorrections.hiddenQuests[nextQuestId]) and
+                            (returnReason ~= DoableStates.WRONG_RACE and returnReason ~= DoableStates.WRONG_CLASS and
                             returnReason ~= DoableStates.PROFESSION_MISSING and returnReason ~= DoableStates.PROFESSION_SPECIALIZATION) do
+                            visitedQuestIds[nextQuestId] = true
                             if firstInChain then
                                 tooltipRows:AddLine(nextQuestLabelPrefix .. l10n("Next in chain") .. l10n(": "), 0.86, 0.86, 0.86)
                                 firstInChain = false
@@ -405,6 +409,7 @@ function MapIconTooltip.ShowOnTooltip(self, Tooltip, owner, icons)
                             tooltipRows:AddDoubleLine(questTitle, rewardString, 1, 1, 1)
 
                             local nextNextQuestId = QuestieDB.QueryQuestSingle(nextQuestId, "nextQuestInChain")
+                            if nextNextQuestId == 0 then nextNextQuestId = QuestieDB.QueryQuestSingle(nextQuestId, "breadcrumbForQuestId") or 0 end
                             if nextNextQuestId > 0 then
                                 nextQuestId = nextNextQuestId
                                 -- check availability for the next nextQuestId

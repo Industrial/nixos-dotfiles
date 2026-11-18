@@ -3,7 +3,7 @@
 ## Notes: Auction house selling and price statistics tool for WoW.
 ## Author: Udorn
 ## X-License: All Rights Reserved
-## Version: v11.6.6
+## Version: v11.7.0
 ## X-Curse-Project-ID: 5762
 ## X-Localizations: enUS, deDE
 ## Category: Auctions
@@ -22,6 +22,7 @@ src/core/Theme.lua
 src/core/Database.lua
 src/core/DebugLog.lua
 src/core/Events.lua
+src/core/Characters.lua
 src/core/Compat.lua
 src/scan/ItemDbKey.lua
 src/scan/ItemStore.lua
@@ -50,6 +51,16 @@ src/sell/OwnAuctions.lua
 src/sell/PostPrice.lua
 src/inventory/Inventory.lua
 src/inventory/Mailbox.lua
+src/ledger/Ledger.lua
+src/ledger/LedgerMail.lua
+src/ledger/LedgerRecorder.lua
+src/ledger/LedgerMerchant.lua
+src/ledger/MerchantRecorder.lua
+src/ledger/LedgerCraft.lua
+src/ledger/CraftRecorder.lua
+src/ledger/LedgerLoot.lua
+src/ledger/LootRecorder.lua
+src/ledger/StockRecorder.lua
 src/professions/MerchantScanner.lua
 src/professions/VendorItems.lua
 src/professions/ShoppingList.lua
@@ -59,6 +70,9 @@ src/professions/RecipeList.lua
 src/professions/RecipeSummary.lua
 src/professions/Leveling.lua
 src/professions/ProfessionsFrame.lua
+src/ui/LedgerTab.lua
+src/ui/LedgerOverview.lua
+src/ui/LedgerDetail.lua
 src/ui/RecipesTab.lua
 src/ui/ShoppingRows.lua
 src/ui/BargainsPanel.lua

@@ -94,19 +94,22 @@ do -- spellbook
 		if asv and asv ~= "1" then
 			SetCVar("showAllSpellRanks", "1")
 		end
+		local BOOKTYPE_SPELL = BOOKTYPE_SPELL
 		for i=1,GetNumSpellTabs()+12 do
 			local _, ico, ofs, c, _, otherSpecID = GetSpellTabInfo(i)
 			local isNotOffspec = otherSpecID == 0
 			for j=ofs+1, knownFilter and CI_ERA and ico == 134419 and ofs+c or 0 do
-				procRuneBookEntry(add, pcall(GetSpellBookItemInfo, j, "spell"))
+				procRuneBookEntry(add, pcall(GetSpellBookItemInfo, j, BOOKTYPE_SPELL))
 			end
 			for j=ofs+1,(isNotOffspec or not knownFilter) and (ofs+c) or 0 do
-				procSpellBookEntry(add, "spell", knownFilter, isNotOffspec, pcall(GetSpellBookItemInfo, j, "spell"))
+				procSpellBookEntry(add, "spell", knownFilter, isNotOffspec, pcall(GetSpellBookItemInfo, j, BOOKTYPE_SPELL))
 			end
 		end
 		if MODERN then
 			addModernTalents(add, knownFilter)
 			addModernPvpTalents(add, knownFilter)
+		elseif CI_4E then
+			addModernTalents(add, knownFilter)
 		end
 		if asv and asv ~= "1" and not MODERN then
 			SetCVar("showAllSpellRanks", asv)
@@ -126,9 +129,10 @@ do -- spellbook
 		AB:AugmentCategory(L"Pet abilities", function(_, add)
 		if not PetHasSpellbook() then return end
 		wipe(mark)
+		local BOOKTYPE_PET = BOOKTYPE_PET
 		for i=1,HasPetSpells() or 0 do
-			if MODERN then
-				local ok, st, aid = pcall(GetSpellBookItemInfo, i, "pet")
+			if MODERN or CI_4E then
+				local ok, st, aid = pcall(GetSpellBookItemInfo, i, BOOKTYPE_PET)
 				local sid = ok and st == "PETACTION" and aid and C_PetInfo.GetSpellForPetAction(aid)
 				if sid and sid > 10 then -- BUG[10.x] shared control commands return bogus low "spell IDs"
 					procSpellBookEntry(add, "petspell", true, true, ok, "SPELL", sid)
@@ -140,8 +144,8 @@ do -- spellbook
 				end
 			end
 		end
-		for s in ("attack move stay follow assist defend passive dismiss"):gmatch("%S+") do
-			if MODERN or s ~= "move" then
+		for s in ("aggressive attack move stay follow assist defend passive dismiss"):gmatch("%S+") do
+			if (MODERN or CI_4E or s ~= "move") and (CI_4E or s ~= "aggressive") then
 				add("petspell", s)
 			end
 		end
@@ -177,7 +181,7 @@ AB:AugmentCategory(L"Equipped", function(_, add)
 		add("peq", w)
 	end
 end)
-if MODERN or CF_WRATH then -- Battle pets/Companions
+if MODERN or CF_WRATH or CI_4E then -- Battle pets/Companions
 	local running, sourceFilters, typeFilters, flagFilters, search = false, {}, {}, {[LE_PET_JOURNAL_FILTER_COLLECTED]=1, [LE_PET_JOURNAL_FILTER_NOT_COLLECTED]=1}, ""
 	hooksecurefunc(C_PetJournal, "SetSearchFilter", function(filter) search = filter end)
 	hooksecurefunc(C_PetJournal, "ClearSearchFilter", function() if not running then search = "" end end)
@@ -295,7 +299,7 @@ AB:AugmentCategory(L"Raid markers", function(_, add)
 		end
 	end
 end)
-if MODERN or CF_WRATH then -- toys
+if MODERN or CF_WRATH or CI_4E then -- toys
 	local tx, fs, fx, tfs = C_ToyBox, {}, {}
 	hooksecurefunc(C_ToyBox, "SetFilterString", function(s) tfs = s end) -- No corresponding Get
 	local function doAddToys(add)

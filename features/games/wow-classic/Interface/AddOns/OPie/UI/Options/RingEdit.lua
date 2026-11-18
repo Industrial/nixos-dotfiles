@@ -1396,7 +1396,7 @@ local cursorAC = {} do
 		return ix > 10 and "petspell", ix
 	end
 	function cursorAC:item(ix)
-		return C_ToyBox.IsToyUsable(ix) ~= nil and "toy" or "item", ix
+		return C_ToyBox.IsToyUsable(ix) ~= nil and C_ToyBox.GetToyInfo(ix) and "toy" or "item", ix
 	end
 	function cursorAC:mount(ix, a3)
 		if a3 == 0 then

@@ -106,19 +106,25 @@ end
 
 -- Resets the once-per-fill guard below whenever the tooltip moves on to a new item (or is
 -- hidden), so the next fill can dispatch again.
-GameTooltip:HookScript("OnTooltipCleared", function(tooltip)
-  tooltip.AM_Dispatched = nil
-end)
+-- The window opened by clicking an item link in the chat (ItemRefTooltip) is filled like GameTooltip and gets the same lines.
+-- The guard is kept in a table of our own, never as a field on the game's tooltip frames: writing to Blizzard frames
+-- can taint them.
+local dispatched = {}
+for _, tooltip in ipairs({ GameTooltip, ItemRefTooltip }) do
+  tooltip:HookScript("OnTooltipCleared", function(self)
+    dispatched[self] = nil
+  end)
+end
 
 -- Runs all registered callbacks for itemId, at most once per tooltip fill. Public so a
 -- game-type-specific override can feed it from a different hook (see
 -- srcClassic/tooltip/Tooltip.lua), with the item link if it has one; guarded here so that stays safe even if some client fires
 -- both TooltipDataProcessor and an override's hook for the same fill.
 local function Dispatch(tooltip, itemId, link, data)
-  if tooltip.AM_Dispatched then
+  if dispatched[tooltip] then
     return
   end
-  tooltip.AM_Dispatched = true
+  dispatched[tooltip] = true
 
   local location = GetBagLocation(tooltip)
   local count = tooltip.AM_Count or GetReagentCount(tooltip)
@@ -204,7 +210,7 @@ end
 
 if TooltipDataProcessor and Enum.TooltipDataType then
   TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
-    if tooltip == GameTooltip and data and data.id then
+    if (tooltip == GameTooltip or tooltip == ItemRefTooltip) and data and data.id then
       Dispatch(tooltip, data.id, nil, data)
     end
   end)

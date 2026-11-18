@@ -23,10 +23,10 @@ VER 3 0000000000000005 "Upkeep Buffs" "INV_MISC_QUESTIONMARK"
 /click idAutomationUpkeepBuffsButton
 END
 VER 3 0000000000000006 "Upkeep Health" "INV_MISC_QUESTIONMARK"
-#showtooltip [combat] item:1710; item:3771
-/use [combat] Greater Healing Potion; Wild Hog Shank
+#showtooltip [combat] item:1710; item:4607
+/use [combat] Greater Healing Potion; Delicious Cave Mold
 END
 VER 3 0000000000000007 "Upkeep Mana" "INV_MISC_QUESTIONMARK"
-#showtooltip [nocombat] item:1708
-/use [nocombat] Sweet Nectar
+#showtooltip [combat] item:3827; item:1708
+/use [combat] Mana Potion; Sweet Nectar
 END

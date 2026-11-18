@@ -175,6 +175,8 @@ securecall(function() -- mount: mount ID
 			actType, clickPrefix = "macrotext", SLASH_CLICK1 .. " " .. bn .. " "
 			if MODERN then
 				actType, clickPrefix = "retext", SLASH_CANCELFORM1 .. " [form,noform:moonkin,nocombat]\n" .. clickPrefix
+			else
+				clickPrefix = SLASH_CANCELFORM1 .. " [nocombat]\n" .. clickPrefix
 			end
 		end
 		summonAction = function(mountID)
@@ -827,7 +829,7 @@ securecall(function() -- macro: name
 	AB:RegisterActionType("macro", createNamedMacro, describeMacro, 2)
 end)
 securecall(function() -- battlepet: pet ID, species ID
-	if not (MODERN_BATTLEPETS or CF_WRATH) then
+	if not (MODERN_BATTLEPETS or CF_WRATH or CI_4E) then
 		return
 	end
 	local petAction, special = {}, {}
@@ -1161,26 +1163,30 @@ securecall(function() -- petspell: spell ID
 		defend={"Interface\\Icons\\Ability_Defend", "PET_MODE_DEFENSIVE"},
 		assist={"Interface\\Icons\\Ability_Hunter_Pet_Assist", "PET_MODE_ASSIST"},
 		passive={"Interface\\Icons\\Ability_Seal", "PET_MODE_PASSIVE"},
+		aggressive={"Interface\\Icons\\Ability_Racial_BloodRage", "PET_MODE_AGGRESSIVE"},
 		dismiss={CLASS == "WARLOCK" and "Interface\\Icons\\spell_shadow_sacrificialshield" or "Interface\\Icons\\spell_nature_spiritwolf"}
 	}
+	local MODERN_PETS = MODERN or CI_4E
 	local actionID = {}
-	local petTip = MODERN and function(self, slot)
+	local petTip = MODERN_PETS and function(self, slot)
 		return self:SetSpellBookItem(slot, BOOKTYPE_PET)
 	end or function(self, slot)
 		return self:SetPetAction(slot)
 	end
-	local petCommandFeedback = MODERN and function(info)
-		local ico, name, slot = info[1], info[2], info[3]
-		if GetSpellBookItemTexture(slot or 0, "pet") ~= ico then
-			slot = nil
+	local petCommandFeedback = MODERN_PETS and function(info)
+		local ico, name, slot, BOOKTYPE_PET = info[1], info[2], info[3], BOOKTYPE_PET
+		local ico2, tex = info[4] or GetFileIDFromPath(ico), GetSpellBookItemTexture(slot or 0, BOOKTYPE_PET)
+		if tex ~= ico and tex ~= ico2 then
+			info[4], slot = ico2, nil
 			for i=1,HasPetSpells() or 0 do
-				if GetSpellBookItemTexture(i, "pet") == ico and GetSpellBookItemInfo(i, "pet") == "PETACTION" then
+				tex = GetSpellBookItemTexture(i, BOOKTYPE_PET)
+				if (tex == ico or tex == ico2) and GetSpellBookItemInfo(i, BOOKTYPE_PET) == "PETACTION" then
 					info[3], slot = i, i
 					break
 				end
 			end
 		end
-		return not not slot, slot and IsSelectedSpellBookItem(slot, "pet") and 1 or 0, ico, _G[name] or (slot and GetSpellBookItemName(slot, "pet")) or "", 0, 0, 0, slot and petTip or nil, slot
+		return not not slot, slot and IsSelectedSpellBookItem(slot, "pet") and 1 or 0, ico, _G[name] or (slot and GetSpellBookItemName(slot, BOOKTYPE_PET)) or "", 0, 0, 0, slot and petTip or nil, slot
 	end or function(info)
 		local ico, name, slot = info[1], info[2], info[3]
 		local sname, _icokey, _isToken, isActive, _autoCastAllowed, _autoCastEnabled, _spellID, hasRange, inRange = GetPetActionInfo(slot or 0)
@@ -1223,7 +1229,7 @@ securecall(function() -- petspell: spell ID
 		elseif actionID[id] then
 			local st, _, _, icon, name, _, _, _, tipf, tipa = nil, petHint(id)
 			_, st = GetSpellBookItemName(tipa or 0, "pet")
-			return MODERN and st or L"Pet Ability", name, icon, nil, tipf, tipa
+			return MODERN_PETS and st or L"Pet Ability", name, icon, nil, tipf, tipa
 		end
 	end
 	AB:RegisterActionType("petspell", createPetAction, describePetAction, 1)
@@ -1251,17 +1257,22 @@ securecall(function() -- petspell: spell ID
 		addPetCommand(SLASH_PET_DEFENSIVE1, "defend")
 		addPetCommand(SLASH_PET_PASSIVE1, "passive")
 		actionID.dismiss = AB:CreateActionSlot(petHint, "dismiss", "conditional", cnd, "macrotext", SLASH_PET_DISMISS1)
-		if MODERN then
+		if MODERN_PETS then
 			addPetCommand(SLASH_PET_MOVE_TO1, "move")
 			addPetCommand(SLASH_PET_ASSIST1, "assist")
+			if CI_4E then
+				addPetCommand(SLASH_PET_AGGRESSIVE1, "aggressive")
+			else
+				actionInfo.aggressive = nil
+			end
 		else
-			actionInfo.assist = {"Interface/Icons/Ability_Racial_BloodRage", "PET_MODE_AGGRESSIVE"}
+			actionInfo.assist, actionInfo.aggressive = actionInfo.aggressive, nil
 			addPetCommand(SLASH_PET_AGGRESSIVE1, "assist")
 		end
 	end
 end)
 securecall(function() -- toy: item ID, flags[FORCE_SHOW]
-	if not (MODERN or CF_WRATH) then
+	if not (MODERN or CF_WRATH or CI_4E) then
 		return
 	end
 	local map, lastUsability, uq, whinedAboutGIIR = {}, {}, {}

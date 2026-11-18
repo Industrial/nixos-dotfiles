@@ -5,6 +5,9 @@ local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:0:0:2:0|t"
 local SILVER_ICON = "|TInterface\\MoneyFrame\\UI-SilverIcon:0:0:2:0|t"
 local COPPER_ICON = "|TInterface\\MoneyFrame\\UI-CopperIcon:0:0:2:0|t"
 
+-- A sum known to be nothing ("0" with the copper icon), where AM.FormatMoney's "--" would read as unknown.
+AM.ZERO_MONEY = "0" .. COPPER_ICON
+
 -- Formats copper as gold, silver and copper with coin icons, e.g. "18[gold] 99[silver]".
 -- To keep it short, silver is left out from 100 gold on and copper from 1 gold on. The
 -- icons need no translation. With abbreviate, gold from 1000 on is shortened like AM.FormatCount

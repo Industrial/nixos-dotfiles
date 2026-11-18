@@ -78,10 +78,25 @@ end
 
 -- Where the marks sit on a line of each list: the status and the cancel icon end at the right edge of a cell (the item
 -- column of the list of all auctions) or at the left edge of one (the owner column of the list of one item).
+-- `fit` marks a cell whose own text (the item name) must end before the marks instead of running under them.
 local LAYOUTS = {
-  all = { cell = 1, from = "RIGHT", to = "RIGHT", x = -4 },
+  all = { cell = 1, from = "RIGHT", to = "RIGHT", x = -4, fit = true },
   item = { cell = 5, from = "RIGHT", to = "LEFT", x = -4 },
 }
+
+-- Ends the item name of a cell left of `mark` (truncated by the game's "..."), or at the cell's own right edge again
+-- (the anchor of the game's item cell template) when `mark` is nil. Lines are reused, so it always sets one or the other.
+local function FitCellText(cell, mark)
+  local text = cell and cell.Text
+  if not text then
+    return
+  end
+  if mark then
+    text:SetPoint("RIGHT", mark, "LEFT", -GAP, 0)
+  else
+    text:SetPoint("RIGHT", cell, "RIGHT", 1, 0)
+  end
+end
 
 -- Puts the status and the cancel icon on a line of a list, or takes them off. Only reads the data of the line. In the
 -- list of one item only the player's own auctions get them.
@@ -95,6 +110,9 @@ local function MarkLine(line, layout)
     if mark then
       mark.status:Hide()
       mark.cancel:Hide()
+      if layout.fit then
+        FitCellText(cell, nil)
+      end
     end
     return
   end
@@ -123,6 +141,15 @@ local function MarkLine(line, layout)
   end
   mark.status:SetText(text or "")
   mark.status:SetShown(text ~= nil)
+  if layout.fit then
+    local leftmost
+    if text then
+      leftmost = mark.status
+    elseif action then
+      leftmost = mark.cancel
+    end
+    FitCellText(cell, leftmost)
+  end
 end
 
 local function MarkAllLines()
@@ -312,12 +339,41 @@ end
 
 local originalGetEntry, originalGetNumEntries
 local resortWanted = false
+local lastPosition = {} -- auctionID -> position in the order last shown
+
+local function PreviousPosition(index)
+  local info = originalGetEntry(index)
+  return info and info.auctionID and lastPosition[info.auctionID] or nil
+end
+
+local function BuildOrder(count)
+  return AM.OwnAuctions.BuildSortOrder(count, function(index)
+    return EntryRank(originalGetEntry, index)
+  end, PreviousPosition)
+end
+
+-- Remembers where each auction stands in an order that is now shown.
+local function RememberOrder(order)
+  lastPosition = {}
+  for position, index in ipairs(order) do
+    local info = originalGetEntry(index)
+    if info and info.auctionID then
+      lastPosition[info.auctionID] = position
+    end
+  end
+end
 
 local function InstallSorting(list)
   if not (list.getEntry and list.getNumEntries and list.SetDataProvider) then
     return
   end
   originalGetEntry, originalGetNumEntries = list.getEntry, list.getNumEntries
+  if list.SetSortOrder then
+    -- the player chose another sorting in the header: it counts again, not the order shown so far
+    hooksecurefunc(list, "SetSortOrder", function()
+      lastPosition = {}
+    end)
+  end
   list:SetDataProvider(list.searchStartedFunc, function(index)
     return originalGetEntry(sortOrder and sortOrder[index] or index)
   end, function()
@@ -326,9 +382,8 @@ local function InstallSorting(list)
     local count = originalGetNumEntries()
     if resortWanted or not sortOrder or #sortOrder ~= count then
       resortWanted = false
-      sortOrder = AM.OwnAuctions.BuildSortOrder(count, function(index)
-        return EntryRank(originalGetEntry, index)
-      end)
+      sortOrder = BuildOrder(count)
+      RememberOrder(sortOrder)
     end
     return count
   end, list.hasFullResultsFunc)
@@ -341,9 +396,7 @@ function ResortIfChanged()
   if not originalGetEntry or not list or not list:IsShown() or AM.OwnAuctions.IsRunning() then
     return
   end
-  local order = AM.OwnAuctions.BuildSortOrder(originalGetNumEntries(), function(index)
-    return EntryRank(originalGetEntry, index)
-  end)
+  local order = BuildOrder(originalGetNumEntries())
   if not SameOrder(order, sortOrder) then
     resortWanted = true
     list:DirtyScrollFrame()

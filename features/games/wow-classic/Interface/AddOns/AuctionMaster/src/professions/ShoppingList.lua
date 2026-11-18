@@ -53,7 +53,7 @@ end
 
 -- The lists were account-wide before they were kept per auction house (the faction object "shoppingList"). Each list
 -- of the old global object moves to the auction house of its crafter as soon as that is known here
--- (ProfessionScanner.GetHouseGuids). The others wait in the global object for
+-- (Characters.GetHouseGuids). The others wait in the global object for
 -- their own auction house, which is deleted once it is empty. Checked once per session (a change of auction house
 -- means a new login).
 local globalChecked
@@ -65,7 +65,7 @@ local function AdoptGlobalLists(data)
   end
   local old = global.crafters
   if old and next(old) then
-    local here = AM.ProfessionScanner.GetHouseGuids()
+    local here = AM.Characters.GetHouseGuids()
     data.crafters = data.crafters or {}
     for guid, list in pairs(old) do
       if here[guid] then
@@ -113,7 +113,6 @@ local GetList = ShoppingList.GetList
 -- the current one, each { guid, name, class (file name, may be nil), count (recipes on the list) }, sorted by name.
 -- Ignored characters are left out (their lists are kept for when they are not), the current one is never.
 function ShoppingList.GetCrafters()
-  local characters = AM.ProfessionScanner.GetCharacters()
   local guids = { [UnitGUID("player")] = true }
   for guid, list in pairs(GetData().crafters or {}) do
     if #list.recipes > 0 and not AM.ProfessionScanner.IsCharacterIgnored(guid) then
@@ -129,12 +128,10 @@ function ShoppingList.GetCrafters()
   end
   local crafters = {}
   for guid in pairs(guids) do
-    local character = characters[guid]
-    -- an earlier version stored the bare name instead of a table
-    if type(character) == "table" then
+    local name, class = AM.Characters.Get(guid)
+    if name then
       local list = GetData().crafters and GetData().crafters[guid]
-      crafters[#crafters + 1] = { guid = guid, name = AM.RecipeList.GetCharacterName(character),
-        class = character.class, count = list and #list.recipes or 0 }
+      crafters[#crafters + 1] = { guid = guid, name = name, class = class, count = list and #list.recipes or 0 }
     end
   end
   table.sort(crafters, function(a, b)
@@ -148,9 +145,9 @@ end
 
 -- Name and class of a crafter as { guid, name, class }.
 function ShoppingList.GetCrafter(guid)
-  local character = AM.ProfessionScanner.GetCharacters()[guid]
-  if type(character) == "table" then
-    return { guid = guid, name = AM.RecipeList.GetCharacterName(character), class = character.class }
+  local name, class = AM.Characters.Get(guid)
+  if name then
+    return { guid = guid, name = name, class = class }
   end
   return { guid = guid, name = UNKNOWN }
 end
@@ -272,7 +269,7 @@ local function AddOtherStock(itemIds, owned, need, counted)
     numCounted = numCounted + 1
   end
   local candidates = {}
-  for guid in pairs(AM.ProfessionScanner.GetCharacters()) do
+  for guid in pairs(AM.Characters.GetAll()) do
     if not counted[guid] and not AM.ProfessionScanner.IsCharacterIgnored(guid) then
       local stock = CountStored(itemIds, guid)
       if stock > 0 then
@@ -791,7 +788,7 @@ function ShoppingList.RemoveCrafter(guid)
   if data.activeGuid == guid then
     data.activeGuid = nil
   end
-  AM.ProfessionScanner.GetCharacters()[guid] = nil
+  AM.Characters.Forget(guid)
   AM.ProfessionScanner.ForgetCharacter(guid)
   AM.Inventory.ForgetCharacter(guid)
   AM.Mailbox.ForgetCharacter(guid)

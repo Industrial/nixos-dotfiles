@@ -4,6 +4,12 @@ local addonName, AM = ...
 AM.ChangelogMarkdown = [====[
 # Changelog
 
+## 11.7.0
+
+- Ledger tab: See what your auctions and vendor trades really earn, item by item, counting what you paid for bought, crafted and looted goods
+- Auctions tab: Fixed your auctions jumping around after canceling one
+- Recipes: Fixed vendor prices shown for reagents no merchant sells, such as Essence of Earth
+
 ## 11.6.6
 
 - Shopping list: Lists, crafters and their hidden professions are now kept separately for each faction and Forever ruleset, so only the characters of the current auction house show up
@@ -196,6 +202,7 @@ AM.ChangelogMarkdown = [====[
 
 -- Chat message per version and language (enUS is the fallback).
 AM.ChangelogAnnounce = {
+  ["11.7.0"] = { enUS = "New Ledger tab: see what your trading really earns", deDE = "Neuer Kassenbuch-Tab: Sieh, was dein Handel wirklich einbringt" },
   ["11.6.6"] = { silent = true },
   ["11.6.5"] = { enUS = "Full Scan button on every auction house tab, automatic scan off by default", deDE = "Komplettscan-Button auf jedem Tab des Auktionshauses, automatischer Scan standardmäßig aus" },
   ["11.6.4"] = { silent = true },

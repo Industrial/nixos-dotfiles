@@ -3,9 +3,9 @@
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
 ## Author: Cidan
-## Version: v0.9.4
+## Version: v0.9.5
 ## SavedVariables: BetterBagsDB, BetterBagsPerfDB
-## X-Date: 2026-11-17T04:05:12Z
+## X-Date: 2026-11-18T02:35:08Z
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
@@ -244,7 +244,22 @@ config\plugin.lua
 next\settings\rows.lua
 next\settings\page.lua
 next\settings\pages.lua
+help\search.lua
+help\articles.lua
+help\articles\start.lua
+help\articles\bags.lua
+help\articles\next.lua
+help\articles\search.lua
+help\articles\categories.lua
+help\articles\automation.lua
+help\articles\bank.lua
+help\articles\appearance.lua
+help\articles\profiles.lua
+help\articles\integrations.lua
+help\articles\troubleshooting.lua
+next\settings\nav.lua
 next\settings\window.lua
+next\settings\cards.lua
 next\settings\themes.lua
 next\settings\reorder.lua
 next\settings\itemstab.lua
@@ -252,6 +267,8 @@ next\settings\categories.lua
 next\settings\bagcategories.lua
 next\settings\currency.lua
 next\settings\currencies.lua
+next\settings\article.lua
+next\settings\help.lua
 next\settings\content.lua
 
 integrations\consoleport.lua

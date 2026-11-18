@@ -88,17 +88,29 @@ end
 
 -- A list area as in the auction house: a strip for the column headers on top and the inset panel below it.
 -- Returns { frame, header, body }: the frame to place, the strip to put the headers in and the area for the list.
-function Native.CreateListPanel(parent)
+-- itemList lays it out exactly as the game's item lists (AuctionHouseItemListTemplate, also under the top tabs of its
+-- Auctions view): the headers on the window's own background (container at 4 / -1, ending where the rows end, left of
+-- the scroll bar), the sunken panel from the headers' height down (its backgroundYOffset -19), the rows 6 below the
+-- headers.
+function Native.CreateListPanel(parent, itemList)
   local frame = CreateFrame("Frame", nil, parent)
   local header = CreateFrame("Frame", nil, frame)
-  header:SetPoint("TOPLEFT")
-  header:SetPoint("TOPRIGHT")
-  header:SetHeight(Native.HEADER_HEIGHT)
   local panel = Native.CreateInset(frame)
-  panel:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -1)
-  panel:SetPoint("BOTTOMRIGHT")
   local body = CreateFrame("Frame", nil, panel)
-  body:SetPoint("TOPLEFT", Native.PANEL_INSET, -Native.PANEL_INSET)
+  if itemList then
+    panel:SetPoint("TOPLEFT", 0, -Native.HEADER_HEIGHT)
+    panel:SetPoint("BOTTOMRIGHT")
+    header:SetPoint("TOPLEFT", 4, -1)
+    header:SetPoint("TOPRIGHT", -(Native.PANEL_INSET + Native.ScrollGutter()), -1)
+    body:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -6)
+  else
+    header:SetPoint("TOPLEFT")
+    header:SetPoint("TOPRIGHT")
+    panel:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -1)
+    panel:SetPoint("BOTTOMRIGHT")
+    body:SetPoint("TOPLEFT", Native.PANEL_INSET, -Native.PANEL_INSET)
+  end
+  header:SetHeight(Native.HEADER_HEIGHT)
   body:SetPoint("BOTTOMRIGHT", -Native.PANEL_INSET, Native.PANEL_INSET)
   return { frame = frame, header = header, body = body }
 end

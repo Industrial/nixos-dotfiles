@@ -281,6 +281,11 @@ QuestieItemDropCorrections.Era = {
         [3466] = DropKeys.WOWHEAD,
         [5831] = DropKeys.WOWHEAD,
     },
+    [5143] = { -- Thunder Lizard Blood
+        [3238] = DropKeys.WOWHEAD,
+        [3239] = DropKeys.WOWHEAD,
+        [3240] = DropKeys.WOWHEAD,
+    },
     [5170] = { -- Mossy Tumor
         [2027] = DropKeys.WOWHEAD,
         [2029] = DropKeys.WOWHEAD,

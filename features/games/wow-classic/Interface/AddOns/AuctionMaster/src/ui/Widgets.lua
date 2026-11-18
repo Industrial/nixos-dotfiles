@@ -61,6 +61,52 @@ function Widgets.CreateText(parent, template, justify)
   return text
 end
 
+local MENU_MAX_HEIGHT = 400 -- of a dropdown menu before it scrolls
+
+-- The text of a dropdown choice: icon, label and, in the menu, the number behind it.
+local function ChoiceText(choice, withCount)
+  local text = choice.label
+  if choice.icon then
+    local c = choice.iconCoords
+    local icon = c and ("|T%s:16:16:0:0:256:256:%d:%d:%d:%d|t "):format(choice.icon, c[1] * 256, c[2] * 256,
+      c[3] * 256, c[4] * 256) or ("|T%s:16|t "):format(choice.icon)
+    text = icon .. text
+  end
+  if withCount and choice.count then
+    text = text .. " |cff9d9d9d" .. choice.count .. "|r"
+  end
+  return text
+end
+
+-- A dropdown of the game (WowStyle1DropdownTemplate) with a radio menu. SetChoices takes { value, label, count,
+-- icon, iconCoords } entries (count and icon optional; the first one, with a nil value, usually stands for "all") and
+-- the selected value; onSelect gets the value picked. dropdown.button is the frame to place.
+function Widgets.CreateDropdown(parent, width, onSelect)
+  local dropdown = { choices = {} }
+  local button = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+  button:SetWidth(width)
+  button:SetSelectionTranslator(function(selection)
+    return ChoiceText(selection.data, false)
+  end)
+  button:SetupMenu(function(_, root)
+    for _, choice in ipairs(dropdown.choices) do
+      root:CreateRadio(ChoiceText(choice, true), function()
+        return choice.value == dropdown.selected
+      end, function()
+        onSelect(choice.value)
+      end, choice)
+    end
+    root:SetScrollMode(MENU_MAX_HEIGHT)
+  end)
+  dropdown.button = button
+
+  function dropdown.SetChoices(choices, selected)
+    dropdown.choices, dropdown.selected = choices, selected
+    button:GenerateMenu()
+  end
+  return dropdown
+end
+
 -- Paints the texture with a horizontal gradient from left to right.
 function Widgets.GradientH(texture, left, right)
   texture:SetColorTexture(1, 1, 1, 1)

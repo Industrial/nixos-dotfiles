@@ -31,6 +31,8 @@ local zoneTreeFrame
 ---@param treeFrame table @The AceGUI TreeGroup frame
 ---@param zoneTree table @The zone tree table
 function _QuestieJourney.questsByZone:RestoreSavedQuestSelection(treeFrame, zoneTree)
+    if not treeFrame or not zoneTree then return end
+
     local savedSelection = _QuestieJourney.lastZoneSelection[3]
     if not savedSelection then return end
 
@@ -472,9 +474,9 @@ function _QuestieJourney.questsByZone:CategorizeQuests(quests)
                     tinsert(zoneTree[6].children, temp)
                     unobtainableCounter = unobtainableCounter + 1
                 elseif returnReason == DoableStates.DISABLED_BY then -- disabling quest is active
-                    tinsert(zoneTree[5].children, temp)
+                    tinsert(zoneTree[6].children, temp)
                     if not QuestieDB.IsRepeatable(questId) then
-                        prequestMissingCounter = prequestMissingCounter + 1
+                        unobtainableCounter = unobtainableCounter + 1
                     end
                 elseif returnReason == DoableStates.ARENA_RATING then -- missing arena rating
                     tinsert(zoneTree[5].children, temp)

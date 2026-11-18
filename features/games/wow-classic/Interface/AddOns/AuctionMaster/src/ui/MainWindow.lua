@@ -1,16 +1,18 @@
 local addonName, AM = ...
 local L = AM.L
 
--- The main window of the addon: a view of its own inside the auction house. It has a tab next to the tabs of the
--- game (Buy, Sell, Auctions) and, when that is clicked, covers the content of the auction house frame; a click on one
--- of the game's tabs, a search or closing the auction house hides it again. Nothing of the game's tab system is
--- replaced: the tab is a button of ours, the game's frame is only hooked after the fact and its tab state and title
--- are put back when our view goes away.
--- The views register themselves with MainWindow.RegisterTab, the first one is the default:
+-- The main window of the addon: views of its own inside the auction house. Each view has a tab next to the tabs of
+-- the game (Buy, Sell, Auctions) and, when that is clicked, the window covers the content of the auction house frame;
+-- a click on one of the game's tabs, a search or closing the auction house hides it again. Nothing of the game's tab
+-- system is replaced: the tabs are buttons of ours, the game's frame is only hooked after the fact and its tab state
+-- and title are put back when our view goes away.
+-- The views register themselves with MainWindow.RegisterTab, in the order of their tabs; the first one is the default:
 --   id       short name, saved as the view shown last
---   label    key of the text in the locale files, shown on the button that switches to it
+--   label    key of the text in the locale files, shown on its tab
 --   create   function(parent) returning the panel of the view, called once when the window is built
 --   refresh  function() redrawing the panel, called when the view is shown and when data changes
+--   setting  optional: key of a boolean setting (AM.Settings) whether its tab is shown, changed with
+--            MainWindow.SetTabShown; a hidden view cannot be selected
 -- A view may place frames of its own beside the auction house (the recipe details do), as children of its panel.
 -- The global object "mainWindow" holds all state of the window and its views (view shown last, the filters of
 -- the recipes view), so that one reset clears it.
@@ -29,18 +31,18 @@ local PORTRAIT_INSET = 36-- The auction house puts its own content at low frame 
 -- Ours is between: above the frames of its own content and of the details beside it, which slide out from behind it,
 -- and below its border.
 local FRAME_LEVEL = 200
-local TAB_LOGO = "Interface\\AddOns\\" .. addonName .. "\\assets\\logo"
 local TAB_PADDING, TAB_MIN_WIDTH = 20, 70 -- of the game's tabs of the auction house
-local TAB_GAP = 8-- between our tab and the game's, if their own gap cannot be measured
--- The auction house's own tab templates come first so that our tab looks like its neighbours (the generic panel
+local TAB_GAP = 8 -- between our tabs and the game's, if their own gap cannot be measured
+-- The auction house's own tab templates come first so that our tabs look like their neighbours (the generic panel
 -- template looks wrong on Classic); the first one the client knows is used.
 local TAB_TEMPLATES = { "AuctionHouseFrameDisplayModeTabTemplate", "AuctionHouseFrameTabTemplate",
   "PanelTabButtonTemplate", "CharacterFrameTabButtonTemplate" }
 
 local views = {}
-local frame, content, footerFrame, switchButton
+local frame, content, footerFrame
 local activeView
-local tabButton
+local installed
+local tabButtons = {} -- view -> its tab
 local savedTab, savedTitle -- what the auction house showed before our view, put back when it goes away
 
 local function GetState()
@@ -51,6 +53,10 @@ function MainWindow.RegisterTab(view)
   views[#views + 1] = view
 end
 
+local function IsViewShown(view)
+  return not view.setting or AM.Settings.Get(view.setting)
+end
+
 local function FindView(id)
   for _, view in ipairs(views) do
     if view.id == id then
@@ -58,6 +64,15 @@ local function FindView(id)
     end
   end
   return nil
+end
+
+local function FirstShownView()
+  for _, view in ipairs(views) do
+    if IsViewShown(view) then
+      return view
+    end
+  end
+  return views[1]
 end
 
 -- Space the first row of controls in the top left corner of a view leaves free for the portrait of the auction
@@ -90,36 +105,33 @@ function MainWindow.Refresh()
   end
 end
 
--- The button in the footer leads to the other view; with a single view there is nothing to switch to.
-local function GetOtherView()
-  if #views < 2 then
-    return nil
-  end
-  return activeView == views[1] and views[2] or views[1]
-end
+local SetTabSelected
 
-local function UpdateSwitchButton()
-  local other = GetOtherView()
-  switchButton:SetShown(other ~= nil)
-  if other then
-    switchButton:SetLabel(L[other.label])
+-- The tab of the view shown looks selected, the others not; none while the window is hidden. shown is passed in:
+-- when the auction house closes, our window's OnHide runs while its own IsShown is still true.
+local function UpdateTabs(shown)
+  for view, button in pairs(tabButtons) do
+    SetTabSelected(button, shown and view == activeView)
   end
 end
 
 function MainWindow.Select(id)
-  local view = FindView(id) or views[1]
+  local view = FindView(id)
+  if not view or not IsViewShown(view) then
+    view = FirstShownView()
+  end
   activeView = view
   GetState().tab = view.id
   for _, other in ipairs(views) do
     other.panel:SetShown(other == view)
   end
-  UpdateSwitchButton()
+  UpdateTabs(frame ~= nil and frame:IsVisible())
   MainWindow.Refresh()
 end
 
 -- The game's tabs of the auction house. Everything done to them is cosmetic and wrapped, so that a client with
 -- other tabs only loses the selection look instead of raising an error.
--- Taken before our own tab exists: the tab templates add every tab to the Tabs of the frame, ours included.
+-- Taken before our own tabs exist: the tab templates add every tab to the Tabs of the frame, ours included.
 local nativeTabs = {}
 
 local function GetNativeTabs()
@@ -135,7 +147,7 @@ local function IsNativeTabSelected()
   return false
 end
 
-local function SetTabSelected(tab, selected)
+function SetTabSelected(tab, selected)
   local select = selected and PanelTemplates_SelectTab or PanelTemplates_DeselectTab
   if select then
     pcall(select, tab)
@@ -203,7 +215,8 @@ local function ShowViews()
   viewAlphas = nil
 end
 
--- Our view takes the place of the game's: its tab looks selected and the title says whose view it is.
+-- Our view takes the place of the game's: the game's tabs look deselected, ours follow the view shown, and the title
+-- says whose view it is.
 local function TakeOver()
   HideStar()
   HideViews()
@@ -214,7 +227,7 @@ local function TakeOver()
     end
     SetTabSelected(tab, false)
   end
-  SetTabSelected(tabButton, true)
+  UpdateTabs(true)
   local title = AuctionHouseFrame.TitleContainer and AuctionHouseFrame.TitleContainer.TitleText
   if title and AuctionHouseFrame.SetTitle then
     savedTitle = title:GetText()
@@ -227,7 +240,7 @@ end
 local function GiveBack()
   ShowStar()
   ShowViews()
-  SetTabSelected(tabButton, false)
+  UpdateTabs(false)
   if savedTab and not IsNativeTabSelected() then
     SetTabSelected(savedTab, true)
   end
@@ -240,7 +253,7 @@ local function GiveBack()
 end
 
 -- The strip of the game's own footer (gold display, buttons of its views) stays: our window ends above it and the
--- scan button and the switch button take the free space right of the gold display, over the buttons of the game's
+-- scan button takes the free space right of the gold display, over the buttons of the game's
 -- view below. The measures are taken from the game's frame, with fallbacks.
 local function MeasureNativeFooter(house)
   local height, left = FOOTER_HEIGHT, 189
@@ -294,11 +307,6 @@ local function CreateFooter(house, left)
   footer:EnableMouse(true)
   footer:Hide()
   footerFrame = footer
-
-  switchButton = Widgets.CreateButton(footer, "", false, function()
-    MainWindow.Select(GetOtherView().id)
-  end)
-  switchButton:SetPoint("RIGHT", -8, 0)
 end
 
 local function CreateWindow()
@@ -352,72 +360,120 @@ local function CreateWindow()
   end)
 end
 
-local function CreateTab()
+-- The tab of a view (index: its place among ours), placed by LayoutTabs.
+local function CreateTab(view, index)
   local house = AuctionHouseFrame
+  local button
   for _, template in ipairs(TAB_TEMPLATES) do
-    local ok, button = pcall(CreateFrame, "Button", addonName .. "Tab", house, template)
+    local ok, created = pcall(CreateFrame, "Button", addonName .. "Tab" .. index, house, template)
     if ok then
-      tabButton = button
+      button = created
       break
     end
   end
-  if not tabButton then
+  if not button then
     -- a client without the tab templates gets a button of ours below the frame
-    tabButton = Widgets.CreateButton(house, "", false)
+    button = Widgets.CreateButton(house, "", false)
   end
-  -- named after the view it opens, like the tabs of the game, with our small logo in front to tell it apart; as
-  -- a texture in the text it stays centered and counts for the width of the tab
-  local label = "|T" .. TAB_LOGO .. ":14:14|t " .. L[views[1].label]
-  tabButton:SetText(label)
-  if tabButton.SetLabel then
-    tabButton:SetLabel(label)
+  local label = L[view.label]
+  button:SetText(label)
+  if button.SetLabel then
+    button:SetLabel(label)
   elseif PanelTemplates_TabResize then
     -- the game's tabs size themselves in OnShow with this padding and minimum (AuctionHouseFrameTabMixin), which
     -- ran before the text was set
-    pcall(PanelTemplates_TabResize, tabButton, TAB_PADDING, nil, TAB_MIN_WIDTH)
+    pcall(PanelTemplates_TabResize, button, TAB_PADDING, nil, TAB_MIN_WIDTH)
   end
-  local tabs = GetNativeTabs()
-  local last = tabs[#tabs]
-  if last then
-    -- the same gap as between the tabs of the game
-    local gap = TAB_GAP
-    local before = tabs[#tabs - 1]
-    if before and before:GetRight() and last:GetLeft() then
-      gap = last:GetLeft() - before:GetRight()
-    end
-    -- by the top edge, so the text keeps the same distance to the frame whatever the heights
-    tabButton:SetPoint("TOPLEFT", last, "TOPRIGHT", gap, 0)
-    -- same height as the game's tabs, whatever template was found
-    if last.GetHeight and last:GetHeight() > 0 and math.abs(tabButton:GetHeight() - last:GetHeight()) > 1 then
-      tabButton:SetHeight(last:GetHeight())
-    end
-  else
-    tabButton:SetPoint("TOPLEFT", house, "BOTTOMLEFT", 20, 2)
+  -- same height as the game's tabs, whatever template was found
+  local native = GetNativeTabs()[1]
+  local function NativeHeight()
+    return native and native.GetHeight and native:GetHeight() or 0
   end
-  tabButton:SetScript("OnClick", function()
-    MainWindow.Show()
+  if NativeHeight() > 0 and math.abs(button:GetHeight() - NativeHeight()) > 1 then
+    button:SetHeight(NativeHeight())
+  end
+  button:SetScript("OnClick", function()
+    MainWindow.Show(view.id)
   end)
-  SetTabSelected(tabButton, false)
+  SetTabSelected(button, false)
   -- a UI addon that restyles the tabs of the game restyles ours the same way
   AM.Compat.OnSkin(house, function(skin)
-    skin.Tab(tabButton)
-    local height = last and last:GetHeight() or 0
-    if height > 0 then
-      tabButton:SetHeight(height)
+    skin.Tab(button)
+    if NativeHeight() > 0 then
+      button:SetHeight(NativeHeight())
     end
-    skin.SetTabSelection(tabButton, not tabButton:IsEnabled())
+    skin.SetTabSelection(button, not button:IsEnabled())
   end)
+  tabButtons[view] = button
+  return button
+end
+
+local tabGap = TAB_GAP
+
+-- The tabs of the views shown in the order the views registered, after the game's; the others are hidden.
+local function LayoutTabs()
+  local last = GetNativeTabs()[#GetNativeTabs()]
+  for _, view in ipairs(views) do
+    local button = tabButtons[view]
+    local shown = IsViewShown(view)
+    button:SetShown(shown)
+    if shown then
+      button:ClearAllPoints()
+      if last then
+        -- by the top edge, so the text keeps the same distance to the frame whatever the heights
+        button:SetPoint("TOPLEFT", last, "TOPRIGHT", tabGap, 0)
+      else
+        -- without the game's tabs, the first one goes below the frame
+        button:SetPoint("TOPLEFT", AuctionHouseFrame, "BOTTOMLEFT", 20, 2)
+      end
+      last = button
+    end
+  end
+end
+
+-- Our tabs, with the same gap as between the game's tabs.
+local function CreateTabs()
+  local tabs = GetNativeTabs()
+  local before, last = tabs[#tabs - 1], tabs[#tabs]
+  if before and last and before:GetRight() and last:GetLeft() then
+    tabGap = last:GetLeft() - before:GetRight()
+  end
+  for index, view in ipairs(views) do
+    CreateTab(view, index)
+  end
+  LayoutTabs()
+end
+
+function MainWindow.IsTabShown(id)
+  local view = FindView(id)
+  return view ~= nil and IsViewShown(view)
+end
+
+-- Shows or hides the tab of a view with a setting; a view hidden while shown gives way to the first one shown.
+function MainWindow.SetTabShown(id, shown)
+  local view = FindView(id)
+  if not view or not view.setting then
+    return
+  end
+  AM.Settings.Set(view.setting, shown)
+  if installed then
+    LayoutTabs()
+  end
+  if frame and activeView == view and not IsViewShown(view) then
+    MainWindow.Select(FirstShownView().id)
+  end
 end
 
 -- The auction house is load on demand: our tab is added the first time it opens.
 local function Install()
-  if tabButton or not AuctionHouseFrame then
+  if installed or not AuctionHouseFrame then
     return
   end
+  installed = true
   for _, tab in ipairs(AuctionHouseFrame.Tabs or {}) do
     nativeTabs[#nativeTabs + 1] = tab
   end
-  CreateTab()
+  CreateTabs()
   -- the cogwheel of the options, next to the close button of the auction house
   if AM.Options then
     AM.Options.CreateButton(AuctionHouseFrame)

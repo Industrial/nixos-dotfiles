@@ -32,7 +32,7 @@ idAutomation: enabled
 idAutomation_Bench: disabled
 LittleWigs: disabled
 ModernMapMarkers: enabled
-OPie: disabled
+OPie: enabled
 Pawn: disabled
 Plater: disabled
 Questie: enabled
@@ -67,3 +67,9 @@ Auc-Stat-Simple: disabled
 Auc-Stat-StdDev: disabled
 Auc-Util-FixAH: disabled
 BeanCounter: disabled
+Enchantrix: disabled
+Enchantrix-Barker: disabled
+Informant: disabled
+SlideBar: disabled
+Stubby: disabled
+AuctionMaster: enabled
