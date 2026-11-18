@@ -150,6 +150,16 @@ in {
     pre-push.entry = lib.mkForce (hookCmd "pre-push");
   };
 
+  # ENTERING THE SHELL MUST NOT RUN THE HOOKS. devenv's git-hooks integration
+  # declares `devenv:git-hooks:run` (`prek run -a`) as `before
+  # devenv:enterTest`, and devenv runs `devenv:enterShell` in `--mode all`, which
+  # also pulls in enterShell's dependents: enterTest, and through it the hook
+  # run. So every `devenv shell`, interactive or `-- <cmd>`, ran every hook
+  # across the repo, and prek's tree-wide stash ran with it. Hooks belong to git
+  # (commit, push), so cut that edge. `devenv test` no longer runs them either;
+  # `prek run -a` does that on demand.
+  tasks."devenv:git-hooks:run".before = lib.mkForce [];
+
   # A stable path to the wrapper for agents and scripts outside the shell:
   # `.devenv/with-devenv <cmd>`, or `bin/with-devenv <cmd>`, which falls back
   # to `devenv shell --` until the link exists.
