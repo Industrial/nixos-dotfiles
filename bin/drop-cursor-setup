@@ -130,6 +130,20 @@ fi
 # own commits, then re-applied with a 3-way merge, so they end up exactly as
 # uncommitted edits again. Patches persist in $STATE until re-applied.
 CARRY=()
+# A stopped run leaves its set-aside foreign edits in pending carry patches.
+# Every foreign edit in a critical file was set aside then, so whatever is
+# dirty there now is that run's own half-done step: reset it and resume.
+if [ -e "$STATE/carry.staged.patch" ] || [ -e "$STATE/carry.unstaged.patch" ]; then
+  : pending carry
+  say "  carry patches pending from a stopped run: they hold the foreign edits; dirty critical files are that run's own partial step"
+  if [ "$APPLY" = 1 ] && [ -n "$dirty_critical" ]; then
+    mapfile -t own < <(printf '%s\n' "$dirty_critical" | sed -E 's/^...//' | grep -v '^$')
+    git reset -q -- "${own[@]}" 2>/dev/null || true
+    git checkout -q HEAD -- "${own[@]}" 2>/dev/null || true
+    say "  reset to HEAD to resume: ${own[*]}"
+  fi
+  dirty_critical=""
+fi
 if [ -n "$dirty_critical" ]; then
   fresh=""
   while IFS= read -r line; do
@@ -210,6 +224,17 @@ PLANS=()
 # service (e.g. scripts/postgres-mcp-wrapper.sh) may genuinely need devenv.
 WRAPPERS="$(git ls-files 'scripts/*-mcp-wrapper.sh' 2>/dev/null |
   grep -E '^scripts/(lean-ctx|roam|roam-code|serena|maestro|context7|omniroute|hermes|claude-code|paperclip)-mcp-wrapper\.sh$' || true)"
+# Validate every wrapper .mcp.json actually uses BEFORE anything is changed, so
+# an untranslatable one stops the run with the tree untouched. serena is not on
+# this host any more (removed from the MCP set), so its server entry is dropped.
+wrapper_used() { [ -f .mcp.json ] && jq -e --arg w "./$1" --arg w2 "$1" '[.mcpServers[]? | select(.command==$w or .command==$w2)] | length > 0' .mcp.json >/dev/null; }
+if [ "$KEEP_AGENTS" = 0 ]; then
+  for w in $WRAPPERS; do
+    wrapper_used "$w" || continue
+    case "$w" in scripts/serena-mcp-wrapper.sh) continue ;; esac
+    grep -Eq '^\s*exec devenv shell -- ' "$w" || die 4 "$w (used by .mcp.json) has no 'exec devenv shell -- <cmd>' line; rewrite its .mcp.json entry by hand, then re-run"
+  done
+fi
 
 step "plan"
 say "  vendor into nix/devenv-modules:${KEEP_MODULES:- (none)}"
@@ -361,7 +386,12 @@ if [ "$KEEP_AGENTS" = 0 ]; then
   if [ -n "$WRAPPERS" ]; then
     for w in $WRAPPERS; do
       # Rewrite the .mcp.json entry only where one actually starts this wrapper.
-      if [ -f .mcp.json ] && jq -e --arg w "./$w" --arg w2 "$w" '[.mcpServers[]? | select(.command==$w or .command==$w2)] | length > 0' .mcp.json >/dev/null; then
+      if [ "$w" = scripts/serena-mcp-wrapper.sh ] && wrapper_used "$w"; then
+        # serena is gone from this host: drop its server entry
+        jq --arg w "./$w" --arg w2 "$w" '.mcpServers |= with_entries(select(.value.command != $w and .value.command != $w2))' \
+          .mcp.json > "$STATE/mcp.json" && cat "$STATE/mcp.json" > .mcp.json
+        say "  dropped the serena MCP server entry (serena is not installed on this host)"
+      elif wrapper_used "$w"; then
         cmdline="$(grep -E '^\s*exec devenv shell -- ' "$w" | head -1 | sed -E 's/^\s*exec devenv shell -- //; s/ "\$@"\s*$//' || true)"
         [ -n "$cmdline" ] || die 4 "$w has no 'exec devenv shell -- <cmd>' line; rewrite its .mcp.json entry by hand"
         read -r -a parts <<< "$cmdline"
