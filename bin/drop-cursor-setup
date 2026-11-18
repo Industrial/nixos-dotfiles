@@ -271,8 +271,18 @@ step "baseline: devenv eval packages"
 if [ -f "$STATE/packages.before.json" ]; then
   say "  reusing $(jq '.packages|length' "$STATE/packages.before.json") packages recorded by an earlier run"
 elif [ -f devenv.nix ]; then
-  devenv eval packages > "$STATE/packages.before.json" 2>"$STATE/eval.before.err" || { rm -f "$STATE/packages.before.json"; tail -20 "$STATE/eval.before.err"; die 6 "devenv does not evaluate on HEAD; not migrating a broken baseline"; }
-  say "  $(jq '.packages|length' "$STATE/packages.before.json") packages"
+  if devenv eval packages > "$STATE/packages.before.json" 2>"$STATE/eval.before.err"; then
+    say "  $(jq '.packages|length' "$STATE/packages.before.json") packages"
+  else
+    rm -f "$STATE/packages.before.json"
+    tail -20 "$STATE/eval.before.err"
+    # A repo that never imported .cursor/nix keeps its devenv untouched by this
+    # tool, so a HEAD that does not evaluate is the repo's own state, not a
+    # baseline this migration could break. Anything we vendor needs one.
+    [ "$NEED_VENDOR" = 0 ] || die 6 "devenv does not evaluate on HEAD; not migrating a broken baseline"
+    BASELINE_BROKEN=1
+    say "  note: devenv does not evaluate on HEAD (pre-existing); this repo's devenv is not changed, so the package check is skipped"
+  fi
 fi
 
 # ---- 1 vendor -----------------------------------------------------------------
@@ -513,7 +523,9 @@ step "verify"
 left="$(git grep -n -I -E '\.cursor/' -- devenv.nix devenv.yaml .mcp.json '*.sh' 'bin/**' 'scripts/**' '.github/**' AGENTS.md CLAUDE.md README.md moon.yml '.moon/**' ':!bin/drop-cursor-setup' ':!bin/drop-cursor-setup.d' 2>/dev/null || true)"
 [ -z "$left" ] || { say "$left" | sed 's/^/  still references .cursor: /'; say "  (fix by hand; spec AC 3)"; }
 [ -z "$(git ls-files .cursor | head -1)" ] || die 6 ".cursor is still tracked"
-if [ -f devenv.nix ]; then
+if [ -f devenv.nix ] && [ "${BASELINE_BROKEN:-0}" = 1 ]; then
+  say "  package check skipped: devenv did not evaluate on HEAD before this run (pre-existing)"
+elif [ -f devenv.nix ]; then
   devenv eval packages > "$STATE/packages.after.json" 2>"$STATE/eval.after.err" || { tail -20 "$STATE/eval.after.err"; die 6 "devenv no longer evaluates"; }
   if [ -f "$STATE/packages.before.json" ]; then
     jq -r '.packages[]' "$STATE/packages.before.json" | sort > "$STATE/b"; jq -r '.packages[]' "$STATE/packages.after.json" | sort > "$STATE/a"
