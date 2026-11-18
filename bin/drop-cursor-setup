@@ -180,7 +180,7 @@ backup_sub() { # backup_sub <path>: tracked diff + untracked files into $STATE/b
   [ -e "$p/.git" ] && git -C "$p" rev-parse HEAD >/dev/null 2>&1 || return 0
   mkdir -p "$dest"
   git -C "$p" diff --binary > "$dest.tracked.diff" || true
-  git -C "$p" ls-files --others --exclude-standard | grep -v -E '(^|/)(\.devenv|\.direnv)/|devenv\.lock$' |
+  { git -C "$p" ls-files --others --exclude-standard | grep -v -E '(^|/)(\.devenv|\.direnv)/|devenv\.lock$' || true; } |
     while IFS= read -r f; do mkdir -p "$dest/$(dirname "$f")" && cp -p "$p/$f" "$dest/$f"; done
   say "  backed up $p local changes to $dest (+ .tracked.diff)"
 }
@@ -281,7 +281,8 @@ if [ "$NEED_VENDOR" = 1 ]; then
   # a stopped earlier attempt may have left uncommitted copies; start clean
   in_head "$D" || rm -rf nix/devenv-modules
   mkdir -p "$D/features"
-  cp -r .cursor/nix/lib "$D/lib"
+  # lib/ holds the assay helpers; older copies of the setup do not have it
+  [ -d .cursor/nix/lib ] && cp -r .cursor/nix/lib "$D/lib"
   cp .cursor/nix/devenv.yaml "$D/devenv.yaml"
   for n in $KEEP_MODULES; do
     cp ".cursor/nix/features/$n.nix" "$D/features/"
@@ -305,16 +306,21 @@ if [ "$NEED_VENDOR" = 1 ]; then
   sed -i -E 's/^(\s*)cursor = \{/\1local = {/' devenv.nix
   # imports and path references
   sed -i 's#\./\.cursor/nix#./nix/devenv-modules#g; s#\.cursor/nix/#nix/devenv-modules/#g; s#\.cursor/nix#nix/devenv-modules#g' devenv.nix devenv.yaml
-  # Nix code still on the old namespace would fail evaluation: stop. Prose is reported.
-  other_ns="$(git grep -l -E '\bcursor\.features\b' -- '*.nix' ':!.cursor' ':!nix/devenv-modules' ':!.maestro' ':!history' ':!docs' 2>/dev/null || true)"
-  [ -z "$other_ns" ] || { say "$other_ns" | sed 's/^/  still uses cursor.features: /'; die 4 "rename cursor.features in the .nix files above by hand, then re-run"; }
+  # Other tracked Nix code on the old namespace (e.g. nix/darwin.nix) would fail
+  # evaluation: rename it too, unless someone has uncommitted edits there.
+  mapfile -t other_ns < <(git grep -l -E '\bcursor\.features\b' -- '*.nix' ':!.cursor' ':!nix/devenv-modules' ':!devenv.nix' ':!.maestro' ':!history' ':!docs' 2>/dev/null || true)
+  for f in "${other_ns[@]}"; do
+    [ -z "$(git status --porcelain -- "$f")" ] || die 4 "$f uses cursor.features and has uncommitted edits; rename it by hand, then re-run"
+    sed -i 's/\bcursor\.features\b/local.features/g' "$f"
+    say "  renamed cursor.features in $f"
+  done
   git grep -l -E '\bcursor\.features\b' -- ':!*.nix' ':!.cursor' ':!.maestro' ':!history' ':!docs' 2>/dev/null | sed 's/^/  note: prose still mentions cursor.features: /' || true
   commit "build(devenv): vendor shared devenv modules into nix/devenv-modules
 
 Copied from the .cursor submodule (Industrial/cursor-setup), only the modules
 this repo references:${KEEP_MODULES}. Option namespace cursor.features ->
 local.features. Shared inputs move with them in nix/devenv-modules/devenv.yaml.
-Behaviour is unchanged; the .cursor directory is removed in a later commit." nix/devenv-modules devenv.nix devenv.yaml
+Behaviour is unchanged; the .cursor directory is removed in a later commit." nix/devenv-modules devenv.nix devenv.yaml "${other_ns[@]}"
 fi
 
 # ---- 2 hooks ------------------------------------------------------------------
@@ -486,7 +492,10 @@ fi
 if [ "$CLAUDE_KIND" != none ] && [ "$KEEP_CLAUDE" = 0 ]; then
   step "6 claude"
   links=""
-  [ -L .claude ] && [[ "$(readlink .claude)" == *claude-setup* ]] && { git rm -q -f .claude; links=".claude"; }
+  if [ -L .claude ] && [[ "$(readlink .claude)" == *claude-setup* ]]; then
+    # the link would dangle once .claude-setup is gone; commit its removal only if it was tracked
+    if tracked .claude; then git rm -q -f .claude; links=".claude"; else rm -f .claude; fi
+  fi
   if [ "$CLAUDE_KIND" = submodule ]; then remove_submodule .claude-setup
   else git rm -r -q -f .claude-setup; rm -rf .claude-setup; fi
   commit "chore: remove the per-project .claude-setup
