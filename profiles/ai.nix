@@ -17,11 +17,16 @@
   imports = [
     # ../features/ai/anythingllm-desktop
     ../features/ai/claude-code
-    # CloudCLI — browser front end for the Claude Code sessions this host already
-    # has. Lives in the profile rather than per-host, unlike openhands below: it
-    # reads ~/.claude in place, so it is useful wherever claude-code is, and both
-    # drakkar and muninn import this profile. Binds 127.0.0.1:3001.
-    ../features/ai/cloudcli
+    # Paseo — the chosen browser surface over this host's coding agents. Binds
+    # 127.0.0.1:6767. In the profile rather than per-host because it is useful
+    # wherever claude-code is, and both drakkar and muninn import this profile.
+    ../features/ai/paseo
+    # CloudCLI — superseded by paseo above and disabled rather than deleted, so
+    # the work and its notes survive if paseo disappoints. Same niche exactly: a
+    # browser over the agents already configured here. Running both would mean two
+    # daemons watching the same ~/.claude session files and two ports to remember,
+    # so they are mutually exclusive by intent, not by accident.
+    # ../features/ai/cloudcli
     # ../features/ai/litellm
     # ../features/ai/lmstudio
     # ../features/ai/n8n
