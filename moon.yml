@@ -6,10 +6,8 @@ tasks:
     command: 'treefmt'
   test:
     description: 'Run Assay on all *.assay.nix suites across the repository'
-    command: 'devenv'
+    command: 'bin/with-devenv'
     args:
-      - 'shell'
-      - '--'
       - 'assay'
       - 'run'
       - '.'
@@ -23,10 +21,8 @@ tasks:
       cache: true
   stig-vm-test:
     description: 'Boot a VM per STIG control and verify the running system (Anduril NixOS STIG)'
-    command: 'devenv'
+    command: 'bin/with-devenv'
     args:
-      - 'shell'
-      - '--'
       - 'bin/stig-vm-test'
     inputs:
       - 'features/security/stig/**/*'
