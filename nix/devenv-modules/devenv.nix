@@ -2,6 +2,8 @@
 # Only the modules this repo references are here. Namespace: local.features.*
 {
   imports = [
+    ./with-devenv.nix
+    ./no-hooks-on-shell-entry.nix
     ./features/dotenv.nix
     ./features/git-hooks-prek.nix
     ./features/languages-javascript.nix

@@ -30,7 +30,7 @@ in {
         pre-commit = {
           enable = true;
           name = "pre-commit";
-          entry = "pre-commit";
+          entry = "${config.local.withDevenv}/bin/with-devenv pre-commit";
           stages = ["pre-commit"];
           pass_filenames = false;
           always_run = true;
@@ -41,7 +41,7 @@ in {
         pre-push = {
           enable = true;
           name = "pre-push";
-          entry = "pre-push";
+          entry = "${config.local.withDevenv}/bin/with-devenv pre-push";
           stages = ["pre-push"];
           pass_filenames = false;
           always_run = true;
