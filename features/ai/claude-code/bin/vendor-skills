@@ -3,10 +3,12 @@
 #
 # Vendors every skill from the source trees into the payload as REAL directories.
 #
-# Why a script and not a one-off `cp -r`: copying 191 skills out of the .cursor
-# submodule forks them from their upstream. A fork with no refresh path rots on
-# the first upstream change, so the vendoring itself is the deliverable and the
-# payload is its output. Re-run this after the submodule moves.
+# Why a script and not a one-off `cp -r`: copying skills out of their source
+# trees forks them from their upstream. A fork with no refresh path rots on the
+# first upstream change, so the vendoring itself is the deliverable and the
+# payload is its output. Re-run this after a source tree moves. (The .cursor
+# submodule was the largest source, 191 skills. It was removed on 2026-11-18,
+# pln-mwlwzmof-blzg78, and its skills already live in the payload.)
 #
 #   bin/vendor-skills             apply
 #   bin/vendor-skills --dry-run   report what would happen, write nothing
@@ -40,7 +42,6 @@ dotfiles="$(cd "$feature/../../.." && pwd)"
 # lean-ctx) that exist nowhere else; it is optional so the script keeps working
 # once that backup is pruned.
 sources=(
-  "$dotfiles/.cursor/skills"
   "$feature/../hermes-agent/.hermes/skills"
   "$HOME/.maestro/skills"
 )

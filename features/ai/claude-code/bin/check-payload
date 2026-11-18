@@ -34,8 +34,8 @@ dotfiles="$(cd "$feature/../../.." && pwd)"
 tracked() { ! git -C "$dotfiles" check-ignore -q "$1" 2>/dev/null; }
 
 # 1 — no symlinks in the content. The load-bearing one: every other invariant
-# assumes the payload is self-contained content rather than pointers into
-# .cursor/.hermes. Gitignored runtime state is exempt -- Claude Code puts its
+# assumes the payload is self-contained content rather than pointers into a
+# source tree such as .hermes. Gitignored runtime state is exempt -- Claude Code puts its
 # own symlinks there (debug/latest), and those are not ours to police.
 link_list="$(find "$payload" -type l 2>/dev/null | while IFS= read -r l; do
   tracked "$l" && printf '%s\n' "$l"
