@@ -184,6 +184,15 @@ backup_sub() { # backup_sub <path>: tracked diff + untracked files into $STATE/b
     while IFS= read -r f; do mkdir -p "$dest/$(dirname "$f")" && cp -p "$p/$f" "$dest/$f"; done
   say "  backed up $p local changes to $dest (+ .tracked.diff)"
 }
+# Never remove a .cursor that the repo's own .claude lives in. In the idclear
+# monorepo .claude -> .cursor/.claude held untracked project settings and
+# skills, so removing .cursor broke the project's Claude setup (restored
+# 2026-11-18). That .claude needs a home of its own first.
+if [ -L .claude ] && [ "$CURSOR_KIND" != none ]; then
+  case "$(readlink .claude)" in
+    .cursor/*|./.cursor/*) die 4 ".claude -> $(readlink .claude) lives inside .cursor; give the project's .claude a home of its own before removing .cursor" ;;
+  esac
+fi
 # Never remove the .claude-setup that ~/.claude itself resolves into: in
 # ~/.dotfiles it is the host-wide harness, not a per-project copy.
 if [ "$CLAUDE_KIND" != none ] && [ "$KEEP_CLAUDE" = 0 ]; then

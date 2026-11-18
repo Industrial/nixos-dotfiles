@@ -78,6 +78,16 @@
     name = "with-devenv";
     runtimeInputs = config.packages;
     bashOptions = ["errexit" "pipefail"];
+    # Syntax check only. The exports are generated from the repo's env, and a
+    # legitimate value can trip shellcheck: the idclear monorepo exports
+    # KUBECONFIG='~/.kube/config-staging' (SC2088), exactly as devenv shell
+    # does. writeShellApplication's default check runs shellcheck and fails the
+    # build on that.
+    checkPhase = ''
+      runHook preCheck
+      ${pkgs.stdenv.shellDryRun} "$target"
+      runHook postCheck
+    '';
     text = ''
       ${lib.concatStrings (lib.mapAttrsToList (n: v: "export ${n}=${lib.escapeShellArg (toString v)}\n") exportable)}
       snapshot="''${DEVENV_DOTFILE:-''${DEVENV_ROOT:-.}/.devenv}/with-devenv.env"
