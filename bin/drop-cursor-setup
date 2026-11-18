@@ -74,7 +74,13 @@ commit() { # commit <message> <paths...>: pathspec-limited, never runs hooks
     if [ -e "$p" ] || [ -L "$p" ] || tracked "$p"; then add+=("$p"); all+=("$p")
     elif [ -n "$(git ls-tree --name-only HEAD -- "$p" 2>/dev/null)" ]; then all+=("$p"); fi
   done
-  [ "${#add[@]}" -eq 0 ] || git add -A -- "${add[@]}"
+  local normal=()
+  for p in "${add[@]}"; do
+    # a file this tool created on purpose (bin/with-devenv) is versioned even
+    # where the repo ignores its directory; directories keep the ignore rules
+    if [ -f "$p" ] && ! tracked "$p" && git check-ignore -q "$p"; then git add -f -- "$p"; else normal+=("$p"); fi
+  done
+  [ "${#normal[@]}" -eq 0 ] || git add -A -- "${normal[@]}"
   if [ "${#all[@]}" -eq 0 ] || git diff --cached --quiet -- "${all[@]}"; then say "  (nothing to commit for: ${msg%%$'\n'*})"; return 0; fi
   printf '%s\n\nPart of pln-mwlwzmof-blzg78 (bin/drop-cursor-setup in ~/.dotfiles).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n' "$msg" > "$STATE/msg"
   git commit -q --no-verify -F "$STATE/msg" --only -- "${all[@]}"
@@ -149,9 +155,10 @@ say "  critical files clean: $CRITICAL"
 # Each step is gated on its own committed result, so a re-run after a stop
 # (exit 3/4/5) resumes where it left off instead of redoing or skipping work.
 D=nix/devenv-modules
-tracked() { [ -n "$(git ls-files -- "$1" | head -1)" ]; }
-NEED_VENDOR=0; [ "$IMPORTS" = 1 ] && ! tracked "$D/devenv.nix" && NEED_VENDOR=1
-NEED_HOOKS=0; { [ "$NEED_VENDOR" = 1 ] || tracked "$D/devenv.nix"; } && ! tracked "$D/with-devenv.nix" && NEED_HOOKS=1
+tracked() { [ -n "$(git ls-files -- "$1" | head -1)" ]; }                 # in the index
+in_head() { [ -n "$(git ls-tree -r --name-only HEAD -- "$1" 2>/dev/null | head -1)" ]; } # committed
+NEED_VENDOR=0; [ "$IMPORTS" = 1 ] && ! in_head "$D/devenv.nix" && NEED_VENDOR=1
+NEED_HOOKS=0; { [ "$NEED_VENDOR" = 1 ] || in_head "$D/devenv.nix"; } && ! in_head "$D/with-devenv.nix" && NEED_HOOKS=1
 candidates="$AGENT_MODULES"
 [ -d .cursor/nix/features ] && candidates="$candidates $(find .cursor/nix/features -maxdepth 1 -name '*.nix' ! -name '*.assay.nix' -printf '%f\n' | sed 's/\.nix$//' | sort -u | tr '\n' ' ')"
 MODULES=""
@@ -194,7 +201,7 @@ fi
 if [ "$NEED_VENDOR" = 1 ]; then
   step "1 vendor"
   # a stopped earlier attempt may have left uncommitted copies; start clean
-  tracked "$D" || rm -rf nix/devenv-modules
+  in_head "$D" || rm -rf nix/devenv-modules
   mkdir -p "$D/features"
   cp -r .cursor/nix/lib "$D/lib"
   cp .cursor/nix/devenv.yaml "$D/devenv.yaml"
@@ -235,6 +242,12 @@ fi
 # ---- 2 hooks ------------------------------------------------------------------
 if [ "$NEED_HOOKS" = 1 ]; then
   step "2 hooks"
+  # a stopped earlier attempt may have half-applied this step: restart from the
+  # step-1 commit so the import lines are not inserted twice
+  if in_head "$D/devenv.nix"; then
+    git checkout -q HEAD -- "$D/devenv.nix" "$D/features" 2>/dev/null || true
+    git rm -q --cached -f --ignore-unmatch -- "$D/with-devenv.nix" "$D/no-hooks-on-shell-entry.nix" >/dev/null
+  fi
   cp "$TPL/with-devenv.nix" "$D/with-devenv.nix"
   sed -i 's#^  imports = \[#  imports = [\n    ./with-devenv.nix#' "$D/devenv.nix"
   if [ -f "$D/features/git-hooks-prek.nix" ]; then

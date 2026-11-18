@@ -20,9 +20,10 @@ check() { # check <name> <expected-exit> <cmd...>
     if [ "$got" = "$want" ]; then pass=$((pass + 1)); echo "PASS $name"
 else fail=$((fail + 1)); echo "FAIL $name (exit $got, want $want)"; tail -n 5 "$T/test.out" | sed 's/^/    /'; fi
 }
-fresh() { # fresh <dir>: clone ~/.dotfiles HEAD with the .cursor submodule checked out
+fresh() { # fresh <dir>: clone ~/.dotfiles at its last pre-migration commit, .cursor checked out
     rm -rf "$1"
-    git clone -q --no-local "$DOT" "$1" && git -C "$1" submodule update -q --init .cursor
+    git clone -q --no-local "$DOT" "$1" && git -C "$1" checkout -q 6d7d1c4f &&
+    git -C "$1" submodule update -q --init .cursor
 }
 mkdir -p "$T"
 
