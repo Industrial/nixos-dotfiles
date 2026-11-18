@@ -328,6 +328,11 @@ if [ "$KEEP_AGENTS" = 0 ]; then
         git rm -q "$w"
       fi
     done
+    # jq rewrote .mcp.json in its own style; hand it back to the repo's
+    # formatter, or the pre-push format check fails ("files modified by hook")
+    if ! git diff --quiet -- .mcp.json 2>/dev/null && [ -x bin/with-devenv ]; then
+      bin/with-devenv treefmt --no-cache .mcp.json >/dev/null 2>&1 || say "  note: treefmt did not format .mcp.json; check its style before pushing"
+    fi
   fi
   commit "build(devenv): agent tooling comes from the host, not the repo devenv
 
