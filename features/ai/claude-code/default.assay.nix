@@ -7,12 +7,13 @@ let
     bash = "bash";
     git = "git";
     jq = "jq";
+    python3 = "python3";
   };
   mod = import ./default.nix {inherit pkgs;};
   src = builtins.readFile ./default.nix;
 in
   assay.suite "claude-code" {
-    systemPackages = assay.eq mod.environment.systemPackages ["claude-code" "bash" "git" "jq"];
+    systemPackages = assay.eq mod.environment.systemPackages ["claude-code" "bash" "git" "jq" "python3"];
     importsFiveMcpFeatures = assay.eq (builtins.length mod.imports) 5;
     importsLeanCtx = assay.eq (builtins.match ".*lean-ctx.*" src != null) true;
     importsMaestro = assay.eq (builtins.match ".*maestro.*" src != null) true;
