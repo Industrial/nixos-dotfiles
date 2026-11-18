@@ -70,6 +70,22 @@ in
 
     telemetryOff = assay.eq (hasText "metrics = false;") true;
 
+    # Nix and TOML are Zed extensions, not built-in languages. Without these two
+    # the languages.* and lsp.* blocks parse fine and do nothing at all — no
+    # grammar, no server, no error. The first version of this feature shipped
+    # exactly that, so both the request and the pairing are pinned: an lsp.<x>
+    # binary pin without the extension that registers <x> is dead config.
+    installsNixExtension = assay.eq (activationHas ''"nix":true'') true;
+    installsTomlExtension = assay.eq (activationHas ''"toml":true'') true;
+    requestsExtensionsDeclaratively = assay.eq (hasText "auto_install_extensions") true;
+
+    # taplo is declared opt_in_languages = ["TOML"] by zed-extensions/toml, which
+    # means it is skipped even by the "..." wildcard and starts only when named.
+    # Naming it is therefore required, not stylistic.
+    namesTaploExplicitly = assay.eq (activationHas ''"TOML":{"language_servers":["taplo"]}'') true;
+    # And the Nix list picks nixd over the extension's other server, nil.
+    namesNixdExplicitly = assay.eq (activationHas ''"language_servers":["nixd"]'') true;
+
     # Zed 1.28.1 renamed features.edit_prediction_provider to
     # edit_predictions.provider and flags the old spelling with "Your settings
     # file uses deprecated settings". The first version of this feature shipped

@@ -73,6 +73,32 @@
     # See note 3 in the header: "direct", not "shell_hook", because nushell.
     load_direnv = "direct";
 
+    # ZED SHIPS NO NIX OR TOML SUPPORT. Both are extensions, and without them
+    # every `languages.Nix`, `languages.TOML`, `lsp.nixd` and `lsp.taplo` key
+    # below is inert — the settings parse, the grammars never load, the servers
+    # never start, and nothing reports an error. That is how the first version of
+    # this feature shipped.
+    #
+    # Verified against the extension manifests rather than guessed:
+    #   zed-extensions/nix  0.1.5  registers language servers `nil` AND `nixd`
+    #   zed-extensions/toml 1.1.0  registers `taplo`, with
+    #                              opt_in_languages = ["TOML"]
+    #
+    # The taplo opt-in is why `TOML.language_servers = ["taplo"]` is load-bearing
+    # and not decoration: an opt-in server is excluded even by the "..." wildcard
+    # and only starts when named. For Nix the explicit list picks nixd over nil,
+    # since omitting "..." means only the servers named are used.
+    #
+    # NOT HERMETIC, and there is no way to make it so: extensions come from Zed's
+    # registry at runtime and have no nixpkgs packaging path. What the download
+    # gets us is the grammar and the server registration, NOT the server binary —
+    # the lsp.*.binary.path pins below keep nixd and taplo themselves inside the
+    # store, which is also what stops the extension fetching its own copies.
+    auto_install_extensions = {
+      nix = true;
+      toml = true;
+    };
+
     # See note 2: never fetch a Node.
     node = {
       ignore_system_version = false;
