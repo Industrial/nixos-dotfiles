@@ -27,6 +27,12 @@
   };
 
   boot.blacklistedKernelModules = [
+    # drakkar is wired-only by policy (features/nixos/networking + the
+    # rfkill-block service below). Blacklist the Qualcomm WiFi-7 device
+    # driver directly so the PCI NIC never binds and never brings up a
+    # wl* interface; keep the 802.11 core blacklisted as defence in depth.
+    "ath12k_pci"
+    "ath12k"
     "cfg80211"
     "mac80211"
   ];
