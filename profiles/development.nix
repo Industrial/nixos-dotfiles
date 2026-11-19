@@ -17,6 +17,9 @@
     # ../features/programming/vscode
     # ../features/programming/bun
     ../features/programming/cursor
+    # Open-source VS Code build, configured to match cursor (same settings,
+    # keybindings and extensions). See its header for the few differences.
+    ../features/programming/vscodium
     ../features/programming/devenv
     ../features/programming/emerald
     # Lighter alternatives to cursor above, both on trial. They coexist with it
