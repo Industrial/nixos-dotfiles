@@ -7,9 +7,8 @@
   # Comprehensive systemd configuration with security and performance optimizations
 
   systemd = {
-    oomd = {
-      enable = true;
-    };
+    # systemd-oomd is configured in features/performance/memory, beside its
+    # pressure thresholds.
 
     # dbus-broker reload (Type=notify-reload) exceeds DefaultTimeoutStartSec on
     # large desktop configs and fails switch-to-configuration with exit 4.

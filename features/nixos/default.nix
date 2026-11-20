@@ -66,12 +66,6 @@
 
       # Enable keep-outputs for better caching
       keep-outputs = true;
-
-      # Set gc-keep-derivations
-      gc-keep-derivations = true;
-
-      # Set gc-keep-outputs
-      gc-keep-outputs = true;
     };
 
     # Configure garbage collection

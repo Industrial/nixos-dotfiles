@@ -23,4 +23,8 @@ let
 in
   assay.suite "hardware" {
     shape = assay.hasAttrs mod ["hardware" "powerManagement"];
+
+    # hardware.graphics belongs to features/nixos/graphics. profiles/base.nix imports both
+    # modules, so declaring it here too was a duplicate definition.
+    graphicsNotDeclaredHere = assay.eq (mod.hardware ? graphics) false;
   }

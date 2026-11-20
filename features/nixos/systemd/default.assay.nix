@@ -67,4 +67,8 @@ in
 
     # The journal is capped by journald itself, continuously, not vacuumed weekly.
     journalCapped = assay.eq config.services.journald.settings.Journal.SystemMaxUse "1G";
+
+    # systemd-oomd belongs to features/performance/memory; declaring it here too was a
+    # second, silently-agreeing definition.
+    oomdNotDeclaredHere = assay.eq (mod.systemd ? oomd) false;
   }
