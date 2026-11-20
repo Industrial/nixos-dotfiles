@@ -1,25 +1,14 @@
 name: 'Check'
-description: 'Run nix flake check and build dry-run for a host'
+description: 'Evaluate one nixosConfiguration and dry-run its build'
 inputs:
   host:
-    description: 'Host name to check'
+    description: 'nixosConfigurations attribute to check'
     required: true
 runs:
   using: 'composite'
   steps:
-    - name: Nix Flake Check and build dry-run
+    - name: Evaluate and dry-run build
       shell: bash
       env:
         HOST: ${{ inputs.host }}
-      run: |
-        set -euo pipefail
-        case "$HOST" in
-          drakkar|huginn|mimir) ;;
-          *)
-            echo "Invalid host: $HOST" >&2
-            exit 1
-            ;;
-        esac
-        cd "$GITHUB_WORKSPACE"
-        nix flake check
-        nix build --dry-run ".#nixosConfigurations.$HOST.config.system.build.toplevel"
+      run: ./bin/ci/check-host "$HOST"

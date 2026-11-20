@@ -37,7 +37,14 @@ let
   getFrom = pairs: k: map (p: p.value) (builtins.filter (p: p.key == k) pairs);
 
   linkedPath = builtins.match ".*ln -sf (/nix/store/[^ ]+-config[.]ghostty) ${home}/[.]config/ghostty/config[.]ghostty\n.*" activation;
-  generatedConfig = builtins.readFile (builtins.head linkedPath);
+  # builtins.match drops string context, and a store path without context is never built, so
+  # readFile only worked where the file was already in the store (never on a fresh CI
+  # runner). Re-attach the context of the derivation that produces the matched path.
+  realised = path:
+    builtins.appendContext path (lib.filterAttrs
+      (drv: _: lib.hasSuffix "-${builtins.substring 33 (-1) (baseNameOf path)}.drv" drv)
+      (builtins.getContext activation));
+  generatedConfig = builtins.readFile (realised (builtins.head linkedPath));
   generatedPairs = pairsOf generatedConfig;
   generatedGet = getFrom generatedPairs;
   # `palette = N=#rrggbb`, which ghostty accumulates rather than replaces.

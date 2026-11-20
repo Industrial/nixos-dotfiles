@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Evaluate one nixosConfiguration and dry-run its toplevel build.
+#
+#   bin/ci/check-host <name>      e.g. drakkar, muninn, installer
+#
+# One host per process, on purpose. This job used to run `nix flake check` in every matrix
+# leg, which evaluates all five configurations, the deploy-rs checks and every STIG VM test
+# in a single evaluator, and (without --no-build) then tries to build them. Measured on
+# drakkar: that evaluation alone passes 13 GB resident in under two minutes, and a hosted
+# runner has 16 GB. The legs were being killed mid-evaluation ("runner has received a
+# shutdown signal" / "lost communication with the server"), not failing on anything in the
+# configuration. The rest of what `nix flake check` covered lives in bin/ci/flake-checks,
+# which evaluates the checks in memory-capped workers.
+#
+# The CI matrix is generated from the flake's own nixosConfigurations (see the `hosts` job
+# in .github/workflows/ci.yml), so a new host is checked without anyone editing a list.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+host="${1:?usage: bin/ci/check-host <nixosConfigurations attribute>}"
+
+# Validate against the flake rather than a hard-coded list: a host-name allowlist in this
+# file is exactly how muninn went unchecked.
+if ! nix eval --json .#nixosConfigurations --apply builtins.attrNames \
+  | jq -e --arg h "$host" 'index($h) != null' >/dev/null; then
+  echo "check-host: '$host' is not a nixosConfigurations attribute of this flake" >&2
+  exit 1
+fi
+
+attr=".#nixosConfigurations.${host}.config.system.build.toplevel"
+echo "check-host: evaluating $attr"
+nix build --dry-run "$attr"

@@ -34,7 +34,14 @@ let
   # The shim is a store script the activation copies into place; read it back (IFD is fine
   # in a suite) so the claims are about what actually lands in ~/.local/bin.
   shimPath = builtins.head (builtins.match ".*cp (/nix/store/[^ ]+-cursor-agent-local-wrapper) .*" activation);
-  shim = builtins.readFile shimPath;
+  # builtins.match drops string context, and a store path without context is never built, so
+  # readFile only worked where the file was already in the store (never on a fresh CI
+  # runner). Re-attach the context of the derivation that produces the matched path.
+  realised = path:
+    builtins.appendContext path (lib.filterAttrs
+      (drv: _: lib.hasSuffix "-${builtins.substring 33 (-1) (baseNameOf path)}.drv" drv)
+      (builtins.getContext activation));
+  shim = builtins.readFile (realised shimPath);
 in
   assay.suite "cursor" {
     installsCursor = assay.eq (nixos.hasPackage cfg "cursor") true;

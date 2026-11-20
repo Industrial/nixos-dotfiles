@@ -94,6 +94,16 @@ priority = 3
 command = "biome"
 options = ["format", "--write"]
 includes = ["*.{js,jsx,ts,tsx,json}"]
+# Kept identical to treefmt.toml's [formatter.javascript] excludes -- see the
+# comments there. CI and the dev hook must agree on what is formatted, or the
+# hook passes locally and this gate fails on main (it did, for the openhands
+# payload, from the day the dev-side exclude landed without this one).
+excludes = [
+  "features/ai/openhands/.openhands/*.json",
+  "features/ai/openhands/.openhands/**/*.json",
+  "features/games/wow-classic/Interface/AddOns/**",
+  "features/games/wow-classic/WTF/**",
+]
 priority = 4
 
 [formatter.yaml]

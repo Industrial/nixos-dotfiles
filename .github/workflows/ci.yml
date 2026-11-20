@@ -1,0 +1,255 @@
+name: CI
+# The one job list. main.yml (push to main) and pr.yml (pull requests) are thin callers;
+# what differs between them is an input, not a copy of every job.
+on:
+  workflow_call:
+    inputs:
+      stig-vm-tests:
+        description: 'Also boot a VM per STIG control (slow; main only)'
+        type: boolean
+        default: false
+# Read the repository, nothing else. No job pushes, comments or publishes.
+permissions:
+  contents: read
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Format Check
+        uses: ./.github/actions/format
+  clamav:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: ClamAV Scan
+        uses: ./.github/actions/clamav
+  lynis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Lynis Scan
+        uses: ./.github/actions/lynis
+  deadnix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Dead Code Detection
+        uses: ./.github/actions/deadnix
+  feature-reachability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Feature Reachability
+        uses: ./.github/actions/feature-reachability
+  lint-fetch-pins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Fetch Pin Lint
+        uses: ./.github/actions/lint-fetch-pins
+  assay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Assay
+        uses: ./.github/actions/assay
+  shell-budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      # The threshold is a ratio against `nu -n` measured in the same hyperfine run on this
+      # runner, so a slower and noisier machine than the one the number came from does not
+      # move it, and main gets no stricter gate than a pull request. The step summary
+      # carries the measurement; the log line carries the trend.
+      - name: Shell startup budget
+        uses: ./.github/actions/shell-budget
+  stig:
+    runs-on: ubuntu-latest
+    # A VM per control on main (~35 min measured); reports and the CAT I gate otherwise.
+    timeout-minutes: ${{ inputs.stig-vm-tests && 90 || 30 }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      # VM tests are the only gate that proves the runtime half of the baseline, the controls
+      # no static analysis can speak to. 68 booted machines per pull request is not a
+      # reasonable default, so pull requests get reports plus the CAT I gate.
+      - name: STIG compliance
+        uses: ./.github/actions/stig
+        with:
+          vm-tests: ${{ inputs.stig-vm-tests && 'true' || 'false' }}
+  cargo-clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Clippy
+        run: nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#clippy -c bash -c "cd rust && cargo clippy --workspace --all-targets -- -D warnings"
+  cargo-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Test
+        run: nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo test --workspace"
+  cargo-nix-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Check Cargo.nix drift
+        run: |
+          nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo generate-lockfile"
+          # Check if any Cargo.nix files would change
+          git diff --exit-code rust/tools/*/Cargo.nix || (echo 'Cargo.nix is out of date. Run cargo regenerate-lockfile and commit.' && exit 1)
+  # The check matrix comes from the flake, not from a list here: a hand-written matrix is
+  # how muninn went unchecked. Every nixosConfigurations attribute (installer included)
+  # gets a leg.
+  hosts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      names: ${{ steps.list.outputs.names }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: List nixosConfigurations
+        id: list
+        run: |
+          names="$(nix eval --json .#nixosConfigurations --apply builtins.attrNames)"
+          echo "nixosConfigurations: $names"
+          echo "names=$names" >>"$GITHUB_OUTPUT"
+  check:
+    needs: hosts
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJSON(needs.hosts.outputs.names) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Check
+        uses: ./.github/actions/check
+        with:
+          host: ${{ matrix.host }}
+  # What `nix flake check` covered beyond the hosts: the deploy-rs checks, every STIG VM test
+  # and the packages, each evaluated in a memory-capped worker (see bin/ci/flake-checks).
+  flake-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Flake checks
+        run: ./bin/ci/flake-checks
+  # The single required check. Branch protection names this one job instead of fifteen, so
+  # adding, renaming or splitting a gate never needs a settings change, and a skipped or
+  # cancelled dependency counts as a failure rather than as a pass.
+  all-green:
+    if: always()
+    needs:
+      - format
+      - clamav
+      - lynis
+      - deadnix
+      - feature-reachability
+      - lint-fetch-pins
+      - assay
+      - shell-budget
+      - stig
+      - cargo-clippy
+      - cargo-test
+      - cargo-nix-drift
+      - hosts
+      - check
+      - flake-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every gate passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.value.result)\t\(.key)"' | sort
+          echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' >/dev/null
