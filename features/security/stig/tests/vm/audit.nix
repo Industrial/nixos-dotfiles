@@ -158,7 +158,8 @@ in [
 
     # cron.allow and cron.deny are a documented partial exclusion. Creating an empty
     # cron.allow so a watch could load would tell cron that NO user may use cron, silently
-    # revoking crontab access including the nix-gc and store-optimise jobs. Assert they are
+    # revoking crontab access for every user (fleet GC/optimise are systemd/nix.gc since #122,
+    # not cron jobs). Assert they are
     # genuinely absent rather than silently unwatched, so the exclusion stays deliberate.
     machine.succeed("test ! -e /var/cron/cron.allow")
   '')
