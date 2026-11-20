@@ -125,7 +125,7 @@ and prints a pass/fail summary with a log per step under `.tmp/dev/check/`:
 | `deadnix` | `deadnix` | `bin/ci/deadnix` |
 | `feature-reachability` | `feature-reachability` | `bin/ci/feature-reachability` |
 | `lint-fetch-pins` | `lint-fetch-pins` | `bin/ci/lint-fetch-pins` |
-| `assay` | `assay` | `bin/ci/assay` (suites + coverage) |
+| `assay` | `assay` | `bin/ci/assay` (suites, coverage, source-match ratchet) |
 | `bin-dev-selftest` | (none yet) | `bin/dev.d/test.sh` |
 | `cargo-clippy`, `cargo-test` | same names | only when `rust/` changed, or `--rust` |
 | `eval-<host>` | `check (<host>)`, eval half | only with `--host <h>` or `--hosts` |

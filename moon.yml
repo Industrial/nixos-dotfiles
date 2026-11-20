@@ -23,7 +23,7 @@ tasks:
     options:
       cache: false
   lint:
-    description: 'deadnix, feature-reachability, lint-fetch-pins, assay coverage. bin/dev lint'
+    description: 'deadnix, feature-reachability, lint-fetch-pins, assay coverage and source-match. bin/dev lint'
     command: 'bin/dev'
     args:
       - 'lint'

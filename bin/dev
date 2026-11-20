@@ -44,7 +44,7 @@ bin/dev — tasks for this repo. Every command runs from any directory.
 
 Before pushing
   check [opts]            Mirror the PR workflow locally: format, deadnix,
-                          feature-reachability, lint-fetch-pins, assay (+coverage),
+                          feature-reachability, lint-fetch-pins, assay (+coverage checks),
                           cargo jobs when rust/ changed. Builds no host by default.
     --host <h>            also evaluate host <h> (repeatable)
     --hosts               also evaluate every CI host (drakkar huginn mimir)
@@ -66,7 +66,7 @@ Everyday
                           branch changed; --all: over the whole tree, as CI does.
                           Both rewrite the files they would fail on.
   lint                    Static checks without assay: deadnix, feature-reachability,
-                          lint-fetch-pins, assay-coverage-check.
+                          lint-fetch-pins, assay coverage + source-match checks.
   eval [host]             Evaluate one host's system derivation, no build
                           (default: this machine's hostname). ~20 s, a few GB of RAM.
   hosts                   List the flake's nixosConfigurations.
@@ -157,7 +157,9 @@ eval_host() {
 
 base_ref() {
   local up
-  for up in '@{upstream}' origin/main main; do
+  # The PR base, not the branch's own upstream: a pushed feature branch tracks
+  # origin/<branch>, whose merge base says nothing about what the PR changes.
+  for up in origin/main main '@{upstream}'; do
     if git rev-parse -q --verify "$up^{commit}" >/dev/null 2>&1; then
       git merge-base HEAD "$up" 2>/dev/null && return 0
     fi
@@ -355,11 +357,14 @@ cmd_test() {
   done
   need assay
   if ((${#targets[@]} == 0)); then
-    say "> assay run . && bin/assay-coverage-check"
-    assay run .
+    # Tracked suites only: `assay run .` would also walk gitignored worktrees
+    # and probes under .tmp/. Then the two checks bin/ci/assay adds.
+    need python3 git
+    say "> bin/assay-run-tracked && bin/assay-coverage-check && bin/assay-source-match-check"
+    bin/assay-run-tracked
     printf '\n'
-    need python3
     bin/assay-coverage-check
+    bin/assay-source-match-check
     return
   fi
   for t in "${targets[@]}"; do
@@ -414,7 +419,7 @@ cmd_lint() {
   (($# == 0)) || usage_die "lint takes no arguments"
   need nix nix-shell python3
   local failed=0 s
-  for s in bin/ci/deadnix bin/ci/feature-reachability bin/ci/lint-fetch-pins bin/assay-coverage-check; do
+  for s in bin/ci/deadnix bin/ci/feature-reachability bin/ci/lint-fetch-pins bin/assay-coverage-check bin/assay-source-match-check; do
     say "=== $s"
     "$s" || failed=1
   done
