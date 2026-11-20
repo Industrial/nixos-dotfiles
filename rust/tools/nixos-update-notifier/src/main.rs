@@ -9,23 +9,46 @@ fn main() {
     apply_flake_default(&mut config);
 
     let mut notifier = SystemNotifier;
-    match run_check(&config, &mut notifier) {
-        Ok(CheckOutcome::UpToDate) => {
+    let report = match run_check(&config, &mut notifier) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("nixos-update-notifier: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    for pr in &report.pending.lock_prs {
+        println!("nixos-update-notifier: lock bump awaiting review: {pr}");
+    }
+    if !report.pending.reboot.is_empty() {
+        println!(
+            "nixos-update-notifier: reboot pending ({} differ from the booted system)",
+            report.pending.reboot.join(", ")
+        );
+    }
+
+    match report.outcome {
+        CheckOutcome::UpToDate => {
             println!("nixos-update-notifier: system flake lock is up to date");
         }
-        Ok(CheckOutcome::LockChangedNoPackageDiff) => {
+        CheckOutcome::ReviewPending => {
+            println!(
+                "nixos-update-notifier: skipped the local upstream check; the open PR carries the diff"
+            );
+        }
+        CheckOutcome::LockChangedNoPackageDiff => {
             println!(
                 "nixos-update-notifier: flake.lock would change, but no package-level diff vs {}",
                 config.current_system.display()
             );
         }
-        Ok(CheckOutcome::LockUpdatesPending { reason, payloads }) => {
+        CheckOutcome::LockUpdatesPending { reason, payloads } => {
             println!("nixos-update-notifier: updates pending ({reason})");
             for p in &payloads {
                 println!("--- {} ---\n{}", p.summary, p.body);
             }
         }
-        Ok(CheckOutcome::PackageUpdates { changes, payloads }) => {
+        CheckOutcome::PackageUpdates { changes, payloads } => {
             println!(
                 "nixos-update-notifier: {} package(s) would update:",
                 changes.len()
@@ -36,10 +59,6 @@ fn main() {
             for p in &payloads {
                 eprintln!("notified: {}", p.summary);
             }
-        }
-        Err(e) => {
-            eprintln!("nixos-update-notifier: {e}");
-            std::process::exit(1);
         }
     }
 }
@@ -54,9 +73,9 @@ fn apply_hostname_default(config: &mut Config) {
 }
 
 fn apply_flake_default(config: &mut Config) {
-    if config.flake.as_os_str().is_empty() {
+    if config.flake.is_none() {
         let home = std::env::var("HOME").unwrap_or_else(|_| "/home/tom".into());
-        config.flake = default_flake_dir(&home, &config.hostname);
+        config.flake = Some(default_flake_dir(&home));
     }
 }
 

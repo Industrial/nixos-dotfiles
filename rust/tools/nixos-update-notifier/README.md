@@ -1,10 +1,17 @@
 # nixos-update-notifier
 
-Check whether a NixOS host flake would update, then **notify with the exact packages** that would change (name + version delta).
+Tells the operator what an update is waiting on (see `docs/runbooks/updates.md`):
+
+- an **open lock-bump PR** from `.github/workflows/update-flake-lock.yml`, awaiting review
+  (unauthenticated GitHub API, public repo; while one is open the local build below is skipped,
+  since the PR body already carries the per-host diff);
+- a **pending reboot**: `kernel`, `initrd` or `kernel-modules` of `/run/current-system` differ
+  from `/run/booted-system` (comin switched, but nothing reboots by itself);
+- otherwise, whether upstream inputs moved, with **the exact packages** that would change.
 
 Uses the session D-Bus (`org.freedesktop.Notifications`) so GNOME shows a normal banner and tray entry — same channel as `notify-send`.
 
-## What it does
+## What it does (upstream check)
 
 1. Runs `nix flake update --output-lock-file` into a temp lock (does **not** modify your repo `flake.lock`).
 2. If the lock is unchanged → exits quietly (“up to date”).
@@ -26,12 +33,12 @@ Uses the session D-Bus (`org.freedesktop.Notifications`) so GNOME shows a normal
 
    Large diffs are split across numbered notifications (`1/3`, `2/3`, …) so GNOME body limits never drop package names.
 
-This tool **does not** run `nixos-rebuild switch`. Apply updates yourself (e.g. `bin/update/host`) when memory and time allow.
+This tool **does not** switch, merge or reboot. Updates reach hosts only through a merged lock-bump PR, which comin applies (ADR-0006).
 
 ## Usage
 
 ```bash
-# Defaults: flake=$HOME/.dotfiles/hosts/$(uname -n), current=/run/current-system
+# Defaults: flake=$HOME/.dotfiles (root flake), current=/run/current-system
 nixos-update-notifier
 
 # Print package list only (no desktop notification)
@@ -40,9 +47,9 @@ nixos-update-notifier --no-notify
 # Only check whether flake.lock would change (no build / no package list)
 nixos-update-notifier --lock-only --no-notify
 
-# Explicit host flake
+# Explicit flake + host
 nixos-update-notifier \
-  --flake ~/.dotfiles/hosts/drakkar \
+  --flake ~/.dotfiles \
   --hostname drakkar
 ```
 
@@ -50,9 +57,12 @@ nixos-update-notifier \
 
 | Flag | Env | Default | Meaning |
 |------|-----|---------|--------|
-| `--flake` | `NIXOS_UPDATE_FLAKE` | `~/.dotfiles/hosts/<hostname>` | Host flake directory |
+| `--flake` | `NIXOS_UPDATE_FLAKE` | `~/.dotfiles` | Root flake directory |
 | `--hostname` | `NIXOS_UPDATE_HOSTNAME` | `uname -n` | `nixosConfigurations` attr |
 | `--current-system` | `NIXOS_UPDATE_CURRENT` | `/run/current-system` | Closure to diff against |
+| `--booted-system` | `NIXOS_UPDATE_BOOTED` | `/run/booted-system` | Compared with current to detect a pending reboot |
+| `--github-repo` | `NIXOS_UPDATE_GITHUB_REPO` | empty (off) | `owner/name` whose open lock-bump PRs to report |
+| `--lock-branch` | `NIXOS_UPDATE_LOCK_BRANCH` | `update/flake-lock` | Branch the workflow opens its PR from |
 | `--min-mem-mib` | `NIXOS_UPDATE_MIN_MEM_MIB` | `4096` | Skip build if free RAM below this |
 | `--body-limit` | `NIXOS_UPDATE_BODY_LIMIT` | `900` | Max chars per notification body |
 | `--no-notify` | — | off | Stdout only |
@@ -62,11 +72,11 @@ If the lock would change but free memory is below `--min-mem-mib`, you get a not
 
 ## Host install
 
-`features/cli/nixos-update-notifier` (imported from `profiles/base.nix`):
+`features/cli/nixos-update-notifier` (imported from `profiles/cli-desktop.nix`):
 
 - Installs the binary on PATH
 - Enables a **user** systemd timer (~09:00 daily, persistent + random delay)
-- Sets `NIXOS_UPDATE_*` for the host flake under `~/.dotfiles/hosts/<hostname>`
+- Sets `NIXOS_UPDATE_*` for the root flake `~/.dotfiles`, this host, and the repo/branch of the lock-bump PR
 
 Requires a logged-in graphical session for notifications (session bus). Missed runs fire on next login when `Persistent=true`.
 
@@ -79,7 +89,7 @@ nixos-update-notifier-src = {
 };
 ```
 
-The old root `features/nixos/auto-update` nightly switch is disabled (`enableAutoUpdate = false`): root cannot update a user-owned git flake, and automatic switch is unsafe under memory pressure.
+The old root nightly switch in `features/nixos/auto-update` is gone; that feature now only asserts `system.autoUpgrade` stays off (comin is the single unattended activator, ADR-0006).
 
 ## Develop / test
 

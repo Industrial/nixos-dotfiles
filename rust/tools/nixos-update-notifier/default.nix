@@ -8,6 +8,7 @@
   git,
   coreutils,
   util-linux,
+  curl,
 }:
 rustPlatform.buildRustPackage {
   pname = "nixos-update-notifier";
@@ -26,7 +27,7 @@ rustPlatform.buildRustPackage {
 
   postInstall = ''
     wrapProgram $out/bin/nixos-update-notifier \
-      --prefix PATH : ${lib.makeBinPath [nix git coreutils util-linux]}
+      --prefix PATH : ${lib.makeBinPath [nix git coreutils util-linux curl]}
   '';
 
   meta = with lib; {

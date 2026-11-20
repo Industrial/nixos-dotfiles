@@ -21,9 +21,10 @@ in
     usesBuildRustPackage = assay.eq (pkg ? cargoDeps && pkg ? cargoBuildType) true;
     vendorsFromCargoLock = assay.eq (pkg.cargoHash or null) null;
 
-    # The binary shells out to nix and git; the wrapper puts them on its PATH.
+    # The binary shells out to nix and git, and to curl for the open lock-bump PR lookup
+    # (src/lib/pending.rs); the wrapper puts them on its PATH.
     wrapsTheBinaryWithItsTools = assay.eq (builtins.all (p: lib.hasInfix (builtins.unsafeDiscardStringContext "${lib.getBin p}/bin") pkg.postInstall)
-      [pkgs.nix pkgs.git pkgs.coreutils pkgs.util-linux])
+      [pkgs.nix pkgs.git pkgs.coreutils pkgs.util-linux pkgs.curl])
     true;
     wrapsTheInstalledBinary =
       assay.eq (lib.hasInfix "wrapProgram $out/bin/nixos-update-notifier" pkg.postInstall) true;

@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn chunk_keeps_oversized_line_as_own_body() {
         let long = "x".repeat(50);
-        let bodies = chunk_package_lines(&[long.clone()], 10);
+        let bodies = chunk_package_lines(std::slice::from_ref(&long), 10);
         assert_eq!(bodies, vec![long]);
     }
 
