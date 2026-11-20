@@ -91,7 +91,9 @@ features/cli/navi/default.assay.nix   # its claims
 Every in-scope `*.nix` needs a colocated `*.assay.nix`. `bin/assay-coverage-check`
 enforces that, and so does CI. Prefer claims about evaluated config, for example
 "this option ends up set to X", over regexes on the source text. A feature also
-has to be imported by some host closure, or `feature-reachability` fails.
+has to reach at least one host, or `feature-reachability` fails. How a feature is
+switched on for a host is moving from path imports to `features.<path>.enable`
+options. `AGENTS.md` has the current rule.
 
 ### Fast paths
 
