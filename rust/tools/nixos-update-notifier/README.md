@@ -80,11 +80,11 @@ If the lock would change but free memory is below `--min-mem-mib`, you get a not
 
 Requires a logged-in graphical session for notifications (session bus). Missed runs fire on next login when `Persistent=true`.
 
-Host flakes must expose the path input:
+The root `flake.nix` exposes the source as a path input (already present):
 
 ```nix
 nixos-update-notifier-src = {
-  url = "path:../../rust/tools/nixos-update-notifier";
+  url = "path:./rust/tools/nixos-update-notifier";
   flake = false;
 };
 ```

@@ -154,7 +154,7 @@ fn maybe_notify(
 }
 
 /// The unified root flake (ADR-0001): every host is `nixosConfigurations.<host>` of
-/// `$HOME/.dotfiles`. The per-host `hosts/<name>` flakes are legacy shims.
+/// `$HOME/.dotfiles`; there are no per-host flakes to point at.
 pub fn default_flake_dir(home: &str) -> PathBuf {
     PathBuf::from(home).join(".dotfiles")
 }
