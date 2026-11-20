@@ -1,5 +1,9 @@
 # Mimir system configuration (file server)
-{inputs, ...}: {
+{
+  inputs,
+  lib,
+  ...
+}: {
   imports = [
     inputs.disko.nixosModules.disko
     ./disko.nix
@@ -12,6 +16,9 @@
   profiles.communication.enable = true;
   # profiles.creative.enable = true;
   profiles.desktop.enable = true;
+  # Mimir is a headless-first file server; GNOME is the only desktop it needs. The desktop
+  # profile turns Hyprland on fleet-wide, so opt out here rather than in the profile.
+  features.window-manager.hyprland.enable = lib.mkForce false;
   profiles.development.enable = true;
   # profiles.gaming.enable = true;
 

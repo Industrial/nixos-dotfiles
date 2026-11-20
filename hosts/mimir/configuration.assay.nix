@@ -28,4 +28,7 @@ in
     buildClientNotServer = assay.eq [(has "fleet.nix-remote-builder-client") (has "fleet.nix-remote-builder-server")] [true false];
 
     noGaming = assay.eq cfg.profiles.gaming.enable false;
+
+    # The desktop profile brings GNOME and Hyprland; mimir keeps GNOME only.
+    gnomeWithoutHyprland = assay.eq [(has "window-manager.gnome") (has "window-manager.hyprland")] [true false];
   }
