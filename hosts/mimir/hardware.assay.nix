@@ -1,7 +1,8 @@
 # Colocated suite for hosts/mimir/hardware.nix.
 #
-# Mimir's hardware module is the fleet's common hardware stance with nothing host-specific
-# (its storage drivers live in ./filesystems.nix): full redistributable and unfree firmware,
+# Mimir's hardware module is the fleet's common hardware stance plus one host-specific fix
+# (SATA link power at max performance, for the WTR PRO's bay 3; storage drivers live in
+# ./filesystems.nix): full redistributable and unfree firmware,
 # Bluetooth powered at boot with blueman, and power management. Claims read the evaluated NixOS
 # config, so they also hold if the module is refactored into a shared profile.
 let
@@ -30,4 +31,7 @@ in
     sleepTargetsDisabled =
       assay.eq (map (t: cfg.systemd.targets.${t}.enable) ["sleep" "suspend" "hibernate" "hybrid-sleep"])
       [false false false false];
+    # Bay 3 hard-resets its link with BadCRC under the default med_power_with_dipm policy;
+    # max_performance (1) is AOOSTAR's fix. Losing it puts a RAID5 member back on the reset path.
+    sataLpmMaxPerformance = assay.eq (builtins.elem "ahci.mobile_lpm_policy=1" cfg.boot.kernelParams) true;
   }

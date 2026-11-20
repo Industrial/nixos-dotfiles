@@ -1,4 +1,13 @@
 {...}: {
+  # Mimir is an AOOSTAR WTR PRO (Ryzen 7 5825U): four bays on two 2-port AHCI controllers
+  # (0000:05:00.0 / 05:00.1). The kernel's default mobile LPM policy on this chipset is
+  # med_power_with_dipm, under which bay 3 (ata3) throws `interface fatal error` /
+  # `SError: { UnrecovData 10B8B BadCRC }` and hard-resets its link — seen on the first boot
+  # after the 2026-11-20 reinstall, with a btrfs read error on that member. AOOSTAR's own fix
+  # is SATA link power management at max performance; 1 = max_performance. Costs a few watts
+  # of idle power and keeps the RAID5 members off the reset path.
+  boot.kernelParams = ["ahci.mobile_lpm_policy=1"];
+
   hardware = {
     enableAllFirmware = true;
 
