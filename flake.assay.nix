@@ -48,7 +48,25 @@ in
     ];
     # Deliberately NOT following nixpkgs: its FOD hash and interpreter pin are fixed against
     # its own nixpkgs (see the comment in flake.nix).
-    llmAgentsKeepsItsOwnNixpkgs = assay.eq (inputs.llm-agents ? inputs) false;
+    # Its lib-only inputs (systems, flake-parts, treefmt-nix) do follow the root; nixpkgs not.
+    llmAgentsKeepsItsOwnNixpkgs = assay.eq ((inputs.llm-agents.inputs or {}) ? nixpkgs) false;
+    # Links against the root pin fail (-lsqlite3) until Industrial/assay#11 lands.
+    assayKeepsItsOwnNixpkgs = assay.eq ((inputs.assay.inputs or {}) ? nixpkgs) false;
+    # Everything else that carries a nixpkgs follows the root's.
+    nixpkgsFollowedWhereSafe =
+      assay.eq
+      (map (n: inputs.${n}.inputs.nixpkgs.follows or null) ["hyprland" "nixos-hardware" "deploy-rs" "comin" "stylix" "nixvim" "emerald"])
+      ["nixpkgs" "nixpkgs" "nixpkgs" "nixpkgs" "nixpkgs" "nixpkgs" "nixpkgs"];
+    # The lock holds exactly three nixpkgs: the root's, llm-agents' and assay's.
+    lockHasThreeNixpkgs =
+      assay.eq
+      (builtins.length (lib.filter (n: lib.toLower (n.locked.repo or "") == "nixpkgs" || lib.hasSuffix "nixexprs.tar.xz" (n.locked.url or "") || (n.locked.repo or "") == "nixpkgs.lib") (builtins.attrValues lock.nodes)))
+      3;
+    # checks.flake-lock-follows has nothing to report on the committed lock.
+    lockFollowsCheckIsClean = assay.eq outputs.checks.x86_64-linux.flake-lock-follows.report "";
+    # One nix-community key, the one nix-community.org/cache publishes.
+    trustsOnlyTheRealNixCommunityKey =
+      assay.eq flake.nixConfig.extra-trusted-public-keys ["nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="];
     # Every input the lock resolves is one the flake declares, and vice versa.
     lockMatchesDeclaredInputs =
       assay.eq (builtins.attrNames nixos.flakeInputs) (builtins.attrNames inputs);
