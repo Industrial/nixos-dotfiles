@@ -64,16 +64,34 @@ expect "check -n prints the plan" 0 '^bin/dev check' "$DEV" check -n --no-rust
 for s in format deadnix feature-reachability lint-fetch-pins assay bin-dev-selftest; do
     has "check plan has $s" "^  $s "
 done
-lacks "check builds or evaluates no host by default" '^  (eval-|flake-check|cargo-)'
+lacks "check builds or evaluates no host by default" '^  (check-|flake-checks|cargo-|shell-budget|clamav|lynis|stig) '
 has "check format-checks only changed files by default" '^  format +bin/dev format --check$'
 expect "check --format-all checks the whole tree, as CI" 0 '^  format +bin/dev format --check --all$' "$DEV" check -n --no-rust --format-all
-expect "check --host adds that host's eval" 0 '^  eval-mimir +bin/dev eval mimir' "$DEV" check -n --no-rust --host mimir
-expect "check --hosts covers the CI matrix" 0 '^  eval-huginn ' "$DEV" check -n --no-rust --hosts
-has "check --hosts has drakkar" '^  eval-drakkar '
-has "check --hosts has mimir" '^  eval-mimir '
+expect "check --host runs CI's check-host for it" 0 '^  check-mimir +bin/ci/check-host mimir$' "$DEV" check -n --no-rust --host mimir
+# --hosts takes the host list from the flake, like ci.yml's generated matrix;
+# BIN_DEV_HOSTS stands in for `nix eval .#nixosConfigurations` here.
+expect "check --hosts covers every nixosConfigurations host" 0 '^  check-installer ' \
+    env BIN_DEV_HOSTS="drakkar huginn installer mimir muninn" "$DEV" check -n --no-rust --hosts
+for h in drakkar huginn mimir muninn; do has "check --hosts has $h" "^  check-$h "; done
 expect "check --rust adds the cargo jobs" 0 '^  cargo-clippy ' "$DEV" check -n --rust
 has "check --rust has cargo-test" '^  cargo-test '
-expect "check --flake-check adds nix flake check" 0 '^  flake-check +nix flake check --no-build' "$DEV" check -n --no-rust --flake-check
+has "check --rust has cargo-nix-drift" '^  cargo-nix-drift '
+expect "check --flake-checks runs bin/ci/flake-checks" 0 '^  flake-checks +bin/ci/flake-checks$' "$DEV" check -n --no-rust --flake-checks
+expect "check --scans adds clamav, lynis, stig" 0 '^  stig +bin/ci/stig$' "$DEV" check -n --no-rust --scans
+expect "check --shell-budget adds it" 0 '^  shell-budget +bin/ci/shell-budget$' "$DEV" check -n --no-rust --shell-budget
+
+# --all is ci.yml's job list: every job there (bar the `hosts` lister and the
+# `all-green` gate) is a step here, and every step here is a job there.
+ci_jobs="$(sed -n '/^jobs:/,$p' "$DOT/.github/workflows/ci.yml" | grep -oE '^  [a-z][a-z0-9-]*:' | tr -d ' :' | grep -vxE 'hosts|all-green' | sort)"
+expect "check --all prints the whole plan" 0 '^  check-mimir ' \
+    env BIN_DEV_HOSTS="mimir" "$DEV" check -n --all
+plan_jobs="$(grep -oE '^  [a-z][a-z0-9-]* ' "$T/out" | tr -d ' ' | sed 's/^check-.*/check/' | sort -u)"
+if [ -n "$ci_jobs" ] && [ "$ci_jobs" = "$plan_jobs" ]; then
+    ok "check --all matches ci.yml's jobs ($(wc -l <<<"$ci_jobs"))"
+else
+    ko "check --all differs from ci.yml's jobs"
+    diff <(echo "$ci_jobs") <(echo "$plan_jobs") | sed 's/^/    /'
+fi
 expect "check --only narrows the plan" 0 '^  deadnix ' "$DEV" check -n --no-rust --only deadnix
 lacks "check --only drops the rest" '^  format '
 expect "check --skip drops a step" 0 '^  format ' "$DEV" check -n --no-rust --skip deadnix

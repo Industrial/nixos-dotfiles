@@ -2,7 +2,7 @@
 # bin/dev — the one entry point for working on this repo.
 #
 #   bin/dev                 list the commands (this is the discoverable part)
-#   bin/dev check           mirror the PR workflow locally, without building hosts
+#   bin/dev check           mirror .github/workflows/ci.yml locally, without building hosts
 #   bin/dev test nushell    one feature's assay suites
 #   bin/dev eval mimir      evaluate one host, no build
 #
@@ -20,9 +20,6 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
-
-# Hosts the PR workflow's `check (<host>)` matrix covers (.github/workflows/pr.yml).
-CI_HOSTS=(drakkar huginn mimir)
 
 ORIG_ARGS=("$@")
 
@@ -43,12 +40,16 @@ usage() {
 bin/dev — tasks for this repo. Every command runs from any directory.
 
 Before pushing
-  check [opts]            Mirror the PR workflow locally: format, deadnix,
-                          feature-reachability, lint-fetch-pins, assay (+coverage checks),
-                          cargo jobs when rust/ changed. Builds no host by default.
-    --host <h>            also evaluate host <h> (repeatable)
-    --hosts               also evaluate every CI host (drakkar huginn mimir)
-    --flake-check         also run `nix flake check --no-build` (evaluates all hosts)
+  check [opts]            Mirror .github/workflows/ci.yml locally, step names = job
+                          names. Default: format, deadnix, feature-reachability,
+                          lint-fetch-pins, assay, bin-dev-selftest, and the cargo
+                          jobs when rust/ changed. Evaluates and builds no host.
+    --host <h>            add check-<h>: bin/ci/check-host <h> (repeatable)
+    --hosts               add check-<h> for every nixosConfigurations host, as CI does
+    --flake-checks        add flake-checks: bin/ci/flake-checks (~6 min, ~6 GiB)
+    --shell-budget        add shell-budget: bin/ci/shell-budget
+    --scans               add clamav, lynis, stig
+    --all                 all of the above: the whole ci.yml job list
     --format-all          format-check the whole tree, as CI does (default: the
                           files changed against the merge base)
     --rust | --no-rust    force the cargo jobs on or off (default: on if rust/ changed)
@@ -130,7 +131,14 @@ need() {
 
 # --- hosts ---------------------------------------------------------------------
 
+# The flake's nixosConfigurations: the same list ci.yml's `hosts` job generates
+# the check matrix from. BIN_DEV_HOSTS overrides it (bin/dev.d/test.sh uses that
+# to stay evaluation-free).
 flake_hosts() {
+  if [[ -n "${BIN_DEV_HOSTS:-}" ]]; then
+    tr ' ' '\n' <<<"$BIN_DEV_HOSTS"
+    return 0
+  fi
   nix eval --json .#nixosConfigurations --apply builtins.attrNames 2>/dev/null |
     tr -d '[]"' | tr ',' '\n'
 }
@@ -178,7 +186,7 @@ in_list() { # in_list <needle> <comma,list>
 }
 
 cmd_check() {
-  local hosts=() flake_check=0 format_all="" rust=auto only="" skip="" fail_fast=0 dry=0
+  local hosts=() all_hosts=0 flake_checks=0 shell_budget=0 scans=0 format_all="" rust=auto only="" skip="" fail_fast=0 dry=0
   while (($#)); do
     case "$1" in
       --host)
@@ -191,11 +199,23 @@ cmd_check() {
         shift
         ;;
       --hosts)
-        hosts+=("${CI_HOSTS[@]}")
+        all_hosts=1
         shift
         ;;
-      --flake-check)
-        flake_check=1
+      --flake-checks | --flake-check)
+        flake_checks=1
+        shift
+        ;;
+      --shell-budget)
+        shell_budget=1
+        shift
+        ;;
+      --scans)
+        scans=1
+        shift
+        ;;
+      --all)
+        all_hosts=1 flake_checks=1 shell_budget=1 scans=1 format_all=1 rust=1
         shift
         ;;
       --format-all)
@@ -240,32 +260,43 @@ cmd_check() {
     if rust_changed; then rust=1; else rust=0; fi
   fi
 
-  # name|command. Names are the PR workflow's job names, so a red step here
-  # points at the same job there.
-  local plan=(
-    "format|bin/dev format --check${format_all:+ --all}"
+  if ((all_hosts)); then
+    local listed
+    listed="$(flake_hosts)" || true
+    [[ -n "$listed" ]] || usage_die "check --hosts: could not list nixosConfigurations (is nix installed?)"
+    mapfile -t -O "${#hosts[@]}" hosts <<<"$listed"
+  fi
+
+  # name|command, in ci.yml's job order. Names are ci.yml's job names, so a red
+  # step here points at the same job there; commands are the scripts or the
+  # run: lines those jobs execute.
+  local plan=("format|bin/dev format --check${format_all:+ --all}")
+  ((scans)) && plan+=("clamav|bin/ci/clamav" "lynis|bin/ci/lynis")
+  plan+=(
     "deadnix|bin/ci/deadnix"
     "feature-reachability|bin/ci/feature-reachability"
     "lint-fetch-pins|bin/ci/lint-fetch-pins"
     "assay|bin/ci/assay"
-    "bin-dev-selftest|bin/dev.d/test.sh"
   )
+  ((shell_budget)) && plan+=("shell-budget|bin/ci/shell-budget")
+  ((scans)) && plan+=("stig|bin/ci/stig")
   if ((rust)); then
     plan+=(
       'cargo-clippy|nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#clippy -c bash -c "cd rust && cargo clippy --workspace --all-targets -- -D warnings"'
       'cargo-test|nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo test --workspace"'
+      'cargo-nix-drift|nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo generate-lockfile" && git diff --exit-code rust/tools/*/Cargo.nix'
     )
-  fi
-  if ((flake_check)); then
-    plan+=("flake-check|nix flake check --no-build")
   fi
   local h seen=","
   for h in ${hosts[@]+"${hosts[@]}"}; do
+    [[ -n "$h" ]] || continue
     [[ "$seen" == *",$h,"* ]] && continue
     seen+="$h,"
     [[ "$h" =~ ^[A-Za-z0-9_-]+$ ]] || usage_die "not a host name: '$h'"
-    plan+=("eval-$h|bin/dev eval $h")
+    plan+=("check-$h|bin/ci/check-host $h")
   done
+  ((flake_checks)) && plan+=("flake-checks|bin/ci/flake-checks")
+  plan+=("bin-dev-selftest|bin/dev.d/test.sh")
 
   local selected=() entry name
   for entry in "${plan[@]}"; do
@@ -276,12 +307,20 @@ cmd_check() {
   done
   ((${#selected[@]})) || usage_die "check: --only/--skip left no steps"
 
-  say "bin/dev check — local mirror of .github/workflows/pr.yml"
+  say "bin/dev check — local mirror of .github/workflows/ci.yml"
   for entry in "${selected[@]}"; do
     printf '  %-22s %s\n' "${entry%%|*}" "${entry#*|}"
   done
-  say "  not run here (CI covers them): clamav, lynis, stig, shell-budget, check (<host>) builds."
-  say "  run one by hand with bin/ci/<name>; evaluate a host with --host <h>."
+  local left=()
+  ((scans)) || left+=(clamav lynis stig)
+  ((shell_budget)) || left+=(shell-budget)
+  ((rust)) || left+=("cargo-*")
+  ((${#hosts[@]})) || left+=("check (<host>)")
+  ((flake_checks)) || left+=(flake-checks)
+  if ((${#left[@]})); then
+    say "  left to CI: ${left[*]} (add with --scans, --shell-budget, --rust, --host/--hosts,"
+    say "  --flake-checks; --all for the whole list)"
+  fi
   if ((dry)); then return 0; fi
 
   need nix nix-shell git jq python3
@@ -313,8 +352,8 @@ cmd_check() {
   say "bin/dev check — summary"
   printf '%s\n' "${results[@]}"
   if ((failed)); then
-    say "Some steps failed. On a branch cut from a red main, compare with main's run before"
-    say "treating a failure as yours: gh run list -R Industrial/nixos-dotfiles -b main"
+    say "Some steps failed. main is gated by ci / all-green, so these are most likely this"
+    say "branch's; main's runs: gh run list -R Industrial/nixos-dotfiles -b main"
   fi
   return "$failed"
 }
@@ -394,14 +433,14 @@ cmd_format() {
       treefmt
       ;;
     "--check --all")
-      need nix-shell
+      need nix
       bin/ci/lint
       ;;
     "--check ")
       # CI's format job walks the whole tree. Locally that rewrites every file
       # main itself leaves unformatted, so by default only the files this
       # branch touched are checked: the ones a new format failure can be in.
-      need nix-shell git
+      need nix git
       local files=()
       mapfile -t files < <(changed_files)
       if ((${#files[@]} == 0)); then
