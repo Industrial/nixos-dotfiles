@@ -22,8 +22,8 @@
 # (see rules/roam-code.md) and `cargo check` answers the rest, at a fraction of
 # the resident cost.
 #
-# CONFIG IS A STORE SYMLINK, not a seeded copy, following features/cli/atuin and
-# features/cli/tealdeer. Helix only ever reads these files — nothing in the editor
+# CONFIG IS A STORE SYMLINK, not a seeded copy, following features/cli/atuin.
+# Helix only ever reads these files — nothing in the editor
 # writes its own config back — so an immutable symlink costs nothing and keeps the
 # configuration reviewable here instead of drifting in $HOME. A pre-existing real
 # file is moved aside rather than clobbered. features/programming/zed goes the
@@ -134,7 +134,7 @@ in {
 
       for name in config.toml languages.toml; do
         # Move a real file aside rather than clobber it, the same way
-        # features/cli/tealdeer and features/cli/atuin do.
+        # features/cli/atuin does.
         if [ -f ${configDir}/$name ] && [ ! -L ${configDir}/$name ]; then
           mv ${configDir}/$name ${configDir}/$name.backup
         fi

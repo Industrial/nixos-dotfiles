@@ -54,7 +54,7 @@ in
     relativeLineNumbers = assay.eq config.editor.line-number "relative";
 
     # Config is symlinked from the store, and a pre-existing real file is moved aside rather
-    # than clobbered -- the features/cli/tealdeer pattern.
+    # than clobbered -- the features/cli/atuin pattern.
     symlinksConfig = assay.eq (activationHas "ln -sfn /nix/store/") true;
     backsUpExistingConfig = assay.eq (activationHas "mv ${configDir}/$name ${configDir}/$name.backup") true;
     chownsToUser = assay.eq (activationHas "chown -R ${user}:users ${configDir}") true;

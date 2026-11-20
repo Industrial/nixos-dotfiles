@@ -5,8 +5,8 @@
 # discovering interactively: every sheet opens with a `%` tag line, and every snippet has a
 # comment above it, because navi's `write_cmd` throws away an item whose comment is empty.
 #
-# The rest of the suite pins the wiring: that the sheets land where navi looks by default, that
-# the parent directory stays writable, and that `--tldr` is told it is talking to tealdeer.
+# The rest of the suite pins the wiring: that the sheets land where navi looks by default and
+# that the parent directory stays writable.
 let
   assay = import ./../../../common/assay/default.nix;
   pkgs = import <nixpkgs> {};
@@ -100,7 +100,7 @@ in
     everySheetOpensWithATag = assay.eq (map firstTagLine sheetNames) [
       "% dotfiles, fleet, deploy"
       "% dotfiles, gates, assay, ci"
-      "% dotfiles, help, tldr, navi"
+      "% dotfiles, help, navi"
       "% dotfiles, nix, eval"
       "% dotfiles, rebuild"
       "% dotfiles, security, stig"
@@ -141,11 +141,6 @@ in
     # ---------------------------------------------------------------------------
     # The config
     # ---------------------------------------------------------------------------
-    #
-    # navi's --tldr client shells out to whatever `tldr` is on PATH and picks its output flag
-    # from this boolean alone: true is `--raw` (tealdeer's), false is `--markdown` (the
-    # node client's, which tealdeer rejects). features/cli/tealdeer is what provides `tldr`.
-    tldrClientIsTealdeer = assay.eq (has configYaml "tealdeer: true") true;
     finderIsFzf = assay.eq (has configYaml "command: fzf") true;
     # Naming the store path here would make this repo's sheets the only ones navi can see, and
     # the activation link already puts them where navi looks.
@@ -155,7 +150,7 @@ in
     # Content, not generic Linux
     # ---------------------------------------------------------------------------
     #
-    # The point of the feature. tldr already knows about tar; only this repo knows these.
+    # The point of the feature. Generic help already knows about tar; only this repo knows these.
     coversTheHostEvalIdiom =
       assay.eq (has allSheets "nix eval --raw \".#nixosConfigurations.<host>.config.system.build.toplevel.drvPath\"") true;
     coversFleetDeploy = assay.eq (has allSheets "bin/fleet deploy <host> --dry-activate") true;

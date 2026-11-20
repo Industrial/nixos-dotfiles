@@ -37,7 +37,6 @@
 
     # Documentation and Help — the answer to "how do I run this" without a browser
     features.cli.navi.enable = true;
-    features.cli.tealdeer.enable = true;
 
     # Files, Listing, Search and Text
     features.cli.bat.enable = true;

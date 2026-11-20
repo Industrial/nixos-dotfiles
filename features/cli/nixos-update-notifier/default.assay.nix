@@ -2,7 +2,7 @@
 #
 # Evaluated against the real NixOS option tree with the nixos-update-notifier-src input resolved
 # from flake.lock (rust/tools/nixos-update-notifier). The notifier draws a desktop notification,
-# so — unlike atuin's and tealdeer's maintenance timers — it is the one user unit here that
+# so — unlike atuin's maintenance timer — it is the one user unit here that
 # does want and follow the graphical session.
 let
   assay = import ./../../../common/assay/default.nix;

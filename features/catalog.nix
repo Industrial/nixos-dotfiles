@@ -87,7 +87,6 @@
   ./cli/slumber
   ./cli/spotify-player
   ./cli/starship
-  ./cli/tealdeer
   ./cli/television
   ./cli/tokei
   ./cli/unrar
