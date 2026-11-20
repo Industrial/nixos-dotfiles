@@ -79,6 +79,7 @@
     features.cli.hyperfine.enable = true;
     features.cli.killall.enable = true;
     features.cli.lnav.enable = true;
+    features.cli.lowprio.enable = true;
     features.cli.lsof.enable = true;
     features.cli.lsusb.enable = true;
     features.cli.oomkiller.enable = true;

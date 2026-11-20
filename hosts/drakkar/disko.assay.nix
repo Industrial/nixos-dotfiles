@@ -35,6 +35,9 @@ in
     unlocksSsdLuksPartition = assay.eq luks.cryptroot.device "/dev/disk/by-partlabel/disk-ssd-luks";
     # No keyfile baked into the world-readable store: the passphrase is entered at boot.
     noKeyFileInStore = assay.eq luks.cryptroot.keyFile null;
+    # dm-crypt skips its kcryptd workqueues on the NVMe: lower latency under write bursts,
+    # where fsync() callers otherwise stall behind the queue.
+    bypassesCryptWorkqueues = assay.eq luks.cryptroot.bypassWorkqueues true;
 
     rootIsBtrfs = assay.eq fs."/".fsType "btrfs";
     # Each system mount is its own subvolume, so /nix, /home and /var snapshot independently.

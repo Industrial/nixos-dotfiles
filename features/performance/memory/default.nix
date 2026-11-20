@@ -30,9 +30,33 @@
     };
   };
 
+  # Compressed swap in RAM. With no swap at all, the only memory the kernel can reclaim under
+  # pressure is file-backed pages, and those include the executable code of gnome-shell and
+  # the browsers. They get evicted and re-read from disk over and over, which is what a
+  # "frozen" desktop is. zram gives anonymous memory somewhere to go first. zstd fits 2-4x
+  # into the same space; 25% of RAM caps how much it can take.
+  #
+  # systemd-oomd stays unaffected: only the root slice opts into oomd, and only by memory
+  # pressure (ManagedOOMMemoryPressure), never by swap use (ManagedOOMSwap).
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 25;
+  };
+
   boot = {
     kernel = {
       sysctl = {
+        # Write back in small steady amounts instead of multi-gigabyte bursts. The ratio
+        # defaults (20% / 10%) let ~12 GiB of dirty pages build up on a 61 GiB host before
+        # writers are throttled. Parallel lld links filled that with gigabytes of output and
+        # then flushed it all at once; every fsync() behind the flush (browser profiles,
+        # dockerd, gnome-shell) stalled with it. Measured on drakkar 2026-11-20: I/O
+        # pressure "full" up to 71% with 4.5 GiB dirty, memory never below 16 GiB available.
+        # Setting the *_bytes knobs zeroes the *_ratio ones.
+        "vm.dirty_bytes" = 536870912; # 512 MiB: writers are throttled from here
+        "vm.dirty_background_bytes" = 134217728; # 128 MiB: background writeback starts here
+
         # Kill the allocating task instead of searching for best candidate
         "vm.oom_kill_allocating_task" = 1;
 
