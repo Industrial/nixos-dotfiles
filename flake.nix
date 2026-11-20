@@ -4,6 +4,31 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
+    # Shared library-only inputs, hoisted so the lock holds one copy of each instead of
+    # one per consumer. None of them carries packages: they are systems lists, flake
+    # helpers and the flake-compat shim, so a single pin cannot change what gets built.
+    systems.url = "github:nix-systems/default";
+
+    flake-utils = {
+      url = "github:numtide/flake-utils";
+      inputs.systems.follows = "systems";
+    };
+
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+
+    flake-compat = {
+      url = "github:NixOS/flake-compat";
+      flake = false;
+    };
+
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Follows nixpkgs, against the Hyprland wiki's default advice, on purpose. The wiki
     # (content/nix/cachix.md) warns that overriding nixpkgs makes the Hyprland Cachix
     # useless. This fleet does not use that cache: hyprland.cachix.org is in neither
@@ -17,6 +42,7 @@
     hyprland = {
       url = "github:hyprwm/hyprland";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pre-commit-hooks.inputs.flake-compat.follows = "flake-compat";
     };
 
     quickshell = {
@@ -45,6 +71,8 @@
     nixvim = {
       url = "github:nix-community/nixvim";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.systems.follows = "systems";
     };
 
     nix-vscode-extensions = {
@@ -55,6 +83,8 @@
     stylix = {
       url = "github:danth/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.systems.follows = "systems";
     };
 
     disko = {
@@ -72,11 +102,21 @@
       flake = false;
     };
 
+    # Deliberately does NOT follow nixpkgs, for now. Built against the root pin, the
+    # locked assay (fd6b48ca) fails to link: `ld: cannot find -lsqlite3`. Its
+    # buildRustPackage declares only pkg-config, and rusqlite's libsqlite3-sys (not
+    # `bundled`) emits `-lsqlite3` with no sqlite in buildInputs. Under its own pin
+    # (rustc 1.97.1) the binary links without it (no libsqlite3 in NEEDED); under the
+    # root pin (rustc 1.99.1) the linker demands it. Tried 2026-11-20 (drv
+    # h46igm72...-assay-0.3.0). The fix belongs upstream:
+    # `buildInputs = [pkgs.sqlite]` in Industrial/assay's mkCrate. Once that lands, add
+    # `inputs.nixpkgs.follows = "nixpkgs"` and drop assay from `separateNixpkgs` below.
     assay.url = "github:Industrial/assay";
 
     emerald = {
       url = "github:Industrial/emerald";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
 
     voltaic = {
@@ -87,6 +127,8 @@
     deploy-rs = {
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.utils.follows = "flake-utils";
+      inputs.flake-compat.follows = "flake-compat";
     };
 
     nixos-generators = {
@@ -106,6 +148,8 @@
     comin = {
       url = "github:nlewo/comin";
       inputs.nixpkgs.follows = "nixpkgs";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+      inputs.flake-compat.follows = "flake-compat";
     };
 
     # numtide's package set for coding agents — the source of openhands-agent-canvas
@@ -124,7 +168,16 @@
     # Nix ignores substituters from a non-root flake, so it is not in effect — adding it to
     # the fleet's nix settings would be a separate trust decision, not a side effect of
     # installing a package.
-    llm-agents.url = "github:numtide/llm-agents.nix";
+    #
+    # Its library-only inputs (systems, flake-parts, treefmt-nix) do follow the root:
+    # they shape the flake's outputs, not the derivations, so the packages keep building
+    # from numtide's nixpkgs. Verified by an unchanged openhands-agent-canvas drvPath.
+    llm-agents = {
+      url = "github:numtide/llm-agents.nix";
+      inputs.systems.follows = "systems";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.treefmt-nix.follows = "treefmt-nix";
+    };
 
     # Prebuilt nix-index databases, so `comma` can answer "which package ships this
     # binary?" immediately instead of each host spending a multi-hour local `nix-index`
