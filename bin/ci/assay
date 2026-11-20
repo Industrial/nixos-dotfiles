@@ -6,3 +6,4 @@ cd "$ROOT"
 ASSAY_FLAKE="$(jq -r '.nodes.assay.locked | "github:\(.owner)/\(.repo)/\(.rev)"' devenv.lock)"
 nix shell "${ASSAY_FLAKE}#assay" -c assay run .
 ./bin/assay-coverage-check
+./bin/assay-source-match-check

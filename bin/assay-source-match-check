@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# Fail if an *.assay.nix suite regex-matches Nix module source instead of evaluating it.
+#
+# A suite that does `builtins.readFile ./foo.nix` and greps it passes whenever the text
+# looks right: a refactor can break behaviour without failing it, and a comment can fail
+# it without any behaviour change. Suites evaluate modules instead, via
+# common/assay/nixos.nix. Reading non-Nix files (Lua, shell, TOML) stays fine: there the
+# text is the artifact.
+#
+# Ratchet: suites written before this check are listed in
+# common/assay/source-match-allowlist.txt. A new offender fails, and so does an allowlist
+# entry that no longer offends, so the list can only shrink.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+python3 - "$ROOT" "$@" <<'PY'
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+write = "--write-allowlist" in sys.argv[2:]
+allow_path = root / "common/assay/source-match-allowlist.txt"
+
+# readFile of a path literal ending in .nix, optionally parenthesised / concatenated.
+pattern = re.compile(r"readFile\s*\(?\s*[^\s;)]*\.nix\b")
+
+suites = subprocess.run(
+    ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "*.assay.nix"],
+    cwd=root, check=True, capture_output=True, text=True,
+).stdout.split("\0")
+
+offenders = sorted(
+    s for s in suites
+    if s and (root / s).is_file() and pattern.search((root / s).read_text())
+)
+
+header = [
+    "# Suites still regex-matching Nix source (see bin/assay-source-match-check).",
+    "# Migrate one to common/assay/nixos.nix, then delete its line. Never add lines.",
+]
+
+if write:
+    allow_path.write_text("\n".join(header + offenders) + "\n")
+    print(f"assay-source-match-check: wrote {len(offenders)} entries to {allow_path.relative_to(root)}")
+    sys.exit(0)
+
+allow = {
+    l.strip() for l in allow_path.read_text().splitlines()
+    if l.strip() and not l.strip().startswith("#")
+}
+
+new = [o for o in offenders if o not in allow]
+# A suite deleted outright is not a regression; only one that still exists and no longer
+# offends must leave the list (which is what keeps the ratchet moving).
+stale = sorted(a for a in allow if a not in offenders and (root / a).exists())
+
+if new or stale:
+    if new:
+        print(f"assay-source-match-check: FAIL — {len(new)} suite(s) regex-match Nix source;"
+              " evaluate the module with common/assay/nixos.nix instead:", file=sys.stderr)
+        for n in new:
+            print(f"  {n}", file=sys.stderr)
+    if stale:
+        print(f"assay-source-match-check: FAIL — {len(stale)} allowlist entr(y/ies) no longer"
+              " offend; delete them from common/assay/source-match-allowlist.txt:", file=sys.stderr)
+        for s in stale:
+            print(f"  {s}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"assay-source-match-check: OK — {len(suites) - 1} suites, {len(offenders)} legacy source-matchers left")
+PY
