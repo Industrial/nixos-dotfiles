@@ -1,74 +1,8 @@
-# DNSCrypt with Quad9 upstream
-# Check if the service is running:
-#   systemctl status dnscrypt-proxy2
-# Test DNS Resolution:
-#   nix-shell -p dnsutils --run "dig example.com @127.0.0.1"
-# Test Malware Blocking:
-#   nix-shell -p dnsutils --run "dig malware.testcategory.com @127.0.0.1"
-# Verify DNSSEC:
-#   nix-shell -p dnsutils --run "dig +dnssec example.com @127.0.0.1"
-{
-  settings,
-  lib,
-  ...
-}: {
-  # Add local DNS entries
-  networking = {
-    # nameservers = ["127.0.0.1" "::1"];
-    # search = ["${settings.hostname}"];
-  };
-
-  # services = {
-  #   dnscrypt-proxy2 = {
-  #     enable = true;
-  #     settings = {
-  #       ipv6_servers = true;
-  #       block_ipv6 = false;
-  #       require_dnssec = true;
-
-  #       # Use Quad9 servers
-  #       server_names = [
-  #         "quad9-dnscrypt-ip4-filter-pri"
-  #         "quad9-dnscrypt-ip4-filter-alt"
-  #       ];
-
-  #       sources = {
-  #         # Use Quad9's resolver list
-  #         quad9-resolvers = {
-  #           urls = [
-  #             "https://quad9.net/dnscrypt/quad9-resolvers.md"
-  #             "https://raw.githubusercontent.com/Quad9DNS/dnscrypt-settings/main/dnscrypt/quad9-resolvers.md"
-  #           ];
-  #           cache_file = "/var/lib/dnscrypt-proxy/quad9-resolvers.md";
-  #           minisign_key = "RWQBphd2+f6eiAqBsvDZEBXBGHQBJfeG6G+wJPPKxCZMoEQYpmoysKUN";
-  #           refresh_delay = 72;
-  #           prefix = "quad9-";
-  #         };
-  #       };
-  #     };
-  #   };
-
-  #   # Optimize resolved
-  #   resolved = {
-  #     enable = true;
-  #     # extraConfig = ''
-  #     #   DNS=1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4
-  #     #   FallbackDNS=1.1.1.1 1.0.0.1
-  #     #   DNSSEC=yes
-  #     #   DNSOverTLS=yes
-  #     #   MulticastDNS=yes
-  #     #   LLMNR=yes
-  #     # '';
-  #   };
-  # };
-
-  # systemd = {
-  #   services = {
-  #     dnscrypt-proxy2 = {
-  #       serviceConfig = {
-  #         StateDirectory = "dnscrypt-proxy";
-  #       };
-  #     };
-  #   };
-  # };
-}
+# DNS: intentionally empty.
+#
+# This module used to carry a commented-out dnscrypt-proxy2 (Quad9) and systemd-resolved
+# setup that no host ran; it is in git history if DNSCrypt is wanted again. Name resolution
+# is whatever NetworkManager (features/nixos/networking) and, where enabled, Mullvad
+# (features/network/mullvad) configure. features/catalog.nix still lists this file; dropping
+# it from there is a follow-up for the catalog owner.
+{...}: {}
