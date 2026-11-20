@@ -58,6 +58,7 @@
   ./cli/leaves
   ./cli/ll
   ./cli/lnav
+  ./cli/lowprio
   ./cli/lsof
   ./cli/lsusb
   ./cli/navi
