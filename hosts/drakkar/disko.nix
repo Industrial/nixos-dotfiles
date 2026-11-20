@@ -30,6 +30,14 @@
                   type = "luks";
                   name = "cryptroot";
                   keyFile = null;
+                  # dm-crypt encrypts in the submitting thread instead of handing every I/O
+                  # to its own kcryptd workqueues. On NVMe the queueing is what costs: it
+                  # adds latency to every read and write, and under a heavy write burst it
+                  # is where fsync() callers end up waiting. Lands in
+                  # boot.initrd.luks.devices.cryptroot.bypassWorkqueues; applies on the next
+                  # unlock (reboot), or live with `cryptsetup refresh --perf-no_read_workqueue
+                  # --perf-no_write_workqueue cryptroot`.
+                  settings.bypassWorkqueues = true;
                   content = {
                     type = "btrfs";
                     # No top-level mountpoint. With one set, disko mounts subvolid 5 at the
