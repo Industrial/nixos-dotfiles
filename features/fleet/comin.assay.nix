@@ -1,29 +1,36 @@
 # Assay: comin pull-convergence feature.
 #
 # Guards the invariants that make pull-convergence safe alongside deploy-rs
-# push (see docs/adr/0002-comin-pull-convergence.md).
+# push (see docs/adr/0002-comin-pull-convergence.md). Evaluated against the real
+# comin module at its flake.lock revision, so an option comin renames or removes
+# fails here instead of on a host.
 let
   assay = import ../../common/assay/default.nix;
-  src = builtins.readFile ./comin.nix;
+  nixos = import ../../common/assay/nixos.nix;
+  cfg = nixos.eval {
+    modules = [./comin.nix];
+    settings.hostname = "mimir";
+  };
+  comin = cfg.services.comin;
+  origin = builtins.head comin.remotes;
 in
   assay.suite "comin" {
-    # The module is not in nixpkgs; it must come from the flake input.
-    importsCominFlakeModule = assay.eq (builtins.match ".*inputs\\.comin\\.nixosModules\\.comin.*" src != null) true;
-
-    enablesComin = assay.eq (builtins.match ".*services\\.comin.*enable = true.*" src != null) true;
+    enablesComin = assay.eq comin.enable true;
 
     # Must select nixosConfigurations.<hostname> from the unified root flake.
-    usesSettingsHostname = assay.eq (builtins.match ".*hostname = settings\\.hostname.*" src != null) true;
+    usesSettingsHostname = assay.eq comin.hostname "mimir";
 
     # repositorySubdir must stay at its default "." — the pre-ADR-0001
-    # per-host-flake value (hosts/<hostname>) silently breaks eval. Anchored to
-    # a line-leading assignment so prose mentioning the option cannot trip it.
-    noStaleRepositorySubdir =
-      assay.eq (builtins.match ".*\n[[:space:]]*repositorySubdir[[:space:]]*=.*" src != null) false;
+    # per-host-flake value (hosts/<hostname>) silently breaks eval.
+    repositorySubdirIsRoot = assay.eq comin.repositorySubdir ".";
 
-    pullsOriginMainWithSwitch =
-      assay.eq (builtins.match ".*name = \"main\".*operation = \"switch\".*" src != null) true;
+    singleOriginRemote = assay.eq (map (r: r.name) comin.remotes) ["origin"];
+    pullsMainWithSwitch = assay.subset origin.branches.main {
+      name = "main";
+      operation = "switch";
+    };
 
-    # Convergence must be observable, not merely asserted.
-    exportsMetrics = assay.eq (builtins.match ".*exporter.*port = 4243.*" src != null) true;
+    # Convergence must be observable, not merely asserted — but only on the tailnet.
+    exportsMetrics = assay.eq comin.exporter.port 4243;
+    metricsPortNotPublished = assay.eq (builtins.elem 4243 (nixos.openTCPPorts cfg)) false;
   }
