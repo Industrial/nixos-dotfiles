@@ -4,7 +4,20 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
-    hyprland.url = "github:hyprwm/hyprland";
+    # Follows nixpkgs, against the Hyprland wiki's default advice, on purpose. The wiki
+    # (content/nix/cachix.md) warns that overriding nixpkgs makes the Hyprland Cachix
+    # useless. This fleet does not use that cache: hyprland.cachix.org is in neither
+    # nixConfig nor nix.settings (features/nixos/default.nix), so Hyprland already builds
+    # from source and the warning costs nothing here. What a second nixpkgs does cost is
+    # the mesa mismatch the wiki documents (installing-hyprland-on-nixos.md, Hyprland
+    # issue #5148): Hyprland linked against one mesa, the system's GL driver from another.
+    # One nixpkgs removes that class of bug. Hyprland's own needs (lua5_5 for the Lua
+    # config) were checked against the root pin on 2026-11-20: lua5_5 5.5.1, mesa 26.3.0.
+    # Revisit only if the fleet adopts the Hyprland Cachix; then drop this follows.
+    hyprland = {
+      url = "github:hyprwm/hyprland";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     quickshell = {
       url = "github:quickshell-mirror/quickshell/28771c7c74b42e20afca0b1b63980cb46515537c";
@@ -17,7 +30,17 @@
       inputs.quickshell.follows = "quickshell";
     };
 
-    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
+    # Tracks master on purpose. nixos-hardware publishes no releases and no stable
+    # branches: master is its only line, the two tags are not releases (one is literally
+    # `not-a-release`), and its README pins `github:NixOS/nixos-hardware/master`. Its
+    # modules are hardware quirks that are meant to track the current kernel, so a frozen
+    # tag would only drift. flake.lock pins the exact rev, which is what makes it
+    # reproducible; `master` only says where `nix flake update` moves it. Follows nixpkgs
+    # as its README shows: its own nixpkgs only feeds its formatter and tests.
+    nixos-hardware = {
+      url = "github:NixOS/nixos-hardware/master";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     nixvim = {
       url = "github:nix-community/nixvim";
@@ -69,6 +92,9 @@
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
+      # nixlib is nix-community/nixpkgs.lib, a lib-only mirror of nixpkgs. The root
+      # nixpkgs exposes the same `lib`, so a second copy buys nothing.
+      inputs.nixlib.follows = "nixpkgs";
     };
 
     claude-desktop = {
