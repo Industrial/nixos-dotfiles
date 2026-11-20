@@ -75,15 +75,58 @@ assay.drv {
 
 ## Deferred expressions (throws)
 
-Nix evaluates arguments eagerly when they appear in strict contexts. Wrap side-effecting or throwing code in a **lambda** so building the suite does not throw:
+Nix evaluates arguments eagerly when they appear in strict contexts, so `assay.throws` takes
+the throwing expression as a **Nix source string**; the runner re-evaluates it in isolation.
+The pattern is a plain **substring** of the error message, or `null` for "any error". A
+function value is rejected (`cannot convert a function to JSON`).
 
 ```nix
 # Bad — fails at import time
-bad = assay.throws (builtins.throw "boom") ".*";
+bad = assay.throws (builtins.throw "boom") "boom";
 
-# Good — runner applies the function in isolation
-good = assay.throws (_: builtins.throw "boom") ".*";
+# Good — the runner evaluates the string
+good = assay.throws "builtins.throw \"boom\"" "boom";
 ```
+
+Inside the string, reference repo files as `${toString ./file.nix}`, not `${./file.nix}`:
+the latter copies that one file into the store, where its own relative imports no longer
+resolve.
+
+## Evaluating NixOS modules (`nixos.nix`)
+
+Assert on what a module **evaluates to**, not on what its source **says**. A suite that
+regex-matches `builtins.readFile ./foo.nix` passes whenever the text looks right — a
+refactor through `mkMerge`, a helper or an import breaks behaviour without failing it, and
+a comment can fail it with no behaviour change.
+
+```nix
+let
+  assay = import ../../common/assay/default.nix;
+  nixos = import ../../common/assay/nixos.nix;
+  cfg = nixos.eval {modules = [./foo.nix]; settings.hostname = "mimir";};
+in
+  assay.suite "foo" {
+    enables = assay.eq cfg.services.foo.enable true;
+    installs = assay.eq (nixos.hasPackage cfg "foo") true;
+    noPorts = assay.eq (nixos.openTCPPorts cfg) (nixos.openTCPPorts nixos.baseline);
+  }
+```
+
+- Evaluates against the **real NixOS option tree**, nixpkgs pinned from the root
+  `flake.lock`: an option that does not exist is an eval error, not a silent pass.
+- `settings` defaults to `common/settings.nix` for a placeholder host; override per suite.
+- `inputs` carries stand-ins for flake inputs modules import (comin today); extend
+  `defaultInputs` in `nixos.nix` when a module needs another.
+- Helpers: `eval`, `evalSystem` (full result incl. `options`), `packageNames`,
+  `hasPackage`, `openTCPPorts`, `openUDPPorts`, `baseline` (empty system to diff against).
+
+Matching text is still right when the **text is the artifact**: a Lua file, a shell
+script, or a generated config string such as `programs.ssh.extraConfig`.
+
+`bin/assay-source-match-check` (run in CI) fails any suite that `readFile`s a `.nix` file.
+Suites predating it are listed in `source-match-allowlist.txt`: migrate one, delete its
+line. An entry that no longer offends fails the check until it is removed, so the list only
+shrinks.
 
 ## runTests / nix-unit compatibility
 
@@ -132,7 +175,8 @@ Colocate suites next to the Nix they exercise (`common/settings.assay.nix`, `fea
 2. Use `assay.drv` instead of raw `eq` on derivations (avoids deep-compare stack overflow).
 3. Prefer `subset` / `hasAttrs` for large configs.
 4. Keep fixtures in separate `.nix` files; import them in `expr`.
-5. Do not rely on global `NIX_PATH` mutations — inject `pkgs` via `module` args or capabilities (runner).
+5. Assert on evaluated config via `nixos.nix`, never on module source text.
+6. Do not rely on global `NIX_PATH` mutations — inject `pkgs` via `module` args or capabilities (runner).
 
 ## Eval locally (no runner)
 
