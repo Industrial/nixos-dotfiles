@@ -59,6 +59,9 @@ in {
   };
 
   scripts = {
+    # `dev check`, `dev test nushell`, ...: bin/dev on PATH inside the shell
+    # (and under direnv). bin/dev with no arguments lists every command.
+    dev.exec = ''exec "$DEVENV_ROOT/bin/dev" "$@"'';
     format.exec = "moon run dotfiles:format";
     # Dotfiles-appropriate targets for git-hooks-prek entry points.
     pre-push.exec = ''

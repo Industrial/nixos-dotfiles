@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-echo "> repl"
-exec > >(tee ./logs/repl) 2>&1
-set -e
+# nix repl on this flake (also: bin/dev repl). Works from any directory.
+set -euo pipefail
 
 dotfiles_root="$(cd "$(dirname "$0")/.." && pwd)"
-echo "> repl > cd $dotfiles_root"
 cd "$dotfiles_root"
-nix repl --extra-experimental-features "flakes repl-flake" ".#"
+mkdir -p logs
+echo "> repl > cd $dotfiles_root"
+exec > >(tee ./logs/repl) 2>&1
+exec nix repl --extra-experimental-features "nix-command flakes" ".#"

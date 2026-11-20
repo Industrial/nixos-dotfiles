@@ -1,0 +1,589 @@
+#!/usr/bin/env bash
+# bin/dev — the one entry point for working on this repo.
+#
+#   bin/dev                 list the commands (this is the discoverable part)
+#   bin/dev check           mirror .github/workflows/ci.yml locally, without building hosts
+#   bin/dev test nushell    one feature's assay suites
+#   bin/dev eval mimir      evaluate one host, no build
+#
+# It is a dispatcher over what already exists, not a second build system: CI's
+# jobs are bin/ci/*, and `check` runs those same scripts; deploys are bin/fleet;
+# updates are bin/update/*; moon's tasks in moon.yml call back into this file.
+# docs/development.md walks through a fresh clone to a first PR with it.
+#
+# Toolchain: commands that need the devenv toolchain (assay, treefmt, python3,
+# jq) re-run themselves through bin/with-devenv when it is missing from PATH,
+# and fail with a message naming the missing tool when that is not possible.
+# Nothing here enters `devenv shell` on its own account, and nothing runs git
+# hooks: shell entry used to run `prek run -a` and recurse (see bin/with-devenv).
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+
+ORIG_ARGS=("$@")
+
+say() { printf '%s\n' "$*"; }
+err() { printf 'bin/dev: %s\n' "$*" >&2; }
+die() {
+  err "$*"
+  exit 1
+}
+usage_die() {
+  err "$*"
+  err "run 'bin/dev' for the list of commands"
+  exit 64
+}
+
+usage() {
+  cat <<'EOF'
+bin/dev — tasks for this repo. Every command runs from any directory.
+
+Before pushing
+  check [opts]            Mirror .github/workflows/ci.yml locally, step names = job
+                          names. Default: format, deadnix, feature-reachability,
+                          lint-fetch-pins, assay, bin-dev-selftest, and the cargo
+                          jobs when rust/ changed. Evaluates and builds no host.
+    --host <h>            add check-<h>: bin/ci/check-host <h> (repeatable)
+    --hosts               add check-<h> for every nixosConfigurations host, as CI does
+    --flake-checks        add flake-checks: bin/ci/flake-checks (~6 min, ~6 GiB)
+    --shell-budget        add shell-budget: bin/ci/shell-budget
+    --scans               add clamav, lynis, stig
+    --all                 all of the above: the whole ci.yml job list
+    --format-all          format-check the whole tree, as CI does (default: the
+                          files changed against the merge base)
+    --rust | --no-rust    force the cargo jobs on or off (default: on if rust/ changed)
+    --only a,b | --skip a,b   pick steps by name
+    --fail-fast           stop at the first failing step
+    -n, --dry-run         print the plan and exit
+  pre-push [opts]         Same as check.
+
+Everyday
+  test [target...]        Assay. No target: the whole repo (what CI runs).
+                          A target is a path (features/cli/nushell, devenv.assay.nix)
+                          or a bare feature name (nushell, cli/nushell).
+  format [--check [--all]]  treefmt over the tree (writes). --check: CI's format
+                          job (treefmt.ci.toml, fails on change) over the files this
+                          branch changed; --all: over the whole tree, as CI does.
+                          Both rewrite the files they would fail on.
+  lint                    Static checks without assay: deadnix, feature-reachability,
+                          lint-fetch-pins, assay coverage + source-match checks.
+  eval [host]             Evaluate one host's system derivation, no build
+                          (default: this machine's hostname). ~20 s, a few GB of RAM.
+  hosts                   List the flake's nixosConfigurations.
+
+Machines
+  build <host>            Build a host's system closure (heavy; nom if available,
+                          nvd diff against /run/current-system for this machine).
+  deploy <host|all> [..]  deploy-rs push via bin/fleet (flags pass through).
+  update [target]         Run bin/update/<target>; no target lists them.
+  repl                    nix repl on this flake.
+
+Setup
+  doctor                  Check the prerequisites and print what is missing.
+  help                    This text.
+
+Also as moon tasks: moon run dotfiles:check | dotfiles:test | dotfiles:lint |
+dotfiles:format | dotfiles:eval -- <host>. See docs/development.md.
+EOF
+}
+
+# --- toolchain -----------------------------------------------------------------
+
+# need <cmd>...: make sure the commands are on PATH. If they are not, re-run
+# this invocation through bin/with-devenv once (it supplies the devenv
+# packages); if that is impossible or did not help, say exactly what is
+# missing and how to get it, instead of failing deep inside a CI script.
+need() {
+  local missing=() c
+  for c in "$@"; do
+    command -v "$c" >/dev/null 2>&1 || missing+=("$c")
+  done
+  ((${#missing[@]} == 0)) && return 0
+
+  if [[ -z "${BIN_DEV_REEXEC:-}" ]] && { [[ -x "$root/.devenv/with-devenv" ]] || command -v devenv >/dev/null 2>&1; }; then
+    export BIN_DEV_REEXEC=1
+    err "${missing[*]} not on PATH; re-running through bin/with-devenv"
+    exec "$root/bin/with-devenv" "$root/bin/dev" "${ORIG_ARGS[@]}"
+  fi
+
+  err "missing on PATH: ${missing[*]}"
+  local host_tools=" nix nix-shell git ssh "
+  for c in "${missing[@]}"; do
+    if [[ "$host_tools" == *" $c "* ]]; then
+      err "  '$c' comes from the host, not devenv: install it (Nix with flakes enabled, git)."
+      err "  See docs/development.md#prerequisites."
+      exit 127
+    fi
+  done
+  if [[ -n "${BIN_DEV_REEXEC:-}" ]]; then
+    err "  bin/with-devenv ran, but the devenv toolchain still lacks them."
+    err "  Re-enter the shell once (direnv reload, or 'devenv shell' then exit) so"
+    err "  .devenv/with-devenv is rebuilt from the current devenv.nix."
+  else
+    err "  They come from the devenv toolchain, and devenv is not installed."
+    err "  Install devenv (https://devenv.sh), then either 'direnv allow' in the repo"
+    err "  or prefix the command: bin/with-devenv bin/dev ${ORIG_ARGS[*]}"
+    err "  See docs/development.md#prerequisites."
+  fi
+  exit 127
+}
+
+# --- hosts ---------------------------------------------------------------------
+
+# The flake's nixosConfigurations: the same list ci.yml's `hosts` job generates
+# the check matrix from. BIN_DEV_HOSTS overrides it (bin/dev.d/test.sh uses that
+# to stay evaluation-free).
+flake_hosts() {
+  if [[ -n "${BIN_DEV_HOSTS:-}" ]]; then
+    tr ' ' '\n' <<<"$BIN_DEV_HOSTS"
+    return 0
+  fi
+  nix eval --json .#nixosConfigurations --apply builtins.attrNames 2>/dev/null |
+    tr -d '[]"' | tr ',' '\n'
+}
+
+require_host() {
+  local h="$1" known
+  [[ "$h" =~ ^[A-Za-z0-9_-]+$ ]] || usage_die "not a host name: '$h'"
+  known="$(flake_hosts)" || true
+  if [[ -n "$known" ]] && ! grep -qx -- "$h" <<<"$known"; then
+    usage_die "unknown host '$h'; the flake has: $(tr '\n' ' ' <<<"$known")"
+  fi
+}
+
+host_attr() { printf '.#nixosConfigurations.%s.config.system.build.toplevel' "$1"; }
+
+eval_host() {
+  local h="$1"
+  say "> nix eval $(host_attr "$h").drvPath"
+  nix eval --raw "$(host_attr "$h").drvPath"
+  printf '\n'
+}
+
+# --- check / pre-push ----------------------------------------------------------
+
+base_ref() {
+  local up
+  # The PR base, not the branch's own upstream: a pushed feature branch tracks
+  # origin/<branch>, whose merge base says nothing about what the PR changes.
+  for up in origin/main main '@{upstream}'; do
+    if git rev-parse -q --verify "$up^{commit}" >/dev/null 2>&1; then
+      git merge-base HEAD "$up" 2>/dev/null && return 0
+    fi
+  done
+  return 1
+}
+
+rust_changed() {
+  local base
+  base="$(base_ref)" || return 0
+  ! git diff --quiet "$base" -- rust || [[ -n "$(git ls-files --others --exclude-standard -- rust)" ]]
+}
+
+in_list() { # in_list <needle> <comma,list>
+  [[ ",$2," == *",$1,"* ]]
+}
+
+cmd_check() {
+  local hosts=() all_hosts=0 flake_checks=0 shell_budget=0 scans=0 format_all="" rust=auto only="" skip="" fail_fast=0 dry=0
+  while (($#)); do
+    case "$1" in
+      --host)
+        [[ $# -ge 2 ]] || usage_die "--host needs a host name"
+        hosts+=("$2")
+        shift 2
+        ;;
+      --host=*)
+        hosts+=("${1#--host=}")
+        shift
+        ;;
+      --hosts)
+        all_hosts=1
+        shift
+        ;;
+      --flake-checks | --flake-check)
+        flake_checks=1
+        shift
+        ;;
+      --shell-budget)
+        shell_budget=1
+        shift
+        ;;
+      --scans)
+        scans=1
+        shift
+        ;;
+      --all)
+        all_hosts=1 flake_checks=1 shell_budget=1 scans=1 format_all=1 rust=1
+        shift
+        ;;
+      --format-all)
+        format_all=1
+        shift
+        ;;
+      --rust)
+        rust=1
+        shift
+        ;;
+      --no-rust)
+        rust=0
+        shift
+        ;;
+      --only)
+        [[ $# -ge 2 ]] || usage_die "--only needs a comma-separated list"
+        only="$2"
+        shift 2
+        ;;
+      --skip)
+        [[ $# -ge 2 ]] || usage_die "--skip needs a comma-separated list"
+        skip="$2"
+        shift 2
+        ;;
+      --fail-fast)
+        fail_fast=1
+        shift
+        ;;
+      -n | --dry-run)
+        dry=1
+        shift
+        ;;
+      -h | --help)
+        usage
+        return 0
+        ;;
+      *) usage_die "check: unknown option '$1'" ;;
+    esac
+  done
+
+  if [[ "$rust" == auto ]]; then
+    if rust_changed; then rust=1; else rust=0; fi
+  fi
+
+  if ((all_hosts)); then
+    local listed
+    listed="$(flake_hosts)" || true
+    [[ -n "$listed" ]] || usage_die "check --hosts: could not list nixosConfigurations (is nix installed?)"
+    mapfile -t -O "${#hosts[@]}" hosts <<<"$listed"
+  fi
+
+  # name|command, in ci.yml's job order. Names are ci.yml's job names, so a red
+  # step here points at the same job there; commands are the scripts or the
+  # run: lines those jobs execute.
+  local plan=("format|bin/dev format --check${format_all:+ --all}")
+  ((scans)) && plan+=("clamav|bin/ci/clamav" "lynis|bin/ci/lynis")
+  plan+=(
+    "deadnix|bin/ci/deadnix"
+    "feature-reachability|bin/ci/feature-reachability"
+    "lint-fetch-pins|bin/ci/lint-fetch-pins"
+    "assay|bin/ci/assay"
+  )
+  ((shell_budget)) && plan+=("shell-budget|bin/ci/shell-budget")
+  ((scans)) && plan+=("stig|bin/ci/stig")
+  if ((rust)); then
+    plan+=(
+      'cargo-clippy|nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#clippy -c bash -c "cd rust && cargo clippy --workspace --all-targets -- -D warnings"'
+      'cargo-test|nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo test --workspace"'
+      'cargo-nix-drift|nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo generate-lockfile" && git diff --exit-code rust/tools/*/Cargo.nix'
+    )
+  fi
+  local h seen=","
+  for h in ${hosts[@]+"${hosts[@]}"}; do
+    [[ -n "$h" ]] || continue
+    [[ "$seen" == *",$h,"* ]] && continue
+    seen+="$h,"
+    [[ "$h" =~ ^[A-Za-z0-9_-]+$ ]] || usage_die "not a host name: '$h'"
+    plan+=("check-$h|bin/ci/check-host $h")
+  done
+  ((flake_checks)) && plan+=("flake-checks|bin/ci/flake-checks")
+  plan+=("bin-dev-selftest|bin/dev.d/test.sh")
+
+  local selected=() entry name
+  for entry in "${plan[@]}"; do
+    name="${entry%%|*}"
+    if [[ -n "$only" ]] && ! in_list "$name" "$only"; then continue; fi
+    if [[ -n "$skip" ]] && in_list "$name" "$skip"; then continue; fi
+    selected+=("$entry")
+  done
+  ((${#selected[@]})) || usage_die "check: --only/--skip left no steps"
+
+  say "bin/dev check — local mirror of .github/workflows/ci.yml"
+  for entry in "${selected[@]}"; do
+    printf '  %-22s %s\n' "${entry%%|*}" "${entry#*|}"
+  done
+  local left=()
+  ((scans)) || left+=(clamav lynis stig)
+  ((shell_budget)) || left+=(shell-budget)
+  ((rust)) || left+=("cargo-*")
+  ((${#hosts[@]})) || left+=("check (<host>)")
+  ((flake_checks)) || left+=(flake-checks)
+  if ((${#left[@]})); then
+    say "  left to CI: ${left[*]} (add with --scans, --shell-budget, --rust, --host/--hosts,"
+    say "  --flake-checks; --all for the whole list)"
+  fi
+  if ((dry)); then return 0; fi
+
+  need nix nix-shell git jq python3
+
+  local logdir="$root/.tmp/dev/check"
+  mkdir -p "$logdir"
+  local results=() failed=0 start dur status cmd
+  for entry in "${selected[@]}"; do
+    name="${entry%%|*}"
+    cmd="${entry#*|}"
+    say ""
+    say "=== $name: $cmd"
+    start=$SECONDS
+    set +e
+    bash -c "$cmd" 2>&1 | tee "$logdir/$name.log"
+    status=${PIPESTATUS[0]}
+    set -e
+    dur=$((SECONDS - start))
+    if ((status == 0)); then
+      results+=("$(printf '  PASS  %-22s %4ds' "$name" "$dur")")
+    else
+      failed=1
+      results+=("$(printf '  FAIL  %-22s %4ds  exit %d, log .tmp/dev/check/%s.log' "$name" "$dur" "$status" "$name")")
+      if ((fail_fast)); then break; fi
+    fi
+  done
+
+  say ""
+  say "bin/dev check — summary"
+  printf '%s\n' "${results[@]}"
+  if ((failed)); then
+    say "Some steps failed. main is gated by ci / all-green, so these are most likely this"
+    say "branch's; main's runs: gh run list -R Industrial/nixos-dotfiles -b main"
+  fi
+  return "$failed"
+}
+
+# --- test ----------------------------------------------------------------------
+
+# resolve_target <arg>: a path as given, or a feature name looked up under
+# features/ (nushell -> features/cli/nushell; cli/nushell -> features/cli/nushell).
+resolve_target() {
+  local t="$1" matches=()
+  if [[ -e "$t" ]]; then
+    printf '%s\n' "$t"
+    return 0
+  fi
+  if [[ -e "features/$t" ]]; then
+    printf '%s\n' "features/$t"
+    return 0
+  fi
+  shopt -s nullglob
+  matches=(features/*/"$t")
+  shopt -u nullglob
+  case ${#matches[@]} in
+    1) printf '%s\n' "${matches[0]}" ;;
+    0) usage_die "test: no path or feature named '$t'" ;;
+    *) usage_die "test: '$t' is ambiguous: ${matches[*]}" ;;
+  esac
+}
+
+cmd_test() {
+  local targets=() t
+  for t in "$@"; do
+    case "$t" in
+      -h | --help)
+        usage
+        return 0
+        ;;
+      -*) usage_die "test: unknown option '$t'" ;;
+    esac
+    targets+=("$(resolve_target "$t")")
+  done
+  need assay
+  if ((${#targets[@]} == 0)); then
+    # Tracked suites only: `assay run .` would also walk gitignored worktrees
+    # and probes under .tmp/. Then the two checks bin/ci/assay adds.
+    need python3 git
+    say "> bin/assay-run-tracked && bin/assay-coverage-check && bin/assay-source-match-check"
+    bin/assay-run-tracked
+    printf '\n'
+    bin/assay-coverage-check
+    bin/assay-source-match-check
+    return
+  fi
+  for t in "${targets[@]}"; do
+    say "> assay run $t"
+    assay run "$t"
+    printf '\n'
+  done
+}
+
+# --- format / lint -------------------------------------------------------------
+
+# changed_files: tracked files that differ from the merge base (deletions
+# excluded) plus untracked ones, one per line.
+changed_files() {
+  local base
+  base="$(base_ref)" || base=HEAD
+  {
+    git diff --name-only --diff-filter=d "$base" --
+    git ls-files --others --exclude-standard
+  } | sort -u
+}
+
+cmd_format() {
+  case "${1:-} ${2:-}" in
+    " ")
+      need treefmt
+      treefmt
+      ;;
+    "--check --all")
+      need nix
+      bin/ci/lint
+      ;;
+    "--check ")
+      # CI's format job walks the whole tree. Locally that rewrites every file
+      # main itself leaves unformatted, so by default only the files this
+      # branch touched are checked: the ones a new format failure can be in.
+      need nix git
+      local files=()
+      mapfile -t files < <(changed_files)
+      if ((${#files[@]} == 0)); then
+        say "format --check: no files changed against the merge base; nothing to check"
+        return 0
+      fi
+      say "> bin/ci/lint <${#files[@]} changed files>  (whole tree: bin/dev format --check --all)"
+      bin/ci/lint "${files[@]}"
+      ;;
+    *) usage_die "format: unknown option '$*' (only --check [--all])" ;;
+  esac
+}
+
+cmd_lint() {
+  (($# == 0)) || usage_die "lint takes no arguments"
+  need nix nix-shell python3
+  local failed=0 s
+  for s in bin/ci/deadnix bin/ci/feature-reachability bin/ci/lint-fetch-pins bin/assay-coverage-check bin/assay-source-match-check; do
+    say "=== $s"
+    "$s" || failed=1
+  done
+  return "$failed"
+}
+
+# --- machines ------------------------------------------------------------------
+
+cmd_eval() {
+  (($# <= 1)) || usage_die "eval takes one host"
+  need nix
+  local h="${1:-}"
+  if [[ -z "$h" ]]; then
+    h="$(hostname 2>/dev/null || cat /etc/hostname 2>/dev/null || true)"
+    [[ -n "$h" ]] || usage_die "eval: no host given and no hostname to default to"
+  fi
+  require_host "$h"
+  eval_host "$h"
+}
+
+cmd_build() {
+  (($# == 1)) || usage_die "build takes exactly one host"
+  need nix
+  local h="$1" out builder=nix
+  require_host "$h"
+  out="$root/.tmp/dev/build-$h"
+  mkdir -p "$(dirname "$out")"
+  command -v nom >/dev/null 2>&1 && builder=nom
+  say "> $builder build --out-link .tmp/dev/build-$h $(host_attr "$h")"
+  "$builder" build --out-link "$out" "$(host_attr "$h")"
+  if [[ "$h" == "$(hostname 2>/dev/null || true)" ]] && command -v nvd >/dev/null 2>&1 && [[ -e /run/current-system ]]; then
+    nvd diff /run/current-system "$out"
+  fi
+}
+
+cmd_deploy() {
+  (($# >= 1)) || usage_die "deploy needs a host or 'all'"
+  need nix
+  exec bin/fleet deploy "$@"
+}
+
+cmd_update() {
+  local targets=() f
+  for f in bin/update/*; do
+    [[ -f "$f" && -x "$f" ]] && targets+=("${f#bin/update/}")
+  done
+  if (($# == 0)); then
+    say "bin/dev update <target> runs bin/update/<target>. Targets:"
+    printf '  %s\n' "${targets[@]}"
+    return 0
+  fi
+  local t="$1"
+  shift
+  [[ " ${targets[*]} " == *" $t "* ]] || usage_die "update: unknown target '$t' (have: ${targets[*]})"
+  exec "bin/update/$t" "$@"
+}
+
+# --- doctor --------------------------------------------------------------------
+
+cmd_doctor() {
+  local bad=0
+  ok() { printf '  ok    %s\n' "$*"; }
+  warn() { printf '  warn  %s\n' "$*"; }
+  fail() {
+    printf '  FAIL  %s\n' "$*"
+    bad=1
+  }
+  say "bin/dev doctor"
+  if command -v nix >/dev/null 2>&1; then
+    ok "nix: $(nix --version 2>/dev/null)"
+    if nix eval --expr 1 >/dev/null 2>&1; then ok "nix-command enabled"; else fail "nix-command/flakes not enabled (experimental-features = nix-command flakes)"; fi
+  else
+    fail "nix not installed (https://nixos.org/download)"
+  fi
+  if command -v git >/dev/null 2>&1; then ok "git: $(git --version)"; else fail "git not installed"; fi
+  if command -v devenv >/dev/null 2>&1; then
+    ok "devenv: $(devenv version 2>/dev/null || echo present)"
+  else
+    fail "devenv not installed (https://devenv.sh); bin/with-devenv and the toolchain need it"
+  fi
+  if command -v direnv >/dev/null 2>&1; then ok "direnv present (optional; 'direnv allow' loads the toolchain on cd)"; else warn "direnv not installed (optional)"; fi
+  if [[ -x "$root/.devenv/with-devenv" ]]; then
+    ok ".devenv/with-devenv linked (fast path for bin/with-devenv)"
+  else
+    warn ".devenv/with-devenv missing: bin/with-devenv falls back to 'devenv shell --' (slow, correct). Enter the shell once to create it."
+  fi
+  local hooks
+  hooks="$(git rev-parse --git-path hooks 2>/dev/null || true)"
+  if [[ -n "$hooks" && -e "$hooks/pre-commit" ]]; then ok "git hooks installed ($hooks)"; else warn "git hooks not installed: entering the devenv shell once installs them (it does not run them)"; fi
+  if command -v gh >/dev/null 2>&1; then
+    if gh auth status >/dev/null 2>&1; then ok "gh authenticated"; else warn "gh not authenticated (gh auth login) — needed to open PRs"; fi
+  else
+    warn "gh not installed (needed to open PRs from the CLI)"
+  fi
+  local t
+  for t in assay treefmt moon jq python3; do
+    if command -v "$t" >/dev/null 2>&1; then ok "$t on PATH"; else warn "$t not on PATH here; bin/dev re-runs through bin/with-devenv when a command needs it"; fi
+  done
+  if ((bad)); then
+    say "Fix the FAIL lines, then re-run bin/dev doctor. docs/development.md#prerequisites"
+  else
+    say "Ready. Next: bin/dev check -n, then bin/dev test <feature>."
+  fi
+  return "$bad"
+}
+
+# --- dispatch ------------------------------------------------------------------
+
+cmd="${1:-help}"
+(($#)) && shift
+case "$cmd" in
+  help | -h | --help) usage ;;
+  check | pre-push) cmd_check "$@" ;;
+  test) cmd_test "$@" ;;
+  format | fmt) cmd_format "$@" ;;
+  lint) cmd_lint "$@" ;;
+  eval) cmd_eval "$@" ;;
+  hosts)
+    need nix
+    flake_hosts
+    ;;
+  build) cmd_build "$@" ;;
+  deploy) cmd_deploy "$@" ;;
+  update) cmd_update "$@" ;;
+  repl) exec bin/repl "$@" ;;
+  doctor) cmd_doctor "$@" ;;
+  *) usage_die "unknown command '$cmd'" ;;
+esac

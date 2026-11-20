@@ -11,8 +11,10 @@ cd "$ROOT"
 # `--inputs-from .` resolves `nixpkgs#` against this flake's locked nixpkgs, not the
 # runner's channel: with `nix-shell -p` the formatter versions moved every time
 # nixos-unstable did, so the gate could go red on main with no commit to blame.
+#
+# With no arguments it walks the whole tree (the CI job). Paths given are passed to
+# treefmt, which is how `bin/dev format --check` checks only the files a branch changed.
 nix shell --inputs-from . \
   nixpkgs#treefmt nixpkgs#deadnix nixpkgs#alejandra nixpkgs#actionlint \
   nixpkgs#beautysh nixpkgs#biome nixpkgs#yamlfmt nixpkgs#taplo \
-  -c treefmt --config-file treefmt.ci.toml
-
+  -c treefmt --config-file treefmt.ci.toml "$@"
