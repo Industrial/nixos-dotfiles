@@ -104,7 +104,7 @@ Key metrics: `comin_last_deployment_failed`, `comin_last_build_failed`,
 
 ## Related docs
 
-- ADR: `docs/adr/0001-fleet-deploy-rs.md`
+- ADRs: `docs/adr/0001-fleet-deploy-rs.md`, `docs/adr/0002-comin-pull-convergence.md`
 - Principle: `docs/principles/fleet-deploy.md`
 - Maestro mission: `pln-mt0fxitc-f74sm9`
 - Remote builds: `docs/runbooks/nix-remote-build.md`
