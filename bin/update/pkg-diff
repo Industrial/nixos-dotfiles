@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# What a flake.lock bump changes, as markdown, computed by evaluating two checkouts.
+#
+#   bin/update/pkg-diff inputs <old-tree> <new-tree>          root inputs that moved
+#   bin/update/pkg-diff host   <old-tree> <new-tree> <host> [row-limit]
+#                                                           NixOS, kernel and
+#                                                           systemPackages versions
+#
+# <old-tree>/<new-tree> are directories holding the root flake (usually a checkout of
+# main and a checkout of the lock-bump branch). Nothing is built: both host
+# configurations are evaluated and their package sets compared. The pure logic and its
+# tests live in bin/update/lib/pkg-diff{,.assay}.nix; the update-flake-lock workflow
+# writes this output into each lock-bump PR. See docs/runbooks/updates.md.
+#
+# Locally, to preview a bump before opening a PR:
+#   git worktree add /tmp/main origin/main
+#   bin/update/pkg-diff host /tmp/main . "$(hostname)"
+# The Nix expressions below are single-quoted on purpose: `${...}` is Nix interpolation.
+# shellcheck disable=SC2016
+set -euo pipefail
+
+here="$(cd "$(dirname "$0")" && pwd)"
+lib="$here/lib/pkg-diff.nix"
+
+usage() {
+  sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+}
+
+abs() {
+  if [ ! -f "$1/flake.nix" ]; then
+    echo "pkg-diff: $1 holds no flake.nix" >&2
+    exit 2
+  fi
+  (cd "$1" && pwd)
+}
+
+nix_eval() {
+  # --impure: getFlake on a local, unlocked path, and builtins.getEnv. Arguments travel
+  # in PKG_DIFF_* environment variables, so no path is ever spliced into Nix source.
+  nix --extra-experimental-features "nix-command flakes" eval --raw --impure "$@"
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  inputs)
+    [ $# -eq 3 ] || usage
+    old="$(abs "$2")"
+    new="$(abs "$3")"
+    PKG_DIFF_LIB="$lib" PKG_DIFF_OLD="$old" PKG_DIFF_NEW="$new" nix_eval --expr '
+      let
+        env = builtins.getEnv;
+        d = import (/. + env "PKG_DIFF_LIB");
+        read = var: builtins.fromJSON (builtins.readFile (/. + "${env var}/flake.lock"));
+      in
+        d.renderInputs (d.inputChanges (read "PKG_DIFF_OLD") (read "PKG_DIFF_NEW"))'
+    ;;
+  host)
+    [ $# -ge 4 ] && [ $# -le 5 ] || usage
+    old="$(abs "$2")"
+    new="$(abs "$3")"
+    host="$4"
+    limit="${5:-150}"
+    case "$limit" in
+      '' | *[!0-9]*)
+        echo "pkg-diff: row-limit must be a number, got '$limit'" >&2
+        exit 2
+        ;;
+    esac
+    PKG_DIFF_LIB="$lib" PKG_DIFF_OLD="$old" PKG_DIFF_NEW="$new" \
+      PKG_DIFF_HOST="$host" PKG_DIFF_LIMIT="$limit" nix_eval --expr '
+      let
+        env = builtins.getEnv;
+        d = import (/. + env "PKG_DIFF_LIB");
+        host = env "PKG_DIFF_HOST";
+        config = var: (builtins.getFlake (env var)).nixosConfigurations.${host}.config;
+      in
+        d.renderHost host (builtins.fromJSON (env "PKG_DIFF_LIMIT"))
+        (d.compare (d.facts (config "PKG_DIFF_OLD")) (d.facts (config "PKG_DIFF_NEW")))'
+    ;;
+  *)
+    usage
+    ;;
+esac

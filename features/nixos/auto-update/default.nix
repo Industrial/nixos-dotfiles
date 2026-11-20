@@ -1,67 +1,28 @@
-{
-  config,
-  lib,
-  pkgs,
-  settings,
-  ...
-}: let
-  # Disabled: root cannot update a user-owned flake (libgit2 "repository path is not
-  # owned by current user"). Nightly switch also fights interactive sessions / RAM.
-  # Prefer features/cli/nixos-update-notifier (user timer + package list) and manual
-  # `bin/update/host` when ready.
-  enableAutoUpdate = false;
-
-  dotfilesDir = "${settings.userdir}/.dotfiles";
-  hostFlakeDir = dotfilesDir;
-  logFile = "${dotfilesDir}/logs/nixos-auto-update";
-
-  updateScript = pkgs.writeShellScript "nixos-auto-update" ''
-    set -euo pipefail
-
-    exec >> ${logFile} 2>&1
-
-    echo "[$(date -Is)] Starting NixOS automatic update..."
-
-    if [ ! -d ${hostFlakeDir} ]; then
-      echo "[$(date -Is)] Host flake directory not found: ${hostFlakeDir}"
-      exit 1
-    fi
-
-    cd ${hostFlakeDir}
-
-    echo "[$(date -Is)] Updating flake inputs..."
-    ${pkgs.nix}/bin/nix --experimental-features "nix-command flakes" flake update
-
-    echo "[$(date -Is)] Rebuilding and switching system..."
-    ${config.system.build.nixos-rebuild}/bin/nixos-rebuild switch \
-      --flake ".#${settings.hostname}" \
-      --show-trace \
-      --option eval-cache false
-
-    echo "[$(date -Is)] NixOS automatic update completed successfully."
-  '';
-in {
-  systemd.services.nixos-auto-update = lib.mkIf enableAutoUpdate {
-    description = "Nightly NixOS flake update and switch";
-    after = ["network-online.target"];
-    wants = ["network-online.target"];
-
-    serviceConfig = {
-      Type = "oneshot";
-      User = "root";
-      ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p ${dotfilesDir}/logs";
-      ExecStart = updateScript;
-    };
-  };
-
-  systemd.timers.nixos-auto-update = lib.mkIf enableAutoUpdate {
-    description = "Run NixOS automatic update daily at 04:00";
-    wantedBy = ["timers.target"];
-
-    timerConfig = {
-      OnCalendar = "*-*-* 04:00:00";
-      Persistent = true;
-      RandomizedDelaySec = "30min";
-    };
-  };
+# Unattended updates on this fleet belong to comin, and only to comin
+# (docs/adr/0002-comin-pull-convergence.md, docs/adr/0006-update-policy.md).
+#
+# This feature used to hold a nightly root timer that ran `nix flake update` and
+# `nixos-rebuild switch` in ~/.dotfiles. It was never turned on, for three reasons:
+#   * root cannot update a user-owned git flake (libgit2: "repository path is not
+#     owned by current user");
+#   * a nightly switch fights interactive sessions and RAM;
+#   * it would activate an unreviewed lock from a local working tree: a third
+#     activator next to comin and deploy-rs, and one that comin reverts within
+#     300s anyway.
+# The replacement: .github/workflows/update-flake-lock.yml opens a lock-bump PR,
+# the operator reviews and merges it, and comin converges every host from main.
+#
+# What is left is the guard: nixpkgs' own unattended upgrader must stay off,
+# because it would be exactly that third activator.
+{config, ...}: {
+  assertions = [
+    {
+      assertion = !config.system.autoUpgrade.enable;
+      message = ''
+        system.autoUpgrade.enable is set, but comin is this fleet's only unattended
+        activator (ADR-0002, ADR-0006). Lock bumps arrive as reviewed PRs from
+        .github/workflows/update-flake-lock.yml; hosts converge from merged main.
+      '';
+    }
+  ];
 }

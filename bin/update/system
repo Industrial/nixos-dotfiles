@@ -19,6 +19,32 @@ host_dir="$dotfiles_root"
 echo "> update > system > cd $host_dir"
 cd "$host_dir"
 
+# Converge only from merged main (docs/adr/0006-update-policy.md). comin switches every
+# host to origin/main every 300s (ADR-0002), so switching to anything else here is either
+# reverted within five minutes or, worse, survives because comin is stopped. Experiments
+# go to the testing-<hostname> branch instead. UPDATE_ALLOW_UNMERGED=1 overrides, for
+# console recovery when the network or GitHub is down.
+if [ "${UPDATE_ALLOW_UNMERGED:-0}" != 1 ]; then
+  if ! git fetch --quiet origin main; then
+    echo "> update > system > cannot fetch origin/main; refusing (UPDATE_ALLOW_UNMERGED=1 overrides)"
+    exit 1
+  fi
+  head_rev="$(git rev-parse HEAD)"
+  main_rev="$(git rev-parse origin/main)"
+  # Submodules (.claude-setup) are not part of the flake source, so they do not count.
+  dirty="$(git status --porcelain --untracked-files=no --ignore-submodules=all)"
+  if [ "$head_rev" != "$main_rev" ] || [ -n "$dirty" ]; then
+    echo "> update > system > refusing: this tree is not origin/main."
+    echo "> update > system >   HEAD:        $head_rev"
+    echo "> update > system >   origin/main: $main_rev"
+    [ -n "$dirty" ] && echo "> update > system >   uncommitted tracked changes present"
+    echo "> update > system > Merge the change (lock bumps: the update-flake-lock PR) and"
+    echo "> update > system > 'git switch main && git pull --ff-only', or push to"
+    echo "> update > system > testing-$(hostname) for a one-host experiment."
+    exit 1
+  fi
+fi
+
 # Always `switch` so the new generation is activated immediately (PATH, services, new
 # packages). Some upgrades still need a reboot for the kernel or firmware path to match
 # `/run/booted-system`; if `switch` is blocked (switch inhibitors / known breaking changes),
