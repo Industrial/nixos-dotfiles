@@ -12,7 +12,7 @@ cd "$ROOT"
 # runner's channel: with `nix-shell -p` the formatter versions moved every time
 # nixos-unstable did, so the gate could go red on main with no commit to blame.
 nix shell --inputs-from . \
-  nixpkgs#treefmt nixpkgs#deadnix nixpkgs#alejandra nixpkgs#actionlint \
+  nixpkgs#treefmt nixpkgs#deadnix nixpkgs#statix nixpkgs#alejandra nixpkgs#actionlint \
   nixpkgs#beautysh nixpkgs#biome nixpkgs#yamlfmt nixpkgs#taplo \
   -c treefmt --config-file treefmt.ci.toml
 
