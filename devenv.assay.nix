@@ -63,7 +63,9 @@ in
     llvmCovPointsAtTheInstalledLlvm =
       assay.eq shell.env.LLVM_COV "${pkgs.llvmPackages.llvm}/bin/llvm-cov";
 
-    scriptsForThePrekEntryPoints = assay.eq (builtins.attrNames shell.scripts) ["format" "pre-commit" "pre-push"];
+    scriptsForThePrekEntryPoints = assay.eq (builtins.attrNames shell.scripts) ["dev" "format" "pre-commit" "pre-push"];
+    # bin/dev is the repo's entry point; inside the shell it is `dev`.
+    devScriptRunsBinDev = assay.eq shell.scripts.dev.exec ''exec "$DEVENV_ROOT/bin/dev" "$@"'';
     prePushRunsTheFullSuite = assay.eq (lib.hasInfix "moon run dotfiles:test\n" shell.scripts.pre-push.exec) true;
     preCommitRunsOnlyAffected =
       assay.eq (lib.hasInfix "moon run dotfiles:test --affected" shell.scripts.pre-commit.exec) true;
@@ -83,4 +85,15 @@ in
     deepsecRunsTheHookScript = assay.eq hooks.deepsec.entry "${withDevenv}/bin/with-devenv bin/git-hooks/deepsec-pre-push";
     affectedTestsGateCommit = assay.eq [hooks.moon-test.enable hooks.moon-test.stages] [true ["pre-commit"]];
     coverageHookIsOff = assay.eq hooks.moon-coverage.enable false;
+
+    # Shell entry must not run hooks (it used to run `prek run -a` and recurse): this file
+    # adds no enterShell work and no task wiring of its own, and every enabled hook is a
+    # git (commit or push) hook.
+    noEnterShell = assay.eq (shell ? enterShell) false;
+    noTasks = assay.eq (shell ? tasks) false;
+    hookStagesAreGitStages =
+      assay.eq
+      (lib.all (h: lib.all (s: builtins.elem s ["pre-commit" "pre-push"]) h.stages)
+        (lib.attrValues (lib.filterAttrs (_: h: h.enable) hooks)))
+      true;
   }
