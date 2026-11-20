@@ -1,128 +1,205 @@
+# Boot loader, kernel hardening and the physical-access options (ADR-0007).
+#
+# The fleet-wide kernel and network hardening lives here, as boot.kernel.sysctl and
+# boot.blacklistedKernelModules. It used to sit in boot.kernelParams as strings like
+# "net.ipv4.conf.all.accept_redirects=0". The kernel never treats a bare sysctl name on the
+# command line as a sysctl. It only reads "sysctl.<name>=", and the rest go to init as
+# unused arguments. So none of those settings ever reached a host. Each sysctl below was
+# checked against a mixed desktop/gaming/server fleet, and ADR-0007 lists what was left out
+# and why.
+#
+# Settings that are STIG controls (kptr_restrict, randomize_va_space, tcp_syncookies) are
+# not set here. ADR-0003 makes the STIG modules their only source.
+#
+# Secure Boot and TPM2 unlock need someone at the machine (key enrollment, a TPM PCR
+# binding), so they ship as options that default to OFF. The runbooks are in ADR-0007.
 {
   config,
   lib,
-  pkgs,
+  options,
   ...
-}: {
-  # Comprehensive boot configuration with security and performance optimizations
+}: let
+  cfg = config.features.hardening;
 
-  boot = {
-    # Enable secure boot
-    loader = {
-      systemd-boot = {
-        enable = true;
-        configurationLimit = 10;
-        # editor = false; # Disable boot editor for security (commented out)
-      };
-      efi = {
-        canTouchEfiVariables = true;
+  # Network protocols nothing in this fleet uses. Their modules have had a history of
+  # remotely or locally reachable bugs, and an unprivileged socket() call is enough to
+  # autoload them. `blacklist` only stops that autoloading; root can still `modprobe` one
+  # explicitly.
+  # sctp is safe to list: WebRTC (browsers, Discord, Steam voice) uses the userspace usrsctp
+  # stack, not the kernel module. can and atm cover hardware no host has.
+  unusedNetworkProtocols = [
+    "dccp"
+    "sctp"
+    "rds"
+    "tipc"
+    "n-hdlc"
+    "ax25"
+    "netrom"
+    "x25"
+    "rose"
+    "decnet"
+    "econet"
+    "af_802154"
+    "ipx"
+    "appletalk"
+    "psnap"
+    "p8023"
+    "p8022"
+    "can"
+    "atm"
+  ];
+
+  hasLanzaboote = options ? boot && options.boot ? lanzaboote;
+in {
+  options.features.hardening = {
+    secureBoot = {
+      enable = lib.mkEnableOption ''
+        UEFI Secure Boot through lanzaboote. OFF by default: it needs the lanzaboote flake
+        input, keys created with sbctl, and the firmware in setup mode to enroll them. Turning
+        it on before that leaves a host its firmware refuses to boot. See ADR-0007,
+        "Runbook: Secure Boot"'';
+
+      pkiBundle = lib.mkOption {
+        type = lib.types.str;
+        default = "/var/lib/sbctl";
+        description = "Where `sbctl create-keys` put the Secure Boot keys.";
       };
     };
 
-    # Secure Boot configuration (commented out)
-    # secureBoot = {
-    #   enable = true;
-    #   bootloader = "systemd-boot";
-    # };
-
-    # Configure kernel parameters for security and performance
-    kernelParams = [
-      # Security kernel parameters
-      "fs.suid_dumpable=0"
-      "kernel.randomize_va_space=2"
-      "kernel.sysrq=0"
-
-      # Network security parameters
-      "net.ipv4.conf.all.accept_redirects=0"
-      "net.ipv4.conf.default.accept_redirects=0"
-      "net.ipv4.conf.all.secure_redirects=0"
-      "net.ipv4.conf.default.secure_redirects=0"
-      "net.ipv4.conf.all.send_redirects=0"
-      "net.ipv4.conf.default.send_redirects=0"
-      "net.ipv4.conf.all.rp_filter=1"
-      "net.ipv4.conf.default.rp_filter=1"
-      "net.ipv4.conf.all.log_martians=1"
-      "net.ipv4.conf.default.log_martians=1"
-
-      # IPv6 security parameters
-      "net.ipv6.conf.all.accept_redirects=0"
-      "net.ipv6.conf.default.accept_redirects=0"
-      "net.ipv6.conf.all.accept_ra=0"
-      "net.ipv6.conf.default.accept_ra=0"
-
-      # Disable ICMP redirects
-      "net.ipv4.conf.all.accept_source_route=0"
-      "net.ipv4.conf.default.accept_source_route=0"
-      "net.ipv6.conf.all.accept_source_route=0"
-      "net.ipv6.conf.default.accept_source_route=0"
-
-      # Performance kernel parameters
-      "transparent_hugepage=always"
-      "elevator=deadline"
-      "cpufreq.default_governor=performance"
-
-      # Memory management optimization
-      "vm.swappiness=10"
-      "vm.dirty_ratio=15"
-      "vm.dirty_background_ratio=5"
-
-      # Network performance optimization
-      "net.core.rmem_max=16777216"
-      "net.core.wmem_max=16777216"
-      # "net.ipv4.tcp_rmem=4096 87380 16777216"
-      # "net.ipv4.tcp_wmem=4096 65536 16777216"
-      "net.core.netdev_max_backlog=5000"
-      "net.ipv4.tcp_congestion_control=bbr"
-
-      # File system performance optimization
-      "fs.file-max=2097152"
-      "fs.inotify.max_user_watches=524288"
-
-      # Advanced security parameters (commented out)
-      # "lockdown=confidentiality"
-      # "slab_nomerge"
-      # "slab_max_order=0"
-      # "pti=on"
-      # "vsyscall=none"
-      # "debugfs=off"
-      # "oops=panic"
-      # "module.sig_enforce=1"
-    ];
-
-    # Disable unnecessary kernel modules (commented out)
-    # blacklistedKernelModules = [
-    #   # Disable potentially dangerous modules
-    #   "dccp"
-    #   "sctp"
-    #   "rds"
-    #   "tipc"
-    #   "n-hdlc"
-    #   "ax25"
-    #   "netrom"
-    #   "x25"
-    #   "rose"
-    #   "decnet"
-    #   "econet"
-    #   "af_802154"
-    #   "ipx"
-    #   "appletalk"
-    #   "psnap"
-    #   "p8023"
-    #   "p8022"
-    #   "can"
-    #   "atm"
-    # ];
-
-    # ZFS root pool import behavior
-    # Setting this explicitly to adopt the safer 26.11+ default.
-    # - false (26.11+ default, RECOMMENDED): Requires manual intervention if pool was last imported elsewhere
-    #   → Safer: Prevents accidental corruption from dual-imports
-    # - true (old default): Force-imports ZFS root pool even if previously mounted elsewhere
-    #   → Risk: Can cause data corruption if pool was active on another machine
-    # Note: Currently no fleet hosts use ZFS (all use btrfs), but setting this proactively
-    # ensures safety if ZFS is added later. Use kernel param `zfs_force=1` on unclean shutdowns.
-    zfs = {
-      forceImportRoot = false;
-    };
+    tpm2Unlock.enable = lib.mkEnableOption ''
+      unlocking the LUKS root (cryptroot) with the TPM2 chip, through systemd-cryptenroll.
+      OFF by default: the TPM has to be enrolled on the machine itself
+      (systemd-cryptenroll), and an unenrolled TPM token only adds a timeout before the
+      passphrase prompt. The passphrase keeps working as a fallback. See ADR-0007, "Runbook: TPM2 unlock"'';
   };
+
+  config = lib.mkMerge [
+    {
+      boot = {
+        loader = {
+          systemd-boot = {
+            enable = lib.mkDefault true;
+            configurationLimit = 10;
+            # The editor stays ON while Secure Boot is off. It is the recovery path for a
+            # locked root (ADR-0007, "Recovery"): appending
+            # systemd.setenv=SYSTEMD_SULOGIN_FORCE=1 opens an emergency shell. Turning it off
+            # without Secure Boot buys nothing. The root filesystem is LUKS, so an edited
+            # command line still stops at the passphrase prompt, and anyone with physical
+            # access can rewrite the unsigned ESP anyway.
+          };
+          efi = {
+            canTouchEfiVariables = true;
+          };
+        };
+
+        kernelParams = [
+          # Performance kernel parameters
+          "transparent_hugepage=always"
+          "elevator=deadline"
+          # The CPU governor is set by powerManagement.cpuFreqGovernor in
+          # features/performance/hardware, its single owner.
+
+          # NOTE: the entries below are NOT applied. They are sysctl names, and the kernel
+          # ignores them on its command line (see the header). Moving them into
+          # boot.kernel.sysctl would change memory and network tuning on every host, which is
+          # outside this security change. That is left as a follow-up for the performance
+          # owner. `elevator=` has also done nothing since Linux 5.0.
+
+          # Memory management optimization
+          "vm.swappiness=10"
+          "vm.dirty_ratio=15"
+          "vm.dirty_background_ratio=5"
+
+          # Network performance optimization
+          "net.core.rmem_max=16777216"
+          "net.core.wmem_max=16777216"
+          "net.core.netdev_max_backlog=5000"
+          "net.ipv4.tcp_congestion_control=bbr"
+
+          # File system performance optimization
+          "fs.file-max=2097152"
+          "fs.inotify.max_user_watches=524288"
+        ];
+
+        # mkDefault throughout, so a host with a real reason can override one key without a
+        # conflicting-definition error.
+        kernel.sysctl = lib.mapAttrs (_: lib.mkDefault) {
+          # Kernel log (addresses, driver state) readable only with CAP_SYSLOG. Wheel can
+          # still read it through `journalctl -k`.
+          "kernel.dmesg_restrict" = 1;
+          # No eBPF for unprivileged users, and the JIT hardened against spraying. Nothing
+          # on these hosts loads BPF without root. Steam, Wine and Docker don't.
+          "kernel.unprivileged_bpf_disabled" = 1;
+          "net.core.bpf_jit_harden" = 2;
+
+          # No host here is a router. Ignore ICMP redirects and source-routed packets, and
+          # don't send redirects. Docker and Tailscale forward, but never back out the
+          # interface a packet came in on, which is the only case send_redirects covers.
+          "net.ipv4.conf.all.accept_redirects" = 0;
+          "net.ipv4.conf.default.accept_redirects" = 0;
+          "net.ipv4.conf.all.secure_redirects" = 0;
+          "net.ipv4.conf.default.secure_redirects" = 0;
+          "net.ipv4.conf.all.send_redirects" = 0;
+          "net.ipv4.conf.default.send_redirects" = 0;
+          "net.ipv6.conf.all.accept_redirects" = 0;
+          "net.ipv6.conf.default.accept_redirects" = 0;
+          "net.ipv4.conf.all.accept_source_route" = 0;
+          "net.ipv4.conf.default.accept_source_route" = 0;
+          "net.ipv6.conf.all.accept_source_route" = 0;
+          "net.ipv6.conf.default.accept_source_route" = 0;
+          "net.ipv4.conf.all.log_martians" = 1;
+          "net.ipv4.conf.default.log_martians" = 1;
+          # RFC 1337: drop RSTs for sockets in TIME-WAIT (TIME-WAIT assassination).
+          "net.ipv4.tcp_rfc1337" = 1;
+        };
+
+        blacklistedKernelModules = unusedNetworkProtocols;
+
+        # ZFS root pool import behavior
+        # Setting this explicitly to adopt the safer 26.11+ default.
+        # - false (26.11+ default, RECOMMENDED): Requires manual intervention if pool was last imported elsewhere
+        #   → Safer: Prevents accidental corruption from dual-imports
+        # - true (old default): Force-imports ZFS root pool even if previously mounted elsewhere
+        #   → Risk: Can cause data corruption if pool was active on another machine
+        # Note: Currently no fleet hosts use ZFS (all use btrfs), but setting this proactively
+        # ensures safety if ZFS is added later. Use kernel param `zfs_force=1` on unclean shutdowns.
+        zfs = {
+          forceImportRoot = false;
+        };
+      };
+    }
+
+    (lib.mkIf cfg.secureBoot.enable ({
+        assertions = [
+          {
+            assertion = hasLanzaboote;
+            message = ''
+              features.hardening.secureBoot.enable needs the lanzaboote NixOS module, which
+              this flake does not import yet. Add the input and
+              inputs.lanzaboote.nixosModules.lanzaboote to the host's modules first
+              (ADR-0007, "Runbook: Secure Boot").
+            '';
+          }
+        ];
+        # lanzaboote replaces systemd-boot's installer with its own, which signs the UKIs.
+        boot.loader.systemd-boot.enable = lib.mkForce false;
+        # With signed UKIs the command line is part of what's signed. Leaving the editor on
+        # would defeat the measurement.
+        boot.loader.systemd-boot.editor = false;
+      }
+      // lib.optionalAttrs hasLanzaboote {
+        boot.lanzaboote = {
+          enable = true;
+          inherit (cfg.secureBoot) pkiBundle;
+        };
+      }))
+
+    (lib.mkIf cfg.tpm2Unlock.enable {
+      security.tpm2.enable = true;
+      # nixpkgs 26.11 only has the systemd initrd, so all this adds is the TPM2 token
+      # plugin and the crypttab option.
+      boot.initrd.systemd.tpm2.enable = true;
+      boot.initrd.luks.devices.cryptroot.crypttabExtraOpts = ["tpm2-device=auto"];
+    })
+  ];
 }

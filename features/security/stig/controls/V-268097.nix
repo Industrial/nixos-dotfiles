@@ -19,16 +19,18 @@
 # squeamishness about diverging from the fix text — it is that satisfying it literally would
 # change the system's authorization semantics. An EMPTY /var/cron/cron.allow does not mean
 # "no allow-list configured"; to cron it means "no user may use cron". Creating the file to
-# satisfy an audit watch would silently revoke crontab access for every user, including the
-# nix-gc and store-optimise jobs in features/nixos/systemd. An empty cron.deny is harmless but
-# pointless on its own.
+# satisfy an audit watch would silently revoke crontab access for every user. No fleet job
+# runs from cron any more: garbage collection is nix.gc (a systemd timer) and store
+# optimisation is auto-optimise-store (#122). The semantics still matter for any crontab a
+# user adds. An empty cron.deny is harmless but pointless on its own.
 #
 # Watching the directory does cover the requirement's intent: crontabs live in
 # /var/cron/tabs, and `-p wa` on the directory records creation, modification and deletion of
 # any file inside it.
 {...}: {
-  # The watch target has to exist before auditctl loads the rule, hence tmpfiles rather than
-  # relying on cron to create it. Mode and ownership match what the cron package expects.
+  # The watch target has to exist before auditctl loads the rule, and with services.cron off
+  # (#122) nothing else creates it, hence tmpfiles. Mode and ownership match what the cron
+  # package expects, should cron be enabled again.
   systemd.tmpfiles.rules = [
     "d /var/cron 0755 root root -"
     "d /var/cron/tabs 0700 root root -"

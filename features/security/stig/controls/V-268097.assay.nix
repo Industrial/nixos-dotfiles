@@ -22,7 +22,8 @@ in
 
     # cron.allow and cron.deny are deliberately NOT watched. Creating an empty cron.allow to
     # satisfy a watch would tell cron that NO user may use cron, silently revoking crontab
-    # access -- including the nix-gc and store-optimise jobs. This case guards against
+    # access for every user (fleet GC and store optimisation are nix.gc and
+    # auto-optimise-store since #122, not cron jobs). This case guards against
     # someone restoring those two watches from the published fix text.
     doesNotWatchCronAllow = assay.eq (builtins.any (r: builtins.match ".*cron\\.allow.*" r != null) rules) false;
     doesNotWatchCronDeny = assay.eq (builtins.any (r: builtins.match ".*cron\\.deny.*" r != null) rules) false;

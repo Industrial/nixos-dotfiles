@@ -12,8 +12,8 @@ let
   jsonPath = ../data/Anduril_NixOS_STIG-V1R3.controls.json;
 
   doc = builtins.fromJSON (builtins.readFile jsonPath);
-  benchmark = doc.benchmark;
-  controls = doc.controls;
+  inherit (doc) benchmark;
+  inherit (doc) controls;
   ids = builtins.attrNames controls;
 
   xmlHash = builtins.hashFile "sha256" xmlPath;

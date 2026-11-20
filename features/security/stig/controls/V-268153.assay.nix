@@ -40,7 +40,7 @@ in
 
     # A systemd timer, not the fix text's cron job piping to /bin/mail — which does not exist
     # on NixOS.
-    usesSystemdNotCron = assay.eq (configured.systemd.services.stig-aide-check.startAt) "Sun 00:00";
+    usesSystemdNotCron = assay.eq configured.systemd.services.stig-aide-check.startAt "Sun 00:00";
     doesNotUseBinMail =
       assay.eq (builtins.match ".*/bin/mail.*" configured.systemd.services.stig-aide-check.script) null;
 
