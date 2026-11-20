@@ -8,7 +8,7 @@ let
   assay = import ./../../../../common/assay/default.nix;
   fixture = import ./../lib/fixture.nix;
   manifest = import ./../lib/manifest.nix;
-  lib = (import <nixpkgs> {}).lib;
+  inherit (import <nixpkgs> {}) lib;
 
   fleet = import ./fleet-baseline.nix {inherit lib;};
   baseSafe = import ./base-safe.nix {};

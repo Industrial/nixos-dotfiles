@@ -90,12 +90,8 @@
     in {
       inherit id;
       inherit (v) status detail compliant;
-      severity = control.severity;
+      inherit (control) severity title cci ruleId ruleVersion;
       category = catOf control.severity;
-      title = control.title;
-      cci = control.cci;
-      ruleId = control.ruleId;
-      ruleVersion = control.ruleVersion;
     })
     manifest.ids;
 
@@ -105,7 +101,7 @@
     inherit hostName;
     benchmark = "${stig.benchmark.title} V${stig.benchmark.version}R${stig.benchmark.release}";
     benchmarkDate = stig.benchmark.benchmarkDate;
-    profile = cfg.profile;
+    inherit (cfg) profile;
     total = builtins.length rows;
     compliant = countWhere (r: r.compliant);
     byStatus = builtins.listToAttrs (map (s: {

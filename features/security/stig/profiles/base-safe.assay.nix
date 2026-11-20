@@ -73,7 +73,7 @@ in
       # config + lib for its assertion.
       stub = {
         config.environment.systemPackages = [];
-        lib = (import <nixpkgs> {}).lib;
+        inherit ((import <nixpkgs> {})) lib;
         pkgs = {};
       };
       controlFiles = builtins.filter (p: builtins.match ".*V-[0-9]+\\.nix" (toString p) != null) mod.imports;

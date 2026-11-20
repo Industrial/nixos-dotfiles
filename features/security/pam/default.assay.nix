@@ -17,7 +17,7 @@ let
       writeShellScript = name: text: name;
       writeText = name: text: name;
     };
-    lib = (import <nixpkgs> {}).lib;
+    inherit ((import <nixpkgs> {})) lib;
     config = {};
   };
 in
