@@ -1,14 +1,46 @@
 $schema: 'https://moonrepo.dev/schemas/project.json'
 id: 'dotfiles'
 language: 'bash'
+# Every task is a thin call into bin/dev, the repo's one entry point (`bin/dev`
+# with no arguments lists the commands). Arguments after `--` pass through:
+#   moon run dotfiles:test -- nushell
+#   moon run dotfiles:eval -- mimir
+#   moon run dotfiles:check -- --host mimir
 tasks:
-  format:
-    command: 'treefmt'
-  test:
-    description: 'Run Assay on all git-tracked *.assay.nix suites across the repository'
-    command: 'bin/with-devenv'
+  check:
+    description: 'Mirror the PR workflow locally (format, lints, assay); builds no host. bin/dev check'
+    command: 'bin/dev'
     args:
-      - 'bin/assay-run-tracked'
+      - 'check'
+    options:
+      # Reads the working tree, git state and the network; a cached pass means nothing.
+      cache: false
+  format:
+    description: 'Format the tree with treefmt (writes). bin/dev format'
+    command: 'bin/dev'
+    args:
+      - 'format'
+    options:
+      cache: false
+  lint:
+    description: 'deadnix, feature-reachability, lint-fetch-pins, assay coverage. bin/dev lint'
+    command: 'bin/dev'
+    args:
+      - 'lint'
+    options:
+      cache: false
+  eval:
+    description: "Evaluate one host's system derivation without building it. bin/dev eval <host>"
+    command: 'bin/dev'
+    args:
+      - 'eval'
+    options:
+      cache: false
+  test:
+    description: 'Run Assay on all git-tracked *.assay.nix suites (bin/assay-run-tracked). bin/dev test [target]'
+    command: 'bin/dev'
+    args:
+      - 'test'
     inputs:
       - '**/*.assay.nix'
       - '**/*.assay.json'
@@ -18,6 +50,7 @@ tasks:
       - '**/*.nix'
       - 'flake.lock'
       - 'bin/assay-run-tracked'
+      - 'bin/dev'
     options:
       # Whole-repo discovery; do not treat as always-cacheable across env changes.
       cache: true
