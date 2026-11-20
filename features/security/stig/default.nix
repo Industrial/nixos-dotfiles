@@ -47,10 +47,11 @@
     };
 
     profile = lib.mkOption {
-      type = lib.types.enum ["none" "base-safe" "full"];
+      type = lib.types.enum ["none" "fleet-baseline" "base-safe" "full"];
       default = "none";
       description = ''
-        Which baseline this host carries. "base-safe" is the subset with no interactive cost;
+        Which baseline this host carries. "fleet-baseline" is the subset safe on interactive
+        hosts too (ADR-0006). "base-safe" is the subset with no interactive cost;
         "full" is all 103 controls and is intended for VM-test targets, not for workstations.
       '';
     };
