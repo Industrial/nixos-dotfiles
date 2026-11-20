@@ -34,7 +34,6 @@
   ./cli/c
   ./cli/calcurse
   ./cli/carapace
-  ./cli/cheatsheet
   ./cli/create-ssh-key
   ./cli/delta
   ./cli/difftastic

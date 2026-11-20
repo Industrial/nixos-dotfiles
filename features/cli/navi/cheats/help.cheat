@@ -1,7 +1,7 @@
 % dotfiles, help, tldr, navi
 
-; Read out of features/cli/tealdeer, features/cli/navi and features/cli/cheatsheet — the three
-; features that make up this fleet's help stack.
+; Read out of features/cli/tealdeer and features/cli/navi — the two features that make up
+; this fleet's help stack.
 
 # The tldr page for a command, out of the offline cache; this never opens a socket
 tldr <command>
@@ -44,8 +44,5 @@ navi info cheats-path
 
 # A worked example of the .cheat format, for adding an entry
 navi info cheats-example
-
-# The one command in this stack that needs the network: cheat.sh's generic answer
-cheatsheet --web <command>
 
 $ command: tldr --list
