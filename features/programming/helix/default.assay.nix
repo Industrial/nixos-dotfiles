@@ -13,9 +13,15 @@ let
   configDir = "${nixos.defaultSettings.userdir}/.config/helix";
   activation = cfg.system.activationScripts.helixConfig.text;
   activationHas = needle: lib.hasInfix needle activation;
-  linkedFile = name:
-    builtins.fromTOML (builtins.readFile (builtins.head
-        (builtins.match ".*ln -sfn (/nix/store/[^ ]+) ${configDir}/${name}\n.*" activation)));
+  # builtins.match drops string context, and a store path without context is never built:
+  # readFile then only works where the file happens to be in the store already (it did on a
+  # workstation that had built the host, and failed on every fresh CI runner). Re-attach the
+  # context of the one derivation that produces this file so reading it realises it.
+  linkedFile = name: let
+    path = builtins.head (builtins.match ".*ln -sfn (/nix/store/[^ ]+) ${configDir}/${name}\n.*" activation);
+    producer = lib.filterAttrs (drv: _: lib.hasSuffix "-helix-${name}.drv" drv) (builtins.getContext activation);
+  in
+    builtins.fromTOML (builtins.readFile (builtins.appendContext path producer));
   config = linkedFile "config.toml";
   languages = linkedFile "languages.toml";
   language = name: lib.findFirst (l: l.name == name) null languages.language;

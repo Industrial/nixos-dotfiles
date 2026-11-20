@@ -16,8 +16,15 @@ let
   seeded =
     # (Context dropped: fromJSON refuses text that refers to store paths, and the pinned
     # binary paths inside it are compared as plain strings below.)
-    builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (builtins.head
-          (builtins.match ".*[\n ](/nix/store/[^ ]+-zed-settings[.]json) ${configDir}/settings[.]json.*" activation))));
+    builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile (realised (builtins.head
+            (builtins.match ".*[\n ](/nix/store/[^ ]+-zed-settings[.]json) ${configDir}/settings[.]json.*" activation)))));
+  # builtins.match drops string context, and a store path without context is never built, so
+  # readFile only worked where the file was already in the store (never on a fresh CI
+  # runner). Re-attach the context of the derivation that produces the matched path.
+  realised = path:
+    builtins.appendContext path (lib.filterAttrs
+      (drv: _: lib.hasSuffix "-${builtins.substring 33 (-1) (baseNameOf path)}.drv" drv)
+      (builtins.getContext activation));
   agent = seeded.agent_servers."Claude Code";
 
   # A path pinned in settings must point into a package that is actually installed, or Zed
