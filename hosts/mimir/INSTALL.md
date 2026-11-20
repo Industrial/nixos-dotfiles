@@ -131,6 +131,19 @@ sudo systemctl start nfs-server          # once /data is really mounted
 
 ## Troubleshooting
 
+- **`Invalid partition data!` on `/dev/sdd`, whose `blkid` says `TYPE="iso9660"`** — the
+  installer stick took a `/dev/sdX` name the layout gives to an HDD (it came up as `/dev/sdd`,
+  hdd-d's name). The installer now refuses this before touching anything and prints every disk
+  with its model, serial and `/dev/disk/by-id` name. Re-run pointing the misnamed disk at its
+  stable path: `install-nixos mimir --disk hdd-d=/dev/disk/by-id/ata-<model>_<serial>`
+  (repeat `--disk` for each). Existing `/data` members are recognised by the
+  `disk-hdd-?-data` partlabels shown in `lsblk -o NAME,SIZE,PARTLABEL`. On the members that
+  were reached, the failed run only re-applied partition name/type and a fresh partition GUID;
+  the btrfs data is untouched.
+- **`Could not create partition 1 from … to …` followed by `The operation has completed
+  successfully`** — expected on a reinstall: the partition already exists, and disko falls back
+  to relabelling it.
+
 - **`mkfs.btrfs: No such file or directory`** on a `by-partlabel` path — the array's `mkfs` ran
   before a member partition existed. Check that the disk carrying `extraArgs` still sorts last.
 - **`/data` will not mount after a disk failure** — RAID5 needs `-o degraded` to mount with a
