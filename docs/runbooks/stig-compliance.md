@@ -19,10 +19,10 @@ Everything below exists because there is nothing off the shelf.
 ## Reading the report
 
 ```bash
-nix build .#stigReport.muninn
+nix build .#stigReport.mimir     # or any host: drakkar, huginn, muninn
 cat result/report.md        # the assessor-facing table
 jq . result/report.json     # same data, stable-sorted, for tooling
-cat result/summary.txt       # one line: "muninn: 67/103 compliant"
+cat result/summary.txt       # one line: "<host>: <n>/103 compliant" (1/103 on the three hosts without controls)
 ```
 
 Status is derived from the evaluated configuration, never hand-maintained. Six values, and
@@ -68,7 +68,7 @@ classified `base`. A disruptive control cannot drift onto a fielded host.
 
 **Only mimir carries controls.** drakkar, huginn and muninn import the option surface alone
 and therefore score `1/103` against profile `none`, with every control `Not Implemented`
-except `V-268144`, which `profiles/external-evidence.nix` credits on all four hosts.
+except `V-268144`, which `features/security/stig/profiles/external-evidence.nix` credits on all four hosts.
 That is a deliberate posture decision, not a regression — see
 [ADR-0004](../adr/0004-stig-baseline-mimir-only.md). `bin/ci/stig` encodes the same
 distinction: a CAT I control whose status is `Not Implemented` is a documented decision and

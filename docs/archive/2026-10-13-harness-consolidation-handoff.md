@@ -7,6 +7,19 @@ upstream-plan: /data/Code/rust/solana-yield-optimizer/.cursor/plans/2026-10-13-h
 status: W1–W3 done, W4–W6 open
 ---
 
+> **Archived 2026-11-20 (#114).** A one-session hand-off, kept for the record only. Do not
+> act on it. Since it was written:
+>
+> - The `.cursor` submodule (Industrial/cursor-setup) is gone. Its devenv modules are
+>   vendored in `nix/devenv-modules/` and enabled with `local.features.*` (see `AGENTS.md`).
+> - Toolchain commands run through `bin/with-devenv <cmd>`; the gate commands below that
+>   enter the dev shell are out of date.
+> - Hermes is retired; the skill tree lives only in `.claude-setup`.
+>
+> What stayed true about the repo (four hosts, `lib/mk-host.nix`, profiles, assay) is in the
+> [README](../../README.md). The storage, docker and skill-tree items were state on one
+> machine at the time, not configuration.
+
 # Handoff: finish the harness consolidation in ~/.dotfiles
 
 You are picking up a six-wave plan at wave 4. Waves 1–3 are **done and

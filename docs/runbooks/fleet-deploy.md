@@ -67,7 +67,7 @@ cd ~/.dotfiles
 sudo nixos-rebuild switch --flake ".#$(hostname)"
 ```
 
-Or legacy path via host shim (same root eval):
+Or legacy path via host shim (same root eval; the shims are slated for removal):
 
 ```bash
 cd ~/.dotfiles/hosts/$(hostname)
@@ -104,7 +104,7 @@ Key metrics: `comin_last_deployment_failed`, `comin_last_build_failed`,
 
 ## Related docs
 
-- ADR: `docs/adr/0001-fleet-deploy-rs.md`
+- ADRs: `docs/adr/0001-fleet-deploy-rs.md`, `docs/adr/0002-comin-pull-convergence.md`
 - Principle: `docs/principles/fleet-deploy.md`
 - Maestro mission: `pln-mt0fxitc-f74sm9`
 - Remote builds: `docs/runbooks/nix-remote-build.md`
