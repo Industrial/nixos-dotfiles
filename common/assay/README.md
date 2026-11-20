@@ -115,10 +115,16 @@ in
 - Evaluates against the **real NixOS option tree**, nixpkgs pinned from the root
   `flake.lock`: an option that does not exist is an eval error, not a silent pass.
 - `settings` defaults to `common/settings.nix` for a placeholder host; override per suite.
-- `inputs` carries stand-ins for flake inputs modules import (comin today); extend
-  `defaultInputs` in `nixos.nix` when a module needs another.
+- `inputs` is every root flake input, resolved from `flake.lock` the way `nix` does
+  (follows included) and lazily: a suite pays only for inputs its modules reach. Also
+  exposed as `nixos.flakeInputs`, e.g. `nixos.flakeInputs.nixvim.nixosModules.nixvim`.
+  Whole hosts evaluate too: `(import ../lib/mk-host.nix {inputs = nixos.flakeInputs;} "mimir").config`
+  — see `hosts/fleet.assay.nix`.
 - Helpers: `eval`, `evalSystem` (full result incl. `options`), `packageNames`,
-  `hasPackage`, `openTCPPorts`, `openUDPPorts`, `baseline` (empty system to diff against).
+  `hasPackage`, `baseline` (empty system to diff against), and two port views:
+  `openTCPPorts`/`openUDPPorts` (open on any interface, tailscale0 included: the strict
+  bar for "this feature adds no ports") and `publicTCPPorts`/`publicUDPPorts` (reachable
+  from an untrusted interface: what a host actually exposes).
 
 Matching text is still right when the **text is the artifact**: a Lua file, a shell
 script, or a generated config string such as `programs.ssh.extraConfig`.

@@ -15,6 +15,14 @@ let
         ])
     ];
   };
+  withTailnetPort = nixos.eval {
+    modules = [
+      {
+        networking.firewall.trustedInterfaces = ["tailscale0"];
+        networking.firewall.interfaces.tailscale0.allowedTCPPorts = [2049];
+      }
+    ];
+  };
   withPkg = nixos.eval {modules = [({pkgs, ...}: {environment.systemPackages = [pkgs.hello];})];};
   withSettings = nixos.eval {
     modules = [({settings, ...}: {networking.hostName = settings.hostname;})];
@@ -29,6 +37,12 @@ in
     # Ports are seen through mkMerge and per-interface rules — what source regexes missed.
     seesMergedTCPPort = assay.eq (nixos.openTCPPorts withPort) [1234];
     seesInterfaceUDPPort = assay.eq (nixos.openUDPPorts withPort) [5678];
+
+    # Public = reachable from an untrusted interface. tailscale0-only rules are not public.
+    tailnetOnlyPortIsNotPublic = assay.eq (nixos.publicTCPPorts withTailnetPort) [];
+    tailnetOnlyPortIsStillOpen = assay.eq (nixos.openTCPPorts withTailnetPort) [2049];
+    globalPortIsPublic = assay.eq (nixos.publicTCPPorts withPort) [1234];
+    untrustedInterfacePortIsPublic = assay.eq (nixos.publicUDPPorts withPort) [5678];
 
     seesPackage = assay.eq (nixos.hasPackage withPkg "hello") true;
     baselineLacksPackage = assay.eq (nixos.hasPackage nixos.baseline "hello") false;
