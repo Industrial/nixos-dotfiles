@@ -1,8 +1,8 @@
 # Users, groups and the Nix daemon's trust boundary.
 #
-# Root is locked (ADR-0006). Privilege is reached through the operator user's wheel
+# Root is locked (ADR-0007). Privilege is reached through the operator user's wheel
 # membership and sudo, never by logging in as root. The recovery paths for a host whose
-# sudo is broken are in docs/adr/0006-fleet-security-baseline.md, "Recovery".
+# sudo is broken are in docs/adr/0007-fleet-security-baseline.md, "Recovery".
 #
 # The operator user stays in nix.settings.trusted-users by default, because two fleet paths
 # need it today:
@@ -26,7 +26,7 @@
 
   # Hash of "test". It only applies when the account is first created (mutableUsers keeps an
   # existing /etc/shadow entry), so on an installed host it is long gone. Kept for fresh
-  # installs, where the first login is expected to run `passwd`. See ADR-0006.
+  # installs, where the first login is expected to run `passwd`. See ADR-0007.
   initialOperatorHash = "$6$jne0QlJa/oBzEapq$4/gnXjNpggz.R45ND4QYwzqOyIz9CeblnqKzfnN7njIuKZSEfweNISngx87xy6VA0bEmncyyTmiNa5Q5GXDj5/";
 in {
   options.features.hardening = {
@@ -68,7 +68,7 @@ in {
       enable = lib.mkEnableOption ''
         signing every locally built store path with this host's key, and trusting the
         fleet's keys. Off by default, because the keys are provisioned out of band (see
-        ADR-0006, "Runbook: store-path signing")'';
+        ADR-0007, "Runbook: store-path signing")'';
 
       secretKeyFile = lib.mkOption {
         type = lib.types.str;
@@ -99,7 +99,7 @@ in {
         message = ''
           features.hardening.operatorTrusted = false needs features.hardening.storeSigning.enable.
           Without signed store paths, deploy-rs (nix copy --no-check-sigs) and remote builds
-          stop working once the operator is no longer a trusted user. See ADR-0006.
+          stop working once the operator is no longer a trusted user. See ADR-0007.
         '';
       }
       {

@@ -1,6 +1,6 @@
 # OpenSSH server and sshguard, fleet-wide (via features/fleet/remote-access.nix).
 #
-# Crypto (ADR-0006): the nixpkgs 26.11 defaults are already the modern set: ML-KEM/sntrup
+# Crypto (ADR-0007): the nixpkgs 26.11 defaults are already the modern set: ML-KEM/sntrup
 # hybrid and curve25519 key exchange, chacha20-poly1305 and AES-GCM/CTR ciphers, and
 # encrypt-then-MAC SHA-2 MACs. Pinning our own copy would only let it go stale, so this
 # module does not, and default.assay.nix asserts on the evaluated lists instead. That way an

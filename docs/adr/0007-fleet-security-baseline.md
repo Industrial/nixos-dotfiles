@@ -1,4 +1,4 @@
-# ADR-0006: A fleet-wide security baseline, and what stays operator-gated
+# ADR-0007: A fleet-wide security baseline, and what stays operator-gated
 
 **Status:** Accepted
 **Date:** 2026-11-20

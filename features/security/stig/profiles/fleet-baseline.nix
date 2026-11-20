@@ -1,11 +1,11 @@
 # STIG fleet-baseline profile: the controls safe on EVERY host, including the interactive
-# ones (ADR-0006).
+# ones (ADR-0007).
 #
 # ADR-0004 took the whole base-safe profile off drakkar, huginn and muninn because of the
 # audit set's cost. Its own "Negative" section names what that also dropped: firewall,
 # AppArmor, no-root SSH, kernel sysctls, require-sigs. Those cost an interactive user
 # nothing. This profile brings exactly those back, and leaves out everything that has a cost
-# on a workstation (each exclusion and the reason for it is in ADR-0006):
+# on a workstation (each exclusion and the reason for it is in ADR-0007):
 #   - the audit set (V-268080 and the syscall/watch rules): the cost ADR-0004 exists for
 #   - V-268089/V-268157 (Ciphers/MACs): narrower and weaker than the nixpkgs defaults
 #   - V-268130 (ENCRYPT_METHOD SHA512): a downgrade from the yescrypt default

@@ -1,4 +1,4 @@
-# Colocated suite for features/nixos/boot/default.nix (ADR-0006).
+# Colocated suite for features/nixos/boot/default.nix (ADR-0007).
 #
 # Evaluates the module in a real NixOS system, so the sysctls are read from the merged
 # boot.kernel.sysctl, the same attrset nixpkgs renders into /etc/sysctl.d/60-nixos.conf.
@@ -68,7 +68,7 @@ in
     # nixpkgs' own mkDefault already gives that.
     kptrRestrictIsNixpkgsDefault = assay.eq sysctl."kernel.kptr_restrict" 1;
 
-    # Deliberately NOT set (ADR-0006): these would break gaming, rootless Docker, debugging
+    # Deliberately NOT set (ADR-0007): these would break gaming, rootless Docker, debugging
     # or Tailscale routing.
     userNamespacesUntouched = assay.eq (sysctl ? "kernel.unprivileged_userns_clone") false;
     ptraceScopeUntouched = assay.eq (sysctl ? "kernel.yama.ptrace_scope") false;

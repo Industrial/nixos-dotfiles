@@ -1,4 +1,4 @@
-# Colocated suite: sshd hardening and crypto, on the evaluated configuration (ADR-0006).
+# Colocated suite: sshd hardening and crypto, on the evaluated configuration (ADR-0007).
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ../../../common/assay/nixos.nix;

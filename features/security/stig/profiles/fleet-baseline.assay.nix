@@ -1,8 +1,8 @@
-# Colocated suite: the fleet-baseline profile (ADR-0006).
+# Colocated suite: the fleet-baseline profile (ADR-0007).
 #
 # Three properties make it safe to put on every host:
 #   1. it is a strict subset of base-safe, so mimir (which imports both) is unchanged
-#   2. it carries none of the controls ADR-0006 excludes for their cost on a workstation
+#   2. it carries none of the controls ADR-0007 excludes for their cost on a workstation
 #   3. the merged result on a fleet-baseline + base-safe host is base-safe's, not a mixture
 let
   assay = import ./../../../../common/assay/default.nix;
@@ -20,7 +20,7 @@ let
   fleetControls = controlsOf fleet;
   baseSafeControls = controlsOf baseSafe;
 
-  # Excluded by ADR-0006, each for a named interactive or operational cost.
+  # Excluded by ADR-0007, each for a named interactive or operational cost.
   excluded = [
     "V-268080" # auditd: the ADR-0004 cost
     "V-268091" # privileged-command auditing

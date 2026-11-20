@@ -1,4 +1,4 @@
-# Colocated suite: users, root lock, and the Nix daemon trust boundary (ADR-0006).
+# Colocated suite: users, root lock, and the Nix daemon trust boundary (ADR-0007).
 #
 # Evaluates the module inside a real NixOS system (common/assay/nixos.nix, pinned to the
 # flake's nixpkgs), so assertions read the merged configuration rather than the module's

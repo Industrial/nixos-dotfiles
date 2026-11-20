@@ -1,18 +1,18 @@
-# Boot loader, kernel hardening and the physical-access options (ADR-0006).
+# Boot loader, kernel hardening and the physical-access options (ADR-0007).
 #
 # The fleet-wide kernel and network hardening lives here, as boot.kernel.sysctl and
 # boot.blacklistedKernelModules. It used to sit in boot.kernelParams as strings like
 # "net.ipv4.conf.all.accept_redirects=0". The kernel never treats a bare sysctl name on the
 # command line as a sysctl. It only reads "sysctl.<name>=", and the rest go to init as
 # unused arguments. So none of those settings ever reached a host. Each sysctl below was
-# checked against a mixed desktop/gaming/server fleet, and ADR-0006 lists what was left out
+# checked against a mixed desktop/gaming/server fleet, and ADR-0007 lists what was left out
 # and why.
 #
 # Settings that are STIG controls (kptr_restrict, randomize_va_space, tcp_syncookies) are
 # not set here. ADR-0003 makes the STIG modules their only source.
 #
 # Secure Boot and TPM2 unlock need someone at the machine (key enrollment, a TPM PCR
-# binding), so they ship as options that default to OFF. The runbooks are in ADR-0006.
+# binding), so they ship as options that default to OFF. The runbooks are in ADR-0007.
 {
   config,
   lib,
@@ -56,7 +56,7 @@ in {
       enable = lib.mkEnableOption ''
         UEFI Secure Boot through lanzaboote. OFF by default: it needs the lanzaboote flake
         input, keys created with sbctl, and the firmware in setup mode to enroll them. Turning
-        it on before that leaves a host its firmware refuses to boot. See ADR-0006,
+        it on before that leaves a host its firmware refuses to boot. See ADR-0007,
         "Runbook: Secure Boot"'';
 
       pkiBundle = lib.mkOption {
@@ -70,7 +70,7 @@ in {
       unlocking the LUKS root (cryptroot) with the TPM2 chip, through systemd-cryptenroll.
       OFF by default: the TPM has to be enrolled on the machine itself
       (systemd-cryptenroll), and an unenrolled TPM token only adds a timeout before the
-      passphrase prompt. The passphrase keeps working as a fallback. See ADR-0006, "Runbook: TPM2 unlock"'';
+      passphrase prompt. The passphrase keeps working as a fallback. See ADR-0007, "Runbook: TPM2 unlock"'';
   };
 
   config = lib.mkMerge [
@@ -81,7 +81,7 @@ in {
             enable = lib.mkDefault true;
             configurationLimit = 10;
             # The editor stays ON while Secure Boot is off. It is the recovery path for a
-            # locked root (ADR-0006, "Recovery"): appending
+            # locked root (ADR-0007, "Recovery"): appending
             # systemd.setenv=SYSTEMD_SULOGIN_FORCE=1 opens an emergency shell. Turning it off
             # without Secure Boot buys nothing. The root filesystem is LUKS, so an edited
             # command line still stops at the passphrase prompt, and anyone with physical
@@ -177,7 +177,7 @@ in {
               features.hardening.secureBoot.enable needs the lanzaboote NixOS module, which
               this flake does not import yet. Add the input and
               inputs.lanzaboote.nixosModules.lanzaboote to the host's modules first
-              (ADR-0006, "Runbook: Secure Boot").
+              (ADR-0007, "Runbook: Secure Boot").
             '';
           }
         ];
