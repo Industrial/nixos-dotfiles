@@ -1,0 +1,218 @@
+# Scheduled flake.lock bumps, opened as a pull request for the operator to review.
+#
+# Policy: docs/adr/0006-update-policy.md. Procedure: docs/runbooks/updates.md.
+#
+#   lock    bumps every root input and opens or refreshes ONE PR on `update/flake-lock`.
+#   diff    per host: runs the same `check` action the PR workflow runs, evaluates the
+#           package diff against main, and posts a commit status on the PR head.
+#   report  writes the input table and the per-host package diff into the PR body.
+#
+# This workflow NEVER merges, approves or enables auto-merge. Hosts change only after the
+# operator merges the PR into main, when comin (ADR-0002) converges them.
+#
+# Token: with the default GITHUB_TOKEN, GitHub does not start other workflows for the PR
+# this one opens, so `PR` (pr.yml) will not run on it until someone closes and reopens it.
+# The `update-flake-lock / check (<host>)` statuses posted below are the host gate in the
+# meantime. Setting the FLAKE_LOCK_UPDATE_TOKEN secret (fine-grained PAT or GitHub App
+# token, contents + pull-requests: write on this repo) makes pr.yml run automatically.
+name: Update flake.lock
+on:
+  schedule:
+    # Mondays 03:23 UTC: off the hour, and a full week of upstream churn per review.
+    - cron: '23 3 * * 1'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: update-flake-lock
+  cancel-in-progress: false
+env:
+  LOCK_BRANCH: update/flake-lock
+jobs:
+  lock:
+    name: Bump flake.lock
+    # Lock bumps are always against main: the PR base is whatever branch is checked out.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      pr: ${{ steps.update.outputs.pull-request-number }}
+      operation: ${{ steps.update.outputs.pull-request-operation }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+      - name: Update flake.lock and open PR
+        id: update
+        uses: DeterminateSystems/update-flake-lock@da03c0f078bc4b2c37ee4f7e072d34bf8f188bb3 # v29
+        with:
+          token: ${{ secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
+          branch: ${{ env.LOCK_BRANCH }}
+          commit-msg: 'chore(flake): bump flake.lock'
+          pr-title: 'chore(flake): bump flake.lock'
+          pr-labels: flake-lock
+          pr-body: |
+            Scheduled lock bump from `.github/workflows/update-flake-lock.yml`. **Review and merge by hand**: nothing merges this automatically, and no host changes until it lands on `main` (comin then converges every host within ~5 minutes; see `docs/runbooks/updates.md`).
+
+            ```
+            {{ env.GIT_COMMIT_MESSAGE }}
+            ```
+
+            <!-- update-flake-lock:diff:start -->
+            _Per-host package diff pending: this workflow's `report` job fills it in._
+            <!-- update-flake-lock:diff:end -->
+
+            ### Review checklist
+
+            - [ ] `update-flake-lock / check (<host>)` statuses are green (or red only for reasons main already has)
+            - [ ] kernel and NixOS moves above are expected; a kernel move needs a reboot after convergence
+            - [ ] no removed package that a host still needs
+            - [ ] if `PR` checks did not run: close and reopen this PR to start them (see the workflow header)
+  diff:
+    name: Diff (${{ matrix.host }})
+    needs: lock
+    if: needs.lock.outputs.pr != '' && needs.lock.outputs.operation != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [drakkar, huginn, mimir, muninn]
+    env:
+      HOST: ${{ matrix.host }}
+    steps:
+      - name: Checkout lock-bump branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.LOCK_BRANCH }}
+      # Untracked inside the head checkout, so neither flake ever sees the other.
+      - name: Checkout base (main as the bump saw it)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: .update-base
+      - name: Record head SHA
+        id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Setup Nix and Cachix
+        uses: ./.github/actions/setup-nix
+      # The `check` action only accepts the hosts pr.yml's matrix covers; muninn gets the
+      # package diff but no host check here (follow-up for the CI workflow owner).
+      - name: Check
+        id: check
+        if: matrix.host != 'muninn'
+        continue-on-error: true
+        uses: ./.github/actions/check
+        with:
+          host: ${{ matrix.host }}
+      - name: Package diff
+        id: diff
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          if ! bin/update/pkg-diff host "$PWD/.update-base" "$PWD" "$HOST" 120 > "out/$HOST.md" 2> err.log; then
+            {
+              echo "### $HOST"
+              echo
+              echo "**Evaluation failed** -- this bump does not evaluate for $HOST. Last lines:"
+              echo
+              echo '```'
+              tail -n 20 err.log
+              echo '```'
+            } > "out/$HOST.md"
+            exit 1
+          fi
+      - name: Upload diff
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pkg-diff-${{ matrix.host }}
+          path: out/${{ matrix.host }}.md
+          retention-days: 14
+      - name: Post commit status on the PR head
+        if: matrix.host != 'muninn'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.head.outputs.sha }}
+          OUTCOME: ${{ steps.check.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$OUTCOME" = success ]; then state=success; else state=failure; fi
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$SHA" \
+            -f state="$state" \
+            -f context="update-flake-lock / check ($HOST)" \
+            -f description="nix flake check + dry-run build: $OUTCOME" \
+            -f target_url="$RUN_URL"
+      - name: Fail on a red check or a failed evaluation
+        if: steps.check.outcome == 'failure' || steps.diff.outcome == 'failure'
+        run: |
+          echo "check: ${{ steps.check.outcome }}  diff: ${{ steps.diff.outcome }}" >&2
+          exit 1
+  report:
+    name: Write diff into PR body
+    needs: [lock, diff]
+    if: always() && needs.lock.outputs.pr != '' && needs.lock.outputs.operation != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      PR: ${{ needs.lock.outputs.pr }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout lock-bump branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.LOCK_BRANCH }}
+      - name: Checkout base
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.sha }}
+          path: .update-base
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+      - name: Download diffs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: pkg-diff-*
+          merge-multiple: true
+          path: diffs
+      - name: Assemble and write PR body
+        run: |
+          set -euo pipefail
+          {
+            echo '## What this bump changes'
+            echo
+            echo "Base: \`${GITHUB_SHA:0:12}\` (main). Package versions are **evaluated, not built**: \`environment.systemPackages\`, kernel and NixOS release per host. The exact built closure diff appears on each host after merge (\`nixos-update-notifier\`, \`nix store diff-closures\`)."
+            echo
+            echo '### Flake inputs'
+            echo
+            bin/update/pkg-diff inputs "$PWD/.update-base" "$PWD"
+            echo
+            for host in drakkar huginn mimir muninn; do
+              if [ -f "diffs/$host.md" ]; then
+                cat "diffs/$host.md"
+              else
+                printf '### %s\n\n_No diff: the job for this host did not produce one; see the workflow run._\n' "$host"
+              fi
+              echo
+            done
+            echo "[Workflow run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)"
+          } > section.md
+          gh pr view "$PR" --json body --jq .body > body.md
+          start='<!-- update-flake-lock:diff:start -->'
+          end='<!-- update-flake-lock:diff:end -->'
+          if grep -qF "$start" body.md && grep -qF "$end" body.md; then
+            awk -v start="$start" -v end="$end" -v f=section.md '
+              $0 == start { print; while ((getline l < f) > 0) print l; skip = 1; next }
+              $0 == end { skip = 0 }
+              !skip { print }
+            ' body.md > new.md
+          else
+            { cat body.md; echo; echo "$start"; cat section.md; echo "$end"; } > new.md
+          fi
+          gh pr edit "$PR" --body-file new.md
