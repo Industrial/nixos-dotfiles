@@ -4,7 +4,7 @@
 #
 # Entering the shell runs the git-hooks task (`prek run -a`). Hooks that
 # themselves entered the shell made that recursive; see the comment above
-# `withDevenv` in devenv.nix. This calls the store wrapper that devenv.nix
+# `withDevenv` in nix/devenv-modules/with-devenv.nix. This calls the store wrapper that devenv.nix
 # builds and links at .devenv/with-devenv on every shell entry. Until that
 # link exists (fresh clone, no shell entered yet) it falls back to
 # `devenv shell --`, which is correct, only slower.
@@ -20,5 +20,15 @@ fi
 
 if [[ -x "$wrapper" ]]; then
   exec "$wrapper" "$@"
+fi
+if ! command -v devenv >/dev/null 2>&1; then
+  cat >&2 <<MSG
+bin/with-devenv: cannot supply the devenv toolchain for '$1'.
+  $wrapper does not exist yet (no devenv shell has been entered in this
+  checkout), and 'devenv' is not on PATH to build it.
+  Install devenv (https://devenv.sh), then re-run; the first run is slow
+  because it evaluates the shell. See docs/development.md#prerequisites.
+MSG
+  exit 127
 fi
 exec devenv shell -- "$@"
