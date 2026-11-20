@@ -5,8 +5,10 @@ fn main() {
     // Create System object once and reuse it to avoid expensive initialization
     let mut system = System::new_all();
 
-    // Main daemon loop: check memory every 5 seconds (reduced from 1 second)
-    // This significantly reduces CPU usage while still being responsive enough
+    // Main daemon loop: check memory every second. A check only refreshes memory totals
+    // (one read of /proc/meminfo); the process table is walked only when the threshold is
+    // crossed. At 5 seconds a parallel link or a large backtest could take a 61 GiB host
+    // from 80% to exhaustion between two checks.
     loop {
         // Perform one daemon iteration with the reused System object
         match daemon_iteration(&mut system) {
@@ -20,7 +22,6 @@ fn main() {
             }
         }
 
-        // Sleep for 5 seconds before next check (reduced frequency = lower CPU)
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        std::thread::sleep(std::time::Duration::from_secs(1));
     }
 }
