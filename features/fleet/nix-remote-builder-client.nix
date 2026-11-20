@@ -1,36 +1,19 @@
 # Offload nix builds to fleet machines. Nix skips unreachable hosts automatically.
-{settings, ...}: {
+# The builder list and each machine's capacity live in common/fleet.nix.
+{settings, ...}: let
+  fleet = import ../../common/fleet.nix;
+in {
   nix.distributedBuilds = true;
 
-  nix.buildMachines = [
-    {
-      hostName = "drakkar";
+  nix.buildMachines =
+    map (b: {
+      hostName = b.name;
       system = "x86_64-linux";
-      maxJobs = 8;
-      speedFactor = 2;
-      supportedFeatures = ["big-parallel" "kvm" "nixos-test"];
+      inherit (b) maxJobs speedFactor supportedFeatures;
       sshUser = settings.username;
       sshKey = "${settings.userdir}/.ssh/id_ed25519";
-    }
-    {
-      hostName = "muninn";
-      system = "x86_64-linux";
-      maxJobs = 4;
-      speedFactor = 1;
-      supportedFeatures = ["kvm" "nixos-test"];
-      sshUser = settings.username;
-      sshKey = "${settings.userdir}/.ssh/id_ed25519";
-    }
-    {
-      hostName = "huginn";
-      system = "x86_64-linux";
-      maxJobs = 4;
-      speedFactor = 1;
-      supportedFeatures = ["kvm" "nixos-test"];
-      sshUser = settings.username;
-      sshKey = "${settings.userdir}/.ssh/id_ed25519";
-    }
-  ];
+    })
+    fleet.builders;
 
   nix.settings.builders-use-substitutes = true;
 }

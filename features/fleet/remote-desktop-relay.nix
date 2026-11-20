@@ -12,7 +12,12 @@
 #
 # Note: services.rustdesk-server.relayIP was removed upstream in favour of
 # signal.relayHosts; the assay guards against it creeping back in.
-{
+#
+# Which host relays is fleet data: the "remote-desktop-relay" role in
+# common/fleet.nix.
+let
+  fleet = import ../../common/fleet.nix;
+in {
   services.rustdesk-server = {
     enable = true;
 
@@ -22,7 +27,7 @@
     signal = {
       enable = true;
       # Handed to clients by hbbs as the relay endpoint. MagicDNS short name.
-      relayHosts = ["mimir"];
+      relayHosts = fleet.withRole "remote-desktop-relay";
     };
 
     relay = {

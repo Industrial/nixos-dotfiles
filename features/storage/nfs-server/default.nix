@@ -1,10 +1,8 @@
 # NFS server for fleet bulk storage (Mimir /data).
 {lib, ...}: let
-  # Tailscale IPv4 of Drakkar and Huginn — clients for /data exports.
-  clientHosts = [
-    "100.69.213.35/32" # drakkar
-    "100.70.136.13/32" # huginn
-  ];
+  fleet = import ../../../common/fleet.nix;
+  # Tailscale IPv4 of every "nfs-client" host in common/fleet.nix.
+  clientHosts = map (name: "${fleet.hosts.${name}.tailscaleIp}/32") fleet.nfsClients;
 
   exportOptions = "rw,sync,no_subtree_check,sec=sys";
 

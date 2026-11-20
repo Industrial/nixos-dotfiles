@@ -1,4 +1,6 @@
-{settings, ...}: {
+{settings, ...}: let
+  fleet = import ../../../common/fleet.nix;
+in {
   # Comprehensive Prometheus monitoring stack
   services = {
     prometheus = {
@@ -13,29 +15,19 @@
           scrape_interval = "1s";
           # Explicit host labels so dashboards legend by fleet hostname
           # instead of raw instance addresses. Local host uses 0.0.0.0,
-          # remote hosts use their hostnames.
-          static_configs = [
-            {
-              targets = ["0.0.0.0:9002"];
-              labels = {host = settings.hostname;};
-            }
-            {
-              targets = ["mimir:9002"];
-              labels = {host = "mimir";};
-            }
-            {
-              targets = ["drakkar:9002"];
-              labels = {host = "drakkar";};
-            }
-            {
-              targets = ["huginn:9002"];
-              labels = {host = "huginn";};
-            }
-            {
-              targets = ["muninn:9002"];
-              labels = {host = "muninn";};
-            }
-          ];
+          # remote hosts use their hostnames, in common/fleet.nix order.
+          static_configs =
+            [
+              {
+                targets = ["0.0.0.0:9002"];
+                labels = {host = settings.hostname;};
+              }
+            ]
+            ++ map (name: {
+              targets = ["${name}:9002"];
+              labels = {host = name;};
+            })
+            fleet.order;
         }
       ];
     };

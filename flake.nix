@@ -128,7 +128,7 @@
     lib = inputs.nixpkgs.lib;
     system = "x86_64-linux";
     pkgs = inputs.nixpkgs.legacyPackages.${system};
-    hosts = ["drakkar" "huginn" "mimir" "muninn"];
+    hosts = (import ./common/fleet.nix).names;
     mkHost = import ./lib/mk-host.nix {inherit inputs;};
     nixosConfigurations =
       lib.genAttrs hosts mkHost

@@ -9,23 +9,16 @@
 #
 # Privilege: SSH is key-only; deploy-rs activates as root via passwordless sudo
 # for the operator (interactiveSudo = false in flake deploy profile).
+#
+# Hosts and their pubkeys (operatorKey) live in common/fleet.nix.
 {
   lib,
   settings,
   ...
 }: let
-  fleetHosts = "drakkar huginn mimir muninn";
-
-  # One Ed25519 pubkey per operator host. null = not yet enrolled.
-  operatorPubKeys = {
-    drakkar = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtviEPSAz5PlJ8K8mFzSQz/Y6WqzqrBA5PzXkhjZ2/y tom@drakkar";
-    huginn = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINvaH/4XK0nQr6vo1ZZYpk0SIv0LvtJm6yxWMv7U2/Gb tom@huginn";
-    mimir = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaaBOy2a1WnlGy5B6WwEmVlf7s5VUgVIbsjdGZrsmK+ tom@mimir";
-    muninn = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAC/xRRyQ1Om1ChkxfeqfK8HjvAgzg1d+bfgU9ALxgYx tom@muninn";
-  };
-
-  enrolledKeys =
-    lib.filter (k: k != null) (lib.attrValues operatorPubKeys);
+  fleet = import ../../common/fleet.nix;
+  fleetHosts = lib.concatStringsSep " " fleet.names;
+  enrolledKeys = fleet.operatorKeys;
 in {
   users.users.${settings.username}.openssh.authorizedKeys.keys = enrolledKeys;
 
