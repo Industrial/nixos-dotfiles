@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Evaluate every flake check, plus the outputs `nix flake check` would have looked at that
+# no per-host job covers, without one evaluator holding all of them at once.
+#
+# `nix flake check --no-build` on this flake passes 13 GB resident in under two minutes
+# (measured on drakkar, 2026-11-20) and keeps growing: it evaluates five NixOS systems,
+# the deploy-rs checks over four of them and one NixOS VM test per STIG control, and Nix's
+# evaluator frees almost nothing in between. A hosted runner has 16 GB.
+#
+# nix-eval-jobs evaluates the same attributes in worker processes and replaces a worker
+# once it passes --max-memory-size, so peak memory is bounded by the largest single check
+# rather than by their sum. Every check must evaluate to a derivation; an evaluation error
+# in any of them fails this script.
+#
+# Building them is not this job's business: the STIG VM tests are built on main by the
+# `stig` job (STIG_VM=1), and building deploy-activate means building every host, which a
+# hosted runner without a pushable binary cache cannot afford per pull request.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+if [[ -z "${FLAKE_CHECKS_TOOLCHAIN:-}" ]]; then
+  export FLAKE_CHECKS_TOOLCHAIN=1
+  exec nix shell --inputs-from . nixpkgs#nix-eval-jobs nixpkgs#jq -c "$0" "$@"
+fi
+
+SYSTEM="x86_64-linux"
+# workers * max-memory-size is the total budget; an attribute that outgrows one worker is
+# retried alone with all of it. Measured locally (drakkar, 2026-11-20): one worker at 6 GiB
+# evaluates all 76 checks in 6 min with a 6.1 GiB peak, the per-host deploy checks being the
+# largest. 2 x 4 GiB keeps the worst case at 8 GiB, half a hosted runner.
+WORKERS="${FLAKE_CHECKS_WORKERS:-2}"
+MAX_MEMORY_MIB="${FLAKE_CHECKS_MAX_MEMORY_MIB:-4096}"
+
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+
+status=0
+evaluate() { # evaluate <flake attr>
+  echo "flake-checks: evaluating .#$1 (workers=$WORKERS, max-memory-size=${MAX_MEMORY_MIB}MiB)"
+  if ! nix-eval-jobs --flake ".#$1" --workers "$WORKERS" --max-memory-size "$MAX_MEMORY_MIB" >"$out"; then
+    echo "flake-checks: nix-eval-jobs failed on .#$1" >&2
+    status=1
+  fi
+  local total errors
+  total="$(jq -s 'length' "$out")"
+  errors="$(jq -s '[.[] | select(.error != null)] | length' "$out")"
+  jq -r 'if .error then "  FAIL \(.attr)\n\(.error | split("\n") | map("       " + .) | join("\n"))" else "  ok   \(.attr)  \(.drvPath)" end' "$out"
+  if [[ "$total" -eq 0 ]]; then
+    echo "flake-checks: .#$1 produced no attributes" >&2
+    status=1
+  fi
+  if [[ "$errors" -ne 0 ]]; then
+    echo "flake-checks: $errors/$total attribute(s) of .#$1 failed to evaluate" >&2
+    status=1
+  fi
+}
+
+evaluate "checks.${SYSTEM}"
+evaluate "packages.${SYSTEM}"
+
+echo "flake-checks: formatter.${SYSTEM}"
+nix eval --raw ".#formatter.${SYSTEM}.drvPath" >/dev/null || status=1
+
+if [[ "$status" -ne 0 ]]; then
+  echo "flake-checks: FAILED" >&2
+  exit 1
+fi
+echo "flake-checks: OK"

@@ -1,0 +1,20 @@
+name: Main
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+permissions:
+  contents: read
+# A newer push to main supersedes the run in flight: its tree contains everything the older
+# one would have checked, and the 35-minute STIG VM leg should not queue behind itself.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      # On main, also boot a VM per STIG control: the only gate that proves the runtime half
+      # of the baseline.
+      stig-vm-tests: true

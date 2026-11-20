@@ -1,0 +1,16 @@
+name: PR
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+# One run per pull request: a new push cancels the run for the commit it replaces.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      stig-vm-tests: false
