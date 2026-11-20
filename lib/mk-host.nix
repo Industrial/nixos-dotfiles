@@ -8,7 +8,14 @@
 # host with `lib.mkForce false` rather than by editing or commenting out an import.
 {inputs}: hostname: let
   inherit (inputs.nixpkgs) lib;
-  settings = (import ../common/settings.nix {inherit hostname;}).settings;
+  inherit
+    (import ../common/settings.nix {
+      inherit hostname;
+      # Git commit identity on every host (features/programming/git).
+      useremail = "tom.wieland@gmail.com";
+    })
+    settings
+    ;
   features = import ./features.nix {inherit lib;};
 in
   lib.nixosSystem {

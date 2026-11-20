@@ -10,6 +10,8 @@ in
     # settings.hostname reaches the system.
     hostnameFromSettings = assay.eq mimir.config.networking.hostName "mimir";
 
+    # Fleet hosts commit under the real address, not settings.nix's placeholder.
+    realUseremail = assay.eq mimir._module.specialArgs.settings.useremail "tom.wieland@gmail.com";
 
     # Every catalogued feature is declared on every host, so a host can switch any of
     # them on or off; one not enabled anywhere is declared but false.
