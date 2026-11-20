@@ -4,6 +4,10 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
 
+    # Every input follows this nixpkgs unless it is listed in `separateNixpkgs` (in
+    # `outputs` below) with a reason. `checks.<system>.flake-lock-follows` enforces it
+    # against flake.lock, so a new input that drags in its own nixpkgs fails CI.
+
     # Shared library-only inputs, hoisted so the lock holds one copy of each instead of
     # one per consumer. None of them carries packages: they are systems lists, flake
     # helpers and the flake-compat shim, so a single pin cannot change what gets built.
@@ -229,6 +233,72 @@
         };
       };
     deployLib = inputs.deploy-rs.lib.${system};
+
+    # Root inputs allowed to bring their own nixpkgs, each with the reason. Everything else
+    # must resolve every nixpkgs-shaped node it reaches in flake.lock to the root's.
+    separateNixpkgs = {
+      llm-agents = "FOD hashes and the uv/python pin are fixed against its own nixpkgs";
+      assay = "fails to link against the root pin (-lsqlite3); fix pending upstream";
+    };
+
+    # Walks flake.lock and fails when an input reaches a nixpkgs (github nixpkgs,
+    # nixpkgs.lib, or a channel nixexprs tarball) other than the root's, unless the root
+    # input it hangs off is in `separateNixpkgs`. Also fails on a stale allowlist entry.
+    flakeLockFollows = let
+      lock = builtins.fromJSON (builtins.readFile ./flake.lock);
+      inherit (lock) nodes;
+      rootInputs = nodes.${lock.root}.inputs;
+      # A lock input is a node name, or a follows path walked from the root.
+      resolve = spec:
+        if builtins.isString spec
+        then spec
+        else lib.foldl' (node: name: resolve nodes.${node}.inputs.${name}) lock.root spec;
+      rootNixpkgs = resolve rootInputs.nixpkgs;
+      isNixpkgs = node: let
+        l = node.locked or {};
+      in
+        builtins.elem (lib.toLower (l.repo or "")) ["nixpkgs" "nixpkgs.lib"]
+        || lib.hasSuffix "nixexprs.tar.xz" (l.url or "");
+      # Every node reachable from root input `k`, once each (the graph has cycles, e.g.
+      # caelestia-shell <-> caelestia-cli), with the first input path that reached it.
+      reachable = k:
+        builtins.genericClosure {
+          startSet = [
+            {
+              key = resolve rootInputs.${k};
+              path = [k];
+            }
+          ];
+          operator = item:
+            lib.mapAttrsToList (name: spec: {
+              key = resolve spec;
+              path = item.path ++ [name];
+            }) (nodes.${item.key}.inputs or {});
+        };
+      offendersOf = k:
+        map (item: "${lib.concatStringsSep "/" item.path} -> ${item.key}")
+        (lib.filter (item: item.key != rootNixpkgs && isNixpkgs nodes.${item.key}) (reachable k));
+      offenders = lib.concatMap offendersOf (lib.filter (k: !(separateNixpkgs ? ${k})) (builtins.attrNames rootInputs));
+      stale = lib.filter (k: !(rootInputs ? ${k}) || offendersOf k == []) (builtins.attrNames separateNixpkgs);
+      report =
+        lib.optionalString (offenders != []) ''
+          These inputs reach a nixpkgs other than the root's. Add
+          `inputs.<name>.follows = "nixpkgs"` in flake.nix, or list the root input in
+          `separateNixpkgs` with a reason:
+          ${lib.concatMapStrings (o: "  ${o}\n") offenders}''
+        + lib.optionalString (stale != []) ''
+          These `separateNixpkgs` entries no longer pin a separate nixpkgs (or are not
+          inputs at all); remove them:
+          ${lib.concatMapStrings (s: "  ${s}\n") stale}'';
+    in
+      pkgs.runCommand "flake-lock-follows" {inherit report;} (
+        if report == ""
+        then "touch $out"
+        else ''
+          printf '%s' "$report" >&2
+          exit 1
+        ''
+      );
     mkDeployNode = hostname: {
       inherit hostname;
       profiles.system = {
@@ -283,7 +353,8 @@
         (deployLib.deployChecks (self.deploy // {nodes = {${host} = self.deploy.nodes.${host};};})))
       {}
       hosts
-      // (builtins.removeAttrs self.stigVmTests ["passthru"]);
+      // (builtins.removeAttrs self.stigVmTests ["passthru"])
+      // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
   };
