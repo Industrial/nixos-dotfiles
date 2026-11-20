@@ -3,7 +3,7 @@
   lib,
   ...
 }: let
-  tinted-theming-schemes = (import ./derivations/tinted-theming-schemes.nix {inherit pkgs lib;}).tinted-theming-schemes;
+  inherit (import ./derivations/tinted-theming-schemes.nix {inherit pkgs lib;}) tinted-theming-schemes;
 
   # atelier-cave
   # atelier-estuary

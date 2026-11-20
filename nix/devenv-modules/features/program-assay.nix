@@ -5,7 +5,7 @@
   ...
 }: let
   cfg = config.local.features.program-assay;
-  version = cfg.version;
+  inherit (cfg) version;
   assay-release = pkgs.stdenv.mkDerivation {
     pname = "assay";
     inherit version;

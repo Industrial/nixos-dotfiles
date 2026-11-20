@@ -10,7 +10,7 @@ let
       pgadmin4-desktopmode = "pgadmin4-desktopmode";
       writeShellScriptBin = name: text: name;
     };
-    lib = (import <nixpkgs> {}).lib;
+    inherit (import <nixpkgs> {}) lib;
   };
 in
   assay.suite "pgadmin" {

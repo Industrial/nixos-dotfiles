@@ -43,7 +43,7 @@
   asset =
     assets.${system}
     or (throw "local.features.program-blaze: blaze publishes no release for ${system} (x86_64-linux, aarch64-linux, aarch64-darwin only)");
-  triple = asset.triple;
+  inherit (asset) triple;
   hash =
     if cfg.releaseHash != null
     then cfg.releaseHash

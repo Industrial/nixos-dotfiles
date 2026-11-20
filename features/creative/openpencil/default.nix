@@ -12,7 +12,7 @@
   };
   openpencil = pkgs.appimageTools.wrapType2 {
     pname = "openpencil";
-    version = version;
+    inherit version;
     src = appimage;
     extraPkgs = _pkgs: [];
   };

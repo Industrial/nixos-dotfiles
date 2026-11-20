@@ -6,7 +6,7 @@
 }: let
   cargoNix = import ./Cargo.nix {
     inherit pkgs;
-    defaultCrateOverrides = pkgs.defaultCrateOverrides;
+    inherit (pkgs) defaultCrateOverrides;
   };
 in
   cargoNix.workspaceMembers.oomkiller.build.overrideAttrs (oldAttrs: {

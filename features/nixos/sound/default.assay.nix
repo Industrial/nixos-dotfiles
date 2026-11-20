@@ -2,7 +2,7 @@
 let
   assay = import ./../../../common/assay/default.nix;
   mod = let
-    lib = (import <nixpkgs> {}).lib;
+    inherit (import <nixpkgs> {}) lib;
     pkgs = {
       pavucontrol = "pavucontrol";
       pulsemixer = "pulsemixer";

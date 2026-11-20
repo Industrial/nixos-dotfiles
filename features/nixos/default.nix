@@ -14,7 +14,7 @@
   };
 
   system = {
-    stateVersion = settings.stateVersion;
+    inherit (settings) stateVersion;
   };
 
   nix = {
@@ -74,7 +74,7 @@
   };
 
   nixpkgs = {
-    hostPlatform = settings.hostPlatform;
+    inherit (settings) hostPlatform;
     config = {
       allowUnfree = true;
       # Allow insecure packages (required for some gaming applications)
