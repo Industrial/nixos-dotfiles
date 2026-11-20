@@ -1,21 +1,26 @@
 # Colocated suite: nushell on systemPackages, login shell, and config activation.
+#
+# The module is evaluated against the real NixOS option tree, so the activation claims read the
+# script a host actually runs. config.nu and env.nu are Nushell source — the artifact itself —
+# and are read as text.
 let
   assay = import ./../../../common/assay/default.nix;
-  lib = (import <nixpkgs> {}).lib;
-  src = builtins.readFile ./default.nix;
-  mod = import ./default.nix {
+  nixos = import ./../../../common/assay/nixos.nix;
+  lib = nixos.lib;
+
+  system = nixos.evalSystem {
+    modules = [./default.nix];
     settings = {
-      hostname = "h";
       username = "alice";
       userdir = "/home/alice";
     };
-    pkgs = {
-      nushell = "nushell";
-      callPackage = path: args: "havamal";
-    };
   };
-  activation = mod.system.activationScripts.linkNushellConfig.text;
-  has = needle: builtins.match ".*${lib.escapeRegex needle}.*" activation != null;
+  cfg = system.config;
+  pkgs = system._module.args.pkgs;
+  havamal = pkgs.callPackage ../fish/havamal.nix {};
+
+  activation = cfg.system.activationScripts.linkNushellConfig.text;
+  has = needle: lib.hasInfix (builtins.unsafeDiscardStringContext needle) activation;
 
   # Every .nu this feature still ships. starship.nu and login.nu are deliberately absent.
   nuFiles =
@@ -45,10 +50,21 @@ let
   fdCallSites = builtins.filter (lib.hasInfix "fd --type") (lib.splitString "\n" config);
 in
   assay.suite "nushell" {
-    packages = assay.eq mod.environment.systemPackages ["nushell"];
-    shells = assay.eq mod.environment.shells ["nushell"];
-    loginShell = assay.eq mod.users.users.alice.shell "nushell";
-    linksConfigOnActivate = assay.eq (builtins.match ".*linkNushellConfig.*" src != null) true;
+    packages = assay.eq (nixos.hasPackage cfg "nushell") true;
+    # Listed in /etc/shells, which is what lets it be a login shell at all.
+    shells = assay.eq (builtins.elem pkgs.nushell cfg.environment.shells) true;
+    loginShell = assay.eq (lib.getName cfg.users.users.alice.shell) "nushell";
+    linksConfigOnActivate = assay.eq (cfg.system.activationScripts ? linkNushellConfig) true;
+
+    # Linked from the mutable checkout so edits apply without a rebuild.
+    linksFromTheCheckout =
+      assay.eq (has ''ln -sfn /home/alice/.dotfiles/features/cli/nushell/$file "$target"'') true;
+    # A first `nu` launch writes real files there; they are moved aside, not clobbered.
+    keepsPreExistingRealFiles = assay.eq (has ''mv "$target" "$target.backup"'') true;
+    # Hávamál's stanzas come from the same plugin derivation fish uses.
+    linksHavamalStanzas =
+      assay.eq (has "ln -sfn ${havamal}/share/fish/stanzas /home/alice/.config/nushell/havamal-stanzas") true;
+    chownsToUser = assay.eq (has "chown -R alice:users /home/alice/.config/nushell") true;
 
     # The prompt and the NixOS session variables moved to features/cli/shell-init, which
     # generates them into $nu.data-dir/vendor/autoload from the installed binaries. Linking

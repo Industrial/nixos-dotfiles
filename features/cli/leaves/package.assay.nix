@@ -1,21 +1,24 @@
 # Colocated suite for features/cli/leaves/package.nix.
-# String-level guards (repo pattern): identity and the two hashes a version bump must move.
+# Identity and the two hashes a version bump must move, read off the package as callPackage
+# builds it from the pinned nixpkgs.
 let
   assay = import ./../../../common/assay/default.nix;
-  src = builtins.readFile ./package.nix;
-  has = pat: builtins.match pat src != null;
+  nixos = import ./../../../common/assay/nixos.nix;
+  pkgs = nixos.flakeInputs.nixpkgs.legacyPackages.x86_64-linux;
+  leaves = pkgs.callPackage ./package.nix {};
 in
   assay.suite "leaves-package" {
-    namesLeaves = assay.eq (has ".*pname = \"leaves\";.*") true;
+    namesLeaves = assay.eq leaves.pname "leaves";
 
     # The `-cross` suffix is part of the upstream tag, not a local marker — the rev is
     # "v${version}", so dropping it would point fetchFromGitHub at a tag that does not exist.
-    pinsCrossTaggedVersion = assay.eq (has ".*version = \"0\\.2\\.0-cross\";.*") true;
-    revDerivesFromVersion = assay.eq (has ".*rev = \"v.*version.*\";.*") true;
+    pinsCrossTaggedVersion = assay.eq leaves.version "0.2.0-cross";
+    revDerivesFromVersion = assay.eq leaves.src.rev "v${leaves.version}";
+    fetchesUpstream = assay.eq [leaves.src.owner leaves.src.repo] ["patonw" "leaves"];
 
-    pinsSrcHash = assay.eq (has ".*hash = \"sha256-JGWGo/JDC3/Sj97ca4CrgD4WaobYUVmbryuIg/AN2kU=\";.*") true;
+    pinsSrcHash = assay.eq leaves.src.outputHash "sha256-JGWGo/JDC3/Sj97ca4CrgD4WaobYUVmbryuIg/AN2kU=";
     # A Rust package needs both hashes; forgetting cargoHash on a bump is the usual slip.
-    pinsCargoHash = assay.eq (has ".*cargoHash = \"sha256-W1RWE08HXDhgejWcnUKI6/WTk9CAU6wayrNNl87rvMw=\";.*") true;
+    pinsCargoHash = assay.eq leaves.cargoHash "sha256-W1RWE08HXDhgejWcnUKI6/WTk9CAU6wayrNNl87rvMw=";
 
-    exposesLeavesAsMainProgram = assay.eq (has ".*mainProgram = \"leaves\";.*") true;
+    exposesLeavesAsMainProgram = assay.eq leaves.meta.mainProgram "leaves";
   }

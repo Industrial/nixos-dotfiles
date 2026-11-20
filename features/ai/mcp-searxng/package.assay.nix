@@ -1,23 +1,25 @@
 # Colocated suite for features/ai/mcp-searxng/package.nix.
-# String-level guards (repo pattern): identity, pinned tarball and npm closure, vendored
+# Asserts on the evaluated derivation: identity, pinned tarball and npm closure, vendored
 # lockfile.
 let
   assay = import ./../../../common/assay/default.nix;
-  src = builtins.readFile ./package.nix;
-  has = pat: builtins.match pat src != null;
+  nixos = import ./../../../common/assay/nixos.nix;
+  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  drv = pkgs.callPackage ./package.nix {};
 in
   assay.suite "mcp-searxng-package" {
-    namesMcpSearxng = assay.eq (has ".*pname = \"mcp-searxng\";.*") true;
-    pinsVersion = assay.eq (has ".*version = \"2\\.1\\.0\";.*") true;
-    pinsTarballHash = assay.eq (has ".*hash = \"sha256-H/\\+Fn9gUIsm79Ze88cvHqPuMbdF4hHYYBFzxt5EgNhw=\";.*") true;
-    pinsNpmDepsHash = assay.eq (has ".*npmDepsHash = \"sha256-5OtWT99QEYqbDYGLv1OlLKrRiPL9eT7fHNLetFJNXkg=\";.*") true;
+    namesMcpSearxng = assay.eq drv.pname "mcp-searxng";
+    pinsVersion = assay.eq drv.version "2.1.0";
+    tarballMatchesVersion = assay.eq drv.src.url "https://registry.npmjs.org/mcp-searxng/-/mcp-searxng-2.1.0.tgz";
+    pinsTarballHash = assay.eq drv.src.outputHash "sha256-H/+Fn9gUIsm79Ze88cvHqPuMbdF4hHYYBFzxt5EgNhw=";
+    pinsNpmDepsHash = assay.eq drv.npmDeps.outputHash "sha256-5OtWT99QEYqbDYGLv1OlLKrRiPL9eT7fHNLetFJNXkg=";
 
-    # Brace-free pattern: Nix's regex engine rejects \{ as invalid.
-    vendorsLockfile = assay.eq (has ".*cp .*package-lock\\.json.* package-lock\\.json.*") true;
+    # The tarball ships no lockfile; postPatch (the generated shell step) copies ours in.
+    vendorsLockfile = assay.eq (builtins.match "cp /nix/store/[^ ]*-package-lock\\.json package-lock\\.json\n" drv.postPatch != null) true;
     lockfileExists = assay.eq (builtins.pathExists ./package-lock.json) true;
 
-    usesPackageSourceRoot = assay.eq (has ".*sourceRoot = \"package\";.*") true;
-    skipsBuild = assay.eq (has ".*dontNpmBuild = true;.*") true;
+    usesPackageSourceRoot = assay.eq drv.sourceRoot "package";
+    skipsBuild = assay.eq drv.dontNpmBuild true;
 
-    exposesMcpAsMainProgram = assay.eq (has ".*mainProgram = \"mcp-searxng\";.*") true;
+    exposesMcpAsMainProgram = assay.eq drv.meta.mainProgram "mcp-searxng";
   }

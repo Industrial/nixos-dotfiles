@@ -1,10 +1,21 @@
 # Colocated suite for features/ai/cloudcli/package.nix.
-# String-level guards (repo pattern): identity, the two pins, the vendored manifests,
-# and the three prebuilt-binary replacements that make this run on NixOS at all.
+# Asserts on the evaluated derivation: identity, the two pins, the vendored manifests,
+# and the prebuilt-binary handling that makes this run on NixOS at all. postPatch and
+# postInstall are matched as text because they ARE text: the generated build steps.
 let
   assay = import ./../../../common/assay/default.nix;
-  src = builtins.readFile ./package.nix;
-  has = pat: builtins.match pat src != null;
+  nixos = import ./../../../common/assay/nixos.nix;
+  lib = nixos.lib;
+  # Substring test over generated text; store-path context is irrelevant to the match.
+  contains = needle: s: lib.hasInfix (builtins.unsafeDiscardStringContext needle) (builtins.unsafeDiscardStringContext s);
+  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  drv = pkgs.callPackage ./package.nix {};
+  install = drv.postInstall;
+  # Shell comments in postInstall explain the choices; the counting claims read commands.
+  installCode =
+    lib.concatStringsSep "\n"
+    (builtins.filter (l: builtins.match "[[:space:]]*#.*" l == null) (lib.splitString "\n" install));
+  occurrences = needle: s: builtins.length (builtins.filter builtins.isString (builtins.split needle s)) - 1;
 
   # The lockfile is parsed, not pattern-matched. builtins.match with a leading `.*`
   # over 488 KB overflows Nix's regex stack ("stack overflow (possible infinite
@@ -16,16 +27,16 @@ let
   manifest = builtins.fromJSON (builtins.readFile ./package.json);
 in
   assay.suite "cloudcli-package" {
-    namesCloudcli = assay.eq (has ".*pname = \"cloudcli\";.*") true;
-    pinsVersion = assay.eq (has ".*version = \"1\\.37\\.9\";.*") true;
-    pinsTarballHash = assay.eq (has ".*hash = \"sha256-3ueqwG4FNdWCwAnP7ibUSr1T76ZEjH0Wgj2eqo1zVSU=\";.*") true;
-    pinsNpmDepsHash = assay.eq (has ".*npmDepsHash = \"sha256-mnVbTJJox6Lsk35veigqgQS\\+7fWx8ghfchGqg2NqD4Q=\";.*") true;
+    namesCloudcli = assay.eq drv.pname "cloudcli";
+    pinsVersion = assay.eq drv.version "1.37.9";
+    tarballMatchesVersion = assay.eq drv.src.url "https://registry.npmjs.org/@cloudcli-ai/cloudcli/-/cloudcli-${drv.version}.tgz";
+    pinsTarballHash = assay.eq drv.src.outputHash "sha256-3ueqwG4FNdWCwAnP7ibUSr1T76ZEjH0Wgj2eqo1zVSU=";
+    pinsNpmDepsHash = assay.eq drv.npmDeps.outputHash "sha256-mnVbTJJox6Lsk35veigqgQS+7fWx8ghfchGqg2NqD4Q=";
 
     # The published tarball ships neither manifest, so buildNpmPackage needs both
     # copied in. Without the lockfile the build cannot resolve dependencies at all.
-    # Brace-free patterns: Nix's regex engine rejects \{ as invalid.
-    vendorsLockfile = assay.eq (has ".*cp .*package-lock\\.json.* package-lock\\.json.*") true;
-    vendorsPackageJson = assay.eq (has ".*cp .*package\\.json.* package\\.json.*") true;
+    vendorsLockfile = assay.eq (builtins.match ".*cp /nix/store/[^ ]*-package-lock\\.json package-lock\\.json\n.*" drv.postPatch != null) true;
+    vendorsPackageJson = assay.eq (builtins.match ".*cp /nix/store/[^ ]*-package\\.json package\\.json\n.*" drv.postPatch != null) true;
     lockfileExists = assay.eq (builtins.pathExists ./package-lock.json) true;
     packageJsonExists = assay.eq (builtins.pathExists ./package.json) true;
 
@@ -63,55 +74,52 @@ in
       ];
 
     # The tarball unpacks into package/ and already ships compiled dist/ + dist-server/.
-    usesPackageSourceRoot = assay.eq (has ".*sourceRoot = \"package\";.*") true;
-    skipsBuild = assay.eq (has ".*dontNpmBuild = true;.*") true;
+    usesPackageSourceRoot = assay.eq drv.sourceRoot "package";
+    skipsBuild = assay.eq drv.dontNpmBuild true;
+    buildsOnNode22 = assay.eq drv.nodejs.outPath pkgs.nodejs_22.outPath;
 
     # bcrypt, better-sqlite3 and node-pty are gyp builds; python3 and building from
     # source rather than reaching for a prebuilt are both load-bearing.
-    hasPython3ForGyp = assay.eq (has ".*python3.*") true;
-    buildsNativeFromSource = assay.eq (has ".*npm_config_build_from_source = \"true\";.*") true;
+    hasPython3ForGyp = assay.eq (builtins.elem pkgs.python3.outPath (map (p: p.outPath) drv.nativeBuildInputs)) true;
+    buildsNativeFromSource = assay.eq drv.drvAttrs.npm_config_build_from_source "true";
 
     # The vendored claude CLI is the one generic-linux prebuilt in the tree: glibc
     # dynamic, interpreter /lib64/ld-linux-x86-64.so.2, which on NixOS is stub-ld.
     # Without the replacement the child process exits 127 with nothing useful said.
-    replacesClaudeBinary = assay.eq (has ".*claude-agent-sdk-linux-x64/claude.*") true;
+    replacesClaudeBinary =
+      assay.eq
+      (contains "ln -s \"${pkgs.claude-code}/bin/claude\" \"$out/lib/node_modules/@cloudcli-ai/cloudcli/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude\"" install)
+      true;
 
     # ripgrep and codex are static-pie and must stay untouched: codex resolves its
     # sibling resources relative to its own path inside the vendor tree, and
     # CloudCLI imports ripgrep as rgPath rather than finding it on PATH. Replacing
     # either is the plausible-looking mistake, so pin the count: exactly one `ln -s`
-    # in the whole derivation. Matching on their paths instead would false-fail,
-    # because the comment block names them while explaining why they are left alone.
-    exactlyOneBinaryReplacement =
-      assay.eq
-      (builtins.length (builtins.filter builtins.isString (builtins.split "ln -s" src)))
-      2;
-    documentsStaticPieFinding = assay.eq (has ".*static-pie linked -> left alone.*") true;
+    # among postInstall's commands.
+    exactlyOneBinaryReplacement = assay.eq (occurrences "ln -s" installCode) 1;
 
     # What actually guards the next bump: any vendored platform binary needing an
     # interpreter outside the store fails the build by name.
-    checksVendoredLinkage = assay.eq (has ".*print-interpreter.*") true;
-    rejectsNonStoreInterpreter = assay.eq (has ".*interpreter outside the store.*") true;
+    checksVendoredLinkage = assay.eq (contains "patchelf --print-interpreter" installCode) true;
+    rejectsNonStoreInterpreter = assay.eq (contains "need an interpreter outside the store" installCode) true;
+    hasPatchelfForLinkageCheck = assay.eq (builtins.elem "patchelf" (map lib.getName drv.nativeBuildInputs)) true;
 
     # The check has exactly one exemption: codex's voice host, which is a real
     # generic-linux prebuilt but unreachable from CloudCLI. Pinning the count is the
     # point — the failure mode for a guard like this is being widened under pressure
     # on the next bump, so a second exemption has to fail this claim first.
-    exactlyOneLinkageExemption =
-      assay.eq
-      (builtins.length (builtins.filter builtins.isString (builtins.split "_exemption=" src)))
-      2;
-    exemptsOnlyCodexVoice = assay.eq (has ".*codex-resources/voice.*") true;
+    exactlyOneLinkageExemption = assay.eq (occurrences "_exemption=" installCode) 1;
+    exemptsOnlyCodexVoice = assay.eq (contains "voice_host_exemption='*/codex-resources/voice/*'" installCode) true;
 
     # A renamed or dropped vendored path must fail the build, not produce a package
     # that only breaks when somebody opens a session.
-    failsLoudOnLayoutChange = assay.eq (has ".*upstream layout changed; update postInstall.*") true;
+    failsLoudOnLayoutChange = assay.eq (contains "upstream layout changed; update postInstall" installCode) true;
 
     # Both the provider layer's variable and the agent SDK's own override are set, and
     # overridable from the environment.
-    setsClaudeCliPath = assay.eq (has ".*--set-default CLAUDE_CLI_PATH.*") true;
-    setsClaudeCodeExecutable = assay.eq (has ".*--set-default CLAUDE_CODE_EXECUTABLE.*") true;
+    setsClaudeCliPath = assay.eq (contains "--set-default CLAUDE_CLI_PATH ${pkgs.claude-code}/bin/claude" installCode) true;
+    setsClaudeCodeExecutable = assay.eq (contains "--set-default CLAUDE_CODE_EXECUTABLE ${pkgs.claude-code}/bin/claude" installCode) true;
 
-    exposesCloudcliAsMainProgram = assay.eq (has ".*mainProgram = \"cloudcli\";.*") true;
-    isAgpl = assay.eq (has ".*license = lib\\.licenses\\.agpl3Plus;.*") true;
+    exposesCloudcliAsMainProgram = assay.eq drv.meta.mainProgram "cloudcli";
+    isAgpl = assay.eq drv.meta.license.spdxId "AGPL-3.0-or-later";
   }

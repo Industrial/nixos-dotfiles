@@ -1,20 +1,32 @@
-# Colocated suite: systemPackages from stubbed pkgs, plus the MCP feature imports
-# that make `claude-code` self-sufficient (the servers .claude/mcp.json declares).
+# Colocated suite for features/ai/claude-code/default.nix: the CLI and the tools its
+# hooks shell out to, plus the MCP features it imports that make `claude-code`
+# self-sufficient (the servers .claude/mcp.json declares).
 let
   assay = import ./../../../common/assay/default.nix;
-  pkgs = {
-    "claude-code" = "claude-code";
-    bash = "bash";
-    git = "git";
-    jq = "jq";
-    python3 = "python3";
-  };
-  mod = import ./default.nix {inherit pkgs;};
-  src = builtins.readFile ./default.nix;
+  nixos = import ./../../../common/assay/nixos.nix;
+  system = nixos.evalSystem {modules = [./default.nix];};
+  cfg = system.config;
+  pkgs = system.pkgs;
+  installed = map (p: p.outPath) cfg.environment.systemPackages;
+  installs = p: builtins.elem p.outPath installed;
 in
   assay.suite "claude-code" {
-    systemPackages = assay.eq mod.environment.systemPackages ["claude-code" "bash" "git" "jq" "python3"];
-    importsFiveMcpFeatures = assay.eq (builtins.length mod.imports) 5;
-    importsLeanCtx = assay.eq (builtins.match ".*lean-ctx.*" src != null) true;
-    importsMaestro = assay.eq (builtins.match ".*maestro.*" src != null) true;
+    installsClaudeCode = assay.eq (installs pkgs.claude-code) true;
+
+    # id-workflow hooks and the statusline shell out to these.
+    installsHookTools = assay.eq (builtins.all installs [pkgs.bash pkgs.git pkgs.jq]) true;
+
+    # uvx-launched MCP servers need a system python, or uv downloads a generic-linux
+    # CPython that NixOS cannot exec (stub-ld, exit 127).
+    installsSystemPython = assay.eq (installs pkgs.python3) true;
+
+    # Every MCP server .claude/mcp.json declares comes in through the imported features,
+    # so enabling claude-code alone is enough for the harness to work.
+    importsContext7 = assay.eq (nixos.hasPackage cfg "context7-mcp") true;
+    importsLeanCtx = assay.eq (nixos.hasPackage cfg "lean-ctx") true;
+    importsMaestro = assay.eq (nixos.hasPackage cfg "maestro") true;
+    importsMcpSearxng = assay.eq (nixos.hasPackage cfg "mcp-searxng") true;
+    importsRoamCode = assay.eq (nixos.hasPackage cfg "roam-code") true;
+    # Imported features bring their whole config, not just a package.
+    importsLeanCtxHookPin = assay.eq (cfg.systemd.user.services ? lean-ctx-hook-binary) true;
   }

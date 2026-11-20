@@ -1,60 +1,54 @@
-# Colocated suite: stylix autoEnable, scheme selection and the font package.
+# Assay: stylix -- scheme selection, the colours stylix actually parses, and the fonts.
+#
+# The feature is evaluated together with stylix's own NixOS module (as profiles/desktop.nix
+# imports it), so the claims read the real stylix.* options -- and `lib.stylix.colors`, the
+# palette stylix parses out of the scheme YAML, which is what its targets paint with.
 let
-  assay = import ./../../../common/assay/default.nix;
+  assay = import ../../../common/assay/default.nix;
+  nixos = import ../../../common/assay/nixos.nix;
+  inherit (nixos) lib;
   palette = import ./palette.nix;
-  # The stub stands in for nixpkgs so the module's attribute *shape* can be read without
-  # instantiating anything. `nerd-fonts` is nested because that is how nixpkgs spells it
-  # since the nerdfonts split -- a flat stub would let a regression back to a top-level
-  # alias pass here unnoticed.
-  #
-  # `stdenv.mkDerivation` discards its argument and returns a plausible store path: the
-  # schemes derivation is only ever interpolated into `base16Scheme`, so the suite needs its
-  # *path shape*, not a build. Returning a path here is also what keeps this suite free of
-  # the fetchFromGitHub it would otherwise drag in.
-  pkgs = {
-    noto-fonts-color-emoji = "emoji";
-    nerd-fonts = {iosevka-term = "nerd-fonts.iosevka-term";};
-    dejavu_fonts = "dejavu";
-    stdenv.mkDerivation = _: "/nix/store/0000-tinted-theming-schemes";
+  cfg = nixos.eval {
+    modules = [
+      nixos.flakeInputs.stylix.nixosModules.stylix
+      ./default.nix
+    ];
   };
-  mod = import ./default.nix {
-    inherit pkgs;
-    lib = (import <nixpkgs> {}).lib;
-  };
-  fonts = mod.stylix.fonts;
-
-  # Comment lines are dropped before the alias tripwires below scan the file: the comment on
-  # `monospace` names the broken alias in order to explain it, and a tripwire that cannot
-  # tell prose from code would forbid documenting the bug it guards against.
-  code =
-    builtins.concatStringsSep "\n"
-    (builtins.filter (l: builtins.match " *#.*" l == null)
-      (builtins.filter builtins.isString
-        (builtins.split "\n" (builtins.readFile ./default.nix))));
+  stylix = cfg.stylix;
+  fonts = stylix.fonts;
+  parsed = cfg.lib.stylix.colors;
+  baseNames = builtins.attrNames palette.colors;
 in
   assay.suite "stylix" {
-    autoEnable = assay.eq mod.stylix.autoEnable true;
-    polarityMatchesScheme = assay.eq mod.stylix.polarity palette.scheme.variant;
+    autoEnable = assay.eq stylix.autoEnable true;
+    polarityMatchesScheme = assay.eq stylix.polarity palette.scheme.variant;
 
-    # The scheme is selected by interpolating the slug into the pinned schemes derivation,
-    # so the YAML stylix parses and the hex palette.nix carries describe one scheme.
+    # The scheme is selected by interpolating palette.nix's slug into the pinned schemes
+    # derivation, so the YAML stylix parses and the hex palette.nix carries describe one scheme.
     schemeFileNamesTheSlug =
-      assay.eq
-      (builtins.match ".*/share/schemes/${palette.scheme.slug}[.]yaml.*"
-        mod.stylix.base16Scheme
-        != null)
-      true;
+      assay.eq (builtins.match "/nix/store/[^/]+-tinted-theming-schemes-[^/]+/share/schemes/(.*)" stylix.base16Scheme)
+      ["${palette.scheme.slug}.yaml"];
+    installsTheSchemes = assay.eq (nixos.hasPackage cfg "tinted-theming-schemes") true;
+    # ...and what stylix parsed out of that YAML is palette.nix, digit for digit.
+    stylixColoursAreThePalette =
+      assay.eq (lib.genAttrs baseNames (n: lib.toLower parsed.${n})) palette.colors;
 
     # The monospace family is duplicated, deliberately and under test, into alacritty.toml
-    # and ghostty's config (see ghostty/default.assay.nix). What is asserted here is the
-    # half that used to be wrong: that `package` actually ships `name`.
+    # and ghostty's config (see ghostty/default.assay.nix). What is asserted here is the half
+    # that used to be wrong: that `package` actually ships `name`.
     monospaceIsIosevkaTerm = assay.eq fonts.monospace.name "IosevkaTerm Nerd Font Mono";
-    monospacePackageShipsThatFamily =
-      assay.eq fonts.monospace.package "nerd-fonts.iosevka-term";
-    # `pkgs.terminus-nerdfont` is a throwing alias, and Terminess rather than Iosevka.
-    # Forcing it broke evaluation on every host; it must not return by either route.
-    noThrowingFontAlias =
-      assay.eq (builtins.match ".*pkgs[.]terminus-nerdfont.*" code != null) false;
-    noNerdfontsMetapackage =
-      assay.eq (builtins.match ".*pkgs[.]nerdfonts[^.-].*" code != null) false;
+    monospacePackageShipsThatFamily = assay.eq (lib.getName fonts.monospace.package) "nerd-fonts-iosevka-term";
+    # `pkgs.terminus-nerdfont` was a throwing alias that only evaluated because nothing forced
+    # it. Forcing every font package here is the tripwire: a throwing alias fails the suite.
+    everyFontPackageEvaluates =
+      assay.eq (map (f: builtins.isString fonts.${f}.package.drvPath) ["emoji" "monospace" "sansSerif" "serif"])
+      [true true true true];
+    sansAndSerifAreDejaVu =
+      assay.eq [fonts.sansSerif.name fonts.serif.name] ["DejaVu Sans" "DejaVu Serif"];
+
+    # stylix's fontconfig target is home-manager-only, so this feature writes the generic
+    # monospace alias itself, as its single writer, from the same name.
+    fontconfigMonospaceAliasIsTheFamily =
+      assay.eq cfg.fonts.fontconfig.defaultFonts.monospace [fonts.monospace.name];
+    wallpaperIsCommitted = assay.eq "${stylix.image}" "${./wallpaper.jpg}";
   }

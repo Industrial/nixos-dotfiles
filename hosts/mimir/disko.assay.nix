@@ -1,72 +1,92 @@
-# Colocated suite for hosts/mimir/disko.nix
+# Colocated suite for hosts/mimir/disko.nix.
 #
-# Upgraded from a bare non-empty check to assert full-disk encryption — Anduril NixOS STIG
-# V-268144 (information at rest, CAT I), which the disk layout decides rather than any NixOS
-# option. See hosts/drakkar/disko.assay.nix for the reasoning and
-# features/security/stig/profiles/base-safe.nix for where this evidence is cited.
+# Evaluated through the real disko module (pinned from flake.lock): claims read what disko
+# generates (fileSystems, initrd LUKS, partition devices) rather than the layout's text. The
+# old suite counted `raid5Member "` occurrences in comment-stripped source; the evaluated disk
+# set states the same invariants directly and survives a refactor of the helper.
 #
-# Mimir also carries the fleet's only multi-device volume — the four-disk btrfs RAID5 holding
-# ~55 TB at /data — so most of what follows guards that it stays one array, created only when
-# absent, rather than reverting to four separate single-disk filesystems.
+# Full-disk encryption of the system SSD is this host's evidence for Anduril NixOS STIG
+# V-268144 (information at rest, CAT I). Mimir also carries the fleet's only multi-device volume
+# — the four-disk btrfs RAID5 holding ~55 TB at /data — so most claims guard that it stays one
+# array, created once on the last disk, rather than reverting to four single-disk filesystems.
 let
-  assay = import ./../../common/assay/default.nix;
-  src = builtins.readFile ./disko.nix;
-  has = pat: builtins.match pat src != null;
+  assay = import ../../common/assay/default.nix;
+  nixos = import ../../common/assay/nixos.nix;
+  inherit (nixos) lib;
 
-  # Counting assertions must not count prose in the comments.
-  lines = builtins.filter builtins.isString (builtins.split "\n" src);
-  code = builtins.concatStringsSep "\n" (
-    builtins.filter (l: builtins.match "[[:space:]]*#.*" l == null) lines
-  );
-  # builtins.split returns 2n+1 elements for n matches.
-  occurrences = pat: (builtins.length (builtins.split pat code) - 1) / 2;
+  cfg = nixos.eval {
+    modules = [nixos.flakeInputs.disko.nixosModules.disko ./disko.nix];
+    settings.hostname = "mimir";
+  };
+  fs = cfg.fileSystems;
+  luks = cfg.boot.initrd.luks.devices;
+  disks = cfg.disko.devices.disk;
+  ssd = disks.ssd.content.partitions;
+  subvolOf = mount: lib.findFirst (lib.hasPrefix "subvol=") null fs.${mount}.options;
+
+  hdds = builtins.filter (lib.hasPrefix "hdd-") (builtins.attrNames disks); # attrNames is sorted
+  dataPart = name: disks.${name}.content.partitions.data;
+  array = (dataPart "hdd-d").content;
+  args = array.extraArgs;
+  flag = f: builtins.elemAt args (lib.lists.findFirstIndex (a: a == f) null args + 1);
+  # mkfs.btrfs <target> <extraArgs>: everything after the option flags is a further member.
+  extraMembers = builtins.filter (lib.hasPrefix "/dev/") args;
 in
   assay.suite "mimir-disko" {
-    nonEmpty = assay.eq ((builtins.stringLength src) > 20) true;
+    # /data is deliberately absent: ./filesystems.nix owns that mount, by label, and a second
+    # definition here would collide on fileSystems."/data".device.
+    mountSet = assay.eq (builtins.attrNames fs) ["/" "/boot" "/nix"];
 
-    # V-268144.
-    encryptsAtRest = assay.eq (has ".*type = \"luks\";.*") true;
-    namesCryptroot = assay.eq (has ".*name = \"cryptroot\";.*") true;
-    noKeyFileInStore = assay.eq (has ".*keyFile = null;.*") true;
+    # V-268144: the system mounts sit on the unlocked LUKS mapper.
+    systemMountsInsideLuks =
+      assay.eq (map (m: fs.${m}.device) ["/" "/nix"]) ["/dev/mapper/cryptroot" "/dev/mapper/cryptroot"];
+    unlocksSsdLuksPartition = assay.eq luks.cryptroot.device "/dev/disk/by-partlabel/disk-ssd-luks";
+    noKeyFileInStore = assay.eq luks.cryptroot.keyFile null;
 
-    bootIsOwnerOnly = assay.eq (has ".*umask=0077.*") true;
-    btrfsRootInsideLuks = assay.eq (has ".*type = \"btrfs\";.*") true;
+    rootIsBtrfs = assay.eq fs."/".fsType "btrfs";
+    subvolumePerMount = assay.eq (lib.genAttrs ["/" "/nix"] subvolOf) {
+      "/" = "subvol=@root";
+      "/nix" = "subvol=@nix";
+    };
 
-    # The /data array must be one RAID5 volume labelled `data`, not four filesystems. The label
-    # is load-bearing: ./filesystems.nix mounts /data by LABEL=data, so losing it means the
-    # mount fails and — absent nofail — the host boots to an emergency shell.
-    declaresRaid5 =
-      assay.eq (has ".*\"-m\" \"raid5\".*" && has ".*\"-d\" \"raid5\".*") true;
-    labelsVolumeData = assay.eq (has ".*\"-L\" \"data\".*") true;
+    # No top-level btrfs mountpoint: with one, disko mounts subvolid 5 at the mount root during
+    # install and nixos-install writes `/` into the bare volume while the installed system boots
+    # with subvol=@root. Mimir feels this hardest: no @home or @var, so more lives in @root.
+    btrfsHasNoTopLevelMountpoint = assay.eq ssd.luks.content.content.mountpoint null;
+    rootDeclaredOnce =
+      assay.eq (builtins.length (lib.catAttrs "/" cfg.disko.devices._config.fileSystems.contents)) 1;
 
-    # mkfs.btrfs takes one target device plus the rest as arguments, so exactly three of the
-    # four members ride in extraArgs and the fourth is the target.
-    membersCoverABC =
-      assay.eq (
-        has ".*disk-hdd-a-data.*"
-        && has ".*disk-hdd-b-data.*"
-        && has ".*disk-hdd-c-data.*"
-      )
-      true;
-    # hdd-d is the mkfs target; naming it in extraArgs too would pass the same device twice.
-    arrayTargetNotAlsoAMember = assay.eq (has ".*disk-hdd-d-data.*") false;
+    espPartitionType = assay.eq ssd.boot.type "EF00";
+    bootIsOwnerOnly = assay.eq (builtins.elem "umask=0077" fs."/boot".options) true;
 
-    # Three members are declared partition-only (content = null) via one shared helper, so
-    # disko creates and labels their partitions but never formats them individually.
-    threeUnformattedMembers = assay.eq (occurrences "raid5Member \"") 3;
-    membersCarryNoContent = assay.eq (occurrences "content = null") 1;
+    hddDevices = assay.eq (lib.genAttrs hdds (n: disks.${n}.device)) {
+      hdd-a = "/dev/sda";
+      hdd-b = "/dev/sdb";
+      hdd-c = "/dev/sdc";
+      hdd-d = "/dev/sdd";
+    };
+
+    # One RAID5 volume for data and metadata, labelled `data`. The label is load-bearing:
+    # ./filesystems.nix mounts /data by LABEL=data.
+    arrayIsBtrfs = assay.eq array.type "btrfs";
+    raid5Metadata = assay.eq (flag "-m") "raid5";
+    raid5Data = assay.eq (flag "-d") "raid5";
+    labelsVolumeData = assay.eq (flag "-L") "data";
+
+    # The members passed to mkfs are exactly the partitions disko creates on the other three
+    # disks — not hdd-d's own (the target would be passed twice), and by the partlabel disko
+    # actually assigns, so a disk rename cannot leave a dangling path.
+    extraMembersAreOtherDisks =
+      assay.eq extraMembers (map (n: (dataPart n).device) ["hdd-a" "hdd-b" "hdd-c"]);
+
+    # Members are created and labelled but never formatted on their own.
+    membersCarryNoContent = assay.eq (map (n: (dataPart n).content) ["hdd-a" "hdd-b" "hdd-c"]) [null null null];
 
     # Ordering invariant: disko emits disks in attribute-name order and tracks no dependencies
-    # for multi-device btrfs, so the mkfs must sit on the alphabetically last disk — after
-    # every member partition exists. If hdd-d became a plain member, the mkfs would move
-    # earlier and fail on a missing by-partlabel path.
-    arrayNotOnAPlainMember = assay.eq (has ".*raid5Member \"/dev/sdd\".*") false;
+    # for multi-device btrfs, so the only HDD that formats must sort last — after every member
+    # partition exists — or mkfs.btrfs fails on a missing by-partlabel path.
+    arrayOnLastHdd = assay.eq (builtins.filter (n: (dataPart n).content != null) hdds) [(lib.last hdds)];
 
-    # The btrfs filesystem must have no top-level mountpoint. With one, disko mounts subvolid 5
-    # at the mount root during install — it wins the attrset collision against the @root
-    # subvolume mount — so nixos-install writes `/` into the bare volume while the installed
-    # system boots with subvol=@root. Mimir feels this hardest: it declares no @home or @var,
-    # so more of the tree lives in @root.
-    rootMountedViaSubvolumeOnly =
-      assay.eq (has ".*type = \"btrfs\";[[:space:]]*mountpoint = \"/\";.*") false;
+    # Unmounted during install; ./filesystems.nix owns /data.
+    arrayHasNoMountpoint = assay.eq array.mountpoint null;
   }

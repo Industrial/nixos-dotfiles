@@ -1,10 +1,11 @@
-# Colocated suite for features/programming/neovim/folds.nix
+# Assay: neovim folds (placeholder).
+#
+# folds.nix only carries a commented-out fold setup from the old config. Calling the
+# module pins that it contributes nothing, so config that lands here later has to come
+# with real claims.
 let
-  assay = import ./../../../common/assay/default.nix;
-  mod = import ./folds.nix {};
-  src = builtins.readFile ./folds.nix;
+  assay = import ../../../common/assay/default.nix;
 in
   assay.suite "folds" {
-    isAttrs = assay.eq (builtins.isAttrs mod) true;
-    nonEmpty = assay.eq ((builtins.stringLength src) > 0) true;
+    contributesNothing = assay.eq (import ./folds.nix {}) {};
   }

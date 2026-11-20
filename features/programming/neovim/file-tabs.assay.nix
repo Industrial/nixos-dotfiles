@@ -1,10 +1,11 @@
-# Colocated suite for features/programming/neovim/file-tabs.nix
+# Assay: neovim file tabs (placeholder).
+#
+# file-tabs.nix only carries a commented-out bufferline setup from the old config; the
+# tab line itself is tab-line.nix. Calling the module pins that it contributes nothing,
+# so config that lands here later has to come with real claims.
 let
-  assay = import ./../../../common/assay/default.nix;
-  mod = import ./file-tabs.nix {};
-  src = builtins.readFile ./file-tabs.nix;
+  assay = import ../../../common/assay/default.nix;
 in
   assay.suite "file-tabs" {
-    isAttrs = assay.eq (builtins.isAttrs mod) true;
-    nonEmpty = assay.eq ((builtins.stringLength src) > 0) true;
+    contributesNothing = assay.eq (import ./file-tabs.nix {}) {};
   }

@@ -1,10 +1,11 @@
-# Colocated suite for features/programming/neovim/quickfix.nix
+# Assay: neovim quickfix (placeholder).
+#
+# quickfix.nix only carries a commented-out trouble setup from the old config; trouble is
+# configured in visual-information.nix. Calling the module pins that it contributes
+# nothing, so config that lands here later has to come with real claims.
 let
-  assay = import ./../../../common/assay/default.nix;
-  mod = import ./quickfix.nix {};
-  src = builtins.readFile ./quickfix.nix;
+  assay = import ../../../common/assay/default.nix;
 in
   assay.suite "quickfix" {
-    isAttrs = assay.eq (builtins.isAttrs mod) true;
-    nonEmpty = assay.eq ((builtins.stringLength src) > 0) true;
+    contributesNothing = assay.eq (import ./quickfix.nix {}) {};
   }

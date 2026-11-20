@@ -7,8 +7,10 @@
 # here instead of in palette.nix: a suite may force a derivation, a host eval may not.
 let
   assay = import ./../../../common/assay/default.nix;
-  pkgs = import <nixpkgs> {};
-  lib = pkgs.lib;
+  nixos = import ../../../common/assay/nixos.nix;
+  # The pinned nixpkgs the fleet builds against, not whatever <nixpkgs> resolves to.
+  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos) lib;
 
   palette = import ./palette.nix;
   schemes =
@@ -45,17 +47,17 @@ let
 
   # The pin itself: palette.nix records the rev it was projected from, and the derivation
   # records the rev actually fetched. If someone bumps one, this is what notices.
-  derivationRev =
-    builtins.head
-    (builtins.match ".*rev = \"([0-9a-f]{40})\";.*"
-      (builtins.readFile ./derivations/tinted-theming-schemes.nix));
+  derivationRev = schemes.src.rev;
 
-  # stylix/default.nix must select its scheme from this file rather than restating the slug,
-  # so there is exactly one place the fleet's scheme is named.
-  moduleDefersToPalette =
-    builtins.match ".*theme = palette[.]scheme[.]slug;.*"
-    (builtins.readFile ./default.nix)
-    != null;
+  # stylix/default.nix must select the scheme this file names, so there is exactly one
+  # scheme in play. Read from the evaluated stylix option, with stylix's own module loaded.
+  stylixScheme =
+    (nixos.eval {
+      modules = [nixos.flakeInputs.stylix.nixosModules.stylix ./default.nix];
+    })
+    .stylix
+    .base16Scheme;
+  moduleDefersToPalette = stylixScheme == "${schemes}/share/schemes/${palette.scheme.slug}.yaml";
 in
   assay.suite "stylix-palette" {
     # Every one of the sixteen, compared as a whole attrset so a single wrong digit names

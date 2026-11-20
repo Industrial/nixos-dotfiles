@@ -6,9 +6,25 @@
 # point of the ACP/Claude Code shape is that it reuses the host's subscription login, and an
 # ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in a NixOS module would land in the world-
 # readable Nix store.
+#
+# Module claims read the evaluated config. The wrapper's build script is the artifact the
+# two NixOS-specific fixes live in, so those are matched against that script's text — the
+# generated buildCommand, never the module's source, whose header deliberately discusses
+# every variable a negative claim below rules out.
 let
   assay = import ./../../../common/assay/default.nix;
-  src = builtins.readFile ./default.nix;
+  nixos = import ./../../../common/assay/nixos.nix;
+  lib = nixos.lib;
+  # Substring test over generated text; store-path context is irrelevant to the match.
+  contains = needle: s: lib.hasInfix (builtins.unsafeDiscardStringContext needle) (builtins.unsafeDiscardStringContext s);
+  system = nixos.evalSystem {modules = [./default.nix];};
+  cfg = system.config;
+  pkgs = system.pkgs;
+  upstream = nixos.flakeInputs.llm-agents.packages.x86_64-linux.openhands-agent-canvas;
+  added = lib.subtractLists (nixos.packageNames nixos.baseline) (nixos.packageNames cfg);
+  canvas = lib.findFirst (p: lib.getName p == "openhands-agent-canvas-wrapped") null cfg.environment.systemPackages;
+  wrapper = canvas.buildCommand;
+  names = attrs: builtins.attrNames attrs;
 
   # The Tier 2 payload. Parsed rather than grepped: these are the settings the module's
   # two NixOS-specific fixes exist to serve, and a string match would pass on a mention
@@ -19,70 +35,45 @@ let
   gitignore = builtins.readFile ./.gitignore;
   linker = builtins.readFile ./bin/link-files-nixos;
   treefmt = builtins.readFile ./../../../treefmt.toml;
-
-  # symlinkJoin is stubbed to report what it was handed, so the systemPackages claim below
-  # still proves the upstream package is what gets wrapped rather than something else.
-  pkgs = {
-    stdenv.hostPlatform.system = "x86_64-linux";
-    makeWrapper = "makeWrapper";
-    claude-code = "/CLAUDE";
-    symlinkJoin = args: "wrapped(${builtins.concatStringsSep "," args.paths})";
-  };
-  inputs = {
-    llm-agents.packages.x86_64-linux.openhands-agent-canvas = "openhands-agent-canvas";
-  };
-  mod = import ./default.nix {inherit pkgs inputs;};
-
-  # Negative claims read code, not prose: this module's header discusses the credential
-  # variables and the container image precisely so nobody re-derives the reasoning, which
-  # would falsify a claim matched against the raw file.
-  isCommentLine = l: builtins.match "[[:space:]]*#.*" l != null;
-  code =
-    builtins.concatStringsSep "\n"
-    (builtins.filter (l: !isCommentLine l)
-      (builtins.filter builtins.isString (builtins.split "\n" src)));
 in
   assay.suite "openhands" {
     # Exactly one package, and it is the upstream one with a wrapper around it.
-    systemPackages = assay.eq mod.environment.systemPackages ["wrapped(openhands-agent-canvas)"];
+    addsOnlyTheWrappedCanvas = assay.eq added ["openhands-agent-canvas-wrapped"];
+    # From the flake input, never from nixpkgs: OpenHands is not in nixpkgs, so a
+    # `pkgs.openhands` that silently appears later would be a different, unvetted thing.
+    wrapsTheFlakeInputPackage = assay.eq canvas.paths ["${upstream}"];
 
     # The load-bearing fix. A devenv shell exports ~130 python3.13 site-packages entries on
     # PYTHONPATH, which shadow the uv venv's own 3.14 packages and killed the agent-server
     # with `ModuleNotFoundError: No module named 'pydantic_core._pydantic_core'` before it
     # bound a port. Asserted so it cannot regress into a tool that only works when invoked
     # with the right environment.
-    unsetsPythonPath = assay.eq (builtins.match ".*--unset PYTHONPATH.*" code != null) true;
-    unsetsPythonHome = assay.eq (builtins.match ".*--unset PYTHONHOME.*" code != null) true;
-    wrapsTheBinary = assay.eq (builtins.match ".*wrapProgram [$]out/bin/agent-canvas.*" code != null) true;
+    unsetsPythonPath = assay.eq (contains "--unset PYTHONPATH" wrapper) true;
+    unsetsPythonHome = assay.eq (contains "--unset PYTHONHOME" wrapper) true;
+    wrapsTheBinary = assay.eq (contains "wrapProgram $out/bin/agent-canvas" wrapper) true;
 
     # The second NixOS-specific fix. The ACP bridge's bundled claude is a generic-linux ELF
     # whose interpreter is nixpkgs' stub-ld, so it exits 127 and the bridge reports only
     # "Internal error". Pointing it at the nixpkgs build is what makes a Claude Code
-    # conversation possible at all.
-    pointsAtNixpkgsClaude = assay.eq (builtins.match ".*--set-default CLAUDE_CODE_EXECUTABLE.*" code != null) true;
-    usesClaudeCodePackage = assay.eq (builtins.match ".*pkgs\\.claude-code.*" code != null) true;
+    # conversation possible at all. set-default, not set: overridable from the
+    # environment for a local Claude build.
+    pointsAtNixpkgsClaude = assay.eq (contains "--set-default CLAUDE_CODE_EXECUTABLE ${pkgs.claude-code}/bin/claude" wrapper) true;
+    claudeExecutableIsOverridable = assay.eq (contains "--set CLAUDE_CODE_EXECUTABLE" wrapper) false;
 
-    # set-default, not set: overridable from the environment for a local Claude build.
-    claudeExecutableIsOverridable = assay.eq (builtins.match ".*--set CLAUDE_CODE_EXECUTABLE.*" code != null) false;
-
-    # From the flake input, never from nixpkgs.
-    comesFromTheFlakeInput = assay.eq (builtins.match ".*inputs\\.llm-agents\\.packages.*" code != null) true;
-    notFromNixpkgs = assay.eq (builtins.match ".*pkgs\\.openhands.*" code != null) false;
-
-    # No credential material in the module, in any of its spellings.
-    noApiKey = assay.eq (builtins.match ".*ANTHROPIC_API_KEY.*" code != null) false;
-    noOauthToken = assay.eq (builtins.match ".*CLAUDE_CODE_OAUTH_TOKEN.*" code != null) false;
-    noCredentialsPath = assay.eq (builtins.match ".*credentials\\.json.*" code != null) false;
+    # No credential material, in any of its spellings: neither baked into the wrapper (the
+    # world-readable store) nor exported by the module.
+    noApiKey = assay.eq (contains "ANTHROPIC_API_KEY" wrapper) false;
+    noOauthToken = assay.eq (contains "CLAUDE_CODE_OAUTH_TOKEN" wrapper) false;
+    noCredentialsPath = assay.eq (contains "credentials.json" wrapper) false;
+    exportsNoVariables = assay.eq (names cfg.environment.variables) (names nixos.baseline.environment.variables);
+    exportsNoSessionVariables = assay.eq (names cfg.environment.sessionVariables) (names nixos.baseline.environment.sessionVariables);
 
     # Installs a CLI; does not declare a service or open a port. Both are deliberate and
     # both are decisions to revisit explicitly rather than drift into.
-    noSystemdUnit = assay.eq (builtins.match ".*systemd\\..*" code != null) false;
-    noFirewallOpening = assay.eq (builtins.match ".*allowedTCPPorts.*" code != null) false;
-
-    # The stripper must actually strip, or every negative claim above weakens to "not even
-    # mentioned in a comment" — and this module's header mentions all of them.
-    commentsAreStripped = assay.eq (builtins.stringLength code < builtins.stringLength src) true;
-    credentialsAreDiscussedInProse = assay.eq (builtins.match ".*CLAUDE_CODE_OAUTH_TOKEN.*" src != null) true;
+    noSystemUnit = assay.eq (names cfg.systemd.services) (names nixos.baseline.systemd.services);
+    noUserUnit = assay.eq (names cfg.systemd.user.services) (names nixos.baseline.systemd.user.services);
+    noTCPPortsOpened = assay.eq (nixos.openTCPPorts cfg) (nixos.openTCPPorts nixos.baseline);
+    noUDPPortsOpened = assay.eq (nixos.openUDPPorts cfg) (nixos.openUDPPorts nixos.baseline);
 
     # ---- Tier 2 payload -----------------------------------------------------------------
     #
@@ -143,13 +134,6 @@ in
 
     # Tier 3 is a committed symlink, so the linker must NOT create it.
     leavesTierThreeAlone = assay.eq (builtins.match ".*ln -s[^\n]*project.*" linker != null) false;
-
-    # ---- documentation ------------------------------------------------------------------
-    #
-    # The three tiers are the thing a reader needs before touching any of this, and the
-    # split is unobvious enough that rediscovering it costs a debugging session.
-    documentsTheTiers = assay.eq (builtins.match ".*Tier 1.*Tier 2.*Tier 3.*" src != null) true;
-    documentsTheAtomicRename = assay.eq (builtins.match ".*_atomic_write_json.*" src != null) true;
 
     # ---- the formatter must keep its hands off the payload -----------------------------
     #

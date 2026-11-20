@@ -1,9 +1,12 @@
-# Colocated suite for features/programming/neovim/status-line.nix
+# Assay: neovim status line.
+#
+# Claims read the evaluated nixvim config: the module is evaluated alone on top of the
+# nixvim NixOS module, so they pin what it contributes, not how its source is spelled.
 let
-  assay = import ./../../../common/assay/default.nix;
-  src = builtins.readFile ./status-line.nix;
+  assay = import ../../../common/assay/default.nix;
+  nixos = import ../../../common/assay/nixos.nix;
+  cfg = nixos.eval {modules = [nixos.flakeInputs.nixvim.nixosModules.nixvim ./status-line.nix];};
 in
   assay.suite "status-line" {
-    mentionsPrograms = assay.eq (builtins.match ".*programs.*" src != null) true;
-    mentionsNixvim = assay.eq (builtins.match ".*nixvim.*" src != null) true;
+    enablesLualine = assay.eq cfg.programs.nixvim.plugins.lualine.enable true;
   }
