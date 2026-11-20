@@ -15,4 +15,7 @@ let
 in
   assay.suite "users" {
     username = assay.eq mod.users.users.alice.isNormalUser true;
+    # NFS authorises by number: uid and the data gid must be identical on every host for
+    # mimir's /data ownership to mean the same user on its clients.
+    nfsStableIds = assay.eq [mod.users.users.alice.uid mod.users.groups.data.gid] [1000 1111];
   }

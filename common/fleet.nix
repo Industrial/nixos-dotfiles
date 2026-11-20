@@ -44,6 +44,7 @@ let
     mimir = {
       description = "always-on file server";
       roles = ["server" "monitoring" "nfs-server" "remote-desktop-relay"];
+      tailscaleIp = "100.103.79.41";
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaaBOy2a1WnlGy5B6WwEmVlf7s5VUgVIbsjdGZrsmK+ tom@mimir";
     };
     muninn = {
