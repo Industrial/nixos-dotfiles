@@ -8,7 +8,7 @@ language: 'bash'
 #   moon run dotfiles:check -- --host mimir
 tasks:
   check:
-    description: 'Mirror the PR workflow locally (format, lints, assay); builds no host. bin/dev check'
+    description: 'Mirror .github/workflows/ci.yml locally (format, lints, assay); builds no host. bin/dev check'
     command: 'bin/dev'
     args:
       - 'check'

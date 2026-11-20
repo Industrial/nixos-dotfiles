@@ -118,36 +118,41 @@ bin/dev check            # same as: bin/dev pre-push, moon run dotfiles:check
 bin/dev check -n         # just print the plan
 ```
 
-`check` runs the PR workflow's cheap jobs, using the scripts CI itself runs,
-and prints a pass/fail summary with a log per step under `.tmp/dev/check/`:
+`check` runs the jobs of `.github/workflows/ci.yml` (the one job list that
+`pr.yml` and `main.yml` both call) through the scripts those jobs run. Each
+step is named after its job, and you get a pass/fail summary plus a log per
+step in `.tmp/dev/check/`. By default it runs only the cheap jobs:
 
-| Step | CI job (`.github/workflows/pr.yml`) | Script |
-|------|-------------------------------------|--------|
-| `format` | `format` | `bin/ci/lint`, over the files changed against the merge base (`--format-all`: the whole tree, as CI) |
-| `deadnix` | `deadnix` | `bin/ci/deadnix` |
-| `feature-reachability` | `feature-reachability` | `bin/ci/feature-reachability` |
-| `lint-fetch-pins` | `lint-fetch-pins` | `bin/ci/lint-fetch-pins` |
-| `assay` | `assay` | `bin/ci/assay` (suites, coverage, source-match ratchet) |
-| `bin-dev-selftest` | (none yet) | `bin/dev.d/test.sh` |
-| `cargo-clippy`, `cargo-test` | same names | only when `rust/` changed, or `--rust` |
-| `eval-<host>` | `check (<host>)`, eval half | only with `--host <h>` or `--hosts` |
-| `flake-check` | `check (<host>)`, `nix flake check` | only with `--flake-check` |
+| Step | Default | Script |
+|------|---------|--------|
+| `format` | yes | `bin/ci/lint` over the files changed against origin/main (`--format-all`: the whole tree, as CI) |
+| `clamav`, `lynis`, `stig` | `--scans` | `bin/ci/clamav`, `bin/ci/lynis`, `bin/ci/stig` |
+| `deadnix` | yes | `bin/ci/deadnix` |
+| `feature-reachability` | yes | `bin/ci/feature-reachability` |
+| `lint-fetch-pins` | yes | `bin/ci/lint-fetch-pins` |
+| `assay` | yes | `bin/ci/assay` (suites, coverage, source-match ratchet) |
+| `shell-budget` | `--shell-budget` | `bin/ci/shell-budget` |
+| `cargo-clippy`, `cargo-test`, `cargo-nix-drift` | when `rust/` changed, or `--rust` | the same commands as the jobs |
+| `check-<host>` (CI: `check (<host>)`) | `--host <h>`, or `--hosts` | `bin/ci/check-host <h>`: evaluate and dry-run build |
+| `flake-checks` | `--flake-checks` | `bin/ci/flake-checks` (~6 min, ~6 GiB peak) |
+| `bin-dev-selftest` | yes | `bin/dev.d/test.sh` |
 
-By default it builds no host and evaluates none. Add `--host mimir` for the
-host your change touches, or `--hosts` for all three CI hosts, evaluated one at
-a time. `--only a,b`, `--skip a,b` and `--fail-fast` do what they say.
+`--all` runs the whole list. `--hosts` takes its hosts from the flake's
+`nixosConfigurations`, as CI's generated matrix does, so the installer is
+included. Host checks run one at a time. `--only a,b`, `--skip a,b` and
+`--fail-fast` do what they say. The self-test fails if `ci.yml` gains a job
+that has no step here, so keeping the two in sync is enforced.
 
-Left to CI: `clamav`, `lynis`, `stig`, `shell-budget` and the `check (<host>)`
-dry-run builds. Each of these has a `bin/ci/<name>` you can run by hand. Run
-`bin/ci/shell-budget` when you touch `features/cli/nushell` or
-`features/cli/shell-init`.
+Run `--shell-budget` when you touch `features/cli/nushell` or
+`features/cli/shell-init`. CI requires a single check, `ci / all-green`, which
+passes only when every job passes.
 
 The format step rewrites the files it would fail on, as `treefmt` does, so
 check `git diff` afterwards. `bin/dev format` formats on purpose.
 
-**Main may already be red.** When a step fails, compare it with main's latest
-run (`gh run list -R Industrial/nixos-dotfiles -b main`) before you treat the
-failure as yours. A new error inside an already-red job still counts.
+Main is protected by `ci / all-green`, so a step that fails on your branch is
+almost always caused by your branch. To make sure, compare with main's latest
+run: `gh run list -R Industrial/nixos-dotfiles -b main`.
 
 ## 4. Git hooks
 
