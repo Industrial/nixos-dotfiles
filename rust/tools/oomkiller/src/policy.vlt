@@ -1,0 +1,178 @@
+-- The oomkiller's decisions, with no I/O: whether memory is past the line,
+-- which process dies, and what the journal says about it. `daemon.vlt` feeds
+-- this real readings; the tests here feed it chosen ones, which is what makes
+-- every branch reachable without a machine that is actually out of memory.
+--
+-- There is no float here. Voltaic has no `as`, so there is no u64 -> f64 cast
+-- to reach for, and the arithmetic is integer: exact for the threshold, and
+-- half-up rounding for the log figures.
+
+-- Kill when used memory reaches this percentage of total.
+export const MEMORY_THRESHOLD_PERCENT : u64 = 90
+
+-- Longest command line a log line carries, ellipsis included.
+export const CMDLINE_LOG_CHARS : usize = 240
+
+const KIB : u64 = 1024
+const MIB : u64 = 1048576
+const GIB : u64 = 1073741824
+
+-- A candidate victim, as `daemon.vlt` read it from sysinfo and /proc.
+export data ProcessInfo { export pid u32, export uid u32, export memory u64, export name String, export cmdline String }
+  deriving (Debug, Clone, PartialEq)
+
+-- `num / den` rounded half-up, to two decimals for scale 100 and one otherwise;
+-- `0.0` for a zero `den`. u128, so `num * scale` cannot overflow for any u64
+-- figure scaled up first (a byte count, or used bytes times 100).
+decimal : u128 -> u128 -> u128 -> String
+decimal num den scale =
+  r = if den == 0
+    0
+  else
+    (num * scale + den / 2) / den
+  whole = r / scale
+  frac = r % scale
+  if scale == 100
+    "#{whole}.#{frac:02}"
+  else
+    "#{whole}.#{frac}"
+
+-- A byte count for humans: `1.28 GiB`, `3.0 MiB`, `512 B`.
+export format_bytes : u64 -> String
+format_bytes bytes
+  | bytes >= GIB = "#{decimal (u128::from bytes) (u128::from GIB) 100} GiB"
+  | bytes >= MIB = "#{decimal (u128::from bytes) (u128::from MIB) 10} MiB"
+  | bytes >= KIB = "#{decimal (u128::from bytes) (u128::from KIB) 10} KiB"
+  | _ = "#{bytes} B"
+
+-- Whether `used` has reached the threshold share of `total`. A zero total is a
+-- broken reading, not an idle machine, so it is an error the daemon exits on.
+export threshold_exceeded : u64 -> u64 -> Result<bool, String>
+threshold_exceeded used total
+  | total == 0 = Err (.to_string "Total memory is 0, cannot calculate usage percentage")
+  | _ = Ok (u128::from used * 100 >= u128::from total * u128::from MEMORY_THRESHOLD_PERCENT)
+
+-- The process to kill: the largest RSS among those `uid` owns. Processes of
+-- other users, root included, are never candidates.
+export pick_victim : Vec<ProcessInfo> -> u32 -> Option<ProcessInfo>
+pick_victim processes uid =
+  processes |> .into_iter |> .filter (\p -> p.uid == uid) |> .max_by_key (\p -> p.memory)
+
+-- `cmdline` cut to `max_chars` characters, the last three of them `...`.
+export truncate_cmdline : &str -> usize -> String
+truncate_cmdline cmdline max_chars =
+  if cmdline.chars ().count () <= max_chars
+    cmdline.to_string ()
+  else
+    head = (cmdline.chars ().take (max_chars.saturating_sub 3)).collect () : String
+    "#{head}..."
+
+-- The journal's form of a victim's command line.
+shown_cmdline : &ProcessInfo -> String
+shown_cmdline p =
+  if p.cmdline.is_empty ()
+    .to_string "(no cmdline)"
+  else
+    truncate_cmdline (&p.cmdline) CMDLINE_LOG_CHARS
+
+export exceeded_line : u64 -> u64 -> String
+exceeded_line used total =
+  usage = decimal (u128::from used * 100) (u128::from total) 10
+  "Memory threshold exceeded (#{MEMORY_THRESHOLD_PERCENT}%): used=#{format_bytes used} / total=#{format_bytes total} (#{usage}%)"
+
+export killed_line : &ProcessInfo -> String
+killed_line p =
+  rss = format_bytes p.memory
+  cmdline = shown_cmdline p
+  "Killed process name=#{p.name} pid=#{p.pid} rss=#{rss} cmdline=#{cmdline}"
+
+export kill_failed_line : &ProcessInfo -> &str -> String
+kill_failed_line p e =
+  rss = format_bytes p.memory
+  "Failed to kill pid=#{p.pid} name=#{p.name} rss=#{rss}: #{e}"
+
+#[cfg(test)]
+proc : u32 -> u32 -> u64 -> ProcessInfo
+proc pid uid memory = ProcessInfo { pid, uid, memory, name = .to_string "test", cmdline = .to_string "test --flag" }
+
+test "format_bytes picks the largest unit that fits"
+  assert! \-> format_bytes 0 == "0 B"
+  assert! \-> format_bytes 512 == "512 B"
+  assert! \-> format_bytes 1023 == "1023 B"
+  assert! \-> format_bytes 1024 == "1.0 KiB"
+  assert! \-> format_bytes 2048 == "2.0 KiB"
+  assert! \-> format_bytes (3 * MIB) == "3.0 MiB"
+  assert! \-> format_bytes 1377468416 == "1.28 GiB"
+  assert! \-> format_bytes (64 * GIB) == "64.00 GiB"
+
+test "format_bytes rounds half up"
+  assert! \-> format_bytes (KIB + 51) == "1.0 KiB"
+  assert! \-> format_bytes (KIB + 52) == "1.1 KiB"
+
+test "format_bytes survives the largest byte count"
+  assert! \-> format_bytes u64::MAX == "17179869184.00 GiB"
+
+test "the threshold is ninety percent"
+  assert! \-> MEMORY_THRESHOLD_PERCENT == 90
+
+test "below the threshold is not exceeded"
+  assert! \-> threshold_exceeded 89 100 == Ok false
+
+test "exactly at the threshold is exceeded"
+  assert! \-> threshold_exceeded 90 100 == Ok true
+  assert! \-> threshold_exceeded 900 1000 == Ok true
+
+test "one byte short of the threshold is not exceeded"
+  assert! \-> threshold_exceeded 899 1000 == Ok false
+
+test "full memory is exceeded, even at u64 scale"
+  assert! \-> threshold_exceeded u64::MAX u64::MAX == Ok true
+
+test "a zero total is an error, not idle"
+  assert! \-> .is_err (threshold_exceeded 0 0)
+
+test "the victim is the largest process the user owns"
+  ps = .to_vec ([proc 1 1000 10, proc 2 1000 300, proc 3 1000 20])
+  assert! \-> pick_victim ps 1000 == Some (proc 2 1000 300)
+
+test "other users' processes are never victims, however large"
+  ps = .to_vec ([proc 1 0 999999, proc 2 1000 5, proc 3 1001 888888])
+  assert! \-> pick_victim ps 1000 == Some (proc 2 1000 5)
+
+test "no owned process means no victim"
+  ps = .to_vec ([proc 1 0 999999])
+  assert! \-> pick_victim ps 1000 == None
+  assert! \-> pick_victim (Vec::new ()) 1000 == None
+
+test "truncate_cmdline keeps a line that fits"
+  assert! \-> truncate_cmdline "short" 10 == "short"
+  assert! \-> truncate_cmdline "abcdefghij" 10 == "abcdefghij"
+
+test "truncate_cmdline cuts to the limit, ellipsis included"
+  assert! \-> truncate_cmdline "abcdefghijkl" 10 == "abcdefg..."
+
+test "truncate_cmdline counts characters, not bytes"
+  assert! \-> truncate_cmdline "ééééééééééé" 10 == "ééééééé..."
+
+test "the exceeded line names threshold, usage and share"
+  assert! \-> exceeded_line (934 * MIB) (1000 * MIB) == "Memory threshold exceeded (90%): used=934.0 MiB / total=1000.0 MiB (93.4%)"
+
+test "the killed line carries identity, size and command"
+  p = ProcessInfo { pid = 42, uid = 1000, memory = 2 * GIB, name = .to_string "hog", cmdline = .to_string "hog --eat" }
+  assert! \-> killed_line (&p) == "Killed process name=hog pid=42 rss=2.00 GiB cmdline=hog --eat"
+
+test "an empty command line is logged as such"
+  p = ProcessInfo { pid = 7, uid = 1000, memory = 0, name = .to_string "z", cmdline = String::new () }
+  assert! \-> killed_line (&p) == "Killed process name=z pid=7 rss=0 B cmdline=(no cmdline)"
+
+test "a long command line is truncated in the log"
+  p = ProcessInfo { pid = 7, uid = 1000, memory = 0, name = .to_string "z", cmdline = "x".repeat 300 }
+  line = killed_line (&p)
+  assert! \-> line.chars ().count () == .len "Killed process name=z pid=7 rss=0 B cmdline=" + CMDLINE_LOG_CHARS
+
+test "the kill-failure line carries the error"
+  p = ProcessInfo { pid = 9, uid = 1000, memory = KIB, name = .to_string "y", cmdline = String::new () }
+  assert! \-> kill_failed_line (&p) "denied" == "Failed to kill pid=9 name=y rss=1.0 KiB: denied"
+
+test "the exceeded line survives a zero total"
+  assert! \-> exceeded_line 0 0 == "Memory threshold exceeded (90%): used=0 B / total=0 B (0.0%)"

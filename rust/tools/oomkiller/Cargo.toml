@@ -5,12 +5,20 @@ edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
 description = "A daemon that monitors system memory and kills the highest memory-consuming process when memory usage exceeds 90%"
 
+build = "build.rs"
+
 [dependencies]
 sysinfo = "0.31"
 
+# Voltaic as a library: build.rs compiles src/*.vlt to Rust. The published
+# crates ship their generated Rust, so no voltaic binary or bootstrap is needed.
+[build-dependencies]
+voltaic-driver = "0.2"
+voltaic-diag = "0.2"
+
 [lib]
 name = "oomkiller"
-path = "src/lib/mod.rs"
+path = "src/lib.rs"
 
 [[bin]]
 name = "oomkiller"
