@@ -3,139 +3,178 @@
 [![CI - PR](https://github.com/Industrial/nixos-dotfiles/actions/workflows/pr.yml/badge.svg)](https://github.com/Industrial/nixos-dotfiles/actions/workflows/pr.yml)
 [![CI - Main](https://github.com/Industrial/nixos-dotfiles/actions/workflows/main.yml/badge.svg)](https://github.com/Industrial/nixos-dotfiles/actions/workflows/main.yml)
 
-My NixOS configuration. I have separated out all software into features and
-avoided [HomeManager](https://github.com/nix-community/home-manager) to make it
-more portable. The caveat is that you have to configure everything manually but
-hey it's nix so that's pretty easy!
+The NixOS configuration for a four-machine fleet, in one flake. Software is split into
+small **features** (plain NixOS modules), grouped into **profiles**, and composed per
+**host**. There is no [Home Manager](https://github.com/nix-community/home-manager): user
+configuration is written by the NixOS modules themselves.
+
+Further reading: [`docs/README.md`](docs/README.md) indexes the ADRs, runbooks, principles
+and security docs. The development environment is covered in
+[`docs/development.md`](docs/development.md).
 
 ## Hosts
 
-This repository manages the following NixOS hosts:
+| Host | Role | Notes |
+| --- | --- | --- |
+| [**drakkar**](hosts/drakkar/) | Desktop workstation and gaming station (Gigabyte X870E, AMD) | Remote builder for the fleet; wired-only (WiFi driver blacklisted) |
+| [**huginn**](hosts/huginn/) | Tablet ([StarLite 5](https://us.starlabs.systems/products/starlite), Intel N200) | Hibernation swapfile; Intel graphics |
+| [**mimir**](hosts/mimir/) | Headless file server | `/data` btrfs RAID5 over NFS; Prometheus + Grafana; RustDesk relay; the only host with the STIG baseline |
+| [**muninn**](hosts/muninn/) | Intel portable machine | Monitoring standby for mimir (Prometheus + Grafana) |
 
-- **drakkar** - Desktop workstation
-- **huginn** - Tablet ([StarLite 5](https://us.starlabs.systems/products/starlite))
-- **mimir** - Server
+Every host has the same per-host docs: `INSTALL.md` (disk layout and reinstall) and
+`DATA.md` (storage layout and where data belongs).
 
-Each host has its own flake configuration in the `hosts/` directory.
+What every host shares, as of today:
 
-## Installation
+- **Profiles** `base`, `communication`, `desktop`, `development`. drakkar and muninn add
+  `ai`; drakkar adds `gaming`. `creative` and `crypto` exist but no host imports them.
+- **Fleet features** `features/fleet/comin.nix` (pull convergence, [ADR-0002](docs/adr/0002-comin-pull-convergence.md))
+  and `features/fleet/remote-access.nix` (Tailscale, SSH, operator keys, RustDesk client).
+- **Remote builds**: mimir is the only build client
+  (`features/fleet/nix-remote-builder-client.nix`); drakkar, huginn and muninn are builders
+  (`features/fleet/nix-remote-builder-server.nix`). See
+  [`docs/runbooks/nix-remote-build.md`](docs/runbooks/nix-remote-build.md).
 
-```bash
-git clone git@github.com:Industrial/nixos-dotfiles.git ~/.dotfiles
+The source of truth for all of this is `hosts/<host>/configuration.nix`; if this table and
+that file disagree, the file wins.
+
+## How the flake is built
+
+```
+flake.nix                       hosts = [drakkar huginn mimir muninn]
+  └─ lib/mk-host.nix            nixosSystem per host; specialArgs = {inputs, settings}
+       ├─ common/settings.nix   settings.{hostname, username = "tom", stateVersion, userdir, ...}
+       └─ hosts/<host>/configuration.nix
+            ├─ disko.nix, filesystems.nix, hardware.nix
+            ├─ profiles/<name>.nix        imports a list of features
+            │    └─ features/<category>/<feature>/default.nix
+            └─ features/...               host-specific features, imported directly
 ```
 
-For detailed installation instructions for specific hosts, see the `hosts/<hostname>/INSTALL.md` file (if available).
+- **Features** live in `features/<category>/` (20 categories: `ai`, `cli`, `nixos`,
+  `programming`, `security`, `window-manager`, ...). A feature is a directory with a
+  `default.nix` NixOS module, or a single loose module such as
+  `features/fleet/comin.nix`. Today a feature is switched on by being imported; there are
+  no `enable` options.
+- **Profiles** (`profiles/*.nix`) are import lists: `base` (every host; pulls in
+  `cli-core`), `desktop` (pulls in `cli-desktop`), `development`, `communication`, `ai`,
+  `gaming`, `creative`, `crypto`.
+- **Hosts** import profiles plus any host-specific features, and their own hardware and
+  disk modules.
 
-## Update
+The root flake also exports:
 
-Update the current host system:
+| Output | What it is |
+| --- | --- |
+| `nixosConfigurations.<host>` | the four hosts, plus `installer` |
+| `deploy.nodes.<host>` | [deploy-rs](https://github.com/serokell/deploy-rs) nodes, driven by `bin/fleet` |
+| `packages.x86_64-linux.installer-iso` | the install ISO (`bin/flash-installer` builds and writes it) |
+| `stigReport.<host>` | per-host STIG compliance report ([runbook](docs/runbooks/stig-compliance.md)) |
+| `checks.x86_64-linux` | deploy-rs schema checks plus one STIG VM test per verified control |
+
+`hosts/<host>/flake.nix` is a shim that re-exports the root flake, so
+`nixos-rebuild --flake .#<host>` also works from inside a host directory. New work goes
+through the root flake.
+
+## Adding things
+
+Every `*.nix` file needs a colocated `*.assay.nix` suite (see [Tests](#tests-assay)), and
+every feature must be reachable from some host. CI enforces both.
+
+**A feature.** Create `features/<category>/<name>/default.nix` and
+`features/<category>/<name>/default.assay.nix`, then add `../features/<category>/<name>`
+to a profile's `imports` (or `../../features/...` to a host's).
+
+**A profile.** Create `profiles/<name>.nix` (an `imports` list of features) and
+`profiles/<name>.assay.nix`, then import `../../profiles/<name>.nix` from the hosts that
+should carry it.
+
+**A host.**
+
+1. Create `hosts/<name>/` with `configuration.nix`, `disko.nix`, `filesystems.nix`,
+   `hardware.nix`, each with its `*.assay.nix`, plus `INSTALL.md` and `DATA.md`. Copy the
+   closest existing host.
+2. Add the name to `hosts` in `flake.nix`. That alone creates its `nixosConfigurations`,
+   `deploy.nodes` and `stigReport` entries.
+3. Add it to the other host lists, which are not derived from `flake.nix`:
+   `HOSTS` in `bin/fleet`, `VALID_HOSTS` in `installer/install-nixos.sh`, `fleetHosts`
+   and `operatorPubKeys` in `features/fleet/operator-ssh.nix`, and the `check` matrix in
+   `.github/workflows/*.yml` together with the host `case` in
+   `.github/actions/check/action.yml`.
+4. Install it: `hosts/<name>/INSTALL.md`, starting from `bin/flash-installer`.
+
+## Tests (assay)
+
+Tests are [Assay](https://github.com/Industrial/assay) suites: `*.assay.nix` files beside
+the module they cover, written with the claim DSL in
+[`common/assay/`](common/assay/README.md).
 
 ```bash
-bin/update/host
+bin/with-devenv assay run .                  # every suite in the repo
+bin/with-devenv assay run features/fleet     # one directory
+bin/assay-coverage-check                     # every in-scope *.nix has a colocated suite
+bin/ci/feature-reachability                  # every feature reaches a host closure
 ```
 
-This will:
-- Update the system using `nixos-rebuild switch`
-- Link necessary files for certain features
+`moon run :test` runs the same `assay run .` through moon. Exceptions to the coverage
+check are listed in `common/assay/coverage-allowlist.txt`; features deliberately parked
+outside every host are listed in `common/ci/feature-reachability-baseline.txt`.
 
-Other update commands:
+## CI
 
-- `bin/update/system` - Update system only
-- `bin/update/flake` - Update flake lock files
-- `bin/update/channels` - Update NixOS channels
-- `bin/update/profiles` - Update profiles
-- `bin/update/repositories` - Update git repositories
+Two GitHub Actions workflows run the same job set: `pr.yml` on pull requests to `main`,
+`main.yml` on pushes to `main`. Each job is a composite action in `.github/actions/`,
+most of them a thin wrapper around a `bin/ci/*` script you can run locally.
 
-The login shell is set declaratively by `users.users.<name>.shell` and has exactly one
-writer; see `docs/adr/0005-shell-strategy.md`.
+| Job | Runs | Checks |
+| --- | --- | --- |
+| `format` | `bin/ci/lint` | `treefmt --config-file treefmt.ci.toml` makes no change |
+| `deadnix` | `bin/ci/deadnix` | no unused Nix bindings |
+| `assay` | `bin/ci/assay` | all suites pass, then `bin/assay-coverage-check` |
+| `feature-reachability` | `bin/ci/feature-reachability` | no feature outside every host closure |
+| `lint-fetch-pins` | `bin/ci/lint-fetch-pins` | no fetcher under `features/` points at a moving target (`latest`, `master`) |
+| `shell-budget` | `bin/ci/shell-budget` | shell startup within budget ([terminal runbook](docs/runbooks/terminal.md)) |
+| `stig` | `bin/ci/stig` | STIG reports build; CAT I gate. `main.yml` also boots the VM tests |
+| `clamav`, `lynis` | `bin/ci/clamav`, `bin/ci/lynis` | malware and hardening scans |
+| `cargo-clippy`, `cargo-test`, `cargo-nix-drift` | inline | the Rust tools under `rust/` |
+| `check (<host>)` | `.github/actions/check` | `nix flake check`, then `nix build --dry-run` of the host's toplevel |
 
-The terminal — shell load order, the generated zellij keymap, the startup budget and the
-escape hatches — is documented in [`docs/runbooks/terminal.md`](docs/runbooks/terminal.md).
+`check` covers drakkar, huginn and mimir. **muninn is not in the matrix**, so nothing in
+CI evaluates it.
 
-## System Management
-
-### Generations
-
-List, rollback, or delete system generations:
+## Day-to-day
 
 ```bash
-bin/generations/list      # List all system generations
-bin/generations/rollback  # Rollback to previous generation
-bin/generations/delete    # Delete old generations (keeps last 2)
+bin/update/system          # nixos-rebuild switch --flake .#$(hostname), then feature link scripts
+bin/update/host            # same as bin/update/system, logged to logs/update-host
+bin/update/flake           # nix-channel --update, then nix flake update
+bin/update/channels        # nix-channel --update
+bin/update/profiles        # nix profile upgrade --all
+
+bin/fleet status           # SSH reachability of all four hosts
+bin/fleet deploy <host>    # deploy-rs push; see docs/runbooks/fleet-deploy.md
+
+bin/generations/list                      # system generations
+bin/generations/rollback system-<N>-link  # switch to a generation (argument required)
+bin/generations/delete                    # delete all but the last 2
+bin/delete/collectgarbage                 # nix-collect-garbage -d
 ```
 
-### Cleanup
+comin pulls `origin/main` on every host every 300 seconds, so an unpushed local switch is
+reverted within five minutes. Push first; see
+[`docs/runbooks/fleet-deploy.md`](docs/runbooks/fleet-deploy.md).
 
-Collect garbage to free up disk space:
-
-```bash
-bin/delete/collectgarbage
-```
+The login shell (Nushell) is set declaratively by `users.users.<name>.shell`; see
+[ADR-0005](docs/adr/0005-shell-strategy.md) and the
+[terminal runbook](docs/runbooks/terminal.md).
 
 ## Development
 
-This repository uses [devenv.sh](https://devenv.sh/) for development environment management. Devenv provides a consistent development environment with all necessary tools and dependencies configured through Nix.
-
-### Getting Started
-
-Enter the devenv shell:
-
-```bash
-devenv shell
-```
-
-This will activate the development environment with all necessary tools and dependencies.
-
-The devenv environment includes:
-- Nix development tools (nix-unit, namaka, nixt)
-- Rust toolchain (rustc, cargo, rustfmt, clippy, rust-analyzer)
-- Formatting tools (treefmt, alejandra, deadnix, biome, etc.)
-- Security scanning tools (clamav, lynis, vulnix)
-- And more...
-
-For more information about devenv, see the [devenv.sh documentation](https://devenv.sh/).
-
-### Development Workflow
-
-1. Make your changes
-2. Format code (if needed):
-   ```bash
-   treefmt
-   ```
-3. Commit your changes:
-   ```bash
-   git commit -m "your message"
-   ```
-
-The CI pipeline will automatically check formatting, run security scans, and validate configurations for all hosts.
-
-## Project Structure
-
-```
-.
-├── bin/              # Utility scripts
-├── common/           # Common NixOS configuration
-├── features/         # Feature modules (organized by category)
-├── hosts/            # Host-specific configurations
-│   ├── drakkar/      # Desktop workstation
-│   ├── huginn/       # Tablet (StarLite 5)
-│   └── mimir/        # Server
-├── profiles/         # User profiles
-└── devenv.nix        # Development environment configuration
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Ensure all CI checks pass
-5. Commit your changes (`git commit -m 'Add some amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+Toolchain commands run through `bin/with-devenv <cmd>`, which gives the command the devenv
+shell's packages and environment without entering `devenv shell`. Details, including the
+git hooks, are in [`docs/development.md`](docs/development.md) and
+[`AGENTS.md`](AGENTS.md).
 
 ## License
 
-This project is released into the public domain. See [LICENSE](LICENSE) for details.
+Released into the public domain. See [LICENSE](LICENSE).
