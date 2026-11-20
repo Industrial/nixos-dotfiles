@@ -1,16 +1,23 @@
-name: 'Setup Nix and Cachix'
-description: 'Install Nix and configure Cachix'
+name: 'Setup Nix'
+description: 'Install Nix and the GitHub Actions-backed Nix store cache'
 runs:
   using: 'composite'
   steps:
     - name: Install Nix
-      uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31
+      uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31.11.5
       with:
+        # Still needed by the bin/ci scripts that use `nix-shell -p` (clamav, deadnix, vulnix).
         nix_path: nixpkgs=channel:nixos-unstable
-    - name: Install Cachix
-      uses: cachix/cachix-action@18cf96c7c98e048e10a83abd92116114cd8504be # v14
+    # Nix store cache. Every path this job builds locally (not ones cache.nixos.org already
+    # serves) is pushed to the GitHub Actions cache and offered back to later runs as a
+    # substituter, so crates, generated autoload dirs and VM test closures are built once
+    # per change rather than once per job per run. Per-path, so jobs share what they
+    # overlap on instead of each owning a store-sized tarball in the 10 GB cache budget.
+    # FlakeHub is off: it needs an account and `id-token: write`, and nothing here needs it.
+    - name: Nix store cache
+      uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7 # v15
       with:
-        name: devenv
-    - name: Install devenv
-      shell: bash
-      run: nix profile install nixpkgs#devenv
+        use-flakehub: false
+        use-gha-cache: true
+  # Removed: `cachix use devenv` and `nix profile install nixpkgs#devenv`. No bin/ci script
+  # enters devenv (each says why), so both cost every job ~30 s for nothing.
