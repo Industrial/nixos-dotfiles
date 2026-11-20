@@ -53,15 +53,16 @@ Each host directory carries the same two docs.
 - [`../AGENTS.md`](../AGENTS.md): rules for coding agents working in this repo.
 - [`../common/assay/README.md`](../common/assay/README.md): the assay claim DSL used by every
   `*.assay.nix` suite.
-- [history/](history/): dated plans and design notes. They record what was true when they
-  were written and are not kept current.
+- [`history/`](../history/) (repo root): dated plans and design notes. They record what was
+  true when they were written and are not kept current. A move to `docs/history/` is in
+  progress; update this link when it lands.
 - [archive/](archive/): retired one-off docs, such as session hand-offs, kept for the record.
 
 ## Conventions
 
 - A doc that states a fact about the configuration names the file it comes from, so it can
   be checked. When the doc and the code disagree, the code wins: fix the doc.
-- Dated, single-session material (hand-offs, plans) goes in `history/` or `archive/`, not
+- Dated, single-session material (hand-offs, plans) goes in `history/` or `docs/archive/`, not
   at the top of `docs/`.
 - New ADRs take the next number and the format of the existing ones: Status, Date,
   Context, Decision, Consequences, and Alternatives considered where there were any.

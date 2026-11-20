@@ -67,7 +67,7 @@ cd ~/.dotfiles
 sudo nixos-rebuild switch --flake ".#$(hostname)"
 ```
 
-Or legacy path via host shim (same root eval):
+Or legacy path via host shim (same root eval; the shims are slated for removal):
 
 ```bash
 cd ~/.dotfiles/hosts/$(hostname)

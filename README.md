@@ -54,8 +54,9 @@ flake.nix                       hosts = [drakkar huginn mimir muninn]
 - **Features** live in `features/<category>/` (20 categories: `ai`, `cli`, `nixos`,
   `programming`, `security`, `window-manager`, ...). A feature is a directory with a
   `default.nix` NixOS module, or a single loose module such as
-  `features/fleet/comin.nix`. Today a feature is switched on by being imported; there are
-  no `enable` options.
+  `features/fleet/comin.nix`. Composition is by path import: a feature is on for a host
+  when some import chain reaches it, and there are no `enable` options. (An enable-option
+  model is in progress; this section and [Adding things](#adding-things) change with it.)
 - **Profiles** (`profiles/*.nix`) are import lists: `base` (every host; pulls in
   `cli-core`), `desktop` (pulls in `cli-desktop`), `development`, `communication`, `ai`,
   `gaming`, `creative`, `crypto`.
@@ -73,13 +74,15 @@ The root flake also exports:
 | `checks.x86_64-linux` | deploy-rs schema checks plus one STIG VM test per verified control |
 
 `hosts/<host>/flake.nix` is a shim that re-exports the root flake, so
-`nixos-rebuild --flake .#<host>` also works from inside a host directory. New work goes
-through the root flake.
+`nixos-rebuild --flake .#<host>` also works from inside a host directory (the shims are
+slated for removal). New work goes through the root flake.
 
 ## Adding things
 
 Every `*.nix` file needs a colocated `*.assay.nix` suite (see [Tests](#tests-assay)), and
-every feature must be reachable from some host. CI enforces both.
+every feature must be reachable from some host. CI enforces both. The steps below are for
+composition by path import, which is what `main` does today; they are the one place to
+update when the enable-option model lands.
 
 **A feature.** Create `features/<category>/<name>/default.nix` and
 `features/<category>/<name>/default.assay.nix`, then add `../features/<category>/<name>`
