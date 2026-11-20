@@ -189,8 +189,19 @@
         inherit (nixosConfigurations.${hostname}) config;
       });
 
+    # deploy-rs's checks, once per node (`deploy-schema-<host>`, `deploy-activate-<host>`)
+    # rather than once over all of them. The combined pair evaluates every host in one
+    # attribute, which needs more than 11 GB of evaluator memory and so cannot be evaluated
+    # on a 16 GB CI runner at all (bin/ci/flake-checks); per node, each is one host's worth.
+    # Same checks, same schema: each node is validated inside the full `deploy` attrset
+    # with only its own entry under `nodes`.
     checks.${system} =
-      deployLib.deployChecks self.deploy
+      lib.foldl' (acc: host:
+        acc
+        // lib.mapAttrs' (name: lib.nameValuePair "${name}-${host}")
+        (deployLib.deployChecks (self.deploy // {nodes = {${host} = self.deploy.nodes.${host};};})))
+      {}
+      hosts
       // (builtins.removeAttrs self.stigVmTests ["passthru"]);
 
     formatter.${system} = pkgs.alejandra;
