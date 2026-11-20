@@ -163,9 +163,13 @@ The profile is a strict subset of base-safe. Its `profile` and `implemented` are
 so on mimir (which will import both) base-safe's metadata wins and mimir's report is
 unchanged. The suite asserts the subset, the exclusions and the merged result.
 
-**Wiring is a follow-up.** It needs one import in `profiles/base.nix` (or the equivalent
-`features.*.enable` once the features catalog lands). That file is owned by another
-workstream. Until then the three interactive hosts keep reporting profile `none`. Most of
+**Wiring is a follow-up.** It takes two lines in files owned by another workstream:
+`./security/stig/profiles/fleet-baseline.nix` in `features/catalog.nix`, which declares
+`features.security.stig.profiles.fleet-baseline.enable`, and that enable set to `true` in
+`profiles/base.nix`. `lib/features.nix` keys each wrapped module by its file, so on mimir the
+control modules shared with base-safe are evaluated once. That combination was evaluated on
+mimir and drakkar in PR #125. Until it is wired, the three interactive hosts keep reporting
+profile `none`. Most of
 these controls are already satisfied in substance there through `features/nixos/networking`,
 `features/security/apparmor`, `features/nixos/security/sudo` and `features/network/ssh`.
 

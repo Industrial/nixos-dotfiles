@@ -19,8 +19,9 @@
 # (normal priority) replace this file's mkDefault ones. So mimir's report is unchanged. The
 # colocated suite asserts the subset property, which is what makes that safe.
 #
-# Wiring: profiles/base.nix has to import this file (or enable it through the
-# features catalog). That file belongs to another workstream, so the import is listed as a
+# Wiring: list this file in features/catalog.nix, which declares
+# features.security.stig.profiles.fleet-baseline.enable, and set that to true in
+# profiles/base.nix. Both files belong to another workstream, so this is listed as a
 # follow-up in the PR rather than made here.
 {lib, ...}: let
   controlModules = [
