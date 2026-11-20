@@ -38,7 +38,6 @@
   ./cli/delta
   ./cli/difftastic
   ./cli/direnv
-  ./cli/du
   ./cli/dust
   ./cli/dysk
   ./cli/eza
