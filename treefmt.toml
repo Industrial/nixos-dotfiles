@@ -113,9 +113,18 @@ includes = ["*.{js,jsx,ts,tsx,json}"]
 #
 # Both globs are needed: `**/` matches one or more directory levels, so it
 # covers agent-profiles/default.json but NOT settings.json at the payload root.
+#
+# The WoW tree is excluded for the same reason from two directions: AddOns/ is
+# vendored upstream code (reformatting it turns every addon bump into a
+# whole-file diff), and WTF/ is written back by the game client on every exit,
+# in its own style.
+#
+# treefmt.ci.toml carries the same list; keep the two in step.
 excludes = [
   "features/ai/openhands/.openhands/*.json",
   "features/ai/openhands/.openhands/**/*.json",
+  "features/games/wow-classic/Interface/AddOns/**",
+  "features/games/wow-classic/WTF/**",
 ]
 priority = 4
 
