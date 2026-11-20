@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Run Assay on every git-tracked *.assay.nix suite, and nothing else.
+#
+# `assay run .` discovers suites by walking the filesystem, so a gitignored scratch tree
+# under .tmp/ — another session's worktree mid-refactor, a mutation probe — gets run
+# too, and its failures block every commit and push in the repo. Assay has no exclude
+# flag, so run it once per top-level path that holds tracked suites instead.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+mapfile -t roots < <(git ls-files -- '*.assay.nix' | cut -d/ -f1 | sort -u)
+
+status=0
+for r in "${roots[@]}"; do
+  assay run "$r" "$@" || status=1
+done
+exit "$status"

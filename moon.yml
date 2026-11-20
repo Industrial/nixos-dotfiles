@@ -5,17 +5,19 @@ tasks:
   format:
     command: 'treefmt'
   test:
-    description: 'Run Assay on all *.assay.nix suites across the repository'
+    description: 'Run Assay on all git-tracked *.assay.nix suites across the repository'
     command: 'bin/with-devenv'
     args:
-      - 'assay'
-      - 'run'
-      - '.'
+      - 'bin/assay-run-tracked'
     inputs:
       - '**/*.assay.nix'
       - '**/*.assay.json'
       - 'common/assay/**/*'
-      - 'common/**/*.nix'
+      # Suites evaluate the modules they cover (common/assay/nixos.nix), so any module
+      # edit — and any nixpkgs bump — must invalidate the cached result.
+      - '**/*.nix'
+      - 'flake.lock'
+      - 'bin/assay-run-tracked'
     options:
       # Whole-repo discovery; do not treat as always-cacheable across env changes.
       cache: true
