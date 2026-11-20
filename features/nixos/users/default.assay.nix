@@ -1,10 +1,11 @@
 # Colocated suite: users, root lock, and the Nix daemon trust boundary (ADR-0006).
 #
-# Evaluates the module inside a real NixOS system (the STIG fixture), so assertions read the
-# merged configuration rather than the module's literal attrset.
+# Evaluates the module inside a real NixOS system (common/assay/nixos.nix, pinned to the
+# flake's nixpkgs), so assertions read the merged configuration rather than the module's
+# literal attrset.
 let
   assay = import ./../../../common/assay/default.nix;
-  fixture = import ./../../security/stig/lib/fixture.nix;
+  nixos = import ../../../common/assay/nixos.nix;
 
   settings = {
     hostname = "h";
@@ -14,11 +15,10 @@ let
   };
 
   evalWith = extra:
-    fixture.evalWith ([
-        ./default.nix
-        {_module.args.settings = settings;}
-      ]
-      ++ extra);
+    nixos.eval {
+      modules = [./default.nix] ++ extra;
+      inherit settings;
+    };
 
   default = evalWith [];
   signing = evalWith [

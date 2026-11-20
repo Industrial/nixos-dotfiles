@@ -1,8 +1,8 @@
 # Colocated suite: sshd hardening and crypto, on the evaluated configuration (ADR-0006).
 let
   assay = import ./../../../common/assay/default.nix;
-  fixture = import ./../../security/stig/lib/fixture.nix;
-  config = fixture.evalWith [./default.nix];
+  nixos = import ../../../common/assay/nixos.nix;
+  config = nixos.eval {modules = [./default.nix];};
   s = config.services.openssh.settings;
 
   matching = pat: builtins.filter (a: builtins.match pat a != null);
