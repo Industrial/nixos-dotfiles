@@ -46,6 +46,11 @@ in
       && builtins.match ".*(redirect|source_route|rp_filter|martians|suid_dumpable|sysrq|randomize_va_space|accept_ra).*" p != null)
     default.boot.kernelParams) [];
 
+    # Memory sysctls are owned by features/performance/memory as real sysctls; the inert
+    # vm.* command-line copies that used to sit here must not come back.
+    noMemorySysctlOnCmdline =
+      assay.eq (builtins.filter (lib.hasPrefix "vm.") default.boot.kernelParams) [];
+
     dmesgRestricted = assay.eq sysctl."kernel.dmesg_restrict" 1;
     unprivBpfOff = assay.eq sysctl."kernel.unprivileged_bpf_disabled" 1;
     bpfJitHardened = assay.eq sysctl."net.core.bpf_jit_harden" 2;

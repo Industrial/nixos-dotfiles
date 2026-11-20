@@ -100,15 +100,10 @@ in {
           # features/performance/hardware, its single owner.
 
           # NOTE: the entries below are NOT applied. They are sysctl names, and the kernel
-          # ignores them on its command line (see the header). Moving them into
-          # boot.kernel.sysctl would change memory and network tuning on every host, which is
-          # outside this security change. That is left as a follow-up for the performance
-          # owner. `elevator=` has also done nothing since Linux 5.0.
-
-          # Memory management optimization
-          "vm.swappiness=10"
-          "vm.dirty_ratio=15"
-          "vm.dirty_background_ratio=5"
+          # ignores them on its command line (see the header). Moving the network and fs
+          # ones into boot.kernel.sysctl is a follow-up for the performance owner.
+          # `elevator=` has also done nothing since Linux 5.0. Memory writeback and swap are
+          # set as real sysctls in features/performance/memory, their single owner.
 
           # Network performance optimization
           "net.core.rmem_max=16777216"
