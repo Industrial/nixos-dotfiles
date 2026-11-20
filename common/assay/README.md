@@ -2,7 +2,7 @@
 
 Author-facing claim algebra for [Assay](https://github.com/Industrial/assay). Tests are **data**: plain Nix attrsets the Rust runner evaluates in isolation.
 
-Design background: [history/20260803-232133-nix-assay-testing.md](../../history/20260803-232133-nix-assay-testing.md).
+Design background: [docs/history/20260803-232133-nix-assay-testing.md](../../docs/history/20260803-232133-nix-assay-testing.md).
 
 ## Import
 
