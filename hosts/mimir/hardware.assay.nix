@@ -24,4 +24,10 @@ in
     # Driver blacklisting is drakkar's wired-only policy; copied here it would silently take
     # mimir's radios down with it.
     blacklistsNoModules = assay.eq cfg.boot.blacklistedKernelModules [];
+    # The always-on file server must never sleep: GDM's greeter auto-suspend took it off the
+    # tailnet whenever nobody was logged in.
+    greeterNeverSuspends = assay.eq cfg.services.displayManager.gdm.autoSuspend false;
+    sleepTargetsDisabled =
+      assay.eq (map (t: cfg.systemd.targets.${t}.enable) ["sleep" "suspend" "hibernate" "hybrid-sleep"])
+      [false false false false];
   }
