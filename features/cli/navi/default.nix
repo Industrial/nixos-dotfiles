@@ -3,7 +3,7 @@
 # The package was already here; the content is what makes it worth having. `cheats/` holds this
 # repo's own .cheat files — the bin/ wrappers, the deploy-rs invocations, the gates, the
 # `nix eval --raw .#nixosConfigurations.<host>…` idiom — rather than the generic Linux answers
-# that tldr and cheat.sh already give. Nothing in them is invented: every entry was read out of
+# that generic help tools already give. Nothing in them is invented: every entry was read out of
 # the script or runbook it names in its own `;` provenance line.
 #
 # The sheets are linked in as `~/.local/share/navi/cheats/dotfiles` rather than named in

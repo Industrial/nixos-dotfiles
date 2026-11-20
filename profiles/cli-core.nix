@@ -29,7 +29,6 @@
 
     # Shell Ergonomics — one-letter wrappers over the tools in the sections below
     features.cli.c.enable = true;
-    features.cli.cheatsheet.enable = true;
     features.cli.du.enable = true;
     features.cli.g.enable = true;
     features.cli.l.enable = true;
@@ -38,7 +37,6 @@
 
     # Documentation and Help — the answer to "how do I run this" without a browser
     features.cli.navi.enable = true;
-    features.cli.tealdeer.enable = true;
 
     # Files, Listing, Search and Text
     features.cli.bat.enable = true;

@@ -227,8 +227,7 @@ in {
       install -d -o ${settings.username} -g users -m 0755 ${configDir}
 
       # Seed once. Zed's settings UI owns this file afterwards — re-copying on
-      # every switch would silently revert whatever you changed in the UI, the
-      # same trap features/cli/tealdeer avoids with its page cache.
+      # every switch would silently revert whatever you changed in the UI.
       if [ ! -e ${configDir}/settings.json ]; then
         echo "zed: seeding ${configDir}/settings.json (yours to edit from here on)"
         install -o ${settings.username} -g users -m 0644 \

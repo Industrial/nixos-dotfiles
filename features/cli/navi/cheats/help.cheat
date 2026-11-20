@@ -1,25 +1,6 @@
-% dotfiles, help, tldr, navi
+% dotfiles, help, navi
 
-; Read out of features/cli/tealdeer, features/cli/navi and features/cli/cheatsheet — the three
-; features that make up this fleet's help stack.
-
-# The tldr page for a command, out of the offline cache; this never opens a socket
-tldr <command>
-
-# Every command the local page cache has a page for
-tldr --list
-
-# Which config file and page directory tealdeer is actually using
-tldr --show-paths
-
-# Refresh the page cache now rather than waiting for the weekly timer
-systemctl --user start tealdeer-pages-refresh.service
-
-# When the page cache refreshes next, and when it last ran
-systemctl --user list-timers tealdeer-pages-refresh.timer
-
-# Why the last refresh failed; a failed refresh deliberately does not fail the unit
-journalctl --user -u tealdeer-pages-refresh.service -n 50
+; Read out of features/cli/navi, the feature that holds this fleet's help stack.
 
 # Browse every cheatsheet navi can see
 navi
@@ -33,19 +14,14 @@ navi --tag-rules 'dotfiles,!stig'
 # Pick an entry and print it instead of running it
 navi --print
 
+# Open the finder already narrowed to entries matching a query
+navi --query '<query>'
+
 # Autoselect the entry that best matches a query, with no finder at all
 navi --query '<query>' --best-match --print
-
-# Render a tldr page through navi, out of the local tealdeer cache
-navi --tldr <command>
 
 # Where navi looks for .cheat files by default
 navi info cheats-path
 
 # A worked example of the .cheat format, for adding an entry
 navi info cheats-example
-
-# The one command in this stack that needs the network: cheat.sh's generic answer
-cheatsheet --web <command>
-
-$ command: tldr --list
