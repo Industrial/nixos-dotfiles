@@ -253,6 +253,18 @@ log_success "Disk partitioned and mounted"
 # Copy dotfiles to the new system
 log_info "Setting up dotfiles in new system..."
 mkdir -p /mnt/home/tom
+# A non-destructive reinstall keeps the old root filesystem, and with it the old
+# ~/.dotfiles. Features link user config (nushell's env.nu, …) into that checkout, so
+# a stale one breaks the new system: on mimir an August checkout sourced a starship.nu
+# the current config no longer ships, nushell failed as the login shell, and GDM
+# bounced every login back to the greeter. `cp -r` onto an existing directory would
+# also nest the fresh copy inside the stale one instead of replacing it. Move the old
+# checkout aside, keeping it in case it held uncommitted work, and copy the fresh one.
+if [[ -e /mnt/home/tom/.dotfiles ]]; then
+    stale="/mnt/home/tom/.dotfiles.pre-install-$(date +%Y%m%d-%H%M%S)"
+    log_warn "Existing ~/.dotfiles found in the target; moving it to ${stale#/mnt}"
+    mv /mnt/home/tom/.dotfiles "$stale"
+fi
 cp -r "$DOTFILES_DIR" /mnt/home/tom/.dotfiles
 
 # Install NixOS
