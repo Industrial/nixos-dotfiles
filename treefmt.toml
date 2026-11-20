@@ -87,13 +87,6 @@ excludes = [
   "common/assay/nixos.nix",
   "common/assay/tests/smoke.assay.nix",
   "features/cli/nixos-update-notifier/default.assay.nix",
-  "features/nixos/security/no-defaults/default.assay.nix",
-  "features/security/apparmor/default.assay.nix",
-  "features/security/pam/default.assay.nix",
-  "features/security/stig/controls/V-268153.assay.nix",
-  "features/security/stig/lib/parse-xccdf.nix",
-  "features/security/stig/lib/report.nix",
-  "features/security/stig/profiles/base-safe.assay.nix",
   "flake.assay.nix",
   "rust/tools/nixos-update-notifier/default.assay.nix",
 ]
