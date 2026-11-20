@@ -18,6 +18,13 @@ features/ai/ollama
 features/ai/opencode
 features/ai/paperclip
 
+# --- Superseded by Paseo; kept as one-line opt-ins. ----------------------------------
+# cloudcli: commented-out switch in profiles/ai.nix (9ec7f668). openhands: commented-out
+# switch in hosts/drakkar/configuration.nix (b2fccfc1). Neither is in features/catalog.nix,
+# so re-enabling either also means adding it there.
+features/ai/cloudcli
+features/ai/openhands
+
 # --- Parked behind a commented-out import in profiles/communication.nix. -------------
 features/communication/fractal
 features/communication/teams
