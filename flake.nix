@@ -126,9 +126,11 @@
 
   nixConfig = {
     extra-substituters = ["https://nix-community.cachix.org"];
+    # The one nix-community signing key, as published at https://nix-community.org/cache/
+    # and by the Cachix API (app.cachix.org/api/v1/cache/nix-community), checked
+    # 2026-11-20. Same key as nix.settings in features/nixos/default.nix.
     extra-trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7BKqP7YhK1i3JvGvscqg5k="
     ];
   };
 
