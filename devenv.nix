@@ -94,7 +94,5 @@ in {
     moon-coverage = {
       enable = false;
     };
-
   };
-
 }
