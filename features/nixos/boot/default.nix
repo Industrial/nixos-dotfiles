@@ -96,7 +96,8 @@ in {
           # Performance kernel parameters
           "transparent_hugepage=always"
           "elevator=deadline"
-          "cpufreq.default_governor=performance"
+          # The CPU governor is set by powerManagement.cpuFreqGovernor in
+          # features/performance/hardware, its single owner.
 
           # NOTE: the entries below are NOT applied. They are sysctl names, and the kernel
           # ignores them on its command line (see the header). Moving them into
