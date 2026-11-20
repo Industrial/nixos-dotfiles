@@ -44,16 +44,12 @@
 
   # Configure services for performance and security
   services = {
-    # Optimize cron for performance
-    cron = {
-      enable = true;
-      systemCronJobs = [
-        # Optimize system performance
-        "0 2 * * * root /run/current-system/sw/bin/nix-collect-garbage -d"
-        "0 3 * * * root /run/current-system/sw/bin/nix-store --optimise"
-        "30 3 * * 0 root /run/current-system/sw/bin/journalctl --vacuum-size=800M"
-      ];
-    };
+    # No cron. Store GC is nix.gc in features/nixos/default.nix, which keeps a
+    # rollback window (the old nightly `nix-collect-garbage -d` deleted every
+    # generation). Store dedup is nix.settings.auto-optimise-store, and the
+    # journal is capped by journald's SystemMaxUse. STIG V-268097 audits
+    # /var/cron/tabs, which that control provisions itself via tmpfiles, so its
+    # watch loads whether or not a cron daemon runs.
 
     # Optimize timesyncd
     timesyncd = {
