@@ -7,7 +7,7 @@ let
   assay = import ../../../common/assay/default.nix;
   nixos = import ../../../common/assay/nixos.nix;
   inherit (nixos) lib;
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   inputs = nixos.flakeInputs;
   drv = import ./vscode-extension.nix {inherit inputs pkgs;};
   installHas = needle: lib.hasInfix needle drv.installPhase;

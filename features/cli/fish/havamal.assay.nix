@@ -11,7 +11,7 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
 
   system = nixos.evalSystem {modules = [./default.nix];};
   pkgs = system._module.args.pkgs;

@@ -6,7 +6,7 @@ let
   nixos = import ./../../../common/assay/nixos.nix;
   system = nixos.evalSystem {modules = [./default.nix];};
   cfg = system.config;
-  pkgs = system.pkgs;
+  inherit (system) pkgs;
   installed = map (p: p.outPath) cfg.environment.systemPackages;
   installs = p: builtins.elem p.outPath installed;
 in

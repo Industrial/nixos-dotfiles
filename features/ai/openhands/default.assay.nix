@@ -14,12 +14,12 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   # Substring test over generated text; store-path context is irrelevant to the match.
   contains = needle: s: lib.hasInfix (builtins.unsafeDiscardStringContext needle) (builtins.unsafeDiscardStringContext s);
   system = nixos.evalSystem {modules = [./default.nix];};
   cfg = system.config;
-  pkgs = system.pkgs;
+  inherit (system) pkgs;
   upstream = nixos.flakeInputs.llm-agents.packages.x86_64-linux.openhands-agent-canvas;
   added = lib.subtractLists (nixos.packageNames nixos.baseline) (nixos.packageNames cfg);
   canvas = lib.findFirst (p: lib.getName p == "openhands-agent-canvas-wrapped") null cfg.environment.systemPackages;

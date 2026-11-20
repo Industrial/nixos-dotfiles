@@ -17,7 +17,7 @@
 let
   assay = import ./../common/assay/default.nix;
   nixos = import ./../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
 
   flake = import ./../flake.nix;
   outputs = flake.outputs (nixos.flakeInputs // {self = outputs;});

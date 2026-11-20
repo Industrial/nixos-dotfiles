@@ -2,7 +2,7 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   cfg = nixos.eval {modules = [./default.nix];};
   server = lib.findFirst (p: lib.getName p == "context7-mcp") null cfg.environment.systemPackages;
   added = lib.subtractLists (nixos.packageNames nixos.baseline) (nixos.packageNames cfg);

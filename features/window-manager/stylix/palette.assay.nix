@@ -9,7 +9,7 @@ let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ../../../common/assay/nixos.nix;
   # The pinned nixpkgs the fleet builds against, not whatever <nixpkgs> resolves to.
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   inherit (nixos) lib;
 
   palette = import ./palette.nix;

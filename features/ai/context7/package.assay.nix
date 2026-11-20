@@ -4,7 +4,7 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   drv = pkgs.callPackage ./package.nix {};
 in
   assay.suite "context7-package" {

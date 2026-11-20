@@ -9,7 +9,7 @@ let
   nixos = import ./../../../common/assay/nixos.nix;
   system = nixos.evalSystem {modules = [./default.nix];};
   cfg = system.config;
-  pkgs = system.pkgs;
+  inherit (system) pkgs;
   inherit (nixos.defaultSettings) username userdir;
   svc = cfg.systemd.user.services.paseo;
   onPath = entry: builtins.elem "${entry}" (map (p: "${p}") svc.path);

@@ -6,12 +6,12 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   # Substring test over generated text; store-path context is irrelevant to the match.
   contains = needle: s: lib.hasInfix (builtins.unsafeDiscardStringContext needle) (builtins.unsafeDiscardStringContext s);
   system = nixos.evalSystem {modules = [./default.nix];};
   cfg = system.config;
-  pkgs = system.pkgs;
+  inherit (system) pkgs;
   inherit (nixos.defaultSettings) username userdir;
   paperclipai = lib.findFirst (p: lib.getName p == "paperclipai") null cfg.environment.systemPackages;
   svc = cfg.systemd.user.services.paperclipai;
