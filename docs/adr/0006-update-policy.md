@@ -5,9 +5,8 @@
 **Issue:** Industrial/nixos-dotfiles#117
 **Builds on:** [ADR-0001](./0001-fleet-deploy-rs.md) (deploy-rs), [ADR-0002](./0002-comin-pull-convergence.md) (comin)
 
-> Numbering note: several tickets were in flight in parallel on 2026-11-20. If another
-> ADR-0006 lands first, renumber this file; nothing else depends on the number except
-> the comments that cite it.
+> Numbering note: #125 also adds an ADR-0006. Whichever of the two merges second
+> renumbers; nothing depends on the number except the comments that cite it.
 
 ## Context
 
@@ -43,11 +42,11 @@ after comin has already switched kernels.
    pinned to a commit SHA, to open or refresh one PR from `update/flake-lock`.
    `bin/update/flake` is the by-hand equivalent and refuses to bump on `main`.
 3. **Every lock-bump PR carries its own evidence:**
-   - `update-flake-lock / check (<host>)` commit statuses for drakkar, huginn and mimir.
-     They come from the same `.github/actions/check` the PR workflow runs (`nix flake check`
-     plus a dry-run toplevel build).
+   - The regular PR workflow (`pr.yml` → `ci.yml`), with its host matrix generated from
+     `nixosConfigurations` and the required `ci / all-green` gate. Host checks are not
+     duplicated in the bump workflow.
    - A PR-body table of root inputs that moved, with GitHub compare links.
-   - A per-host diff for all four hosts: NixOS release, kernel version and
+   - A per-host diff for every `nixosConfigurations` entry: NixOS release, kernel version and
      `environment.systemPackages` versions. It comes from `bin/update/pkg-diff` (logic in
      `bin/update/lib/pkg-diff.nix`, with an assay suite). An evaluation failure shows up
      in the PR body and fails the job.
@@ -56,9 +55,8 @@ after comin has already switched kernels.
    within ~5 minutes. Optionally, push to `testing-<hostname>` first to try one host.
 5. **"Green main" is enforced at the merge gate, not on the hosts.** comin can't tell
    whether a commit was green, so the guarantee has to hold before the commit reaches
-   `main`. That's branch protection on `main` requiring the host checks (operator setting,
-   below). Until it's set, the PR's statuses are the operator's evidence and the rule is
-   procedural.
+   `main`. That's branch protection on `main` requiring `ci / all-green` (in place since
+   #126), which covers every host check.
 6. **The notifier reports what's pending on the operator.** On a schedule
    `nixos-update-notifier` reports:
    - any open `update/flake-lock` PR, through the unauthenticated GitHub API on this
@@ -89,12 +87,10 @@ The built diff still exists, on the host after merge, through the notifier.
 - A kernel update no longer goes unnoticed until the next reboot.
 
 **Negative**
-- With the default `GITHUB_TOKEN`, GitHub doesn't start `pr.yml` for the bot's PR. Until a
-  `FLAKE_LOCK_UPDATE_TOKEN` secret exists, the operator closes and reopens the PR to run
-  the full PR suite. The host checks still run inside this workflow and post statuses.
-- muninn gets a package diff but no host check. `.github/actions/check` and the `pr.yml`
-  matrix list only drakkar, huginn and mimir. That's owned by the CI workflow, and filed as
-  a follow-up.
+- With the default `GITHUB_TOKEN`, GitHub doesn't start `pr.yml` for the bot's PR, so the
+  required `ci / all-green` never runs and the PR **can't merge**. Until a
+  `FLAKE_LOCK_UPDATE_TOKEN` secret exists, someone has to close and reopen each bump PR to
+  start CI.
 - `bin/update/system` now needs a network fetch, and refuses dirty trees.
 
 ## Alternatives considered
@@ -109,12 +105,10 @@ The built diff still exists, on the host after merge, through the notifier.
 
 ## Needs operator
 
-- Branch protection on `main`: require `check (drakkar)`, `check (huginn)`, `check (mimir)`
-  before merge. Don't make `update-flake-lock / check (<host>)` required: only bump PRs
-  carry it, so requiring it would block every other PR. With the token below, bump PRs
-  satisfy the `pr.yml` checks like any other PR.
+- **`FLAKE_LOCK_UPDATE_TOKEN` repo secret** (fine-grained PAT or GitHub App token,
+  `contents: write` and `pull-requests: write` on this repo). `main` requires
+  `ci / all-green`, and GitHub won't run it on a PR opened with `GITHUB_TOKEN`. Without this
+  secret, every bump PR is blocked until a person closes and reopens it.
 - Settings → Actions → General → Workflow permissions: enable **"Allow GitHub Actions to
-  create and approve pull requests"**. Without it, the `lock` job can't open the PR.
-- Optional: a `FLAKE_LOCK_UPDATE_TOKEN` repo secret (fine-grained PAT or GitHub App token,
-  `contents: write` and `pull-requests: write` on this repo), so `pr.yml` runs on bump PRs
-  without a close/reopen.
+  create and approve pull requests"**. Without it, the `lock` job can't open the PR with
+  `GITHUB_TOKEN`. That setting isn't needed once the token above is set.

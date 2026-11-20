@@ -5,7 +5,7 @@ How the fleet takes upstream updates, and how to back one out. Policy and ration
 
 ```
 weekly cron ──► update-flake-lock.yml ──► PR "chore(flake): bump flake.lock"
-                                          ├─ update-flake-lock / check (<host>)  statuses
+                                          ├─ PR workflow → ci.yml → ci / all-green  (required)
                                           └─ PR body: inputs moved + per-host package diff
 operator reviews ──► merge to main ──► comin on every host: switch (≤ 300s)
                                    └─► nixos-update-notifier: "reboot pending" if kernel moved
@@ -40,16 +40,11 @@ The PR body's **What this bump changes** section, written by the workflow's `rep
 | Package versions table | removals a host still needs; major-version jumps |
 | "Evaluation failed" | the bump breaks that host. Don't merge. Pin or fix first |
 
-Statuses on the PR head:
-
-- `update-flake-lock / check (drakkar|huginn|mimir)`: `nix flake check` plus a dry-run
-  toplevel build, the same action as `pr.yml`'s `check (<host>)`. muninn has a diff but
-  no check (follow-up).
-- `PR` workflow checks: these run only if the PR was opened with `FLAKE_LOCK_UPDATE_TOKEN`.
-  Otherwise **close and reopen the PR** to start them.
-
-Main is not fully green today. A red job on the bump PR only counts against it when the
-same job is green on `main`, or fails there for a different reason.
+Checks: the bump PR runs the regular `PR` workflow (`ci.yml`, with every
+`nixosConfigurations` host in its check matrix), and `main` requires `ci / all-green`.
+GitHub starts that workflow for the bot's PR only if the PR was opened with
+`FLAKE_LOCK_UPDATE_TOKEN`. If no checks appear, **close and reopen the PR**; until then it
+cannot merge.
 
 Preview a diff locally without CI:
 
@@ -116,5 +111,6 @@ Run it by hand: `nixos-update-notifier --no-notify`.
 
 ## Needs operator (one-time)
 
-See ADR-0006 § Needs operator: branch protection on `main`, *Allow GitHub Actions to
-create and approve pull requests*, and optionally the `FLAKE_LOCK_UPDATE_TOKEN` secret.
+See ADR-0006 § Needs operator: the `FLAKE_LOCK_UPDATE_TOKEN` secret (without it, bump PRs
+are blocked on `ci / all-green` until someone closes and reopens them), or at minimum
+*Allow GitHub Actions to create and approve pull requests*.
