@@ -3,18 +3,17 @@
 {
   config,
   lib,
-  pkgs,
-  inputs,
-  settings,
   ...
 }: {
-  imports = [
-    ../features/games/appimage
-    ../features/games/awakened-poe-trade
-    ../features/games/exiled-exchange-2
-    ../features/games/lutris
-    ../features/games/path-of-building
-    ../features/games/wow-classic
-    ../features/games/wowup
-  ];
+  options.profiles.gaming.enable = lib.mkEnableOption "the gaming profile";
+
+  config = lib.mkIf config.profiles.gaming.enable {
+    features.games.appimage.enable = true;
+    features.games.awakened-poe-trade.enable = true;
+    features.games.exiled-exchange-2.enable = true;
+    features.games.lutris.enable = true;
+    features.games.path-of-building.enable = true;
+    features.games.wow-classic.enable = true;
+    features.games.wowup.enable = true;
+  };
 }

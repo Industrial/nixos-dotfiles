@@ -1,13 +1,31 @@
+# Colocated suite for hosts/mimir/configuration.nix — which profiles and features mimir
+# switches on, evaluated through the option layer. Hardware/disk files set real NixOS
+# options and are covered by their own suites, so they are disabled here.
 let
   assay = import ../../common/assay/default.nix;
-  src = builtins.readFile ./configuration.nix;
+  nixos = import ../../common/assay/nixos.nix;
+  features = import ../../lib/features.nix {inherit (nixos) lib;};
+  cfg = features.evalSelection {
+    modules = [
+      ./configuration.nix
+      {disabledModules = [./disko.nix ./filesystems.nix ./hardware.nix];}
+    ];
+  };
+  has = f: builtins.elem f (features.enabledFeatures cfg);
 in
   assay.suite "configuration" {
-    nonEmpty = assay.eq ((builtins.stringLength src) > 50) true;
-    importsFleet = assay.eq (builtins.match ".*features/fleet/remote-access.*" src != null) true;
-    importsNfsServer = assay.eq (builtins.match ".*features/storage/nfs-server.*" src != null) true;
+    enablesBase = assay.eq cfg.profiles.base.enable true;
+    enablesFleetAccess = assay.eq (has "fleet.remote-access") true;
+    enablesNfsServer = assay.eq (has "storage.nfs-server") true;
 
-    # mimir is the always-on host, so it carries the RustDesk signal/relay for
-    # the fleet. The other three hosts must not import this.
-    importsRemoteDesktopRelay = assay.eq (builtins.match ".*features/fleet/remote-desktop-relay.*" src != null) true;
+    # mimir is the always-on host, so it carries the RustDesk signal/relay for the fleet.
+    enablesRemoteDesktopRelay = assay.eq (has "fleet.remote-desktop-relay") true;
+
+    # The STIG base-safe baseline lives here and nowhere else (ADR-0004).
+    enablesStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") true;
+
+    # mimir offloads builds rather than serving them.
+    buildClientNotServer = assay.eq [(has "fleet.nix-remote-builder-client") (has "fleet.nix-remote-builder-server")] [true false];
+
+    noGaming = assay.eq cfg.profiles.gaming.enable false;
   }

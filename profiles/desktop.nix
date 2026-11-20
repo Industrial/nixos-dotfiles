@@ -2,24 +2,27 @@
 # Desktop environment and window managers
 {
   config,
-  lib,
-  pkgs,
   inputs,
-  settings,
+  lib,
   ...
 }: {
   imports = [
-    ../features/desktop/claude-desktop
-    ../features/nixos/window-manager
-    ../features/window-manager/alacritty
-    ../features/window-manager/ghostty
-    ../features/window-manager/gnome
-    ../features/window-manager/hyprland
-    ../features/window-manager/stylix
-    ../features/window-manager/xclip
-    ../features/window-manager/xfce-screenshooter
-    ../features/window-manager/xsel
-    ../profiles/cli-desktop.nix
     inputs.stylix.nixosModules.stylix
   ];
+
+  options.profiles.desktop.enable = lib.mkEnableOption "the desktop profile";
+
+  config = lib.mkIf config.profiles.desktop.enable {
+    features.desktop.claude-desktop.enable = true;
+    features.nixos.window-manager.enable = true;
+    features.window-manager.alacritty.enable = true;
+    features.window-manager.ghostty.enable = true;
+    features.window-manager.gnome.enable = true;
+    features.window-manager.hyprland.enable = true;
+    features.window-manager.stylix.enable = true;
+    features.window-manager.xclip.enable = true;
+    features.window-manager.xfce-screenshooter.enable = true;
+    features.window-manager.xsel.enable = true;
+    profiles.cli-desktop.enable = true;
+  };
 }

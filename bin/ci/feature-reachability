@@ -4,14 +4,17 @@
 # This is the check that `features/cli/leaves` and `features/cli/nmtui` needed: a feature
 # directory that exists, carries a suite, evaluates fine, and reaches no machine.
 #
-# Reachability is a transitive walk of literal path imports from every nixosConfiguration
-# entry point (hosts/*/configuration.nix plus installer/configuration.nix), not a grep for
-# the feature's name. Two properties that a name grep gets wrong and this does not:
+# Reachability is a transitive walk from every nixosConfiguration entry point
+# (hosts/*/configuration.nix plus installer/configuration.nix), not a grep for the
+# feature's name. It follows two kinds of edge: literal path imports, and option switches —
+# `profiles.<name>.enable = true` into profiles/<name>.nix and `features.<path>.enable =
+# true` into that feature's module (see lib/features.nix and features/catalog.nix).
+# Two properties that a name grep gets wrong and this does not:
 #
-#   - a live import carrying a trailing reason comment is an import
-#     (`../features/cli/bluetuith # Bluetooth pairing TUI` in profiles/cli-desktop.nix),
-#   - a commented-out import is not an import
-#     (`#../features/ai/opencode` in profiles/ai.nix).
+#   - a live switch carrying a trailing reason comment is a switch
+#     (`features.cli.bluetuith.enable = true; # Bluetooth pairing TUI` in profiles/cli-desktop.nix),
+#   - a commented-out switch is not a switch
+#     (`# features.ai.opencode.enable = true;` in profiles/ai.nix).
 #
 # Both follow from stripping Nix comments and strings before matching, which is what
 # strip_nix_comments below does.
@@ -129,18 +132,68 @@ if not entry_points:
     print("feature-reachability: FAIL — found no host entry points to walk from", file=sys.stderr)
     sys.exit(1)
 
-visited = set(entry_points)
-queue = list(entry_points)
-while queue:
-    current = queue.pop()
-    for ref in path_refs(current):
-        target = resolve(current, ref)
-        if target is None or target in visited or target.suffix != ".nix":
-            continue
-        if root not in target.parents:
-            continue
-        visited.add(target)
-        queue.append(target)
+visited = set()
+
+
+def walk(starts):
+    """Transitive walk of literal path imports from `starts`, into `visited`."""
+    queue = [s for s in starts if s not in visited]
+    visited.update(queue)
+    while queue:
+        current = queue.pop()
+        for ref in path_refs(current):
+            target = resolve(current, ref)
+            if target is None or target in visited or target.suffix != ".nix":
+                continue
+            if root not in target.parents or target == catalog:
+                continue
+            visited.add(target)
+            queue.append(target)
+
+
+# Features are switched on by option, not imported by path: lib/mk-host.nix gives every
+# host every entry of features/catalog.nix, each behind `features.<path>.enable`, plus
+# every profile behind `profiles.<name>.enable`. So a feature reaches a host when that
+# host's configuration.nix — directly, or through a profile it (transitively) enables —
+# sets its switch to true. The catalog itself is never walked: listing a feature there
+# makes it switchable, not reached.
+catalog = features / "catalog.nix"
+ENABLE_RE = re.compile(r"(?<![\w.-])(features|profiles)\.([\w.-]+?)\.enable\s*=\s*(?:lib\.mk(?:Default|Force|Override\s+\d+)\s+)?true\b")
+
+
+def switches(path: Path):
+    return [(m.group(1), m.group(2)) for m in ENABLE_RE.finditer(strip_nix_comments(path.read_text(errors="replace")))]
+
+
+def feature_module(dotted: str):
+    base = features.joinpath(*dotted.split("."))
+    if (base / "default.nix").is_file():
+        return base / "default.nix"
+    file = Path(f"{base}.nix")
+    return file if file.is_file() else None
+
+
+walk(entry_points)
+
+enabled_profiles = set()
+enabled_features = set()
+pending = list(entry_points)
+while pending:
+    source = pending.pop()
+    for kind, name in switches(source):
+        if kind == "profiles":
+            profile = root / "profiles" / f"{name}.nix"
+            if name not in enabled_profiles and profile.is_file():
+                enabled_profiles.add(name)
+                pending.append(profile)
+        else:
+            module = feature_module(name)
+            if module is not None and module not in enabled_features:
+                enabled_features.add(module)
+                # A feature may switch on others too (rare, but walk it the same way).
+                pending.append(module)
+
+walk(sorted(enabled_features))
 
 
 def skipped(path: Path) -> bool:
@@ -167,6 +220,8 @@ for candidate in features.rglob("*"):
             units.append(candidate)
 for candidate in features.rglob("*.nix"):
     if skipped(candidate) or candidate.name == "default.nix" or candidate.name.endswith(".assay.nix"):
+        continue
+    if candidate == catalog:
         continue
     if not nested_in_feature(candidate):
         units.append(candidate)

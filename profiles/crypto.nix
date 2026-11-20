@@ -3,14 +3,13 @@
 {
   config,
   lib,
-  pkgs,
-  inputs,
-  settings,
   ...
 }: {
-  imports = [
-    # ../features/crypto/bisq
-    # ../features/crypto/monero
-    #../features/crypto/solana
-  ];
+  options.profiles.crypto.enable = lib.mkEnableOption "the crypto profile";
+
+  config = lib.mkIf config.profiles.crypto.enable {
+    # features.crypto.bisq.enable = true;
+    # features.crypto.monero.enable = true;
+    # features.crypto.solana.enable = true;
+  };
 }

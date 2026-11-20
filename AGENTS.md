@@ -14,6 +14,21 @@ env without entering `devenv shell`. Git hooks run through the same wrapper,
 and entering the shell no longer runs them. Previously, shell entry ran
 `prek run -a`, and hooks that re-entered the shell recursed.
 
+## Hosts, profiles, features
+
+Features are switched on by option, not imported by path. Every host gets every
+entry of `features/catalog.nix` (each wrapped by `lib/features.nix`, which declares
+`features.<path>.enable`, default off) and every `profiles/*.nix` (each declaring
+`profiles.<name>.enable`). `hosts/<name>/configuration.nix` enables profiles and
+features; a profile's choice is overridden per host with `lib.mkForce false`.
+
+- New feature: add its path to `features/catalog.nix`, then set
+  `features.<category>.<name>.enable = true;` in a profile or host.
+- Host facts (roles, builders, operator keys, tailnet IPs) live in
+  `common/fleet.nix`. Features read it; they never name hosts.
+- `features.<…>` / `profiles.<…>` selections are cheap to test with
+  `evalSelection` from `lib/features.nix`; see `profiles/*.assay.nix`.
+
 ## Git pre-push (deepsec)
 
 With the dev shell active, devenv installs a **pre-push** hook that runs `bin/git-hooks/deepsec-pre-push`. It invokes `deepsec process` (via `nix develop .deepsec`) on the commit range being pushed and **rejects the push** if deepsec exits non-zero (reported findings or AI stage failure).

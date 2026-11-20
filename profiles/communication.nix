@@ -3,17 +3,16 @@
 {
   config,
   lib,
-  pkgs,
-  inputs,
-  settings,
   ...
 }: {
-  imports = [
-    ../features/communication/discord
-    # ../features/communication/fractal
-    ../features/communication/signal-desktop
-    # ../features/communication/teams
-    # ../features/communication/telegram
-    # ../features/communication/weechat
-  ];
+  options.profiles.communication.enable = lib.mkEnableOption "the communication profile";
+
+  config = lib.mkIf config.profiles.communication.enable {
+    features.communication.discord.enable = true;
+    # features.communication.fractal.enable = true;
+    features.communication.signal-desktop.enable = true;
+    # features.communication.teams.enable = true;
+    # features.communication.telegram.enable = true;
+    # features.communication.weechat.enable = true;
+  };
 }

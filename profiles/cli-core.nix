@@ -1,93 +1,99 @@
 # CLI Core Profile
 # The command-line features a host needs with nobody sitting at it: shell, search, git,
 # multiplexer, nix tooling, documentation, archives, system inspection, networking diagnostics.
-# Split out of profiles/base.nix, which imports it, so every host still carries exactly this set.
+# Split out of profiles/base.nix, which enables it, so every host still carries exactly this set.
 #
 # Membership test: would this tool earn its place on a machine reached only over ssh? If the
 # answer is "only if someone is looking at a screen", it belongs in profiles/cli-desktop.nix.
-{...}: {
-  imports = [
+{
+  config,
+  lib,
+  ...
+}: {
+  options.profiles.cli-core.enable = lib.mkEnableOption "the cli-core profile";
+
+  config = lib.mkIf config.profiles.cli-core.enable {
     # Shell and Prompt
-    ../features/cli/atuin
-    ../features/cli/carapace
-    ../features/cli/direnv
-    ../features/cli/fish
-    ../features/cli/nushell
-    ../features/cli/nushell-plugins
-    ../features/cli/shell-init
-    ../features/cli/starship
-    ../features/cli/zoxide
+    features.cli.atuin.enable = true;
+    features.cli.carapace.enable = true;
+    features.cli.direnv.enable = true;
+    features.cli.fish.enable = true;
+    features.cli.nushell.enable = true;
+    features.cli.nushell-plugins.enable = true;
+    features.cli.shell-init.enable = true;
+    features.cli.starship.enable = true;
+    features.cli.zoxide.enable = true;
 
     # Multiplexer
-    ../features/cli/zellij
+    features.cli.zellij.enable = true;
 
     # Shell Ergonomics — one-letter wrappers over the tools in the sections below
-    ../features/cli/c
-    ../features/cli/cheatsheet
-    ../features/cli/du
-    ../features/cli/g
-    ../features/cli/l
-    ../features/cli/ll
-    ../features/cli/p
+    features.cli.c.enable = true;
+    features.cli.cheatsheet.enable = true;
+    features.cli.du.enable = true;
+    features.cli.g.enable = true;
+    features.cli.l.enable = true;
+    features.cli.ll.enable = true;
+    features.cli.p.enable = true;
 
     # Documentation and Help — the answer to "how do I run this" without a browser
-    ../features/cli/navi
-    ../features/cli/tealdeer
+    features.cli.navi.enable = true;
+    features.cli.tealdeer.enable = true;
 
     # Files, Listing, Search and Text
-    ../features/cli/bat
-    ../features/cli/eza
-    ../features/cli/fd
-    ../features/cli/fzf
-    ../features/cli/jq
-    ../features/cli/ranger
-    ../features/cli/ripgrep
-    ../features/cli/television
-    ../features/cli/tokei
-    ../features/cli/yazi
+    features.cli.bat.enable = true;
+    features.cli.eza.enable = true;
+    features.cli.fd.enable = true;
+    features.cli.fzf.enable = true;
+    features.cli.jq.enable = true;
+    features.cli.ranger.enable = true;
+    features.cli.ripgrep.enable = true;
+    features.cli.television.enable = true;
+    features.cli.tokei.enable = true;
+    features.cli.yazi.enable = true;
 
     # Git
-    ../features/cli/delta
-    ../features/cli/difftastic
-    ../features/cli/gix
-    ../features/cli/lazygit
+    features.cli.delta.enable = true;
+    features.cli.difftastic.enable = true;
+    features.cli.gix.enable = true;
+    features.cli.lazygit.enable = true;
 
     # Nix Tooling
-    ../features/cli/assay
-    ../features/cli/nh
-    ../features/cli/nix-index
-    ../features/cli/nix-output-monitor
-    ../features/cli/nix-tree
-    ../features/cli/nixdrv
-    ../features/cli/nixfetch
-    ../features/cli/nixq
-    ../features/cli/nixstore
-    ../features/cli/nvd
+    features.cli.assay.enable = true;
+    features.cli.nh.enable = true;
+    features.cli.nix-index.enable = true;
+    features.cli.nix-output-monitor.enable = true;
+    features.cli.nix-tree.enable = true;
+    features.cli.nixdrv.enable = true;
+    features.cli.nixfetch.enable = true;
+    features.cli.nixq.enable = true;
+    features.cli.nixstore.enable = true;
+    features.cli.nvd.enable = true;
 
     # Archives
-    ../features/cli/p7zip
-    ../features/cli/unrar
-    ../features/cli/unzip
+    features.cli.p7zip.enable = true;
+    features.cli.unrar.enable = true;
+    features.cli.unzip.enable = true;
 
     # System Inspection
-    ../features/cli/btop
-    ../features/cli/dust
-    ../features/cli/dysk
-    ../features/cli/hyperfine
-    ../features/cli/killall
-    ../features/cli/lnav
-    ../features/cli/lsof
-    ../features/cli/lsusb
-    ../features/cli/oomkiller
-    ../features/cli/procs
+    features.cli.btop.enable = true;
+    features.cli.dust.enable = true;
+    features.cli.dysk.enable = true;
+    features.cli.hyperfine.enable = true;
+    features.cli.killall.enable = true;
+    features.cli.lnav.enable = true;
+    features.cli.lsof.enable = true;
+    features.cli.lsusb.enable = true;
+    features.cli.oomkiller.enable = true;
+    features.cli.procs.enable = true;
 
     # Networking Diagnostics
-    ../features/cli/bandwhich
-    ../features/cli/gping
-    ../features/cli/nettools
+    features.cli.bandwhich.enable = true;
+    features.cli.gping.enable = true;
+    features.cli.nettools.enable = true;
 
     # Keys and Secrets
-    ../features/cli/create-ssh-key
-    ../features/cli/gpg
-  ];
+    features.cli.create-ssh-key.enable = true;
+    features.cli.gpg.enable = true;
+  };
 }

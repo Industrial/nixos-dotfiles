@@ -3,50 +3,49 @@
 {
   config,
   lib,
-  pkgs,
-  inputs,
-  settings,
   ...
 }: {
-  imports = [
+  options.profiles.base.enable = lib.mkEnableOption "the base profile";
+
+  config = lib.mkIf config.profiles.base.enable {
     # CLI Tools — the headless-safe set. The seat-bound rest is in profiles/cli-desktop.nix,
-    # imported by profiles/desktop.nix; see that file's header for the boundary.
-    ../profiles/cli-core.nix
+    # enabled by profiles/desktop.nix; see that file's header for the boundary.
+    profiles.cli-core.enable = true;
 
     # Core NixOS Configuration
-    ../features/nixos
-    ../features/nixos/auto-update
-    ../features/nixos/bluetooth
-    ../features/nixos/boot
-    ../features/nixos/docker
-    ../features/nixos/fonts
-    ../features/nixos/graphics
-    ../features/nixos/networking
-    ../features/nixos/networking/dns.nix
-    ../features/nixos/networking/firewall.nix
-    ../features/nixos/security/no-defaults
-    ../features/nixos/security/sudo
-    ../features/nixos/systemd
-    ../features/nixos/sound
-    ../features/nixos/users
+    features.nixos.enable = true;
+    features.nixos.auto-update.enable = true;
+    features.nixos.bluetooth.enable = true;
+    features.nixos.boot.enable = true;
+    features.nixos.docker.enable = true;
+    features.nixos.fonts.enable = true;
+    features.nixos.graphics.enable = true;
+    features.nixos.networking.enable = true;
+    features.nixos.networking.dns.enable = true;
+    features.nixos.networking.firewall.enable = true;
+    features.nixos.security.no-defaults.enable = true;
+    features.nixos.security.sudo.enable = true;
+    features.nixos.systemd.enable = true;
+    features.nixos.sound.enable = true;
+    features.nixos.users.enable = true;
 
     # Performance Optimization
-    ../features/performance/environment
-    ../features/performance/hardware
-    ../features/performance/filesystems
-    ../features/performance/memory
+    features.performance.environment.enable = true;
+    features.performance.hardware.enable = true;
+    features.performance.filesystems.enable = true;
+    features.performance.memory.enable = true;
 
     # Security
-    ../features/security/apparmor
-    ../features/security/keepassxc
-    ../features/security/pam
-    ../features/security/veracrypt
-    ../features/security/yubikey
+    features.security.apparmor.enable = true;
+    features.security.keepassxc.enable = true;
+    features.security.pam.enable = true;
+    features.security.veracrypt.enable = true;
+    features.security.yubikey.enable = true;
 
     # Anduril NixOS STIG V1R3 — the OPTION SURFACE ONLY, deliberately.
     #
     # The control modules are no longer host-wide. The baseline now lives on mimir
-    # alone, which imports profiles/base-safe.nix directly; see ADR-0004 for the
+    # alone, which enables the base-safe control set directly; see ADR-0004 for the
     # decision and docs/security/stig-triage.md for the per-control classification.
     #
     # Why it moved: the audit set is not free on an interactive machine. The
@@ -64,32 +63,32 @@
     # `nixosConfigurations.<host>.config.security.stig`, so dropping the option
     # surface would make `nix build .#stigReport.drakkar` fail to EVALUATE rather
     # than report an unhardened host — an error where a finding belongs. With no
-    # control modules imported the report scores the host against profile "none"
+    # control modules enabled the report scores the host against profile "none"
     # and renders every control "Not Implemented", which is the honest answer and
     # the one bin/ci/stig already treats as a documented decision rather than a
     # CAT I regression.
-    ../features/security/stig/default.nix
+    features.security.stig.enable = true;
 
     # Controls satisfied by the fleet's disk layout rather than by a control module. Carried
     # by every host because the property is true of every host, independently of which
-    # baseline it imports — see that file's header and ADR-0004.
-    ../features/security/stig/profiles/external-evidence.nix
+    # baseline it enables — see that file's header and ADR-0004.
+    features.security.stig.profiles.external-evidence.enable = true;
 
     # Storage
-    ../features/storage/qdirstat
+    features.storage.qdirstat.enable = true;
 
     # VPN
-    #../features/network/mullvad
+    # features.network.mullvad.enable = true;
 
     # Network Browsers
-    ../features/network/chromium
-    ../features/network/firefox
-    ../features/network/searx
+    features.network.chromium.enable = true;
+    features.network.firefox.enable = true;
+    features.network.searx.enable = true;
 
     # Media (common to all hosts)
-    ../features/media/calibre
-    ../features/media/qbittorrent
-    ../features/media/spotify
-    ../features/media/vlc
-  ];
+    features.media.calibre.enable = true;
+    features.media.qbittorrent.enable = true;
+    features.media.spotify.enable = true;
+    features.media.vlc.enable = true;
+  };
 }

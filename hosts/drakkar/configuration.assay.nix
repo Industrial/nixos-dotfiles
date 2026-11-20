@@ -1,8 +1,21 @@
+# Colocated suite for hosts/drakkar/configuration.nix — evaluated selection, not source text.
 let
   assay = import ../../common/assay/default.nix;
-  src = builtins.readFile ./configuration.nix;
+  nixos = import ../../common/assay/nixos.nix;
+  features = import ../../lib/features.nix {inherit (nixos) lib;};
+  cfg = features.evalSelection {
+    modules = [
+      ./configuration.nix
+      {disabledModules = [./disko.nix ./filesystems.nix ./hardware.nix];}
+    ];
+  };
+  has = f: builtins.elem f (features.enabledFeatures cfg);
 in
   assay.suite "configuration" {
-    nonEmpty = assay.eq ((builtins.stringLength src) > 50) true;
-    importsFleet = assay.eq (builtins.match ".*features/fleet/remote-access.*" src != null) true;
+    enablesFleetAccess = assay.eq (has "fleet.remote-access") true;
+    enablesGaming = assay.eq cfg.profiles.gaming.enable true;
+    enablesAi = assay.eq cfg.profiles.ai.enable true;
+    servesBuilds = assay.eq (has "fleet.nix-remote-builder-server") true;
+    amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
+    noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
   }
