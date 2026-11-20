@@ -112,7 +112,7 @@
     # `bundled`) emits `-lsqlite3` with no sqlite in buildInputs. Under its own pin
     # (rustc 1.97.1) the binary links without it (no libsqlite3 in NEEDED); under the
     # root pin (rustc 1.99.1) the linker demands it. Tried 2026-11-20 (drv
-    # h46igm72...-assay-0.3.0). The fix belongs upstream:
+    # h46igm72...-assay-0.3.0). The fix belongs upstream (Industrial/assay#11):
     # `buildInputs = [pkgs.sqlite]` in Industrial/assay's mkCrate. Once that lands, add
     # `inputs.nixpkgs.follows = "nixpkgs"` and drop assay from `separateNixpkgs` below.
     assay.url = "github:Industrial/assay";
@@ -238,7 +238,7 @@
     # must resolve every nixpkgs-shaped node it reaches in flake.lock to the root's.
     separateNixpkgs = {
       llm-agents = "FOD hashes and the uv/python pin are fixed against its own nixpkgs";
-      assay = "fails to link against the root pin (-lsqlite3); fix pending upstream";
+      assay = "fails to link against the root pin (-lsqlite3); fix pending in Industrial/assay#11";
     };
 
     # Walks flake.lock and fails when an input reaches a nixpkgs (github nixpkgs,
