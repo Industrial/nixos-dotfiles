@@ -32,7 +32,7 @@
     enable = true;
 
     # Selects nixosConfigurations.<hostname> out of the root flake.
-    hostname = settings.hostname;
+    inherit (settings) hostname;
 
     remotes = [
       {

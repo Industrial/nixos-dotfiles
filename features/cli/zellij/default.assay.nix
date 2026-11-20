@@ -7,7 +7,7 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
 
   kdl = builtins.readFile ./etc/zellij/config.kdl;
   # POSIX ERE: `.` spans newlines, so `.*` reaches any line; `{`/`}` must go

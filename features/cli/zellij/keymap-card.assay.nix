@@ -122,7 +122,7 @@ in
       ])
       true;
     compoundOnlyModesAreInTheirBlockTables =
-      assay.eq (builtins.all (pattern: inCard pattern) [
+      assay.eq (builtins.all inCard [
         ".*[|] `c` [|] `SwitchToMode \"renamepane\"; PaneNameInput 0` [|].*"
         ".*[|] `s` [|] `SwitchToMode \"entersearch\"; SearchInput 0` [|].*"
       ])

@@ -4,10 +4,10 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   # Substring test over generated text; store-path context is irrelevant to the match.
   contains = needle: s: lib.hasInfix (builtins.unsafeDiscardStringContext needle) (builtins.unsafeDiscardStringContext s);
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   drv = pkgs.callPackage ./package.nix {};
 in
   assay.suite "maestro-package" {

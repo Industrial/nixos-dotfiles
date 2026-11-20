@@ -7,24 +7,6 @@
   # TODO: https://github.com/folke/flash.nvim
   programs.nixvim.plugins.flash.enable = true;
 
-  # programs.nixvim.keymaps = [
-  #   {
-  #     mode = "n";
-  #     key = "s";
-  #     action = "<cmd>bn<cr>";
-  #   }
-  #   {
-  #     mode = "n";
-  #     key = "<S-Tab>";
-  #     action = "<cmd>bp<cr>";
-  #   }
-  #   {
-  #     mode = "n";
-  #     key = "<C-Q>";
-  #     action = "<cmd>Bwipeout<cr>";
-  #   }
-  # ];
-
   # TODO: Can't seem to call Lua in `programs.nixvim.keymaps`.
   programs.nixvim.extraConfigLua = ''
     telescopeBuiltin = require("telescope.builtin")

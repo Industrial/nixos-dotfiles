@@ -7,7 +7,7 @@ let
   assay = import ../../../common/assay/default.nix;
   nixos = import ../../../common/assay/nixos.nix;
   inherit (nixos) lib;
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   drv = pkgs.callPackage ./webui.nix {};
 in
   assay.suite "flexget-webui" {

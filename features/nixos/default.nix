@@ -14,7 +14,7 @@
   };
 
   system = {
-    stateVersion = settings.stateVersion;
+    inherit (settings) stateVersion;
   };
 
   nix = {
@@ -58,20 +58,11 @@
       # Enable sandbox for security
       sandbox = true;
 
-      # # Set max log size
-      # max-log-size = 1000000;
-
       # Enable keep-derivations for better caching
       keep-derivations = true;
 
       # Enable keep-outputs for better caching
       keep-outputs = true;
-
-      # Set gc-keep-derivations
-      gc-keep-derivations = true;
-
-      # Set gc-keep-outputs
-      gc-keep-outputs = true;
     };
 
     # Configure garbage collection
@@ -83,7 +74,7 @@
   };
 
   nixpkgs = {
-    hostPlatform = settings.hostPlatform;
+    inherit (settings) hostPlatform;
     config = {
       allowUnfree = true;
       # Allow insecure packages (required for some gaming applications)
@@ -136,23 +127,6 @@
       })
     ];
   };
-
-  # # Disable package doc outputs globally to avoid pulling fragile doc builds
-  # # (e.g. python docs via sphinx/docutils) into system-path.
-  # # Disable package doc outputs globally to avoid pulling fragile doc builds
-  # # (e.g. python docs via sphinx/docutils) into system-path.
-  # documentation = {
-  #   doc = {
-  #     enable = false;
-  #   };
-  #   man = {
-  #     enable = false;
-  #     generateCaches = false;
-  #     man-db = {
-  #       enable = false;
-  #     };
-  #   };
-  # };
 
   # Cap journal size so a runaway user unit cannot fill /var/log/journal and
   # break dbus-broker reload during nixos-rebuild switch.

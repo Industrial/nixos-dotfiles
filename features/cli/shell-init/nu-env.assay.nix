@@ -8,7 +8,7 @@
 # and takes the whole prompt down with it).
 let
   assay = import ./../../../common/assay/default.nix;
-  lib = (import <nixpkgs> {}).lib;
+  inherit (import <nixpkgs> {}) lib;
 
   render = args:
     import ./nu-env.nix ({

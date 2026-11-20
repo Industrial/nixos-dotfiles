@@ -22,8 +22,7 @@ in {
   config = lib.mkIf cfg.enable {
     languages.rust = {
       enable = true;
-      channel = cfg.channel;
-      version = cfg.version;
+      inherit (cfg) channel version;
       components = [
         "cargo"
         "clippy"

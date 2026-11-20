@@ -1,0 +1,16 @@
+# statix lint configuration (https://github.com/oppiliappan/statix), run through treefmt
+# (see [formatter.statix] in treefmt.toml and treefmt.ci.toml).
+#
+# Two lints are off, both because they fight the house module style rather than catch bugs:
+#
+# - empty_pattern asks for `_:` instead of `{...}:`. `{...}:` is the conventional NixOS
+#   module signature: it says "this is a module" and already accepts the module arguments
+#   the next edit will reach for. ~140 modules would be rewritten for nothing.
+#
+# - repeated_keys flags `programs.nixvim.opts.a = …; programs.nixvim.opts.b = …;` and asks
+#   for one nested `programs = { … }` block. Dotted keys with a comment above each setting
+#   are how these modules document why each line exists (features/media/flexget,
+#   features/programming/neovim/*); nesting them re-indents whole files and separates each
+#   comment from the path it explains. Defining the *same* key twice is still caught: Nix
+#   itself rejects `a.b = 1; a.b = 2;` at parse time.
+disabled = ["empty_pattern", "repeated_keys"]

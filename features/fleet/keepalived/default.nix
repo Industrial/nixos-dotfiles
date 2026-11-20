@@ -56,13 +56,13 @@ in {
       enable = true;
 
       vrrpInstances.FLEET_VIP = {
-        interface = cfg.interface;
+        inherit (cfg) interface;
         state =
           if cfg.priority >= 150
           then "MASTER"
           else "BACKUP";
         virtualRouterId = cfg.routerId;
-        priority = cfg.priority;
+        inherit (cfg) priority;
 
         virtualIps = [
           {addr = "${cfg.virtualIp}/24";}

@@ -39,6 +39,9 @@ in
     buildTimeoutOneHour = assay.eq ns.build-timeout 3600;
     autoOptimisesStore = assay.eq ns.auto-optimise-store true;
     keepsOutputsAndDerivations = assay.eq [ns.keep-outputs ns.keep-derivations] [true true];
+    # gc-keep-derivations / gc-keep-outputs are Nix's legacy aliases of the two above.
+    # Setting both spellings was one setting declared twice.
+    noLegacyKeepAliases = assay.eq [(ns ? gc-keep-derivations) (ns ? gc-keep-outputs)] [false false];
 
     gcWeeklyKeeps30Days =
       assay.eq {inherit (cfg.nix.gc) automatic dates options;}

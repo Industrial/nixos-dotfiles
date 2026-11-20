@@ -10,7 +10,7 @@
 let
   assay = import ./common/assay/default.nix;
   nixos = import ./common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   pkgs = nixos.flakeInputs.nixpkgs.legacyPackages.x86_64-linux;
 
   withDevenv = "/stub-with-devenv";

@@ -1,6 +1,6 @@
 # Assay: the DNS feature is currently inert.
 #
-# dns.nix carries a DNSCrypt-over-Quad9 setup, but every line of it is commented out, so
+# dns.nix is an empty module (its commented-out DNSCrypt-over-Quad9 setup was deleted), so
 # importing it must change nothing about name resolution. These claims compare the evaluated
 # resolver options against an empty system, so re-enabling any of it fails here and the
 # suite has to be rewritten to say what the new setup promises.

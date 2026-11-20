@@ -11,6 +11,8 @@ in
     hasTreefmt = assay.eq (has "treefmt") true;
     hasBiome = assay.eq (has "biome") true;
     hasTaplo = assay.eq (has "taplo") true;
+    # treefmt.toml's [formatter.statix] needs it on PATH.
+    hasStatix = assay.eq (has "statix") true;
     omitsRustfmt = assay.eq (has "rustfmt") false;
-    count = assay.eq (builtins.length on.packages) 9;
+    count = assay.eq (builtins.length on.packages) 10;
   }

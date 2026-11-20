@@ -15,12 +15,7 @@
       };
     };
 
-    # Configure GPU for performance
-    graphics = {
-      enable = true;
-      # driSupport = true;
-      # driSupport32Bit = true;
-    };
+    # hardware.graphics is configured in features/nixos/graphics.
   };
 
   powerManagement = {

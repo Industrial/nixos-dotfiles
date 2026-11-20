@@ -7,7 +7,7 @@ let
   assay = import ../../../../common/assay/default.nix;
   nixos = import ../../../../common/assay/nixos.nix;
   inherit (nixos) lib;
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   drv = (import ./tinted-theming-schemes.nix {inherit pkgs lib;}).tinted-theming-schemes;
 in
   assay.suite "tinted-theming-schemes" {

@@ -3,8 +3,8 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos) lib;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   drv = pkgs.callPackage ./package.nix {};
 in
   assay.suite "lean-ctx-package" {

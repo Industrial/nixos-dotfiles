@@ -7,7 +7,7 @@ let
       username = "alice";
     };
     pkgs = {};
-    lib = (import <nixpkgs> {}).lib;
+    inherit (import <nixpkgs> {}) lib;
   };
 in
   assay.suite "syncthing" {

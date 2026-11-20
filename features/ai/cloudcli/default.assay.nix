@@ -5,10 +5,10 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
+  inherit (nixos) lib;
   system = nixos.evalSystem {modules = [./default.nix];};
   cfg = system.config;
-  pkgs = system.pkgs;
+  inherit (system) pkgs;
   inherit (nixos.defaultSettings) username userdir;
   cloudcli = lib.findFirst (p: lib.getName p == "cloudcli") null cfg.environment.systemPackages;
   svc = cfg.systemd.user.services.cloudcli;

@@ -3,7 +3,7 @@ let
   assay = import ./../../../common/assay/default.nix;
   mod = import ./default.nix {
     config = {};
-    lib = (import <nixpkgs> {}).lib;
+    inherit (import <nixpkgs> {}) lib;
     pkgs = {
       mullvad = "mullvad";
       mullvad-vpn = "mullvad-vpn";

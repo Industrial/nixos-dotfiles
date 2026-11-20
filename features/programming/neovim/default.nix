@@ -26,7 +26,6 @@
     ./language-support.nix
     ./library.nix
     ./movement.nix
-    ./quickfix.nix
     ./refactoring.nix
     ./saving-files.nix
     ./searching.nix

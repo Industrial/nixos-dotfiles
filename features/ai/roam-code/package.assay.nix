@@ -4,8 +4,8 @@
 let
   assay = import ./../../../common/assay/default.nix;
   nixos = import ./../../../common/assay/nixos.nix;
-  lib = nixos.lib;
-  pkgs = (nixos.evalSystem {modules = [];}).pkgs;
+  inherit (nixos) lib;
+  inherit (nixos.evalSystem {modules = [];}) pkgs;
   drv = pkgs.callPackage ./package.nix {};
   fastmcp = lib.findFirst (p: lib.getName p == "fastmcp") null drv.propagatedBuildInputs;
   mcp = lib.findFirst (p: lib.getName p == "mcp") null fastmcp.propagatedBuildInputs;

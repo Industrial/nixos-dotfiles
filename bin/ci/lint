@@ -15,6 +15,6 @@ cd "$ROOT"
 # With no arguments it walks the whole tree (the CI job). Paths given are passed to
 # treefmt, which is how `bin/dev format --check` checks only the files a branch changed.
 nix shell --inputs-from . \
-  nixpkgs#treefmt nixpkgs#deadnix nixpkgs#alejandra nixpkgs#actionlint \
+  nixpkgs#treefmt nixpkgs#deadnix nixpkgs#statix nixpkgs#alejandra nixpkgs#actionlint \
   nixpkgs#beautysh nixpkgs#biome nixpkgs#yamlfmt nixpkgs#taplo \
   -c treefmt --config-file treefmt.ci.toml "$@"

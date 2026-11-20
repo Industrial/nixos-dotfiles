@@ -14,8 +14,8 @@ let
       ./default.nix
     ];
   };
-  stylix = cfg.stylix;
-  fonts = stylix.fonts;
+  inherit (cfg) stylix;
+  inherit (stylix) fonts;
   parsed = cfg.lib.stylix.colors;
   baseNames = builtins.attrNames palette.colors;
 in
