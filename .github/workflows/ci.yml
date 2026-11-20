@@ -223,6 +223,19 @@ jobs:
         uses: ./.github/actions/setup-nix
       - name: Flake checks
         run: ./bin/ci/flake-checks
+  # bin/dev, the local entry point: its command list, its mirror of this job list (the
+  # test fails when a job here has no `bin/dev check` step or the other way round), and
+  # its outside-devenv errors. Plain bash, no Nix and no network.
+  bin-dev-selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: bin/dev self-test
+        run: bin/dev.d/test.sh
   # The single required check. Branch protection names this one job instead of fifteen, so
   # adding, renaming or splitting a gate never needs a settings change, and a skipped or
   # cancelled dependency counts as a failure rather than as a pass.
@@ -244,6 +257,7 @@ jobs:
       - hosts
       - check
       - flake-checks
+      - bin-dev-selftest
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
