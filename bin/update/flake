@@ -1,14 +1,29 @@
 #!/usr/bin/env bash
+# Bump flake.lock locally, on a branch, for a lock-bump PR.
+#
+# The scheduled path is .github/workflows/update-flake-lock.yml, which opens the PR and
+# writes the per-host diff into it. This script is the by-hand equivalent: it refuses to
+# bump on main, because hosts converge only from merged main (docs/adr/0006-update-policy.md)
+# and a lock bump that skipped review is exactly what that policy exists to stop.
+# UPDATE_ALLOW_MAIN=1 overrides, for an emergency that is still pushed through a PR.
 echo "> update > flake"
 dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$dotfiles_root"
+mkdir -p ./logs
 exec > >(tee ./logs/update-flake) 2>&1
 set -e
 
-bin/update/channels
-
-echo "> update > flake > cd $dotfiles_root"
-cd "$dotfiles_root"
+branch="$(git symbolic-ref --quiet --short HEAD || true)"
+if [ "$branch" = main ] && [ "${UPDATE_ALLOW_MAIN:-0}" != 1 ]; then
+  echo "> update > flake > refusing to bump flake.lock on main."
+  echo "> update > flake >   git switch -c update/flake-lock-$(date +%F)   then re-run, or"
+  echo "> update > flake >   run the \"Update flake.lock\" workflow (Actions tab)."
+  exit 1
+fi
 
 echo "> update > flake > nix --experimental-features \"nix-command flakes\" flake update"
 nix --experimental-features "nix-command flakes" flake update
+
+echo "> update > flake > next: review what moved, then commit, push and open a PR:"
+echo "> update > flake >   git worktree add /tmp/main origin/main"
+echo "> update > flake >   bin/update/pkg-diff host /tmp/main . \"\$(hostname)\""
