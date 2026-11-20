@@ -110,8 +110,16 @@
 
     # Source-only: the upstream Nushell script collection. Consumed in wave 6 to emit a
     # selected set of completers at build time; nothing from it is vendored into this repo.
+    #
+    # Pinned to a rev, not tracking the default branch: the input bump in 5dae8688 brought
+    # upstream's rewritten git completer (64 KB -> 106 KB), which alone added ~8 ms to the
+    # replayed interactive startup and put bin/ci/shell-budget over its 4.0x budget on
+    # every run since (35.3 ms vs 27.6 ms on drakkar, same harness, only that file
+    # swapped). Moving this pin is a startup-budget decision: re-run bin/ci/shell-budget
+    # with the new rev before bumping it, and drop "git" from cli.shellInit.completers if
+    # the rewrite is wanted.
     nu-scripts = {
-      url = "github:nushell/nu_scripts";
+      url = "github:nushell/nu_scripts/19c49e09e1970a11db235fd38477dd5fa44e56bc";
       flake = false;
     };
   };

@@ -14,6 +14,7 @@ let
   outputs = flake.outputs (nixos.flakeInputs // {self = outputs;});
 
   hosts = (import ./common/fleet.nix).names;
+  lock = builtins.fromJSON (builtins.readFile ./flake.lock);
   node = outputs.deploy.nodes.drakkar;
 in
   assay.suite "flake" {
@@ -27,10 +28,13 @@ in
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # Source only: features/cli/shell-init copies completers out of it at build time.
+    # Pinned by rev, below upstream's git completer rewrite: `nix flake update` must not move
+    # it past bin/ci/shell-budget unnoticed (see the comment in flake.nix).
     hasNuScripts = assay.eq inputs.nu-scripts {
-      url = "github:nushell/nu_scripts";
+      url = "github:nushell/nu_scripts/19c49e09e1970a11db235fd38477dd5fa44e56bc";
       flake = false;
     };
+    nuScriptsLockMatchesPin = assay.eq lock.nodes.nu-scripts.locked.rev "19c49e09e1970a11db235fd38477dd5fa44e56bc";
     # The fleet's own Rust tools come from the checkout, as plain sources.
     rustToolsAreLocalSources = assay.eq [inputs.oomkiller-src inputs.nixos-update-notifier-src] [
       {
