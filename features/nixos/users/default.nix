@@ -29,6 +29,9 @@
 
       "${settings.username}" = {
         isNormalUser = true;
+        # Pinned, not allocated: NFS (sec=sys) authorises by number, so a client's uid must
+        # equal mimir's for /data ownership to mean the same user on both ends.
+        uid = 1000;
         home = settings.userdir;
         description = settings.userfullname;
         extraGroups = [
