@@ -13,7 +13,9 @@
 -- head vdeploy just fetched is up to date without touching the network.
 --
 -- The commands run as the user through `setpriv` (no PAM, no shell) when
--- vdeploy runs as root; the files a merge writes are the user's.
+-- vdeploy runs as root; the files a merge writes are the user's. Every git
+-- call is `--no-optional-locks`: polling a checkout someone works in must not
+-- take its index lock.
 
 import std::path::Path
 import crate::common::{Cmd, asked, cmd, first_line, run}
@@ -92,6 +94,9 @@ git_cmd d args =
       all.push (d.git.clone ())
     None ->
       ()
+  -- The checkout may be someone's working tree: never take the index lock just to
+  -- look (`git status` would otherwise refresh and rewrite the index).
+  all.push (.to_string "--no-optional-locks")
   all.push (.to_string "-C")
   all.push (d.path.clone ())
   for a in args
@@ -216,5 +221,5 @@ test "as the user, git runs through setpriv with the user's home"
   d = Dotfiles { path = .to_string "/home/tom/.dotfiles", url = .to_string "u", branch = .to_string "main", user = Some (.to_string "tom"), group = Some (.to_string "users"), home = None, git = .to_string "/bin/git" }
   c = git_cmd (&d) (&["status"])
   assert_eq! \-> c.program \-> "setpriv"
-  assert_eq! \-> c.args \-> crate::common::strs (&["--reuid", "tom", "--regid", "users", "--init-groups", "env", "HOME=/home/tom", "/bin/git", "-C", "/home/tom/.dotfiles", "status"])
+  assert_eq! \-> c.args \-> crate::common::strs (&["--reuid", "tom", "--regid", "users", "--init-groups", "env", "HOME=/home/tom", "/bin/git", "--no-optional-locks", "-C", "/home/tom/.dotfiles", "status"])
   assert_eq! \-> state_name (&Checkout::Dirty 3) \-> "dirty"

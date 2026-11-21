@@ -98,7 +98,7 @@ in
 
     # Sandbox.
     protectSystemStrict = assay.eq [sc.ProtectSystem sc.ProtectHome] ["strict" "read-only"];
-    stopsWithSigint = assay.eq sc.KillSignal "SIGINT";
+    stopsWithSigint = assay.eq [sc.KillSignal sc.SuccessExitStatus] ["SIGINT" [130]];
     restartsOnFailure = assay.eq sc.Restart "on-failure";
     hardened = assay.subset sc {
       PrivateTmp = true;

@@ -79,7 +79,7 @@ in
           return alice("git -C /srv/origin rev-parse HEAD").strip()
 
       def commit(n):
-          alice(f"cd /srv/origin && echo {n} > n && git add n && git commit -qm 'commit {n}'")
+          alice(f"cd /srv/origin && echo {n} > n && git add -A && git commit -qm 'commit {n}'")
           return head()
 
       def plan():

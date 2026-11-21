@@ -160,8 +160,10 @@ in {
             "--dotfiles-home"
             userHome
           ]);
-        # id_effect_cli interrupts the fibers on SIGINT, running finalizers.
+        # id_effect_cli interrupts the fibers on SIGINT, running finalizers, and exits 130:
+        # a stop, not a failure.
         KillSignal = "SIGINT";
+        SuccessExitStatus = [130];
         Restart = "on-failure";
         RestartSec = "1min";
 
