@@ -388,8 +388,24 @@ in {
     };
   };
 
-  system = {
-    activationScripts = {
+  imports = [../../../lib/vfiles.nix];
+
+  vfiles = {
+    # Links into /etc/zellij, as the script made: the /etc entries above stay the one copy,
+    # and zellij's `layout_dir` points there as well. Themes resolve relative to the config
+    # dir only (no `theme_dir`), so the theme link is what makes it reachable.
+    files = builtins.listToAttrs (map (rel: {
+        name = "${settings.userdir}/.config/zellij/${rel}";
+        value = {
+          source = "/etc/zellij/${rel}";
+          user = settings.username;
+        };
+      })
+      (["config.kdl" "keymap.md" "plugins/zjstatus-hints.wasm" "themes/${themeName}.kdl"]
+        ++ map (layout: "layouts/${layout}.kdl") ["agents" "data" "dev" "system"]));
+
+    # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+    legacy = {
       linkZellijConfig = {
         text = ''
           mkdir -p ${settings.userdir}/.config/zellij/layouts
