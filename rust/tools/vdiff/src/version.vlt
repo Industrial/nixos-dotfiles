@@ -1,0 +1,215 @@
+-- Package names and versions out of store path names, and their order, as
+-- nvd 0.2.4 has them. nvd is the reference, its quirks included:
+--
+--   * the name is split by `^/nix/store/[a-z0-9]+-(.+?)(-([0-9].*?))?(\.drv)?$`:
+--     the package name is the shortest prefix (one character at least) that is
+--     followed by `-<digit>`, and everything after that dash is the version,
+--     output suffixes such as `-bin` or `-lib` included. No such dash: no version.
+--   * a version is its runs of digits and of letters ("chunks"); every other
+--     character only separates them. Numbers compare as numbers, words as
+--     strings, `pre` before any other word, every word before every number.
+--   * versions compare as chunk lists, lexicographically: `1.0pre1` is newer
+--     than `1.0` (a longer list wins a tie), unlike `nix-env`, which nvd does
+--     not follow there.
+
+import std::cmp::Ordering
+import nix_store_core::storepath::STORE_PREFIX
+
+-- One run of a version. A number keeps its digits without leading zeros, so
+-- `007` and `7` are one chunk, and numbers of any length compare exactly.
+export data Chunk
+  = Num String
+  | Word String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A package as nvd sees a store path: a name and a version, if there is one.
+export data Name { export pname String, export version Option<String> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A character's run: 1 a digit, 2 a letter, 0 a separator.
+kind_of : char -> u8
+kind_of c =
+  if c.is_ascii_digit ()
+    1
+  else if c.is_ascii_alphabetic ()
+    2
+  else
+    0
+
+chunk_of : u8 -> &str -> Option<Chunk>
+chunk_of kind run =
+  if kind == 1
+    Some (Num (run.trim_start_matches '0' |> .to_string))
+  else if kind == 2
+    Some (Word (run.to_string ()))
+  else
+    None
+
+-- A version's chunks, in order (nvd's `Version.__init__`).
+export chunks : &str -> Vec<Chunk>
+chunks text =
+  mut out = Vec::new () : Vec<Chunk>
+  mut run = String::new ()
+  mut kind = 0 : u8
+  for c in text.chars ()
+    k = kind_of c
+    if k != kind
+      if (chunk_of kind (&run)) is Some ch
+        out.push ch
+      run := String::new ()
+      kind := k
+    run.push c
+  if (chunk_of kind (&run)) is Some ch
+    out.push ch
+  out
+
+-- `pre` sorts first, then the other words, then the numbers.
+rank : &Chunk -> u8
+rank c =
+  case c of
+    Word w -> word_rank w
+    Num _ -> 2
+
+word_rank : &str -> u8
+word_rank w =
+  if w == "pre"
+    0
+  else
+    1
+
+-- nvd's `VersionChunk.__lt__`, as a total order.
+export compare_chunk : &Chunk -> &Chunk -> Ordering
+compare_chunk a b =
+  case (a, b) of
+    (Num x, Num y) -> (x.len ()).cmp (&y.len ()) |> .then_with (\-> x.cmp y)
+    (Word x, Word y) -> (rank a).cmp (&rank b) |> .then_with (\-> x.cmp y)
+    _ -> (rank a).cmp (&rank b)
+
+-- Python's list order over chunks: the first difference decides, and a list
+-- that is a prefix of the other is the older one.
+export compare_chunks : &[Chunk] -> &[Chunk] -> Ordering
+compare_chunks a b =
+  mut order = Ordering::Equal
+  for pair in a.iter () |> .zip (b.iter ())
+    (x, y) = pair
+    if order == Ordering::Equal
+      order := compare_chunk x y
+  order |> .then_with (\-> (a.len ()).cmp (&b.len ()))
+
+-- One split of the name after its hash: `head` is a package name when the rest
+-- is nothing, `.drv`, or `-<digit>...` (the version, without a final `.drv`).
+split_at : &str -> usize -> Option<Name>
+split_at rest i =
+  (head, tail) = rest.split_at i
+  pname = head.to_string ()
+  if tail.is_empty () || tail == ".drv"
+    Some (Name { pname, version = None })
+  else if (tail.strip_prefix '-') is Some v
+    if (v.chars () |> .next |> .is_some_and (\c -> c.is_ascii_digit ()))
+      Some (Name { pname, version = Some (v.strip_suffix ".drv" |> .unwrap_or v |> .to_string) })
+    else
+      None
+  else
+    None
+
+-- The name part (after `<hash>-`) split into package name and version.
+export split_name : &str -> Name
+split_name rest =
+  mut found = None : Option<Name>
+  mut i = 1 : usize
+  while found.is_none () && i <= rest.len ()
+    if rest.is_char_boundary i
+      found := split_at rest i
+    i := i + 1
+  found |> .unwrap_or_else (\-> Name { pname = rest.to_string (), version = None })
+
+-- A store path (full, or just its base name) as nvd's `parse_pname_version`
+-- reads it: only the store path itself counts, not a subpath inside it.
+export parse_name : &str -> Name
+parse_name path =
+  inner = path.strip_prefix STORE_PREFIX |> .unwrap_or path
+  base = inner.split '/' |> .next |> .unwrap_or inner
+  case base.split_once '-' of
+    Some (_, rest) -> split_name rest
+    None -> split_name base
+
+#[cfg(test)]
+named : &str -> (String, Option<String>)
+named path =
+  n = parse_name path
+  (n.pname, n.version)
+
+#[cfg(test)]
+some : &str -> Option<String>
+some v = Some (v.to_string ())
+
+#[cfg(test)]
+newer : &str -> &str -> bool
+newer a b = compare_chunks (&chunks a) (&chunks b) == Ordering::Greater
+
+#[cfg(test)]
+same : &str -> &str -> bool
+same a b = compare_chunks (&chunks a) (&chunks b) == Ordering::Equal
+
+test "a plain name and version split at the dash before the version"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-hello-2.12.1" \-> (.to_string "hello", some "2.12.1")
+  assert_eq! \-> named "0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-foo-bar-baz-1.0" \-> (.to_string "foo-bar-baz", some "1.0")
+
+test "the first dash before a digit splits, so output suffixes stay in the version"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-openssl-3.0.13-bin" \-> (.to_string "openssl", some "3.0.13-bin")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-util-linux-2.39.3-lib" \-> (.to_string "util-linux", some "2.39.3-lib")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-linux-6.6.1-modules-shrunk" \-> (.to_string "linux", some "6.6.1-modules-shrunk")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-glibc-2.38-44" \-> (.to_string "glibc", some "2.38-44")
+
+test "digits inside the name do not split it"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-python3.12-requests-2.31.0" \-> (.to_string "python3.12-requests", some "2.31.0")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-perl5.38.2-Foo-Bar-1.0" \-> (.to_string "perl5.38.2-Foo-Bar", some "1.0")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-1password-8.10.7" \-> (.to_string "1password", some "8.10.7")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-x264-0-unstable-2023" \-> (.to_string "x264", some "0-unstable-2023")
+
+test "a name with no dash before a digit has no version"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-source" \-> (.to_string "source", None)
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-unit-dbus.service" \-> (.to_string "unit-dbus.service", None)
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-etc-v2" \-> (.to_string "etc-v2", None)
+
+test "the package name takes one character at least, even a digit"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-1-2.3" \-> (.to_string "1", some "2.3")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-a-1b" \-> (.to_string "a", some "1b")
+
+test "a derivation's .drv is dropped from the version, or from the name"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-nss-cacert-3.95.drv" \-> (.to_string "nss-cacert", some "3.95")
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-builder.sh.drv" \-> (.to_string "builder.sh", None)
+
+test "a path inside a store path is named by the store path"
+  assert_eq! \-> named "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-bash-5.2p26/bin/bash" \-> (.to_string "bash", some "5.2p26")
+
+test "a version is its digit and letter runs"
+  assert_eq! \-> chunks "1.2.3" \-> .to_vec ([Num (.to_string "1"), Num (.to_string "2"), Num (.to_string "3")])
+  assert_eq! \-> chunks "5.2p26" \-> .to_vec ([Num (.to_string "5"), Num (.to_string "2"), Word (.to_string "p"), Num (.to_string "26")])
+  assert_eq! \-> chunks "" \-> Vec::new ()
+  assert_eq! \-> chunks "--" \-> Vec::new ()
+
+test "numbers compare as numbers, of any length and with leading zeros"
+  assert! \-> newer "10.0" "9.9"
+  assert! \-> newer "1.10" "1.9"
+  assert! \-> same "007" "7"
+  assert! \-> same "0" "000"
+  assert! \-> newer "123456789012345678901234567890123456789012" "99999999999999999999999999999999999999999"
+
+test "separators do not count, only the runs"
+  assert! \-> same "1.0" "1-0"
+  assert! \-> same "1.0" "1_0"
+  assert! \-> same "" "--"
+
+test "words sort before numbers, and pre before every other word"
+  assert! \-> newer "1.0" "1.alpha"
+  assert! \-> newer "1.alpha" "1.pre"
+  assert! \-> newer "1.beta" "1.alpha"
+  assert! \-> newer "1.0" "1.pre"
+  assert! \-> same "1pre" "1.pre"
+
+test "a longer version wins a tie, so 1.0pre1 is newer than 1.0 (nvd, not nix-env)"
+  assert! \-> newer "1.0pre1" "1.0"
+  assert! \-> newer "1.0.1" "1.0"
+  assert! \-> newer "1.0-bin" "1.0"
+  assert! \-> newer "1" ""

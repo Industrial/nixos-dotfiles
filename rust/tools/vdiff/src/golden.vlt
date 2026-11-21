@@ -1,0 +1,77 @@
+-- Golden cases: closures with what nvd 0.2.4 printed for them, in
+-- tests/fixtures/*.json. Each holds the closure paths both sides share
+-- (`common`), each side's label, root, own paths (`only`), selected paths
+-- (store base names) and narSize sum, and `nvd`, the output of
+-- `nvd --color=never diff` over them. vdiff's text must equal it byte for byte.
+--
+--   synthetic.json  nvd's tricky cases, run through nvd's own code
+--                   (tests/nvd-synthetic.py)
+--   drakkar-*.json  a real pair of drakkar's system generations
+--                   (tests/gen-fixture.sh)
+
+import serde_json::Value
+import std::path::{Path, PathBuf}
+import nix_store_core::storepath::STORE_PREFIX
+import crate::report::{Closure, diff, render_json, render_text}
+
+fixtures_dir : PathBuf
+fixtures_dir = Path::new (env!("CARGO_MANIFEST_DIR")) |> .join "tests/fixtures"
+
+cases : Vec<PathBuf>
+cases =
+  mut out = Vec::new () : Vec<PathBuf>
+  listing = std::fs::read_dir (fixtures_dir ()) |> .expect "tests/fixtures"
+  for item in listing
+    if item is Ok e
+      path = e.path ()
+      if path.extension () |> .is_some_and (\x -> x == "json")
+        out.push path
+  out.sort ()
+  out
+
+fixture : &Path -> Value
+fixture file =
+  text = std::fs::read_to_string file |> .expect "a fixture file"
+  (serde_json::from_str (&text) : serde_json::Result<Value>) |> .expect "a JSON fixture"
+
+paths : &Value -> Vec<String>
+paths v =
+  mut out = Vec::new () : Vec<String>
+  for x in v.as_array () |> .cloned |> .unwrap_or_default
+    if x.as_str () is Some s
+      out.push "#{STORE_PREFIX}#{s}"
+  out
+
+-- One side: the paths both closures share (`common`) and its own (`only`).
+closure_of : &Value -> &str -> Closure
+closure_of v side =
+  s = &v[side]
+  mut all = paths (&v["common"])
+  all.extend (paths (&s["only"]))
+  all.sort ()
+  Closure { label = s["label"].as_str () |> .unwrap_or "" |> .to_string, root = s["root"].as_str () |> .unwrap_or "" |> .to_string, paths = all, selected = paths (&s["selected"]), nar_size = s["narSize"].as_u64 () |> .unwrap_or 0 }
+
+test "there is a synthetic case and a real generation pair"
+  names = cases () |> .iter |> .filter_map (\p -> p.file_name () |> .map (\n -> n.to_string_lossy () |> .to_string)) |> .collect : Vec<String>
+  assert! \-> names.contains (&.to_string "synthetic.json")
+  real = names.iter () |> .filter (\n -> n.starts_with "drakkar-") |> .count
+  assert! \-> real >= 1
+
+test "every case renders exactly as nvd printed it"
+  for file in cases ()
+    v = fixture (&file)
+    text = render_text (&diff (&closure_of (&v) "old") (&closure_of (&v) "new"))
+    expected = v["nvd"].as_str () |> .unwrap_or "" |> .to_string
+    assert_eq! \-> (file.clone (), text) \-> (file.clone (), expected)
+
+test "every case's json agrees with its text"
+  for file in cases ()
+    v = fixture (&file)
+    report = diff (&closure_of (&v) "old") (&closure_of (&v) "new")
+    json = (serde_json::from_str (&render_json (&report)) : serde_json::Result<Value>) |> .expect "json"
+    assert_eq! \-> count_of (&json["changed"]) \-> report.changed.len ()
+    assert_eq! \-> count_of (&json["added"]) \-> report.added.len ()
+    assert_eq! \-> count_of (&json["removed"]) \-> report.removed.len ()
+
+count_of : &Value -> usize
+count_of v = v.as_array () |> .map (\a -> a.len ()) |> .unwrap_or 0

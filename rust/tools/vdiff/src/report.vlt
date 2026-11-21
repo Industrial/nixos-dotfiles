@@ -1,0 +1,394 @@
+-- The diff of two closures by package, and its two renderings: nvd's text
+-- (`nvd --color=never diff`, byte for byte) and the `--json` report.
+--
+-- A closure is grouped by package name; a name's versions are the versions of
+-- all its store paths, oldest first. Between the two closures:
+--
+--   * a name in both whose version lists differ is a version change: `U`
+--     (upgraded) when the old newest is older than the new oldest, `D`
+--     (downgraded) the other way round, `C` otherwise;
+--   * a name in both with the same versions, but selected on one side only,
+--     is a selection change. "Selected" means a direct reference of the
+--     system's `sw` (both sides have one) or of the root itself;
+--   * a name on one side only is added or removed.
+--
+-- Everything here is a plain function over the closures already read.
+
+import std::cmp::Ordering
+import std::collections::{BTreeMap, BTreeSet}
+import serde_json::{Map, Value}
+import crate::version::{Chunk, chunks, compare_chunks, parse_name}
+
+-- One version of a package, as its store path names it ("" for none).
+export data Version { export text String, export chunks Vec<Chunk> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A closure as read from the store: the argument as given (`label`), the
+-- store path it resolved to, every path in its closure, the direct references
+-- that count as selected, and the sum of the closure's narSize.
+export data Closure { export label String, export root String, export paths Vec<String>, export selected Vec<String>, export nar_size u64 }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- One line of the report. `state` is nvd's install state (U, D, C, A or R),
+-- `selection` its selection state: `*` selected on both sides, `.` on
+-- neither, `+` newly selected, `-` no longer selected.
+export data Entry { export pname String, export state String, export selection String, export old Vec<Version>, export new Vec<Version> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Side { export label String, export root String, export paths usize, export nar_size u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Report { export old Side, export new Side, export changed Vec<Entry>, export selection Vec<Entry>, export added Vec<Entry>, export removed Vec<Entry>, export paths_added usize, export paths_removed usize }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Every package name in the paths, with its versions oldest first. The sort
+-- is stable, so versions that compare equal keep the closure's order.
+export packages : &[String] -> BTreeMap<String, Vec<Version>>
+packages paths =
+  mut out = BTreeMap::new () : BTreeMap<String, Vec<Version>>
+  for p in paths
+    name = parse_name p
+    text = name.version |> .unwrap_or_default
+    version = Version { chunks = chunks (&text), text }
+    out.entry name.pname |> .or_insert_with Vec::new |> .push version
+  for versions in out.values_mut ()
+    versions.sort_by (\a b -> compare_chunks (&a.chunks) (&b.chunks))
+  out
+
+-- The package names among the paths.
+export names : &[String] -> BTreeSet<String>
+names paths = paths.iter () |> .map (\p -> (parse_name p).pname) |> .collect
+
+order : &Version -> &Version -> Ordering
+order a b = compare_chunks (&a.chunks) (&b.chunks)
+
+same_versions : &[Version] -> &[Version] -> bool
+same_versions a b =
+  a.len () == b.len () && (a.iter () |> .zip (b.iter ()) |> .all (\pair -> order pair.0 pair.1 == Ordering::Equal))
+
+-- U, D or C for a name whose versions changed (lists are never empty).
+change_of : &[Version] -> &[Version] -> &'static str
+change_of old new =
+  case (old.first (), old.last (), new.first (), new.last ()) of
+    (Some old_min, Some old_max, Some new_min, Some new_max) -> change_between old_min old_max new_min new_max
+    _ -> "C"
+
+change_between : &Version -> &Version -> &Version -> &Version -> &'static str
+change_between old_min old_max new_min new_max =
+  if order old_max new_min == Ordering::Less
+    "U"
+  else if order old_min new_max == Ordering::Greater
+    "D"
+  else
+    "C"
+
+-- nvd's selection state of a name, from the two selected sets.
+selection_of : &BTreeSet<String> -> &BTreeSet<String> -> &str -> String
+selection_of old new pname =
+  was = old.contains pname
+  is_now = new.contains pname
+  if was && is_now
+    "*".to_string ()
+  else if is_now
+    "+".to_string ()
+  else if was
+    "-".to_string ()
+  else
+    ".".to_string ()
+
+side_of : &Closure -> Side
+side_of c = Side { label = c.label.clone (), root = c.root.clone (), paths = (distinct (&c.paths)).len (), nar_size = c.nar_size }
+
+distinct : &[String] -> BTreeSet<String>
+distinct paths = paths.iter () |> .cloned |> .collect
+
+entry : &str -> &str -> String -> Vec<Version> -> Vec<Version> -> Entry
+entry pname state selection old new = Entry { pname = pname.to_string (), state = state.to_string (), selection, old, new }
+
+-- The diff of two closures.
+export diff : &Closure -> &Closure -> Report
+diff old new =
+  left = packages (&old.paths)
+  right = packages (&new.paths)
+  left_selected = names (&old.selected)
+  right_selected = names (&new.selected)
+  mut changed = Vec::new () : Vec<Entry>
+  mut selection = Vec::new () : Vec<Entry>
+  mut added = Vec::new () : Vec<Entry>
+  mut removed = Vec::new () : Vec<Entry>
+  for kv in &left
+    (pname, lv) = kv
+    sel = selection_of (&left_selected) (&right_selected) pname
+    case right.get pname of
+      Some rv ->
+        if !(same_versions lv rv)
+          changed.push (entry pname (change_of lv rv) sel (lv.clone ()) (rv.clone ()))
+        else if left_selected.contains pname != right_selected.contains pname
+          selection.push (entry pname "C" sel (lv.clone ()) (rv.clone ()))
+      None ->
+        removed.push (entry pname "R" sel (lv.clone ()) (Vec::new ()))
+  for kv in &right
+    (pname, rv) = kv
+    if !(left.contains_key pname)
+      sel = selection_of (&left_selected) (&right_selected) pname
+      added.push (entry pname "A" sel (Vec::new ()) (rv.clone ()))
+  old_paths = distinct (&old.paths)
+  new_paths = distinct (&new.paths)
+  paths_added = new_paths.difference (&old_paths) |> .count
+  paths_removed = old_paths.difference (&new_paths) |> .count
+  Report { old = side_of old, new = side_of new, changed, selection, added, removed, paths_added, paths_removed }
+
+-- nvd's `render_versions`: runs of equal versions as `<text> xN`, an empty
+-- version as `<none>`.
+export render_versions : &[Version] -> String
+render_versions versions =
+  mut items = Vec::new () : Vec<String>
+  mut i = 0 : usize
+  while i < versions.len ()
+    mut j = i + 1
+    while j < versions.len () && order (&versions[j]) (&versions[i]) == Ordering::Equal
+      j := j + 1
+    text = shown (&versions[j - 1].text)
+    if j - i == 1
+      items.push text
+    else
+      items.push "#{text} x#{j - i}"
+    i := j
+  if items.is_empty ()
+    "<no versions>".to_string ()
+  else
+    items.join ", "
+
+shown : &str -> String
+shown text =
+  if text.is_empty ()
+    "<none>".to_string ()
+  else
+    text.to_string ()
+
+pad_right : &str -> usize -> String
+pad_right s width =
+  mut out = s.to_string ()
+  out.push_str (&(" ".repeat (width.saturating_sub (s.len ()))))
+  out
+
+-- `#` and the count, zero-padded to the width of the largest.
+pad_zeros : usize -> usize -> String
+pad_zeros n width =
+  s = n.to_string ()
+  mut out = String::from "#"
+  out.push_str (&("0".repeat (width.saturating_sub (s.len ()))))
+  out.push_str (&s)
+  out
+
+-- One section of nvd's listing. `both` prints `old -> new`; otherwise the
+-- versions are the side the package is on.
+section : &str -> &[Entry] -> bool -> String
+section title entries both =
+  if entries.is_empty ()
+    String::new ()
+  else
+    count_width = entries.len () |> .to_string |> .len
+    name_width = entries.iter () |> .map (\e -> e.pname.len ()) |> .max |> .unwrap_or 0
+    mut out = "#{title}\n"
+    mut n = 1 : usize
+    for e in entries
+      out.push_str (&line e (pad_zeros n count_width) name_width both)
+      n := n + 1
+    out
+
+line : &Entry -> String -> usize -> bool -> String
+line e count name_width both =
+  versions = if_both both (&e.old) (&e.new)
+  "[#{e.state}#{e.selection}]  #{count}  #{pad_right (&e.pname) name_width}  #{versions}\n"
+
+if_both : bool -> &[Version] -> &[Version] -> String
+if_both both old new =
+  if both
+    "#{render_versions old} -> #{render_versions new}"
+  else if old.is_empty ()
+    render_versions new
+  else
+    render_versions old
+
+-- `1234567` as `1,234,567`.
+group : &str -> String
+group digits =
+  mut out = String::new ()
+  n = digits.len ()
+  for pair in digits.chars () |> .enumerate
+    (i, c) = pair
+    if i > 0 && (n - i) % 3 == 0
+      out.push ','
+    out.push c
+  out
+
+-- nvd's `render_bytes`: bytes below 1 KiB as a signed integer, anything else
+-- in the largest binary unit that keeps it at 1024 or more, to one decimal.
+export render_bytes : i128 -> String
+render_bytes delta =
+  sign = sign_of delta
+  magnitude = delta.unsigned_abs ()
+  if magnitude < 1024
+    "#{sign}#{group (&magnitude.to_string ())}B"
+  else
+    -- nvd divides a float by 1024 per unit. A power of two divides a size
+    -- below 2^53 exactly, and Python prints that exact value rounded half to
+    -- even, so integers give the same digits.
+    mut divisor = 1 : u128
+    mut unit = "B"
+    for u in ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB"]
+      if magnitude >= divisor * 1024
+        divisor := divisor * 1024
+        unit := u
+    tenths = rounded_tenths magnitude divisor
+    "#{sign}#{group (&(tenths / 10).to_string ())}.#{tenths % 10}#{unit}"
+
+-- `n / d` in tenths, rounded half to even.
+rounded_tenths : u128 -> u128 -> u128
+rounded_tenths n d =
+  q = (n * 10) / d
+  r = (n * 10) % d
+  if r * 2 > d || (r * 2 == d && q % 2 == 1)
+    q + 1
+  else
+    q
+
+sign_of : i128 -> &'static str
+sign_of n =
+  if n < 0
+    "-"
+  else
+    "+"
+
+-- The signed difference of two sizes.
+delta_of : u64 -> u64 -> i128
+delta_of old new = i128::from new - i128::from old
+
+-- The report as `nvd --color=never diff` prints it.
+export render_text : &Report -> String
+render_text r =
+  mut out = "<<< #{r.old.label}\n>>> #{r.new.label}\n"
+  out.push_str (&section "Version changes:" (&r.changed) true)
+  out.push_str (&section "Selection state changes:" (&r.selection) false)
+  out.push_str (&section "Added packages:" (&r.added) false)
+  out.push_str (&section "Removed packages:" (&r.removed) false)
+  if r.changed.is_empty () && r.selection.is_empty () && r.added.is_empty () && r.removed.is_empty ()
+    out.push_str "No version or selection state changes.\n"
+  paths_delta = (i128::try_from r.paths_added |> .unwrap_or 0) - (i128::try_from r.paths_removed |> .unwrap_or 0)
+  delta_sign = sign_of paths_delta
+  usage = render_bytes (delta_of r.old.nar_size r.new.nar_size)
+  summary = "Closure size: #{r.old.paths} -> #{r.new.paths} (#{r.paths_added} paths added, #{r.paths_removed} paths removed, delta #{delta_sign}#{paths_delta.unsigned_abs ()}, disk usage #{usage}).\n"
+  out.push_str (&summary)
+  out
+
+
+-- The kind of a version change, spelled out for `--json`.
+kind_of : &str -> &str
+kind_of state =
+  case state of
+    "U" -> "upgraded"
+    "D" -> "downgraded"
+    "A" -> "added"
+    "R" -> "removed"
+    _ -> "changed"
+
+texts : &[Version] -> Value
+texts versions = Value::Array (versions.iter () |> .map (\v -> Value::String (v.text.clone ())) |> .collect)
+
+object : Vec<(&str, Value)> -> Value
+object fields =
+  mut m = Map::new ()
+  for f in fields
+    (k, v) = f
+    m.insert (k.to_string ()) v
+  Value::Object m
+
+entry_json : &Entry -> Value
+entry_json e =
+  object (.to_vec ([("name", Value::from (e.pname.clone ())), ("kind", Value::from (kind_of (&e.state))), ("selection", Value::from (e.selection.clone ())), ("old", texts (&e.old)), ("new", texts (&e.new))]))
+
+entries_json : &[Entry] -> Value
+entries_json entries = Value::Array (entries.iter () |> .map entry_json |> .collect)
+
+side_json : &Side -> Value
+side_json s =
+  object (.to_vec ([("label", Value::from (s.label.clone ())), ("path", Value::from (s.root.clone ())), ("paths", Value::from (s.paths)), ("narSize", Value::from (s.nar_size))]))
+
+-- The JSON schema version. Bump it on any change a reader could notice.
+export const SCHEMA : u64 = 1
+
+-- The report for `--json`, documented in README.md (schema 1).
+export render_json : &Report -> String
+render_json r =
+  size_delta = delta_of r.old.nar_size r.new.nar_size
+  closure = object (.to_vec ([("pathsAdded", Value::from (r.paths_added)), ("pathsRemoved", Value::from (r.paths_removed)), ("narSizeDelta", Value::from (i64::try_from size_delta |> .unwrap_or 0))]))
+  doc = object (.to_vec ([("schema", Value::from SCHEMA), ("old", side_json (&r.old)), ("new", side_json (&r.new)), ("changed", entries_json (&r.changed)), ("selectionChanged", entries_json (&r.selection)), ("added", entries_json (&r.added)), ("removed", entries_json (&r.removed)), ("closure", closure)]))
+  "#{serde_json::to_string_pretty (&doc) |> .unwrap_or_default}\n"
+
+#[cfg(test)]
+p : &str -> String
+p name = "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-#{name}"
+
+#[cfg(test)]
+closure_of : &str -> Vec<&str> -> Vec<&str> -> u64 -> Closure
+closure_of label paths selected nar_size =
+  Closure { label = label.to_string (), root = p label, paths = paths.iter () |> .map (\n -> p n) |> .collect, selected = selected.iter () |> .map (\n -> p n) |> .collect, nar_size }
+
+test "bytes render as nvd's render_bytes does"
+  assert_eq! \-> render_bytes 0 \-> "+0B"
+  assert_eq! \-> render_bytes 1023 \-> "+1,023B"
+  assert_eq! \-> render_bytes (0 - 5) \-> "-5B"
+  assert_eq! \-> render_bytes 1024 \-> "+1.0KiB"
+  assert_eq! \-> render_bytes (0 - 1536) \-> "-1.5KiB"
+  assert_eq! \-> render_bytes 1048575 \-> "+1,024.0KiB"
+  assert_eq! \-> render_bytes 5368709120 \-> "+5.0GiB"
+
+test "a tenth exactly halfway rounds to even, as Python's format does"
+  assert_eq! \-> render_bytes 1280 \-> "+1.2KiB"
+  assert_eq! \-> render_bytes 1792 \-> "+1.8KiB"
+  assert_eq! \-> render_bytes 1075 \-> "+1.0KiB"
+
+test "equal versions collapse into a count"
+  vs = ["1.0", "1.0", "2.0", ""] |> .iter |> .map (\t -> Version { text = t.to_string (), chunks = chunks t }) |> .collect : Vec<Version>
+  mut sorted = vs.clone ()
+  sorted.sort_by (\a b -> order a b)
+  assert_eq! \-> render_versions (&sorted) \-> "<none>, 1.0 x2, 2.0"
+
+test "upgrades, downgrades and mixed changes"
+  old = closure_of "a" (.to_vec (["up-1.0", "down-2.0", "mixed-1.0", "mixed-3.0"])) (Vec::new ()) 0
+  new = closure_of "b" (.to_vec (["up-1.1", "down-1.0", "mixed-2.0"])) (Vec::new ()) 0
+  r = diff (&old) (&new)
+  states = r.changed.iter () |> .map (\e -> "#{e.pname}=#{e.state}") |> .collect : Vec<String>
+  assert_eq! \-> states \-> .to_vec (["down=D", "mixed=C", "up=U"])
+
+test "the same versions under new hashes are no change"
+  old = Closure { paths = .to_vec ([.to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-x-1.0"]), ...Closure::default () }
+  new = Closure { paths = .to_vec ([.to_string "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-x-1.0"]), ...Closure::default () }
+  r = diff (&old) (&new)
+  assert! \-> r.changed.is_empty () && r.added.is_empty () && r.removed.is_empty ()
+  assert_eq! \-> (r.paths_added, r.paths_removed) \-> (1, 1)
+
+test "a selection change without a version change is its own section"
+  old = closure_of "a" (.to_vec (["x-1.0", "y-1.0"])) (.to_vec (["x-1.0"])) 0
+  new = closure_of "b" (.to_vec (["x-1.0", "y-1.0"])) (.to_vec (["x-1.0", "y-1.0"])) 0
+  r = diff (&old) (&new)
+  sel = r.selection.iter () |> .map (\e -> "#{e.pname}#{e.selection}") |> .collect : Vec<String>
+  assert_eq! \-> sel \-> .to_vec (["y+"])
+
+test "the text report has nvd's layout"
+  old = closure_of "old" (.to_vec (["a-1.0", "gone-3"])) (.to_vec (["a-1.0"])) 2048
+  new = closure_of "new" (.to_vec (["a-1.2", "fresh"])) (.to_vec (["a-1.2", "fresh"])) 1024
+  text = render_text (&diff (&old) (&new))
+  assert_eq! \-> text \-> "<<< old\n>>> new\nVersion changes:\n[U*]  #1  a  1.0 -> 1.2\nAdded packages:\n[A+]  #1  fresh  <none>\nRemoved packages:\n[R.]  #1  gone  3\nClosure size: 2 -> 2 (2 paths added, 2 paths removed, delta +0, disk usage -1.0KiB).\n"
+
+test "the json report carries every section and the size delta"
+  old = closure_of "old" (.to_vec (["a-1.0"])) (Vec::new ()) 100
+  new = closure_of "new" (.to_vec (["a-1.2", "b-2"])) (Vec::new ()) 250
+  v = (serde_json::from_str (&render_json (&diff (&old) (&new))) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> v["schema"].as_u64 () \-> Some 1
+  assert_eq! \-> v["changed"][0]["kind"].as_str () \-> Some "upgraded"
+  assert_eq! \-> v["changed"][0]["new"][0].as_str () \-> Some "1.2"
+  assert_eq! \-> v["added"][0]["name"].as_str () \-> Some "b"
+  assert_eq! \-> v["closure"]["narSizeDelta"].as_i64 () \-> Some 150
+  assert_eq! \-> v["new"]["paths"].as_u64 () \-> Some 2
