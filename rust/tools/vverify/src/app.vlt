@@ -1,0 +1,198 @@
+-- The program: one verification pass as an effect, run once (`--once`) or
+-- rerun on an id_effect Schedule (the daemon). `main` parses argv and runs it
+-- under id_effect_cli's `run_main`, so the exit code follows the 0 / 1 / 101 /
+-- 130 taxonomy and Ctrl-C (or systemd's SIGINT) interrupts with finalizers.
+--
+-- Parallelism: the paths are hashed by `for_each_par` under
+-- `Concurrency::Bounded jobs`, a sliding window of child fibers. Each hash is
+-- one blocking `suspend` step (a NAR is read chunk by chunk, never held
+-- whole), and the fibers run on the runtime's multi-thread executor, one
+-- worker thread per CPU; `jobs` defaults to half of them, which leaves the
+-- rest for the executor's timers. Low priority is the service's business
+-- (Nice, IOSchedulingClass=idle), not the program's.
+
+import std::time::{Duration, Instant, SystemTime, UNIX_EPOCH}
+import id_effect::{Concurrency, Effect, HNil, Never, Schedule, effect, fail, for_each_par, sleep, succeed, suspend}
+import nix_store_core::db
+import nix_store_core::storepath::STORE_DIR
+import crate::cli::{Options, USAGE, parse_args}
+import crate::report::{Pass, json, last_run, metrics_path, publish}
+import crate::verify::{Candidate, Checked, check, faults, recheck, tally, valid_paths}
+
+-- Why a pass, or the program, stopped.
+export errors VerifyError
+  Usage String     "#{0}"
+  Database String  "store database: #{0}"
+  Publish String   "publishing: #{0}"
+  Faults usize     "#{0} store path(s) corrupt, missing or unreadable"
+
+-- An effect for a computed result: the planned failure stays typed.
+lifted : given <A: Send + 'static> Result<A, VerifyError> -> Effect<A, VerifyError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+now_secs : u64
+now_secs =
+  SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+read_listing : String -> Result<Vec<Candidate>, VerifyError>
+read_listing db_path =
+  conn = (db::open (&db_path) |> .map_err (\e -> Database ("opening #{db_path}: #{e}")))?
+  valid_paths (&conn) |> .map_err (\e -> Database ("listing valid paths in #{db_path}: #{e}"))
+
+-- Every valid path, read on one connection that is closed again before the
+-- hashing starts.
+listing : String -> Effect<Vec<Candidate>, VerifyError, HNil>
+listing db_path = suspend (move \-> lifted (read_listing db_path))
+
+-- One path: archive, hash, judge, and recheck a missing path's validity.
+checked : String -> Candidate -> Effect<Checked, VerifyError, HNil>
+checked db_path c = suspend (move \-> succeed (recheck (&db_path) (check c)))
+
+-- Every path, `jobs` at a time.
+checked_all : String -> usize -> Vec<Candidate> -> Effect<Vec<Checked>, VerifyError, HNil>
+checked_all db_path jobs candidates =
+  for_each_par candidates (move \c -> checked (db_path.clone ()) c) (Concurrency::Bounded jobs)
+
+published : Pass -> Option<String> -> Option<String> -> Result<Pass, VerifyError>
+published p textfile_dir report_file =
+  (publish (&p) textfile_dir report_file |> .map_err Publish)?
+  println! \-> "#{json (&p)}"
+  Ok p
+
+-- One pass: list, hash every path, tally, publish the metrics and the report.
+export pass : Options -> Effect<Pass, VerifyError, HNil>
+pass o =
+  effect!
+    let started = Instant::now();
+    let candidates = ~listing(o.db.clone());
+    eprintln!("vverify: checking {} valid paths, {} at a time", candidates.len(), o.jobs);
+    let all = ~checked_all(o.db.clone(), o.jobs, candidates);
+    let p = Pass { store_dir: STORE_DIR.to_string(), finished: now_secs(), duration: started.elapsed().as_secs_f64(), tally: tally(all) };
+    eprintln!("vverify: {} paths in {:.1}s: {} corrupt, {} missing, {} unreadable, {} vanished", p.tally.total, p.duration, p.tally.corrupt.len(), p.tally.missing.len(), p.tally.unreadable.len(), p.tally.vanished);
+    ~lifted(published(p, o.textfile_dir.clone(), o.report.clone()))
+
+-- `--once`: one pass, failing when it found a fault.
+export once : Options -> Effect<(), VerifyError, HNil>
+once o =
+  pass o |> .flat_map (\p -> judged (faults (&p.tally)))
+
+judged : usize -> Effect<(), VerifyError, HNil>
+judged n =
+  if n == 0
+    succeed (())
+  else
+    fail (Faults n)
+
+-- A daemon pass never stops the daemon: its error is logged, and the next
+-- pass is still scheduled. Faults are not errors here; they are in the
+-- metrics.
+logged : VerifyError -> Effect<(), Never, HNil>
+logged e =
+  eprintln! \-> "vverify: pass failed: #{e}"
+  succeed (())
+
+guarded : Options -> Effect<(), Never, HNil>
+guarded o = pass o |> .map (\_ -> ()) |> .catch logged
+
+-- Seconds until the first pass: what is left of the interval since the last
+-- recorded pass, so a restart (a deploy, a reboot) does not rerun a pass
+-- that is not due. No record, or one from the future, is due now or within
+-- one interval.
+export first_delay : Option<u64> -> u64 -> u64 -> u64
+first_delay last now interval =
+  case last of
+    None -> 0
+    Some t -> (t.saturating_add interval |> .saturating_sub now).min interval
+
+-- After `first`, run `make ()` and rerun it as `schedule` allows. The
+-- repetition is the Schedule's, on the executor's clock: no timer loop.
+export rerun : given <F: Fn() -> Effect<(), Never, HNil> + Send + Sync + 'static> Duration -> Schedule<u64, ()> -> F -> Effect<u64, Never, HNil>
+rerun first schedule make =
+  (sleep first : Effect<(), Never, HNil>) |> .then (Effect::repeat make schedule)
+
+recorded : Option<String> -> Option<u64>
+recorded textfile_dir =
+  textfile_dir |> .and_then (\d -> std::fs::read_to_string (metrics_path (&d)) |> .ok) |> .and_then (\t -> last_run (&t))
+
+-- The daemon: the first pass when it is due, then one every interval.
+export daemon : Options -> Effect<u64, Never, HNil>
+daemon o =
+  effect!
+    let wait = first_delay(recorded(o.textfile_dir.clone()), now_secs(), o.interval);
+    eprintln!("vverify: first pass in {}s, then every {}s", wait, o.interval);
+    let opts = o.clone();
+    ~rerun(Duration::from_secs(wait), Schedule::spaced(Duration::from_secs(o.interval)), move || guarded(opts.clone()))
+
+-- The program for parsed options (or the usage error).
+export program : Result<Options, String> -> Effect<(), VerifyError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok o -> if o.once
+      once o
+    else
+      daemon o |> .map (\_ -> ()) |> .widen
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the tokio context the executor's timers and
+-- the parallel children need, so the program runs as the root's child.
+-- Structured: an interrupt of the root (Ctrl-C, SIGINT) interrupts and awaits
+-- the child and every hashing fiber under it.
+supervised : Effect<(), VerifyError, HNil> -> Effect<(), VerifyError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+cpus : usize
+cpus = std::thread::available_parallelism () |> .map (\n -> n.get ()) |> .unwrap_or 2
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  id_effect_cli::run_main (supervised (program (parse_args (&args) (cpus ())))) HNil (id_effect_cli::RunMainConfig::default ())
+
+test "the first pass waits out the rest of the interval"
+  assert_eq! \-> first_delay None 1000 600 \-> 0
+  assert_eq! \-> first_delay (Some 900) 1000 600 \-> 500
+  assert_eq! \-> first_delay (Some 100) 1000 600 \-> 0
+  assert_eq! \-> first_delay (Some 5000) 1000 600 \-> 600
+
+test "the schedule reruns a pass, after the first delay"
+  runs = std::sync::Arc::new (std::sync::atomic::AtomicU64::new 0)
+  counter = runs.clone ()
+  make = move \-> counted (counter.clone ())
+  bounded = Schedule::spaced (Duration::from_secs 3600) |> .intersect (Schedule::recurs 2) |> .map (\p -> p.0)
+  exit = id_effect::testing::run_test (rerun (Duration::from_secs 60) bounded make)
+  assert! \-> exit |> .into_result |> .is_ok
+  assert_eq! \-> runs.load (std::sync::atomic::Ordering::SeqCst) \-> 3
+
+#[cfg(test)]
+counted : std::sync::Arc<std::sync::atomic::AtomicU64> -> Effect<(), Never, HNil>
+counted n =
+  suspend (move \-> bump n)
+
+#[cfg(test)]
+bump : std::sync::Arc<std::sync::atomic::AtomicU64> -> Effect<(), Never, HNil>
+bump n =
+  n.fetch_add 1 std::sync::atomic::Ordering::SeqCst
+  succeed (())
+
+test "a usage error carries the usage line"
+  exit = id_effect::testing::run_test (program (Err (.to_string "unknown argument: -x")))
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false
+
+test "a missing database fails the pass with its path"
+  o = parse_args (&.to_vec ([.to_string "--once", .to_string "--db", .to_string "/nonexistent/vverify.sqlite"])) 2 |> .expect "options"
+  exit = id_effect::testing::run_test (once o)
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains "/nonexistent/vverify.sqlite") |> .unwrap_or false
+
+test "a fault fails --once, a clean pass does not"
+  assert! \-> id_effect::testing::run_test (judged 0) |> .into_result |> .is_ok
+  assert! \-> id_effect::testing::run_test (judged 2) |> .into_result |> .is_err

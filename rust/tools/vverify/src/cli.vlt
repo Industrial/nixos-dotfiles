@@ -1,0 +1,119 @@
+-- vverify's command line, parsed into `Options` by a pure function.
+--
+--   vverify [--once] [--jobs N] [--interval DURATION] [--db FILE]
+--           [--textfile-dir DIR] [--report FILE]
+--
+-- `--once` runs one pass and exits: 0 when every path is intact, 1 when a
+-- path is corrupt, missing or unreadable (the JSON report on stdout says
+-- which). Without it vverify is a daemon that reruns the pass every
+-- `--interval` (default a week, `1w`; `s`, `m`, `h`, `d` and `w` suffixes, or
+-- bare seconds). `--jobs` paths are hashed at a time, default half the CPUs.
+
+import nix_store_core::db
+
+export const USAGE : &str = "usage: vverify [--once] [--jobs N] [--interval DURATION] [--db FILE] [--textfile-dir DIR] [--report FILE]"
+
+-- A week, in seconds.
+export const WEEK : u64 = 604800
+
+export data Options
+  { export once bool
+  , export jobs usize
+  , export interval u64
+  , export db String
+  , export textfile_dir Option<String>
+  , export report Option<String>
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- Half the CPUs, at least one: hashing is I/O as much as CPU, and the
+-- machine stays usable.
+export default_jobs : usize -> usize
+default_jobs cpus = (cpus / 2).max 1
+
+defaults : usize -> Options
+defaults cpus = Options { once = false, jobs = default_jobs cpus, interval = WEEK, db = db::DEFAULT_DB.to_string (), textfile_dir = None, report = None }
+
+-- A duration in seconds: bare seconds, or a number with s/m/h/d/w.
+export parse_interval : &str -> Option<u64>
+parse_interval s =
+  (digits, unit) = case s.char_indices () |> .find (\ic -> !(ic.1.is_ascii_digit ())) of
+    Some (i, _) -> s.split_at i
+    None -> (s, "")
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  scale = case unit of
+    "" -> Some 1
+    "s" -> Some 1
+    "m" -> Some 60
+    "h" -> Some 3600
+    "d" -> Some 86400
+    "w" -> Some WEEK
+    _ -> None
+  n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1) |> .filter (\secs -> *secs > 0)
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The options in `args` (argv without the program name), on a machine with
+-- `cpus` CPUs.
+export parse_args : &[String] -> usize -> Result<Options, String>
+parse_args args cpus =
+  mut o = defaults cpus
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--once" ->
+        o.once := true
+      "--jobs" ->
+        v = (value (it.next ()) "--jobs")?
+        n = (v.parse () : Result<usize, std::num::ParseIntError>) |> .ok |> .filter (\n -> *n > 0)
+        o.jobs := (n.ok_or ("--jobs: not a positive number: #{v}"))?
+      "--interval" ->
+        v = (value (it.next ()) "--interval")?
+        o.interval := (parse_interval (&v) |> .ok_or ("--interval: not a duration: #{v}"))?
+      "--db" ->
+        o.db := (value (it.next ()) "--db")?
+      "--textfile-dir" ->
+        o.textfile_dir := Some ((value (it.next ()) "--textfile-dir")?)
+      "--report" ->
+        o.report := Some ((value (it.next ()) "--report")?)
+      other ->
+        return Err "unknown argument: #{other}"
+  Ok o
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "no arguments is a weekly daemon on the default database at half the CPUs"
+  o = parse_args (&args (&[])) 16 |> .expect "options"
+  assert_eq! \-> o \-> defaults 16
+  assert_eq! \-> (o.once, o.jobs, o.interval) \-> (false, 8, WEEK)
+  assert_eq! \-> o.db \-> "/nix/var/nix/db/db.sqlite"
+
+test "one CPU still gets one job"
+  assert_eq! \-> default_jobs 1 \-> 1
+  assert_eq! \-> default_jobs 0 \-> 1
+
+test "every option is read"
+  o = parse_args (&args (&["--once", "--jobs", "3", "--interval", "12h", "--db", "/tmp/db.sqlite", "--textfile-dir", "/var/lib/t", "--report", "/var/lib/t/r.json"])) 16 |> .expect "options"
+  assert_eq! \-> o \-> Options { once = true, jobs = 3, interval = 43200, db = .to_string "/tmp/db.sqlite", textfile_dir = Some (.to_string "/var/lib/t"), report = Some (.to_string "/var/lib/t/r.json") }
+
+test "intervals take a unit, or are seconds"
+  assert_eq! \-> parse_interval "1w" \-> Some WEEK
+  assert_eq! \-> parse_interval "7d" \-> Some WEEK
+  assert_eq! \-> parse_interval "90" \-> Some 90
+  assert_eq! \-> parse_interval "5m" \-> Some 300
+  assert_eq! \-> parse_interval "0" \-> None
+  assert_eq! \-> parse_interval "1y" \-> None
+  assert_eq! \-> parse_interval "h" \-> None
+  assert_eq! \-> parse_interval "" \-> None
+
+test "bad arguments are refused with the reason"
+  assert_eq! \-> parse_args (&args (&["--jobs", "0"])) 4 \-> Err (.to_string "--jobs: not a positive number: 0")
+  assert_eq! \-> parse_args (&args (&["--jobs"])) 4 \-> Err (.to_string "--jobs needs a value")
+  assert_eq! \-> parse_args (&args (&["--interval", "soon"])) 4 \-> Err (.to_string "--interval: not a duration: soon")
+  assert_eq! \-> parse_args (&args (&["--verbose"])) 4 \-> Err (.to_string "unknown argument: --verbose")
