@@ -187,12 +187,14 @@ sample = crate::graph::fixture T (.to_vec ([(T, 1, .to_vec ([A, B])), (A, 2048, 
 test "the chain prints as nix why-depends prints it"
   g = sample ()
   c = crate::graph::shortest (&g) (crate::graph::index_of (&g) C |> .expect "c") |> .expect "a chain"
-  assert_eq! \-> chain_text (&g) (&c) \-> "#{T}\n└───#{A}\n    └───#{C}\n"
+  want = "#{T}\n└───#{A}\n    └───#{C}\n"
+  assert_eq! \-> chain_text (&g) (&c) \-> want
 
 test "the --all tree prints as nix why-depends --all prints it"
   g = sample ()
   lines = crate::graph::tree (&g) (crate::graph::index_of (&g) C |> .expect "c")
-  assert_eq! \-> tree_text (&g) (&lines) \-> "#{T}\n├───#{A}\n│   └───#{C}\n└───#{B}\n    └───#{C}\n"
+  want = "#{T}\n├───#{A}\n│   └───#{C}\n└───#{B}\n    └───#{C}\n"
+  assert_eq! \-> tree_text (&g) (&lines) \-> want
 
 test "the json answer carries the chain, and the count and edges with --all"
   g = sample ()
