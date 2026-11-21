@@ -1,0 +1,72 @@
+-- Narinfo signatures: ed25519 over the fingerprint, in Nix's key format.
+-- A secret key file holds `<name>:<base64 of 64 bytes>` (seed, then public
+-- key), as `nix key generate-secret` writes it; a signature is
+-- `<name>:<base64 of 64 bytes>`.
+
+import base64::Engine
+import base64::engine::general_purpose::STANDARD
+import ed25519_dalek::Signer
+import ed25519_dalek::SigningKey
+
+export data SecretKey { export name String, key SigningKey }
+  deriving (Clone)
+
+-- Parse a secret key file's contents. Surrounding whitespace is ignored.
+export parse_secret_key : &str -> Result<SecretKey, String>
+parse_secret_key text =
+  trimmed = text.trim ()
+  (name, encoded) = (trimmed.split_once ':' |> .ok_or (.to_string "a secret key is <name>:<base64>"))?
+  bytes = (STANDARD.decode encoded |> .map_err (\e -> "the key is not base64: #{e}"))?
+  arr = (bytes.try_into () : Result<[u8; 64], Vec<u8>>) |> .map_err (\_ -> .to_string "a secret key is 64 bytes")
+  pair = arr?
+  key = (SigningKey::from_keypair_bytes (&pair) |> .map_err (\e -> "the key's halves do not match: #{e}"))?
+  if name.is_empty ()
+    Err (.to_string "a secret key needs a name")
+  else
+    Ok (SecretKey { name = name.to_string (), key })
+
+-- The `Sig:` value for a fingerprint.
+export sign : &SecretKey -> &str -> String
+sign secret fingerprint =
+  signature = secret.key.sign (fingerprint.as_bytes ())
+  "#{secret.name}:#{STANDARD.encode (signature.to_bytes ())}"
+
+-- The public key in Nix's format, for `trusted-public-keys`.
+export public_key : &SecretKey -> String
+public_key secret =
+  "#{secret.name}:#{STANDARD.encode (secret.key.verifying_key ().to_bytes ())}"
+
+-- A fixed test key: seed 0..31, so the expected values below are stable.
+#[cfg(test)]
+test_key : String
+test_key =
+  seed = (0 .. 32) |> .collect : Vec<u8>
+  seed_arr = (seed.try_into () : Result<[u8; 32], Vec<u8>>) |> .unwrap_or ([0; 32])
+  sk = SigningKey::from_bytes (&seed_arr)
+  mut both = seed_arr.to_vec ()
+  both.extend_from_slice (&sk.verifying_key ().to_bytes ())
+  "test-1:#{STANDARD.encode (&both)}"
+
+test "a key round-trips to its public half"
+  k = parse_secret_key (&test_key ())
+  assert! \-> k.is_ok ()
+  assert! \-> k.map (\s -> public_key (&s)) |> .unwrap_or_default |> .starts_with "test-1:"
+
+test "a signature verifies against the public key"
+  k = parse_secret_key (&test_key ())
+  assert! \-> k.as_ref () |> .map (\s -> verifies s "1;/nix/store/x;sha256:y;1;") |> .unwrap_or false
+
+test "malformed keys are refused"
+  assert! \-> parse_secret_key "no-colon" |> .is_err
+  assert! \-> parse_secret_key "name:!!!" |> .is_err
+  assert! \-> parse_secret_key "name:AAAA" |> .is_err
+
+#[cfg(test)]
+verifies : &SecretKey -> &str -> bool
+verifies secret fp =
+  sig = sign secret fp
+  (_, encoded) = sig.split_once ':' |> .unwrap_or (("", ""))
+  bytes = STANDARD.decode encoded |> .unwrap_or_default
+  arr = (bytes.try_into () : Result<[u8; 64], Vec<u8>>) |> .unwrap_or ([0; 64])
+  s = ed25519_dalek::Signature::from_bytes (&arr)
+  secret.key.verifying_key ().verify_strict (fp.as_bytes ()) (&s) |> .is_ok

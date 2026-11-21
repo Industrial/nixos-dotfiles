@@ -1,0 +1,72 @@
+-- The local store's database, read-only. Nix keeps every valid path in
+-- `ValidPaths` and the reference graph in `Refs`; one indexed range scan finds
+-- a path by its hash part, without the daemon and without root (the database
+-- and its WAL are world-readable, and SQLite reads a WAL database read-only).
+
+import rusqlite::Connection
+import rusqlite::OpenFlags
+import crate::narinfo::NarInfo
+import crate::nixbase32::narinfo_hash
+
+export const DEFAULT_DB : &str = "/nix/var/nix/db/db.sqlite"
+
+-- `path` is the primary key's index, so this is a range scan of one row.
+const BY_HASH : &str = "SELECT id, path, hash, narSize, deriver, sigs, ca FROM ValidPaths WHERE path >= ?1 AND path < ?2 LIMIT 1"
+
+const REFS : &str = "SELECT v.path FROM Refs r JOIN ValidPaths v ON r.reference = v.id WHERE r.referrer = ?1 ORDER BY v.path"
+
+-- A read-only connection. One per worker thread: a connection is not `Sync`.
+export open : &str -> rusqlite::Result<Connection>
+open path =
+  Connection::open_with_flags path (OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)
+
+-- Optional text that the database stores as NULL or as the empty string.
+present : Option<String> -> Option<String>
+present v = v |> .filter (\s -> !s.is_empty ())
+
+-- The referrer's references, as full store paths in sorted order.
+references : &Connection -> i64 -> rusqlite::Result<Vec<String>>
+references conn id =
+  mut stmt = (conn.prepare_cached REFS)?
+  mut rows = (stmt.query ([id]))?
+  mut out = Vec::new () : Vec<String>
+  while (rows.next ())? is Some row
+    out.push ((row.get 0)?)
+  Ok out
+
+-- The narinfo for the valid path whose hash part is `hash`, if there is one.
+export lookup : &Connection -> &str -> &str -> rusqlite::Result<Option<NarInfo>>
+lookup conn store_dir hash =
+  lower = "#{store_dir}/#{hash}-"
+  upper = "#{store_dir}/#{hash}."
+  mut stmt = (conn.prepare_cached BY_HASH)?
+  mut rows = (stmt.query ([lower.as_str (), upper.as_str ()]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row -> found conn row
+
+found : &Connection -> &rusqlite::Row -> rusqlite::Result<Option<NarInfo>>
+found conn row =
+  id = (row.get 0 : rusqlite::Result<i64>)?
+  store_path = (row.get 1 : rusqlite::Result<String>)?
+  db_hash = (row.get 2 : rusqlite::Result<String>)?
+  nar_size = (row.get 3 : rusqlite::Result<Option<u64>>)?
+  deriver = (row.get 4 : rusqlite::Result<Option<String>>)?
+  sigs = (row.get 5 : rusqlite::Result<Option<String>>)?
+  ca = (row.get 6 : rusqlite::Result<Option<String>>)?
+  refs = (references conn id)?
+  case narinfo_hash (&db_hash) of
+    None -> Ok None
+    Some nar_hash -> Ok (Some (NarInfo { store_path, nar_hash, nar_size = nar_size.unwrap_or 0, references = refs, deriver = present deriver, sigs = split_sigs sigs, ca = present ca }))
+
+split_sigs : Option<String> -> Vec<String>
+split_sigs sigs =
+  sigs |> .unwrap_or_default |> .split_whitespace |> .map (\s -> s.to_string ()) |> .collect
+
+test "a hash part no valid path has is not found"
+  if std::path::Path::new DEFAULT_DB |> .exists
+    conn = open DEFAULT_DB
+    assert! \-> conn.is_ok ()
+    found = conn.map (\c -> lookup (&c) "/nix/store" "00000000000000000000000000000000" |> .map (\o -> o.is_none ()) |> .unwrap_or false)
+    assert! \-> found.unwrap_or false

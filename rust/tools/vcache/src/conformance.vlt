@@ -1,0 +1,53 @@
+-- Differential checks against Nix itself, on this machine's real store.
+--
+-- The store database holds the SHA-256 Nix computed for every valid path's
+-- NAR when it registered the path. Archiving the same path here and hashing it
+-- must give the same digest, byte for byte; any divergence in the format —
+-- ordering, padding, the executable bit, symlinks — changes the hash.
+--
+-- Skipped (passes vacuously) where there is no store database, such as in the
+-- Nix build sandbox.
+
+import sha2::Digest
+import sha2::Sha256
+import crate::db
+import crate::nar
+
+-- Paths per run, chosen at random, and the largest NAR worth hashing in a test.
+const SAMPLE : i64 = 400
+const MAX_NAR : i64 = 33554432
+
+const PICK : &str = "SELECT path, hash FROM ValidPaths WHERE narSize <= ?1 ORDER BY random() LIMIT ?2"
+
+-- `sha256:<base16>` of the NAR this crate writes for `path`.
+nar_sha256 : &str -> std::io::Result<String>
+nar_sha256 path =
+  mut hasher = Sha256::new ()
+  (nar::dump (&mut hasher) (std::path::Path::new path))?
+  digest = hasher.finalize ()
+  hex = digest.iter () |> .map (\b -> format! \-> "#{b:02x}") |> .collect : String
+  Ok ("sha256:#{hex}")
+
+-- Every sampled path whose NAR hash differs from the database's, with both.
+mismatches : &rusqlite::Connection -> rusqlite::Result<Vec<String>>
+mismatches conn =
+  mut stmt = (conn.prepare PICK)?
+  mut rows = (stmt.query ([MAX_NAR, SAMPLE]))?
+  mut bad = Vec::new () : Vec<String>
+  mut seen = 0 : u32
+  while (rows.next ())? is Some row
+    path = (row.get 0 : rusqlite::Result<String>)?
+    want = (row.get 1 : rusqlite::Result<String>)?
+    seen += 1
+    got = nar_sha256 (&path) |> .unwrap_or_else (\e -> "error: #{e}")
+    if got != want
+      bad.push ("#{path}: nix #{want}, vcache #{got}")
+  eprintln! \-> "conformance: #{seen} store paths archived"
+  Ok bad
+
+test "NARs hash to what Nix registered for them"
+  if std::path::Path::new db::DEFAULT_DB |> .exists
+    conn = db::open db::DEFAULT_DB
+    assert! \-> conn.is_ok ()
+    result = conn.map_err (\e -> e.to_string ()) |> .and_then (\c -> mismatches (&c) |> .map_err (\e -> e.to_string ()))
+    assert_eq! \-> result \-> Ok (Vec::new ())

@@ -1,0 +1,74 @@
+-- Store paths and the cache's URL space. A store path is
+-- `<store dir>/<32 base-32 chars>-<name>`; a client names one by its hash part.
+
+import crate::nixbase32::is_nixbase32
+
+export const HASH_PART_LEN : usize = 32
+
+-- Whether `s` can be a store path's hash part.
+export is_hash_part : &str -> bool
+is_hash_part s = s.len () == HASH_PART_LEN && is_nixbase32 s
+
+-- A store path without its directory: `<hash>-<name>`.
+export base_name : &str -> &str
+base_name path =
+  case path.rsplit_once '/' of
+    Some (_, name) -> name
+    None -> path
+
+-- The hash part of a full store path, when it has one.
+export hash_part_of : &str -> Option<&str>
+hash_part_of path =
+  name = base_name path
+  hash = (name.get (0 .. HASH_PART_LEN))?
+  if is_hash_part hash && name.as_bytes ().get HASH_PART_LEN == Some (&b'-')
+    Some hash
+  else
+    None
+
+-- What a request asks for.
+export data Route
+  = CacheInfo
+  | NarInfo String
+  | Nar String
+  | Missing
+  deriving (Debug, Clone, PartialEq)
+
+-- The route for a request target, query string ignored. NARs are served at
+-- `nar/<store hash part>.nar`, the URL every narinfo here points to.
+export route : &str -> Route
+route target =
+  path = case target.split_once '?' of
+    Some (p, _) -> p
+    None -> target
+  nar = path.strip_prefix "/nar/" |> .and_then (\p -> p.strip_suffix ".nar") |> .filter (\h -> is_hash_part h)
+  info = path.strip_prefix "/" |> .and_then (\p -> p.strip_suffix ".narinfo") |> .filter (\h -> is_hash_part h)
+  if path == "/nix-cache-info"
+    CacheInfo
+  else if nar is Some h
+    Nar (h.to_string ())
+  else if info is Some h
+    NarInfo (h.to_string ())
+  else
+    Missing
+
+test "the cache info route"
+  assert_eq! \-> route "/nix-cache-info" \-> CacheInfo
+
+test "a narinfo route"
+  assert_eq! \-> route "/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo" \-> NarInfo (.to_string "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq")
+
+test "a nar route, with a query string"
+  assert_eq! \-> route "/nar/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.nar?hash=x" \-> Nar (.to_string "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq")
+
+test "a hash part with a letter base-32 never produces is refused"
+  assert_eq! \-> route "/ej1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo" \-> Missing
+
+test "path traversal is not a route"
+  assert_eq! \-> route "/nar/../../etc/passwd.nar" \-> Missing
+  assert_eq! \-> route "/" \-> Missing
+
+test "the hash part of a store path"
+  assert_eq! \-> hash_part_of "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh" \-> Some "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq"
+  assert_eq! \-> hash_part_of "/nix/store/short-name" \-> None
+  assert_eq! \-> base_name "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh" \-> "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"

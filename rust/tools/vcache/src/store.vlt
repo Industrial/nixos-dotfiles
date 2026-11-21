@@ -1,0 +1,96 @@
+-- The store as a capability: "what does this cache know about a hash part".
+--
+-- `PathInfos` is the port, shaped to its one caller (the HTTP routes); its
+-- live implementation reads the store database through a pool of read-only
+-- connections, and tests provide an in-memory one behind the same class.
+
+import std::sync::{Arc, Mutex}
+import rusqlite::Connection
+import id_effect::{Effect, HNil, Pool, fail, succeed, suspend}
+import crate::db
+import crate::narinfo::NarInfo
+
+-- Why a lookup failed. One variant: whatever went wrong with the database,
+-- the caller's only answer is "not now" (a 503) and an operator's attention.
+export errors StoreError
+  Unavailable String  "store database unavailable: #{0}"
+
+instance Clone StoreError
+  clone : &self -> Self
+  clone self = case self of
+    Unavailable why -> Unavailable (why.clone ())
+
+instance PartialEq StoreError
+  eq : &self -> &Self -> bool
+  eq self other = self.to_string () == other.to_string ()
+
+export class PathInfos
+  lookup : &self -> String -> Effect<Option<NarInfo>, StoreError, HNil>
+
+-- The capability: the store, whichever implementation provides it.
+export newtype PathInfoStore = PathInfoStore (export Arc<dyn PathInfos + Send + Sync>)
+
+instance Clone PathInfoStore
+  clone : &self -> Self
+  clone self = PathInfoStore (Arc::clone (&self.0))
+
+-- A pooled connection. A connection is `Send` but not `Sync`, and a pool item
+-- is checked out by one fiber at a time, so the mutex is never contended; it
+-- is what makes the item shareable at all. Identity is the allocation.
+export data Conn { inner Arc<Mutex<Connection>> }
+  deriving (Clone)
+
+instance PartialEq Conn
+  eq : &self -> &Self -> bool
+  eq self other = Arc::ptr_eq (&self.inner) (&other.inner)
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static, E: Send + 'static> Result<A, E> -> Effect<A, E, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+unavailable : given <T: std::fmt::Display> T -> StoreError
+unavailable e = Unavailable (e.to_string ())
+
+open_conn : String -> Result<Conn, StoreError>
+open_conn path =
+  conn = (db::open (&path) |> .map_err (\e -> Unavailable ("opening #{path}: #{e}")))?
+  Ok (Conn { inner = Arc::new (Mutex::new conn) })
+
+query : Conn -> String -> String -> Result<Option<NarInfo>, StoreError>
+query conn store_dir hash =
+  locked = (conn.inner.lock () |> .map_err unavailable)?
+  db::lookup (&locked) (&store_dir) (&hash) |> .map_err unavailable
+
+-- The live store: the database at `db_path`, at most `capacity` connections.
+export data SqliteStore { pool Pool<Conn, StoreError>, store_dir String }
+
+instance PathInfos SqliteStore
+  lookup : &self -> String -> Effect<Option<NarInfo>, StoreError, HNil>
+  lookup self hash =
+    pool = self.pool.clone ()
+    dir = self.store_dir.clone ()
+    Effect::scoped (move \scope -> pool.get (&scope) |> .flat_map (move \conn -> suspend (move \-> lifted (query conn dir hash))))
+
+-- Open the live store. One connection is opened (and pooled) up front, so a
+-- missing or unreadable database fails at startup instead of per request.
+export live : String -> String -> usize -> Effect<PathInfoStore, StoreError, HNil>
+live db_path store_dir capacity =
+  probe = db_path.clone ()
+  pool = Pool::new (capacity.max 1) (move \-> lifted (open_conn (probe.clone ())))
+  checked = pool.clone ()
+  Effect::scoped (move \scope -> checked.get (&scope) |> .map (\_ -> ())) |> .map (move \_ -> PathInfoStore (Arc::new (SqliteStore { pool, store_dir })))
+
+-- An in-memory store, for tests: every path it was given, by hash part.
+export data MemoryStore { paths Vec<NarInfo> }
+
+instance PathInfos MemoryStore
+  lookup : &self -> String -> Effect<Option<NarInfo>, StoreError, HNil>
+  lookup self hash =
+    found = self.paths |> .iter |> .find (\p -> crate::storepath::hash_part_of (&p.store_path) == Some (hash.as_str ())) |> .cloned
+    succeed found
+
+export memory : Vec<NarInfo> -> PathInfoStore
+memory paths = PathInfoStore (Arc::new (MemoryStore { paths }))

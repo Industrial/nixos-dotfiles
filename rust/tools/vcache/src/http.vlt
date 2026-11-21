@@ -1,0 +1,160 @@
+-- The HTTP routes. One fallback handler: the pure `storepath::route` decides
+-- what a request asks for, and the answer is an effect over the app's
+-- capabilities, run as a request fiber by id_effect_axum's `execute` (a
+-- disconnect interrupts it).
+
+import std::path::PathBuf
+import axum::extract::State
+import axum::http::{StatusCode, Uri, header}
+import axum::response::{IntoResponse, Response}
+import id_effect::{Effect, HCons, HNil, effect, succeed}
+import id_effect_axum::execute
+import id_effect_axum::body::stream_body
+import crate::nar
+import crate::narinfo::{NarInfo, cache_info, fingerprint, render}
+import crate::signing::{SecretKey, sign}
+import crate::storepath::{Route, route}
+import crate::store::{PathInfoStore, StoreError}
+
+-- What the routes read besides the store.
+export data Settings
+  { export db String
+  , export store_dir String
+  , export priority i64
+  , export sign_key_file Option<String>
+  }
+  deriving (Clone, Debug)
+
+-- The key narinfos are signed with, when there is one.
+export newtype Signer = Signer (export Option<SecretKey>)
+
+instance Clone Signer
+  clone : &self -> Self
+  clone self = Signer (self.0.clone ())
+
+export type AppEnv = HCons<PathInfoStore, HCons<Settings, HCons<Signer, HNil>>>
+
+-- A store failure is the client's 503: try another substituter, or later.
+instance IntoResponse StoreError
+  into_response : self -> Response
+  into_response self =
+    eprintln! \-> "vcache: #{self}"
+    (StatusCode::SERVICE_UNAVAILABLE, "store unavailable\n").into_response ()
+
+text : &'static str -> String -> Response
+text content_type body =
+  (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response ()
+
+not_found : Response
+not_found = (StatusCode::NOT_FOUND, "not found\n").into_response ()
+
+-- The narinfo, with this cache's signature added when it has a key.
+signed : &Signer -> NarInfo -> NarInfo
+signed signer info =
+  case &signer.0 of
+    None -> info
+    Some k -> with_signature k info
+
+with_signature : &SecretKey -> NarInfo -> NarInfo
+with_signature k info =
+  sig = sign k (&fingerprint (&info))
+  mut out = info
+  out.sigs.push sig
+  out
+
+export narinfo_page : &Signer -> Option<NarInfo> -> Response
+narinfo_page signer found =
+  case found of
+    None -> not_found ()
+    Some info -> text "text/x-nix-narinfo" (render (&signed signer info))
+
+-- The NAR, streamed: the body pulls the archive chunk by chunk, and its
+-- length is the one the database recorded.
+export nar_page : Option<NarInfo> -> Response
+nar_page found =
+  case found of
+    None -> not_found ()
+    Some info -> nar_body info
+
+nar_body : NarInfo -> Response
+nar_body info =
+  body = stream_body (nar::stream (PathBuf::from (&info.store_path)))
+  (StatusCode::OK, [(header::CONTENT_TYPE, .to_string "application/x-nix-nar"), (header::CONTENT_LENGTH, info.nar_size.to_string ())], body).into_response ()
+
+cache_info_effect : Effect<Response, StoreError, AppEnv>
+cache_info_effect =
+  effect!
+    let settings = ~Settings;
+    text("text/x-nix-cache-info", cache_info(&settings.store_dir, settings.priority))
+
+narinfo_effect : String -> Effect<Response, StoreError, AppEnv>
+narinfo_effect hash =
+  effect!
+    let store = ~PathInfoStore;
+    let signer = ~Signer;
+    let found = ~store.0.lookup(hash);
+    narinfo_page(signer, found)
+
+nar_effect : String -> Effect<Response, StoreError, AppEnv>
+nar_effect hash =
+  effect!
+    let store = ~PathInfoStore;
+    let found = ~store.0.lookup(hash);
+    nar_page(found)
+
+-- What a request is answered with.
+export answer : Route -> Effect<Response, StoreError, AppEnv>
+answer r =
+  case r of
+    Route::CacheInfo -> cache_info_effect ()
+    Route::NarInfo hash -> narinfo_effect hash
+    Route::Nar hash -> nar_effect hash
+    Route::Missing -> succeed (not_found ())
+
+handle : State<AppEnv> -> Uri -> impl std::future::Future<Output = Response> + Send
+handle st uri =
+  target = uri.path ().to_string ()
+  execute st (move \_env -> answer (route (&target)))
+
+-- The app: every path through `handle`, over `env`.
+export router : AppEnv -> axum::Router
+router env =
+  axum::Router::new () |> .fallback handle |> .with_state env
+
+#[cfg(test)]
+sample_info : NarInfo
+sample_info = NarInfo {
+    store_path = .to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"
+    , nar_hash = .to_string "sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4"
+    , nar_size = 256
+    , references = Vec::new ()
+    , deriver = None
+    , sigs = Vec::new ()
+    , ca = None
+    }
+
+#[cfg(test)]
+test_env : AppEnv
+test_env =
+  settings = Settings { db = String::new (), store_dir = .to_string "/nix/store", priority = 41, sign_key_file = None }
+  HCons::new (crate::store::memory (.to_vec ([sample_info ()]))) (HCons::new settings (HCons::new (Signer None) HNil))
+
+-- The status a request's effect answers with, run on the test executor.
+#[cfg(test)]
+status_of : Route -> Option<StatusCode>
+status_of r =
+  id_effect::testing::run_test (answer r |> .provide_env (test_env ())) |> .into_result |> .ok |> .map (\resp -> resp.status ())
+
+test "a hash part the store has is a 200 narinfo"
+  assert_eq! \-> status_of (Route::NarInfo (.to_string "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq")) \-> Some StatusCode::OK
+
+test "a hash part the store lacks is a 404"
+  assert_eq! \-> status_of (Route::NarInfo (.to_string "00000000000000000000000000000000")) \-> Some StatusCode::NOT_FOUND
+  assert_eq! \-> status_of (Route::Nar (.to_string "00000000000000000000000000000000")) \-> Some StatusCode::NOT_FOUND
+
+test "anything else is a 404, and cache info a 200"
+  assert_eq! \-> status_of Route::Missing \-> Some StatusCode::NOT_FOUND
+  assert_eq! \-> status_of Route::CacheInfo \-> Some StatusCode::OK
+
+test "without a key the narinfo keeps only the store's signatures"
+  assert! \-> !(render (&signed (&Signer None) (sample_info ())) |> .contains "Sig:")

@@ -1,0 +1,80 @@
+-- The program edge: configuration, construction, and the server. Everything
+-- here is one effect over the config provider; `main` provides the process
+-- environment as that provider and runs it (id_effect_cli's `run_main`, so
+-- the exit code follows the 0 / 1 / 101 / 130 taxonomy and Ctrl-C interrupts
+-- with finalizers).
+
+import std::convert::Infallible
+import id_effect::{Effect, HNil, effect, hlist, suspend}
+import id_effect_axum::{HostConfig, HostError, serve}
+import id_effect_config::{Config, ConfigEnv, ConfigError}
+import crate::db
+import crate::http::{Settings, Signer, router}
+import crate::signing::parse_secret_key
+import crate::store::{StoreError, lifted, live}
+
+-- Why the program stopped: each is the operator's to fix before a restart.
+export errors AppError
+  from ConfigError as Configuration  "configuration: #{0}"
+  from StoreError as Store           "#{0}"
+  from HostError as Host             "serving: #{0}"
+  SignKey String                     "signing key: #{0}"
+
+-- VCACHE_DB, VCACHE_STORE_DIR (/nix/store), VCACHE_PRIORITY (30) and
+-- VCACHE_SIGN_KEY_FILE (unset: narinfos carry only the store's own
+-- signatures). The listener is the host's HOST and PORT.
+export settings_config : Config<Settings>
+settings_config =
+  Config::all ((Config::string "VCACHE_DB" |> .with_default (db::DEFAULT_DB.to_string ()), Config::string "VCACHE_STORE_DIR" |> .with_default (.to_string "/nix/store"), Config::integer "VCACHE_PRIORITY" |> .with_default 30, Config::optional_string "VCACHE_SIGN_KEY_FILE")) |> .map settings_of
+
+settings_of : (String, String, i64, Option<String>) -> Settings
+settings_of fields =
+  (db, store_dir, priority, sign_key_file) = fields
+  Settings { db, store_dir, priority, sign_key_file }
+
+read_signer : Option<String> -> Result<Signer, String>
+read_signer file =
+  case file of
+    None -> Ok (Signer None)
+    Some path -> read_key_file path
+
+read_key_file : String -> Result<Signer, String>
+read_key_file path =
+  text = (std::fs::read_to_string (&path) |> .map_err (\e -> "#{path}: #{e}"))?
+  key = (parse_secret_key (&text) |> .map_err (\e -> "#{path}: #{e}"))?
+  Ok (Signer (Some key))
+
+load_signer : Option<String> -> Effect<Signer, AppError, HNil>
+load_signer file = suspend (move \-> lifted (read_signer file |> .map_err SignKey))
+
+-- Connections in the store's pool: two per CPU.
+pool_size : usize
+pool_size =
+  std::thread::available_parallelism () |> .map (\n -> n.get () * 2) |> .unwrap_or 8
+
+-- Load, construct, serve until interrupted.
+export program : Effect<Infallible, AppError, ConfigEnv>
+program =
+  effect!
+    let settings = ~settings_config().run::<Settings, AppError, ConfigEnv, _>();
+    let host = ~HostConfig::config().run::<HostConfig, AppError, ConfigEnv, _>();
+    let signer = ~load_signer(settings.sign_key_file.clone());
+    let store = ~live(settings.db.clone(), settings.store_dir.clone(), pool_size()).map_err(AppError::from);
+    eprintln!("vcache: serving {} from {} on {}:{}", settings.store_dir, settings.db, host.bind_host, host.bind_port);
+    ~serve(router(hlist![store, settings, signer])).provide(host).map_err(AppError::from)
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the tokio context the HTTP listener needs, so
+-- the program runs as the root's child. Structured: an interrupt of the root
+-- (Ctrl-C, SIGINT) interrupts and awaits the child, so the server drains and
+-- every finalizer runs before the 130 exit.
+supervised : Effect<Infallible, AppError, ConfigEnv>
+supervised =
+  effect!
+    let child = ~program().fork();
+    ~child.join::<ConfigEnv>()
+
+-- The process: the environment as the config provider, under `run_main`.
+export main_code : std::process::ExitCode
+main_code =
+  id_effect_cli::run_main (supervised ().provide_layer (id_effect_config::EnvConfigProviderLive::layer ())) HNil (id_effect_cli::RunMainConfig::default ())
