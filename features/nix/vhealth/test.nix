@@ -41,7 +41,7 @@ in
             url = "http://127.0.0.1:9100/metrics";
             bodyContains = "node_exporter_build_info";
           };
-          nix-daemon = {
+          nix-daemon-socket = {
             type = "unix";
             path = "/nix/var/nix/daemon-socket/socket";
           };
@@ -91,7 +91,9 @@ in
           assert r["failing"] == ["liar"], r
           assert probes["liar"]["up"] is False, probes["liar"]
           assert "127.0.0.1:${toString liarPort}" in probes["liar"]["detail"], probes["liar"]
-          for name in ["node-exporter", "nix-daemon", "true-command", "stamp"]:
+          # nix-daemon-socket (unix): the socket accepts; nix-daemon (the built-in command probe,
+          # as vhealth's non-root user in the service, as root here): the daemon answers.
+          for name in ["node-exporter", "nix-daemon-socket", "nix-daemon", "true-command", "stamp"]:
               assert probes[name]["up"] is True, probes[name]
 
       with subtest("a probe past its timeout is down, and is not waited for"):
