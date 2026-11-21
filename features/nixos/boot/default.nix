@@ -13,10 +13,18 @@
 #
 # Secure Boot and TPM2 unlock need someone at the machine (key enrollment, a TPM PCR
 # binding), so they ship as options that default to OFF. The runbooks are in ADR-0007.
+#
+# The lanzaboote module (flake input, GH-184) is imported here, on every host that has the
+# input, and stays inert until features.hardening.secureBoot.enable turns it on. An
+# evaluation without the input (inputs.lanzaboote absent or null) still gets the option,
+# and the assertion below refuses to turn it on there. The reboot/rollback VM test is
+# ./test.nix (checks.x86_64-linux.lanzaboote-vm).
 {
   config,
   lib,
   options,
+  inputs,
+  pkgs,
   ...
 }: let
   cfg = config.features.hardening;
@@ -50,14 +58,19 @@
   ];
 
   hasLanzaboote = options ? boot && options.boot ? lanzaboote;
+  lanzaboote = inputs.lanzaboote or null;
 in {
+  imports = lib.optional (lanzaboote != null) lanzaboote.nixosModules.lanzaboote;
+
   options.features.hardening = {
     secureBoot = {
       enable = lib.mkEnableOption ''
-        UEFI Secure Boot through lanzaboote. OFF by default: it needs the lanzaboote flake
-        input, keys created with sbctl, and the firmware in setup mode to enroll them. Turning
-        it on before that leaves a host its firmware refuses to boot. See ADR-0007,
-        "Runbook: Secure Boot"'';
+        UEFI Secure Boot through lanzaboote, which replaces the Python systemd-boot
+        installer with lzbt (signed UKIs on the ESP). OFF by default. The keys must exist
+        in pkiBundle (`sudo sbctl create-keys`) BEFORE the first deploy with this on, or
+        the bootloader install fails and the switch with it. Secure Boot itself stays off
+        in firmware until the keys are enrolled at the machine; the signed images boot
+        either way. See ADR-0007, "Runbook: Secure Boot"'';
 
       pkiBundle = lib.mkOption {
         type = lib.types.str;
@@ -164,14 +177,18 @@ in {
       };
     }
 
-    (lib.mkIf cfg.secureBoot.enable ({
+    # mkMerge, not `//`: the right-hand `boot.lanzaboote` used to replace the whole `boot`
+    # attrset on the left, so systemd-boot was never turned off and the editor stayed on.
+    # Nothing noticed while the lanzaboote module was absent (GH-184).
+    (lib.mkIf cfg.secureBoot.enable (lib.mkMerge [
+      {
         assertions = [
           {
             assertion = hasLanzaboote;
             message = ''
               features.hardening.secureBoot.enable needs the lanzaboote NixOS module, which
-              this flake does not import yet. Add the input and
-              inputs.lanzaboote.nixosModules.lanzaboote to the host's modules first
+              this evaluation does not have: features/nixos/boot imports it from
+              inputs.lanzaboote (the flake input), and that is absent or null here
               (ADR-0007, "Runbook: Secure Boot").
             '';
           }
@@ -181,13 +198,16 @@ in {
         # With signed UKIs the command line is part of what's signed. Leaving the editor on
         # would defeat the measurement.
         boot.loader.systemd-boot.editor = false;
+        # `sbctl verify` (is everything on the ESP signed?) and `sbctl status`.
+        environment.systemPackages = [pkgs.sbctl];
       }
-      // lib.optionalAttrs hasLanzaboote {
+      (lib.optionalAttrs hasLanzaboote {
         boot.lanzaboote = {
           enable = true;
           inherit (cfg.secureBoot) pkiBundle;
         };
-      }))
+      })
+    ]))
 
     (lib.mkIf cfg.tpm2Unlock.enable {
       security.tpm2.enable = true;

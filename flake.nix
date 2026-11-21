@@ -148,6 +148,20 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Secure Boot for NixOS: lzbt, a Rust bootloader installer that reads bootspec and
+    # signs what it puts on the ESP. It replaces the Python systemd-boot installer only on
+    # a host with features.hardening.secureBoot.enable (features/nixos/boot, ADR-0007);
+    # everywhere else the module is imported but inert. nixpkgs dropped lanzaboote-tool, so
+    # this is the only source. Pinned to a release tag. Every input it brings follows ours:
+    # crane has no inputs, rust-overlay and the git-hooks source (unused by its outputs)
+    # take our nixpkgs and flake-compat. Exception to the Voltaic + id_effect rule granted
+    # for GH-184: adopting upstream, not writing a new installer.
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v1.2.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.pre-commit.inputs.flake-compat.follows = "flake-compat";
+    };
+
     # Pull-based convergence; not packaged in nixpkgs. See ADR-0002.
     comin = {
       url = "github:nlewo/comin";
@@ -218,7 +232,7 @@
   };
 
   outputs = inputs @ {self, ...}: let
-    lib = inputs.nixpkgs.lib;
+    inherit (inputs.nixpkgs) lib;
     system = "x86_64-linux";
     pkgs = inputs.nixpkgs.legacyPackages.${system};
     hosts = (import ./common/fleet.nix).names;
@@ -358,6 +372,9 @@
       // {vverify-vm = import ./features/nix/vverify/test.nix {inherit pkgs;};}
       # vbuild's two-node test and fan-out benchmark (rust/tools/vbuild/vm-test.nix).
       // {vbuild-vm = import ./rust/tools/vbuild/vm-test.nix {inherit pkgs;};}
+      # features/nixos/boot's Secure Boot path (GH-184): systemd-boot -> lanzaboote -> reboot
+      # -> rollback to systemd-boot -> reboot, through OVMF and the ESP.
+      // {lanzaboote-vm = import ./features/nixos/boot/test.nix {inherit pkgs inputs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
