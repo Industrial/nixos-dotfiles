@@ -17,8 +17,9 @@ build = "build.rs"
 [dependencies]
 # Effects, typed errors, parallel phases and the run edge. Fleet-wide pin.
 id_effect = "=0.13.0"
+# Store paths and the NAR hash, shared by the Voltaic store tools (rust/tools/nix-store-core).
+nix-store-core = { path = "../nix-store-core" }
 rusqlite = { version = "0.37", features = ["bundled"] }
-sha2 = "0.10"
 # Safe unshare / mount / statvfs for the private, writable store mount.
 nix = { version = "0.30", default-features = false, features = [
   "sched",

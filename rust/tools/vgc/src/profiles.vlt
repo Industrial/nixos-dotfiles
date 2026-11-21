@@ -6,7 +6,7 @@
 import std::fs
 import std::os::unix::fs::MetadataExt
 import std::path::{Path, PathBuf}
-import crate::generations::{Generation, doomed, parse_generation}
+import crate::generations::{Generation, all_but, doomed, parse_generation}
 
 -- A profile and the generations that `--delete-older-than` would remove.
 -- `current` is None when the profile link does not name a generation, and
@@ -51,7 +51,8 @@ generations_of profile =
   (gens, current)
 
 -- The plan for every profile in `dirs` (deduplicated), given the cutoff.
-export plan : &[PathBuf] -> i64 -> Vec<Profile>
+-- `cutoff` None is `--delete-old`: every generation but the current one.
+export plan : &[PathBuf] -> Option<i64> -> Vec<Profile>
 plan dirs cutoff =
   mut seen = std::collections::BTreeSet::new () : std::collections::BTreeSet<PathBuf>
   for d in dirs
@@ -60,10 +61,12 @@ plan dirs cutoff =
   mut out = Vec::new () : Vec<Profile>
   for p in seen
     (gens, current) = generations_of (&p)
-    verdict = if current.is_some ()
-      doomed (&gens) current cutoff
-    else
+    verdict = if current.is_none ()
       Some (Vec::new ())
+    else if cutoff is Some t
+      doomed (&gens) current t
+    else
+      Some (all_but (&gens) current)
     blocked = verdict.is_none ()
     out.push (Profile { path = p, current, doomed = verdict.unwrap_or_default (), blocked })
   out

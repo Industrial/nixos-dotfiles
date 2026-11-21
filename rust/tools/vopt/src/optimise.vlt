@@ -19,8 +19,8 @@ import std::io::ErrorKind
 import std::os::unix::fs::{DirEntryExt, MetadataExt, PermissionsExt}
 import std::path::Path
 import std::time::{Duration, UNIX_EPOCH}
-import crate::nar::nar_hash
-import crate::storepath::STORE_DIR
+import nix_store_core::nar::nar_hash_nix32
+import nix_store_core::storepath::STORE_DIR
 
 export const LINKS_DIR : &str = "/nix/store/.links"
 
@@ -88,7 +88,7 @@ ensure_entry path link st mine =
 
 link_one : &Path -> &fs::Metadata -> &mut HashSet<u64> -> &mut Stats -> std::io::Result<()>
 link_one path st mine stats =
-  hash = (nar_hash path)?
+  hash = (nar_hash_nix32 path)?
   link = Path::new LINKS_DIR |> .join (&hash)
   if (ensure_entry path (&link) st mine)?
     case fs::symlink_metadata (&link) of

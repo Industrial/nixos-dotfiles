@@ -160,7 +160,7 @@ bin/fleet deploy <host>    # deploy-rs push; see docs/runbooks/fleet-deploy.md
 bin/generations/list                      # system generations
 bin/generations/rollback system-<N>-link  # switch to a generation (argument required)
 bin/generations/delete                    # delete all but the last 2
-bin/delete/collectgarbage                 # nix-collect-garbage -d
+bin/delete/collectgarbage                 # vgc run --delete-old (nix-collect-garbage -d)
 ```
 
 comin pulls `origin/main` on every host every 300 seconds, so an unpushed local switch is

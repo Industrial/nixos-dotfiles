@@ -30,7 +30,7 @@ sudo /nix/var/nix/profiles/<generation>/bin/switch-to-configuration switch
 # Delete every system generation but the newest two
 bin/generations/delete
 
-# nix-collect-garbage -d through the repo's root-cmd wrapper
+# vgc run --delete-old (nix-collect-garbage -d) through the repo's root-cmd wrapper
 bin/delete/collectgarbage
 
 # Newest nixos channel version, which is what stateVersion wants

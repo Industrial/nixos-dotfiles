@@ -17,6 +17,8 @@ build = "build.rs"
 [dependencies]
 # Effects, typed errors and the run edge. Fleet-wide pin.
 id_effect = "=0.13.0"
+# Store-path primitives shared by the Voltaic store tools (rust/tools/nix-store-core).
+nix-store-core = { path = "../nix-store-core" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 # Safe unshare / mount / statvfs: the private mount namespace in which the
 # read-only store bind is remounted writable (src/mounts.vlt).

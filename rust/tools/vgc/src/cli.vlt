@@ -2,7 +2,7 @@
 --
 --   vgc plan  [--delete-older-than Nd] [--print-dead]
 --   vgc check
---   vgc run   [--delete-older-than Nd] [--dry-run] [--verify]
+--   vgc run   [--delete-older-than Nd | -d|--delete-old] [--dry-run] [--verify]
 --
 -- `plan` says what a collection would remove. `check` compares vgc's dead set
 -- with `nix-store --gc --print-dead` and exits 1 on any difference. `run` is
@@ -28,11 +28,11 @@ import crate::effects::{GcError, exit_code, step}
 import crate::generations::cutoff_of
 import crate::profiles::{Profile, plan, root_dirs}
 import crate::roots::{Roots, find_all}
-import crate::storepath::{STORE_DIR, STORE_PREFIX, full, hash_part, valid_base}
+import nix_store_core::storepath::{STORE_DIR, STORE_PREFIX, full, hash_part, valid_base}
 
-const USAGE : &str = "usage: vgc (plan|check|run) [--delete-older-than Nd] [--dry-run] [--print-dead] [--verify]"
+const USAGE : &str = "usage: vgc (plan|check|run) [--delete-older-than Nd | -d|--delete-old] [--dry-run] [--print-dead] [--verify]"
 
-data Options { command String, older_than Option<String>, dry_run bool, print_dead bool, verify bool, unknown Vec<String> }
+data Options { command String, older_than Option<String>, delete_old bool, dry_run bool, print_dead bool, verify bool, unknown Vec<String> }
   deriving (Debug, Clone, Default)
 
 parse_args : &[String] -> Options
@@ -47,6 +47,10 @@ parse_args args =
       Some a -> case a.as_str () of
         "--delete-older-than" ->
           o.older_than := Some (it.next () |> .cloned |> .unwrap_or_default)
+        "--delete-old" ->
+          o.delete_old := true
+        "-d" ->
+          o.delete_old := true
         "--dry-run" ->
           o.dry_run := true
         "--print-dead" ->
@@ -187,8 +191,13 @@ delete_generations p =
 -- Generations first: removing them is what turns their closures into garbage.
 prune_generations : &Options -> Result<(), String>
 prune_generations o =
-  if &o.older_than is Some spec
-    cutoff = (cutoff_of spec (now_secs ()))?
+  mode = if o.delete_old
+    Some None
+  else if &o.older_than is Some spec
+    Some (Some ((cutoff_of spec (now_secs ()))?))
+  else
+    None
+  if mode is Some cutoff
     for p in plan (&(root_dirs ())) cutoff
       if p.blocked
         eprintln! \-> "vgc: leaving #{p.path.display ()} alone: generation times are not monotonic (Nix would abort here)"
@@ -322,7 +331,7 @@ print_dead a =
 
 plan_cmd : Options -> Effect<i32, GcError>
 plan_cmd o =
-  dry = Options { dry_run = true, older_than = o.older_than.clone (), ...Options::default () }
+  dry = Options { dry_run = true, older_than = o.older_than.clone (), delete_old = o.delete_old, ...Options::default () }
   listing = o.print_dead
   (step (move \-> prune_generations (&dry)) GcError::Nix) |> .flat_map (move \_ -> analyse ()) |> .map (move \a -> finish listing a)
 

@@ -5,5 +5,7 @@ set -e
 
 source "$(dirname "$0")/../lib/root-cmd.sh"
 
-echo "> nix-collect-garbage -d"
-root_cmd nix-collect-garbage -d
+# vgc (rust/tools/vgc) is the fleet's collector; -d is nix-collect-garbage's
+# --delete-old: every generation but the current one, then a collection.
+echo "> vgc run --delete-old"
+root_cmd vgc run --delete-old

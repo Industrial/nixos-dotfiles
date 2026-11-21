@@ -26,7 +26,6 @@ macro_rules! voltaic {
     };
 }
 
-voltaic!(storepath);
 voltaic!(generations);
 voltaic!(db);
 voltaic!(roots);

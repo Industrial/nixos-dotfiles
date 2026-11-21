@@ -12,7 +12,7 @@
 import nix::mount::{MsFlags, mount}
 import nix::sched::{CloneFlags, unshare}
 import nix::sys::statvfs::{FsFlags, statvfs}
-import crate::storepath::STORE_DIR
+import nix_store_core::storepath::STORE_DIR
 
 -- MS_REMOUNT | MS_BIND, plus each flag the current mount has that a remount
 -- would otherwise drop.
