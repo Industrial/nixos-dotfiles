@@ -1,0 +1,142 @@
+-- What a pass reports: a JSON document (every path that is not intact) and
+-- node_exporter textfile metrics (the counts). Rendering is pure; `publish`
+-- is the one write, and it is atomic: the text goes to a temporary file in
+-- the same directory, is synced, and is renamed over the old file, so the
+-- textfile collector never reads half a file.
+
+import std::fs
+import std::io::Write
+import std::path::{Path, PathBuf}
+import crate::verify::{Checked, Tally, Verdict}
+
+-- The metrics file node_exporter's textfile collector reads (`*.prom`).
+export const METRICS_FILE : &str = "vverify.prom"
+
+-- A finished pass: when it ended (Unix seconds), how long it took, and what
+-- it found.
+export data Pass { export store_dir String, export finished u64, export duration f64, export tally Tally }
+  deriving (Clone, Debug, PartialEq)
+
+-- A JSON string literal.
+quote : &str -> String
+quote s = serde_json::to_string s |> .unwrap_or_else (\_ -> .to_string "\"\"")
+
+corrupt_json : &Checked -> String
+corrupt_json c =
+  case &c.verdict of
+    Verdict::Corrupt want got want_size got_size -> "{\"path\":#{quote (&c.path)},\"expected_hash\":#{quote want},\"actual_hash\":#{quote got},\"expected_size\":#{want_size},\"actual_size\":#{got_size}}"
+    _ -> "{\"path\":#{quote (&c.path)}}"
+
+unreadable_json : &Checked -> String
+unreadable_json c =
+  case &c.verdict of
+    Verdict::Unreadable why -> "{\"path\":#{quote (&c.path)},\"error\":#{quote why}}"
+    _ -> "{\"path\":#{quote (&c.path)}}"
+
+joined : Vec<String> -> String
+joined items =
+  inner = items.join ","
+  "[#{inner}]"
+
+-- The report: one line of JSON.
+export json : &Pass -> String
+json p =
+  t = &p.tally
+  corrupt = joined (t.corrupt.iter () |> .map corrupt_json |> .collect)
+  missing = joined (t.missing.iter () |> .map (\c -> quote (&c.path)) |> .collect)
+  unreadable = joined (t.unreadable.iter () |> .map unreadable_json |> .collect)
+  "{\"store_dir\":#{quote (&p.store_dir)},\"finished\":#{p.finished},\"duration_seconds\":#{p.duration:.3},\"paths_total\":#{t.total},\"paths_intact\":#{t.intact},\"paths_vanished\":#{t.vanished},\"corrupt\":#{corrupt},\"missing\":#{missing},\"unreadable\":#{unreadable}}"
+
+gauge : &str -> &str -> String -> String
+gauge name help value = "# HELP #{name} #{help}\n# TYPE #{name} gauge\n#{name} #{value}\n"
+
+-- The textfile metrics, in the Prometheus text exposition format.
+export metrics : &Pass -> String
+metrics p =
+  t = &p.tally
+  .concat ([gauge "vverify_paths_total" "Valid store paths checked by the last vverify pass." (t.total.to_string ()), gauge "vverify_paths_corrupt" "Store paths whose NAR hash or size differs from the database's." (t.corrupt.len ().to_string ()), gauge "vverify_paths_missing" "Valid store paths absent from disk." (t.missing.len ().to_string ()), gauge "vverify_paths_unreadable" "Store paths that could not be read." (t.unreadable.len ().to_string ()), gauge "vverify_last_run_timestamp_seconds" "Unix time the last vverify pass finished." (p.finished.to_string ()), gauge "vverify_duration_seconds" "Wall time of the last vverify pass." ("#{p.duration:.3}")])
+
+-- When the pass recorded in a metrics file finished, if it records one.
+export last_run : &str -> Option<u64>
+last_run text =
+  text.lines () |> .find_map (\l -> l.strip_prefix "vverify_last_run_timestamp_seconds ") |> .and_then (\v -> v.trim () |> .parse |> .ok)
+
+-- Replace `file` with `text`, atomically.
+export write_atomic : &Path -> &str -> std::io::Result<()>
+write_atomic file text =
+  dir = file.parent () |> .unwrap_or (Path::new ".")
+  name = file.file_name () |> .map (\n -> n.to_string_lossy () |> .into_owned) |> .unwrap_or_default
+  tmp = dir.join (".#{name}.tmp")
+  mut out = (fs::File::create (&tmp))?
+  (out.write_all (text.as_bytes ()))?
+  (out.sync_all ())?
+  fs::rename (&tmp) file
+
+-- Where a pass's metrics go in a textfile directory.
+export metrics_path : &str -> PathBuf
+metrics_path dir = Path::new dir |> .join METRICS_FILE
+
+-- Publish a pass: the metrics into the textfile directory and the JSON
+-- report into its file, when either was asked for.
+export publish : &Pass -> Option<String> -> Option<String> -> Result<(), String>
+publish p textfile_dir report_file =
+  if textfile_dir is Some dir
+    target = metrics_path (&dir)
+    (write_atomic (&target) (&metrics p) |> .map_err (\e -> "writing #{target.display ()}: #{e}"))?
+  if report_file is Some file
+    (write_atomic (Path::new (&file)) (&"#{json p}\n") |> .map_err (\e -> "writing #{file}: #{e}"))?
+  Ok ()
+
+#[cfg(test)]
+sample : Pass
+sample =
+  mut t = Tally::default ()
+  t.total := 4
+  t.intact := 1
+  t.corrupt := .to_vec ([Checked { path = .to_string "/nix/store/a\"b", verdict = Verdict::Corrupt (.to_string "sha256:x") (.to_string "sha256:y") 8 9 }])
+  t.missing := .to_vec ([Checked { path = .to_string "/nix/store/m", verdict = Verdict::Missing }])
+  t.unreadable := .to_vec ([Checked { path = .to_string "/nix/store/u", verdict = Verdict::Unreadable (.to_string "Permission denied") }])
+  Pass { store_dir = .to_string "/nix/store", finished = 1700000000, duration = 12.5, tally = t }
+
+test "the metrics carry every gauge, one sample each"
+  m = metrics (&sample ())
+  assert! \-> m.contains "\nvverify_paths_total 4\n"
+  assert! \-> m.contains "\nvverify_paths_corrupt 1\n"
+  assert! \-> m.contains "\nvverify_paths_missing 1\n"
+  assert! \-> m.contains "\nvverify_paths_unreadable 1\n"
+  assert! \-> m.contains "\nvverify_last_run_timestamp_seconds 1700000000\n"
+  assert! \-> m.contains "\nvverify_duration_seconds 12.500\n"
+  assert_eq! \-> m.matches "# TYPE " |> .count \-> 6
+
+test "the last run is read back from the metrics"
+  assert_eq! \-> last_run (&metrics (&sample ())) \-> Some 1700000000
+  assert_eq! \-> last_run "vverify_paths_total 3\n" \-> None
+  assert_eq! \-> last_run "" \-> None
+
+test "the report is JSON, with every fault and escaped paths"
+  text = json (&sample ())
+  parsed = serde_json::from_str (&text) : Result<serde_json::Value, serde_json::Error>
+  v = parsed |> .expect "valid JSON"
+  assert_eq! \-> v["paths_total"] \-> 4
+  assert_eq! \-> v["corrupt"][0]["path"] \-> "/nix/store/a\"b"
+  assert_eq! \-> v["corrupt"][0]["actual_size"] \-> 9
+  assert_eq! \-> v["missing"][0] \-> "/nix/store/m"
+  assert_eq! \-> v["unreadable"][0]["error"] \-> "Permission denied"
+
+test "publishing replaces the files whole and leaves no temporary behind"
+  dir = std::env::temp_dir () |> .join (format! \-> "vverify-publish-#{std::process::id ()}")
+  fs::create_dir_all (&dir) |> .expect "a temp dir"
+  d = dir.to_string_lossy () |> .into_owned
+  report = dir.join "report.json" |> .to_string_lossy |> .into_owned
+  fs::write (metrics_path (&d)) "stale" |> .expect "an old file"
+  assert_eq! \-> publish (&sample ()) (Some (d.clone ())) (Some (report.clone ())) \-> Ok ()
+  written = fs::read_to_string (metrics_path (&d)) |> .expect "the metrics"
+  assert_eq! \-> written \-> metrics (&sample ())
+  assert! \-> fs::read_to_string (&report) |> .expect "the report" |> .starts_with "{"
+  names = fs::read_dir (&dir) |> .expect "the dir" |> .filter_map (\e -> e.ok ()) |> .map (\e -> e.file_name ().to_string_lossy ().into_owned ()) |> .collect : Vec<String>
+  assert! \-> names.iter () |> .all (\n -> !(n.ends_with ".tmp"))
+  fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "publishing into a directory that does not exist fails with its path"
+  r = publish (&sample ()) (Some (.to_string "/nonexistent/vverify")) None
+  assert! \-> r |> .err |> .map (\e -> e.contains "/nonexistent/vverify/vverify.prom") |> .unwrap_or false

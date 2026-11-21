@@ -42,5 +42,7 @@
   features.nix.vcache.enable = true;
   # vgc (Voltaic) replaces nix-collect-garbage for the weekly GC.
   features.nixos.vgc.enable = true;
+  # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
+  features.nix.vverify.enable = true;
   features.storage.nfs-client.enable = true;
 }

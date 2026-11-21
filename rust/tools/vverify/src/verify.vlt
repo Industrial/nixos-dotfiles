@@ -1,0 +1,244 @@
+-- One store path checked against what the database registered for it, and
+-- the tally of a whole pass.
+--
+-- The database holds the SHA-256 and length Nix computed for every valid
+-- path's NAR when it registered the path. Archiving the path again and
+-- hashing it must give the same digest and the same length: anything else is
+-- corruption on disk (a flipped bit, a truncated or rewritten file, a file
+-- added or removed). This is the content half of `nix store verify --all`;
+-- signatures and the reference graph are not checked.
+--
+-- `judge` is the decision and stays pure; `check` is the one blocking read.
+
+import std::io::{Error, ErrorKind}
+import std::path::Path
+import rusqlite::Connection
+import nix_store_core::db
+import nix_store_core::hash
+import nix_store_core::nar
+import nix_store_core::nar::NarDigest
+
+-- A valid path as the database lists it. `nar_hash` is the database form,
+-- `sha256:<base16>`.
+export data Candidate { export path String, export nar_hash String, export nar_size u64 }
+  deriving (Clone, Debug, PartialEq)
+
+-- What checking one path found.
+export data Verdict
+  = Intact
+  -- The NAR on disk differs from the registration: hashes as `sha256:<nix32>`.
+  | Corrupt String String u64 u64
+  -- The path is valid in the database but not on disk.
+  | Missing
+  -- The path could not be read (permissions, I/O errors).
+  | Unreadable String
+  -- Missing on disk because it is no longer valid either: collected while the
+  -- pass ran. Not a fault.
+  | Vanished
+  deriving (Clone, Debug, PartialEq)
+
+export data Checked { export path String, export verdict Verdict }
+  deriving (Clone, Debug, PartialEq)
+
+-- Every valid path, in path order.
+const ALL_VALID : &str = "SELECT path, hash, narSize FROM ValidPaths ORDER BY path"
+
+export valid_paths : &Connection -> rusqlite::Result<Vec<Candidate>>
+valid_paths conn =
+  mut stmt = (conn.prepare ALL_VALID)?
+  rows = (stmt.query_map () (\r -> Ok (Candidate { path = (r.get 0)?, nar_hash = (r.get 1)?, nar_size = (r.get 2 : rusqlite::Result<Option<u64>>)? |> .unwrap_or 0 })))?
+  rows.collect ()
+
+-- The registered hash, in the form a report prints (`sha256:<nix32>`).
+shown : &str -> String
+shown registered =
+  case hash::parse registered of
+    Some h -> hash::typed_nix32 (&h)
+    None -> registered.to_string ()
+
+-- The verdict on a path from its NAR digest, or from why it could not be
+-- archived. A registered hash that does not parse cannot match anything, so
+-- it is reported as corrupt, with the database's text.
+export judge : &Candidate -> std::io::Result<NarDigest> -> Verdict
+judge c got =
+  case got of
+    Ok d ->
+      same = hash::parse (&c.nar_hash) == Some d.hash
+      if same && d.size == c.nar_size
+        Intact
+      else
+        Corrupt (shown (&c.nar_hash)) (hash::typed_nix32 (&d.hash)) c.nar_size d.size
+    Err e -> unreadable (&c.path) e
+
+unreadable : &str -> Error -> Verdict
+unreadable path e =
+  root_gone = std::fs::symlink_metadata path |> .err |> .map (\m -> m.kind () == ErrorKind::NotFound) |> .unwrap_or false
+  if e.kind () == ErrorKind::NotFound && root_gone
+    Missing
+  else
+    Unreadable (e.to_string ())
+
+-- Archive and hash one path (blocking: the whole NAR is read, one chunk at a
+-- time), then judge it.
+export check : Candidate -> Checked
+check c =
+  verdict = judge (&c) (nar::nar_hash (Path::new (&c.path)))
+  Checked { path = c.path, verdict }
+
+-- A missing path is only missing if it is still valid: a garbage collection
+-- that ran during the pass removes paths after we listed them. The database
+-- is asked again, on a connection of its own (this is the rare case).
+export recheck : &str -> Checked -> Checked
+recheck db_path found =
+  if found.verdict == Missing && gone db_path (&found.path)
+    Checked { path = found.path, verdict = Vanished }
+  else
+    found
+
+-- Whether the database positively says the path is no longer valid. A
+-- database that cannot be asked says nothing, and the path stays missing.
+gone : &str -> &str -> bool
+gone db_path path =
+  case db::open db_path of
+    Err _ -> false
+    Ok conn -> db::path_info (&conn) path |> .map (\i -> i.is_none ()) |> .unwrap_or false
+
+-- A pass's findings: counts, and every path that is not intact.
+export data Tally
+  { export total u64
+  , export intact u64
+  , export vanished u64
+  , export corrupt Vec<Checked>
+  , export missing Vec<Checked>
+  , export unreadable Vec<Checked>
+  }
+  deriving (Clone, Debug, Default, PartialEq)
+
+export add : Tally -> Checked -> Tally
+add t c =
+  mut out = t
+  out.total += 1
+  case &c.verdict of
+    Intact -> out.intact += 1
+    Vanished -> out.vanished += 1
+    Corrupt _ _ _ _ -> out.corrupt.push c
+    Missing -> out.missing.push c
+    Unreadable _ -> out.unreadable.push c
+  out
+
+export tally : Vec<Checked> -> Tally
+tally all =
+  all |> .into_iter |> .fold (Tally::default ()) add
+
+-- Paths that need an operator: corrupt, missing or unreadable.
+export faults : &Tally -> usize
+faults t =
+  t.corrupt.len () + t.missing.len () + t.unreadable.len ()
+
+#[cfg(test)]
+candidate : &str -> &str -> u64 -> Candidate
+candidate path h size = Candidate { path = path.to_string (), nar_hash = h.to_string (), nar_size = size }
+
+#[cfg(test)]
+digest_of : &str -> u64 -> NarDigest
+digest_of h size =
+  NarDigest { hash = hash::parse h |> .expect "a test hash", size }
+
+#[cfg(test)]
+const H1 : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
+
+#[cfg(test)]
+const H2 : &str = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+test "a path whose NAR hashes as registered is intact"
+  c = candidate "/nix/store/x" H1 8
+  assert_eq! \-> judge (&c) (Ok (digest_of H1 8)) \-> Intact
+
+test "a different hash is corruption, reported in nix32"
+  c = candidate "/nix/store/x" H1 8
+  v = judge (&c) (Ok (digest_of H2 8))
+  want = Corrupt (shown H1) (shown H2) 8 8
+  assert_eq! \-> v \-> want
+  assert! \-> shown H1 |> .starts_with "sha256:"
+  assert_eq! \-> shown H1 |> .len \-> 59
+
+test "the same hash with a different size is corruption"
+  c = candidate "/nix/store/x" H1 8
+  assert! \-> judge (&c) (Ok (digest_of H1 9)) |> .ne (&Intact)
+
+test "an unparsable registration never matches"
+  c = candidate "/nix/store/x" "md5:abc" 8
+  assert_eq! \-> judge (&c) (Ok (digest_of H1 8)) \-> Corrupt (.to_string "md5:abc") (shown H1) 8 8
+
+test "a path that is not there is missing"
+  c = candidate "/nonexistent/vverify-test-path" H1 8
+  assert_eq! \-> judge (&c) (Err (Error::from ErrorKind::NotFound)) \-> Missing
+
+test "an error reading a path that exists is unreadable"
+  c = candidate "/" H1 8
+  assert_eq! \-> judge (&c) (Err (Error::from ErrorKind::PermissionDenied)) \-> Unreadable (Error::from ErrorKind::PermissionDenied |> .to_string)
+
+test "a file inside a path that disappeared is unreadable, not missing"
+  c = candidate "/" H1 8
+  assert! \-> judge (&c) (Err (Error::from ErrorKind::NotFound)) |> .ne (&Missing)
+
+test "a real file checks against its own digest"
+  dir = std::env::temp_dir () |> .join "vverify-check-test"
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  file = dir.join "f"
+  std::fs::write (&file) "hello\n" |> .expect "a temp file"
+  path = file.to_string_lossy () |> .into_owned
+  d = nar::nar_hash (&file) |> .expect "a NAR"
+  good = check (Candidate { path = path.clone (), nar_hash = hash::typed_base16 (&d.hash), nar_size = d.size })
+  assert_eq! \-> good.verdict \-> Intact
+  std::fs::write (&file) "hellO\n" |> .expect "a corrupted file"
+  bad = check (Candidate { path = path.clone (), nar_hash = hash::typed_base16 (&d.hash), nar_size = d.size })
+  assert! \-> bad.verdict |> .ne (&Intact)
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "a tally counts every verdict and keeps the faults"
+  checked = .to_vec ([Checked { path = .to_string "a", verdict = Intact }, Checked { path = .to_string "b", verdict = Missing }, Checked { path = .to_string "c", verdict = Vanished }, Checked { path = .to_string "d", verdict = Corrupt (.to_string "x") (.to_string "y") 1 2 }, Checked { path = .to_string "e", verdict = Unreadable (.to_string "denied") }])
+  t = tally checked
+  assert_eq! \-> (t.total, t.intact, t.vanished) \-> (5, 1, 1)
+  assert_eq! \-> (t.corrupt.len (), t.missing.len (), t.unreadable.len ()) \-> (1, 1, 1)
+  assert_eq! \-> faults (&t) \-> 3
+
+-- Nix's schema for the two tables read here (nix-store-core's own test
+-- database is private to its tests), at `file`, with two rows; one has no
+-- narSize.
+#[cfg(test)]
+listing_db : &Path -> Connection
+listing_db file =
+  conn = Connection::open file |> .expect "a test database"
+  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
+  added = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) VALUES (?1, ?2, 0, 8)" (["/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b", H2]) |> .expect "a path"
+  assert_eq! \-> added \-> 1
+  bare = conn.execute "INSERT INTO ValidPaths (path, hash, registrationTime) VALUES (?1, ?2, 0)" (["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a", H1]) |> .expect "a path"
+  assert_eq! \-> bare \-> 1
+  conn
+
+test "listing reads every valid path with its registration, in path order"
+  conn = listing_db (Path::new ":memory:")
+  listed = valid_paths (&conn) |> .expect "a listing"
+  assert_eq! \-> listed \-> .to_vec ([candidate "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a" H1 0, candidate "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b" H2 8])
+
+test "a missing path vanished only when the database no longer has it"
+  dir = std::env::temp_dir () |> .join (format! \-> "vverify-recheck-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  file = dir.join "db.sqlite"
+  conn = listing_db (&file)
+  drop conn
+  db_path = file.to_string_lossy () |> .into_owned
+  gone_path = Checked { path = .to_string "/nix/store/00000000000000000000000000000000-gone", verdict = Missing }
+  assert_eq! \-> (recheck (&db_path) gone_path).verdict \-> Vanished
+  valid_path = Checked { path = .to_string "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a", verdict = Missing }
+  assert_eq! \-> (recheck (&db_path) valid_path).verdict \-> Missing
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "a database that cannot be opened leaves a missing path missing"
+  found = Checked { path = .to_string "/nix/store/x", verdict = Missing }
+  assert_eq! \-> recheck "/nonexistent/vverify-test.sqlite" (found.clone ()) \-> found
+
+test "only missing paths are rechecked"
+  found = Checked { path = .to_string "/nix/store/x", verdict = Unreadable (.to_string "denied") }
+  assert_eq! \-> recheck "/nonexistent/vverify-test.sqlite" (found.clone ()) \-> found

@@ -354,6 +354,8 @@
       {}
       hosts
       // (builtins.removeAttrs self.stigVmTests ["passthru"])
+      # features/nix/vverify's VM test: a corrupted store path is reported.
+      // {vverify-vm = import ./features/nix/vverify/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
