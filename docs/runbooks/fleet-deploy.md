@@ -50,8 +50,9 @@ Manual rollback on host:
 ```bash
 sudo nixos-rebuild switch --rollback
 # or pick a generation:
-sudo nix-env -p /nix/var/nix/profiles/system --list-generations
-sudo /nix/var/nix/profiles/system-<N>-link/bin/switch-to-configuration switch
+sudo vgen list            # every system profile: system, and comin's under system-profiles/
+sudo /nix/var/nix/profiles/system-profiles/comin-<N>-link/bin/switch-to-configuration switch
+# (or /nix/var/nix/profiles/system-<N>-link/... for a nixos-rebuild/deploy-rs generation)
 ```
 
 Re-enabling `magicRollback` is tracked as follow-up in

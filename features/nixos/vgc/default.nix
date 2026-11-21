@@ -25,7 +25,7 @@ in {
     startAt = "weekly";
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${lib.getExe vgc} run --delete-older-than 30d";
+      ExecStart = "${lib.getExe vgc} run" + lib.optionalString (!(config.features.nixos.vgen.enable or false)) " --delete-older-than 30d"; # vgen-prune owns retention when on (GH-190)
       # /nix/store is a read-only bind mount. vgc makes it writable for itself
       # the way Nix does (private mount namespace + bind remount, src/mounts.vlt),
       # so the unit needs no mount options and the host keeps a read-only store.

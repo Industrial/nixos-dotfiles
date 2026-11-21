@@ -1,0 +1,559 @@
+-- vgen's command line.
+--
+--   vgen list  [--profile P]... [--no-diff] [--db PATH]
+--   vgen pin   <N> [--profile P]
+--   vgen unpin <N> [--profile P]
+--   vgen prune [--keep N] [--keep-days D] [--profile P]... [--all-profiles] [--dry-run] [--no-boot] [--boot-default LINK]
+--
+-- `list` shows the system profiles (`system` and every one in
+-- `system-profiles/`, comin's among them) with each generation's date, the
+-- system it boots, whether it is current, booted, running or pinned, and a
+-- vdiff summary against the generation before it. `pin` and `unpin` add and
+-- remove a generation's GC root (`pin.vlt`); with no `--profile` they act on
+-- the system profile switched last. `prune` removes generations by policy
+-- (`policy.vlt`) from the system profiles (with `--all-profiles`, from every
+-- profile `nix-collect-garbage` would prune, which the weekly unit uses), then,
+-- if a system profile lost any, rewrites the boot entries through the
+-- system's own installer (`boot.vlt`).
+--
+-- Each command is one effect: the filesystem reads, the closure walks (on
+-- fibers, `for_each_par`), the removals and the installer are its steps.
+-- `main_code` runs it under id_effect_cli's `run_main` (exit 0, 1 on a typed
+-- failure, 101 on a defect, 130 on Ctrl-C).
+
+import std::io::Write
+import std::path::{Path, PathBuf}
+import std::time::{SystemTime, UNIX_EPOCH}
+import id_effect::{Concurrency, Effect, HNil, fail, for_each_par, succeed, suspend}
+import nix_store_core::db
+import nix_store_core::generations::cutoff_of
+import nix_store_core::storepath::base_name
+import vdiff::closure::{lifted, resolve, walk}
+import vdiff::report::{Closure, diff, render_bytes}
+import crate::boot::{boot_default, current_gen, install, remove_generations}
+import crate::pin::{PIN_DIR, pin, pinned, unpin}
+import crate::policy::{Plan, Policy, Protect, decide}
+import crate::profile::{PROFILES_DIR, Gen, Profile, all_profiles, is_system_profile, profile_path, read_profile, resolved, system_profiles}
+
+const USAGE : &str = "usage: vgen list  [--profile P]... [--no-diff] [--db PATH]\n       vgen pin   <N> [--profile P]\n       vgen unpin <N> [--profile P]\n       vgen prune [--keep N] [--keep-days D] [--profile P]... [--all-profiles] [--dry-run] [--no-boot] [--boot-default LINK]"
+
+-- Why vgen stopped. Each is the operator's to fix.
+export errors VgenError
+  Usage String   "#{0}"
+  Pins String    "pin: #{0}"
+  Prune String   "prune: #{0}"
+  Boot String    "boot entries: #{0}"
+  Output String  "writing: #{0}"
+
+export data Options { export command String, export args Vec<String>, export profiles Vec<String>, export keep Option<String>, export keep_days Option<String>, export dry_run bool, export no_boot bool, export no_diff bool, export all_profiles bool, export boot_default Option<String>, export db String, export help bool, export unknown Vec<String> }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+export parse_args : &[String] -> Options
+parse_args args =
+  mut o = Options { db = db::DEFAULT_DB.to_string (), ...Options::default () }
+  mut it = (args.iter ()).skip 1
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--profile" ->
+          o.profiles.push (it.next () |> .cloned |> .unwrap_or_default)
+        "--keep" ->
+          o.keep := Some (it.next () |> .cloned |> .unwrap_or_default)
+        "--keep-days" ->
+          o.keep_days := Some (it.next () |> .cloned |> .unwrap_or_default)
+        "--boot-default" ->
+          o.boot_default := Some (it.next () |> .cloned |> .unwrap_or_default)
+        "--db" ->
+          o.db := it.next () |> .cloned |> .unwrap_or_default
+        "--dry-run" ->
+          o.dry_run := true
+        "--no-boot" ->
+          o.no_boot := true
+        "--all-profiles" ->
+          o.all_profiles := true
+        "--no-diff" ->
+          o.no_diff := true
+        "-h" ->
+          o.help := true
+        "--help" ->
+          o.help := true
+        s | o.command.is_empty () && !(s.starts_with '-') ->
+          o.command := s.to_string ()
+        s | !(s.starts_with '-') ->
+          o.args.push (s.to_string ())
+        s ->
+          o.unknown.push (s.to_string ())
+  o
+
+now_secs : i64
+now_secs =
+  secs = SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+  i64::try_from secs |> .unwrap_or i64::MAX
+
+-- A link time as UTC `YYYY-MM-DD HH:MM` (days to civil date: Hinnant's
+-- `civil_from_days`).
+export date_of : i64 -> String
+date_of secs =
+  rest = secs.rem_euclid 86400
+  (y, m, d) = civil (secs.div_euclid 86400)
+  "#{y}-#{two m}-#{two d} #{two (rest / 3600)}:#{two ((rest % 3600) / 60)}"
+
+civil : i64 -> (i64, i64, i64)
+civil days =
+  z = days + 719468
+  era = z.div_euclid 146097
+  doe = z - era * 146097
+  yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+  doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+  mp = (5 * doy + 2) / 153
+  d = doy - (153 * mp + 2) / 5 + 1
+  m = month_of mp
+  (yoe + era * 400 + january_carry m, m, d)
+
+month_of : i64 -> i64
+month_of mp =
+  if mp < 10
+    mp + 3
+  else
+    mp - 9
+
+january_carry : i64 -> i64
+january_carry m =
+  if m <= 2
+    1
+  else
+    0
+
+two : i64 -> String
+two n =
+  if n < 10
+    "0#{n}"
+  else
+    n.to_string ()
+
+pad_left : &str -> usize -> String
+pad_left s width =
+  pad = " ".repeat (width.saturating_sub (s.len ()))
+  "#{pad}#{s}"
+
+-- A store path's name, without the hash.
+export name_of : &str -> String
+name_of path =
+  base = base_name path
+  case base.split_once '-' of
+    Some pair -> pair.1.to_string ()
+    None -> base.to_string ()
+
+numbers : &[u64] -> String
+numbers ns = (ns.iter ()).map (\n -> n.to_string ()) |> .collect : Vec<String> |> .join " "
+
+-- The profiles a command acts on: the ones named, or by default the system
+-- profiles, or with `--all-profiles` every profile vgc's flag pruned.
+chosen : &Options -> bool -> (Vec<PathBuf>, Vec<String>)
+chosen o everything =
+  root = Path::new PROFILES_DIR
+  if !(o.profiles.is_empty ())
+    named = o.profiles.iter () |> .map (\n -> profile_path root n) |> .collect : Vec<PathBuf>
+    (named, Vec::new ())
+  else if everything
+    every_profile root
+  else
+    system_profiles root
+
+-- Every profile under the profiles directory, and those beside root's own
+-- `~/.nix-profile` when it lives elsewhere: `nix-collect-garbage`'s set.
+every_profile : &Path -> (Vec<PathBuf>, Vec<String>)
+every_profile root =
+  first = all_profiles root
+  mut found = first.0
+  mut notes = first.1
+  home = std::env::var "HOME" |> .unwrap_or_else (\_ -> "/root".to_string ())
+  if std::fs::read_link ("#{home}/.nix-profile") is Ok t
+    if t.parent () is Some parent
+      if !(parent.starts_with root)
+        (more, deeper) = all_profiles parent
+        found.extend more
+        notes.extend deeper
+  found.sort ()
+  found.dedup ()
+  (found, notes)
+
+-- What protects a generation of `profile`, read now.
+protection : &Path -> &[Gen] -> Protect
+protection profile gens = Protect { booted = resolved "/run/booted-system", running = resolved "/run/current-system", pinned = pinned (Path::new PIN_DIR) (Path::new PROFILES_DIR) profile gens }
+
+-- The system profile switched last: its current generation's link is the newest.
+active_profile : &[Profile] -> Option<PathBuf>
+active_profile profiles =
+  mut best = None : Option<(i64, PathBuf)>
+  for p in profiles
+    if current_gen p is Some g
+      if newer_than (&best) g.mtime
+        best := Some ((g.mtime, p.path.clone ()))
+  best.map (\b -> b.1)
+
+newer_than : &Option<(i64, PathBuf)> -> i64 -> bool
+newer_than best mtime =
+  case best of
+    Some b -> mtime > b.0
+    None -> true
+
+-- The one profile `pin` and `unpin` act on.
+one_profile : &Options -> Result<PathBuf, VgenError>
+one_profile o =
+  root = Path::new PROFILES_DIR
+  case o.profiles.len () of
+    0 -> Ok (default_profile root)
+    1 -> Ok (profile_path root (&o.profiles[0]))
+    _ -> Err (Usage (.to_string "pin and unpin take one --profile"))
+
+default_profile : &Path -> PathBuf
+default_profile root =
+  (paths, _) = system_profiles root
+  read = paths.iter () |> .map (\p -> read_profile p) |> .collect : Vec<Profile>
+  active_profile (&read) |> .unwrap_or_else (\-> root.join "system")
+
+number_arg : &Options -> Result<u64, VgenError>
+number_arg o =
+  if o.args.len () == 1
+    n = &o.args[0]
+    n.parse () |> .map_err (\_ -> Usage ("not a generation number: #{n}"))
+  else
+    Err (Usage (USAGE.to_string ()))
+
+-- A reader that stops early (`vgen list | head`) is not an error.
+write_out : String -> Result<(), VgenError>
+write_out text =
+  mut out = std::io::stdout ().lock ()
+  written = out.write_all (text.as_bytes ()) |> .and_then (\_ -> out.flush ())
+  case written of
+    Ok _ -> Ok ()
+    Err e -> output_error e
+
+output_error : std::io::Error -> Result<(), VgenError>
+output_error e =
+  if e.kind () == std::io::ErrorKind::BrokenPipe
+    Ok ()
+  else
+    Err (Output (e.to_string ()))
+
+-- `list` -------------------------------------------------------------------
+
+export data Listing { export profiles Vec<Profile>, export protect Vec<Protect>, export notes Vec<String> }
+  deriving (Debug, Clone, PartialEq)
+
+read_listing : &Options -> Listing
+read_listing o =
+  (paths, notes) = chosen o false
+  profiles = paths.iter () |> .map (\p -> read_profile p) |> .collect : Vec<Profile>
+  protect = profiles.iter () |> .map (\p -> protection (&p.path) (&p.gens)) |> .collect : Vec<Protect>
+  Listing { profiles, protect, notes }
+
+-- Every generation's link, in listing order.
+links_of : &Listing -> Vec<String>
+links_of l = (l.profiles.iter ()).flat_map (\p -> p.gens.iter ()) |> .map (\g -> g.link.to_string_lossy ().into_owned ()) |> .collect
+
+-- One closure, or None when it cannot be read (a link into a path the
+-- database no longer has): the listing shows `?` there rather than failing.
+closure_of : String -> String -> Effect<Option<Closure>, VgenError, HNil>
+closure_of db_path link =
+  case resolve (&link) of
+    Err _ -> succeed None
+    Ok root -> walked db_path root
+
+walked : String -> vdiff::closure::Root -> Effect<Option<Closure>, VgenError, HNil>
+walked db_path root =
+  selected = root.sw.clone () |> .unwrap_or (root.root.clone ())
+  walk db_path root selected |> .map (\c -> Some c) |> .catch (\_ -> succeed None)
+
+-- The closures of every generation, four walks at a time.
+const WALKS : usize = 4
+
+closures : String -> bool -> Listing -> Effect<(Listing, Vec<Option<Closure>>), VgenError, HNil>
+closures db_path wanted l =
+  links = if wanted
+    links_of (&l)
+  else
+    Vec::new ()
+  (for_each_par links (move \link -> closure_of (db_path.clone ()) link) (Concurrency::Bounded WALKS)) |> .map (move \cs -> (l, cs))
+
+-- vdiff's counts between two neighbours, and the change in closure size.
+export summary : &Closure -> &Closure -> String
+summary old new =
+  r = diff old new
+  delta = i128::from new.nar_size - i128::from old.nar_size
+  "#{r.changed.len ()} changed, #{r.added.len ()} added, #{r.removed.len ()} removed, #{render_bytes delta}"
+
+neighbours : Option<&Option<Closure>> -> Option<&Option<Closure>> -> String
+neighbours old new =
+  case (old, new) of
+    (Some (Some a), Some (Some b)) -> summary a b
+    _ -> .to_string "?"
+
+flags_of : &Gen -> Option<u64> -> &Protect -> String
+flags_of g current protect =
+  mut marks = Vec::new () : Vec<&str>
+  if current == Some g.number
+    marks.push "current"
+  if protect.booted.as_deref () == Some (g.toplevel.as_str ()) || protect.booted.as_deref () == Some (g.target.as_str ())
+    marks.push "booted"
+  if protect.running.as_deref () == Some (g.toplevel.as_str ()) || protect.running.as_deref () == Some (g.target.as_str ())
+    marks.push "running"
+  if protect.pinned.contains (&g.number)
+    marks.push "pinned"
+  if marks.is_empty ()
+    String::new ()
+  else
+    "  [#{marks.join ", "}]"
+
+-- The listing as text. `closures` is in listing order, or empty without diffs.
+export render_listing : &Listing -> &[Option<Closure>] -> String
+render_listing l cs =
+  mut out = String::new ()
+  mut i = 0 : usize
+  for pair in l.profiles.iter () |> .zip (l.protect.iter ())
+    (p, protect) = pair
+    header = "#{p.path.display ()}\n"
+    out.push_str (&header)
+    if p.gens.is_empty ()
+      out.push_str "  (no generations)\n"
+    mut j = 0 : usize
+    for g in p.gens.iter ()
+      tail = if cs.is_empty () || j == 0
+        String::new ()
+      else
+        "  vs #{p.gens[j - 1].number}: #{neighbours (cs.get (i - 1)) (cs.get i)}"
+      line = "  #{pad_left (&g.number.to_string ()) 5}  #{date_of g.mtime}  #{name_of (&g.toplevel)}#{flags_of g p.current protect}#{tail}\n"
+      out.push_str (&line)
+      i := i + 1
+      j := j + 1
+  for n in l.notes.iter ()
+    note = "note: #{n} (comin's profile is root-only: run vgen as root to see it)\n"
+    out.push_str (&note)
+  out
+
+list_cmd : Options -> Effect<(), VgenError, HNil>
+list_cmd o =
+  db_path = o.db.clone ()
+  wanted = !o.no_diff
+  suspend (move \-> succeed (read_listing (&o))) |> .flat_map (move \l -> closures db_path wanted l) |> .flat_map (\pair -> suspend (move \-> lifted (write_out (render_listing (&pair.0) (&pair.1)))))
+
+-- `pin` / `unpin` ------------------------------------------------------------
+
+pin_now : &Options -> bool -> Result<(), VgenError>
+pin_now o adding =
+  n = (number_arg o)?
+  profile = (one_profile o)?
+  root = Path::new PROFILES_DIR
+  dir = Path::new PIN_DIR
+  if adding
+    p = read_profile (&profile)
+    g = (p.gens.iter () |> .find (\g -> g.number == n) |> .ok_or_else (\-> Pins ("no generation #{n} in #{profile.display ()}")))?
+    made = (pin dir root (&profile) g |> .map_err Pins)?
+    println! \-> "pinned generation #{n} of #{profile.display ()}: #{made.display ()} -> #{g.target}"
+  else
+    gone = (unpin dir root (&profile) n |> .map_err Pins)?
+    println! \-> "unpinned generation #{n} of #{profile.display ()}: removed #{gone.display ()}"
+  Ok ()
+
+pin_cmd : Options -> bool -> Effect<(), VgenError, HNil>
+pin_cmd o adding = suspend (move \-> lifted (pin_now (&o) adding))
+
+-- `prune` --------------------------------------------------------------------
+
+export policy_of : &Options -> i64 -> Result<Policy, VgenError>
+policy_of o now =
+  keep = (parse_keep (&o.keep))?
+  cutoff = (parse_days (&o.keep_days) now)?
+  if keep.is_none () && cutoff.is_none ()
+    Err (Usage ("prune needs --keep N, --keep-days D, or both\n#{USAGE}"))
+  else
+    Ok (Policy { keep, cutoff })
+
+parse_keep : &Option<String> -> Result<Option<usize>, VgenError>
+parse_keep keep =
+  case keep of
+    None -> Ok None
+    Some k -> k.parse () |> .map (\n -> Some n) |> .map_err (\_ -> Usage ("--keep takes a count, not #{k}"))
+
+-- `--keep-days 30` is `--delete-older-than 30d`, with Nix's parser.
+parse_days : &Option<String> -> i64 -> Result<Option<i64>, VgenError>
+parse_days days now =
+  case days of
+    None -> Ok None
+    Some d -> days_cutoff d now
+
+days_cutoff : &str -> i64 -> Result<Option<i64>, VgenError>
+days_cutoff d now =
+  trimmed = d.trim_end_matches 'd'
+  spec = "#{trimmed}d"
+  cutoff_of (&spec) now |> .map (\c -> Some c) |> .map_err Usage
+
+-- One profile's share of a prune.
+export data Work { export profile PathBuf, export system bool, export plan Plan }
+  deriving (Debug, Clone, PartialEq)
+
+-- Read every profile and decide, printing the plan.
+planned : &Options -> Result<Vec<Work>, VgenError>
+planned o =
+  policy = (policy_of o (now_secs ()))?
+  root = Path::new PROFILES_DIR
+  (paths, notes) = chosen o o.all_profiles
+  for n in notes.iter ()
+    eprintln! \-> "vgen: note: #{n}"
+  mut out = Vec::new () : Vec<Work>
+  for path in paths
+    p = read_profile (&path)
+    plan = decide (&p.gens) p.current (&(protection (&path) (&p.gens))) (&policy)
+    report_plan o (&path) (&plan)
+    out.push (Work { system = is_system_profile root (&path), profile = path, plan })
+  Ok out
+
+report_plan : &Options -> &Path -> &Plan -> ()
+report_plan o path plan =
+  if plan.blocked
+    println! \-> "leaving #{path.display ()} alone: generation times are not monotonic (Nix would abort here)"
+  for spared in plan.spared.iter ()
+    (n, why) = spared
+    println! \-> "keeping generation #{n} of #{path.display ()}: #{why}"
+  if !(plan.doomed.is_empty ())
+    verb = if o.dry_run
+      "would remove"
+    else
+      "removing"
+    println! \-> "#{verb} generations #{numbers (&plan.doomed)} of #{path.display ()}"
+  ()
+
+-- Remove one profile's doomed generations. True when a system profile lost any.
+apply : bool -> Work -> Result<bool, VgenError>
+apply dry_run w =
+  if dry_run || w.plan.doomed.is_empty ()
+    Ok (w.system && !(w.plan.doomed.is_empty ()))
+  else
+    removed = (remove_generations (&w.profile) (&w.plan.doomed) |> .map_err Prune)?
+    Ok (w.system && !(removed.is_empty ()))
+
+-- The generation whose installer rewrites the menu.
+boot_link : &Options -> Option<PathBuf>
+boot_link o =
+  case &o.boot_default of
+    Some l -> Some (PathBuf::from l)
+    None -> active_boot ()
+
+active_boot : Option<PathBuf>
+active_boot =
+  root = Path::new PROFILES_DIR
+  (paths, _) = system_profiles root
+  read = paths.iter () |> .map (\p -> read_profile p) |> .collect : Vec<Profile>
+  boot_default root (&read)
+
+-- After the removals: the boot menu, if a system profile changed.
+rewrite_boot : &Options -> Vec<bool> -> Result<(), VgenError>
+rewrite_boot o changed =
+  if o.no_boot || !(changed.iter ().any (\c -> *c))
+    Ok ()
+  else
+    case boot_link o of
+      None -> Err (Boot (.to_string "no system profile has a current generation to install"))
+      Some l -> boot_through o (&l)
+
+boot_through : &Options -> &Path -> Result<(), VgenError>
+boot_through o link =
+  if o.dry_run
+    println! \-> "would rewrite the boot entries: #{link.display ()}/bin/switch-to-configuration boot"
+    Ok ()
+  else
+    println! \-> "rewriting the boot entries: #{link.display ()}/bin/switch-to-configuration boot"
+    install link |> .map_err Boot
+
+prune_cmd : Options -> Effect<(), VgenError, HNil>
+prune_cmd o =
+  dry_run = o.dry_run
+  p = o.clone ()
+  (suspend (move \-> lifted (planned (&p)))) |> .flat_map (move \work -> for_each_par work (move \w -> suspend (move \-> lifted (apply dry_run w))) Concurrency::Sequential) |> .flat_map (move \changed -> suspend (move \-> lifted (rewrite_boot (&o) changed)))
+
+-- The program --------------------------------------------------------------
+
+export program : Options -> Effect<(), VgenError, HNil>
+program o =
+  if !(o.unknown.is_empty ())
+    fail (Usage ("unknown arguments: #{o.unknown.join " "}\n#{USAGE}"))
+  else
+    command = o.command.clone ()
+    case command.as_str () of
+      "list" -> list_cmd o
+      "pin" -> pin_cmd o true
+      "unpin" -> pin_cmd o false
+      "prune" -> prune_cmd o
+      _ -> fail (Usage (USAGE.to_string ()))
+
+-- A failure as run_main prints it (`error: <this>`): the message, not Debug.
+export data Failed { message Box<str> }
+
+instance std::fmt::Debug Failed
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&self.message)
+
+failed : VgenError -> Failed
+failed e = Failed { message = "vgen: #{e}" |> .into_boxed_str }
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .collect : Vec<String>
+  o = parse_args (&args)
+  if o.help
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (program o |> .map_err failed) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+argv : Vec<&str> -> Vec<String>
+argv words = words.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "commands, numbers and flags parse"
+  o = parse_args (&argv (.to_vec (["vgen", "prune", "--keep", "5", "--keep-days", "30", "--profile", "comin", "--all-profiles", "--dry-run", "--no-boot"])))
+  assert_eq! \-> o.command \-> "prune"
+  assert_eq! \-> o.keep \-> Some (.to_string "5")
+  assert_eq! \-> o.keep_days \-> Some (.to_string "30")
+  assert_eq! \-> o.profiles \-> argv (.to_vec (["comin"]))
+  assert! \-> o.dry_run && o.no_boot && o.all_profiles && o.unknown.is_empty ()
+  pinned = parse_args (&argv (.to_vec (["vgen", "pin", "493"])))
+  assert_eq! \-> number_arg (&pinned) |> .ok \-> Some 493
+
+test "unknown flags and a missing policy are usage errors"
+  bogus = id_effect::testing::run_test (program (parse_args (&argv (.to_vec (["vgen", "list", "--bogus"])))))
+  assert! \-> id_effect::testing::expect_exit_failure bogus |> .to_string |> .starts_with "unknown arguments"
+  bare = parse_args (&argv (.to_vec (["vgen", "prune"])))
+  assert! \-> policy_of (&bare) 0 |> .is_err
+  assert! \-> number_arg (&parse_args (&argv (.to_vec (["vgen", "pin", "x"])))) |> .is_err
+
+test "keep-days is a whole number of days, as Nix parses it"
+  o = parse_args (&argv (.to_vec (["vgen", "prune", "--keep-days", "30"])))
+  assert_eq! \-> policy_of (&o) 10_000_000 |> .ok \-> Some (Policy { keep = None, cutoff = Some (10_000_000 - 30 * 86400) })
+  zero = parse_args (&argv (.to_vec (["vgen", "prune", "--keep-days", "0"])))
+  assert! \-> policy_of (&zero) 0 |> .is_err
+
+test "link times print as UTC dates"
+  assert_eq! \-> date_of 0 \-> "1970-01-01 00:00"
+  assert_eq! \-> date_of 951782400 \-> "2000-02-29 00:00"
+  assert_eq! \-> date_of 1700000000 \-> "2023-11-14 22:13"
+
+test "names drop the hash"
+  assert_eq! \-> name_of "/nix/store/2xkphs43kbqap45ll7adyd1vyqlghy8y-nixos-system-drakkar-26.11" \-> "nixos-system-drakkar-26.11"
+
+test "the listing marks current, booted and pinned generations"
+  g1 = Gen { number = 1, mtime = 0, link = PathBuf::from "/p/system-1-link", target = .to_string "/nix/store/aaaa-nixos-system-1", toplevel = .to_string "/nix/store/aaaa-nixos-system-1" }
+  g2 = Gen { number = 2, mtime = 86400, link = PathBuf::from "/p/system-2-link", target = .to_string "/nix/store/bbbb-nixos-system-2", toplevel = .to_string "/nix/store/bbbb-nixos-system-2" }
+  p = Profile { path = PathBuf::from "/p/system", current = Some 2, gens = vec![g1, g2] }
+  protect = Protect { booted = Some (.to_string "/nix/store/aaaa-nixos-system-1"), running = Some (.to_string "/nix/store/bbbb-nixos-system-2"), pinned = vec![1] }
+  l = Listing { profiles = vec![p], protect = vec![protect], notes = Vec::new () }
+  none = Vec::new () : Vec<Option<Closure>>
+  text = render_listing (&l) (&none)
+  assert_eq! \-> text \-> "/p/system\n      1  1970-01-01 00:00  nixos-system-1  [booted, pinned]\n      2  1970-01-02 00:00  nixos-system-2  [current, running]\n"
+  unknown = .to_vec ([None, None]) : Vec<Option<Closure>>
+  assert! \-> render_listing (&l) (&unknown) |> .contains "vs 1: ?"

@@ -1,0 +1,100 @@
+-- Pins: a generation kept by a GC root of its own.
+--
+-- A pin is a symlink in /nix/var/nix/gcroots/vgen/ to the generation's store
+-- path (not to its profile link, so the root still holds if the link is
+-- deleted by hand). vgc walks gcroots recursively, so it honours a pin with no
+-- change of its own, and so does `nix-collect-garbage`. vgen's prune keeps a
+-- pinned generation's profile link too, so it stays in the boot menu.
+--
+-- The pin's name is the generation link's, prefixed by the profile's place
+-- under /nix/var/nix/profiles: `system-493-link`,
+-- `system-profiles-comin-12-link`.
+
+import std::fs
+import std::path::{Path, PathBuf}
+import crate::profile::{Gen, file_name_of}
+
+export const PIN_DIR : &str = "/nix/var/nix/gcroots/vgen"
+
+-- The profile's key: its path under `root` with `/` as `-`, or its whole path
+-- (without the leading `/`) when it is elsewhere.
+export key_of : &Path -> &Path -> String
+key_of root profile = (relative root profile).replace '/' "-"
+
+relative : &Path -> &Path -> String
+relative root profile =
+  case profile.strip_prefix root of
+    Ok r -> r.to_string_lossy ().into_owned ()
+    Err _ -> profile.to_string_lossy ().trim_start_matches '/' |> .to_string
+
+-- The pin's file name for generation `n` of `profile`.
+export pin_name : &Path -> &Path -> u64 -> String
+pin_name root profile n = "#{key_of root profile}-#{n}-link"
+
+-- The generations of `profile` that are pinned: a pin of that name whose
+-- target is the generation's store path.
+export pinned : &Path -> &Path -> &Path -> &[Gen] -> Vec<u64>
+pinned dir root profile gens =
+  mut out = Vec::new () : Vec<u64>
+  for g in gens
+    pin = dir.join (pin_name root profile g.number)
+    if fs::read_link (&pin) is Ok t
+      if t.to_string_lossy () == g.target.as_str ()
+        out.push g.number
+  out
+
+-- Pin `g`: write the root beside its final name and rename it into place, so
+-- the root is never half-written. Pinning a pinned generation is a no-op.
+export pin : &Path -> &Path -> &Path -> &Gen -> Result<PathBuf, String>
+pin dir root profile g =
+  (fs::create_dir_all dir |> .map_err (\e -> "creating #{dir.display ()}: #{e}"))?
+  name = pin_name root profile g.number
+  path = dir.join (&name)
+  tmp = dir.join (".#{name}.tmp")
+  fs::remove_file (&tmp) |> .ok
+  (std::os::unix::fs::symlink (&g.target) (&tmp) |> .map_err (\e -> "writing #{tmp.display ()}: #{e}"))?
+  (fs::rename (&tmp) (&path) |> .map_err (\e -> "renaming #{tmp.display ()} to #{path.display ()}: #{e}"))?
+  Ok path
+
+-- Remove the pin of generation `n`; an error when there is none.
+export unpin : &Path -> &Path -> &Path -> u64 -> Result<PathBuf, String>
+unpin dir root profile n =
+  path = dir.join (pin_name root profile n)
+  case fs::symlink_metadata (&path) of
+    Err _ -> Err "generation #{n} of #{profile.display ()} is not pinned (no #{path.display ()})"
+    Ok _ -> fs::remove_file (&path) |> .map (\_ -> path.clone ()) |> .map_err (\e -> "removing #{path.display ()}: #{e}")
+
+-- The pins in `dir` (names), for `vgen list --pins`.
+export all_pins : &Path -> Vec<String>
+all_pins dir =
+  mut out = Vec::new () : Vec<String>
+  if fs::read_dir dir is Ok entries
+    for entry in entries
+      if entry is Ok e
+        out.push (file_name_of (&(e.path ())))
+  out.sort ()
+  out
+
+test "pin names carry the profile's place"
+  root = Path::new "/nix/var/nix/profiles"
+  assert! \-> pin_name root (Path::new "/nix/var/nix/profiles/system") 493 == "system-493-link"
+  assert! \-> pin_name root (Path::new "/nix/var/nix/profiles/system-profiles/comin") 12 == "system-profiles-comin-12-link"
+  assert! \-> pin_name root (Path::new "/home/u/.local/state/nix/profiles/hm") 3 == "home-u-.local-state-nix-profiles-hm-3-link"
+
+test "a pin is a root to the store path, and unpin removes it"
+  dir = std::env::temp_dir () |> .join "vgen-test-pin-#{std::process::id ()}"
+  fs::remove_dir_all (&dir) |> .ok
+  root = Path::new "/nix/var/nix/profiles"
+  profile = Path::new "/nix/var/nix/profiles/system"
+  g = Gen { number = 7, mtime = 0, link = PathBuf::from "/nix/var/nix/profiles/system-7-link", target = .to_string "/nix/store/aaaa-nixos-system-7", toplevel = .to_string "/nix/store/aaaa-nixos-system-7" }
+  other = Gen { number = 8, target = .to_string "/nix/store/bbbb-nixos-system-8", ...g.clone () }
+  made = pin (&dir) root profile (&g) |> .unwrap
+  assert! \-> (fs::read_link (&made) |> .unwrap) == PathBuf::from "/nix/store/aaaa-nixos-system-7"
+  pin (&dir) root profile (&g) |> .unwrap
+  assert! \-> pinned (&dir) root profile (&(.to_vec ([g.clone (), other.clone ()]))) == vec![7]
+  assert! \-> all_pins (&dir) == vec!["system-7-link".to_string()]
+  assert! \-> unpin (&dir) root profile 7 |> .is_ok
+  assert! \-> unpin (&dir) root profile 7 |> .is_err
+  assert! \-> pinned (&dir) root profile (&(.to_vec ([g]))) |> .is_empty
+  fs::remove_dir_all (&dir) |> .ok
+  ()

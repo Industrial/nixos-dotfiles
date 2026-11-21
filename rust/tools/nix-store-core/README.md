@@ -167,6 +167,21 @@ them.
 
 None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in vgc.
 
+### `generations`: profile generations and `--delete-older-than`
+
+vgc's module (`rust/tools/vgc/src/generations.vlt`), lifted unchanged with its
+tests, so vgen's prune and vgc's flag apply one rule. Copied from Nix 2.35.6
+`profiles.cc`. All functions are pure: the caller reads the directory and the
+link mtimes.
+
+| Item | Meaning |
+|---|---|
+| `Generation { number: u64, mtime: i64 }` | one `<profile>-<N>-link` and its link time |
+| `parse_generation : &str -> &str -> Option<u64>` | `parseName`: the number of `<profile>-<N>-link` (text after `-link` ignored) |
+| `cutoff_of : &str -> i64 -> Result<i64, String>` | `parseOlderThanTimeSpec`: `Nd` (N ≥ 1) as a cutoff in epoch seconds, given now |
+| `doomed : &[Generation] -> Option<u64> -> i64 -> Option<Vec<u64>>` | `deleteGenerationsOlderThan`: what goes, ascending. The newest generation older than the cutoff and the current one stay. None when creation times are not monotonic below the kept one, where Nix aborts: remove nothing |
+| `all_but : &[Generation] -> Option<u64> -> Vec<u64>` | `deleteOldGenerations` (`nix-collect-garbage -d`): every generation but the current one, ascending |
+
 ### `worker`: the nix-daemon worker protocol
 
 What `nix` speaks to nix-daemon over `/nix/var/nix/daemon-socket/socket`, and
@@ -258,7 +273,7 @@ the runtime (such as `tokio::process` pipes) work either way.
 
 `cargo test` runs:
 
-- unit tests in every module. `storepath`'s tests are vgc's, verbatim.
+- unit tests in every module. `storepath`'s and `generations`' tests are vgc's, verbatim.
 - `golden`: vectors from C++ Nix 2.31.4, stored in `tests/fixtures/`:
   - 60 store paths: `nix path-info --json`, `nix hash path` in SRI/base-16/nix32, and `nix-store -qR`.
   - 56 `.drv` files, with their ATerm text and `nix derivation show`.

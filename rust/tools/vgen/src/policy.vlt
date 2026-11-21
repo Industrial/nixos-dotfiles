@@ -1,0 +1,149 @@
+-- Which generations a prune removes. Pure: the profile is already read.
+--
+-- Two policies, both optional, and a generation goes only when every policy
+-- given lets it go:
+--   --keep-days D  Nix's `--delete-older-than Dd` (nix-store-core's
+--                  `generations::doomed`, vgc's rule): the newest generation
+--                  older than the cutoff stays as the rollback target, and a
+--                  profile whose creation times are not monotonic below it is
+--                  left alone, as Nix aborts there.
+--   --keep N       the newest N generations stay.
+-- Whatever the policies say, these always stay: the profile's current
+-- generation, the generation the machine booted, the one it is running, and
+-- every pinned one (`pin.vlt`).
+
+import nix_store_core::generations::{Generation, doomed}
+import crate::profile::Gen
+
+export data Policy { export keep Option<usize>, export cutoff Option<i64> }
+  deriving (Debug, Clone, PartialEq)
+
+-- What must stay: the booted and the running system (store paths), and the
+-- pinned generation numbers of this profile.
+export data Protect { export booted Option<String>, export running Option<String>, export pinned Vec<u64> }
+  deriving (Debug, Clone, Default, PartialEq)
+
+-- The verdict for one profile: what goes (ascending), what a policy would
+-- have removed but a protection kept (with the reason), and whether Nix's
+-- monotonic-time check stopped the `--keep-days` policy.
+export data Plan { export doomed Vec<u64>, export spared Vec<(u64, String)>, export blocked bool }
+  deriving (Debug, Clone, PartialEq)
+
+-- The newest `keep` of the ascending `numbers`.
+newest_of : &[u64] -> Option<usize> -> Vec<u64>
+newest_of numbers keep =
+  case keep of
+    Some k -> (numbers.iter ()).rev () |> .take k |> .copied |> .collect
+    None -> Vec::new ()
+
+-- The `--keep-days` candidates; with no cutoff, every generation is one.
+older_than : &[Gen] -> Option<u64> -> Option<i64> -> Option<Vec<u64>>
+older_than gens current cutoff =
+  case cutoff of
+    Some c -> doomed (&(ages gens)) current c
+    None -> Some (gens.iter () |> .map (\g -> g.number) |> .collect)
+
+ages : &[Gen] -> Vec<Generation>
+ages gens = gens.iter () |> .map (\g -> Generation { number = g.number, mtime = g.mtime }) |> .collect
+
+-- Whether a store path identity names this generation: its link target or
+-- the system it boots.
+names : &Option<String> -> &Gen -> bool
+names id g =
+  case id of
+    Some p -> *p == g.target || *p == g.toplevel
+    None -> false
+
+-- Why `n` must stay, if it must.
+export protected : &[Gen] -> u64 -> Option<u64> -> &Protect -> Option<String>
+protected gens n current protect =
+  found = gens.iter () |> .find (\g -> g.number == n)
+  if current == Some n
+    Some (.to_string "current")
+  else if protect.pinned.contains (&n)
+    Some (.to_string "pinned")
+  else
+    case found of
+      Some g -> running_reason g protect
+      None -> None
+
+running_reason : &Gen -> &Protect -> Option<String>
+running_reason g protect =
+  if names (&protect.booted) g
+    Some (.to_string "booted")
+  else if names (&protect.running) g
+    Some (.to_string "running")
+  else
+    None
+
+-- The plan for one profile.
+export decide : &[Gen] -> Option<u64> -> &Protect -> &Policy -> Plan
+decide gens current protect policy =
+  case older_than gens current policy.cutoff of
+    None -> Plan { doomed = Vec::new (), spared = Vec::new (), blocked = true }
+    Some old -> sift gens current protect (old, newest_of (&(numbers_of gens)) policy.keep)
+
+numbers_of : &[Gen] -> Vec<u64>
+numbers_of gens =
+  mut ns = gens.iter () |> .map (\g -> g.number) |> .collect : Vec<u64>
+  ns.sort ()
+  ns
+
+sift : &[Gen] -> Option<u64> -> &Protect -> (Vec<u64>, Vec<u64>) -> Plan
+sift gens current protect sets =
+  (old, newest) = sets
+  mut out = Vec::new () : Vec<u64>
+  mut spared = Vec::new () : Vec<(u64, String)>
+  for n in old
+    if !(newest.contains (&n))
+      case protected gens n current protect of
+        Some why ->
+          spared.push ((n, why))
+        None ->
+          out.push n
+  out.sort ()
+  Plan { doomed = out, spared, blocked = false }
+
+#[cfg(test)]
+gens_of : Vec<(u64, i64)> -> Vec<Gen>
+gens_of pairs = pairs.iter () |> .map (\p -> Gen { number = p.0, mtime = p.1, link = std::path::PathBuf::from ("/p/system-#{p.0}-link"), target = "/nix/store/x-#{p.0}", toplevel = "/nix/store/t-#{p.0}" }) |> .collect
+
+#[cfg(test)]
+ten : Vec<Gen>
+ten = gens_of (.to_vec ([(1, 10), (2, 20), (3, 30), (4, 40), (5, 50), (6, 60), (7, 70), (8, 80), (9, 90), (10, 100)]))
+
+#[cfg(test)]
+nothing : Protect
+nothing = Protect::default ()
+
+test "keep N keeps the newest N and the current one"
+  plan = decide (&ten ()) (Some 10) (&nothing ()) (&Policy { keep = Some 3, cutoff = None })
+  assert! \-> plan.doomed == vec![1, 2, 3, 4, 5, 6, 7]
+  assert! \-> !plan.blocked
+  rolled_back = decide (&ten ()) (Some 2) (&nothing ()) (&Policy { keep = Some 3, cutoff = None })
+  assert! \-> rolled_back.doomed == vec![1, 3, 4, 5, 6, 7]
+  assert! \-> rolled_back.spared == vec![(2, "current".to_string())]
+
+test "keep days is Nix's delete-older-than"
+  -- Cutoff 55: generation 5 is the newest older one and stays as the rollback target.
+  plan = decide (&ten ()) (Some 10) (&nothing ()) (&Policy { keep = None, cutoff = Some 55 })
+  assert! \-> plan.doomed == vec![1, 2, 3, 4]
+
+test "with both policies a generation goes only when both let it"
+  plan = decide (&ten ()) (Some 10) (&nothing ()) (&Policy { keep = Some 8, cutoff = Some 55 })
+  assert! \-> plan.doomed == vec![1, 2]
+
+test "the booted, running and pinned generations are never removed"
+  protect = Protect { booted = Some (.to_string "/nix/store/t-2"), running = Some (.to_string "/nix/store/x-3"), pinned = vec![4] }
+  plan = decide (&ten ()) (Some 10) (&protect) (&Policy { keep = Some 1, cutoff = None })
+  assert! \-> plan.doomed == vec![1, 5, 6, 7, 8, 9]
+  assert! \-> plan.spared == vec![(2, "booted".to_string()), (3, "running".to_string()), (4, "pinned".to_string())]
+
+test "a touched old generation stops the days policy, as Nix's assert does"
+  gens = gens_of (.to_vec ([(1, 10), (2, 99), (3, 30), (4, 40), (5, 99)]))
+  plan = decide (&gens) (Some 5) (&nothing ()) (&Policy { keep = None, cutoff = Some 50 })
+  assert! \-> plan.blocked && plan.doomed.is_empty ()
+
+test "the current generation stays even when it is the oldest"
+  plan = decide (&ten ()) (Some 1) (&nothing ()) (&Policy { keep = Some 0, cutoff = None })
+  assert! \-> plan.doomed == vec![2, 3, 4, 5, 6, 7, 8, 9, 10]
