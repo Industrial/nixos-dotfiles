@@ -1,0 +1,191 @@
+-- The two closures, read from the store database (nix-store-core's `db`,
+-- read-only, no daemon and no root needed).
+--
+-- Resolving an argument and listing a profile's generations read the
+-- filesystem; walking a closure reads the database. Those reads are the only
+-- I/O, so they are the only effects: each is a blocking read in `suspend`, and
+-- the walks of the old and the new closure run as two fibers (`zip_par`), each
+-- on its own connection (a connection is `Send` but not `Sync`).
+
+import std::path::Path
+import id_effect::{Effect, HNil, fail, succeed, suspend, zip_par}
+import nix_store_core::db
+import nix_store_core::storepath::{full, store_base}
+import crate::report::Closure
+
+-- Why vdiff could not produce a report. Each is the operator's to fix.
+export errors VdiffError
+  Usage String        "#{0}"
+  Missing String      "path does not exist: #{0}"
+  NotInStore String   "not in the Nix store: #{0}"
+  Invalid String      "not a valid store path: #{0}"
+  Generations String  "#{0}"
+  Store String        "store database: #{0}"
+  Output String       "writing the report: #{0}"
+
+-- An argument, resolved: as given (normalised as nvd prints it), the store
+-- path it resolves to, and that path's `sw` (a NixOS system's package set)
+-- when it has one.
+export data Root { export label String, export root String, export sw Option<String> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static, E: Send + 'static> Result<A, E> -> Effect<A, E, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- The argument as Python's `Path` prints it, the way nvd's `<<<`/`>>>` lines
+-- show it: no empty or `.` components, no trailing slash.
+export label_of : &str -> String
+label_of arg =
+  absolute = arg.starts_with '/'
+  parts = arg.split '/' |> .filter (\c -> !(c.is_empty () || *c == ".")) |> .collect : Vec<&str>
+  joined = parts.join "/"
+  if absolute
+    "/#{joined}"
+  else if joined.is_empty ()
+    ".".to_string ()
+  else
+    joined
+
+-- The store path of a canonical path, if it is inside the store.
+store_path_of : &Path -> Option<String>
+store_path_of path =
+  text = path.to_string_lossy () |> .to_string
+  store_base (&text) |> .map (\b -> full b)
+
+-- Resolve one argument: follow its links, find its store path and its `sw`.
+export resolve : &str -> Result<Root, VdiffError>
+resolve arg =
+  label = label_of arg
+  canonical = (std::fs::canonicalize arg |> .map_err (\_ -> Missing (label.clone ())))?
+  shown = canonical.to_string_lossy () |> .to_string
+  root = (store_path_of (&canonical) |> .ok_or (NotInStore shown))?
+  sw_dir = canonical.join "sw"
+  sw = if_dir (&sw_dir)
+  Ok (Root { label, root, sw })
+
+if_dir : &Path -> Option<String>
+if_dir dir =
+  if dir.is_dir ()
+    std::fs::canonicalize dir |> .ok |> .and_then (\p -> store_path_of (&p))
+  else
+    None
+
+store_error : rusqlite::Error -> VdiffError
+store_error e = Store (e.to_string ())
+
+-- The closure of `root` and the direct references of `selected_root`, with
+-- the closure's total narSize (`nix path-info --closure-size`).
+read_closure : String -> String -> String -> String -> Result<Closure, VdiffError>
+read_closure db_path label root selected_root =
+  conn = (db::open (&db_path) |> .map_err (\e -> Store ("opening #{db_path}: #{e}")))?
+  found = (db::closure (&conn) (&root) |> .map_err store_error)?
+  paths = (found.ok_or_else (\-> Invalid (root.clone ())))?
+  refs = (db::references (&conn) (&selected_root) |> .map_err store_error)?
+  selected = refs.unwrap_or_default ()
+  mut nar_size = 0 : u64
+  for p in &paths
+    info = (db::path_info (&conn) p |> .map_err store_error)?
+    if info is Some i
+      nar_size := nar_size + i.nar_size
+  Ok (Closure { label, root, paths, selected, nar_size })
+
+-- One closure walk, as an effect.
+export walk : String -> Root -> String -> Effect<Closure, VdiffError, HNil>
+walk db_path root selected_root =
+  suspend (move \-> lifted (read_closure db_path root.label root.root selected_root))
+
+-- nvd's selected set: the `sw` when both sides have one, else the root.
+selected_of : &Root -> bool -> String
+selected_of r use_sw =
+  case (&r.sw, use_sw) of
+    (Some sw, true) -> sw.clone ()
+    _ -> r.root.clone ()
+
+-- Both closures, walked concurrently on two fibers.
+export both : String -> Root -> Root -> Effect<(Closure, Closure), VdiffError, HNil>
+both db_path old new =
+  use_sw = old.sw.is_some () && new.sw.is_some ()
+  old_selected = selected_of (&old) use_sw
+  new_selected = selected_of (&new) use_sw
+  zip_par (walk (db_path.clone ()) old old_selected) (walk db_path new new_selected)
+
+-- The generation number of a profile link `<name>-<N>-link`.
+export generation_of : &str -> &str -> Option<u64>
+generation_of name file =
+  rest = (file.strip_prefix name)?
+  digits = (rest.strip_prefix '-' |> .and_then (\r -> r.strip_suffix "-link"))?
+  if !(digits.is_empty ()) && (digits.chars ()).all (\c -> c.is_ascii_digit ())
+    digits.parse () |> .ok
+  else
+    None
+
+-- A profile by name (`system`, in /nix/var/nix/profiles) or by path.
+export profile_path : &str -> String
+profile_path profile =
+  if profile.contains '/'
+    profile.to_string ()
+  else
+    "/nix/var/nix/profiles/#{profile}"
+
+-- The newest two generations of a profile, oldest first, as their links.
+export last_two : &str -> Result<(String, String), VdiffError>
+last_two profile =
+  path = profile_path profile
+  p = Path::new (&path)
+  dir = p.parent () |> .map (\d -> d.to_path_buf ()) |> .unwrap_or_default
+  name = p.file_name () |> .map (\n -> n.to_string_lossy () |> .to_string) |> .unwrap_or_default
+  listing = (std::fs::read_dir (&dir) |> .map_err (\e -> Generations ("reading #{dir.display ()}: #{e}")))?
+  mut found = Vec::new () : Vec<(u64, String)>
+  for item in listing
+    if item is Ok e
+      file = e.file_name () |> .to_string_lossy |> .to_string
+      if (generation_of (&name) (&file)) is Some n
+        found.push ((n, e.path () |> .to_string_lossy |> .to_string))
+  found.sort ()
+  pick_last_two (&path) found
+
+pick_last_two : &str -> Vec<(u64, String)> -> Result<(String, String), VdiffError>
+pick_last_two path found =
+  n = found.len ()
+  if n < 2
+    Err (Generations ("profile #{path} has #{n} generation(s); --generations needs two"))
+  else
+    Ok ((found[n - 2].1.clone (), found[n - 1].1.clone ()))
+
+test "labels print as Python's Path prints them"
+  assert_eq! \-> label_of "/run/current-system" \-> "/run/current-system"
+  assert_eq! \-> label_of "./result/" \-> "result"
+  assert_eq! \-> label_of "//nix//store/./x/" \-> "/nix/store/x"
+  assert_eq! \-> label_of "." \-> "."
+
+test "generation links are numbered by their profile name"
+  assert_eq! \-> generation_of "system" "system-493-link" \-> Some 493
+  assert_eq! \-> generation_of "system" "system-profiles" \-> None
+  assert_eq! \-> generation_of "system" "system-x-link" \-> None
+  assert_eq! \-> generation_of "system" "system--link" \-> None
+  assert_eq! \-> generation_of "home" "system-1-link" \-> None
+
+test "a profile is a name under the system profiles or a path"
+  assert_eq! \-> profile_path "system" \-> "/nix/var/nix/profiles/system"
+  assert_eq! \-> profile_path "/home/u/.local/state/nix/profiles/home-manager" \-> "/home/u/.local/state/nix/profiles/home-manager"
+
+test "the last two generations, or a usage error with fewer"
+  two = pick_last_two "p" (.to_vec ([(1, .to_string "p-1-link"), (2, .to_string "p-2-link"), (10, .to_string "p-10-link")]))
+  assert_eq! \-> two.ok () \-> Some ((.to_string "p-2-link", .to_string "p-10-link"))
+  one = pick_last_two "p" (.to_vec ([(7, .to_string "p-7-link")]))
+  assert! \-> one.is_err ()
+
+test "a path outside the store is refused, a missing one too"
+  assert_eq! \-> resolve "/" |> .err |> .map (\e -> e.to_string ()) \-> Some (.to_string "not in the Nix store: /")
+  assert_eq! \-> resolve "/nonexistent/vdiff" |> .err |> .map (\e -> e.to_string ()) \-> Some (.to_string "path does not exist: /nonexistent/vdiff")
+
+test "both closures are walked from the database"
+  if Path::new db::DEFAULT_DB |> .exists
+    if (resolve "/run/current-system") is Ok r
+      exit = id_effect::testing::run_test (both (db::DEFAULT_DB.to_string ()) (r.clone ()) r)
+      pair = id_effect::testing::expect_exit_success exit
+      assert! \-> pair.0 == pair.1 && !(pair.0.paths.is_empty ())

@@ -1,0 +1,162 @@
+-- vdiff's command line.
+--
+--   vdiff [--json] [--db PATH] <old> <new>
+--   vdiff [--json] [--db PATH] --generations <profile>
+--
+-- `old` and `new` are store paths or anything that links into the store
+-- (`/run/current-system`, `/nix/var/nix/profiles/system-492-link`, a
+-- `result`). `--generations system` diffs the newest two generations of
+-- /nix/var/nix/profiles/system; a profile with a `/` is taken as a path.
+-- The text is `nvd --color=never diff`'s; `--json` is the report vdeploy reads.
+--
+-- The program is one effect: resolve the arguments, walk both closures on two
+-- fibers, render, write. `main_code` runs it under id_effect_cli's `run_main`
+-- (exit 0, 1 on a typed failure, 101 on a defect, 130 on Ctrl-C).
+
+import std::io::Write
+import id_effect::{Effect, HNil, suspend}
+import nix_store_core::db
+import crate::closure::{Root, VdiffError, both, last_two, lifted, resolve}
+import crate::closure::VdiffError::{Output, Usage}
+import crate::report::{Closure, diff, render_json, render_text}
+
+const USAGE : &str = "usage: vdiff [--json] [--db PATH] <old> <new>\n       vdiff [--json] [--db PATH] --generations <profile>"
+
+export data Options { export targets Vec<String>, export generations Option<String>, export json bool, export db String, export help bool, export unknown Vec<String> }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+export parse_args : &[String] -> Options
+parse_args args =
+  mut o = Options { db = db::DEFAULT_DB.to_string (), ...Options::default () }
+  mut it = (args.iter ()).skip 1
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--json" ->
+          o.json := true
+        "--db" ->
+          o.db := it.next () |> .cloned |> .unwrap_or_default
+        "--generations" ->
+          o.generations := Some (it.next () |> .cloned |> .unwrap_or_default)
+        "-h" ->
+          o.help := true
+        "--help" ->
+          o.help := true
+        s | !(s.starts_with '-') ->
+          o.targets.push (s.to_string ())
+        s ->
+          o.unknown.push (s.to_string ())
+  o
+
+-- The two arguments to diff, resolved.
+roots_of : &Options -> Result<(Root, Root), VdiffError>
+roots_of o =
+  if !(o.unknown.is_empty ())
+    Err (Usage ("unknown arguments: #{o.unknown.join " "}\n#{USAGE}"))
+  else
+    case (&o.generations, o.targets.len ()) of
+      (Some profile, 0) -> resolve_pair (last_two profile)
+      (None, 2) -> resolve_pair (Ok ((o.targets[0].clone (), o.targets[1].clone ())))
+      _ -> Err (Usage (USAGE.to_string ()))
+
+resolve_pair : Result<(String, String), VdiffError> -> Result<(Root, Root), VdiffError>
+resolve_pair pair =
+  (old, new) = pair?
+  a = (resolve (&old))?
+  b = (resolve (&new))?
+  Ok ((a, b))
+
+render : bool -> (Closure, Closure) -> String
+render json closures =
+  (old, new) = closures
+  report = diff (&old) (&new)
+  if json
+    render_json (&report)
+  else
+    render_text (&report)
+
+-- A reader that stops early (`vdiff … | head`) is not an error, as for nvd.
+write_out : String -> Result<(), VdiffError>
+write_out text =
+  mut out = std::io::stdout ().lock ()
+  written = out.write_all (text.as_bytes ()) |> .and_then (\_ -> out.flush ())
+  case written of
+    Ok _ -> Ok ()
+    Err e -> output_error e
+
+output_error : std::io::Error -> Result<(), VdiffError>
+output_error e =
+  if e.kind () == std::io::ErrorKind::BrokenPipe
+    Ok ()
+  else
+    Err (Output (e.to_string ()))
+
+-- Resolve, walk both closures concurrently, render, write.
+export program : Options -> Effect<(), VdiffError, HNil>
+program o =
+  json = o.json
+  db_path = o.db.clone ()
+  suspend (move \-> lifted (roots_of (&o))) |> .flat_map (move \roots -> walk_both db_path roots) |> .flat_map (move \closures -> suspend (move \-> lifted (write_out (render json closures))))
+
+walk_both : String -> (Root, Root) -> Effect<(Closure, Closure), VdiffError, HNil>
+walk_both db_path roots =
+  (old, new) = roots
+  both db_path old new
+
+-- A failure as run_main prints it (`error: <this>`): the message, not Debug.
+-- (`Box<str>`, not `String`: Voltaic derives Debug for a `String` field.)
+export data Failed { message Box<str> }
+
+instance std::fmt::Debug Failed
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&self.message)
+
+failed : VdiffError -> Failed
+failed e = Failed { message = "vdiff: #{e}" |> .into_boxed_str }
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .collect : Vec<String>
+  o = parse_args (&args)
+  if o.help
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (program o |> .map_err failed) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+argv : Vec<&str> -> Vec<String>
+argv words = words.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "a closed pipe is not an error, another write failure is"
+  assert! \-> output_error (std::io::Error::from std::io::ErrorKind::BrokenPipe) |> .is_ok
+  assert! \-> output_error (std::io::Error::from std::io::ErrorKind::StorageFull) |> .is_err
+
+test "two targets and the flags parse"
+  o = parse_args (&argv (.to_vec (["vdiff", "--json", "/a", "/b"])))
+  assert_eq! \-> o.targets \-> argv (.to_vec (["/a", "/b"]))
+  assert! \-> o.json && o.unknown.is_empty () && o.generations.is_none ()
+  assert_eq! \-> o.db \-> db::DEFAULT_DB
+
+test "generations and a database path parse"
+  o = parse_args (&argv (.to_vec (["vdiff", "--generations", "system", "--db", "/tmp/db.sqlite"])))
+  assert_eq! \-> o.generations \-> Some (.to_string "system")
+  assert_eq! \-> o.db \-> "/tmp/db.sqlite"
+
+test "unknown flags are usage errors, not ignored"
+  o = parse_args (&argv (.to_vec (["vdiff", "--bogus", "/a", "/b"])))
+  assert_eq! \-> o.unknown \-> argv (.to_vec (["--bogus"]))
+  assert! \-> roots_of (&o) |> .is_err
+
+test "one target, or targets with --generations, is a usage error"
+  assert! \-> roots_of (&parse_args (&argv (.to_vec (["vdiff", "/a"])))) |> .is_err
+  assert! \-> roots_of (&parse_args (&argv (.to_vec (["vdiff", "--generations", "system", "/a"])))) |> .is_err
+
+test "a usage error fails the program with exit code 1"
+  exit = id_effect::testing::run_test (program (parse_args (&argv (.to_vec (["vdiff"])))))
+  e = id_effect::testing::expect_exit_failure exit
+  assert! \-> e.to_string ().starts_with "usage: vdiff"
