@@ -19,6 +19,8 @@ in
     servesTheBinaryCache = assay.eq (has "nix.vcache") true;
     verifiesTheStore = assay.eq (has "nix.vverify") true;
     vbuildIsTheBuildHook = assay.eq (has "fleet.vbuild") true;
+    # userborn manages the user database (GH-187; docs/runbooks/userborn.md).
+    managesUsersWithUserborn = assay.eq cfg.features.nixos.users.userborn.enable true;
     # bin/update/flake runs vbump here; without it, it falls back to `nix flake update`.
     bumpsLocksPerInput = assay.eq (has "cli.vbump") true;
     installsVfetch = assay.eq (has "cli.vfetch") true;

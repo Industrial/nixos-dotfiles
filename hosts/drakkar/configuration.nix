@@ -73,4 +73,8 @@
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.
   features.fleet.vbuild.enable = true;
+  # userborn writes /etc/passwd, group and shadow in place of update-users-groups.pl
+  # (GH-187). Root is locked: switch over and roll back per docs/runbooks/userborn.md.
+  # Rollback: set it to false, then userdel any user created while it was on.
+  features.nixos.users.userborn.enable = true;
 }
