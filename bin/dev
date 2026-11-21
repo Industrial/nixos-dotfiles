@@ -73,7 +73,7 @@ Everyday
   hosts                   List the flake's nixosConfigurations.
 
 Machines
-  build <host>            Build a host's system closure (heavy; nom if available,
+  build <host>            Build a host's system closure (heavy; through vmon,
                           vdiff against /run/current-system for this machine).
   deploy <host|all> [..]  deploy-rs push via bin/fleet (flags pass through).
   update [target]         Run bin/update/<target>; no target lists them.
@@ -483,13 +483,18 @@ cmd_eval() {
 cmd_build() {
   (($# == 1)) || usage_die "build takes exactly one host"
   need nix
-  local h="$1" out builder=nix
+  local h="$1" out builder=(nix)
   require_host "$h"
   out="$root/.tmp/dev/build-$h"
   mkdir -p "$(dirname "$out")"
-  command -v nom >/dev/null 2>&1 && builder=nom
-  say "> $builder build --out-link .tmp/dev/build-$h $(host_attr "$h")"
-  "$builder" build --out-link "$out" "$(host_attr "$h")"
+  # vmon is the build monitor (GH-181); nom only where a host rolled vmon back.
+  if command -v vmon >/dev/null 2>&1; then
+    builder=(vmon -- nix)
+  elif command -v nom >/dev/null 2>&1; then
+    builder=(nom)
+  fi
+  say "> ${builder[*]} build --out-link .tmp/dev/build-$h $(host_attr "$h")"
+  "${builder[@]}" build --out-link "$out" "$(host_attr "$h")"
   if [[ "$h" == "$(hostname 2>/dev/null || true)" ]] && [[ -e /run/current-system ]]; then
     # vdiff took over from nvd (GH-153); nvd only on a host rolled back to it.
     if command -v vdiff >/dev/null 2>&1; then

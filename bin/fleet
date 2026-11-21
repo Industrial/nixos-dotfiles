@@ -11,6 +11,15 @@ deploy_cmd() {
   nix run --accept-flake-config github:serokell/deploy-rs -- "$@"
 }
 
+# Build a node's profile through vmon, the build monitor (GH-181), before deploy-rs
+# copies and activates it: deploy-rs then finds it in the store. Without vmon
+# (a host that rolled it back), deploy-rs builds it as before.
+prebuild() {
+  command -v vmon >/dev/null 2>&1 || return 0
+  echo "> fleet build .#deploy.nodes.$1.profiles.system.path (vmon)"
+  vmon -- nix build --no-link ".#deploy.nodes.$1.profiles.system.path"
+}
+
 usage() {
   cat <<EOF
 Usage: fleet <command> [host|all] [deploy-rs flags...]
@@ -65,13 +74,14 @@ case "$cmd" in
       failed=0
       for h in "${HOSTS[@]}"; do
         echo "> fleet deploy .#$h"
-        if ! deploy_cmd ".#$h" --skip-checks "$@"; then
+        if ! prebuild "$h" || ! deploy_cmd ".#$h" --skip-checks "$@"; then
           echo "> fleet deploy .#$h FAILED (continuing)"
           failed=1
         fi
       done
       exit "$failed"
     else
+      prebuild "$target"
       deploy_cmd ".#$target" --skip-checks "$@"
     fi
     ;;
