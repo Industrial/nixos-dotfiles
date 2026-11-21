@@ -1,0 +1,166 @@
+-- The program: `check` (one check, or a settle window with `--wait`) or
+-- `daemon` (a check now and then every interval, on an id_effect Schedule,
+-- into the node_exporter textfile directory). `main` parses argv and runs it
+-- under id_effect_cli's `run_main`, so the exit code follows the 0 / 1 / 101
+-- / 130 taxonomy and Ctrl-C (or systemd's SIGINT) interrupts with
+-- finalizers: a probe in flight is dropped, a probe command is killed.
+
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, Schedule, effect, fail, succeed, suspend}
+import crate::check::{check, settle}
+import crate::cli::{Options, USAGE, parse_args}
+import crate::config::{load, select}
+import crate::probe::{Probe, Report, down, failing, healthy}
+import crate::report::{human, json, publish}
+
+-- Why the program stopped.
+export errors HealthError
+  Usage String      "#{0}"
+  Config String     "configuration: #{0}"
+  Unhealthy String  "unhealthy: critical probe(s) down: #{0}"
+
+lifted : given <A: Send + 'static> Result<A, HealthError> -> Effect<A, HealthError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+probes_for : &Options -> Result<Vec<Probe>, HealthError>
+probes_for o =
+  all = (load (&o.config) |> .map_err Config)?
+  select all (&o.only) |> .map_err Config
+
+-- The configured probes, read when the program runs.
+configured : Options -> Effect<Vec<Probe>, HealthError, HNil>
+configured o = suspend (move \-> lifted (probes_for (&o)))
+
+-- One check, or a settle window.
+checked : &Options -> Vec<Probe> -> Effect<Report, Never, HNil>
+checked o probes =
+  if o.wait == 0
+    check probes
+  else
+    settle probes (Duration::from_secs o.wait) (Duration::from_secs o.every)
+
+-- Print the report; fail when the host is unhealthy.
+shown : bool -> Report -> Result<(), HealthError>
+shown as_json r =
+  if as_json
+    println! \-> "#{json (&r)}"
+  else
+    print! \-> "#{human (&r)}"
+  if healthy (&r)
+    Ok ()
+  else
+    Err (Unhealthy (failing (&r) |> .join ", "))
+
+export once : Options -> Vec<Probe> -> Effect<(), HealthError, HNil>
+once o probes =
+  as_json = o.json
+  checked (&o) probes |> .widen |> .flat_map (move \r -> lifted (shown as_json r))
+
+logged : Report -> Result<(), String> -> ()
+logged r published =
+  if published is Err e
+    eprintln! \-> "vhealth: #{e}"
+  names = down (&r)
+  listed = names.join ", "
+  if !(names.is_empty ())
+    eprintln! \-> "vhealth: down: #{listed}"
+  ()
+
+-- One daemon round: check, publish, log what is down. Never fails, so the
+-- next round is always scheduled.
+round : Vec<Probe> -> String -> Effect<(), Never, HNil>
+round probes dir =
+  check probes |> .map (move \r -> logged (r.clone ()) (publish (&r) (&dir)))
+
+-- `make ()` now, and again as `schedule` allows. The repetition is the
+-- Schedule's, on the executor's clock: no timer loop.
+export rerun : given <F: Fn() -> Effect<(), Never, HNil> + Send + Sync + 'static> Schedule<u64, ()> -> F -> Effect<u64, Never, HNil>
+rerun schedule make = Effect::repeat make schedule
+
+export daemon : Options -> Vec<Probe> -> Effect<u64, Never, HNil>
+daemon o probes =
+  dir = o.textfile_dir.clone () |> .unwrap_or_default
+  interval = o.interval
+  count = probes.len ()
+  effect!
+    eprintln!("vhealth: {} probes, checked every {}s into {}", count, interval, dir);
+    ~rerun(Schedule::spaced(Duration::from_secs(interval)), move || round(probes.clone(), dir.clone()))
+
+chosen : Options -> Vec<Probe> -> Effect<(), HealthError, HNil>
+chosen o probes =
+  if o.daemon
+    daemon o probes |> .map (\_ -> ()) |> .widen
+  else
+    once o probes
+
+-- The program for parsed options (or the usage error).
+export program : Result<Options, String> -> Effect<(), HealthError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok o -> configured (o.clone ()) |> .flat_map (move \probes -> chosen o probes)
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the tokio context the probes' sockets and
+-- processes need, so the program runs as the root's child. Structured: an
+-- interrupt of the root interrupts and awaits the child and every probe.
+supervised : Effect<(), HealthError, HNil> -> Effect<(), HealthError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  id_effect_cli::run_main (supervised (program (parse_args (&args)))) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+counted : std::sync::Arc<std::sync::atomic::AtomicU64> -> Effect<(), Never, HNil>
+counted n =
+  suspend (move \-> bump n)
+
+#[cfg(test)]
+bump : std::sync::Arc<std::sync::atomic::AtomicU64> -> Effect<(), Never, HNil>
+bump n =
+  n.fetch_add 1 std::sync::atomic::Ordering::SeqCst
+  succeed (())
+
+test "the schedule reruns a round"
+  runs = std::sync::Arc::new (std::sync::atomic::AtomicU64::new 0)
+  counter = runs.clone ()
+  make = move \-> counted (counter.clone ())
+  bounded = Schedule::spaced (Duration::from_secs 60) |> .intersect (Schedule::recurs 2) |> .map (\p -> p.0)
+  exit = id_effect::testing::run_test (rerun bounded make)
+  assert! \-> exit |> .into_result |> .is_ok
+  assert_eq! \-> runs.load (std::sync::atomic::Ordering::SeqCst) \-> 3
+
+#[cfg(test)]
+failure : Effect<(), HealthError, HNil> -> Option<String>
+failure eff =
+  id_effect::testing::run_test eff |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+
+test "a usage error carries the usage line"
+  err = failure (program (Err (.to_string "unknown argument: -x")))
+  assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false
+
+test "a missing configuration fails with its path"
+  o = parse_args (&[.to_string "check", .to_string "--config", .to_string "/nonexistent/vhealth.json"]) |> .expect "options"
+  err = failure (program (Ok o))
+  assert! \-> err |> .map (\e -> e.contains "/nonexistent/vhealth.json") |> .unwrap_or false
+
+test "an unhealthy check fails and names the critical probes down"
+  dir = std::env::temp_dir () |> .join (format! \-> "vhealth-app-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  config = dir.join "probes.json"
+  std::fs::write (&config) "{\"probes\":[{\"name\":\"root\",\"type\":\"file\",\"path\":\"/\",\"maxAgeSeconds\":4000000000},{\"name\":\"gone\",\"type\":\"file\",\"path\":\"/nonexistent/x\",\"maxAgeSeconds\":1},{\"name\":\"minor\",\"type\":\"file\",\"path\":\"/nonexistent/y\",\"maxAgeSeconds\":1,\"critical\":false}]}" |> .expect "a configuration"
+  path = config.to_string_lossy () |> .into_owned
+  all = parse_args (&[.to_string "check", .to_string "--json", .to_string "--config", path.clone ()]) |> .expect "options"
+  assert_eq! \-> failure (program (Ok all)) \-> Some (.to_string "unhealthy: critical probe(s) down: gone")
+  healthy_only = parse_args (&[.to_string "check", .to_string "--config", path.clone (), .to_string "--probe", .to_string "root", .to_string "--probe", .to_string "minor"]) |> .expect "options"
+  assert_eq! \-> failure (program (Ok healthy_only)) \-> None
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
