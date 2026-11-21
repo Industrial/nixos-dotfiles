@@ -1,0 +1,185 @@
+-- Hard-link deduplication into /nix/store/.links, as Nix 2.35.6
+-- `LocalStore::optimisePath_` does it (src/libstore/optimise-store.cc):
+--
+--   * directories are walked, skipping entries whose inode is already one of
+--     the `.links` files (`readDirectoryIgnoringInodes`);
+--   * only regular files and symlinks are linked (Linux can hard-link a
+--     symlink); a regular file its owner can write is suspicious and skipped;
+--   * the file's NAR hash names its `.links` entry; a same-named entry of a
+--     different size is corrupt and replaced;
+--   * the file is replaced by a hard link to that entry through a temporary
+--     link in the store root and an atomic rename, with its directory made
+--     writable for the moment and canonicalised (0555, mtime 1) after;
+--   * ENOSPC making the entry, EMLINK at either step, and an entry that a
+--     concurrent collection removed all mean "leave this file as it is".
+
+import std::collections::HashSet
+import std::fs
+import std::io::ErrorKind
+import std::os::unix::fs::{DirEntryExt, MetadataExt, PermissionsExt}
+import std::path::Path
+import std::time::{Duration, UNIX_EPOCH}
+import crate::nar::nar_hash
+import crate::storepath::STORE_DIR
+
+export const LINKS_DIR : &str = "/nix/store/.links"
+
+-- `linked`: files replaced by a link. `bytes`: their apparent size, Nix's
+-- "freed" figure. `writable`: suspicious files skipped. `failed`: paths
+-- given up on (each is reported as it happens).
+export data Stats { export linked u64, export bytes u64, export writable u64, export failed u64 }
+  deriving (Debug, Clone, Default, PartialEq)
+
+const EMLINK : i32 = 31
+const ENOSPC : i32 = 28
+
+-- `loadInodeHash`: the inode of every `.links` entry.
+export link_inodes : Result<HashSet<u64>, String>
+link_inodes =
+  dir = ((fs::read_dir LINKS_DIR).map_err (\e -> "reading #{LINKS_DIR}: #{e}"))?
+  mut out = HashSet::new () : HashSet<u64>
+  for entry in dir
+    e = (entry.map_err (\e -> "reading #{LINKS_DIR}: #{e}"))?
+    out.insert (e.ino ())
+  Ok out
+
+-- One entry of a store path, recursively. `known` is the `.links` inode set
+-- read at the start; `mine` collects the inodes this worker linked since.
+export optimise_path : &Path -> &HashSet<u64> -> &mut HashSet<u64> -> &mut Stats -> std::io::Result<()>
+optimise_path path known mine stats =
+  st = (fs::symlink_metadata path)?
+  t = st.file_type ()
+  if t.is_dir ()
+    for entry in (fs::read_dir path)?
+      e = entry?
+      ino = e.ino ()
+      if !(known.contains (&ino)) && !(mine.contains (&ino))
+        (optimise_path (&(e.path ())) known mine stats)?
+    Ok ()
+  else if !(t.is_file ()) && !(t.is_symlink ())
+    Ok ()
+  else if t.is_file () && st.mode () & 0o200 != 0
+    eprintln! \-> "vopt: skipping suspicious writable file #{path.display ()}"
+    stats.writable += 1
+    Ok ()
+  else if st.nlink () > 1 && (known.contains (&(st.ino ())) || mine.contains (&(st.ino ())))
+    Ok ()
+  else
+    link_one path (&st) mine stats
+
+-- Make sure `.links/<hash>` exists for this content; false means leave the
+-- file alone (no room for another entry).
+ensure_entry : &Path -> &Path -> &fs::Metadata -> &mut HashSet<u64> -> std::io::Result<bool>
+ensure_entry path link st mine =
+  if fs::symlink_metadata link is Ok lm
+    if lm.len () != st.len ()
+      eprintln! \-> "vopt: removing corrupted link #{link.display ()}; run nix-store --verify --check-contents --repair"
+      _ := fs::remove_file link
+  if (fs::symlink_metadata link).is_ok ()
+    Ok true
+  else
+    case fs::hard_link path link of
+      Ok _ ->
+        _ := mine.insert (st.ino ())
+        Ok true
+      Err e | e.kind () == ErrorKind::AlreadyExists -> Ok true
+      Err e | e.raw_os_error () == Some ENOSPC -> Ok false
+      Err e -> Err e
+
+link_one : &Path -> &fs::Metadata -> &mut HashSet<u64> -> &mut Stats -> std::io::Result<()>
+link_one path st mine stats =
+  hash = (nar_hash path)?
+  link = Path::new LINKS_DIR |> .join (&hash)
+  if (ensure_entry path (&link) st mine)?
+    case fs::symlink_metadata (&link) of
+      -- A concurrent collection removed it: a later pass dedups this file.
+      Err _ -> Ok ()
+      Ok lm | lm.ino () == st.ino () -> Ok ()
+      Ok _ -> replace path (&link) (&hash) st mine stats
+  else
+    Ok ()
+
+-- Swap the file for a link to the entry, with its directory writable only
+-- for the swap (the store root itself is never touched).
+replace : &Path -> &Path -> &str -> &fs::Metadata -> &mut HashSet<u64> -> &mut Stats -> std::io::Result<()>
+replace path link hash st mine stats =
+  dir = path.parent () |> .unwrap_or (Path::new STORE_DIR)
+  toggle = dir != Path::new STORE_DIR
+  if toggle
+    mode = ((fs::symlink_metadata dir)?).mode ()
+    (fs::set_permissions dir (fs::Permissions::from_mode (mode | 0o200)))?
+  outcome = swap path link hash st mine stats
+  if toggle
+    (canonicalise_dir dir)?
+  outcome
+
+swap : &Path -> &Path -> &str -> &fs::Metadata -> &mut HashSet<u64> -> &mut Stats -> std::io::Result<()>
+swap path link hash st mine stats =
+  short = (hash.get (0 .. 8)).unwrap_or hash
+  tmp = Path::new STORE_DIR |> .join ".tmp-link-#{std::process::id ()}-#{st.ino ()}-#{short}"
+  case fs::hard_link link (&tmp) of
+    Err e | e.raw_os_error () == Some EMLINK -> Ok ()
+    Err e | e.kind () == ErrorKind::NotFound -> Ok ()
+    Err e -> Err e
+    Ok _ ->
+      _ := mine.insert (st.ino ())
+      -- The file hashed must still be the file replaced: a concurrent
+      -- `--repair` may have swapped in a fresh copy since, and renaming the
+      -- old content's link over it would undo the repair.
+      same = case fs::symlink_metadata path of
+        Ok now -> now.ino () == st.ino () && now.dev () == st.dev ()
+        Err _ -> false
+      if !same
+        _ := fs::remove_file (&tmp)
+        Ok ()
+      else
+        rename_over (&tmp) path st stats
+
+rename_over : &Path -> &Path -> &fs::Metadata -> &mut Stats -> std::io::Result<()>
+rename_over tmp path st stats =
+  case fs::rename tmp path of
+    Ok _ ->
+      -- rename(2) between two links to one inode does nothing and leaves
+      -- the temporary; something else linked the file meanwhile.
+      if (fs::symlink_metadata tmp).is_ok ()
+        _ := fs::remove_file tmp
+      stats.linked += 1
+      stats.bytes += st.len ()
+      Ok ()
+    Err e ->
+      _ := fs::remove_file tmp
+      if e.raw_os_error () == Some EMLINK
+        Ok ()
+      else
+        Err e
+
+-- `canonicaliseTimestampAndPermissions` for a directory: mode 0555, mtime 1.
+canonicalise_dir : &Path -> std::io::Result<()>
+canonicalise_dir dir =
+  (fs::set_permissions dir (fs::Permissions::from_mode 0o555))?
+  handle = (fs::File::open dir)?
+  handle.set_modified (UNIX_EPOCH + Duration::from_secs 1)
+
+-- Optimise whole store paths, by base name; an error gives up on that path
+-- only, as a later run will try it again.
+export optimise_paths : Vec<String> -> std::sync::Arc<HashSet<u64>> -> Stats
+optimise_paths bases known =
+  mut mine = HashSet::new () : HashSet<u64>
+  mut stats = Stats::default ()
+  for b in bases.iter ()
+    p = Path::new STORE_DIR |> .join b
+    if (optimise_path (&p) (&known) (&mut mine) (&mut stats)).is_err ()
+      eprintln! \-> "vopt: could not optimise #{p.display ()}"
+      stats.failed += 1
+  stats
+
+-- Sum of per-chunk statistics.
+export total : Vec<Stats> -> Stats
+total parts =
+  mut t = Stats::default ()
+  for p in parts.iter ()
+    t.linked += p.linked
+    t.bytes += p.bytes
+    t.writable += p.writable
+    t.failed += p.failed
+  t

@@ -1,0 +1,204 @@
+-- vopt's command line.
+--
+--   vopt run [--full] [--dry-run]
+--
+-- Optimises the store paths registered since the last successful run (all of
+-- them with --full), holding the GC lock *shared*: builds and their temporary
+-- roots carry on, and only a garbage collection waits, which also keeps vgc's
+-- `.links` pruning from racing the linking here. Replaces the inline
+-- `auto-optimise-store`, so builds stop paying for hashing every file they
+-- write; store paths are immutable, so a path optimised once stays so.
+
+import id_effect::{Concurrency, Effect, fail, for_each_par, succeed, sync}
+import rusqlite::{Connection, OpenFlags}
+import std::collections::HashSet
+import std::fs
+import std::sync::Arc
+import std::time::Instant
+import crate::effects::{OptError, exit_code, step}
+import crate::mounts::writable_store
+import crate::optimise::{Stats, link_inodes, optimise_paths, total}
+import crate::storepath::store_base
+
+const USAGE : &str = "usage: vopt run [--full] [--dry-run]"
+const DB_PATH : &str = "/nix/var/nix/db/db.sqlite"
+const GC_LOCK : &str = "/nix/var/nix/gc.lock"
+-- The highest ValidPaths id the last run saw. Ids are autoincrement and never
+-- reused, so unlike registrationTime (which `nix copy`, remote builds and
+-- ssh substituters carry over from the source host) they only move forward.
+const STATE : &str = "/var/lib/vopt/last-id"
+-- Each run starts this many ids before the last one seen, so a registration
+-- whose transaction committed after the previous run's query is not skipped
+-- for good. Re-visiting an optimised path costs an inode lookup per file.
+const MARGIN : i64 = 1000
+const WORKERS : usize = 16
+
+data Options { command String, full bool, dry_run bool, unknown Vec<String> }
+  deriving (Debug, Clone, Default)
+
+parse_args : &[String] -> Options
+parse_args args =
+  mut o = Options::default ()
+  for a in (args.iter ()).skip 1
+    case a.as_str () of
+      "--full" ->
+        o.full := true
+      "--dry-run" ->
+        o.dry_run := true
+      s | o.command.is_empty () && !(s.starts_with '-') ->
+        o.command := s.to_string ()
+      s ->
+        o.unknown.push (s.to_string ())
+  o
+
+-- The last run's highest id; 0 (everything) when there is none.
+since_last : Result<i64, String>
+since_last =
+  case fs::read_to_string STATE of
+    Ok s -> (s.trim ()).parse () |> .map_err (\e -> "#{STATE}: #{e}")
+    Err e | e.kind () == std::io::ErrorKind::NotFound -> Ok 0
+    Err e -> Err "#{STATE}: #{e}"
+
+-- Write the state atomically (temporary file, fsync, rename), so a crash
+-- mid-write never leaves a file the next run cannot parse.
+record : i64 -> Result<(), String>
+record max_id =
+  state = std::path::Path::new STATE
+  if state.parent () is Some parent
+    _ := fs::create_dir_all parent
+  tmp = state.with_extension "tmp"
+  written = write_synced (&tmp) (max_id.to_string ())
+  (written.map_err (\e -> "#{tmp.display ()}: #{e}"))?
+  (fs::rename (&tmp) state).map_err (\e -> "#{STATE}: #{e}")
+
+write_synced : &std::path::Path -> String -> std::io::Result<()>
+write_synced path text =
+  mut f = (fs::File::create path)?
+  (std::io::Write::write_all (&mut f) (text.as_bytes ()))?
+  f.sync_all ()
+
+sql : rusqlite::Error -> String
+sql e = "#{e}"
+
+data Row { id i64, path String }
+
+-- Base names of the valid paths with an id above `after`, and the highest id
+-- seen (`after` itself when there are none).
+paths_after : i64 -> Result<(Vec<String>, i64), String>
+paths_after after =
+  conn = ((Connection::open_with_flags DB_PATH OpenFlags::SQLITE_OPEN_READ_ONLY).map_err sql)?
+  mut stmt = ((conn.prepare "SELECT id, path FROM ValidPaths WHERE id > ?1 ORDER BY id").map_err sql)?
+  rows = ((stmt.query_map ([after]) (\r -> Ok (Row { id = (r.get 0)?, path = (r.get 1)? }))).map_err sql)?
+  mut out = Vec::new () : Vec<String>
+  mut top = after
+  for row in rows
+    v = (row.map_err sql)?
+    top := top.max v.id
+    if store_base (&v.path) is Some b
+      out.push (b.to_string ())
+  Ok (out, top)
+
+-- The GC lock, shared, held until the returned file is dropped.
+shared_lock : Result<fs::File, String>
+shared_lock =
+  opened = fs::OpenOptions::new () |> .read true |> .write true |> .create true |> .truncate false |> .open GC_LOCK
+  file = (opened.map_err (\e -> "opening #{GC_LOCK}: #{e}"))?
+  ((file.lock_shared ()).map_err (\e -> "locking #{GC_LOCK}: #{e}"))?
+  Ok file
+
+split : Vec<String> -> usize -> Vec<Vec<String>>
+split items n =
+  size = (items.len () / n.max 1) + 1
+  (items.chunks size).map (\c -> c.to_vec ()) |> .collect
+
+mib : u64 -> u64
+mib b = b / 1048576
+
+-- Optimise `bases` in WORKERS chunks against one snapshot of the `.links` inodes.
+optimised : Vec<String> -> Effect<Stats, OptError>
+optimised bases =
+  (step (\-> link_inodes ()) OptError::Links) |> .flat_map (move \known -> optimise_all bases (Arc::new known))
+
+optimise_all : Vec<String> -> Arc<HashSet<u64>> -> Effect<Stats, OptError>
+optimise_all bases known =
+  chunks = split bases WORKERS
+  (for_each_par chunks (move \c -> optimise_chunk c (Arc::clone (&known))) (Concurrency::Bounded WORKERS)) |> .map (\parts -> total parts)
+
+optimise_chunk : Vec<String> -> Arc<HashSet<u64>> -> Effect<Stats, OptError>
+optimise_chunk c known = sync (move \-> optimise_paths c known)
+
+-- The state advances even past a path that failed: a missed dedup is harmless
+-- and `--full` retries everything, while not advancing would re-hash the same
+-- days forever behind one bad path. Failures still make the run exit 1.
+report : Stats -> usize -> Instant -> i64 -> Result<i32, String>
+report s n start max_id =
+  println! \-> "optimised #{n} store paths: #{s.linked} files hard-linked, #{mib s.bytes} MiB freed, #{s.writable} writable files skipped, #{s.failed} paths failed, #{start.elapsed ().as_millis ()}ms"
+  (record max_id)?
+  if s.failed == 0
+    Ok 0
+  else
+    Ok 1
+
+start_from : bool -> Result<i64, String>
+start_from full =
+  if full
+    Ok 0
+  else
+    since_last () |> .map (\last -> (last - MARGIN).max 0)
+
+-- A run, holding the shared GC lock throughout; the lock is released however
+-- the run ends.
+run : Options -> Effect<i32, OptError>
+run o =
+  start = Instant::now ()
+  full = o.full
+  dry = o.dry_run
+  (step (\-> shared_lock ()) OptError::Lock) |> .flat_map (move \lock -> (body full dry start).ensuring (sync (move \-> drop lock)))
+
+body : bool -> bool -> Instant -> Effect<i32, OptError>
+body full dry start =
+  after = step (move \-> start_from full) OptError::State
+  after |> .flat_map (\t -> step (move \-> paths_after t) OptError::Database) |> .flat_map (move \found -> act found.0 found.1 dry start)
+
+act : Vec<String> -> i64 -> bool -> Instant -> Effect<i32, OptError>
+act bases max_id dry start =
+  n = bases.len ()
+  if dry
+    println! \-> "would optimise #{n} store paths"
+    succeed 0
+  else
+    (optimised bases) |> .flat_map (move \s -> step (move \-> report s n start max_id) OptError::State)
+
+program : Options -> Effect<i32, OptError>
+program o =
+  if !(o.unknown.is_empty ()) || o.command != "run"
+    fail (OptError::Usage (USAGE.to_string ()))
+  else
+    run o
+
+prepare : &Options -> Result<(), String>
+prepare o =
+  if o.command == "run" && !o.dry_run
+    writable_store ()
+  else
+    Ok ()
+
+-- The namespace switch must happen while vopt is still single-threaded.
+export main : i32
+main =
+  args = std::env::args () |> .collect : Vec<String>
+  o = parse_args (&args)
+  case prepare (&o) of
+    Err e ->
+      eprintln! \-> "vopt: #{e}"
+      1
+    Ok _ -> exit_code (program o)
+
+test "flags parse"
+  args = ["vopt", "run", "--full"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  o = parse_args (&args)
+  assert! \-> o.command == "run" && o.full && !o.dry_run && o.unknown.is_empty ()
+
+test "anything but run is a usage error"
+  args = ["vopt", "frobnicate"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  assert! \-> exit_code (program (parse_args (&args))) == 1
