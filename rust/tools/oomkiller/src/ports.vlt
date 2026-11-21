@@ -1,0 +1,72 @@
+-- The oomkiller's capabilities: every way it touches the machine, as a trait
+-- whose methods return an Effect, behind a newtype that is the capability's
+-- identity in the environment. `live.vlt` holds the real implementations;
+-- the tests in `daemon.vlt` provide fakes through the same traits.
+
+import std::sync::Arc
+import id_effect::{Effect, Never, HCons, HNil, caps}
+import crate::policy::{Line, ProcessInfo, Reading}
+
+-- The daemon's one failure boundary. Both variants have the same caller
+-- response, which is to stop with exit 1; they stay apart because they tell
+-- the operator different things.
+--
+-- A plain enum with a hand-written Display rather than an `errors` block,
+-- whose generated Display names its fields `_0`, which trips
+-- clippy::just_underscores_and_digits.
+export data DaemonError
+  = MemoryUnreadable String
+  | OwnerUnknown String
+  deriving (Debug, Clone, PartialEq, Eq, Hash)
+
+instance std::fmt::Display DaemonError
+  fmt : &self -> &mut std::fmt::Formatter<'_> -> std::fmt::Result
+  fmt self f = case self of
+    DaemonError::MemoryUnreadable reason -> write! \-> f \-> "Failed to read memory: #{reason}"
+    DaemonError::OwnerUnknown reason -> write! \-> f \-> "Failed to get current process metadata: #{reason}"
+
+-- Used and total memory. Reading is infallible; whether a reading is usable
+-- is `policy.vlt`'s decision.
+export class MemoryProbe
+  read : &self -> Effect<Reading, Never>
+
+-- Every process the table can name an owner for. Expensive, so the daemon asks
+-- only once memory is past the threshold.
+export class ProcessTable
+  snapshot : &self -> Effect<Vec<ProcessInfo>, Never>
+
+-- Why a kill failed: kill(1)'s stderr, or why it could not run. A failed kill
+-- is reported and the daemon carries on, so this is the whole error.
+#[derive(Clone, Debug, PartialEq, Eq)]
+export newtype KillError = KillError { export reason String }
+
+-- SIGKILL one pid.
+export class Killer
+  kill : &self -> u32 -> Effect<(), KillError>
+
+-- Where the daemon's lines go: stdout and stderr, which systemd sends to the journal.
+export class Journal
+  write : &self -> Vec<Line> -> Effect<(), Never>
+
+#[derive(Clone)]
+export newtype Memory = Memory { export inner Arc<dyn MemoryProbe + Send + Sync> }
+
+#[derive(Clone)]
+export newtype Processes = Processes { export inner Arc<dyn ProcessTable + Send + Sync> }
+
+#[derive(Clone)]
+export newtype Kill = Kill { export inner Arc<dyn Killer + Send + Sync> }
+
+#[derive(Clone)]
+export newtype Log = Log { export inner Arc<dyn Journal + Send + Sync> }
+
+-- Whose processes may die: the uid the daemon runs as. A plain value, read
+-- once when the environment is built.
+#[derive(Clone, Copy, Debug)]
+export newtype Owner = Owner { export uid u32 }
+
+export type DaemonEnv = caps!(Memory, Processes, Kill, Log, Owner)
+
+export env : Memory -> Processes -> Kill -> Log -> Owner -> DaemonEnv
+env memory processes kill log owner =
+  HCons (Arc::new memory) (HCons (Arc::new processes) (HCons (Arc::new kill) (HCons (Arc::new log) (HCons (Arc::new owner) HNil))))
