@@ -1,0 +1,113 @@
+-- Per-builder slot accounting, compatible with build-remote's.
+--
+-- Nix starts one hook process per accepted build, so slots are shared between
+-- processes, and only something outside every process can count them: the
+-- same flock'd files build-remote uses, `<state>/current-load/<uri>-<n>`,
+-- one per slot, held for the whole build, and `main-lock` around the choice.
+-- Using build-remote's files (not new ones) keeps the count right while both
+-- hooks run on one host, as during a switch-over.
+--
+-- Inside a process the slot is an id_effect resource: `held` releases it by
+-- a finalizer, however the build ends (success, failure, defect, interrupt).
+
+import std::fs::{File, OpenOptions}
+import std::os::unix::fs::OpenOptionsExt
+import std::sync::Arc
+import id_effect::{Effect, HNil, sync}
+import crate::machines::{Machine, escape_uri}
+
+-- A held slot: the locked file. Dropping the last handle unlocks it.
+export data Slot { export path String, export file Arc<File> }
+  deriving (Clone)
+
+export slot_path : &str -> &Machine -> u64 -> String
+slot_path dir m n = "#{dir}/#{escape_uri (&m.store_uri)}-#{n}"
+
+-- Nix's `openLockFile`: read-write, created 0600.
+open_lock : &str -> std::io::Result<File>
+open_lock path =
+  OpenOptions::new () |> .read true |> .write true |> .create true |> .truncate false |> .mode 0o600 |> .open path
+
+-- Take the choice lock, waiting for whichever hook holds it.
+export main_lock : &str -> Result<File, String>
+main_lock dir =
+  _ = std::fs::create_dir_all dir
+  path = "#{dir}/main-lock"
+  file = (open_lock (&path) |> .map_err (\e -> "opening #{path}: #{e}"))?
+  ((file.lock ()) |> .map_err (\e -> "locking #{path}: #{e}"))?
+  Ok file
+
+-- The slot file locked, or None when another process holds it.
+try_slot : &str -> Option<File>
+try_slot path =
+  file = (open_lock path |> .ok)?
+  case file.try_lock () of
+    Ok _ -> Some file
+    Err _ -> None
+
+-- How many of a machine's slots are held (by any hook on this host).
+export held_count : &str -> &Machine -> u64
+held_count dir m =
+  mut n = 0 : u64
+  for slot in 0 .. m.max_jobs
+    if try_slot (&slot_path dir m slot) |> .is_none
+      n := n + 1
+  n
+
+-- The first free slot of a machine, locked.
+export take : &str -> &Machine -> Option<Slot>
+take dir m =
+  mut found = None : Option<Slot>
+  for slot in 0 .. m.max_jobs
+    if found.is_none ()
+      path = slot_path dir m slot
+      if try_slot (&path) is Some file
+        found := Some (Slot { path, file = Arc::new file })
+  found
+
+-- Run `body` holding `slot`; the slot is released however `body` ends.
+export holding : given <A: Send + 'static, E: Send + 'static> Slot -> Effect<A, E, HNil> -> Effect<A, E, HNil>
+holding slot body = body.ensuring (sync (move \-> drop slot))
+
+#[cfg(test)]
+scratch : &str -> String
+scratch name =
+  dir = std::env::temp_dir () |> .join ("vbuild-slots-#{name}-#{std::process::id ()}")
+  _ = std::fs::remove_dir_all (&dir)
+  _ = std::fs::create_dir_all (&dir)
+  dir.to_string_lossy ().into_owned ()
+
+#[cfg(test)]
+two_slots : Machine
+two_slots = crate::machines::parse_line (&std::collections::BTreeSet::new ()) "ssh://tom@b x86_64-linux - 2 1" |> .unwrap
+
+test "slots are taken until the machine is full, and freed by dropping"
+  dir = scratch "full"
+  m = two_slots ()
+  assert_eq! \-> held_count (&dir) (&m) \-> 0
+  a = take (&dir) (&m)
+  assert! \-> a.is_some ()
+  assert_eq! \-> held_count (&dir) (&m) \-> 1
+  b = take (&dir) (&m)
+  assert! \-> b.is_some ()
+  assert! \-> take (&dir) (&m) |> .is_none
+  drop a
+  assert_eq! \-> held_count (&dir) (&m) \-> 1
+  drop b
+  assert_eq! \-> held_count (&dir) (&m) \-> 0
+
+test "slot files have build-remote's names"
+  m = two_slots ()
+  assert_eq! \-> slot_path "/nix/var/nix/current-load" (&m) 1 \-> .to_string "/nix/var/nix/current-load/ssh:__tom@b-1"
+
+test "a slot held by an effect is released when it ends, success or failure"
+  dir = scratch "effect"
+  m = two_slots ()
+  s = take (&dir) (&m) |> .unwrap
+  ok = id_effect::testing::run_test (holding s (id_effect::succeed 7 : Effect<i32, String, HNil>))
+  assert! \-> ok.into_result () |> .is_ok
+  assert_eq! \-> held_count (&dir) (&m) \-> 0
+  s2 = take (&dir) (&m) |> .unwrap
+  failed = id_effect::testing::run_test (holding s2 (id_effect::fail (.to_string "boom") : Effect<i32, String, HNil>))
+  assert! \-> failed.into_result () |> .is_err
+  assert_eq! \-> held_count (&dir) (&m) \-> 0

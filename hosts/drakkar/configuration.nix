@@ -47,4 +47,7 @@
   # vopt (Voltaic) replaces inline auto-optimise-store with a daily pass.
   features.nixos.vopt.enable = true;
   features.storage.nfs-client.enable = true;
+  # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
+  # has no remote builders, so its visible effect is an immediate decline.
+  features.fleet.vbuild.enable = true;
 }

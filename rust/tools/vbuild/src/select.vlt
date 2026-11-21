@@ -1,0 +1,234 @@
+-- Which builder takes a build, or none. Pure: the probes, the slot counts and
+-- the request come in as values, the decision goes out as one.
+--
+-- build-remote filters by system and features, then ranks by its own lock
+-- files only: `load / speedFactor`, where load is how many of the machine's
+-- slots this host holds. It never asks the builder, so a builder another
+-- client is saturating looks idle, and an unreachable one is only found out by
+-- connecting to it (and waiting out the TCP timeout) after it has been picked.
+--
+-- vbuild ranks by what the builder says it is doing (its 1-minute load per
+-- CPU, from the probe) plus the share of its slots this host already holds
+-- (builds just started have not reached the load average yet). A builder that
+-- did not answer the probe, has no free slot here, or already runs `maxJobs`
+-- builds is out. Ties, at two decimals, break on the higher speed factor,
+-- then on fewer slots held, then on the order of the machines file.
+
+import std::collections::BTreeSet
+import crate::machines::{Machine, suits}
+
+-- What a builder reported: `cat /proc/loadavg`, `nproc`, and how many build
+-- users have processes (one per running build).
+export data Load { export load1 f64, export cpus u64, export jobs u64 }
+  deriving (Debug, Clone, PartialEq)
+
+export data Probe
+  = Up Load
+  | Down String
+  deriving (Debug, Clone, PartialEq)
+
+-- One machine as the decision sees it: its probe, and how many of its slots
+-- this host holds (build-remote's slot lock files).
+export data Candidate { export machine Machine, export probe Probe, export held u64 }
+  deriving (Debug, Clone, PartialEq)
+
+-- The request, reduced to what the decision needs.
+export data Want
+  { export system String
+  , export features BTreeSet<String>
+  , export local_ok bool
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- The hook's answer. `Accept` names the candidate by index.
+export data Decision
+  = Accept usize
+  | Decline
+  | Postpone
+  | DeclinePermanently
+  deriving (Debug, Clone, PartialEq)
+
+-- The line Nix reads (`# ` + word); `accept` is followed by the machine name.
+export reply_word : &Decision -> &'static str
+reply_word d =
+  case d of
+    Accept _ -> "accept"
+    Decline -> "decline"
+    Postpone -> "postpone"
+    DeclinePermanently -> "decline-permanently"
+
+-- Whether a candidate can take a build right now.
+export available : &Candidate -> bool
+available c =
+  case &c.probe of
+    Down _ -> false
+    Up load -> c.held < c.machine.max_jobs && load.jobs < c.machine.max_jobs
+
+-- Lower is better: load per CPU, plus the share of slots already held here.
+export score : &Candidate -> f64
+score c =
+  slots = ratio c.held (c.machine.max_jobs.max 1)
+  case &c.probe of
+    Down _ -> f64::MAX
+    Up load -> ratio_f load.load1 (load.cpus.max 1) + slots
+
+ratio : u64 -> u64 -> f64
+ratio a b = ratio_f (f64::from (u32::try_from a |> .unwrap_or u32::MAX)) b
+
+ratio_f : f64 -> u64 -> f64
+ratio_f a b = a / f64::from (u32::try_from b |> .unwrap_or u32::MAX)
+
+-- The score as the ranking compares it: two decimals, so noise in the load
+-- average does not decide between equal builders.
+export rounded : &Candidate -> f64
+rounded c = (score c * 100.0).round ()
+
+-- Whether `a` beats `b` (indices break the last tie, earlier first).
+better : &Candidate -> usize -> &Candidate -> usize -> bool
+better a ia b ib =
+  sa = rounded a
+  sb = rounded b
+  if sa != sb
+    sa < sb
+  else if a.machine.speed_factor != b.machine.speed_factor
+    a.machine.speed_factor > b.machine.speed_factor
+  else if a.held != b.held
+    a.held < b.held
+  else
+    ia < ib
+
+-- The best available candidate that suits the request.
+export best : &Want -> &[Candidate] -> Option<usize>
+best want cs =
+  mut pick = None : Option<usize>
+  for i in 0 .. cs.len ()
+    c = &cs[i]
+    if suits (&c.machine) (&want.system) (&want.features) && available c
+      pick := case pick of
+        None -> Some i
+        Some j ->
+          if better c i (&cs[j]) j
+            Some i
+          else
+            Some j
+  pick
+
+-- The decision. With no machines at all Nix stops asking (build-remote's
+-- `decline-permanently`). With none available: wait (`postpone`) only when
+-- the build cannot run here and a builder of the right type answered but is
+-- busy; otherwise `decline`, and Nix builds locally (or reports that it
+-- cannot) at once. An unreachable builder is never waited for.
+export decide : &Want -> &[Candidate] -> Decision
+decide want cs =
+  if cs.is_empty ()
+    DeclinePermanently
+  else
+    case best want cs of
+      Some i -> Accept i
+      None -> unplaced want cs
+
+unplaced : &Want -> &[Candidate] -> Decision
+unplaced want cs =
+  busy = cs.iter () |> .any (\c -> suits (&c.machine) (&want.system) (&want.features) && is_up c)
+  if busy && !want.local_ok
+    Postpone
+  else
+    Decline
+
+is_up : &Candidate -> bool
+is_up c =
+  case &c.probe of
+    Up _ -> true
+    Down _ -> false
+
+-- build-remote's `couldBuildLocally`: local builds are allowed, the system is
+-- this one (or an extra platform), and every required feature is a local
+-- system feature.
+export could_build_locally : u64 -> &str -> &BTreeSet<String> -> &str -> &BTreeSet<String> -> &BTreeSet<String> -> bool
+could_build_locally max_jobs this_system platforms system local_features required =
+  all_local = required.iter () |> .all (\f -> local_features.contains f)
+  max_jobs > 0 && (system == this_system || platforms.contains system) && all_local
+
+#[cfg(test)]
+machine : &str -> u64 -> f64 -> &[&str] -> Machine
+machine uri jobs speed features = Machine {
+    store_uri = uri.to_string ()
+    , systems = BTreeSet::from ([.to_string "x86_64-linux"])
+    , ssh_key = String::new ()
+    , max_jobs = jobs
+    , speed_factor = speed
+    , supported = features.iter () |> .map (\f -> f.to_string ()) |> .collect
+    , mandatory = BTreeSet::new ()
+    , host_key = String::new ()
+    }
+
+#[cfg(test)]
+up : f64 -> u64 -> u64 -> Probe
+up load1 cpus jobs = Up (Load { load1, cpus, jobs })
+
+#[cfg(test)]
+cand : Machine -> Probe -> u64 -> Candidate
+cand m p held = Candidate { machine = m, probe = p, held }
+
+#[cfg(test)]
+want : &[&str] -> bool -> Want
+want features local_ok = Want { system = .to_string "x86_64-linux", features = features.iter () |> .map (\f -> f.to_string ()) |> .collect, local_ok }
+
+test "no machines at all is a permanent decline"
+  assert_eq! \-> decide (&want (&[]) true) (&[]) \-> DeclinePermanently
+
+test "the least loaded builder wins"
+  cs = .to_vec ([cand (machine "ssh://a" 4 1.0 (&[])) (up 3.5 4 3) 0, cand (machine "ssh://b" 4 1.0 (&[])) (up 0.2 4 0) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Accept 1
+
+test "load is per CPU"
+  cs = .to_vec ([cand (machine "ssh://small" 8 1.0 (&[])) (up 2.0 2 1) 0, cand (machine "ssh://big" 8 1.0 (&[])) (up 4.0 16 2) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Accept 1
+
+test "slots already held here count against a builder"
+  cs = .to_vec ([cand (machine "ssh://a" 4 1.0 (&[])) (up 0.0 4 0) 3, cand (machine "ssh://b" 4 1.0 (&[])) (up 0.5 4 0) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Accept 1
+
+test "ties break on the higher speed factor"
+  cs = .to_vec ([cand (machine "ssh://muninn" 4 1.0 (&[])) (up 0.0 4 0) 0, cand (machine "ssh://drakkar" 8 2.0 (&[])) (up 0.001 8 0) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Accept 1
+
+test "a full tie keeps the machines file order"
+  cs = .to_vec ([cand (machine "ssh://a" 4 1.0 (&[])) (up 0.0 4 0) 0, cand (machine "ssh://b" 4 1.0 (&[])) (up 0.0 4 0) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Accept 0
+
+test "a required feature only one builder has sends the build there"
+  cs = .to_vec ([cand (machine "ssh://a" 4 2.0 (&[])) (up 0.0 4 0) 0, cand (machine "ssh://b" 4 1.0 (&["big-parallel"])) (up 3.0 4 1) 0])
+  assert_eq! \-> decide (&want (&["big-parallel"]) false) (&cs) \-> Accept 1
+
+test "an unreachable builder is skipped"
+  cs = .to_vec ([cand (machine "ssh://a" 4 2.0 (&[])) (Down (.to_string "timed out")) 0, cand (machine "ssh://b" 4 1.0 (&[])) (up 3.0 4 1) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Accept 1
+
+test "every builder unreachable is a decline, even for a build that cannot run here"
+  cs = .to_vec ([cand (machine "ssh://a" 4 1.0 (&["kvm"])) (Down (.to_string "timed out")) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Decline
+  assert_eq! \-> decide (&want (&["kvm"]) false) (&cs) \-> Decline
+
+test "busy builders: decline when local can build, postpone when it cannot"
+  cs = .to_vec ([cand (machine "ssh://a" 2 1.0 (&["kvm"])) (up 1.0 4 0) 2, cand (machine "ssh://b" 2 1.0 (&["kvm"])) (up 2.0 4 2) 0])
+  assert_eq! \-> decide (&want (&[]) true) (&cs) \-> Decline
+  assert_eq! \-> decide (&want (&["kvm"]) false) (&cs) \-> Postpone
+
+test "no builder of the right type is a decline"
+  cs = .to_vec ([cand (machine "ssh://a" 4 1.0 (&[])) (up 0.0 4 0) 0])
+  assert_eq! \-> decide (&want (&["nixos-test"]) false) (&cs) \-> Decline
+
+test "could_build_locally follows build-remote"
+  feats = BTreeSet::from ([.to_string "kvm"])
+  none = BTreeSet::new () : BTreeSet<String>
+  arm = BTreeSet::from ([.to_string "aarch64-linux"])
+  assert_eq! \-> could_build_locally 4 "x86_64-linux" (&none) "x86_64-linux" (&feats) (&feats) \-> true
+  assert_eq! \-> could_build_locally 0 "x86_64-linux" (&none) "x86_64-linux" (&feats) (&none) \-> false
+  assert_eq! \-> could_build_locally 4 "x86_64-linux" (&none) "aarch64-linux" (&feats) (&none) \-> false
+  assert_eq! \-> could_build_locally 4 "x86_64-linux" (&arm) "aarch64-linux" (&feats) (&none) \-> true
+  assert_eq! \-> could_build_locally 4 "x86_64-linux" (&none) "x86_64-linux" (&none) (&feats) \-> false
+
+test "reply words are the ones Nix parses"
+  assert_eq! \-> reply_word (&Accept 0) \-> "accept"
+  assert_eq! \-> reply_word (&DeclinePermanently) \-> "decline-permanently"

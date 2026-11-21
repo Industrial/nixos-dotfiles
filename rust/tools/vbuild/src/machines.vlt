@@ -1,0 +1,243 @@
+-- The builders, as Nix 2.35.6's `machines.cc` reads its `builders` setting:
+-- entries separated by newlines or `;`, `#` starting a comment, `@<file>`
+-- including a file (a missing one is skipped). An entry is whitespace-separated
+-- columns, `-` or absent meaning the default:
+--
+--   <store uri> <systems,> <ssh key> <max jobs> <speed factor> <supported,> <mandatory,> <base64 host key>
+--
+-- On NixOS the setting is `@/etc/nix/machines`, which `nix.buildMachines`
+-- writes, and the fleet's feature generates that from common/fleet.nix. So
+-- vbuild never names a host: it reads what Nix itself would.
+
+import std::collections::BTreeSet
+
+export data Machine
+  { export store_uri String
+  , export systems BTreeSet<String>
+  , export ssh_key String
+  , export max_jobs u64
+  , export speed_factor f64
+  , export supported BTreeSet<String>
+  , export mandatory BTreeSet<String>
+  , export host_key String
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- `Machine::systemSupported`: `builtin` runs anywhere.
+export system_supported : &Machine -> &str -> bool
+system_supported m system = system == "builtin" || m.systems.contains system
+
+-- `Machine::allSupported`: every required feature is supported or mandatory.
+export all_supported : &Machine -> &BTreeSet<String> -> bool
+all_supported m features =
+  features.iter () |> .all (\f -> m.supported.contains f || m.mandatory.contains f)
+
+-- `Machine::mandatoryMet`: the derivation asks for every mandatory feature.
+export mandatory_met : &Machine -> &BTreeSet<String> -> bool
+mandatory_met m features =
+  m.mandatory.iter () |> .all (\f -> features.contains f)
+
+-- Whether `m` can take a build of this type at all.
+export suits : &Machine -> &str -> &BTreeSet<String> -> bool
+suits m system features =
+  system_supported m system && all_supported m features && mandatory_met m features
+
+special_store : &str -> bool
+special_store uri =
+  uri == "auto" || uri == "daemon" || uri == "local" || uri.starts_with "auto?" || uri.starts_with "daemon?" || uri.starts_with "local?" || uri.starts_with "?"
+
+-- A schemeless entry that is not a path or a special store is an ssh host.
+export normal_uri : &str -> String
+normal_uri uri =
+  if uri.contains "://" || uri.contains "/" || special_store uri
+    uri.to_string ()
+  else
+    "ssh://#{uri}"
+
+-- `ssh://` or `ssh-ng://` with no query: `[user@]host` for ssh.
+export ssh_target : &Machine -> Option<String>
+ssh_target m =
+  rest = m.store_uri.strip_prefix "ssh://" |> .or_else (\-> m.store_uri.strip_prefix "ssh-ng://")
+  rest |> .map (\r -> r.split ('?') |> .next |> .unwrap_or "" |> .to_string) |> .filter (\t -> !t.is_empty ())
+
+-- The same builder as an `ssh-ng://` store, for `nix copy` and `nix build
+-- --store`, with the key and host key the machines entry names
+-- (`Machine::completeStoreReference`).
+export ng_store : &Machine -> Option<String>
+ng_store m =
+  ssh_target m |> .map (\t -> with_params m ("ssh-ng://#{t}"))
+
+with_params : &Machine -> String -> String
+with_params m base =
+  mut params = Vec::new () : Vec<String>
+  if !m.ssh_key.is_empty ()
+    params.push ("ssh-key=#{m.ssh_key}")
+  if !m.host_key.is_empty ()
+    params.push ("base64-ssh-public-host-key=#{m.host_key}")
+  query = params.join "&"
+  if params.is_empty ()
+    base
+  else
+    "#{base}?#{query}"
+
+-- The lock-file name build-remote gives a store URI: `/` becomes `_`.
+export escape_uri : &str -> String
+escape_uri uri = uri.replace '/' "_"
+
+column_set : &str -> BTreeSet<String>
+column_set s = s.split (',') |> .filter (\x -> !x.is_empty ()) |> .map (\x -> x.to_string ()) |> .collect
+
+is_set : &[&str] -> usize -> bool
+is_set tokens i =
+  case tokens.get i of
+    Some t -> !t.is_empty () && *t != "-"
+    None -> false
+
+column : &[&str] -> usize -> String
+column tokens i =
+  if is_set tokens i
+    tokens[i].to_string ()
+  else
+    String::new ()
+
+-- One entry. `default_systems` is `[thisSystem]`, as `getMachines` passes.
+export parse_line : &BTreeSet<String> -> &str -> Result<Machine, String>
+parse_line default_systems line =
+  tokens = line.split_whitespace () |> .collect : Vec<&str>
+  if !(is_set (&tokens) 0)
+    Err ("bad machine specification: no store URL in '#{line}'")
+  else
+    max_jobs = (parse_jobs (&column (&tokens) 3) line)?
+    speed = (parse_speed (&column (&tokens) 4) line)?
+    systems = if is_set (&tokens) 1
+      column_set (tokens[1])
+    else
+      default_systems.clone ()
+    Ok (Machine { store_uri = normal_uri (tokens[0]), systems, ssh_key = column (&tokens) 2, max_jobs, speed_factor = speed, supported = column_set (&column (&tokens) 5), mandatory = column_set (&column (&tokens) 6), host_key = column (&tokens) 7 })
+
+parse_jobs : &str -> &str -> Result<u64, String>
+parse_jobs s line =
+  if s.is_empty ()
+    Ok 1
+  else
+    s.parse () : Result<u64, std::num::ParseIntError> |> .map_err (\_ -> "bad machine specification: max jobs '#{s}' in '#{line}'")
+
+-- A speed factor of 0 means 1; a negative one is an error.
+parse_speed : &str -> &str -> Result<f64, String>
+parse_speed s line =
+  if s.is_empty ()
+    Ok 1.0
+  else
+    v = (s.parse () : Result<f64, std::num::ParseFloatError> |> .map_err (\_ -> "bad machine specification: speed factor '#{s}' in '#{line}'"))?
+    if v < 0.0
+      Err ("bad machine specification: negative speed factor in '#{line}'")
+    else if v == 0.0
+      Ok 1.0
+    else
+      Ok v
+
+-- `expandBuilderLines`: the entries of a setting, `@file` includes resolved
+-- through `read` (None: the file is missing, and is skipped). Includes nest
+-- at most `depth` deep, so a file that includes itself cannot recurse forever.
+export expand : &str -> &dyn Fn(&str) -> Option<String> -> usize -> Vec<String>
+expand text read depth =
+  mut out = Vec::new () : Vec<String>
+  for raw in text.split ('\n')
+    line = raw.split ('#') |> .next |> .unwrap_or ""
+    for piece in line.split (';')
+      entry = piece.trim ()
+      if entry.starts_with "@"
+        if depth > 0
+          if read (entry[1 .. entry.len ()].trim ()) is Some included
+            out.extend (expand (&included) read (depth - 1))
+      else if !entry.is_empty ()
+        out.push (entry.to_string ())
+  out
+
+-- `Machine::parseConfig`.
+export parse_config : &BTreeSet<String> -> &str -> &dyn Fn(&str) -> Option<String> -> Result<Vec<Machine>, String>
+parse_config default_systems text read =
+  expand text read 8 |> .iter |> .map (\l -> parse_line default_systems l) |> .collect
+
+-- The live include reader: the file's text, or None when it cannot be read.
+export read_file : &str -> Option<String>
+read_file path = std::fs::read_to_string path |> .ok
+
+#[cfg(test)]
+x86 : BTreeSet<String>
+x86 = BTreeSet::from ([.to_string "x86_64-linux"])
+
+#[cfg(test)]
+no_files : &str -> Option<String>
+no_files _ = None
+
+#[cfg(test)]
+one_file : &str -> Option<String>
+one_file p =
+  if p == "/etc/nix/machines"
+    Some (.to_string "ssh://tom@huginn x86_64-linux - 4 1 kvm")
+  else
+    None
+
+#[cfg(test)]
+looping : &str -> Option<String>
+looping _ = Some (.to_string "@/loop\nh")
+
+#[cfg(test)]
+set_of : &[&str] -> BTreeSet<String>
+set_of xs = xs.iter () |> .map (\x -> x.to_string ()) |> .collect
+
+test "a full NixOS machines line"
+  m = parse_line (&x86 ()) "ssh://tom@drakkar x86_64-linux /home/tom/.ssh/id_ed25519 8 2 big-parallel,kvm,nixos-test - -" |> .unwrap
+  assert_eq! \-> m.store_uri \-> .to_string "ssh://tom@drakkar"
+  assert_eq! \-> m.max_jobs \-> 8
+  assert_eq! \-> m.speed_factor \-> 2.0
+  assert_eq! \-> m.supported \-> set_of (&["big-parallel", "kvm", "nixos-test"])
+  assert! \-> m.mandatory.is_empty ()
+  assert_eq! \-> m.ssh_key \-> .to_string "/home/tom/.ssh/id_ed25519"
+
+test "a bare host gets ssh:// and the defaults"
+  m = parse_line (&x86 ()) "muninn" |> .unwrap
+  assert_eq! \-> m.store_uri \-> .to_string "ssh://muninn"
+  assert_eq! \-> m.systems \-> x86 ()
+  assert_eq! \-> m.max_jobs \-> 1
+  assert_eq! \-> m.speed_factor \-> 1.0
+
+test "a speed factor of zero is one, a negative one is refused"
+  zero = parse_line (&x86 ()) "h - - 1 0" |> .unwrap
+  assert_eq! \-> zero.speed_factor \-> 1.0
+  assert! \-> parse_line (&x86 ()) "h - - 1 -1" |> .is_err
+  assert! \-> parse_line (&x86 ()) "h - - many" |> .is_err
+
+test "entries split on newlines and semicolons, comments dropped"
+  got = expand "a x86_64-linux; b\n# all comment\nc # trailing\n\n" (&no_files) 8
+  assert_eq! \-> got \-> .to_vec ([.to_string "a x86_64-linux", .to_string "b", .to_string "c"])
+
+test "an @file include is expanded, a missing one skipped"
+  got = expand "@/etc/nix/machines; @/missing" (&one_file) 8
+  assert_eq! \-> got \-> .to_vec ([.to_string "ssh://tom@huginn x86_64-linux - 4 1 kvm"])
+
+test "an include that includes itself stops"
+  got = expand "@/loop" (&looping) 3
+  assert_eq! \-> got.len () \-> 3
+
+test "feature matching follows Machine::allSupported and mandatoryMet"
+  m = parse_line (&x86 ()) "h x86_64-linux - 2 1 kvm,big-parallel" |> .unwrap
+  assert_eq! \-> suits (&m) "x86_64-linux" (&set_of (&["kvm"])) \-> true
+  assert_eq! \-> suits (&m) "x86_64-linux" (&set_of (&["nixos-test"])) \-> false
+  assert_eq! \-> suits (&m) "x86_64-linux" (&set_of (&["kvm", "big-parallel"])) \-> true
+  m2 = parse_line (&x86 ()) "h x86_64-linux - 2 1 kvm benchmark" |> .unwrap
+  assert_eq! \-> suits (&m2) "x86_64-linux" (&set_of (&["kvm"])) \-> false
+  assert_eq! \-> suits (&m2) "x86_64-linux" (&set_of (&["kvm", "benchmark"])) \-> true
+  assert_eq! \-> suits (&m) "aarch64-linux" (&BTreeSet::new ()) \-> false
+  assert_eq! \-> suits (&m) "builtin" (&BTreeSet::new ()) \-> true
+
+test "ssh targets and the ssh-ng store carry the key and host key"
+  m = parse_line (&x86 ()) "ssh://tom@drakkar x86_64-linux /k 8 2 - - QUJD" |> .unwrap
+  assert_eq! \-> ssh_target (&m) \-> Some (.to_string "tom@drakkar")
+  assert_eq! \-> ng_store (&m) \-> Some (.to_string "ssh-ng://tom@drakkar?ssh-key=/k&base64-ssh-public-host-key=QUJD")
+  local = parse_line (&x86 ()) "local" |> .unwrap
+  assert_eq! \-> ssh_target (&local) \-> None
+
+test "lock names escape slashes like build-remote"
+  assert_eq! \-> escape_uri "ssh://tom@drakkar" \-> .to_string "ssh:__tom@drakkar"

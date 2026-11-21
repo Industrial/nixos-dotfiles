@@ -1,0 +1,41 @@
+[package]
+name = "vbuild"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "A load-aware Nix build hook: speaks build-remote's protocol, ranks builders by live load, declines fast when none answers"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# nix-store-core and vcache.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The `.drv` parser (output paths, requiredSystemFeatures). default.nix roots
+# its source at rust/tools so the path resolves.
+nix-store-core = { path = "../nix-store-core" }
+# A machines entry's host key is base64 (`base64-ssh-public-host-key`).
+base64 = "0.22"
+# Child processes (ssh probes, nix copy, the remote build) as futures that
+# id_effect can time out and interrupt: `kill_on_drop` ends the child with its
+# fiber. The same tokio that id_effect's runtime already runs on.
+tokio = { version = "1", features = ["process", "io-util"] }
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vbuild"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vbuild"
+path = "src/main.rs"

@@ -1,0 +1,185 @@
+-- Moving a build's closure to the builder and its outputs back, and running
+-- the build there.
+--
+-- `Copier` and `RemoteBuild` are the ports. Their implementation here,
+-- `NixCli`, runs the Nix CLI: `nix copy --to/--from ssh-ng://<builder>` and
+-- `nix build --store ssh-ng://<builder>`, which is what build-remote does
+-- in-process with `copyPaths` and `buildDerivation`. The worker-protocol
+-- client (`nix_store_core::worker`, #157) is the planned second
+-- implementation, behind the same classes.
+--
+-- Every child joins the probe's ssh ControlPersist master (`NIX_SSHOPTS`), and
+-- writes its output to Nix's build log.
+--
+-- The output lock. The goal that asked for this build holds an flock on
+-- `<output>.lock` until the hook exits, and `LocalStore::addToStore` takes the
+-- same lock unless the path is in its process's `locksHeld`; build-remote,
+-- which imports in-process, adds the outputs there. A `nix copy --from`
+-- child is another process, so it would wait on the goal and the goal on it,
+-- forever. `release_output_locks` unlinks the lock files first: the goal
+-- keeps its lock on the unlinked file, `nix copy` creates and locks a fresh
+-- one, and the goal's own cleanup (`deleteLockFile`) removes whichever file is
+-- there once the outputs are valid. Between the unlink and the copy, another
+-- process could take the fresh lock and build the same output itself: double
+-- work, never a wrong store (each side registers the path only while holding
+-- a lock, and checks validity under it).
+
+import std::sync::Arc
+import id_effect::{Effect, HNil, fail, succeed, suspend}
+import crate::machines::{Machine, ng_store}
+import crate::run::{Cmd, Ran, RunnerService, succeeded}
+
+export data BuildError = BuildError String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display BuildError
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f =
+    case self of
+      BuildError why -> f.write_str why
+
+export class Copier
+  copy_to : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_from : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+
+export newtype CopierService = CopierService (export Arc<dyn Copier + Send + Sync>)
+
+instance Clone CopierService
+  clone : &self -> Self
+  clone self = CopierService (Arc::clone (&self.0))
+
+export class RemoteBuild
+  build : &self -> Machine -> String -> Effect<(), BuildError, HNil>
+
+export newtype RemoteBuildService = RemoteBuildService (export Arc<dyn RemoteBuild + Send + Sync>)
+
+instance Clone RemoteBuildService
+  clone : &self -> Self
+  clone self = RemoteBuildService (Arc::clone (&self.0))
+
+-- The Nix CLI: which `nix`, the environment its children get, and whether
+-- the builder may substitute (`builders-use-substitutes`).
+export data NixCli { export nix String, export env Vec<(String, String)>, export substitute bool, export runner RunnerService }
+
+instance Clone NixCli
+  clone : &self -> Self
+  clone self = NixCli { nix = self.nix.clone (), env = self.env.clone (), substitute = self.substitute, runner = self.runner.clone () }
+
+-- `nix <args>` with the experimental CLI on, writing to the build log.
+export nix_cmd : &NixCli -> Vec<String> -> Cmd
+nix_cmd cli rest =
+  mut args = .to_vec (["--extra-experimental-features", "nix-command"]) |> .into_iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  args.extend rest
+  Cmd { program = cli.nix.clone (), args, env = cli.env.clone (), to_log = true, detached = false }
+
+strings : &[&str] -> Vec<String>
+strings xs = xs.iter () |> .map (\x -> x.to_string ()) |> .collect
+
+store_of : &Machine -> Result<String, BuildError>
+store_of m = ng_store m |> .ok_or (BuildError ("'#{m.store_uri}' is not an ssh store"))
+
+export copy_to_args : &str -> bool -> Vec<String> -> Vec<String>
+copy_to_args store substitute paths =
+  mut args = strings (&["copy", "--to", store, "--no-check-sigs"])
+  if substitute
+    args.push (.to_string "--substitute-on-destination")
+  args.extend paths
+  args
+
+export copy_from_args : &str -> Vec<String> -> Vec<String>
+copy_from_args store paths =
+  mut args = strings (&["copy", "--from", store, "--no-check-sigs"])
+  args.extend paths
+  args
+
+-- All outputs of the derivation: `<drv>^*`.
+export build_args : &str -> &str -> Vec<String>
+build_args store drv =
+  mut args = strings (&["build", "--store", store, "--no-link", "--print-build-logs"])
+  args.push ("#{drv}^*")
+  args
+
+checked : String -> Ran -> Effect<(), BuildError, HNil>
+checked what ran =
+  if succeeded (&ran)
+    succeed (())
+  else
+    fail (BuildError ("#{what} failed (exit #{ran.status.unwrap_or (-1)})"))
+
+run_checked : NixCli -> String -> Vec<String> -> Effect<(), BuildError, HNil>
+run_checked cli what args =
+  w = what.clone ()
+  cli.runner.0.run (nix_cmd (&cli) args) |> .map_err (\e -> BuildError (e.to_string ())) |> .flat_map (move \ran -> checked w ran)
+
+lifted : given <A: Send + 'static> Result<A, BuildError> -> Effect<A, BuildError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+instance Copier NixCli
+  copy_to : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_to self m paths =
+    case store_of (&m) of
+      Err e -> fail e
+      Ok store ->
+        if paths.is_empty ()
+          succeed (())
+        else
+          run_checked (self.clone ()) ("copying the inputs to #{m.store_uri}") (copy_to_args (&store) self.substitute paths)
+
+  copy_from : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_from self m paths =
+    case store_of (&m) of
+      Err e -> fail e
+      Ok store ->
+        if paths.is_empty ()
+          succeed (())
+        else
+          held = paths.clone ()
+          cli = self.clone ()
+          what = "copying the outputs from #{m.store_uri}"
+          suspend (move \-> lifted (release_output_locks (&held))) |> .flat_map (move \_ -> run_checked cli what (copy_from_args (&store) paths))
+
+instance RemoteBuild NixCli
+  build : &self -> Machine -> String -> Effect<(), BuildError, HNil>
+  build self m drv =
+    case store_of (&m) of
+      Err e -> fail e
+      Ok store -> run_checked (self.clone ()) ("building #{drv} on #{m.store_uri}") (build_args (&store) (&drv))
+
+-- Unlink each output's `.lock` file (see the top of this file). A missing one
+-- is fine; any other failure stops the build rather than risk the deadlock.
+export release_output_locks : &[String] -> Result<(), BuildError>
+release_output_locks paths =
+  for p in paths
+    lock = "#{p}.lock"
+    case std::fs::remove_file (&lock) of
+      Ok _ -> ()
+      Err e ->
+        if e.kind () != std::io::ErrorKind::NotFound
+          (Err (BuildError ("removing #{lock}: #{e}")))?
+  Ok ()
+
+test "nix copy to the builder, with and without substitution"
+  got = copy_to_args "ssh-ng://tom@b" false (.to_vec ([.to_string "/nix/store/a"]))
+  assert_eq! \-> got \-> strings (&["copy", "--to", "ssh-ng://tom@b", "--no-check-sigs", "/nix/store/a"])
+  sub = copy_to_args "ssh-ng://tom@b" true (Vec::new ())
+  assert! \-> sub.contains (&.to_string "--substitute-on-destination")
+
+test "the remote build asks for every output"
+  got = build_args "ssh-ng://tom@b" "/nix/store/x.drv"
+  assert_eq! \-> got.last () \-> Some (&.to_string "/nix/store/x.drv^*")
+
+test "releasing output locks removes them and tolerates missing ones"
+  dir = std::env::temp_dir () |> .join ("vbuild-locks-#{std::process::id ()}")
+  _ = std::fs::create_dir_all (&dir)
+  out = dir.join "out" |> .to_string_lossy |> .into_owned
+  _ = std::fs::write ("#{out}.lock") ""
+  missing = dir.join "missing" |> .to_string_lossy |> .into_owned
+  assert_eq! \-> release_output_locks (&[out.clone (), missing]) \-> Ok ()
+  assert! \-> !(std::path::Path::new (&format! \-> "{out}.lock") |> .exists)
+
+-- A BuildError from outside this module.
+export build_error : String -> BuildError
+build_error why = BuildError why
