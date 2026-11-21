@@ -109,3 +109,8 @@ features/cli/nix-output-monitor
 # <host>): on for every builder-role host that is not a cache (huginn, muninn), which this
 # text-only check cannot see. profiles/base.assay.nix proves the selection (GH-154).
 features/nix/vpush
+
+# --- Replaced, kept as the one-option rollback. -------------------------------------
+# nix-tree: vwhy took over in profiles/cli-core.nix (GH-182). A host that sets
+# `features.cli.nix-tree.enable = true;` has it back (profiles/cli-core.assay.nix).
+features/cli/nix-tree
