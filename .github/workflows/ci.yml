@@ -169,6 +169,51 @@ jobs:
           nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c "cd rust && cargo generate-lockfile"
           # Check if any Cargo.nix files would change
           git diff --exit-code rust/tools/*/Cargo.nix || (echo 'Cargo.nix is out of date. Run cargo regenerate-lockfile and commit.' && exit 1)
+  # The crates under rust/tools/* with their own Cargo.lock and empty [workspace], which the
+  # three jobs above never see. Found, not listed, like the hosts below: a new crate gets a
+  # cargo-standalone leg without an edit here. The lister fails when it finds no crate, or a
+  # rust/tools crate that is neither standalone nor a workspace member (checked by no job).
+  standalone-crates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      crates: ${{ steps.list.outputs.crates }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: List standalone crates
+        id: list
+        run: |
+          crates="$(bin/ci/cargo-standalone --list)"
+          echo "standalone crates: $crates"
+          echo "crates=$crates" >>"$GITHUB_OUTPUT"
+  cargo-standalone:
+    needs: standalone-crates
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        crate: ${{ fromJSON(needs.standalone-crates.outputs.crates) }}
+    env:
+      CRATE: ${{ matrix.crate }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      - name: Clippy
+        run: bin/ci/cargo-standalone clippy "$CRATE"
+      # Setup Nix installed a store, so the tests that read /nix/var/nix/db run here; the
+      # ones that need it skip on their own where there is none (the build sandbox).
+      - name: Test
+        run: bin/ci/cargo-standalone test "$CRATE"
+      - name: Check Cargo.nix drift
+        run: bin/ci/cargo-standalone drift "$CRATE"
   # The check matrix comes from the flake, not from a list here: a hand-written matrix is
   # how muninn went unchecked. Every nixosConfigurations attribute (installer included)
   # gets a leg.
@@ -254,6 +299,8 @@ jobs:
       - cargo-clippy
       - cargo-test
       - cargo-nix-drift
+      - standalone-crates
+      - cargo-standalone
       - hosts
       - check
       - flake-checks

@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Lint, test and drift-check the standalone crates under rust/tools/.
+#
+#   bin/ci/cargo-standalone --list           JSON array of the standalone crates' names
+#   bin/ci/cargo-standalone clippy <crate>   cargo clippy --all-targets -- -D warnings
+#   bin/ci/cargo-standalone test <crate>     cargo test
+#   bin/ci/cargo-standalone drift <crate>    Cargo.nix against a fresh crate2nix (if it has one)
+#   bin/ci/cargo-standalone all [<crate>…]   all three, for every crate or the ones named
+#
+# A standalone crate has its own Cargo.lock and an empty [workspace] table, so the
+# workspace jobs (`cd rust && cargo … --workspace`) never see it. The list is found, not
+# written down: the `standalone-crates` job in .github/workflows/ci.yml feeds --list to the
+# `cargo-standalone` matrix, so a new crate is gated without an edit there.
+#
+# --list fails when it finds no crate, and when a rust/tools/*/Cargo.toml is neither a
+# member of rust/Cargo.toml nor standalone: that crate would be checked by no job.
+#
+# RUST_DIR (default rust/) points --list at another tree; bin/dev.d/test.sh uses it.
+#
+# The `bash -c '…"$1"…' _ "$dir"` calls are single-quoted on purpose: the inner shell
+# expands $1, so a path never becomes part of a command string.
+# shellcheck disable=SC2016
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+cd "$ROOT"
+
+die() {
+  echo "cargo-standalone: $*" >&2
+  exit 1
+}
+
+list() {
+  python3 -I - "${RUST_DIR:-$ROOT/rust}" <<'PY'
+import glob, json, os, sys, tomllib
+
+rust = sys.argv[1]
+with open(os.path.join(rust, "Cargo.toml"), "rb") as f:
+    ws = tomllib.load(f).get("workspace", {})
+
+def expand(patterns):
+    out = set()
+    for p in patterns:
+        out.update(os.path.normpath(d) for d in glob.glob(os.path.join(rust, p)))
+    return out
+
+members = expand(ws.get("members", [])) - expand(ws.get("exclude", []))
+found, orphans = [], []
+for manifest in sorted(glob.glob(os.path.join(rust, "tools", "*", "Cargo.toml"))):
+    crate = os.path.dirname(manifest)
+    with open(manifest, "rb") as f:
+        standalone = "workspace" in tomllib.load(f)
+    if os.path.normpath(crate) in members:
+        if standalone:
+            orphans.append(f"{crate}: has its own [workspace] but is a member of {rust}/Cargo.toml")
+    elif standalone:
+        found.append(os.path.basename(crate))
+    else:
+        orphans.append(f"{crate}: neither a member of {rust}/Cargo.toml nor standalone ([workspace] table)")
+
+for o in orphans:
+    print(f"cargo-standalone: {o}", file=sys.stderr)
+if orphans:
+    sys.exit(1)
+if not found:
+    print(f"cargo-standalone: no standalone crate under {rust}/tools", file=sys.stderr)
+    sys.exit(1)
+print(json.dumps(found))
+PY
+}
+
+# The crate's directory, after checking the name is one --list found.
+crate_dir() {
+  local name="$1"
+  [[ "$name" =~ ^[A-Za-z0-9_-]+$ ]] || die "not a crate name: '$name'"
+  list | jq -e --arg c "$name" 'index($c) != null' >/dev/null \
+    || die "'$name' is not a standalone crate under rust/tools"
+  echo "rust/tools/$name"
+}
+
+# Same toolchain as the workspace jobs. --locked: a Cargo.lock that no longer matches
+# Cargo.toml is a failure, not something to rewrite on the runner.
+clippy() {
+  local dir
+  dir="$(crate_dir "$1")" || return 1
+  nix shell nixpkgs#cargo nixpkgs#rustc nixpkgs#clippy \
+    -c bash -c 'cd "$1" && cargo clippy --locked --all-targets -- -D warnings' _ "$dir"
+}
+
+test_crate() {
+  local dir
+  dir="$(crate_dir "$1")" || return 1
+  nix shell nixpkgs#cargo nixpkgs#rustc -c bash -c 'cd "$1" && cargo test --locked' _ "$dir"
+}
+
+# Regenerate Cargo.nix from a copy of the crate (what a path: input sees) with the flake's
+# own crate2nix, format it as bin/ci/lint would, and compare. A crate without a Cargo.nix
+# is packaged with buildRustPackage + cargoLock and has nothing to drift.
+drift() {
+  local dir
+  dir="$(crate_dir "$1")" || return 1
+  if [[ ! -f "$dir/Cargo.nix" ]]; then
+    echo "cargo-standalone: $dir has no Cargo.nix, nothing to drift"
+    return 0
+  fi
+  local tmp status=0
+  tmp="$(mktemp -d)" || return 1
+  drift_in "$dir" "$tmp/crate" || status=$?
+  rm -rf "$tmp"
+  return "$status"
+}
+
+# drift_in <crate dir> <scratch dir>: the committed files only, with the old Cargo.nix
+# removed, so a crate2nix that writes nothing cannot pass by leaving it in place.
+drift_in() {
+  local dir="$1" work="$2" f rel
+  while IFS= read -r -d '' f; do
+    rel="${f#"$dir"/}"
+    mkdir -p "$work/$(dirname "$rel")" && cp "$f" "$work/$rel" || return 1
+  done < <(git ls-files -z -- "$dir")
+  rm -f "$work/Cargo.nix"
+  nix shell --inputs-from . nixpkgs#crate2nix nixpkgs#cargo nixpkgs#rustc nixpkgs#alejandra \
+    -c bash -c 'cd "$1" && crate2nix generate && alejandra -q Cargo.nix' _ "$work" || return 1
+  if ! diff -u "$dir/Cargo.nix" "$work/Cargo.nix"; then
+    echo "cargo-standalone: $dir/Cargo.nix is out of date: run crate2nix generate in $dir, then bin/ci/lint, and commit it" >&2
+    return 1
+  fi
+  echo "cargo-standalone: $dir/Cargo.nix is up to date"
+}
+
+cmd="${1:-}"
+[[ $# -gt 0 ]] && shift
+case "$cmd" in
+  --list) list ;;
+  clippy) clippy "${1:?usage: bin/ci/cargo-standalone clippy <crate>}" ;;
+  test) test_crate "${1:?usage: bin/ci/cargo-standalone test <crate>}" ;;
+  drift) drift "${1:?usage: bin/ci/cargo-standalone drift <crate>}" ;;
+  all)
+    if [[ $# -eq 0 ]]; then
+      mapfile -t crates < <(list | jq -r '.[]')
+    else
+      crates=("$@")
+    fi
+    failed=()
+    for c in "${crates[@]}"; do
+      echo "=== $c"
+      { clippy "$c" && test_crate "$c" && drift "$c"; } || failed+=("$c")
+    done
+    ((${#failed[@]} == 0)) || die "failed: ${failed[*]}"
+    ;;
+  *)
+    sed -n '2,9s/^# \{0,1\}//p' "$0" >&2
+    exit 64
+    ;;
+esac
