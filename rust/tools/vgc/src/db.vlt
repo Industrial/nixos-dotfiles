@@ -1,0 +1,67 @@
+-- Nix's store database, read-only: the three tables the garbage collector
+-- walks (`ValidPaths`, `Refs`, `DerivationOutputs`), loaded once into dense
+-- indices so liveness is a plain graph search.
+
+import rusqlite::{Connection, OpenFlags}
+import std::collections::HashMap
+import crate::storepath::store_base
+
+export const DB_PATH : &str = "/nix/var/nix/db/db.sqlite"
+
+-- The store graph. `paths[i]` is a valid path's base name; `refs[i]` the
+-- paths it references; `deriver[i]` its deriver when that is valid;
+-- `outputs[i]` the valid outputs a derivation records in DerivationOutputs.
+export data Graph { export paths Vec<String>, export index HashMap<String, usize>, export refs Vec<Vec<usize>>, export deriver Vec<Option<usize>>, export outputs Vec<Vec<usize>> }
+  deriving (Debug, Clone, Default)
+
+data ValidRow { id i64, path String, deriver Option<String> }
+
+data EdgeRow { from i64, to i64 }
+
+data OutputRow { drv i64, path String }
+
+sql : rusqlite::Error -> String
+sql e = "store database: #{e}"
+
+-- The base name of a full store path from the database.
+base_of : &str -> String
+base_of p = (store_base p).unwrap_or p |> .to_string
+
+-- Load the graph from the database at `db`, opened read-only so the daemon's
+-- writers are never blocked.
+export load : &str -> Result<Graph, String>
+load db =
+  conn = ((Connection::open_with_flags db OpenFlags::SQLITE_OPEN_READ_ONLY).map_err sql)?
+  mut g = Graph::default ()
+  mut ids = HashMap::new () : HashMap<i64, usize>
+  mut derivers = Vec::new () : Vec<Option<String>>
+  mut valid = ((conn.prepare "SELECT id, path, deriver FROM ValidPaths").map_err sql)?
+  rows = ((valid.query_map () (\r -> Ok (ValidRow { id = (r.get 0)?, path = (r.get 1)?, deriver = (r.get 2)? }))).map_err sql)?
+  for row in rows
+    v = (row.map_err sql)?
+    n = g.paths.len ()
+    ids.insert v.id n
+    b = base_of (&v.path)
+    g.index.insert (b.clone ()) n
+    g.paths.push b
+    derivers.push v.deriver
+  count = g.paths.len ()
+  g.refs := vec![Vec::new(); count]
+  g.outputs := vec![Vec::new(); count]
+  for d in derivers
+    g.deriver.push (d.and_then (\p -> (g.index.get (&base_of (&p))).copied ()))
+  mut refs = ((conn.prepare "SELECT referrer, reference FROM Refs").map_err sql)?
+  edges = ((refs.query_map () (\r -> Ok (EdgeRow { from = (r.get 0)?, to = (r.get 1)? }))).map_err sql)?
+  for row in edges
+    e = (row.map_err sql)?
+    if ids.get (&e.from) is Some a
+      if ids.get (&e.to) is Some b
+        g.refs[*a].push (*b)
+  mut outs = ((conn.prepare "SELECT drv, path FROM DerivationOutputs").map_err sql)?
+  outputs = ((outs.query_map () (\r -> Ok (OutputRow { drv = (r.get 0)?, path = (r.get 1)? }))).map_err sql)?
+  for row in outputs
+    o = (row.map_err sql)?
+    if ids.get (&o.drv) is Some d
+      if g.index.get (&base_of (&o.path)) is Some p
+        g.outputs[*d].push (*p)
+  Ok g

@@ -1,0 +1,103 @@
+-- Store paths, exactly as Nix 2.35.6 accepts them (`src/libstore/path.cc`,
+-- `StorePath::StorePath` and `checkName`). No GC logic lives here, so a shared
+-- store crate can absorb this module unchanged.
+
+export const STORE_DIR : &str = "/nix/store"
+
+-- STORE_DIR with its trailing slash: what every path inside the store starts with.
+export const STORE_PREFIX : &str = "/nix/store/"
+
+-- Length of the nix32 hash part of a store path's base name.
+export const HASH_LEN : usize = 32
+
+-- Longest name part Nix accepts (`StorePath::MaxPathLen`).
+export const MAX_NAME_LEN : usize = 211
+
+-- Nix's base-32 alphabet: digits and lower-case letters, minus e, o, u and t.
+export nix32_char : char -> bool
+nix32_char c =
+  (c.is_ascii_digit () || c.is_ascii_lowercase ()) && c != 'e' && c != 'o' && c != 'u' && c != 't'
+
+-- A character allowed in the name part.
+export name_char : char -> bool
+name_char c =
+  c.is_ascii_alphanumeric () || c == '+' || c == '-' || c == '.' || c == '_' || c == '?' || c == '='
+
+-- `checkName`: non-empty, at most MAX_NAME_LEN, legal characters, and the first
+-- dash-separated component is not `.` or `..`.
+export valid_name : &str -> bool
+valid_name name =
+  dots = name == "." || name == ".." || name.starts_with ".-" || name.starts_with "..-"
+  !(name.is_empty () || name.len () > MAX_NAME_LEN || dots) && (name.chars ()).all name_char
+
+-- Whether a base name (`<hash>-<name>`, no directory) is a store path.
+export valid_base : &str -> bool
+valid_base base =
+  if base.len () < HASH_LEN + 1 || !(base.is_char_boundary HASH_LEN)
+    false
+  else
+    (hash, rest) = base.split_at HASH_LEN
+    case rest.strip_prefix '-' of
+      Some name -> (hash.chars ()).all nix32_char && valid_name name
+      None -> false
+
+-- The hash part of a base name already known to be valid.
+export hash_part : &str -> &str
+hash_part base = (base.split_at HASH_LEN).0
+
+-- A derivation is a store path whose name ends in `.drv`.
+export is_derivation : &str -> bool
+is_derivation base = base.ends_with ".drv"
+
+-- `isInStore`: the path lies strictly under STORE_DIR.
+export in_store : &str -> bool
+in_store path =
+  case path.strip_prefix STORE_PREFIX of
+    Some rest -> !(rest.is_empty ())
+    None -> false
+
+-- `toStorePath(...).first`: the store path's base name of any path inside the
+-- store, or None when the first component is not a valid store path.
+export store_base : &str -> Option<&str>
+store_base path =
+  case path.strip_prefix STORE_PREFIX of
+    None -> None
+    Some rest ->
+      base = (rest.split '/').next () |> .unwrap_or rest
+      if valid_base base
+        Some base
+      else
+        None
+
+-- The full path of a base name.
+export full : &str -> String
+full base = "#{STORE_PREFIX}#{base}"
+
+test "a real store path base is valid"
+  assert! \-> valid_base "hbgbsdfjd88491yf8x14id8y9d6nkscp-activatable-nixos-system-drakkar-26.11.20261116.e21fec3"
+
+test "e, o, u and t are not nix32"
+  assert! \-> !(valid_base "ebgbsdfjd88491yf8x14id8y9d6nkscp-x")
+  assert! \-> !(valid_base "tbgbsdfjd88491yf8x14id8y9d6nkscp-x")
+
+test "the hash must be followed by a dash and a name"
+  assert! \-> !(valid_base "hbgbsdfjd88491yf8x14id8y9d6nkscp")
+  assert! \-> !(valid_base "hbgbsdfjd88491yf8x14id8y9d6nkscp-")
+  assert! \-> !(valid_base "hbgbsdfjd88491yf8x14id8y9d6nkscpx")
+
+test "names reject dot components and illegal characters"
+  assert! \-> !(valid_name ".")
+  assert! \-> !(valid_name "..-x")
+  assert! \-> !(valid_name "a b")
+  assert! \-> valid_name ".hidden-ok"
+  assert! \-> valid_name "foo-1.0+git_x?y=z"
+
+test "store_base takes the first component under the store"
+  assert! \-> store_base "/nix/store/hbgbsdfjd88491yf8x14id8y9d6nkscp-x/bin/sh" == Some "hbgbsdfjd88491yf8x14id8y9d6nkscp-x"
+  assert! \-> store_base "/nix/store/.links/abc" == None
+  assert! \-> store_base "/nix/storex/hbgbsdfjd88491yf8x14id8y9d6nkscp-x" == None
+  assert! \-> store_base "/run/current-system" == None
+
+test "derivations end in .drv"
+  assert! \-> is_derivation "hbgbsdfjd88491yf8x14id8y9d6nkscp-hello.drv"
+  assert! \-> !(is_derivation "hbgbsdfjd88491yf8x14id8y9d6nkscp-hello")

@@ -1,0 +1,315 @@
+-- vgc's command line.
+--
+--   vgc plan  [--delete-older-than Nd] [--print-dead]
+--   vgc check
+--   vgc run   [--delete-older-than Nd] [--dry-run] [--verify]
+--
+-- `plan` says what a collection would remove. `check` compares vgc's dead set
+-- with `nix-store --gc --print-dead` and exits 1 on any difference. `run` is
+-- the `nix-collect-garbage` replacement: it prunes generations, plans, and
+-- hands the dead set to `nix store delete --skip-alive`, so Nix re-checks every
+-- path under its own GC lock and stays the authority on safety. `--verify`
+-- also asks Nix for its dead set and deletes only what both agree on.
+--
+-- Each command is one id_effect program; `effects.vlt` runs it.
+
+import id_effect::{Effect, fail}
+import std::collections::HashSet
+import std::fs
+import std::io::Write
+import std::process::{ChildStdin, Command, Stdio}
+import std::time::{Instant, SystemTime, UNIX_EPOCH}
+import crate::closure::{Keep, Verdict, judge, live, root_indices}
+import crate::db
+import crate::db::Graph
+import crate::effects::{GcError, exit_code, step}
+import crate::generations::cutoff_of
+import crate::profiles::{Profile, plan, root_dirs}
+import crate::roots::{Roots, find_all}
+import crate::storepath::{STORE_DIR, STORE_PREFIX, full, hash_part, valid_base}
+
+const USAGE : &str = "usage: vgc (plan|check|run) [--delete-older-than Nd] [--dry-run] [--print-dead] [--verify]"
+
+data Options { command String, older_than Option<String>, dry_run bool, print_dead bool, verify bool, unknown Vec<String> }
+  deriving (Debug, Clone, Default)
+
+parse_args : &[String] -> Options
+parse_args args =
+  mut o = Options::default ()
+  mut it = (args.iter ()).skip 1
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--delete-older-than" ->
+          o.older_than := Some (it.next () |> .cloned |> .unwrap_or_default)
+        "--dry-run" ->
+          o.dry_run := true
+        "--print-dead" ->
+          o.print_dead := true
+        "--verify" ->
+          o.verify := true
+        s | o.command.is_empty () && !(s.starts_with '-') ->
+          o.command := s.to_string ()
+        s ->
+          o.unknown.push (s.to_string ())
+  o
+
+now_secs : i64
+now_secs =
+  secs = SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+  i64::try_from secs |> .unwrap_or i64::MAX
+
+-- A boolean Nix setting, as the daemon's configuration has it.
+setting : &str -> Result<bool, String>
+setting name =
+  ran = Command::new "nix" |> .args (["--extra-experimental-features", "nix-command", "config", "show", name]) |> .output
+  out = (ran.map_err (\e -> "running nix config show: #{e}"))?
+  if out.status.success ()
+    Ok ((String::from_utf8_lossy (&out.stdout)).trim () == "true")
+  else
+    Err "nix config show #{name} failed"
+
+keep_settings : Result<Keep, String>
+keep_settings =
+  outputs = (setting "keep-outputs")?
+  derivations = (setting "keep-derivations")?
+  Ok (Keep { outputs, derivations })
+
+scan_roots : Result<Roots, String>
+scan_roots =
+  mut r = Roots::default ()
+  (find_all (&mut r))?
+  Ok r
+
+store_entries : Result<Vec<String>, String>
+store_entries =
+  dir = ((fs::read_dir STORE_DIR).map_err (\e -> "reading #{STORE_DIR}: #{e}"))?
+  mut out = Vec::new () : Vec<String>
+  for entry in dir
+    e = (entry.map_err (\e -> "reading #{STORE_DIR}: #{e}"))?
+    out.push (e.file_name ().to_string_lossy ().into_owned ())
+  Ok out
+
+data Analysis { verdict Verdict, roots Roots }
+
+-- The pure half of a planning pass, with its summary on stderr.
+judged : Keep -> Graph -> Roots -> Vec<String> -> Instant -> Analysis
+judged keep g r entries start =
+  mut names = r.found.clone ()
+  names.extend (r.temp.iter ().cloned ())
+  alive = live (&g) (&(root_indices (&g) (&names))) keep
+  temp_hashes = (r.temp.iter ()).map (\t -> (hash_part t).to_string ()) |> .collect : HashSet<String>
+  verdict = judge (&g) (&alive) (&temp_hashes) entries
+  eprintln! \-> "vgc: #{g.paths.len ()} valid paths, #{names.len ()} roots, #{verdict.live} live, #{verdict.dead.len ()} dead, #{verdict.invalid.len ()} invalid, #{verdict.junk.len ()} junk, #{start.elapsed ().as_millis ()}ms"
+  for n in r.notes.iter ()
+    eprintln! \-> "vgc: note: #{n}"
+  Analysis { verdict, roots = r }
+
+-- A planning pass: settings and the database snapshot, then the roots, then
+-- the store directory, which comes last so a path registered mid-pass is
+-- unknown rather than dead.
+analyse : Effect<Analysis, GcError>
+analyse =
+  start = Instant::now ()
+  settled = (step (\-> keep_settings ()) GcError::Nix).zip (step (\-> db::load db::DB_PATH) GcError::Database)
+  settled |> .flat_map (move \kg -> ((step (\-> scan_roots ()) GcError::Roots).zip (step (\-> store_entries ()) GcError::Store)) |> .map (move \re -> judged kg.0 kg.1 re.0 re.1 start))
+
+-- Nix's own dead set, from the daemon: the oracle. Entries that are not store
+-- paths (`tmp-*` directories) are dropped: Nix 2.35.6 deletes those even when
+-- only asked to print.
+oracle : Result<HashSet<String>, String>
+oracle =
+  ran = Command::new "nix-store" |> .args (["--gc", "--print-dead"]) |> .stderr (Stdio::null ()) |> .output
+  out = (ran.map_err (\e -> "running nix-store --gc --print-dead: #{e}"))?
+  if !out.status.success ()
+    Err (.to_string "nix-store --gc --print-dead failed")
+  else
+    text = String::from_utf8_lossy (&out.stdout)
+    Ok ((text.lines ()).filter_map (\l -> l.strip_prefix STORE_PREFIX) |> .filter (\b -> valid_base b) |> .map (\s -> s.to_string ()) |> .collect)
+
+sorted : HashSet<String> -> Vec<String>
+sorted set =
+  mut v = set |> .into_iter |> .collect : Vec<String>
+  v.sort ()
+  v
+
+show_some : &str -> &[String] -> ()
+show_some label paths =
+  for p in paths |> .iter |> .take 20
+    println! \-> "  #{label} #{p}"
+  if paths.len () > 20
+    println! \-> "  #{label} ... and #{paths.len () - 20} more"
+  ()
+
+-- vgc's dead set (valid and invalid) against Nix's. 0 when they are equal.
+compare : HashSet<String> -> u128 -> Analysis -> i32
+compare theirs t_nix a =
+  ours = (a.verdict.dead.iter ()).chain (a.verdict.invalid.iter ()) |> .cloned |> .collect : HashSet<String>
+  only_ours = sorted ((ours.difference (&theirs)) |> .cloned |> .collect)
+  only_theirs = sorted ((theirs.difference (&ours)) |> .cloned |> .collect)
+  println! \-> "nix dead: #{theirs.len ()} (#{t_nix}ms)  vgc dead: #{ours.len ()}  only-vgc: #{only_ours.len ()}  only-nix: #{only_theirs.len ()}"
+  show_some "only-vgc" (&only_ours)
+  show_some "only-nix" (&only_theirs)
+  if a.roots.incomplete
+    println! \-> "note: root scan incomplete (not root?); only-vgc entries may be protected by roots vgc could not read"
+  if only_ours.is_empty () && only_theirs.is_empty ()
+    0
+  else
+    1
+
+check : Effect<i32, GcError>
+check =
+  t0 = Instant::now ()
+  (step (\-> oracle ()) GcError::Nix) |> .flat_map (move \theirs -> (analyse ()) |> .map (move \a -> compare theirs (t0.elapsed ().as_millis ()) a))
+
+numbers : &[u64] -> String
+numbers ns = (ns.iter ()).map (\n -> n.to_string ()) |> .collect : Vec<String> |> .join " "
+
+delete_generations : &Profile -> Result<(), String>
+delete_generations p =
+  mut cmd = Command::new "nix-env"
+  cmd.arg "--profile"
+  cmd.arg (&p.path)
+  cmd.arg "--delete-generations"
+  for n in p.doomed.iter ()
+    cmd.arg (n.to_string ())
+  status = ((cmd.status ()).map_err (\e -> "running nix-env: #{e}"))?
+  if status.success ()
+    Ok ()
+  else
+    Err "nix-env --delete-generations failed for #{p.path.display ()}"
+
+-- Generations first: removing them is what turns their closures into garbage.
+prune_generations : &Options -> Result<(), String>
+prune_generations o =
+  if &o.older_than is Some spec
+    cutoff = (cutoff_of spec (now_secs ()))?
+    for p in plan (&(root_dirs ())) cutoff
+      if !(p.doomed.is_empty ())
+        verb = if o.dry_run
+          "would remove"
+        else
+          "removing"
+        println! \-> "#{verb} generations #{numbers (&p.doomed)} of #{p.path.display ()}"
+        if !o.dry_run
+          (delete_generations (&p))?
+  Ok ()
+
+feed : ChildStdin -> String -> Result<(), String>
+feed pipe body =
+  mut sink = pipe
+  (sink.write_all (body.as_bytes ())).map_err (\e -> "writing to nix store delete: #{e}")
+
+-- Hand the dead set to Nix, which deletes each path only if it is still dead
+-- under its GC lock (`--skip-alive` makes a path that came alive a no-op).
+delete_paths : Vec<String> -> Result<(), String>
+delete_paths dead =
+  spawned = Command::new "nix" |> .args (["--extra-experimental-features", "nix-command", "store", "delete", "--skip-alive", "--stdin"]) |> .stdin (Stdio::piped ()) |> .spawn
+  mut child = (spawned.map_err (\e -> "running nix store delete: #{e}"))?
+  mut body = ((dead.iter ()).map (\b -> full b)) |> .collect : Vec<String> |> .join "\n"
+  body.push '\n'
+  if child.stdin.take () is Some pipe
+    (feed pipe body)?
+  status = ((child.wait ()).map_err (\e -> "waiting for nix store delete: #{e}"))?
+  if status.success ()
+    Ok ()
+  else
+    Err (.to_string "nix store delete failed")
+
+-- Nix removes dangling links under gcroots/auto while it collects; so does vgc.
+remove_stale : Vec<std::path::PathBuf> -> Result<(), String>
+remove_stale links =
+  for link in links.iter ()
+    if (fs::remove_file link).is_err ()
+      eprintln! \-> "vgc: could not remove stale root #{link.display ()}"
+  Ok ()
+
+-- The deletion itself: the dead set, cut to what Nix agrees on when verifying.
+delete_agreed : Options -> Analysis -> Option<HashSet<String>> -> Effect<i32, GcError>
+delete_agreed o a agreed =
+  mut dead = a.verdict.dead.clone ()
+  if agreed is Some theirs
+    before = dead.len ()
+    dead.retain (\d -> theirs.contains d)
+    println! \-> "verify: nix agrees on #{dead.len ()} of #{before} dead paths"
+  if !(a.verdict.invalid.is_empty ())
+    println! \-> "leaving #{a.verdict.invalid.len ()} invalid store entries for a stock collection"
+  if o.dry_run
+    for link in a.roots.stale.iter ()
+      println! \-> "would remove stale root #{link.display ()}"
+    println! \-> "would delete #{dead.len ()} store paths"
+    id_effect::succeed 0
+  else
+    println! \-> "deleting #{dead.len ()} store paths"
+    stale = a.roots.stale.clone ()
+    (step (move \-> remove_stale stale) GcError::Roots) |> .flat_map (move \_ -> step (move \-> delete_paths dead) GcError::Nix) |> .map (\_ -> 0)
+
+act : Options -> Analysis -> Effect<i32, GcError>
+act o a =
+  if a.roots.incomplete && !o.dry_run
+    fail (GcError::Refused (a.roots.notes.join "; "))
+  else if o.verify
+    (step (\-> oracle ()) GcError::Nix) |> .flat_map (move \theirs -> delete_agreed o a (Some theirs))
+  else
+    delete_agreed o a None
+
+run_gc : Options -> Effect<i32, GcError>
+run_gc o =
+  p = o.clone ()
+  (step (move \-> prune_generations (&p)) GcError::Nix) |> .flat_map (move \_ -> (analyse ()) |> .flat_map (move \a -> act o a))
+
+print_dead : Analysis -> i32
+print_dead a =
+  mut all = (a.verdict.dead.iter ()).chain (a.verdict.invalid.iter ()) |> .map (\b -> full b) |> .collect : Vec<String>
+  all.sort ()
+  for p in all
+    println! \-> "#{p}"
+  0
+
+plan_cmd : Options -> Effect<i32, GcError>
+plan_cmd o =
+  dry = Options { dry_run = true, older_than = o.older_than.clone (), ...Options::default () }
+  listing = o.print_dead
+  (step (move \-> prune_generations (&dry)) GcError::Nix) |> .flat_map (move \_ -> analyse ()) |> .map (move \a -> finish listing a)
+
+finish : bool -> Analysis -> i32
+finish listing a =
+  if listing
+    print_dead a
+  else
+    0
+
+program : Options -> Effect<i32, GcError>
+program o =
+  command = o.command.clone ()
+  if !(o.unknown.is_empty ())
+    fail (GcError::Usage "unknown arguments: #{o.unknown.join " "}\n#{USAGE}")
+  else
+    case command.as_str () of
+      "plan" -> plan_cmd o
+      "check" -> check ()
+      "run" -> run_gc o
+      _ -> fail (GcError::Usage (USAGE.to_string ()))
+
+export main : i32
+main =
+  args = std::env::args () |> .collect : Vec<String>
+  exit_code (program (parse_args (&args)))
+
+test "arguments parse into one command and its flags"
+  args = ["vgc", "run", "--delete-older-than", "30d", "--verify"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  o = parse_args (&args)
+  assert! \-> o.command == "run"
+  assert! \-> o.older_than == Some ("30d".to_string ())
+  assert! \-> o.verify && !o.dry_run && o.unknown.is_empty ()
+
+test "unknown flags are collected, not ignored"
+  args = ["vgc", "plan", "--bogus"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  assert! \-> (parse_args (&args)).unknown == vec!["--bogus".to_string()]
+
+test "unknown flags fail as a usage error"
+  args = ["vgc", "plan", "--bogus"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  assert! \-> exit_code (program (parse_args (&args))) == 1

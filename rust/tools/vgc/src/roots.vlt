@@ -1,0 +1,229 @@
+-- Garbage-collector roots, found exactly where Nix 2.35.6 looks for them
+-- (`LocalStore::findRoots`, `findTempRoots`, `findRuntimeRootsUnchecked`).
+-- This reports candidate base names only; whether each is a valid path is the
+-- database's to say. No GC logic lives here.
+
+import std::fs
+import std::io::{ErrorKind, Read}
+import std::path::{Component, Path, PathBuf}
+import crate::storepath::{STORE_PREFIX, in_store, name_char, store_base, valid_base}
+
+export const STATE_DIR : &str = "/nix/var/nix"
+
+-- `found`: permanent and runtime roots. `temp`: temporary roots of live
+-- processes. `stale`: dangling links under gcroots/auto, which Nix removes.
+-- `incomplete`: a root source could not be read, so the dead set may be too
+-- large and must not be acted on.
+export data Roots { export found Vec<String>, export temp Vec<String>, export stale Vec<PathBuf>, export notes Vec<String>, export incomplete bool }
+  deriving (Debug, Default)
+
+-- The permanent failures Nix ignores while looking for roots: EACCES, ENOENT,
+-- ENOTDIR, and ESRCH for a process that exited mid-scan.
+ignorable : &std::io::Error -> bool
+ignorable e =
+  k = e.kind ()
+  k == ErrorKind::PermissionDenied || k == ErrorKind::NotFound || k == ErrorKind::NotADirectory || e.raw_os_error () == Some 3
+
+-- `canonPath` without resolving symlinks: drop `.` and fold `..`.
+export normalize : &Path -> PathBuf
+normalize p =
+  mut out = PathBuf::from "/"
+  for c in p.components ()
+    case c of
+      Component::Normal s -> out.push s
+      Component::ParentDir ->
+        _ := out.pop ()
+      _ -> ()
+  out
+
+-- A target inside the store names a root by its first component.
+found : &str -> &mut Roots -> ()
+found target acc =
+  if store_base target is Some b
+    acc.found.push (b.to_string ())
+  ()
+
+-- `findRoots(path, type)`, with Nix's error policy: an ignorable failure skips
+-- the entry, anything else ends the search.
+export find_roots : &Path -> Option<fs::FileType> -> &Path -> &mut Roots -> Result<(), String>
+find_roots path kind auto_dir acc =
+  case visit path kind auto_dir acc of
+    Ok _ -> Ok ()
+    Err e | ignorable (&e) ->
+      acc.notes.push "cannot read potential root #{path.display ()}"
+      Ok ()
+    Err e -> Err "finding GC roots in #{path.display ()}: #{e}"
+
+visit : &Path -> Option<fs::FileType> -> &Path -> &mut Roots -> std::io::Result<()>
+visit path kind auto_dir acc =
+  t = case kind of
+    Some k -> k
+    None -> ((fs::symlink_metadata path)?).file_type ()
+  if t.is_dir ()
+    for entry in (fs::read_dir path)?
+      e = entry?
+      sub = e.path ()
+      k = e.file_type () |> .ok
+      ((find_roots (&sub) k auto_dir acc).map_err std::io::Error::other)?
+  else if t.is_symlink ()
+    target = (fs::read_link path)?
+    shown = target.to_string_lossy ().into_owned ()
+    if in_store (&shown)
+      found (&shown) acc
+    else
+      (indirect path (&target) auto_dir acc)?
+  else if t.is_file ()
+    if path.file_name () is Some n
+      name = n.to_string_lossy ().into_owned ()
+      if valid_base (&name)
+        acc.found.push name
+  Ok ()
+
+-- An indirect root: a link to a link (a `result` symlink, say) that itself
+-- points into the store. A dangling one under gcroots/auto is stale.
+indirect : &Path -> &Path -> &Path -> &mut Roots -> std::io::Result<()>
+indirect path target auto_dir acc =
+  parent = path.parent () |> .unwrap_or (Path::new "/")
+  abs = normalize (&(parent.join target))
+  case fs::symlink_metadata (&abs) of
+    Err e | e.kind () == ErrorKind::NotFound || e.kind () == ErrorKind::NotADirectory ->
+      if path.starts_with auto_dir
+        acc.stale.push (path.to_path_buf ())
+      Ok ()
+    Err e -> Err e
+    Ok m ->
+      if m.file_type ().is_symlink ()
+        t2 = (fs::read_link (&abs))?
+        found (&(t2.to_string_lossy ())) acc
+      Ok ()
+
+-- `findTempRoots`: every per-process file in `dir` whose owner still holds its
+-- lock. A file whose lock can be taken belongs to a dead process; Nix deletes
+-- it, and the planner only skips it.
+export temp_roots : &Path -> &mut Roots -> Result<(), String>
+temp_roots dir acc =
+  entries = ((fs::read_dir dir).map_err (\e -> "reading #{dir.display ()}: #{e}"))?
+  for entry in entries
+    e = ((entry.map_err (\e -> "reading #{dir.display ()}: #{e}")))?
+    name = e.file_name ().to_string_lossy ().into_owned ()
+    if !(name.starts_with '.')
+      read_temp (&(e.path ())) acc
+  Ok ()
+
+read_temp : &Path -> &mut Roots -> ()
+read_temp path acc =
+  opened = fs::OpenOptions::new () |> .read true |> .write true |> .open path
+  case opened of
+    Ok f -> temp_file f path acc
+    Err e | e.kind () == ErrorKind::NotFound -> ()
+    Err e ->
+      acc.notes.push "opening temporary roots file #{path.display ()}: #{e}"
+      acc.incomplete := true
+  ()
+
+temp_file : fs::File -> &Path -> &mut Roots -> ()
+temp_file f path acc =
+  mut file = f
+  if (file.try_lock ()).is_ok ()
+    _ := file.unlock ()
+  else
+    mut bytes = Vec::new () : Vec<u8>
+    if (file.read_to_end (&mut bytes)).is_err ()
+      acc.notes.push "reading temporary roots file #{path.display ()}"
+      acc.incomplete := true
+    else
+      parts = (bytes.split (\b -> *b == 0)).collect () : Vec<&[u8]>
+      complete = parts.len () - 1
+      for part in parts |> .iter |> .take complete
+        root = String::from_utf8_lossy part
+        if store_base (&root) is Some b
+          acc.temp.push (b.to_string ())
+  ()
+
+-- `findRuntimeRootsUnchecked`: what running processes hold open, map or name
+-- in their environment, and the kernel's helper programs.
+export runtime_roots : &mut Roots -> ()
+runtime_roots acc =
+  if fs::read_dir "/proc" is Ok procs
+    for entry in procs
+      if entry is Ok e
+        name = e.file_name ().to_string_lossy ().into_owned ()
+        if !(name.is_empty ()) && (name.chars ()).all (\c -> c.is_ascii_digit ())
+          process_roots (&name) acc
+  for f in ["/proc/sys/kernel/modprobe", "/proc/sys/kernel/fbsplash", "/proc/sys/kernel/poweroff_cmd"]
+    if fs::read f is Ok bytes
+      found (&(String::from_utf8_lossy (&bytes))) acc
+  ()
+
+-- One process: exe, cwd and every fd link, then maps, then environ. As in Nix,
+-- an unreadable fd directory or maps file skips the rest of that process.
+process_roots : &str -> &mut Roots -> ()
+process_roots pid acc =
+  base = "/proc/#{pid}"
+  proc_link ("#{base}/exe") acc
+  proc_link ("#{base}/cwd") acc
+  if fs::read_dir ("#{base}/fd") is Ok fds
+    for entry in fds
+      if entry is Ok e
+        n = e.file_name ().to_string_lossy ().into_owned ()
+        if !(n.starts_with '.')
+          proc_link ("#{base}/fd/#{n}") acc
+    if fs::read ("#{base}/maps") is Ok maps
+      map_roots (&(String::from_utf8_lossy (&maps))) acc
+      if fs::read ("#{base}/environ") is Ok env
+        env_roots (&(String::from_utf8_lossy (&env))) acc
+  ()
+
+-- `readProcLink`: only an absolute target counts.
+proc_link : String -> &mut Roots -> ()
+proc_link link acc =
+  if fs::read_link (&link) is Ok t
+    if t.is_absolute ()
+      found (&(t.to_string_lossy ())) acc
+  ()
+
+-- A maps line whose sixth and last field is an absolute path.
+export map_roots : &str -> &mut Roots -> ()
+map_roots maps acc =
+  for line in maps.lines ()
+    fields = (line.split_whitespace ()).collect () : Vec<&str>
+    if fields.len () == 6 && fields[5].starts_with '/'
+      found fields[5] acc
+  ()
+
+-- Every `/nix/store/[0-9a-z]+[0-9a-zA-Z+._?=-]*` in an environment block.
+export env_roots : &str -> &mut Roots -> ()
+env_roots env acc =
+  for hit in env.match_indices STORE_PREFIX
+    rest = (env.get (hit.0 + STORE_PREFIX.len () .. env.len ())).unwrap_or ""
+    end = (rest.find (\c : char -> !(name_char c))).unwrap_or (rest.len ())
+    word = (rest.get (0 .. end)).unwrap_or ""
+    if word.starts_with (\c : char -> c.is_ascii_digit () || c.is_ascii_lowercase ())
+      found (&("#{STORE_PREFIX}#{word}")) acc
+  ()
+
+-- All four sources, in Nix's order: gcroots, profiles, runtime, temporary.
+export find_all : &mut Roots -> Result<(), String>
+find_all acc =
+  state = Path::new STATE_DIR
+  auto_dir = state.join "gcroots/auto"
+  (find_roots (&(state.join "gcroots")) None (&auto_dir) acc)?
+  (find_roots (&(state.join "profiles")) None (&auto_dir) acc)?
+  runtime_roots acc
+  temp_roots (&(state.join "temproots")) acc
+
+test "normalize folds dot and dot-dot without touching the disk"
+  assert! \-> normalize (Path::new "/a/./b/../c") == PathBuf::from "/a/c"
+  assert! \-> normalize (Path::new "/../x") == PathBuf::from "/x"
+
+test "maps lines count only a trailing absolute path"
+  mut acc = Roots::default ()
+  maps = "7f00-7f01 r-xp 00000000 00:1f 123 /nix/store/hbgbsdfjd88491yf8x14id8y9d6nkscp-glibc/lib/libc.so.6\n7f00-7f01 rw-p 00000000 00:00 0 \n7f00-7f01 r-xp 0 00:1f 9 /nix/store/abcbsdfjd88491yf8x14id8y9d6nkscp-x/lib (deleted)"
+  map_roots maps (&mut acc)
+  assert! \-> acc.found == vec!["hbgbsdfjd88491yf8x14id8y9d6nkscp-glibc".to_string()]
+
+test "environment blocks yield every store path they name"
+  mut acc = Roots::default ()
+  env = "PATH=/nix/store/hbgbsdfjd88491yf8x14id8y9d6nkscp-coreutils/bin:/nix/store/zzzbsdfjd88491yf8x14id8y9d6nkscp-git/bin\u{0}X=/nix/store/.links"
+  env_roots env (&mut acc)
+  assert! \-> acc.found == vec!["hbgbsdfjd88491yf8x14id8y9d6nkscp-coreutils".to_string(), "zzzbsdfjd88491yf8x14id8y9d6nkscp-git".to_string()]

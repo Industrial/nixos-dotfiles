@@ -1,0 +1,80 @@
+-- Which profile generations `nix-collect-garbage --delete-older-than Nd` removes,
+-- copied from Nix 2.35.6 `src/libstore/profiles.cc` (`parseName`,
+-- `deleteGenerationsOlderThan`, `parseOlderThanTimeSpec`). Pure: the caller
+-- reads the directory and the link times.
+
+export data Generation { export number u64, export mtime i64 }
+  deriving (Debug, Clone, PartialEq)
+
+-- `parseName`: the generation number of `<profile>-<N>-link`, where `-link` is
+-- its first occurrence after the dash and anything after it is ignored.
+export parse_generation : &str -> &str -> Option<u64>
+parse_generation profile name =
+  prefix = "#{profile}-"
+  case name.strip_prefix (prefix.as_str ()) of
+    None -> None
+    Some rest -> case rest.find "-link" of
+      None -> None
+      Some p -> digits ((rest.split_at p).0)
+
+-- `string2Int<uint64_t>`: one or more ASCII digits, nothing else.
+digits : &str -> Option<u64>
+digits s =
+  if s.is_empty () || !((s.chars ()).all (\c -> c.is_ascii_digit ()))
+    None
+  else
+    s.parse () |> .ok
+
+-- `parseOlderThanTimeSpec`: `Nd` with N >= 1, as a cutoff in seconds since the
+-- epoch, given the current time.
+export cutoff_of : &str -> i64 -> Result<i64, String>
+cutoff_of spec now =
+  case spec.strip_suffix 'd' of
+    None -> Err "invalid number of days specifier '#{spec}', expected something like '14d'"
+    Some n ->
+      parsed = n.parse () : Result<i64, core::num::ParseIntError>
+      case parsed of
+        Ok days | days >= 1 -> Ok (now - days * 24 * 3600)
+        _ -> Err "invalid number of days specifier '#{spec}'"
+
+-- `deleteGenerationsOlderThan`: walking from newest to oldest, find the first
+-- generation created before the cutoff and keep it (it was live at the cutoff,
+-- so it is the rollback target); every older one goes, except the current.
+-- Returned in ascending order.
+export doomed : &[Generation] -> Option<u64> -> i64 -> Vec<u64>
+doomed gens current cutoff =
+  mut sorted = gens.to_vec ()
+  sorted.sort_by_key (\g -> g.number)
+  mut out = Vec::new () : Vec<u64>
+  mut kept = false
+  for g in sorted |> .iter |> .rev
+    if kept
+      if current != Some g.number
+        out.push g.number
+    else if g.mtime < cutoff
+      kept := true
+  out.sort ()
+  out
+
+test "generation links parse like Nix's parseName"
+  assert! \-> parse_generation "system" "system-493-link" == Some 493
+  assert! \-> parse_generation "system" "system-493-link.tmp" == Some 493
+  assert! \-> parse_generation "system" "system" == None
+  assert! \-> parse_generation "system" "system--link" == None
+  assert! \-> parse_generation "system" "other-1-link" == None
+  assert! \-> parse_generation "system" "system-1a-link" == None
+
+test "time specs are whole days"
+  assert! \-> cutoff_of "30d" 10_000_000 == Ok (10_000_000 - 30 * 86400)
+  assert! \-> (cutoff_of "0d" 0).is_err ()
+  assert! \-> (cutoff_of "30" 0).is_err ()
+  assert! \-> (cutoff_of "xd" 0).is_err ()
+
+test "the newest pre-cutoff generation and the current one survive"
+  gens = ((1 ..= 5).map (\n -> Generation { number = n, mtime = (i64::try_from n).unwrap () * 10 })).collect () : Vec<Generation>
+  none = Vec::new () : Vec<u64>
+  assert! \-> doomed (&gens) (Some 5) 35 == vec! [1, 2]
+  assert! \-> doomed (&gens) (Some 1) 35 == vec! [2]
+  assert! \-> doomed (&gens) (Some 5) 5 == none
+  assert! \-> doomed (&gens) (Some 5) 100 == vec! [1, 2, 3, 4]
+  assert! \-> doomed (&gens) (Some 2) 100 == vec! [1, 3, 4]

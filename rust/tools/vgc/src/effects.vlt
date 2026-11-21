@@ -1,0 +1,53 @@
+-- vgc's effect edge. Every step that touches the machine (the store
+-- database, the root scan, the store directory, a nix subprocess) runs as an
+-- id_effect `Effect` with one typed error, and `cli.vlt` composes them. The
+-- planning modules stay pure functions.
+
+import id_effect::{Cause, Effect, fail, succeed, suspend}
+
+-- What can stop a collection, by where it happened.
+export data GcError
+  = Database String "store database: #{0}"
+  | Roots String "GC roots: #{0}"
+  | Store String "store directory: #{0}"
+  | Nix String "nix: #{0}"
+  | Usage String "#{0}"
+  | Refused String "refusing to delete: #{0}"
+
+-- A Result as an effect, its error typed by `kind`.
+export lift : given <A: Send + 'static, K: FnOnce(String) -> GcError> Result<A, String> -> K -> Effect<A, GcError>
+lift r kind =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail (kind e)
+
+-- A fallible step, deferred until the effect runs.
+export step : given <A: Send + 'static, F: FnOnce() -> Result<A, String> + Send + 'static, K: FnOnce(String) -> GcError + Send + 'static> F -> K -> Effect<A, GcError>
+step f kind = suspend (move \-> lift (f ()) kind)
+
+-- Run a program to its exit code. A typed failure is reported and is exit 1;
+-- a defect (a panic inside a step) is exit 2.
+export exit_code : Effect<i32, GcError> -> i32
+exit_code program =
+  case program.block_on () |> .into_result of
+    Ok code -> code
+    Err cause -> failed cause
+
+failed : Cause<GcError> -> i32
+failed cause =
+  shown = "#{cause:?}"
+  case cause.fail_option () of
+    Some e ->
+      eprintln! \-> "vgc: #{e}"
+      1
+    None ->
+      eprintln! \-> "vgc: aborted: #{shown}"
+      2
+
+test "a failed step carries its typed error"
+  e = step (\-> Err (.to_string "locked")) GcError::Database : Effect<u32, GcError>
+  assert! \-> e.block_on () |> .into_result |> .err |> .is_some
+
+test "a successful step yields its value"
+  e = step (\-> Ok 7) GcError::Store : Effect<u32, GcError>
+  assert! \-> exit_code (e.map (\n -> i32::try_from n |> .unwrap_or 0)) == 7
