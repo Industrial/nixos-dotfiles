@@ -118,6 +118,7 @@
   ./fleet/nix-remote-builder-server.nix
   ./fleet/remote-access.nix
   ./fleet/remote-desktop-relay.nix
+  ./fleet/vbuild.nix
 
   # games
   ./games/appimage
