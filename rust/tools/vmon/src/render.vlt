@@ -1,0 +1,358 @@
+-- What vmon prints, as plain functions of the monitor.
+--
+--   * plain mode (`--plain`, or stderr is not a terminal): each event's
+--     lines as they come (`stepped`), then the summary;
+--   * live mode: every tick redraws the tree of running builds and fetches
+--     under a status line, with the log lines that arrived since the last
+--     tick printed above it (`framed`), then the summary (`closing`);
+--   * the summary: counts, the slowest builds, and every failed build with
+--     the last lines of its log;
+--   * the metrics textfile: each build's duration as
+--     `vmon_build_seconds{pname=…}`, for node_exporter's textfile collector.
+
+import std::collections::BTreeSet
+import crate::event::{pname_of, strip_ansi}
+import crate::monitor::{ACT_BUILD, ACT_COPY_PATH, ACT_FETCH_TREE, ACT_POST_BUILD_HOOK, ACT_SUBSTITUTE, Act, Build, Monitor, apply, built, bytes_copied, cancelled_builds, failed_builds, fetched, running_builds, seconds}
+import crate::monitor::Out::{Log, Step}
+import crate::event::Event
+
+-- At most this many tree lines; the rest are counted.
+export const TREE_LINES : usize = 15
+
+-- At most this many lines of a failed build's log in the summary.
+export const SUMMARY_TAIL : usize = 10
+
+------------------------------------------------------------------------
+-- The fold, with what to print
+
+-- One event. In plain mode the lines it produced are returned at once; in
+-- live mode they wait for the next frame.
+export stepped : Monitor -> u64 -> Event -> bool -> (String, Monitor)
+stepped monitor now ev live =
+  mut m = monitor
+  apply (&mut m) now ev
+  if live
+    (String::new (), m)
+  else
+    text = plain_text (&mut m)
+    (text, m)
+
+-- The pending lines, all of them, without escapes (a log is not a terminal).
+plain_text : &mut Monitor -> String
+plain_text m =
+  mut text = String::new ()
+  for o in std::mem::take (&mut m.out)
+    case o of
+      Step line -> push_line (&mut text) (&line)
+      Log line -> push_line (&mut text) (&strip_ansi (&line))
+  text
+
+push_line : &mut String -> &str -> ()
+push_line text line =
+  text.push_str line
+  text.push '\n'
+  ()
+
+-- One live frame: erase the last tree, print the logs that came since,
+-- draw the tree again.
+export framed : Monitor -> u64 -> usize -> (String, Monitor)
+framed monitor now width =
+  mut m = monitor
+  mut text = erase m.drawn
+  for o in std::mem::take (&mut m.out)
+    if o is Log line
+      push_line (&mut text) (&line)
+  lines = tree (&m) now width
+  m.drawn := lines.len ()
+  for l in lines
+    push_line (&mut text) (&l)
+  (text, m)
+
+-- Move up over the `n` lines drawn last and clear to the end of the screen.
+export erase : usize -> String
+erase n =
+  if n == 0
+    String::new ()
+  else
+    e = esc ()
+    "#{e}[#{n}F#{e}[J"
+
+esc : String
+esc = String::from (char::from (27 : u8))
+
+-- What the run ends with: the last lines and the tree erased (live), then
+-- the summary, the counts the exit code is decided by, and the metrics.
+export data Closing { export text String, export failed usize, export faults usize, export metrics String }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+export closing : Monitor -> u64 -> bool -> u64 -> (Closing, Monitor)
+closing monitor now live unix_seconds =
+  mut m = monitor
+  mut text = String::new ()
+  if live
+    text.push_str (&erase m.drawn)
+    for o in std::mem::take (&mut m.out)
+      if o is Log line
+        push_line (&mut text) (&line)
+    m.drawn := 0
+  else
+    text.push_str (&plain_text (&mut m))
+  text.push_str (&summary (&m) now)
+  c = Closing { text, failed = failed_builds (&m), faults = m.faults.len (), metrics = metrics_text (&m) unix_seconds }
+  (c, m)
+
+------------------------------------------------------------------------
+-- The live tree
+
+-- Running builds, fetches, copies, hooks and fetchTree calls, nested under
+-- the shown activity they run in, then the status line. Lines are cut to
+-- the terminal's width so the frame's height is its line count.
+export tree : &Monitor -> u64 -> usize -> Vec<String>
+tree m now width =
+  mut lines = Vec::new () : Vec<String>
+  mut hidden = 0 : usize
+  for kv in &m.acts
+    (id, a) = kv
+    if shown a
+      if lines.len () < TREE_LINES
+        depth = depth_of m (*id)
+        lines.push (cut ("#{"  ".repeat (depth + 1)}#{act_line a now}") width)
+      else
+        hidden := hidden + 1
+  if hidden > 0
+    lines.push (cut ("  … and #{hidden} more") width)
+  lines.push (cut (status m now) width)
+  lines
+
+shown : &Act -> bool
+shown a = a.kind == ACT_BUILD || a.kind == ACT_SUBSTITUTE || a.kind == ACT_COPY_PATH || a.kind == ACT_POST_BUILD_HOOK || a.kind == ACT_FETCH_TREE
+
+-- How many shown activities `id` runs inside.
+depth_of : &Monitor -> u64 -> usize
+depth_of m id =
+  mut depth = 0 : usize
+  mut seen = BTreeSet::new () : BTreeSet<u64>
+  mut at = m.acts.get (&id) |> .map (\a -> a.parent) |> .unwrap_or 0
+  while at != 0 && seen.insert at
+    case m.acts.get (&at) of
+      Some p ->
+        if shown p
+          depth := depth + 1
+        at := p.parent
+      None ->
+        at := 0
+  depth
+
+act_line : &Act -> u64 -> String
+act_line a now =
+  took = seconds (now.saturating_sub a.started)
+  if a.kind == ACT_BUILD
+    phase = if_some (&a.phase)
+    "⏵ #{label a}#{phase} #{took}"
+  else if a.kind == ACT_COPY_PATH
+    "↓ #{label a} #{bytes_of a.done}/#{bytes_of a.expected} #{took}"
+  else
+    "↓ #{label a} #{took}"
+
+-- The name an activity is shown by: its build's or fetch's name, else its text.
+label : &Act -> String
+label a = a.name.clone ()
+
+if_some : &str -> String
+if_some phase =
+  if phase.is_empty ()
+    String::new ()
+  else
+    " (#{phase})"
+
+-- builds 3/10 (2 running, 1 failed) · fetched 5/40 12.3 MiB · 1m02s · ETA 3m10s
+export status : &Monitor -> u64 -> String
+status m now =
+  b_done = u64::try_from (built m) |> .unwrap_or 0
+  b_failed = u64::try_from (failed_builds m) |> .unwrap_or 0
+  b_running = running_builds m
+  b_total = m.builds_expected.max (u64::try_from (m.builds.len ()) |> .unwrap_or 0)
+  f_done = u64::try_from (fetched m) |> .unwrap_or 0
+  f_total = m.fetches_expected.max (u64::try_from (m.fetches.len ()) |> .unwrap_or 0)
+  failed_part = if_failed b_failed
+  eta = eta_of now (b_done + f_done + b_failed) (b_total + f_total)
+  "builds #{b_done}/#{b_total} (#{b_running} running#{failed_part}) · fetched #{f_done}/#{f_total} #{bytes_of (bytes_copied m)} · #{seconds now}#{eta}"
+
+if_failed : u64 -> String
+if_failed n =
+  if n == 0
+    String::new ()
+  else
+    ", #{n} failed"
+
+-- The rest at the rate so far: `elapsed × left / done`.
+export eta_of : u64 -> u64 -> u64 -> String
+eta_of now done total =
+  if done == 0 || done >= total
+    String::new ()
+  else
+    left = total - done
+    " · ETA #{seconds (now / done * left)}"
+
+export bytes_of : u64 -> String
+bytes_of n =
+  if n < 1024
+    "#{n} B"
+  else if n < 1048576
+    "#{n / 1024}.#{(n % 1024) * 10 / 1024} KiB"
+  else if n < 1073741824
+    "#{n / 1048576}.#{(n % 1048576) * 10 / 1048576} MiB"
+  else
+    "#{n / 1073741824}.#{(n % 1073741824) * 10 / 1073741824} GiB"
+
+-- The line, cut to `width` characters (one short, so it never wraps).
+export cut : String -> usize -> String
+cut line width =
+  room = width.saturating_sub 1 |> .max 20
+  if (line.chars () |> .count) <= room
+    line
+  else
+    line.chars () |> .take room |> .collect
+
+------------------------------------------------------------------------
+-- The summary
+
+-- vmon: 3 built, 12 fetched, 1 failed in 1m02s
+-- vmon: slowest: a-1.0 2m10s, b-2 1m50s, c-3 2.1s
+-- vmon: ✗ a-1.0 (/nix/store/…-a-1.0.drv)
+--   > the last lines of its log
+export summary : &Monitor -> u64 -> String
+summary m now =
+  mut text = "vmon: #{built m} built, #{fetched m} fetched, #{failed_builds m} failed#{if_cancelled (cancelled_builds m)} in #{seconds now}\n"
+  slow = slowest m 3
+  if !(slow.is_empty ())
+    text.push_str (&"vmon: slowest: #{slow.join ", "}\n")
+  for b in &m.builds
+    if b.failed
+      text.push_str (&"vmon: ✗ #{b.name} (#{b.drv})\n")
+      skip = b.tail.len ().saturating_sub SUMMARY_TAIL
+      for line in b.tail.iter () |> .skip skip
+        text.push_str (&"  > #{line}\n")
+  others = m.faults.len ().saturating_sub (failed_builds m)
+  if (m.builds.iter () |> .all (\b -> !b.failed)) && !(m.faults.is_empty ())
+    text.push_str (&"vmon: #{m.faults.len ()} error(s), see above\n")
+  else if others > 0
+    text.push_str (&"vmon: #{others} other error(s), see above\n")
+  text.push_str (&if_relayed m.relayed)
+  text
+
+-- The `n` longest successful builds, longest first.
+export slowest : &Monitor -> usize -> Vec<String>
+slowest m n =
+  mut timed = m.builds.iter () |> .filter (\b -> !b.failed && !b.cancelled) |> .filter_map (\b -> took_by b) |> .collect : Vec<(u64, String)>
+  timed.sort_by (\a b -> b.0.cmp (&a.0) |> .then_with (\-> a.1.cmp (&b.1)))
+  timed.iter () |> .take n |> .map (\t -> "#{t.1} #{seconds t.0}") |> .collect
+
+took_by : &Build -> Option<(u64, String)>
+took_by b = b.finished |> .map (\f -> (f.saturating_sub b.started, b.name.clone ()))
+
+if_cancelled : usize -> String
+if_cancelled n =
+  if n == 0
+    String::new ()
+  else
+    ", #{n} cancelled"
+
+-- The daemon's relayed lines that were not shown (see monitor).
+if_relayed : u64 -> String
+if_relayed n =
+  if n == 0
+    String::new ()
+  else
+    "vmon: #{n} line(s) the daemon relayed not shown\n"
+
+------------------------------------------------------------------------
+-- The metrics textfile
+
+-- Prometheus text: each successful build's seconds by package and name,
+-- the run's counts by result, and when the run ended.
+export metrics_text : &Monitor -> u64 -> String
+metrics_text m unix_seconds =
+  mut text = String::from "# HELP vmon_build_seconds Wall-clock seconds each derivation took to build, in vmon's last run.\n# TYPE vmon_build_seconds gauge\n"
+  for b in &m.builds
+    if !b.failed && !b.cancelled
+      if b.finished is Some f
+        ms = f.saturating_sub b.started
+        text.push_str (&"vmon_build_seconds{pname=\"#{label_value (&pname_of (&b.name))}\",name=\"#{label_value (&b.name)}\"} #{ms / 1000}.#{pad3 (ms % 1000)}\n")
+  text.push_str "# HELP vmon_builds Derivations in vmon's last run, by result.\n# TYPE vmon_builds gauge\n"
+  text.push_str (&"vmon_builds{result=\"built\"} #{built m}\n")
+  text.push_str (&"vmon_builds{result=\"failed\"} #{failed_builds m}\n")
+  text.push_str (&"vmon_builds{result=\"cancelled\"} #{cancelled_builds m}\n")
+  text.push_str (&"vmon_builds{result=\"fetched\"} #{fetched m}\n")
+  text.push_str "# HELP vmon_last_run_timestamp_seconds When vmon's last run ended.\n# TYPE vmon_last_run_timestamp_seconds gauge\n"
+  text.push_str (&"vmon_last_run_timestamp_seconds #{unix_seconds}\n")
+  text
+
+pad3 : u64 -> String
+pad3 n =
+  if n < 10
+    "00#{n}"
+  else if n < 100
+    "0#{n}"
+  else
+    n.to_string ()
+
+-- A label value with `\`, `"` and newlines escaped.
+export label_value : &str -> String
+label_value s = s.replace "\\" "\\\\" |> .replace "\"" "\\\"" |> .replace "\n" "\\n"
+
+#[cfg(test)]
+replay : &str -> bool -> (String, Monitor)
+replay text live =
+  mut m = Monitor::default ()
+  mut out = String::new ()
+  mut t = 0 : u64
+  for line in text.lines ()
+    t := t + 1000
+    (s, next) = stepped m t (crate::event::parse_line line) live
+    out.push_str (&s)
+    m := next
+  (out, m)
+
+#[cfg(test)]
+const RUN : &str = "@nix {\"action\":\"start\",\"id\":1,\"level\":0,\"parent\":0,\"text\":\"\",\"type\":104}\n@nix {\"action\":\"start\",\"fields\":[\"/nix/store/aaaa-hello-2.12.drv\",\"\"],\"id\":2,\"level\":3,\"parent\":0,\"text\":\"building '/nix/store/aaaa-hello-2.12.drv'\",\"type\":105}\n@nix {\"action\":\"result\",\"fields\":[\"buildPhase\"],\"id\":2,\"type\":104}\n@nix {\"action\":\"msg\",\"level\":1,\"msg\":\"warning: something\"}\n@nix {\"action\":\"result\",\"fields\":[1,1,0,0],\"id\":1,\"type\":105}\n@nix {\"action\":\"stop\",\"id\":2}"
+
+test "plain mode prints each step and log line as it comes"
+  (out, _m) = replay RUN false
+  assert_eq! \-> out \-> "⏵ building hello-2.12\nwarning: something\n✔ built hello-2.12 in 4.0s\n"
+
+test "live mode holds the lines for the frame, which draws the tree under them"
+  (out, m) = replay "@nix {\"action\":\"start\",\"fields\":[\"/nix/store/aaaa-hello-2.12.drv\",\"\"],\"id\":2,\"level\":3,\"parent\":0,\"text\":\"building '/nix/store/aaaa-hello-2.12.drv'\",\"type\":105}\n@nix {\"action\":\"result\",\"fields\":[\"buildPhase\"],\"id\":2,\"type\":104}\n@nix {\"action\":\"msg\",\"level\":1,\"msg\":\"warning: something\"}" true
+  assert_eq! \-> out \-> ""
+  (frame, m2) = framed m 5000 80
+  assert_eq! \-> frame \-> "warning: something\n  ⏵ hello-2.12 (buildPhase) 4.0s\nbuilds 0/1 (1 running) · fetched 0/0 0 B · 5.0s\n"
+  assert_eq! \-> m2.drawn \-> 2
+  (again, _m3) = framed m2 6000 80
+  assert! \-> again.starts_with (&"#{esc ()}[2F#{esc ()}[J")
+
+test "the summary counts, ranks and shows a failure's tail"
+  mut m = Monitor::default ()
+  m.builds := .to_vec ([Build { drv = .to_string "/nix/store/a-a-1.drv", name = .to_string "a-1", started = 0, finished = Some 2000, ...Build::default () }, Build { drv = .to_string "/nix/store/b-b-2.drv", name = .to_string "b-2", started = 0, finished = Some 1000, failed = true, tail = .to_vec ([.to_string "boom"]), ...Build::default () }])
+  m.faults := .to_vec ([.to_string "error: Cannot build b"])
+  assert_eq! \-> summary (&m) 3000 \-> "vmon: 1 built, 0 fetched, 1 failed in 3.0s\nvmon: slowest: a-1 2.0s\nvmon: ✗ b-2 (/nix/store/b-b-2.drv)\n  > boom\n"
+
+test "an error with no failed build is reported in the summary"
+  mut m = Monitor::default ()
+  m.faults := .to_vec ([.to_string "error: attribute missing"])
+  assert! \-> summary (&m) 0 |> .contains "vmon: 1 error(s), see above"
+
+test "metrics carry each build's seconds by package name"
+  mut m = Monitor::default ()
+  m.builds := .to_vec ([Build { drv = .to_string "/nix/store/a-hello-2.12.drv", name = .to_string "hello-2.12", started = 500, finished = Some 3750, ...Build::default () }])
+  text = metrics_text (&m) 1700000000
+  assert! \-> text.contains "vmon_build_seconds{pname=\"hello\",name=\"hello-2.12\"} 3.250\n"
+  assert! \-> text.contains "vmon_builds{result=\"built\"} 1\n"
+  assert! \-> text.contains "vmon_last_run_timestamp_seconds 1700000000\n"
+  assert_eq! \-> label_value "a\"b\\c" \-> "a\\\"b\\\\c"
+
+test "the ETA is the rate so far over what is left"
+  assert_eq! \-> eta_of 10000 2 4 \-> " · ETA 10.0s"
+  assert_eq! \-> eta_of 10000 0 4 \-> ""
+  assert_eq! \-> eta_of 10000 4 4 \-> ""
+  assert_eq! \-> bytes_of 1572864 \-> "1.5 MiB"
+  assert_eq! \-> cut (.to_string "abcdefghijklmnopqrstuvwxyz") 22 \-> "abcdefghijklmnopqrstu"

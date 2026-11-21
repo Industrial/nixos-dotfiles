@@ -1,0 +1,42 @@
+[package]
+name = "vmon"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "A Nix build-log monitor: a live build/download tree from --log-format internal-json, a plain mode, failure summaries and build-time metrics (replaces nix-output-monitor)"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# nix-store-core and its other consumers.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The stderr message family (StderrMsg, Activity, Field) the internal-json
+# stream decodes into. default.nix roots its source at rust/tools so the path
+# resolves.
+nix-store-core = { path = "../nix-store-core" }
+# Each `@nix {…}` line is one JSON object.
+serde_json = "1"
+# The terminal's width, for the live tree.
+terminal_size = "0.4"
+# Async stdin and the child's stderr (`vmon -- nix build …`).
+tokio = { version = "1", features = ["io-std", "io-util", "process"] }
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vmon"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vmon"
+path = "src/main.rs"

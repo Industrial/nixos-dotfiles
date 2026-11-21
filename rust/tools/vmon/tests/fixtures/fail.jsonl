@@ -1,0 +1,45 @@
+@nix {"action":"msg","level":4,"msg":"evaluating file '«nix-internal»/derivation-internal.nix'"}
+@nix {"action":"start","id":17596180364001280,"level":6,"parent":0,"text":"querying info about missing paths","type":0}
+@nix {"action":"start","fields":["/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0","https://cache.nixos.org"],"id":17596180364001281,"level":4,"parent":0,"text":"querying info about '/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0' on 'https://cache.nixos.org'","type":109}
+@nix {"action":"start","fields":["https://cache.nixos.org/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl.narinfo"],"id":17596180364001282,"level":4,"parent":17596180364001281,"text":"downloading 'https://cache.nixos.org/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl.narinfo'","type":101}
+@nix {"action":"stop","id":17596180364001281}
+@nix {"action":"stop","id":17596180364001282}
+@nix {"action":"start","fields":["/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0","https://nix-community.cachix.org"],"id":17596180364001283,"level":4,"parent":0,"text":"querying info about '/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0' on 'https://nix-community.cachix.org'","type":109}
+@nix {"action":"start","fields":["https://nix-community.cachix.org/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl.narinfo"],"id":17596180364001284,"level":4,"parent":17596180364001283,"text":"downloading 'https://nix-community.cachix.org/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl.narinfo'","type":101}
+@nix {"action":"stop","id":17596180364001283}
+@nix {"action":"stop","id":17596180364001284}
+@nix {"action":"start","fields":["/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0","https://devenv.cachix.org"],"id":17596180364001285,"level":4,"parent":0,"text":"querying info about '/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0' on 'https://devenv.cachix.org'","type":109}
+@nix {"action":"start","fields":["https://devenv.cachix.org/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl.narinfo"],"id":17596180364001286,"level":4,"parent":17596180364001285,"text":"downloading 'https://devenv.cachix.org/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl.narinfo'","type":101}
+@nix {"action":"stop","id":17596180364001285}
+@nix {"action":"stop","id":17596180364001286}
+@nix {"action":"stop","id":17596180364001280}
+@nix {"action":"msg","level":3,"msg":"this derivation will be built:"}
+@nix {"action":"msg","level":3,"msg":"  /nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv"}
+@nix {"action":"start","id":17596180364001287,"level":0,"parent":0,"text":"","type":102}
+@nix {"action":"start","id":17596180364001288,"level":0,"parent":0,"text":"","type":104}
+@nix {"action":"start","id":17596180364001289,"level":0,"parent":0,"text":"","type":103}
+@nix {"action":"result","fields":[0,0,0,0],"id":17596180364001288,"type":105}
+@nix {"action":"result","fields":[0,0,0,0],"id":17596180364001289,"type":105}
+@nix {"action":"result","fields":[101,0],"id":17596180364001287,"type":106}
+@nix {"action":"result","fields":[100,0],"id":17596180364001287,"type":106}
+@nix {"action":"result","fields":[0,1,0,0],"id":17596180364001288,"type":105}
+@nix {"action":"result","fields":[0,0,0,0],"id":17596180364001289,"type":105}
+@nix {"action":"result","fields":[101,0],"id":17596180364001287,"type":106}
+@nix {"action":"result","fields":[100,0],"id":17596180364001287,"type":106}
+@nix {"action":"start","fields":["/nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv","",1,1],"id":17596180364001290,"level":3,"parent":0,"text":"building '/nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv'","type":105}
+@nix {"action":"result","fields":[0,1,1,0],"id":17596180364001288,"type":105}
+@nix {"action":"result","fields":[0,0,0,0],"id":17596180364001289,"type":105}
+@nix {"action":"result","fields":[101,0],"id":17596180364001287,"type":106}
+@nix {"action":"result","fields":[100,0],"id":17596180364001287,"type":106}
+@nix {"action":"result","fields":["line one"],"id":17596180364001290,"type":101}
+@nix {"action":"result","fields":["line two"],"id":17596180364001290,"type":101}
+@nix {"action":"result","fields":["oops"],"id":17596180364001290,"type":101}
+@nix {"action":"result","fields":[0,1,0,1],"id":17596180364001288,"type":105}
+@nix {"action":"result","fields":[0,0,0,0],"id":17596180364001289,"type":105}
+@nix {"action":"result","fields":[101,0],"id":17596180364001287,"type":106}
+@nix {"action":"result","fields":[100,0],"id":17596180364001287,"type":106}
+@nix {"action":"stop","id":17596180364001290}
+@nix {"action":"stop","id":17596180364001289}
+@nix {"action":"stop","id":17596180364001288}
+@nix {"action":"stop","id":17596180364001287}
+@nix {"action":"msg","column":null,"file":null,"level":0,"line":null,"msg":"\u001b[31;1merror:\u001b[0m Cannot build '\u001b[35;1m/nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv\u001b[0m'.\n       Reason: \u001b[31;1mbuilder failed with exit code 3\u001b[0m.\n       Output paths:\n         \u001b[35;1m/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0\u001b[0m\n       Last 3 log lines:\n       > line one\n       > line two\n       > oops\n       For full logs, run:\n         \u001b[1mnix log /nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv\u001b[0m","raw_msg":"Cannot build '\u001b[35;1m/nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv\u001b[0m'.\nReason: \u001b[31;1mbuilder failed with exit code 3\u001b[0m.\nOutput paths:\n  \u001b[35;1m/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0\u001b[0m\nLast 3 log lines:\n> line one\n> line two\n> oops\nFor full logs, run:\n  \u001b[1mnix log /nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv\u001b[0m"}

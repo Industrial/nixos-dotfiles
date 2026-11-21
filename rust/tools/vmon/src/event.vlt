@@ -1,0 +1,218 @@
+-- One line of Nix's `--log-format internal-json` stream, decoded.
+--
+-- Nix writes `@nix {…}` lines: `start` / `stop` / `result` for activities
+-- and `msg` for log messages. They are the messages the daemon relays as
+-- STDERR_START_ACTIVITY, STDERR_STOP_ACTIVITY, STDERR_RESULT and STDERR_NEXT
+-- / STDERR_ERROR, so they decode into nix-store-core's `StderrMsg`. Two
+-- things the wire form lacks get their own events: a message's verbosity
+-- (`Note`) and a line that is not `@nix` at all (`Raw`: nix's stdout under
+-- `2>&1`, or the output of whatever else is in the pipe).
+--
+-- Everything here is a plain function over text.
+
+import serde_json::Value
+import nix_store_core::worker::{Activity, DaemonFailure, Field, StderrMsg}
+import nix_store_core::worker::Field::{Int, Text}
+import nix_store_core::worker::StderrMsg::{ActivityResult, Failed, LogNext, StartActivity, StopActivity}
+
+export data Event = Wire StderrMsg | Note u64 String | Raw String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The line, without its line ending. A `@nix` line that is not JSON, or is
+-- an action vmon does not know, is shown as it came.
+export parse_line : &str -> Event
+parse_line line =
+  trimmed = line.trim_end ()
+  case trimmed.strip_prefix "@nix " of
+    None -> Raw (trimmed.to_string ())
+    Some body -> decoded trimmed body
+
+decoded : &str -> &str -> Event
+decoded line body =
+  parsed = serde_json::from_str body : serde_json::Result<Value>
+  case parsed of
+    Ok v -> event_of (&v) |> .unwrap_or_else (\-> Raw (line.to_string ()))
+    Err _ -> Raw (line.to_string ())
+
+event_of : &Value -> Option<Event>
+event_of v =
+  action = (v.get "action" |> .and_then (\a -> a.as_str ()))?
+  case action of
+    "start" -> Some (Wire (StartActivity (Activity { id = num v "id", level = num v "level", kind = num v "type", text = text_of v "text", fields = fields_of v, parent = num v "parent" })))
+    "stop" -> Some (Wire (StopActivity (num v "id")))
+    "result" -> Some (Wire (ActivityResult (num v "id") (num v "type") (fields_of v)))
+    "msg" -> Some (message v)
+    _ -> None
+
+-- An error is the wire's STDERR_ERROR: level 0, and either Nix's structured
+-- form (it carries `raw_msg`) or text that says `error:`. Any other level-0
+-- message is a line the daemon relayed (STDERR_NEXT), which the client logs
+-- at level 0 whatever it says. The rest are log lines at their level.
+message : &Value -> Event
+message v =
+  level = num v "level"
+  msg = text_of v "msg"
+  if level == 0 && ((v.get "raw_msg" |> .is_some) || says_error (&msg))
+    Wire (Failed (DaemonFailure { message = msg, level, traces = Vec::new () }))
+  else if level == 0
+    Wire (LogNext msg)
+  else
+    Note level msg
+
+says_error : &str -> bool
+says_error msg = strip_ansi msg |> .trim_start |> .starts_with "error:"
+
+num : &Value -> &str -> u64
+num v key = v.get key |> .and_then (\x -> x.as_u64 ()) |> .unwrap_or 0
+
+text_of : &Value -> &str -> String
+text_of v key = v.get key |> .and_then (\x -> x.as_str ()) |> .unwrap_or "" |> .to_string
+
+fields_of : &Value -> Vec<Field>
+fields_of v =
+  mut out = Vec::new () : Vec<Field>
+  items = v.get "fields" |> .and_then (\f -> f.as_array ())
+  if items is Some list
+    for item in list
+      out.push (field_of item)
+  out
+
+field_of : &Value -> Field
+field_of item =
+  case item.as_u64 () of
+    Some n -> Int n
+    None -> Text (item.as_str () |> .map (\s -> s.to_string ()) |> .unwrap_or_else (\-> item.to_string ()))
+
+-- Field `i` of an activity as text ("" when absent or a number).
+export field_text : &[Field] -> usize -> String
+field_text fields i =
+  case fields.get i of
+    Some (Text s) -> s.clone ()
+    _ -> String::new ()
+
+-- Field `i` as a number (0 when absent or text).
+export field_num : &[Field] -> usize -> u64
+field_num fields i =
+  case fields.get i of
+    Some (Int n) -> *n
+    _ -> 0
+
+------------------------------------------------------------------------
+-- Text helpers
+
+-- The text without ANSI escapes: CSI sequences (`ESC [ … final`), OSC
+-- sequences (`ESC ] … BEL` or `ESC ] … ESC \`, Nix's hyperlinks) and
+-- two-byte escapes.
+export strip_ansi : &str -> String
+strip_ansi s =
+  mut out = String::with_capacity (s.len ())
+  -- 0 text, 1 after ESC, 2 in CSI, 3 in OSC, 4 ESC inside OSC
+  mut state = 0 : u8
+  for c in s.chars ()
+    code = u32::from c
+    if state == 0
+      if code == 27
+        state := 1
+      else
+        out.push c
+    else if state == 1
+      if c == '['
+        state := 2
+      else if c == ']'
+        state := 3
+      else
+        state := 0
+    else if state == 2
+      if code >= 64 && code <= 126
+        state := 0
+    else if state == 3
+      if code == 7
+        state := 0
+      else if code == 27
+        state := 4
+    else
+      state := 0
+  out
+
+-- A store path's name: `/nix/store/<hash>-hello-2.12.1.drv` is
+-- `hello-2.12.1`. Text that is not a store path is returned as it is.
+export store_name : &str -> String
+store_name path =
+  base = path.rsplit '/' |> .next |> .unwrap_or path
+  if path.starts_with "/nix/store/"
+    rest = after_hash base
+    rest.strip_suffix ".drv" |> .unwrap_or rest |> .to_string
+  else
+    path.to_string ()
+
+after_hash : &str -> &str
+after_hash base =
+  case base.split_once '-' of
+    Some (_, rest) -> rest
+    None -> base
+
+-- A name's package name, as Nix's `DrvName` splits it: the version starts at
+-- the first `-` not followed by a letter (`hello-2.12.1` is `hello`,
+-- `python3.12-requests-2.31.0` is `python3.12-requests`).
+export pname_of : &str -> String
+pname_of name =
+  chars = name.chars () |> .collect : Vec<char>
+  mut cut = chars.len ()
+  mut i = 0 : usize
+  while i + 1 < chars.len () && cut == chars.len ()
+    if chars[i] == '-' && !(chars[i + 1].is_alphabetic ())
+      cut := i
+    i := i + 1
+  chars[0 .. cut].iter () |> .collect
+
+-- The derivation paths a message names, in order, each once. Escapes are
+-- stripped first: Nix colours the paths in its errors.
+export drvs_in : &str -> Vec<String>
+drvs_in text =
+  plain = strip_ansi text
+  mut out = Vec::new () : Vec<String>
+  for piece in plain.split (\c -> !(store_char c))
+    if piece.starts_with "/nix/store/" && piece.ends_with ".drv" && !(out.iter () |> .any (\o -> o == piece))
+      out.push (piece.to_string ())
+  out
+
+store_char : char -> bool
+store_char c = c.is_ascii_alphanumeric () || "+-._?=/".contains c
+
+test "a start line decodes into the stderr message family"
+  ev = parse_line "@nix {\"action\":\"start\",\"fields\":[\"/nix/store/c7lg-vmon-fail-1.0.drv\",\"\",1,1],\"id\":7,\"level\":3,\"parent\":2,\"text\":\"building\",\"type\":105}"
+  want = Wire (StartActivity (Activity { id = 7, level = 3, kind = 105, text = .to_string "building", fields = .to_vec ([Text (.to_string "/nix/store/c7lg-vmon-fail-1.0.drv"), Text (String::new ()), Int 1, Int 1]), parent = 2 }))
+  assert_eq! \-> ev \-> want
+
+test "stop, result and msg lines decode"
+  assert_eq! \-> parse_line "@nix {\"action\":\"stop\",\"id\":9}" \-> Wire (StopActivity 9)
+  assert_eq! \-> parse_line "@nix {\"action\":\"result\",\"fields\":[\"line one\"],\"id\":9,\"type\":101}" \-> Wire (ActivityResult 9 101 (.to_vec ([Text (.to_string "line one")])))
+  assert_eq! \-> parse_line "@nix {\"action\":\"msg\",\"level\":3,\"msg\":\"these 2 derivations will be built:\"}" \-> Note 3 (.to_string "these 2 derivations will be built:")
+  assert! \-> parse_line "@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"error: boom\"}" |> .eq (&Wire (Failed (DaemonFailure { message = .to_string "error: boom", level = 0, traces = Vec::new () })))
+  assert_eq! \-> parse_line "@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"linking x\"}" \-> Wire (LogNext (.to_string "linking x"))
+
+test "other lines are raw, line endings dropped"
+  assert_eq! \-> parse_line "/nix/store/abc-hello\r\n" \-> Raw (.to_string "/nix/store/abc-hello")
+  assert_eq! \-> parse_line "@nix {not json" \-> Raw (.to_string "@nix {not json")
+  assert_eq! \-> parse_line "@nix {\"action\":\"setFoo\"}" \-> Raw (.to_string "@nix {\"action\":\"setFoo\"}")
+
+test "escapes are stripped, hyperlinks included"
+  esc = String::from (char::from (27 : u8))
+  coloured = "#{esc}[31;1merror:#{esc}[0m Cannot build '#{esc}[35;1m/nix/store/c7lg-x-1.0.drv#{esc}[0m'"
+  assert_eq! \-> strip_ansi (&coloured) \-> "error: Cannot build '/nix/store/c7lg-x-1.0.drv'"
+  linked = "#{esc}]8;;https://x#{esc}\\text#{esc}]8;;#{esc}\\"
+  assert_eq! \-> strip_ansi (&linked) \-> "text"
+
+test "store names and package names"
+  assert_eq! \-> store_name "/nix/store/c7lgn7jd14kdy0mz4yrxhzj6458cck0z-vmon-fail-1.0.drv" \-> "vmon-fail-1.0"
+  assert_eq! \-> store_name "/nix/store/7i7jd4vw9lah3cfgrcyl9knj2ylmpjvl-vmon-fail-1.0" \-> "vmon-fail-1.0"
+  assert_eq! \-> store_name "plain text" \-> "plain text"
+  assert_eq! \-> pname_of "hello-2.12.1" \-> "hello"
+  assert_eq! \-> pname_of "python3.12-requests-2.31.0" \-> "python3.12-requests"
+  assert_eq! \-> pname_of "unit-dbus-broker.service" \-> "unit-dbus-broker.service"
+  assert_eq! \-> pname_of "vdiff-0.1.0_fish-completions" \-> "vdiff"
+
+test "the derivations an error names"
+  esc = String::from (char::from (27 : u8))
+  msg = "#{esc}[31;1merror:#{esc}[0m Cannot build '#{esc}[35;1m/nix/store/c7lg-a-1.0.drv#{esc}[0m'.\n  Output paths: /nix/store/7i7j-a-1.0\n  nix log /nix/store/c7lg-a-1.0.drv"
+  assert_eq! \-> drvs_in (&msg) \-> .to_vec ([.to_string "/nix/store/c7lg-a-1.0.drv"])

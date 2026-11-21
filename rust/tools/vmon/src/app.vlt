@@ -1,0 +1,414 @@
+-- vmon's command line.
+--
+--   nix build … --log-format internal-json -v 2>&1 | vmon [--plain] [--metrics FILE]
+--   vmon [--plain] [--metrics FILE] -- nix build …
+--
+-- The first form reads the stream on stdin, as `nom --json` does (`--json`
+-- is accepted and ignored, so `vmon --json` drops in for it). The second
+-- runs the command with its stderr piped to vmon, adding
+-- `--log-format internal-json -v` to a nix, nix-build, nix-shell,
+-- nix-store or nixos-rebuild command that has no `--log-format`; the
+-- command's stdout is left alone.
+--
+-- Output goes to stderr: the live tree when stderr is a terminal (and not
+-- `--plain`), plain lines otherwise, then the summary. `--metrics FILE` (or
+-- VMON_METRICS_FILE) writes the build durations there as a Prometheus
+-- textfile, replaced atomically.
+--
+-- Exit: 0; 1 when a build failed or Nix reported an error (piped), or when
+-- the command failed (wrapped); 101 on a defect; 130 on Ctrl-C. The I/O is
+-- id_effect: the input is a Stream of lines, the state a Ref, the live
+-- redraw an `Effect::repeat` on a spaced Schedule raced against the input.
+
+import std::io::{IsTerminal, Write}
+import std::process::{ExitStatus, Stdio}
+import std::time::{Duration, Instant, SystemTime, UNIX_EPOCH}
+import tokio::io::{AsyncBufReadExt, AsyncRead, BufReader}
+import tokio::process::{Child, Command}
+import id_effect::{Effect, HNil, Ref, Schedule, Stream, effect, fail, from_async, succeed, suspend}
+import crate::event::parse_line
+import crate::monitor::Monitor
+import crate::render::{Closing, closing, framed, stepped}
+
+const USAGE : &str = "usage: nix build … --log-format internal-json -v 2>&1 | vmon [--plain] [--metrics FILE]\n       vmon [--plain] [--metrics FILE] -- <command> [args…]"
+
+-- How often the live tree is redrawn.
+const TICK_MS : u64 = 150
+
+export errors VmonError
+  Usage String     "#{0}"
+  Read String      "reading the log: #{0}"
+  Spawn String     "#{0}"
+  Command String   "#{0}"
+  Failed String    "#{0}"
+  Output String    "writing: #{0}"
+
+export data Options { export plain bool, export metrics Option<String>, export command Vec<String>, export help bool, export unknown Vec<String> }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+export parse_args : &[String] -> Options
+parse_args args =
+  mut o = Options::default ()
+  mut it = (args.iter ()).skip 1
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--" ->
+          o.command := it.by_ref () |> .cloned |> .collect
+          more := false
+        "--plain" ->
+          o.plain := true
+        "--json" ->
+          ()
+        "--metrics" ->
+          o.metrics := it.next () |> .cloned
+        "-h" ->
+          o.help := true
+        "--help" ->
+          o.help := true
+        s ->
+          o.unknown.push (s.to_string ())
+  o
+
+-- `--log-format internal-json -v` added where the command takes them: after
+-- `nix <subcommand>`, after the other Nix commands' names. A command that
+-- already chose a log format, or is not Nix's, is left as it is.
+export with_log_flags : Vec<String> -> Vec<String>
+with_log_flags command =
+  if command.iter () |> .any (\a -> a == "--log-format")
+    command
+  else
+    at = flags_at (&command)
+    case at of
+      None -> command
+      Some i -> inserted command i
+
+flags_at : &[String] -> Option<usize>
+flags_at command =
+  prog = command.first () |> .map (\p -> p.rsplit '/' |> .next |> .unwrap_or "" |> .to_string) |> .unwrap_or_default
+  if prog == "nix"
+    case command.get 1 of
+      Some sub ->
+        if sub.starts_with '-'
+          None
+        else
+          Some 2
+      None -> None
+  else if prog == "nix-build" || prog == "nix-shell" || prog == "nix-store" || prog == "nixos-rebuild"
+    Some 1
+  else
+    None
+
+inserted : Vec<String> -> usize -> Vec<String>
+inserted command at =
+  mut out = command.iter () |> .take at |> .cloned |> .collect : Vec<String>
+  out.push (.to_string "--log-format")
+  out.push (.to_string "internal-json")
+  out.push (.to_string "-v")
+  out.extend (command.into_iter () |> .skip at)
+  out
+
+------------------------------------------------------------------------
+-- The input
+
+export type Input = Box<dyn AsyncRead + Send + Unpin>
+export type Lines = BufReader<Input>
+
+-- The next line, or None at the end. Bytes that are not UTF-8 (a build log
+-- may hold anything) are replaced, not an error.
+read_line_io : async Lines -> Result<Option<(String, Lines)>, std::io::Error>
+read_line_io reader =
+  mut r = reader
+  mut buf = Vec::new () : Vec<u8>
+  n <- r.read_until (10 : u8) (&mut buf)
+  count = n?
+  if count == 0
+    Ok None
+  else
+    Ok (Some ((String::from_utf8_lossy (&buf) |> .into_owned, r)))
+
+next_line : Lines -> Effect<Option<(String, Lines)>, VmonError, HNil>
+next_line r = from_async (move \-> read_line_io r) |> .map_err (\e -> Read (e.to_string ()))
+
+-- The input as a stream of lines, pulled one at a time.
+lines_of : Input -> Stream<String, VmonError, HNil>
+lines_of input = Stream::unfold_effect (BufReader::new input) next_line
+
+-- Stdin, or the command's stderr. The command runs in its own right: its
+-- stdin and stdout are the terminal's.
+opened : Vec<String> -> Result<(Option<Child>, Input), VmonError>
+opened command =
+  if command.is_empty ()
+    Ok ((None, stdin_input ()))
+  else
+    spawned (with_log_flags command)
+
+stdin_input : Input
+stdin_input = Box::new (tokio::io::stdin ())
+
+spawned : Vec<String> -> Result<(Option<Child>, Input), VmonError>
+spawned command =
+  mut c = Command::new (&command[0])
+  c.args (command.iter () |> .skip 1)
+  c.stderr (Stdio::piped ())
+  c.kill_on_drop true
+  mut child = (c.spawn () |> .map_err (\e -> Spawn ("#{command[0]}: #{e}")))?
+  case child.stderr.take () of
+    Some err -> Ok ((Some child, boxed err))
+    None -> Err (Spawn (.to_string "the command's stderr was not piped"))
+
+boxed : tokio::process::ChildStderr -> Input
+boxed err = Box::new err
+
+open_input : Vec<String> -> Effect<(Option<Child>, Input), VmonError, HNil>
+open_input command = suspend (move \-> lifted (opened command))
+
+waited_io : async Option<Child> -> Result<Option<ExitStatus>, VmonError>
+waited_io child =
+  case child of
+    None -> Ok None
+    Some c ->
+      r <- waited_child c
+      r
+
+waited_child : async Child -> Result<Option<ExitStatus>, VmonError>
+waited_child child =
+  mut c = child
+  s <- c.wait ()
+  status = (s |> .map_err (\e -> Command (e.to_string ())))?
+  Ok (Some status)
+
+wait_for : Option<Child> -> Effect<Option<ExitStatus>, VmonError, HNil>
+wait_for child = from_async (move \-> waited_io child)
+
+------------------------------------------------------------------------
+-- The output
+
+-- A reader that went away (`vmon | head`) is not an error.
+write_text : String -> Result<(), VmonError>
+write_text text =
+  if text.is_empty ()
+    Ok ()
+  else
+    mut err = std::io::stderr ().lock ()
+    written = err.write_all (text.as_bytes ()) |> .and_then (\_ -> err.flush ())
+    case written of
+      Ok _ -> Ok ()
+      Err e -> output_error e
+
+output_error : std::io::Error -> Result<(), VmonError>
+output_error e =
+  if e.kind () == std::io::ErrorKind::BrokenPipe
+    Ok ()
+  else
+    Err (Output (e.to_string ()))
+
+say : String -> Effect<(), VmonError, HNil>
+say text = suspend (move \-> lifted (write_text text))
+
+-- The textfile, replaced in one rename so a collector never reads half.
+write_metrics : String -> String -> Result<(), VmonError>
+write_metrics path text =
+  tmp = "#{path}.tmp"
+  (std::fs::write (&tmp) text |> .map_err (\e -> Output ("#{tmp}: #{e}")))?
+  std::fs::rename (&tmp) (&path) |> .map_err (\e -> Output ("#{path}: #{e}"))
+
+-- A metrics file that cannot be written is reported, not fatal: the build
+-- already happened.
+save_metrics : Option<String> -> String -> Effect<(), VmonError, HNil>
+save_metrics path text =
+  case path of
+    None -> succeed (())
+    Some p -> suspend (move \-> lifted (warned (write_metrics p text)))
+
+warned : Result<(), VmonError> -> Result<(), VmonError>
+warned r =
+  if r is Err e
+    write_text ("vmon: metrics: #{e}\n")
+  else
+    Ok ()
+
+------------------------------------------------------------------------
+-- The run
+
+elapsed_ms : Instant -> u64
+elapsed_ms start = u64::try_from (start.elapsed ().as_millis ()) |> .unwrap_or u64::MAX
+
+unix_now : u64
+unix_now = SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+width_now : usize
+width_now =
+  case terminal_size::terminal_size_of (std::io::stderr ()) of
+    Some (w, _) -> usize::from w.0
+    None -> 80
+
+-- One line into the monitor; in plain mode its lines are printed now.
+take_line : Ref<Monitor> -> Instant -> bool -> String -> Effect<(), VmonError, HNil>
+take_line state start live line =
+  ev = parse_line (&line)
+  now = elapsed_ms start
+  state.modify (move \m -> stepped m now ev live) |> .flat_map say
+
+feed : Ref<Monitor> -> Instant -> bool -> Input -> Effect<(), VmonError, HNil>
+feed state start live input =
+  lines_of input |> .run_for_each_effect (move \line -> take_line (state.clone ()) start live line)
+
+redraw : Ref<Monitor> -> Instant -> Effect<(), VmonError, HNil>
+redraw state start =
+  now = elapsed_ms start
+  width = width_now ()
+  state.modify (move \m -> framed m now width) |> .flat_map say
+
+-- The live tree, redrawn every tick until it is interrupted.
+ticker : Ref<Monitor> -> Instant -> Effect<(), VmonError, HNil>
+ticker state start =
+  Effect::repeat (move \-> redraw (state.clone ()) start) (Schedule::spaced (Duration::from_millis TICK_MS)) |> .map (\_ -> ())
+
+finish : Ref<Monitor> -> Instant -> bool -> Option<String> -> Effect<Closing, VmonError, HNil>
+finish state start live metrics =
+  now = elapsed_ms start
+  unix = unix_now ()
+  state.modify (move \m -> closing m now live unix) |> .flat_map (move \c -> reported c metrics)
+
+reported : Closing -> Option<String> -> Effect<Closing, VmonError, HNil>
+reported c metrics =
+  text = c.text.clone ()
+  body = c.metrics.clone ()
+  say text |> .flat_map (move \_ -> save_metrics metrics body) |> .map (move \_ -> c)
+
+-- The stream to its end (with the tree redrawn alongside, live), then the
+-- summary.
+export monitor : Input -> bool -> Option<String> -> Effect<Closing, VmonError, HNil>
+monitor input live metrics =
+  effect!
+    let state = Ref::new(Monitor::default());
+    let start = Instant::now();
+    let reader = feed(state.clone(), start, live, input);
+    let body = if live { reader.race_first(ticker(state.clone(), start)) } else { reader };
+    ~body;
+    ~finish(state, start, live, metrics)
+
+-- The exit: the command's status when there is one, else what the log said.
+export verdict : Option<ExitStatus> -> Closing -> Result<(), VmonError>
+verdict status c =
+  case status of
+    Some s ->
+      if s.success ()
+        Ok ()
+      else
+        Err (Command ("vmon: the command failed (#{s})"))
+    None -> logged c
+
+logged : Closing -> Result<(), VmonError>
+logged c =
+  if c.failed > 0
+    Err (Failed ("vmon: #{c.failed} build(s) failed"))
+  else if c.faults > 0
+    Err (Failed ("vmon: Nix reported #{c.faults} error(s)"))
+  else
+    Ok ()
+
+live_for : bool -> bool
+live_for plain =
+  term = std::env::var "TERM" |> .unwrap_or_default
+  !plain && std::io::stderr ().is_terminal () && term != "dumb"
+
+metrics_for : Option<String> -> Option<String>
+metrics_for flag =
+  case flag of
+    Some p -> Some p
+    None -> std::env::var "VMON_METRICS_FILE" |> .ok |> .filter (\p -> !(p.is_empty ()))
+
+usage_of : &Options -> Result<(), VmonError>
+usage_of o =
+  if o.unknown.is_empty ()
+    Ok ()
+  else
+    Err (Usage ("unknown arguments: #{o.unknown.join " "}\n#{USAGE}"))
+
+export program : Options -> Effect<(), VmonError, HNil>
+program o =
+  effect!
+    ~lifted(usage_of(&o));
+    let live = live_for(o.plain);
+    let metrics = metrics_for(o.metrics.clone());
+    let (child, input) = ~open_input(o.command.clone());
+    let c = ~monitor(input, live, metrics);
+    let status = ~wait_for(child);
+    ~lifted(verdict(status, c))
+
+export lifted : given <A: Send + 'static, E: Send + 'static> Result<A, E> -> Effect<A, E, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber
+-- outside the tokio context that stdin and the child process need (see
+-- vcache's `supervised`). An interrupt of the root (Ctrl-C) interrupts and
+-- awaits the child.
+supervised : Options -> Effect<(), VmonError, HNil>
+supervised o =
+  effect!
+    let child = ~program(o).fork();
+    ~child.join::<HNil>()
+
+-- A failure as run_main prints it (`error: <this>`): the message, not Debug.
+export data Failure { message Box<str> }
+
+instance std::fmt::Debug Failure
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&self.message)
+
+failure_of : VmonError -> Failure
+failure_of e = Failure { message = e.to_string () |> .into_boxed_str }
+
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .collect : Vec<String>
+  o = parse_args (&args)
+  if o.help
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised o |> .map_err failure_of) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+argv : Vec<&str> -> Vec<String>
+argv words = words.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "the piped form's flags parse; --json is nom's and accepted"
+  o = parse_args (&argv (.to_vec (["vmon", "--json", "--plain", "--metrics", "/tmp/m.prom"])))
+  assert! \-> o.plain && o.unknown.is_empty () && o.command.is_empty ()
+  assert_eq! \-> o.metrics \-> Some (.to_string "/tmp/m.prom")
+
+test "everything after -- is the command"
+  o = parse_args (&argv (.to_vec (["vmon", "--", "nix", "build", "--plain", ".#x"])))
+  assert_eq! \-> o.command \-> argv (.to_vec (["nix", "build", "--plain", ".#x"]))
+  assert! \-> !o.plain
+
+test "unknown flags are usage errors"
+  o = parse_args (&argv (.to_vec (["vmon", "--bogus"])))
+  assert! \-> usage_of (&o) |> .is_err
+  exit = id_effect::testing::run_test (program o)
+  e = id_effect::testing::expect_exit_failure exit
+  assert! \-> e.to_string ().starts_with "unknown arguments: --bogus"
+
+test "nix commands get the internal-json flags, once"
+  assert_eq! \-> with_log_flags (argv (.to_vec (["nix", "build", ".#x"]))) \-> argv (.to_vec (["nix", "build", "--log-format", "internal-json", "-v", ".#x"]))
+  assert_eq! \-> with_log_flags (argv (.to_vec (["nix", "build"]))) \-> argv (.to_vec (["nix", "build", "--log-format", "internal-json", "-v"]))
+  assert_eq! \-> with_log_flags (argv (.to_vec (["/run/current-system/sw/bin/nixos-rebuild", "build"]))) \-> argv (.to_vec (["/run/current-system/sw/bin/nixos-rebuild", "--log-format", "internal-json", "-v", "build"]))
+  assert_eq! \-> with_log_flags (argv (.to_vec (["nix", "build", "--log-format", "bar"]))) \-> argv (.to_vec (["nix", "build", "--log-format", "bar"]))
+  assert_eq! \-> with_log_flags (argv (.to_vec (["make", "all"]))) \-> argv (.to_vec (["make", "all"]))
+
+test "the verdict: a failed command, failed builds, errors, or success"
+  ok = Closing::default ()
+  assert! \-> verdict None (ok.clone ()) |> .is_ok
+  assert! \-> verdict None (Closing { failed = 1, ...Closing::default () }) |> .is_err
+  assert! \-> verdict None (Closing { faults = 1, ...Closing::default () }) |> .is_err
+  assert! \-> verdict (Some (std::os::unix::process::ExitStatusExt::from_raw 256)) (ok.clone ()) |> .is_err
+  assert! \-> verdict (Some (std::os::unix::process::ExitStatusExt::from_raw 0)) (Closing { faults = 1, ...Closing::default () }) |> .is_ok
