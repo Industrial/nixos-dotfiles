@@ -29,6 +29,13 @@
     features.nixos.sound.enable = true;
     features.nixos.users.enable = true;
 
+    # Store maintenance is the Voltaic tools' (rust/tools/vgc, rust/tools/vopt), in place of
+    # nix-collect-garbage and auto-optimise-store. Rollback, per host or here:
+    #   features.nixos.vgc.enable = lib.mkForce false;   # stock nix.gc back
+    #   features.nixos.vopt.enable = lib.mkForce false;  # inline auto-optimise-store back
+    features.nixos.vgc.enable = true;
+    features.nixos.vopt.enable = true;
+
     # Substitute from the fleet's vcache servers (common/fleet.nix binaryCaches) first.
     # Rollback: features.nix.vcache.client.enable = lib.mkForce false;
     features.nix.vcache.client.enable = true;

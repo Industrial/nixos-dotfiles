@@ -14,6 +14,10 @@ in
 
     enablesCoreNixos = assay.eq (has "nixos") true;
     enablesUsers = assay.eq (has "nixos.users") true;
+    # Store maintenance on every host is the Voltaic tools', not nix-collect-garbage /
+    # auto-optimise-store.
+    collectsWithVgc = assay.eq (has "nixos.vgc") true;
+    optimisesWithVopt = assay.eq (has "nixos.vopt") true;
 
     # The STIG option surface must be on every host (flake.nix builds stigReport for all
     # four), but the base-safe control set is mimir's alone — ADR-0004.
