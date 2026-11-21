@@ -222,7 +222,18 @@ in {
     claude-agent-acp
   ];
 
-  system.activationScripts.zedSettingsSeed = {
+  imports = [../../../lib/vfiles.nix];
+
+  # Seeded once: Zed's settings UI owns the file afterwards, so a later switch never
+  # reverts what was changed there.
+  vfiles.files."${configDir}/settings.json" = {
+    source = settingsFile;
+    mode = "seed";
+    user = settings.username;
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.zedSettingsSeed = {
     text = ''
       install -d -o ${settings.username} -g users -m 0755 ${configDir}
 

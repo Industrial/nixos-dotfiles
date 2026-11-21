@@ -125,4 +125,10 @@ in
     seedsSettingsPath = assay.eq (activationHas "${configDir}/settings.json") true;
     seedsOnlyWhenAbsent = assay.eq (activationHas "if [ ! -e ${configDir}/settings.json ]") true;
     doesNotSymlinkSettings = assay.eq (activationHas "ln -s") false;
+
+    # vfiles (GH-188): settings.json is seeded, never re-copied over the UI's edits.
+    vfilesSeedsTheSettings = let
+      f = cfg.vfiles.files."${configDir}/settings.json";
+    in
+      assay.eq [f.mode f.user (lib.hasSuffix "-zed-settings.json" "${f.source}")] ["seed" nixos.defaultSettings.username true];
   }
