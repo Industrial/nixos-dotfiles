@@ -1,0 +1,229 @@
+-- Running probes: the library API vdeploy (#160) consumes; see README.md.
+--
+--   check  : Vec<Probe> -> Effect<Report, Never, HNil>
+--   settle : Vec<Probe> -> Duration -> Duration -> Effect<Report, Never, HNil>
+--
+-- Every probe is a fiber: `check` runs them all at once (`for_each_par`,
+-- unbounded), each under its own `timeout` (an id_effect race against a
+-- sleep on the executor clock). The sockets and child processes are tokio's,
+-- as futures (`from_async`), so the losing side of the race is dropped: a
+-- connect in flight is abandoned and a command is killed (`kill_on_drop`).
+-- A probe never fails the effect; it is down, with the reason.
+--
+-- The effects need a tokio reactor: run them on a fiber of a tokio-backed
+-- executor (`Runtime::new ()` / `run_main`, then fork and join), not on the
+-- thread that calls `block_on`. `File` probes are plain reads and run on any
+-- executor, including a TestExecutor.
+
+import std::time::{Duration, Instant, SystemTime, UNIX_EPOCH}
+import tokio::io::{AsyncReadExt, AsyncWriteExt}
+import id_effect::{Concurrency, Effect, HNil, Never, Schedule, fail, for_each_par, from_async, succeed, suspend}
+import crate::probe::{HttpCheck, Kind, Outcome, Probe, Report, address, healthy, judge_age, judge_exit, judge_http, outcome_of, request}
+
+-- The most of an HTTP response that is read: a status line and the start of
+-- a body are what is judged.
+export const MAX_RESPONSE : u64 = 1048576
+
+export now_secs : u64
+now_secs =
+  SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+lifted : given <A: Send + 'static> Result<A, String> -> Effect<A, String, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+tcp_io : async String -> Result<String, String>
+tcp_io addr =
+  s <- tokio::net::TcpStream::connect (&addr)
+  _stream = (s |> .map_err (\e -> "#{addr}: #{e}"))?
+  Ok "connected to #{addr}"
+
+http_io : async HttpCheck -> Result<String, String>
+http_io h =
+  addr = address (&h.host) h.port
+  s <- tokio::net::TcpStream::connect (&addr)
+  mut stream = (s |> .map_err (\e -> "#{addr}: #{e}"))?
+  req = request (&h)
+  w <- stream.write_all (req.as_bytes ())
+  (w |> .map_err (\e -> "#{addr}: #{e}"))?
+  mut raw = Vec::new () : Vec<u8>
+  mut limited = stream.take MAX_RESPONSE
+  r <- limited.read_to_end (&mut raw)
+  (r |> .map_err (\e -> "#{addr}: #{e}"))?
+  judge_http (&h) (&raw)
+
+unix_io : async String -> Result<String, String>
+unix_io path =
+  s <- tokio::net::UnixStream::connect (&path)
+  _stream = (s |> .map_err (\e -> "#{path}: #{e}"))?
+  Ok "connected to #{path}"
+
+command_io : async Vec<String> -> Result<String, String>
+command_io argv =
+  program = (argv.first () |> .cloned |> .ok_or (.to_string "an empty command"))?
+  mut cmd = tokio::process::Command::new (&program)
+  cmd.args (argv.iter () |> .skip 1)
+  cmd.stdin (std::process::Stdio::null ())
+  cmd.stdout (std::process::Stdio::null ())
+  cmd.kill_on_drop true
+  o <- cmd.output ()
+  out = (o |> .map_err (\e -> "#{program}: #{e}"))?
+  judge_exit (out.status.code ()) (&out.stderr)
+
+-- Seconds since `path` was modified (0 if its mtime is in the future).
+file_age : &str -> Result<u64, String>
+file_age path =
+  meta = (std::fs::metadata path |> .map_err (\e -> "#{path}: #{e}"))?
+  modified = (meta.modified () |> .map_err (\e -> "#{path}: #{e}"))?
+  Ok (SystemTime::now () |> .duration_since modified |> .map (\d -> d.as_secs ()) |> .unwrap_or 0)
+
+-- One attempt: the detail when the probe passes, the reason when not.
+attempt : Kind -> Effect<String, String, HNil>
+attempt kind =
+  case kind of
+    Kind::Tcp host port -> from_async (move \-> tcp_io (address (&host) port))
+    Kind::Http h -> from_async (move \-> http_io h)
+    Kind::Unix path -> from_async (move \-> unix_io path)
+    Kind::Command argv -> from_async (move \-> command_io argv)
+    Kind::File path max_age -> suspend (move \-> lifted (file_age (&path) |> .and_then (\age -> judge_age max_age age)))
+
+settled : Option<String> -> u64 -> Result<String, String>
+settled r limit_ms =
+  case r of
+    Some detail -> Ok detail
+    None -> Err "timed out after #{limit_ms}ms"
+
+elapsed_ms : Instant -> u64
+elapsed_ms started = u64::try_from (started.elapsed ().as_millis ()) |> .unwrap_or (u64::MAX)
+
+timed : Probe -> Instant -> Effect<Outcome, Never, HNil>
+timed p started =
+  limit = p.timeout_ms
+  kind = p.kind.clone ()
+  attempt kind |> .timeout (Duration::from_millis limit) |> .map (move \o -> settled o limit) |> .catch (\why -> succeed (Err why)) |> .map (move \r -> outcome_of (&p) r (elapsed_ms started))
+
+-- One probe, under its timeout. Never fails: a probe that does not pass is
+-- an outcome that is down.
+export run : Probe -> Effect<Outcome, Never, HNil>
+run p = suspend (move \-> timed p (Instant::now ()))
+
+-- Every probe at once; the report lists them in the order given.
+export check : Vec<Probe> -> Effect<Report, Never, HNil>
+check probes =
+  for_each_par probes run (Concurrency::Unbounded) |> .map (\outcomes -> Report { finished = now_secs (), outcomes })
+
+-- A check that fails, with its report, when the host is unhealthy.
+verdict : Vec<Probe> -> Effect<Report, Report, HNil>
+verdict probes =
+  check probes |> .widen |> .flat_map judged
+
+judged : Report -> Effect<Report, Report, HNil>
+judged r =
+  if healthy (&r)
+    succeed r
+  else
+    fail r
+
+-- Check, and while a critical probe is down check again every `every`, until
+-- `within` has passed since the first unhealthy check: the first healthy
+-- report, or the last unhealthy one. This is the wait after a switch, when
+-- restarted services are still coming up; the decision (roll back or not)
+-- is the caller's, on `healthy`.
+export settle : Vec<Probe> -> Duration -> Duration -> Effect<Report, Never, HNil>
+settle probes within every =
+  make = move \-> verdict (probes.clone ())
+  Effect::retry_or_else make (Schedule::spaced every |> .up_to within) (\last _ -> succeed last)
+
+#[cfg(test)]
+probe : &str -> Kind -> u64 -> Probe
+probe name kind timeout_ms = Probe { name = name.to_string (), kind, timeout_ms, critical = true }
+
+#[cfg(test)]
+argv : &[&str] -> Kind
+argv words = Kind::Command (words.iter () |> .map (\w -> w.to_string ()) |> .collect)
+
+-- On a fiber of a tokio-backed runtime, so sockets and processes have a reactor.
+#[cfg(test)]
+live : given <A: Send + 'static> Effect<A, Never, HNil> -> A
+live eff =
+  rt = id_effect::Runtime::new () |> .expect "a runtime"
+  handle = rt.fork eff
+  case rt.block_on (handle.join ()) |> .into_result of
+    Ok a -> a
+    Err cause -> panic! \-> "effect failed: #{cause:?}"
+
+#[cfg(test)]
+one : Probe -> Outcome
+one p = live (run p)
+
+test "a TCP probe is up while something listens, and down once it stops"
+  listener = std::net::TcpListener::bind "127.0.0.1:0" |> .expect "a listener"
+  port = listener.local_addr () |> .expect "an address" |> .port
+  up = one (probe "t" (Kind::Tcp (.to_string "127.0.0.1") port) 2000)
+  assert! \-> up.up
+  assert_eq! \-> (up.kind.as_str (), up.detail.clone ()) \-> ("tcp", "connected to 127.0.0.1:#{port}")
+  drop listener
+  -- Not the freed port: a connect to a free ephemeral port can pick it as its own source
+  -- port and self-connect (TCP simultaneous open), which reads as up. Port 1 is below the
+  -- ephemeral range and nothing listens on it.
+  down = one (probe "t" (Kind::Tcp (.to_string "127.0.0.1") 1) 2000)
+  assert! \-> !(down.up)
+  assert! \-> down.detail.starts_with "127.0.0.1:1: "
+
+test "a unix socket probe connects, or reports the path"
+  dir = std::env::temp_dir () |> .join (format! \-> "vhealth-unix-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  path = dir.join "s" |> .to_string_lossy |> .into_owned
+  listener = std::os::unix::net::UnixListener::bind (&path) |> .expect "a socket"
+  assert! \-> (one (probe "u" (Kind::Unix (path.clone ())) 2000)).up
+  drop listener
+  std::fs::remove_file (&path) |> .expect "cleanup"
+  down = one (probe "u" (Kind::Unix (path.clone ())) 2000)
+  assert! \-> !(down.up) && down.detail.starts_with (path.as_str ())
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "a command probe passes on exit 0"
+  assert! \-> (one (probe "c" (argv (&["true"])) 5000)).up
+  no = one (probe "c" (argv (&["false"])) 5000)
+  assert! \-> !(no.up) && no.detail.starts_with "exit 1"
+  missing = one (probe "c" (argv (&["/nonexistent/vhealth-cmd"])) 5000)
+  assert! \-> !(missing.up) && missing.detail.starts_with "/nonexistent/vhealth-cmd: "
+
+test "a probe that outlives its timeout is down, and is not waited for"
+  slow = one (probe "slow" (argv (&["sleep", "30"])) 200)
+  assert! \-> !(slow.up)
+  assert_eq! \-> slow.detail \-> "timed out after 200ms"
+  assert! \-> slow.millis < 5000
+
+test "probes run concurrently"
+  started = Instant::now ()
+  probes = .to_vec ([probe "a" (argv (&["sleep", "1"])) 5000, probe "b" (argv (&["sleep", "1"])) 5000, probe "c" (argv (&["sleep", "1"])) 5000])
+  r = live (check probes)
+  assert! \-> r.outcomes.iter () |> .all (\o -> o.up)
+  assert! \-> started.elapsed () < Duration::from_millis 2500
+  order = r.outcomes.iter () |> .map (\o -> o.name.clone ()) |> .collect : Vec<String>
+  assert_eq! \-> order \-> .to_vec ([.to_string "a", .to_string "b", .to_string "c"])
+
+test "a file probe judges the file's age"
+  dir = std::env::temp_dir () |> .join (format! \-> "vhealth-file-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "a temp dir"
+  path = dir.join "f.prom" |> .to_string_lossy |> .into_owned
+  std::fs::write (&path) "x 1\n" |> .expect "a file"
+  r = id_effect::testing::run_test (check (.to_vec ([probe "fresh" (Kind::File (path.clone ()) 3600) 1000, probe "gone" (Kind::File (.to_string "/nonexistent/vhealth.prom") 3600) 1000]))) |> .into_result |> .expect "a report"
+  assert! \-> r.outcomes[0].up
+  assert! \-> !(r.outcomes[1].up)
+  assert_eq! \-> crate::probe::failing (&r) \-> .to_vec ([.to_string "gone"])
+  std::fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "settling returns the first healthy report at once"
+  probes = .to_vec ([probe "root" (Kind::File (.to_string "/") 4000000000) 1000])
+  r = id_effect::testing::run_test (settle probes (Duration::from_secs 60) (Duration::from_secs 5)) |> .into_result |> .expect "a report"
+  assert! \-> healthy (&r)
+
+test "settling gives up after the window with the last unhealthy report"
+  probes = .to_vec ([probe "gone" (Kind::File (.to_string "/nonexistent/vhealth.prom") 60) 1000])
+  r = id_effect::testing::run_test (settle probes (Duration::from_secs 60) (Duration::from_secs 5)) |> .into_result |> .expect "a report"
+  assert! \-> !(healthy (&r))
+  assert_eq! \-> crate::probe::failing (&r) \-> .to_vec ([.to_string "gone"])

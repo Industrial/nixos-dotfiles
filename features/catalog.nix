@@ -158,6 +158,7 @@
   ./nix/vverify
   ./nix/vpush
   ./nix/vdeploy
+  ./nix/vhealth
 
   # nixos
   ./nixos

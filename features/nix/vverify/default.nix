@@ -15,13 +15,14 @@
 # the database (opened read-only, as vcache does), never the daemon socket. Its only
 # writable path is the textfile directory, through the `prometheus-textfile` group.
 #
-# node_exporter: the fleet's exporter (features/monitoring/prometheus-exporter) has no
-# textfile collector directory configured, so this feature adds one: the directory below,
-# created by tmpfiles (root:prometheus-textfile, setgid, 2775), and
-# `--collector.textfile.directory` on the exporter. The textfile collector itself is one of
-# node_exporter's defaults; it only needs the directory. Kept here rather than in the
-# exporter feature so a host without vverify sees no change at all; another writer joins
-# the group.
+# node_exporter: the textfile collector directory (created by tmpfiles, setgid to the
+# prometheus-textfile group, and passed to the exporter) is
+# features/monitoring/textfile-collector.nix, imported here and by features/nix/vhealth,
+# so a host without either sees no change at all.
+#
+# vhealth: the metrics file's freshness is a probe (`vverify-metrics`), not critical: a
+# first pass after a fresh install takes long, and a stale file is not something a
+# rollback fixes.
 #
 # Output: `vverify.prom` (vverify_paths_total, vverify_paths_corrupt, vverify_paths_missing,
 # vverify_paths_unreadable, vverify_last_run_timestamp_seconds, vverify_duration_seconds)
@@ -34,7 +35,6 @@
 #     && { grep -q '^vverify_paths_total ' /var/lib/prometheus-node-exporter-text/vverify.prom \
 #          || echo "first pass in progress"; }
 {
-  config,
   lib,
   pkgs,
   ...
@@ -42,16 +42,23 @@
   vverify = pkgs.callPackage ../../../rust/tools/vverify/default.nix {};
   textfileDir = "/var/lib/prometheus-node-exporter-text";
   group = "prometheus-textfile";
+  # Eight days: the weekly pass plus a day's slack.
+  maxAge = 8 * 24 * 3600;
 in {
+  imports = [
+    ../../../common/vhealth-probes.nix
+    ../../monitoring/textfile-collector.nix
+  ];
+
   environment.systemPackages = [vverify];
 
-  users.groups.${group} = {};
-
-  systemd.tmpfiles.rules = ["d ${textfileDir} 2775 root ${group} - -"];
-
-  services.prometheus.exporters.node.extraFlags =
-    lib.mkIf config.services.prometheus.exporters.node.enable
-    ["--collector.textfile.directory=${textfileDir}"];
+  features.nix.vhealth.probes.vverify-metrics = {
+    type = "file";
+    path = "${textfileDir}/vverify.prom";
+    inherit maxAge;
+    critical = false;
+    description = "vverify's textfile metrics are at most eight days old";
+  };
 
   systemd.services.vverify = {
     description = "vverify: the Nix store verified against its database, weekly";

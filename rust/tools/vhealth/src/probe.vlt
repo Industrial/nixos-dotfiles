@@ -1,0 +1,235 @@
+-- What a probe is, and the pure half of judging one: the URL, the request
+-- and the response of an HTTP probe, a command's exit, a file's age, and the
+-- verdict over a whole check. The I/O is `check`'s; everything decided from
+-- what the I/O returned is here, and is tested without a socket.
+--
+-- A probe is up or down, never "unknown": a timeout, a refused connection,
+-- a wrong status and a missing file are all down, with the reason in
+-- `detail`. A critical probe that is down makes the host unhealthy; a
+-- non-critical one is reported (and exported) but does not.
+
+-- An HTTP GET: where, and what the answer must be.
+export data HttpCheck
+  { export host String
+  , export port u16
+  , export path String
+  , export status u16
+  , export body Option<String>
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- What a probe checks.
+export data Kind
+  -- A TCP connect to host:port.
+  = Tcp String u16
+  -- An HTTP/1.0 GET whose status (and, if given, body) must match.
+  | Http HttpCheck
+  -- A connect to a unix stream socket.
+  | Unix String
+  -- A command (argv, no shell) that must exit 0.
+  | Command (Vec<String>)
+  -- A file modified at most this many seconds ago.
+  | File String u64
+  deriving (Clone, Debug, PartialEq)
+
+export data Probe
+  { export name String
+  , export kind Kind
+  , export timeout_ms u64
+  , export critical bool
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- One probe's result.
+export data Outcome
+  { export name String
+  , export kind String
+  , export critical bool
+  , export up bool
+  , export detail String
+  , export millis u64
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- One check: every probe's outcome, in configuration order, and when the
+-- check finished (Unix seconds).
+export data Report { export finished u64, export outcomes Vec<Outcome> }
+  deriving (Clone, Debug, PartialEq)
+
+export kind_name : &Kind -> &'static str
+kind_name k =
+  case k of
+    Tcp _ _ -> "tcp"
+    Http _ -> "http"
+    Unix _ -> "unix"
+    Command _ -> "command"
+    File _ _ -> "file"
+
+-- Healthy: no critical probe is down.
+export healthy : &Report -> bool
+healthy r = r.outcomes.iter () |> .all (\o -> o.up || !(o.critical))
+
+-- The probes that are down, critical or not.
+export down : &Report -> Vec<String>
+down r = r.outcomes.iter () |> .filter (\o -> !(o.up)) |> .map (\o -> o.name.clone ()) |> .collect
+
+-- The critical probes that are down: what makes the host unhealthy.
+export failing : &Report -> Vec<String>
+failing r = r.outcomes.iter () |> .filter (\o -> o.critical && !(o.up)) |> .map (\o -> o.name.clone ()) |> .collect
+
+-- host:port as a socket address; an IPv6 literal gets its brackets.
+export address : &str -> u16 -> String
+address host port =
+  if host.contains ":" && !(host.starts_with "[")
+    "[#{host}]:#{port}"
+  else
+    "#{host}:#{port}"
+
+-- `http://host[:port][/path]` as (host, port, path). Only plain HTTP: the
+-- probes are of this host's own services.
+export parse_url : &str -> Result<(String, u16, String), String>
+parse_url url =
+  rest = (url.strip_prefix "http://" |> .ok_or ("not an http:// URL: #{url}"))?
+  (authority, path) = case rest.find "/" of
+    Some i -> rest.split_at i
+    None -> (rest, "/")
+  (host, port_text) = case authority.rsplit_once ":" of
+    Some (h, p) -> (h, p)
+    None -> (authority, "80")
+  port = (port_text.parse () : Result<u16, std::num::ParseIntError>) |> .ok |> .filter (\p -> *p > 0)
+  if host.is_empty ()
+    return Err "no host in #{url}"
+  p = (port.ok_or ("not a port in #{url}: #{port_text}"))?
+  Ok (host.to_string (), p, path.to_string ())
+
+-- The request: HTTP/1.0, so the answer is never chunked and ends at EOF.
+export request : &HttpCheck -> String
+request h =
+  authority = address (&h.host) h.port
+  "GET #{h.path} HTTP/1.0\r\nHost: #{authority}\r\nUser-Agent: vhealth\r\nAccept: */*\r\nConnection: close\r\n\r\n"
+
+expect_status : u16 -> u16 -> Result<(), String>
+expect_status want got =
+  if want == got
+    Ok ()
+  else
+    Err "HTTP #{got}, expected #{want}"
+
+expect_body : &Option<String> -> &str -> Result<(), String>
+expect_body want body =
+  case want of
+    None -> Ok ()
+    Some w ->
+      if body.contains (w.as_str ())
+        Ok ()
+      else
+        Err "HTTP body does not contain #{w:?}"
+
+-- The verdict on a raw HTTP response.
+export judge_http : &HttpCheck -> &[u8] -> Result<String, String>
+judge_http h raw =
+  text = String::from_utf8_lossy raw
+  status_line = text.lines () |> .next |> .unwrap_or ""
+  code = status_line.split_whitespace () |> .nth 1 |> .and_then (\c -> c.parse () |> .ok) : Option<u16>
+  body = text.split_once "\r\n\r\n" |> .map (\p -> p.1) |> .unwrap_or ""
+  c = (code.ok_or (.to_string "no HTTP status line in the response"))?
+  (expect_status h.status c)?
+  (expect_body (&h.body) body)?
+  Ok "HTTP #{c}"
+
+-- The last non-empty line of a command's stderr, for the report.
+export last_line : &[u8] -> String
+last_line bytes =
+  text = String::from_utf8_lossy bytes
+  text.lines () |> .map (\l -> l.trim ()) |> .rfind (\l -> !(l.is_empty ())) |> .map (\l -> l.chars ().take 200 |> .collect) |> .unwrap_or_default
+
+exit_of : i32 -> String -> Result<String, String>
+exit_of code why =
+  if code == 0
+    Ok (.to_string "exit 0")
+  else
+    Err "exit #{code}: #{why}"
+
+-- The verdict on a command's exit (None: killed by a signal).
+export judge_exit : Option<i32> -> &[u8] -> Result<String, String>
+judge_exit code stderr =
+  why = last_line stderr
+  case code of
+    None -> Err "killed by a signal: #{why}"
+    Some c -> exit_of c why
+
+-- The verdict on a file's age, in seconds, against the most it may be.
+export judge_age : u64 -> u64 -> Result<String, String>
+judge_age max_age age =
+  if age <= max_age
+    Ok "modified #{age}s ago"
+  else
+    Err "modified #{age}s ago, more than #{max_age}s"
+
+-- Up or down, with the detail, as an outcome of `p`.
+export outcome_of : &Probe -> Result<String, String> -> u64 -> Outcome
+outcome_of p r millis =
+  (up, detail) = case r of
+    Ok d -> (true, d)
+    Err d -> (false, d)
+  Outcome { name = p.name.clone (), kind = (kind_name (&p.kind)).to_string (), critical = p.critical, up, detail, millis }
+
+#[cfg(test)]
+http : u16 -> Option<&str> -> HttpCheck
+http status body = HttpCheck { host = .to_string "127.0.0.1", port = 9002, path = .to_string "/metrics", status, body = body.map (\b -> b.to_string ()) }
+
+#[cfg(test)]
+outcome : &str -> bool -> bool -> Outcome
+outcome name critical up = Outcome { name = name.to_string (), kind = .to_string "tcp", critical, up, detail = .to_string "", millis = 0 }
+
+test "URLs give host, port and path"
+  assert_eq! \-> parse_url "http://100.69.213.35:5100/nix-cache-info" \-> Ok ((.to_string "100.69.213.35", 5100, .to_string "/nix-cache-info"))
+  assert_eq! \-> parse_url "http://localhost" \-> Ok ((.to_string "localhost", 80, .to_string "/"))
+  assert_eq! \-> parse_url "http://[::1]:9002/metrics?x=1" \-> Ok ((.to_string "[::1]", 9002, .to_string "/metrics?x=1"))
+  assert! \-> parse_url "https://example.org/" |> .is_err
+  assert! \-> parse_url "http://host:http/" |> .is_err
+  assert! \-> parse_url "http://host:0/" |> .is_err
+  assert! \-> parse_url "http://:80/" |> .is_err
+
+test "addresses bracket IPv6 literals only"
+  assert_eq! \-> address "127.0.0.1" 22 \-> "127.0.0.1:22"
+  assert_eq! \-> address "::1" 22 \-> "[::1]:22"
+  assert_eq! \-> address "[::1]" 22 \-> "[::1]:22"
+
+test "the request is HTTP/1.0 with a Host header"
+  r = request (&http 200 None)
+  assert! \-> r.starts_with "GET /metrics HTTP/1.0\r\n"
+  assert! \-> r.contains "\r\nHost: 127.0.0.1:9002\r\n"
+  assert! \-> r.ends_with "\r\n\r\n"
+
+test "an HTTP response passes on its status and body"
+  ok = b"HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n\r\nStoreDir: /nix/store\nPriority: 30\n"
+  assert_eq! \-> judge_http (&http 200 None) ok \-> Ok (.to_string "HTTP 200")
+  assert_eq! \-> judge_http (&http 200 (Some "StoreDir: /nix/store")) ok \-> Ok (.to_string "HTTP 200")
+  assert_eq! \-> judge_http (&http 200 (Some "WantMassQuery")) ok \-> Err (.to_string "HTTP body does not contain \"WantMassQuery\"")
+  assert_eq! \-> judge_http (&http 204 None) ok \-> Err (.to_string "HTTP 200, expected 204")
+  assert_eq! \-> judge_http (&http 200 None) b"HTTP/1.1 503 Service Unavailable\r\n\r\n" \-> Err (.to_string "HTTP 503, expected 200")
+  assert! \-> judge_http (&http 200 None) b"" |> .is_err
+  assert! \-> judge_http (&http 200 None) b"SSH-2.0-OpenSSH_9.9\r\n" |> .is_err
+
+test "a command passes on exit 0 only"
+  assert_eq! \-> judge_exit (Some 0) b"" \-> Ok (.to_string "exit 0")
+  assert_eq! \-> judge_exit (Some 3) b"warming up\nnot ready\n\n" \-> Err (.to_string "exit 3: not ready")
+  assert_eq! \-> judge_exit None b"" \-> Err (.to_string "killed by a signal: ")
+
+test "a file passes while it is fresh enough"
+  assert! \-> judge_age 60 0 |> .is_ok
+  assert! \-> judge_age 60 60 |> .is_ok
+  assert_eq! \-> judge_age 60 61 \-> Err (.to_string "modified 61s ago, more than 60s")
+
+test "only a critical probe that is down makes the host unhealthy"
+  all_up = Report { finished = 1, outcomes = .to_vec ([outcome "a" true true, outcome "b" false true]) }
+  minor = Report { finished = 1, outcomes = .to_vec ([outcome "a" true true, outcome "b" false false]) }
+  major = Report { finished = 1, outcomes = .to_vec ([outcome "a" true false, outcome "b" false false]) }
+  assert! \-> healthy (&all_up)
+  assert! \-> healthy (&minor)
+  assert! \-> !(healthy (&major))
+  assert_eq! \-> down (&minor) \-> .to_vec ([.to_string "b"])
+  assert_eq! \-> failing (&minor) \-> (Vec::new () : Vec<String>)
+  assert_eq! \-> failing (&major) \-> .to_vec ([.to_string "a"])
+  assert! \-> healthy (&Report { finished = 1, outcomes = Vec::new () })
