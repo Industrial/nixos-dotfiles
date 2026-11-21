@@ -1,0 +1,177 @@
+-- The probe configuration: a JSON document, written by features/nix/vhealth
+-- from `features.nix.vhealth.probes` (to /etc/vhealth/probes.json), parsed
+-- here into `Probe`s in one step. Nothing past `parse` sees JSON.
+--
+--   {"probes": [
+--     {"name": "sshd", "type": "tcp", "host": "100.69.213.35", "port": 22},
+--     {"name": "vcache", "type": "http", "url": "http://100.69.213.35:5100/nix-cache-info",
+--      "status": 200, "bodyContains": "StoreDir: /nix/store", "timeoutMs": 3000},
+--     {"name": "daemon", "type": "unix", "path": "/nix/var/nix/daemon-socket/socket"},
+--     {"name": "ok", "type": "command", "argv": ["/run/current-system/sw/bin/true"]},
+--     {"name": "vverify", "type": "file", "path": "/var/lib/.../vverify.prom",
+--      "maxAgeSeconds": 691200, "critical": false}
+--   ]}
+--
+-- `timeoutMs` defaults to 5000, `critical` to true, `status` to 200. A null
+-- field counts as absent. Names are unique.
+
+import serde_json::Value
+import crate::probe::{HttpCheck, Kind, Probe, parse_url}
+
+export const DEFAULT_CONFIG : &str = "/etc/vhealth/probes.json"
+export const DEFAULT_TIMEOUT_MS : u64 = 5000
+
+-- A field, unless it is absent or null.
+present : &Value -> &str -> Option<Value>
+present v key = v.get key |> .filter (\x -> !(x.is_null ())) |> .cloned
+
+text_of : &Value -> &str -> &str -> Result<String, String>
+text_of v name key =
+  present v key |> .and_then (\x -> x.as_str () |> .map (\s -> s.to_string ())) |> .ok_or ("probe #{name}: #{key} must be a string")
+
+optional_text : &Value -> &str -> &str -> Result<Option<String>, String>
+optional_text v name key =
+  case present v key of
+    None -> Ok None
+    Some x -> x.as_str () |> .map (\s -> Some (s.to_string ())) |> .ok_or ("probe #{name}: #{key} must be a string")
+
+number_or : &Value -> &str -> &str -> u64 -> Result<u64, String>
+number_or v name key fallback =
+  case present v key of
+    None -> Ok fallback
+    Some x -> x.as_u64 () |> .ok_or ("probe #{name}: #{key} must be a non-negative integer")
+
+number_of : &Value -> &str -> &str -> Result<u64, String>
+number_of v name key =
+  present v key |> .and_then (\x -> x.as_u64 ()) |> .ok_or ("probe #{name}: #{key} must be a non-negative integer")
+
+flag_or : &Value -> &str -> &str -> bool -> Result<bool, String>
+flag_or v name key fallback =
+  case present v key of
+    None -> Ok fallback
+    Some x -> x.as_bool () |> .ok_or ("probe #{name}: #{key} must be true or false")
+
+tcp_of : &Value -> &str -> Result<Kind, String>
+tcp_of v name =
+  host = (text_of v name "host")?
+  port = (number_of v name "port")?
+  p = (u16::try_from port |> .ok |> .filter (\p -> *p > 0) |> .ok_or ("probe #{name}: port #{port} is not a TCP port"))?
+  Ok (Kind::Tcp host p)
+
+http_of : &Value -> &str -> Result<Kind, String>
+http_of v name =
+  url = (text_of v name "url")?
+  (host, port, path) = (parse_url (&url) |> .map_err (\e -> "probe #{name}: #{e}"))?
+  status = (number_or v name "status" 200)?
+  code = (u16::try_from status |> .ok |> .filter (\c -> *c >= 100 && *c <= 599) |> .ok_or ("probe #{name}: #{status} is not an HTTP status"))?
+  body = (optional_text v name "bodyContains")?
+  Ok (Kind::Http (HttpCheck { host, port, path, status = code, body }))
+
+command_of : &Value -> &str -> Result<Kind, String>
+command_of v name =
+  words = present v "argv" |> .and_then (\x -> x.as_array () |> .map (\a -> a.iter () |> .map (\w -> w.as_str () |> .map (\s -> s.to_string ())) |> .collect)) : Option<Option<Vec<String>>>
+  argv = (words |> .flatten |> .filter (\w -> !(w.is_empty ())) |> .ok_or ("probe #{name}: argv must be a non-empty list of strings"))?
+  Ok (Kind::Command argv)
+
+file_of : &Value -> &str -> Result<Kind, String>
+file_of v name =
+  path = (text_of v name "path")?
+  max_age = (number_of v name "maxAgeSeconds")?
+  Ok (Kind::File path max_age)
+
+kind_of : &Value -> &str -> &str -> Result<Kind, String>
+kind_of v name kind =
+  case kind of
+    "tcp" -> tcp_of v name
+    "http" -> http_of v name
+    "unix" -> text_of v name "path" |> .map (\p -> Kind::Unix p)
+    "command" -> command_of v name
+    "file" -> file_of v name
+    other -> Err "probe #{name}: unknown type #{other:?} (tcp, http, unix, command, file)"
+
+probe_of : &Value -> Result<Probe, String>
+probe_of v =
+  name = (present v "name" |> .and_then (\x -> x.as_str () |> .map (\s -> s.to_string ())) |> .filter (\s -> !(s.is_empty ())) |> .ok_or (.to_string "a probe without a name"))?
+  kind_text = (text_of v (&name) "type")?
+  kind = (kind_of v (&name) (&kind_text))?
+  timeout_ms = (number_or v (&name) "timeoutMs" DEFAULT_TIMEOUT_MS)?
+  if timeout_ms == 0
+    return Err "probe #{name}: timeoutMs must be positive"
+  critical = (flag_or v (&name) "critical" true)?
+  Ok (Probe { name, kind, timeout_ms, critical })
+
+-- The first name that appears twice, if any.
+duplicate : &[Probe] -> Option<String>
+duplicate probes =
+  mut seen = std::collections::BTreeSet::new () : std::collections::BTreeSet<String>
+  probes.iter () |> .find (\p -> !(seen.insert (p.name.clone ()))) |> .map (\p -> p.name.clone ())
+
+-- The probes in a configuration document.
+export parse : &str -> Result<Vec<Probe>, String>
+parse text =
+  parsed = serde_json::from_str text : Result<Value, serde_json::Error>
+  root = (parsed |> .map_err (\e -> "not JSON: #{e}"))?
+  list = (root.get "probes" |> .and_then (\x -> x.as_array ()) |> .ok_or (.to_string "no \"probes\" list"))?
+  probes = (list.iter () |> .map probe_of |> .collect : Result<Vec<Probe>, String>)?
+  if duplicate (&probes) is Some name
+    return Err "probe #{name} is declared twice"
+  Ok probes
+
+-- The probes in the configuration file at `path`.
+export load : &str -> Result<Vec<Probe>, String>
+load path =
+  text = (std::fs::read_to_string path |> .map_err (\e -> "#{path}: #{e}"))?
+  parse (&text) |> .map_err (\e -> "#{path}: #{e}")
+
+-- The probes named in `only`, in configuration order; all of them when
+-- `only` is empty. A name that is not configured is an error.
+export select : Vec<Probe> -> &[String] -> Result<Vec<Probe>, String>
+select probes only =
+  missing = only.iter () |> .find (\n -> !(probes.iter ().any (\p -> &p.name == *n)))
+  if missing is Some n
+    return Err "no probe named #{n}"
+  Ok (probes |> .into_iter |> .filter (\p -> only.is_empty () || only.contains (&p.name)) |> .collect)
+
+#[cfg(test)]
+const SAMPLE : &str = "{\"probes\":[{\"name\":\"sshd\",\"type\":\"tcp\",\"host\":\"127.0.0.1\",\"port\":22},{\"name\":\"vcache\",\"type\":\"http\",\"url\":\"http://127.0.0.1:5100/nix-cache-info\",\"bodyContains\":\"StoreDir:\",\"timeoutMs\":3000},{\"name\":\"daemon\",\"type\":\"unix\",\"path\":\"/nix/var/nix/daemon-socket/socket\",\"bodyContains\":null},{\"name\":\"ok\",\"type\":\"command\",\"argv\":[\"true\",\"-x\"]},{\"name\":\"vverify\",\"type\":\"file\",\"path\":\"/tmp/v.prom\",\"maxAgeSeconds\":60,\"critical\":false}]}"
+
+#[cfg(test)]
+names : &[Probe] -> Vec<String>
+names probes = probes.iter () |> .map (\p -> p.name.clone ()) |> .collect
+
+test "every probe type parses, with its defaults"
+  probes = parse SAMPLE |> .expect "a configuration"
+  assert_eq! \-> probes.len () \-> 5
+  assert_eq! \-> probes[0] \-> Probe { name = .to_string "sshd", kind = Kind::Tcp (.to_string "127.0.0.1") 22, timeout_ms = DEFAULT_TIMEOUT_MS, critical = true }
+  assert_eq! \-> probes[1].kind \-> Kind::Http (HttpCheck { host = .to_string "127.0.0.1", port = 5100, path = .to_string "/nix-cache-info", status = 200, body = Some (.to_string "StoreDir:") })
+  assert_eq! \-> probes[1].timeout_ms \-> 3000
+  assert_eq! \-> probes[2].kind \-> Kind::Unix (.to_string "/nix/var/nix/daemon-socket/socket")
+  assert_eq! \-> probes[3].kind \-> Kind::Command (.to_vec ([.to_string "true", .to_string "-x"]))
+  assert_eq! \-> probes[4].kind \-> Kind::File (.to_string "/tmp/v.prom") 60
+  assert! \-> !(probes[4].critical)
+
+test "a bad probe is refused with its name and field"
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"tcp\",\"host\":\"h\"}]}" \-> Err (.to_string "probe x: port must be a non-negative integer")
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"tcp\",\"host\":\"h\",\"port\":70000}]}" \-> Err (.to_string "probe x: port 70000 is not a TCP port")
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"ping\"}]}" \-> Err (.to_string "probe x: unknown type \"ping\" (tcp, http, unix, command, file)")
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"command\",\"argv\":[]}]}" \-> Err (.to_string "probe x: argv must be a non-empty list of strings")
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"http\",\"url\":\"http://h/\",\"status\":42}]}" \-> Err (.to_string "probe x: 42 is not an HTTP status")
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"unix\",\"path\":\"/s\",\"timeoutMs\":0}]}" \-> Err (.to_string "probe x: timeoutMs must be positive")
+  assert_eq! \-> parse "{\"probes\":[{\"type\":\"unix\",\"path\":\"/s\"}]}" \-> Err (.to_string "a probe without a name")
+  assert_eq! \-> parse "{\"probes\":[{\"name\":\"x\",\"type\":\"unix\",\"path\":\"/a\"},{\"name\":\"x\",\"type\":\"unix\",\"path\":\"/b\"}]}" \-> Err (.to_string "probe x is declared twice")
+  assert_eq! \-> parse "{}" \-> Err (.to_string "no \"probes\" list")
+  assert! \-> parse "probes" |> .is_err
+
+test "an empty configuration has no probes"
+  assert_eq! \-> parse "{\"probes\":[]}" \-> Ok (Vec::new ())
+
+test "selection keeps configuration order and refuses unknown names"
+  probes = parse SAMPLE |> .expect "a configuration"
+  everything = select (probes.clone ()) (&[]) |> .expect "all"
+  assert_eq! \-> names (&everything) \-> names (&probes)
+  picked = select (probes.clone ()) (&[.to_string "vverify", .to_string "sshd"]) |> .expect "two"
+  assert_eq! \-> names (&picked) \-> .to_vec ([.to_string "sshd", .to_string "vverify"])
+  assert_eq! \-> select probes (&[.to_string "grafana"]) |> .err \-> Some (.to_string "no probe named grafana")
+
+test "a missing file is an error with its path"
+  assert! \-> load "/nonexistent/vhealth.json" |> .err |> .map (\e -> e.starts_with "/nonexistent/vhealth.json: ") |> .unwrap_or false
