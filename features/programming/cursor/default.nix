@@ -177,7 +177,31 @@ in {
     ];
   };
 
-  system.activationScripts.cursorAgentLocalWrapper = {
+  imports = [../../../lib/vfiles.nix];
+
+  # The delegate at both names Cursor's shell wrapper looks for, copied (not linked: the
+  # wrapper resolves the path) and immutable, so its self-update cannot replace it.
+  vfiles.files = builtins.listToAttrs (map (name: {
+    name = "${settings.userdir}/.local/bin/${name}";
+    value = {
+      source = cursorAgentLocalWrapper;
+      mode = "copy";
+      perms = "0755";
+      immutable = true;
+      user = settings.username;
+    };
+  }) ["cursor-agent" "agent"]);
+
+  # Not a file vfiles places: the upstream FHS agent the self-update downloads, which cannot
+  # run on NixOS. Removed on every activation, as before (class b, GH-188's audit).
+  system.activationScripts.cursorAgentShareCleanup = {
+    text = ''
+      rm -rf "${settings.userdir}/.local/share/cursor-agent"
+    '';
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.cursorAgentLocalWrapper = {
     text = ''
       local_bin="${settings.userdir}/.local/bin"
       share_agent="${settings.userdir}/.local/share/cursor-agent"
