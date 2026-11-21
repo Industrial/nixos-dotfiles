@@ -490,8 +490,13 @@ cmd_build() {
   command -v nom >/dev/null 2>&1 && builder=nom
   say "> $builder build --out-link .tmp/dev/build-$h $(host_attr "$h")"
   "$builder" build --out-link "$out" "$(host_attr "$h")"
-  if [[ "$h" == "$(hostname 2>/dev/null || true)" ]] && command -v vdiff >/dev/null 2>&1 && [[ -e /run/current-system ]]; then
-    vdiff /run/current-system "$out"
+  if [[ "$h" == "$(hostname 2>/dev/null || true)" ]] && [[ -e /run/current-system ]]; then
+    # vdiff took over from nvd (GH-153); nvd only on a host rolled back to it.
+    if command -v vdiff >/dev/null 2>&1; then
+      vdiff /run/current-system "$out"
+    elif command -v nvd >/dev/null 2>&1; then
+      nvd diff /run/current-system "$out"
+    fi
   fi
 }
 

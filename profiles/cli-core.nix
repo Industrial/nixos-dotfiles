@@ -65,7 +65,7 @@
     features.cli.nixfetch.enable = true;
     features.cli.nixq.enable = true;
     features.cli.nixstore.enable = true;
-    features.cli.nvd.enable = true;
+    # vdiff took over from nvd (GH-153). Rollback: features.cli.nvd.enable = true on a host.
     features.cli.vdiff.enable = true;
 
     # Archives
