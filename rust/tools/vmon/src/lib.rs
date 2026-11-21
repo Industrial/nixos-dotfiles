@@ -9,7 +9,8 @@
 //! line: the I/O and the render tick, as id_effect effects.
 
 // Lints on the *shape* of Voltaic's emitted Rust, not on decisions in the
-// source (see rust/tools/vdiff/src/lib.rs).
+// source (see rust/tools/vdiff/src/lib.rs), and `let r <- f; r` for an awaited
+// value a case arm returns.
 #![allow(
     clippy::assign_op_pattern,
     clippy::no_effect,
@@ -21,7 +22,8 @@
     clippy::redundant_closure,
     clippy::needless_borrow,
     clippy::needless_borrows_for_generic_args,
-    clippy::field_reassign_with_default
+    clippy::field_reassign_with_default,
+    clippy::let_and_return
 )]
 
 macro_rules! voltaic {
