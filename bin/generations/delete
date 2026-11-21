@@ -5,5 +5,13 @@ set -e
 
 source "$(dirname "$0")/../lib/root-cmd.sh"
 
-echo "> nix-env -p /nix/var/nix/profiles/system --delete-generations +2"
-root_cmd nix-env -p /nix/var/nix/profiles/system --delete-generations +2
+# vgen keeps the newest 2 generations of every system profile (and the current, booted,
+# running and pinned ones), then rewrites the boot entries through the system's own
+# installer. Without vgen (the feature rolled back), nix-env as before.
+if command -v vgen >/dev/null; then
+    echo "> vgen prune --keep 2"
+    root_cmd vgen prune --keep 2
+else
+    echo "> nix-env -p /nix/var/nix/profiles/system --delete-generations +2"
+    root_cmd nix-env -p /nix/var/nix/profiles/system --delete-generations +2
+fi

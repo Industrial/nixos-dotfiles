@@ -9,6 +9,9 @@ let
   inherit (nixos) lib;
   cfg = (nixos.evalSystem {modules = [../default.nix ./default.nix];}).config;
   svc = cfg.systemd.services.vgc;
+  # vgen's switch, as lib/features.nix declares it on a real host.
+  vgenOn = {options.features.nixos.vgen.enable = lib.mkOption {default = true;};};
+  withVgen = (nixos.evalSystem {modules = [../default.nix ./default.nix vgenOn];}).config.systemd.services.vgc;
 in
   assay.suite "vgc" {
     stockGcIsOff = assay.eq cfg.nix.gc.automatic false;
@@ -17,8 +20,11 @@ in
     runsWeekly = assay.eq svc.startAt ["weekly"];
     catchesUpAfterDowntime = assay.eq cfg.systemd.timers.vgc.timerConfig.Persistent true;
     isOneshot = assay.eq svc.serviceConfig.Type "oneshot";
-    # Same retention as the stock unit.
-    keeps30Days = assay.eq (lib.hasSuffix "/bin/vgc run --delete-older-than 30d" svc.serviceConfig.ExecStart) true;
+    # Same retention as the stock unit, until vgen takes it over (GH-190): with
+    # features.nixos.vgen on, vgen-prune runs the 30-day prune before vgc, and
+    # vgc only collects.
+    keeps30Days =
+      assay.eq [(lib.hasSuffix "/bin/vgc run --delete-older-than 30d" svc.serviceConfig.ExecStart) (lib.hasSuffix "/bin/vgc run" withVgen.serviceConfig.ExecStart)] [true true];
     # The standing oracle comparison: monthly, read-only.
     checksAgainstNixMonthly =
       assay.eq [cfg.systemd.services.vgc-check.startAt (lib.hasSuffix "/bin/vgc check" cfg.systemd.services.vgc-check.serviceConfig.ExecStart)] [["monthly"] true];
