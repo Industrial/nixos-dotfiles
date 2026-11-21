@@ -50,7 +50,7 @@ packages paths =
     name = parse_name p
     text = name.version |> .unwrap_or_default
     version = Version { chunks = chunks (&text), text }
-    out.entry name.pname |> .or_insert_with Vec::new |> .push version
+    out.entry name.pname |> .or_default |> .push version
   for versions in out.values_mut ()
     versions.sort_by (\a b -> compare_chunks (&a.chunks) (&b.chunks))
   out
@@ -218,7 +218,7 @@ group digits =
   n = digits.len ()
   for pair in digits.chars () |> .enumerate
     (i, c) = pair
-    if i > 0 && (n - i) % 3 == 0
+    if i > 0 && (n - i).is_multiple_of 3
       out.push ','
     out.push c
   out

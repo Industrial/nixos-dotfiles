@@ -9,8 +9,10 @@
 // Lints on the *shape* of Voltaic's emitted Rust, not on decisions in the
 // source (see rust/tools/vgc/src/lib.rs): `_0` binders in the Display impl of
 // `errors` declarations, one `if let` per `is` test, nullary lambdas around
-// zero-argument functions, borrows Voltaic writes at every call site.
+// zero-argument functions, borrows Voltaic writes at every call site, and
+// `x = x + 1` for every `x := x + 1` (Voltaic has no compound assignment).
 #![allow(
+    clippy::assign_op_pattern,
     clippy::no_effect,
     clippy::unused_unit,
     clippy::collapsible_if,

@@ -62,7 +62,7 @@ resolve arg =
   label = label_of arg
   canonical = (std::fs::canonicalize arg |> .map_err (\_ -> Missing (label.clone ())))?
   shown = canonical.to_string_lossy () |> .to_string
-  root = (store_path_of (&canonical) |> .ok_or_else (\-> NotInStore shown))?
+  root = (store_path_of (&canonical) |> .ok_or (NotInStore shown))?
   sw_dir = canonical.join "sw"
   sw = if_dir (&sw_dir)
   Ok (Root { label, root, sw })
