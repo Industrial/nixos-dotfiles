@@ -1,0 +1,85 @@
+-- What every vbump module shares: the error type, the Result-to-Effect lift,
+-- and running one external command (nix, git, gh) to completion.
+--
+-- External commands are blocking steps: callers run them inside `suspend`, so
+-- each is one step of a fiber, interruptible between steps.
+
+import std::process::{Command, Stdio}
+import id_effect::{Effect, HNil, fail, succeed}
+
+-- Why an input, or the run, stopped. Split by what the operator does next.
+export errors VbumpError
+  Usage String    "#{0}"
+  Command String  "#{0}"
+  Lock String     "flake.lock: #{0}"
+  Eval String     "#{0}"
+  Diff String     "closure diff: #{0}"
+  Publish String  "GitHub: #{0}"
+  Io String       "#{0}"
+  Inputs String   "#{0}"
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static> Result<A, VbumpError> -> Effect<A, VbumpError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- One command to run: program, arguments, working directory, extra
+-- environment.
+export data Cmd { export program String, export args Vec<String>, export cwd Option<String>, export env Vec<(String, String)> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export cmd : &str -> Vec<String> -> Cmd
+cmd program args = Cmd { program = program.to_string (), args, cwd = None, env = Vec::new () }
+
+-- What a finished command printed.
+export data Ran { export stdout String, export stderr String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The last `n` lines of `text`, for an error message.
+export tail_lines : &str -> usize -> String
+tail_lines text n =
+  lines = text.lines () |> .collect : Vec<&str>
+  skip = lines.len ().saturating_sub n
+  lines |> .iter |> .skip skip |> .cloned |> .collect : Vec<&str> |> .join "\n"
+
+-- The command as a shell would show it, for messages.
+export shown : &Cmd -> String
+shown c = "#{c.program} #{c.args.join " "}"
+
+-- Run `c` to completion. A non-zero exit is an error carrying the last lines
+-- of its stderr.
+export run : &Cmd -> Result<Ran, String>
+run c =
+  mut command = Command::new (&c.program)
+  command.args (&c.args)
+  command.stdin (Stdio::null ())
+  if &c.cwd is Some d
+    command.current_dir d
+  for kv in &c.env
+    command.env (&kv.0) (&kv.1)
+  out = (command.output () |> .map_err (\e -> "running #{shown c}: #{e}"))?
+  stdout = String::from_utf8_lossy (&out.stdout) |> .to_string
+  stderr = String::from_utf8_lossy (&out.stderr) |> .to_string
+  if out.status.success ()
+    Ok (Ran { stdout, stderr })
+  else
+    Err "#{shown c} failed (#{out.status}):\n#{tail_lines (&stderr) 20}"
+
+test "the tail of a message keeps its last lines"
+  assert_eq! \-> tail_lines "a\nb\nc" 2 \-> "b\nc"
+  assert_eq! \-> tail_lines "a" 5 \-> "a"
+  assert_eq! \-> tail_lines "" 3 \-> ""
+
+test "a command that fails names itself and its stderr"
+  c = cmd "sh" (.to_vec ([.to_string "-c", .to_string "echo out; echo boom >&2; exit 3"]))
+  err = run (&c) |> .err |> .unwrap_or_default
+  assert! \-> err.contains "sh -c" && err.contains "boom"
+
+test "a command's output, its environment and its directory"
+  mut c = cmd "sh" (.to_vec ([.to_string "-c", .to_string "echo $VBUMP_PROBE; pwd"]))
+  c.env.push ((.to_string "VBUMP_PROBE", .to_string "seen"))
+  c.cwd := Some (.to_string "/")
+  ran = run (&c) |> .expect "ran"
+  assert_eq! \-> ran.stdout \-> "seen\n/\n"

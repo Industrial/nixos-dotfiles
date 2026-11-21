@@ -1,0 +1,149 @@
+-- vbump's command line, parsed into `Options` by a pure function.
+--
+--   vbump run [--input NAME]... [--dry-run] [--jobs N] [--repo DIR] [--rev REV]
+--             [--remote NAME] [--base-branch NAME] [--label NAME]
+--             [--gh-repo OWNER/NAME] [--run-url URL] [--summary FILE]
+--             [--out DIR] [--db FILE]
+--
+-- No `--input` is every root input of the flake. `--dry-run` does all of the
+-- work (relock, evaluate, dry-build, diff) and publishes nothing.
+
+import nix_store_core::db
+
+export const USAGE : &str = "usage: vbump run [--input NAME]... [--dry-run] [--jobs N] [--repo DIR] [--rev REV] [--remote NAME] [--base-branch NAME] [--label NAME] [--gh-repo OWNER/NAME] [--run-url URL] [--summary FILE] [--out DIR] [--db FILE] [--committer 'NAME <EMAIL>']"
+
+export data Options
+  { export inputs Vec<String>
+  , export dry_run bool
+  , export jobs usize
+  , export repo String
+  , export rev String
+  , export remote String
+  , export base_branch String
+  , export label String
+  , export gh_repo Option<String>
+  , export run_url Option<String>
+  , export summary Option<String>
+  , export out Option<String>
+  , export db String
+  , export committer Option<(String, String)>
+  , export help bool
+  }
+  deriving (Clone, Debug, PartialEq)
+
+export defaults : Options
+defaults = Options { inputs = Vec::new (), dry_run = false, jobs = 1, repo = .to_string ".", rev = .to_string "HEAD", remote = .to_string "origin", base_branch = .to_string "main", label = .to_string "flake-lock", gh_repo = None, run_url = None, summary = None, out = None, db = db::DEFAULT_DB.to_string (), committer = None, help = false }
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The options in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = defaults ()
+  mut it = args.iter ()
+  first = it.next () |> .map (\s -> s.as_str ())
+  case first of
+    Some "run" ->
+      ()
+    Some "-h" ->
+      o.help := true
+    Some "--help" ->
+      o.help := true
+    Some other ->
+      return Err "unknown command: #{other}"
+    None ->
+      return Err (.to_string "no command")
+  while it.next () is Some a
+    case a.as_str () of
+      "--input" ->
+        o.inputs.push ((value (it.next ()) "--input")?)
+      "--dry-run" ->
+        o.dry_run := true
+      "--jobs" ->
+        v = (value (it.next ()) "--jobs")?
+        n = (v.parse () : Result<usize, std::num::ParseIntError>) |> .ok |> .filter (\n -> *n > 0)
+        o.jobs := (n.ok_or ("--jobs: not a positive number: #{v}"))?
+      "--repo" ->
+        o.repo := (value (it.next ()) "--repo")?
+      "--rev" ->
+        o.rev := (value (it.next ()) "--rev")?
+      "--remote" ->
+        o.remote := (value (it.next ()) "--remote")?
+      "--base-branch" ->
+        o.base_branch := (value (it.next ()) "--base-branch")?
+      "--label" ->
+        o.label := (value (it.next ()) "--label")?
+      "--gh-repo" ->
+        o.gh_repo := Some ((value (it.next ()) "--gh-repo")?)
+      "--run-url" ->
+        o.run_url := Some ((value (it.next ()) "--run-url")?)
+      "--summary" ->
+        o.summary := Some ((value (it.next ()) "--summary")?)
+      "--out" ->
+        o.out := Some ((value (it.next ()) "--out")?)
+      "--committer" ->
+        v = (value (it.next ()) "--committer")?
+        o.committer := Some ((identity (&v) |> .ok_or ("--committer: not NAME <EMAIL>: #{v}"))?)
+      "--db" ->
+        o.db := (value (it.next ()) "--db")?
+      "-h" ->
+        o.help := true
+      "--help" ->
+        o.help := true
+      other ->
+        return Err "unknown argument: #{other}"
+  Ok o
+
+-- The workflow run's URL, from the variables GitHub Actions sets.
+export run_url_of : Option<String> -> Option<String> -> Option<String> -> Option<String>
+run_url_of server repo id =
+  case (server, repo, id) of
+    (Some s, Some r, Some i) -> Some "#{s}/#{r}/actions/runs/#{i}"
+    _ -> None
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "run with no options is every input, one at a time, for real"
+  o = parse_args (&args (&["run"])) |> .expect "options"
+  assert_eq! \-> o \-> defaults ()
+  assert! \-> o.inputs.is_empty () && !o.dry_run && o.jobs == 1
+
+test "every option is read, and --input repeats"
+  o = parse_args (&args (&["run", "--input", "nixpkgs", "--input", "disko", "--dry-run", "--jobs", "2", "--repo", "/r", "--rev", "abc", "--remote", "up", "--base-branch", "trunk", "--label", "l", "--gh-repo", "o/r", "--run-url", "https://x/1", "--summary", "/s.md", "--out", "/o", "--db", "/db"])) |> .expect "options"
+  assert_eq! \-> o.inputs \-> args (&["nixpkgs", "disko"])
+  assert_eq! \-> (o.dry_run, o.jobs, o.repo.as_str (), o.rev.as_str (), o.remote.as_str (), o.base_branch.as_str (), o.label.as_str (), o.db.as_str ()) \-> (true, 2, "/r", "abc", "up", "trunk", "l", "/db")
+  assert_eq! \-> (o.gh_repo, o.run_url, o.summary, o.out) \-> (Some (.to_string "o/r"), Some (.to_string "https://x/1"), Some (.to_string "/s.md"), Some (.to_string "/o"))
+
+test "bad command lines are refused with the reason"
+  assert_eq! \-> parse_args (&args (&[])) \-> Err (.to_string "no command")
+  assert_eq! \-> parse_args (&args (&["update"])) \-> Err (.to_string "unknown command: update")
+  assert_eq! \-> parse_args (&args (&["run", "--jobs", "0"])) \-> Err (.to_string "--jobs: not a positive number: 0")
+  assert_eq! \-> parse_args (&args (&["run", "--input"])) \-> Err (.to_string "--input needs a value")
+  assert_eq! \-> parse_args (&args (&["run", "--frob"])) \-> Err (.to_string "unknown argument: --frob")
+  assert! \-> parse_args (&args (&["--help"])) |> .map (\o -> o.help) |> .unwrap_or false
+
+test "the run URL needs all three of GitHub's variables"
+  assert_eq! \-> run_url_of (Some (.to_string "https://github.com")) (Some (.to_string "o/r")) (Some (.to_string "9")) \-> Some (.to_string "https://github.com/o/r/actions/runs/9")
+  assert_eq! \-> run_url_of None (Some (.to_string "o/r")) (Some (.to_string "9")) \-> None
+
+-- `NAME <EMAIL>`, as git writes an identity.
+export identity : &str -> Option<(String, String)>
+identity s =
+  (name, rest) = (s.split_once '<')?
+  email = (rest.strip_suffix '>')?
+  n = name.trim ()
+  if n.is_empty () || email.is_empty ()
+    None
+  else
+    Some ((n.to_string (), email.to_string ()))
+
+test "an identity is NAME <EMAIL>"
+  assert_eq! \-> identity "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>" \-> Some ((.to_string "github-actions[bot]", .to_string "41898282+github-actions[bot]@users.noreply.github.com"))
+  assert_eq! \-> identity "nobody" \-> None
+  assert_eq! \-> identity " <a@b>" \-> None

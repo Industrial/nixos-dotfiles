@@ -1,0 +1,175 @@
+-- flake.lock, read: the root's inputs, what each is locked to, and which
+-- nodes one update moved. Pure; the lock text comes from the caller.
+
+import serde_json::{Map, Value}
+
+-- One locked node, as much of it as a reviewer reads.
+export data Locked
+  { export node String
+  , export kind String
+  , export owner String
+  , export repo String
+  , export rev String
+  , export last_modified u64
+  , export url String
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+parse : &str -> Result<Value, String>
+parse text = serde_json::from_str text |> .map_err (\e -> "not JSON: #{e}")
+
+nodes_of : &Value -> Option<&Map<String, Value>>
+nodes_of doc = doc.get "nodes" |> .and_then (\n -> n.as_object ())
+
+text_of : &Value -> &str -> String
+text_of v key = v.get key |> .and_then (\x -> x.as_str ()) |> .unwrap_or "" |> .to_string
+
+-- The root's direct inputs and the node each names, in lock order. An input
+-- that `follows` another (a list, not a node name) is not the root's to
+-- update and is left out.
+export root_inputs : &str -> Result<Vec<(String, String)>, String>
+root_inputs text =
+  doc = (parse text)?
+  root_name = doc.get "root" |> .and_then (\r -> r.as_str ()) |> .unwrap_or "root" |> .to_string
+  nodes = (nodes_of (&doc) |> .ok_or (.to_string "no nodes"))?
+  root = (nodes.get (&root_name) |> .ok_or ("no root node #{root_name}"))?
+  mut out = Vec::new () : Vec<(String, String)>
+  listed = root.get "inputs" |> .and_then (\i -> i.as_object ())
+  if listed is Some inputs
+    for kv in inputs
+      if kv.1.as_str () is Some node
+        out.push ((kv.0.clone (), node.to_string ()))
+  Ok out
+
+-- What `node` is locked to.
+export locked_of : &Value -> &str -> Locked
+locked_of nodes node =
+  n = nodes.get node
+  l = n |> .and_then (\x -> x.get "locked")
+  o = n |> .and_then (\x -> x.get "original")
+  case l of
+    None -> Locked { node = node.to_string (), ...Locked::default () }
+    Some locked ->
+      url = locked.get "url" |> .or (o |> .and_then (\x -> x.get "url")) |> .and_then (\x -> x.as_str ()) |> .unwrap_or "" |> .to_string
+      Locked { node = node.to_string (), kind = text_of locked "type", owner = text_of locked "owner", repo = text_of locked "repo", rev = text_of locked "rev", last_modified = locked.get "lastModified" |> .and_then (\x -> x.as_u64 ()) |> .unwrap_or 0, url }
+
+-- The node `input` of the root names, and what it is locked to.
+export input_locked : &str -> &str -> Result<Locked, String>
+input_locked text input =
+  doc = (parse text)?
+  inputs = (root_inputs text)?
+  node = (inputs.iter () |> .find (\kv -> kv.0 == input) |> .map (\kv -> kv.1.clone ()) |> .ok_or ("no root input #{input}"))?
+  nodes = (doc.get "nodes" |> .ok_or (.to_string "no nodes"))?
+  Ok (locked_of nodes (&node))
+
+-- Every node whose lock differs between the two texts (added or removed
+-- ones too), sorted by name.
+export moved : &str -> &str -> Result<Vec<String>, String>
+moved old new =
+  a = (parse old)?
+  b = (parse new)?
+  empty = Map::new ()
+  na = nodes_of (&a) |> .unwrap_or (&empty)
+  nb = nodes_of (&b) |> .unwrap_or (&empty)
+  mut names = na.keys () |> .chain (nb.keys ()) |> .cloned |> .collect : Vec<String>
+  names.sort ()
+  names.dedup ()
+  Ok (names |> .into_iter |> .filter (\n -> lock_of na n != lock_of nb n) |> .collect)
+
+lock_of : &Map<String, Value> -> &str -> Option<Value>
+lock_of nodes name = nodes.get name |> .and_then (\x -> x.get "locked") |> .cloned
+
+-- The first twelve characters of a revision.
+export short : &str -> String
+short rev = rev.chars () |> .take 12 |> .collect
+
+-- A day from Unix seconds, as YYYY-MM-DD (civil-from-days, proleptic
+-- Gregorian, UTC).
+export day_of : u64 -> String
+day_of secs =
+  z = (i64::try_from (secs / 86400) |> .unwrap_or 0) + 719468
+  era = z.div_euclid 146097
+  doe = z - era * 146097
+  yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+  doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
+  mp = (5 * doy + 2) / 153
+  d = doy - (153 * mp + 2) / 5 + 1
+  m = if mp < 10
+    mp + 3
+  else
+    mp - 9
+  carry = if m <= 2
+    1
+  else
+    0
+  y = yoe + era * 400 + carry
+  "#{y}-#{pad2 m}-#{pad2 d}"
+
+pad2 : i64 -> String
+pad2 n =
+  if n < 10
+    "0#{n}"
+  else
+    n.to_string ()
+
+-- How a reviewer reads a lock: `github:owner/repo@rev (day)`, or its URL.
+export describe : &Locked -> String
+describe l =
+  base = if l.kind == "github"
+    "github:#{l.owner}/#{l.repo}"
+  else if l.url.is_empty ()
+    l.kind.clone ()
+  else
+    l.url.clone ()
+  rev = if l.rev.is_empty ()
+    "".to_string ()
+  else
+    "@#{short (&l.rev)}"
+  day = if l.last_modified == 0
+    "".to_string ()
+  else
+    " (#{day_of l.last_modified})"
+  "#{base}#{rev}#{day}"
+
+-- The GitHub compare page between two locks of the same repository.
+export compare_url : &Locked -> &Locked -> Option<String>
+compare_url old new =
+  same = old.kind == "github" && new.kind == "github" && old.owner == new.owner && old.repo == new.repo
+  if same && !(old.rev.is_empty ()) && !(new.rev.is_empty ()) && old.rev != new.rev
+    Some "https://github.com/#{new.owner}/#{new.repo}/compare/#{old.rev}...#{new.rev}"
+  else
+    None
+
+#[cfg(test)]
+export sample : &str -> u64 -> String
+sample rev modified = "{\"nodes\":{\"a\":{\"locked\":{\"type\":\"github\",\"owner\":\"o\",\"repo\":\"a\",\"rev\":\"#{rev}\",\"lastModified\":#{modified}}},\"b\":{\"locked\":{\"type\":\"tarball\",\"url\":\"https://x/b.tar.gz\"}},\"root\":{\"inputs\":{\"a\":\"a\",\"b\":\"b\",\"c\":[\"a\",\"c\"]}}},\"root\":\"root\",\"version\":7}"
+
+test "the root's inputs, without the ones that follow another"
+  inputs = root_inputs (&sample "1111" 0) |> .expect "inputs"
+  assert_eq! \-> inputs \-> .to_vec ([(.to_string "a", .to_string "a"), (.to_string "b", .to_string "b")])
+
+test "an input's lock, and how it reads"
+  l = input_locked (&sample "0123456789abcdef" 1763596800) "a" |> .expect "a"
+  assert_eq! \-> (l.kind.as_str (), l.owner.as_str (), l.rev.as_str ()) \-> ("github", "o", "0123456789abcdef")
+  assert_eq! \-> describe (&l) \-> "github:o/a@0123456789ab (2025-11-20)"
+  b = input_locked (&sample "1" 0) "b" |> .expect "b"
+  assert_eq! \-> describe (&b) \-> "https://x/b.tar.gz"
+  assert! \-> input_locked (&sample "1" 0) "zz" |> .is_err
+
+test "days are UTC calendar days"
+  assert_eq! \-> day_of 0 \-> "1970-01-01"
+  assert_eq! \-> day_of 951782400 \-> "2000-02-29"
+  assert_eq! \-> day_of 1798761599 \-> "2026-12-31"
+
+test "only the nodes that moved"
+  assert_eq! \-> moved (&sample "1" 1) (&sample "2" 2) |> .expect "moved" \-> .to_vec ([.to_string "a"])
+  assert! \-> moved (&sample "1" 1) (&sample "1" 1) |> .expect "moved" |> .is_empty
+  assert! \-> moved "{" "{}" |> .is_err
+
+test "a compare link only within one GitHub repository"
+  a = Locked { kind = .to_string "github", owner = .to_string "o", repo = .to_string "r", rev = .to_string "aaa", ...Locked::default () }
+  b = Locked { rev = .to_string "bbb", ...a.clone () }
+  assert_eq! \-> compare_url (&a) (&b) \-> Some (.to_string "https://github.com/o/r/compare/aaa...bbb")
+  assert_eq! \-> compare_url (&a) (&a) \-> None
+  c = Locked { repo = .to_string "other", ...b.clone () }
+  assert_eq! \-> compare_url (&a) (&c) \-> None

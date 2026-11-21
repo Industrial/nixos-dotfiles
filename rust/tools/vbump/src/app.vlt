@@ -1,0 +1,215 @@
+-- The program: read the base revision, wire the three capabilities, run every
+-- selected input in a scratch root that is removed however the run ends, and
+-- report. `main` runs it under id_effect_cli's `run_main` (exit 0, 1 when an
+-- input failed or on a usage error, 101 on a bug, 130 on Ctrl-C).
+--
+-- The base is a commit, not a work tree: the flake is evaluated as
+-- `git+file://<repo>?rev=<sha>`, so uncommitted changes in the checkout never
+-- reach a proposal, and the per-input locks are applied with
+-- `--reference-lock-file` rather than by copying the tree.
+
+import id_effect::{Effect, HNil, Never, acquire_use_release, effect, fail, succeed, suspend}
+import crate::body::body_of
+import crate::cli::{Options, USAGE, parse_args, run_url_of}
+import crate::common::{VbumpError, cmd, lifted, run}
+import crate::common::VbumpError::{Inputs, Io, Usage}
+import crate::forge::Live
+import crate::lock::root_inputs
+import crate::run::{Caps, Outcome, Settings, any_failed, is_failed, run_all, summary_of}
+
+-- The base revision, read once.
+export data Base { export top String, export sha String, export flake String, export flake_nix String, export flake_lock String }
+  deriving (Debug, Clone)
+
+git_out : &str -> Vec<&str> -> Result<String, VbumpError>
+git_out repo args =
+  mut all = .to_vec ([.to_string "-C", repo.to_string ()]) : Vec<String>
+  for a in args
+    all.push (a.to_string ())
+  run (&cmd "git" all) |> .map (\r -> r.stdout) |> .map_err Usage
+
+-- The flake reference of a commit of the repository at `top`.
+export flake_of : &str -> &str -> bool -> String
+flake_of top sha shallow =
+  if shallow
+    "git+file://#{top}?rev=#{sha}&shallow=1"
+  else
+    "git+file://#{top}?rev=#{sha}"
+
+base_of : &Options -> Result<Base, VbumpError>
+base_of o =
+  top = (git_out (&o.repo) (.to_vec (["rev-parse", "--show-toplevel"])))? |> .trim |> .to_string
+  wanted = "#{o.rev}^{commit}"
+  sha = (git_out (&top) (.to_vec (["rev-parse", "--verify", wanted.as_str ()])))? |> .trim |> .to_string
+  shallow_text = (git_out (&top) (.to_vec (["rev-parse", "--is-shallow-repository"])))?
+  shallow = shallow_text.trim () == "true"
+  nix_at = "#{sha}:flake.nix"
+  lock_at = "#{sha}:flake.lock"
+  flake_nix = (git_out (&top) (.to_vec (["show", nix_at.as_str ()])))?
+  flake_lock = (git_out (&top) (.to_vec (["show", lock_at.as_str ()])))?
+  flake = flake_of (&top) (&sha) shallow
+  Ok (Base { top, sha, flake, flake_nix, flake_lock })
+
+-- The inputs to run: the ones asked for, each a root input, or all of them.
+export selected : &[String] -> &str -> Result<Vec<String>, VbumpError>
+selected asked lock =
+  all = (root_inputs lock |> .map_err (\e -> VbumpError::Lock e))? |> .into_iter |> .map (\kv -> kv.0) |> .collect : Vec<String>
+  if asked.is_empty ()
+    Ok all
+  else
+    unknown = asked.iter () |> .filter (\a -> !(all.contains a)) |> .cloned |> .collect : Vec<String>
+    if unknown.is_empty ()
+      Ok (asked.to_vec ())
+    else
+      Err (Usage ("not a root input of the flake: #{unknown.join ", "} (have: #{all.join ", "})"))
+
+caps_of : &Options -> &Base -> Caps
+caps_of o b =
+  nix = crate::nix::live (b.flake.clone ()) (b.flake_nix.clone ()) (b.flake_lock.clone ())
+  differ = crate::differ::live (o.db.clone ())
+  forge = if o.dry_run
+    crate::forge::dry_run ()
+  else
+    crate::forge::live (Live { repo = b.top.clone (), base = b.sha.clone (), remote = o.remote.clone (), base_branch = o.base_branch.clone (), label = o.label.clone (), gh_repo = o.gh_repo.clone (), committer = o.committer.clone () })
+  Caps { nix, differ, forge }
+
+-- The run's scratch root: one directory per input under it.
+make_work : Result<String, VbumpError>
+make_work =
+  dir = std::env::temp_dir () |> .join ("vbump-#{std::process::id ()}")
+  shown = dir.to_string_lossy () |> .to_string
+  (std::fs::create_dir_all (&dir) |> .map_err (\e -> Io ("creating #{shown}: #{e}")))?
+  Ok shown
+
+removed : String -> Effect<(), Never, HNil>
+removed dir =
+  suspend (move \-> forget (std::fs::remove_dir_all (&dir)))
+
+forget : std::io::Result<()> -> Effect<(), Never, HNil>
+forget _ = succeed (())
+
+-- Every input, in a scratch root removed on every exit (success, failure,
+-- interrupt).
+in_scratch : Caps -> Settings -> Vec<String> -> Effect<Vec<Outcome>, VbumpError, HNil>
+in_scratch caps settings inputs =
+  acquire_use_release (suspend (\-> lifted (make_work ()))) (move \work -> run_all caps (Settings { work, ...settings }) inputs |> .widen) (\work _ -> removed work)
+
+write : &str -> &str -> Result<(), VbumpError>
+write path text = std::fs::write path text |> .map_err (\e -> Io ("writing #{path}: #{e}"))
+
+-- `--out DIR`: every proposal's body, and each host's vdiff report.
+written : &str -> &[Outcome] -> Option<String> -> Result<(), VbumpError>
+written dir outcomes run_url =
+  (std::fs::create_dir_all dir |> .map_err (\e -> Io ("creating #{dir}: #{e}")))?
+  for o in outcomes
+    if &o.bump is Some b
+      (write (&"#{dir}/#{o.input}.md") (&body_of b (run_url.clone ())))?
+      for h in &b.hosts
+        if !(h.json.is_empty ())
+          (write (&"#{dir}/#{o.input}.#{h.host}.json") (&h.json))?
+  Ok ()
+
+-- Report the run: the summary on stdout (and in `--summary`), the bodies in
+-- `--out`, and a failure when any input failed.
+reported : Options -> Base -> Vec<Outcome> -> Result<(), VbumpError>
+reported o b outcomes =
+  text = summary_of (&outcomes) (b.sha.clone ()) o.dry_run
+  println! \-> "#{text}"
+  if &o.summary is Some path
+    (write path (&text))?
+  if &o.out is Some dir
+    (written dir (&outcomes) (o.run_url.clone ()))?
+  if any_failed (&outcomes)
+    names = outcomes.iter () |> .filter (\x -> is_failed (&x.status)) |> .map (\x -> x.input.clone ()) |> .collect : Vec<String>
+    Err (Inputs ("#{names.len ()} input(s) failed: #{names.join ", "}"))
+  else
+    Ok ()
+
+-- The program for parsed options.
+export program : Options -> Effect<(), VbumpError, HNil>
+program o =
+  effect!
+    let b = ~lifted(base_of(&o));
+    let inputs = ~lifted(selected(&o.inputs, &b.flake_lock));
+    eprintln!("vbump: base {} ({}), {} input(s){}", b.sha, b.flake, inputs.len(), if o.dry_run { ", dry run" } else { "" });
+    let settings = Settings { jobs: o.jobs, base_lock: b.flake_lock.clone(), work: String::new(), run_url: o.run_url.clone() };
+    let outcomes = ~in_scratch(caps_of(&o, &b), settings, inputs);
+    ~lifted(reported(o, b, outcomes))
+
+-- Parsed options, the usage error, or the run URL from the environment.
+export options : Result<Options, String> -> Result<Options, VbumpError>
+options parsed =
+  case parsed of
+    Err why -> Err (Usage ("#{why}\n#{USAGE}"))
+    Ok o -> Ok (with_run_url o)
+
+env : &str -> Option<String>
+env name = std::env::var name |> .ok
+
+with_run_url : Options -> Options
+with_run_url o =
+  if o.run_url.is_some ()
+    o
+  else
+    Options { run_url = run_url_of (env "GITHUB_SERVER_URL") (env "GITHUB_REPOSITORY") (env "GITHUB_RUN_ID"), ...o }
+
+-- On a fiber of the runtime's executor (see rust/tools/vverify's app.vlt):
+-- `run_main` polls its root outside the executor's context, so the program
+-- runs as the root's child; an interrupt reaches it and every fiber under it.
+supervised : Effect<(), VbumpError, HNil> -> Effect<(), VbumpError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+startup : Result<Options, VbumpError> -> Effect<(), VbumpError, HNil>
+startup o =
+  case o of
+    Ok opts -> program opts
+    Err e -> fail e
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  if parsed |> .as_ref |> .map (\o -> o.help) |> .unwrap_or false
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (startup (options parsed))) HNil (id_effect_cli::RunMainConfig::default ())
+
+test "the base is a commit of the repository, shallow or not"
+  assert_eq! \-> flake_of "/r" "abc" false \-> "git+file:///r?rev=abc"
+  assert_eq! \-> flake_of "/r" "abc" true \-> "git+file:///r?rev=abc&shallow=1"
+
+test "inputs are the asked ones, each a root input, or all"
+  lock = crate::lock::sample "1" 0
+  assert_eq! \-> selected (&[]) (&lock) |> .expect "all" \-> .to_vec ([.to_string "a", .to_string "b"])
+  assert_eq! \-> selected (&[.to_string "b"]) (&lock) |> .expect "b" \-> .to_vec ([.to_string "b"])
+  err = selected (&[.to_string "zz"]) (&lock) |> .err |> .map (\e -> e.to_string ()) |> .unwrap_or_default
+  assert! \-> err.contains "zz" && err.contains "have: a, b"
+
+test "a usage error carries the usage line"
+  e = options (Err (.to_string "unknown argument: -x")) |> .err |> .map (\e -> e.to_string ()) |> .unwrap_or_default
+  assert! \-> e.contains USAGE && e.contains "-x"
+
+test "a repository that is not one fails the program, with exit code 1"
+  o = Options { repo = .to_string "/nonexistent/vbump", ...crate::cli::defaults () }
+  exit = id_effect::testing::run_test (program o)
+  assert! \-> exit |> .into_result |> .is_err
+
+test "the scratch root is removed after the run"
+  dir = make_work () |> .expect "work"
+  assert! \-> std::path::Path::new (&dir) |> .is_dir
+  id_effect::testing::expect_exit_success (id_effect::testing::run_test (removed (dir.clone ())))
+  assert! \-> !(std::path::Path::new (&dir) |> .exists)
+
+test "a proposal's body and reports land in --out"
+  root = std::env::temp_dir () |> .join ("vbump-out-#{std::process::id ()}") |> .to_string_lossy |> .to_string
+  b = crate::body::sample_bump ()
+  o = Outcome { input = .to_string "nixpkgs", status = crate::run::Status::Proposed (.to_string "u"), bump = Some b }
+  written (&root) (&[o]) None |> .expect "written"
+  assert! \-> std::fs::read_to_string ("#{root}/nixpkgs.md") |> .map (\t -> t.contains "## `nixpkgs`") |> .unwrap_or false
+  assert_eq! \-> std::fs::read_to_string ("#{root}/nixpkgs.drakkar.json") |> .ok \-> Some (.to_string "{\"schema\":1}")
+  std::fs::remove_dir_all (&root) |> .ok

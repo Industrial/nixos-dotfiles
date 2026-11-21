@@ -1,0 +1,191 @@
+-- What a proposal says: the branch, title, commit message and pull request
+-- body of one input's bump, and the run's summary. Pure.
+
+import crate::differ::{Change, Summary}
+import crate::lock::{Locked, compare_url, describe}
+import crate::nix::DryBuild
+
+-- GitHub refuses a body over 65536 characters; the JSON reports go first.
+export const BODY_LIMIT : usize = 60000
+
+-- The note of a host whose derivation did not move.
+export const UNCHANGED : &str = "unchanged"
+
+-- Package lines shown per host before "and N more".
+export const SHOWN : usize = 40
+
+-- One host, for one input.
+export data HostResult
+  { export host String
+  , export drv String
+  , export dry DryBuild
+  , export summary Option<Summary>
+  , export json String
+  , export note String
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- An input's bump, evaluated on every host.
+export data Bump
+  { export input String
+  , export old Locked
+  , export new Locked
+  , export moved Vec<String>
+  , export hosts Vec<HostResult>
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- A branch name from an input name: anything git or a reader would trip on
+-- becomes `-`.
+export branch_of : &str -> String
+branch_of input =
+  safe = input.chars () |> .map safe_char |> .collect : String
+  "update/flake-lock-#{safe}"
+
+safe_char : char -> char
+safe_char c =
+  if c.is_ascii_alphanumeric () || c == '-' || c == '_' || c == '.'
+    c
+  else
+    '-'
+
+export title_of : &str -> String
+title_of input = "chore(flake): bump #{input}"
+
+export message_of : &Bump -> String
+message_of b = "#{title_of (&b.input)}\n\n#{describe (&b.old)}\n-> #{describe (&b.new)}\n"
+
+ticked : &String -> String
+ticked n = "`#{n}`"
+
+versions_of : &[String] -> String
+versions_of vs =
+  if vs.is_empty ()
+    "∅".to_string ()
+  else
+    vs.join ", "
+
+change_line : &Change -> String
+change_line c = "- `#{c.name}`: #{versions_of (&c.old)} → #{versions_of (&c.new)}"
+
+-- The dry build, as a table cell.
+export dry_cell : &DryBuild -> String
+dry_cell d =
+  fetch = if d.download.is_empty ()
+    "#{d.to_fetch} to fetch"
+  else
+    "#{d.to_fetch} to fetch (#{d.download})"
+  "#{d.to_build} to build, #{fetch}"
+
+host_row : &HostResult -> String
+host_row h =
+  case &h.summary of
+    Some s -> "| #{h.host} | #{dry_cell (&h.dry)} | #{s.changed.len ()} | #{s.added.len ()} | #{s.removed.len ()} | +#{s.paths_added} / -#{s.paths_removed} |"
+    None -> "| #{h.host} | #{dry_cell (&h.dry)} | – | – | – | #{h.note} |"
+
+-- One host's package lines, at most SHOWN of them.
+export host_section : &HostResult -> String
+host_section h =
+  mut out = "### #{h.host}\n\n"
+  case &h.summary of
+    None ->
+      out.push_str (&("_No diff: #{h.note}_\n"))
+    Some s ->
+      all = s.changed.iter () |> .chain (s.added.iter ()) |> .chain (s.removed.iter ()) |> .collect : Vec<&Change>
+      if all.is_empty ()
+        out.push_str (empty_text (&h.note))
+      for c in all.iter () |> .take SHOWN
+        out.push_str (&change_line c)
+        out.push '\n'
+      if all.len () > SHOWN
+        out.push_str (&("- … and #{all.len () - SHOWN} more\n"))
+  out
+
+json_block : &HostResult -> String
+json_block h = "<details><summary><code>vdiff --json</code>, #{h.host}</summary>\n\n```json\n#{h.json.trim_end ()}\n```\n\n</details>\n"
+
+-- The pull request body. `run_url` is the workflow run, when there is one.
+export body_of : &Bump -> Option<String> -> String
+body_of b run_url =
+  refs = case run_url of
+    Some u -> "Refs #{u}."
+    None -> .to_string "Opened by a local `vbump run`."
+  compare = case compare_url (&b.old) (&b.new) of
+    Some u -> "\n[Compare on GitHub](#{u})\n"
+    None -> "".to_string ()
+  moved = if b.moved.is_empty ()
+    "".to_string ()
+  else
+    names = b.moved.iter () |> .map ticked |> .collect : Vec<String>
+    "\nLock nodes moved: #{names.join ", "}.\n"
+  mut head = "Lock bump of one input, `#{b.input}`, by `vbump` (`.github/workflows/update-flake-lock.yml`). #{refs}\n\n**Review and merge by hand**: nothing merges this automatically, and no host changes until it lands on `main` (comin then converges every host within ~5 minutes; see `docs/runbooks/updates.md`). Each input gets its own pull request, so this one can merge, wait or close without holding up the others.\n\n## `#{b.input}`\n\n| | lock |\n|---|---|\n| old | #{describe (&b.old)} |\n| new | #{describe (&b.new)} |\n#{compare}#{moved}\n## Hosts\n\nEvery `nixosConfigurations` host was evaluated and dry-built against this lock. The diff is of each host's toplevel **derivation** closure against the base (`vdiff --json`), so it names every package version move without building anything.\n\n| host | dry build | changed | added | removed | paths |\n|---|---|---|---|---|---|\n"
+  for h in &b.hosts
+    head.push_str (&host_row h)
+    head.push '\n'
+  head.push '\n'
+  for h in &b.hosts
+    head.push_str (&host_section h)
+    head.push '\n'
+  checklist = "### Review checklist\n\n- [ ] `ci / all-green` passed. If no `PR` checks started, close and reopen this PR: it was opened without `FLAKE_LOCK_UPDATE_TOKEN`\n- [ ] the kernel and NixOS moves above are expected; a kernel move needs a reboot after convergence\n- [ ] no removed package that a host still needs\n"
+  mut blocks = "".to_string ()
+  for h in &b.hosts
+    if !(h.json.is_empty ())
+      blocks.push_str (&json_block h)
+  if head.len () + blocks.len () + checklist.len () > BODY_LIMIT
+    blocks := "_The `vdiff --json` reports do not fit in a pull request body; they are in the run's artifacts._\n".to_string ()
+  mut all = "#{head}#{blocks}\n#{checklist}"
+  if all.len () > BODY_LIMIT
+    all := cut (&all) BODY_LIMIT
+  all
+
+-- `text` cut to at most `limit` bytes, on a character boundary.
+export cut : &str -> usize -> String
+cut text limit =
+  mut end = limit.min (text.len ())
+  while !(text.is_char_boundary end)
+    end := end - 1
+  "#{&text[0..end]}\n\n_… cut at #{limit} characters._\n"
+
+#[cfg(test)]
+export sample_bump : Bump
+sample_bump =
+  old = Locked { node = .to_string "nixpkgs", kind = .to_string "github", owner = .to_string "NixOS", repo = .to_string "nixpkgs", rev = .to_string "aaaaaaaaaaaaaaaa", last_modified = 1763596800, url = .to_string "" }
+  new = Locked { rev = .to_string "bbbbbbbbbbbbbbbb", last_modified = 1763683200, ...old.clone () }
+  hello = Change { name = .to_string "hello", kind = .to_string "upgraded", old = .to_vec ([.to_string "2.12.1"]), new = .to_vec ([.to_string "2.12.2"]) }
+  s = Summary { changed = .to_vec ([hello]), added = Vec::new (), removed = Vec::new (), paths_added = 7, paths_removed = 5 }
+  ok = HostResult { host = .to_string "drakkar", drv = .to_string "/nix/store/x.drv", dry = DryBuild { to_build = 9, to_fetch = 4, download = .to_string "2.0 MiB" }, summary = Some s, json = .to_string "{\"schema\":1}", note = .to_string "" }
+  bad = HostResult { host = .to_string "mimir", note = .to_string "the base does not evaluate", ...HostResult::default () }
+  Bump { input = .to_string "nixpkgs", old, new, moved = .to_vec ([.to_string "nixpkgs"]), hosts = .to_vec ([ok, bad]) }
+
+test "branch names are safe and per input"
+  assert_eq! \-> branch_of "nixos-hardware" \-> "update/flake-lock-nixos-hardware"
+  assert_eq! \-> branch_of "we ird/x" \-> "update/flake-lock-we-ird-x"
+
+test "the body names the input, the run, every host and the checklist"
+  body = body_of (&sample_bump ()) (Some (.to_string "https://github.com/o/r/actions/runs/1"))
+  assert! \-> body.contains "`nixpkgs`" && body.contains "Refs https://github.com/o/r/actions/runs/1."
+  assert! \-> body.contains "| old | github:NixOS/nixpkgs@aaaaaaaaaaaa (2025-11-20) |"
+  assert! \-> body.contains "https://github.com/NixOS/nixpkgs/compare/aaaaaaaaaaaaaaaa...bbbbbbbbbbbbbbbb"
+  assert! \-> body.contains "| drakkar | 9 to build, 4 to fetch (2.0 MiB) | 1 | 0 | 0 | +7 / -5 |"
+  assert! \-> body.contains "- `hello`: 2.12.1 → 2.12.2"
+  assert! \-> body.contains "| mimir |" && body.contains "_No diff: the base does not evaluate_"
+  assert! \-> body.contains "```json\n{\"schema\":1}\n```"
+  assert! \-> body.contains "### Review checklist"
+  assert! \-> body_of (&sample_bump ()) None |> .contains "local `vbump run`"
+
+test "an oversized body drops the JSON first, and is cut last"
+  mut b = sample_bump ()
+  b.hosts[0].json := "x".repeat 70000
+  body = body_of (&b) None
+  assert! \-> body.len () <= BODY_LIMIT + 100 && body.contains "run's artifacts" && body.contains "Review checklist"
+  assert! \-> cut "ééé" 3 |> .starts_with "é\n"
+
+test "a commit message carries the old and the new lock"
+  assert_eq! \-> message_of (&sample_bump ()) \-> "chore(flake): bump nixpkgs\n\ngithub:NixOS/nixpkgs@aaaaaaaaaaaa (2025-11-20)\n-> github:NixOS/nixpkgs@bbbbbbbbbbbb (2025-11-21)\n"
+
+empty_text : &str -> &str
+empty_text note =
+  if note == UNCHANGED
+    "Its derivation is unchanged: this bump does not touch this host.\n"
+  else
+    "No package version moves on this host.\n"

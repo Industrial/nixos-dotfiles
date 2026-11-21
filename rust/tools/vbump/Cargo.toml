@@ -1,0 +1,39 @@
+[package]
+name = "vbump"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Per-input flake.lock updates: relock one input, evaluate and dry-build every host, diff each host's closure, open one pull request per input"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# nix-store-core and every other consumer.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The closure diff, as a library: `vdiff --json`'s report (schema 1) without a
+# second binary on the runner. It brings nix-store-core's read-only store
+# database. default.nix roots its source at rust/tools so both paths resolve.
+vdiff = { path = "../vdiff" }
+nix-store-core = { path = "../nix-store-core" }
+# flake.lock and vdiff's report are JSON.
+serde_json = "1"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vbump"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vbump"
+path = "src/main.rs"
