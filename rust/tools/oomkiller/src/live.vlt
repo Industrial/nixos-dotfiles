@@ -9,7 +9,7 @@
 import std::os::unix::fs::MetadataExt
 import std::process::ExitCode
 import std::sync::{Arc, Mutex, PoisonError}
-import sysinfo::System
+import sysinfo::{ProcessesToUpdate, System}
 import id_effect::{Effect, HNil, Layer, Never, fail, succeed, suspend, sync}
 import id_effect_cli::{RunMainConfig, run_main}
 import crate::daemon::daemon
@@ -67,10 +67,12 @@ instance ProcessTable LiveTable
     system = Arc::clone (&self.system)
     sync (move \-> refreshed (&system))
 
+-- Every process refreshed, and the dead ones dropped. Said explicitly because
+-- sysinfo 0.33's refresh_all keeps dead processes in the table.
 refreshed : &Mutex<System> -> Vec<ProcessInfo>
 refreshed system =
   mut locked = system.lock ().unwrap_or_else PoisonError::into_inner
-  locked.refresh_all ()
+  _updated = locked.refresh_processes ProcessesToUpdate::All true
   listed (&locked)
 
 -- The unit value, for `succeed UNIT`: a literal `()` argument reads as a
