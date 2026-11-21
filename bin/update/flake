@@ -1,17 +1,31 @@
 #!/usr/bin/env bash
-# Bump flake.lock locally, on a branch, for a lock-bump PR.
+# Bump flake.lock by hand: one pull request per input, through vbump.
 #
-# The scheduled path is .github/workflows/update-flake-lock.yml, which opens the PR and
-# writes the per-host diff into it. This script is the by-hand equivalent: it refuses to
-# bump on main, because hosts converge only from merged main (docs/adr/0006-update-policy.md)
-# and a lock bump that skipped review is exactly what that policy exists to stop.
-# UPDATE_ALLOW_MAIN=1 overrides, for an emergency that is still pushed through a PR.
+#   bin/update/flake [--dry-run] [--input NAME]...     (any `vbump run` option)
+#
+# The scheduled path is .github/workflows/update-flake-lock.yml, which runs the same
+# `vbump run` weekly. vbump relocks each root input on its own against origin/main's
+# commit (never the work tree), evaluates and dry-builds every host, diffs each host's
+# closure and opens or refreshes that input's PR (docs/adr/0006-update-policy.md).
+# `--dry-run` does all of it but push and open.
+#
+# Rollback: without vbump on PATH (features.cli.vbump off), or with UPDATE_LEGACY=1,
+# this is the old all-inputs `nix flake update` in the current branch, which refuses to
+# bump on main; UPDATE_ALLOW_MAIN=1 overrides that, for an emergency that is still pushed
+# through a PR.
 echo "> update > flake"
 dotfiles_root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$dotfiles_root"
 mkdir -p ./logs
 exec > >(tee ./logs/update-flake) 2>&1
 set -e
+
+if [ "${UPDATE_LEGACY:-0}" != 1 ] && command -v vbump >/dev/null 2>&1; then
+  echo "> update > flake > git fetch origin main"
+  git fetch --quiet origin main
+  echo "> update > flake > vbump run --rev origin/main $*"
+  exec vbump run --rev origin/main "$@"
+fi
 
 branch="$(git symbolic-ref --quiet --short HEAD || true)"
 if [ "$branch" = main ] && [ "${UPDATE_ALLOW_MAIN:-0}" != 1 ]; then

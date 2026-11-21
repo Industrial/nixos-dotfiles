@@ -71,6 +71,25 @@ after comin has already switched kernels.
    until comin's next poll, unless comin is stopped first. The procedure is in
    `docs/runbooks/updates.md`.
 
+## Amendment (2026-11-21, GH-189): one PR per input, by vbump
+
+Decision 2 now runs `vbump` (rust/tools/vbump, Voltaic + id_effect) instead of
+`DeterminateSystems/update-flake-lock`. For each root input on its own, it runs
+`nix flake update <input>` (C++ Nix stays the lock resolver), evaluates and dry-builds
+every `nixosConfigurations` host against that lock (`--reference-lock-file` on the base
+commit), diffs each host's toplevel **derivation** closure against `main` with vdiff's
+`--json` report, and opens or refreshes one PR per input on `update/flake-lock-<input>`.
+An input that does not evaluate or dry-build gets no PR and fails the run; it never blocks
+another input's PR. Decision 3's evidence is now per input: the dry build and the
+derivation-closure diff replace the evaluated `systemPackages` diff. A derivation closure is
+known without building, and every package's version move is in it.
+`bin/update/flake` runs the same `vbump run` by hand.
+
+Rollback: the repository variable `FLAKE_LOCK_UPDATER=legacy` (or the dispatch input
+`updater: legacy`) runs the previous single all-inputs PR job unchanged. The selector is
+covered by `features/cli/vbump/default.assay.nix`. Decisions 1 and 4 to 7 are unchanged:
+nothing merges on its own.
+
 ## Why the PR shows evaluated versions, not a built closure diff
 
 A real closure diff (`nix store diff-closures`, nvd) needs both closures realised for each

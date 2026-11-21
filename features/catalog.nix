@@ -92,6 +92,7 @@
   ./cli/unrar
   ./cli/unzip
   ./cli/usbtree
+  ./cli/vbump
   ./cli/vdiff
   ./cli/yazi
   ./cli/zellij
