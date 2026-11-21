@@ -40,21 +40,30 @@ cutoff_of spec now =
 -- `deleteGenerationsOlderThan`: walking from newest to oldest, find the first
 -- generation created before the cutoff and keep it (it was live at the cutoff,
 -- so it is the rollback target); every older one goes, except the current.
--- Returned in ascending order.
-export doomed : &[Generation] -> Option<u64> -> i64 -> Vec<u64>
+-- Returned in ascending order. None when a generation below the kept one is
+-- not older than the cutoff: Nix asserts creation times are monotonic there
+-- (`assert(older(*i))`) and aborts, removing nothing more, so vgc leaves such
+-- a profile alone.
+export doomed : &[Generation] -> Option<u64> -> i64 -> Option<Vec<u64>>
 doomed gens current cutoff =
   mut sorted = gens.to_vec ()
   sorted.sort_by_key (\g -> g.number)
   mut out = Vec::new () : Vec<u64>
   mut kept = false
+  mut monotonic = true
   for g in sorted |> .iter |> .rev
     if kept
+      if g.mtime >= cutoff
+        monotonic := false
       if current != Some g.number
         out.push g.number
     else if g.mtime < cutoff
       kept := true
   out.sort ()
-  out
+  if monotonic
+    Some out
+  else
+    None
 
 test "generation links parse like Nix's parseName"
   assert! \-> parse_generation "system" "system-493-link" == Some 493
@@ -73,8 +82,13 @@ test "time specs are whole days"
 test "the newest pre-cutoff generation and the current one survive"
   gens = ((1 ..= 5).map (\n -> Generation { number = n, mtime = (i64::try_from n).unwrap () * 10 })).collect () : Vec<Generation>
   none = Vec::new () : Vec<u64>
-  assert! \-> doomed (&gens) (Some 5) 35 == vec! [1, 2]
-  assert! \-> doomed (&gens) (Some 1) 35 == vec! [2]
-  assert! \-> doomed (&gens) (Some 5) 5 == none
-  assert! \-> doomed (&gens) (Some 5) 100 == vec! [1, 2, 3, 4]
-  assert! \-> doomed (&gens) (Some 2) 100 == vec! [1, 3, 4]
+  assert! \-> doomed (&gens) (Some 5) 35 == Some (vec! [1, 2])
+  assert! \-> doomed (&gens) (Some 1) 35 == Some (vec! [2])
+  assert! \-> doomed (&gens) (Some 5) 5 == Some none
+  assert! \-> doomed (&gens) (Some 5) 100 == Some (vec! [1, 2, 3, 4])
+  assert! \-> doomed (&gens) (Some 2) 100 == Some (vec! [1, 3, 4])
+
+test "a touched old generation stops pruning, as Nix's assert does"
+  -- Generation 2 got a fresh mtime; 1, 3 and 4 are old; 5 is current.
+  gens = vec![Generation { number: 1, mtime: 10 }, Generation { number: 2, mtime: 99 }, Generation { number: 3, mtime: 30 }, Generation { number: 4, mtime: 40 }, Generation { number: 5, mtime: 99 }]
+  assert! \-> doomed (&gens) (Some 5) 50 == None

@@ -13,6 +13,8 @@ export data GcError
   | Nix String "nix: #{0}"
   | Usage String "#{0}"
   | Refused String "refusing to delete: #{0}"
+  | Lock String "GC lock: #{0}"
+  | Delete String "deleting: #{0}"
 
 -- A Result as an effect, its error typed by `kind`.
 export lift : given <A: Send + 'static, K: FnOnce(String) -> GcError> Result<A, String> -> K -> Effect<A, GcError>

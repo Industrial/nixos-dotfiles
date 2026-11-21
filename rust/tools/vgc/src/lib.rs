@@ -33,4 +33,7 @@ voltaic!(roots);
 voltaic!(profiles);
 voltaic!(closure);
 voltaic!(effects);
+voltaic!(lock);
+voltaic!(mounts);
+voltaic!(delete);
 voltaic!(cli);

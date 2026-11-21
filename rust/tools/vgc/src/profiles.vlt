@@ -11,7 +11,9 @@ import crate::generations::{Generation, doomed, parse_generation}
 -- A profile and the generations that `--delete-older-than` would remove.
 -- `current` is None when the profile link does not name a generation, and
 -- such a profile is never touched.
-export data Profile { export path PathBuf, export current Option<u64>, export doomed Vec<u64> }
+-- `blocked`: creation times are not monotonic below the kept generation, where
+-- Nix would abort; nothing is removed from such a profile.
+export data Profile { export path PathBuf, export current Option<u64>, export doomed Vec<u64>, export blocked bool }
   deriving (Debug, Clone, PartialEq)
 
 -- Every profile under `dir`, recursively, the way `removeOldGenerations` finds them.
@@ -58,11 +60,12 @@ plan dirs cutoff =
   mut out = Vec::new () : Vec<Profile>
   for p in seen
     (gens, current) = generations_of (&p)
-    gone = if current.is_some ()
+    verdict = if current.is_some ()
       doomed (&gens) current cutoff
     else
-      Vec::new ()
-    out.push (Profile { path = p, current, doomed = gone })
+      Some (Vec::new ())
+    blocked = verdict.is_none ()
+    out.push (Profile { path = p, current, doomed = verdict.unwrap_or_default (), blocked })
   out
 
 -- The directories `nix-collect-garbage` cleans when run as root: the state

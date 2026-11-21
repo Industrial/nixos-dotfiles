@@ -32,6 +32,8 @@ base_of p = (store_base p).unwrap_or p |> .to_string
 export load : &str -> Result<Graph, String>
 load db =
   conn = ((Connection::open_with_flags db OpenFlags::SQLITE_OPEN_READ_ONLY).map_err sql)?
+  -- One read transaction, so the three tables come from one snapshot.
+  ((conn.execute_batch "BEGIN").map_err sql)?
   mut g = Graph::default ()
   mut ids = HashMap::new () : HashMap<i64, usize>
   mut derivers = Vec::new () : Vec<Option<String>>
