@@ -29,7 +29,10 @@ nix-store-core = { path = "../nix-store-core" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde_json = "1"
 sha2 = "0.10"
-tokio = { version = "1", features = ["io-util", "net"] }
+# The NAR chunks nix_store_core::nar::stream yields (native NarFromPath).
+bytes = "1"
+# sync: the client's write half, shared by the relay and native answers.
+tokio = { version = "1", features = ["io-util", "net", "sync"] }
 
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
 # exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.

@@ -39,8 +39,9 @@ line fields =
   m.insert (.to_string "ts_ms") (Value::from (now_ms ()))
   Value::Object m |> .to_string
 
-export op_line : u64 -> &Peer -> &Finished -> &str -> String
-op_line conn peer f verdict =
+-- `answered` is who answered the op: "daemon", or "native" (crate::answer).
+export op_line : u64 -> &Peer -> &Finished -> &str -> &str -> String
+op_line conn peer f verdict answered =
   mut m = base "op" conn peer
   name = f.request.op |> .map op_name |> .unwrap_or_else (\-> .to_string "Unknown")
   m.insert (.to_string "op") (Value::from name)
@@ -54,6 +55,7 @@ op_line conn peer f verdict =
       m.insert (.to_string "result") (Value::from "error")
       m.insert (.to_string "error") (Value::from (why.as_str ()))
   m.insert (.to_string "policy") (Value::from verdict)
+  m.insert (.to_string "answered") (Value::from answered)
   line m
 
 export connect_line : u64 -> &Peer -> String
@@ -99,19 +101,20 @@ import nix_store_core::worker::{Op, Request}
 test "an op line is one JSON object with the op, the uid and the paths"
   peer = Peer { uid = 1000, gid = 100, pid = 42 }
   f = Finished { request = Request { code = 26, op = Some Op::QueryPathInfo, paths = .to_vec ([.to_string "/nix/store/a"]) }, truncated = false, elapsed = std::time::Duration::from_micros 412, error = None }
-  text = op_line 3 (&peer) (&f) "allow"
+  text = op_line 3 (&peer) (&f) "allow" "native"
   assert! \-> !(text.contains "\n")
   v = serde_json::from_str (&text) |> .expect "JSON" : Value
   assert_eq! \-> v.get "op" |> .and_then (\x -> x.as_str ()) \-> Some "QueryPathInfo"
   assert_eq! \-> v.get "uid" |> .and_then (\x -> x.as_u64 ()) \-> Some 1000
   assert_eq! \-> v.get "duration_us" |> .and_then (\x -> x.as_u64 ()) \-> Some 412
   assert_eq! \-> v.get "result" |> .and_then (\x -> x.as_str ()) \-> Some "ok"
+  assert_eq! \-> v.get "answered" |> .and_then (\x -> x.as_str ()) \-> Some "native"
   assert_eq! \-> v.get "paths" |> .and_then (\x -> x.as_array ()) |> .map (\a -> a.len ()) \-> Some 1
 
 test "a failed op carries the daemon's message"
   peer = Peer { uid = 0, gid = 0, pid = 1 }
   f = Finished { request = Request { code = 99, op = None, paths = Vec::new () }, truncated = true, elapsed = std::time::Duration::from_micros 1, error = Some (.to_string "no") }
-  v = serde_json::from_str (&op_line 1 (&peer) (&f) "allow") |> .expect "JSON" : Value
+  v = serde_json::from_str (&op_line 1 (&peer) (&f) "allow" "daemon") |> .expect "JSON" : Value
   assert_eq! \-> v.get "op" |> .and_then (\x -> x.as_str ()) \-> Some "Unknown"
   assert_eq! \-> v.get "error" |> .and_then (\x -> x.as_str ()) \-> Some "no"
   assert_eq! \-> v.get "paths_truncated" |> .and_then (\x -> x.as_bool ()) \-> Some true

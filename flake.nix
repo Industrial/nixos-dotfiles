@@ -381,6 +381,8 @@
       // {vdaemon-proxy-live-switch-vm = import ./features/nix/vdaemon-proxy/test-live-switch.nix {inherit pkgs;};}
       # ... in conformance mode, with builds and GCs racing the queries (#183).
       // {vdaemon-proxy-conformance-vm = import ./features/nix/vdaemon-proxy/test-conformance.nix {inherit pkgs;};}
+      # ... answering read-only ops natively, with the kill switch (#183).
+      // {vdaemon-proxy-native-vm = import ./features/nix/vdaemon-proxy/test-native.nix {inherit pkgs;};}
       # features/nix/vpush's VM test: builds pushed to vcache, substituted by a fresh store.
       // {vpush-vm = import ./features/nix/vpush/test.nix {inherit pkgs;};}
       # features/nix/vfetch's VM test: a substitution goes through vfetch serve.
