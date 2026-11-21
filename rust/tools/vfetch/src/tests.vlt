@@ -165,7 +165,8 @@ test "a corrupt NAR is rejected, never staged and never imported"
   staging = scratch "corrupt"
   o = run_with remote (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
   assert! \-> failure (&o) |> .is_some_and (\e -> e.starts_with "Corrupt") \-> "#{o.result:?}"
-  assert! \-> o.added.is_empty ()
+  -- libb (sound, and referring to nothing) may have gone in; liba and root never.
+  assert! \-> !(o.added.contains (&LIBA.to_string ())) && !(o.added.contains (&ROOT.to_string ())) \-> "#{o.added:?}"
   assert! \-> !(narinfo_file (&staging) LIBA |> .exists)
   assert! \-> !(nar_file (&staging) LIBA |> .exists)
   assert! \-> !(part_file (&staging) LIBA |> .exists)
@@ -183,13 +184,14 @@ test "an undecodable NAR is rejected as corrupt"
 test "an interrupted run resumes without fetching again what it finished"
   staging = scratch "resume"
   -- First run: root's NAR never arrives, so the run fails after its retries;
-  -- liba and libb were fetched and verified meanwhile.
+  -- liba and libb were fetched, verified and (the import overlapping the
+  -- fetch) imported meanwhile, references first; root never was.
   mut faults = HashMap::new () : HashMap<String, usize>
   faults.insert (nar_url_of ROOT "none") 100
   (remote, _) = fake (cache_files ()) faults
   first = run_with remote (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
   assert! \-> failure (&first) |> .is_some_and (\e -> e.starts_with "Transient") \-> "#{first.result:?}"
-  assert! \-> first.added.is_empty ()
+  assert_eq! \-> first.added \-> strings (&[LIBB, LIBA])
   assert! \-> staged (&staging) LIBA |> .is_some
   assert! \-> staged (&staging) LIBB |> .is_some
   assert! \-> staged (&staging) ROOT |> .is_none

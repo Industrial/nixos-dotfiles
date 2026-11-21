@@ -159,7 +159,9 @@ waves infos =
     out[d].push (info.clone ())
   out
 
-export data WorkerImporter { staging Staging, endpoint Endpoint, connections usize }
+-- The pool lives as long as the importer, so paths added one at a time
+-- share its connections.
+export data WorkerImporter { staging Staging, pool Pool<Link, VfetchError>, connections usize }
 
 -- One connection and one op before the rest: a store that does not exist yet
 -- is created by the first daemon that opens it, under an exclusive lock that
@@ -180,8 +182,7 @@ instance Importer WorkerImporter
     if infos.is_empty ()
       succeed (())
     else
-      e = self.endpoint.clone ()
-      pool = Pool::new self.connections (move \-> link_to (e.clone ()))
+      pool = self.pool.clone ()
       n = self.connections
       s = self.staging.clone ()
       s2 = self.staging.clone ()
@@ -190,9 +191,28 @@ instance Importer WorkerImporter
       p0 = pool.clone ()
       (warm p0 first) |> .flat_map (move \_ -> for_each_par (waves (&infos)) (move \wave -> for_each_par wave (\i -> add_one (pool.clone ()) (s.clone ()) i) (Concurrency::Bounded n)) Concurrency::Sequential) |> .map (move \done -> imported_all s2 batch done)
 
+  streams : &self -> bool
+  streams self = true
+
+  prepare : &self -> Option<String> -> Effect<(), VfetchError, HNil>
+  prepare self first =
+    case first of
+      Some p -> warm (self.pool.clone ()) p
+      None -> succeed (())
+
+  -- One path, then its staged NAR is forgotten.
+  add_one : &self -> NarInfo -> Effect<(), VfetchError, HNil>
+  add_one self info =
+    s = self.staging.clone ()
+    p = info.store_path.clone ()
+    (add_one (self.pool.clone ()) (self.staging.clone ()) info) |> .map (move \_ -> discard (&s) (&p))
+
 export worker : Staging -> Option<String> -> usize -> ImporterService
 worker staging to connections =
-  ImporterService (Arc::new (WorkerImporter { staging, endpoint = endpoint_of (to.as_deref ()), connections = connections.max 1 }))
+  e = endpoint_of (to.as_deref ())
+  n = connections.max 1
+  pool = Pool::new n (move \-> link_to (e.clone ()))
+  ImporterService (Arc::new (WorkerImporter { staging, pool, connections = n }))
 
 #[cfg(test)]
 info_of : &str -> &[&str] -> NarInfo
