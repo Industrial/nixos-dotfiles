@@ -253,7 +253,8 @@ switch if the keys are missing. So **step 1 happens before the enable merges.**
    and `/boot/loader/loader.conf` has `default nixos-*`.
 4. **First reboot, at the machine.**
    - Remove the Python installer's entries:
-     `sudo rm -f /boot/loader/entries/nixos-generation-*.conf`. `lzbt` does not remove them,
+     `sudo rm -f /boot/loader/entries/nixos-*.conf` (it names them by content hash,
+     `nixos-<sha256>.conf`). `lzbt` does not remove them,
      they are unsigned, and once lanzaboote owns `EFI/nixos/` their kernels are not
      guaranteed to stay there.
    - Reboot. `bootctl status` should show `Current Entry: nixos-generation-<N>-….efi`, and
@@ -273,11 +274,11 @@ switch if the keys are missing. So **step 1 happens before the enable merges.**
    systemd-boot and kernels are unsigned, so an enforcing firmware refuses them.
 2. Revert the enable (`features.hardening.secureBoot.enable` back to off) and merge. comin
    switches to a new generation with the Python installer. That installer writes
-   `/boot/loader/entries/nixos-generation-*.conf` for every generation and removes
+   `/boot/loader/entries/nixos-<sha256>.conf` for every generation and removes
    lanzaboote's files from `/boot/EFI/nixos/`. It does not touch `/boot/EFI/Linux/`.
 3. **ESP cleanup:** `sudo rm -f /boot/EFI/Linux/nixos-generation-*.efi`. Those UKIs now point
    at kernels that step 2 deleted, and systemd-boot would still list them.
-4. Reboot at the machine. `bootctl status` should show a `nixos-generation-<N>.conf` entry.
+4. Reboot at the machine. `bootctl status` should show a `nixos-<sha256>.conf` current entry.
 5. Keep the `/var/lib/sbctl` backup. Keys enrolled in firmware stay there until the firmware
    is reset to Setup Mode or its default keys.
 

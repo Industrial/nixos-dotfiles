@@ -92,6 +92,11 @@ pkgs.testers.runNixOSTest {
                 return line.split(":", 1)[1].strip()
         raise Exception("bootctl status shows no current entry")
 
+    # The Python installer names its entries nixos-<sha256 of the contents>.conf; the
+    # generation is in the `version Generation <N> ...` line.
+    def python_entry(generation):
+        machine.succeed(f"grep -l '^version Generation {generation} ' /boot/loader/entries/nixos-*.conf")
+
     def switch_to(system):
         machine.succeed(f"nix-env -p {profile} --set {system}")
         print(machine.succeed(f"{profile}/bin/switch-to-configuration boot 2>&1"))
@@ -102,7 +107,7 @@ pkgs.testers.runNixOSTest {
     with subtest("generation 1 boots through the Python systemd-boot installer"):
         t.assertEqual(booted(), plain)
         machine.succeed("grep -qx systemd-boot /etc/vmtest-installer")
-        machine.succeed("test -e /boot/loader/entries/nixos-generation-1.conf")
+        python_entry(1)
         machine.fail("ls /boot/EFI/Linux/nixos-*.efi")
         t.assertIn(".conf", current_entry())
 
@@ -120,7 +125,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("sbctl verify 2>&1 | grep nixos-generation-2- | grep -v 'not signed' | grep -q 'signed'")
 
     with subtest("runbook: remove the Python installer's leftover entries"):
-        machine.succeed("rm -f /boot/loader/entries/nixos-generation-*.conf")
+        machine.succeed("rm -f /boot/loader/entries/nixos-*.conf")
         esp()
 
     machine.reboot()
@@ -134,7 +139,7 @@ pkgs.testers.runNixOSTest {
     with subtest("rollback: generation 3 has Secure Boot off, the Python installer takes the ESP back"):
         switch_to(plain)
         esp()
-        machine.succeed("test -e /boot/loader/entries/nixos-generation-3.conf")
+        python_entry(3)
 
     with subtest("runbook: remove lanzaboote's UKIs, which the Python installer does not collect"):
         machine.succeed("rm -f /boot/EFI/Linux/nixos-generation-*.efi")
