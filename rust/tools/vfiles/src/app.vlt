@@ -294,14 +294,14 @@ test "placed, kept, drift reported and untouched, dropped removed"
   assert_eq! \-> fs::read_to_string (&copy.path) |> .expect "a copy" \-> "B"
   assert_eq! \-> first.records.len () \-> 2
   again = reconcile (&[link.clone (), copy.clone ()]) (&first.records) (&s.ids) true
-  assert_eq! \-> kinds (&again) |> .iter () |> .all (\k -> k.1 == "kept") \-> true
+  assert! \-> kinds (&again) |> .iter () |> .all (\k -> k.1 == "kept")
   fs::write (&copy.path) "edited by hand" |> .expect "an edit"
   edited = reconcile (&[link.clone (), copy.clone ()]) (&again.records) (&s.ids) true
   assert_eq! \-> kind_of (&edited) (&copy.path) \-> "drift"
   assert_eq! \-> fs::read_to_string (&copy.path) |> .expect "the edit" \-> "edited by hand"
   still = reconcile (&[link.clone (), copy.clone ()]) (&edited.records) (&s.ids) true
   assert_eq! \-> kind_of (&still) (&copy.path) \-> "drift"
-  dropped_link = reconcile (&[copy.clone ()]) (&still.records) (&s.ids) true
+  dropped_link = reconcile (std::slice::from_ref (&copy)) (&still.records) (&s.ids) true
   assert_eq! \-> kind_of (&dropped_link) (&link.path) \-> "removed"
   assert! \-> fs::symlink_metadata (&link.path) |> .is_err
   assert_eq! \-> dropped_link.records.len () \-> 1
@@ -312,7 +312,7 @@ test "the first run adopts a real file with a backup"
   link = declared (&s) "home/c" crate::spec::Mode::Link "src/a" None
   fs::create_dir_all (s.dir.join "home") |> .expect "a home"
   fs::write (&link.path) "the user's own" |> .expect "a real file"
-  r = reconcile (&[link.clone ()]) (&[]) (&s.ids) true
+  r = reconcile (std::slice::from_ref (&link)) (&[]) (&s.ids) true
   assert_eq! \-> kind_of (&r) (&link.path) \-> "adopted"
   assert_eq! \-> fs::read_to_string (&"#{link.path}.backup") |> .expect "the backup" \-> "the user's own"
   assert_eq! \-> fs::read_link (&link.path) |> .expect "a link" \-> s.dir.join "src/a"
@@ -322,11 +322,11 @@ test "the fallback stands in for a missing out-of-store source, and yields to it
   s = scratch "fallback"
   checkout = at (&s) "checkout/h.conf"
   e = declared (&s) "home/h.conf" crate::spec::Mode::Link "checkout/h.conf" (Some (at (&s) "src/a"))
-  first = reconcile (&[e.clone ()]) (&[]) (&s.ids) true
+  first = reconcile (std::slice::from_ref (&e)) (&[]) (&s.ids) true
   assert_eq! \-> fs::read_link (&e.path) |> .expect "a link" \-> s.dir.join "src/a"
   fs::create_dir_all (s.dir.join "checkout") |> .expect "a checkout"
   fs::write (&checkout) "H" |> .expect "the checkout file"
-  second = reconcile (&[e.clone ()]) (&first.records) (&s.ids) true
+  second = reconcile (std::slice::from_ref (&e)) (&first.records) (&s.ids) true
   assert_eq! \-> kind_of (&second) (&e.path) \-> "replaced"
   assert_eq! \-> fs::read_link (&e.path) |> .expect "a link" \-> std::path::PathBuf::from (&checkout)
   fs::remove_dir_all (&s.dir) |> .expect "cleanup"
@@ -334,7 +334,7 @@ test "the fallback stands in for a missing out-of-store source, and yields to it
 test "a dry run decides and changes nothing"
   s = scratch "dry"
   link = declared (&s) "home/a" crate::spec::Mode::Link "src/a" None
-  r = reconcile (&[link.clone ()]) (&[]) (&s.ids) false
+  r = reconcile (std::slice::from_ref (&link)) (&[]) (&s.ids) false
   assert_eq! \-> kind_of (&r) (&link.path) \-> "placed"
   assert! \-> fs::symlink_metadata (&link.path) |> .is_err
   fs::remove_dir_all (&s.dir) |> .expect "cleanup"
