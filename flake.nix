@@ -218,7 +218,7 @@
   };
 
   outputs = inputs @ {self, ...}: let
-    lib = inputs.nixpkgs.lib;
+    inherit (inputs.nixpkgs) lib;
     system = "x86_64-linux";
     pkgs = inputs.nixpkgs.legacyPackages.${system};
     hosts = (import ./common/fleet.nix).names;
@@ -356,6 +356,14 @@
       // (builtins.removeAttrs self.stigVmTests ["passthru"])
       # features/nix/vverify's VM test: a corrupted store path is reported.
       // {vverify-vm = import ./features/nix/vverify/test.nix {inherit pkgs;};}
+      # GH-185: drakkar's /etc under setup-etc.pl vs system.etc.overlay (measurement).
+      // {
+        etc-overlay-stock = import ./features/nixos/etc-overlay/test.nix {inherit pkgs inputs;};
+        etc-overlay-on = import ./features/nixos/etc-overlay/test.nix {
+          inherit pkgs inputs;
+          overlay = true;
+        };
+      }
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
