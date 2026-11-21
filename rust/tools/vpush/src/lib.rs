@@ -17,7 +17,8 @@
 //! (`push`) and the program (`app`).
 
 // Lints on the *shape* of Voltaic's emitted Rust, not on decisions in the
-// source (the same set as rust/tools/vverify).
+// source (the same set as rust/tools/vverify, plus match_like_matches_macro: a
+// two-arm `case` returning bool literals is emitted as a `match`).
 #![allow(
     clippy::no_effect,
     clippy::unused_unit,
@@ -26,7 +27,8 @@
     clippy::just_underscores_and_digits,
     clippy::redundant_closure,
     clippy::needless_borrows_for_generic_args,
-    clippy::field_reassign_with_default
+    clippy::field_reassign_with_default,
+    clippy::match_like_matches_macro
 )]
 
 pub mod cli {

@@ -31,15 +31,15 @@ export errors AppError
 export hook : String -> String -> Effect<(), Never, HNil>
 hook spool paths_text =
   paths = out_paths (&paths_text)
-  suspend (move \-> succeed (spooled spool paths))
+  suspend (move \-> spooled spool paths)
 
-spooled : String -> Vec<String> -> ()
+spooled : String -> Vec<String> -> Effect<(), Never, HNil>
 spooled spool paths =
   case enqueue (&PathBuf::from (&spool)) (&paths) of
     Ok (Some file) -> eprintln! \-> "vpush: spooled #{paths.len ()} path(s) as #{file.display ()}"
     Ok None -> ()
     Err e -> eprintln! \-> "vpush: could not spool #{paths.len ()} path(s) into #{spool}: #{e} (the build is unaffected)"
-  ()
+  succeed (())
 
 read_key : Option<String> -> Result<Option<SecretKey>, AppError>
 read_key file =
@@ -129,12 +129,12 @@ drain p dir =
 -- A daemon drain never stops the daemon: a spool it cannot read is logged.
 logged_drain : Pusher -> PathBuf -> Effect<(), Never, HNil>
 logged_drain p dir =
-  drain p dir |> .map (\_ -> ()) |> .catch (\e -> succeed (log_failure e))
+  drain p dir |> .map (\_ -> ()) |> .catch log_failure
 
-log_failure : AppError -> ()
+log_failure : AppError -> Effect<(), Never, HNil>
 log_failure e =
   eprintln! \-> "vpush: drain failed: #{e}"
-  ()
+  succeed (())
 
 -- `--once`: one drain, failing when an item is left.
 judged : Drained -> Effect<(), AppError, HNil>
@@ -262,7 +262,7 @@ test "an item whose push keeps failing stays in the spool, and the drain stops t
   enqueue (&dir) (&[.to_string "/nix/store/1v4s0mlgyhw2m1rcf4yw8pyab6mbwnpn-hello-2.12.1-man"]) |> .expect "spooled"
   -- No database: the push fails locally (transient), on every retry.
   exit = id_effect::testing::run_test (drain (unreachable_pusher (.to_string "/nonexistent/db.sqlite")) (dir.clone ()))
-  d = exit |> .into_result |> .ok |> .expect "a drain never fails on a push"
+  d = exit |> .into_result |> .expect "a drain never fails on a push"
   assert_eq! \-> d \-> Drained { pushed = 0, set_aside = 0, left = 2 }
   assert_eq! \-> items (&dir) |> .expect "listed" |> .len \-> 2
   exit2 = id_effect::testing::run_test (judged d)

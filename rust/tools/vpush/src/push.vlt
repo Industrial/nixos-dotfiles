@@ -167,12 +167,12 @@ test "only the cache's own refusal is permanent"
 
 test "a missing database is a local, retryable failure that names it"
   r = closure_infos (.to_string "/nonexistent/vpush.sqlite") (.to_vec ([.to_string "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-x"]))
-  e = r |> .err |> .expect "an error"
+  e = r |> .expect_err "an error"
   assert! \-> transient (&e)
   assert! \-> e.to_string () |> .contains "/nonexistent/vpush.sqlite"
 
 test "nothing valid to push is an empty report, with no connection made"
   p = Pusher { link = crate::cli::Link { target = crate::cli::Target::Socket (.to_string "/nonexistent/socket"), ssh_program = .to_string "ssh", ssh_args = Vec::new (), remote_command = .to_string "nix-daemon --stdio" }, key = None, jobs = 2, db = .to_string "/unused" }
   exit = id_effect::testing::run_test (pushed p (Vec::new ()))
-  r = exit |> .into_result |> .ok |> .expect "succeeds"
+  r = exit |> .into_result |> .expect "succeeds"
   assert_eq! \-> (r.closure, r.uploaded, r.bytes, r.mode) \-> (0, 0, 0, None)
