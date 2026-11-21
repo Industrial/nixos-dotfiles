@@ -7,5 +7,7 @@ source "$(dirname "$0")/../lib/root-cmd.sh"
 
 # vgc (rust/tools/vgc) is the fleet's collector; -d is nix-collect-garbage's
 # --delete-old: every generation but the current one, then a collection.
+# "Current" is per profile: on a comin host the running system is comin's
+# profile, so `system` keeps its own (possibly older) current generation too.
 echo "> vgc run --delete-old"
 root_cmd vgc run --delete-old
