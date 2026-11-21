@@ -180,7 +180,6 @@ test "a compressed narinfo keeps its file fields through parse and render"
     assert_eq! \-> f.info.sigs.len () \-> 2
     assert_eq! \-> f.info.ca \-> Some (.to_string "fixed:r:sha256:1w1f")
     assert_eq! \-> parse (&render_file (&f)) \-> Ok (f.clone ())
-  ()
 
 test "a narinfo without its required fields is refused"
   assert! \-> parse "URL: x\nNarHash: sha256:x\nNarSize: 1\n" |> .is_err

@@ -72,9 +72,10 @@ verify k fingerprint sig =
 verify_bytes : &PublicKey -> &str -> &str -> bool
 verify_bytes k fingerprint encoded =
   bytes = STANDARD.decode encoded |> .unwrap_or_default
-  case (bytes.try_into () : Result<[u8; 64], Vec<u8>>) of
+  arr = bytes.try_into () : Result<[u8; 64], Vec<u8>>
+  case arr of
     Err _ -> false
-    Ok arr -> k.key.verify_strict (fingerprint.as_bytes ()) (&ed25519_dalek::Signature::from_bytes (&arr)) |> .is_ok
+    Ok raw -> k.key.verify_strict (fingerprint.as_bytes ()) (&ed25519_dalek::Signature::from_bytes (&raw)) |> .is_ok
 
 -- How many of the narinfo's signatures one of `keys` made over its
 -- fingerprint: libstore's `checkSignatures`, and a substituter accepts a path
@@ -116,7 +117,6 @@ test "a signature over another fingerprint, or under another name, does not veri
     assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;1;" (&renamed))
     assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;1;" "test-1:AAAA")
     assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;1;" "no-colon")
-  ()
 
 test "malformed keys are refused"
   assert! \-> parse_secret_key "no-colon" |> .is_err

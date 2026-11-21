@@ -212,11 +212,10 @@ test "a two-output derivation parses into every field"
     assert_eq! \-> drv.env.get "a" |> .map (\v -> v.as_str ()) \-> Some "say \"hi\"\n\tdone\\"
     assert! \-> !(is_fixed_output (&drv))
     assert_eq! \-> output_paths (&drv) |> .len \-> 2
-  ()
 
 test "a fixed-output derivation is recognised"
   d = parse "Derive([(\"out\",\"/nix/store/h24jwyqgava9fwnq8rxfk56n2gi25wgs-p.patch\",\"sha256\",\"49a5\")],[],[],\"builtin\",\"builtin:fetchurl\",[],[])"
-  assert_eq! \-> d.as_ref () |> .map (\x -> is_fixed_output x) \-> Ok true
+  assert_eq! \-> d.as_ref () |> .map is_fixed_output \-> Ok true
 
 test "malformed derivations are refused"
   assert! \-> parse "" |> .is_err

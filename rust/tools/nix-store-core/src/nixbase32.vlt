@@ -49,10 +49,11 @@ decode s =
     i = b / 8
     j = b % 8
     shifted = digit << j
-    out[i] := out[i] | (u8::try_from (shifted & 255) |> .unwrap_or 0)
+    -- Each digit owns its own five bits of the output, so adding is or-ing.
+    out[i] += u8::try_from (shifted & 255) |> .unwrap_or 0
     carry = shifted >> 8
     if i + 1 < size
-      out[i + 1] := out[i + 1] | (u8::try_from carry |> .unwrap_or 0)
+      out[i + 1] += u8::try_from carry |> .unwrap_or 0
     else if carry != 0
       return None
   Some out

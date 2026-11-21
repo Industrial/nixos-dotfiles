@@ -31,7 +31,7 @@ export to_nix32 : &Sha256 -> String
 to_nix32 h = encode (&h.bytes)
 
 export to_base64 : &Sha256 -> String
-to_base64 h = STANDARD.encode (&h.bytes)
+to_base64 h = STANDARD.encode h.bytes
 
 -- `sha256-<base64>`.
 export to_sri : &Sha256 -> String

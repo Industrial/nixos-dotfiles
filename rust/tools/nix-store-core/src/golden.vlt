@@ -51,9 +51,16 @@ derivations = items (&fixture "drvs.json") "derivations"
 -- The path's info as a narinfo carries it, from `nix path-info --json`.
 info_of : &Value -> Option<narinfo::NarInfo>
 info_of p =
-  case hash::parse (&text p "narHash") of
-    None -> None
-    Some h -> Some (narinfo::NarInfo { store_path = text p "path", nar_hash = hash::typed_nix32 (&h), nar_size = p["narSize"].as_u64 () |> .unwrap_or 0, references = texts p "references", deriver = p["deriver"].as_str () |> .map (\s -> s.to_string ()), sigs = texts p "signatures", ca = p["ca"].as_str () |> .map (\s -> s.to_string ()) })
+  hash::parse (&text p "narHash") |> .map (\h -> narinfo_of p h)
+
+narinfo_of : &Value -> hash::Sha256 -> narinfo::NarInfo
+narinfo_of p h =
+  narinfo::NarInfo { store_path = text p "path", nar_hash = hash::typed_nix32 (&h), nar_size = p["narSize"].as_u64 () |> .unwrap_or 0, references = texts p "references", deriver = p["deriver"].as_str () |> .map (\s -> s.to_string ()), sigs = texts p "signatures", ca = p["ca"].as_str () |> .map (\s -> s.to_string ()) }
+
+-- The path's info, when cache.nixos.org signed it.
+cache_signed : &Value -> Option<narinfo::NarInfo>
+cache_signed p =
+  info_of p |> .filter (\i -> i.sigs.iter () |> .any (\s -> s.starts_with "cache.nixos.org-1:"))
 
 test "there are at least fifty golden store paths and derivations"
   assert! \-> (store_paths ()).len () >= 50
@@ -68,7 +75,6 @@ test "every golden path is a store path, and its hash part is found"
     assert_eq! \-> storepath::hash_part_of (&path) \-> base.map storepath::hash_part
     assert! \-> storepath::in_store (&path)
     assert_eq! \-> storepath::full (base.unwrap_or "") \-> path
-  ()
 
 test "NAR hashes convert between SRI, base-16 and nix32 as nix hash convert does"
   for p in store_paths ()
@@ -85,27 +91,24 @@ test "NAR hashes convert between SRI, base-16 and nix32 as nix hash convert does
     assert_eq! \-> hash::parse ("sha256:#{n32}".as_str ()) \-> h
     assert_eq! \-> nixbase32::narinfo_hash ("sha256:#{b16}".as_str ()) \-> Some ("sha256:#{n32}")
     assert_eq! \-> nixbase32::decode (&n32) \-> nixbase32::decode_hex (&b16)
-  ()
 
 test "cache.nixos.org's signatures verify over the fingerprint, and a changed one does not"
   key = signing::parse_public_key CACHE_KEY |> .expect "the cache.nixos.org key"
   keys = .to_vec ([key])
   mut signed = 0 : usize
   for p in store_paths ()
-    if info_of (&p) is Some info
-      if info.sigs.iter () |> .any (\s -> s.starts_with "cache.nixos.org-1:")
-        signed += 1
-        assert_eq! \-> signing::valid_signatures (&keys) (&info) \-> 1 \-> "#{narinfo::fingerprint (&info)}"
-        mut wrong = info.clone ()
-        wrong.nar_size += 1
-        assert_eq! \-> signing::valid_signatures (&keys) (&wrong) \-> 0
+    if cache_signed (&p) is Some info
+      signed += 1
+      assert_eq! \-> signing::valid_signatures (&keys) (&info) \-> 1 \-> "#{narinfo::fingerprint (&info)}"
+      mut wrong = info.clone ()
+      wrong.nar_size += 1
+      assert_eq! \-> signing::valid_signatures (&keys) (&wrong) \-> 0
   assert! \-> signed >= 30 \-> "only #{signed} signed fixture paths"
 
 test "narinfo text round-trips every golden path"
   for p in store_paths ()
     if info_of (&p) is Some info
       assert_eq! \-> narinfo::parse (&narinfo::render (&info)) |> .map (\f -> f.info) \-> Ok (info.clone ())
-  ()
 
 test "the ATerm parser agrees with nix derivation show"
   for d in derivations ()
@@ -120,7 +123,6 @@ test "the ATerm parser agrees with nix derivation show"
       assert_eq! \-> got.env \-> string_map (&d["env"])
       assert_eq! \-> got.input_drvs \-> drv_inputs (&d["inputDrvs"])
       assert_eq! \-> got.outputs \-> drv_outputs (&d["outputs"]) \-> "#{path}"
-  ()
 
 string_map : &Value -> BTreeMap<String, String>
 string_map v =
@@ -164,10 +166,9 @@ synthetic_tree root =
   (std::fs::write (root.join "eight") "exactly8")?
   (std::os::unix::fs::symlink "a.txt" (root.join "link"))?
   (std::os::unix::fs::symlink "../a.txt" (root.join "sub/up"))?
-  -- 0o644 and 0o755.
   for f in ["a.txt", "empty", "sub/deeper/z", "B", "eight"]
-    (std::fs::set_permissions (root.join f) (std::fs::Permissions::from_mode 420))?
-  std::fs::set_permissions (root.join "bin/run") (std::fs::Permissions::from_mode 493)
+    (std::fs::set_permissions (root.join f) (std::fs::Permissions::from_mode 0o644))?
+  std::fs::set_permissions (root.join "bin/run") (std::fs::Permissions::from_mode 0o755)
 
 test "a synthetic tree's NAR hashes to what nix hash path gives"
   want = fixture "nar-tree.json"
@@ -211,7 +212,6 @@ test "the store database agrees with nix path-info and nix-store -qR"
           assert_eq! \-> closure \-> texts (&p) "closure"
         assert_eq! \-> db::references (&conn) (&path) |> .expect "a references query" \-> Some (texts (&p) "references")
     eprintln! \-> "golden: #{seen} store paths found in the database"
-  ()
 
 test "real derivers parse, and list the path among their outputs"
   mut seen = 0 : usize
