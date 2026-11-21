@@ -188,7 +188,7 @@ test "a usage error carries the usage line"
   assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false
 
 test "a missing database fails the pass with its path"
-  o = parse_args (&.to_vec ([.to_string "--once", .to_string "--db", .to_string "/nonexistent/vverify.sqlite"])) 2 |> .expect "options"
+  o = parse_args (&[.to_string "--once", .to_string "--db", .to_string "/nonexistent/vverify.sqlite"]) 2 |> .expect "options"
   exit = id_effect::testing::run_test (once o)
   err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
   assert! \-> err |> .map (\e -> e.contains "/nonexistent/vverify.sqlite") |> .unwrap_or false
