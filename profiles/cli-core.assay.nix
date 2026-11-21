@@ -21,6 +21,10 @@ in
     # builtin `du`, so the wrapper bought nothing.
     carriesDustNotDuWrapper = assay.eq [(has "cli.dust") (has "cli.du")] [true false];
 
+    # vdiff is what `bin/dev build` diffs a fresh closure with (GH-153); nvd stays installed
+    # alongside it, but nothing in the flow calls it any more.
+    carriesVdiff = assay.eq [(has "cli.vdiff") (has "cli.nvd")] [true true];
+
     # cli-core is CLI only: nothing outside features/cli.
     onlyCliFeatures = assay.eq (builtins.filter (f: builtins.substring 0 4 f != "cli.") on) [];
   }

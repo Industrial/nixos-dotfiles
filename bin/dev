@@ -74,7 +74,7 @@ Everyday
 
 Machines
   build <host>            Build a host's system closure (heavy; nom if available,
-                          nvd diff against /run/current-system for this machine).
+                          vdiff against /run/current-system for this machine).
   deploy <host|all> [..]  deploy-rs push via bin/fleet (flags pass through).
   update [target]         Run bin/update/<target>; no target lists them.
   repl                    nix repl on this flake.
@@ -490,8 +490,8 @@ cmd_build() {
   command -v nom >/dev/null 2>&1 && builder=nom
   say "> $builder build --out-link .tmp/dev/build-$h $(host_attr "$h")"
   "$builder" build --out-link "$out" "$(host_attr "$h")"
-  if [[ "$h" == "$(hostname 2>/dev/null || true)" ]] && command -v nvd >/dev/null 2>&1 && [[ -e /run/current-system ]]; then
-    nvd diff /run/current-system "$out"
+  if [[ "$h" == "$(hostname 2>/dev/null || true)" ]] && command -v vdiff >/dev/null 2>&1 && [[ -e /run/current-system ]]; then
+    vdiff /run/current-system "$out"
   fi
 }
 

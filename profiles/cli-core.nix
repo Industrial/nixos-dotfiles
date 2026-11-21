@@ -66,6 +66,7 @@
     features.cli.nixq.enable = true;
     features.cli.nixstore.enable = true;
     features.cli.nvd.enable = true;
+    features.cli.vdiff.enable = true;
 
     # Archives
     features.cli.p7zip.enable = true;

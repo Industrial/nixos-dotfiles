@@ -1,7 +1,7 @@
 # Pure functions behind bin/update/pkg-diff: what a flake.lock bump changes, per host,
 # computed by EVALUATING both trees rather than building them.
 #
-# Why evaluate, not build: a real closure diff (`nix store diff-closures`, nvd) needs both
+# Why evaluate, not build: a real closure diff (`nix store diff-closures`, vdiff) needs both
 # system closures realised. Three to four desktop/server closures per lock-bump PR do not
 # fit a GitHub runner's disk or time budget, and this box is RAM-shared. The evaluated
 # package set is the honest cheap proxy: it names every package in
