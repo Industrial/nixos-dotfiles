@@ -22,7 +22,13 @@ let
   # Note what is NOT here: mimir's NFS (111, 2049, 20048) is opened on tailscale0 only.
   publicTCP = onAll [22];
   publicUDP = onAll [5353];
-  tailnetTCP = onAll {} // {mimir.tailscale0 = [111 2049 20048];};
+  # mimir's NFS; drakkar's vcache (features/nix/vcache, fleet.cachePort).
+  tailnetTCP =
+    onAll {}
+    // {
+      mimir.tailscale0 = [111 2049 20048];
+      drakkar.tailscale0 = [(import ../common/fleet.nix).cachePort];
+    };
 in
   assay.suite "fleet" {
     firewallOnEverywhere = assay.eq (forAll (c: c.networking.firewall.enable)) (onAll true);
@@ -32,7 +38,7 @@ in
     publicTCPPortsArePinned = assay.eq (forAll nixos.publicTCPPorts) publicTCP;
     publicUDPPortsArePinned = assay.eq (forAll nixos.publicUDPPorts) publicUDP;
 
-    # Per-interface rules: only mimir's NFS, and only on the tailnet.
+    # Per-interface rules: only mimir's NFS and drakkar's vcache, and only on the tailnet.
     interfaceTCPRulesArePinned =
       assay.eq
       (forAll (c: lib.filterAttrs (_: v: v != []) (lib.mapAttrs (_: i: i.allowedTCPPorts) c.networking.firewall.interfaces)))

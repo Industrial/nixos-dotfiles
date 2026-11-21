@@ -14,7 +14,12 @@
 #   operatorKey  — the host's ~/.ssh/id_ed25519.pub, installed fleet-wide by
 #                  features/fleet/operator-ssh.nix. null = not yet enrolled.
 #   tailscaleIp  — tailnet IPv4, for consumers that need an address rather than a
-#                  MagicDNS name (NFS export lists).
+#                  MagicDNS name (NFS export lists, the vcache listener).
+#   cacheKey     — public half of the host's vcache signing key (features/nix/vcache).
+#                  The secret half is generated on the host at the service's first
+#                  start and never leaves it; the public half is copied here so
+#                  clients trust it at eval time. null/absent = the host serves no
+#                  cache (yet), and clients leave it out.
 #
 # Host names double as MagicDNS short names on the tailnet.
 let
@@ -23,6 +28,9 @@ let
       description = "desktop and gaming station";
       roles = ["desktop" "builder" "nfs-client"];
       tailscaleIp = "100.69.213.35";
+      # Copy in from `journalctl -u vcache` (the ExecStartPre logs it) after the first
+      # deploy of features.nix.vcache; until then no client substitutes from drakkar.
+      cacheKey = null;
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtviEPSAz5PlJ8K8mFzSQz/Y6WqzqrBA5PzXkhjZ2/y tom@drakkar";
       builder = {
         maxJobs = 8;
@@ -70,8 +78,21 @@ let
 
   hasRole = role: name: builtins.elem role hosts.${name}.roles;
   withRole = role: builtins.filter (hasRole role) order;
+
+  # vcache's TCP port, on every serving host's tailnet address.
+  cachePort = 5100;
 in {
-  inherit hosts order hasRole withRole;
+  inherit hosts order hasRole withRole cachePort;
+
+  # The fleet's binary caches (features/nix/vcache), in builder preference order:
+  # builder-role hosts with a tailnet address and a published cacheKey.
+  binaryCaches =
+    map (name: {
+      inherit name;
+      url = "http://${hosts.${name}.tailscaleIp}:${toString cachePort}";
+      publicKey = hosts.${name}.cacheKey;
+    })
+    (builtins.filter (name: hasRole "builder" name && hosts.${name} ? tailscaleIp && (hosts.${name}.cacheKey or null) != null) builderOrder);
 
   # Alphabetical, like builtins.attrNames.
   names = builtins.attrNames hosts;

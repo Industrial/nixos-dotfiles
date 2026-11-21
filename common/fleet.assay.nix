@@ -43,5 +43,11 @@ in
     # Builders advertised to clients are exactly the builder-role hosts.
     buildersAreBuilderRole = assay.eq (lib.sort lib.lessThan (map (b: b.name) fleet.builders)) (lib.sort lib.lessThan (fleet.withRole "builder"));
 
+    # vcache: served only by builders with a tailnet address, and a host advertises a
+    # cache key only if it runs the server.
+    vcacheServersAreAddressedBuilders = assay.eq (lib.filter (name: !(fleet.hasRole "builder" name && fleet.hosts.${name} ? tailscaleIp)) (runs "nix.vcache")) [];
+    cacheKeysOnlyOnServers = assay.eq (lib.filter (name: !(builtins.elem name (runs "nix.vcache"))) (map (c: c.name) fleet.binaryCaches)) [];
+    binaryCachesUseTheFleetPort = assay.eq (lib.all (c: lib.hasSuffix ":${toString fleet.cachePort}" c.url) fleet.binaryCaches) true;
+
     everyHostEnrolled = assay.eq (builtins.length fleet.operatorKeys) (builtins.length fleet.names);
   }

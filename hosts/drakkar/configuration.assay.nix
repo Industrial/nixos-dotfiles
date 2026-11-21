@@ -16,6 +16,7 @@ in
     enablesGaming = assay.eq cfg.profiles.gaming.enable true;
     enablesAi = assay.eq cfg.profiles.ai.enable true;
     servesBuilds = assay.eq (has "fleet.nix-remote-builder-server") true;
+    servesTheBinaryCache = assay.eq (has "nix.vcache") true;
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
   }
