@@ -18,6 +18,11 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ./Cargo.lock;
 
+  # Link rusqlite's `bundled` SQLite: nixpkgs' cargoUseSystemLibs hook would
+  # point libsqlite3-sys at a system libsqlite3 that is not in the build inputs
+  # (it broke vgc's first drakkar deploy, #171).
+  dontCargoUseSystemLibs = true;
+
   meta = {
     description = "Nix store optimiser in Voltaic: incremental hard-link deduplication into /nix/store/.links";
     license = lib.licenses.mit;
