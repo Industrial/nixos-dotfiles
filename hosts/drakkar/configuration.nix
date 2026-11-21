@@ -47,8 +47,6 @@
   features.nix.vverify.enable = true;
   # vbump (Voltaic): per-input flake.lock bumps, one PR each; bin/update/flake runs it (GH-189).
   features.cli.vbump.enable = true;
-  # vfetch, the concurrent closure fetcher vdeploy (#159) calls (GH-155). A CLI only:
-  # nothing substitutes through it yet.
   # vfetch, the concurrent closure fetcher vdeploy (#159) calls (GH-155), as a CLI.
   features.cli.vfetch.enable = true;
   # vfetch serve: the first substituter, so every substitution here fetches through
