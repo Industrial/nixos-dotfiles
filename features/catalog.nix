@@ -149,6 +149,7 @@
   # nix
   ./nix/vcache
   ./nix/vcache/client.nix
+  ./nix/vdaemon-proxy
   ./nix/vverify
 
   # nixos
