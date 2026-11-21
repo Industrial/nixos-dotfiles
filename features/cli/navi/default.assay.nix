@@ -24,7 +24,7 @@ let
     };
   };
 
-  activation = mod.system.activationScripts.linkNaviCheats.text;
+  activation = mod.vfiles.legacy.linkNaviCheats.text;
 
   has = haystack: needle: nixpkgsLib.hasInfix needle haystack;
 
@@ -121,8 +121,8 @@ in
     # ---------------------------------------------------------------------------
     # Where the sheets go
     # ---------------------------------------------------------------------------
-    activationScriptName = assay.eq (mod.system.activationScripts ? linkNaviCheats) true;
-    doesNotClaimGenericLinkFile = assay.eq (mod.system.activationScripts ? linkFile) false;
+    activationScriptName = assay.eq (mod.vfiles.legacy ? linkNaviCheats) true;
+    doesNotClaimGenericLinkFile = assay.eq (mod.vfiles.legacy ? linkFile) false;
     # $XDG_DATA_HOME/navi/cheats is navi's own `default_cheat_pathbuf()`: land there and no
     # configuration is needed to find the sheets at all.
     linksIntoNavisDefaultCheatPath =
@@ -164,4 +164,11 @@ in
     readsTheZellijKeymapRatherThanCopyingIt =
       assay.eq (has allSheets "bat ~/.config/zellij/config.kdl") true;
     transcribesNoZellijKeybinding = assay.eq (has allSheets "SwitchToMode") false;
+
+    # vfiles (GH-188): the config and the dotfiles cheat repository, linked and owned by the
+    # user; nothing else under the cheats directory is declared.
+    vfilesLinksConfigAndCheats =
+      assay.eq (builtins.attrNames mod.vfiles.files) ["/home/alice/.config/navi/config.yaml" "/home/alice/.local/share/navi/cheats/dotfiles"];
+    vfilesCheatsAreTheRepoDirectory =
+      assay.eq mod.vfiles.files."/home/alice/.local/share/navi/cheats/dotfiles".source ./cheats;
   }

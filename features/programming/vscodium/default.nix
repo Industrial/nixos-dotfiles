@@ -115,7 +115,21 @@ in {
     uv
   ];
 
-  system.activationScripts.linkVscodiumConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  # Linked from the checkout (Cursor's User dir), so a change made in the editor lands in
+  # git; the committed copy stands in while the checkout is missing.
+  vfiles.files = builtins.listToAttrs (map (file: {
+    name = "${codiumDir}/User/${file}";
+    value = {
+      source = "${cursorUserDir}/${file}";
+      fallback = ../cursor/.config/Cursor/User + "/${file}";
+      user = settings.username;
+    };
+  }) ["settings.json" "keybindings.json"]);
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.linkVscodiumConfig = {
     text = ''
       mkdir -p "${codiumDir}/User"
       for file in settings.json keybindings.json; do

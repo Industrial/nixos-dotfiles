@@ -56,4 +56,11 @@ in
     linksSettingsAndKeybindings = assay.eq (activationHas "for file in settings.json keybindings.json; do") true;
     backsUpRealFiles = assay.eq (activationHas ''mv "$target" "$target.backup"'') true;
     linksIntoVscodiumUserDir = assay.eq (activationHas ''target="${home}/.config/VSCodium/User/$file"'') true;
+
+    # vfiles (GH-188): both files linked from Cursor's checkout dir, the committed copies as
+    # fallbacks.
+    vfilesLinksCursorsFiles = assay.eq (builtins.mapAttrs (_: f: [f.source (builtins.pathExists f.fallback)]) cfg.vfiles.files) {
+      "${home}/.config/VSCodium/User/settings.json" = ["${home}/.dotfiles/features/programming/cursor/.config/Cursor/User/settings.json" true];
+      "${home}/.config/VSCodium/User/keybindings.json" = ["${home}/.dotfiles/features/programming/cursor/.config/Cursor/User/keybindings.json" true];
+    };
   }

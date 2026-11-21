@@ -52,4 +52,10 @@ in
       cfg.system.activationScripts.gnome-monitors.text
       != null)
     true;
+
+    # vfiles (GH-188): monitors.xml, linked from the committed file.
+    vfilesLinksMonitorsXml = let
+      f = cfg.vfiles.files."${nixos.defaultSettings.userdir}/.config/monitors.xml";
+    in
+      assay.eq [f.mode (f.source == ./monitors.xml)] ["link" true];
   }

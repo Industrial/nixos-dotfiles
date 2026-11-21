@@ -383,6 +383,8 @@
       // {vpush-vm = import ./features/nix/vpush/test.nix {inherit pkgs;};}
       # features/nix/vfetch's VM test: a substitution goes through vfetch serve.
       // {vfetch-vm = import ./features/nix/vfetch/test.nix {inherit pkgs;};}
+      # features/nixos/vfiles's VM test: add, remove, adopt, fall back, report drift.
+      // {vfiles-vm = import ./features/nixos/vfiles/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

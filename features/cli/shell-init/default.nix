@@ -236,6 +236,8 @@ in {
     };
   };
 
+  imports = [../../../lib/vfiles.nix];
+
   config = mkMerge [
     # Relocated from features/cli/fish/default.nix, where this block had lived since fish was
     # the login shell. `environment.sessionVariables` is a global attribute with nothing
@@ -260,7 +262,13 @@ in {
       # dropping a hook from `hooks` then takes its file with it. A copy leaves the dropped
       # file behind and Nushell keeps sourcing it on every start, which is the
       # stale-generated-file failure this feature exists to end.
-      system.activationScripts.nushellVendorAutoload = {
+      vfiles.files.${autoloadDir} = {
+        source = autoload;
+        user = settings.username;
+      };
+
+      # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+      vfiles.legacy.nushellVendorAutoload = {
         text = ''
           install -d -o ${settings.username} -g users -m 0755 \
             ${settings.userdir}/.local \

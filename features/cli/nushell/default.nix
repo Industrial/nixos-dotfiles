@@ -23,7 +23,39 @@ in {
   # variables are no longer linked from here: features/cli/shell-init generates
   # them into `$nu.data-dir/vendor/autoload`, which is why `login.nu` and
   # `starship.nu` are gone from this list and from the repo.
-  system.activationScripts.linkNushellConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  vfiles.files = let
+    configDir = "${settings.userdir}/.config/nushell";
+    nu = file: {
+      name = "${configDir}/${file}";
+      value = {
+        # Linked from the checkout, so an edit applies at the next `nu`; the committed copy
+        # stands in while the checkout is missing.
+        source = "${nushellDir}/${file}";
+        fallback = ./. + "/${file}";
+        user = settings.username;
+      };
+    };
+    # Links earlier generations made, whose sources are gone: removed while still links.
+    stale = file: {
+      name = "${configDir}/${file}";
+      value = {
+        mode = "absent";
+        user = settings.username;
+      };
+    };
+  in
+    builtins.listToAttrs (map nu ["env.nu" "config.nu" "havamal.nu"] ++ map stale ["login.nu" "starship.nu"])
+    // {
+      "${configDir}/havamal-stanzas" = {
+        source = "${havamal}/share/fish/stanzas";
+        user = settings.username;
+      };
+    };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.linkNushellConfig = {
     text = ''
       mkdir -p /home/${settings.username}/.config/nushell
       for file in env.nu config.nu havamal.nu; do

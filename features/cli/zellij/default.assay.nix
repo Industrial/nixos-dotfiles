@@ -217,4 +217,15 @@ in
       assay.eq
       [themeEntries.red themeEntries.green themeEntries.blue]
       [palette.withHash.base08 palette.withHash.base0B palette.withHash.base0D];
+
+    # vfiles (GH-188): every /etc/zellij file the script linked is declared, linked from
+    # the same place, and owned by the user.
+    vfilesLinksEveryEtcFile =
+      assay.eq
+      (lib.mapAttrs (_: f: [f.mode f.user]) cfg.vfiles.files)
+      (lib.mapAttrs' (name: _: lib.nameValuePair "/home/u/.config/${name}" ["link" "u"]) zellijEtc);
+    vfilesSourcesAreTheEtcPaths =
+      assay.eq
+      (lib.all (path: cfg.vfiles.files.${path}.source == "/etc/${lib.removePrefix "/home/u/.config/" path}") (builtins.attrNames cfg.vfiles.files))
+      true;
   }

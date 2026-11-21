@@ -31,10 +31,26 @@ in {
     navi
   ];
 
+  imports = [../../../lib/vfiles.nix];
+
+  # The config and the `dotfiles` cheat repository are links; the cheats parent stays a real
+  # directory (vfiles makes it, owned by the user) that navi writes imported repositories into.
+  vfiles.files = {
+    "${configDir}/config.yaml" = {
+      source = configFile;
+      user = settings.username;
+    };
+    "${cheatsDir}/dotfiles" = {
+      source = cheats;
+      user = settings.username;
+    };
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
   # Named for this feature rather than the generic linkFile that
   # features/window-manager/alacritty already claims: two features writing one
   # activation-script name is an evaluation conflict, not a merge.
-  system.activationScripts.linkNaviCheats = {
+  vfiles.legacy.linkNaviCheats = {
     text = ''
       mkdir -p ${configDir}
       # navi writes no config of its own, but `navi info config-example > config.yaml` is the

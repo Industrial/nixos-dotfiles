@@ -213,4 +213,12 @@ in
       XDG_STATE_HOME = "$HOME/.local/state";
     };
     sessionVariablesSurviveDisable = assay.eq disabled.environment.sessionVariables.EDITOR "nvim";
+
+    # vfiles (GH-188): the autoload directory is one declared link, and only while enabled.
+    vfilesLinksTheAutoloadDir = let
+      files = lib.attrValues enabled.vfiles.files;
+      f = builtins.head files;
+    in
+      assay.eq [(builtins.length files) (lib.hasSuffix "/.local/share/nushell/vendor/autoload" f.path) (lib.hasSuffix "-nushell-vendor-autoload" "${f.source}")] [1 true true];
+    vfilesDeclaresNothingWhenDisabled = assay.eq disabled.vfiles.files {};
   }

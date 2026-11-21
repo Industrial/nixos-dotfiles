@@ -22,7 +22,16 @@
   #
   # Only a symlink is removed. A real file there is a hand-written config this feature has no
   # business deleting.
-  system.activationScripts.pruneStarshipConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  # vfiles: `absent` removes a symlink there and reports a real file, exactly the prune.
+  vfiles.files."${settings.userdir}/.config/starship.toml" = {
+    mode = "absent";
+    user = settings.username;
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.pruneStarshipConfig = {
     text = ''
       target=${settings.userdir}/.config/starship.toml
       if [ -L "$target" ]; then
