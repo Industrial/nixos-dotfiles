@@ -53,6 +53,7 @@ while read -r f; do
     nix derivation show "$f" > "$work/show.json"
     jq -c --arg f "$f" --rawfile aterm "$f" \
     '.[$f] | {path: $f, aterm: $aterm, system, builder, args, env, inputSrcs,
+              structuredAttrs: (.structuredAttrs // null),
               inputDrvs: (.inputDrvs | map_values(.outputs)),
               outputs: (.outputs | map_values(
                 {path: (.path // ""),

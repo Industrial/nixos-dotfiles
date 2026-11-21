@@ -120,9 +120,24 @@ test "the ATerm parser agrees with nix derivation show"
       assert_eq! \-> got.builder \-> text (&d) "builder"
       assert_eq! \-> got.args \-> texts (&d) "args"
       assert_eq! \-> got.input_srcs \-> BTreeSet::from_iter (texts (&d) "inputSrcs")
-      assert_eq! \-> got.env \-> string_map (&d["env"])
+      assert_eq! \-> plain_env (&got) \-> string_map (&d["env"]) \-> "#{path}"
+      assert_eq! \-> structured_attrs (&got) \-> d["structuredAttrs"].clone () \-> "#{path}"
       assert_eq! \-> got.input_drvs \-> drv_inputs (&d["inputDrvs"])
       assert_eq! \-> got.outputs \-> drv_outputs (&d["outputs"]) \-> "#{path}"
+
+-- `nix derivation show` lifts a structured-attrs derivation's `__json`
+-- variable out of env into its own `structuredAttrs` object (null otherwise).
+plain_env : &drv::Derivation -> BTreeMap<String, String>
+plain_env d =
+  mut env = d.env.clone ()
+  env.remove "__json"
+  env
+
+structured_attrs : &drv::Derivation -> Value
+structured_attrs d =
+  case d.env.get "__json" of
+    None -> Value::Null
+    Some j -> (serde_json::from_str j : serde_json::Result<Value>) |> .unwrap_or (Value::Null)
 
 string_map : &Value -> BTreeMap<String, String>
 string_map v =

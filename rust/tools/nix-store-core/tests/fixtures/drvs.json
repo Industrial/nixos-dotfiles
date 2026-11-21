@@ -22,6 +22,7 @@
         "urls": "https://github.com/fosslinux/live-bootstrap/raw/a8752029f60217a5c41c548b16f5cdd2a1a0e0db/sysa/coreutils-5.0/patches/expr-strcmp.patch"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -53,6 +54,7 @@
         "urls": "https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55200.patch"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -84,6 +86,7 @@
         "urls": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.5.6.tar.xz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -115,6 +118,7 @@
         "urls": "https://salsa.debian.org/debian/libssh2/-/raw/fe2e3c0848f8501bf729d61790360761a20c75f2/debian/patches/CVE-2026-66032.patch"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -146,6 +150,7 @@
       "inputSrcs": [
         "/nix/store/9hvp9axa7zm732xi5jvg8pckvfk6ixcj-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/m6mv4n37zil8bnif1zc2s57rklyb8gcf-bootstrap-coreutils-5.0.drv": [
           "out"
@@ -186,6 +191,7 @@
         "urls": "https://github.com/fosslinux/live-bootstrap/raw/c0494d9af84b9e8c3e76e34c6e898978013a3b39/steps/bash-2.05b/patches/dev-tty.patch"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -214,6 +220,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/dipc6gf1wqlcxm2qximla4vjxf1hcbax-libc.a-builder.drv": [
           "out"
@@ -256,6 +263,7 @@
         "urls": "https://ftp.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -284,6 +292,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
           "out"
@@ -321,6 +330,49 @@
         "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
         "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
       ],
+      "structuredAttrs": {
+        "buildInputs": [
+          "/nix/store/ja464x29jc1xxb1jkpmr4xypi95gxk1q-gnum4-1.4.21"
+        ],
+        "builder": "/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash",
+        "cmakeFlags": [],
+        "configureFlags": [],
+        "depsBuildBuild": [],
+        "depsBuildBuildPropagated": [],
+        "depsBuildTarget": [],
+        "depsBuildTargetPropagated": [],
+        "depsHostHost": [],
+        "depsHostHostPropagated": [],
+        "depsTargetTarget": [],
+        "depsTargetTargetPropagated": [],
+        "doCheck": false,
+        "doInstallCheck": false,
+        "dontPatchShebangs": true,
+        "enableParallelBuilding": true,
+        "enableParallelChecking": true,
+        "enableParallelInstalling": true,
+        "env": {},
+        "mesonFlags": [],
+        "name": "autoconf-2.69",
+        "nativeBuildInputs": [
+          "/nix/store/ja464x29jc1xxb1jkpmr4xypi95gxk1q-gnum4-1.4.21",
+          "/nix/store/7skrnc8m0v4wvkm7b508llyan0dijmrq-perl-5.42.3"
+        ],
+        "outputChecks": {
+          "out": {}
+        },
+        "outputs": ["out"],
+        "patches": [],
+        "pname": "autoconf",
+        "preCheck": "export TESTSUITEFLAGS=\"-j$NIX_BUILD_CORES\"\n",
+        "propagatedBuildInputs": [],
+        "propagatedNativeBuildInputs": [],
+        "src": "/nix/store/sm3m6c71sxa8rwzk85zllm9xjqrdvdb4-autoconf-2.69.tar.xz",
+        "stdenv": "/nix/store/m6jijz26w630pkc05mcyhmc5v1n66vv8-bootstrap-stage-xgcc-stdenv-linux",
+        "strictDeps": true,
+        "system": "x86_64-linux",
+        "version": "2.69"
+      },
       "inputDrvs": {
         "/nix/store/7camx6as44z7ks8g4azj65c7rf594zby-bootstrap-stage-xgcc-stdenv-linux.drv": [
           "out"
@@ -364,6 +416,7 @@
       "inputSrcs": [
         "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
         "/nix/store/bny5cp5xx3yc70hwlmxgcxjb7gg7c5wn-findutils-static-4.11.0.drv": [
@@ -403,6 +456,7 @@
         "urls": "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -434,6 +488,7 @@
         "urls": "https://ftpmirror.gnu.org/gcc/gcc-16.2.0/gcc-16.2.0.tar.xz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -462,6 +517,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/lw3yyhi0kja3w4bzn090fqdf6bcmd1i0-tinycc-mes-chain-unstable-2025-12-03-builder.drv": [
           "out"
@@ -504,6 +560,7 @@
       "inputSrcs": [
         "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
         "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
@@ -546,6 +603,7 @@
       "inputSrcs": [
         "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/h6pi2cyw7j5liy0fbzq8i1ippcqwdjd3-mes-src-0.27.1.drv": [
           "bin",
@@ -588,6 +646,7 @@
       "inputSrcs": [
         "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/19vlv640sa5fr6cpnr14s166v9vd2p9m-bzip2-1.0.8.tar.gz.drv": [
           "out"
@@ -640,6 +699,7 @@
         "urls": "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -671,6 +731,7 @@
         "urls": "https://git.savannah.gnu.org/cgit/config.git/plain/config.guess?id=948ae97ca5703224bd3eada06b7a69f40dd15a02"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -697,6 +758,52 @@
         "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
         "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
       ],
+      "structuredAttrs": {
+        "buildInputs": [],
+        "builder": "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash",
+        "cmakeFlags": [],
+        "configureFlags": [
+          "--build=x86_64-unknown-linux-gnu",
+          "--host=x86_64-unknown-linux-gnu"
+        ],
+        "configurePlatforms": ["build", "host"],
+        "depsBuildBuild": [],
+        "depsBuildBuildPropagated": [],
+        "depsBuildTarget": [],
+        "depsBuildTargetPropagated": [],
+        "depsHostHost": [],
+        "depsHostHostPropagated": [],
+        "depsTargetTarget": [],
+        "depsTargetTargetPropagated": [],
+        "doCheck": false,
+        "doInstallCheck": true,
+        "enableParallelBuilding": true,
+        "enableParallelChecking": true,
+        "enableParallelInstalling": true,
+        "env": {},
+        "mesonFlags": [],
+        "name": "bison-3.8.2",
+        "nativeBuildInputs": [
+          "/nix/store/dpfl1jgh80jki2a53i6i1gx19lccvk9f-gnum4-1.4.21",
+          "/nix/store/niqsa6mxqsyax9lzbm261a2ml6m71vb6-perl-5.42.3"
+        ],
+        "outputChecks": {
+          "out": {}
+        },
+        "outputs": ["out"],
+        "patches": [],
+        "pname": "bison",
+        "postFixup": "patchShebangs --build $out/bin/yacc\n",
+        "propagatedBuildInputs": [
+          "/nix/store/dpfl1jgh80jki2a53i6i1gx19lccvk9f-gnum4-1.4.21"
+        ],
+        "propagatedNativeBuildInputs": [],
+        "src": "/nix/store/9vm1ihdg1ysmrjdbb80g834iizzxb4yk-bison-3.8.2.tar.gz",
+        "stdenv": "/nix/store/z2wyfgcxn7brfklv373fz0l9k8b5pwsg-stdenv-linux",
+        "strictDeps": true,
+        "system": "x86_64-linux",
+        "version": "3.8.2"
+      },
       "inputDrvs": {
         "/nix/store/08grahh6i022hkpbaz3yix4wvrcrpyks-stdenv-linux.drv": ["out"],
         "/nix/store/3y0bjp6kk93iw74vzp4s976zdmcqaznc-bison-3.8.2.tar.gz.drv": [
@@ -739,6 +846,7 @@
       "inputSrcs": [
         "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/nxw2yr1lk45ypcnira1m153ar8dwdzj2-libgetopt.a.drv": ["out"],
         "/nix/store/ssj4nwq1miqn3i5rhihvgd3mck7fwm40-libtcc1.a.drv": ["out"],
@@ -779,6 +887,7 @@
         "urls": "https://ftpmirror.gnu.org/mpfr/mpfr-2.4.2.tar.gz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -807,6 +916,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/nsrksq0rxb8m5wgn541c0j6n03cjzd7y-libgetopt.a-builder.drv": [
           "out"
@@ -847,6 +957,7 @@
         "version": "1.9.1"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv": ["out"],
         "/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv": [
@@ -880,6 +991,7 @@
         "version": "1.9.1"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/rq77y1w9cbyx76dqcnw4wa24w1wq3ybw-M2-0.c-1.9.1.drv": ["out"],
         "/nix/store/s47mlxqkjc26fvmx2yrps4hkpigimxi1-cc_arch-1.9.1.drv": ["out"]
@@ -910,6 +1022,7 @@
         "version": "1.9.1"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/dschwsfi21lwar5ldv5wdqnm1waf197a-M2-0-0.M1-1.9.1.drv": [
           "out"
@@ -946,6 +1059,7 @@
         "urls": "https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -974,6 +1088,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/l0rq88l43hfrdaywci9zzjglkw56gwc0-mes-get-version-0.27.1-builder.drv": [
           "out"
@@ -1013,6 +1128,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
           "out"
@@ -1052,6 +1168,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/n8xfn5p7ap99jqirj54202i7g7mwscbb-mes-libc+tcc-0.27.1-builder.drv": [
           "out"
@@ -1091,6 +1208,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
           "out"
@@ -1129,6 +1247,44 @@
         "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
         "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
       ],
+      "structuredAttrs": {
+        "buildCommand": "mkdir -p $out/nix-support\ncp /nix/store/96rvfw5vlv1hwwm9sdxhdkkpjyym6p2x-update-autotools-gnu-config-scripts.sh $out/nix-support/setup-hook\nrecordPropagatedDependencies\nsubstitute /nix/store/96rvfw5vlv1hwwm9sdxhdkkpjyym6p2x-update-autotools-gnu-config-scripts.sh $out/nix-support/setup-hook --subst-var gnu_config\n",
+        "buildInputs": [],
+        "builder": "/nix/store/yn40n1h7nry843rmhiz1rzxxbgais07x-bash-static-5.3/bin/bash",
+        "cmakeFlags": [],
+        "configureFlags": [],
+        "depsBuildBuild": [],
+        "depsBuildBuildPropagated": [],
+        "depsBuildTarget": [],
+        "depsBuildTargetPropagated": [],
+        "depsHostHost": [],
+        "depsHostHostPropagated": [],
+        "depsTargetTarget": [],
+        "depsTargetTargetPropagated": [],
+        "doCheck": false,
+        "doInstallCheck": false,
+        "enableParallelBuilding": true,
+        "enableParallelChecking": true,
+        "enableParallelInstalling": true,
+        "env": {},
+        "gnu_config": "/nix/store/vjh3adfljl7187n0hbm0h1pvrg3nq17l-gnu-config-2024-01-01",
+        "mesonFlags": [],
+        "name": "update-autotools-gnu-config-scripts-hook",
+        "nativeBuildInputs": [],
+        "outputChecks": {
+          "out": {}
+        },
+        "outputs": ["out"],
+        "passAsFile": ["buildCommand"],
+        "patches": [],
+        "pname": "update-autotools-gnu-config-scripts-hook",
+        "propagatedBuildInputs": [],
+        "propagatedNativeBuildInputs": [],
+        "stdenv": "/nix/store/dnvd4fmksvklapdq97jlajv0w0faby4g-bootstrap-stage2-stdenv-linux-no-cc",
+        "strictDeps": true,
+        "system": "x86_64-linux",
+        "version": "26.05pre-git"
+      },
       "inputDrvs": {
         "/nix/store/9s1n83dmdihh3zzqpqlp88kfw91nzwd7-bootstrap-stage2-stdenv-linux-no-cc.drv": [
           "out"
@@ -1170,6 +1326,7 @@
       "inputSrcs": [
         "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
         "/nix/store/d21687bzcrh0bvz34kra3il3g75xvgix-bzip2-static-1.0.8.drv": [
@@ -1209,6 +1366,7 @@
         "urls": "https://www.libssh2.org/download/libssh2-1.11.1.tar.gz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -1236,6 +1394,45 @@
         "/nix/store/l622p70vy8k5sh7y5wizi5f2mic6ynpg-source-stdenv.sh",
         "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
       ],
+      "structuredAttrs": {
+        "baseBinName": "pkg-config",
+        "buildCommand": "mkdir -p $out/nix-support\ncp /nix/store/c4akajrb4jg50k72jw7zfbyv8z139ri0-setup-hook.sh $out/nix-support/setup-hook\nrecordPropagatedDependencies\nsubstitute /nix/store/c4akajrb4jg50k72jw7zfbyv8z139ri0-setup-hook.sh $out/nix-support/setup-hook --subst-var baseBinName --subst-var targetPrefix\n",
+        "buildInputs": [],
+        "builder": "/nix/store/hasnvc0j36gg6qrdsfcx7yivx3c2bpqr-bash-5.3p20/bin/bash",
+        "cmakeFlags": [],
+        "configureFlags": [],
+        "depsBuildBuild": [],
+        "depsBuildBuildPropagated": [],
+        "depsBuildTarget": [],
+        "depsBuildTargetPropagated": [],
+        "depsHostHost": [],
+        "depsHostHostPropagated": [],
+        "depsTargetTarget": [],
+        "depsTargetTargetPropagated": [],
+        "doCheck": false,
+        "doInstallCheck": false,
+        "enableParallelBuilding": true,
+        "enableParallelChecking": true,
+        "enableParallelInstalling": true,
+        "env": {},
+        "mesonFlags": [],
+        "name": "pkgs-config-setup-hook",
+        "nativeBuildInputs": [],
+        "outputChecks": {
+          "out": {}
+        },
+        "outputs": ["out"],
+        "passAsFile": ["buildCommand"],
+        "patches": [],
+        "pname": "pkgs-config-setup-hook",
+        "propagatedBuildInputs": [],
+        "propagatedNativeBuildInputs": [],
+        "stdenv": "/nix/store/vd29sjk0bfwm2fygq5a9an70qd8hfnlb-stdenv-linux-no-cc",
+        "strictDeps": true,
+        "system": "x86_64-linux",
+        "targetPrefix": "",
+        "version": "26.05pre-git"
+      },
       "inputDrvs": {
         "/nix/store/9k2radvbny2prs6r0l215zy4r5wd2cyp-stdenv-linux-no-cc.drv": [
           "out"
@@ -1272,6 +1469,7 @@
         "urls": "https://ftpmirror.gnu.org/patch/patch-2.5.9.tar.gz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -1300,6 +1498,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/7sn98bdbh4x5b58q0ghni71ginkqxcms-mes-libc-mini-0.27.1-builder.drv": [
           "out"
@@ -1339,6 +1538,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/d3v7xlwway2wsb2ipyfxnh2y3xfydjqm-minimal-bootstrap-bootstrap-chain-test-builder.drv": [
           "out"
@@ -1384,6 +1584,7 @@
       "inputSrcs": [
         "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/m2khnp0iw665w7zjkyvil62v5wjlbl8i-patch-2.5.9.tar.gz.drv": [
           "out"
@@ -1426,6 +1627,7 @@
         "version": "1.9.1"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/xsn3z4sqkn6ac7mlq35b62qs31mlnhbw-blood-elf-0-1.9.1.drv": [
           "out"
@@ -1462,6 +1664,7 @@
       "inputSrcs": [
         "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
         "/nix/store/lv5k1mp3m8zdv42lx9aizrii7j18sm86-bootstrap-coreutils-musl-9.11.drv": [
@@ -1501,6 +1704,7 @@
       "inputSrcs": [
         "/nix/store/70acbfgbz5cxsx4sqzcnj8qaqhb4i9ay-bash-builder.sh"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/6iymp2ayvqxz8br80ng51ybb05sjl93j-bash-5.3.drv": ["out"],
         "/nix/store/lrahhnksqxiphhrk9kk13s52sip49xbb-gnutar-static-1.35.drv": [
@@ -1539,6 +1743,7 @@
         "version": "unstable-2023-05-22"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/cwsp8d28ypl2yvhbbhlvd9c3w0mdrkp3-ln-boot-unstable-2023-05-22-builder.drv": [
           "out"
@@ -1578,6 +1783,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/54zbninnz5i47975x5gzfmal50q29zyq-crt-builder.drv": ["out"],
         "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
@@ -1624,6 +1830,7 @@
         "version": "1.9.1"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv": ["out"],
         "/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv": [
@@ -1657,6 +1864,7 @@
         "version": "1.9.1"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/2jwh5pdbg0mff2bhxvc2vam8bm05wa08-catm-1.9.1.drv": ["out"],
         "/nix/store/2kbbzfsz1hzd21yj0h989s3z40cgrp58-stage0-posix-1.9.1-source.drv": [
@@ -1696,6 +1904,7 @@
         "urls": "https://ftpmirror.gnu.org/bash/bash-5.3-patches/bash53-010"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -1730,6 +1939,7 @@
       "inputSrcs": [
         "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/4id1z907zlr2vf8x4hjqvgv2hb12cyji-tccdefs-unstable-2025-12-03.drv": [
           "out"
@@ -1772,6 +1982,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/9b5xvzhkkyvf9k6mxskgawzsq2129iga-mes-crt1-0.27.1-builder.drv": [
           "out"
@@ -1811,6 +2022,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/7nhdvy4cj7rqk8zfxi248bkqgfxkwzxg-tinycc-unstable-2025-12-03-source-builder.drv": [
           "out"
@@ -1856,6 +2068,7 @@
       "inputSrcs": [
         "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/43c53m8vn9xgm336dgb8fzm24a0sfak9-tinycc-boot-mes-unstable-2024-07-07.drv": [
           "out"
@@ -1902,6 +2115,7 @@
         "/nix/store/kqi6x4rd1a8q3dm1w6r03xy3czsiq1r6-config_tccdefs.h",
         "/nix/store/m48r7nsm8wgjy69jg442vc7jjdfmcnl7-write-text-file.kaem"
       ],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/bgjwrca3m6p7r00sfk7s6fg78zfawxa9-tinycc-bootstrappable-unstable-2024-07-07.drv": [
           "out"
@@ -1947,6 +2161,7 @@
         "urls": "https://ftpmirror.gnu.org/diffutils/diffutils-3.8.tar.xz"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
@@ -1975,6 +2190,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/34vmg1140k58kb2j63gsp0f1n45rg5cc-tinycc-boot1-libs-unstable-2024-07-07-builder.drv": [
           "out"
@@ -2014,6 +2230,7 @@
         "system": "x86_64-linux"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {
         "/nix/store/6nz7fix73p045w536s53idblfknf8zcp-crt-builder.drv": ["out"],
         "/nix/store/pz3m6g7iabylyazm40p363y8795vybf9-mescc-tools-1.9.1.drv": [
@@ -2054,6 +2271,7 @@
         "urls": "https://salsa.debian.org/debian/libssh2/-/raw/1d4906e6ebe85a9da2931ba33677ead96a61f07f/debian/patches/CVE-2026-55199.patch"
       },
       "inputSrcs": [],
+      "structuredAttrs": null,
       "inputDrvs": {},
       "outputs": {
         "out": {
