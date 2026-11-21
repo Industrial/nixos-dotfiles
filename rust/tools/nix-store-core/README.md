@@ -180,6 +180,7 @@ link mtimes.
 | `parse_generation : &str -> &str -> Option<u64>` | `parseName`: the number of `<profile>-<N>-link` (text after `-link` ignored) |
 | `cutoff_of : &str -> i64 -> Result<i64, String>` | `parseOlderThanTimeSpec`: `Nd` (N ≥ 1) as a cutoff in epoch seconds, given now |
 | `doomed : &[Generation] -> Option<u64> -> i64 -> Option<Vec<u64>>` | `deleteGenerationsOlderThan`: what goes, ascending. The newest generation older than the cutoff and the current one stay. None when creation times are not monotonic below the kept one, where Nix aborts: remove nothing |
+| `all_but : &[Generation] -> Option<u64> -> Vec<u64>` | `deleteOldGenerations` (`nix-collect-garbage -d`): every generation but the current one, ascending |
 
 ### `worker`: the nix-daemon worker protocol
 
