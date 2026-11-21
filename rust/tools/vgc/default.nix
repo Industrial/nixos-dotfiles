@@ -18,6 +18,12 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ./Cargo.lock;
 
+  # rusqlite's `bundled` SQLite is the one to link. nixpkgs' cargoUseSystemLibs
+  # hook would point libsqlite3-sys at a system libsqlite3 that is not in the
+  # build inputs, and the link fails with `cannot find -lsqlite3` (it did, on
+  # drakkar's first deploy of vgc); vcache opts out the same way.
+  dontCargoUseSystemLibs = true;
+
   meta = {
     description = "Nix garbage collector in Voltaic: plans exactly what nix-collect-garbage would delete";
     license = lib.licenses.mit;
