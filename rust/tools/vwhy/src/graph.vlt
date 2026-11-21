@@ -27,6 +27,10 @@ export data Graph { export paths Vec<String>, export sizes Vec<u64>, export refs
 export data TreeLine { export prefix String, export parent usize, export node usize, export seen bool }
   deriving (Debug, Clone, PartialEq, Eq)
 
+-- `n` copies of a value.
+filled : given <T: Clone> T -> usize -> Vec<T>
+filled value n = std::iter::repeat_n value n |> .collect
+
 empty_lists : usize -> Vec<Vec<usize>>
 empty_lists n =
   mut out = Vec::new () : Vec<Vec<usize>>
@@ -82,9 +86,7 @@ referrers g =
 export distances : &Graph -> usize -> Vec<Option<usize>>
 distances g dep =
   back = referrers g
-  mut dist = Vec::new () : Vec<Option<usize>>
-  for _ in 0 .. g.paths.len ()
-    dist.push None
+  mut dist = filled None (g.paths.len ())
   dist[dep] := Some 0
   mut queue = VecDeque::new () : VecDeque<usize>
   queue.push_back dep
@@ -169,9 +171,7 @@ tree g dep =
   dist = distances g dep
   mut out = Vec::new () : Vec<TreeLine>
   if dist[g.root].is_some ()
-    mut visited = Vec::new () : Vec<bool>
-    for _ in 0 .. g.paths.len ()
-      visited.push false
+    mut visited = filled false (g.paths.len ())
     expand g (&dist) dep g.root "" (&mut visited) (&mut out)
   out
 
@@ -196,9 +196,7 @@ chain_count g dep =
   if dist[g.root].is_none ()
     0
   else
-    mut memo = Vec::new () : Vec<Option<u64>>
-    for _ in 0 .. g.paths.len ()
-      memo.push None
+    mut memo = filled None (g.paths.len ())
     count_from g (&dist) dep g.root (&mut memo)
 
 -- The nodes in reverse postorder of a depth-first walk from the root, with
@@ -208,9 +206,7 @@ chain_count g dep =
 export reverse_postorder : &Graph -> (Vec<usize>, Vec<usize>)
 reverse_postorder g =
   n = g.paths.len ()
-  mut seen = Vec::new () : Vec<bool>
-  for _ in 0 .. n
-    seen.push false
+  mut seen = filled false n
   mut post = Vec::new () : Vec<usize>
   mut stack = .to_vec ([(g.root, 0)]) : Vec<(usize, usize)>
   seen[g.root] := true
@@ -225,9 +221,7 @@ reverse_postorder g =
     else
       post.push node
   post.reverse ()
-  mut order = Vec::new () : Vec<usize>
-  for _ in 0 .. n
-    order.push usize::MAX
+  mut order = filled usize::MAX n
   for pair in post.iter () |> .enumerate
     (k, v) = pair
     order[*v] := k
@@ -253,9 +247,7 @@ export dominators : &Graph -> Vec<Option<usize>>
 dominators g =
   (post, order) = reverse_postorder g
   back = referrers g
-  mut idom = Vec::new () : Vec<Option<usize>>
-  for _ in 0 .. g.paths.len ()
-    idom.push None
+  mut idom = filled None (g.paths.len ())
   idom[g.root] := Some g.root
   mut changed = true
   while changed

@@ -95,9 +95,10 @@ export ranked : &Graph -> bool -> usize -> Vec<Row>
 ranked g by_own limit =
   unique = unique_sizes g
   mut rows = Vec::new () : Vec<Row>
-  for n in 0 .. g.paths.len ()
+  for pair in unique.iter () |> .enumerate
+    (n, u) = pair
     if n != g.root
-      rows.push (Row { node = n, own = g.sizes[n], unique = unique[n] })
+      rows.push (Row { node = n, own = g.sizes[n], unique = *u })
   if by_own
     rows.sort_by (\a b -> b.own.cmp (&a.own) |> .then (b.unique.cmp (&a.unique)) |> .then (a.node.cmp (&b.node)))
   else
