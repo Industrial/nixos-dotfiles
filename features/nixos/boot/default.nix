@@ -59,6 +59,64 @@
 
   hasLanzaboote = options ? boot && options.boot ? lanzaboote;
   lanzaboote = inputs.lanzaboote or null;
+
+  # The bootloader install hook used when Secure Boot is on, in place of upstream's
+  # (GH-184). It does what the Python systemd-boot installer does that upstream's does not:
+  #  - It gives lzbt the generations of EVERY system profile: system-*-link (nixos-rebuild,
+  #    deploy-rs) and system-profiles/<name>-<N>-link (comin). A link lzbt cannot parse is
+  #    skipped with a warning; lzbt itself would fail on it.
+  #  - It makes the generation being switched to ($1, the toplevel from
+  #    switch-to-configuration) the boot default. It finds the UKI whose .cmdline carries
+  #    init=<toplevel>/init, the highest version if several do, and writes
+  #    `default <that file>` into loader.conf (temp file, fsync, rename). lzbt alone
+  #    leaves `default nixos-*`, which picks the highest version number, and a stale
+  #    high-numbered profile wins that.
+  lzbtAllProfiles = let
+    lz = config.boot.lanzaboote;
+    esp = config.boot.loader.efi.efiSysMountPoint;
+  in
+    pkgs.writeShellApplication {
+      name = "lzbt-all-profiles";
+      runtimeInputs = [pkgs.coreutils pkgs.gnugrep];
+      text = ''
+        toplevel=$(readlink -f "$1")
+        esp=${lib.escapeShellArg esp}
+
+        shopt -s nullglob
+        links=()
+        for link in /nix/var/nix/profiles/system-*-link /nix/var/nix/profiles/system-profiles/*-link; do
+          if [[ ''${link##*/} =~ ^[^-]+-[0-9]+-link$ ]]; then
+            links+=("$link")
+          else
+            echo "lzbt-all-profiles: skipping $link (not <profile>-<N>-link)" >&2
+          fi
+        done
+
+        PATH=${config.systemd.package}/lib/systemd:$PATH
+        ${lz.installCommand} \
+          ${lib.escapeShellArgs ["--public-key=${toString lz.publicKeyFile}" "--private-key=${toString lz.privateKeyFile}"]} \
+          "$esp" "''${links[@]}"
+
+        matches=()
+        for uki in "$esp"/EFI/Linux/nixos-generation-*.efi; do
+          if grep -qaF -- "init=$toplevel/init" "$uki"; then
+            matches+=("''${uki##*/}")
+          fi
+        done
+        if [ "''${#matches[@]}" -eq 0 ]; then
+          echo "lzbt-all-profiles: no UKI boots $toplevel; loader.conf keeps its default" >&2
+          exit 0
+        fi
+        entry=$(printf '%s\n' "''${matches[@]}" | sort -V | tail -n 1)
+
+        conf="$esp/loader/loader.conf"
+        { grep -v '^default ' "$conf" || true; echo "default $entry"; } > "$conf.tmp"
+        sync "$conf.tmp"
+        mv -f "$conf.tmp" "$conf"
+        sync "$conf"
+        echo "lzbt-all-profiles: boot default is $entry" >&2
+      '';
+    };
 in {
   imports = lib.optional (lanzaboote != null) lanzaboote.nixosModules.lanzaboote;
 
@@ -206,6 +264,19 @@ in {
           enable = true;
           inherit (cfg.secureBoot) pkiBundle;
         };
+        # Upstream's hook only sees /nix/var/nix/profiles/system-*-link and leaves
+        # `default nixos-*` (highest version wins). comin deploys through
+        # system-profiles/comin, so on drakkar that made a stale system-493 the boot
+        # default. This hook, below, fixes both.
+        boot.loader.external.installHook = lib.mkForce "${lzbtAllProfiles}/bin/lzbt-all-profiles";
+        assertions = [
+          {
+            # The hook below runs one lzbt install on the main ESP, without the pcrlock
+            # prediction. Those upstream features would need porting first.
+            assertion = config.boot.lanzaboote.extraEfiSysMountPoints == [] && !config.boot.lanzaboote.measuredBoot.enable;
+            message = "features/nixos/boot's lanzaboote install hook supports neither extraEfiSysMountPoints nor measuredBoot.";
+          }
+        ];
       })
     ]))
 

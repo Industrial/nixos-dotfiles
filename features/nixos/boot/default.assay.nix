@@ -35,6 +35,7 @@ let
   sbOn = {features.hardening.secureBoot.enable = true;};
   sb = eval [sbOn];
   sbNoLanza = evalNoLanza [sbOn];
+  sbMeasured = eval [sbOn {boot.lanzaboote.extraEfiSysMountPoints = ["/boot2"];}];
   # What a host evaluates when the option is off: the lanzaboote module is there, inert.
   noLanzaDefault = evalNoLanza [];
   failed = config: builtins.filter (a: !a.assertion) config.assertions;
@@ -134,5 +135,15 @@ in
     secureBootKeepsTenGenerations = assay.eq sb.boot.lanzaboote.configurationLimit 10;
     # Keys are created by hand (runbook), never generated or enrolled behind the operator's back.
     secureBootNoAutoKeys = assay.eq [sb.boot.lanzaboote.autoGenerateKeys.enable sb.boot.lanzaboote.autoEnrollKeys.enable sb.boot.lanzaboote.allowUnsigned] [false false false];
+    # Our hook, not upstream's: upstream only sees system-*-link and defaults to the highest
+    # version, which on drakkar (comin's system-profiles/comin, stale system-493) boots the
+    # stale generation.
+    secureBootInstallsEveryProfile =
+      assay.eq (builtins.match ".*-lzbt-all-profiles/bin/lzbt-all-profiles" sb.boot.loader.external.installHook != null) true;
+    # And it is what switch-to-configuration runs.
+    secureBootHookIsTheInstaller =
+      assay.eq sb.system.build.installBootLoader sb.boot.loader.external.installHook;
+    # The hook ports neither of these upstream extras: on, they must refuse to evaluate.
+    secureBootRefusesUnportedExtras = assay.eq (builtins.any (a: builtins.match ".*supports neither extraEfiSysMountPoints nor measuredBoot.*" a.message != null) (failed sbMeasured)) true;
     secureBootShipsSbctl = assay.eq (nixos.hasPackage sb "sbctl") true;
   }
