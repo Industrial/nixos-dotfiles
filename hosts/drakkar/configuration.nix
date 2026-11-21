@@ -56,4 +56,8 @@
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.
   features.fleet.vbuild.enable = true;
+  # lanzaboote replaces the Python systemd-boot installer (GH-184). Needs the keys in
+  # /var/lib/sbctl first; ADR-0007 "Runbook: Secure Boot". Secure Boot stays off in
+  # firmware until the keys are enrolled at the machine.
+  features.hardening.secureBoot.enable = true;
 }
