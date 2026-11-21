@@ -21,6 +21,8 @@ in
     vbuildIsTheBuildHook = assay.eq (has "fleet.vbuild") true;
     # bin/update/flake runs vbump here; without it, it falls back to `nix flake update`.
     bumpsLocksPerInput = assay.eq (has "cli.vbump") true;
+    # vgen prunes generations and keeps the boot menu in step; vgc collects (GH-190).
+    managesGenerationsWithVgen = assay.eq [(has "nixos.vgen") (has "nixos.vgc")] [true true];
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
   }
