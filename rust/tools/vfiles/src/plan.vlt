@@ -229,19 +229,10 @@ test "a dropped file is removed while untouched, and left once edited"
   assert! \-> is_left (&dropped (&mine) (&present "sha256:edited"))
 
 export is_drift : &Action -> bool
-is_drift a =
-  case a of
-    Action::Drift _ -> true
-    _ -> false
+is_drift a = rust """matches!(a, Action::Drift(_))"""
 
 export is_left : &Action -> bool
-is_left a =
-  case a of
-    Action::Left _ -> true
-    _ -> false
+is_left a = rust """matches!(a, Action::Left(_))"""
 
 export is_skip : &Action -> bool
-is_skip a =
-  case a of
-    Action::Skip _ -> true
-    _ -> false
+is_skip a = rust """matches!(a, Action::Skip(_))"""
