@@ -1,13 +1,13 @@
 -- The import into the target store, as a capability: "add these staged
 -- paths, references first".
 --
--- `NixCopyImporter` is the temporary implementation, until the
--- daemon-protocol client (nix-store-core's `worker`, AddToStoreNar) lands: the
--- staging directory already is a `file://` binary cache, so one
--- `nix copy --from file://<staging>` imports the whole batch. That runs
--- through the daemon (or opens the local store) and checks the signatures
--- and NAR hashes again, as any substitution does. `MemoryImporter` records
--- what it was given, for tests.
+-- The default is `daemon`'s `WorkerImporter` (AddToStoreNar over the worker
+-- protocol). `NixCopyImporter` (`--importer nix-copy`) is the first
+-- implementation, kept as the fallback: the staging directory already is a
+-- `file://` binary cache, so one `nix copy --from file://<staging>` imports
+-- the whole batch, through the daemon (or the local store), checking the
+-- signatures and NAR hashes again as any substitution does.
+-- `MemoryImporter` records what it was given, for tests.
 
 import std::sync::{Arc, Mutex}
 import id_effect::{Effect, HNil, succeed}

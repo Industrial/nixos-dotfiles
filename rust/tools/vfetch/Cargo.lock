@@ -2259,6 +2259,7 @@ dependencies = [
  "nix-store-core",
  "rusqlite",
  "sha2",
+ "tokio",
  "voltaic-diag",
  "voltaic-driver",
  "zstd",

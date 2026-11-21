@@ -44,6 +44,7 @@ voltaic!(remote);
 voltaic!(target);
 voltaic!(stage);
 voltaic!(importer);
+voltaic!(daemon);
 voltaic!(fetch);
 voltaic!(app);
 

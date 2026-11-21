@@ -8,13 +8,20 @@ import std::process::ExitCode
 import id_effect::{Effect, HNil, effect, hlist, suspend}
 import id_effect_platform::command::{ProcessRuntimeService, TokioProcessRuntime}
 import nix_store_core::signing::{PublicKey, parse_public_key}
-import crate::config::{Options, USAGE, conf_keys, db_of_store, parse_args}
+import crate::config::{ImporterKind, Options, USAGE, conf_keys, db_of_store, parse_args}
+import crate::daemon::worker
 import crate::fault::VfetchError
 import crate::fetch::{Report, Request, program}
 import crate::importer::nix_copy
 import crate::remote::{http, lifted}
 import crate::stage::Staging
 import crate::target::open
+
+-- Daemon connections the worker importer adds paths over at once. Measured on
+-- drakkar (git's 87-path closure into a fresh store): 1.16s with one, 1.12s
+-- with four, 1.3-2.3s with eight. The store serialises most of an add, so
+-- more connections only add daemon processes.
+const IMPORT_CONNECTIONS : usize = 4
 
 -- `--staging`, else $XDG_CACHE_HOME/vfetch, else ~/.cache/vfetch.
 export staging_dir : Option<String> -> Option<String> -> Option<String> -> PathBuf
@@ -56,7 +63,10 @@ live o =
   effect!
     let req = ~suspend({ let o = o.clone(); move || lifted(request_of(&o)) });
     let target = ~suspend({ let to = o.to.clone(); move || lifted(open(db_of_store(to.as_deref()))) });
-    let importer = nix_copy(req.staging.clone(), o.to.clone(), o.trusted_keys.clone(), ProcessRuntimeService::new(TokioProcessRuntime));
+    let importer = match o.importer {
+        ImporterKind::Worker => worker(req.staging.clone(), o.to.clone(), req.jobs.min(IMPORT_CONNECTIONS)),
+        ImporterKind::NixCopy => nix_copy(req.staging.clone(), o.to.clone(), o.trusted_keys.clone(), ProcessRuntimeService::new(TokioProcessRuntime)),
+    };
     let r = ~program(req).provide_env(hlist![http(), target, importer]);
     report(&r)
 

@@ -28,6 +28,9 @@ nix-store-core = { path = "../nix-store-core" }
 # The target store's database, read-only; the same version nix-store-core opens.
 rusqlite = { version = "0.37", features = ["bundled"] }
 sha2 = "0.10"
+# The `nix daemon --stdio` children the worker importer talks to for a store
+# other than the system one (pipes for nix-store-core's worker::open_halves).
+tokio = { version = "1", features = ["process"] }
 
 [dev-dependencies]
 # A test signing key from a fixed seed, in Nix's key format.

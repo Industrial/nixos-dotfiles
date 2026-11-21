@@ -1,0 +1,225 @@
+-- `WorkerImporter`, the default import: AddToStoreNar over the nix-daemon
+-- worker protocol (nix-store-core's `worker`), from the verified NARs in the
+-- staging directory, streamed a frame per chunk, never read whole.
+--
+-- Where it connects:
+--   * the system store (no --to, `daemon`, `local`, `auto`): the daemon's
+--     socket, as any `nix` client does;
+--   * any other store: a `nix daemon --stdio --store <to>` child per
+--     connection, run as the caller, over its pipes.
+--
+-- The narinfo's signatures go along and `dont_check_sigs` stays false, so
+-- the daemon applies its own trust policy, exactly as for a substitution.
+--
+-- Paths go in waves: a wave is every path whose references in the batch are
+-- all in earlier waves, so a path is never added before what it refers to.
+-- Each wave is imported in parallel over a pool of connections (the daemon
+-- serves each connection in its own process).
+
+import std::io::Read
+import std::path::{Path, PathBuf}
+import std::sync::Arc
+import std::collections::BTreeMap
+import id_effect::{Concurrency, Effect, HNil, Pool, for_each_par, from_async, succeed, suspend}
+import nix_store_core::hash
+import nix_store_core::narinfo::NarInfo
+import nix_store_core::worker::{Conn, DEFAULT_SOCKET, Daemon, Op, PathInfo, WorkerError, connect, is_valid_path, op_code, open_halves, process_stderr, put_bool, put_frame, put_path_info, put_str, put_u64, send}
+import crate::fault::VfetchError
+import crate::importer::{Importer, ImporterService}
+import crate::remote::lifted
+import crate::stage::{Staging, discard, nar_file}
+
+-- Frames of at most this many bytes.
+const FRAME : usize = 262144
+
+-- Where a connection goes: the daemon's socket, or a `nix daemon --stdio`
+-- child for the store named.
+export data Endpoint
+  = Socket String
+  | Stdio String
+  deriving (Clone, Debug, PartialEq)
+
+-- `--to` as an endpoint.
+export endpoint_of : Option<&str> -> Endpoint
+endpoint_of to =
+  case to of
+    None -> Socket (DEFAULT_SOCKET.to_string ())
+    Some s | s == "daemon" || s == "local" || s == "auto" -> Socket (DEFAULT_SOCKET.to_string ())
+    Some s | s.starts_with "unix://" -> Socket (s.trim_start_matches "unix://" |> .to_string)
+    Some s -> Stdio (s.to_string ())
+
+-- One connection: the handshaken daemon, and the child serving it, if any
+-- (killed when the last clone is dropped). Identity is the allocation.
+export data Link { daemon Daemon, _child Option<Arc<tokio::process::Child>> }
+  deriving (Clone)
+
+instance PartialEq Link
+  eq : &self -> &Self -> bool
+  eq self other = Arc::ptr_eq (&self.daemon.0) (&other.daemon.0)
+
+worker_error : WorkerError -> VfetchError
+worker_error e = VfetchError::Import (e.to_string ())
+
+-- A `nix daemon --stdio` for `store`, shaken hands with over its pipes.
+stdio_link : String -> Effect<Link, VfetchError, HNil>
+stdio_link store =
+  suspend (move \-> lifted (spawn_daemon (&store))) |> .flat_map (\parts -> linked parts)
+
+data Spawned { child tokio::process::Child, stdin tokio::process::ChildStdin, stdout tokio::process::ChildStdout }
+
+spawn_daemon : &str -> Result<Spawned, VfetchError>
+spawn_daemon store =
+  mut cmd = tokio::process::Command::new "nix"
+  cmd.args (["--extra-experimental-features", "nix-command", "daemon", "--stdio", "--store", store])
+  cmd.stdin (std::process::Stdio::piped ())
+  cmd.stdout (std::process::Stdio::piped ())
+  cmd.kill_on_drop true
+  mut child = (cmd.spawn () |> .map_err (\e -> VfetchError::Import "starting nix daemon --stdio --store #{store}: #{e}"))?
+  stdin = (child.stdin.take () |> .ok_or (VfetchError::Import (.to_string "nix daemon: no stdin")))?
+  stdout = (child.stdout.take () |> .ok_or (VfetchError::Import (.to_string "nix daemon: no stdout")))?
+  Ok (Spawned { child, stdin, stdout })
+
+linked : Spawned -> Effect<Link, VfetchError, HNil>
+linked s =
+  child = Arc::new s.child
+  (open_halves s.stdout s.stdin) |> .map_err worker_error |> .map (move \daemon -> Link { daemon, _child = Some child })
+
+socket_link : String -> Effect<Link, VfetchError, HNil>
+socket_link socket =
+  (connect socket) |> .map_err worker_error |> .map (\daemon -> Link { daemon, _child = None })
+
+link_to : Endpoint -> Effect<Link, VfetchError, HNil>
+link_to e =
+  case e of
+    Socket s -> socket_link s
+    Stdio store -> stdio_link store
+
+-- AddToStoreNar with the NAR read from `file`, a frame per chunk.
+add_file_on : async &mut Conn -> &PathInfo -> &Path -> Result<(), WorkerError>
+add_file_on c info file =
+  mut head = Vec::new () : Vec<u8>
+  put_u64 (&mut head) (op_code Op::AddToStoreNar)
+  put_str (&mut head) (&info.path)
+  put_path_info (&mut head) info
+  put_bool (&mut head) false
+  put_bool (&mut head) false
+  s <- send c (&head)
+  s?
+  mut f = (std::fs::File::open file)?
+  mut buf = vec![0u8; FRAME]
+  mut more = true
+  while more
+    n = (f.read (&mut buf))?
+    mut frame = Vec::new () : Vec<u8>
+    if n == 0
+      put_u64 (&mut frame) 0
+      more := false
+    else
+      put_frame (&mut frame) (&buf[0 .. n])
+    s2 <- send c (&frame)
+    s2?
+  e <- process_stderr c
+  e
+
+add_file_io : async Daemon -> PathInfo -> PathBuf -> Result<(), WorkerError>
+add_file_io d info file =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- add_file_on (&mut g) (&info) (&file)
+  r
+
+-- What the daemon is told about a path: the narinfo's, signatures included.
+export path_info_of : &NarInfo -> Result<PathInfo, VfetchError>
+path_info_of info =
+  nar_hash = (hash::parse (&info.nar_hash) |> .ok_or (VfetchError::Corrupt "#{info.store_path}: unreadable NarHash #{info.nar_hash}"))?
+  Ok (PathInfo { path = info.store_path.clone (), deriver = info.deriver.clone (), nar_hash, references = info.references.clone (), registration_time = 0, nar_size = info.nar_size, ultimate = false, sigs = info.sigs.clone (), ca = info.ca.clone () })
+
+-- Add one staged path over a pooled connection.
+add_one : Pool<Link, VfetchError> -> Staging -> NarInfo -> Effect<(), VfetchError, HNil>
+add_one pool staging info =
+  file = nar_file (&staging) (&info.store_path)
+  path = info.store_path.clone ()
+  suspend (move \-> lifted (path_info_of (&info))) |> .flat_map (move \pi -> Effect::scoped (move \scope -> pool.get (&scope) |> .flat_map (move \link -> from_async (move \-> add_file_io link.daemon pi file) |> .map_err (move \e -> VfetchError::Import "#{path}: #{e}"))))
+
+-- The batch in waves: each path after every reference it has in the batch.
+export waves : &[NarInfo] -> Vec<Vec<NarInfo>>
+waves infos =
+  mut depth = BTreeMap::new () : BTreeMap<String, usize>
+  mut out = Vec::new () : Vec<Vec<NarInfo>>
+  -- `infos` is in topological order, so every reference's depth is known.
+  for info in infos
+    mut d = 0 : usize
+    for r in &info.references
+      if r != &info.store_path
+        if depth.get r is Some rd
+          d := d.max (rd + 1)
+    depth.insert (info.store_path.clone ()) d
+    while out.len () <= d
+      out.push (Vec::new ())
+    out[d].push (info.clone ())
+  out
+
+export data WorkerImporter { staging Staging, endpoint Endpoint, connections usize }
+
+-- One connection and one op before the rest: a store that does not exist yet
+-- is created by the first daemon that opens it, under an exclusive lock that
+-- daemons opening it at the same moment would each wait for.
+warm : Pool<Link, VfetchError> -> String -> Effect<(), VfetchError, HNil>
+warm pool path =
+  Effect::scoped (move \scope -> pool.get (&scope) |> .flat_map (move \link -> is_valid_path (&link.daemon) path |> .map_err worker_error |> .map (\_ -> ())))
+
+imported_all : Staging -> Vec<NarInfo> -> Vec<Vec<()>> -> ()
+imported_all s infos _done =
+  for i in &infos
+    discard (&s) (&i.store_path)
+  ()
+
+instance Importer WorkerImporter
+  add_all : &self -> Vec<NarInfo> -> Effect<(), VfetchError, HNil>
+  add_all self infos =
+    if infos.is_empty ()
+      succeed (())
+    else
+      e = self.endpoint.clone ()
+      pool = Pool::new self.connections (move \-> link_to (e.clone ()))
+      n = self.connections
+      s = self.staging.clone ()
+      s2 = self.staging.clone ()
+      batch = infos.clone ()
+      first = infos[0].store_path.clone ()
+      p0 = pool.clone ()
+      (warm p0 first) |> .flat_map (move \_ -> for_each_par (waves (&infos)) (move \wave -> for_each_par wave (\i -> add_one (pool.clone ()) (s.clone ()) i) (Concurrency::Bounded n)) Concurrency::Sequential) |> .map (move \done -> imported_all s2 batch done)
+
+export worker : Staging -> Option<String> -> usize -> ImporterService
+worker staging to connections =
+  ImporterService (Arc::new (WorkerImporter { staging, endpoint = endpoint_of (to.as_deref ()), connections = connections.max 1 }))
+
+#[cfg(test)]
+info_of : &str -> &[&str] -> NarInfo
+info_of path refs = NarInfo { store_path = path.to_string (), nar_hash = String::new (), nar_size = 0, references = refs |> .iter |> .map (\r -> r.to_string ()) |> .collect, deriver = None, sigs = Vec::new (), ca = None }
+
+test "a wave holds only paths whose references came in earlier waves"
+  a = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+  b = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b"
+  c = "/nix/store/cccccccccccccccccccccccccccccccc-c"
+  d = "/nix/store/dddddddddddddddddddddddddddddddd-d"
+  -- Topological order: c, b, d, a. a refers to itself and to a valid path.
+  infos = .to_vec ([info_of c (&[]), info_of b (&[c]), info_of d (&[]), info_of a (&[a, b, "/nix/store/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-valid"])])
+  w = waves (&infos)
+  names = w |> .iter |> .map (\wave -> wave |> .iter |> .map (\i -> i.store_path.clone ()) |> .collect : Vec<String>) |> .collect : Vec<Vec<String>>
+  assert_eq! \-> names \-> vec![vec![c.to_string(), d.to_string()], vec![b.to_string()], vec![a.to_string()]]
+
+test "--to picks the daemon socket or a stdio daemon for the store"
+  assert_eq! \-> endpoint_of None \-> Socket (DEFAULT_SOCKET.to_string ())
+  assert_eq! \-> endpoint_of (Some "daemon") \-> Socket (DEFAULT_SOCKET.to_string ())
+  assert_eq! \-> endpoint_of (Some "unix:///run/x.sock") \-> Socket (.to_string "/run/x.sock")
+  assert_eq! \-> endpoint_of (Some "/tmp/s") \-> Stdio (.to_string "/tmp/s")
+
+test "the daemon is told the narinfo's hash, references and signatures"
+  info = NarInfo { store_path = .to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", nar_hash = .to_string "sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4", nar_size = 256, references = vec!["/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh".to_string()], deriver = None, sigs = vec!["k-1:sig".to_string()], ca = None }
+  pi = path_info_of (&info)
+  assert! \-> pi.is_ok ()
+  if pi is Ok p
+    assert_eq! \-> (p.nar_size, p.references.len (), p.sigs.clone ()) \-> (256, 1, vec!["k-1:sig".to_string()])
+    assert_eq! \-> hash::typed_nix32 (&p.nar_hash) \-> info.nar_hash
+  assert! \-> path_info_of (&NarInfo { nar_hash = .to_string "md5:x", ...info }) |> .is_err

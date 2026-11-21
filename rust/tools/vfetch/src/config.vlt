@@ -7,7 +7,22 @@
 
 import nix_store_core::storepath::{full, store_base}
 
-export const USAGE : &str = "usage: vfetch <store-path>... --from <cache-url>[,<url>...] [--to <store>] [--jobs N] [--trusted-key <name:base64>]... [--staging <dir>] [--nix-conf <file>]"
+export const USAGE : &str = "usage: vfetch <store-path>... --from <cache-url>[,<url>...] [--to <store>] [--jobs N] [--trusted-key <name:base64>]... [--staging <dir>] [--nix-conf <file>] [--importer worker|nix-copy]"
+
+-- How the verified NARs reach the target: AddToStoreNar over the daemon
+-- protocol (`worker`, the default), or one `nix copy --from file://` of the
+-- staging directory (`nix-copy`).
+export data ImporterKind = Worker | NixCopy
+  deriving (Debug, Clone, Copy, PartialEq)
+
+importer_of : &str -> Result<ImporterKind, String>
+importer_of s =
+  if s == "worker"
+    Ok ImporterKind::Worker
+  else if s == "nix-copy"
+    Ok ImporterKind::NixCopy
+  else
+    Err "--importer #{s}: expected worker or nix-copy"
 
 -- Fetches and narinfo queries in flight at once, unless --jobs says otherwise.
 export const DEFAULT_JOBS : usize = 16
@@ -22,6 +37,7 @@ export data Options
   , export trusted_keys Vec<String>
   , export staging Option<String>
   , export nix_conf String
+  , export importer ImporterKind
   , export help bool
   }
   deriving (Debug, Clone, PartialEq)
@@ -57,7 +73,7 @@ jobs_of s =
 -- argv, program name first.
 export parse_args : &[String] -> Result<Options, String>
 parse_args args =
-  mut o = Options { paths = Vec::new (), caches = Vec::new (), to = None, jobs = DEFAULT_JOBS, trusted_keys = Vec::new (), staging = None, nix_conf = DEFAULT_NIX_CONF.to_string (), help = false }
+  mut o = Options { paths = Vec::new (), caches = Vec::new (), to = None, jobs = DEFAULT_JOBS, trusted_keys = Vec::new (), staging = None, nix_conf = DEFAULT_NIX_CONF.to_string (), importer = ImporterKind::Worker, help = false }
   mut it = (args.iter ()).skip 1
   mut more = true
   while more
@@ -77,6 +93,8 @@ parse_args args =
           o.staging := Some ((value_of (it.next ()) "--staging")?)
         "--nix-conf" ->
           o.nix_conf := (value_of (it.next ()) "--nix-conf")?
+        "--importer" ->
+          o.importer := (importer_of (&(value_of (it.next ()) "--importer")?))?
         "-h" ->
           o.help := true
         "--help" ->
@@ -146,6 +164,10 @@ test "paths, caches and flags parse"
     assert_eq! \-> o.to \-> Some (.to_string "/tmp/s")
     assert_eq! \-> o.jobs \-> 4
     assert_eq! \-> o.trusted_keys \-> vec!["k-1:abc".to_string()]
+    assert_eq! \-> o.importer \-> ImporterKind::Worker
+  nc = parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from", "http://a", "--importer", "nix-copy"]))
+  assert_eq! \-> nc.map (\o -> o.importer) \-> Ok ImporterKind::NixCopy
+  assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from", "http://a", "--importer", "tar"])) |> .is_err
 
 test "bad command lines are refused"
   assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"])) |> .is_err
