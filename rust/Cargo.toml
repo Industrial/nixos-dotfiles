@@ -13,9 +13,10 @@ license = "MIT"
 authors = ["Industrial <tom.wieland@gmail.com>"]
 
 [workspace.dependencies]
-# No consumer yet — nix-hash was the last one and is gone. Staged here for the
-# oomkiller / nixos-update-notifier adoption, because id_effect must be pinned
-# in exactly one place: types from two id_effect versions do not unify, so
-# every member has to resolve to the same one. Bump here, never in a member.
-id_effect = { version = "0.13", features = ["schema-serde"] }
-id_effect_cli = "0.13"
+# id_effect is pinned in exactly one version: types from two id_effect versions
+# do not unify, so every member has to resolve to the same one. Bump here.
+# Default features are off (they pull rayon, a second sysinfo and clap); a
+# member turns on what it uses. oomkiller is also built standalone by its flake
+# input, so it cannot say `workspace = true` and repeats this pin — keep the two equal.
+id_effect = { version = "=0.13.0", default-features = false }
+id_effect_cli = { version = "=0.13.0", default-features = false }

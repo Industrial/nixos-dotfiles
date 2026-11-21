@@ -9,6 +9,11 @@ build = "build.rs"
 
 [dependencies]
 sysinfo = "0.31"
+# The same pin as rust/Cargo.toml's [workspace.dependencies]. Spelled out rather
+# than `workspace = true`, because the oomkiller-src flake input builds this crate
+# on its own, without the workspace.
+id_effect = { version = "=0.13.0", default-features = false }
+id_effect_cli = { version = "=0.13.0", default-features = false }
 
 # Voltaic as a library: build.rs compiles src/*.vlt to Rust. The published
 # crates ship their generated Rust, so no voltaic binary or bootstrap is needed.
