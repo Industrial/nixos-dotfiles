@@ -10,12 +10,14 @@
 # slow build must finish across both switches.
 {pkgs}: let
   inherit (pkgs) busybox;
+  # The sandbox has no PATH: sleep by its full path, or the build is instant.
   slow = pkgs.writeText "slow.nix" ''
+    let bb = builtins.storePath ${busybox}; in
     derivation {
       name = "vdaemon-proxy-slow";
       system = builtins.currentSystem;
-      builder = "''${builtins.storePath ${busybox}}/bin/sh";
-      args = ["-c" "sleep 20; echo survived-the-switches > $out"];
+      builder = "''${bb}/bin/sh";
+      args = ["-c" "''${bb}/bin/sleep 25 && echo survived-the-switches > $out"];
     }
   '';
 in
@@ -49,7 +51,7 @@ in
 
       # A build in flight across both switches: it must not be killed.
       machine.succeed("su - alice -c 'nohup nix-build --no-out-link ${slow} > /tmp/slow.out 2>&1 &'")
-      machine.wait_until_succeeds("pgrep -f vdaemon-proxy-slow || pgrep -x sleep", timeout=30)
+      machine.wait_until_succeeds("pgrep -f 'bin/sleep 25'", timeout=30)
 
       with subtest("a live switch into the feature hands the socket to the proxy"):
           machine.succeed("${base}/specialisation/proxy/bin/switch-to-configuration test")
@@ -63,6 +65,8 @@ in
           machine.fail("systemctl is-active vdaemon-proxy.socket")
           machine.succeed("systemctl is-active nix-daemon-listen.service")
           alice("nix-store -q --hash /run/current-system")
+          # Both rebinds are done and the build is still at it: neither killed it.
+          machine.succeed("pgrep -f 'bin/sleep 25'")
 
       with subtest("the build in flight survived both switches"):
           machine.wait_until_succeeds("grep -q '^/nix/store/.*-vdaemon-proxy-slow$' /tmp/slow.out", timeout=120)
