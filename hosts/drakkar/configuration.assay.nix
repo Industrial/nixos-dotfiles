@@ -24,6 +24,8 @@ in
     installsVfetch = assay.eq (has "cli.vfetch") true;
     fetchesThroughVfetch = assay.eq (has "nix.vfetch") true;
     placesDotfilesWithVfiles = assay.eq (has "nixos.vfiles") true;
+    # vgen prunes generations and keeps the boot menu in step; vgc collects (GH-190).
+    managesGenerationsWithVgen = assay.eq [(has "nixos.vgen") (has "nixos.vgc")] [true true];
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
     # vdeploy observes next to comin, which still deploys (GH-159); one option removes it.

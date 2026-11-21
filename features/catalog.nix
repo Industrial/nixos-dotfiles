@@ -180,6 +180,7 @@
   ./nixos/vgc
   ./nixos/vopt
   ./nixos/vfiles
+  ./nixos/vgen
   ./nixos/window-manager
 
   # performance

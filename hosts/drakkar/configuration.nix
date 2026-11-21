@@ -61,6 +61,8 @@
   # vfiles (Voltaic): declared dotfiles placed by one linker, not 16 activation scripts (GH-188).
   # Rollback: lib.mkForce false brings the scripts back.
   features.nixos.vfiles.enable = true;
+  # vgen (Voltaic) owns generation retention and the boot entries; vgc only collects (GH-190).
+  features.nixos.vgen.enable = true;
   features.storage.nfs-client.enable = true;
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.

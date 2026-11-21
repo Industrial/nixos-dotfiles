@@ -38,6 +38,22 @@ pub mod db {
     include!(concat!(env!("OUT_DIR"), "/db.rs"));
 }
 
+// Profile generations and Nix's `--delete-older-than` rule: vgc's module,
+// lifted for vgen (GH-190). The allows are on the shape of Voltaic's emitted
+// loops and `if let`s, not on decisions in the source (see vgc's lib.rs).
+#[allow(
+    clippy::collapsible_if,
+    clippy::collapsible_else_if,
+    clippy::manual_flatten,
+    clippy::redundant_closure,
+    clippy::needless_borrows_for_generic_args,
+    clippy::unused_unit,
+    clippy::no_effect
+)]
+pub mod generations {
+    include!(concat!(env!("OUT_DIR"), "/generations.rs"));
+}
+
 // The worker protocol's emitted Rust: `x <- f ...` then `x` (an awaited
 // binding returned), `_0` binders in the `errors` Display, `case`-to-bool
 // tables, and the `()` that ends unit bodies.
