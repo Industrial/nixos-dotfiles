@@ -128,7 +128,21 @@ in {
   # quietly repointing it from a feature import is the kind of change that is very
   # annoying to track down from the other side.
 
-  system.activationScripts.helixConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  vfiles.files = {
+    "${configDir}/config.toml" = {
+      source = configFile;
+      user = settings.username;
+    };
+    "${configDir}/languages.toml" = {
+      source = languagesFile;
+      user = settings.username;
+    };
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.helixConfig = {
     text = ''
       install -d -o ${settings.username} -g users -m 0755 ${configDir}
 

@@ -72,4 +72,13 @@ in
     removesUpstreamAgentInstall = assay.eq (activationHas ''rm -rf "$share_agent"'') true;
     shimExecsNixpkgsCursorCli = assay.eq (builtins.match ".*exec /nix/store/[^ ]+-cursor-cli-[^ ]+/bin/[a-z-]+ \"\\$@\".*" shim != null) true;
     shimRefusesSelfUpdate = assay.eq (lib.hasInfix "managed by NixOS (pkgs.cursor-cli)" shim) true;
+
+    # vfiles (GH-188): the delegate at both names, an immutable 0755 copy; the downloaded
+    # upstream agent is still removed on every activation.
+    vfilesCopiesTheDelegateImmutably = assay.eq (builtins.mapAttrs (_: f: [f.mode f.perms f.immutable]) cfg.vfiles.files) {
+      "${home}/.local/bin/cursor-agent" = ["copy" "0755" true];
+      "${home}/.local/bin/agent" = ["copy" "0755" true];
+    };
+    removesTheDownloadedAgent =
+      assay.eq (lib.hasInfix "rm -rf \"${home}/.local/share/cursor-agent\"" cfg.system.activationScripts.cursorAgentShareCleanup.text) true;
   }

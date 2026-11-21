@@ -63,4 +63,8 @@ in
     # is left alone, and this keeps that true.
     doesNotSetEditorVariable =
       assay.eq (cfg.environment.variables.EDITOR or null) (nixos.baseline.environment.variables.EDITOR or null);
+
+    # vfiles (GH-188): both files linked from the same store files the script linked.
+    vfilesLinksBothFiles =
+      assay.eq (map (n: lib.hasInfix (builtins.unsafeDiscardStringContext "${cfg.vfiles.files."${configDir}/${n}".source}") (builtins.unsafeDiscardStringContext activation)) ["config.toml" "languages.toml"]) [true true];
   }

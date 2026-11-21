@@ -80,7 +80,15 @@ in {
     alacritty
   ];
 
-  system.activationScripts.linkFile = {
+  imports = [../../../lib/vfiles.nix];
+
+  vfiles.files."/home/${settings.username}/.config/alacritty/alacritty.toml" = {
+    source = alacrittyToml;
+    user = settings.username;
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.linkFile = {
     text = ''
       mkdir -p /home/${settings.username}/.config/alacritty
       ln -sf ${alacrittyToml} /home/${settings.username}/.config/alacritty/alacritty.toml

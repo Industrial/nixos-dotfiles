@@ -47,6 +47,9 @@
   features.nix.vverify.enable = true;
   # vbump (Voltaic): per-input flake.lock bumps, one PR each; bin/update/flake runs it (GH-189).
   features.cli.vbump.enable = true;
+  # vfiles (Voltaic): declared dotfiles placed by one linker, not 16 activation scripts (GH-188).
+  # Rollback: lib.mkForce false brings the scripts back.
+  features.nixos.vfiles.enable = true;
   features.storage.nfs-client.enable = true;
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.

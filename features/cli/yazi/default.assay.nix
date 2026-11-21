@@ -22,7 +22,7 @@ let
     };
     inherit pkgs;
   };
-  activation = mod.system.activationScripts.linkYaziConfig.text;
+  activation = mod.vfiles.legacy.linkYaziConfig.text;
   # fromTOML doubles as the parse check: a malformed config fails the suite at
   # eval rather than silently at the next `yazi` launch.
   cfg = builtins.fromTOML (builtins.readFile ./yazi.toml);
@@ -41,10 +41,10 @@ in
     ];
 
     activationScriptDeclared =
-      assay.eq (mod.system.activationScripts ? linkYaziConfig) true;
+      assay.eq (mod.vfiles.legacy ? linkYaziConfig) true;
     # `linkFile` belongs to alacritty; a second definition collides on eval.
     doesNotClaimGenericLinkFile =
-      assay.eq (mod.system.activationScripts ? linkFile) false;
+      assay.eq (mod.vfiles.legacy ? linkFile) false;
     createsConfigDir =
       assay.eq
       (builtins.match ".*mkdir -p /home/alice/[.]config/yazi.*" activation != null)
@@ -104,4 +104,10 @@ in
       assay.eq
       (builtins.all (c: builtins.match ".*/home/.*" c.run == null) chords)
       true;
+
+    # vfiles (GH-188): the same two links, owned by the user.
+    vfilesLinksBothFiles = assay.eq (builtins.mapAttrs (_: f: [(f.mode or "link") f.user f.source]) mod.vfiles.files) {
+      "/home/alice/.config/yazi/yazi.toml" = ["link" "alice" "yazi.toml"];
+      "/home/alice/.config/yazi/keymap.toml" = ["link" "alice" "keymap.toml"];
+    };
   }

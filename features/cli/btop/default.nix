@@ -109,10 +109,21 @@ in {
     };
   };
 
-  # Activation script names share one namespace across every feature, so this one is named
-  # for its feature rather than the generic `linkFile`, which
-  # features/window-manager/alacritty already defines.
-  system.activationScripts.linkBtopConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  # btop.conf is copied, not linked (see the top of this file), and `force`d: btop rewrites
+  # the whole file on every exit, so a changed file is btop's doing, not a hand edit to
+  # protect, and each switch restores what is generated here, as the script always did.
+  vfiles.files."${settings.userdir}/.config/btop/btop.conf" = {
+    source = btopConf;
+    mode = "copy";
+    force = true;
+    user = settings.username;
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  # Named for its feature: legacy names become activation script names, one namespace.
+  vfiles.legacy.linkBtopConfig = {
     text = ''
       mkdir -p ${settings.userdir}/.config/btop
       install -m 0644 /etc/btop/btop.conf ${settings.userdir}/.config/btop/btop.conf

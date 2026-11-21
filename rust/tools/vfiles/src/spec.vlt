@@ -1,0 +1,207 @@
+-- The spec the NixOS module writes (lib/vfiles.nix: one entry per declared
+-- file) and the manifest vfiles keeps (one record per file it owns). Both
+-- are JSON; both are parsed and rendered here by pure functions.
+--
+--   spec:     {"version":1,"files":[{"path":"/home/u/.config/x","mode":"link",
+--              "source":"/nix/store/…-x","fallback":null,"user":"u",
+--              "group":"users","perms":"0644","immutable":false,"force":false}, …]}
+--   manifest: {"version":1,"files":[{"path":"/home/u/.config/x","mode":"link",
+--              "fingerprint":"link:/nix/store/…-x"}, …]}
+
+import serde_json::Value
+
+-- How a file is placed.
+export data Mode
+  -- A symlink to the source.
+  = Link
+  -- A copy of the source, replaced when the source changes.
+  | Copy
+  -- A copy placed only when nothing is there: the user's from then on.
+  | Seed
+  -- Nothing: a stray symlink here is removed, a real file is reported.
+  | Absent
+  deriving (Clone, Copy, Debug, PartialEq, Eq)
+
+export mode_name : Mode -> String
+mode_name m =
+  case m of
+    Mode::Link -> .to_string "link"
+    Mode::Copy -> .to_string "copy"
+    Mode::Seed -> .to_string "seed"
+    Mode::Absent -> .to_string "absent"
+
+export parse_mode : &str -> Option<Mode>
+parse_mode s =
+  case s of
+    "link" -> Some Mode::Link
+    "copy" -> Some Mode::Copy
+    "seed" -> Some Mode::Seed
+    "absent" -> Some Mode::Absent
+    _ -> None
+
+-- One declared file. `source` is absent only for `absent`; `fallback` is
+-- used when `source` (an out-of-store path, such as a checkout) is missing.
+export data Entry
+  { export path String
+  , export mode Mode
+  , export source Option<String>
+  , export fallback Option<String>
+  , export user String
+  , export group String
+  , export perms u32
+  , export immutable bool
+  -- Replace the file even when it changed since vfiles placed it: for a
+  -- file its program rewrites itself (btop rewrites btop.conf on exit), where
+  -- a change is not a hand edit to protect.
+  , export force bool
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- One owned file: where, how it was placed, and what vfiles left there
+-- (`link:<target>` or `sha256:<hex>`), so a later run can tell an untouched
+-- file from one edited by hand.
+export data Record { export path String, export mode Mode, export fingerprint String }
+  deriving (Clone, Debug, PartialEq)
+
+text_field : &Value -> &str -> Result<String, String>
+text_field v key =
+  v.get key |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ()) |> .ok_or ("missing string field #{key}")
+
+opt_field : &Value -> &str -> Option<String>
+opt_field v key =
+  v.get key |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ())
+
+-- An absolute path that does not climb out with `..`.
+export checked_path : &str -> Result<(), String>
+checked_path p =
+  if !(p.starts_with "/") || p == "/"
+    return Err "not an absolute file path: #{p}"
+  if p.split "/" |> .any (\c -> c == "..")
+    return Err "path climbs with ..: #{p}"
+  Ok ()
+
+parse_entry : &Value -> Result<Entry, String>
+parse_entry v =
+  path = (text_field v "path")?
+  (checked_path (&path))?
+  mode_text = (text_field v "mode")?
+  mode = (parse_mode (&mode_text) |> .ok_or ("#{path}: unknown mode #{mode_text}"))?
+  source = opt_field v "source"
+  if mode != Mode::Absent && source.is_none ()
+    return Err "#{path}: a #{mode_text} entry needs a source"
+  user = (text_field v "user" |> .map_err (\e -> "#{path}: #{e}"))?
+  group = opt_field v "group" |> .unwrap_or (.to_string "users")
+  perms_text = opt_field v "perms" |> .unwrap_or (.to_string "0644")
+  perms = (u32::from_str_radix (&perms_text) 8 |> .ok |> .filter (\p -> *p <= 4095) |> .ok_or ("#{path}: perms is not an octal mode: #{perms_text}"))?
+  immutable = v.get "immutable" |> .and_then (\x -> x.as_bool ()) |> .unwrap_or false
+  force = v.get "force" |> .and_then (\x -> x.as_bool ()) |> .unwrap_or false
+  Ok (Entry { path, mode, source, fallback = opt_field v "fallback", user, group, perms, immutable, force })
+
+parse_record : &Value -> Result<Record, String>
+parse_record v =
+  path = (text_field v "path")?
+  mode_text = (text_field v "mode")?
+  mode = (parse_mode (&mode_text) |> .ok_or ("#{path}: unknown mode #{mode_text}"))?
+  fingerprint = (text_field v "fingerprint")?
+  Ok (Record { path, mode, fingerprint })
+
+files_of : &str -> &str -> Result<Vec<Value>, String>
+files_of what text =
+  parsed = serde_json::from_str text : Result<Value, serde_json::Error>
+  v = (parsed |> .map_err (\e -> "#{what} is not JSON: #{e}"))?
+  files = (v.get "files" |> .and_then (\f -> f.as_array ()) |> .ok_or ("#{what} has no files array"))?
+  Ok (files.clone ())
+
+-- The declared files, or why the spec is unusable. Two entries for one path
+-- are refused: which of them wins would be an accident.
+export parse_spec : &str -> Result<Vec<Entry>, String>
+parse_spec text =
+  files = (files_of "the spec" text)?
+  collected = files.iter () |> .map parse_entry |> .collect : Result<Vec<Entry>, String>
+  entries = collected?
+  mut seen = std::collections::HashSet::new ()
+  for e in &entries
+    if !(seen.insert (e.path.clone ()))
+      return Err "#{e.path} is declared twice"
+  Ok entries
+
+-- The owned files. An empty text (no manifest yet) owns nothing.
+export parse_manifest : &str -> Result<Vec<Record>, String>
+parse_manifest text =
+  if text.trim ().is_empty ()
+    return Ok (Vec::new ())
+  files = (files_of "the manifest" text)?
+  files.iter () |> .map parse_record |> .collect
+
+-- A JSON string literal.
+export quote : &str -> String
+quote s = serde_json::to_string s |> .unwrap_or_else (\_ -> .to_string "\"\"")
+
+record_json : &Record -> String
+record_json r = "{\"path\":#{quote (&r.path)},\"mode\":#{quote (&mode_name r.mode)},\"fingerprint\":#{quote (&r.fingerprint)}}"
+
+-- The manifest for `records`, sorted by path so a rewrite is a stable diff.
+export render_manifest : &[Record] -> String
+render_manifest records =
+  mut sorted = records.to_vec ()
+  sorted.sort_by (\a b -> a.path.cmp (&b.path))
+  items = sorted.iter () |> .map record_json |> .collect : Vec<String>
+  inner = items.join ",\n  "
+  "{\"version\":1,\"files\":[\n  #{inner}\n]}\n"
+
+#[cfg(test)]
+entry_json : &str -> String
+entry_json mode = "{\"path\":\"/home/u/.config/x\",\"mode\":\"#{mode}\",\"source\":\"/nix/store/abc-x\",\"user\":\"u\"}"
+
+test "a spec entry is read with its defaults"
+  one = entry_json "link"
+  entries = parse_spec (&"{\"version\":1,\"files\":[#{one}]}") |> .expect "a spec"
+  assert_eq! \-> entries.len () \-> 1
+  e = &entries[0]
+  assert_eq! \-> e.path \-> "/home/u/.config/x"
+  assert_eq! \-> e.mode \-> Mode::Link
+  assert_eq! \-> e.source \-> Some (.to_string "/nix/store/abc-x")
+  assert_eq! \-> e.fallback \-> None
+  assert_eq! \-> e.group \-> "users"
+  assert_eq! \-> e.perms \-> 420
+  assert! \-> !e.immutable && !e.force
+
+test "every field is read"
+  text = "{\"files\":[{\"path\":\"/home/u/.local/bin/a\",\"mode\":\"copy\",\"source\":\"/s\",\"fallback\":\"/f\",\"user\":\"u\",\"group\":\"wheel\",\"perms\":\"0755\",\"immutable\":true,\"force\":true}]}"
+  e = parse_spec text |> .expect "a spec" |> .remove 0
+  assert_eq! \-> (e.mode, e.perms, e.immutable, e.force) \-> (Mode::Copy, 493, true, true)
+  assert_eq! \-> e.fallback \-> Some (.to_string "/f")
+  assert_eq! \-> e.group \-> "wheel"
+
+test "bad specs are refused with the reason"
+  assert! \-> parse_spec "not json" |> .err |> .map (\e -> e.contains "not JSON") |> .unwrap_or false
+  assert! \-> parse_spec "{}" |> .err |> .map (\e -> e.contains "no files array") |> .unwrap_or false
+  hard = entry_json "hardlink"
+  assert! \-> parse_spec (&"{\"files\":[#{hard}]}") |> .err |> .map (\e -> e.contains "unknown mode hardlink") |> .unwrap_or false
+  relative = "{\"files\":[{\"path\":\"x\",\"mode\":\"link\",\"source\":\"/s\",\"user\":\"u\"}]}"
+  assert! \-> parse_spec relative |> .err |> .map (\e -> e.contains "not an absolute") |> .unwrap_or false
+  climbing = "{\"files\":[{\"path\":\"/home/u/../../etc/shadow\",\"mode\":\"link\",\"source\":\"/s\",\"user\":\"u\"}]}"
+  assert! \-> parse_spec climbing |> .err |> .map (\e -> e.contains "climbs") |> .unwrap_or false
+  sourceless = "{\"files\":[{\"path\":\"/home/u/x\",\"mode\":\"copy\",\"user\":\"u\"}]}"
+  assert! \-> parse_spec sourceless |> .err |> .map (\e -> e.contains "needs a source") |> .unwrap_or false
+  l = entry_json "link"
+  c = entry_json "copy"
+  twice = "{\"files\":[#{l},#{c}]}"
+  assert! \-> parse_spec (&twice) |> .err |> .map (\e -> e.contains "declared twice") |> .unwrap_or false
+
+test "an absent entry needs no source"
+  text = "{\"files\":[{\"path\":\"/home/u/.config/starship.toml\",\"mode\":\"absent\",\"user\":\"u\"}]}"
+  e = parse_spec text |> .expect "a spec" |> .remove 0
+  assert_eq! \-> (e.mode, e.source) \-> (Mode::Absent, None)
+
+test "the manifest round-trips, sorted by path"
+  records = .to_vec ([Record { path = .to_string "/b", mode = Mode::Copy, fingerprint = .to_string "sha256:00" }, Record { path = .to_string "/a\"q", mode = Mode::Link, fingerprint = .to_string "link:/nix/store/x" }])
+  text = render_manifest (&records)
+  back = parse_manifest (&text) |> .expect "a manifest"
+  assert_eq! \-> back.len () \-> 2
+  assert_eq! \-> back[0] \-> records[1]
+  assert_eq! \-> back[1] \-> records[0]
+
+test "no manifest yet owns nothing"
+  assert_eq! \-> parse_manifest "" \-> Ok (Vec::new ())
+  assert_eq! \-> parse_manifest "  \n" \-> Ok (Vec::new ())

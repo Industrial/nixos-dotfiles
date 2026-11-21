@@ -84,6 +84,8 @@ in {
     };
   };
 
+  imports = [../../../lib/vfiles.nix];
+
   config = mkMerge [
     {
       environment.systemPackages = with pkgs; [
@@ -93,7 +95,13 @@ in {
       # Named linkAtuinConfig rather than the generic linkFile that
       # features/window-manager/alacritty/default.nix already claims: two features writing
       # one activation-script name is an evaluation conflict, not a merge.
-      system.activationScripts.linkAtuinConfig = {
+      vfiles.files."${configDir}/config.toml" = {
+        source = configFile;
+        user = settings.username;
+      };
+
+      # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+      vfiles.legacy.linkAtuinConfig = {
         text = ''
           mkdir -p ${configDir}
           # Atuin writes a default config.toml on its first run if none exists. If that
@@ -140,7 +148,10 @@ in {
     (mkIf cfg.importFishHistory {
       system.activationScripts.importAtuinFishHistory = {
         # The import resolves db_path out of config.toml, so the link goes in first.
-        deps = ["linkAtuinConfig"];
+        deps =
+          if config.vfiles.enable
+          then ["vfiles"]
+          else ["linkAtuinConfig"];
         text = ''
           if [ -f ${fishHistory} ] && [ ! -e ${importStamp} ]; then
             install -d -o ${settings.username} -g users -m 0700 ${dataDir}
