@@ -175,6 +175,7 @@
   ./nixos/users
   ./nixos/vgc
   ./nixos/vopt
+  ./nixos/vfiles
   ./nixos/window-manager
 
   # performance
