@@ -23,6 +23,7 @@ in
     bumpsLocksPerInput = assay.eq (has "cli.vbump") true;
     installsVfetch = assay.eq (has "cli.vfetch") true;
     fetchesThroughVfetch = assay.eq (has "nix.vfetch") true;
+    placesDotfilesWithVfiles = assay.eq (has "nixos.vfiles") true;
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
   }
