@@ -103,10 +103,28 @@ function SlashCmdList.AUX(command)
         aux.account_data.post_full_scan = not aux.account_data.post_full_scan
         aux.print('post full scan ' .. status(aux.account_data.post_full_scan))
     elseif arguments[1] == 'post' and arguments[2] == 'bid' then
-        aux.account_data.post_bid = ({ unit = 'unit', stack = 'stack' })[arguments[3]]
-        post.apply_bid_layout()
-        aux.refresh_settings()
-	    aux.print('post bid ' .. aux.color.blue(aux.account_data.post_bid or 'off'))
+        -- 0.8.2.2 (FB-052, joker2206): "on" turned it off, since only unit and stack were known and
+        -- the help list showed it like an on/off switch. "on" means per unit (gear is one item per
+        -- auction on Forever, so unit and stack are the same there); a word it does not know changes
+        -- nothing and lists the choices.
+        local choice = ({ on = 'unit', unit = 'unit', stack = 'stack', off = false })[strlower(arguments[3] or '')]
+        if choice == nil then
+            aux.print('post bid [' .. aux.color.blue(aux.account_data.post_bid or 'off') .. ']: type /aux post bid on, /aux post bid off, /aux post bid unit or /aux post bid stack')
+        else
+            aux.account_data.post_bid = choice or nil
+            post.apply_bid_layout()
+            aux.refresh_settings()
+            aux.print('post bid ' .. aux.color.blue(aux.account_data.post_bid or 'off'))
+        end
+    elseif arguments[1] == 'buy' and arguments[2] == 'confirm' then
+        -- 0.8.2.2 (FB-049): the same as the switch in Settings; on or off, or no word to switch it
+        local word = strlower(arguments[3] or '')
+        if word == 'on' or word == 'off' then
+            aux.set_buy_confirm(word == 'on')
+        else
+            aux.set_buy_confirm(not aux.account_data.buy_confirm)
+        end
+        aux.print('buy confirm ' .. status(aux.account_data.buy_confirm) .. (aux.account_data.buy_confirm and ': Buy shows the price, a second click on Confirm buys' or ': one click on Buy buys'))
     elseif arguments[1] == 'post' and arguments[2] == 'duration' and post_duration_code(arguments[3]) then
         -- Forever: accepts the hours of the auction house's options (e.g. 12, 24, 48)
         aux.account_data.post_duration = post_duration_code(arguments[3])
@@ -168,7 +186,8 @@ function SlashCmdList.AUX(command)
 		aux.print('- ignore owner [' .. status(aux.account_data.ignore_owner) .. ']')
         aux.print('- action shortcuts [' .. status(aux.account_data.action_shortcuts) .. ']')
         aux.print('- post full scan [' .. status(aux.account_data.post_full_scan) .. ']')
-        aux.print('- post bid [' .. aux.color.blue(aux.account_data.post_bid or 'off') .. ']')
+        aux.print('- post bid [' .. aux.color.blue(aux.account_data.post_bid or 'off') .. '] (on, off, unit or stack)')
+        aux.print('- buy confirm [' .. status(aux.account_data.buy_confirm) .. ']')
         aux.print('- post duration [' .. aux.color.blue(info.duration_hours(aux.account_data.post_duration) .. 'h') .. ']')
         aux.print('- undercut [' .. status(aux.account_data.post_undercut) .. ']')
         aux.print('- opacity [' .. aux.color.blue(floor(aux.account_data.background_opacity * 100 + .5) .. '%') .. ']')
