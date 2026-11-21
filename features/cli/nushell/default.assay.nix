@@ -159,4 +159,17 @@ in
     # `c` is cd-and-list, and a plain `def` would scope the cd to the body and leave the
     # caller where it started — the command has never actually worked without --env.
     cChangesTheCallersDirectory = assay.eq (inConfig "def --env c [") true;
+
+    # vfiles (GH-188): the three files linked from the checkout, with the committed copies as
+    # fallbacks; the links of earlier generations declared absent; the stanzas linked.
+    vfilesLinksTheCheckoutWithFallbacks = let
+      f = cfg.vfiles.files."/home/alice/.config/nushell/config.nu";
+    in
+      assay.eq [f.mode f.source (f.fallback == ./config.nu)] ["link" "/home/alice/.dotfiles/features/cli/nushell/config.nu" true];
+    vfilesDeclaresEveryShippedFile =
+      assay.eq (builtins.all (n: cfg.vfiles.files ? "/home/alice/.config/nushell/${n}") nuFiles) true;
+    vfilesRemovesStaleLinks =
+      assay.eq (map (n: cfg.vfiles.files."/home/alice/.config/nushell/${n}".mode) ["login.nu" "starship.nu"]) ["absent" "absent"];
+    vfilesLinksTheStanzas =
+      assay.eq (lib.hasSuffix "/share/fish/stanzas" cfg.vfiles.files."/home/alice/.config/nushell/havamal-stanzas".source) true;
   }

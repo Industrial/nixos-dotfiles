@@ -157,4 +157,11 @@ in
         "XDG_DATA_HOME=/home/alice/.local/share"
       ])
       [true true true];
+
+    # vfiles (GH-188): the config link, owned by the user; the import still runs after it.
+    vfilesLinksTheConfig = let
+      f = base.vfiles.files."/home/alice/.config/atuin/config.toml";
+    in
+      assay.eq [f.mode f.user (lib.hasSuffix "-atuin-config.toml" "${f.source}")] ["link" "alice" true];
+    importFollowsTheLegacyLinkWhileVfilesIsOff = assay.eq importing.system.activationScripts.importAtuinFishHistory.deps ["linkAtuinConfig"];
   }
