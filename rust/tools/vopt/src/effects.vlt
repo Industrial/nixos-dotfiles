@@ -1,0 +1,42 @@
+-- vopt's effect edge: each step that touches the machine runs as an
+-- id_effect `Effect` with one typed error, and `cli.vlt` composes them.
+
+import id_effect::{Cause, Effect, fail, succeed, suspend}
+
+-- What can stop an optimisation run, by where it happened.
+export data OptError
+  = Database String "store database: #{0}"
+  | Links String "links directory: #{0}"
+  | Lock String "GC lock: #{0}"
+  | Mount String "store mount: #{0}"
+  | State String "state file: #{0}"
+  | Usage String "#{0}"
+
+-- A Result as an effect, its error typed by `kind`.
+export lift : given <A: Send + 'static, K: FnOnce(String) -> OptError> Result<A, String> -> K -> Effect<A, OptError>
+lift r kind =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail (kind e)
+
+-- A fallible step, deferred until the effect runs.
+export step : given <A: Send + 'static, F: FnOnce() -> Result<A, String> + Send + 'static, K: FnOnce(String) -> OptError + Send + 'static> F -> K -> Effect<A, OptError>
+step f kind = suspend (move \-> lift (f ()) kind)
+
+-- Run a program to its exit code: a typed failure is 1, a defect 2.
+export exit_code : Effect<i32, OptError> -> i32
+exit_code program =
+  case program.block_on () |> .into_result of
+    Ok code -> code
+    Err cause -> failed cause
+
+failed : Cause<OptError> -> i32
+failed cause =
+  shown = "#{cause:?}"
+  case cause.fail_option () of
+    Some e ->
+      eprintln! \-> "vopt: #{e}"
+      1
+    None ->
+      eprintln! \-> "vopt: aborted: #{shown}"
+      2

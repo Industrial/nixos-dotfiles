@@ -1,0 +1,45 @@
+# vopt — the Nix store optimiser, in Voltaic.
+#
+# Standalone crate (own Cargo.lock, empty [workspace]) so buildRustPackage vendors
+# it on its own and it never contends with rust/Cargo.toml's members or lockfile.
+[workspace]
+
+[package]
+name = "vopt"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial"]
+description = "Nix store optimiser: incremental hard-link deduplication into /nix/store/.links"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# Effects, typed errors, parallel phases and the run edge. Fleet-wide pin.
+id_effect = "=0.13.0"
+rusqlite = { version = "0.37", features = ["bundled"] }
+sha2 = "0.10"
+# Safe unshare / mount / statvfs for the private, writable store mount.
+nix = { version = "0.30", default-features = false, features = [
+  "sched",
+  "mount",
+  "fs",
+] }
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Exact pin —
+# the surface still moves between minors.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vopt"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vopt"
+path = "src/main.rs"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

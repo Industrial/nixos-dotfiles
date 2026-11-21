@@ -169,6 +169,7 @@
   ./nixos/systemd
   ./nixos/users
   ./nixos/vgc
+  ./nixos/vopt
   ./nixos/window-manager
 
   # performance

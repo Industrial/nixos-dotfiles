@@ -44,5 +44,7 @@
   features.nixos.vgc.enable = true;
   # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
   features.nix.vverify.enable = true;
+  # vopt (Voltaic) replaces inline auto-optimise-store with a daily pass.
+  features.nixos.vopt.enable = true;
   features.storage.nfs-client.enable = true;
 }
