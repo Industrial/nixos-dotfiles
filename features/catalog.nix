@@ -166,6 +166,7 @@
   ./nixos/sound
   ./nixos/systemd
   ./nixos/users
+  ./nixos/vgc
   ./nixos/window-manager
 
   # performance
