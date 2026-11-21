@@ -18,6 +18,7 @@ in
     servesBuilds = assay.eq (has "fleet.nix-remote-builder-server") true;
     servesTheBinaryCache = assay.eq (has "nix.vcache") true;
     verifiesTheStore = assay.eq (has "nix.vverify") true;
+    vbuildIsTheBuildHook = assay.eq (has "fleet.vbuild") true;
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
   }
