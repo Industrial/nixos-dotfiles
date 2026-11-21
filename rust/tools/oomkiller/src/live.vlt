@@ -1,0 +1,156 @@
+-- The real capabilities: sysinfo for memory and the process table, /proc for
+-- ownership, kill(1) for the kill, and stdout/stderr for the journal. Plus the
+-- program edge: one layer that builds them, and `run_main`, which owns the exit
+-- code (0 success, 1 typed failure, 101 defect, 130 interrupted).
+--
+-- This is the only file that touches the machine. Its tests run against the
+-- real machine; every decision is tested against fakes in `daemon.vlt`.
+
+import std::os::unix::fs::MetadataExt
+import std::process::ExitCode
+import std::sync::{Arc, Mutex, PoisonError}
+import sysinfo::{ProcessesToUpdate, System}
+import id_effect::{Effect, HNil, Layer, Never, fail, succeed, suspend, sync}
+import id_effect_cli::{RunMainConfig, run_main}
+import crate::daemon::daemon
+import crate::policy::{Line, ProcessInfo, Reading}
+import crate::ports::{DaemonEnv, DaemonError, Journal, Kill, KillError, Killer, Log, Memory, MemoryProbe, Owner, ProcessTable, Processes, env}
+
+-- The uid owning /proc/<pid>, or None once the process is gone or unreadable.
+proc_uid : u32 -> Option<u32>
+proc_uid pid =
+  std::fs::metadata (format! \-> "/proc/#{pid}") |> .ok |> .map (\m -> m.uid ())
+
+-- The daemon's own uid: the user whose processes it may kill.
+current_uid : Result<u32, DaemonError>
+current_uid =
+  std::fs::metadata "/proc/self" |> .map (\m -> m.uid ()) |> .map_err (\e -> DaemonError::OwnerUnknown (e.to_string ()))
+
+cmdline_of : &sysinfo::Process -> String
+cmdline_of process =
+  parts = process.cmd () |> .iter |> .map (\s -> s.to_string_lossy ().into_owned ()) |> .collect : Vec<String>
+  parts.join " "
+
+-- Every process sysinfo last saw whose owner /proc can still name.
+listed : &System -> Vec<ProcessInfo>
+listed system =
+  mut out = Vec::new () : Vec<ProcessInfo>
+  for entry in system.processes ()
+    n = entry.0.as_u32 ()
+    process = entry.1
+    if proc_uid n is Some uid
+      name = process.name ().to_string_lossy ().into_owned ()
+      out.push (ProcessInfo { pid = n, uid, memory = process.memory (), name, cmdline = cmdline_of process })
+  out
+
+-- One sysinfo System, shared by the memory probe and the process table:
+-- building it scans the whole machine, so it is built once.
+data LiveMemory { system Arc<Mutex<System>> }
+
+instance MemoryProbe LiveMemory
+  read : &self -> Effect<Reading, Never>
+  read self =
+    system = Arc::clone (&self.system)
+    sync (move \-> measured (&system))
+
+measured : &Mutex<System> -> Reading
+measured system =
+  mut locked = system.lock ().unwrap_or_else PoisonError::into_inner
+  locked.refresh_memory ()
+  Reading { used = locked.used_memory (), total = locked.total_memory () }
+
+data LiveTable { system Arc<Mutex<System>> }
+
+instance ProcessTable LiveTable
+  snapshot : &self -> Effect<Vec<ProcessInfo>, Never>
+  snapshot self =
+    system = Arc::clone (&self.system)
+    sync (move \-> refreshed (&system))
+
+-- Every process refreshed, and the dead ones dropped. Said explicitly because
+-- sysinfo 0.33's refresh_all keeps dead processes in the table.
+refreshed : &Mutex<System> -> Vec<ProcessInfo>
+refreshed system =
+  mut locked = system.lock ().unwrap_or_else PoisonError::into_inner
+  _updated = locked.refresh_processes ProcessesToUpdate::All true
+  listed (&locked)
+
+-- The unit value, for `succeed UNIT`: a literal `()` argument reads as a
+-- zero-argument call.
+const UNIT : () = ()
+
+-- SIGKILL through kill(1), as the daemon always has.
+data LiveKiller = LiveKiller
+
+instance Killer LiveKiller
+  kill : &self -> u32 -> Effect<(), KillError>
+  kill self pid = suspend (move \-> killed pid)
+
+killed : u32 -> Effect<(), KillError>
+killed pid =
+  output = std::process::Command::new "kill" |> .arg "-9" |> .arg (pid.to_string ()) |> .output
+  case output of
+    Err e -> fail (KillError { reason = format! \-> "Failed to execute kill command: #{e}" })
+    Ok out -> if out.status.success ()
+      succeed UNIT
+    else
+      fail (KillError { reason = (String::from_utf8_lossy (&out.stderr)).into_owned () })
+
+-- stdout for Info and stderr for Warn: systemd sends both to the journal.
+data StdJournal = StdJournal
+
+instance Journal StdJournal
+  write : &self -> Vec<Line> -> Effect<(), Never>
+  write self lines = sync (move \-> emit lines)
+
+emit : Vec<Line> -> ()
+emit lines =
+  for line in lines
+    case line of
+      Line::Info s -> println! \-> "#{s}"
+      Line::Warn s -> eprintln! \-> "#{s}"
+  ()
+
+-- The live environment. It fails only when the daemon cannot tell whose
+-- processes it may kill.
+live_env : Effect<DaemonEnv, DaemonError>
+live_env = suspend (\-> built (current_uid ()))
+
+built : Result<u32, DaemonError> -> Effect<DaemonEnv, DaemonError>
+built uid = case uid of
+  Err e -> fail e
+  Ok uid ->
+    system = Arc::new (Mutex::new (System::new_all ()))
+    memory = Memory { inner = Arc::new (LiveMemory { system = Arc::clone (&system) }) }
+    table = Processes { inner = Arc::new (LiveTable { system }) }
+    killer = Kill { inner = Arc::new (LiveKiller) }
+    log = Log { inner = Arc::new (StdJournal) }
+    succeed (env memory table killer log (Owner { uid }))
+
+export layer : Layer<DaemonEnv, DaemonError>
+layer = Layer::effect crate::live::live_env
+
+-- The program: the daemon on the live environment, run by run_main.
+export start : ExitCode
+start = run_main ((daemon ()).provide_layer (layer ())) HNil (RunMainConfig::minimal ())
+
+test "this process belongs to this daemon's uid"
+  assert! \-> proc_uid (std::process::id ()) == .ok (current_uid ())
+
+test "a pid that does not exist has no owner"
+  assert! \-> proc_uid 999999999 == None
+
+test "the live memory probe reads a total"
+  system = Arc::new (Mutex::new (System::new_all ()))
+  exit = ((LiveMemory { system }).read ()).block_on ()
+  assert! \-> matches!(exit, id_effect::Exit::Success(r) if r.total > 0)
+
+test "the live process table sees this process"
+  system = Arc::new (Mutex::new (System::new_all ()))
+  me = std::process::id ()
+  exit = ((LiveTable { system }).snapshot ()).block_on ()
+  assert! \-> matches!(exit, id_effect::Exit::Success(ps) if ps.iter().any(|p| p.pid == me))
+
+test "killing a pid that does not exist fails"
+  exit = ((LiveKiller).kill 999999999).block_on ()
+  assert! \-> matches!(exit, id_effect::Exit::Failure(_))

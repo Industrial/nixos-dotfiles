@@ -17,9 +17,28 @@ const KIB : u64 = 1024
 const MIB : u64 = 1048576
 const GIB : u64 = 1073741824
 
--- A candidate victim, as `daemon.vlt` read it from sysinfo and /proc.
+-- A candidate victim, as the process table read it from sysinfo and /proc.
 export data ProcessInfo { export pid u32, export uid u32, export memory u64, export name String, export cmdline String }
   deriving (Debug, Clone, PartialEq)
+
+-- One memory reading, in bytes.
+export data Reading { export used u64, export total u64 }
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- What one check did. Under the threshold nothing happens; over it, the
+-- largest owned process is killed, or the kill fails, or there is none.
+export data Tick
+  = Idle
+  | NoVictim Reading
+  | Killed Reading ProcessInfo
+  | KillFailed Reading ProcessInfo String
+  deriving (Debug, Clone, PartialEq)
+
+-- A journal line: Info goes to stdout, Warn to stderr.
+export data Line
+  = Info String
+  | Warn String
+  deriving (Debug, Clone, PartialEq, Eq)
 
 -- `num / den` rounded half-up, to two decimals for scale 100 and one otherwise;
 -- `0.0` for a zero `den`. u128, so `num * scale` cannot overflow for any u64
@@ -87,6 +106,17 @@ export kill_failed_line : &ProcessInfo -> &str -> String
 kill_failed_line p e =
   rss = format_bytes p.memory
   "Failed to kill pid=#{p.pid} name=#{p.name} rss=#{rss}: #{e}"
+
+export const NO_VICTIM_LINE : &str = "Memory threshold exceeded but no killable process found"
+
+-- What the journal says about one check: nothing when idle; otherwise the
+-- exceeded line, then the outcome.
+export journal : &Tick -> Vec<Line>
+journal tick = case tick of
+  Idle -> Vec::new ()
+  NoVictim r -> .to_vec ([Info (exceeded_line r.used r.total), Warn (.to_string NO_VICTIM_LINE)])
+  Killed r p -> .to_vec ([Info (exceeded_line r.used r.total), Info (killed_line p)])
+  KillFailed r p e -> .to_vec ([Info (exceeded_line r.used r.total), Warn (kill_failed_line p e)])
 
 #[cfg(test)]
 proc : u32 -> u32 -> u64 -> ProcessInfo
@@ -173,3 +203,17 @@ test "the kill-failure line carries the error"
 
 test "the exceeded line survives a zero total"
   assert! \-> exceeded_line 0 0 == "Memory threshold exceeded (90%): used=0 B / total=0 B (0.0%)"
+
+test "an idle check writes nothing"
+  assert! \-> journal (&Idle) == Vec::new ()
+
+test "a kill is logged after the exceeded line"
+  r = Reading { used = 95, total = 100 }
+  p = proc 42 1000 (2 * GIB)
+  assert! \-> journal (&Killed r (p.clone ())) == .to_vec ([Info (exceeded_line 95 100), Info (killed_line (&p))])
+
+test "a failed kill and a missing victim are warnings"
+  r = Reading { used = 95, total = 100 }
+  p = proc 42 1000 KIB
+  assert! \-> journal (&KillFailed r (p.clone ()) (.to_string "denied")) == .to_vec ([Info (exceeded_line 95 100), Warn (kill_failed_line (&p) "denied")])
+  assert! \-> journal (&NoVictim r) == .to_vec ([Info (exceeded_line 95 100), Warn (.to_string NO_VICTIM_LINE)])
