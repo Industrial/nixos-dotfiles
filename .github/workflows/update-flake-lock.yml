@@ -24,9 +24,11 @@
 # Host checks are NOT duplicated here. The bump PR runs the regular PR workflow (pr.yml ->
 # ci.yml), and `ci / all-green` is the required check on main. GitHub only starts that
 # workflow for a PR that a workflow opened when the PR was opened with a token other than
-# GITHUB_TOKEN, so set the FLAKE_LOCK_UPDATE_TOKEN secret (fine-grained PAT or GitHub App
-# token: contents + pull-requests write on this repo). Without it, a person has to close
-# and reopen the PR before `ci / all-green` can run and the PR can merge.
+# GITHUB_TOKEN. The vbump job mints one per run from the vbump GitHub App (secrets
+# VBUMP_APP_ID and VBUMP_APP_PRIVATE_KEY; setup in docs/runbooks/updates.md); without
+# them it falls back to FLAKE_LOCK_UPDATE_TOKEN, then GITHUB_TOKEN, with a warning, and a
+# person has to close and reopen each PR before `ci / all-green` can run. The legacy job
+# reads FLAKE_LOCK_UPDATE_TOKEN only.
 #
 # This workflow NEVER merges, approves or enables auto-merge. Hosts change only after the
 # operator merges the PR into main, when comin (ADR-0002) converges them.
@@ -66,18 +68,55 @@ jobs:
       # Labels are an issues API: vbump creates `flake-lock` when missing and adds it.
       issues: write
     env:
-      # The PR's own `ci / all-green` only starts for a PR opened with a token other than
-      # GITHUB_TOKEN; see the header and ADR-0006.
-      GH_TOKEN: ${{ secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
       INPUT: ${{ inputs.input }}
+      # The vbump GitHub App (VBUMP_APP_ID: its Client ID or App ID; VBUMP_APP_PRIVATE_KEY:
+      # a private key it generated). Both set: each run mints a short-lived installation
+      # token scoped to this repository. Either missing: the job runs as before, with
+      # FLAKE_LOCK_UPDATE_TOKEN or GITHUB_TOKEN, and says so in the job summary.
+      HAS_APP: ${{ secrets.VBUMP_APP_ID != '' && secrets.VBUMP_APP_PRIVATE_KEY != '' }}
     steps:
+      # Why a token other than GITHUB_TOKEN: GitHub starts no workflow for a PR that
+      # GITHUB_TOKEN opened, so `ci / all-green` (required on main) would never run on a
+      # bump PR until someone closed and reopened it. See ADR-0006.
+      - name: Mint the vbump app token
+        id: app
+        if: env.HAS_APP == 'true'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ secrets.VBUMP_APP_ID }}
+          private-key: ${{ secrets.VBUMP_APP_PRIVATE_KEY }}
+          # No owner/repositories: the token is scoped to this repository alone. The
+          # permissions narrow it further, to what vbump uses.
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - name: Without the app, say so
+        if: env.HAS_APP != 'true'
+        run: |
+          msg='VBUMP_APP_ID / VBUMP_APP_PRIVATE_KEY are not set: the bump PRs are opened with FLAKE_LOCK_UPDATE_TOKEN or GITHUB_TOKEN. With GITHUB_TOKEN their CI does not start until each PR is closed and reopened (docs/runbooks/updates.md).'
+          echo "::warning title=vbump without its app token::$msg"
+          printf '> [!WARNING]\n> %s\n' "$msg" >> "$GITHUB_STEP_SUMMARY"
       # vbump pushes each input's branch from this checkout, so it keeps the credentials
       # (the same token the PRs are opened with). The legacy job's action did the same.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
+          token: ${{ steps.app.outputs.token || secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
           persist-credentials: true
+      # The commits are the app's bot user's when the app token is in use.
+      - name: Committer
+        id: committer
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          if [ -n "$SLUG" ]; then
+            id="$(gh api "/users/${SLUG}[bot]" --jq .id)"
+            echo "identity=${SLUG}[bot] <${id}+${SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+          else
+            echo "identity=github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+          fi
       - name: Setup Nix
         uses: ./.github/actions/setup-nix
       # The crate's default.nix through the flake's nixpkgs, as the fleet builds it.
@@ -88,10 +127,14 @@ jobs:
             "(builtins.getFlake \"git+file://$PWD?shallow=1&rev=$GITHUB_SHA\").inputs.nixpkgs.legacyPackages.x86_64-linux.callPackage $PWD/rust/tools/vbump {}")"
           echo "$out/bin" >> "$GITHUB_PATH"
       - name: Bump each input
+        env:
+          # gh (PR create/edit, the label) uses the same token as the push.
+          GH_TOKEN: ${{ steps.app.outputs.token || secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
+          COMMITTER: ${{ steps.committer.outputs.identity }}
         run: |
           set -euo pipefail
           args=(run --rev "$GITHUB_SHA" --jobs 2 --out vbump-out --summary "$GITHUB_STEP_SUMMARY"
-            --committer 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>')
+            --committer "$COMMITTER")
           if [ -n "$INPUT" ]; then args+=(--input "$INPUT"); fi
           vbump "${args[@]}"
       - name: Upload proposals

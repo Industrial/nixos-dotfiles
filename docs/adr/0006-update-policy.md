@@ -90,6 +90,17 @@ Rollback: the repository variable `FLAKE_LOCK_UPDATER=legacy` (or the dispatch i
 covered by `features/cli/vbump/default.assay.nix`. Decisions 1 and 4 to 7 are unchanged:
 nothing merges on its own.
 
+The token (2026-11-22, user decision on #189): the first real run (#210) showed the
+*Negative* consequence below in practice. Its PR was opened with `GITHUB_TOKEN` and got no
+CI until it was closed and reopened, and per-input PRs make that a weekly chore per input.
+The `vbump` job therefore mints a **GitHub App installation token** at the start of each
+run (`actions/create-github-app-token`, pinned by commit, from the secrets `VBUMP_APP_ID`
+and `VBUMP_APP_PRIVATE_KEY`). The token is limited to this repository and to contents,
+pull-requests and issues write, and it expires within the hour. A long-lived PAT was
+rejected: it is tied to a person, it must be rotated by hand, and the PRs would show as
+that person's. Without the secrets, the job falls back to `FLAKE_LOCK_UPDATE_TOKEN`, then
+`GITHUB_TOKEN`, with a warning in the job summary. Setup: `docs/runbooks/updates.md` §6.
+
 ## Why the PR shows evaluated versions, not a built closure diff
 
 A real closure diff (`nix store diff-closures`, nvd) needs both closures realised for each
