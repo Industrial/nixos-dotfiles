@@ -55,8 +55,11 @@ in
     rustdeskServerOnlyOnMimir =
       assay.eq (forAll (c: c.services.rustdesk-server.enable)) (onAll false // {mimir = true;});
 
-    # Pull convergence (ADR-0002) on every host, each tracking its own configuration.
-    cominEverywhere = assay.eq (forAll (c: c.services.comin.enable)) (onAll true);
+    # Pull convergence (ADR-0002) on every host, each tracking its own configuration: comin,
+    # except where vdeploy took over (the `vdeploy` role, GH-160: drakkar).
+    cominEverywhere = assay.eq (forAll (c: c.services.comin.enable)) (onAll true // {drakkar = false;});
+    vdeployDeploysDrakkar = assay.eq (forAll (c: c.features.nix.vdeploy.mode)) (onAll "observe" // {drakkar = "deploy";});
+    cominTombstoneOnDrakkar = assay.eq (forAll (c: c.systemd.services.comin.serviceConfig.Restart)) (onAll "always" // {drakkar = "no";});
     cominTracksOwnHost = assay.eq (forAll (c: c.services.comin.hostname)) (lib.genAttrs hosts (h: h));
 
     hostnamesMatch = assay.eq (forAll (c: c.networking.hostName)) (lib.genAttrs hosts (h: h));
