@@ -36,6 +36,8 @@ Two earlier changes are prior art and shape the decisions:
   module declares those options, so every host would fail to evaluate. Its import would also
   turn it on fleet-wide. Decision 6 is the off-by-default, lanzaboote-based replacement. #108
   should be closed in favour of it, or reworked to set `features.hardening.secureBoot`.
+  GH-184 has since wired the lanzaboote input and module behind that option, which
+  supersedes the branch.
 
 ## Decisions
 
@@ -225,16 +227,59 @@ In order of preference:
 
 ## Runbook: Secure Boot (lanzaboote)
 
-1. Add the `lanzaboote` flake input and `inputs.lanzaboote.nixosModules.lanzaboote` to the
-   host's modules (`flake.nix`/host config, another workstream). The option asserts that this
-   is done.
-2. `sudo sbctl create-keys` (writes `/var/lib/sbctl`), set
-   `features.hardening.secureBoot.enable = true`, deploy, and check with `sbctl verify` that
-   everything on the ESP is signed.
-3. At the machine: put the firmware in Setup Mode, run `sudo sbctl enroll-keys --microsoft`
-   (keep the Microsoft keys for GPU option ROMs), reboot, and enable Secure Boot in firmware.
-   `bootctl status` should show `Secure Boot: enabled (user)`.
-4. Fallback: disable Secure Boot in firmware. The signed UKIs still boot with it off.
+The `lanzaboote` flake input (nix-community/lanzaboote, pinned to a release tag, every input
+following ours) is in `flake.nix` since GH-184. `features/nixos/boot` imports its module on
+every host, where it stays inert until the option is on. With the option on, lanzaboote's
+`lzbt` replaces the Python systemd-boot installer: it reads each generation's bootspec,
+writes signed UKIs to `/boot/EFI/Linux/`, and keeps the same 10-generation limit.
+`checks.x86_64-linux.lanzaboote-vm` (`features/nixos/boot/test.nix`) runs this whole runbook
+in a VM: switch, reboot into the lanzaboote generation, roll back, reboot.
+
+The order matters. comin deploys every merge to drakkar on its own, and `lzbt` fails the
+switch if the keys are missing. So **step 1 happens before the enable merges.**
+
+1. **Keys, on the host, before the enable.** Run
+   `sudo nix run nixpkgs#sbctl -- create-keys`. This writes `/var/lib/sbctl/keys/{PK,KEK,db}`
+   and `/var/lib/sbctl/GUID`, which is `pkiBundle`. Check that
+   `sudo test -s /var/lib/sbctl/keys/db/db.key` passes.
+2. **Back up `/var/lib/sbctl` right away, off the machine.** For example:
+   `sudo tar -C /var/lib -cf - sbctl | gpg -c > sbctl-<host>.tar.gpg`, stored on encrypted
+   offline media or in the password manager. Never commit it. Before enrollment (step 5), a
+   lost bundle only means creating keys again. After enrollment, losing `db.key` means no
+   new generation can be signed until new keys are enrolled at the machine.
+3. **Enable.** Set `features.hardening.secureBoot.enable = true` for the host, and merge.
+   comin switches the host, and `lzbt` installs signed UKIs for every generation it keeps.
+   Then check: `sudo sbctl verify` lists `/boot/EFI/Linux/nixos-generation-*.efi` as signed,
+   and `/boot/loader/loader.conf` has `default nixos-*`.
+4. **First reboot, at the machine.**
+   - Remove the Python installer's entries:
+     `sudo rm -f /boot/loader/entries/nixos-generation-*.conf`. `lzbt` does not remove them,
+     they are unsigned, and once lanzaboote owns `EFI/nixos/` their kernels are not
+     guaranteed to stay there.
+   - Reboot. `bootctl status` should show `Current Entry: nixos-generation-<N>-….efi`, and
+     `readlink -f /run/booted-system` should be the generation that comin switched to.
+   - If that entry fails to boot, pick an older lanzaboote generation in the systemd-boot
+     menu. `lzbt` installs every kept generation, not just the new one.
+5. **Enroll, at the machine.** Put the firmware in Setup Mode, run
+   `sudo sbctl enroll-keys --microsoft` (keep the Microsoft keys, which the GPU option ROMs
+   need), reboot, and turn Secure Boot on in the firmware. `bootctl status` should show
+   `Secure Boot: enabled (user)`.
+6. **Fallback while enrolled:** turn Secure Boot off in the firmware. The signed UKIs still
+   boot with it off.
+
+### Rollback to systemd-boot
+
+1. If Secure Boot is on in the firmware, **turn it off first**. The Python installer's
+   systemd-boot and kernels are unsigned, so an enforcing firmware refuses them.
+2. Revert the enable (`features.hardening.secureBoot.enable` back to off) and merge. comin
+   switches to a new generation with the Python installer. That installer writes
+   `/boot/loader/entries/nixos-generation-*.conf` for every generation and removes
+   lanzaboote's files from `/boot/EFI/nixos/`. It does not touch `/boot/EFI/Linux/`.
+3. **ESP cleanup:** `sudo rm -f /boot/EFI/Linux/nixos-generation-*.efi`. Those UKIs now point
+   at kernels that step 2 deleted, and systemd-boot would still list them.
+4. Reboot at the machine. `bootctl status` should show a `nixos-generation-<N>.conf` entry.
+5. Keep the `/var/lib/sbctl` backup. Keys enrolled in firmware stay there until the firmware
+   is reset to Setup Mode or its default keys.
 
 ## Runbook: TPM2 unlock
 
