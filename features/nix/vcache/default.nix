@@ -123,7 +123,9 @@ in {
       LockPersonality = true;
       MemoryDenyWriteExecute = true;
       SystemCallArchitectures = "native";
-      SystemCallFilter = ["@system-service" "~@privileged" "~@resources"];
+      # Not ~@resources: nix (the ExecStartPre) raises its stack rlimit at startup.
+      SystemCallFilter = ["@system-service" "~@privileged"];
+      SystemCallErrorNumber = "EPERM";
     };
   };
 }
