@@ -35,6 +35,7 @@ export data Plan
   , export diff Option<String>
   , export note String
   , export planned_at u64
+  , export deploy bool
   }
   deriving (Debug, Clone, PartialEq, Eq)
 
@@ -90,7 +91,9 @@ line_of p =
     " (#{p.skipped} newer commit(s) skipped since the last plan)"
   else
     String::new ()
-  if p.switch
+  if p.switch && p.deploy
+    "vdeploy: switching #{p.host} from #{from} to #{short (&p.commit)}#{skipped}: #{p.out} (#{p.realised}); #{diff_words p}. Deploy mode: applying, with a health check."
+  else if p.switch
     "vdeploy: would switch #{p.host} from #{from} to #{short (&p.commit)}#{skipped}: #{p.out} (#{p.realised}); #{diff_words p}. Observe mode: not switching."
   else
     "vdeploy: #{p.host} already runs #{p.out} (#{short (&p.commit)}#{skipped}): nothing to switch."
@@ -113,7 +116,11 @@ json_of p full =
     p.diff.clone () |> .unwrap_or_else (\-> .to_string "null")
   else
     counts_json (&p.diff)
-  "{\"schema\":1,\"mode\":\"observe\",\"host\":#{quote (&p.host)},\"commit\":#{quote (&p.commit)},\"commitTime\":#{p.commit_time},\"signedByGithub\":#{p.signed},\"skipped\":#{p.skipped},\"running\":{\"rev\":#{quote_opt (&p.running_rev)},\"toplevel\":#{quote (&p.running)}},\"drv\":#{quote (&p.drv)},\"out\":#{quote (&p.out)},\"realised\":#{quote (&p.realised)},\"action\":\"#{action}\",\"wouldRun\":#{quote (&"#{p.out}/bin/switch-to-configuration switch")},\"diff\":#{diff},\"note\":#{quote (&p.note)},\"plannedAt\":#{p.planned_at}}"
+  mode = if p.deploy
+    "deploy"
+  else
+    "observe"
+  "{\"schema\":1,\"mode\":\"#{mode}\",\"host\":#{quote (&p.host)},\"commit\":#{quote (&p.commit)},\"commitTime\":#{p.commit_time},\"signedByGithub\":#{p.signed},\"skipped\":#{p.skipped},\"running\":{\"rev\":#{quote_opt (&p.running_rev)},\"toplevel\":#{quote (&p.running)}},\"drv\":#{quote (&p.drv)},\"out\":#{quote (&p.out)},\"realised\":#{quote (&p.realised)},\"action\":\"#{action}\",\"wouldRun\":#{quote (&"#{p.out}/bin/switch-to-configuration switch")},\"diff\":#{diff},\"note\":#{quote (&p.note)},\"plannedAt\":#{p.planned_at}}"
 
 gauge : &str -> &str -> String -> String
 gauge name help value = "# HELP #{name} #{help}\n# TYPE #{name} gauge\n#{name} #{value}\n"
@@ -131,7 +138,8 @@ flag b =
 -- The textfile metrics, in the Prometheus text exposition format.
 export metrics : &Status -> String
 metrics st =
-  mut out = gauge "vdeploy_observe_mode" "1: vdeploy plans and logs switches, and never makes one." (.to_string "1")
+  mut out = gauge "vdeploy_observe_mode" "1: vdeploy plans and logs switches, and never makes one." (flag (!st.deploy))
+  out.push_str (&gauge "vdeploy_deploy_mode" "1: vdeploy deploys this host (switch, health check, rollback); comin is retired." (flag st.deploy))
   if st.generation_age is Some age
     out.push_str (&gauge "vdeploy_generation_age_seconds" "Now minus the commit time of the commit the running system was built from." (age.to_string ()))
   if st.last_poll is Some t
@@ -188,7 +196,7 @@ publish_plan dir p =
 
 #[cfg(test)]
 sample : Plan
-sample = Plan { host = .to_string "drakkar", commit = .to_string "0123456789abcdef", commit_time = 7, signed = true, skipped = 2, running_rev = Some (.to_string "fedcba9876543210"), running = .to_string "/nix/store/old", drv = .to_string "/nix/store/new.drv", out = .to_string "/nix/store/new", realised = .to_string "fetched", switch = true, diff = Some (.to_string "{\"schema\":1,\"changed\":[{\"name\":\"hello\"}],\"selectionChanged\":[],\"added\":[],\"removed\":[{\"name\":\"gone\"}],\"closure\":{\"pathsAdded\":3,\"pathsRemoved\":2,\"narSizeDelta\":2048}}"), note = String::new (), planned_at = 9 }
+sample = Plan { host = .to_string "drakkar", commit = .to_string "0123456789abcdef", commit_time = 7, signed = true, skipped = 2, running_rev = Some (.to_string "fedcba9876543210"), running = .to_string "/nix/store/old", drv = .to_string "/nix/store/new.drv", out = .to_string "/nix/store/new", realised = .to_string "fetched", switch = true, deploy = false, diff = Some (.to_string "{\"schema\":1,\"changed\":[{\"name\":\"hello\"}],\"selectionChanged\":[],\"added\":[],\"removed\":[{\"name\":\"gone\"}],\"closure\":{\"pathsAdded\":3,\"pathsRemoved\":2,\"narSizeDelta\":2048}}"), note = String::new (), planned_at = 9 }
 
 test "a plan that would switch says so, with the diff, and that it does not"
   l = line_of (&sample ())

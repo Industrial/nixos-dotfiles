@@ -32,6 +32,7 @@ export data Settings
   , export textfile_dir Option<String>
   , export state_dir Option<String>
   , export dotfiles String
+  , export deploy bool
   }
   deriving (Debug, Clone, PartialEq, Eq)
 
@@ -152,7 +153,7 @@ planned caps s head skipped =
     let drv = ~caps.nix.0.drv(head.sha.clone());
     let (out, how) = ~realised(caps.clone(), drv.clone());
     let (diff, note) = ~diffed(caps.differ.clone(), running.toplevel.clone(), out.clone());
-    Plan { host: s.host.clone(), commit: head.sha.clone(), commit_time: head.time, signed: head.signed, skipped, running_rev: running.rev.clone(), running: running.toplevel.clone(), drv, switch: out != running.toplevel, out, realised: how, diff, note, planned_at: now_secs() }
+    Plan { host: s.host.clone(), commit: head.sha.clone(), commit_time: head.time, signed: head.signed, skipped, running_rev: running.rev.clone(), running: running.toplevel.clone(), drv, switch: out != running.toplevel, out, realised: how, diff, note, planned_at: now_secs(), deploy: s.deploy }
 
 -- A plan's failure as a value: one bad commit never stops the agent.
 settled : Effect<Plan, DeployError, HNil> -> Effect<Result<Plan, DeployError>, Never, HNil>
@@ -181,14 +182,24 @@ cycle caps s state head changes =
       Ok(plan) => {
         let pending = plan.switch;
         let out = plan.out.clone();
+        let target = out.clone();
         ~reported(s.clone(), plan);
         ~state.update::<Never, HNil>(move |st| finished_with(st, pending, out, at, secs));
+        if pending && s.deploy {
+          let said = ~caps.deployer.0.apply(Some(target));
+          eprintln!("vdeploy: apply {}", said);
+          ~state.update::<Never, HNil>(move |st| applied_with(st, said));
+        }
       }
       Err(e) => {
         eprintln!("vdeploy: plan for {} failed: {}", short(&head.sha), e);
         ~state.update::<Never, HNil>(move |st| failed_with(st, at, secs));
       }
     }
+
+-- An apply's outcome (from the ledger), into the Status.
+export applied_with : Status -> String -> Status
+applied_with st said = Status { last_apply = Some said, ...st }
 
 acted : Caps -> Settings -> Ref<Status> -> Status -> Effect<(), Never, HNil>
 acted caps s state st =
@@ -211,13 +222,29 @@ agent caps s state work polls =
   poller = Effect::repeat (move \-> poll (caps.clone ()) (s.clone ()) (state.clone ())) polls |> .map (\_ -> ())
   worker.race_first poller
 
+-- Deploy mode, before the first poll: retire comin (wait for its last
+-- switch, then stop it), and finish an apply a restart interrupted.
+export prepared : Caps -> Settings -> Effect<(), Never, HNil>
+prepared caps s =
+  if s.deploy
+    d = caps.deployer.clone ()
+    caps.deployer.0.retire () |> .flat_map (move \_ -> d.0.apply None) |> .map (\said -> eprintln! \-> "vdeploy: resume: #{said}")
+  else
+    succeed (())
+
 -- The daemon's Schedules: the worker every `tick`, the poller every `interval`.
 export daemon : Caps -> Settings -> Effect<(), Never, HNil>
 daemon caps s =
-  eprintln! \-> "vdeploy: observe mode for #{s.host}: polling main every #{s.interval}s, debounce #{s.quiet_polls} poll(s); never switching"
+  if s.deploy
+    eprintln! \-> "vdeploy: deploy mode for #{s.host}: polling main every #{s.interval}s, debounce #{s.quiet_polls} poll(s); every switch is health-checked and rolled back when unhealthy"
+  else
+    eprintln! \-> "vdeploy: observe mode for #{s.host}: polling main every #{s.interval}s, debounce #{s.quiet_polls} poll(s); never switching"
   work = Schedule::spaced (Duration::from_secs s.tick)
   polls = Schedule::spaced (Duration::from_secs s.interval)
-  agent caps s (Ref::new (Status::default ())) work polls
+  state = Ref::new (Status { deploy = s.deploy, ...Status::default () })
+  c2 = caps.clone ()
+  s2 = s.clone ()
+  prepared caps s |> .flat_map (move \_ -> agent c2 s2 state work polls)
 
 judged : Status -> Effect<(), DeployError, HNil>
 judged st =
@@ -245,7 +272,7 @@ heads n = (1 .. n + 1) |> .map (\i -> "c#{i}") |> .collect
 
 #[cfg(test)]
 settings : u64 -> Settings
-settings quiet = Settings { host = .to_string "machine", interval = 1, quiet_polls = quiet, tick = 1, textfile_dir = None, state_dir = None, dotfiles = .to_string "~/.dotfiles" }
+settings quiet = Settings { host = .to_string "machine", interval = 1, quiet_polls = quiet, tick = 1, textfile_dir = None, state_dir = None, dotfiles = .to_string "~/.dotfiles", deploy = false }
 
 #[cfg(test)]
 seconds : u64 -> Schedule<u64, ()>
@@ -285,6 +312,33 @@ test "commits faster than a build: no build cancelled, the newest one planned"
   assert_eq! \-> st.done \-> Some (.to_string "c10")
   assert_eq! \-> st.skipped + st.started \-> 10
   assert! \-> st.pending
+
+test "deploy mode retires comin first, then applies every plan that switches"
+  world = crate::caps::Scripted { heads = heads 3, build_secs = 1, ...crate::caps::Scripted::default () }
+  s = Settings { deploy = true, ...settings 0 }
+  state = Ref::new (Status { deploy = true, ...Status::default () })
+  assert! \-> id_effect::testing::run_test (prepared (crate::caps::scripted (world.clone ())) (s.clone ())) |> .into_result |> .is_ok
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) s (state.clone ()) (seconds 20) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  log = logged (&world.deployer.log)
+  first = log.iter () |> .take 2 |> .cloned |> .collect : Vec<String>
+  assert_eq! \-> first \-> .to_vec ([.to_string "retire", .to_string "resume"])
+  assert_eq! \-> log.last () |> .cloned \-> Some (.to_string "apply /nix/store/out-c3")
+  -- Each apply follows its own plan's build: never one for a commit not built.
+  built = logged (&world.finished)
+  assert_eq! \-> log.len () - 2 \-> built.len ()
+  st = status_of state
+  assert_eq! \-> st.last_apply \-> Some (.to_string "switched: /nix/store/out-c3")
+  assert! \-> crate::report::metrics (&st) |> .contains "\nvdeploy_deploy_mode 1\n"
+
+test "observe mode never asks the deployer for anything"
+  world = crate::caps::Scripted { heads = heads 2, build_secs = 1, ...crate::caps::Scripted::default () }
+  state = Ref::new (Status::default ())
+  assert! \-> id_effect::testing::run_test (prepared (crate::caps::scripted (world.clone ())) (settings 0)) |> .into_result |> .is_ok
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) (settings 0) (state.clone ()) (seconds 10) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  assert! \-> logged (&world.deployer.log) |> .is_empty
+  assert! \-> !(logged (&world.finished) |> .is_empty)
 
 test "with a debounce, a busy main is planned once, when it goes quiet"
   world = crate::caps::Scripted { heads = heads 10, build_secs = 5, ...crate::caps::Scripted::default () }

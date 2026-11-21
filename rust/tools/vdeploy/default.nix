@@ -49,7 +49,7 @@ rustPlatform.buildRustPackage {
   '';
 
   meta = {
-    description = "Pull-based deploy agent, observe mode: poll main, verify the commit, evaluate and realise this host's system, diff it against the running one, and log the switch it would make";
+    description = "Pull-based deploy agent: poll main, verify the commit, evaluate and realise this host's system, diff it against the running one; in observe mode log the switch, in deploy mode make it with a health check and rollback";
     license = lib.licenses.mit;
     mainProgram = "vdeploy";
     platforms = lib.platforms.linux;

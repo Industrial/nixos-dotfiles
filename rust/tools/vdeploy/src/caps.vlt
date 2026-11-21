@@ -13,7 +13,11 @@
 --   Host     the running system (its toplevel and the commit it was built
 --            from) and the user's dotfiles checkout.
 --
--- Nothing here switches a system: observe mode has no such capability.
+--   Deployer deploy mode only (#160): retire comin, and run the apply
+--            transaction (apply.vlt) as a transient systemd unit.
+--
+-- Nothing here switches a system itself: the switch is the apply
+-- transaction's, in its own unit, and only in deploy mode.
 
 import std::path::Path
 import std::sync::Arc
@@ -27,6 +31,7 @@ import crate::common::{DeployError, cmd, exec, first_line, lifted, run, asked, s
 import crate::common::DeployError::{Diff, Eval, Fetch, Realise, System, Unverified}
 import crate::dotfiles::{Checkout, Dotfiles, fast_forward}
 import crate::watch::Head
+import crate::takeover::{DeployerTool, LiveDeployer}
 
 -- The system this host runs: its toplevel store path, and the commit it was
 -- built from (`system.configurationRevision`), when it records one.
@@ -93,6 +98,7 @@ export data Caps
   , export builder BuilderTool
   , export differ DifferTool
   , export host HostTool
+  , export deployer DeployerTool
   }
   deriving (Clone)
 
@@ -272,7 +278,7 @@ instance Host LiveHost
     suspend (move \-> checked_out d head)
 
 -- The live capabilities.
-export data Wiring { export git String, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles> }
+export data Wiring { export git String, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles>, export deployer LiveDeployer }
   deriving (Debug, Clone)
 
 export live : Wiring -> Caps
@@ -282,8 +288,9 @@ live w =
   fetcher = FetcherTool (Arc::new (NixFetcher { nix = w.nix.clone () }))
   builder = BuilderTool (Arc::new (NixBuilder { nix = w.nix.clone () }))
   differ = DifferTool (Arc::new (Vdiff { db = w.db.clone () }))
-  host = HostTool (Arc::new (LiveHost { current = .to_string "/run/current-system", nixos_version = .to_string "/run/current-system/sw/bin/nixos-version", checkout = w.checkout }))
-  Caps { source, nix, fetcher, builder, differ, host }
+  host = HostTool (Arc::new (LiveHost { current = .to_string "/run/current-system", nixos_version = .to_string "/run/current-system/sw/bin/nixos-version", checkout = w.checkout.clone () }))
+  deployer = DeployerTool (Arc::new (w.deployer.clone ()))
+  Caps { source, nix, fetcher, builder, differ, host, deployer }
 
 -- A scripted world, for tests. Poll n (from 1) sees `heads[n-1]`, or the
 -- last head once the list runs out: commits that arrive one per poll, then
@@ -297,6 +304,7 @@ export data Scripted
   , export started Arc<Mutex<Vec<String>>>
   , export finished Arc<Mutex<Vec<String>>>
   , export failing Vec<String>
+  , export deployer crate::takeover::Scripted
   }
   deriving (Clone, Default)
 
@@ -361,7 +369,7 @@ instance Host Scripted
 
 export scripted : Scripted -> Caps
 scripted s =
-  Caps { source = SourceTool (Arc::new (s.clone ())), nix = NixTool (Arc::new (s.clone ())), fetcher = FetcherTool (Arc::new (s.clone ())), builder = BuilderTool (Arc::new (s.clone ())), differ = DifferTool (Arc::new (s.clone ())), host = HostTool (Arc::new s) }
+  Caps { source = SourceTool (Arc::new (s.clone ())), nix = NixTool (Arc::new (s.clone ())), fetcher = FetcherTool (Arc::new (s.clone ())), builder = BuilderTool (Arc::new (s.clone ())), differ = DifferTool (Arc::new (s.clone ())), deployer = DeployerTool (Arc::new (s.deployer.clone ())), host = HostTool (Arc::new s) }
 
 test "a GitHub-signed commit is told from an unsigned one"
   signed = "tree t\nparent p\nauthor Tom <t@x> 1 +0000\ncommitter GitHub <noreply@github.com> 1 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----\n\nfeat: x\n"

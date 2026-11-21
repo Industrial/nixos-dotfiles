@@ -13,7 +13,9 @@ import id_effect::{Effect, HNil, fail, succeed}
 -- `Fetch` is retried on a Schedule and the poll tries again next interval;
 -- `Unverified` skips the commit; `Eval`, `Realise` and `System` fail this
 -- plan, and the next commit on main gets a new one; `Diff` is a note on a
--- plan, never its failure; `Usage` and `Publish` are the operator's.
+-- plan, never its failure; `Usage` and `Publish` are the operator's; `Apply`
+-- is an apply transaction that did not leave the host on the toplevel asked
+-- for (rolled back, refused).
 export errors DeployError
   Usage String       "#{0}"
   Fetch String       "fetching main: #{0}"
@@ -23,6 +25,7 @@ export errors DeployError
   System String      "the running system: #{0}"
   Diff String        "closure diff: #{0}"
   Publish String     "publishing: #{0}"
+  Apply String       "not kept: #{0}"
 
 -- An effect for a computed result: the planned failure stays typed.
 export lifted : given <A: Send + 'static> Result<A, DeployError> -> Effect<A, DeployError, HNil>

@@ -1,0 +1,260 @@
+-- Deploy mode's side of the daemon (GH-160): retiring comin, and starting
+-- the apply transaction (apply.vlt) as a transient systemd unit.
+--
+-- The apply never runs inside vdeploy.service. A switch can restart or
+-- remove vdeploy.service, and the switch must survive that: comin is the
+-- example of what goes wrong (it runs switch-to-configuration as its own
+-- child, with its output piped into itself, so a switch that removes comin's
+-- unit kills the switch). So the daemon runs
+--
+--   systemd-run --unit=vdeploy-apply --service-type=exec --collect --wait \
+--     vdeploy apply --toplevel X …
+--
+-- One fixed unit name is also the lock: the daemon waits (on a Schedule)
+-- until no vdeploy-apply is running before it starts one, and a daemon that
+-- was restarted mid-apply waits for the running one the same way. The
+-- outcome is read back from the ledger (last.json), not from the exit code.
+--
+-- Retiring comin: in the generation that takes over, comin.service is a
+-- tombstone (features/nix/vdeploy): the comin that applied that generation
+-- keeps running until its switch has finished, then exits on its own (its
+-- unit file changed) and is not restarted. The daemon waits until no
+-- switch-to-configuration is left in comin.service's cgroup, then stops the
+-- unit itself, which does nothing when comin has already gone.
+
+import std::fs
+import std::path::Path
+import std::process::{Command, Stdio}
+import std::sync::Arc
+import std::sync::Mutex
+import std::time::Duration
+import serde_json::Value
+import id_effect::{Effect, HNil, Never, Schedule, fail, succeed, suspend}
+import crate::common::{cmd, exec, first_line}
+
+-- What deploy mode asks of the host.
+export class Deployer
+  retire : &self -> Effect<(), Never, HNil>
+  apply : &self -> Option<String> -> Effect<String, Never, HNil>
+
+export newtype DeployerTool = DeployerTool (export Arc<dyn Deployer + Send + Sync>)
+
+instance Clone DeployerTool
+  clone : &self -> Self
+  clone self = DeployerTool (Arc::clone (&self.0))
+
+-- The live deployer. `program` and `args` are the apply command line
+-- (vdeploy's own binary, `apply`, and the ledger and host options).
+export data LiveDeployer
+  { export systemd_run String
+  , export systemctl String
+  , export program String
+  , export args Vec<String>
+  , export state_dir String
+  , export comin_unit String
+  , export unit String
+  }
+  deriving (Debug, Clone)
+
+-- The transient unit's command line, for one toplevel (None: only finish an
+-- interrupted apply).
+export apply_command : &LiveDeployer -> Option<String> -> Vec<String>
+apply_command d toplevel =
+  mut all = Vec::new () : Vec<String>
+  all.push ("--unit=#{d.unit}")
+  all.push (.to_string "--description=vdeploy apply: switch, health check, keep or roll back")
+  all.push (.to_string "--service-type=exec")
+  all.push (.to_string "--collect")
+  all.push (.to_string "--wait")
+  all.push (.to_string "--quiet")
+  all.push (.to_string "--no-ask-password")
+  if std::env::var "LOCALE_ARCHIVE" is Ok v
+    all.push ("--setenv=LOCALE_ARCHIVE=#{v}")
+  all.push (d.program.clone ())
+  all.push (.to_string "apply")
+  for a in &d.args
+    all.push (a.clone ())
+  if &toplevel is Some t
+    all.push (.to_string "--toplevel")
+    all.push (t.clone ())
+  all
+
+quiet_status : &str -> &[String] -> bool
+quiet_status program args =
+  Command::new program |> .args args |> .stdin (Stdio::null ()) |> .stdout (Stdio::null ()) |> .stderr (Stdio::null ()) |> .status () |> .map (\s -> s.success ()) |> .unwrap_or false
+
+-- Whether `unit` is active.
+export unit_active : &str -> &str -> bool
+unit_active systemctl unit = quiet_status systemctl (&[.to_string "is-active", .to_string "--quiet", unit.to_string ()])
+
+-- The processes in `unit`'s cgroup whose command line names
+-- switch-to-configuration.
+switches_in : &str -> &str -> Vec<String>
+switches_in systemctl unit =
+  shown = Command::new systemctl |> .args ([.to_string "show", .to_string "--property=ControlGroup", .to_string "--value", unit.to_string ()]) |> .stdin (Stdio::null ()) |> .output ()
+  cgroup = shown |> .ok |> .map (\o -> first_line (&String::from_utf8_lossy (&o.stdout))) |> .unwrap_or_default
+  if cgroup.is_empty ()
+    Vec::new ()
+  else
+    procs = fs::read_to_string ("/sys/fs/cgroup#{cgroup}/cgroup.procs") |> .unwrap_or_default
+    procs.lines () |> .filter (\pid -> is_switch pid) |> .map (\p -> p.to_string ()) |> .collect
+
+-- Whether process `pid` runs switch-to-configuration.
+is_switch : &str -> bool
+is_switch pid =
+  bytes = fs::read ("/proc/#{pid}/cmdline") |> .unwrap_or_default
+  line = String::from_utf8_lossy (&bytes)
+  line.contains "switch-to-configuration"
+
+-- Err while comin's switch is still running.
+comin_settled : LiveDeployer -> Result<(), String>
+comin_settled d =
+  running = switches_in (&d.systemctl) (&d.comin_unit)
+  if running.is_empty ()
+    Ok ()
+  else
+    Err "#{d.comin_unit} is still switching (pid #{running.join ", "})"
+
+stop_comin : LiveDeployer -> ()
+stop_comin d =
+  if unit_active (&d.systemctl) (&d.comin_unit)
+    if quiet_status (&d.systemctl) (&[.to_string "stop", d.comin_unit.clone ()])
+      eprintln! \-> "vdeploy: retired #{d.comin_unit}: vdeploy deploys this host now"
+    else
+      eprintln! \-> "vdeploy: could not stop #{d.comin_unit}; it stays a tombstone, and every apply refuses while it is active"
+  else
+    eprintln! \-> "vdeploy: #{d.comin_unit} is not running: vdeploy deploys this host"
+  ()
+
+-- Err while an apply unit runs.
+apply_idle : LiveDeployer -> Result<(), String>
+apply_idle d =
+  if unit_active (&d.systemctl) (&d.unit)
+    Err "#{d.unit} is running"
+  else
+    Ok ()
+
+done_or : Result<(), String> -> Effect<(), String, HNil>
+done_or r =
+  case r of
+    Ok _ -> succeed (())
+    Err e -> fail e
+
+-- Polled every 5 s while the condition holds. A Schedule, not a loop.
+every_5s : Schedule<u64, String>
+every_5s = Schedule::spaced (Duration::from_secs 5)
+
+waited : String -> Effect<(), Never, HNil>
+waited why =
+  eprintln! \-> "vdeploy: #{why}"
+  succeed (())
+
+-- The last apply's outcome, from the ledger, in words.
+export summary_of : &str -> String
+summary_of text =
+  doc = (serde_json::from_str text : serde_json::Result<Value>) |> .ok
+  case doc of
+    None -> .to_string "no outcome recorded"
+    Some d ->
+      result = d.get "result" |> .and_then (\v -> v.as_str ()) |> .unwrap_or "?"
+      toplevel = d.get "toplevel" |> .and_then (\v -> v.as_str ()) |> .unwrap_or "?"
+      reason = d.get "reason" |> .and_then (\v -> v.as_str ()) |> .unwrap_or ""
+      if reason.is_empty ()
+        "#{result}: #{toplevel}"
+      else
+        "#{result}: #{toplevel} (#{reason})"
+
+last_outcome : String -> Effect<String, Never, HNil>
+last_outcome dir =
+  text = fs::read_to_string (Path::new (&dir) |> .join "last.json") |> .unwrap_or_default
+  succeed (summary_of (&text))
+
+launched : LiveDeployer -> Option<String> -> Effect<String, Never, HNil>
+launched d toplevel =
+  args = apply_command (&d) toplevel
+  dir = d.state_dir.clone ()
+  exec (cmd (&d.systemd_run) args) |> .map (\_ -> ()) |> .catch (\e -> waited ("the apply unit ended unkept or did not start: #{first_line (&e)}")) |> .flat_map (move \_ -> last_outcome dir)
+
+settled_check : LiveDeployer -> Effect<(), String, HNil>
+settled_check d = suspend (move \-> done_or (comin_settled d))
+
+idle_check : LiveDeployer -> Effect<(), String, HNil>
+idle_check d = suspend (move \-> done_or (apply_idle d))
+
+stopped : LiveDeployer -> Effect<(), Never, HNil>
+stopped d = suspend (move \-> stopped_now d)
+
+stopped_now : LiveDeployer -> Effect<(), Never, HNil>
+stopped_now d =
+  stop_comin d
+  succeed (())
+
+has_inflight : &str -> bool
+has_inflight dir = Path::new dir |> .join "inflight.json" |> .exists
+
+instance Deployer LiveDeployer
+  retire : &self -> Effect<(), Never, HNil>
+  retire self =
+    d = self.clone ()
+    d2 = self.clone ()
+    eprintln! \-> "vdeploy: deploy mode: waiting for #{self.comin_unit}'s last switch to finish"
+    Effect::retry (move \-> settled_check (d.clone ())) every_5s |> .catch (\e -> waited e) |> .flat_map (move \_ -> stopped d2)
+  apply : &self -> Option<String> -> Effect<String, Never, HNil>
+  apply self toplevel =
+    if toplevel.is_none () && !(has_inflight (&self.state_dir))
+      succeed (.to_string "nothing to resume")
+    else
+      d = self.clone ()
+      d2 = self.clone ()
+      Effect::retry (move \-> idle_check (d.clone ())) every_5s |> .catch (\e -> waited e) |> .flat_map (move \_ -> launched d2 toplevel)
+
+-- A scripted deployer, for tests: every call is logged, and the toplevels in
+-- `sick` come back rolled back.
+export data Scripted { export log Arc<Mutex<Vec<String>>>, export sick Vec<String> }
+  deriving (Clone, Default)
+
+noted : &Arc<Mutex<Vec<String>>> -> String -> ()
+noted log line =
+  if log.lock () is Ok held
+    mut v = held
+    v.push line
+  ()
+
+outcome_for : &Scripted -> &str -> String
+outcome_for s t =
+  if s.sick.iter () |> .any (\x -> x == t)
+    "rolled-back: #{t} (unhealthy: dead-port down)"
+  else
+    "switched: #{t}"
+
+instance Deployer Scripted
+  retire : &self -> Effect<(), Never, HNil>
+  retire self =
+    noted (&self.log) (.to_string "retire")
+    succeed (())
+  apply : &self -> Option<String> -> Effect<String, Never, HNil>
+  apply self toplevel =
+    case toplevel of
+      None ->
+        noted (&self.log) (.to_string "resume")
+        succeed (.to_string "nothing to resume")
+      Some t ->
+        noted (&self.log) ("apply #{t}")
+        succeed (outcome_for self (&t))
+
+test "the transient unit runs vdeploy apply, waits, and is collected"
+  d = LiveDeployer { systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", program = .to_string "/nix/store/v/bin/vdeploy", args = .to_vec ([.to_string "--state-dir", .to_string "/var/lib/vdeploy"]), state_dir = .to_string "/var/lib/vdeploy", comin_unit = .to_string "comin.service", unit = .to_string "vdeploy-apply" }
+  c = apply_command (&d) (Some (.to_string "/nix/store/x"))
+  assert! \-> c.contains (&.to_string "--unit=vdeploy-apply") && c.contains (&.to_string "--wait") && c.contains (&.to_string "--collect")
+  -- Never piped back into the daemon: its output goes to the journal.
+  assert! \-> !(c.contains (&.to_string "--pipe"))
+  i = c.iter () |> .position (\a -> a == "/nix/store/v/bin/vdeploy") |> .expect "program"
+  rest = c.iter () |> .skip (i + 1) |> .cloned |> .collect : Vec<String>
+  assert_eq! \-> rest \-> .to_vec ([.to_string "apply", .to_string "--state-dir", .to_string "/var/lib/vdeploy", .to_string "--toplevel", .to_string "/nix/store/x"])
+  resume = apply_command (&d) None
+  assert! \-> !(resume.contains (&.to_string "--toplevel"))
+
+test "the ledger's last outcome in words"
+  assert_eq! \-> summary_of "{\"result\":\"switched\",\"toplevel\":\"/nix/store/x\",\"reason\":\"\"}" \-> "switched: /nix/store/x"
+  assert_eq! \-> summary_of "{\"result\":\"rolled-back\",\"toplevel\":\"/nix/store/x\",\"reason\":\"unhealthy: web down\"}" \-> "rolled-back: /nix/store/x (unhealthy: web down)"
+  assert_eq! \-> summary_of "" \-> "no outcome recorded"

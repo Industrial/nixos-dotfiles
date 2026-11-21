@@ -37,6 +37,35 @@ let
   noDotfiles = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.dotfiles.enable = false;}];};
   slow = nixos.eval {modules = [./default.nix base {features.nix.vdeploy.debounce = "15m";}];};
 
+  # Deploy mode (#160). The host's own `features.fleet.comin.enable = true` stands in for
+  # lib/features.nix's switch; vhealth's probes file for features/nix/vhealth.
+  fleet = {
+    options.features.fleet.comin.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+    };
+    config.features.fleet.comin.enable = true;
+  };
+  probes = {environment.etc."vhealth/probes.json".text = ''{"probes": []}'';};
+  deployed = nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.mode = "deploy";}];};
+  # The take-over's rollback option, on top of a host that set deploy mode.
+  rolledBack = nixos.eval {
+    modules = [
+      ./default.nix
+      base
+      fleet
+      probes
+      {features.nix.vdeploy.mode = "deploy";}
+      {features.nix.vdeploy.mode = lib.mkForce "observe";}
+    ];
+  };
+  # The fleet's `vdeploy` role picks deploy mode: a host without it observes.
+  byRole = host: (nixos.eval {modules = [./default.nix base fleet probes {features.nix.vdeploy.host = host;}];}).features.nix.vdeploy.mode;
+  noVhealth = nixos.eval {modules = [./default.nix base fleet {features.nix.vdeploy.mode = "deploy";}];};
+  failedAssertions = c: map (a: a.message) (builtins.filter (a: !a.assertion && lib.hasPrefix "features.nix.vdeploy" a.message) c.assertions);
+  tomb = deployed.systemd.services.comin;
+  dargAfter = argAfterIn deployed;
+
   service = cfg.systemd.services.vdeploy;
   sc = service.serviceConfig;
   argsOf = c: lib.splitString " " c.systemd.services.vdeploy.serviceConfig.ExecStart;
@@ -95,6 +124,41 @@ in
     # node_exporter refuses the flag twice: with vverify on, it is vverify's alone.
     noSecondFlagBesideVverify =
       assay.eq [withVverify.services.prometheus.exporters.node.extraFlags (builtins.elem "d ${dir} 2775 root prometheus-textfile - -" withVverify.systemd.tmpfiles.rules)] [[] false];
+
+    # Deploy mode (#160): the take-over.
+    observeByDefault = assay.eq [cfg.features.nix.vdeploy.mode (builtins.elem "--mode" args)] ["observe" false];
+    modeFollowsTheFleetRole = let
+      fleetData = import ../../../common/fleet.nix;
+      expect = h:
+        if fleetData.hasRole "vdeploy" h
+        then "deploy"
+        else "observe";
+    in
+      assay.eq (map byRole (fleetData.order ++ ["not-in-the-fleet"])) (map expect fleetData.order ++ ["observe"]);
+    deployModeOnTheCommandLine = assay.eq (dargAfter "--mode") "deploy";
+    healthWindowTwoMinutes = assay.eq (dargAfter "--health-window") "2m";
+    appliesThroughTransientUnits =
+      assay.eq [(lib.hasSuffix "/bin/systemd-run" (dargAfter "--systemd-run")) (lib.hasSuffix "/bin/systemctl" (dargAfter "--systemctl"))] [true true];
+    writesTheSystemProfile = assay.eq (dargAfter "--profile") "/nix/var/nix/profiles/system";
+    rootsTheCandidate =
+      assay.eq [(dargAfter "--gcroot") (builtins.elem "d /nix/var/nix/gcroots/vdeploy 0755 root root - -" deployed.systemd.tmpfiles.rules)] ["/nix/var/nix/gcroots/vdeploy/candidate" true];
+    profileToolsPinned =
+      assay.eq [(lib.hasSuffix "/bin/nix-env" (dargAfter "--nix-env")) (lib.hasSuffix "/bin/nix-store" (dargAfter "--nix-store"))] [true true];
+    # The probes run as nobody (setpriv), as vhealth's own daemon runs them.
+    healthAsNobody =
+      assay.eq [(dargAfter "--health-as") (lib.hasSuffix "/bin/setpriv" (dargAfter "--setpriv"))] ["nobody" true];
+    # The by-hand apply, the same transient unit the daemon uses; deploy mode only.
+    applyWrapper = assay.eq [(nixos.hasPackage deployed "vdeploy-apply") (nixos.hasPackage cfg "vdeploy-apply")] [true false];
+    # comin is demoted: forced off, whatever the host says.
+    cominForcedOff = assay.eq deployed.features.fleet.comin.enable false;
+    # The tombstone that lets comin finish the switch that retires it.
+    cominTombstone = assay.eq [tomb.restartIfChanged tomb.wantedBy tomb.serviceConfig.Restart (lib.hasSuffix "/bin/true" tomb.serviceConfig.ExecStart)] [false [] "no" true];
+    # The one rollback option: deploy mode forced back to observe, and comin is the host's
+    # again, with no tombstone.
+    rollbackRestoresComin =
+      assay.eq [rolledBack.features.fleet.comin.enable (builtins.elem "--mode" (argsOf rolledBack)) (rolledBack.systemd.services ? comin)] [true false false];
+    # keep-or-rollback needs vhealth's probes.
+    deployNeedsVhealth = assay.eq [(failedAssertions deployed) (builtins.length (failedAssertions noVhealth))] [[] 1];
 
     # Sandbox.
     protectSystemStrict = assay.eq [sc.ProtectSystem sc.ProtectHome] ["strict" "read-only"];

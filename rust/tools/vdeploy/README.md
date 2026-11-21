@@ -1,9 +1,10 @@
 # vdeploy
 
-The fleet's pull-based deploy agent, in **observe mode** (GH-159). It runs next to comin.
-It works out the switch comin would make, logs it, and never makes it. The take-over
-(switch, health check through vhealth, rollback) is #160. vdeploy is written in Voltaic
-0.2.1 (`src/*.vlt`, compiled by `build.rs`) with id_effect 0.13.0.
+The fleet's pull-based deploy agent. In **observe mode** (GH-159, the default) it runs next
+to comin, works out the switch comin would make, logs it, and never makes it. In **deploy
+mode** (GH-160, the take-over) it switches the host itself: every switch is health-checked
+with vhealth and rolled back when unhealthy, and comin is retired. vdeploy is written in
+Voltaic 0.2.1 (`src/*.vlt`, compiled by `build.rs`) with id_effect 0.13.0.
 
 ```
 vdeploy --host NAME [--once] [--url URL] [--branch NAME] [--repo DIR]
@@ -12,7 +13,61 @@ vdeploy --host NAME [--once] [--url URL] [--branch NAME] [--repo DIR]
         [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]]
 ```
 
-No flag switches anything. The code has no switch capability.
+```
+vdeploy --host NAME --mode deploy [--health-window DURATION] [--systemd-run PROG] [APPLY OPTIONS] …
+vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]
+
+APPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG]
+               [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG]
+               [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--setpriv PROG]]
+```
+
+In observe mode nothing switches. In deploy mode the switch is made only by `vdeploy apply`
+(below), in its own transient unit.
+
+## Deploy mode: the apply transaction (GH-160)
+
+For each plan that would switch, the daemon runs
+
+```
+systemd-run --unit=vdeploy-apply --service-type=exec --collect --wait \
+  vdeploy apply --toplevel X <apply options>
+```
+
+and reads the outcome back from the ledger. `vdeploy apply` (`src/apply.vlt`):
+
+1. `prev` = `/run/current-system`. It refuses when X was rolled back before (marked bad:
+   `<state-dir>/bad/<store name>`) or when comin is active (one deployer at a time). It
+   writes `inflight.json` (X, prev) and GC-roots X.
+2. `X/bin/switch-to-configuration test`: X runs; the boot entries are not touched.
+3. Health: `X/sw/bin/vhealth check --config X/etc/vhealth/probes.json --json --wait W` (X's
+   own vhealth and probes), as `--health-as` (nobody, through setpriv) like vhealth's own
+   daemon. Exit 0 is healthy; 1 means a critical probe is down (`failing`).
+4. Healthy: `nix-env -p /nix/var/nix/profiles/system --set X`, then
+   `X/bin/switch-to-configuration boot`. Only now is X the boot default.
+5. Otherwise, or when 2 failed: `prev/bin/switch-to-configuration test`, and X is marked bad.
+   The boot entries were never written, so a crash anywhere before step 4 reboots into
+   prev.
+
+An apply killed between 2 and 4 leaves `inflight.json`. The next apply, or the daemon at
+start, finishes the decision for it first: health check, then keep or roll back.
+
+The outcome goes to `<state-dir>/last.json`, `<state-dir>/deploys.jsonl` and
+`<textfile-dir>/vdeploy-apply.prom` (`vdeploy_applies_total{result}`,
+`vdeploy_rollbacks_total`, `vdeploy_last_result{result}`,
+`vdeploy_last_apply_timestamp_seconds`). `vdeploy apply` exits 0 when the host ends on X,
+and 1 when it was rolled back or refused.
+
+Why a transient unit: a switch can restart or remove `vdeploy.service`, and that must not
+kill the switch. comin shows what goes wrong otherwise: it runs switch-to-configuration as
+its own child, with the output piped into itself. The fixed unit name is also the lock.
+The daemon waits on a Schedule until no `vdeploy-apply` runs before it starts one.
+
+Retiring comin: in deploy mode, `features/nix/vdeploy` keeps `comin.service` as a
+tombstone (`X-RestartIfChanged=false`, `Restart=no`, no `WantedBy`). So the comin that
+applies the take-over generation finishes that switch, then exits as it does whenever its
+unit file changes, and stays down. At start, the daemon waits on a Schedule until no
+`switch-to-configuration` is left in comin's cgroup, then stops the unit.
 
 ## One plan
 
@@ -103,7 +158,7 @@ rewritten on every poll:
 | `vdeploy_last_poll_timestamp_seconds`, `vdeploy_poll_failures_total`, `vdeploy_polls_total`, `vdeploy_head_changes_total` | the poller |
 | `vdeploy_last_plan_timestamp_seconds`, `vdeploy_last_plan_duration_seconds` | the worker |
 | `vdeploy_dotfiles_state{state=…}` | 1 for the checkout's current state |
-| `vdeploy_observe_mode` | always 1 in this version |
+| `vdeploy_observe_mode`, `vdeploy_deploy_mode` | 1 for the mode the daemon runs in |
 
 ## Capabilities
 
@@ -115,6 +170,8 @@ rewritten on every poll:
 | `Builder` (build) | `nix build` | `Scripted` (a build takes N s on the test clock) |
 | `Differ` (json) | vdiff on the store database | `Scripted` |
 | `Host` (running, dotfiles) | `/run/current-system`, its `nixos-version`, git via `setpriv` | `Scripted` |
+| `Deployer` (retire, apply) | `systemctl`, `systemd-run vdeploy apply` (deploy mode) | `takeover::Scripted` |
+| `System` (`vdeploy apply`) | switch-to-configuration, nix-env, nix-store, vhealth | `apply::Scripted` |
 
 ## Tests
 

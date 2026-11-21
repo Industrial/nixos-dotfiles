@@ -1,0 +1,721 @@
+-- The apply transaction (GH-160): switch this host to a realised toplevel X,
+-- keep it only when vhealth says X is healthy, else roll back.
+--
+--   1. prev = /run/current-system. Refuse when X is already marked bad, or
+--      when comin is active (one deployer at a time). Write inflight.json
+--      (X, prev) and GC-root X.
+--   2. X/bin/switch-to-configuration test: activate X; the bootloader is not
+--      touched.
+--   3. vhealth, X's own probes (X/etc/vhealth/probes.json), with a settle
+--      window.
+--   4. healthy: nix-env -p <profile> --set X, then
+--      X/bin/switch-to-configuration boot. Only now is X the boot default.
+--   5. otherwise (or when 2 failed): prev/bin/switch-to-configuration test,
+--      and X is marked bad. Nothing is written to the boot entries, so a
+--      crash anywhere before 4 reboots into prev.
+--
+-- Run by the daemon as a transient systemd unit (`vdeploy-apply`), never
+-- inside vdeploy.service: a switch may restart or remove vdeploy.service, and
+-- that must not kill the switch. inflight.json makes it resumable: an apply
+-- that finds one whose X is running (it died in the health window) finishes
+-- the decision for it first.
+--
+-- Every outcome is recorded: last.json (the latest), deploys.jsonl (the
+-- history) and vdeploy-apply.prom (node_exporter textfile metrics).
+
+import std::fs
+import std::io::Write
+import std::path::Path
+import std::process::{Command, Stdio}
+import std::sync::Arc
+import std::sync::Mutex
+import serde_json::Value
+import id_effect::{Effect, HNil, Never, effect, fail, succeed, suspend}
+import crate::common::{DeployError, first_line, lifted, now_secs, tail_lines}
+import crate::common::DeployError::Publish
+import crate::report::write_atomic
+
+-- What vhealth said about a generation.
+export data Verdict { export healthy bool, export failing Vec<String>, export detail String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What one apply did.
+export data Outcome
+  = Switched
+  | Already
+  | RolledBack String
+  | RollbackFailed String
+  | Refused String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Every outcome's metric label, in a fixed order.
+export const RESULTS : [&str; 5] = ["switched", "already", "rolled-back", "rollback-failed", "refused"]
+
+export result_name : &Outcome -> &'static str
+result_name o =
+  case o of
+    Outcome::Switched -> "switched"
+    Outcome::Already -> "already"
+    Outcome::RolledBack _ -> "rolled-back"
+    Outcome::RollbackFailed _ -> "rollback-failed"
+    Outcome::Refused _ -> "refused"
+
+export reason_of : &Outcome -> String
+reason_of o =
+  case o of
+    Outcome::RolledBack r -> r.clone ()
+    Outcome::RollbackFailed r -> r.clone ()
+    Outcome::Refused r -> r.clone ()
+    _ -> String::new ()
+
+export refused : &Outcome -> bool
+refused o = result_name o == "refused"
+
+removed : &str -> ()
+removed path =
+  fs::remove_file path |> .ok
+  ()
+
+unrooted : String -> Effect<(), Never, HNil>
+unrooted link =
+  removed (&link)
+  succeed (())
+
+-- Whether the host ends on the generation it was asked for.
+export kept : &Outcome -> bool
+kept o =
+  case o of
+    Outcome::Switched -> true
+    Outcome::Already -> true
+    _ -> false
+
+-- The decision after step 2 and 3, pure: keep X, or go back and why.
+export data Judgement = Keep | Back String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export judge : &Result<(), String> -> &Option<Verdict> -> Judgement
+judge activated verdict =
+  case activated of
+    Err e -> Judgement::Back ("switch-to-configuration test failed: #{first_line e}")
+    Ok _ -> case verdict of
+      None -> Judgement::Back (.to_string "no health verdict")
+      Some v -> judged_health v
+
+judged_health : &Verdict -> Judgement
+judged_health v =
+  if v.healthy
+    Judgement::Keep
+  else if v.failing.is_empty ()
+    Judgement::Back ("unhealthy: #{first_line (&v.detail)}")
+  else
+    Judgement::Back ("unhealthy: #{v.failing.join ", "} down")
+
+-- The host, as the transaction needs it. The live one runs
+-- switch-to-configuration, nix-env, nix-store, systemctl and vhealth; the
+-- scripted one is for tests.
+export class System
+  current : &self -> Effect<String, DeployError, HNil>
+  activate : &self -> String -> String -> Effect<(), String, HNil>
+  set_profile : &self -> String -> Effect<(), String, HNil>
+  root : &self -> String -> Effect<(), String, HNil>
+  unroot : &self -> Effect<(), Never, HNil>
+  health : &self -> String -> Effect<Verdict, Never, HNil>
+  comin_active : &self -> Effect<bool, Never, HNil>
+
+export newtype SystemTool = SystemTool (export Arc<dyn System + Send + Sync>)
+
+instance Clone SystemTool
+  clone : &self -> Self
+  clone self = SystemTool (Arc::clone (&self.0))
+
+-- One apply: the toplevel to switch to (None: only finish an interrupted
+-- one), where the ledger lives, and where the metrics go.
+export data Apply { export toplevel Option<String>, export state_dir String, export textfile_dir Option<String> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The textfile metrics of the apply transaction.
+export const APPLY_METRICS_FILE : &str = "vdeploy-apply.prom"
+
+-- The ledger: inflight.json, bad/<name>, last.json, deploys.jsonl.
+
+inflight_path : &str -> std::path::PathBuf
+inflight_path dir = Path::new dir |> .join "inflight.json"
+
+-- The store path's name, as a file name: /nix/store/<hash>-<name> -> <hash>-<name>.
+export store_name : &str -> String
+store_name p = Path::new p |> .file_name |> .map (\n -> n.to_string_lossy () |> .to_string) |> .unwrap_or_else (\-> p.replace '/' "_")
+
+bad_path : &str -> &str -> std::path::PathBuf
+bad_path dir x = Path::new dir |> .join "bad" |> .join (store_name x)
+
+export is_bad : &str -> &str -> bool
+is_bad dir x = bad_path dir x |> .exists
+
+mark_bad : &str -> &str -> &str -> Result<(), String>
+mark_bad dir x why =
+  path = bad_path dir x
+  if &path.parent () is Some p
+    (fs::create_dir_all p |> .map_err (\e -> "creating #{p.display ()}: #{e}"))?
+  write_atomic (&path) (&"#{why}\n") |> .map_err (\e -> "writing #{path.display ()}: #{e}")
+
+quote : &str -> String
+quote s = serde_json::to_string s |> .unwrap_or_else (\_ -> .to_string "\"\"")
+
+text_of : &Value -> &str -> Option<String>
+text_of doc key = doc.get key |> .and_then (\v -> v.as_str ()) |> .map (\s -> s.to_string ())
+
+-- The interrupted apply, when there is one: (X, prev).
+export read_inflight : &str -> Option<(String, String)>
+read_inflight dir =
+  text = fs::read_to_string (inflight_path dir) |> .ok
+  doc = text |> .and_then (\t -> (serde_json::from_str (&t) : serde_json::Result<Value>) |> .ok)
+  doc |> .and_then (\d -> text_of (&d) "toplevel" |> .zip (text_of (&d) "prev"))
+
+export write_inflight : &str -> &str -> &str -> Result<(), String>
+write_inflight dir x prev =
+  (fs::create_dir_all dir |> .map_err (\e -> "creating #{dir}: #{e}"))?
+  path = inflight_path dir
+  write_atomic (&path) (&"{\"toplevel\":#{quote x},\"prev\":#{quote prev},\"since\":#{now_secs ()}}\n") |> .map_err (\e -> "writing #{path.display ()}: #{e}")
+
+clear_inflight : &str -> ()
+clear_inflight dir =
+  fs::remove_file (inflight_path dir) |> .ok
+  ()
+
+-- One outcome as one line of JSON (schema 1).
+export record_json : &Outcome -> &str -> &str -> &Option<Verdict> -> &str -> u64 -> String
+record_json o x prev verdict note at =
+  health = case verdict of
+    None -> .to_string "null"
+    Some v -> "{\"healthy\":#{v.healthy},\"failing\":#{serde_json::to_string (&v.failing) |> .unwrap_or_else (\_ -> .to_string "[]")},\"detail\":#{quote (&v.detail)}}"
+  "{\"schema\":1,\"result\":\"#{result_name o}\",\"toplevel\":#{quote x},\"prev\":#{quote prev},\"reason\":#{quote (&reason_of o)},\"health\":#{health},\"note\":#{quote note},\"at\":#{at}}"
+
+-- How many of each result deploys.jsonl holds.
+export tally : &str -> Vec<(&'static str, u64)>
+tally history =
+  mut counts = Vec::new () : Vec<(&'static str, u64)>
+  for r in RESULTS
+    needle = "\"result\":\"#{r}\""
+    n = history.lines () |> .filter (\l -> l.contains (needle.as_str ())) |> .count
+    counts.push ((r, u64::try_from n |> .unwrap_or 0))
+  counts
+
+-- The apply metrics, in the Prometheus text exposition format.
+export apply_metrics : &str -> &Outcome -> u64 -> String
+apply_metrics history o at =
+  mut out = String::from "# HELP vdeploy_applies_total Apply transactions by result, since the ledger began.\n# TYPE vdeploy_applies_total counter\n"
+  counts = tally history
+  for c in &counts
+    out.push_str (&"vdeploy_applies_total{result=\"#{c.0}\"} #{c.1}\n")
+  rollbacks = counts.iter () |> .filter (\c -> c.0 == "rolled-back" || c.0 == "rollback-failed") |> .map (\c -> c.1) |> .sum : u64
+  out.push_str (&"# HELP vdeploy_rollbacks_total Applies that went back to the previous generation.\n# TYPE vdeploy_rollbacks_total counter\nvdeploy_rollbacks_total #{rollbacks}\n")
+  out.push_str "# HELP vdeploy_last_result The last apply's result (1 for it).\n# TYPE vdeploy_last_result gauge\n"
+  current = result_name o
+  for r in RESULTS
+    v = if r == current
+      1
+    else
+      0
+    out.push_str (&"vdeploy_last_result{result=\"#{r}\"} #{v}\n")
+  out.push_str (&"# HELP vdeploy_last_apply_timestamp_seconds Unix time the last apply finished.\n# TYPE vdeploy_last_apply_timestamp_seconds gauge\nvdeploy_last_apply_timestamp_seconds #{at}\n")
+  out
+
+-- Write the outcome to the ledger and the metrics.
+export recorded : &Apply -> &str -> &str -> &Outcome -> &Option<Verdict> -> &str -> Result<(), DeployError>
+recorded a x prev o verdict note =
+  at = now_secs ()
+  line = record_json o x prev verdict note at
+  dir = Path::new (&a.state_dir)
+  (fs::create_dir_all dir |> .map_err (\e -> Publish ("creating #{a.state_dir}: #{e}")))?
+  (write_atomic (&dir.join "last.json") (&"#{line}\n") |> .map_err (\e -> Publish ("writing last.json: #{e}")))?
+  history_path = dir.join "deploys.jsonl"
+  mut f = (fs::OpenOptions::new () |> .create true |> .append true |> .open (&history_path) |> .map_err (\e -> Publish ("opening deploys.jsonl: #{e}")))?
+  (f.write_all ("#{line}\n".as_bytes ()) |> .map_err (\e -> Publish ("appending to deploys.jsonl: #{e}")))?
+  if &a.textfile_dir is Some t
+    history = fs::read_to_string (&history_path) |> .unwrap_or_default
+    path = Path::new t |> .join APPLY_METRICS_FILE
+    (write_atomic (&path) (&apply_metrics (&history) o at) |> .map_err (\e -> Publish ("writing #{path.display ()}: #{e}")))?
+  Ok ()
+
+-- The outcome in words, for the journal.
+export line_for : &Outcome -> &str -> &str -> String
+line_for o x prev =
+  case o of
+    Outcome::Switched -> "vdeploy: switched to #{x}: healthy"
+    Outcome::Already -> "vdeploy: already running #{x}"
+    Outcome::RolledBack r -> "vdeploy: rolled back from #{x} to #{prev}: #{r}"
+    Outcome::RollbackFailed r -> "vdeploy: ROLLBACK FAILED from #{x} to #{prev}: #{r}"
+    Outcome::Refused r -> "vdeploy: not applying #{x}: #{r}"
+
+-- A step's failure as a value.
+settled : Effect<(), String, HNil> -> Effect<Result<(), String>, Never, HNil>
+settled eff = eff |> .map (\v -> Ok v) |> .catch (\e -> succeed (Err e))
+
+-- Record an outcome and say it; the outcome is the result.
+finished : SystemTool -> Apply -> String -> String -> Outcome -> Option<Verdict> -> String -> Effect<Outcome, DeployError, HNil>
+finished sys a x prev o verdict note =
+  effect!
+    ~sys.0.unroot().widen();
+    clear_inflight(&a.state_dir);
+    if !kept(&o) && !refused(&o) {
+      if let Err(e) = mark_bad(&a.state_dir, &x, &reason_of(&o)) {
+        eprintln!("vdeploy: marking {} bad: {}", x, e);
+      }
+    }
+    ~lifted(recorded(&a, &x, &prev, &o, &verdict, &note));
+    eprintln!("{}", line_for(&o, &x, &prev));
+    if !note.is_empty() {
+      eprintln!("vdeploy: {}", note);
+    }
+    o
+
+-- Step 4: X becomes the system profile's newest generation and the boot default.
+boot_entry : SystemTool -> String -> Effect<(), String, HNil>
+boot_entry sys x =
+  s2 = sys.clone ()
+  x2 = x.clone ()
+  sys.0.set_profile x |> .flat_map (move \_ -> s2.0.activate x2 (.to_string "boot"))
+
+booted_note : &Result<(), String> -> String
+booted_note r =
+  case r of
+    Ok _ -> .to_string "now the system profile's newest generation and the boot default"
+    Err e -> "healthy and running, but the boot entry was not written: #{first_line e}"
+
+keep_it : SystemTool -> Apply -> String -> String -> Option<Verdict> -> Effect<Outcome, DeployError, HNil>
+keep_it sys a x prev verdict =
+  effect!
+    let boot = ~settled(boot_entry(sys.clone(), x.clone())).widen();
+    let note = booted_note(&boot);
+    ~finished(sys, a, x, prev, Outcome::Switched, verdict, note)
+
+after_note : &Verdict -> String
+after_note v =
+  if v.healthy
+    .to_string "the previous generation is healthy"
+  else
+    "the previous generation is not healthy either: #{v.failing.join ", "}"
+
+-- Step 5: back to prev with `test`; the boot entries were never touched.
+roll_back : SystemTool -> Apply -> String -> String -> String -> Option<Verdict> -> Effect<Outcome, DeployError, HNil>
+roll_back sys a x prev why verdict =
+  effect!
+    eprintln!("vdeploy: {} is not kept ({}): rolling back to {}", x, why, prev);
+    let back = ~settled(sys.0.activate(prev.clone(), "test".to_string())).widen();
+    let after = ~sys.0.health(prev.clone()).widen();
+    let outcome = match &back {
+      Ok(()) => Outcome::RolledBack(why.clone()),
+      Err(e) => Outcome::RollbackFailed(format!("{}; switching back failed: {}", why, first_line(e))),
+    };
+    ~finished(sys, a, x, prev, outcome, verdict, after_note(&after))
+
+concluded : SystemTool -> Apply -> String -> String -> Judgement -> Option<Verdict> -> Effect<Outcome, DeployError, HNil>
+concluded sys a x prev j verdict =
+  case j of
+    Judgement::Keep -> keep_it sys a x prev verdict
+    Judgement::Back why -> roll_back sys a x prev why verdict
+
+verdict_if : SystemTool -> String -> bool -> Effect<Option<Verdict>, Never, HNil>
+verdict_if sys x activated =
+  if activated
+    sys.0.health x |> .map (\v -> Some v)
+  else
+    succeed None
+
+-- Steps 1 (inflight, root) to 5, for a host that is not on X yet.
+switched : SystemTool -> Apply -> String -> String -> Effect<Outcome, DeployError, HNil>
+switched sys a x prev =
+  effect!
+    ~lifted(write_inflight(&a.state_dir, &x, &prev).map_err(Publish));
+    eprintln!("vdeploy: switching to {} (test), from {}", x, prev);
+    let rooted = ~settled(sys.0.root(x.clone())).widen();
+    if let Err(e) = &rooted {
+      eprintln!("vdeploy: could not GC-root {}: {}", x, first_line(e));
+    }
+    let activated = ~settled(sys.0.activate(x.clone(), "test".to_string())).widen();
+    let verdict = ~verdict_if(sys.clone(), x.clone(), activated.is_ok()).widen();
+    let j = judge(&activated, &verdict);
+    ~concluded(sys, a, x, prev, j, verdict)
+
+-- What step 1 refuses, if anything.
+refusal : &Apply -> &str -> bool -> Option<String>
+refusal a x comin =
+  if is_bad (&a.state_dir) x
+    Some (.to_string "it was rolled back before (marked bad); waiting for a newer commit")
+  else if comin
+    Some (.to_string "comin.service is active, and only one deployer may switch")
+  else
+    None
+
+decided : SystemTool -> Apply -> String -> String -> bool -> Effect<Outcome, DeployError, HNil>
+decided sys a x current comin =
+  case refusal (&a) (&x) comin of
+    Some why -> finished sys a x current (Outcome::Refused why) None (String::new ())
+    None -> switched sys a x current
+
+checked : SystemTool -> Apply -> String -> String -> Effect<Outcome, DeployError, HNil>
+checked sys a x current =
+  if current == x
+    finished sys a x current Outcome::Already None (String::new ())
+  else
+    s = sys.clone ()
+    sys.0.comin_active () |> .widen |> .flat_map (move \comin -> decided s a x current comin)
+
+transaction : SystemTool -> Apply -> String -> Effect<Outcome, DeployError, HNil>
+transaction sys a x =
+  s = sys.clone ()
+  sys.0.current () |> .flat_map (move \current -> checked s a x current)
+
+-- An interrupted apply (inflight.json): when its X is running, it died
+-- between the switch and the decision, so decide now.
+resumed : SystemTool -> Apply -> String -> String -> String -> Effect<(), DeployError, HNil>
+resumed sys a x prev current =
+  if current == x
+    eprintln! \-> "vdeploy: resuming the interrupted apply of #{x}: checking its health"
+    s = sys.clone ()
+    sys.0.health (x.clone ()) |> .widen |> .flat_map (move \v -> concluded s a x prev (judge (&Ok (())) (&Some (v.clone ()))) (Some v)) |> .map (\_ -> ())
+  else
+    eprintln! \-> "vdeploy: an interrupted apply of #{x} left the host on #{current}: nothing to resume"
+    clear_inflight (&a.state_dir)
+    succeed (())
+
+recovered : SystemTool -> Apply -> Effect<(), DeployError, HNil>
+recovered sys a =
+  case read_inflight (&a.state_dir) of
+    None -> succeed (())
+    Some (x, prev) ->
+      s = sys.clone ()
+      sys.0.current () |> .flat_map (move \current -> resumed s a x prev current)
+
+requested : SystemTool -> Apply -> Effect<Outcome, DeployError, HNil>
+requested sys a =
+  case a.toplevel.clone () of
+    None -> succeed Outcome::Already
+    Some x -> transaction sys a x
+
+-- The whole apply: finish an interrupted one, then switch to the toplevel
+-- asked for. Fails (exit 1) unless the host ends on it.
+export apply : SystemTool -> Apply -> Effect<Outcome, DeployError, HNil>
+apply sys a =
+  s = sys.clone ()
+  a2 = a.clone ()
+  recovered sys a |> .flat_map (move \_ -> requested s a2)
+
+-- The program's verdict on an outcome.
+export accepted : Outcome -> Effect<(), DeployError, HNil>
+accepted o =
+  if kept (&o)
+    succeed (())
+  else
+    fail (DeployError::Apply (reason_of (&o)))
+
+-- The live host.
+export data LiveSystem
+  { export current String
+  , export profile String
+  , export gcroot String
+  , export nix_env String
+  , export nix_store String
+  , export systemctl String
+  , export comin_unit String
+  , export vhealth Option<String>
+  , export window u64
+  , export every u64
+  , export health_as Option<String>
+  , export setpriv String
+  }
+  deriving (Debug, Clone)
+
+-- Run a command with its output going where ours goes (the journal).
+ran : &str -> &[String] -> Result<(), String>
+ran program args =
+  status = (Command::new program |> .args args |> .stdin (Stdio::null ()) |> .status () |> .map_err (\e -> "running #{program}: #{e}"))?
+  if status.success ()
+    Ok ()
+  else
+    Err "#{program} #{args.join " "} failed (#{status})"
+
+done_or : given <A: Send + 'static> Result<A, String> -> Effect<A, String, HNil>
+done_or r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+export switch_program : &str -> String
+switch_program toplevel = "#{toplevel}/bin/switch-to-configuration"
+
+export probes_of : &str -> String
+probes_of toplevel = "#{toplevel}/etc/vhealth/probes.json"
+
+-- The vhealth to run: the one asked for, else X's own.
+export vhealth_of : &Option<String> -> &str -> String
+vhealth_of chosen toplevel =
+  case chosen of
+    Some v -> v.clone ()
+    None -> "#{toplevel}/sw/bin/vhealth"
+
+-- vhealth's --json report: the critical probes down.
+export failing_of : &str -> Vec<String>
+failing_of report =
+  doc = (serde_json::from_str report : serde_json::Result<Value>) |> .ok
+  names = doc |> .and_then (\d -> d.get "failing" |> .and_then (\f -> f.as_array ()) |> .map (\a -> a.iter () |> .filter_map (\n -> n.as_str () |> .map (\s -> s.to_string ())) |> .collect : Vec<String>))
+  names |> .unwrap_or_default
+
+-- What vhealth's exit status and report mean: 0 healthy, 1 a critical probe
+-- down, anything else (101 a defect, not starting) not healthy either.
+export verdict_of : Option<i32> -> &str -> &str -> Verdict
+verdict_of code stdout stderr =
+  case code of
+    Some 0 -> Verdict { healthy = true, failing = Vec::new (), detail = first_line stdout }
+    Some 1 -> Verdict { healthy = false, failing = failing_of stdout, detail = first_line stdout }
+    _ -> Verdict { healthy = false, failing = Vec::new (), detail = "vhealth did not give a verdict (#{code:?}): #{tail_lines stderr 3}" }
+
+-- The vhealth command line for X. With `health_as`, the probes run as that
+-- user (setpriv, no PAM), as vhealth's own daemon does (a DynamicUser): a
+-- daemon that answers root and not other users is not healthy.
+export health_command : &LiveSystem -> &str -> (String, Vec<String>)
+health_command s x =
+  vhealth = vhealth_of (&s.vhealth) x
+  check = .to_vec ([.to_string "check", .to_string "--config", probes_of x, .to_string "--json", .to_string "--wait", "#{s.window}s", .to_string "--every", "#{s.every}s"]) : Vec<String>
+  case &s.health_as of
+    None -> (vhealth, check)
+    Some user ->
+      mut all = .to_vec ([.to_string "--reuid", user.clone (), .to_string "--regid", .to_string "nogroup", .to_string "--clear-groups", vhealth]) : Vec<String>
+      all.extend check
+      (s.setpriv.clone (), all)
+
+health_now : LiveSystem -> String -> Verdict
+health_now s x =
+  probes = probes_of (&x)
+  if !(Path::new (&probes) |> .exists)
+    Verdict { healthy = true, failing = Vec::new (), detail = "#{x} declares no vhealth probes: the switch's exit status is all there is" }
+  else
+    (program, args) = health_command (&s) (&x)
+    out = Command::new (&program) |> .args (&args) |> .stdin (Stdio::null ()) |> .output ()
+    case out of
+      Err e -> Verdict { healthy = false, failing = Vec::new (), detail = "running #{program}: #{e}" }
+      Ok o -> verdict_of (o.status.code ()) (&String::from_utf8_lossy (&o.stdout)) (&String::from_utf8_lossy (&o.stderr))
+
+canonical : String -> Result<String, DeployError>
+canonical link =
+  path = (fs::canonicalize (&link) |> .map_err (\e -> DeployError::System ("#{link}: #{e}")))?
+  Ok (path.to_string_lossy () |> .to_string)
+
+rooted : LiveSystem -> String -> Result<(), String>
+rooted s x =
+  gc = Path::new (&s.gcroot)
+  if gc.parent () is Some p
+    (fs::create_dir_all p |> .map_err (\e -> "creating #{p.display ()}: #{e}"))?
+  ran (&s.nix_store) (&[.to_string "--add-root", s.gcroot.clone (), .to_string "--realise", x])
+
+active : LiveSystem -> bool
+active s =
+  Command::new (&s.systemctl) |> .args ([.to_string "is-active", .to_string "--quiet", s.comin_unit.clone ()]) |> .stdin (Stdio::null ()) |> .status () |> .map (\st -> st.success ()) |> .unwrap_or false
+
+instance System LiveSystem
+  current : &self -> Effect<String, DeployError, HNil>
+  current self =
+    link = self.current.clone ()
+    suspend (move \-> lifted (canonical link))
+  activate : &self -> String -> String -> Effect<(), String, HNil>
+  activate self toplevel action =
+    suspend (move \-> done_or (ran (&switch_program (&toplevel)) (&[action])))
+  set_profile : &self -> String -> Effect<(), String, HNil>
+  set_profile self toplevel =
+    program = self.nix_env.clone ()
+    profile = self.profile.clone ()
+    suspend (move \-> done_or (ran (&program) (&[.to_string "-p", profile, .to_string "--set", toplevel])))
+  root : &self -> String -> Effect<(), String, HNil>
+  root self toplevel =
+    s = self.clone ()
+    suspend (move \-> done_or (rooted s toplevel))
+  unroot : &self -> Effect<(), Never, HNil>
+  unroot self =
+    link = self.gcroot.clone ()
+    suspend (move \-> unrooted link)
+  health : &self -> String -> Effect<Verdict, Never, HNil>
+  health self toplevel =
+    s = self.clone ()
+    suspend (move \-> succeed (health_now s toplevel))
+  comin_active : &self -> Effect<bool, Never, HNil>
+  comin_active self =
+    s = self.clone ()
+    suspend (move \-> succeed (active s))
+
+-- A scripted host, for tests: `current` is the running toplevel, `profile`
+-- the system profile; activating a toplevel named in `broken` fails, and a
+-- toplevel is healthy unless it is named in `sick`. Every call is logged.
+export data Scripted
+  { export current Arc<Mutex<String>>
+  , export profile Arc<Mutex<String>>
+  , export log Arc<Mutex<Vec<String>>>
+  , export broken Vec<String>
+  , export sick Vec<String>
+  , export comin bool
+  }
+  deriving (Clone, Default)
+
+noted : &Arc<Mutex<Vec<String>>> -> String -> ()
+noted log line =
+  if log.lock () is Ok held
+    mut v = held
+    v.push line
+  ()
+
+set_to : &Arc<Mutex<String>> -> String -> ()
+set_to cell value =
+  if cell.lock () is Ok held
+    mut v = held
+    v.clear ()
+    v.push_str (&value)
+  ()
+
+read_of : &Arc<Mutex<String>> -> String
+read_of cell = cell.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+instance System Scripted
+  current : &self -> Effect<String, DeployError, HNil>
+  current self = succeed (read_of (&self.current))
+  activate : &self -> String -> String -> Effect<(), String, HNil>
+  activate self toplevel action =
+    noted (&self.log) ("#{action} #{toplevel}")
+    if self.broken.contains (&toplevel)
+      fail (.to_string "scripted activation failure")
+    else
+      if action == "test"
+        set_to (&self.current) toplevel
+      succeed (())
+  set_profile : &self -> String -> Effect<(), String, HNil>
+  set_profile self toplevel =
+    noted (&self.log) ("profile #{toplevel}")
+    set_to (&self.profile) toplevel
+    succeed (())
+  root : &self -> String -> Effect<(), String, HNil>
+  root self toplevel =
+    noted (&self.log) ("root #{toplevel}")
+    succeed (())
+  unroot : &self -> Effect<(), Never, HNil>
+  unroot self =
+    noted (&self.log) (.to_string "unroot")
+    succeed (())
+  health : &self -> String -> Effect<Verdict, Never, HNil>
+  health self toplevel =
+    noted (&self.log) ("health #{toplevel}")
+    if self.sick.contains (&toplevel)
+      succeed (Verdict { healthy = false, failing = .to_vec ([.to_string "dead-port"]), detail = .to_string "1 down" })
+    else
+      succeed (Verdict { healthy = true, failing = Vec::new (), detail = .to_string "all up" })
+  comin_active : &self -> Effect<bool, Never, HNil>
+  comin_active self = succeed self.comin
+
+#[cfg(test)]
+world : &str -> Scripted
+world current = Scripted { current = Arc::new (Mutex::new (current.to_string ())), profile = Arc::new (Mutex::new (current.to_string ())), ...Scripted::default () }
+
+#[cfg(test)]
+scratch : &str -> Apply
+scratch name =
+  dir = std::env::temp_dir () |> .join ("vdeploy-apply-#{name}-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok
+  Apply { toplevel = Some (.to_string "/nix/store/x-new"), state_dir = dir.to_string_lossy () |> .to_string, textfile_dir = Some (dir.to_string_lossy () |> .to_string) }
+
+#[cfg(test)]
+applied : Scripted -> Apply -> Result<Outcome, String>
+applied w a =
+  id_effect::testing::run_test (apply (SystemTool (Arc::new w)) a) |> .into_result |> .map_err (\c -> "#{c:?}")
+
+#[cfg(test)]
+log_of : &Scripted -> Vec<String>
+log_of w = w.log.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+#[cfg(test)]
+last_of : &Apply -> Value
+last_of a = fs::read_to_string (Path::new (&a.state_dir) |> .join "last.json") |> .ok |> .and_then (\t -> serde_json::from_str (&t) |> .ok) |> .unwrap_or (Value::Null)
+
+test "the decision: a failed switch or an unhealthy generation goes back, a healthy one stays"
+  up = Some (Verdict { healthy = true, failing = Vec::new (), detail = String::new () })
+  down = Some (Verdict { healthy = false, failing = .to_vec ([.to_string "web"]), detail = String::new () })
+  assert_eq! \-> judge (&Ok (())) (&up) \-> Judgement::Keep
+  assert_eq! \-> judge (&Ok (())) (&down) \-> Judgement::Back (.to_string "unhealthy: web down")
+  assert_eq! \-> judge (&Err (.to_string "boom\nmore")) (&up) \-> Judgement::Back (.to_string "switch-to-configuration test failed: boom")
+  assert_eq! \-> judge (&Ok (())) (&None) \-> Judgement::Back (.to_string "no health verdict")
+
+test "vhealth's exit status and report become a verdict"
+  assert! \-> (verdict_of (Some 0) "{}" "").healthy
+  v = verdict_of (Some 1) "{\"healthy\":false,\"failing\":[\"liar\"],\"down\":[\"liar\",\"x\"]}" ""
+  assert_eq! \-> (v.healthy, v.failing) \-> (false, .to_vec ([.to_string "liar"]))
+  d = verdict_of (Some 101) "" "panicked\nat here"
+  assert! \-> !d.healthy && d.detail.contains "101"
+  assert! \-> !((verdict_of None "" "").healthy)
+  assert_eq! \-> vhealth_of (&None) "/nix/store/x" \-> "/nix/store/x/sw/bin/vhealth"
+  assert_eq! \-> probes_of "/nix/store/x" \-> "/nix/store/x/etc/vhealth/probes.json"
+  s = LiveSystem { current = .to_string "/run/current-system", profile = .to_string "/p", gcroot = .to_string "/g", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", systemctl = .to_string "systemctl", comin_unit = .to_string "comin.service", vhealth = None, window = 120, every = 2, health_as = None, setpriv = .to_string "/s/setpriv" }
+  (p, a) = health_command (&s) "/nix/store/x"
+  assert_eq! \-> (p.as_str (), a.join " ") \-> ("/nix/store/x/sw/bin/vhealth", .to_string "check --config /nix/store/x/etc/vhealth/probes.json --json --wait 120s --every 2s")
+  (q, b) = health_command (&LiveSystem { health_as = Some (.to_string "nobody"), ...s.clone () }) "/nix/store/x"
+  assert_eq! \-> (q.as_str (), b.iter () |> .take 6 |> .cloned |> .collect : Vec<String>) \-> ("/s/setpriv", .to_vec ([.to_string "--reuid", .to_string "nobody", .to_string "--regid", .to_string "nogroup", .to_string "--clear-groups", .to_string "/nix/store/x/sw/bin/vhealth"]))
+
+test "a healthy generation is switched to, then made the boot default"
+  w = world "/nix/store/x-old"
+  a = scratch "healthy"
+  assert_eq! \-> applied (w.clone ()) (a.clone ()) \-> Ok Outcome::Switched
+  assert_eq! \-> log_of (&w) \-> .to_vec ([.to_string "root /nix/store/x-new", .to_string "test /nix/store/x-new", .to_string "health /nix/store/x-new", .to_string "profile /nix/store/x-new", .to_string "boot /nix/store/x-new", .to_string "unroot"])
+  assert_eq! \-> read_of (&w.profile) \-> "/nix/store/x-new"
+  assert_eq! \-> last_of (&a) |> .get "result" |> .and_then (\r -> r.as_str ()) |> .map (\s -> s.to_string ()) \-> Some (.to_string "switched")
+  assert! \-> read_inflight (&a.state_dir) |> .is_none
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "an unhealthy generation is rolled back with test, never written to the boot entries, and marked bad"
+  w = Scripted { sick = .to_vec ([.to_string "/nix/store/x-new"]), ...world "/nix/store/x-old" }
+  a = scratch "sick"
+  assert_eq! \-> applied (w.clone ()) (a.clone ()) \-> Ok (Outcome::RolledBack (.to_string "unhealthy: dead-port down"))
+  assert_eq! \-> log_of (&w) \-> .to_vec ([.to_string "root /nix/store/x-new", .to_string "test /nix/store/x-new", .to_string "health /nix/store/x-new", .to_string "test /nix/store/x-old", .to_string "health /nix/store/x-old", .to_string "unroot"])
+  assert_eq! \-> (read_of (&w.current), read_of (&w.profile)) \-> (.to_string "/nix/store/x-old", .to_string "/nix/store/x-old")
+  assert! \-> is_bad (&a.state_dir) "/nix/store/x-new"
+  metrics = fs::read_to_string (Path::new (&a.state_dir) |> .join APPLY_METRICS_FILE) |> .unwrap_or_default
+  assert! \-> metrics.contains "vdeploy_rollbacks_total 1\n" && metrics.contains "vdeploy_last_result{result=\"rolled-back\"} 1\n"
+  -- Asked again, it is refused without switching.
+  w2 = world "/nix/store/x-old"
+  assert! \-> applied (w2.clone ()) (a.clone ()) |> .map (\o -> refused (&o)) |> .unwrap_or false
+  assert_eq! \-> log_of (&w2) \-> .to_vec ([.to_string "unroot"])
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "a switch that fails goes back without asking vhealth about the new generation"
+  w = Scripted { broken = .to_vec ([.to_string "/nix/store/x-new"]), ...world "/nix/store/x-old" }
+  a = scratch "broken"
+  assert! \-> applied (w.clone ()) (a.clone ()) |> .map (\o -> result_name (&o) == "rolled-back") |> .unwrap_or false
+  assert! \-> !(log_of (&w) |> .contains (&.to_string "health /nix/store/x-new"))
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "while comin is active nothing is switched; the running generation is already applied"
+  busy = Scripted { comin = true, ...world "/nix/store/x-old" }
+  a = scratch "comin"
+  assert! \-> applied (busy.clone ()) (a.clone ()) |> .map (\o -> refused (&o)) |> .unwrap_or false
+  assert! \-> !(log_of (&busy) |> .iter |> .any (\l -> l.starts_with "test "))
+  assert! \-> !(is_bad (&a.state_dir) "/nix/store/x-new")
+  same = world "/nix/store/x-new"
+  assert_eq! \-> applied (same.clone ()) (a.clone ()) \-> Ok Outcome::Already
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "an apply interrupted in the health window is decided by the next one"
+  a = scratch "resume"
+  write_inflight (&a.state_dir) "/nix/store/x-mid" "/nix/store/x-old" |> .expect "inflight"
+  w = Scripted { sick = .to_vec ([.to_string "/nix/store/x-mid"]), ...world "/nix/store/x-mid" }
+  only = Apply { toplevel = None, ...a.clone () }
+  assert_eq! \-> applied (w.clone ()) only \-> Ok Outcome::Already
+  assert_eq! \-> read_of (&w.current) \-> "/nix/store/x-old"
+  assert! \-> is_bad (&a.state_dir) "/nix/store/x-mid" && (read_inflight (&a.state_dir) |> .is_none)
+  -- One whose X is not running (it died before the switch) is dropped.
+  write_inflight (&a.state_dir) "/nix/store/x-never" "/nix/store/x-old" |> .expect "inflight"
+  w2 = world "/nix/store/x-old"
+  assert_eq! \-> applied (w2.clone ()) (Apply { toplevel = None, ...a.clone () }) \-> Ok Outcome::Already
+  assert! \-> (read_inflight (&a.state_dir) |> .is_none) && (log_of (&w2) |> .is_empty)
+  fs::remove_dir_all (&a.state_dir) |> .ok
+
+test "the outcome's record is one parseable JSON line"
+  r = record_json (&Outcome::RolledBack (.to_string "unhealthy")) "/nix/store/x" "/nix/store/y" (&Some (Verdict { healthy = false, failing = .to_vec ([.to_string "web"]), detail = .to_string "d" })) "n" 7
+  doc = (serde_json::from_str (&r) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> doc.get "result" |> .and_then (\v -> v.as_str ()) \-> Some "rolled-back"
+  assert_eq! \-> doc.get "health" |> .and_then (\h -> h.get "failing") |> .and_then (\f -> f.as_array ()) |> .map (\a -> a.len ()) \-> Some 1
+  assert_eq! \-> tally "{\"result\":\"switched\"}\n{\"result\":\"switched\"}\n{\"result\":\"refused\"}\n" |> .iter |> .find (\c -> c.0 == "switched") |> .map (\c -> c.1) \-> Some 2
+  assert_eq! \-> store_name "/nix/store/abc-nixos-system" \-> "abc-nixos-system"

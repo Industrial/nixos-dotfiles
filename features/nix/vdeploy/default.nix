@@ -1,8 +1,33 @@
-# vdeploy (rust/tools/vdeploy), OBSERVE mode (GH-159): next to comin, this agent polls main,
-# verifies the commit, evaluates and realises this host's system, diffs it against
-# /run/current-system with vdiff, and logs the switch it WOULD make. It never switches. The
-# take-over (switch, vhealth check, rollback) is #160, and comin stays the deployer until
-# then.
+# vdeploy (rust/tools/vdeploy): the fleet's pull-based deploy agent. It polls main, verifies
+# the commit, evaluates and realises this host's system, and diffs it against
+# /run/current-system with vdiff.
+#
+#   mode = "observe" (GH-159, the default): it logs the switch it WOULD make, and never
+#     switches. comin stays the deployer.
+#   mode = "deploy" (GH-160, the take-over): every plan that switches runs `vdeploy apply` in
+#     a transient unit (vdeploy-apply): switch-to-configuration test, vhealth on the new
+#     generation's own probes, then `nix-env -p /nix/var/nix/profiles/system --set` and
+#     switch-to-configuration boot, or a rollback with `test` to the previous generation.
+#     Nothing is written to the boot entries until the health check passes. comin is forced
+#     off, and its unit is replaced by a TOMBSTONE (below).
+#
+# Taking over from comin, live: the generation that turns deploy mode on is applied BY
+# comin, which runs switch-to-configuration as its own child, with its output piped into
+# itself. If that generation simply dropped comin.service, the switch would stop comin and
+# kill itself halfway. So deploy mode keeps a comin.service unit that is a tombstone:
+# restartIfChanged = false (the switch neither stops nor restarts it, so comin finishes the
+# switch), Restart = "no" and no wantedBy (comin then exits, as it does whenever its unit
+# file changes, and stays down; it never starts at boot). vdeploy waits until no
+# switch-to-configuration is left in comin's cgroup, then stops the unit itself. Going back
+# (the rollback option) is safe by construction: vdeploy's switch runs in vdeploy-apply, not
+# in vdeploy.service, and comin starts again from its own wantedBy.
+#
+# Which hosts deploy: those with the `vdeploy` role in common/fleet.nix (a host fact, so no
+# host file names the mode).
+#
+# Take-over rollback: `features.nix.vdeploy.mode = lib.mkForce "observe";` (or dropping the
+# role) brings comin back: the host keeps `features.fleet.comin.enable = true`, which
+# deploy mode overrides.
 #
 # No starvation (what comin gets wrong): a plan in flight is never cancelled because main
 # moved. When it finishes, the next plan is for the newest commit (latest-wins). `debounce`
@@ -22,8 +47,7 @@
 # vverify is off, this feature sets it up the same way. The exporter flag is added only
 # once, because node_exporter refuses a repeated --collector.textfile.directory.
 #
-# Rollback: `features.nix.vdeploy.enable = lib.mkForce false;` removes the unit. comin is
-# untouched either way.
+# Observe-mode rollback: `features.nix.vdeploy.enable = lib.mkForce false;` removes the unit.
 #
 # Health probe (on the host, no root needed):
 #   systemctl is-active vdeploy \
@@ -32,10 +56,59 @@
 {
   config,
   lib,
+  options,
   pkgs,
   ...
 } @ args: let
   cfg = config.features.nix.vdeploy;
+  deploy = cfg.mode == "deploy";
+  # Which hosts vdeploy deploys is a host fact: the `vdeploy` role in common/fleet.nix.
+  fleet = import ../../../common/fleet.nix;
+  deploysHere = fleet.hosts ? ${cfg.host} && fleet.hasRole "vdeploy" cfg.host;
+  systemd = config.systemd.package;
+  gcroots = "/nix/var/nix/gcroots/vdeploy";
+  # features.fleet.comin exists on hosts (lib/features.nix declares it); a suite that
+  # evaluates this module alone has no such option, and nothing to force off.
+  cominOption = lib.hasAttrByPath ["features" "fleet" "comin" "enable"] options;
+  cominOn = config.services.comin.enable or false;
+  # What `vdeploy apply` is told, by the daemon (from these same flags) and by the
+  # vdeploy-apply wrapper.
+  applyArgs = [
+    "--health-window"
+    cfg.healthWindow
+    "--systemctl"
+    "${systemd}/bin/systemctl"
+    "--nix-env"
+    "${config.nix.package}/bin/nix-env"
+    "--nix-store"
+    "${config.nix.package}/bin/nix-store"
+    "--profile"
+    "/nix/var/nix/profiles/system"
+    "--gcroot"
+    "${gcroots}/candidate"
+    # The probes run as nobody, as vhealth's own daemon runs them: a Nix daemon that
+    # answers root but not other users is not healthy.
+    "--health-as"
+    "nobody"
+    "--setpriv"
+    "${pkgs.util-linux}/bin/setpriv"
+  ];
+  # `vdeploy-apply [TOPLEVEL]`: by hand, what the daemon does for each plan (the same
+  # transient unit, the same health check and rollback). Without a toplevel it only
+  # finishes an interrupted apply.
+  applyNow = pkgs.writeShellScriptBin "vdeploy-apply" ''
+    set -eu
+    extra=()
+    if [ $# -gt 0 ]; then
+      extra=(--toplevel "$(${pkgs.coreutils}/bin/readlink -f "$1")")
+    fi
+    exec ${systemd}/bin/systemd-run --unit=vdeploy-apply \
+      --description="vdeploy apply: switch, health check, keep or roll back" \
+      --service-type=exec --collect --wait --quiet --no-ask-password \
+      ${vdeploy}/bin/vdeploy apply \
+      --state-dir /var/lib/vdeploy --textfile-dir ${textfileDir} \
+      ${lib.escapeShellArgs applyArgs} "''${extra[@]}"
+  '';
   vdeploy = pkgs.callPackage ../../../rust/tools/vdeploy/default.nix {};
   textfileDir = "/var/lib/prometheus-node-exporter-text";
   group = "prometheus-textfile";
@@ -52,6 +125,28 @@
   userHome = config.users.users.${user}.home or "/home/${user}";
 in {
   options.features.nix.vdeploy = {
+    mode = lib.mkOption {
+      type = lib.types.enum ["observe" "deploy"];
+      default =
+        if deploysHere
+        then "deploy"
+        else "observe";
+      defaultText = lib.literalExpression ''if the host has the "vdeploy" role in common/fleet.nix then "deploy" else "observe"'';
+      description = ''
+        observe: plan and log the switch, never make it (comin deploys). deploy: switch,
+        health-check with vhealth, keep or roll back; comin is retired. Hosts with the
+        `vdeploy` role in common/fleet.nix deploy. The take-over's rollback is
+        lib.mkForce "observe" (or dropping the role).
+      '';
+    };
+    healthWindow = lib.mkOption {
+      type = lib.types.str;
+      default = "2m";
+      description = ''
+        Deploy mode: how long a new generation may take to become healthy (vhealth's settle
+        window) before it is rolled back.
+      '';
+    };
     host = lib.mkOption {
       type = lib.types.str;
       default = settings.hostname or config.networking.hostName;
@@ -100,106 +195,149 @@ in {
     };
   };
 
-  config = {
-    environment.systemPackages = [vdeploy];
+  config = lib.mkMerge [
+    {
+      environment.systemPackages = [vdeploy];
 
-    users.groups.${group} = {};
-    systemd.tmpfiles.rules = lib.mkIf (!vverifyOn) ["d ${textfileDir} 2775 root ${group} - -"];
-    services.prometheus.exporters.node.extraFlags =
-      lib.mkIf (config.services.prometheus.exporters.node.enable && !vverifyOn)
-      ["--collector.textfile.directory=${textfileDir}"];
+      users.groups.${group} = {};
+      systemd.tmpfiles.rules = lib.mkIf (!vverifyOn) ["d ${textfileDir} 2775 root ${group} - -"];
+      services.prometheus.exporters.node.extraFlags =
+        lib.mkIf (config.services.prometheus.exporters.node.enable && !vverifyOn)
+        ["--collector.textfile.directory=${textfileDir}"];
 
-    systemd.services.vdeploy = {
-      description = "vdeploy (observe mode): plans the switch to main, never makes it";
-      wantedBy = ["multi-user.target"];
-      wants = ["network-online.target"];
-      after = ["network-online.target" "nix-daemon.socket" "systemd-tmpfiles-setup.service"];
+      systemd.services.vdeploy = {
+        description =
+          if deploy
+          then "vdeploy (deploy mode): switches this host to main, health-checked, with rollback"
+          else "vdeploy (observe mode): plans the switch to main, never makes it";
+        wantedBy = ["multi-user.target"];
+        wants = ["network-online.target"];
+        after = ["network-online.target" "nix-daemon.socket" "systemd-tmpfiles-setup.service"];
 
-      # setpriv and env (util-linux, coreutils) run git as the user.
-      path = [pkgs.git config.nix.package pkgs.util-linux pkgs.coreutils];
-      environment = {
-        HOME = "/var/lib/vdeploy";
-        XDG_CACHE_HOME = "/var/lib/vdeploy/.cache";
-        NIX_REMOTE = "daemon";
+        # setpriv and env (util-linux, coreutils) run git as the user.
+        path = [pkgs.git config.nix.package pkgs.util-linux pkgs.coreutils] ++ lib.optional deploy systemd;
+        environment = {
+          HOME = "/var/lib/vdeploy";
+          XDG_CACHE_HOME = "/var/lib/vdeploy/.cache";
+          NIX_REMOTE = "daemon";
+        };
+
+        serviceConfig = {
+          Type = "simple";
+          ExecStart = lib.escapeShellArgs ([
+              "${vdeploy}/bin/vdeploy"
+              "--host"
+              cfg.host
+              "--url"
+              cfg.url
+              "--branch"
+              cfg.branch
+              "--interval"
+              cfg.interval
+              "--debounce"
+              cfg.debounce
+              "--repo"
+              "/var/lib/vdeploy/repo"
+              "--state-dir"
+              "/var/lib/vdeploy"
+              "--textfile-dir"
+              textfileDir
+              "--db"
+              "/nix/var/nix/db/db.sqlite"
+              "--git"
+              "${pkgs.git}/bin/git"
+              "--nix"
+              "${config.nix.package}/bin/nix"
+            ]
+            ++ lib.optionals deploy ([
+                "--mode"
+                "deploy"
+                "--systemd-run"
+                "${systemd}/bin/systemd-run"
+              ]
+              ++ applyArgs)
+            ++ lib.optionals cfg.dotfiles.enable [
+              "--dotfiles"
+              cfg.dotfiles.path
+              "--dotfiles-user"
+              user
+              "--dotfiles-group"
+              userGroup
+              "--dotfiles-home"
+              userHome
+            ]);
+          # id_effect_cli interrupts the fibers on SIGINT, running finalizers, and exits 130:
+          # a stop, not a failure.
+          KillSignal = "SIGINT";
+          SuccessExitStatus = [130];
+          Restart = "on-failure";
+          RestartSec = "1min";
+
+          # Evaluation is this process's own CPU; builds are the daemon's.
+          Nice = 10;
+          IOSchedulingClass = "best-effort";
+          IOSchedulingPriority = 7;
+
+          StateDirectory = "vdeploy";
+          StateDirectoryMode = "0750";
+          # node_exporter (its own user) reads what is written: 0644 files.
+          UMask = "0022";
+
+          ProtectSystem = "strict";
+          ProtectHome = "read-only";
+          # `-`: a host without the checkout still starts (it is reported missing).
+          ReadWritePaths = [textfileDir] ++ lib.optional cfg.dotfiles.enable "-${cfg.dotfiles.path}";
+          PrivateTmp = true;
+          PrivateDevices = true;
+          ProtectKernelTunables = true;
+          ProtectKernelModules = true;
+          ProtectKernelLogs = true;
+          ProtectControlGroups = true;
+          ProtectClock = true;
+          ProtectHostname = true;
+          RestrictNamespaces = true;
+          RestrictRealtime = true;
+          RestrictSUIDSGID = true;
+          LockPersonality = true;
+          NoNewPrivileges = true;
+          RestrictAddressFamilies = ["AF_UNIX" "AF_INET" "AF_INET6"];
+          SystemCallArchitectures = "native";
+          # Root, but only what observe mode uses: reading into the user's home, and
+          # setpriv's drop to the user (it loses these on the way).
+          CapabilityBoundingSet = ["CAP_SETUID" "CAP_SETGID" "CAP_DAC_READ_SEARCH"];
+        };
       };
+    }
 
-      serviceConfig = {
-        Type = "simple";
-        ExecStart = lib.escapeShellArgs ([
-            "${vdeploy}/bin/vdeploy"
-            "--host"
-            cfg.host
-            "--url"
-            cfg.url
-            "--branch"
-            cfg.branch
-            "--interval"
-            cfg.interval
-            "--debounce"
-            cfg.debounce
-            "--repo"
-            "/var/lib/vdeploy/repo"
-            "--state-dir"
-            "/var/lib/vdeploy"
-            "--textfile-dir"
-            textfileDir
-            "--db"
-            "/nix/var/nix/db/db.sqlite"
-            "--git"
-            "${pkgs.git}/bin/git"
-            "--nix"
-            "${config.nix.package}/bin/nix"
-          ]
-          ++ lib.optionals cfg.dotfiles.enable [
-            "--dotfiles"
-            cfg.dotfiles.path
-            "--dotfiles-user"
-            user
-            "--dotfiles-group"
-            userGroup
-            "--dotfiles-home"
-            userHome
-          ]);
-        # id_effect_cli interrupts the fibers on SIGINT, running finalizers, and exits 130:
-        # a stop, not a failure.
-        KillSignal = "SIGINT";
-        SuccessExitStatus = [130];
-        Restart = "on-failure";
-        RestartSec = "1min";
+    (lib.mkIf deploy {
+      assertions = [
+        {
+          assertion = config.environment.etc ? "vhealth/probes.json";
+          message = "features.nix.vdeploy.mode = \"deploy\" decides keep or rollback with vhealth: enable features.nix.vhealth (and its probes) on this host.";
+        }
+      ];
 
-        # Evaluation is this process's own CPU; builds are the daemon's.
-        Nice = 10;
-        IOSchedulingClass = "best-effort";
-        IOSchedulingPriority = 7;
+      environment.systemPackages = [applyNow];
 
-        StateDirectory = "vdeploy";
-        StateDirectoryMode = "0750";
-        # node_exporter (its own user) reads what is written: 0644 files.
-        UMask = "0022";
+      # The candidate generation's GC root, while an apply decides on it.
+      systemd.tmpfiles.rules = ["d ${gcroots} 0755 root root - -"];
 
-        ProtectSystem = "strict";
-        ProtectHome = "read-only";
-        # `-`: a host without the checkout still starts (it is reported missing).
-        ReadWritePaths = [textfileDir] ++ lib.optional cfg.dotfiles.enable "-${cfg.dotfiles.path}";
-        PrivateTmp = true;
-        PrivateDevices = true;
-        ProtectKernelTunables = true;
-        ProtectKernelModules = true;
-        ProtectKernelLogs = true;
-        ProtectControlGroups = true;
-        ProtectClock = true;
-        ProtectHostname = true;
-        RestrictNamespaces = true;
-        RestrictRealtime = true;
-        RestrictSUIDSGID = true;
-        LockPersonality = true;
-        NoNewPrivileges = true;
-        RestrictAddressFamilies = ["AF_UNIX" "AF_INET" "AF_INET6"];
-        SystemCallArchitectures = "native";
-        # Root, but only what observe mode uses: reading into the user's home, and
-        # setpriv's drop to the user (it loses these on the way).
-        CapabilityBoundingSet = ["CAP_SETUID" "CAP_SETGID" "CAP_DAC_READ_SEARCH"];
+      # comin's tombstone (see the header). Only where the real comin is off, so the rollback
+      # option gets the real unit back.
+      systemd.services.comin = lib.mkIf (!cominOn) {
+        description = "comin, retired by vdeploy (a tombstone: features/nix/vdeploy)";
+        restartIfChanged = false;
+        wantedBy = lib.mkForce [];
+        serviceConfig = {
+          Type = "simple";
+          ExecStart = "${pkgs.coreutils}/bin/true";
+          Restart = lib.mkForce "no";
+        };
       };
-    };
-  };
+    })
+
+    (lib.optionalAttrs cominOption {
+      features.fleet.comin.enable = lib.mkIf deploy (lib.mkForce false);
+    })
+  ];
 }
