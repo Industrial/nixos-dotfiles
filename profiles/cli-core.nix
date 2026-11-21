@@ -59,7 +59,6 @@
     features.cli.assay.enable = true;
     features.cli.nh.enable = true;
     features.cli.nix-index.enable = true;
-    features.cli.nix-output-monitor.enable = true;
     features.cli.nix-tree.enable = true;
     features.cli.nixdrv.enable = true;
     features.cli.nixfetch.enable = true;
@@ -67,6 +66,10 @@
     features.cli.nixstore.enable = true;
     # vdiff took over from nvd (GH-153). Rollback: features.cli.nvd.enable = true on a host.
     features.cli.vdiff.enable = true;
+    # vmon is the build-log monitor (GH-181); nix-output-monitor is its rollback, installed
+    # only when a host turns vmon off (`features.cli.vmon.enable = lib.mkForce false;`).
+    features.cli.vmon.enable = true;
+    features.cli.nix-output-monitor.enable = lib.mkDefault (!config.features.cli.vmon.enable);
 
     # Archives
     features.cli.p7zip.enable = true;

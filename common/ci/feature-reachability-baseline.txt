@@ -97,3 +97,9 @@ features/network/syncthing
 features/office/obsidian
 features/office/onlyoffice
 features/window-manager/slock
+
+# --- The rollback of a take-over. ----------------------------------------------------
+# nix-output-monitor is vmon's rollback (GH-181): cli-core installs it only on a host
+# that sets `features.cli.vmon.enable = lib.mkForce false;` (profiles/cli-core.assay.nix,
+# rollbackRestoresNom). Remove this entry when nom is deleted.
+features/cli/nix-output-monitor

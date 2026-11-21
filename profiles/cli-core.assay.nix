@@ -32,6 +32,24 @@ in
     in
       assay.eq [(builtins.elem "cli.vdiff" rolledBack) (builtins.elem "cli.nvd" rolledBack)] [true true];
 
+    # vmon took over from nix-output-monitor (GH-181): bin/dev, bin/update and bin/fleet build
+    # through it, and nom is not installed beside it.
+    vmonReplacesNom = assay.eq [(has "cli.vmon") (has "cli.nix-output-monitor")] [true false];
+
+    # The rollback is one option: a host that turns vmon off gets nom back (and bin/dev falls
+    # back to it), with nothing else to change.
+    rollbackRestoresNom = let
+      off = features.enabledFeatures (features.evalSelection {
+        modules = [
+          ({lib, ...}: {
+            profiles.cli-core.enable = true;
+            features.cli.vmon.enable = lib.mkForce false;
+          })
+        ];
+      });
+    in
+      assay.eq [(builtins.elem "cli.vmon" off) (builtins.elem "cli.nix-output-monitor" off)] [false true];
+
     # cli-core is CLI only: nothing outside features/cli.
     onlyCliFeatures = assay.eq (builtins.filter (f: builtins.substring 0 4 f != "cli.") on) [];
   }
