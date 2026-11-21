@@ -1,0 +1,34 @@
+-- Why a run stopped, split by what the caller does about it.
+--
+--   Transient    a network fault or a 5xx/429: retried with backoff, then fatal
+--   Refused      the cache answered, and the answer is final (a 4xx, a bad narinfo)
+--   Missing      no cache has the path
+--   Untrusted    no trusted key signed the path: fix --trusted-key or nix.conf
+--   Unsupported  a NAR compression vfetch does not read
+--   Corrupt      the NAR is not the one the narinfo describes: never imported
+--   Io           the staging directory or the target's database
+--   Import       the import into the target store failed
+--   Usage        the command line or the trusted keys
+
+export errors VfetchError
+  Transient String    "#{0}"
+  Refused String      "#{0}"
+  Missing String      "#{0} is in none of the caches"
+  Untrusted String    "#{0}"
+  Unsupported String  "#{0}"
+  Corrupt String      "#{0}"
+  Io String           "#{0}"
+  Import String       "import: #{0}"
+  Usage String        "#{0}"
+
+-- Only a transient fault is worth another attempt.
+export is_transient : &VfetchError -> bool
+is_transient e =
+  case e of
+    Transient _ -> true
+    _ -> false
+
+test "only transient faults are retried"
+  assert! \-> is_transient (&Transient (.to_string "reset"))
+  assert! \-> !(is_transient (&Corrupt (.to_string "bad hash")))
+  assert! \-> !(is_transient (&Refused (.to_string "HTTP 404")))

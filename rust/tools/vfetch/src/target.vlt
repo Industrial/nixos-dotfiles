@@ -1,0 +1,75 @@
+-- The target store as a capability: "is this path valid there already".
+--
+-- A valid path's closure is valid too (the store's invariant), so the walk
+-- neither fetches it nor follows its references. The live implementation
+-- reads the target's SQLite database read-only (nix-store-core's `db`); a
+-- store vfetch cannot read, or one with no database yet, has nothing valid.
+
+import std::collections::HashSet
+import std::sync::{Arc, Mutex}
+import rusqlite::Connection
+import id_effect::{Effect, HNil, succeed, suspend}
+import nix_store_core::db
+import crate::fault::VfetchError
+import crate::remote::lifted
+
+export class TargetStore
+  valid : &self -> String -> Effect<bool, VfetchError, HNil>
+
+export newtype TargetService = TargetService (export Arc<dyn TargetStore + Send + Sync>)
+
+instance Clone TargetService
+  clone : &self -> Self
+  clone self = TargetService (Arc::clone (&self.0))
+
+-- One read-only connection. A query is a single indexed row, so the fibers
+-- that share it hold the lock for microseconds.
+export data SqliteTarget { conn Option<Arc<Mutex<Connection>>> }
+
+query : Option<Arc<Mutex<Connection>>> -> String -> Result<bool, VfetchError>
+query conn path =
+  case conn of
+    None -> Ok false
+    Some c -> query_on c path
+
+query_on : Arc<Mutex<Connection>> -> String -> Result<bool, VfetchError>
+query_on c path =
+  locked = (c.lock () |> .map_err (\e -> VfetchError::Io "target database: #{e}"))?
+  db::is_valid (&locked) (&path) |> .map_err (\e -> VfetchError::Io "target database: #{e}")
+
+instance TargetStore SqliteTarget
+  valid : &self -> String -> Effect<bool, VfetchError, HNil>
+  valid self path =
+    c = self.conn.clone ()
+    suspend (move \-> lifted (query c path))
+
+-- The target whose database is at `db_path`, if it has one.
+export open : Option<String> -> Result<TargetService, VfetchError>
+open db_path =
+  conn = (connect db_path)?
+  Ok (TargetService (Arc::new (SqliteTarget { conn })))
+
+connect : Option<String> -> Result<Option<Arc<Mutex<Connection>>>, VfetchError>
+connect db_path =
+  case db_path of
+    Some p | std::path::Path::new (&p) |> .exists ->
+      c = (db::open (&p) |> .map_err (\e -> VfetchError::Io "opening #{p}: #{e}"))?
+      Ok (Some (Arc::new (Mutex::new c)))
+    _ -> Ok None
+
+-- A target for tests: exactly these paths are valid.
+export data MemoryTarget { paths HashSet<String> }
+
+instance TargetStore MemoryTarget
+  valid : &self -> String -> Effect<bool, VfetchError, HNil>
+  valid self path =
+    succeed (self.paths.contains (&path))
+
+export memory : Vec<String> -> TargetService
+memory paths = TargetService (Arc::new (MemoryTarget { paths = paths.into_iter () |> .collect }))
+
+test "a store without a database has nothing valid"
+  t = open (Some (.to_string "/nonexistent/vfetch/db.sqlite"))
+  assert! \-> t.is_ok ()
+  if t is Ok t
+    assert_eq! \-> id_effect::testing::run_test (t.0.valid (.to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-x")) |> .into_result |> .ok \-> Some false

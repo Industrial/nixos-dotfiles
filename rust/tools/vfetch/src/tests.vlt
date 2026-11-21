@@ -1,0 +1,250 @@
+-- Whole runs against a fake cache (`MemoryRemote`), a fake target and a
+-- recording importer, on id_effect's test executor (virtual time, so the
+-- retries' backoff costs nothing). The staging directory is real.
+--
+-- The closure: root -> liba -> libb, with root also referring to itself.
+-- root's NAR is served uncompressed, liba's as xz, libb's as zstd, so every
+-- decoder is on the path. Every narinfo is signed by a test key.
+
+import std::collections::HashMap
+import std::io::Write
+import std::path::PathBuf
+import std::sync::{Arc, Mutex}
+import base64::Engine
+import id_effect::{Cause, hlist}
+import id_effect::testing::run_test
+import nix_store_core::hash
+import nix_store_core::nar::push_bytes
+import nix_store_core::narinfo::{NarInfo, NarInfoFile, fingerprint, render_file}
+import nix_store_core::signing::{PublicKey, SecretKey, parse_secret_key, public_of, sign}
+import crate::fault::VfetchError
+import crate::fetch::{Report, Request, ctx_of, program, run}
+import crate::importer::{ImporterService, MemoryImporter}
+import crate::remote::{MemoryRemote, RemoteService}
+import crate::stage::{Staging, hash_of, nar_file, narinfo_file, part_file, staged}
+import crate::target
+
+const CACHE : &str = "http://fake"
+const ROOT : &str = "/nix/store/rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr-root"
+const LIBA : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-liba"
+const LIBB : &str = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-libb"
+
+-- A signing key from a fixed seed, in Nix's `<name>:<base64(seed ‖ public)>`.
+test_key : SecretKey
+test_key =
+  seed = [7; 32] : [u8; 32]
+  sk = ed25519_dalek::SigningKey::from_bytes (&seed)
+  mut raw = seed.to_vec ()
+  raw.extend_from_slice (sk.verifying_key ().as_bytes ())
+  text = "vfetch-test-1:#{base64::engine::general_purpose::STANDARD.encode (&raw)}"
+  parse_secret_key (&text) |> .expect "the test key parses"
+
+-- The NAR of a single regular file.
+nar_of : &[u8] -> Vec<u8>
+nar_of contents =
+  mut out = Vec::new () : Vec<u8>
+  for t in ["nix-archive-1", "(", "type", "regular", "contents"]
+    push_bytes (&mut out) (t.as_bytes ())
+  push_bytes (&mut out) contents
+  push_bytes (&mut out) (")".as_bytes ())
+  out
+
+compressed : &str -> &[u8] -> Vec<u8>
+compressed compression bytes =
+  if compression == "xz"
+    mut e = liblzma::write::XzEncoder::new (Vec::new () : Vec<u8>) 6
+    e.write_all bytes |> .expect "xz encodes"
+    e.finish () |> .expect "xz finishes"
+  else if compression == "zstd"
+    zstd::encode_all bytes 3 |> .expect "zstd encodes"
+  else
+    bytes.to_vec ()
+
+suffix : &str -> &str
+suffix compression =
+  if compression == "xz"
+    ".nar.xz"
+  else if compression == "zstd"
+    ".nar.zst"
+  else
+    ".nar"
+
+-- Where the fake cache serves `path`'s NAR.
+nar_url_of : &str -> &str -> String
+nar_url_of path compression = "#{CACHE}/nar/#{hash_of path}#{suffix compression}"
+
+-- Serve `path` (with `refs`, its file holding `contents`) from `files`.
+serve : &mut HashMap<String, Vec<u8>> -> &str -> &[&str] -> &str -> &[u8] -> ()
+serve files path refs compression contents =
+  nar = nar_of contents
+  unsigned = NarInfo { store_path = path.to_string (), nar_hash = hash::typed_nix32 (&hash::digest (&nar)), nar_size = u64::try_from (nar.len ()) |> .unwrap_or 0, references = refs |> .iter |> .map (\r -> r.to_string ()) |> .collect, deriver = None, sigs = Vec::new (), ca = None }
+  sig = sign (&test_key ()) (&fingerprint (&unsigned))
+  info = NarInfo { sigs = vec![sig], ...unsigned }
+  url = "nar/#{hash_of path}#{suffix compression}"
+  text = render_file (&NarInfoFile { info, url, compression = compression.to_string (), file_hash = None, file_size = None })
+  files.insert ("#{CACHE}/#{hash_of path}.narinfo") (text.into_bytes ())
+  files.insert (nar_url_of path compression) (compressed compression (&nar))
+  ()
+
+cache_files : HashMap<String, Vec<u8>>
+cache_files =
+  mut files = HashMap::new () : HashMap<String, Vec<u8>>
+  serve (&mut files) ROOT (&[LIBA, ROOT]) "none" (b"#!/bin/sh\necho root\n")
+  serve (&mut files) LIBA (&[LIBB]) "xz" (b"liba: an xz-compressed library")
+  serve (&mut files) LIBB (&[]) "zstd" (b"libb: a zstd-compressed library")
+  files
+
+-- A fake cache over `files`, and its request log.
+fake : HashMap<String, Vec<u8>> -> HashMap<String, usize> -> (RemoteService, Arc<Mutex<Vec<String>>>)
+fake files faults =
+  log = Arc::new (Mutex::new (Vec::new ())) : Arc<Mutex<Vec<String>>>
+  m = MemoryRemote { files, log = Arc::clone (&log), faults = Arc::new (Mutex::new faults) }
+  (RemoteService (Arc::new m), log)
+
+-- A fresh staging directory for one test.
+scratch : &str -> Staging
+scratch name =
+  dir = std::env::temp_dir () |> .join "vfetch-test-#{name}-#{std::process::id ()}"
+  std::fs::remove_dir_all (&dir) |> .ok
+  Staging { dir }
+
+request_of : Staging -> Vec<PublicKey> -> Vec<String> -> Request
+request_of staging keys paths =
+  Request { paths, caches = vec![CACHE.to_string()], keys, staging, jobs = 4 }
+
+trusting : Vec<PublicKey>
+trusting = vec![public_of(&test_key())]
+
+-- A run's outcome and what it imported, in order.
+data Outcome { result Result<Report, Cause<VfetchError>>, added Vec<String> }
+
+run_with : RemoteService -> crate::target::TargetService -> Request -> Outcome
+run_with remote target req =
+  added = Arc::new (Mutex::new (Vec::new ())) : Arc<Mutex<Vec<String>>>
+  importer = ImporterService (Arc::new (MemoryImporter { added = Arc::clone (&added) }))
+  result = run_test (run (ctx_of remote target req) importer) |> .into_result
+  Outcome { result, added = added.lock () |> .map (\a -> a.clone ()) |> .unwrap_or_default }
+
+-- The typed failure of a run, if it failed with one.
+failure : &Outcome -> Option<String>
+failure o =
+  case &o.result of
+    Err (Cause::Fail e) -> Some (format! \-> "#{e:?}")
+    _ -> None
+
+logged : &Arc<Mutex<Vec<String>>> -> Vec<String>
+logged log = log.lock () |> .map (\l -> l.clone ()) |> .unwrap_or_default
+
+mentions : &[String] -> &str -> bool
+mentions log path = log.iter () |> .any (\u -> u.contains (&hash_of path))
+
+strings : &[&str] -> Vec<String>
+strings xs = xs |> .iter |> .map (\s -> s.to_string ()) |> .collect
+
+test "a closure is fetched, verified and imported references first"
+  (remote, log) = fake (cache_files ()) (HashMap::new ())
+  staging = scratch "closure"
+  added = Arc::new (Mutex::new (Vec::new ())) : Arc<Mutex<Vec<String>>>
+  importer = ImporterService (Arc::new (MemoryImporter { added = Arc::clone (&added) }))
+  env = hlist![remote, target::memory (Vec::new ()), importer]
+  result = run_test (program (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT]))) |> .provide_env env) |> .into_result
+  assert! \-> result.is_ok () \-> "#{result:?}"
+  if result is Ok r
+    assert_eq! \-> (r.closure, r.valid, r.staged, r.fetched) \-> (3, 0, 0, 3)
+  assert_eq! \-> added.lock () |> .map (\a -> a.clone ()) |> .unwrap_or_default \-> strings (&[LIBB, LIBA, ROOT])
+  assert! \-> staged (&staging) LIBA |> .is_some
+  assert! \-> staged (&staging) LIBB |> .is_some
+  -- One narinfo and one NAR request per path: nothing asked twice.
+  assert_eq! \-> logged (&log) |> .len \-> 6
+
+test "a corrupt NAR is rejected, never staged and never imported"
+  mut files = cache_files ()
+  -- liba's NAR decodes, but is not the NAR its narinfo hashes.
+  files.insert (nar_url_of LIBA "xz") (compressed "xz" (&nar_of (b"liba: tampered with")))
+  (remote, _) = fake files (HashMap::new ())
+  staging = scratch "corrupt"
+  o = run_with remote (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
+  assert! \-> failure (&o) |> .is_some_and (\e -> e.starts_with "Corrupt") \-> "#{o.result:?}"
+  assert! \-> o.added.is_empty ()
+  assert! \-> !(narinfo_file (&staging) LIBA |> .exists)
+  assert! \-> !(nar_file (&staging) LIBA |> .exists)
+  assert! \-> !(part_file (&staging) LIBA |> .exists)
+
+test "an undecodable NAR is rejected as corrupt"
+  mut files = cache_files ()
+  files.insert (nar_url_of LIBB "zstd") (b"this is not zstd at all".to_vec ())
+  (remote, _) = fake files (HashMap::new ())
+  staging = scratch "undecodable"
+  o = run_with remote (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
+  assert! \-> failure (&o) |> .is_some_and (\e -> e.starts_with "Corrupt") \-> "#{o.result:?}"
+  assert! \-> o.added.is_empty ()
+  assert! \-> !(narinfo_file (&staging) LIBB |> .exists)
+
+test "an interrupted run resumes without fetching again what it finished"
+  staging = scratch "resume"
+  -- First run: root's NAR never arrives, so the run fails after its retries;
+  -- liba and libb were fetched and verified meanwhile.
+  mut faults = HashMap::new () : HashMap<String, usize>
+  faults.insert (nar_url_of ROOT "none") 100
+  (remote, _) = fake (cache_files ()) faults
+  first = run_with remote (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
+  assert! \-> failure (&first) |> .is_some_and (\e -> e.starts_with "Transient") \-> "#{first.result:?}"
+  assert! \-> first.added.is_empty ()
+  assert! \-> staged (&staging) LIBA |> .is_some
+  assert! \-> staged (&staging) LIBB |> .is_some
+  assert! \-> staged (&staging) ROOT |> .is_none
+  -- A half-written NAR from the interruption is never taken for a whole one.
+  std::fs::write (part_file (&staging) ROOT) (b"half a NAR") |> .ok
+  -- Second run: nothing about liba or libb is asked of the cache again.
+  (again, log) = fake (cache_files ()) (HashMap::new ())
+  second = run_with again (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
+  assert! \-> second.result.is_ok () \-> "#{second.result:?}"
+  if &second.result is Ok r
+    assert_eq! \-> (r.closure, r.staged, r.fetched) \-> (3, 2, 1)
+  assert_eq! \-> second.added \-> strings (&[LIBB, LIBA, ROOT])
+  requests = logged (&log)
+  assert! \-> !(mentions (&requests) LIBA) && !(mentions (&requests) LIBB) \-> "#{requests:?}"
+  assert_eq! \-> requests.len () \-> 2
+
+test "transient faults are retried"
+  mut faults = HashMap::new () : HashMap<String, usize>
+  faults.insert ("#{CACHE}/#{hash_of LIBB}.narinfo") 2
+  faults.insert (nar_url_of LIBA "xz") 1
+  (remote, _) = fake (cache_files ()) faults
+  o = run_with remote (target::memory (Vec::new ())) (request_of (scratch "transient") (trusting ()) (strings (&[ROOT])))
+  assert! \-> o.result.is_ok () \-> "#{o.result:?}"
+  assert_eq! \-> o.added \-> strings (&[LIBB, LIBA, ROOT])
+
+test "a path valid in the target is neither fetched, walked nor imported"
+  (remote, log) = fake (cache_files ()) (HashMap::new ())
+  o = run_with remote (target::memory (strings (&[LIBA]))) (request_of (scratch "valid") (trusting ()) (strings (&[ROOT])))
+  assert! \-> o.result.is_ok () \-> "#{o.result:?}"
+  if &o.result is Ok r
+    assert_eq! \-> (r.closure, r.valid, r.fetched) \-> (2, 1, 1)
+  assert_eq! \-> o.added \-> strings (&[ROOT])
+  requests = logged (&log)
+  assert! \-> !(mentions (&requests) LIBA) && !(mentions (&requests) LIBB) \-> "#{requests:?}"
+
+test "a narinfo no trusted key signed stops the run"
+  (remote, _) = fake (cache_files ()) (HashMap::new ())
+  o = run_with remote (target::memory (Vec::new ())) (request_of (scratch "untrusted") (Vec::new ()) (strings (&[ROOT])))
+  assert! \-> failure (&o) |> .is_some_and (\e -> e.starts_with "Untrusted") \-> "#{o.result:?}"
+  assert! \-> o.added.is_empty ()
+
+test "a path no cache has is missing"
+  (remote, _) = fake (cache_files ()) (HashMap::new ())
+  o = run_with remote (target::memory (Vec::new ())) (request_of (scratch "missing") (trusting ()) (strings (&["/nix/store/mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm-nowhere"])))
+  assert! \-> failure (&o) |> .is_some_and (\e -> e.starts_with "Missing") \-> "#{o.result:?}"
+
+test "the staging directory is a file:// binary cache"
+  (remote, _) = fake (cache_files ()) (HashMap::new ())
+  staging = scratch "layout"
+  o = run_with remote (target::memory (Vec::new ())) (request_of (staging.clone ()) (trusting ()) (strings (&[ROOT])))
+  assert! \-> o.result.is_ok ()
+  assert_eq! \-> std::fs::read_to_string (staging.dir.join "nix-cache-info") |> .ok \-> Some (.to_string "StoreDir: /nix/store\n")
+  text = std::fs::read_to_string (narinfo_file (&staging) LIBA) |> .unwrap_or_default
+  assert! \-> text.contains "\nCompression: none\n" && text.contains "\nURL: nar/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.nar\n" && text.contains "\nSig: vfetch-test-1:" \-> "#{text}"
+  nar = std::fs::read (nar_file (&staging) LIBA) |> .unwrap_or_default
+  assert_eq! \-> nar \-> nar_of (b"liba: an xz-compressed library")
+  dirs = PathBuf::from (&staging.dir) |> .join "nar"
+  assert! \-> dirs.is_dir ()

@@ -1,0 +1,84 @@
+-- The import into the target store, as a capability: "add these staged
+-- paths, references first".
+--
+-- `NixCopyImporter` is the temporary implementation, until the
+-- daemon-protocol client (nix-store-core's `worker`, AddToStoreNar) lands: the
+-- staging directory already is a `file://` binary cache, so one
+-- `nix copy --from file://<staging>` imports the whole batch. That runs
+-- through the daemon (or opens the local store) and checks the signatures
+-- and NAR hashes again, as any substitution does. `MemoryImporter` records
+-- what it was given, for tests.
+
+import std::sync::{Arc, Mutex}
+import id_effect::{Effect, HNil, succeed}
+import id_effect_platform::command::{CommandSpec, ProcessRuntimeService}
+import nix_store_core::narinfo::NarInfo
+import crate::fault::VfetchError
+import crate::remote::lifted
+import crate::stage::{Staging, discard}
+
+export class Importer
+  add_all : &self -> Vec<NarInfo> -> Effect<(), VfetchError, HNil>
+
+export newtype ImporterService = ImporterService (export Arc<dyn Importer + Send + Sync>)
+
+instance Clone ImporterService
+  clone : &self -> Self
+  clone self = ImporterService (Arc::clone (&self.0))
+
+-- `nix copy` of exactly these paths (`--no-recursive`: the rest of the
+-- closure is valid in the target already), from the staging cache into `to`
+-- (the system store when None), trusting `keys` on top of nix.conf's.
+export copy_command : &Staging -> &Option<String> -> &[String] -> &[NarInfo] -> CommandSpec
+copy_command s to keys infos =
+  mut c = CommandSpec::new "nix" |> .arg "--extra-experimental-features" |> .arg "nix-command" |> .arg "copy" |> .arg "--no-recursive" |> .arg "--from" |> .arg "file://#{s.dir.display ()}"
+  if to is Some t
+    c := c |> .arg "--to" |> .arg t
+  if !keys.is_empty ()
+    c := c |> .arg "--option" |> .arg "extra-trusted-public-keys" |> .arg (keys.join " ")
+  for i in infos
+    c := c.arg (&i.store_path)
+  c
+
+export data NixCopyImporter { staging Staging, to Option<String>, keys Vec<String>, runtime ProcessRuntimeService }
+
+copied : Staging -> Vec<NarInfo> -> std::process::ExitStatus -> Result<(), VfetchError>
+copied s infos status =
+  if status.success ()
+    for i in &infos
+      discard (&s) (&i.store_path)
+    Ok ()
+  else
+    Err (VfetchError::Import "nix copy exited with #{status}; the verified NARs stay in #{s.dir.display ()} for the next run")
+
+instance Importer NixCopyImporter
+  add_all : &self -> Vec<NarInfo> -> Effect<(), VfetchError, HNil>
+  add_all self infos =
+    if infos.is_empty ()
+      succeed (())
+    else
+      cmd = copy_command (&self.staging) (&self.to) (&self.keys) (&infos)
+      s = self.staging.clone ()
+      (self.runtime.0.spawn_wait cmd) |> .map_err (\e -> VfetchError::Import "running nix: #{e}") |> .flat_map (move \status -> lifted (copied s infos status))
+
+export nix_copy : Staging -> Option<String> -> Vec<String> -> ProcessRuntimeService -> ImporterService
+nix_copy staging to keys runtime =
+  ImporterService (Arc::new (NixCopyImporter { staging, to, keys, runtime }))
+
+-- Records every batch's store paths, in order.
+export data MemoryImporter { export added Arc<Mutex<Vec<String>>> }
+
+instance Importer MemoryImporter
+  add_all : &self -> Vec<NarInfo> -> Effect<(), VfetchError, HNil>
+  add_all self infos =
+    for added in self.added.lock ().iter_mut ()
+      for i in &infos
+        added.push (i.store_path.clone ())
+    succeed (())
+
+test "nix copy is asked for exactly the batch, from the staging cache"
+  s = Staging { dir = std::path::PathBuf::from "/var/tmp/vfetch" }
+  info = NarInfo { store_path = .to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", nar_hash = String::new (), nar_size = 0, references = Vec::new (), deriver = None, sigs = Vec::new (), ca = None }
+  cmd = copy_command (&s) (&Some (.to_string "/tmp/s")) (&[.to_string "k-1:x"]) (&[info])
+  args = cmd.args |> .iter |> .map (\a -> a.to_string_lossy () |> .into_owned) |> .collect : Vec<String>
+  assert_eq! \-> args.join " " \-> "--extra-experimental-features nix-command copy --no-recursive --from file:///var/tmp/vfetch --to /tmp/s --option extra-trusted-public-keys k-1:x /nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"

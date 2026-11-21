@@ -1,0 +1,93 @@
+-- The program edge: the command line and nix.conf into a `Request`, the live
+-- capabilities, and the run under id_effect_cli's `run_main` (exit 0 / 1 /
+-- 101 / 130; Ctrl-C interrupts with finalizers, and a NAR cut off mid-way
+-- stays a `.part` that is never imported). A usage error exits 2.
+
+import std::path::PathBuf
+import std::process::ExitCode
+import id_effect::{Effect, HNil, effect, hlist, suspend}
+import id_effect_platform::command::{ProcessRuntimeService, TokioProcessRuntime}
+import nix_store_core::signing::{PublicKey, parse_public_key}
+import crate::config::{Options, USAGE, conf_keys, db_of_store, parse_args}
+import crate::fault::VfetchError
+import crate::fetch::{Report, Request, program}
+import crate::importer::nix_copy
+import crate::remote::{http, lifted}
+import crate::stage::Staging
+import crate::target::open
+
+-- `--staging`, else $XDG_CACHE_HOME/vfetch, else ~/.cache/vfetch.
+export staging_dir : Option<String> -> Option<String> -> Option<String> -> PathBuf
+staging_dir flag xdg home =
+  case (flag, xdg, home) of
+    (Some d, _, _) -> PathBuf::from d
+    (None, Some x, _) | !x.is_empty () -> PathBuf::from x |> .join "vfetch"
+    (None, _, Some h) | !h.is_empty () -> PathBuf::from h |> .join ".cache" |> .join "vfetch"
+    _ -> PathBuf::from "/var/tmp/vfetch"
+
+-- nix.conf's keys (a missing file has none) and every --trusted-key.
+key_texts : &Options -> Vec<String>
+key_texts o =
+  mut keys = std::fs::read_to_string (&o.nix_conf) |> .map (\t -> conf_keys (&t)) |> .unwrap_or_default
+  keys.extend (o.trusted_keys.iter () |> .cloned)
+  keys
+
+parse_keys : &[String] -> Result<Vec<PublicKey>, VfetchError>
+parse_keys texts =
+  mut out = Vec::new () : Vec<PublicKey>
+  for t in texts
+    out.push ((parse_public_key t |> .map_err (\e -> VfetchError::Usage "trusted key #{t}: #{e}"))?)
+  Ok out
+
+request_of : &Options -> Result<Request, VfetchError>
+request_of o =
+  keys = (parse_keys (&key_texts o))?
+  dir = staging_dir (o.staging.clone ()) (std::env::var "XDG_CACHE_HOME" |> .ok) (std::env::var "HOME" |> .ok)
+  Ok (Request { paths = o.paths.clone (), caches = o.caches.clone (), keys, staging = Staging { dir }, jobs = o.jobs })
+
+report : &Report -> ()
+report r =
+  eprintln! \-> "vfetch: #{r.closure} paths: #{r.valid} valid already, #{r.staged} staged by an earlier run, #{r.fetched} fetched (#{r.nar_bytes} NAR bytes), imported"
+  ()
+
+-- The run with the live capabilities.
+live : Options -> Effect<(), VfetchError, HNil>
+live o =
+  effect!
+    let req = ~suspend({ let o = o.clone(); move || lifted(request_of(&o)) });
+    let target = ~suspend({ let to = o.to.clone(); move || lifted(open(db_of_store(to.as_deref()))) });
+    let importer = nix_copy(req.staging.clone(), o.to.clone(), o.trusted_keys.clone(), ProcessRuntimeService::new(TokioProcessRuntime));
+    let r = ~program(req).provide_env(hlist![http(), target, importer]);
+    report(&r)
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the tokio context reqwest needs, so the run is
+-- the root's child. An interrupt of the root interrupts and awaits it.
+supervised : Options -> Effect<(), VfetchError, HNil>
+supervised o =
+  effect!
+    let child = ~live(o).fork();
+    ~child.join::<HNil>()
+
+export main_code : ExitCode
+main_code =
+  args = std::env::args () |> .collect : Vec<String>
+  case parse_args (&args) of
+    Err e ->
+      eprintln! \-> "vfetch: #{e}\n#{USAGE}"
+      ExitCode::from 2
+    Ok o -> if_help o
+
+if_help : Options -> ExitCode
+if_help o =
+  if o.help
+    println! \-> "#{USAGE}"
+    ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised o) HNil (id_effect_cli::RunMainConfig::default ())
+
+test "the staging directory: the flag, then XDG, then HOME"
+  assert_eq! \-> staging_dir (Some (.to_string "/s")) (Some (.to_string "/x")) None \-> PathBuf::from "/s"
+  assert_eq! \-> staging_dir None (Some (.to_string "/x")) (Some (.to_string "/h")) \-> PathBuf::from "/x/vfetch"
+  assert_eq! \-> staging_dir None None (Some (.to_string "/h")) \-> PathBuf::from "/h/.cache/vfetch"
+  assert_eq! \-> staging_dir None None None \-> PathBuf::from "/var/tmp/vfetch"

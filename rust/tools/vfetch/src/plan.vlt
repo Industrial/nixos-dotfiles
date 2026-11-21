@@ -1,0 +1,77 @@
+-- The pure decisions of a run: where a cache keeps a path's narinfo and NAR,
+-- whether a narinfo is trusted, and the order paths are imported in.
+
+import std::collections::{BTreeMap, BTreeSet}
+import nix_store_core::narinfo::NarInfo
+import nix_store_core::signing::{PublicKey, valid_signatures}
+import nix_store_core::storepath::hash_part_of
+
+-- `<cache>/<hash part>.narinfo`.
+export narinfo_url : &str -> &str -> String
+narinfo_url cache path =
+  hash = hash_part_of path |> .unwrap_or ""
+  "#{cache}/#{hash}.narinfo"
+
+-- A narinfo's `URL:` is relative to its cache, unless it is absolute.
+export nar_url : &str -> &str -> String
+nar_url cache url =
+  if url.contains "://"
+    url.to_string ()
+  else
+    "#{cache}/#{url.trim_start_matches '/'}"
+
+-- libstore's rule: a narinfo is trusted when a trusted key signed it. A
+-- content-addressed path carries its own proof (its CA claim), which the
+-- import checks.
+export trusted : &[PublicKey] -> &NarInfo -> bool
+trusted keys info =
+  info.ca.is_some () || valid_signatures keys info > 0
+
+-- Every path of `infos`, each after the references it has in `infos`
+-- (references outside it are already valid in the target).
+export topo : &BTreeMap<String, NarInfo> -> Vec<String>
+topo infos =
+  mut out = Vec::new () : Vec<String>
+  mut done = BTreeSet::new () : BTreeSet<String>
+  for root in infos.keys ()
+    mut stack = Vec::from ([(root.clone (), false)])
+    while stack.pop () is Some (p, expanded)
+      if expanded
+        if done.insert (p.clone ())
+          out.push p
+      else if !done.contains (&p)
+        stack.push ((p.clone (), true))
+        if infos.get (&p) is Some info
+          for r in &info.references
+            if r != &p && infos.contains_key r && !done.contains r
+              stack.push ((r.clone (), false))
+  out
+
+#[cfg(test)]
+info_of : &str -> &[&str] -> NarInfo
+info_of path refs = NarInfo { store_path = path.to_string (), nar_hash = String::new (), nar_size = 0, references = refs |> .iter |> .map (\r -> r.to_string ()) |> .collect, deriver = None, sigs = Vec::new (), ca = None }
+
+test "references come before the paths that use them"
+  a = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+  b = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b"
+  c = "/nix/store/cccccccccccccccccccccccccccccccc-c"
+  d = "/nix/store/dddddddddddddddddddddddddddddddd-d"
+  mut m = BTreeMap::new () : BTreeMap<String, NarInfo>
+  m.insert (a.to_string ()) (info_of a (&[b, c, a, "/nix/store/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz-valid"]))
+  m.insert (b.to_string ()) (info_of b (&[c]))
+  m.insert (c.to_string ()) (info_of c (&[]))
+  m.insert (d.to_string ()) (info_of d (&[b]))
+  order = topo (&m)
+  at = \p -> order.iter () |> .position (\q -> q == p) |> .unwrap_or usize::MAX
+  assert_eq! \-> order.len () \-> 4
+  assert! \-> at c < at b && at b < at a && at b < at d
+
+test "NAR URLs are relative to the cache unless absolute"
+  assert_eq! \-> nar_url "http://c:5100" "nar/x.nar" \-> "http://c:5100/nar/x.nar"
+  assert_eq! \-> nar_url "http://c" "https://elsewhere/nar/x.nar.xz" \-> "https://elsewhere/nar/x.nar.xz"
+  assert_eq! \-> narinfo_url "https://cache.nixos.org" "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh" \-> "https://cache.nixos.org/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo"
+
+test "an unsigned narinfo is untrusted unless content-addressed"
+  info = info_of "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a" (&[])
+  assert! \-> !(trusted (&[]) (&info))
+  assert! \-> trusted (&[]) (&NarInfo { ca = Some (.to_string "fixed:r:sha256:x"), ...info })
