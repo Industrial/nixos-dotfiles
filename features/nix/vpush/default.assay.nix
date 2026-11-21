@@ -21,6 +21,9 @@ let
   sc = service.serviceConfig;
   exec = sc.ExecStart;
   has = s: lib.hasInfix s exec;
+  # The built hook script (a shell script in the store, the artifact itself, not Nix source).
+  hookPath = cfg.nix.settings.post-build-hook;
+  hookScript = builtins.readFile hookPath;
 
   failedAssertions = c: map (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
 
@@ -46,8 +49,8 @@ in
     # The hook: vpush's spooler, behind a wrapper that always exits 0.
     setsThePostBuildHook = assay.eq (builtins.match "/nix/store/[a-z0-9]+-vpush-post-build-hook" (toString cfg.nix.settings.post-build-hook) != null) true;
     hookNeverFailsTheBuild =
-      assay.eq (lib.hasInfix "\nexit 0" (builtins.readFile cfg.nix.settings.post-build-hook)) true;
-    hookSpoolsIntoTheStateDir = assay.eq (lib.hasInfix "vpush hook --spool /var/lib/vpush/spool" (builtins.readFile cfg.nix.settings.post-build-hook)) true;
+      assay.eq (lib.hasInfix "\nexit 0" hookScript) true;
+    hookSpoolsIntoTheStateDir = assay.eq (lib.hasInfix "vpush hook --spool /var/lib/vpush/spool" hookScript) true;
 
     # The daemon: the installed binary, draining the same spool, to the fleet cache.
     runsTheInstalledBinary = assay.eq (builtins.match "/nix/store/[a-z0-9]+-vpush-[^/]+/bin/vpush daemon .*" exec != null) true;
