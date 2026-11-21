@@ -29,6 +29,10 @@
     features.nixos.sound.enable = true;
     features.nixos.users.enable = true;
 
+    # Substitute from the fleet's vcache servers (common/fleet.nix binaryCaches) first.
+    # Rollback: features.nix.vcache.client.enable = lib.mkForce false;
+    features.nix.vcache.client.enable = true;
+
     # Performance Optimization
     features.performance.environment.enable = true;
     features.performance.hardware.enable = true;

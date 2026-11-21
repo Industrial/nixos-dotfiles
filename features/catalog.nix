@@ -144,6 +144,9 @@
   ./network/firefox
   ./network/searx
 
+  # nix
+  ./nix/vcache/client.nix
+
   # nixos
   ./nixos
   ./nixos/auto-update

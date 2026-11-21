@@ -14,6 +14,18 @@ let
   ns = cfg.nix.settings;
   # NixOS itself also contributes cache.nixos.org; what matters is the set that is trusted.
   asSet = l: lib.sort lib.lessThan (lib.unique (map (lib.removeSuffix "/") l));
+
+  # The three upstream caches. Every host also carries features/nix/vcache/client.nix
+  # (profiles/base.nix), which adds the fleet's vcache servers from common/fleet.nix:
+  # the trust set on a host is exactly these three plus those, nothing else.
+  upstream = ["https://cache.nixos.org" "https://devenv.cachix.org" "https://nix-community.cachix.org"];
+  upstreamKeys = [
+    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw="
+    "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+  ];
+  fleet = import ../../common/fleet.nix;
+  withClient = (nixos.evalSystem {modules = [./default.nix ../nix/vcache/client.nix];}).config.nix.settings;
 in
   assay.suite "nixos" {
     # Pre-generated, so pressure-vessel/steamrt does not regenerate locales per game launch.
@@ -22,16 +34,13 @@ in
     stateVersionFromSettings = assay.eq cfg.system.stateVersion nixos.defaultSettings.stateVersion;
     hostPlatformFromSettings = assay.eq cfg.nixpkgs.hostPlatform.system nixos.defaultSettings.hostPlatform.system;
 
-    substitutersAreExactlyTheThreeCaches =
-      assay.eq (asSet ns.substituters)
-      ["https://cache.nixos.org" "https://devenv.cachix.org" "https://nix-community.cachix.org"];
-    trustsExactlyTheThreeCacheKeys =
-      assay.eq (asSet ns.trusted-public-keys)
-      [
-        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-        "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw="
-        "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-      ];
+    substitutersAreExactlyTheThreeUpstreamCaches = assay.eq (asSet ns.substituters) upstream;
+    trustsExactlyTheThreeUpstreamKeys = assay.eq (asSet ns.trusted-public-keys) upstreamKeys;
+    # Exactly 3 + N with the fleet client: the upstream caches and fleet.nix's vcache servers.
+    withFleetCachesSubstitutersAreExactlyUpstreamPlusVcache =
+      assay.eq (asSet withClient.substituters) (asSet (upstream ++ map (c: c.url) fleet.binaryCaches));
+    withFleetCachesTrustsExactlyUpstreamPlusVcacheKeys =
+      assay.eq (asSet withClient.trusted-public-keys) (asSet (upstreamKeys ++ map (c: c.publicKey) fleet.binaryCaches));
     buildsAreSandboxed = assay.eq ns.sandbox true;
     flakesEnabled = assay.eq ns.experimental-features ["nix-command" "flakes"];
     # Big builds go to disk, not the tmpfs /tmp.
