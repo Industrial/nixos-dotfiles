@@ -302,11 +302,9 @@ export data Scripted
 
 pushed : Arc<Mutex<Vec<String>>> -> String -> Effect<(), DeployError, HNil>
 pushed log item =
-  case log.lock () of
-    Ok held ->
-      mut v = held
-      v.push item
-    Err _ -> ()
+  if log.lock () is Ok held
+    mut v = held
+    v.push item
   succeed (())
 
 export sha_of_drv : &str -> String

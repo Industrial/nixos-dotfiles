@@ -82,18 +82,15 @@ describe path branch c =
 export git_cmd : &Dotfiles -> &[&str] -> Cmd
 git_cmd d args =
   mut all = Vec::new () : Vec<String>
-  case &d.user of
-    Some u ->
-      all.push (.to_string "--reuid")
-      all.push (u.clone ())
-      all.push (.to_string "--regid")
-      all.push (d.group.clone () |> .unwrap_or_else (\-> .to_string "users"))
-      all.push (.to_string "--init-groups")
-      all.push (.to_string "env")
-      all.push ("HOME=#{d.home.clone ().unwrap_or_else (\-> home_of (&d.path))}")
-      all.push (d.git.clone ())
-    None ->
-      ()
+  if &d.user is Some u
+    all.push (.to_string "--reuid")
+    all.push (u.clone ())
+    all.push (.to_string "--regid")
+    all.push (d.group.clone () |> .unwrap_or_else (\-> .to_string "users"))
+    all.push (.to_string "--init-groups")
+    all.push (.to_string "env")
+    all.push ("HOME=#{d.home.clone ().unwrap_or_else (\-> home_of (&d.path))}")
+    all.push (d.git.clone ())
   -- The checkout may be someone's working tree: never take the index lock just to
   -- look (`git status` would otherwise refresh and rewrite the index).
   all.push (.to_string "--no-optional-locks")
