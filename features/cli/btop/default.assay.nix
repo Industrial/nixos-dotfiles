@@ -26,7 +26,7 @@ let
 
   theme = mod.environment.etc."btop/themes/stylix.theme".source;
   conf = mod.environment.etc."btop/btop.conf".source;
-  activation = mod.system.activationScripts.linkBtopConfig.text;
+  activation = mod.vfiles.legacy.linkBtopConfig.text;
 
   lines = s: builtins.filter builtins.isString (builtins.split "\n" s);
   # `theme[key]="#rrggbb"` -- the only shape btop's own theme files use.
@@ -88,7 +88,7 @@ in
 
     # `linkFile` belongs to alacritty; a second definition collides on eval.
     doesNotClaimGenericLinkFile =
-      assay.eq (mod.system.activationScripts ? linkFile) false;
+      assay.eq (mod.vfiles.legacy ? linkFile) false;
     # A writable copy rather than a store symlink, because btop rewrites its whole config on
     # exit and a read-only path would make every quit an error. `install`, not `ln -sf`.
     installsConfigAsWritableCopy =
@@ -107,4 +107,11 @@ in
         activation
         != null)
       true;
+
+    # vfiles (GH-188): the same writable copy, owned by the user, restored on every switch
+    # even though btop rewrote it (force), so it is never reported as a hand edit.
+    vfilesCopiesTheConfig = let
+      f = mod.vfiles.files."/home/alice/.config/btop/btop.conf";
+    in
+      assay.eq [f.mode f.force f.user (f.source == conf)] ["copy" true "alice" true];
   }

@@ -3,7 +3,16 @@
   settings,
   pkgs,
   ...
-}: {
+}: let
+  yaziToml = pkgs.writeTextFile {
+    name = "yazi.toml";
+    text = builtins.readFile ./yazi.toml;
+  };
+  keymapToml = pkgs.writeTextFile {
+    name = "keymap.toml";
+    text = builtins.readFile ./keymap.toml;
+  };
+in {
   environment.systemPackages = with pkgs; [
     # nixpkgs' yazi is a wrapper that already prefixes yazi's PATH with every
     # preview companion its own preset config spawns: file, jq, poppler-utils
@@ -25,20 +34,26 @@
     (yazi.override {extraPackages = [exiftool];})
   ];
 
-  # Activation script names share one namespace across every feature, so this
-  # one is named for its feature rather than the generic `linkFile`, which
-  # features/window-manager/alacritty already defines.
-  system.activationScripts.linkYaziConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  vfiles.files = {
+    "${settings.userdir}/.config/yazi/yazi.toml" = {
+      source = yaziToml;
+      user = settings.username;
+    };
+    "${settings.userdir}/.config/yazi/keymap.toml" = {
+      source = keymapToml;
+      user = settings.username;
+    };
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  # Named for this feature: legacy names become activation script names, one namespace.
+  vfiles.legacy.linkYaziConfig = {
     text = ''
       mkdir -p ${settings.userdir}/.config/yazi
-      ln -sf ${pkgs.writeTextFile {
-        name = "yazi.toml";
-        text = builtins.readFile ./yazi.toml;
-      }} ${settings.userdir}/.config/yazi/yazi.toml
-      ln -sf ${pkgs.writeTextFile {
-        name = "keymap.toml";
-        text = builtins.readFile ./keymap.toml;
-      }} ${settings.userdir}/.config/yazi/keymap.toml
+      ln -sf ${yaziToml} ${settings.userdir}/.config/yazi/yazi.toml
+      ln -sf ${keymapToml} ${settings.userdir}/.config/yazi/keymap.toml
     '';
   };
 }
