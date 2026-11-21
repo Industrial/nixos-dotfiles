@@ -71,7 +71,8 @@
 in {
   # A live switch moves nix-daemon.socket only if something restarts it; this does,
   # on the way in and (being outside features/, so ungated) on the way back out.
-  imports = [../../../common/nix-daemon-listen.nix];
+  # ./conformance.nix: the native answers checked against the daemon's (#183), off by default.
+  imports = [../../../common/nix-daemon-listen.nix ./conformance.nix];
 
   environment.systemPackages = [proxy];
 

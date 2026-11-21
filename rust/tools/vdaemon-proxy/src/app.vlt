@@ -9,10 +9,14 @@
 
 import std::os::fd::FromRawFd
 import std::os::unix::fs::PermissionsExt
-import id_effect::{Effect, HNil, effect, fail, succeed, suspend}
+import std::sync::Arc
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, Schedule, effect, fail, succeed, suspend}
 import id_effect_config::{Config, ConfigEnv, ConfigError}
 import crate::policy::allow_all
 import crate::proxy::{ProxyError, Settings, serve}
+import crate::conform::{Checker, new_checker, totals_line, write_metrics}
+import crate::record::emit
 
 export const DEFAULT_UPSTREAM : &str = "/nix/var/nix/daemon-socket-upstream/socket"
 
@@ -32,6 +36,76 @@ export data Paths { export listen String, export upstream String }
 export paths_config : Config<Paths>
 paths_config =
   Config::all ((Config::string "VDAEMON_LISTEN" |> .with_default (DEFAULT_LISTEN.to_string ()), Config::string "VDAEMON_UPSTREAM" |> .with_default (DEFAULT_UPSTREAM.to_string ()))) |> .map paths_of
+
+-- Conformance mode (crate::conform): VDAEMON_CONFORMANCE=1 turns it on (off by
+-- default); VDAEMON_DB is the store database it reads; VDAEMON_METRICS, when
+-- set, the Prometheus textfile its counters are written to.
+export data Conformance { export on bool, export db String, export metrics Option<String> }
+  deriving (Clone, Debug)
+
+export const DEFAULT_DB : &str = "/nix/var/nix/db/db.sqlite"
+
+-- How often the totals are logged and the textfile rewritten (and at once
+-- after every difference).
+const TOTALS_EVERY_S : u64 = 30
+
+export conformance_config : Config<Conformance>
+conformance_config =
+  Config::all ((Config::string "VDAEMON_CONFORMANCE" |> .with_default (.to_string "0"), Config::string "VDAEMON_DB" |> .with_default (DEFAULT_DB.to_string ()), Config::string "VDAEMON_METRICS" |> .with_default (String::new ()))) |> .map conformance_of
+
+conformance_of : (String, String, String) -> Conformance
+conformance_of fields =
+  (flag, db, metrics) = fields
+  Conformance { on = switched_on (&flag), db, metrics = Some metrics |> .filter (\m -> !m.is_empty ()) }
+
+export switched_on : &str -> bool
+switched_on flag =
+  case flag.trim ().to_ascii_lowercase ().as_str () of
+    "1" -> true
+    "on" -> true
+    "true" -> true
+    "yes" -> true
+    _ -> false
+
+checker_of : &Conformance -> Option<Arc<Checker>>
+checker_of c =
+  if c.on
+    Some (Arc::new (new_checker (c.db.clone ()) (c.metrics.clone ())))
+  else
+    None
+
+report_now : Arc<Checker> -> ()
+report_now c =
+  emit (totals_line (&c))
+  if write_metrics (&c) is Err e
+    eprintln! \-> "vdaemon-proxy: writing the conformance metrics: #{e}"
+  ()
+
+report_once : Arc<Checker> -> Effect<(), ProxyError, HNil>
+report_once c = suspend (move \-> reported c)
+
+reported : given <E: Send + 'static> Arc<Checker> -> Effect<(), E, HNil>
+reported c =
+  report_now c
+  succeed (())
+
+-- The totals, now and then every TOTALS_EVERY_S, until interrupted.
+export reporter : Arc<Checker> -> Effect<(), ProxyError, HNil>
+reporter c =
+  Effect::repeat (move \-> report_once (Arc::clone (&c))) (Schedule::spaced (Duration::from_secs TOTALS_EVERY_S)) |> .map (\_ -> ())
+
+-- The proxy, with the reporter beside it in conformance mode.
+serving : tokio::net::UnixListener -> Settings -> Effect<(), ProxyError, HNil>
+serving listener settings =
+  case settings.checker.clone () of
+    Some c ->
+      last = Arc::clone (&c)
+      serve listener settings |> .race_first (reporter c) |> .ensuring (final_report last)
+    None -> serve listener settings
+
+-- The totals once more as the proxy stops, however it stops.
+final_report : Arc<Checker> -> Effect<(), Never, HNil>
+final_report c = suspend (move \-> reported c)
 
 paths_of : (String, String) -> Paths
 paths_of fields =
@@ -88,10 +162,11 @@ export program : Effect<(), AppError, ConfigEnv>
 program =
   effect!
     let paths = ~paths_config().run::<Paths, AppError, ConfigEnv, _>();
+    let conformance = ~conformance_config().run::<Conformance, AppError, ConfigEnv, _>();
     let listener = ~listen(paths.clone());
-    let settings = Settings { upstream: paths.upstream.clone(), policy: allow_all() };
-    eprintln!("vdaemon-proxy: relaying {} to {} (policy: allow all)", if socket_activated() { "systemd's socket".to_string() } else { paths.listen.clone() }, paths.upstream);
-    ~serve(listener, settings).map_err(AppError::from)
+    let settings = Settings { upstream: paths.upstream.clone(), policy: allow_all(), checker: checker_of(&conformance) };
+    eprintln!("vdaemon-proxy: relaying {} to {} (policy: allow all; conformance: {})", if socket_activated() { "systemd's socket".to_string() } else { paths.listen.clone() }, paths.upstream, if conformance.on { format!("on, against {}", conformance.db) } else { "off".to_string() });
+    ~serving(listener, settings).map_err(AppError::from)
 
 -- On a fiber of the runtime's executor: `run_main` polls its root fiber on
 -- the calling thread, outside the tokio context the sockets need, so the

@@ -23,7 +23,12 @@ libc = "0.2"
 # The worker protocol's grammar (nix_store_core::worker). default.nix roots its
 # source at rust/tools so the path resolves.
 nix-store-core = { path = "../nix-store-core" }
+# Native answers (src/native.vlt, src/conform.vlt): the store database, read-only,
+# through nix-store-core's own rusqlite (bundled SQLite), and the SHA-256 of a NAR
+# as the daemon streams it. Both are already in nix-store-core's tree.
+rusqlite = { version = "0.37", features = ["bundled"] }
 serde_json = "1"
+sha2 = "0.10"
 tokio = { version = "1", features = ["io-util", "net"] }
 
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
