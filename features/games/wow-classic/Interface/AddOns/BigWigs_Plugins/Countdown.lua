@@ -88,7 +88,7 @@ local function updateProfile()
 	if db.outline ~= "NONE" and db.outline ~= "OUTLINE" and db.outline ~= "THICKOUTLINE" then
 		db.outline = plugin.defaultDB.outline
 	end
-	if db.fontSize < 20 or db.fontSize > 200 then
+	if db.fontSize < 20 or db.fontSize > 200 or math.floor(db.fontSize+0.5) ~= db.fontSize then
 		db.fontSize = plugin.defaultDB.fontSize
 	end
 	if type(db.fontColor.r) ~= "number" or db.fontColor.r < 0 or db.fontColor.r > 1
@@ -454,6 +454,26 @@ do
 							plugin.db.profile.position[4] = value
 							countdownAnchor:RefixPosition()
 						end,
+					},
+					resetHeader = {
+						type = "header",
+						name = "",
+						order = 3,
+					},
+					reset = {
+						type = "execute",
+						name = L.reset,
+						desc = L.resetDesc,
+						func = function()
+							plugin.db.profile.position = {
+								plugin.defaultDB.position[1],
+								plugin.defaultDB.position[2],
+								plugin.defaultDB.position[3],
+								plugin.defaultDB.position[4],
+							}
+							updateProfile()
+						end,
+						order = 4,
 					},
 				},
 			},

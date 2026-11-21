@@ -485,7 +485,7 @@ function ShoppingList.BuildModel(list)
         -- only a recipe the owner of the list knows: another character crafts it, not this one
         local sub
         for _, known in ipairs(AM.ProfessionScanner.GetRecipes(itemId)) do
-          if AM.RecipeCost.IsCraftedBy(known, list.guid) then
+          if not known.cooldown and AM.RecipeCost.IsCraftedBy(known, list.guid) then
             sub = known
             break
           end

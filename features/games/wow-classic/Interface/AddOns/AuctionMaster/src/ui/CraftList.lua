@@ -124,6 +124,13 @@ local function InsertCategory(page, dataProvider, category, title, entries, fold
   end
 end
 
+-- Whether the game's gamepad interface is on. Our categories are left out then: the recipes in them are copies written
+-- by the addon, and the selected one is what the game's craft reads, so a craft started without a hardware event (the
+-- gamepad's held Create runs from a timer) is blocked as tainted. The same goes for our guard on the sort comparator.
+local function IsGamepadUI()
+  return InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() or false
+end
+
 -- Puts the categories into the list of the page again, as the shopping list and the profession are now. Called whenever
 -- the game fills the list and whenever the shopping list or the prices change.
 function CraftList.Update()
@@ -136,7 +143,7 @@ function CraftList.Update()
   local levelingFolded, levelingSelected = RemoveCategory(page, dataProvider, LEVELING)
   local selected = shoppingSelected or levelingSelected
   -- not while searching, then the game shows the matches without categories, and not for the recipes of someone else
-  if page.RecipeList.SearchBox:HasText() or not ShoppingList.IsOwnCrafting() then
+  if page.RecipeList.SearchBox:HasText() or not ShoppingList.IsOwnCrafting() or IsGamepadUI() then
     return
   end
   local order, amounts = ReadPlan()

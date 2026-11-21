@@ -1,7 +1,6 @@
 # Auctionator
 
-## [347](https://github.com/TheMouseNest/Auctionator/tree/347) (2026-11-14)
-[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/346...347) 
+## [349](https://github.com/TheMouseNest/Auctionator/tree/349) (2026-11-18)
+[Full Changelog](https://github.com/TheMouseNest/Auctionator/compare/348...349) 
 
-- Forever: Fix black market skewing crafting prices  
-- Attempt to fix undercut scan cancelling errors  
+- Forever: Auto-import from existing ruleset with faction shift in price database  

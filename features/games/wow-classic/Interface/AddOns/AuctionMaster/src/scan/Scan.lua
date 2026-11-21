@@ -13,8 +13,9 @@ local Scan = AM.Scan
 -- set once the items were read and stored, to the time that scan was started.
 --
 -- The response of a busy auction house can take a while (seen: about 1 s on Forever, 17 s for 250000 auctions on
--- Retail), but sometimes it never comes: the first call after a long break has been seen to get no answer, and such a
--- lost call still counts for the 15 minutes, every call before they are over is ignored. After ResponseTimeout()
+-- Retail), but sometimes it never comes: a call a few seconds after an opening, in the first scan after a login, has been seen to get
+-- no answer (see LOGIN_OPEN_DELAY), and such a lost call still counts for the 15 minutes, every call before they are
+-- over is ignored. After ResponseTimeout()
 -- seconds the scan is reported as not answered and stops showing as running, but it keeps listening: an answer that
 -- arrives later is still used, with a message. The 15 minutes stay counted from the lost call; there is no retry of
 -- its own, the scan button (AM.ScanButton) shows when the next scan is possible.
@@ -25,6 +26,17 @@ local THROTTLE_SECONDS = 15 * 60
 local READY_WAIT = 30
 local READY_POLL = 0.5
 local READY_SETTLE = 1
+
+-- The first scan after a login (not after a /reload): calls 2.0 s and 3.7 s after the auction house opened got no
+-- answer and still counted for the 15 minutes, also when it had been opened and closed before; calls 15 s and more
+-- after the opening worked (doc/notes/scan_failure.md). So until the first call after a login is sent, the call waits
+-- until LOGIN_OPEN_DELAY seconds after the current opening; later scans do not wait.
+-- 5 s is a first value above the one failure: raise it when a call at 5 s is seen to get no answer.
+local LOGIN_OPEN_DELAY = 5
+
+-- The progress of a running scan moves by time up to WAIT_PERCENT until the server has answered, then by the auctions
+-- read (see Scan.Percent).
+local WAIT_PERCENT = 50
 
 -- A full scan can contain a hundred thousand auctions, so they are read in slices spread over several frames to not
 -- freeze the game: a slice ends once it has used this many milliseconds (checked every CHECK_EVERY auctions), so the
@@ -39,7 +51,13 @@ local scanId = 0
 local startTime = nil
 local readCount, readTotal = 0, 0 -- auctions read so far and in all, while READING
 local requestedAt = nil -- time() of the last ReplicateItems call
+local loadedAt = GetTime() -- when this file loaded, about the login or reload (debug log only)
 local manual = false -- the player started the running scan (a click), not the addon by itself: see AM.Chat
+local sent = false -- the running scan has called ReplicateItems
+local expectedAt = nil -- GetTime() at which the answer of the running scan is expected, for its progress
+local loginPending = false -- a login was seen and no scan has called ReplicateItems since
+local notBefore = 0 -- GetTime() before which no call is sent: LOGIN_OPEN_DELAY after the opening of the first scan after a login
+local shownAt, loginAt = nil, nil -- GetTime() of the last opening of the auction house and of the login (debug log only)
 
 local events = CreateFrame("Frame")
 local loadEvents = CreateFrame("Frame") -- listens for item data only while a scan waits for it
@@ -404,20 +422,31 @@ function Scan.GetProgress()
   end
 end
 
--- The progress shown for a running scan, 1 to 99: 1 while it waits for the server, then the share of the auctions read
--- (nil read: not answered yet). It stays at 99 until the scan is stored, as the item data can take a while after that.
-function Scan.Percent(read, total)
-  if not read or not total or total <= 0 then
+-- The progress shown for a running scan, 1 to 99. Until the server has answered (read nil) it moves by time from 1 to
+-- WAIT_PERCENT, over the seconds the answer is expected to take (waited of expected), and stays there when it takes
+-- longer: it never shows more than is known. Then the share of the auctions read moves it on from WAIT_PERCENT; it stays
+-- at 99 until the scan is stored, as the item data can take a while after that.
+function Scan.Percent(read, total, waited, expected)
+  if read and total and total > 0 then
+    return math.min(99, WAIT_PERCENT + math.floor(read / total * (100 - WAIT_PERCENT)))
+  end
+  if not waited or not expected or expected <= 0 then
     return 1
   end
-  return math.max(1, math.min(99, math.floor(read / total * 100)))
+  return math.max(1, math.min(WAIT_PERCENT, math.floor(1 + waited / expected * (WAIT_PERCENT - 1))))
 end
 
 -- The progress of the running scan in percent (see Scan.Percent), nil if none runs.
 function Scan.GetPercent()
   if Scan.IsRunning() then
-    return Scan.Percent(Scan.GetProgress())
+    local read, total = Scan.GetProgress()
+    return Scan.Percent(read, total, GetTime() - startTime, expectedAt - startTime)
   end
+end
+
+-- True while a scan is started but has not asked the server yet (it waits for the auction house to be ready).
+function Scan.IsPreparing()
+  return state == WAITING and not sent
 end
 
 -- True while the last call got no answer within the timeout (a late answer is still used).
@@ -455,6 +484,16 @@ local function ResponseTimeout()
   return AM.Client.IsForever() and 20 or 40
 end
 
+-- The usual seconds from the call to the answer, for the progress while it waits (see the top of the file).
+local function AnswerSeconds()
+  return AM.Client.IsForever() and 1.5 or 15
+end
+
+-- "12.3 s" since the given GetTime(), "unknown" without one (debug log).
+local function Since(at)
+  return at and string.format("%.1f s", GetTime() - at) or "unknown"
+end
+
 local function OnTimeout()
   state = TIMED_OUT
   AM.DebugLog.Log("scan", "no response within %d seconds", ResponseTimeout())
@@ -479,8 +518,12 @@ function Scan.Start(isManual)
   state = WAITING
   scanId = scanId + 1
   startTime = GetTime()
+  sent = false
+  local hold = math.max(0, notBefore - startTime)
+  expectedAt = startTime + hold + READY_SETTLE + AnswerSeconds()
 
-  AM.DebugLog.Log("scan", "started")
+  AM.DebugLog.Log("scan", "started by %s, %.1f s to wait for the first scan after the login",
+    manual and "a click" or "the addon", hold)
   AM.Portrait.StartAnimate()
   events:RegisterEvent("REPLICATE_ITEM_LIST_UPDATE")
   events:RegisterEvent("AUCTION_HOUSE_CLOSED")
@@ -496,6 +539,11 @@ function Scan.Start(isManual)
     if id ~= scanId or state ~= WAITING then
       return
     end
+    local hold = notBefore - GetTime()
+    if hold > 0 then
+      C_Timer.After(hold, Send)
+      return
+    end
     local ready = C_AuctionHouse.IsThrottledMessageSystemReady()
     if waited < READY_WAIT and (not ready or not settled) then
       -- a pause after the first ready, and again after the system was busy once more in it
@@ -506,6 +554,17 @@ function Scan.Start(isManual)
       return
     end
     AM.DebugLog.Log("scan", "requesting the list after %.1f s, message system ready: %s", waited, tostring(ready))
+    if AM.DebugLog.IsEnabled() then
+      -- for comparing failed and working scans: how long ago the last call was (the server allows one per 15 minutes)
+      local last = GetState().lastScan
+      local success = Scan.GetLastSuccess()
+      AM.DebugLog.Log("scan", "call context: last call %s ago, last success %s ago, %.0f s since the addon loaded, %.1f s since the scan started, %s since the auction house opened, %s since the login",
+        last and string.format("%d s", time() - last) or "never",
+        success and string.format("%d s", time() - success) or "never", GetTime() - loadedAt, GetTime() - startTime,
+        Since(shownAt), Since(loginAt))
+    end
+    sent = true
+    loginPending = false
     requestedAt = time()
     GetState().lastScan = requestedAt
     C_AuctionHouse.ReplicateItems()
@@ -518,16 +577,27 @@ function Scan.Start(isManual)
   Send()
 end
 
--- The automatic scan waits AUTO_DELAY seconds after the auction house opened: a call sent sooner has been seen to get
--- no answer, while a click some seconds later worked. It is dropped when the auction house was closed in that time,
--- or opened again (that opening waits for itself: openId).
+-- The automatic scan starts AUTO_DELAY seconds after the auction house opened (its call may wait longer for the first
+-- scan after a login: LOGIN_OPEN_DELAY). It is dropped when the auction house was closed in that time, or opened
+-- again (that opening waits for itself: openId).
 local AUTO_DELAY = 2
 local openId = 0
 
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:RegisterEvent("AUCTION_HOUSE_SHOW")
-events:SetScript("OnEvent", function(_, event)
-  if event == "AUCTION_HOUSE_SHOW" then
+events:SetScript("OnEvent", function(_, event, isInitialLogin)
+  if event == "PLAYER_ENTERING_WORLD" then
+    -- a real login only, not a /reload or a loading screen
+    if isInitialLogin then
+      loginAt = GetTime()
+      loginPending = true
+    end
+  elseif event == "AUCTION_HOUSE_SHOW" then
     openId = openId + 1
+    shownAt = GetTime()
+    if loginPending then
+      notBefore = shownAt + LOGIN_OPEN_DELAY
+    end
     if Scan.IsAutoEnabled() then
       local id = openId
       C_Timer.After(AUTO_DELAY, function()

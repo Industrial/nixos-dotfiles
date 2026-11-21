@@ -1,16 +1,19 @@
-# QuestieDB 1.1.2
+# QuestieDB 1.1.3
 
 ### Quest fixes
 
-- [Forever] Update quest XP data ([BreakBB](https://github.com/Questie/QuestieDB/commit/4588c4426bf7a3faaf6a9e0033a67d33887341c9))
+- Fix Raene's Cleansing quests ([Cabro](https://github.com/Questie/QuestieDB/commit/996cea9bc5aae3d410cee5a193dc1d08904d1e1f))
+- [Forever] Update quest XP data ([BreakBB](https://github.com/Questie/QuestieDB/commit/d85f6e1874687049573d8c8156575dd887705c5b))
+- [Forever] require Neutral reputation for "Buying Friendship" quests ([babyhuey](https://github.com/Questie/QuestieDB/commit/4a73dc6513f05714101cfc93eda147947b75574a), [Claude Sonnet 5.5](https://github.com/Questie/QuestieDB/commit/4a73dc6513f05714101cfc93eda147947b75574a))
 
 ### Database fixes
 
-- Add Powderfuse faction ([Cabro](https://github.com/Questie/QuestieDB/commit/a14b129bbd953bbc68523519ccd8b149acdd52c9))
-- [Forever] Update quests, NPCs, objects and items data ([BreakBB](https://github.com/Questie/QuestieDB/commit/760c4f96d53d24447fffd99ec962c0b98a5f1f7e))
+- Update race required for Stalk With The Earthmother quests ([Cabro](https://github.com/Questie/QuestieDB/commit/000495c2198ce12ea27ba5271d018c7382faf512))
+- [Forever] Fix location of "Image of Archmage Modera" ([BreakBB](https://github.com/Questie/QuestieDB/commit/e97375f66ce21e4c8da092660e669e727a77b99f))
+- [Forever] Update quests, NPCs, objects and items data ([BreakBB](https://github.com/Questie/QuestieDB/commit/405d648da766edf487ba2c1e3a9d23b1fde633e1))
 
 ### Localization fixes
 
-- [Forever] Update all translations ([BreakBB](https://github.com/Questie/QuestieDB/commit/f58a56f5ab10546cd541bafa01c6ca24671c89cf))
+- [Forever] Update all translations ([BreakBB](https://github.com/Questie/QuestieDB/commit/45264013cca3c4db6fcfb0c169d1e6bf7066030d))
 
-[All changes since v1.1.1](https://github.com/Questie/QuestieDB/compare/v1.1.1..e1652ce62113c152da682baf2d6fb85f1396bcfb)
+[All changes since v1.1.2](https://github.com/Questie/QuestieDB/compare/v1.1.2..8b8df2dc12a34e2eb82bc7105b40405dce1c01f7)

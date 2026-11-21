@@ -45,7 +45,8 @@ end
 
 -----------------------------------------
 local function IsNotCommon( itemRarity )
-  return itemRarity == Enum.ItemQuality.Good or
+  return Enum.ItemQuality.Good and itemRarity == Enum.ItemQuality.Good or
+    itemRarity == Enum.ItemQuality.Uncommon or
     itemRarity == Enum.ItemQuality.Rare or
     itemRarity == Enum.ItemQuality.Epic
 end
@@ -78,7 +79,7 @@ end
 
 function Auctionator.Enchant.DisenchantStatus(itemInfo)
   return {
-    isDisenchantable = IsDisenchantableItemType(itemInfo[12]),
+    isDisenchantable = IsDisenchantableItemType(itemInfo[12]) and IsNotCommon(itemInfo[3]),
     supportedXpac = true,
   }
 end

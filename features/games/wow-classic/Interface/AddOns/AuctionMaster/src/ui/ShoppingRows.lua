@@ -252,7 +252,7 @@ end
 
 -- "Vendor <price>   Auction <price>" for one item, only with the prices that are known, nil if there is none.
 local function GetPriceText(itemId)
-  local vendor = AM.MerchantScanner.GetPrice(itemId) or AM.VendorItems.GetPrice(itemId)
+  local vendor = AM.RecipeCost.GetVendorPrice(itemId)
   local itemDbKey = AM.ItemDbKey.ForItem(itemId)
   local lowest = itemDbKey and AM.ItemStore.Get(itemDbKey)
   if not vendor and not lowest then

@@ -19,8 +19,8 @@ local GAP = 6
 local ROW_HEIGHT = 34
 local ICON_SIZE = 26
 local TOTAL_WIDTH = 100
-local FOOTER_HEIGHT = 22
-local FOOTER_PAD = 0 -- below the footer: as in the auction house, the buttons fill the narrow strip below the list
+local FOOTER_HEIGHT = 20 -- the strip below the list with the value and the scan button, as narrow as the auction house's
+local HISTORY_BOTTOM = 19 -- the item's history (SellHistory) sits below the footer and ends level with the auction house's list
 local SELL_PRICE_INDEX = 11
 local HOLD_BELOW = 0.7 -- the price to post at is less than this share of the market value: hold the item
 local SCAN_PADDING = 10
@@ -43,6 +43,9 @@ local dismissed = false -- closed by the player, until the sell view is entered 
 local refreshPending = false
 local settling = false -- the full scan just ended
 local rowOrder -- itemDbKey -> place in the list as last sorted
+-- The player clicked a row: the rows keep their places until the sell view is entered again or a scan starts, so the
+-- item clicked (whose search changes its hint) and its neighbours do not jump away while the player works down the list.
+local holdOrder = false
 local entries = {} -- as of the last redraw, what the scan button searches
 local keepVersion, keepItems = -1, {} -- reagents of recipes that pay, as of the recipe list version
 local loggedRows = {} -- itemDbKey -> the debug log line last written for its row
@@ -243,8 +246,9 @@ local function BuildEntries()
       end
     end
   end
-  -- While the scan runs the rows keep their places, so they do not jump around as the hints come in.
-  local frozen = AM.SellScan.IsRunning() and rowOrder
+  -- While the scan runs the rows keep their places, so they do not jump around as the hints come in; also after a
+  -- click on a row (holdOrder).
+  local frozen = (AM.SellScan.IsRunning() or holdOrder) and rowOrder
   if frozen then
     table.sort(entries, function(a, b)
       local indexA, indexB = frozen[a.itemDbKey] or math.huge, frozen[b.itemDbKey] or math.huge
@@ -327,6 +331,7 @@ local function CreateRow(parent)
     end
     local house = AuctionHouseFrame
     if self.entry and house and house.SetPostItem then
+      holdOrder = true
       house:SetPostItem(self.entry.location)
       -- the game offers the one stack selected, the quantity is everything there is of the item
       for _, name in ipairs({ "ItemSellFrame", "CommoditiesSellFrame" }) do
@@ -418,7 +423,10 @@ local function SetupRow(row, item, index)
   -- four digits do not fit on the icon
   row.count:SetText(entry.count >= 1000 and math.floor(entry.count / 1000) .. "k" or entry.count > 1 and entry.count or "")
   row.total:SetText(entry.total and AM.FormatMoney(entry.total) or Widgets.Color(UI.muted, "--"))
-  row.each:SetText(entry.net and AM.FormatMoney(entry.net) or Widgets.Color(UI.muted, "--"))
+  -- with how well the item sold so far (the ledger)
+  local rate = AM.SellHistory.GetSellRate(entry.itemDbKey)
+  row.each:SetText((entry.net and AM.FormatMoney(entry.net) or Widgets.Color(UI.muted, "--"))
+    .. (rate and Widgets.Color(UI.muted, " · " .. L["SELL_RATE_SHORT"]:format(math.floor(rate * 100 + 0.5))) or ""))
   row.tip:SetText(entry.tip and Widgets.Color(TIP_COLOR[entry.tip], L[TIP_TEXT[entry.tip]]) or "")
   row.hover.Fit(row.icon)
 end
@@ -455,6 +463,7 @@ local function Refresh()
     sum = sum + (entry.total or 0)
   end
   ui.list.SetItems(items)
+  AM.SellHistory.Show(posted)
   ui.empty:SetText(busy and L["SELL_BUSY"] or #entries == 0 and L["SELL_EMPTY"] or "")
   ui.total:SetText(Widgets.Color(UI.gold, L["SELL_TOTAL"]) .. " " .. (sum > 0 and AM.FormatMoney(sum) or "--"))
   UpdateScanButton()
@@ -471,23 +480,27 @@ local function Create()
   end, true)
   local body = ui.attachment.body
 
+  -- the history of the item in the sell form at the bottom; the footer belongs to the list above it
+  local footer = AM.SellHistory.Create(body, HISTORY_BOTTOM)
+
   ui.scan = Widgets.CreateButton(body, "", false, function()
     -- searches the items without a current price, all of them once every one has one
+    holdOrder = false
     AM.SellScan.Start(entries, AM.SellScan.IsDone(entries))
   end)
-  ui.scan:SetPoint("BOTTOMRIGHT", -PADDING, FOOTER_PAD - 1)
+  ui.scan:SetPoint("BOTTOMRIGHT", -PADDING, footer) -- 2 below the list
   ui.scan:SetHeight(FOOTER_HEIGHT - 2)
   Widgets.SetTooltip(ui.scan, L["SELL_SCAN_TOOLTIP"])
 
   ui.total = Widgets.CreateText(body, "GameFontHighlightSmall")
-  ui.total:SetPoint("LEFT", body, "BOTTOMLEFT", PADDING, FOOTER_PAD + FOOTER_HEIGHT / 2 - 2)
+  ui.total:SetPoint("LEFT", body, "BOTTOMLEFT", PADDING, footer + FOOTER_HEIGHT / 2)
   ui.total:SetPoint("RIGHT", ui.scan, "LEFT", -GAP, 0)
   ui.total:SetJustifyH("LEFT")
 
   -- along the top of the footer while the scan runs
   ui.progress = Widgets.CreateProgressBar(body, 4, true)
-  ui.progress:SetPoint("BOTTOMLEFT", PADDING, FOOTER_PAD + FOOTER_HEIGHT)
-  ui.progress:SetPoint("BOTTOMRIGHT", -PADDING, FOOTER_PAD + FOOTER_HEIGHT)
+  ui.progress:SetPoint("BOTTOMLEFT", PADDING, footer + FOOTER_HEIGHT)
+  ui.progress:SetPoint("BOTTOMRIGHT", -PADDING, footer + FOOTER_HEIGHT)
   ui.progress:Hide()
 
   -- the filter above the list: one checkbox, the button shows when it is on
@@ -501,8 +514,7 @@ local function Create()
   ui.filter = filter
 
   local panel
-  ui.list, panel = AM.Attachment.CreateList(body, LIST_TOP, FOOTER_PAD + FOOTER_HEIGHT,
-    CreateRow, SetupRow)
+  ui.list, panel = AM.Attachment.CreateList(body, LIST_TOP, footer + FOOTER_HEIGHT, CreateRow, SetupRow)
   filter:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", 0, 2) -- attached to the table
   ui.empty = Widgets.CreateText(panel, "GameFontDisableSmall")
   ui.empty:SetPoint("TOPLEFT", 12, -12)
@@ -519,6 +531,7 @@ function SellPanel.Update()
   local sell = IsSellMode()
   if not sell then
     dismissed = false
+    holdOrder = false
   end
   local wanted = sell and not dismissed and not AM.MainWindow.IsShown()
   if wanted and not ui then
@@ -554,6 +567,7 @@ local function Install()
     return
   end
   installed = true
+  AM.SellHistory.Install()
   if AuctionHouseFrame.SetDisplayMode then
     hooksecurefunc(AuctionHouseFrame, "SetDisplayMode", SellPanel.Update)
   end
@@ -596,12 +610,16 @@ end)
 
 -- A scan, a search or a setting changed the prices.
 AM.Events.Register("PRICES_CHANGED", UpdateSoon)
+-- An auction was posted, sold or came back: the history and the sell rates change.
+AM.Events.Register("LEDGER_CHANGED", UpdateSoon)
 -- More disenchants are known, or a character that can disenchant was found.
 AM.Events.Register("DISENCHANT_CHANGED", UpdateSoon)
 -- Our own window covers the sell view of the game.
 AM.Events.Register("MAIN_WINDOW_VISIBILITY", SellPanel.Update)
 -- The full scan started or ended.
 AM.Events.Register("SCAN_CHANGED", function()
+  -- every price changes: the list is sorted anew
+  holdOrder = false
   if not AM.Scan.IsRunning() then
     -- right after the scan the game still reports some bag items as not sellable: the list waits until it has settled
     settling = true

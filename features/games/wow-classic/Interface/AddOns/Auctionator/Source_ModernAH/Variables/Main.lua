@@ -1,4 +1,4 @@
-local function GetRegionalRulesetName()
+function Auctionator.Variables.GetRegionalRulesetName()
   if C_GameRules.IsGameRuleActive(Enum.GameRule.PvPRuleset) and C_GameRules.IsGameRuleActive(Enum.GameRule.RPRuleset) then
     return "RPPvP"
   elseif C_GameRules.IsGameRuleActive(Enum.GameRule.PvPRuleset) then
@@ -11,10 +11,17 @@ local function GetRegionalRulesetName()
     return "PvE"
   end
 end
+local function GetFaction()
+  if Auctionator.Constants.IsForever then
+    return " " .. (UnitFactionGroup("player"))
+  else
+    return""
+  end
+end
 function Auctionator.Variables.GetConnectedRealmRoot()
   -- Special case for regionally unique names, AHs are grouped by ruleset
   if RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() then
-    return GetRegionalRulesetName()
+    return Auctionator.Variables.GetRegionalRulesetName() .. GetFaction()
   end
 
   -- All "realms" that are connected together use the same AH database, this
@@ -30,9 +37,9 @@ function Auctionator.Variables.GetConnectedRealmRoot()
 
   if connections[1] ~= nil then
     -- Case where we are on a connected realm
-    return connections[1]
+    return connections[1] .. GetFaction()
   else
     -- We are not on a connected realm
-    return currentRealm
+    return currentRealm .. GetFaction()
   end
 end

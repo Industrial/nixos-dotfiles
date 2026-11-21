@@ -1084,7 +1084,13 @@ local function ShowTooltip()
 	local link = private.CurRequest.link
 	if not link then return end
 	if strmatch(link, "|Hitem:") then
-		GameTooltip:SetOwner(AuctionFrameCloseButton, "ANCHOR_NONE")
+		-- Forever: AuctionFrameCloseButton is a classic-AH global that does not
+		-- exist on this client (the modern AH is AuctionHouseFrame), so passing
+		-- it made SetOwner(nil, ...) throw "Usage: GameTooltip:SetOwner(region)"
+		-- when hovering the item icon on the buyout confirmation prompt. Own the
+		-- tooltip to the icon itself, matching CorePost's prompt; the explicit
+		-- ClearAllPoints/SetPoint below still controls placement (ANCHOR_NONE).
+		GameTooltip:SetOwner(private.Prompt.Item, "ANCHOR_NONE")
 		GameTooltip:SetHyperlink(link)
 		GameTooltip:ClearAllPoints()
 		GameTooltip:SetPoint("TOPRIGHT", private.Prompt.Item, "TOPLEFT", -10, -20)

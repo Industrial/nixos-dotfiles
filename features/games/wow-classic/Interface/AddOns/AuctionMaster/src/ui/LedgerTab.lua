@@ -584,6 +584,35 @@ local function SetupItemRow(row, entry, index)
 end
 
 -- A journal row is either a day (its name and net, in the header font) or an event of that day.
+-- The texts of a journal entry (Ledger.GetJournal), also used by the Sell tab's history: its kind (muted where no
+-- gold moves), its price and the net it adds (nil where there is none).
+local function EventType(event)
+  local muted = event.type == Ledger.CREATED or event.type == Ledger.UNKNOWN or event.type == Ledger.CRAFTED
+    or event.type == Ledger.LOOTED or event.type == Ledger.USED_UP or event.type == Ledger.DISENCHANTED
+  return muted and Muted(L[TYPE_LABEL[event.type]]) or L[TYPE_LABEL[event.type]]
+end
+
+local function EventPrice(event)
+  -- the price asked for a post, the price paid for a sale or by the player for a purchase; a return's price is only
+  -- what it did not sell at
+  if event.type ~= Ledger.CANCELED and event.type ~= Ledger.EXPIRED and event.type ~= Ledger.UNKNOWN and event.price then
+    return AM.FormatMoney(event.price)
+  elseif (event.type == Ledger.CRAFTED or event.type == Ledger.USED_UP or event.type == Ledger.DISENCHANTED)
+    and event.cost > 0 then
+    -- what the reagents cost, moved to the crafted items, what a disenchanted item cost, moved to its materials, or
+    -- what the used up units cost: no price, no net
+    return Muted(AM.FormatMoney(event.cost))
+  end
+end
+
+local function EventNet(event)
+  if event.net then
+    return Signed(event.net)
+  elseif event.unknown then
+    return Muted("?")
+  end
+end
+
 local function CreateJournalRow(parent)
   local row = CreateFrame("Button", nil, parent)
   Native.StyleRow(row)
@@ -632,23 +661,9 @@ local function SetupJournalRow(row, entry, index)
   local event = entry.entry
   row.time:SetText(Muted(date("%H:%M", event.time)))
   SetupItemCell(row, entry.item, event.count)
-  local muted = event.type == Ledger.CREATED or event.type == Ledger.UNKNOWN or event.type == Ledger.CRAFTED
-    or event.type == Ledger.LOOTED or event.type == Ledger.USED_UP or event.type == Ledger.DISENCHANTED
-  cells.type:SetText(muted and Muted(L[TYPE_LABEL[event.type]]) or L[TYPE_LABEL[event.type]])
-  -- the price asked for a post, the price paid for a sale or by the player for a purchase
-  if event.type ~= Ledger.CANCELED and event.type ~= Ledger.EXPIRED and event.type ~= Ledger.UNKNOWN and event.price then
-    cells.price:SetText(AM.FormatMoney(event.price))
-  elseif (event.type == Ledger.CRAFTED or event.type == Ledger.USED_UP or event.type == Ledger.DISENCHANTED)
-    and event.cost > 0 then
-    -- what the reagents cost, moved to the crafted items, what a disenchanted item cost, moved to its materials, or
-    -- what the used up units cost: no price, no net
-    cells.price:SetText(Muted(AM.FormatMoney(event.cost)))
-  end
-  if event.net then
-    cells.net:SetText(Signed(event.net))
-  elseif event.unknown then
-    cells.net:SetText(Muted("?"))
-  end
+  cells.type:SetText(EventType(event))
+  cells.price:SetText(EventPrice(event) or "")
+  cells.net:SetText(EventNet(event) or "")
 end
 
 -- How far a header reaches under its left neighbour, as in the auction house (SetColumnHeaderOverlap(2)): the edges of
@@ -896,6 +911,7 @@ View.LIST_TOP, View.TYPE_LABEL, View.VIEW_JOURNAL = LIST_TOP, TYPE_LABEL, VIEW_J
 View.Refresh, View.GetRange, View.GetSettings, View.CharacterName = Refresh, GetRange, GetSettings, CharacterName
 View.Money, View.Loss, View.Signed, View.Muted, View.Percent = Money, Loss, Signed, Muted, Percent
 View.Incomplete, View.ShortDate, View.DayLabel = Incomplete, ShortDate, DayLabel
+View.EventType, View.EventPrice, View.EventNet = EventType, EventPrice, EventNet
 
 -- only while the view is shown; it is drawn anew when it is shown again
 AM.Events.Register("LEDGER_CHANGED", function()

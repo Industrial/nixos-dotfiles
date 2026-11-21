@@ -12,16 +12,6 @@ local LDB = LibStub("LibDataBroker-1.1", true)
 local LDBIcon = LibStub("LibDBIcon-1.0", true)
 local LibDualSpec = (not Bartender4.GameType.ClassicEra) and LibStub("LibDualSpec-1.0", true)
 
-local _G = _G
-local type, pairs, hooksecurefunc = type, pairs, hooksecurefunc
-
--- GLOBALS: LibStub, UIParent, PlaySound, SOUNDKIT, RegisterStateDriver, UnregisterStateDriver
--- GLOBALS: BINDING_HEADER_Bartender4, BINDING_CATEGORY_Bartender4, BINDING_NAME_TOGGLEACTIONBARLOCK, BINDING_NAME_BTTOGGLEACTIONBARLOCK
--- GLOBALS: BINDING_HEADER_BT4PET, BINDING_CATEGORY_BT4PET, BINDING_HEADER_BT4STANCE, BINDING_CATEGORY_BT4STANCE
--- GLOBALS: CreateFrame, MultiBarBottomLeft, MultiBarBottomRight, MultiBarLeft, MultiBarRight, UIPARENT_MANAGED_FRAME_POSITIONS
--- GLOBALS: MainMenuBar, OverrideActionBar, MainMenuBarArtFrame, MainMenuBarMaxLevelBar
--- GLOBALS: StanceBarFrame, PossessBarFrame, PetActionBarFrame, PlayerTalentFrame
-
 local defaults = {
 	profile = {
 		tooltip = "enabled",
@@ -376,15 +366,6 @@ function Bartender4.Util:Merge(target, source)
 		end
 	end
 	return target
-end
-
-Bartender4.Compat = {}
-if C_Spell and C_Spell.GetSpellName then
-	Bartender4.Compat.GetSpellName = C_Spell.GetSpellName
-else
-	function Bartender4.Compat.GetSpellName(id)
-		return (GetSpellInfo(id))
-	end
 end
 
 Bartender4.modulePrototype = {}

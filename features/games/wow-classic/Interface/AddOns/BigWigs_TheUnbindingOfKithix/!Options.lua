@@ -7,7 +7,7 @@ BigWigs:AddColors("Kith'ix", {
 	[1303169] = "cyan",
 	[1303406] = "yellow",
 	[1303681] = "yellow",
-	[1304045] = "orange",
+	[1304045] = {"blue","orange"},
 	[1304424] = "red",
 	[1304930] = "purple",
 	[1308873] = "yellow",

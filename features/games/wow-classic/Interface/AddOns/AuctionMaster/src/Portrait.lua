@@ -289,6 +289,13 @@ local function OnAnimateUpdate(self, elapsed)
   for _, panel in ipairs(panels) do
     bars[#bars + 1] = panel.scanBar
   end
+  -- "Preparing scan..." until the full scan has asked the server, then "Scanning..."
+  local text = AM.Scan.IsPreparing() and L["SCAN_BAR_PREPARING"] or L["SCAN_BAR"]
+  for _, bar in ipairs(bars) do
+    if bar and bar.text:GetText() ~= text then
+      bar.text:SetText(text)
+    end
+  end
   MoveSweep(bars, position, SWEEP_DIM + (SWEEP_LIGHT - SWEEP_DIM) * offset)
 end
 

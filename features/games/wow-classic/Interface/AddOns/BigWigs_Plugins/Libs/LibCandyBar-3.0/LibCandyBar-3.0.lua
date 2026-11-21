@@ -15,23 +15,30 @@
 -- @class file
 -- @name LibCandyBar-3.0
 
-local GetTime, floor, next = GetTime, math.floor, next
+local GetTime, next = GetTime, next
 local CreateFrame, error, setmetatable, UIParent = CreateFrame, error, setmetatable, UIParent
+local NewTimer = C_Timer.NewTimer
 
 if not LibStub then error("LibCandyBar-3.0 requires LibStub.") end
 local cbh = LibStub:GetLibrary("CallbackHandler-1.0")
 if not cbh then error("LibCandyBar-3.0 requires CallbackHandler-1.0") end
-local lib = LibStub:NewLibrary("LibCandyBar-3.0", 110) -- Bump minor on changes
+local lib = LibStub:NewLibrary("LibCandyBar-3.0", 115) -- Bump minor on changes
 if not lib then return end
 lib.callbacks = lib.callbacks or cbh:New(lib)
 local cb = lib.callbacks
 lib.dummyFrame = lib.dummyFrame or CreateFrame("Frame")
 lib.barFrameMT = lib.barFrameMT or {__index = lib.dummyFrame}
 lib.barPrototype = lib.barPrototype or setmetatable({}, lib.barFrameMT)
-lib.barPrototype_mt = lib.barPrototype_mt or {__index = lib.barPrototype}
+local barPrototype = lib.barPrototype
+lib.barPrototype_mt = lib.barPrototype_mt or {}
+lib.barPrototype_mt.__index = function(self, key)
+	if key == "remaining" then
+		return self:GetRemainingTime()
+	end
+	return barPrototype[key]
+end
 lib.barCache = lib.barCache or {}
 
-local barPrototype = lib.barPrototype
 local barPrototype_meta = lib.barPrototype_mt
 local barCache = lib.barCache
 
@@ -39,69 +46,7 @@ local GameFontHighlightSmallOutline = GameFontHighlightSmallOutline
 local _fontName, _fontSize = GameFontHighlightSmallOutline:GetFont()
 local _fontShadowX, _fontShadowY = GameFontHighlightSmallOutline:GetShadowOffset()
 local _fontShadowR, _fontShadowG, _fontShadowB, _fontShadowA = GameFontHighlightSmallOutline:GetShadowColor()
-local SetWidth, SetHeight, SetSize = lib.dummyFrame.SetWidth, lib.dummyFrame.SetHeight, lib.dummyFrame.SetSize
-
-local tformat1 = "%d:%02d:%02d"
-local tformat2 = "%d:%02d"
-local tformat3 = "%.1f"
-local tformat4 = "%.0f"
-local barUpdate
-do
-	local NewTimer = C_Timer.NewTimer
-	function barUpdate(updater)
-		local bar = updater.parent
-		local t = GetTime()
-		if t >= bar.exp then
-			if bar.pauseWhenDone then
-				bar:Pause()
-				bar.candyBarBar:SetMinMaxValues(-1, 0)
-				bar.candyBarBar:SetValue(0)
-				bar:SetDuration(0)
-				bar:SetTimeVisibility(false)
-				if bar.maxPauseDuration then
-					bar.maxPauseDurationCallback = NewTimer(bar.maxPauseDuration, function()
-						bar.maxPauseDurationCallback = nil
-						bar:Stop()
-					end)
-				end
-			else
-				bar:Stop()
-			end
-		else
-			local time = bar.exp - t
-			bar.remaining = time
-
-			bar.candyBarBar:SetValue(bar.fill and (t-bar.start)+bar.gap or time)
-
-			if time > 3599.9 then -- > 1 hour
-				local h = floor(time/3600)
-				local m = floor((time - (h*3600))/60)
-				local s = (time - (m*60)) - (h*3600)
-				bar.candyBarDuration:SetFormattedText(tformat1, h, m, s)
-			elseif time > 59.9 then -- 1 minute to 1 hour
-				local m = floor(time/60)
-				local s = time - (m*60)
-				bar.candyBarDuration:SetFormattedText(tformat2, m, s)
-			elseif time < 10 then -- 0 to 10 seconds
-				bar.candyBarDuration:SetFormattedText(tformat3, time)
-			else -- 10 seconds to one minute
-				bar.candyBarDuration:SetFormattedText(tformat4, time)
-			end
-
-			if bar.timeCallback and time < bar.timeCallbackTrigger then
-				bar.timeCallbackTrigger = 0
-				bar.timeCallback(bar)
-				bar.timeCallback = nil
-			end
-
-			if bar.funcs then
-				for i = 1, #bar.funcs do
-					bar.funcs[i](bar)
-				end
-			end
-		end
-	end
-end
+local SetWidth, SetHeight, SetSize, SetFrameLevel = lib.dummyFrame.SetWidth, lib.dummyFrame.SetHeight, lib.dummyFrame.SetSize, lib.dummyFrame.SetFrameLevel
 
 -- ------------------------------------------------------------------------------
 -- Bar functions
@@ -109,22 +54,23 @@ end
 
 local function restyleBar(self)
 	if not self.running then return end
-	self.candyBarIconFrame:ClearAllPoints()
+
 	self.candyBarBar:ClearAllPoints()
 	if self:IsIconVisible() then
+		self.candyBarIconFrame:ClearAllPoints()
 		self.candyBarIconFrame:SetWidth(self.height)
-		if self.iconPosition == "RIGHT" then
+		if self:GetIconPosition() == "RIGHT" then
 			self.candyBarIconFrame:SetPoint("TOPRIGHT", self)
 			self.candyBarIconFrame:SetPoint("BOTTOMRIGHT", self)
-			self.candyBarBar:SetPoint("TOPRIGHT", self.candyBarIconFrame, "TOPLEFT")
-			self.candyBarBar:SetPoint("BOTTOMRIGHT", self.candyBarIconFrame, "BOTTOMLEFT")
+			self.candyBarBar:SetPoint("TOPRIGHT", self, "TOPRIGHT", -self.height, 0)
+			self.candyBarBar:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -self.height, 0)
 			self.candyBarBar:SetPoint("TOPLEFT", self)
 			self.candyBarBar:SetPoint("BOTTOMLEFT", self)
 		else
 			self.candyBarIconFrame:SetPoint("TOPLEFT")
 			self.candyBarIconFrame:SetPoint("BOTTOMLEFT")
-			self.candyBarBar:SetPoint("TOPLEFT", self.candyBarIconFrame, "TOPRIGHT")
-			self.candyBarBar:SetPoint("BOTTOMLEFT", self.candyBarIconFrame, "BOTTOMRIGHT")
+			self.candyBarBar:SetPoint("TOPLEFT", self, "TOPLEFT", self.height, 0)
+			self.candyBarBar:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", self.height, 0)
 			self.candyBarBar:SetPoint("TOPRIGHT", self)
 			self.candyBarBar:SetPoint("BOTTOMRIGHT", self)
 		end
@@ -146,17 +92,33 @@ local function restyleBar(self)
 	end
 end
 
+--- Sets the frame level of the bar.
+-- @param level Frame level of the bar.
+function barPrototype:SetFrameLevel(level)
+	SetFrameLevel(self, level)
+	local frameLevel = self:GetFrameLevel() - 1
+	self.candyBarBackdrop:SetFrameLevel(frameLevel)
+	self.candyBarIconFrameBackdrop:SetFrameLevel(frameLevel)
+end
+
 --- Set whether the bar should drain (default) or fill up.
 -- @param fill Boolean true/false
 function barPrototype:SetFill(fill)
 	self.fill = fill
+	if self.running then
+		if not self.paused then
+			-- Enum.StatusBarInterpolation.Immediate = 0 | Enum.StatusBarTimerDirection: ElapsedTime = 0, RemainingTime = 1
+			self.candyBarBar:SetTimerDuration(self.durationObject, 0, fill and 0 or 1)
+		elseif self.remainingTime and self.remainingTime > 0 then
+			self.candyBarBar:SetValue(fill and self.totalDuration - self.remainingTime or self.remainingTime)
+		else
+			self.candyBarBar:SetMinMaxValues(0, 1)
+			self.candyBarBar:SetValue(1)
+		end
+	end
 end
---- Adds a function to the timerbar. The function will run every update and will receive the bar as a parameter.
--- @param func Function to run every update.
--- @usage
--- -- The example below will print the time remaining to the chatframe every update. Yes, that's a whole lot of spam
--- mybar:AddUpdateFunction( function(bar) print(bar.remaining) end )
-function barPrototype:AddUpdateFunction(func) if not self.funcs then self.funcs = {} end; self.funcs[#self.funcs+1] = func end
+--- Deprecated.
+function barPrototype:AddUpdateFunction() end
 --- Sets user data in the timerbar object.
 -- @param key Key to use for the data storage.
 -- @param data Data to store.
@@ -271,7 +233,6 @@ function barPrototype:SetIcon(icon, ...)
 	else
 		self.candyBarIconFrame:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 	end
-	restyleBar(self)
 end
 --- Returns the atlas name currently set on the bar, if it has an icon set.
 function barPrototype:GetIconAtlas()
@@ -282,7 +243,6 @@ end
 function barPrototype:SetIconAtlas(atlas)
 	self:Set("LCBiconIsAtlas", true)
 	self.candyBarIconFrame:SetAtlas(atlas)
-	restyleBar(self)
 end
 --- Returns true if the icon is an atlas, false otherwise.
 function barPrototype:IsIconAtlas()
@@ -313,6 +273,7 @@ function barPrototype:SetIconVisibility(bool)
 		self:Set("LCBiconVisible", false)
 		self.candyBarIconFrame:Hide()
 	end
+	restyleBar(self)
 end
 --- Returns true if the icon is visible, false otherwise.
 function barPrototype:IsIconVisible()
@@ -325,14 +286,73 @@ function barPrototype:SetTimeVisibility(bool)
 	if bool then
 		self:Set("LCBtimeVisible", true)
 		self.candyBarDuration:Show()
+		if self.running and not self.paused then
+			self.durationBinding:SetEnabled(true)
+		end
 	else
 		self:Set("LCBtimeVisible", false)
 		self.candyBarDuration:Hide()
+		self.durationBinding:SetEnabled(false)
 	end
 end
 --- Returns true if the time is visible, false otherwise.
 function barPrototype:IsTimeVisible()
 	return self:Get("LCBtimeVisible")
+end
+do
+	local minuteBreakpoint = {
+		threshold = 60,
+		format = "%d:%02d",
+		components = {
+			{ div = 60, step = 1, rounding = 2 }, -- Enum.NumericRuleFormatRounding.Down = 2
+			{ mod = 60, step = 1, rounding = 2 },
+		},
+	}
+	local hourBreakpoint = {
+		threshold = 3600,
+		format = "%d:%02d:%02d",
+		components = {
+			{ div = 3600, step = 1, rounding = 2 },
+			{ div = 60, mod = 60, step = 1, rounding = 2 },
+			{ mod = 60, step = 1, rounding = 2 },
+		},
+	}
+	local noDecimalsBreakpoints = {
+		{ threshold = 0, format = "%.0f" },
+		minuteBreakpoint,
+		hourBreakpoint,
+	}
+	local customDecimalsBreakpoint = { threshold = 10, format = "%.0f" }
+	local customDecimalsBreakpoints = {
+		{ threshold = 0, format = "%.1f" },
+		customDecimalsBreakpoint,
+		minuteBreakpoint,
+		hourBreakpoint,
+	}
+	local allDecimalsBreakpoints = {
+		{ threshold = 0, format = "%.1f" },
+		minuteBreakpoint,
+		hourBreakpoint,
+	}
+	--- Sets the threshold in seconds at which decimal points begin to show on the bar.
+	-- @param threshold Number of seconds. Defaults to 10.
+	function barPrototype:SetDecimalsThreshold(threshold)
+		if self.decimalsThreshold ~= threshold then
+			self.decimalsThreshold = threshold
+			local formatter = self.formatter
+			if threshold <= 0 then
+				formatter:SetBreakpoints(noDecimalsBreakpoints)
+			elseif threshold < 60 then
+				customDecimalsBreakpoint.threshold = threshold
+				formatter:SetBreakpoints(customDecimalsBreakpoints)
+			else
+				formatter:SetBreakpoints(allDecimalsBreakpoints)
+			end
+			if self.running and self.paused and self.remainingTime and self.remainingTime > 0 then
+				self.candyBarDuration:SetText(formatter:FormatNumber(self.remainingTime))
+			end
+		end
+	end
 end
 --- Sets wether or not the label should be shown.
 -- label is shown by default.
@@ -354,90 +374,199 @@ end
 -- It will show as full and the time label will be hidden
 -- @param value Seconds to pause the bar when done or true for indefinitely
 function barPrototype:SetPauseWhenDone(value)
-	if type(value) == "number" then
+	if type(value) == "number" and value > 0 then
 		self.maxPauseDuration = value
 		self.pauseWhenDone = true
 	else
 		self.maxPauseDuration = nil
-		self.pauseWhenDone = value or nil
+		self.pauseWhenDone = value and value ~= 0 or nil
 	end
 end
 --- Sets a one-time callback to fire after reaching a certain time remaining on the bar
 -- @param func The callback function to fire
 -- @number time The time the bar will have remaining when the callback triggers
 function barPrototype:SetTimeCallback(func, time)
+	if self.timeCallbackTimer then
+		self.timeCallbackTimer:Cancel()
+		self.timeCallbackTimer = nil
+	end
 	self.timeCallback = func
 	self.timeCallbackTrigger = time
+	if func and time and self.running and not self.paused then
+		local delay = (self.exp - GetTime()) - time
+		self.timeCallbackTimer = NewTimer(delay > 0 and delay or 0, self.onTimeCallback)
+	end
 end
 --- Sets the duration of the bar.
 -- This can also be used while the bar is running to adjust the time remaining, within the bounds of the original duration.
 -- @param duration Duration of the bar in seconds.
-function barPrototype:SetDuration(duration) self.remaining = duration end
+function barPrototype:SetDuration(duration)
+	self.remainingTime = duration
+	if self.running and duration then
+		if duration > self.totalDuration then
+			self.totalDuration = duration
+		end
+		if not self.paused then
+			self.exp = GetTime() + duration
+			self.durationObject:SetTimeFromEnd(self.exp, self.totalDuration)
+			-- Enum.StatusBarInterpolation.Immediate = 0 | Enum.StatusBarTimerDirection: ElapsedTime = 0, RemainingTime = 1
+			self.candyBarBar:SetTimerDuration(self.durationObject, 0, self.fill and 0 or 1)
+			self.durationBinding:SetDuration(self.durationObject)
+			if self.expTimer then
+				self.expTimer:Cancel()
+			end
+			self.expTimer = NewTimer(duration > 0 and duration or 0, self.onExpire)
+			if self.timeCallbackTimer then
+				self.timeCallbackTimer:Cancel()
+				local delay = duration - self.timeCallbackTrigger
+				self.timeCallbackTimer = NewTimer(delay > 0 and delay or 0, self.onTimeCallback)
+			end
+		else
+			if duration <= 0 then
+				self.remainingTime = 0
+				self.candyBarDuration:ClearText()
+				self.candyBarBar:SetMinMaxValues(0, 1)
+				self.candyBarBar:SetValue(1)
+				if self.maxPauseDuration and not self.maxPauseDurationCallback then
+					self.maxPauseDurationCallback = NewTimer(self.maxPauseDuration, self.onMaxPauseExpire)
+				end
+			else
+				if self.maxPauseDurationCallback then
+					self.maxPauseDurationCallback:Cancel()
+					self.maxPauseDurationCallback = nil
+				end
+				self.candyBarDuration:SetText(self.formatter:FormatNumber(duration))
+				self.candyBarBar:SetMinMaxValues(0, self.totalDuration)
+				self.candyBarBar:SetValue(self.fill and self.totalDuration - duration or duration)
+			end
+		end
+	end
+end
+--- Returns the time remaining on the bar in seconds.
+function barPrototype:GetRemainingTime()
+	if self.running and not self.paused then
+		return self.exp - GetTime()
+	end
+	return self.remainingTime
+end
 --- Shows the bar and starts it.
 -- @param maxValue Number. If you don't wish your bar to start full, you can set a max value. A maxValue of 10 on a bar with a duration of 5 would start it at 50%.
 function barPrototype:Start(maxValue)
-	self.running = true
-	local time = self.remaining
-	self.gap = maxValue and maxValue-time or 0
-	restyleBar(self)
-	self.start = GetTime()
-	self.exp = self.start + time
-
-	self.candyBarBar:SetMinMaxValues(0, maxValue or time)
-	self.candyBarBar:SetValue(self.fill and 0 or time)
-
-	if time > 3599.9 then -- > 1 hour
-		local h = floor(time/3600)
-		local m = floor((time - (h*3600))/60)
-		local s = (time - (m*60)) - (h*3600)
-		self.candyBarDuration:SetFormattedText(tformat1, h, m, s)
-	elseif time > 59.9 then -- 1 minute to 1 hour
-		local m = floor(time/60)
-		local s = time - (m*60)
-		self.candyBarDuration:SetFormattedText(tformat2, m, s)
-	elseif time < 10 then -- 0 to 10 seconds
-		self.candyBarDuration:SetFormattedText(tformat3, time)
-	else -- 10 seconds to one minute
-		self.candyBarDuration:SetFormattedText(tformat4, time)
+	local time = self:GetRemainingTime()
+	if self.expTimer then
+		self.expTimer:Cancel()
+		self.expTimer = nil
 	end
-	self.updater:SetScript("OnLoop", barUpdate)
-	self.updater:Play()
+	if self.timeCallbackTimer then
+		self.timeCallbackTimer:Cancel()
+		self.timeCallbackTimer = nil
+	end
+	if self.maxPauseDurationCallback then
+		self.maxPauseDurationCallback:Cancel()
+		self.maxPauseDurationCallback = nil
+	end
+	self.running = true
+	self.paused = nil
+	self.remainingTime = time
+	local totalDuration = (maxValue and maxValue > time) and maxValue or time
+	self.totalDuration = totalDuration
+	restyleBar(self)
+	self.exp = GetTime() + time
+
+	self.durationObject:SetTimeFromEnd(self.exp, totalDuration)
+	-- Enum.StatusBarInterpolation.Immediate = 0 | Enum.StatusBarTimerDirection: ElapsedTime = 0, RemainingTime = 1
+	self.candyBarBar:SetTimerDuration(self.durationObject, 0, self.fill and 0 or 1)
+	self.durationBinding:SetDuration(self.durationObject)
+	self.durationBinding:SetEnabled(self:IsTimeVisible())
+
+	self.expTimer = NewTimer(time > 0 and time or 0, self.onExpire)
+	if self.timeCallback and self.timeCallbackTrigger then
+		local delay = time - self.timeCallbackTrigger
+		self.timeCallbackTimer = NewTimer(delay > 0 and delay or 0, self.onTimeCallback)
+	end
 	self:Show()
 end
 --- Pauses a running bar
 function barPrototype:Pause()
-	if not self.paused then
-		self.updater:Pause()
-		self.paused = GetTime()
+	if self.running and not self.paused then
+		if self.expTimer then
+			self.expTimer:Cancel()
+			self.expTimer = nil
+		end
+		if self.timeCallbackTimer then
+			self.timeCallbackTimer:Cancel()
+			self.timeCallbackTimer = nil
+		end
+		local time = self.exp - GetTime()
+		self.paused = true
+		self.durationBinding:SetEnabled(false)
+		if time <= 0 then
+			self.remainingTime = 0
+			self.candyBarDuration:ClearText()
+			self.candyBarBar:SetMinMaxValues(0, 1)
+			self.candyBarBar:SetValue(1)
+			if self.maxPauseDuration and not self.maxPauseDurationCallback then
+				self.maxPauseDurationCallback = NewTimer(self.maxPauseDuration, self.onMaxPauseExpire)
+			end
+		else
+			self.remainingTime = time
+			self.candyBarDuration:SetText(self.formatter:FormatNumber(time))
+			self.candyBarBar:SetMinMaxValues(0, self.totalDuration)
+			self.candyBarBar:SetValue(self.fill and self.totalDuration - time or time)
+		end
 	end
 end
 --- Resumes a paused bar
 function barPrototype:Resume()
-	if self.paused then
-		local t = GetTime()
-		self.exp = t + self.remaining
-		self.start = self.start + (t-self.paused)
-		self.updater:Play()
+	if self.running and self.paused then
+		if self.maxPauseDurationCallback then
+			self.maxPauseDurationCallback:Cancel()
+			self.maxPauseDurationCallback = nil
+		end
+		local time = self.remainingTime
+		self.exp = GetTime() + time
 		self.paused = nil
+
+		self.durationObject:SetTimeFromEnd(self.exp, self.totalDuration)
+		-- Enum.StatusBarInterpolation.Immediate = 0 | Enum.StatusBarTimerDirection: ElapsedTime = 0, RemainingTime = 1
+		self.candyBarBar:SetTimerDuration(self.durationObject, 0, self.fill and 0 or 1)
+		self.durationBinding:SetDuration(self.durationObject)
+		self.durationBinding:SetEnabled(self:IsTimeVisible())
+
+		self.expTimer = NewTimer(time > 0 and time or 0, self.onExpire)
+		if self.timeCallback and self.timeCallbackTrigger then
+			local delay = time - self.timeCallbackTrigger
+			self.timeCallbackTimer = NewTimer(delay > 0 and delay or 0, self.onTimeCallback)
+		end
 	end
 end
 
 do
 	local function stopBar(bar)
-		bar.updater:Stop()
-		bar:ClearScripts()
-		bar.data = nil
-		bar.funcs = nil
-		bar.running = nil
-		bar.paused = nil
-		bar.pauseWhenDone = nil
-		bar.maxPauseDuration = nil
+		if bar.expTimer then
+			bar.expTimer:Cancel()
+			bar.expTimer = nil
+		end
+		if bar.timeCallbackTimer then
+			bar.timeCallbackTimer:Cancel()
+			bar.timeCallbackTimer = nil
+		end
 		if bar.maxPauseDurationCallback then
 			bar.maxPauseDurationCallback:Cancel()
 			bar.maxPauseDurationCallback = nil
 		end
+		bar.durationBinding:SetEnabled(false)
+		bar:ClearScripts()
+		bar.data = nil
+		bar.running = nil
+		bar.paused = nil
+		bar.pauseWhenDone = nil
+		bar.maxPauseDuration = nil
 		bar.timeCallback = nil
 		bar.timeCallbackTrigger = nil
+		bar.exp = nil
+		bar.totalDuration = nil
+		bar.remainingTime = nil
 		bar:Hide()
 		bar:SetParent(UIParent)
 	end
@@ -463,6 +592,44 @@ end
 -- Library functions
 --
 
+local function initDurationObjects(bar)
+	local formatter = C_StringUtil.CreateNumericRuleFormatter()
+	bar.formatter = formatter
+
+	local durationBinding = C_DurationUtil.CreateDurationTextBinding()
+	durationBinding:SetFormatter(formatter)
+	durationBinding:SetFontString(bar.candyBarDuration)
+	durationBinding:SetExpiredText("")
+	durationBinding:SetZeroDurationText("")
+	durationBinding:SetEnabled(false)
+	bar.durationBinding = durationBinding
+
+	bar.durationObject = C_DurationUtil.CreateDuration()
+
+	bar.onMaxPauseExpire = function()
+		bar.maxPauseDurationCallback = nil
+		bar:Stop()
+	end
+	bar.onExpire = function()
+		bar.expTimer = nil
+		if bar.pauseWhenDone then
+			bar.exp = 0
+			bar:Pause()
+		else
+			bar:Stop()
+		end
+	end
+	bar.onTimeCallback = function()
+		bar.timeCallbackTimer = nil
+		local callback = bar.timeCallback
+		if callback then
+			bar.timeCallback = nil
+			bar.timeCallbackTrigger = nil
+			callback(bar)
+		end
+	end
+end
+
 --- Creates a new timerbar object and returns it. Don't forget to set the duration, label and :Start the timer bar after you get a hold of it!
 -- @paramsig texture, width, height
 -- @param texture Path to the texture used for the bar.
@@ -474,28 +641,33 @@ function lib:New(texture, width, height)
 	local bar = next(barCache)
 	if not bar then
 		local frame = CreateFrame("Frame", nil, UIParent)
+		frame:Hide()
 		bar = setmetatable(frame, barPrototype_meta)
 
 		local icon = bar:CreateTexture()
-		icon:SetPoint("TOPLEFT")
-		icon:SetPoint("BOTTOMLEFT")
+		icon:SetSnapToPixelGrid(false)
+		icon:SetTexelSnappingBias(0)
 		icon:Show()
 		bar.candyBarIconFrame = icon
 
 		local statusbar = CreateFrame("StatusBar", nil, bar)
-		statusbar:SetPoint("TOPRIGHT")
-		statusbar:SetPoint("BOTTOMRIGHT")
 		bar.candyBarBar = statusbar
+		local statusBarTexture = statusbar:CreateTexture()
+		statusBarTexture:SetSnapToPixelGrid(false)
+		statusBarTexture:SetTexelSnappingBias(0)
+		statusbar:SetStatusBarTexture(statusBarTexture)
 
 		local bg = statusbar:CreateTexture(nil, "BACKGROUND")
-		bg:SetAllPoints()
+		bg:SetSnapToPixelGrid(false)
+		bg:SetTexelSnappingBias(0)
 		bar.candyBarBackground = bg
 
 		local backdrop = CreateFrame("Frame", nil, bar, "BackdropTemplate") -- Used by bar stylers for backdrops
-		backdrop:SetFrameLevel(0)
+		backdrop:Hide()
 		bar.candyBarBackdrop = backdrop
 
 		local iconBackdrop = CreateFrame("Frame", nil, bar, "BackdropTemplate") -- Used by bar stylers for backdrops
+		iconBackdrop:Hide()
 		bar.candyBarIconFrameBackdrop = iconBackdrop
 
 		local label = statusbar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
@@ -504,28 +676,41 @@ function lib:New(texture, width, height)
 		local duration = statusbar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
 		bar.candyBarDuration = duration
 
-		local updater = bar:CreateAnimationGroup()
-		updater:SetLooping("REPEAT")
-		updater.parent = bar
-		local anim = updater:CreateAnimation()
-		anim:SetDuration(0.04)
-		bar.updater = updater
-		bar.repeater = anim
+		initDurationObjects(bar)
 	else
 		barCache[bar] = nil
+		if not bar.durationBinding then -- Upgrade code for pre 114
+			if bar.updater then
+				bar.updater:Stop()
+				bar.updater = nil
+				bar.repeater = nil
+			end
+			bar.remaining = nil
+			bar.funcs = nil
+			initDurationObjects(bar)
+		end
 
 		-- Clear secrets from icon textures
-		if bar.candyBarIconFrame.SetToDefaults then
-			bar.candyBarIconFrame:SetToDefaults()
-		end
+		bar.candyBarIconFrame:SetToDefaults()
 		bar.candyBarIconFrame:ClearAllPoints()
+		bar.candyBarIconFrame:SetSnapToPixelGrid(false) -- We shouldn't need to do this if we ever get an alternative to SetToDefaults
+		bar.candyBarIconFrame:SetTexelSnappingBias(0)
+		bar.candyBarIconFrameBackdrop:ClearBackdrop()
 		bar.candyBarIconFrameBackdrop:ClearAllPoints()
+		bar.candyBarIconFrameBackdrop:Hide()
 
 		-- Clear secrets from fontstrings
 		bar.candyBarLabel:ClearText()
 		bar.candyBarDuration:ClearText()
 		bar.candyBarLabel:ClearAllPoints()
 		bar.candyBarDuration:ClearAllPoints()
+
+		-- Clear secrets from the bar texture
+		bar.candyBarBackdrop:ClearBackdrop()
+		bar.candyBarBackdrop:ClearAllPoints()
+		bar.candyBarBackdrop:Hide()
+		bar.candyBarBackground:ClearAllPoints()
+		bar.candyBarBar:ClearAllPoints()
 	end
 
 	-- RESET ALL THE THINGS!
@@ -547,14 +732,15 @@ function lib:New(texture, width, height)
 	bar.candyBarLabel:SetPoint("BOTTOMRIGHT", bar.candyBarBar, "BOTTOMRIGHT", -2, 0)
 	bar.candyBarDuration:SetPoint("TOPLEFT", bar.candyBarBar, "TOPLEFT", 2, 0)
 	bar.candyBarDuration:SetPoint("BOTTOMRIGHT", bar.candyBarBar, "BOTTOMRIGHT", -2, 0)
+	bar.candyBarBar:SetPoint("TOPRIGHT")
+	bar.candyBarBar:SetPoint("BOTTOMRIGHT")
+	bar.candyBarBackground:SetAllPoints()
 
 	bar:SetBackgroundColor(0.5, 0.5, 0.5, 0.3)
 	bar:SetColor(0.5, 0.5, 0.5, 1)
 	bar:SetTextColor(1,1,1,1)
 	bar:ClearAllPoints()
-	SetWidth(bar, width)
-	SetHeight(bar, height)
-	bar:SetMovable(1)
+	SetSize(bar, width, height)
 	bar:SetScale(1)
 	bar:SetAlpha(1)
 	bar:SetClampedToScreen(false)
@@ -563,17 +749,15 @@ function lib:New(texture, width, height)
 	bar:SetShadowOffset(_fontShadowX, _fontShadowY)
 	bar:SetShadowColor(_fontShadowR, _fontShadowG, _fontShadowB, _fontShadowA)
 
-	bar.candyBarIconFrameBackdrop:SetFrameLevel(0)
-
 	bar.candyBarLabel:SetJustifyH("LEFT")
 	bar.candyBarLabel:SetJustifyV("MIDDLE")
 
 	bar.candyBarDuration:SetJustifyH("RIGHT")
 	bar.candyBarDuration:SetJustifyV("MIDDLE")
 
-	bar:SetLabel()
 	bar:SetIcon()
 	bar:SetDuration()
+	bar:SetDecimalsThreshold(10)
 
 	return bar
 end

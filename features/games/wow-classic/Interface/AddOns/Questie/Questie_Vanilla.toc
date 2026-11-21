@@ -1,5 +1,5 @@
 ## Interface: 11508, 11509
-## Title: Questie|cFF00FF00 v12.10.0|r
+## Title: Questie|cFF00FF00 v12.11.1|r
 ## Author: Aero/Logon/Muehe/TheCrux(BreakBB)/Drejjmit/Dyaxler/Cheeq/TechnoHunter/Yttrium/Everyone else
 ## Notes: A standalone Classic QuestHelper
 ## Notes-deDE: Ein Quest-Helfer
@@ -22,7 +22,7 @@
 ## Category-ruRU: Задания
 ## Category-zhCN: 任务
 ## Category-zhTW: 任務
-## Version: 12.10.0
+## Version: 12.11.1
 ## X-QuestieDB-Contract: 4
 ## OptionalDeps: QuestieDB, QuestieTrace, Ace3, CallbackHandler-1.0, HereBeDragons, Krowi_WorldMapButtons, LibDataBroker-1.1, LibDBIcon-1.0, LibSharedMedia-3.0, LibStub, LibUIDropDownMenu
 ## LoadSavedVariablesFirst: 1
@@ -31,7 +31,7 @@
 ## IconTexture: Interface\AddOns\Questie\Icons\questie.png
 ## X-Curse-Project-ID: 334372
 ## X-Wago-ID: qv634BKb
-## X-BUILD-COMMIT: 6d18becb956f95363e79170adef31dbb17fef8ea
+## X-BUILD-COMMIT: 0a737719fb04496d9e004f0516fd6c747c4d3def
 
 # Loader module. First so that every file after it can be timed: the load-time hook lives here,
 # and anything loaded before it is invisible to measurement. It has no dependencies of its own.
@@ -269,6 +269,7 @@ Modules\Tracker\Sorter\byComplete.lua
 Modules\Tracker\Sorter\byLevel.lua
 Modules\Tracker\Sorter\byZone.lua
 Modules\Tracker\TrackerUtils.lua
+Modules\Tracker\TrackerShortcuts.lua
 Modules\Tracker\TrackerSuperTrack.lua
 Modules\Tracker\TrackerFadeTicker.lua
 Modules\Tracker\TrackerBaseFrame.lua
