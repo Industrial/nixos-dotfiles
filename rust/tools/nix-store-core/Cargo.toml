@@ -21,6 +21,9 @@ ed25519-dalek = "2"
 id_effect = "=0.13.0"
 rusqlite = { version = "0.37", features = ["bundled"] }
 sha2 = "0.10"
+# The daemon worker protocol (src/worker.vlt): async I/O over the daemon's Unix
+# socket and over any AsyncRead + AsyncWrite (an ssh `nix-daemon --stdio` pipe).
+tokio = { version = "1", features = ["io-util", "net", "sync"] }
 
 [dev-dependencies]
 serde_json = "1"

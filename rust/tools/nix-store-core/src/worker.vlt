@@ -1,0 +1,1753 @@
+-- The Nix daemon's worker protocol: what `nix` and `nix-store` speak to
+-- nix-daemon over /nix/var/nix/daemon-socket/socket, and over the pipes of
+-- `ssh host nix-daemon --stdio`.
+--
+-- Every value on the wire is a little-endian u64, or a string: its length as
+-- a u64, the bytes, then zero padding to a multiple of eight. A list is a
+-- count and that many values. A connection starts with a handshake (magic
+-- numbers both ways, then the protocol versions; the lower one is spoken).
+-- After that the client sends one operation at a time: its op code and
+-- arguments. The daemon answers with a stream of stderr messages (log lines,
+-- activities, results) that ends in STDERR_LAST, or STDERR_ERROR when the
+-- operation failed, and then, after LAST, the operation's reply.
+--
+-- The module has three layers:
+--
+-- * pure decoders (`take_*`) over a byte buffer, which say `More` when the
+--   buffer ends early, and pure encoders (`put_*`) into a Vec. They are the
+--   whole grammar, and they are what the tests and vdaemon-proxy's tap use.
+-- * a buffered connection (`Conn`) that pulls bytes from any AsyncRead and
+--   runs the decoders over them, and writes encoded requests to any
+--   AsyncWrite. The handshakes (client and server), the stderr relay and the
+--   operations are async functions over it.
+-- * `Daemon`, the connection as an id_effect resource: connected with
+--   `connect` / `open` / `open_halves`, released with `close` (or held by
+--   `with_daemon` and `scoped`), and the client operations as effects.
+--
+-- The client offers protocol 1.37 (the handshake without 1.38's feature
+-- exchange); a daemon that speaks more negotiates down to it. The server
+-- side and the decoders handle 1.38's features as well.
+
+import std::path::PathBuf
+import std::sync::Arc
+import tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt}
+import tokio::sync::Mutex
+import id_effect::{Effect, HNil, Never, Scope, acquire_use_release, from_async}
+import sha2::Digest
+import crate::hash::Sha256
+import crate::nar::{NarDigest, padding}
+
+export const DEFAULT_SOCKET : &str = "/nix/var/nix/daemon-socket/socket"
+
+export const WORKER_MAGIC_1 : u64 = 1852405859
+
+export const WORKER_MAGIC_2 : u64 = 1685612911
+
+-- What this client offers: 1.37, `(1 << 8) | 37`.
+export const CLIENT_VERSION : u64 = 293
+
+-- The oldest peer this module talks to: 1.24 (framed NAR uploads, the
+-- structured error format, and every reply shape below).
+export const MIN_VERSION : u64 = 280
+
+export const STDERR_NEXT : u64 = 1869376871
+
+export const STDERR_READ : u64 = 1684108385
+
+export const STDERR_WRITE : u64 = 1684108310
+
+export const STDERR_LAST : u64 = 1634497651
+
+export const STDERR_ERROR : u64 = 1668838512
+
+export const STDERR_START_ACTIVITY : u64 = 1398035028
+
+export const STDERR_STOP_ACTIVITY : u64 = 1398034256
+
+export const STDERR_RESULT : u64 = 1381190740
+
+-- The longest string the decoders accept. A length past it is a broken or
+-- hostile stream, not something to allocate for.
+export const MAX_STRING : u64 = 268435456
+
+-- The longest list.
+export const MAX_LIST : u64 = 16777216
+
+-- Bytes per read from the socket, and per frame of an upload.
+const CHUNK : usize = 65536
+
+-- The protocol's minor version.
+export minor : u64 -> u64
+minor v = v & 255
+
+-- The protocol's major version (1 for every Nix since 1.x).
+export major : u64 -> u64
+major v = v >> 8
+
+------------------------------------------------------------------------
+-- Errors
+
+export errors WorkerError
+  from std::io::Error as Io  "daemon connection: #{0}"
+  Connect String             "connecting to the daemon: #{0}"
+  Protocol String            "worker protocol: #{0}"
+  Remote String              "nix-daemon: #{0}"
+  Broken String              "the daemon connection broke earlier: #{0}"
+
+------------------------------------------------------------------------
+-- Op codes
+
+-- Every worker op (libstore's `WorkerProto::Op`), obsolete ones included,
+-- so a proxy can name whatever a client sends.
+export data Op
+  = IsValidPath
+  | HasSubstitutes
+  | QueryPathHash
+  | QueryReferences
+  | QueryReferrers
+  | AddToStore
+  | AddTextToStore
+  | BuildPaths
+  | EnsurePath
+  | AddTempRoot
+  | AddIndirectRoot
+  | SyncWithGC
+  | FindRoots
+  | ExportPath
+  | QueryDeriver
+  | SetOptions
+  | CollectGarbage
+  | QuerySubstitutablePathInfo
+  | QueryDerivationOutputs
+  | QueryAllValidPaths
+  | QueryFailedPaths
+  | ClearFailedPaths
+  | QueryPathInfo
+  | ImportPaths
+  | QueryDerivationOutputNames
+  | QueryPathFromHashPart
+  | QuerySubstitutablePathInfos
+  | QueryValidPaths
+  | QuerySubstitutablePaths
+  | QueryValidDerivers
+  | OptimiseStore
+  | VerifyStore
+  | BuildDerivation
+  | AddSignatures
+  | NarFromPath
+  | AddToStoreNar
+  | QueryMissing
+  | QueryDerivationOutputMap
+  | RegisterDrvOutput
+  | QueryRealisation
+  | AddMultipleToStore
+  | AddBuildLog
+  | BuildPathsWithResults
+  | AddPermRoot
+  deriving (Debug, Clone, Copy, PartialEq, Eq, Hash)
+
+-- Every op, for tables and tests.
+export const ALL_OPS : [Op; 44] = [IsValidPath, HasSubstitutes, QueryPathHash, QueryReferences, QueryReferrers, AddToStore, AddTextToStore, BuildPaths, EnsurePath, AddTempRoot, AddIndirectRoot, SyncWithGC, FindRoots, ExportPath, QueryDeriver, SetOptions, CollectGarbage, QuerySubstitutablePathInfo, QueryDerivationOutputs, QueryAllValidPaths, QueryFailedPaths, ClearFailedPaths, QueryPathInfo, ImportPaths, QueryDerivationOutputNames, QueryPathFromHashPart, QuerySubstitutablePathInfos, QueryValidPaths, QuerySubstitutablePaths, QueryValidDerivers, OptimiseStore, VerifyStore, BuildDerivation, AddSignatures, NarFromPath, AddToStoreNar, QueryMissing, QueryDerivationOutputMap, RegisterDrvOutput, QueryRealisation, AddMultipleToStore, AddBuildLog, BuildPathsWithResults, AddPermRoot]
+
+-- The op's code on the wire.
+export op_code : Op -> u64
+op_code op =
+  case op of
+    IsValidPath -> 1
+    HasSubstitutes -> 3
+    QueryPathHash -> 4
+    QueryReferences -> 5
+    QueryReferrers -> 6
+    AddToStore -> 7
+    AddTextToStore -> 8
+    BuildPaths -> 9
+    EnsurePath -> 10
+    AddTempRoot -> 11
+    AddIndirectRoot -> 12
+    SyncWithGC -> 13
+    FindRoots -> 14
+    ExportPath -> 16
+    QueryDeriver -> 18
+    SetOptions -> 19
+    CollectGarbage -> 20
+    QuerySubstitutablePathInfo -> 21
+    QueryDerivationOutputs -> 22
+    QueryAllValidPaths -> 23
+    QueryFailedPaths -> 24
+    ClearFailedPaths -> 25
+    QueryPathInfo -> 26
+    ImportPaths -> 27
+    QueryDerivationOutputNames -> 28
+    QueryPathFromHashPart -> 29
+    QuerySubstitutablePathInfos -> 30
+    QueryValidPaths -> 31
+    QuerySubstitutablePaths -> 32
+    QueryValidDerivers -> 33
+    OptimiseStore -> 34
+    VerifyStore -> 35
+    BuildDerivation -> 36
+    AddSignatures -> 37
+    NarFromPath -> 38
+    AddToStoreNar -> 39
+    QueryMissing -> 40
+    QueryDerivationOutputMap -> 41
+    RegisterDrvOutput -> 42
+    QueryRealisation -> 43
+    AddMultipleToStore -> 44
+    AddBuildLog -> 45
+    BuildPathsWithResults -> 46
+    AddPermRoot -> 47
+
+-- The op a code names, if any.
+export op_of_code : u64 -> Option<Op>
+op_of_code code =
+  ALL_OPS |> .iter |> .copied |> .find (\op -> op_code (*op) == code)
+
+-- The op's name, as libstore spells it (`IsValidPath`).
+export op_name : Op -> String
+op_name op = format! \-> "#{op:?}"
+
+------------------------------------------------------------------------
+-- Pure decoders
+
+-- Why a decoder stopped: the buffer ended before the value did (`More`),
+-- or the bytes are not the protocol (`Bad`).
+export data Short = More | Bad String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- One u64 at `at`, and where the next value starts.
+export take_u64 : &[u8] -> usize -> Result<(u64, usize), Short>
+take_u64 b at =
+  if at + 8 > b.len ()
+    return Err More
+  arr = (b[at .. at + 8]).try_into () |> .map_err (\_ -> More) : Result<[u8; 8], Short>
+  Ok ((u64::from_le_bytes (arr?), at + 8))
+
+export take_bool : &[u8] -> usize -> Result<(bool, usize), Short>
+take_bool b at =
+  (n, next) = (take_u64 b at)?
+  Ok ((n != 0, next))
+
+-- A length that fits in memory and under `limit`.
+length : u64 -> u64 -> Result<usize, Short>
+length n limit =
+  if n > limit
+    return Err (Bad ("length #{n} is past the limit #{limit}"))
+  usize::try_from n |> .map_err (\_ -> Bad (.to_string "length overflows usize"))
+
+-- One string's bytes (length, bytes, padding).
+export take_bytes : &[u8] -> usize -> Result<(Vec<u8>, usize), Short>
+take_bytes b at =
+  (n, start) = (take_u64 b at)?
+  len = (length n MAX_STRING)?
+  end = start + len + padding n
+  if end > b.len ()
+    return Err More
+  Ok ((b[start .. start + len].to_vec (), end))
+
+-- One string as text. Log lines need not be UTF-8; invalid bytes become U+FFFD.
+export take_string : &[u8] -> usize -> Result<(String, usize), Short>
+take_string b at =
+  (bytes, next) = (take_bytes b at)?
+  Ok (((String::from_utf8_lossy (&bytes)).into_owned (), next))
+
+-- A list (or set) of strings.
+export take_strings : &[u8] -> usize -> Result<(Vec<String>, usize), Short>
+take_strings b at =
+  (n, start) = (take_u64 b at)?
+  count = (length n MAX_LIST)?
+  mut out = Vec::new () : Vec<String>
+  mut pos = start
+  for _ in 0 .. count
+    (s, next) = (take_string b pos)?
+    out.push s
+    pos := next
+  Ok ((out, pos))
+
+-- A string where "" means none (a deriver, a content address).
+export take_optional : &[u8] -> usize -> Result<(Option<String>, usize), Short>
+take_optional b at =
+  (s, next) = (take_string b at)?
+  if s.is_empty ()
+    Ok ((None, next))
+  else
+    Ok ((Some s, next))
+
+------------------------------------------------------------------------
+-- Pure encoders
+
+export put_u64 : &mut Vec<u8> -> u64 -> ()
+put_u64 out n =
+  out.extend_from_slice (&n.to_le_bytes ())
+  ()
+
+export put_bool : &mut Vec<u8> -> bool -> ()
+put_bool out b =
+  if b
+    put_u64 out 1
+  else
+    put_u64 out 0
+  ()
+
+export put_bytes : &mut Vec<u8> -> &[u8] -> ()
+put_bytes out s = crate::nar::push_bytes out s
+
+export put_str : &mut Vec<u8> -> &str -> ()
+put_str out s = crate::nar::push_bytes out (s.as_bytes ())
+
+export put_strings : &mut Vec<u8> -> &[String] -> ()
+put_strings out ss =
+  put_u64 out (u64::try_from (ss.len ()) |> .unwrap_or u64::MAX)
+  for s in ss
+    put_str out s
+  ()
+
+export put_optional : &mut Vec<u8> -> &Option<String> -> ()
+put_optional out s =
+  case s of
+    None -> put_str out ""
+    Some v -> put_str out v
+  ()
+
+-- One frame of a framed upload: its length, then the bytes, unpadded. An
+-- empty frame ends the upload.
+export put_frame : &mut Vec<u8> -> &[u8] -> ()
+put_frame out payload =
+  put_u64 out (u64::try_from (payload.len ()) |> .unwrap_or u64::MAX)
+  out.extend_from_slice payload
+  ()
+
+------------------------------------------------------------------------
+-- The stderr stream
+
+-- A field of an activity or a result.
+export data Field = Int u64 | Text String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Activity
+  { export id u64
+  , export level u64
+  , export kind u64
+  , export text String
+  , export fields Vec<Field>
+  , export parent u64
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- An error the daemon reports (1.26's structured form): the message, its
+-- verbosity level, and the trace lines.
+export data DaemonFailure
+  { export message String
+  , export level u64
+  , export traces Vec<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- One message of the stderr stream.
+export data StderrMsg
+  = LogNext String
+  | DataRead u64
+  | DataWrite Vec<u8>
+  | Last
+  | Failed DaemonFailure
+  | StartActivity Activity
+  | StopActivity u64
+  | ActivityResult u64 u64 (Vec<Field>)
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export take_fields : &[u8] -> usize -> Result<(Vec<Field>, usize), Short>
+take_fields b at =
+  (n, start) = (take_u64 b at)?
+  count = (length n MAX_LIST)?
+  mut out = Vec::new () : Vec<Field>
+  mut pos = start
+  for _ in 0 .. count
+    (kind, next) = (take_u64 b pos)?
+    if kind == 0
+      (v, after) = (take_u64 b next)?
+      out.push (Int v)
+      pos := after
+    else if kind == 1
+      (s, after) = (take_string b next)?
+      out.push (Text s)
+      pos := after
+    else
+      return Err (Bad ("field type #{kind}"))
+  Ok ((out, pos))
+
+-- The error a STDERR_ERROR carries. From 1.26 it is libutil's `Error`:
+-- type ("Error"), level, name, message, a position flag (always 0), and the
+-- traces (each a position flag and a hint). Before, a message and a status.
+export take_failure : u64 -> &[u8] -> usize -> Result<(DaemonFailure, usize), Short>
+take_failure version b at =
+  if minor version < 26
+    (message, next) = (take_string b at)?
+    (status, end) = (take_u64 b next)?
+    return Ok ((DaemonFailure { message, level = status, traces = Vec::new () }, end))
+  (_kind, p1) = (take_string b at)?
+  (level, p2) = (take_u64 b p1)?
+  (_name, p3) = (take_string b p2)?
+  (message, p4) = (take_string b p3)?
+  (_pos, p5) = (take_u64 b p4)?
+  (n, p6) = (take_u64 b p5)?
+  count = (length n MAX_LIST)?
+  mut traces = Vec::new () : Vec<String>
+  mut pos = p6
+  for _ in 0 .. count
+    (_tpos, next) = (take_u64 b pos)?
+    (hint, after) = (take_string b next)?
+    traces.push hint
+    pos := after
+  Ok ((DaemonFailure { message, level, traces }, pos))
+
+export take_activity : &[u8] -> usize -> Result<(Activity, usize), Short>
+take_activity b at =
+  (id, p1) = (take_u64 b at)?
+  (level, p2) = (take_u64 b p1)?
+  (kind, p3) = (take_u64 b p2)?
+  (text, p4) = (take_string b p3)?
+  (fields, p5) = (take_fields b p4)?
+  (parent, p6) = (take_u64 b p5)?
+  Ok ((Activity { id, level, kind, text, fields, parent }, p6))
+
+-- One stderr message, for a connection speaking `version`.
+export take_stderr : u64 -> &[u8] -> usize -> Result<(StderrMsg, usize), Short>
+take_stderr version b at =
+  (code, next) = (take_u64 b at)?
+  if code == STDERR_LAST
+    Ok ((Last, next))
+  else if code == STDERR_NEXT
+    (s, end) = (take_string b next)?
+    Ok ((LogNext s, end))
+  else if code == STDERR_ERROR
+    (f, end) = (take_failure version b next)?
+    Ok ((Failed f, end))
+  else if code == STDERR_START_ACTIVITY
+    (a, end) = (take_activity b next)?
+    Ok ((StartActivity a, end))
+  else if code == STDERR_STOP_ACTIVITY
+    (id, end) = (take_u64 b next)?
+    Ok ((StopActivity id, end))
+  else if code == STDERR_RESULT
+    (id, p1) = (take_u64 b next)?
+    (kind, p2) = (take_u64 b p1)?
+    (fields, end) = (take_fields b p2)?
+    Ok ((ActivityResult id kind fields, end))
+  else if code == STDERR_READ
+    (n, end) = (take_u64 b next)?
+    Ok ((DataRead n, end))
+  else if code == STDERR_WRITE
+    (payload, end) = (take_bytes b next)?
+    Ok ((DataWrite payload, end))
+  else
+    Err (Bad ("stderr message code #{code}"))
+
+export put_fields : &mut Vec<u8> -> &[Field] -> ()
+put_fields out fields =
+  put_u64 out (u64::try_from (fields.len ()) |> .unwrap_or u64::MAX)
+  for f in fields
+    case f of
+      Int v ->
+        put_u64 out 0
+        put_u64 out (*v)
+      Text s ->
+        put_u64 out 1
+        put_str out s
+  ()
+
+-- One stderr message, encoded for a connection speaking `version`.
+export put_stderr : &mut Vec<u8> -> u64 -> &StderrMsg -> ()
+put_stderr out version msg =
+  case msg of
+    Last -> put_u64 out STDERR_LAST
+    LogNext s ->
+      put_u64 out STDERR_NEXT
+      put_str out s
+    Failed f -> put_failure out version f
+    StartActivity a ->
+      put_u64 out STDERR_START_ACTIVITY
+      put_u64 out a.id
+      put_u64 out a.level
+      put_u64 out a.kind
+      put_str out (&a.text)
+      put_fields out (&a.fields)
+      put_u64 out a.parent
+    StopActivity id ->
+      put_u64 out STDERR_STOP_ACTIVITY
+      put_u64 out (*id)
+    ActivityResult id kind fields ->
+      put_u64 out STDERR_RESULT
+      put_u64 out (*id)
+      put_u64 out (*kind)
+      put_fields out fields
+    DataRead n ->
+      put_u64 out STDERR_READ
+      put_u64 out (*n)
+    DataWrite payload ->
+      put_u64 out STDERR_WRITE
+      put_bytes out payload
+  ()
+
+put_failure : &mut Vec<u8> -> u64 -> &DaemonFailure -> ()
+put_failure out version f =
+  put_u64 out STDERR_ERROR
+  if minor version < 26
+    put_str out (&f.message)
+    put_u64 out f.level
+  else
+    put_str out "Error"
+    put_u64 out f.level
+    put_str out "Error"
+    put_str out (&f.message)
+    put_u64 out 0
+    put_u64 out (u64::try_from (f.traces.len ()) |> .unwrap_or 0)
+    for t in &f.traces
+      put_u64 out 0
+      put_str out t
+  ()
+
+------------------------------------------------------------------------
+-- Requests, as a proxy sees them
+
+-- The op a request starts with and the store paths among its leading
+-- arguments: the first path, or the list of paths, depending on the op.
+-- A hash part (QueryPathFromHashPart) and a derived path (`<drv>^out`,
+-- BuildPaths) are listed as sent.
+export data Request
+  { export code u64
+  , export op Option<Op>
+  , export paths Vec<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Ops whose first argument is one store path (or path-like string).
+export first_arg_is_path : Op -> bool
+first_arg_is_path op =
+  case op of
+    IsValidPath -> true
+    HasSubstitutes -> true
+    QueryPathHash -> true
+    QueryReferences -> true
+    QueryReferrers -> true
+    EnsurePath -> true
+    AddTempRoot -> true
+    AddIndirectRoot -> true
+    QueryDeriver -> true
+    QuerySubstitutablePathInfo -> true
+    QueryDerivationOutputs -> true
+    QueryPathInfo -> true
+    QueryDerivationOutputNames -> true
+    QueryPathFromHashPart -> true
+    QueryValidDerivers -> true
+    BuildDerivation -> true
+    AddSignatures -> true
+    NarFromPath -> true
+    AddToStoreNar -> true
+    QueryDerivationOutputMap -> true
+    AddBuildLog -> true
+    AddPermRoot -> true
+    _ -> false
+
+-- Ops whose first argument is a list of store paths.
+export first_arg_is_paths : Op -> bool
+first_arg_is_paths op =
+  case op of
+    QueryValidPaths -> true
+    QuerySubstitutablePaths -> true
+    BuildPaths -> true
+    BuildPathsWithResults -> true
+    QueryMissing -> true
+    _ -> false
+
+-- QuerySubstitutablePathInfos from 1.22: a map of path to content address.
+take_path_map : &[u8] -> usize -> Result<(Vec<String>, usize), Short>
+take_path_map b at =
+  (n, start) = (take_u64 b at)?
+  count = (length n MAX_LIST)?
+  mut out = Vec::new () : Vec<String>
+  mut pos = start
+  for _ in 0 .. count
+    (p, next) = (take_string b pos)?
+    (_ca, after) = (take_string b next)?
+    out.push p
+    pos := after
+  Ok ((out, pos))
+
+-- The op and paths at the start of a request. The position returned is the
+-- end of what was read, not of the request: the rest of the arguments (and
+-- any upload) are left to whoever forwards the bytes.
+export take_request : u64 -> &[u8] -> usize -> Result<(Request, usize), Short>
+take_request version b at =
+  (code, next) = (take_u64 b at)?
+  op = op_of_code code
+  case op of
+    None -> Ok ((Request { code, op, paths = Vec::new () }, next))
+    Some o ->
+      if first_arg_is_path o
+        (p, end) = (take_string b next)?
+        Ok ((Request { code, op, paths = .to_vec ([p]) }, end))
+      else if first_arg_is_paths o
+        (ps, end) = (take_strings b next)?
+        Ok ((Request { code, op, paths = ps }, end))
+      else if o == QuerySubstitutablePathInfos && minor version >= 22
+        (ps, end) = (take_path_map b next)?
+        Ok ((Request { code, op, paths = ps }, end))
+      else if o == QuerySubstitutablePathInfos
+        (ps, end) = (take_strings b next)?
+        Ok ((Request { code, op, paths = ps }, end))
+      else
+        Ok ((Request { code, op, paths = Vec::new () }, next))
+
+------------------------------------------------------------------------
+-- Path info
+
+-- A valid path's info as the daemon reports it (`QueryPathInfo`), and as an
+-- upload declares it (`AddToStoreNar`). The deriver and references are full
+-- paths; the NAR hash is a SHA-256.
+export data PathInfo
+  { export path String
+  , export deriver Option<String>
+  , export nar_hash Sha256
+  , export references Vec<String>
+  , export registration_time u64
+  , export nar_size u64
+  , export ultimate bool
+  , export sigs Vec<String>
+  , export ca Option<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The fields after the path (libstore's `UnverifiedPathInfo`), for `path`.
+export take_path_info : String -> &[u8] -> usize -> Result<(PathInfo, usize), Short>
+take_path_info path b at =
+  (deriver, p1) = (take_optional b at)?
+  (hash_text, p2) = (take_string b p1)?
+  nar_hash = (crate::hash::parse (&hash_text) |> .ok_or_else (\-> Bad ("narHash #{hash_text}")))?
+  (references, p3) = (take_strings b p2)?
+  (registration_time, p4) = (take_u64 b p3)?
+  (nar_size, p5) = (take_u64 b p4)?
+  (ultimate, p6) = (take_bool b p5)?
+  (sigs, p7) = (take_strings b p6)?
+  (ca, p8) = (take_optional b p7)?
+  Ok ((PathInfo { path, deriver, nar_hash, references, registration_time, nar_size, ultimate, sigs, ca }, p8))
+
+-- The same fields, encoded (without the path).
+export put_path_info : &mut Vec<u8> -> &PathInfo -> ()
+put_path_info out info =
+  put_optional out (&info.deriver)
+  put_str out (&crate::hash::to_base16 (&info.nar_hash))
+  put_strings out (&info.references)
+  put_u64 out info.registration_time
+  put_u64 out info.nar_size
+  put_bool out info.ultimate
+  put_strings out (&info.sigs)
+  put_optional out (&info.ca)
+  ()
+
+-- QueryPathInfo's reply: a validity flag, then the info.
+export take_path_info_reply : String -> &[u8] -> usize -> Result<(Option<PathInfo>, usize), Short>
+take_path_info_reply path b at =
+  (valid, next) = (take_bool b at)?
+  if valid
+    (info, end) = (take_path_info path b next)?
+    Ok ((Some info, end))
+  else
+    Ok ((None, next))
+
+------------------------------------------------------------------------
+-- NAR, as a stream of the wire
+
+-- Where a NAR being read off the wire is: at a token, at the data that
+-- follows `name` or `target`, or inside a file's contents (bytes left, then
+-- padding).
+export data NarState = AtToken | AtData | InBlob u64 usize
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+export data NarScan { export depth u64, export state NarState, export started bool, export done bool }
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+export nar_scan : NarScan
+nar_scan = NarScan { depth = 0, state = AtToken, started = false, done = false }
+
+-- Advance over as much of a NAR as `b[at ..]` holds, returning where it
+-- stopped. File contents are passed over in pieces, so a NAR of any size
+-- needs one buffer of memory. `More` means not even one step fits.
+export nar_step : &mut NarScan -> &[u8] -> usize -> Result<usize, Short>
+nar_step s b at =
+  mut pos = at
+  mut progressed = false
+  mut more = !s.done
+  while more
+    case nar_one s b pos of
+      Ok next ->
+        pos := next
+        progressed := true
+        more := !s.done
+      Err More -> more := false
+      Err (Bad why) ->
+        return Err (Bad why)
+  if progressed || s.done
+    Ok pos
+  else
+    Err More
+
+nar_one : &mut NarScan -> &[u8] -> usize -> Result<usize, Short>
+nar_one s b at =
+  case s.state of
+    AtData ->
+      (_data, next) = (take_bytes b at)?
+      s.state := AtToken
+      Ok next
+    InBlob left pad ->
+      if left == 0
+        if at + pad > b.len ()
+          return Err More
+        s.state := AtToken
+        return Ok (at + pad)
+      avail = b.len () - at
+      if avail == 0
+        return Err More
+      take = usize::try_from left |> .unwrap_or avail |> .min avail
+      s.state := InBlob (left - (u64::try_from take |> .unwrap_or left)) pad
+      Ok (at + take)
+    AtToken -> nar_token s b at
+
+nar_token : &mut NarScan -> &[u8] -> usize -> Result<usize, Short>
+nar_token s b at =
+  (tok, next) = (take_bytes b at)?
+  t = tok.as_slice ()
+  if !s.started
+    if t != b"nix-archive-1"
+      return Err (Bad (.to_string "not a NAR: no nix-archive-1 magic"))
+    s.started := true
+    return Ok next
+  if t == b"("
+    s.depth += 1
+    Ok next
+  else if t == b")"
+    if s.depth == 0
+      return Err (Bad (.to_string "unbalanced NAR"))
+    s.depth -= 1
+    if s.depth == 0
+      s.done := true
+    Ok next
+  else if t == b"name" || t == b"target"
+    s.state := AtData
+    Ok next
+  else if t == b"contents"
+    (n, after) = (take_u64 b next)?
+    s.state := InBlob n (padding n)
+    Ok after
+  else
+    Ok next
+
+------------------------------------------------------------------------
+-- The buffered connection
+
+export type Reader = Box<dyn AsyncRead + Send + Unpin>
+
+export type Writer = Box<dyn AsyncWrite + Send + Unpin>
+
+-- One side of a worker-protocol conversation: what was read and not yet
+-- decoded, the negotiated version, and what the handshake learned. Once an
+-- I/O or protocol error has desynchronised it, every later use fails.
+export data Conn
+  { reader Reader
+  , writer Writer
+  , buf Vec<u8>
+  , pos usize
+  , export version u64
+  , export daemon_nix_version Option<String>
+  , export trusted Option<bool>
+  , export features Vec<String>
+  , broken Option<String>
+  }
+
+export conn_of : Reader -> Writer -> Conn
+conn_of reader writer =
+  Conn { reader, writer, buf = Vec::with_capacity CHUNK, pos = 0, version = CLIENT_VERSION, daemon_nix_version = None, trusted = None, features = Vec::new (), broken = None }
+
+usable : &Conn -> Result<(), WorkerError>
+usable c =
+  case &c.broken of
+    None -> Ok ()
+    Some why -> Err (Broken (why.clone ()))
+
+-- Note the first failure that leaves the stream out of step.
+poisoned : given <T> &mut Conn -> Result<T, WorkerError> -> Result<T, WorkerError>
+poisoned c r =
+  if &r is Err e
+    if c.broken.is_none ()
+      c.broken := Some (e.to_string ())
+  r
+
+-- Read more bytes into the buffer. The end of the stream is an error: a
+-- decoder only asks when the value it holds is incomplete.
+fill : async &mut Conn -> Result<(), WorkerError>
+fill c =
+  if c.pos > 0
+    len = c.buf.len ()
+    c.buf.copy_within (c.pos .. len) 0
+    c.buf.truncate (len - c.pos)
+    c.pos := 0
+  start = c.buf.len ()
+  c.buf.resize (start + CHUNK) 0
+  r <- c.reader.read (&mut c.buf[start .. start + CHUNK])
+  if r.is_err ()
+    c.buf.truncate start
+  n = r?
+  c.buf.truncate (start + n)
+  if n == 0
+    return Err (Io (std::io::Error::new std::io::ErrorKind::UnexpectedEof "the connection closed mid-message"))
+  Ok ()
+
+-- The next value, decoded by `f`, reading as much as it needs.
+export next : given <T, F: Fn(&[u8], usize) -> Result<(T, usize), Short>> async &mut Conn -> F -> Result<T, WorkerError>
+next c f =
+  (usable c)?
+  mut out = None : Option<Result<T, WorkerError>>
+  while out.is_none ()
+    case f (&c.buf) c.pos of
+      Ok (v, at) ->
+        c.pos := at
+        out := Some (Ok v)
+      Err More ->
+        r <- fill c
+        if r is Err e
+          out := Some (Err e)
+      Err (Bad why) -> out := Some (Err (Protocol why))
+  r = out |> .unwrap_or (Err (Protocol (.to_string "no value")))
+  poisoned c r
+
+-- Write an encoded message and flush it.
+export send : async &mut Conn -> &[u8] -> Result<(), WorkerError>
+send c bytes =
+  (usable c)?
+  w <- c.writer.write_all bytes
+  f <- c.writer.flush ()
+  r = w |> .and (f) |> .map_err Io
+  poisoned c r
+
+-- Bytes already read past the last decoded value. A proxy that hands a
+-- connection over to a raw relay forwards these first.
+export pending : &Conn -> &[u8]
+pending c = &c.buf[c.pos .. c.buf.len ()]
+
+------------------------------------------------------------------------
+-- Handshakes
+
+-- What a server announces in its handshake.
+export data ServerHello
+  { export version u64
+  , export nix_version String
+  , export trusted Option<bool>
+  , export features Vec<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+trust_code : Option<bool> -> u64
+trust_code t =
+  case t of
+    None -> 0
+    Some true -> 1
+    Some false -> 2
+
+trust_of : u64 -> Option<bool>
+trust_of n =
+  if n == 1
+    Some true
+  else if n == 2
+    Some false
+  else
+    None
+
+check_version : u64 -> Result<(), WorkerError>
+check_version v =
+  if major v != 1
+    return Err (Protocol ("protocol major version #{major v}"))
+  if v < MIN_VERSION
+    return Err (Protocol ("protocol 1.#{minor v} is older than 1.#{minor MIN_VERSION}"))
+  Ok ()
+
+-- The client's side, offering `offer` (`CLIENT_VERSION` normally). On
+-- success the connection speaks the lower of the two versions and holds
+-- the daemon's Nix version and whether it trusts this client.
+export client_handshake : async &mut Conn -> u64 -> Result<(), WorkerError>
+client_handshake c offer =
+  mut hello = Vec::new () : Vec<u8>
+  put_u64 (&mut hello) WORKER_MAGIC_1
+  s1 <- send c (&hello)
+  s1?
+  m <- next c take_u64
+  if m? != WORKER_MAGIC_2
+    return poisoned c (Err (Protocol (.to_string "the daemon did not answer with WORKER_MAGIC_2")))
+  dv <- next c take_u64
+  daemon_version = dv?
+  (poisoned c (check_version daemon_version))?
+  version = daemon_version.min offer
+  c.version := version
+  mut reply = Vec::new () : Vec<u8>
+  put_u64 (&mut reply) offer
+  if minor version >= 38
+    put_strings (&mut reply) (&Vec::new ())
+  s2 <- send c (&reply)
+  s2?
+  if minor version >= 38
+    fs <- next c take_strings
+    c.features := fs?
+  -- No CPU affinity (from 1.14), no reserved space (from 1.11).
+  mut post = Vec::new () : Vec<u8>
+  put_u64 (&mut post) 0
+  put_u64 (&mut post) 0
+  s3 <- send c (&post)
+  s3?
+  if minor version >= 33
+    nv <- next c take_string
+    c.daemon_nix_version := Some (nv?)
+  if minor version >= 35
+    t <- next c take_u64
+    c.trusted := trust_of (t?)
+  done <- process_stderr c
+  done
+
+-- The server's side: what a daemon (or a proxy standing in for one) says.
+-- On success the connection speaks the lower version and holds the
+-- client's features.
+export server_handshake : async &mut Conn -> &ServerHello -> Result<(), WorkerError>
+server_handshake c hello =
+  m <- next c take_u64
+  if m? != WORKER_MAGIC_1
+    return poisoned c (Err (Protocol (.to_string "the client did not open with WORKER_MAGIC_1")))
+  mut out = Vec::new () : Vec<u8>
+  put_u64 (&mut out) WORKER_MAGIC_2
+  put_u64 (&mut out) hello.version
+  s1 <- send c (&out)
+  s1?
+  cv <- next c take_u64
+  client_version = cv?
+  (poisoned c (check_version client_version))?
+  version = client_version.min hello.version
+  c.version := version
+  if minor version >= 38
+    fs <- next c take_strings
+    c.features := fs?
+    mut feats = Vec::new () : Vec<u8>
+    put_strings (&mut feats) (&hello.features)
+    s2 <- send c (&feats)
+    s2?
+  if minor version >= 14
+    aff <- next c take_u64
+    if aff? != 0
+      cpu <- next c take_u64
+      cpu?
+  if minor version >= 11
+    rs <- next c take_u64
+    rs?
+  mut tail = Vec::new () : Vec<u8>
+  if minor version >= 33
+    put_str (&mut tail) (&hello.nix_version)
+  if minor version >= 35
+    put_u64 (&mut tail) (trust_code hello.trusted)
+  put_u64 (&mut tail) STDERR_LAST
+  s3 <- send c (&tail)
+  s3
+
+------------------------------------------------------------------------
+-- The stderr stream, client side, and relayed
+
+-- Read the daemon's stderr messages up to LAST. Log lines and activities
+-- are dropped; STDERR_ERROR is the operation's `Remote` failure (the
+-- connection stays usable). The client has no data to give a STDERR_READ.
+export process_stderr : async &mut Conn -> Result<(), WorkerError>
+process_stderr c =
+  mut out = None : Option<Result<(), WorkerError>>
+  v = c.version
+  while out.is_none ()
+    m <- next c (move \b at -> take_stderr v b at)
+    case m of
+      Err e -> out := Some (Err e)
+      Ok Last -> out := Some (Ok ())
+      Ok (Failed f) -> out := Some (Err (Remote f.message))
+      Ok (DataRead _) -> out := Some (poisoned c (Err (Protocol (.to_string "the daemon asked for data this client does not send"))))
+      Ok _ -> ()
+  out |> .unwrap_or (Ok ())
+
+-- How a relayed stderr stream ended.
+export data StderrEnd = Done | Errored DaemonFailure
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Relay one operation's stderr stream from `daemon` to `client`, message by
+-- message, re-encoded for the client's version. A STDERR_READ is answered
+-- by reading one string from the client and passing it to the daemon. This
+-- is the stderr half of forwarding an op through a terminating proxy.
+export relay_stderr : async &mut Conn -> &mut Conn -> Result<StderrEnd, WorkerError>
+relay_stderr daemon client =
+  mut out = None : Option<Result<StderrEnd, WorkerError>>
+  v = daemon.version
+  while out.is_none ()
+    m <- next daemon (move \b at -> take_stderr v b at)
+    case m of
+      Err e -> out := Some (Err e)
+      Ok msg ->
+        mut enc = Vec::new () : Vec<u8>
+        put_stderr (&mut enc) client.version (&msg)
+        s <- send client (&enc)
+        if s is Err e
+          out := Some (Err e)
+        else
+          case msg of
+            Last -> out := Some (Ok Done)
+            Failed f -> out := Some (Ok (Errored f))
+            DataRead _ ->
+              d <- next client take_bytes
+              case d of
+                Err e -> out := Some (Err e)
+                Ok payload ->
+                  mut fwd = Vec::new () : Vec<u8>
+                  put_bytes (&mut fwd) (&payload)
+                  s2 <- send daemon (&fwd)
+                  if s2 is Err e
+                    out := Some (Err e)
+            _ -> ()
+  out |> .unwrap_or (Ok Done)
+
+------------------------------------------------------------------------
+-- Operations over a connection
+
+op_header : Op -> Vec<u8>
+op_header op =
+  mut out = Vec::new () : Vec<u8>
+  put_u64 (&mut out) (op_code op)
+  out
+
+-- Send a request and wait for its stderr stream to end.
+call : async &mut Conn -> &[u8] -> Result<(), WorkerError>
+call c req =
+  s <- send c req
+  s?
+  e <- process_stderr c
+  e
+
+export is_valid_path_on : async &mut Conn -> &str -> Result<bool, WorkerError>
+is_valid_path_on c path =
+  mut req = op_header IsValidPath
+  put_str (&mut req) path
+  r <- call c (&req)
+  r?
+  v <- next c take_bool
+  v
+
+export query_valid_paths_on : async &mut Conn -> &[String] -> bool -> Result<Vec<String>, WorkerError>
+query_valid_paths_on c paths substitute =
+  mut req = op_header QueryValidPaths
+  put_strings (&mut req) paths
+  if minor c.version >= 27
+    put_bool (&mut req) substitute
+  r <- call c (&req)
+  r?
+  v <- next c take_strings
+  v
+
+export query_path_info_on : async &mut Conn -> &str -> Result<Option<PathInfo>, WorkerError>
+query_path_info_on c path =
+  mut req = op_header QueryPathInfo
+  put_str (&mut req) path
+  r <- call c (&req)
+  r?
+  owned = path.to_string ()
+  v <- next c (move \b at -> take_path_info_reply (owned.clone ()) b at)
+  v
+
+export query_path_from_hash_part_on : async &mut Conn -> &str -> Result<Option<String>, WorkerError>
+query_path_from_hash_part_on c hash =
+  mut req = op_header QueryPathFromHashPart
+  put_str (&mut req) hash
+  r <- call c (&req)
+  r?
+  v <- next c take_optional
+  v
+
+export add_temp_root_on : async &mut Conn -> &str -> Result<(), WorkerError>
+add_temp_root_on c path =
+  mut req = op_header AddTempRoot
+  put_str (&mut req) path
+  r <- call c (&req)
+  r?
+  v <- next c take_u64
+  v?
+  Ok ()
+
+export add_signatures_on : async &mut Conn -> &str -> &[String] -> Result<(), WorkerError>
+add_signatures_on c path sigs =
+  mut req = op_header AddSignatures
+  put_str (&mut req) path
+  put_strings (&mut req) sigs
+  r <- call c (&req)
+  r?
+  v <- next c take_u64
+  v?
+  Ok ()
+
+-- Pass the NAR that follows NarFromPath's stderr stream to `sink`, piece by
+-- piece, exactly as it came off the wire.
+export copy_nar : given <F: FnMut(&[u8]) -> ()> async &mut Conn -> F -> Result<(), WorkerError>
+copy_nar c sink =
+  mut emit = sink
+  mut scan = nar_scan ()
+  mut out = None : Option<Result<(), WorkerError>>
+  (usable c)?
+  while out.is_none ()
+    case nar_step (&mut scan) (&c.buf) c.pos of
+      Ok next_pos ->
+        emit (&c.buf[c.pos .. next_pos])
+        c.pos := next_pos
+        if scan.done
+          out := Some (Ok ())
+      Err More ->
+        r <- fill c
+        if r is Err e
+          out := Some (poisoned c (Err e))
+      Err (Bad why) -> out := Some (poisoned c (Err (Protocol why)))
+  out |> .unwrap_or (Ok ())
+
+export nar_from_path_on : async &mut Conn -> &str -> Result<Vec<u8>, WorkerError>
+nar_from_path_on c path =
+  mut req = op_header NarFromPath
+  put_str (&mut req) path
+  r <- call c (&req)
+  r?
+  mut nar = Vec::new () : Vec<u8>
+  done <- copy_nar c (\piece -> nar.extend_from_slice piece)
+  done?
+  Ok nar
+
+export nar_hash_from_path_on : async &mut Conn -> &str -> Result<NarDigest, WorkerError>
+nar_hash_from_path_on c path =
+  mut req = op_header NarFromPath
+  put_str (&mut req) path
+  r <- call c (&req)
+  r?
+  mut hasher = sha2::Sha256::new ()
+  mut size = 0 : u64
+  done <- copy_nar c (\piece -> hash_piece (&mut hasher) (&mut size) piece)
+  done?
+  bytes = hasher.finalize ().into () : [u8; 32]
+  Ok (NarDigest { hash = Sha256 { bytes }, size })
+
+hash_piece : &mut sha2::Sha256 -> &mut u64 -> &[u8] -> ()
+hash_piece hasher size piece =
+  hasher.update piece
+  *size += u64::try_from (piece.len ()) |> .unwrap_or 0
+  ()
+
+add_to_store_nar_header : &PathInfo -> bool -> bool -> Vec<u8>
+add_to_store_nar_header info repair dont_check_sigs =
+  mut req = op_header AddToStoreNar
+  put_str (&mut req) (&info.path)
+  put_path_info (&mut req) info
+  put_bool (&mut req) repair
+  put_bool (&mut req) dont_check_sigs
+  req
+
+-- Upload a NAR held in memory, as frames of at most CHUNK bytes.
+export add_to_store_nar_on : async &mut Conn -> &PathInfo -> &[u8] -> bool -> bool -> Result<(), WorkerError>
+add_to_store_nar_on c info nar repair dont_check_sigs =
+  mut req = add_to_store_nar_header info repair dont_check_sigs
+  for piece in nar.chunks CHUNK
+    put_frame (&mut req) piece
+  put_u64 (&mut req) 0
+  r <- call c (&req)
+  r
+
+-- Upload the NAR of a local path, archived chunk by chunk (nar::cursor) and
+-- sent a frame per chunk, so memory stays at one chunk.
+export add_to_store_nar_from_on : async &mut Conn -> &PathInfo -> &std::path::Path -> bool -> bool -> Result<(), WorkerError>
+add_to_store_nar_from_on c info local repair dont_check_sigs =
+  head = add_to_store_nar_header info repair dont_check_sigs
+  s <- send c (&head)
+  s?
+  mut cur = crate::nar::cursor local
+  mut more = true
+  while more
+    chunk = (crate::nar::next_chunk (&mut cur))?
+    mut frame = Vec::new () : Vec<u8>
+    case chunk of
+      Some bytes -> put_frame (&mut frame) (&bytes)
+      None ->
+        put_u64 (&mut frame) 0
+        more := false
+    s2 <- send c (&frame)
+    s2?
+  e <- process_stderr c
+  e
+
+------------------------------------------------------------------------
+-- The connection as an id_effect resource
+
+-- A handshaken connection, shared: operations take turns on it (one op at
+-- a time, as the protocol requires).
+export newtype Daemon = Daemon (export Arc<Mutex<Conn>>)
+
+instance Clone Daemon
+  clone : &self -> Self
+  clone self = Daemon (Arc::clone (&self.0))
+
+-- What the handshake learned.
+export data Hello
+  { export version u64
+  , export daemon_nix_version Option<String>
+  , export trusted Option<bool>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+handshaken : async Conn -> Result<Daemon, WorkerError>
+handshaken conn =
+  mut c = conn
+  r <- client_handshake (&mut c) CLIENT_VERSION
+  r?
+  Ok (Daemon (Arc::new (Mutex::new c)))
+
+connect_io : async String -> Result<Daemon, WorkerError>
+connect_io socket =
+  s <- tokio::net::UnixStream::connect (&socket)
+  stream = (s |> .map_err (\e -> Connect ("#{socket}: #{e}")))?
+  (r, w) = stream.into_split ()
+  d <- handshaken (conn_of (Box::new r) (Box::new w))
+  d
+
+-- Connect to the daemon socket at `socket` and shake hands. The caller owns
+-- the connection: release it with `close`, or use `with_daemon` / `scoped`.
+export connect : String -> Effect<Daemon, WorkerError, HNil>
+connect socket = from_async (move \-> connect_io socket)
+
+-- Shake hands over a stream that is already open: a socket, or an ssh pipe.
+export open : given <S: AsyncRead + AsyncWrite + Send + Unpin + 'static> S -> Effect<Daemon, WorkerError, HNil>
+open stream =
+  (r, w) = tokio::io::split stream
+  conn = conn_of (Box::new r) (Box::new w)
+  from_async (move \-> handshaken conn)
+
+-- Shake hands over separate halves: a child's stdout and stdin
+-- (`ssh host nix-daemon --stdio`).
+export open_halves : given <R: AsyncRead + Send + Unpin + 'static, W: AsyncWrite + Send + Unpin + 'static> R -> W -> Effect<Daemon, WorkerError, HNil>
+open_halves r w =
+  conn = conn_of (Box::new r) (Box::new w)
+  from_async (move \-> handshaken conn)
+
+close_io : async Daemon -> Result<(), Never>
+close_io d =
+  locked <- d.0.lock ()
+  mut g = locked
+  _r <- g.writer.shutdown ()
+  g.broken := Some (.to_string "closed")
+  Ok ()
+
+-- Shut the connection's write side; the daemon ends the session. Later
+-- operations on it fail with `Broken`.
+export close : Daemon -> Effect<(), Never, HNil>
+close d = from_async (move \-> close_io d)
+
+-- Connect, use, and close however the use ends (acquire/use/release).
+export with_daemon : given <A: Send + 'static, U: FnOnce(Daemon) -> Effect<A, WorkerError, HNil> + Send + 'static> String -> U -> Effect<A, WorkerError, HNil>
+with_daemon socket use_ =
+  acquire_use_release (connect socket) use_ (\d _kind -> close d)
+
+-- Connect and register the close on `scope`.
+export scoped : &Scope -> String -> Effect<Daemon, WorkerError, HNil>
+scoped scope socket =
+  s = scope.clone ()
+  connect socket |> .flat_map (move \d -> s.add_finalizer (close (d.clone ())) |> .map (move \_ -> d))
+
+hello_io : async Daemon -> Result<Hello, WorkerError>
+hello_io d =
+  g <- d.0.lock ()
+  Ok (Hello { version = g.version, daemon_nix_version = g.daemon_nix_version.clone (), trusted = g.trusted })
+
+-- The negotiated version, the daemon's Nix version and its trust in us.
+export hello : &Daemon -> Effect<Hello, WorkerError, HNil>
+hello d =
+  h = d.clone ()
+  from_async (move \-> hello_io h)
+
+is_valid_path_io : async Daemon -> String -> Result<bool, WorkerError>
+is_valid_path_io d path =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- is_valid_path_on (&mut g) (&path)
+  r
+
+export is_valid_path : &Daemon -> String -> Effect<bool, WorkerError, HNil>
+is_valid_path d path =
+  h = d.clone ()
+  from_async (move \-> is_valid_path_io h path)
+
+query_valid_paths_io : async Daemon -> Vec<String> -> bool -> Result<Vec<String>, WorkerError>
+query_valid_paths_io d paths substitute =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- query_valid_paths_on (&mut g) (&paths) substitute
+  r
+
+-- Which of `paths` are valid; with `substitute`, the daemon may first try
+-- to substitute the missing ones.
+export query_valid_paths : &Daemon -> Vec<String> -> bool -> Effect<Vec<String>, WorkerError, HNil>
+query_valid_paths d paths substitute =
+  h = d.clone ()
+  from_async (move \-> query_valid_paths_io h paths substitute)
+
+query_path_info_io : async Daemon -> String -> Result<Option<PathInfo>, WorkerError>
+query_path_info_io d path =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- query_path_info_on (&mut g) (&path)
+  r
+
+-- A path's info; None when it is not valid.
+export query_path_info : &Daemon -> String -> Effect<Option<PathInfo>, WorkerError, HNil>
+query_path_info d path =
+  h = d.clone ()
+  from_async (move \-> query_path_info_io h path)
+
+query_path_from_hash_part_io : async Daemon -> String -> Result<Option<String>, WorkerError>
+query_path_from_hash_part_io d hash =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- query_path_from_hash_part_on (&mut g) (&hash)
+  r
+
+-- The valid path whose hash part is `hash`, if any.
+export query_path_from_hash_part : &Daemon -> String -> Effect<Option<String>, WorkerError, HNil>
+query_path_from_hash_part d hash =
+  h = d.clone ()
+  from_async (move \-> query_path_from_hash_part_io h hash)
+
+nar_from_path_io : async Daemon -> String -> Result<Vec<u8>, WorkerError>
+nar_from_path_io d path =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- nar_from_path_on (&mut g) (&path)
+  r
+
+-- A valid path's NAR, whole, in memory.
+export nar_from_path : &Daemon -> String -> Effect<Vec<u8>, WorkerError, HNil>
+nar_from_path d path =
+  h = d.clone ()
+  from_async (move \-> nar_from_path_io h path)
+
+nar_hash_from_path_io : async Daemon -> String -> Result<NarDigest, WorkerError>
+nar_hash_from_path_io d path =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- nar_hash_from_path_on (&mut g) (&path)
+  r
+
+-- A valid path's NAR hash and size, hashed as it streams (one buffer).
+export nar_hash_from_path : &Daemon -> String -> Effect<NarDigest, WorkerError, HNil>
+nar_hash_from_path d path =
+  h = d.clone ()
+  from_async (move \-> nar_hash_from_path_io h path)
+
+add_to_store_nar_io : async Daemon -> PathInfo -> Vec<u8> -> bool -> bool -> Result<(), WorkerError>
+add_to_store_nar_io d info nar repair dont_check_sigs =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- add_to_store_nar_on (&mut g) (&info) (&nar) repair dont_check_sigs
+  r
+
+-- Add a path from its NAR in memory. `info.nar_hash` and `nar_size` must
+-- match it; `dont_check_sigs` needs a trusted client.
+export add_to_store_nar : &Daemon -> PathInfo -> Vec<u8> -> bool -> bool -> Effect<(), WorkerError, HNil>
+add_to_store_nar d info nar repair dont_check_sigs =
+  h = d.clone ()
+  from_async (move \-> add_to_store_nar_io h info nar repair dont_check_sigs)
+
+add_to_store_nar_from_io : async Daemon -> PathInfo -> PathBuf -> bool -> bool -> Result<(), WorkerError>
+add_to_store_nar_from_io d info local repair dont_check_sigs =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- add_to_store_nar_from_on (&mut g) (&info) (&local) repair dont_check_sigs
+  r
+
+-- Add a path from the NAR of the local path `local`, streamed.
+export add_to_store_nar_from : &Daemon -> PathInfo -> PathBuf -> bool -> bool -> Effect<(), WorkerError, HNil>
+add_to_store_nar_from d info local repair dont_check_sigs =
+  h = d.clone ()
+  from_async (move \-> add_to_store_nar_from_io h info local repair dont_check_sigs)
+
+add_temp_root_io : async Daemon -> String -> Result<(), WorkerError>
+add_temp_root_io d path =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- add_temp_root_on (&mut g) (&path)
+  r
+
+-- Keep `path` alive for as long as this connection is open.
+export add_temp_root : &Daemon -> String -> Effect<(), WorkerError, HNil>
+add_temp_root d path =
+  h = d.clone ()
+  from_async (move \-> add_temp_root_io h path)
+
+add_signatures_io : async Daemon -> String -> Vec<String> -> Result<(), WorkerError>
+add_signatures_io d path sigs =
+  locked <- d.0.lock ()
+  mut g = locked
+  r <- add_signatures_on (&mut g) (&path) (&sigs)
+  r
+
+-- Add signatures (`<key name>:<base64>`) to a valid path.
+export add_signatures : &Daemon -> String -> Vec<String> -> Effect<(), WorkerError, HNil>
+add_signatures d path sigs =
+  h = d.clone ()
+  from_async (move \-> add_signatures_io h path sigs)
+
+------------------------------------------------------------------------
+-- Tests: the grammar, the NAR scanner, and both handshakes against each
+-- other over an in-memory pipe. worker_live.vlt runs the client against
+-- this machine's daemon.
+
+#[cfg(test)]
+encoded_with : given <F: Fn(&mut Vec<u8>) -> ()> F -> Vec<u8>
+encoded_with f =
+  mut out = Vec::new () : Vec<u8>
+  f (&mut out)
+  out
+
+-- Every proper prefix of `bytes` is `More` for `f`, and the whole is one
+-- value that ends exactly at the end.
+#[cfg(test)]
+whole_or_more : given <T: std::fmt::Debug + PartialEq, F: Fn(&[u8], usize) -> Result<(T, usize), Short>> &[u8] -> F -> T
+whole_or_more bytes f =
+  for n in 0 .. bytes.len ()
+    assert_eq! \-> f (&bytes[0 .. n]) 0 |> .err \-> Some More
+  case f bytes 0 of
+    Ok (v, end) ->
+      assert_eq! \-> end \-> bytes.len ()
+      v
+    Err e -> panic! \-> "decoding failed: #{e:?}"
+
+#[cfg(test)]
+sample_failure : DaemonFailure
+sample_failure = DaemonFailure { message = .to_string "path is not valid", level = 0, traces = .to_vec ([.to_string "while querying"]) }
+
+#[cfg(test)]
+sample_messages : Vec<StderrMsg>
+sample_messages =
+  activity = Activity { id = 7, level = 3, kind = 105, text = .to_string "building", fields = .to_vec ([Int 1, Text (.to_string "x86_64-linux")]), parent = 0 }
+  .to_vec ([LogNext (.to_string "a log line"), StartActivity activity, ActivityResult 7 101 (.to_vec ([Text (.to_string "phase")])), StopActivity 7, DataRead 4096, DataWrite (b"bytes".to_vec ()), Failed (sample_failure ()), Last])
+
+#[cfg(test)]
+sample_info : String -> PathInfo
+sample_info path =
+  nar_hash = crate::hash::digest (b"not really a NAR")
+  PathInfo { path, deriver = Some (.to_string "/nix/store/00000000000000000000000000000000-x.drv"), nar_hash, references = .to_vec ([.to_string "/nix/store/11111111111111111111111111111111-dep"]), registration_time = 1700000000, nar_size = 4096, ultimate = false, sigs = .to_vec ([.to_string "cache.nixos.org-1:c2ln"]), ca = None }
+
+test "a u64 is eight little-endian bytes"
+  bytes = encoded_with (\o -> put_u64 o 1852405859)
+  assert_eq! \-> bytes \-> .to_vec ([99, 120, 105, 110, 0, 0, 0, 0])
+  assert_eq! \-> whole_or_more (&bytes) take_u64 \-> WORKER_MAGIC_1
+
+test "strings round-trip with padding to eight, at every length"
+  for n in 0 .. 20
+    s = "x".repeat n
+    bytes = encoded_with (\o -> put_str o (&s))
+    assert_eq! \-> bytes.len () % 8 \-> 0
+    assert_eq! \-> bytes.len () \-> 8 + n.div_ceil 8 * 8
+    assert_eq! \-> whole_or_more (&bytes) take_string \-> s
+
+test "string lists and optional strings round-trip"
+  list = .to_vec ([.to_string "/nix/store/a", String::new (), .to_string "ü"])
+  bytes = encoded_with (\o -> put_strings o (&list))
+  assert_eq! \-> whole_or_more (&bytes) take_strings \-> list
+  none = encoded_with (\o -> put_optional o (&None))
+  assert_eq! \-> whole_or_more (&none) take_optional \-> None
+  some = encoded_with (\o -> put_optional o (&Some (.to_string "a")))
+  assert_eq! \-> whole_or_more (&some) take_optional \-> Some (.to_string "a")
+
+test "a length past the limit is refused, not allocated"
+  bytes = encoded_with (\o -> put_u64 o (MAX_STRING + 1))
+  assert! \-> take_bytes (&bytes) 0 |> .err |> .map (\e -> e != More) |> .unwrap_or false
+  many = encoded_with (\o -> put_u64 o (MAX_LIST + 1))
+  assert! \-> take_strings (&many) 0 |> .err |> .map (\e -> e != More) |> .unwrap_or false
+
+test "every stderr message round-trips, in both error formats"
+  for v in [CLIENT_VERSION, 281]
+    for m in sample_messages ()
+      bytes = encoded_with (\o -> put_stderr o v (&m))
+      back = whole_or_more (&bytes) (move \b at -> take_stderr v b at)
+      if v == CLIENT_VERSION
+        assert_eq! \-> back \-> m
+  -- Before 1.26 an error is a message and a status: the traces are not sent.
+  old = encoded_with (\o -> put_stderr o 281 (&Failed (sample_failure ())))
+  assert_eq! \-> take_stderr 281 (&old) 0 |> .ok |> .map (\p -> p.0) \-> Some (Failed (DaemonFailure { message = .to_string "path is not valid", level = 0, traces = Vec::new () }))
+
+test "an unknown stderr code is a protocol error"
+  bytes = encoded_with (\o -> put_u64 o 42)
+  assert_eq! \-> take_stderr CLIENT_VERSION (&bytes) 0 |> .err \-> Some (Bad (.to_string "stderr message code 42"))
+
+test "op codes are libstore's, unique, and invertible"
+  assert_eq! \-> op_code IsValidPath \-> 1
+  assert_eq! \-> op_code QueryPathInfo \-> 26
+  assert_eq! \-> op_code NarFromPath \-> 38
+  assert_eq! \-> op_code AddToStoreNar \-> 39
+  assert_eq! \-> op_code AddPermRoot \-> 47
+  for op in ALL_OPS
+    assert_eq! \-> op_of_code (op_code op) \-> Some op
+  mut codes = ALL_OPS |> .iter |> .map (\o -> op_code (*o)) |> .collect : Vec<u64>
+  codes.sort ()
+  codes.dedup ()
+  assert_eq! \-> codes.len () \-> ALL_OPS.len ()
+  for gone in [0, 2, 15, 17, 48]
+    assert_eq! \-> op_of_code gone \-> None
+  assert_eq! \-> op_name QueryValidPaths \-> "QueryValidPaths"
+
+test "a request names its op and the paths it starts with"
+  one = encoded_with (\o -> request_with_path o NarFromPath "/nix/store/a")
+  r1 = take_request CLIENT_VERSION (&one) 0 |> .ok |> .map (\p -> p.0)
+  assert_eq! \-> r1 \-> Some (Request { code = 38, op = Some NarFromPath, paths = .to_vec ([.to_string "/nix/store/a"]) })
+  list = .to_vec ([.to_string "/nix/store/a", .to_string "/nix/store/b"])
+  many = encoded_with (\o -> request_with_paths o QueryValidPaths (&list))
+  r2 = take_request CLIENT_VERSION (&many) 0 |> .ok |> .map (\p -> p.0)
+  assert_eq! \-> r2 \-> Some (Request { code = 31, op = Some QueryValidPaths, paths = list })
+  odd = encoded_with (\o -> put_u64 o 99)
+  r3 = take_request CLIENT_VERSION (&odd) 0 |> .ok |> .map (\p -> p.0)
+  assert_eq! \-> r3 \-> Some (Request { code = 99, op = None, paths = Vec::new () })
+  assert_eq! \-> take_request CLIENT_VERSION (&one[0 .. 12]) 0 |> .err \-> Some More
+
+#[cfg(test)]
+request_with_path : &mut Vec<u8> -> Op -> &str -> ()
+request_with_path o op p =
+  put_u64 o (op_code op)
+  put_str o p
+  ()
+
+#[cfg(test)]
+request_with_paths : &mut Vec<u8> -> Op -> &[String] -> ()
+request_with_paths o op ps =
+  put_u64 o (op_code op)
+  put_strings o ps
+  ()
+
+test "path info round-trips through QueryPathInfo's reply"
+  info = sample_info (.to_string "/nix/store/22222222222222222222222222222222-x")
+  bytes = encoded_with (\o -> valid_reply o (&info))
+  p = info.path.clone ()
+  assert_eq! \-> whole_or_more (&bytes) (move \b at -> take_path_info_reply (p.clone ()) b at) \-> Some info
+  missing = encoded_with (\o -> put_bool o false)
+  assert_eq! \-> take_path_info_reply (String::new ()) (&missing) 0 |> .ok |> .map (\p -> p.0) \-> Some None
+
+#[cfg(test)]
+valid_reply : &mut Vec<u8> -> &PathInfo -> ()
+valid_reply o info =
+  put_bool o true
+  put_path_info o info
+  ()
+
+-- A small tree with the awkward cases: a file named "(", a symlink to ")",
+-- an executable, a file larger than a socket read, odd lengths.
+#[cfg(test)]
+sample_tree : &str -> PathBuf
+sample_tree tag =
+  root = std::env::temp_dir () |> .join ("nix-store-core-worker-#{tag}-#{std::process::id ()}")
+  _gone = std::fs::remove_dir_all (&root)
+  std::fs::create_dir_all (root.join "d") |> .expect "tree"
+  std::fs::write (root.join "(") "x" |> .expect "file"
+  std::fs::write (root.join "d/f") "thirteen byte" |> .expect "file"
+  std::fs::write (root.join "big") (&"0123456789abcdef".repeat 12800) |> .expect "file"
+  std::fs::write (root.join "exe") "#!/bin/sh\n" |> .expect "file"
+  std::fs::set_permissions (root.join "exe") (std::os::unix::fs::PermissionsExt::from_mode 493) |> .expect "chmod"
+  std::os::unix::fs::symlink ")" (root.join "link") |> .expect "symlink"
+  root
+
+#[cfg(test)]
+sample_nar : &str -> Vec<u8>
+sample_nar tag =
+  root = sample_tree tag
+  mut out = Vec::new () : Vec<u8>
+  crate::nar::dump (&mut out) (&root) |> .expect "dump"
+  _gone = std::fs::remove_dir_all (&root)
+  out
+
+test "the NAR scanner finds the end of a NAR fed in small pieces"
+  nar = sample_nar "scan"
+  mut wire = nar.clone ()
+  wire.extend_from_slice (b"trailing reply bytes")
+  mut scan = nar_scan ()
+  mut pos = 0
+  mut avail = 0
+  while !scan.done
+    avail := (avail + 7).min (wire.len ())
+    case nar_step (&mut scan) (&wire[0 .. avail]) pos of
+      Ok next_pos -> pos := next_pos
+      Err More -> assert! \-> avail < wire.len ()
+      Err (Bad why) -> panic! \-> "#{why}"
+  assert_eq! \-> pos \-> nar.len ()
+
+test "the NAR scanner refuses what is not a NAR"
+  bytes = encoded_with (\o -> put_str o "not-an-archive")
+  mut scan = nar_scan ()
+  assert_eq! \-> nar_step (&mut scan) (&bytes) 0 |> .err |> .map (\e -> e == More) \-> Some false
+
+------------------------------------------------------------------------
+-- A fake daemon on the other end of an in-memory pipe
+
+#[cfg(test)]
+take_frame : &[u8] -> usize -> Result<(Vec<u8>, usize), Short>
+take_frame b at =
+  (n, start) = (take_u64 b at)?
+  len = (length n MAX_STRING)?
+  if start + len > b.len ()
+    return Err More
+  Ok ((b[start .. start + len].to_vec (), start + len))
+
+#[cfg(test)]
+stderr_then : &[StderrMsg] -> Vec<u8>
+stderr_then msgs =
+  mut out = Vec::new () : Vec<u8>
+  for m in msgs
+    put_stderr (&mut out) CLIENT_VERSION m
+  out
+
+#[cfg(test)]
+expect_op : async &mut Conn -> Op -> Result<String, WorkerError>
+expect_op c op =
+  code <- next c take_u64
+  assert_eq! \-> code? \-> op_code op
+  p <- next c take_string
+  p
+
+-- Serve one scripted session and return the NAR the client uploaded.
+#[cfg(test)]
+fake_daemon : async tokio::io::DuplexStream -> Vec<u8> -> Result<Vec<u8>, WorkerError>
+fake_daemon stream nar =
+  (r, w) = tokio::io::split stream
+  mut c = conn_of (Box::new r) (Box::new w)
+  hello = ServerHello { version = 294, nix_version = .to_string "2.31.0-fake", trusted = Some true, features = .to_vec ([.to_string "x"]) }
+  h <- server_handshake (&mut c) (&hello)
+  h?
+  -- IsValidPath, answered after some log traffic.
+  p1 <- expect_op (&mut c) IsValidPath
+  assert_eq! \-> p1? \-> "/nix/store/22222222222222222222222222222222-x"
+  mut a1 = stderr_then (&sample_messages ()[0 .. 4])
+  a1.extend_from_slice (&stderr_then (&[Last]))
+  put_bool (&mut a1) true
+  s1 <- send (&mut c) (&a1)
+  s1?
+  -- QueryPathInfo.
+  p2 <- expect_op (&mut c) QueryPathInfo
+  mut a2 = stderr_then (&[Last])
+  valid_reply (&mut a2) (&sample_info (p2?))
+  s2 <- send (&mut c) (&a2)
+  s2?
+  -- QueryPathFromHashPart fails; the connection stays usable.
+  _p3 <- expect_op (&mut c) QueryPathFromHashPart
+  s3 <- send (&mut c) (&stderr_then (&[Failed (sample_failure ())]))
+  s3?
+  -- AddTempRoot.
+  _p4 <- expect_op (&mut c) AddTempRoot
+  mut a4 = stderr_then (&[Last])
+  put_u64 (&mut a4) 1
+  s4 <- send (&mut c) (&a4)
+  s4?
+  -- AddToStoreNar: the info, two flags, then the NAR in frames.
+  p5 <- expect_op (&mut c) AddToStoreNar
+  path5 = p5?
+  info <- next (&mut c) (move \b at -> take_path_info (path5.clone ()) b at)
+  assert_eq! \-> info? \-> sample_info (.to_string "/nix/store/22222222222222222222222222222222-x")
+  repair <- next (&mut c) take_bool
+  assert! \-> !(repair?)
+  dont_check <- next (&mut c) take_bool
+  assert! \-> dont_check?
+  mut uploaded = Vec::new () : Vec<u8>
+  mut frames = true
+  while frames
+    f <- next (&mut c) take_frame
+    frame = f?
+    if frame.is_empty ()
+      frames := false
+    else
+      uploaded.extend_from_slice (&frame)
+  s5 <- send (&mut c) (&stderr_then (&[Last]))
+  s5?
+  -- NarFromPath: LAST, then the bare NAR.
+  _p6 <- expect_op (&mut c) NarFromPath
+  mut a6 = stderr_then (&[Last])
+  a6.extend_from_slice (&nar)
+  s6 <- send (&mut c) (&a6)
+  s6?
+  Ok uploaded
+
+#[cfg(test)]
+ok : given <A: Send + 'static> &id_effect::Runtime -> Effect<A, WorkerError, HNil> -> A
+ok rt eff =
+  case rt.block_on eff |> .into_result of
+    Ok a -> a
+    Err cause -> panic! \-> "effect failed: #{cause:?}"
+
+test "the client and server handshakes agree, and the client ops speak the protocol"
+  rt = id_effect::Runtime::new () |> .expect "runtime"
+  (client_end, server_end) = tokio::io::duplex 4096
+  nar = sample_nar "fake"
+  served = nar.clone ()
+  server = rt.fork (from_async (move \-> fake_daemon server_end served))
+  d = ok (&rt) (open client_end)
+  h = ok (&rt) (hello (&d))
+  -- The server offered 1.38, the client 1.37: 1.37 is spoken.
+  assert_eq! \-> h \-> Hello { version = CLIENT_VERSION, daemon_nix_version = Some (.to_string "2.31.0-fake"), trusted = Some true }
+  path = .to_string "/nix/store/22222222222222222222222222222222-x"
+  assert! \-> ok (&rt) (is_valid_path (&d) (path.clone ()))
+  assert_eq! \-> ok (&rt) (query_path_info (&d) (path.clone ())) \-> Some (sample_info (path.clone ()))
+  failed = rt.block_on (query_path_from_hash_part (&d) (.to_string "22222222222222222222222222222222")) |> .into_result
+  assert! \-> failed |> .err |> .map (\c -> format! \-> "#{c:?}") |> .unwrap_or_default |> .contains "path is not valid"
+  ok (&rt) (add_temp_root (&d) (path.clone ()))
+  ok (&rt) (add_to_store_nar (&d) (sample_info (path.clone ())) (nar.clone ()) false true)
+  assert_eq! \-> ok (&rt) (nar_from_path (&d) (path.clone ())) \-> nar
+  assert! \-> rt.block_on (close d) |> .into_result |> .is_ok
+  uploaded = ok (&rt) (server.join ())
+  assert_eq! \-> uploaded \-> nar
+
+#[cfg(test)]
+negotiate : async tokio::io::DuplexStream -> u64 -> Result<(u64, Vec<String>), WorkerError>
+negotiate stream offer =
+  (r, w) = tokio::io::split stream
+  mut c = conn_of (Box::new r) (Box::new w)
+  h <- client_handshake (&mut c) offer
+  h?
+  Ok ((c.version, c.features.clone ()))
+
+#[cfg(test)]
+serve_hello : async tokio::io::DuplexStream -> Result<Vec<String>, WorkerError>
+serve_hello stream =
+  (r, w) = tokio::io::split stream
+  mut c = conn_of (Box::new r) (Box::new w)
+  hello = ServerHello { version = 294, nix_version = .to_string "2.31.0-fake", trusted = None, features = .to_vec ([.to_string "x"]) }
+  h <- server_handshake (&mut c) (&hello)
+  h?
+  Ok (c.features.clone ())
+
+test "at 1.38 both sides exchange features"
+  rt = id_effect::Runtime::new () |> .expect "runtime"
+  (client_end, server_end) = tokio::io::duplex 4096
+  server = rt.fork (from_async (move \-> serve_hello server_end))
+  (version, features) = ok (&rt) (from_async (move \-> negotiate client_end 294))
+  assert_eq! \-> version \-> 294
+  assert_eq! \-> features \-> .to_vec ([.to_string "x"])
+  assert_eq! \-> ok (&rt) (server.join ()) \-> Vec::new () : Vec<String>
+
+test "a peer that is not a daemon is refused"
+  rt = id_effect::Runtime::new () |> .expect "runtime"
+  (client_end, server_end) = tokio::io::duplex 4096
+  mut bogus = Vec::new () : Vec<u8>
+  put_u64 (&mut bogus) 12345
+  _server = rt.fork (from_async (move \-> write_and_hold server_end bogus))
+  refused = rt.block_on (open client_end) |> .into_result
+  assert! \-> refused |> .err |> .map (\c -> format! \-> "#{c:?}") |> .unwrap_or_default |> .contains "WORKER_MAGIC_2"
+
+#[cfg(test)]
+write_and_hold : async tokio::io::DuplexStream -> Vec<u8> -> Result<(), WorkerError>
+write_and_hold stream bytes =
+  mut s = stream
+  w <- s.write_all (&bytes)
+  w?
+  mut sink = Vec::new () : Vec<u8>
+  _r <- s.read_to_end (&mut sink)
+  Ok ()

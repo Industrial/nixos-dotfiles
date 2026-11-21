@@ -2,7 +2,8 @@
 //!
 //! The source is Voltaic (`src/*.vlt`); `build.rs` compiles it into `OUT_DIR`
 //! and these `include!`s are the only Rust in the library. Everything is a
-//! plain function except `nar::stream`, the id_effect face of the NAR cursor.
+//! plain function except `nar::stream`, the id_effect face of the NAR cursor,
+//! and `worker`, the daemon protocol client (async, with id_effect effects).
 //! README.md documents the public API.
 
 pub mod nixbase32 {
@@ -37,6 +38,22 @@ pub mod db {
     include!(concat!(env!("OUT_DIR"), "/db.rs"));
 }
 
+// The worker protocol's emitted Rust: `x <- f ...` then `x` (an awaited
+// binding returned), `_0` binders in the `errors` Display, `case`-to-bool
+// tables, and the `()` that ends unit bodies.
+#[allow(
+    clippy::let_and_return,
+    clippy::just_underscores_and_digits,
+    clippy::match_like_matches_macro,
+    clippy::collapsible_if,
+    clippy::needless_borrows_for_generic_args,
+    clippy::unused_unit,
+    clippy::non_octal_unix_permissions
+)]
+pub mod worker {
+    include!(concat!(env!("OUT_DIR"), "/worker.rs"));
+}
+
 #[cfg(test)]
 mod conformance {
     include!(concat!(env!("OUT_DIR"), "/conformance.rs"));
@@ -45,4 +62,10 @@ mod conformance {
 #[cfg(test)]
 mod golden {
     include!(concat!(env!("OUT_DIR"), "/golden.rs"));
+}
+
+#[cfg(test)]
+#[allow(clippy::let_and_return, clippy::needless_borrows_for_generic_args)]
+mod worker_live {
+    include!(concat!(env!("OUT_DIR"), "/worker_live.rs"));
 }
