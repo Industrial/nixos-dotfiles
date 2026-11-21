@@ -385,6 +385,8 @@
       // {vfetch-vm = import ./features/nix/vfetch/test.nix {inherit pkgs;};}
       # features/nixos/vfiles's VM test: add, remove, adopt, fall back, report drift.
       // {vfiles-vm = import ./features/nixos/vfiles/test.nix {inherit pkgs;};}
+      # features/nix/vdeploy's VM test (#159): commits faster than a build, still converges.
+      // {vdeploy-vm = import ./features/nix/vdeploy/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
