@@ -1,0 +1,72 @@
+-- The program: wire the live capabilities from the options and run the
+-- agent (a daemon), or `--once` (one poll and one plan). `main` runs it under
+-- id_effect_cli's `run_main`: exit 0, 1 on a usage error or a failed
+-- `--once`, 101 on a bug, 130 on Ctrl-C (systemd's stop is SIGINT, and the
+-- fibers are interrupted with their finalizers).
+
+import id_effect::{Effect, HNil, effect, fail}
+import crate::agent::{Settings, daemon, once}
+import crate::caps::{Caps, Wiring, live}
+import crate::cli::{Options, USAGE, parse_args}
+import crate::common::DeployError
+import crate::common::DeployError::Usage
+import crate::dotfiles::Dotfiles
+import crate::watch::quiet_polls_of
+
+-- The user's checkout, when vdeploy manages one.
+export checkout_of : &Options -> Option<Dotfiles>
+checkout_of o =
+  o.dotfiles |> .as_ref |> .map (\p -> Dotfiles { path = p.clone (), url = o.url.clone (), branch = o.branch.clone (), user = o.dotfiles_user.clone (), group = o.dotfiles_group.clone (), home = o.dotfiles_home.clone (), git = o.git.clone () })
+
+export caps_of : &Options -> Caps
+caps_of o = live (Wiring { git = o.git.clone (), nix = o.nix.clone (), repo = o.repo.clone (), url = o.url.clone (), branch = o.branch.clone (), host = o.host.clone (), db = o.db.clone (), checkout = checkout_of o })
+
+export settings_of : &Options -> Settings
+settings_of o = Settings { host = o.host.clone (), interval = o.interval, quiet_polls = quiet_polls_of o.debounce o.interval, tick = o.tick, textfile_dir = o.textfile_dir.clone (), state_dir = o.state_dir.clone (), dotfiles = o.dotfiles.clone () |> .unwrap_or_default }
+
+-- The program for parsed options (or the usage error).
+export program : Result<Options, String> -> Effect<(), DeployError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok o -> if o.once
+      once (caps_of (&o)) (settings_of (&o))
+    else
+      daemon (caps_of (&o)) (settings_of (&o)) |> .widen
+
+-- On a fiber of the runtime's executor (as rust/tools/vverify's app.vlt):
+-- `run_main` polls its root outside the executor's context, so the program
+-- runs as the root's child; an interrupt reaches it and every fiber under it.
+supervised : Effect<(), DeployError, HNil> -> Effect<(), DeployError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  if parsed |> .as_ref |> .map (\o -> o.help) |> .unwrap_or false
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (program parsed)) HNil (id_effect_cli::RunMainConfig::default ())
+
+test "a usage error carries the usage line"
+  exit = id_effect::testing::run_test (program (Err (.to_string "unknown argument: -x")))
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains USAGE && e.contains "-x") |> .unwrap_or false
+
+test "the debounce becomes whole polls, and the checkout is the user's"
+  o = parse_args (&[.to_string "--host", .to_string "mimir", .to_string "--interval", .to_string "1m", .to_string "--debounce", .to_string "10m", .to_string "--dotfiles", .to_string "/home/tom/.dotfiles", .to_string "--dotfiles-user", .to_string "tom"]) |> .expect "options"
+  assert_eq! \-> (settings_of (&o)).quiet_polls \-> 10
+  d = checkout_of (&o) |> .expect "checkout"
+  assert_eq! \-> (d.path.as_str (), d.user, d.url.as_str ()) \-> ("/home/tom/.dotfiles", Some (.to_string "tom"), crate::cli::DEFAULT_URL)
+  assert_eq! \-> checkout_of (&crate::cli::Options { host = .to_string "h", ...crate::cli::defaults () }) \-> None
+
+test "--once against a repository that does not exist fails, with exit code 1"
+  o = parse_args (&[.to_string "--host", .to_string "h", .to_string "--once", .to_string "--url", .to_string "/nonexistent/vdeploy-origin", .to_string "--repo", .to_string "/nonexistent/vdeploy-repo"]) |> .expect "options"
+  exit = id_effect::testing::run_test (program (Ok o))
+  assert! \-> exit |> .into_result |> .is_err

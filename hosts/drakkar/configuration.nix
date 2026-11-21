@@ -33,6 +33,9 @@
   # features.ai.openhands.enable = true;
 
   features.fleet.comin.enable = true;
+  # vdeploy (Voltaic), OBSERVE mode next to comin (GH-159): plans and logs the switch to
+  # main, never makes it; comin still deploys. Rollback: lib.mkForce false.
+  features.nix.vdeploy.enable = true;
   features.fleet.nix-remote-builder-server.enable = true;
   features.fleet.remote-access.enable = true;
   features.monitoring.prometheus-exporter.enable = true;

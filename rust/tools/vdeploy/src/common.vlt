@@ -1,0 +1,157 @@
+-- What every vdeploy module shares: the error type, the Result-to-Effect
+-- lift, the wall clock, and running one external command (git, nix) to
+-- completion.
+--
+-- External commands are blocking steps: callers run them inside `suspend`, so
+-- each is one step of a fiber, interruptible between steps.
+
+import std::process::{Command, Stdio}
+import std::time::{SystemTime, UNIX_EPOCH}
+import id_effect::{Effect, HNil, fail, succeed}
+
+-- Why a poll, a plan or the program stopped. Split by what happens next:
+-- `Fetch` is retried on a Schedule and the poll tries again next interval;
+-- `Unverified` skips the commit; `Eval`, `Realise` and `System` fail this
+-- plan, and the next commit on main gets a new one; `Diff` is a note on a
+-- plan, never its failure; `Usage` and `Publish` are the operator's.
+export errors DeployError
+  Usage String       "#{0}"
+  Fetch String       "fetching main: #{0}"
+  Unverified String  "not deploying: #{0}"
+  Eval String        "#{0}"
+  Realise String     "#{0}"
+  System String      "the running system: #{0}"
+  Diff String        "closure diff: #{0}"
+  Publish String     "publishing: #{0}"
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static> Result<A, DeployError> -> Effect<A, DeployError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- Unix seconds, from the wall clock: for metrics and the plan's timestamps
+-- only. Every wait is the executor's (a Schedule), never this.
+export now_secs : u64
+now_secs =
+  SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+-- One command to run: program, arguments, working directory, extra
+-- environment.
+export data Cmd { export program String, export args Vec<String>, export cwd Option<String>, export env Vec<(String, String)> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export cmd : &str -> Vec<String> -> Cmd
+cmd program args = Cmd { program = program.to_string (), args, cwd = None, env = Vec::new () }
+
+-- Arguments from string slices.
+export strs : &[&str] -> Vec<String>
+strs xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+-- What a finished command printed.
+export data Ran { export stdout String, export stderr String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The last `n` lines of `text`, for an error message.
+export tail_lines : &str -> usize -> String
+tail_lines text n =
+  lines = text.lines () |> .collect : Vec<&str>
+  skip = lines.len ().saturating_sub n
+  lines |> .iter |> .skip skip |> .cloned |> .collect : Vec<&str> |> .join "\n"
+
+-- The command as a shell would show it, for messages.
+export shown : &Cmd -> String
+shown c = "#{c.program} #{c.args.join " "}"
+
+build : &Cmd -> Command
+build c =
+  mut command = Command::new (&c.program)
+  command.args (&c.args)
+  command.stdin (Stdio::null ())
+  if &c.cwd is Some d
+    command.current_dir d
+  for kv in &c.env
+    command.env (&kv.0) (&kv.1)
+  command
+
+-- Run `c` to completion. A non-zero exit is an error carrying the last lines
+-- of its stderr.
+export run : &Cmd -> Result<Ran, String>
+run c =
+  mut command = build c
+  out = (command.output () |> .map_err (\e -> "running #{shown c}: #{e}"))?
+  stdout = String::from_utf8_lossy (&out.stdout) |> .to_string
+  stderr = String::from_utf8_lossy (&out.stderr) |> .to_string
+  if out.status.success ()
+    Ok (Ran { stdout, stderr })
+  else
+    Err "#{shown c} failed (#{out.status}):\n#{tail_lines (&stderr) 20}"
+
+rust """
+  /// `c` to completion as a tokio child process, awaited on the runtime's
+  /// reactor, never on an executor thread: an evaluation or a build can take
+  /// an hour, and the poller fiber runs beside it. A non-zero exit is an error
+  /// carrying the last lines of its stderr. Dropping the future (an
+  /// interrupt) kills the child.
+  pub fn exec(c: Cmd) -> Effect<Ran, String, HNil> {
+      id_effect::from_async(move || async move {
+          let mut command = tokio::process::Command::new(&c.program);
+          command.args(&c.args).stdin(Stdio::null()).kill_on_drop(true);
+          if let Some(d) = &c.cwd {
+              command.current_dir(d);
+          }
+          for (k, v) in &c.env {
+              command.env(k, v);
+          }
+          let out = command
+              .output()
+              .await
+              .map_err(|e| format!("running {}: {e}", shown(&c)))?;
+          let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+          let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+          if out.status.success() {
+              Ok(Ran { stdout, stderr })
+          } else {
+              Err(format!("{} failed ({}):\n{}", shown(&c), out.status, tail_lines(&stderr, 20)))
+          }
+      })
+  }
+"""
+
+-- Run `c` as a yes/no question: exit 0 is yes, exit 1 is no, anything else
+-- (or not starting) is an error. `git merge-base --is-ancestor` answers so.
+export asked : &Cmd -> Result<bool, String>
+asked c =
+  mut command = build c
+  out = (command.output () |> .map_err (\e -> "running #{shown c}: #{e}"))?
+  case out.status.code () of
+    Some 0 -> Ok true
+    Some 1 -> Ok false
+    _ -> Err "#{shown c} failed (#{out.status}):\n#{tail_lines (&String::from_utf8_lossy (&out.stderr)) 20}"
+
+-- The first line of a command's output, trimmed: a sha, a branch, a time.
+export first_line : &str -> String
+first_line s = s.lines () |> .next |> .unwrap_or "" |> .trim |> .to_string
+
+test "the tail of a message keeps its last lines"
+  assert_eq! \-> tail_lines "a\nb\nc" 2 \-> "b\nc"
+  assert_eq! \-> tail_lines "" 3 \-> ""
+
+test "a command that fails names itself and its stderr"
+  c = cmd "sh" (strs (&["-c", "echo out; echo boom >&2; exit 3"]))
+  err = run (&c) |> .err |> .unwrap_or_default
+  assert! \-> err.contains "sh -c" && err.contains "boom"
+
+test "a yes/no command: 0 is yes, 1 is no, 2 is an error"
+  assert_eq! \-> asked (&cmd "sh" (strs (&["-c", "exit 0"]))) \-> Ok true
+  assert_eq! \-> asked (&cmd "sh" (strs (&["-c", "exit 1"]))) \-> Ok false
+  assert! \-> asked (&cmd "sh" (strs (&["-c", "exit 2"]))) |> .is_err
+
+test "a command's environment and directory"
+  mut c = cmd "sh" (strs (&["-c", "echo $VDEPLOY_PROBE; pwd"]))
+  c.env.push ((.to_string "VDEPLOY_PROBE", .to_string "seen"))
+  c.cwd := Some (.to_string "/")
+  ran = run (&c) |> .expect "ran"
+  assert_eq! \-> ran.stdout \-> "seen\n/\n"
+  assert_eq! \-> first_line "  abc \nnext" \-> "abc"

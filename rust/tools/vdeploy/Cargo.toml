@@ -1,0 +1,43 @@
+[package]
+name = "vdeploy"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Pull-based deploy agent, observe mode: poll main, verify the commit, evaluate and realise this host's system, diff it against the running one, and log the switch it would make"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# nix-store-core and every other consumer.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The closure diff, as a library (as rust/tools/vbump links it): vdiff's
+# schema-1 `--json` report without a second binary. It brings nix-store-core's
+# read-only store database. default.nix roots its source at rust/tools.
+vdiff = { path = "../vdiff" }
+nix-store-core = { path = "../nix-store-core" }
+# vdiff's report is JSON, and so is the plan.
+serde_json = "1"
+# nix eval and nix build run as tokio processes, awaited on the runtime's
+# reactor (the same tokio id_effect's runtime runs on): a build of an hour must
+# not hold an executor thread while the poller runs beside it.
+tokio = { version = "1", features = ["process"] }
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vdeploy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vdeploy"
+path = "src/main.rs"

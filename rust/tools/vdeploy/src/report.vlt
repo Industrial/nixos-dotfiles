@@ -1,0 +1,239 @@
+-- What the agent reports: the plan (the switch it would make, as JSON and as
+-- one journal line) and node_exporter textfile metrics. Rendering is pure;
+-- the writes are atomic (a temporary file in the same directory, synced and
+-- renamed over the old one), so a reader never sees half a file.
+
+import std::fs
+import std::io::Write
+import std::path::Path
+import serde_json::Value
+import vdiff::report::render_bytes
+import crate::dotfiles::{STATES, state_name}
+import crate::watch::Status
+
+-- The metrics file node_exporter's textfile collector reads (`*.prom`).
+export const METRICS_FILE : &str = "vdeploy.prom"
+
+-- An empty vdiff report: what an unchanged closure shows.
+export const SAME : &str = "{\"schema\":1,\"changed\":[],\"selectionChanged\":[],\"added\":[],\"removed\":[],\"closure\":{\"pathsAdded\":0,\"pathsRemoved\":0,\"narSizeDelta\":0}}"
+
+-- One plan: the commit, what this host runs, what it would run, and the
+-- diff between them. `switch` is whether it would switch; observe mode never
+-- does.
+export data Plan
+  { export host String
+  , export commit String
+  , export commit_time u64
+  , export signed bool
+  , export skipped u64
+  , export running_rev Option<String>
+  , export running String
+  , export drv String
+  , export out String
+  , export realised String
+  , export switch bool
+  , export diff Option<String>
+  , export note String
+  , export planned_at u64
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- A JSON string literal.
+quote : &str -> String
+quote s = serde_json::to_string s |> .unwrap_or_else (\_ -> .to_string "\"\"")
+
+quote_opt : &Option<String> -> String
+quote_opt o =
+  case o of
+    Some s -> quote s
+    None -> .to_string "null"
+
+-- The counts of a vdiff schema-1 report.
+export data Counts { export changed usize, export added usize, export removed usize, export selection usize, export paths_added u64, export paths_removed u64, export nar_delta i64 }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+listed : &Value -> &str -> usize
+listed doc key = doc.get key |> .and_then (\v -> v.as_array ()) |> .map (\a -> a.len ()) |> .unwrap_or 0
+
+closure_u : &Value -> &str -> u64
+closure_u doc key = doc.get "closure" |> .and_then (\c -> c.get key) |> .and_then (\n -> n.as_u64 ()) |> .unwrap_or 0
+
+-- The counts of a report, or why it cannot be read (not JSON, another schema).
+export counts_of : &str -> Result<Counts, String>
+counts_of text =
+  doc = ((serde_json::from_str text : serde_json::Result<Value>) |> .map_err (\e -> "vdiff report is not JSON: #{e}"))?
+  schema = doc.get "schema" |> .and_then (\s -> s.as_u64 ())
+  if schema != Some 1
+    Err "vdiff report schema #{schema:?}, vdeploy reads schema 1"
+  else
+    nar = doc.get "closure" |> .and_then (\c -> c.get "narSizeDelta") |> .and_then (\n -> n.as_i64 ()) |> .unwrap_or 0
+    Ok (Counts { changed = listed (&doc) "changed", added = listed (&doc) "added", removed = listed (&doc) "removed", selection = listed (&doc) "selectionChanged", paths_added = closure_u (&doc) "pathsAdded", paths_removed = closure_u (&doc) "pathsRemoved", nar_delta = nar })
+
+-- The counts in words, for the journal.
+export counts_line : &Counts -> String
+counts_line c = "#{c.changed} changed, #{c.added} added, #{c.removed} removed, #{c.selection} selection changed, +#{c.paths_added}/-#{c.paths_removed} paths, #{render_bytes (i128::from c.nar_delta)}"
+
+short : &str -> String
+short sha = sha.chars () |> .take 9 |> .collect
+
+diff_words : &Plan -> String
+diff_words p =
+  case &p.diff of
+    Some d -> counts_of d |> .map (\c -> counts_line (&c)) |> .unwrap_or_else (\e -> e)
+    None -> "no diff (#{p.note})"
+
+-- The plan as one journal line.
+export line_of : &Plan -> String
+line_of p =
+  from = p.running_rev |> .as_deref |> .map short |> .unwrap_or_else (\-> p.running.clone ())
+  skipped = if p.skipped > 0
+    " (#{p.skipped} newer commit(s) skipped since the last plan)"
+  else
+    String::new ()
+  if p.switch
+    "vdeploy: would switch #{p.host} from #{from} to #{short (&p.commit)}#{skipped}: #{p.out} (#{p.realised}); #{diff_words p}. Observe mode: not switching."
+  else
+    "vdeploy: #{p.host} already runs #{p.out} (#{short (&p.commit)}#{skipped}): nothing to switch."
+
+counts_json : &Option<String> -> String
+counts_json d =
+  case d |> .as_deref |> .map counts_of of
+    Some (Ok c) -> "{\"changed\":#{c.changed},\"added\":#{c.added},\"removed\":#{c.removed},\"selectionChanged\":#{c.selection},\"pathsAdded\":#{c.paths_added},\"pathsRemoved\":#{c.paths_removed},\"narSizeDelta\":#{c.nar_delta}}"
+    _ -> .to_string "null"
+
+-- The plan as one line of JSON (schema 1). With `full`, vdiff's whole report
+-- is in it (`plan.json`); without, only its counts (`plans.jsonl`).
+export json_of : &Plan -> bool -> String
+json_of p full =
+  action = if p.switch
+    "switch"
+  else
+    "none"
+  diff = if full
+    p.diff.clone () |> .unwrap_or_else (\-> .to_string "null")
+  else
+    counts_json (&p.diff)
+  "{\"schema\":1,\"mode\":\"observe\",\"host\":#{quote (&p.host)},\"commit\":#{quote (&p.commit)},\"commitTime\":#{p.commit_time},\"signedByGithub\":#{p.signed},\"skipped\":#{p.skipped},\"running\":{\"rev\":#{quote_opt (&p.running_rev)},\"toplevel\":#{quote (&p.running)}},\"drv\":#{quote (&p.drv)},\"out\":#{quote (&p.out)},\"realised\":#{quote (&p.realised)},\"action\":\"#{action}\",\"wouldRun\":#{quote (&"#{p.out}/bin/switch-to-configuration switch")},\"diff\":#{diff},\"note\":#{quote (&p.note)},\"plannedAt\":#{p.planned_at}}"
+
+gauge : &str -> &str -> String -> String
+gauge name help value = "# HELP #{name} #{help}\n# TYPE #{name} gauge\n#{name} #{value}\n"
+
+counter : &str -> &str -> u64 -> String
+counter name help value = "# HELP #{name} #{help}\n# TYPE #{name} counter\n#{name} #{value}\n"
+
+flag : bool -> String
+flag b =
+  if b
+    .to_string "1"
+  else
+    .to_string "0"
+
+-- The textfile metrics, in the Prometheus text exposition format.
+export metrics : &Status -> String
+metrics st =
+  mut out = gauge "vdeploy_observe_mode" "1: vdeploy plans and logs switches, and never makes one." (.to_string "1")
+  if st.generation_age is Some age
+    out.push_str (&gauge "vdeploy_generation_age_seconds" "Now minus the commit time of the commit the running system was built from." (age.to_string ()))
+  if st.last_poll is Some t
+    out.push_str (&gauge "vdeploy_last_poll_timestamp_seconds" "Unix time main was last fetched." (t.to_string ()))
+  if st.last_plan is Some t
+    out.push_str (&gauge "vdeploy_last_plan_timestamp_seconds" "Unix time the last plan finished." (t.to_string ()))
+  out.push_str (&gauge "vdeploy_last_plan_duration_seconds" "Wall time of the last plan (evaluate, realise, diff)." ("#{st.last_duration:.3}"))
+  out.push_str (&gauge "vdeploy_switch_pending" "1 when the last plan would switch this host." (flag st.pending))
+  out.push_str (&counter "vdeploy_polls_total" "Polls of main since the agent started." st.watch.polls)
+  out.push_str (&counter "vdeploy_poll_failures_total" "Polls whose fetch of main failed." st.poll_failures)
+  out.push_str (&counter "vdeploy_head_changes_total" "Times main moved, as seen by the poller." st.watch.changes)
+  out.push_str (&counter "vdeploy_plans_started_total" "Plans started." st.started)
+  out.push_str (&counter "vdeploy_plans_finished_total" "Plans finished, successfully or not. Never cancelled: equal to started, or one behind while a plan runs." st.finished)
+  out.push_str (&counter "vdeploy_plans_failed_total" "Plans that failed (evaluation, realisation, verification)." st.failed)
+  out.push_str (&counter "vdeploy_commits_skipped_total" "Commits on main never planned, because a newer one landed first (latest-wins)." st.skipped)
+  out.push_str "# HELP vdeploy_dotfiles_state The user's dotfiles checkout after the last poll (1 for the current state).\n# TYPE vdeploy_dotfiles_state gauge\n"
+  current = st.dotfiles |> .as_ref |> .map (\c -> state_name c)
+  for s in STATES
+    out.push_str (&"vdeploy_dotfiles_state{state=\"#{s}\"} #{flag (current == Some s)}\n")
+  out
+
+-- Replace `file` with `text`, atomically.
+export write_atomic : &Path -> &str -> std::io::Result<()>
+write_atomic file text =
+  dir = file.parent () |> .unwrap_or (Path::new ".")
+  name = file.file_name () |> .map (\n -> n.to_string_lossy () |> .into_owned) |> .unwrap_or_default
+  tmp = dir.join (".#{name}.tmp")
+  mut out = (fs::File::create (&tmp))?
+  (out.write_all (text.as_bytes ()))?
+  (out.sync_all ())?
+  fs::rename (&tmp) file
+
+-- The metrics into the textfile directory, when there is one.
+export publish_metrics : Option<String> -> &Status -> Result<(), String>
+publish_metrics dir st =
+  case dir of
+    None -> Ok ()
+    Some d ->
+      path = Path::new (&d) |> .join METRICS_FILE
+      write_atomic (&path) (&metrics st) |> .map_err (\e -> "writing #{path.display ()}: #{e}")
+
+-- The plan into the state directory: `plan.json` (the latest, whole) and one
+-- line appended to `plans.jsonl` (the history, counts only).
+export publish_plan : Option<String> -> &Plan -> Result<(), String>
+publish_plan dir p =
+  case dir of
+    None -> Ok ()
+    Some d ->
+      latest = Path::new (&d) |> .join "plan.json"
+      (write_atomic (&latest) (&"#{json_of p true}\n") |> .map_err (\e -> "writing #{latest.display ()}: #{e}"))?
+      history = Path::new (&d) |> .join "plans.jsonl"
+      mut f = (fs::OpenOptions::new () |> .create true |> .append true |> .open (&history) |> .map_err (\e -> "opening #{history.display ()}: #{e}"))?
+      f.write_all ("#{json_of p false}\n".as_bytes ()) |> .map_err (\e -> "appending to #{history.display ()}: #{e}")
+
+#[cfg(test)]
+sample : Plan
+sample = Plan { host = .to_string "drakkar", commit = .to_string "0123456789abcdef", commit_time = 7, signed = true, skipped = 2, running_rev = Some (.to_string "fedcba9876543210"), running = .to_string "/nix/store/old", drv = .to_string "/nix/store/new.drv", out = .to_string "/nix/store/new", realised = .to_string "fetched", switch = true, diff = Some (.to_string "{\"schema\":1,\"changed\":[{\"name\":\"hello\"}],\"selectionChanged\":[],\"added\":[],\"removed\":[{\"name\":\"gone\"}],\"closure\":{\"pathsAdded\":3,\"pathsRemoved\":2,\"narSizeDelta\":2048}}"), note = String::new (), planned_at = 9 }
+
+test "a plan that would switch says so, with the diff, and that it does not"
+  l = line_of (&sample ())
+  assert! \-> l.contains "would switch drakkar from fedcba987 to 012345678"
+  assert! \-> l.contains "2 newer commit(s) skipped"
+  assert! \-> l.contains "1 changed, 0 added, 1 removed" && l.contains "+3/-2 paths" && l.contains "+2.0KiB"
+  assert! \-> l.contains "Observe mode: not switching."
+  same = Plan { switch = false, ...sample () }
+  assert! \-> line_of (&same) |> .contains "nothing to switch"
+
+test "the plan's JSON is one parseable line, whole or with counts only"
+  full = (serde_json::from_str (&json_of (&sample ()) true) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> full.get "action" |> .and_then (\v -> v.as_str ()) \-> Some "switch"
+  assert_eq! \-> full.get "mode" |> .and_then (\v -> v.as_str ()) \-> Some "observe"
+  assert_eq! \-> full.get "diff" |> .and_then (\d -> d.get "schema") |> .and_then (\v -> v.as_u64 ()) \-> Some 1
+  brief = (serde_json::from_str (&json_of (&sample ()) false) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> brief.get "diff" |> .and_then (\d -> d.get "pathsAdded") |> .and_then (\v -> v.as_u64 ()) \-> Some 3
+  none = Plan { diff = None, running_rev = None, ...sample () }
+  parsed = (serde_json::from_str (&json_of (&none) false) : serde_json::Result<Value>) |> .expect "json"
+  assert! \-> parsed.get "diff" |> .map (\v -> v.is_null ()) |> .unwrap_or false
+  assert! \-> !(json_of (&sample ()) true |> .contains '\n')
+
+test "another vdiff schema, or not JSON, is not read"
+  assert! \-> counts_of "{\"schema\":2}" |> .is_err
+  assert! \-> counts_of "nope" |> .is_err
+  assert_eq! \-> counts_of SAME \-> Ok (Counts::default ())
+
+test "metrics carry the generation age, the counters and one dotfiles state"
+  st = Status { generation_age = Some 3600, last_poll = Some 5, started = 3, finished = 2, skipped = 4, dotfiles = Some (crate::dotfiles::Checkout::Dirty 2), ...Status::default () }
+  m = metrics (&st)
+  assert! \-> m.contains "\nvdeploy_generation_age_seconds 3600\n"
+  assert! \-> m.contains "\nvdeploy_plans_started_total 3\n" && m.contains "\nvdeploy_plans_finished_total 2\n"
+  assert! \-> m.contains "\nvdeploy_commits_skipped_total 4\n"
+  assert! \-> m.contains "vdeploy_dotfiles_state{state=\"dirty\"} 1\n" && m.contains "vdeploy_dotfiles_state{state=\"up-to-date\"} 0\n"
+  assert! \-> !(metrics (&Status::default ()) |> .contains "vdeploy_generation_age_seconds ")
+
+test "publishing replaces the files whole and appends the history"
+  dir = std::env::temp_dir () |> .join ("vdeploy-publish-#{std::process::id ()}")
+  std::fs::create_dir_all (&dir) |> .expect "dir"
+  d = dir.to_string_lossy () |> .to_string
+  assert_eq! \-> publish_plan (Some (d.clone ())) (&sample ()) \-> Ok ()
+  assert_eq! \-> publish_plan (Some (d.clone ())) (&sample ()) \-> Ok ()
+  assert_eq! \-> publish_metrics (Some (d.clone ())) (&Status::default ()) \-> Ok ()
+  history = std::fs::read_to_string (dir.join "plans.jsonl") |> .expect "history"
+  assert_eq! \-> history.lines () |> .count \-> 2
+  assert! \-> std::fs::read_to_string (dir.join METRICS_FILE) |> .map (\t -> t.contains "vdeploy_observe_mode 1") |> .unwrap_or false
+  assert! \-> !(dir.join ".vdeploy.prom.tmp" |> .exists)
+  std::fs::remove_dir_all (&dir) |> .ok

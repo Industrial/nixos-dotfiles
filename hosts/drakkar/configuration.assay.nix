@@ -26,4 +26,17 @@ in
     placesDotfilesWithVfiles = assay.eq (has "nixos.vfiles") true;
     amdGraphics = assay.eq [(has "nixos.graphics.amd") (has "nixos.graphics.intel")] [true false];
     noStigBaseSafe = assay.eq (has "security.stig.profiles.base-safe") false;
+    # vdeploy observes next to comin, which still deploys (GH-159); one option removes it.
+    observesWithVdeploy = assay.eq [(has "nix.vdeploy") (has "fleet.comin")] [true true];
+    vdeployRollsBack = let
+      off = features.evalSelection {
+        modules = [
+          ./configuration.nix
+          {disabledModules = [./disko.nix ./filesystems.nix ./hardware.nix];}
+          {features.nix.vdeploy.enable = nixos.lib.mkForce false;}
+        ];
+      };
+      on = f: builtins.elem f (features.enabledFeatures off);
+    in
+      assay.eq [(on "nix.vdeploy") (on "fleet.comin")] [false true];
   }

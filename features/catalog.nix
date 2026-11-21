@@ -157,6 +157,7 @@
   ./nix/vfetch
   ./nix/vverify
   ./nix/vpush
+  ./nix/vdeploy
 
   # nixos
   ./nixos
