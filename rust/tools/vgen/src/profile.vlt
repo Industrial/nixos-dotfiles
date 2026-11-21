@@ -1,0 +1,224 @@
+-- Profiles and their generations, as they are on disk.
+--
+-- A profile is a symlink `<dir>/<name>` to `<name>-<N>-link`, and each
+-- generation is a symlink `<dir>/<name>-<N>-link` into the store; this is
+-- Nix's layout (`profiles.cc`). Reading it is the only I/O here: plain
+-- blocking reads, which the program edge (`app.vlt`) runs inside `suspend`.
+--
+-- A NixOS host has two kinds of system profile: `/nix/var/nix/profiles/system`
+-- (nixos-rebuild, deploy-rs) and every profile under
+-- `/nix/var/nix/profiles/system-profiles/` (comin keeps its own there). The
+-- bootloader installer lists both, so vgen does too.
+
+import std::fs
+import std::os::unix::fs::MetadataExt
+import std::path::{Path, PathBuf}
+import nix_store_core::generations::parse_generation
+
+export const PROFILES_DIR : &str = "/nix/var/nix/profiles"
+
+-- One generation. `target` is the store path the link names; `toplevel` is
+-- the NixOS system it boots, from its bootspec (`boot.json`), which differs
+-- from `target` when a deployer wraps the system (deploy-rs's
+-- `activatable-nixos-system-*`). Without a bootspec it is `target`.
+export data Gen { export number u64, export mtime i64, export link PathBuf, export target String, export toplevel String }
+  deriving (Debug, Clone, PartialEq)
+
+-- A profile, its generations in ascending order, and the one it points at.
+export data Profile { export path PathBuf, export current Option<u64>, export gens Vec<Gen> }
+  deriving (Debug, Clone, PartialEq)
+
+-- A profile by name or path: `system` is /nix/var/nix/profiles/system, any
+-- other bare name is a system profile under `system-profiles/` (`comin`), and
+-- anything with a `/` is taken as the path.
+export profile_path : &Path -> &str -> PathBuf
+profile_path root name =
+  if name.contains '/'
+    PathBuf::from name
+  else if name == "system"
+    root.join "system"
+  else
+    root.join "system-profiles" |> .join name
+
+-- The file name of a path, as text.
+export file_name_of : &Path -> String
+file_name_of p = (p.file_name ()).map (\n -> n.to_string_lossy ().into_owned ()) |> .unwrap_or_default
+
+-- Whether `p` is a profile link: a symlink whose target mentions `link`, the
+-- test `nix-collect-garbage` applies (`removeOldGenerations`).
+is_profile_link : &Path -> bool
+is_profile_link p =
+  case fs::read_link p of
+    Ok target -> target.to_string_lossy ().contains "link"
+    Err _ -> false
+
+-- The profile links directly in `dir`, sorted; a note when it cannot be read
+-- (`system-profiles` is root-only on a comin host).
+export links_in : &Path -> (Vec<PathBuf>, Vec<String>)
+links_in dir =
+  mut out = Vec::new () : Vec<PathBuf>
+  mut notes = Vec::new () : Vec<String>
+  case fs::read_dir dir of
+    Err e ->
+      if e.kind () != std::io::ErrorKind::NotFound
+        notes.push ("cannot read #{dir.display ()}: #{e}")
+    Ok entries ->
+      for entry in entries
+        if entry is Ok e
+          p = e.path ()
+          if is_profile_link (&p)
+            out.push p
+  out.sort ()
+  (out, notes)
+
+-- The system profiles under `root`: `system`, then those in `system-profiles/`.
+export system_profiles : &Path -> (Vec<PathBuf>, Vec<String>)
+system_profiles root =
+  mut out = Vec::new () : Vec<PathBuf>
+  system = root.join "system"
+  if is_profile_link (&system)
+    out.push system
+  (more, notes) = links_in (&(root.join "system-profiles"))
+  out.extend more
+  (out, notes)
+
+-- Every profile under `dir`, recursively: the set `nix-collect-garbage
+-- --delete-older-than` (and so vgc's flag) prunes when run as root.
+export all_profiles : &Path -> (Vec<PathBuf>, Vec<String>)
+all_profiles dir =
+  mut out = Vec::new () : Vec<PathBuf>
+  mut notes = Vec::new () : Vec<String>
+  case fs::read_dir dir of
+    Err e ->
+      if e.kind () != std::io::ErrorKind::NotFound
+        notes.push ("cannot read #{dir.display ()}: #{e}")
+    Ok entries ->
+      for entry in entries
+        if entry is Ok e
+          p = e.path ()
+          if e.file_type () is Ok t
+            if t.is_symlink ()
+              if is_profile_link (&p)
+                out.push p
+            else if t.is_dir ()
+              (more, deeper) = all_profiles (&p)
+              out.extend more
+              notes.extend deeper
+  out.sort ()
+  (out, notes)
+
+-- The `toplevel` of a NixOS bootspec, if the text is one.
+export bootspec_toplevel : &str -> Option<String>
+bootspec_toplevel text =
+  parsed = serde_json::from_str text : Result<serde_json::Value, serde_json::Error>
+  case parsed of
+    Ok v -> (v.get "org.nixos.bootspec.v1") |> .and_then (\b -> b.get "toplevel") |> .and_then (\t -> t.as_str ()) |> .map (\s -> s.to_string ())
+    Err _ -> None
+
+-- What a generation boots: its bootspec's toplevel, else its own target.
+toplevel_of : &Path -> String -> String
+toplevel_of link target =
+  case fs::read_to_string (link.join "boot.json") of
+    Ok text -> bootspec_toplevel (&text) |> .unwrap_or target
+    Err _ -> target
+
+-- One generation link, read.
+read_gen : PathBuf -> u64 -> Option<Gen>
+read_gen link number =
+  meta = ((fs::symlink_metadata (&link)).ok ())?
+  target = ((fs::read_link (&link)).ok ())?
+  shown = target.to_string_lossy ().into_owned ()
+  toplevel = toplevel_of (&link) (shown.clone ())
+  Some (Gen { number, mtime = meta.mtime (), link, target = shown, toplevel })
+
+-- A profile's generations (ascending) and its current generation.
+export read_profile : &Path -> Profile
+read_profile profile =
+  dir = profile.parent () |> .unwrap_or (Path::new "/")
+  name = file_name_of profile
+  mut gens = Vec::new () : Vec<Gen>
+  if fs::read_dir dir is Ok entries
+    for entry in entries
+      if entry is Ok e
+        file = e.file_name ().to_string_lossy ().into_owned ()
+        if parse_generation (&name) (&file) is Some n
+          if read_gen (e.path ()) n is Some g
+            gens.push g
+  gens.sort_by_key (\g -> g.number)
+  current = (fs::read_link profile).ok () |> .and_then (\t -> parse_generation (&name) (&(file_name_of (&t))))
+  Profile { path = profile.to_path_buf (), current, gens }
+
+-- The store path a link (`/run/booted-system`) resolves to, if it resolves.
+export resolved : &str -> Option<String>
+resolved link = (fs::canonicalize link).ok () |> .map (\p -> p.to_string_lossy ().into_owned ())
+
+-- Whether `profile` is a system profile under `root`, the ones the bootloader
+-- lists: `system` itself or a profile in `system-profiles/`.
+export is_system_profile : &Path -> &Path -> bool
+is_system_profile root profile =
+  profile == root.join "system" || (profile.parent () |> .map (\d -> d == root.join "system-profiles") |> .unwrap_or false)
+
+#[cfg(test)]
+scratch : &str -> PathBuf
+scratch tag =
+  dir = std::env::temp_dir () |> .join "vgen-test-#{tag}-#{std::process::id ()}"
+  fs::remove_dir_all (&dir) |> .ok
+  fs::create_dir_all (&dir) |> .unwrap
+  dir
+
+#[cfg(test)]
+symlink_at : &Path -> &str -> &str -> ()
+symlink_at dir name target =
+  std::os::unix::fs::symlink target (dir.join name) |> .unwrap
+  ()
+
+test "a profile is a name or a path"
+  root = Path::new "/nix/var/nix/profiles"
+  assert! \-> profile_path root "system" == PathBuf::from "/nix/var/nix/profiles/system"
+  assert! \-> profile_path root "comin" == PathBuf::from "/nix/var/nix/profiles/system-profiles/comin"
+  assert! \-> profile_path root "/home/u/.local/state/nix/profiles/hm" == PathBuf::from "/home/u/.local/state/nix/profiles/hm"
+
+test "system profiles are system and the ones in system-profiles"
+  root = Path::new "/nix/var/nix/profiles"
+  assert! \-> is_system_profile root (Path::new "/nix/var/nix/profiles/system")
+  assert! \-> is_system_profile root (Path::new "/nix/var/nix/profiles/system-profiles/comin")
+  assert! \-> !(is_system_profile root (Path::new "/nix/var/nix/profiles/per-user/root/profile"))
+  assert! \-> !(is_system_profile root (Path::new "/nix/var/nix/profiles/system-493-link"))
+
+test "a bootspec names the toplevel, other text does not"
+  spec = "{\"org.nixos.bootspec.v1\": {\"toplevel\": \"/nix/store/aaaa-nixos-system-x\"}}"
+  assert! \-> bootspec_toplevel spec == Some (.to_string "/nix/store/aaaa-nixos-system-x")
+  assert! \-> bootspec_toplevel "{}" == None
+  assert! \-> bootspec_toplevel "not json" == None
+
+test "a profile's generations are read in order with its current one"
+  dir = scratch "read"
+  symlink_at (&dir) "system-10-link" "/nix/store/cccc-system-10"
+  symlink_at (&dir) "system-2-link" "/nix/store/bbbb-system-2"
+  symlink_at (&dir) "system-1-link" "/nix/store/aaaa-system-1"
+  symlink_at (&dir) "system" "system-2-link"
+  symlink_at (&dir) "other-3-link" "/nix/store/dddd-other-3"
+  p = read_profile (&(dir.join "system"))
+  numbers = p.gens.iter () |> .map (\g -> g.number) |> .collect : Vec<u64>
+  assert! \-> numbers == vec![1, 2, 10]
+  assert! \-> p.current == Some 2
+  assert! \-> p.gens[0].target == "/nix/store/aaaa-system-1" && p.gens[0].toplevel == p.gens[0].target
+  fs::remove_dir_all (&dir) |> .ok
+  ()
+
+test "profiles are found the way nix-collect-garbage finds them"
+  dir = scratch "find"
+  fs::create_dir_all (dir.join "system-profiles") |> .unwrap
+  fs::create_dir_all (dir.join "per-user/root") |> .unwrap
+  symlink_at (&dir) "system" "system-1-link"
+  symlink_at (&dir) "system-1-link" "/nix/store/aaaa-system-1"
+  symlink_at (&(dir.join "system-profiles")) "comin" "comin-4-link"
+  symlink_at (&(dir.join "system-profiles")) "comin-4-link" "/nix/store/bbbb-system-4"
+  symlink_at (&(dir.join "per-user/root")) "profile" "profile-7-link"
+  (sys, notes) = system_profiles (&dir)
+  assert! \-> sys == vec![dir.join("system"), dir.join("system-profiles/comin")]
+  assert! \-> notes.is_empty ()
+  (all, _) = all_profiles (&dir)
+  assert! \-> all.len () == 3 && all.contains (&(dir.join "per-user/root/profile"))
+  fs::remove_dir_all (&dir) |> .ok
+  ()
