@@ -389,6 +389,9 @@
       // {vfiles-vm = import ./features/nixos/vfiles/test.nix {inherit pkgs;};}
       # features/nix/vdeploy's VM test (#159): commits faster than a build, still converges.
       // {vdeploy-vm = import ./features/nix/vdeploy/test.nix {inherit pkgs;};}
+      # features/nixos/vgen's VM test: prunes keep the booted, current and pinned
+      # generations, the boot menu follows, and pins survive vgc.
+      // {vgen-vm = import ./features/nixos/vgen/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

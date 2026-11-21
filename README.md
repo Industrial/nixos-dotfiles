@@ -157,9 +157,10 @@ bin/update/profiles        # nix profile upgrade --all
 bin/fleet status           # SSH reachability of all four hosts
 bin/fleet deploy <host>    # deploy-rs push; see docs/runbooks/fleet-deploy.md
 
-bin/generations/list                      # system generations
+bin/generations/list                      # system generations, every profile, with diffs (vgen list)
 bin/generations/rollback system-<N>-link  # switch to a generation (argument required)
-bin/generations/delete                    # delete all but the last 2
+bin/generations/delete                    # keep the newest 2 per system profile (vgen prune --keep 2)
+sudo vgen pin <N> [--profile comin]       # keep a generation through pruning and GC
 bin/delete/collectgarbage                 # vgc run --delete-old (nix-collect-garbage -d)
 ```
 
