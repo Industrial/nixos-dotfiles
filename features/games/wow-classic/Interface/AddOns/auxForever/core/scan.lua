@@ -791,7 +791,7 @@ function replicate()
     end)
     if not answered then
         result.full.failed = true
-        aux.print(format('Full scan: the auction house did not answer within %d minutes, so nothing was recorded. It may be busy. The Full scan button lights up again 15 minutes after this try.', REPLICATE_WAIT / 60))
+        aux.print(format('Full scan: the auction house did not answer within %d minutes, so nothing was recorded. It may be busy, or a Full scan ran recently (a Full scan by another addon counts too). The Full scan button lights up again 15 minutes after this try.', REPLICATE_WAIT / 60))
         return
     end
     result.full.server = GetTime() - t_request

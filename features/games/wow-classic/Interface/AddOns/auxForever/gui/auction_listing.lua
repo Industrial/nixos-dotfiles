@@ -552,26 +552,32 @@ local methods = {
         local rt = self:GetParent().row.rt
         local row = self:GetParent().row
         if row.record then
-	        GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
-            local key = row.record.browse_key
-            -- 0.8.2.1 build 7 (FB-045, karrier_user_slouyac50poxg707: "of shadow protection" and
-            -- "of healing" without their stat): a fast row has no link of its own. As Blizzard's
-            -- item display does (Code, Blizzard_AuctionHouseSharedTemplates.lua, branch forever), a
-            -- real link of one of the item key's auctions comes first when the game has one, then
-            -- the item key, which shows the suffix of most endings
-            local sample = key and C_AuctionHouse.GetItemKeySampleLink and C_AuctionHouse.GetItemKeySampleLink(key)
-            if type(sample) == 'string' and sample ~= '' then
-                GameTooltip:SetHyperlink(sample)
-            elseif key and GameTooltip.SetItemKey then
-                -- auxForever: a fast mode row has no link of its own; this shows its suffix too
-                GameTooltip:SetItemKey(key.itemID, key.itemLevel or 0, key.itemSuffix or 0, row.record.requirement or 0)
-            else
-                GameTooltip:SetHyperlink(row.record.link)
-            end
-            GameTooltip_ShowCompareItem()
-            gui.add_click_hint(GameTooltip, rt:ClickHint(row))
+            GameTooltip:SetOwner(self, 'ANCHOR_RIGHT')
+            rt:ItemTooltip(row)
             GameTooltip:Show()
+            GameTooltip_ShowCompareItem()
         end
+    end,
+
+    -- auxForever (PR #41, nokkty): the row's item and its click hint in GameTooltip, which the
+    -- caller owns, places and shows (the icon hover above, the gamepad focus in gamepad.lua)
+    ItemTooltip = function(self, row)
+        local key = row.record.browse_key
+        -- 0.8.2.1 build 7 (FB-045, karrier_user_slouyac50poxg707: "of shadow protection" and
+        -- "of healing" without their stat): a fast row has no link of its own. As Blizzard's
+        -- item display does (Code, Blizzard_AuctionHouseSharedTemplates.lua, branch forever), a
+        -- real link of one of the item key's auctions comes first when the game has one, then
+        -- the item key, which shows the suffix of most endings
+        local sample = key and C_AuctionHouse.GetItemKeySampleLink and C_AuctionHouse.GetItemKeySampleLink(key)
+        if type(sample) == 'string' and sample ~= '' then
+            GameTooltip:SetHyperlink(sample)
+        elseif key and GameTooltip.SetItemKey then
+            -- auxForever: a fast mode row has no link of its own; this shows its suffix too
+            GameTooltip:SetItemKey(key.itemID, key.itemLevel or 0, key.itemSuffix or 0, row.record.requirement or 0)
+        else
+            GameTooltip:SetHyperlink(row.record.link)
+        end
+        gui.add_click_hint(GameTooltip, self:ClickHint(row))
     end,
 
     -- auxForever (0.5, docs/clicks.md): the clicks of a row, for the gray line at the bottom of its

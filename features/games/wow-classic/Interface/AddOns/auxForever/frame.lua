@@ -307,9 +307,19 @@ do
     end)
     btn:SetScript('OnLeave', function() GameTooltip:Hide() end)
     btn:SetMotionScriptsWhileDisabled(true)
-    -- the Sniper's notice has a Full scan button of its own that clicks this one (0.6 build 9)
+    -- Starts a Full scan (PR #37, Dragoy). Both the top button and the Sniper's notice button call
+    -- this; if clicked while on cooldown, it says when the next one is allowed instead of silently
+    -- doing nothing.
     M.full_scan_button = btn
-    btn:SetScript('OnClick', function()
+    function M.start_full_scan()
+        if scan.is_full_scan() then
+            return
+        end
+        local seconds = seconds_until_scan()
+        if seconds > 0 then
+            print(format('Full scan is available again in %d:%02d. The game allows one every 15 minutes.', floor(seconds / 60), seconds % 60))
+            return
+        end
         local count, shown_percent = 0
         scan.start{
             type = 'list',
@@ -355,6 +365,9 @@ do
                 end
             end,
         }
+    end
+    btn:SetScript('OnClick', function()
+        start_full_scan()
     end)
     scan_button = btn
 end
@@ -515,9 +528,9 @@ do
     reload_button:SetScript('OnClick', function() ReloadUI() end)
     M.look_buttons, M.reload_button, M.reload_note = look_buttons, reload_button, reload_note
 
-    -- left column: Posting. It moves up when no reload is waiting (see refresh).
+    -- left column: Posting and Buying. They move up when no reload is waiting (see refresh).
     local posting = CreateFrame('Frame', nil, popup)
-    gui.set_size(posting, COLUMN, 100)
+    gui.set_size(posting, COLUMN, 120)
     section(posting, 0, 0, 'POSTING')
     local length_row = row(posting, 0, -16, 30, 'Default duration',
         nil, {'How long new auctions last unless you pick another length on the Post tab.', '/aux post duration'})
@@ -531,6 +544,17 @@ do
     -- Bid prices (/aux post bid) was here in build 3 and taken out in build 4: on Forever only gear
     -- can have bids, few sellers set one, and gear is one item per auction, so "per stack" means
     -- nothing (Tyler: "does the stack option even make any sense?"). The chat command stays.
+
+    -- Buying (0.8.2.2, FB-049, Tyler: Confirm back as an option, off unless turned on, gear too)
+    section(posting, 0, -60, 'BUYING')
+    local confirm_row = row(posting, 0, -76, 36, 'Confirm before buying', 'A second click on Confirm',
+        {'Buy first shows the price on a Confirm button, and a second click buys. Off: one click on Buy buys. For trade goods and gear, on the Search and Sniper tabs.', '/aux buy confirm'})
+    local confirm_switch = gui.switch(confirm_row)
+    confirm_switch:SetPoint('RIGHT', 0, 0)
+    confirm_switch.on_click = function()
+        set_buy_confirm(not account_data.buy_confirm)
+    end
+    M.buy_confirm_switch = confirm_switch
 
     -- right column: the tooltip lines, also /aux tooltip ... (a player on CurseForge asked for the
     -- chat settings in this menu, FB-008). Kept per character, like the chat commands.
@@ -602,8 +626,14 @@ do
         for _, switch in ipairs(tooltip_switches) do
             switch:SetChecked(character_data.tooltip[switch.key] and true or false)
         end
+        confirm_switch:SetChecked(account_data.buy_confirm and true or false)
     end
     M.refresh_settings = refresh
+    -- the switch and /aux buy confirm both come here, so they behave the same
+    function M.set_buy_confirm(on)
+        account_data.buy_confirm = on and true or false
+        refresh()
+    end
     function M.set_background_opacity(opacity)
         account_data.background_opacity = gui.set_background_opacity(opacity)
         refresh()

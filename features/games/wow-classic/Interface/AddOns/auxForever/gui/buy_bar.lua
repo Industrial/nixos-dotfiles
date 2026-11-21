@@ -12,15 +12,24 @@ local money = require 'aux.util.money'
 -- always holds the number being bought (the buttons fill it in, typing changes it; FB-001):
 --   1. Buy asks the server for the real price (the click the game needs to start a purchase)
 --   2. a server price at or below the cost on the button is bought at once (0.8.2.1 build 7,
---      Tyler: players did not like the Confirm click; it added no safety, see below)
+--      Tyler: players did not like the Confirm click; it added no safety, see below), or, with
+--      "Confirm before buying" on (0.8.2.2), shown on a Confirm button that a second click presses
 --   3. a server price above the shown cost is cancelled and the item's listings are re-read
+-- The bar starts at 1 (0.8.2.2, FB-050, Tyler): it started at a full stack, and with one click
+-- buying, players bought far more than they meant to.
 -- Why no Confirm: the safety is step 3, a check aux makes on the server's price before paying,
 -- not the second click. The game needs a click to ask for the price (StartCommoditiesPurchase is
 -- restricted) but not to confirm it (ConfirmCommoditiesPurchase is not: Blizzard's generated
 -- documentation, branch forever), so the confirm is sent when the price arrives.
 --
 -- Items (gear, bags, ...) are bought one at a time at the price shown on the button, as in
--- Classic aux; a Bid button appears when the auction takes bids.
+-- Classic aux; a Bid button appears when the auction takes bids. With "Confirm before buying" on,
+-- Buy turns into Confirm (and Cancel) and a second click buys.
+--
+-- After any purchase Buy stays faded for HOLD_SECONDS (0.8.2.2, FB-051, Tremulent: "sometimes
+-- getting double buys"). The likely cause (from the code, not seen in game): players used to Buy,
+-- then Confirm click twice; once the first click's purchase is done, the second finds Buy lit
+-- again and buys a second time.
 
 M.HEIGHT = 58
 
@@ -32,7 +41,17 @@ local CONFIRM_TEXT = nil
 local INPUT_HOVER = {.42, .42, .42}
 
 local NONE, COMMODITY, ITEM = aux.enum(3)
-local IDLE, QUOTING, BUYING = aux.enum(3)
+local IDLE, QUOTING, QUOTED, BUYING = aux.enum(4)
+
+-- a quarter second since 0.8.2.2 build 3 (1 in build 1, half a second in build 2, which Tyler
+-- found "still feels too long"). A habitual second click mostly lands while the purchase is still on
+-- its way, when Buy is faded anyway; the rest only covers the moment just after it is done.
+M.HOLD_SECONDS = .25
+local hold_until = 0
+-- gear waiting for its Confirm click (0.8.2.2): the record and the price the Confirm button shows
+local item_confirm
+-- the item a "Bought" message is about: it stays when the next auction of that item is selected
+local message_item
 
 local mode = NONE
 local state = IDLE
@@ -70,6 +89,23 @@ end
 local function show_message(text, color, seconds)
     message, message_color = text, color or aux.color.text.enabled
     message_until = GetTime() + (seconds or 6)
+    message_item = nil
+end
+
+-- "Confirm before buying" (Settings, /aux buy confirm), off unless the player turns it on
+local function confirm_wanted()
+    return aux.account_data and aux.account_data.buy_confirm and true or false
+end
+
+local function held()
+    return GetTime() < hold_until
+end
+
+-- a purchase went through: say so, and keep Buy faded for a moment against a second click
+local function bought_message(text1, text2, item_name)
+    show_message({text1, text2}, aux.color.green)
+    message_item = item_name or current and current.name
+    hold_until = GetTime() + HOLD_SECONDS
 end
 
 -- runs up to ten times a second; the look is only redrawn when it or the button's state changed
@@ -206,8 +242,13 @@ local function update_commodity()
     -- the bar redraws every frame: a button hidden and shown again each frame drops any click
     -- that started before the hide, so Cancel is only shown or hidden when that changes
     -- no Cancel since build 7: a price that may be paid is bought the moment it arrives (Escape
-    -- in the quantity box still cancels while the price is asked for)
-    cancel_button:Hide()
+    -- in the quantity box still cancels while the price is asked for); with Confirm before buying
+    -- on, Cancel stands next to Confirm (0.8.2.2)
+    if state == QUOTED then
+        if not cancel_button:IsShown() then cancel_button:Show() end
+    elseif cancel_button:IsShown() then
+        cancel_button:Hide()
+    end
     bid_button:Hide()
     if state == IDLE then
         if message and GetTime() < message_until then
@@ -227,12 +268,17 @@ local function update_commodity()
             set_lines(n .. ' × ' .. current.name .. ' for ' .. money.to_string(total, true), 'Not enough money', aux.color.red)
         end
         primary_button:SetText(can_buy and ('Buy ' .. n .. ' for ' .. plain_money(total)) or 'Buy')
-        style_button(primary_button, ACCENT, ACCENT_TEXT, can_buy)
+        style_button(primary_button, ACCENT, ACCENT_TEXT, can_buy and not held())
         shown.item_id, shown.quantity, shown.total, shown.quote, shown.record = current.item_id, n, total, nil, nil
     elseif state == QUOTING then
         set_lines('Asking the auction house for the price...', 'Nothing is bought yet')
         primary_button:SetText('Getting price...')
         style_button(primary_button, ACCENT, ACCENT_TEXT, false)
+    elseif state == QUOTED then
+        set_lines('Server price: ' .. money.to_string(current.quote_total, true) .. ' for ' .. current.quote_quantity, 'Nothing is bought until you confirm', aux.color.green)
+        primary_button:SetText('Confirm ' .. plain_money(current.quote_total))
+        style_button(primary_button, CONFIRM, CONFIRM_TEXT, current.quote_total <= GetMoney())
+        shown.item_id, shown.quantity, shown.quote, shown.record = current.item_id, current.quote_quantity, current.quote_total, nil
     elseif state == BUYING then
         set_lines('Buying...', 'Waiting for the auction house')
         primary_button:SetText('Buying...')
@@ -243,10 +289,11 @@ end
 
 local function reset(text, color)
     kill_listeners()
-    if mode == COMMODITY and state == QUOTING then
+    if mode == COMMODITY and (state == QUOTING or state == QUOTED) then
         C_AuctionHouse.CancelCommoditiesPurchase()
     end
     state = IDLE
+    item_confirm = nil
     if text then
         show_message(text, color)
     end
@@ -255,14 +302,16 @@ end
 local function request_quote()
     local n = quantity()
     local total, _, count = estimate(n)
-    if n < 1 or count < n or total > GetMoney() then return end
+    if n < 1 or count < n or total > GetMoney() or held() then return end
     current.quote_quantity, current.estimate = n, total
     state = QUOTING
     t0 = GetTime()
     message = nil
 
     listen('COMMODITY_PRICE_UPDATED', function(_, quote_total)
-        if state ~= QUOTING then return end
+        -- QUOTED too: the game can send the price again while Confirm is shown (the old two-click
+        -- flow, 0.8.2 and earlier)
+        if state ~= QUOTING and state ~= QUOTED then return end
         -- never more than the player saw: the button showed current.estimate when it was pressed
         if quote_total > current.estimate then
             reset({'The price went up to ' .. money.to_string(quote_total, true), 'Nothing was bought. Listings refreshed.'}, aux.color.red)
@@ -272,8 +321,14 @@ local function request_quote()
             reset({'Not enough money for ' .. money.to_string(quote_total, true), 'Nothing was bought'}, aux.color.red)
             return
         end
-        -- at or below the price on the button: bought now, with no second click (build 7)
         current.quote_total = quote_total
+        if confirm_wanted() then
+            -- Confirm before buying (0.8.2.2): the price waits on the Confirm button
+            state = QUOTED
+            update()
+            return
+        end
+        -- at or below the price on the button: bought now, with no second click (build 7)
         state = BUYING
         t0 = GetTime()
         update()
@@ -303,7 +358,7 @@ local function request_quote()
         local bought, paid, on_success = current.quote_quantity, current.quote_total, current.on_success
         kill_listeners()
         state = IDLE
-        show_message({'Bought ' .. bought .. ' × ' .. current.name .. ' for ' .. money.to_string(paid, true), 'On the way to your mailbox'}, aux.color.green)
+        bought_message('Bought ' .. bought .. ' × ' .. current.name .. ' for ' .. money.to_string(paid, true), 'On the way to your mailbox')
         do (on_success or pass)(bought) end
         -- the purchase can change the selection, which may already have moved the bar on
         if mode == COMMODITY and current then
@@ -333,9 +388,20 @@ local function update_item()
     local at_price = record.group_count or record.auction_count or 1
     sub_label:SetText(at_price .. ' for sale at this price')
     for _, chip in ipairs(chips) do chip:Hide() end
-    cancel_button:Hide()
+    -- a Confirm is only for the auction and price it showed
+    if item_confirm and (item_confirm.record ~= record or item_confirm.price ~= record.buyout_price) then
+        item_confirm = nil
+    end
+    -- shown or hidden only when that changes (a button hidden every frame drops clicks)
+    if item_confirm then
+        if not cancel_button:IsShown() then cancel_button:Show() end
+    elseif cancel_button:IsShown() then
+        cancel_button:Hide()
+    end
 
-    if message and GetTime() < message_until then
+    if item_confirm then
+        set_lines('1 × ' .. current.name .. ' for ' .. money.to_string(record.buyout_price, true), 'Nothing is bought until you confirm', aux.color.green)
+    elseif message and GetTime() < message_until then
         set_lines(message[1], message[2], message_color)
     elseif record.own or current.own then
         set_lines('This is your own auction', 'It cannot be bought or bid on')
@@ -346,12 +412,21 @@ local function update_item()
     end
 
     local can_buy = can_buy_item()
-    primary_button:SetText(record.buyout_price > 0 and ('Buy for ' .. plain_money(record.buyout_price)) or 'Buy')
     shown.record, shown.buyout, shown.bid, shown.item_id, shown.quote = record, record.buyout_price, record.bid_price, nil, nil
-    style_button(primary_button, ACCENT, ACCENT_TEXT, can_buy)
+    shown.confirm = item_confirm and true or false
+    if item_confirm then
+        primary_button:SetText('Confirm ' .. plain_money(record.buyout_price))
+        style_button(primary_button, CONFIRM, CONFIRM_TEXT, can_buy)
+    else
+        primary_button:SetText(record.buyout_price > 0 and ('Buy for ' .. plain_money(record.buyout_price)) or 'Buy')
+        style_button(primary_button, ACCENT, ACCENT_TEXT, can_buy and not held())
+    end
     fit_width(primary_button, 130)
 
-    if can_bid_item() then
+    if item_confirm then
+        -- Cancel takes the Bid button's place while Confirm is shown
+        bid_button:Hide()
+    elseif can_bid_item() then
         bid_button:Show()
         bid_button:SetText('Bid ' .. plain_money(record.bid_price))
         fit_width(bid_button, 90)
@@ -418,7 +493,7 @@ local function show_common(params)
 end
 
 -- params: item_id, name, texture, quality, max_stack, tiers() (the tiers the player can buy,
--- cheapest first), on_success(n), on_refresh()
+-- cheapest first), on_success(n), on_refresh(), whole_deal (start at all units offered, up to a stack)
 function M.show_commodity(params)
     if mode == COMMODITY and current and current.item_id == params.item_id then
         -- same item (e.g. the table refreshed after a purchase): keep the quantity and any message
@@ -432,7 +507,10 @@ function M.show_commodity(params)
     current = params
     current.tier_list = params.tiers()
     current.quantities = quantities(params.max_stack)
-    local start = max(1, min(params.max_stack or 1, available()))
+    -- 1 to start (0.8.2.2, FB-050): a full stack was one click away from being bought by mistake.
+    -- The Sniper offers only a deal's own units (params.whole_deal), and starts at all of them, up
+    -- to a stack: those units are what the deal is.
+    local start = params.whole_deal and max(1, min(params.max_stack or 1, available())) or 1
     current.quantity = start
     other_input:Show()
     other_input:SetText(tostring(start))
@@ -448,7 +526,11 @@ function M.show_item(params)
         reset()
     end
     if not (mode == ITEM and current and current.record == params.record) then
-        message = nil
+        item_confirm = nil
+        -- "Bought ..." stays when the next auction of the same item is selected after a purchase
+        if not (message_item and message_item == params.name) then
+            message = nil
+        end
     end
     mode = ITEM
     current = params
@@ -492,6 +574,14 @@ function M.busy()
     return state ~= IDLE
 end
 
+-- buys the selected auction at the price on the button; the tab says when it went through
+local function buy_item()
+    local name, price = current.name, current.record.buyout_price
+    current.on_buy(function()
+        bought_message('Bought 1 × ' .. name .. ' for ' .. money.to_string(price, true), 'On the way to your mailbox', name)
+    end)
+end
+
 -- whether the button shows what a click would do now (see `shown`, at the top)
 local function shows_quantity()
     local n = quantity()
@@ -502,9 +592,26 @@ function M.primary_click()
     if mode == COMMODITY then
         if state == IDLE and shows_quantity() then
             request_quote()
+        elseif state == QUOTED and current.quote_total <= GetMoney() and shown.quote == current.quote_total
+                and shown.quantity == current.quote_quantity then
+            -- the Confirm click (Confirm before buying on): only the price the button showed
+            state = BUYING
+            t0 = GetTime()
+            C_AuctionHouse.ConfirmCommoditiesPurchase(current.item_id, current.quote_quantity)
         end
     elseif mode == ITEM and can_buy_item() and shown.record == current.record and shown.buyout == current.record.buyout_price then
-        current.on_buy()
+        if item_confirm then
+            if shown.confirm then
+                item_confirm = nil
+                buy_item()
+            end
+        elseif not held() and not shown.confirm then
+            if confirm_wanted() then
+                item_confirm = {record = current.record, price = current.record.buyout_price}
+            else
+                buy_item()
+            end
+        end
     end
     update()
 end
@@ -570,7 +677,10 @@ function M.create(parent)
         if mode == NONE or GetTime() < next_update then return end
         next_update = GetTime() + .1
         -- a quote only lasts a short time; a lost server answer must not leave the bar stuck
-        if mode == COMMODITY and state == QUOTING and GetTime() - t0 > 10 then
+        if mode == COMMODITY and state == QUOTED and C_AuctionHouse.GetQuoteDurationRemaining() == 0 then
+            -- the server's price only holds for a short time (Confirm before buying on)
+            reset({'The price quote expired', 'Nothing was bought'}, aux.color.red)
+        elseif mode == COMMODITY and state == QUOTING and GetTime() - t0 > 10 then
             reset({'No answer from the auction house', 'Nothing was bought'}, aux.color.red)
         elseif mode == COMMODITY and state == BUYING and GetTime() - t0 > 10 then
             -- the purchase was confirmed and may still go through on a slow server: saying nothing

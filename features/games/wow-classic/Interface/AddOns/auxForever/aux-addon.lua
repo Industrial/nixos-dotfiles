@@ -123,6 +123,8 @@ function event.AUX_LOADED()
         post_bid = nil,
         post_duration = post.DURATION_8,
         post_undercut = false,
+        -- auxForever (0.8.2.2, FB-049): a second click on Confirm before anything is bought
+        buy_confirm = false,
         full_search = false,
         sniper_percent = 60,
         sniper_profit = 500,
