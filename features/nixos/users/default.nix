@@ -28,7 +28,37 @@
   # existing /etc/shadow entry), so on an installed host it is long gone. Kept for fresh
   # installs, where the first login is expected to run `passwd`. See ADR-0007.
   initialOperatorHash = "$6$jne0QlJa/oBzEapq$4/gnXjNpggz.R45ND4QYwzqOyIz9CeblnqKzfnN7njIuKZSEfweNISngx87xy6VA0bEmncyyTmiNa5Q5GXDj5/";
+
+  # Locks root, once, and only while the operator still has a password to sudo with. Shared
+  # by the activation snippet (perl user management) and the unit that follows userborn.
+  # Does nothing until /etc/shadow exists: under userborn a fresh boot activates before
+  # userborn.service has written it, and lock-root-password.service covers that case.
+  lockRootScript = ''
+    if [ -e /etc/shadow ]; then
+      root_hash="$(${pkgs.gawk}/bin/awk -F: '$1 == "root" { print $2 }' /etc/shadow)"
+      operator_hash="$(${pkgs.gawk}/bin/awk -F: -v u=${lib.escapeShellArg user} '$1 == u { print $2 }' /etc/shadow)"
+      case "$root_hash" in
+        '!'* | '*'*) ;; # already locked
+        *)
+          case "$operator_hash" in
+            '$'*)
+              ${pkgs.shadow}/bin/usermod -L root
+              echo "lockRootPassword: locked the root password (reverse with: passwd -u root)"
+              ;;
+            *)
+              echo "lockRootPassword: WARNING: not locking root, because ${user} has no usable password hash, so sudo would be the only way in" >&2
+              ;;
+          esac
+          ;;
+      esac
+    fi
+  '';
 in {
+  options.features.nixos.users.userborn.enable = lib.mkEnableOption ''
+    userborn (services.userborn) in place of update-users-groups.pl for /etc/passwd, group
+    and shadow. Off by default and enabled on no host: measured by ./test.nix (GH-187); the
+    switch-over and the rollback are in docs/runbooks/userborn.md'';
+
   options.features.hardening = {
     lockRoot = lib.mkOption {
       type = lib.types.bool;
@@ -169,24 +199,24 @@ in {
     # has a password to sudo with.
     system.activationScripts.lockRootPassword = lib.mkIf cfg.lockRoot {
       deps = ["users"];
-      text = ''
-        root_hash="$(${pkgs.gawk}/bin/awk -F: '$1 == "root" { print $2 }' /etc/shadow)"
-        operator_hash="$(${pkgs.gawk}/bin/awk -F: -v u=${lib.escapeShellArg user} '$1 == u { print $2 }' /etc/shadow)"
-        case "$root_hash" in
-          '!'* | '*'*) ;; # already locked
-          *)
-            case "$operator_hash" in
-              '$'*)
-                ${pkgs.shadow}/bin/usermod -L root
-                echo "lockRootPassword: locked the root password (reverse with: passwd -u root)"
-                ;;
-              *)
-                echo "lockRootPassword: WARNING: not locking root, because ${user} has no usable password hash, so sudo would be the only way in" >&2
-                ;;
-            esac
-            ;;
-        esac
-      '';
+      text = lockRootScript;
+    };
+
+    services.userborn.enable = config.features.nixos.users.userborn.enable;
+
+    # Under userborn the files are written by userborn.service, which on boot runs after the
+    # activation snippets, so on a fresh install the snippet above finds no /etc/shadow. This
+    # runs the same lock once userborn has written the files.
+    systemd.services.lock-root-password = lib.mkIf (cfg.lockRoot && config.features.nixos.users.userborn.enable) {
+      description = "Lock the root password (ADR-0007)";
+      after = ["userborn.service"];
+      requires = ["userborn.service"];
+      wantedBy = ["multi-user.target"];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = lockRootScript;
     };
 
     systemd = {
