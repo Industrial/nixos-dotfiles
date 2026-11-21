@@ -15,17 +15,28 @@ let
     };
   };
   eval = extra: nixos.eval {modules = [./default.nix esp] ++ extra;};
+  # The same module in an evaluation that has no lanzaboote input (null overrides the one
+  # nixos.nix resolves from flake.lock).
+  evalNoLanza = extra:
+    nixos.eval {
+      modules = [./default.nix esp] ++ extra;
+      inputs.lanzaboote = null;
+    };
   missing = expected: lib.subtractLists default.boot.kernelParams expected;
 
   default = eval [];
-  sysctl = default.boot.kernel.sysctl;
+  inherit (default.boot.kernel) sysctl;
   tpm = eval [
     {
       features.hardening.tpm2Unlock.enable = true;
       boot.initrd.luks.devices.cryptroot.device = "/dev/null";
     }
   ];
-  sb = eval [{features.hardening.secureBoot.enable = true;}];
+  sbOn = {features.hardening.secureBoot.enable = true;};
+  sb = eval [sbOn];
+  sbNoLanza = evalNoLanza [sbOn];
+  # What a host evaluates when the option is off: the lanzaboote module is there, inert.
+  noLanzaDefault = evalNoLanza [];
   failed = config: builtins.filter (a: !a.assertion) config.assertions;
 
   isSysctlName = p: builtins.match "(kernel|net|vm|fs)\\.[a-z0-9_.]+=.*" p != null;
@@ -100,5 +111,28 @@ in
 
     # Secure Boot on without the lanzaboote module: refuse to evaluate, never half-apply.
     secureBootNeedsLanzaboote =
-      assay.eq (builtins.any (a: builtins.match ".*needs the lanzaboote NixOS module.*" a.message != null) (failed sb)) true;
+      assay.eq (builtins.any (a: builtins.match ".*needs the lanzaboote NixOS module.*" a.message != null) (failed sbNoLanza)) true;
+    # Without the input the option still exists, so an off host evaluates the same.
+    noInputStillEvaluates = assay.eq (failed noLanzaDefault) [];
+
+    # GH-184: the flake input's module is imported on every host, and inert while off: the
+    # Python systemd-boot installer stays the bootloader installer.
+    lanzabooteModuleImported = assay.eq (default ? boot && default.boot ? lanzaboote) true;
+    lanzabooteOffByDefault = assay.eq default.boot.lanzaboote.enable false;
+    noExternalInstallerByDefault = assay.eq default.boot.loader.external.enable false;
+
+    # Secure Boot on: lzbt replaces systemd-boot's installer, cleanly.
+    secureBootEvaluatesCleanly = assay.eq (failed sb) [];
+    secureBootEnablesLanzaboote = assay.eq sb.boot.lanzaboote.enable true;
+    secureBootUsesExternalInstaller = assay.eq sb.boot.loader.external.enable true;
+    # The regression this suite missed: `{boot.loader…} // {boot.lanzaboote…}` dropped the
+    # left-hand `boot`, leaving systemd-boot on next to lanzaboote (a conflicting definition).
+    secureBootTurnsSystemdBootOff = assay.eq sb.boot.loader.systemd-boot.enable false;
+    secureBootEditorOff = assay.eq [sb.boot.loader.systemd-boot.editor sb.boot.lanzaboote.settings.editor] [false false];
+    secureBootPkiBundle = assay.eq sb.boot.lanzaboote.pkiBundle "/var/lib/sbctl";
+    # Same generation limit as systemd-boot, so the 511M ESP holds what it holds today.
+    secureBootKeepsTenGenerations = assay.eq sb.boot.lanzaboote.configurationLimit 10;
+    # Keys are created by hand (runbook), never generated or enrolled behind the operator's back.
+    secureBootNoAutoKeys = assay.eq [sb.boot.lanzaboote.autoGenerateKeys.enable sb.boot.lanzaboote.autoEnrollKeys.enable sb.boot.lanzaboote.allowUnsigned] [false false false];
+    secureBootShipsSbctl = assay.eq (nixos.hasPackage sb "sbctl") true;
   }
