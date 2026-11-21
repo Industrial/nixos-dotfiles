@@ -12,9 +12,11 @@ sysinfo = "0.31"
 
 # Voltaic as a library: build.rs compiles src/*.vlt to Rust. The published
 # crates ship their generated Rust, so no voltaic binary or bootstrap is needed.
+# Pinned exactly: the compiler decides what this daemon kills, and 0.2.0 has
+# silent miscompiles that 0.2.1 fixes. Bump deliberately, re-running the tests.
 [build-dependencies]
-voltaic-driver = "0.2"
-voltaic-diag = "0.2"
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
 
 [lib]
 name = "oomkiller"

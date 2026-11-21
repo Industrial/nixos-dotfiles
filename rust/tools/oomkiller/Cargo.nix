@@ -2013,9 +2013,9 @@
       };
       "voltaic-ast" = rec {
         crateName = "voltaic-ast";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "18zpkwbllz8fkr4fk4kxp34c12da0yvcip9pwhwkswwb6vl8zfn9";
+        sha256 = "05xr5391faz7bn7ffh6x36rna4f7nfryn854i8zhbc50bnkzpmhj";
         libName = "voltaic_ast";
         dependencies = [
           {
@@ -2026,9 +2026,9 @@
       };
       "voltaic-diag" = rec {
         crateName = "voltaic-diag";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "0ksdrzslq8vj1ymgiqp2s6amxh761z76qz8ygv5chcxzsnhs77sd";
+        sha256 = "0dhrh0zi2xak7ryiyigk2884jk2p7i0bpil27xlx6dpdbbbiwcy5";
         libName = "voltaic_diag";
         dependencies = [
           {
@@ -2040,9 +2040,9 @@
       };
       "voltaic-driver" = rec {
         crateName = "voltaic-driver";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "1v0rhgm7bapnjkgkxdn0bigh5s4mn2ylb4wza2iff7rg3g35sxdi";
+        sha256 = "0m94fc81hd88lnr3cwkaybnaizdy2ghwkm9jp9f96pph28776lj2";
         libName = "voltaic_driver";
         dependencies = [
           {
@@ -2077,9 +2077,9 @@
       };
       "voltaic-emit" = rec {
         crateName = "voltaic-emit";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "12iw0m407q10z5dzx6dy4vb7blshsxscgxsz7jhsrjns45ka1gp1";
+        sha256 = "12a5ldxr8nsl1y1pb5pvlfnbxgan1l2z19d96b42vwzh5hfgx4lm";
         libName = "voltaic_emit";
         dependencies = [
           {
@@ -2094,9 +2094,9 @@
       };
       "voltaic-lattice" = rec {
         crateName = "voltaic-lattice";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "1c7fx6bz5l2y67zq1q8ikd5zhyi6f3hviqcj9x4xakz2f6rw8fda";
+        sha256 = "1k8pb4mmg7kyysgqzyqs2qyn9ajqyawm9qmbqr2hyql2hwb0m3ng";
         libName = "voltaic_lattice";
         dependencies = [
           {
@@ -2111,9 +2111,9 @@
       };
       "voltaic-lexer" = rec {
         crateName = "voltaic-lexer";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "1588j2yir9a8kw3s7sylf7jk9by5fsdmr44nwpd22si1brdgk71c";
+        sha256 = "01lbg6qjqdvfswr0nf0ahmqgszb9da2dmldans573jzwcfbji164";
         libName = "voltaic_lexer";
         dependencies = [
           {
@@ -2124,9 +2124,9 @@
       };
       "voltaic-parser" = rec {
         crateName = "voltaic-parser";
-        version = "0.2.0";
+        version = "0.2.1";
         edition = "2024";
-        sha256 = "0qnjd40sh196ff5fj9kxp7xscdl280zwm3q0vxjl0djsg3jh96ir";
+        sha256 = "0kqh4f2i5wpb4jhnsw2sspjy0yxmpgscj26kcss9nyiiglddq19d";
         libName = "voltaic_parser";
         dependencies = [
           {

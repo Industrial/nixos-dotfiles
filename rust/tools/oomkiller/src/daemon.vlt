@@ -87,7 +87,6 @@ iteration system =
 
 -- The daemon: check every INTERVAL_SECS, forever. One System is reused, because
 -- building it scans the whole machine.
-#[allow(unreachable_code)]
 export run : ()
 run =
   mut system = System::new_all ()

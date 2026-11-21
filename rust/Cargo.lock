@@ -607,27 +607,27 @@ checksum = "3a3b425286980a367278453f3b6d28cdcb134b574e5a35824a6ff5eebad50bb6"
 
 [[package]]
 name = "voltaic-ast"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9ba8fe8368b733d39e437ddc8b607aa89c0c8b87d92e9489e0e7d4a179ff7a3"
+checksum = "12d6fba75da0b0053f8aa420ebb3b3c71165b319dd40e78e5de72b17d228b917"
 dependencies = [
  "voltaic-lexer",
 ]
 
 [[package]]
 name = "voltaic-diag"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d9fa3a1d5bf33c8ca7e1e7d6cce0fe6c05e95d1e2e2f8aa0f72234cf5cf4d4f"
+checksum = "c5331ed75aed36d3693f82c6bb403c574c491012f3451f7d3e5375113f801936"
 dependencies = [
  "miette",
 ]
 
 [[package]]
 name = "voltaic-driver"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1755dc61b2f1fe7a2509f9345bdb095e8025f5cc0b63edf94f6aa75ea8319ec"
+checksum = "4252730e12f05e935cba32d5c9e113befda8ecf26a7236b2a508351810732455"
 dependencies = [
  "blake3",
  "voltaic-ast",
@@ -640,9 +640,9 @@ dependencies = [
 
 [[package]]
 name = "voltaic-emit"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1bea06621dacaaca13c5ff7c774d750d375d626be99fe5bf920e00348053c8a"
+checksum = "9592fe1c2cf0f32dc832a9a5f0050d56bdbeaca3fb9675830f545b947ba34589"
 dependencies = [
  "voltaic-ast",
  "voltaic-diag",
@@ -650,9 +650,9 @@ dependencies = [
 
 [[package]]
 name = "voltaic-lattice"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa39c4b371e24fd5494f92e1b8e170267af84b9b11e180ff315ed0f297e9eeb0"
+checksum = "cf8e0a168782620f45c6abe254b9f258aa643d161afb8f9ff67e9e572b5917cd"
 dependencies = [
  "voltaic-ast",
  "voltaic-diag",
@@ -660,18 +660,18 @@ dependencies = [
 
 [[package]]
 name = "voltaic-lexer"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9cf95a5e216a21dae596905c9b76c5af34e571d4eba3079f48a51cbd900895"
+checksum = "c484289763fccb718ab6aad1da846a697dfd70850a380b32d76e372cb1798b06"
 dependencies = [
  "voltaic-diag",
 ]
 
 [[package]]
 name = "voltaic-parser"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "399a04e5785a364065df008fca3f408236a6fbb97d26e98a732605a80169d262"
+checksum = "2d05dc1a7d317a9bb466d308c9f4bbb57be0e5d55a706da124ebf2128523104f"
 dependencies = [
  "voltaic-ast",
  "voltaic-diag",
