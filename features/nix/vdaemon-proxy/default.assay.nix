@@ -9,8 +9,7 @@ let
   features = import ../../../lib/features.nix {inherit lib;};
 
   cfg = nixos.eval {modules = [./default.nix];};
-  sockets = cfg.systemd.sockets;
-  services = cfg.systemd.services;
+  inherit (cfg.systemd) sockets services;
   proxySocket = sockets.vdaemon-proxy;
   proxy = services.vdaemon-proxy;
   sc = proxy.serviceConfig;

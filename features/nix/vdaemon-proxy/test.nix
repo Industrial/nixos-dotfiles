@@ -8,7 +8,7 @@
 # upstream connection carries the client's uid), a killed proxy coming back, and the
 # fallback that hands the public socket to nix-daemon directly.
 {pkgs}: let
-  busybox = pkgs.busybox;
+  inherit (pkgs) busybox;
   # A derivation with no inputs but busybox, built in the sandbox.
   expr = pkgs.writeText "trivial.nix" ''
     derivation {
