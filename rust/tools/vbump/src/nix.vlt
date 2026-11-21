@@ -1,0 +1,214 @@
+-- Nix as a capability: the four things vbump asks of it.
+--
+--   hosts      the flake's nixosConfigurations, as the base lock has them;
+--   relock     `nix flake update <input>` in a scratch directory holding the
+--              base flake.nix and flake.lock: C++ Nix stays the lock resolver;
+--   drv        a host's toplevel derivation, evaluated against the base lock or
+--              a relocked one (`--reference-lock-file`, so the source tree is
+--              the base revision's and is never copied);
+--   dry_build  `nix build --dry-run` of that derivation: whether it builds at
+--              all, and how much would be built or fetched.
+--
+-- The live implementation runs the commands; tests use `Scripted`.
+
+import std::collections::BTreeMap
+import std::sync::{Arc, Mutex}
+import id_effect::{Effect, HNil, fail, succeed, suspend}
+import crate::common::{Cmd, VbumpError, cmd, lifted, run}
+import crate::common::VbumpError::{Command, Eval, Io, Lock}
+
+-- An input's new lock: where it was written, and its text.
+export data Relocked { export input String, export path String, export text String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What a dry build would do.
+export data DryBuild { export to_build usize, export to_fetch usize, export download String }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+export class Nix
+  hosts : &self -> Effect<Vec<String>, VbumpError, HNil>
+  relock : &self -> String -> String -> Effect<Relocked, VbumpError, HNil>
+  drv : &self -> Option<Relocked> -> String -> Effect<String, VbumpError, HNil>
+  dry_build : &self -> String -> Effect<DryBuild, VbumpError, HNil>
+
+-- The capability, whichever implementation provides it.
+export newtype NixTools = NixTools (export Arc<dyn Nix + Send + Sync>)
+
+instance Clone NixTools
+  clone : &self -> Self
+  clone self = NixTools (Arc::clone (&self.0))
+
+-- Every nix call gets the flake features, whatever the machine's nix.conf.
+nix_args : Vec<&str> -> Vec<String>
+nix_args rest =
+  mut args = .to_vec ([.to_string "--extra-experimental-features", .to_string "nix-command flakes"]) : Vec<String>
+  for a in rest
+    args.push (a.to_string ())
+  args
+
+-- The count in a `nix build --dry-run` summary line: "these 94 derivations
+-- will be built:", "this path will be fetched (…)".
+export count_of : &str -> Option<usize>
+count_of line =
+  words = line.split_whitespace () |> .collect : Vec<&str>
+  case words.first () |> .copied of
+    Some "this" -> Some 1
+    Some "these" -> words.get 1 |> .and_then (\w -> w.parse () |> .ok)
+    _ -> None
+
+-- The download size in a fetch line: "(176.6 MiB download, 730.7 MiB unpacked)".
+export download_of : &str -> String
+download_of line =
+  after = line.split_once '(' |> .map (\p -> p.1) |> .unwrap_or ""
+  after.split_once " download" |> .map (\p -> p.0.to_string ()) |> .unwrap_or_default
+
+-- The summary of a dry build, from what nix printed on stderr.
+export parse_dry : &str -> DryBuild
+parse_dry text =
+  mut d = DryBuild::default ()
+  for line in text.lines ()
+    l = line.trim_start ()
+    if l.contains "will be built"
+      d.to_build := count_of l |> .unwrap_or 0
+    if l.contains "will be fetched"
+      d.to_fetch := count_of l |> .unwrap_or 0
+      d.download := download_of l
+  d
+
+-- The attribute of a host's toplevel derivation.
+export toplevel : &str -> &str -> String
+toplevel flake host = "#{flake}#nixosConfigurations.\"#{host}\".config.system.build.toplevel.drvPath"
+
+-- The live Nix: the flake at `flake` (a `git+file://…?rev=…` reference to the
+-- base revision), and that revision's flake.nix and flake.lock for relocking.
+export data LiveNix { flake String, flake_nix String, flake_lock String }
+
+on : Cmd -> Result<String, String>
+on c = run (&c) |> .map (\r -> r.stdout)
+
+list_hosts : String -> Result<Vec<String>, VbumpError>
+list_hosts flake =
+  target = "#{flake}#nixosConfigurations"
+  out = (on (cmd "nix" (nix_args (.to_vec (["eval", "--json", target.as_str (), "--apply", "builtins.attrNames"])))) |> .map_err Eval)?
+  serde_json::from_str (&out) |> .map_err (\e -> Eval ("nixosConfigurations: not a list of names: #{e}"))
+
+write_scratch : &str -> &str -> &str -> Result<(), VbumpError>
+write_scratch dir flake_nix flake_lock =
+  (std::fs::create_dir_all dir |> .map_err (\e -> Io ("creating #{dir}: #{e}")))?
+  (std::fs::write "#{dir}/flake.nix" flake_nix |> .map_err (\e -> Io ("writing #{dir}/flake.nix: #{e}")))?
+  std::fs::write "#{dir}/flake.lock" flake_lock |> .map_err (\e -> Io ("writing #{dir}/flake.lock: #{e}"))
+
+relock_in : String -> String -> String -> String -> Result<Relocked, VbumpError>
+relock_in flake_nix flake_lock input dir =
+  (write_scratch (&dir) (&flake_nix) (&flake_lock))?
+  mut c = cmd "nix" (nix_args (.to_vec (["flake", "update", input.as_str ()])))
+  c.cwd := Some (dir.clone ())
+  (on c |> .map_err Command)?
+  path = "#{dir}/flake.lock"
+  text = (std::fs::read_to_string (&path) |> .map_err (\e -> Lock ("reading #{path}: #{e}")))?
+  Ok (Relocked { input, path, text })
+
+eval_drv : String -> Option<Relocked> -> String -> Result<String, VbumpError>
+eval_drv flake lock host =
+  mut args = nix_args (.to_vec (["eval", "--raw"]))
+  if lock is Some l
+    args.push (.to_string "--reference-lock-file")
+    args.push (l.path)
+  args.push (toplevel (&flake) (&host))
+  out = (on (cmd "nix" args) |> .map_err (\e -> Eval ("#{host} does not evaluate: #{e}")))?
+  Ok (out.trim () |> .to_string)
+
+dry : String -> Result<DryBuild, VbumpError>
+dry drv =
+  outputs = "#{drv}^*"
+  c = cmd "nix" (nix_args (.to_vec (["build", "--dry-run", "--no-link", outputs.as_str ()])))
+  ran = (run (&c) |> .map_err (\e -> Eval ("dry build of #{drv}: #{e}")))?
+  Ok (parse_dry (&ran.stderr))
+
+instance Nix LiveNix
+  hosts : &self -> Effect<Vec<String>, VbumpError, HNil>
+  hosts self =
+    flake = self.flake.clone ()
+    suspend (move \-> lifted (list_hosts flake))
+  relock : &self -> String -> String -> Effect<Relocked, VbumpError, HNil>
+  relock self input dir =
+    flake_nix = self.flake_nix.clone ()
+    flake_lock = self.flake_lock.clone ()
+    suspend (move \-> lifted (relock_in flake_nix flake_lock input dir))
+  drv : &self -> Option<Relocked> -> String -> Effect<String, VbumpError, HNil>
+  drv self lock host =
+    flake = self.flake.clone ()
+    suspend (move \-> lifted (eval_drv flake lock host))
+  dry_build : &self -> String -> Effect<DryBuild, VbumpError, HNil>
+  dry_build self drv =
+    suspend (move \-> lifted (dry drv))
+
+export live : String -> String -> String -> NixTools
+live flake flake_nix flake_lock = NixTools (Arc::new (LiveNix { flake, flake_nix, flake_lock }))
+
+-- A scripted Nix, for tests. `locks` is each input's new lock text, or the
+-- error its relock fails with, after `flaky` failed attempts; `drvs` is each
+-- (input or "" for the base, host)'s derivation, or the error. Every relock
+-- attempt is counted.
+export data Scripted
+  { export host_names Vec<String>
+  , export locks BTreeMap<String, Result<String, String>>
+  , export drvs BTreeMap<(String, String), Result<String, String>>
+  , export flaky BTreeMap<String, usize>
+  , export attempts Arc<Mutex<BTreeMap<String, usize>>>
+  }
+  deriving (Clone, Default)
+
+attempt : &Scripted -> &str -> usize
+attempt s input =
+  case s.attempts.lock () of
+    Ok held ->
+      mut m = held
+      n =m.get input |> .copied |> .unwrap_or 0
+      m.insert (input.to_string ()) (n + 1)
+      n + 1
+    Err _ -> 0
+
+instance Nix Scripted
+  hosts : &self -> Effect<Vec<String>, VbumpError, HNil>
+  hosts self = succeed (self.host_names.clone ())
+  relock : &self -> String -> String -> Effect<Relocked, VbumpError, HNil>
+  relock self input dir =
+    n = attempt self (&input)
+    fails = self.flaky.get (&input) |> .copied |> .unwrap_or 0
+    if n <= fails
+      fail (Command ("nix flake update #{input}: transient failure #{n}"))
+    else
+      case self.locks.get (&input) of
+        Some (Ok text) -> succeed (Relocked { input, path = "#{dir}/flake.lock", text = text.clone () })
+        Some (Err e) -> fail (Command (e.clone ()))
+        None -> fail (Command ("no such input #{input}"))
+  drv : &self -> Option<Relocked> -> String -> Effect<String, VbumpError, HNil>
+  drv self lock host =
+    key = (lock |> .map (\l -> l.input) |> .unwrap_or_default, host.clone ())
+    case self.drvs.get (&key) of
+      Some (Ok d) -> succeed (d.clone ())
+      Some (Err e) -> fail (Eval ("#{host} does not evaluate: #{e}"))
+      None -> fail (Eval ("#{host}: no derivation scripted"))
+  dry_build : &self -> String -> Effect<DryBuild, VbumpError, HNil>
+  dry_build self drv =
+    if drv.contains "unbuildable"
+      fail (Eval ("dry build of #{drv}: unbuildable"))
+    else
+      succeed (DryBuild { to_build = 2, to_fetch = 3, download = .to_string "1.0 MiB" })
+
+export scripted : Scripted -> NixTools
+scripted s = NixTools (Arc::new s)
+
+test "a dry run's summary lines are counted"
+  text = "these 94 derivations will be built:\n  /nix/store/a.drv\nthese 16 paths will be fetched (176.6 MiB download, 730.7 MiB unpacked):\n  /nix/store/b\n"
+  assert_eq! \-> parse_dry text \-> DryBuild { to_build = 94, to_fetch = 16, download = .to_string "176.6 MiB" }
+  one = "this derivation will be built:\n  /nix/store/a.drv\nthis path will be fetched (0.1 MiB download, 0.2 MiB unpacked):\n"
+  assert_eq! \-> parse_dry one \-> DryBuild { to_build = 1, to_fetch = 1, download = .to_string "0.1 MiB" }
+  assert_eq! \-> parse_dry "" \-> DryBuild::default ()
+
+test "a host's toplevel derivation attribute is quoted"
+  assert_eq! \-> toplevel "git+file:///r?rev=abc" "drakkar" \-> "git+file:///r?rev=abc#nixosConfigurations.\"drakkar\".config.system.build.toplevel.drvPath"
+
+test "nix always gets the flake features"
+  assert_eq! \-> nix_args (.to_vec (["eval"])) \-> .to_vec ([.to_string "--extra-experimental-features", .to_string "nix-command flakes", .to_string "eval"])

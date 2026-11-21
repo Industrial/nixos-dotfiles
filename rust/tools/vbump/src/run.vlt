@@ -1,0 +1,377 @@
+-- The run: every selected input through its own pipeline, `jobs` inputs at a
+-- time, each input's outcome a value so that one bad input never stops the
+-- others.
+--
+--   base       every host's toplevel derivation against the base lock, once;
+--   relock     `nix flake update <input>` in the input's scratch directory,
+--              retried on an id_effect Schedule (it is the step that fetches);
+--   unchanged  a lock that did not move is up to date: nothing to propose;
+--   hosts      each host evaluated and dry-built against the new lock, then
+--              its derivation closure diffed against the base (vdiff --json).
+--              A host that does not evaluate or dry-build fails the input;
+--              a missing base or a failed diff is a note on that host;
+--   publish    the proposal, through the Forge (retried; it is idempotent).
+--
+-- Concurrency is `for_each_par` (inputs `Bounded jobs`, hosts within an input
+-- `Sequential`, since an evaluation is gigabytes); retries are
+-- `Effect::retry` with a bounded exponential Schedule. No loops, threads or
+-- sleeps of vbump's own.
+
+import std::collections::BTreeMap
+import std::time::Duration
+import id_effect::{Concurrency, Effect, HNil, Never, Schedule, effect, for_each_par, succeed}
+import crate::body::{Bump, HostResult, body_of, branch_of, message_of, title_of}
+import crate::common::{VbumpError, lifted}
+import crate::common::VbumpError::{Eval, Lock}
+import crate::differ::{DifferTool, summarise}
+import crate::forge::{Forge, Proposal}
+import crate::lock::{input_locked, moved}
+import crate::nix::{NixTools, Relocked}
+
+-- What the run needs from the outside: the three capabilities.
+export data Caps { export nix NixTools, export differ DifferTool, export forge Forge }
+  deriving (Clone)
+
+-- How the run goes: inputs at a time, the base lock, the scratch root, the
+-- workflow run to `Refs`.
+export data Settings { export jobs usize, export base_lock String, export work String, export run_url Option<String> }
+  deriving (Debug, Clone)
+
+-- What became of one input.
+export data Status
+  = UpToDate
+  | Proposed String
+  | Failed String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Outcome { export input String, export status Status, export bump Option<Bump> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- Transient failures (the network, GitHub) get two more attempts, 10 s and
+-- 20 s later.
+export transient : Schedule<(Duration, u64), VbumpError>
+transient = Schedule::exponential (Duration::from_secs 10) |> .intersect (Schedule::recurs 2)
+
+-- Each host's base derivation, or None when the base does not evaluate for it
+-- (the host is still checked against the new lock; it only has no diff).
+export base_drvs : NixTools -> Vec<String> -> usize -> Effect<BTreeMap<String, Option<String>>, Never, HNil>
+base_drvs nix hosts jobs =
+  named = hosts.clone ()
+  for_each_par hosts (move \h -> base_one (nix.clone ()) h) (Concurrency::Bounded jobs) |> .map (move \drvs -> named |> .into_iter |> .zip drvs |> .collect)
+
+base_one : NixTools -> String -> Effect<Option<String>, Never, HNil>
+base_one nix host =
+  shown = host.clone ()
+  nix.0.drv None host |> .map (\d -> Some d) |> .catch (move \e -> warn_base shown e)
+
+warn_base : String -> VbumpError -> Effect<Option<String>, Never, HNil>
+warn_base host e =
+  eprintln! \-> "vbump: base: #{e}"
+  eprintln! \-> "vbump: base: #{host} has no diff this run"
+  succeed None
+
+-- The input's new lock, the relock retried on `transient`.
+relocked : NixTools -> String -> String -> Effect<Relocked, VbumpError, HNil>
+relocked nix input dir =
+  Effect::retry (move \-> nix.0.relock (input.clone ()) (dir.clone ())) transient
+
+-- One host against the new lock.
+export host_check : Caps -> Relocked -> Option<String> -> String -> Effect<HostResult, VbumpError, HNil>
+host_check caps lock base host =
+  effect!
+    let drv = ~caps.nix.0.drv(Some(lock), host.clone());
+    let dry = ~caps.nix.0.dry_build(drv.clone());
+    let diffed = if base.as_deref() == Some(drv.as_str()) { (Some(crate::differ::Summary::default()), String::new(), crate::body::UNCHANGED.to_string()) } else { ~diff_host(caps.differ.clone(), base, drv.clone()).widen() };
+    let (summary, json, note) = diffed;
+    eprintln!("vbump: {host}: {} to build, {} to fetch", dry.to_build, dry.to_fetch);
+    HostResult { host, drv, dry, summary, json, note }
+
+-- The diff against the base, or the note saying why there is none.
+diff_host : DifferTool -> Option<String> -> String -> Effect<(Option<crate::differ::Summary>, String, String), Never, HNil>
+diff_host differ base drv =
+  case base of
+    None -> succeed ((None, "".to_string (), "the base does not evaluate for this host".to_string ()))
+    Some b -> differ.0.json b drv |> .flat_map (\text -> lifted (summarise (&text)) |> .map (move \s -> (Some s, text, "".to_string ()))) |> .catch (\e -> succeed ((None, "".to_string (), e.to_string ())))
+
+-- The scratch directory of an input: one per input, under the run's root.
+export scratch_of : &str -> &str -> String
+scratch_of work input =
+  safe = branch_of input |> .replace "update/" ""
+  "#{work}/#{safe}"
+
+-- What the input's lock moved: the input's own lock, before and after, and
+-- every node that changed.
+bump_of : String -> String -> String -> Vec<HostResult> -> Result<Bump, VbumpError>
+bump_of base_lock input new_lock hosts =
+  old = (input_locked (&base_lock) (&input) |> .map_err Lock)?
+  new = (input_locked (&new_lock) (&input) |> .map_err Lock)?
+  nodes = (moved (&base_lock) (&new_lock) |> .map_err Lock)?
+  Ok (Bump { input, old, new, moved = nodes, hosts })
+
+-- One input, start to finish, as a value-producing pipeline.
+export pipeline : Caps -> Settings -> BTreeMap<String, Option<String>> -> String -> Effect<Outcome, VbumpError, HNil>
+pipeline caps settings bases input =
+  effect!
+    let dir = scratch_of(&settings.work, &input);
+    let lock = ~relocked(caps.nix.clone(), input.clone(), dir);
+    if moved(&settings.base_lock, &lock.text).map(|m| m.is_empty()).unwrap_or(false) {
+      eprintln!("vbump: {input}: up to date");
+      Outcome { input, status: Status::UpToDate, bump: None }
+    } else {
+      eprintln!("vbump: {input}: relocked, checking {} host(s)", bases.len());
+      let checks = bases.iter().map(|(h, b)| (h.clone(), b.clone())).collect::<Vec<_>>();
+      let c = caps.clone();
+      let l = lock.clone();
+      let hosts = ~for_each_par(checks, move |(h, b)| host_check(c.clone(), l.clone(), b, h), Concurrency::Sequential);
+      let bump = ~lifted(bump_of(settings.base_lock.clone(), input.clone(), lock.text.clone(), hosts));
+      let proposal = Proposal { input: input.clone(), branch: branch_of(&input), title: title_of(&input), body: body_of(&bump, settings.run_url.clone()), message: message_of(&bump), lock_path: lock.path.clone() };
+      let url = ~published(caps.forge.clone(), proposal);
+      eprintln!("vbump: {input}: {url}");
+      Outcome { input, status: Status::Proposed(url), bump: Some(bump) }
+    }
+
+published : Forge -> Proposal -> Effect<String, VbumpError, HNil>
+published forge p =
+  Effect::retry (move \-> forge.0.publish (p.clone ())) transient
+
+-- An input's failure, of any kind, as its outcome.
+export settled : String -> Effect<Outcome, VbumpError, HNil> -> Effect<Outcome, Never, HNil>
+settled input eff =
+  eff.exit () |> .map (move \exit -> outcome_of input (exit.into_result ()))
+
+outcome_of : String -> Result<Outcome, id_effect::Cause<VbumpError>> -> Outcome
+outcome_of input r =
+  case r of
+    Ok o -> o
+    Err cause ->
+      shown = "#{cause:?}"
+      why = case cause.fail_option () of
+        Some e -> e.to_string ()
+        None -> "vbump bug: #{shown}"
+      eprintln! \-> "vbump: #{input}: failed: #{why}"
+      Outcome { input, status = Failed why, bump = None }
+
+-- The run: the base once, then every input, `jobs` at a time.
+export run_all : Caps -> Settings -> Vec<String> -> Effect<Vec<Outcome>, Never, HNil>
+run_all caps settings inputs =
+  effect!
+    let hosts = ~caps.nix.0.hosts().flat_map(|names| lifted(some_hosts(names))).exit();
+    match hosts.into_result() {
+      Err(cause) => {
+        let why = cause.fail_option().map(|e| e.to_string()).unwrap_or_else(|| "vbump bug listing hosts".to_string());
+        eprintln!("vbump: cannot list hosts: {why}");
+        inputs.into_iter().map(|input| Outcome { input, status: Status::Failed(format!("listing hosts: {why}")), bump: None }).collect()
+      }
+      Ok(names) => {
+        eprintln!("vbump: {} host(s), {} input(s), {} at a time", names.len(), inputs.len(), settings.jobs);
+        let bases = ~base_drvs(caps.nix.clone(), names, settings.jobs);
+        let c = caps.clone();
+        let s = settings.clone();
+        ~for_each_par(inputs, move |input| settled(input.clone(), pipeline(c.clone(), s.clone(), bases.clone(), input)), Concurrency::Bounded(settings.jobs))
+      }
+    }
+
+-- A flake with no host has nothing to check a lock against.
+export some_hosts : Vec<String> -> Result<Vec<String>, VbumpError>
+some_hosts names =
+  if names.is_empty ()
+    Err (Eval (.to_string "the flake has no nixosConfigurations"))
+  else
+    Ok names
+
+-- Any input failed: the run is red.
+export any_failed : &[Outcome] -> bool
+any_failed outcomes = outcomes.iter () |> .any (\o -> is_failed (&o.status))
+
+export is_failed : &Status -> bool
+is_failed s =
+  case s of
+    Failed _ -> true
+    _ -> false
+
+first_line : &str -> String
+first_line s = s.lines () |> .next |> .unwrap_or "" |> .replace '|' "\\|"
+
+host_cell : &HostResult -> String
+host_cell h =
+  case &h.summary of
+    Some s -> counts (&h.host) (&h.note) s
+    None -> "#{h.host} –"
+
+counts : &str -> &str -> &crate::differ::Summary -> String
+counts host note s =
+  if note == crate::body::UNCHANGED
+    "#{host} ="
+  else
+    "#{host} #{s.changed.len ()}/#{s.added.len ()}/#{s.removed.len ()}"
+
+host_cells : &[HostResult] -> String
+host_cells hosts =
+  cells = hosts.iter () |> .map host_cell |> .collect : Vec<String>
+  cells.join ", "
+
+-- One table row per input.
+export row_of : &Outcome -> String
+row_of o =
+  (result, moved, hosts) = case (&o.status, &o.bump) of
+    (UpToDate, _) -> (.to_string "up to date", "".to_string (), "".to_string ())
+    (Failed why, _) -> ("**failed**: #{first_line why}", "".to_string (), "".to_string ())
+    (Proposed url, Some b) -> ("#{url} (`#{branch_of (&b.input)}`)", "#{crate::lock::describe (&b.old)} → #{crate::lock::describe (&b.new)}", host_cells (&b.hosts))
+    (Proposed url, None) -> (url.clone (), "".to_string (), "".to_string ())
+  "| `#{o.input}` | #{result} | #{moved} | #{hosts} |"
+
+-- The run's summary: one row per input, the counts first.
+export summary_of : &[Outcome] -> String -> bool -> String
+summary_of outcomes base dry =
+  proposed = outcomes.iter () |> .filter (\o -> is_proposed (&o.status)) |> .count
+  failed = outcomes.iter () |> .filter (\o -> is_failed (&o.status)) |> .count
+  current = outcomes.len () - proposed - failed
+  mode = if dry
+    " (dry run: nothing pushed, no pull request opened)"
+  else
+    ""
+  mut out = "## vbump run against `#{crate::lock::short (&base)}`#{mode}\n\n#{outcomes.len ()} input(s): #{proposed} with a proposal, #{current} up to date, #{failed} failed. Hosts are `name changed/added/removed` package lines of the derivation-closure diff.\n\n| input | result | lock | hosts |\n|---|---|---|---|\n"
+  for o in outcomes
+    out.push_str (&row_of o)
+    out.push '\n'
+  out
+
+export is_proposed : &Status -> bool
+is_proposed s =
+  case s of
+    Proposed _ -> true
+    _ -> false
+
+#[cfg(test)]
+lock_with : &str -> &str -> String
+lock_with a b = "{\"nodes\":{\"a\":{\"locked\":{\"type\":\"github\",\"owner\":\"o\",\"repo\":\"a\",\"rev\":\"#{a}\"}},\"b\":{\"locked\":{\"type\":\"github\",\"owner\":\"o\",\"repo\":\"b\",\"rev\":\"#{b}\"}},\"c\":{\"locked\":{\"type\":\"github\",\"owner\":\"o\",\"repo\":\"c\",\"rev\":\"1\"}},\"root\":{\"inputs\":{\"a\":\"a\",\"b\":\"b\",\"c\":\"c\"}}},\"root\":\"root\",\"version\":7}"
+
+#[cfg(test)]
+key : &str -> &str -> (String, String)
+key input host = (input.to_string (), host.to_string ())
+
+-- Inputs: `a` moves and checks out, `b` moves but does not evaluate on mimir,
+-- `c` does not move. Hosts: drakkar and mimir, both with a base.
+#[cfg(test)]
+world : crate::nix::Scripted
+world =
+  base = lock_with "1" "1"
+  mut s = crate::nix::Scripted::default ()
+  s.host_names := .to_vec ([.to_string "drakkar", .to_string "mimir"])
+  s.locks.insert (.to_string "a") (Ok (lock_with "2" "1"))
+  s.locks.insert (.to_string "b") (Ok (lock_with "1" "2"))
+  s.locks.insert (.to_string "c") (Ok base)
+  for h in .to_vec (["drakkar", "mimir"])
+    s.drvs.insert (key "" h) (Ok "/nix/store/base-#{h}.drv")
+    s.drvs.insert (key "a" h) (Ok "/nix/store/a-#{h}.drv")
+  s.drvs.insert (key "b" "drakkar") (Ok (.to_string "/nix/store/b-drakkar.drv"))
+  s.drvs.insert (key "b" "mimir") (Err (.to_string "error: attribute 'gone' missing"))
+  s
+
+#[cfg(test)]
+settings : Settings
+settings = Settings { jobs = 2, base_lock = lock_with "1" "1", work = .to_string "/tmp/vbump-test", run_url = Some (.to_string "https://github.com/o/r/actions/runs/7") }
+
+#[cfg(test)]
+caps_of : crate::nix::Scripted -> crate::forge::Recording -> Caps
+caps_of s r = Caps { nix = crate::nix::scripted s, differ = crate::differ::canned crate::differ::SAMPLE, forge = crate::forge::recording r }
+
+#[cfg(test)]
+inputs : Vec<String>
+inputs = .to_vec ([.to_string "a", .to_string "b", .to_string "c"])
+
+#[cfg(test)]
+status_of : &[Outcome] -> &str -> Status
+status_of outcomes input = outcomes.iter () |> .find (\o -> o.input == input) |> .map (\o -> o.status.clone ()) |> .expect "an outcome per input"
+
+test "each input on its own: one proposed, one failed, one up to date"
+  r = crate::forge::Recording::default ()
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of (world ()) (r.clone ())) (settings ()) (inputs ())))
+  assert_eq! \-> outcomes.len () \-> 3
+  assert_eq! \-> status_of (&outcomes) "a" \-> Proposed (.to_string "https://github.com/o/r/pull/a")
+  assert_eq! \-> status_of (&outcomes) "c" \-> UpToDate
+  assert! \-> failed_with (&status_of (&outcomes) "b") "mimir does not evaluate" && failed_with (&status_of (&outcomes) "b") "attribute 'gone'"
+  assert! \-> any_failed (&outcomes)
+  published = r.published.lock () |> .expect "lock" |> .clone
+  assert_eq! \-> published.len () \-> 1
+  p = &published[0]
+  assert_eq! \-> (p.branch.as_str (), p.title.as_str (), p.lock_path.as_str ()) \-> ("update/flake-lock-a", "chore(flake): bump a", "/tmp/vbump-test/flake-lock-a/flake.lock")
+  assert! \-> p.body.contains "Refs https://github.com/o/r/actions/runs/7." && p.body.contains "| drakkar |" && p.body.contains "| mimir |" && p.body.contains "- `hello`: 2.12.1 → 2.12.2"
+
+test "a transient relock failure is retried on the schedule"
+  mut s = world ()
+  s.flaky.insert (.to_string "a") 2
+  attempts = s.attempts.clone ()
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (crate::forge::Recording::default ())) (settings ()) (.to_vec ([.to_string "a"]))))
+  assert! \-> is_proposed (&status_of (&outcomes) "a")
+  assert_eq! \-> attempts.lock () |> .expect "lock" |> .get "a" |> .copied \-> Some 3
+
+test "a relock that keeps failing fails only its input, after three attempts"
+  mut s = world ()
+  s.flaky.insert (.to_string "a") 9
+  attempts = s.attempts.clone ()
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (crate::forge::Recording::default ())) (settings ()) (.to_vec ([.to_string "a", .to_string "c"]))))
+  assert! \-> is_failed (&status_of (&outcomes) "a")
+  assert_eq! \-> status_of (&outcomes) "c" \-> UpToDate
+  assert_eq! \-> attempts.lock () |> .expect "lock" |> .get "a" |> .copied \-> Some 3
+
+test "a rejected publish fails its input and no other"
+  r = crate::forge::Recording { failing = .to_vec ([.to_string "a"]), ...crate::forge::Recording::default () }
+  mut s = world ()
+  s.drvs.insert (key "b" "mimir") (Ok (.to_string "/nix/store/b-mimir.drv"))
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (r.clone ())) (settings ()) (inputs ())))
+  assert! \-> is_failed (&status_of (&outcomes) "a")
+  assert! \-> is_proposed (&status_of (&outcomes) "b")
+  assert_eq! \-> r.published.lock () |> .expect "lock" |> .len \-> 1
+
+test "a host with no base, or no diff, is a note, not a failure"
+  mut s = world ()
+  s.drvs.remove (&key "" "mimir")
+  s.drvs.insert (key "a" "drakkar") (Ok (.to_string "/nix/store/undiffable-drakkar.drv"))
+  r = crate::forge::Recording::default ()
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (r.clone ())) (settings ()) (.to_vec ([.to_string "a"]))))
+  assert! \-> is_proposed (&status_of (&outcomes) "a")
+  published = r.published.lock () |> .expect "lock" |> .clone
+  body = published.first () |> .map (\p -> p.body.clone ()) |> .unwrap_or_default
+  assert! \-> body.contains "_No diff: the base does not evaluate for this host_"
+  assert! \-> body.contains "not a valid store path"
+
+test "a dry build that fails fails the input"
+  mut s = world ()
+  s.drvs.insert (key "a" "mimir") (Ok (.to_string "/nix/store/unbuildable-mimir.drv"))
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (crate::forge::Recording::default ())) (settings ()) (.to_vec ([.to_string "a"]))))
+  assert! \-> is_failed (&status_of (&outcomes) "a")
+
+test "no host list fails every input, and says why"
+  mut s = world ()
+  s.host_names := Vec::new ()
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (crate::forge::Recording::default ())) (settings ()) (inputs ())))
+  assert! \-> outcomes.iter () |> .all (\o -> failed_with (&o.status) "no nixosConfigurations")
+
+test "the dry-run forge publishes nothing, and the summary says so"
+  caps = Caps { nix = crate::nix::scripted (world ()), differ = crate::differ::canned crate::differ::SAMPLE, forge = crate::forge::dry_run () }
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all caps (settings ()) (inputs ())))
+  text = summary_of (&outcomes) (.to_string "0123456789abcdef") true
+  assert! \-> text.contains "against `0123456789ab` (dry run" && text.contains "3 input(s): 1 with a proposal, 1 up to date, 1 failed"
+  assert! \-> text.contains "| `a` | dry run (`update/flake-lock-a`)"
+  assert! \-> text.contains "drakkar 1/1/0, mimir 1/1/0"
+  assert! \-> text.contains "| `c` | up to date |"
+  assert! \-> text.contains "| `b` | **failed**: mimir does not evaluate"
+
+#[cfg(test)]
+failed_with : &Status -> &str -> bool
+failed_with s text =
+  case s of
+    Failed why -> why.contains text
+    _ -> false
+
+test "a host whose derivation did not move is marked unchanged, without a diff"
+  mut s = world ()
+  s.drvs.insert (key "a" "mimir") (Ok (.to_string "/nix/store/base-mimir.drv"))
+  r = crate::forge::Recording::default ()
+  outcomes = id_effect::testing::expect_exit_success (id_effect::testing::run_test (run_all (caps_of s (r.clone ())) (settings ()) (.to_vec ([.to_string "a"]))))
+  text = summary_of (&outcomes) (.to_string "0") false
+  assert! \-> text.contains "drakkar 1/1/0, mimir ="
+  published = r.published.lock () |> .expect "lock" |> .clone
+  body = published.first () |> .map (\p -> p.body.clone ()) |> .unwrap_or_default
+  assert! \-> body.contains "Its derivation is unchanged"

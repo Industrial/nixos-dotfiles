@@ -1,11 +1,25 @@
-# Scheduled flake.lock bumps, opened as a pull request for the operator to review.
+# Scheduled flake.lock bumps, opened as pull requests for the operator to review.
 #
 # Policy: docs/adr/0006-update-policy.md. Procedure: docs/runbooks/updates.md.
+#
+# The updater is vbump (rust/tools/vbump, GH-189), one pull request per input:
+#
+#   vbump   for each root input on its own: `nix flake update <input>`, evaluate and
+#           dry-build every nixosConfigurations host against that lock, diff each host's
+#           derivation closure against main (vdiff --json), and open or refresh the PR on
+#           `update/flake-lock-<input>`. One input failing (it does not evaluate, a host
+#           does not dry-build) fails only that input; the job goes red at the end.
+#
+# Rollback: the repository variable FLAKE_LOCK_UPDATER=legacy (scheduled runs), or the
+# `updater: legacy` dispatch input, runs the previous single all-inputs PR instead:
 #
 #   lock    bumps every root input and opens or refreshes ONE PR on `update/flake-lock`.
 #   hosts   lists nixosConfigurations from the bumped flake (same source as ci.yml).
 #   diff    per host: evaluates the package diff against main. No build.
 #   report  writes the input table and the per-host package diff into the PR body.
+#
+# Selector (both jobs read the same expression; default vbump):
+#   inputs.updater || vars.FLAKE_LOCK_UPDATER || 'vbump'
 #
 # Host checks are NOT duplicated here. The bump PR runs the regular PR workflow (pr.yml ->
 # ci.yml), and `ci / all-green` is the required check on main. GitHub only starts that
@@ -22,6 +36,16 @@ on:
     # Mondays 03:23 UTC: off the hour, and a full week of upstream churn per review.
     - cron: '23 3 * * 1'
   workflow_dispatch:
+    inputs:
+      updater:
+        description: 'vbump: one PR per input (default). legacy: the old single all-inputs PR'
+        type: choice
+        options: [vbump, legacy]
+        default: vbump
+      input:
+        description: 'vbump only: bump just this root input (empty: every input)'
+        type: string
+        default: ''
 permissions: {}
 concurrency:
   group: update-flake-lock
@@ -29,10 +53,60 @@ concurrency:
 env:
   LOCK_BRANCH: update/flake-lock
 jobs:
-  lock:
-    name: Bump flake.lock
+  vbump:
+    name: Bump each input (vbump)
     # Lock bumps are always against main: the PR base is whatever branch is checked out.
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (inputs.updater || vars.FLAKE_LOCK_UPDATER || 'vbump') == 'vbump'
+    runs-on: ubuntu-latest
+    # Every input evaluates every host (about 20 s and 3 GB each), two inputs at a time.
+    timeout-minutes: 240
+    permissions:
+      contents: write
+      pull-requests: write
+      # Labels are an issues API: vbump creates `flake-lock` when missing and adds it.
+      issues: write
+    env:
+      # The PR's own `ci / all-green` only starts for a PR opened with a token other than
+      # GITHUB_TOKEN; see the header and ADR-0006.
+      GH_TOKEN: ${{ secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
+      INPUT: ${{ inputs.input }}
+    steps:
+      # vbump pushes each input's branch from this checkout, so it keeps the credentials
+      # (the same token the PRs are opened with). The legacy job's action did the same.
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}
+          persist-credentials: true
+      - name: Setup Nix
+        uses: ./.github/actions/setup-nix
+      # The crate's default.nix through the flake's nixpkgs, as the fleet builds it.
+      - name: Build vbump
+        run: |
+          set -euo pipefail
+          out="$(nix build --no-link --print-out-paths --impure --expr \
+            "(builtins.getFlake \"git+file://$PWD?shallow=1&rev=$GITHUB_SHA\").inputs.nixpkgs.legacyPackages.x86_64-linux.callPackage $PWD/rust/tools/vbump {}")"
+          echo "$out/bin" >> "$GITHUB_PATH"
+      - name: Bump each input
+        run: |
+          set -euo pipefail
+          args=(run --rev "$GITHUB_SHA" --jobs 2 --out vbump-out --summary "$GITHUB_STEP_SUMMARY"
+            --committer 'github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>')
+          if [ -n "$INPUT" ]; then args+=(--input "$INPUT"); fi
+          vbump "${args[@]}"
+      - name: Upload proposals
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vbump-proposals
+          path: vbump-out
+          if-no-files-found: ignore
+          retention-days: 14
+  lock:
+    name: Bump flake.lock (legacy)
+    # Lock bumps are always against main: the PR base is whatever branch is checked out.
+    # The rollback path: only when the selector says legacy.
+    if: github.ref == 'refs/heads/main' && (inputs.updater || vars.FLAKE_LOCK_UPDATER || 'vbump') == 'legacy'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

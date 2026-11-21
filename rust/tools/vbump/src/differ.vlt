@@ -1,0 +1,130 @@
+-- The closure diff as a capability: `vdiff --json` of two derivations.
+--
+-- The live implementation is vdiff's own code, linked as a library: the two
+-- derivations' closures are read from the store database (read-only) on two
+-- fibers, and the report is vdiff's schema-1 JSON, byte for byte what
+-- `vdiff --json <old> <new>` prints. A derivation closure is what a dry
+-- build can diff without building anything: every package's derivation, so
+-- every version move, is in it. Tests use a canned diff.
+--
+-- The summary a pull request shows is read back from that JSON, so vbump
+-- depends on vdiff's documented schema, not on its types.
+
+import std::sync::Arc
+import serde_json::Value
+import id_effect::{Effect, HNil, fail, succeed, suspend}
+import vdiff::closure::{both, resolve}
+import vdiff::report::{diff, render_json}
+import crate::common::{VbumpError, lifted}
+import crate::common::VbumpError::Diff
+
+export class Differ
+  json : &self -> String -> String -> Effect<String, VbumpError, HNil>
+
+export newtype DifferTool = DifferTool (export Arc<dyn Differ + Send + Sync>)
+
+instance Clone DifferTool
+  clone : &self -> Self
+  clone self = DifferTool (Arc::clone (&self.0))
+
+-- The live diff, on the store database at `db`.
+export data Vdiff { db String }
+
+resolved : String -> String -> Result<(vdiff::closure::Root, vdiff::closure::Root), VbumpError>
+resolved old new =
+  a = (resolve (&old) |> .map_err (\e -> Diff (e.to_string ())))?
+  b = (resolve (&new) |> .map_err (\e -> Diff (e.to_string ())))?
+  Ok ((a, b))
+
+instance Differ Vdiff
+  json : &self -> String -> String -> Effect<String, VbumpError, HNil>
+  json self old new =
+    db = self.db.clone ()
+    suspend (move \-> lifted (resolved old new)) |> .flat_map (move \roots -> walked db roots)
+
+walked : String -> (vdiff::closure::Root, vdiff::closure::Root) -> Effect<String, VbumpError, HNil>
+walked db roots =
+  (a, b) = roots
+  both db a b |> .map_err (\e -> Diff (e.to_string ())) |> .map (\pair -> render_json (&diff (&pair.0) (&pair.1)))
+
+export live : String -> DifferTool
+live db = DifferTool (Arc::new (Vdiff { db }))
+
+-- A canned diff, for tests: this JSON for every pair, or a failure when the
+-- new side names `undiffable`.
+export data Canned { export report String }
+
+instance Differ Canned
+  json : &self -> String -> String -> Effect<String, VbumpError, HNil>
+  json self _old new =
+    if new.contains "undiffable"
+      fail (Diff ("not a valid store path: #{new}"))
+    else
+      succeed (self.report.clone ())
+
+export canned : &str -> DifferTool
+canned report = DifferTool (Arc::new (Canned { report = report.to_string () }))
+
+-- One package line of the report: name, kind, versions on each side.
+export data Change { export name String, export kind String, export old Vec<String>, export new Vec<String> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What a reviewer reads of one host's diff.
+export data Summary
+  { export changed Vec<Change>
+  , export added Vec<Change>
+  , export removed Vec<Change>
+  , export paths_added u64
+  , export paths_removed u64
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+versions : &Value -> &str -> Vec<String>
+versions entry key =
+  listed = entry.get key |> .and_then (\v -> v.as_array ())
+  case listed of
+    Some vs -> vs |> .iter |> .map (\v -> v.as_str () |> .unwrap_or "" |> .to_string) |> .collect
+    None -> Vec::new ()
+
+changes : &Value -> &str -> Vec<Change>
+changes doc key =
+  listed = doc.get key |> .and_then (\v -> v.as_array ())
+  case listed of
+    Some es -> es |> .iter |> .map (\e -> Change { name = e.get "name" |> .and_then (\n -> n.as_str ()) |> .unwrap_or "" |> .to_string, kind = e.get "kind" |> .and_then (\n -> n.as_str ()) |> .unwrap_or "" |> .to_string, old = versions e "old", new = versions e "new" }) |> .collect
+    None -> Vec::new ()
+
+closure_count : &Value -> &str -> u64
+closure_count doc key = doc.get "closure" |> .and_then (\c -> c.get key) |> .and_then (\n -> n.as_u64 ()) |> .unwrap_or 0
+
+-- The summary of a schema-1 report.
+export summarise : &str -> Result<Summary, VbumpError>
+summarise text =
+  doc = ((serde_json::from_str text : serde_json::Result<Value>) |> .map_err (\e -> Diff ("vdiff report is not JSON: #{e}")))?
+  schema = doc.get "schema" |> .and_then (\s -> s.as_u64 ())
+  if schema != Some 1
+    Err (Diff ("vdiff report schema #{schema:?}, vbump reads schema 1"))
+  else
+    Ok (Summary { changed = changes (&doc) "changed", added = changes (&doc) "added", removed = changes (&doc) "removed", paths_added = closure_count (&doc) "pathsAdded", paths_removed = closure_count (&doc) "pathsRemoved" })
+
+-- An empty report: what a host whose closure did not move shows.
+export const SAME : &str = "{\"schema\":1,\"changed\":[],\"selectionChanged\":[],\"added\":[],\"removed\":[],\"closure\":{\"pathsAdded\":0,\"pathsRemoved\":0,\"narSizeDelta\":0}}"
+
+#[cfg(test)]
+export const SAMPLE : &str = "{\"schema\":1,\"changed\":[{\"name\":\"hello\",\"kind\":\"upgraded\",\"selection\":\"*\",\"old\":[\"2.12.1\"],\"new\":[\"2.12.2\"]}],\"selectionChanged\":[],\"added\":[{\"name\":\"fresh\",\"kind\":\"added\",\"selection\":\"+\",\"old\":[],\"new\":[\"1.0\"]}],\"removed\":[],\"closure\":{\"pathsAdded\":7,\"pathsRemoved\":5,\"narSizeDelta\":10}}"
+
+test "a schema-1 report summarises"
+  s = summarise SAMPLE |> .expect "summary"
+  assert_eq! \-> s.changed \-> .to_vec ([Change { name = .to_string "hello", kind = .to_string "upgraded", old = .to_vec ([.to_string "2.12.1"]), new = .to_vec ([.to_string "2.12.2"]) }])
+  assert_eq! \-> (s.added.len (), s.removed.len (), s.paths_added, s.paths_removed) \-> (1, 0, 7, 5)
+  assert_eq! \-> summarise SAME |> .expect "same" \-> Summary::default ()
+
+test "another schema, or not JSON, is refused"
+  assert! \-> summarise "{\"schema\":2}" |> .is_err
+  assert! \-> summarise "nope" |> .is_err
+
+test "vdiff's own report, from vdiff's code, is what vbump summarises"
+  old = vdiff::report::Closure { label = .to_string "a", root = .to_string "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-a", paths = .to_vec ([.to_string "/nix/store/0c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-hello-2.12.1.drv"]), selected = Vec::new (), nar_size = 1 }
+  new = vdiff::report::Closure { paths = .to_vec ([.to_string "/nix/store/1c4b6x2wvq3f6m1x0v5q8a3l5y2n6z7k-hello-2.12.2.drv"]), ...old.clone () }
+  s = summarise (&render_json (&diff (&old) (&new))) |> .expect "summary"
+  assert_eq! \-> s.changed.len () \-> 1
+  assert_eq! \-> (s.changed[0].name.as_str (), s.changed[0].kind.as_str ()) \-> ("hello", "upgraded")
