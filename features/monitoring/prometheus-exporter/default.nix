@@ -2,10 +2,24 @@
 # for services.prometheus.exporters.node)
 {
   config,
-  lib,
-  pkgs,
+  settings ? {},
   ...
-}: {
+}: let
+  fleet = import ../../../common/fleet.nix;
+  # This host's tailnet address from common/fleet.nix (where prometheus scrapes it), or
+  # loopback on a host without one.
+  ip = (fleet.hosts.${settings.hostname or ""} or {}).tailscaleIp or "127.0.0.1";
+in {
+  imports = [../../../common/vhealth-probes.nix];
+
+  # vhealth (features/nix/vhealth): the exporter answers with its own build info.
+  features.nix.vhealth.probes.node-exporter = {
+    type = "http";
+    url = "http://${ip}:${toString config.services.prometheus.exporters.node.port}/metrics";
+    bodyContains = "node_exporter_build_info";
+    description = "node_exporter serves /metrics on the address prometheus scrapes";
+  };
+
   services.prometheus.exporters.node = {
     enable = true;
     port = 9002; # Keep consistent with existing prometheus config

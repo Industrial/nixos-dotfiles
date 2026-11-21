@@ -12,7 +12,30 @@
 # Brute force: sshguard, not fail2ban. sshguard is already wired and blocks through the
 # firewall backend NixOS picks. fail2ban would watch the same log a second time and add
 # nothing for a key-only server.
-{lib, ...}: {
+#
+# vhealth (features/nix/vhealth): a TCP connect to sshd on this host's tailnet address from
+# common/fleet.nix (loopback on a host without one). The connection closes before the
+# banner exchange, which sshd logs once per check; the source address is the host's own,
+# inside sshguard's whitelist.
+{
+  config,
+  lib,
+  settings,
+  ...
+}: let
+  fleet = import ../../../common/fleet.nix;
+  ip = (fleet.hosts.${settings.hostname} or {}).tailscaleIp or "127.0.0.1";
+in {
+  imports = [../../../common/vhealth-probes.nix];
+
+  features.nix.vhealth.probes.sshd = {
+    type = "tcp";
+    host = ip;
+    port = builtins.head config.services.openssh.ports;
+    timeout = 3000;
+    description = "sshd accepts connections on the tailnet address";
+  };
+
   services = {
     openssh = {
       enable = true;

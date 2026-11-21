@@ -1,0 +1,189 @@
+-- What a check reports: a JSON document (every probe's outcome and the
+-- verdict), a human summary, and node_exporter textfile metrics
+-- (`vhealth_probe_up{probe=…}`). Rendering is pure; `publish` is the one
+-- write, and it is atomic: the text goes to a temporary file in the same
+-- directory, is synced, and is renamed over the old file, so the textfile
+-- collector never reads half a file.
+
+import std::fs
+import std::io::Write
+import std::path::{Path, PathBuf}
+import crate::probe::{Outcome, Report, down, failing, healthy}
+
+-- The files a check writes into the textfile directory.
+export const METRICS_FILE : &str = "vhealth.prom"
+export const REPORT_FILE : &str = "vhealth.json"
+
+-- A JSON string literal.
+quote : &str -> String
+quote s = serde_json::to_string s |> .unwrap_or_else (\_ -> .to_string "\"\"")
+
+names_json : Vec<String> -> String
+names_json names =
+  inner = names.iter () |> .map (\n -> quote n) |> .collect : Vec<String>
+  joined = inner.join ","
+  "[#{joined}]"
+
+outcome_json : &Outcome -> String
+outcome_json o = "{\"name\":#{quote (&o.name)},\"kind\":#{quote (&o.kind)},\"critical\":#{o.critical},\"up\":#{o.up},\"detail\":#{quote (&o.detail)},\"millis\":#{o.millis}}"
+
+-- The report: one line of JSON.
+--   {"healthy":bool,"finished":unix-seconds,"failing":[critical names down],
+--    "down":[names down],"probes":[{"name","kind","critical","up","detail","millis"}]}
+export json : &Report -> String
+json r =
+  items = r.outcomes.iter () |> .map outcome_json |> .collect : Vec<String>
+  probes = items.join ","
+  "{\"healthy\":#{healthy r},\"finished\":#{r.finished},\"failing\":#{names_json (failing r)},\"down\":#{names_json (down r)},\"probes\":[#{probes}]}"
+
+state_of : bool -> &'static str
+state_of up =
+  if up
+    "up  "
+  else
+    "DOWN"
+
+importance_of : bool -> &'static str
+importance_of critical =
+  if critical
+    ""
+  else
+    ", not critical"
+
+human_line : &Outcome -> String
+human_line o = "#{state_of o.up} #{o.name} (#{o.kind}#{importance_of o.critical}, #{o.millis}ms): #{o.detail}\n"
+
+verdict_of : bool -> &'static str
+verdict_of ok =
+  if ok
+    "healthy"
+  else
+    "UNHEALTHY"
+
+-- The report for a terminal: one line per probe, then the verdict.
+export human : &Report -> String
+human r =
+  lines = r.outcomes.iter () |> .map human_line |> .collect : Vec<String>
+  body = lines.concat ()
+  total = r.outcomes.len ()
+  up = total - (down r).len ()
+  "#{body}#{verdict_of (healthy r)}: #{up}/#{total} probes up\n"
+
+-- A Prometheus label value.
+export label : &str -> String
+label s = s.replace "\\" "\\\\" |> .replace "\"" "\\\"" |> .replace "\n" "\\n"
+
+bit : bool -> u8
+bit b =
+  if b
+    1
+  else
+    0
+
+seconds : u64 -> String
+seconds millis =
+  whole = millis / 1000
+  frac = millis % 1000
+  "#{whole}.#{frac:03}"
+
+labels : &Outcome -> String
+labels o = "probe=\"#{label (&o.name)}\",kind=\"#{o.kind}\",critical=\"#{o.critical}\""
+
+up_line : &Outcome -> String
+up_line o = "vhealth_probe_up{#{labels o}} #{bit o.up}\n"
+
+duration_line : &Outcome -> String
+duration_line o = "vhealth_probe_duration_seconds{#{labels o}} #{seconds o.millis}\n"
+
+header : &str -> &str -> String
+header name help = "# HELP #{name} #{help}\n# TYPE #{name} gauge\n"
+
+gauge : &str -> &str -> String -> String
+gauge name help value = "#{header name help}#{name} #{value}\n"
+
+-- The textfile metrics, in the Prometheus text exposition format.
+export metrics : &Report -> String
+metrics r =
+  ups = r.outcomes.iter () |> .map up_line |> .collect : Vec<String>
+  durations = r.outcomes.iter () |> .map duration_line |> .collect : Vec<String>
+  down_count = (down r).len ()
+  .concat ([header "vhealth_probe_up" "1 when the probe passed on vhealth's last check, else 0.", ups.concat (), header "vhealth_probe_duration_seconds" "How long the probe took on vhealth's last check.", durations.concat (), gauge "vhealth_healthy" "1 when no critical probe was down on vhealth's last check." ((bit (healthy r)).to_string ()), gauge "vhealth_probes_down" "Probes down on vhealth's last check, critical or not." (down_count.to_string ()), gauge "vhealth_last_check_timestamp_seconds" "Unix time vhealth's last check finished." (r.finished.to_string ())])
+
+-- Replace `file` with `text`, atomically.
+export write_atomic : &Path -> &str -> std::io::Result<()>
+write_atomic file text =
+  dir = file.parent () |> .unwrap_or (Path::new ".")
+  name = file.file_name () |> .map (\n -> n.to_string_lossy () |> .into_owned) |> .unwrap_or_default
+  tmp = dir.join (".#{name}.tmp")
+  mut out = (fs::File::create (&tmp))?
+  (out.write_all (text.as_bytes ()))?
+  (out.sync_all ())?
+  fs::rename (&tmp) file
+
+export metrics_path : &str -> PathBuf
+metrics_path dir = Path::new dir |> .join METRICS_FILE
+
+export report_path : &str -> PathBuf
+report_path dir = Path::new dir |> .join REPORT_FILE
+
+-- Publish a check into a textfile directory: the metrics and the JSON report.
+export publish : &Report -> &str -> Result<(), String>
+publish r dir =
+  m = metrics_path dir
+  (write_atomic (&m) (&metrics r) |> .map_err (\e -> "writing #{m.display ()}: #{e}"))?
+  j = report_path dir
+  (write_atomic (&j) (&"#{json r}\n") |> .map_err (\e -> "writing #{j.display ()}: #{e}"))?
+  Ok ()
+
+#[cfg(test)]
+sample : Report
+sample = Report { finished = 1700000000, outcomes = .to_vec ([Outcome { name = .to_string "vcache", kind = .to_string "http", critical = true, up = true, detail = .to_string "HTTP 200", millis = 3 }, Outcome { name = .to_string "liar\"x", kind = .to_string "tcp", critical = true, up = false, detail = .to_string "127.0.0.1:8081: Connection refused", millis = 1250 }, Outcome { name = .to_string "vverify", kind = .to_string "file", critical = false, up = false, detail = .to_string "gone", millis = 0 }]) }
+
+test "the metrics carry one up sample per probe, labelled"
+  m = metrics (&sample ())
+  assert! \-> m.contains "\nvhealth_probe_up{probe=\"vcache\",kind=\"http\",critical=\"true\"} 1\n"
+  assert! \-> m.contains "\nvhealth_probe_up{probe=\"liar\\\"x\",kind=\"tcp\",critical=\"true\"} 0\n"
+  assert! \-> m.contains "vhealth_probe_up{probe=\"vverify\",kind=\"file\",critical=\"false\"} 0\n"
+  assert! \-> m.contains "vhealth_probe_duration_seconds{probe=\"liar\\\"x\",kind=\"tcp\",critical=\"true\"} 1.250\n"
+  assert! \-> m.contains "\nvhealth_healthy 0\n"
+  assert! \-> m.contains "\nvhealth_probes_down 2\n"
+  assert! \-> m.contains "\nvhealth_last_check_timestamp_seconds 1700000000\n"
+  assert_eq! \-> m.matches "# TYPE " |> .count \-> 5
+
+test "label values are escaped"
+  assert_eq! \-> label "a\\b\"c\nd" \-> "a\\\\b\\\"c\\nd"
+
+test "the report is JSON with the verdict and every probe"
+  text = json (&sample ())
+  parsed = serde_json::from_str (&text) : Result<serde_json::Value, serde_json::Error>
+  v = parsed |> .expect "valid JSON"
+  assert_eq! \-> v["healthy"] \-> false
+  assert_eq! \-> v["failing"][0] \-> "liar\"x"
+  assert_eq! \-> v["down"][1] \-> "vverify"
+  assert_eq! \-> v["probes"][0]["name"] \-> "vcache"
+  assert_eq! \-> v["probes"][1]["up"] \-> false
+  assert_eq! \-> v["probes"][1]["millis"] \-> 1250
+  assert_eq! \-> v["probes"][2]["critical"] \-> false
+
+test "the summary names every probe and the verdict"
+  h = human (&sample ())
+  assert! \-> h.contains "up   vcache (http, 3ms): HTTP 200\n"
+  assert! \-> h.contains "DOWN vverify (file, not critical, 0ms): gone\n"
+  assert! \-> h.ends_with "UNHEALTHY: 1/3 probes up\n"
+
+test "publishing replaces both files whole and leaves no temporary behind"
+  dir = std::env::temp_dir () |> .join (format! \-> "vhealth-publish-#{std::process::id ()}")
+  fs::create_dir_all (&dir) |> .expect "a temp dir"
+  d = dir.to_string_lossy () |> .into_owned
+  fs::write (metrics_path (&d)) "stale" |> .expect "an old file"
+  assert_eq! \-> publish (&sample ()) (&d) \-> Ok ()
+  assert_eq! \-> fs::read_to_string (metrics_path (&d)) |> .expect "the metrics" \-> metrics (&sample ())
+  want = "#{json (&sample ())}\n"
+  assert_eq! \-> fs::read_to_string (report_path (&d)) |> .expect "the report" \-> want
+  names = fs::read_dir (&dir) |> .expect "the dir" |> .filter_map (\e -> e.ok ()) |> .map (\e -> e.file_name ().to_string_lossy ().into_owned ()) |> .collect : Vec<String>
+  assert! \-> names.iter () |> .all (\n -> !(n.ends_with ".tmp"))
+  fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "publishing into a directory that does not exist fails with its path"
+  r = publish (&sample ()) "/nonexistent/vhealth"
+  assert! \-> r |> .err |> .map (\e -> e.contains "/nonexistent/vhealth/vhealth.prom") |> .unwrap_or false

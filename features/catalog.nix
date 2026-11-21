@@ -151,6 +151,7 @@
   ./nix/vcache
   ./nix/vcache/client.nix
   ./nix/vverify
+  ./nix/vhealth
 
   # nixos
   ./nixos

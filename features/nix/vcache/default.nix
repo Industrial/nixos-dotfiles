@@ -53,6 +53,8 @@
     echo "vcache: public key $(cat "$STATE_DIRECTORY/public-key")"
   '';
 in {
+  imports = [../../../common/vhealth-probes.nix];
+
   assertions = [
     {
       assertion = bindIp != null;
@@ -67,6 +69,15 @@ in {
   environment.systemPackages = [vcache];
 
   networking.firewall.interfaces.tailscale0.allowedTCPPorts = [port];
+
+  # vhealth (features/nix/vhealth): the cache answers on the address clients use.
+  features.nix.vhealth.probes.vcache = {
+    type = "http";
+    url = "http://${toString bindIp}:${toString port}/nix-cache-info";
+    bodyContains = "StoreDir: /nix/store";
+    timeout = 3000;
+    description = "vcache serves /nix-cache-info on its tailnet address";
+  };
 
   systemd.services.vcache = {
     description = "vcache: the fleet binary cache, serving the local Nix store on the tailnet";

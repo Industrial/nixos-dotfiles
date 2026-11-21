@@ -42,6 +42,9 @@
   features.nix.vcache.enable = true;
   # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
   features.nix.vverify.enable = true;
+  # vhealth (Voltaic): the probes drakkar's features declare (vcache, node_exporter, sshd,
+  # vverify's metrics), checked every minute into node_exporter; `vhealth check` (GH-180).
+  features.nix.vhealth.enable = true;
   features.storage.nfs-client.enable = true;
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.

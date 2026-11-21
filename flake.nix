@@ -375,6 +375,8 @@
       # features/nixos/boot's Secure Boot path (GH-184): systemd-boot -> lanzaboote -> reboot
       # -> rollback to systemd-boot -> reboot, through OVMF and the ESP.
       // {lanzaboote-vm = import ./features/nixos/boot/test.nix {inherit pkgs inputs;};}
+      # features/nix/vhealth's VM test: a service active per systemd with its port closed is down.
+      // {vhealth-vm = import ./features/nix/vhealth/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

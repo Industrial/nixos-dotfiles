@@ -1,0 +1,130 @@
+-- vhealth's command line, parsed into `Options` by a pure function.
+--
+--   vhealth check  [--config FILE] [--json] [--probe NAME]... [--wait DURATION] [--every DURATION]
+--   vhealth daemon [--config FILE] [--interval DURATION] [--textfile-dir DIR]
+--
+-- `check` runs every configured probe (or the `--probe`s named) once, at the
+-- same time, and exits 0 when no critical probe is down, 1 otherwise; the
+-- report goes to stdout, as JSON with `--json`. With `--wait`, an unhealthy
+-- check is repeated every `--every` (default 2s) until it is healthy or the
+-- wait is over: the settle window after a switch.
+--
+-- `daemon` checks every `--interval` (default 1m) on an id_effect Schedule
+-- and writes vhealth.prom and vhealth.json into `--textfile-dir`.
+--
+-- Durations are bare seconds or a number with s, m, h, d or w.
+
+import crate::config::DEFAULT_CONFIG
+
+export const USAGE : &str = "usage: vhealth check [--config FILE] [--json] [--probe NAME]... [--wait DURATION] [--every DURATION]\n       vhealth daemon [--config FILE] [--interval DURATION] [--textfile-dir DIR]"
+
+export data Options
+  { export daemon bool
+  , export config String
+  , export json bool
+  , export only Vec<String>
+  , export wait u64
+  , export every u64
+  , export interval u64
+  , export textfile_dir Option<String>
+  }
+  deriving (Clone, Debug, PartialEq)
+
+export defaults : Options
+defaults = Options { daemon = false, config = DEFAULT_CONFIG.to_string (), json = false, only = Vec::new (), wait = 0, every = 2, interval = 60, textfile_dir = None }
+
+-- A duration in seconds: bare seconds, or a number with s/m/h/d/w.
+export parse_duration : &str -> Option<u64>
+parse_duration s =
+  (digits, unit) = case s.char_indices () |> .find (\ic -> !(ic.1.is_ascii_digit ())) of
+    Some (i, _) -> s.split_at i
+    None -> (s, "")
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  scale = case unit of
+    "" -> Some 1
+    "s" -> Some 1
+    "m" -> Some 60
+    "h" -> Some 3600
+    "d" -> Some 86400
+    "w" -> Some 604800
+    _ -> None
+  n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1) |> .filter (\secs -> *secs > 0)
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+duration_of : Option<&String> -> &str -> Result<u64, String>
+duration_of v flag =
+  text = (value v flag)?
+  parse_duration (&text) |> .ok_or ("#{flag}: not a duration: #{text}")
+
+-- The options in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = defaults ()
+  mut it = args.iter ()
+  command = (it.next () |> .ok_or (.to_string "no command"))?
+  case command.as_str () of
+    "check" ->
+      o.daemon := false
+    "daemon" ->
+      o.daemon := true
+    other ->
+      return Err "unknown command: #{other}"
+  while it.next () is Some a
+    case a.as_str () of
+      "--config" ->
+        o.config := (value (it.next ()) "--config")?
+      "--json" ->
+        o.json := true
+      "--probe" ->
+        o.only.push ((value (it.next ()) "--probe")?)
+      "--wait" ->
+        o.wait := (duration_of (it.next ()) "--wait")?
+      "--every" ->
+        o.every := (duration_of (it.next ()) "--every")?
+      "--interval" ->
+        o.interval := (duration_of (it.next ()) "--interval")?
+      "--textfile-dir" ->
+        o.textfile_dir := Some ((value (it.next ()) "--textfile-dir")?)
+      other ->
+        return Err "unknown argument: #{other}"
+  if o.daemon && o.textfile_dir.is_none ()
+    return Err (.to_string "daemon needs --textfile-dir")
+  Ok o
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "check alone is one check of every probe in the default configuration"
+  o = parse_args (&args (&["check"])) |> .expect "options"
+  assert_eq! \-> o \-> defaults ()
+  assert_eq! \-> o.config \-> "/etc/vhealth/probes.json"
+
+test "every check option is read"
+  o = parse_args (&args (&["check", "--config", "/tmp/p.json", "--json", "--probe", "a", "--probe", "b", "--wait", "2m", "--every", "5"])) |> .expect "options"
+  assert_eq! \-> o \-> Options { daemon = false, config = .to_string "/tmp/p.json", json = true, only = .to_vec ([.to_string "a", .to_string "b"]), wait = 120, every = 5, interval = 60, textfile_dir = None }
+
+test "the daemon needs a textfile directory"
+  o = parse_args (&args (&["daemon", "--interval", "30s", "--textfile-dir", "/var/lib/t"])) |> .expect "options"
+  assert_eq! \-> (o.daemon, o.interval, o.textfile_dir.clone ()) \-> (true, 30, Some (.to_string "/var/lib/t"))
+  assert_eq! \-> parse_args (&args (&["daemon"])) \-> Err (.to_string "daemon needs --textfile-dir")
+
+test "durations take a unit, or are seconds"
+  assert_eq! \-> parse_duration "90" \-> Some 90
+  assert_eq! \-> parse_duration "1m" \-> Some 60
+  assert_eq! \-> parse_duration "1w" \-> Some 604800
+  assert_eq! \-> parse_duration "0" \-> None
+  assert_eq! \-> parse_duration "1y" \-> None
+  assert_eq! \-> parse_duration "" \-> None
+
+test "bad arguments are refused with the reason"
+  assert_eq! \-> parse_args (&args (&[])) \-> Err (.to_string "no command")
+  assert_eq! \-> parse_args (&args (&["status"])) \-> Err (.to_string "unknown command: status")
+  assert_eq! \-> parse_args (&args (&["check", "--verbose"])) \-> Err (.to_string "unknown argument: --verbose")
+  assert_eq! \-> parse_args (&args (&["check", "--probe"])) \-> Err (.to_string "--probe needs a value")
+  assert_eq! \-> parse_args (&args (&["check", "--wait", "soon"])) \-> Err (.to_string "--wait: not a duration: soon")
