@@ -1,0 +1,118 @@
+-- The oomkiller's edge: everything that touches the machine. sysinfo for
+-- memory and the process table, /proc for ownership, `kill -9` for the kill,
+-- and the loop that runs them. Every decision is `policy.vlt`'s.
+
+import sysinfo::System
+import std::os::unix::fs::MetadataExt
+import crate::policy::{ProcessInfo, exceeded_line, kill_failed_line, killed_line, pick_victim, threshold_exceeded}
+
+-- Seconds between memory checks. A check only refreshes memory totals (one
+-- read of /proc/meminfo); the process table is walked only past the threshold.
+-- At 5 seconds a parallel link or a large backtest could take a 61 GiB host
+-- from 80% to exhaustion between two checks.
+export const INTERVAL_SECS : u64 = 1
+
+-- The uid owning /proc/<pid>, or None once the process is gone or unreadable.
+proc_uid : u32 -> Option<u32>
+proc_uid pid =
+  std::fs::metadata (format! \-> "/proc/#{pid}") |> .ok |> .map (\m -> m.uid ())
+
+-- This daemon's own uid: the user whose processes it may kill.
+export current_uid : Result<u32, String>
+current_uid =
+  std::fs::metadata "/proc/self" |> .map (\m -> m.uid ()) |> .map_err (\e -> format! \-> "Failed to get current process metadata: #{e}")
+
+cmdline_of : &sysinfo::Process -> String
+cmdline_of process =
+  parts = process.cmd () |> .iter |> .map (\s -> s.to_string_lossy ().into_owned ()) |> .collect : Vec<String>
+  parts.join " "
+
+-- Every process sysinfo last saw whose owner /proc can still name.
+snapshot : &System -> Vec<ProcessInfo>
+snapshot system =
+  mut out = Vec::new () : Vec<ProcessInfo>
+  for entry in system.processes ()
+    n = entry.0.as_u32 ()
+    process = entry.1
+    if proc_uid n is Some uid
+      name = process.name ().to_string_lossy ().into_owned ()
+      out.push (ProcessInfo { pid = n, uid, memory = process.memory (), name, cmdline = cmdline_of process })
+  out
+
+-- SIGKILL, through kill(1) as the daemon always has.
+kill : &ProcessInfo -> Result<(), String>
+kill process =
+  output = (std::process::Command::new "kill" |> .arg "-9" |> .arg (process.pid.to_string ()) |> .output) |> .map_err (\e -> format! \-> "Failed to execute kill command: #{e}")
+  out = output?
+  if out.status.success ()
+    Ok ()
+  else
+    stderr = String::from_utf8_lossy (&out.stderr)
+    Err (format! \-> "Failed to kill name=#{process.name} pid=#{process.pid}: #{stderr}")
+
+-- Past the threshold: refresh the process table (expensive, so only now),
+-- pick the victim, kill it, and say what happened.
+reap : &mut System -> ()
+reap system =
+  system.refresh_all ()
+  case current_uid () of
+    Err e -> eprintln! \-> "Failed to find highest memory process: #{e}"
+    Ok uid -> kill_largest (snapshot system) uid
+  ()
+
+kill_largest : Vec<ProcessInfo> -> u32 -> ()
+kill_largest processes uid =
+  case pick_victim processes uid of
+    None -> eprintln! \-> "Memory threshold exceeded but no killable process found"
+    Some victim -> report (&victim) (kill (&victim))
+  ()
+
+report : &ProcessInfo -> Result<(), String> -> ()
+report victim outcome =
+  case outcome of
+    Ok _ -> println! \-> "#{killed_line victim}"
+    Err e -> eprintln! \-> "#{kill_failed_line victim (&e)}"
+  ()
+
+-- One check. Err only when memory cannot be read, which ends the daemon.
+export iteration : &mut System -> Result<(), String>
+iteration system =
+  system.refresh_memory ()
+  used = system.used_memory ()
+  total = system.total_memory ()
+  if (threshold_exceeded used total)?
+    println! \-> "#{exceeded_line used total}"
+    reap system
+  Ok ()
+
+-- The daemon: check every INTERVAL_SECS, forever. One System is reused, because
+-- building it scans the whole machine.
+export run : ()
+run =
+  mut system = System::new_all ()
+  loop
+    if iteration (&mut system) is Err e
+      eprintln! \-> "Failed to read memory: #{e}"
+      std::process::exit 1
+    std::thread::sleep (std::time::Duration::from_secs INTERVAL_SECS)
+  ()
+
+test "this process belongs to this daemon's uid"
+  assert! \-> proc_uid (std::process::id ()) == .ok (current_uid ())
+
+test "a pid that does not exist has no owner"
+  assert! \-> proc_uid 999999999 == None
+
+test "the snapshot sees this process"
+  mut system = System::new_all ()
+  system.refresh_all ()
+  me = std::process::id ()
+  assert! \-> snapshot (&system) |> .iter |> .any (\p -> p.pid == me)
+
+test "killing a pid that does not exist fails"
+  p = ProcessInfo { pid = 999999999, uid = 0, memory = 0, name = .to_string "ghost", cmdline = String::new () }
+  assert! \-> .is_err (kill (&p))
+
+test "an iteration on a healthy machine succeeds"
+  mut system = System::new_all ()
+  assert! \-> .is_ok (iteration (&mut system))
