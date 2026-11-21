@@ -49,7 +49,7 @@ in
 
       def generations(profile):
           out = machine.succeed(f"ls {profile}-*-link -d")
-          return sorted(int(re.search(r"-(\d+)-link$", l).group(1)) for l in out.split())
+          return sorted(int(l.rsplit("-", 2)[1]) for l in out.split())
 
       def menu():
           # Generations with an entry in the boot menu (specialisation entries count as
