@@ -4,7 +4,7 @@
 
 import rusqlite::{Connection, OpenFlags}
 import std::collections::HashMap
-import crate::storepath::store_base
+import nix_store_core::storepath::store_base
 
 export const DB_PATH : &str = "/nix/var/nix/db/db.sqlite"
 

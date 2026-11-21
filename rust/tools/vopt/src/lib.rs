@@ -26,8 +26,6 @@ macro_rules! voltaic {
     };
 }
 
-voltaic!(storepath);
-voltaic!(nar);
 voltaic!(mounts);
 voltaic!(effects);
 voltaic!(optimise);

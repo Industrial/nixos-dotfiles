@@ -21,7 +21,7 @@ import std::path::Path
 import std::time::Duration
 import crate::db::Graph
 import crate::roots::normalize
-import crate::storepath::{STORE_DIR, full}
+import nix_store_core::storepath::{STORE_DIR, full}
 
 export const LINKS_DIR : &str = "/nix/store/.links"
 

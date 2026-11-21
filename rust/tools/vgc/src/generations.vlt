@@ -65,6 +65,18 @@ doomed gens current cutoff =
   else
     None
 
+-- `deleteOldGenerations` (`nix-collect-garbage -d`): every generation but the
+-- current one, ascending.
+export all_but : &[Generation] -> Option<u64> -> Vec<u64>
+all_but gens current =
+  mut out = (gens.iter ()).map (\g -> g.number) |> .filter (\n -> current != Some (*n)) |> .collect : Vec<u64>
+  out.sort ()
+  out
+
+test "delete-old keeps only the current generation"
+  gens = ((1 ..= 4).map (\n -> Generation { number = n, mtime = 0 })).collect () : Vec<Generation>
+  assert! \-> all_but (&gens) (Some 3) == vec![1, 2, 4]
+
 test "generation links parse like Nix's parseName"
   assert! \-> parse_generation "system" "system-493-link" == Some 493
   assert! \-> parse_generation "system" "system-493-link.tmp" == Some 493

@@ -18,7 +18,7 @@ import std::time::Instant
 import crate::effects::{OptError, exit_code, step}
 import crate::mounts::writable_store
 import crate::optimise::{Stats, link_inodes, optimise_paths, total}
-import crate::storepath::store_base
+import nix_store_core::storepath::store_base
 
 const USAGE : &str = "usage: vopt run [--full] [--dry-run]"
 const DB_PATH : &str = "/nix/var/nix/db/db.sqlite"

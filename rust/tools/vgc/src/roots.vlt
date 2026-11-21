@@ -6,7 +6,7 @@
 import std::fs
 import std::io::{ErrorKind, Read}
 import std::path::{Component, Path, PathBuf}
-import crate::storepath::{STORE_PREFIX, in_store, name_char, store_base, valid_base}
+import nix_store_core::storepath::{STORE_PREFIX, in_store, name_char, store_base, valid_base}
 
 export const STATE_DIR : &str = "/nix/var/nix"
 

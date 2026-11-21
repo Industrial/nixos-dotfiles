@@ -7,7 +7,7 @@
 
 import std::collections::{HashSet, VecDeque}
 import crate::db::Graph
-import crate::storepath::{hash_part, valid_base}
+import nix_store_core::storepath::{hash_part, valid_base}
 
 export data Keep { export outputs bool, export derivations bool }
   deriving (Debug, Clone, Copy)
