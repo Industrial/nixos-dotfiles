@@ -25,7 +25,7 @@ import crate::delete::{Freed, deletable, in_use, invalidate, link_names, prune_l
 import crate::lock::locked
 import crate::mounts::writable_store
 import crate::effects::{GcError, exit_code, step}
-import crate::generations::cutoff_of
+import nix_store_core::generations::cutoff_of
 import crate::profiles::{Profile, plan, root_dirs}
 import crate::roots::{Roots, find_all}
 import nix_store_core::storepath::{STORE_DIR, STORE_PREFIX, full, hash_part, valid_base}

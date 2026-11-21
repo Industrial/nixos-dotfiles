@@ -6,7 +6,7 @@
 import std::fs
 import std::os::unix::fs::MetadataExt
 import std::path::{Path, PathBuf}
-import crate::generations::{Generation, all_but, doomed, parse_generation}
+import nix_store_core::generations::{Generation, all_but, doomed, parse_generation}
 
 -- A profile and the generations that `--delete-older-than` would remove.
 -- `current` is None when the profile link does not name a generation, and

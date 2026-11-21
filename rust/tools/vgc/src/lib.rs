@@ -26,7 +26,6 @@ macro_rules! voltaic {
     };
 }
 
-voltaic!(generations);
 voltaic!(db);
 voltaic!(roots);
 voltaic!(profiles);
