@@ -3,7 +3,7 @@ name = "vdeploy"
 version = "0.1.0"
 edition = "2024"
 authors = ["Industrial <tom.wieland@gmail.com>"]
-description = "Pull-based deploy agent, observe mode: poll main, verify the commit, evaluate and realise this host's system, diff it against the running one, and log the switch it would make"
+description = "Pull-based deploy agent: poll main, verify the commit, evaluate and realise this host's system, diff it against the running one; in observe mode log the switch, in deploy mode make it with a health check and rollback"
 license = "MIT"
 build = "build.rs"
 

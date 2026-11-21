@@ -98,6 +98,8 @@ export data Status
   , export dotfiles Option<Checkout>
   , export last_poll Option<u64>
   , export poll_failures u64
+  , export deploy bool
+  , export last_apply Option<String>
   }
   deriving (Debug, Clone, Default, PartialEq)
 

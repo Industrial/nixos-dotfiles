@@ -7,12 +7,21 @@
 --           [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP]
 --            [--dotfiles-home DIR]]
 --
--- Observe mode is the only mode: there is no flag that switches.
+--   vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR]
+--           [--health-window DURATION] [--health-every DURATION]
+--           [--vhealth PROG] [--profile PATH] [--gcroot PATH]
+--           [--nix-env PROG] [--nix-store PROG] [--systemctl PROG]
+--           [--comin-unit UNIT] [--health-as USER [--setpriv PROG]]
+--
+-- `--mode observe` (the default) plans and logs, and never switches.
+-- `--mode deploy` (#160) runs each switching plan through `vdeploy apply`
+-- in a transient unit: switch (test), health check, then the boot entry or a
+-- rollback. The daemon passes its apply options on to that unit.
 -- Durations are bare seconds or a number with s, m, h or d.
 
 import nix_store_core::db
 
-export const USAGE : &str = "usage: vdeploy --host NAME [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]]"
+export const USAGE : &str = "usage: vdeploy --host NAME [--mode observe|deploy] [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]] [APPLY OPTIONS] [--systemd-run PROG]\n       vdeploy apply [--toplevel PATH] [--state-dir DIR] [--textfile-dir DIR] [APPLY OPTIONS]\nAPPLY OPTIONS: [--health-window DURATION] [--health-every DURATION] [--vhealth PROG] [--profile PATH] [--gcroot PATH] [--nix-env PROG] [--nix-store PROG] [--systemctl PROG] [--comin-unit UNIT] [--health-as USER [--setpriv PROG]]"
 
 export const DEFAULT_URL : &str = "https://github.com/Industrial/nixos-dotfiles.git"
 
@@ -35,11 +44,26 @@ export data Options
   , export dotfiles_group Option<String>
   , export dotfiles_home Option<String>
   , export help bool
+  , export deploy bool
+  , export apply bool
+  , export toplevel Option<String>
+  , export health_window u64
+  , export health_every u64
+  , export systemd_run String
+  , export systemctl String
+  , export nix_env String
+  , export nix_store String
+  , export profile String
+  , export gcroot String
+  , export vhealth Option<String>
+  , export comin_unit String
+  , export health_as Option<String>
+  , export setpriv String
   }
   deriving (Clone, Debug, PartialEq)
 
 export defaults : Options
-defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false }
+defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false, deploy = false, apply = false, toplevel = None, health_window = 120, health_every = 2, systemd_run = .to_string "systemd-run", systemctl = .to_string "systemctl", nix_env = .to_string "nix-env", nix_store = .to_string "nix-store", profile = .to_string "/nix/var/nix/profiles/system", gcroot = .to_string "/nix/var/nix/gcroots/vdeploy/candidate", vhealth = None, comin_unit = .to_string "comin.service", health_as = None, setpriv = .to_string "setpriv" }
 
 -- A duration in seconds: bare seconds, or a number with s/m/h/d.
 export parse_duration : &str -> Option<u64>
@@ -57,6 +81,14 @@ parse_duration s =
     _ -> None
   n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1)
 
+-- `--mode`: observe (plan and log only) or deploy (switch, health check, roll back).
+export mode_of : &str -> Result<bool, String>
+mode_of m =
+  case m of
+    "observe" -> Ok false
+    "deploy" -> Ok true
+    other -> Err "--mode: observe or deploy, not #{other}"
+
 value : Option<&String> -> &str -> Result<String, String>
 value v flag =
   case v of
@@ -73,8 +105,40 @@ export parse_args : &[String] -> Result<Options, String>
 parse_args args =
   mut o = defaults ()
   mut it = args.iter ()
+  if args.first () |> .map (\a -> a == "apply") |> .unwrap_or false
+    o.apply := true
+    _sub = it.next ()
   while it.next () is Some a
     case a.as_str () of
+      "--mode" ->
+        m = (value (it.next ()) "--mode")?
+        o.deploy := (mode_of (&m))?
+      "--toplevel" ->
+        o.toplevel := Some ((value (it.next ()) "--toplevel")?)
+      "--health-window" ->
+        o.health_window := (positive (it.next ()) "--health-window")?
+      "--health-every" ->
+        o.health_every := (positive (it.next ()) "--health-every")?
+      "--systemd-run" ->
+        o.systemd_run := (value (it.next ()) "--systemd-run")?
+      "--systemctl" ->
+        o.systemctl := (value (it.next ()) "--systemctl")?
+      "--nix-env" ->
+        o.nix_env := (value (it.next ()) "--nix-env")?
+      "--nix-store" ->
+        o.nix_store := (value (it.next ()) "--nix-store")?
+      "--profile" ->
+        o.profile := (value (it.next ()) "--profile")?
+      "--gcroot" ->
+        o.gcroot := (value (it.next ()) "--gcroot")?
+      "--vhealth" ->
+        o.vhealth := Some ((value (it.next ()) "--vhealth")?)
+      "--comin-unit" ->
+        o.comin_unit := (value (it.next ()) "--comin-unit")?
+      "--health-as" ->
+        o.health_as := Some ((value (it.next ()) "--health-as")?)
+      "--setpriv" ->
+        o.setpriv := (value (it.next ()) "--setpriv")?
       "--host" ->
         o.host := (value (it.next ()) "--host")?
       "--once" ->
@@ -116,8 +180,10 @@ parse_args args =
         o.help := true
       other ->
         return Err "unknown argument: #{other}"
-  if !o.help && o.host.is_empty ()
+  if !o.help && !o.apply && o.host.is_empty ()
     return Err (.to_string "--host is required (the nixosConfigurations name of this host)")
+  if o.toplevel.is_some () && !o.apply
+    return Err (.to_string "--toplevel is for `vdeploy apply`")
   if o.dotfiles.is_none () && (o.dotfiles_user.is_some () || o.dotfiles_group.is_some () || o.dotfiles_home.is_some ())
     return Err (.to_string "--dotfiles-user, --dotfiles-group and --dotfiles-home need --dotfiles")
   Ok o
@@ -144,6 +210,17 @@ test "bad command lines are refused with the reason"
   assert_eq! \-> parse_args (&args (&["--host", "h", "--switch"])) \-> Err (.to_string "unknown argument: --switch")
   assert! \-> parse_args (&args (&["--host", "h", "--dotfiles-user", "tom"])) |> .is_err
   assert! \-> parse_args (&args (&["--help"])) |> .map (\o -> o.help) |> .unwrap_or false
+
+test "deploy mode, and the apply subcommand with its options"
+  d = parse_args (&args (&["--host", "drakkar", "--mode", "deploy", "--health-window", "3m", "--systemd-run", "/s/systemd-run"])) |> .expect "options"
+  assert_eq! \-> (d.deploy, d.apply, d.health_window, d.systemd_run.as_str ()) \-> (true, false, 180, "/s/systemd-run")
+  assert_eq! \-> parse_args (&args (&["--host", "h"])) |> .map (\o -> o.deploy) \-> Ok false
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--mode", "switch"])) \-> Err (.to_string "--mode: observe or deploy, not switch")
+  a = parse_args (&args (&["apply", "--toplevel", "/nix/store/x", "--state-dir", "/s", "--vhealth", "/v", "--profile", "/p", "--gcroot", "/g", "--comin-unit", "c.service"])) |> .expect "apply"
+  assert_eq! \-> (a.apply, a.toplevel.clone (), a.vhealth.clone (), a.profile.as_str (), a.gcroot.as_str (), a.comin_unit.as_str ()) \-> (true, Some (.to_string "/nix/store/x"), Some (.to_string "/v"), "/p", "/g", "c.service")
+  -- No host needed to apply; a toplevel outside apply is refused.
+  assert! \-> parse_args (&args (&["apply"])) |> .is_ok
+  assert! \-> parse_args (&args (&["--host", "h", "--toplevel", "/nix/store/x"])) |> .is_err
 
 test "durations"
   assert_eq! \-> (parse_duration "0", parse_duration "90", parse_duration "2m", parse_duration "1h", parse_duration "1d", parse_duration "1w") \-> (Some 0, Some 90, Some 120, Some 3600, Some 86400, None)

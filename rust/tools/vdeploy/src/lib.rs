@@ -41,6 +41,8 @@ voltaic!(watch);
 voltaic!(dotfiles);
 voltaic!(caps);
 voltaic!(report);
+voltaic!(apply);
+voltaic!(takeover);
 voltaic!(agent);
 voltaic!(cli);
 voltaic!(app);
