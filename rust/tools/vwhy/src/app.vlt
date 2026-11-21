@@ -1,0 +1,331 @@
+-- vwhy's command line.
+--
+--   vwhy [--json] [--all] [--db PATH] <package> <dependency>
+--   vwhy --top [--json] [--sort unique|own] [--limit N] [--db PATH] <path>
+--   vwhy --tui [--db PATH] <path>
+--
+-- The program is one effect: resolve the arguments, read the closure graph
+-- (two concurrent reads, `store`), answer (`graph`, pure), render (`render`),
+-- write. `main_code` runs it under id_effect_cli's `run_main` (exit 0, 1 on a
+-- typed failure, 101 on a defect, 130 on Ctrl-C), as the root fiber's child,
+-- because the parallel reads want the runtime's executor.
+
+import std::io::Write
+import std::process::{Command, Stdio}
+import id_effect::{Effect, HNil, effect, suspend}
+import nix_store_core::db
+import crate::graph::{Graph, chain_count, shortest, tree}
+import crate::render::{Answer, answers_json, answers_text, ranked, row_text, top_json, top_text}
+import crate::store::{Target, WhyError, closure_graph, lifted, matches, resolve, target_of}
+import crate::store::WhyError::{Independent, Output, Tui, Usage}
+
+export const USAGE : &str = "usage: vwhy [--json] [--all] [--db PATH] <package> <dependency>\n       vwhy --top [--json] [--sort unique|own] [--limit N] [--db PATH] <path>\n       vwhy --tui [--db PATH] <path>"
+
+export data Options { export targets Vec<String>, export all bool, export top bool, export tui bool, export json bool, export by_own bool, export limit usize, export db String, export help bool, export unknown Vec<String> }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- `--limit`'s default: a screenful.
+export const LIMIT : usize = 25
+
+export parse_args : &[String] -> Options
+parse_args args =
+  mut o = Options { db = db::DEFAULT_DB.to_string (), limit = LIMIT, ...Options::default () }
+  mut it = args.iter ()
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--json" ->
+          o.json := true
+        "--all" ->
+          o.all := true
+        "--top" ->
+          o.top := true
+        "--tui" ->
+          o.tui := true
+        "--db" ->
+          o.db := it.next () |> .cloned |> .unwrap_or_default
+        "--sort" ->
+          sort_by (&mut o) (it.next ())
+        "--limit" ->
+          limit_of (&mut o) (it.next ())
+        "-h" ->
+          o.help := true
+        "--help" ->
+          o.help := true
+        s | !(s.starts_with '-') ->
+          o.targets.push (s.to_string ())
+        s ->
+          o.unknown.push (s.to_string ())
+  o
+
+sort_by : &mut Options -> Option<&String> -> ()
+sort_by o value =
+  case value |> .map (\s -> s.as_str ()) of
+    Some "own" ->
+      o.by_own := true
+    Some "unique" ->
+      o.by_own := false
+    _ ->
+      o.unknown.push (.to_string "--sort (unique or own)")
+  ()
+
+limit_of : &mut Options -> Option<&String> -> ()
+limit_of o value =
+  case value |> .and_then (\s -> s.parse () |> .ok) of
+    Some n ->
+      o.limit := n
+    None ->
+      o.unknown.push (.to_string "--limit (a number, 0 for every path)")
+  ()
+
+-- What to do, once the arguments check out.
+export data Plan
+  = Why String Target
+  | Top String
+  | Browse String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export plan_of : &Options -> Result<Plan, WhyError>
+plan_of o =
+  modes = .to_vec ([o.top, o.tui]) |> .iter |> .filter (\b -> **b) |> .count
+  if !(o.unknown.is_empty ())
+    Err (Usage ("unknown or incomplete arguments: #{o.unknown.join " "}\n#{USAGE}"))
+  else if modes > 1 || (modes == 1 && (o.all || o.targets.len () != 1))
+    Err (Usage (USAGE.to_string ()))
+  else if o.top
+    resolve (&o.targets[0]) |> .map Top
+  else if o.tui
+    resolve (&o.targets[0]) |> .map Browse
+  else if o.targets.len () == 2
+    package = (resolve (&o.targets[0]))?
+    target = (target_of (&o.targets[1]))?
+    Ok (Why package target)
+  else
+    Err (Usage (USAGE.to_string ()))
+
+-- One dependency's answer. A matched name is always in the closure, so a
+-- missing chain is a path the package does not depend on.
+answer_for : &Graph -> bool -> usize -> Result<Answer, WhyError>
+answer_for g all dep =
+  package = g.paths[g.root].clone ()
+  chain = (shortest g dep |> .ok_or_else (\-> Independent ("'#{package}' does not depend on '#{g.paths[dep]}'")))?
+  if all
+    Ok (Answer { dep, chain, tree = Some (tree g dep), count = Some (chain_count g dep) })
+  else
+    Ok (Answer { dep, chain, tree = None, count = None })
+
+-- `vwhy <package> <dependency>`, rendered.
+export why_text : &Graph -> &Target -> &str -> bool -> bool -> Result<String, WhyError>
+why_text g target query all json =
+  deps = (matches g target)?
+  mut answers = Vec::new () : Vec<Answer>
+  for d in deps
+    answers.push ((answer_for g all d)?)
+  answers.sort_by_key (\a -> (a.chain.len (), a.dep))
+  if json
+    Ok (answers_json g query (&answers))
+  else
+    Ok (answers_text g (&answers))
+
+-- `vwhy --top`, rendered.
+export top_out : &Graph -> &Options -> String
+top_out g o =
+  rows = ranked g o.by_own o.limit
+  if o.json
+    top_json g o.by_own (&rows)
+  else
+    top_text g (&rows)
+
+-- A reader that stops early (`vwhy … | head`) is not an error.
+write_out : String -> Result<(), WhyError>
+write_out text =
+  mut out = std::io::stdout ().lock ()
+  written = out.write_all (text.as_bytes ()) |> .and_then (\_ -> out.flush ())
+  case written of
+    Ok _ -> Ok ()
+    Err e -> output_error e
+
+output_error : std::io::Error -> Result<(), WhyError>
+output_error e =
+  if e.kind () == std::io::ErrorKind::BrokenPipe
+    Ok ()
+  else
+    Err (Output (e.to_string ()))
+
+-- A word for `sh -c`, in single quotes.
+export sh_quote : &str -> String
+sh_quote s =
+  inner = s.replace "'" "'\\''"
+  "'#{inner}'"
+
+-- `--tui`: fzf over every closure member, largest unique size first, with the
+-- chain from the root as the preview (this program again, on the line's
+-- path). Enter prints the chosen path's chain; Esc prints nothing. The fzf
+-- binary is `$VWHY_FZF`, or `fzf` on PATH.
+export fzf_args : &str -> &str -> &str -> Vec<String>
+fzf_args exe db_path root =
+  preview = "#{sh_quote exe} --db #{sh_quote db_path} #{sh_quote root} {-1}"
+  header = "UNIQUE / OWN / PATH of #{root}. Enter: print the chain. Esc: quit."
+  .to_vec (["--no-sort", "--reverse", "--header", header.as_str (), "--preview", preview.as_str (), "--preview-window", "down,40%,wrap"]) |> .iter |> .map (\s -> s.to_string ()) |> .collect
+
+-- The line fzf printed, or None when the user left without choosing (fzf's
+-- 1 and 130).
+chosen : std::process::Output -> Result<Option<String>, WhyError>
+chosen out =
+  code = out.status.code ()
+  text = String::from_utf8_lossy (&out.stdout) |> .trim |> .to_string
+  if code == Some 0 && !(text.is_empty ())
+    Ok (Some text)
+  else if code == Some 0 || code == Some 1 || code == Some 130
+    Ok None
+  else
+    Err (Tui ("fzf exited with #{out.status}"))
+
+-- The path at the end of a table line.
+export path_of_line : &str -> Option<String>
+path_of_line line = line.split_whitespace () |> .last |> .map (\s -> s.to_string ())
+
+run_fzf : String -> Vec<String> -> String -> Result<Option<String>, WhyError>
+run_fzf fzf args input =
+  mut child = (Command::new (&fzf) |> .args (&args) |> .stdin (Stdio::piped ()) |> .stdout (Stdio::piped ()) |> .spawn |> .map_err (\e -> Tui ("starting #{fzf} (set VWHY_FZF to another fzf): #{e}")))?
+  mut sink = (child.stdin.take () |> .ok_or (Tui (.to_string "fzf's stdin")))?
+  fed = sink.write_all (input.as_bytes ())
+  drop sink
+  if (fed) is Err e
+    if e.kind () != std::io::ErrorKind::BrokenPipe
+      eprintln! \-> "vwhy: feeding fzf: #{e}"
+  out = (child.wait_with_output () |> .map_err (\e -> Tui ("waiting for fzf: #{e}")))?
+  chosen out
+
+browse : Graph -> String -> Result<(), WhyError>
+browse g db_path =
+  rows = ranked (&g) false 0
+  lines = rows.iter () |> .map (\r -> row_text (&g) r) |> .collect : Vec<String>
+  exe = std::env::current_exe () |> .map (\p -> p.to_string_lossy () |> .to_string) |> .unwrap_or (.to_string "vwhy")
+  fzf = std::env::var "VWHY_FZF" |> .unwrap_or (.to_string "fzf")
+  root = g.paths[g.root].clone ()
+  picked = (run_fzf fzf (fzf_args (&exe) (&db_path) (&root)) (lines.join "\n"))?
+  case picked |> .and_then (\l -> path_of_line (&l)) of
+    None -> Ok ()
+    Some p -> why_text (&g) (&Target::ByPath p) (&root) false false |> .and_then write_out
+
+-- The plan, run: read the graph, answer, write.
+export run_plan : Options -> Plan -> Effect<(), WhyError, HNil>
+run_plan o plan =
+  db_path = o.db.clone ()
+  case plan of
+    Why package target ->
+      query = o.targets[1].clone ()
+      (all, json) = (o.all, o.json)
+      closure_graph db_path package |> .flat_map (move \g -> suspend (move \-> lifted (why_text (&g) (&target) (&query) all json |> .and_then write_out)))
+    Top root ->
+      closure_graph db_path root |> .flat_map (move \g -> suspend (move \-> lifted (write_out (top_out (&g) (&o)))))
+    Browse root ->
+      closure_graph (db_path.clone ()) root |> .flat_map (move \g -> suspend (move \-> lifted (browse g db_path)))
+
+-- Check the arguments, then run the plan.
+export program : Options -> Effect<(), WhyError, HNil>
+program o =
+  checked = o.clone ()
+  suspend (move \-> lifted (plan_of (&checked))) |> .flat_map (move \plan -> run_plan o plan)
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the context the parallel reads need, so the
+-- program runs as the root's child; Ctrl-C interrupts and awaits it.
+supervised : Effect<(), WhyError, HNil> -> Effect<(), WhyError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- A failure as run_main prints it (`error: <this>`): the message, not Debug.
+export data Failed { message Box<str> }
+
+instance std::fmt::Debug Failed
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&self.message)
+
+failed : WhyError -> Failed
+failed e = Failed { message = "vwhy: #{e}" |> .into_boxed_str }
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  o = parse_args (&args)
+  if o.help
+    println! \-> "#{USAGE}"
+    std::process::ExitCode::SUCCESS
+  else
+    id_effect_cli::run_main (supervised (program o) |> .map_err failed) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+argv : Vec<&str> -> Vec<String>
+argv words = words.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "a closed pipe is not an error, another write failure is"
+  assert! \-> output_error (std::io::Error::from std::io::ErrorKind::BrokenPipe) |> .is_ok
+  assert! \-> output_error (std::io::Error::from std::io::ErrorKind::StorageFull) |> .is_err
+
+test "flags and targets parse"
+  o = parse_args (&argv (.to_vec (["--json", "--all", "/a", "glibc", "--db", "/tmp/db.sqlite"])))
+  assert_eq! \-> o.targets \-> argv (.to_vec (["/a", "glibc"]))
+  assert! \-> o.json && o.all && !o.top && o.unknown.is_empty ()
+  assert_eq! \-> o.db \-> "/tmp/db.sqlite"
+  assert_eq! \-> o.limit \-> LIMIT
+
+test "--top takes --sort and --limit, and refuses bad values"
+  o = parse_args (&argv (.to_vec (["--top", "--sort", "own", "--limit", "0", "/a"])))
+  assert! \-> o.top && o.by_own && o.limit == 0 && o.unknown.is_empty ()
+  bad = parse_args (&argv (.to_vec (["--top", "--sort", "size", "--limit", "x", "/a"])))
+  assert_eq! \-> bad.unknown.len () \-> 2
+  assert! \-> plan_of (&bad) |> .is_err
+
+test "the wrong number of targets, or two modes, is a usage error"
+  assert! \-> plan_of (&parse_args (&argv (.to_vec (["/run/current-system"])))) |> .is_err
+  assert! \-> plan_of (&parse_args (&argv (.to_vec (["--top", "/a", "/b"])))) |> .is_err
+  assert! \-> plan_of (&parse_args (&argv (.to_vec (["--top", "--tui", "/a"])))) |> .is_err
+  assert! \-> plan_of (&parse_args (&argv (.to_vec (["--top", "--all", "/a"])))) |> .is_err
+  assert! \-> plan_of (&parse_args (&argv (.to_vec (["--bogus", "/a", "/b"])))) |> .is_err
+
+test "a usage error fails the program with exit code 1"
+  exit = id_effect::testing::run_test (program (parse_args (&Vec::new ())))
+  e = id_effect::testing::expect_exit_failure exit
+  assert! \-> e.to_string ().starts_with "usage: vwhy"
+
+test "the tui's preview runs vwhy on the line's path, quoted for sh"
+  args = fzf_args "/bin/vwhy" "/d b" "/nix/store/x-root"
+  assert! \-> args.contains (&.to_string "'/bin/vwhy' --db '/d b' '/nix/store/x-root' {-1}")
+  assert_eq! \-> sh_quote "it's" \-> "'it'\\''s'"
+  assert_eq! \-> path_of_line "   1.0 MiB    2.0 KiB  /nix/store/x-a" \-> Some (.to_string "/nix/store/x-a")
+
+#[cfg(test)]
+const SYSTEM : &str = "/nix/store/rdyar9w45ifi45866ig3fsa8bni2l3dx-nixos-system-drakkar-26.11.20261120.9996594"
+
+#[cfg(test)]
+const GLIBC : &str = "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+
+#[cfg(test)]
+const OPENSSL : &str = "/nix/store/3h4ifcg10i9j0kj5c0cmas23v15pc7cl-openssl-3.5.9"
+
+test "a name answers for every match, a path outside the closure fails"
+  g = crate::graph::fixture SYSTEM (.to_vec ([(SYSTEM, 1, .to_vec ([OPENSSL, GLIBC])), (OPENSSL, 2, .to_vec ([GLIBC])), (GLIBC, 4, Vec::new ())]))
+  text = why_text (&g) (&Target::ByName (.to_string "glibc")) "glibc" false false
+  assert_eq! \-> text.ok () \-> Some ("#{SYSTEM}\n└───#{GLIBC}\n")
+  far = why_text (&g) (&Target::ByPath (.to_string "/nix/store/00000000000000000000000000000000-x")) "x" false false
+  assert! \-> far.is_err ()
+  all = why_text (&g) (&Target::ByPath (GLIBC.to_string ())) GLIBC true false |> .expect "an answer"
+  assert! \-> all.ends_with "(2 chain(s))\n"
+
+test "end to end on this machine: the current system depends on its own references"
+  if std::path::Path::new db::DEFAULT_DB |> .exists
+    if (resolve "/run/current-system") is Ok root
+      conn = db::open db::DEFAULT_DB |> .expect "the database"
+      refs = db::references (&conn) (&root) |> .expect "references" |> .unwrap_or_default
+      if (refs.first ()) is Some dep
+        o = parse_args (&argv (.to_vec (["--json", root.as_str (), dep.as_str ()])))
+        exit = id_effect::testing::run_test (program o)
+        id_effect::testing::expect_exit_success exit

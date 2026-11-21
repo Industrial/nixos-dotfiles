@@ -1,0 +1,399 @@
+-- A closure as a graph, and the questions vwhy asks of it. Everything here is
+-- a plain function over the rows the store database gave (`store`): the
+-- nodes are the closure's paths in byte order (so a node's index sorts as its
+-- path does, which is the order `nix why-depends` breaks ties in), the edges
+-- are the `Refs` rows between them.
+--
+--   * `distances`: every node's distance to a dependency, a breadth-first
+--     walk over the reversed edges;
+--   * `shortest`: the chain `nix why-depends` prints. From the package, step
+--     to the reference nearest the dependency, the first in path order on a
+--     tie, until the dependency is reached;
+--   * `tree`: the tree `nix why-depends --all` prints, every edge on a path
+--     from the package to the dependency, each node expanded once;
+--   * `chain_count`: how many distinct chains there are (saturating);
+--   * `dominators` and `unique_sizes`: the size only reachable through each
+--     path, what removing that path from the closure would save (nix-tree's
+--     "added size" is the closest relative; this is the dominator-tree one).
+
+import std::collections::{HashMap, VecDeque}
+
+export data Graph { export paths Vec<String>, export sizes Vec<u64>, export refs Vec<Vec<usize>>, export root usize }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- One line of `--all`'s tree: the box-drawing prefix, the node, and whether
+-- the node was already expanded above (nix greys those out). `parent` is
+-- the node it is a reference of, so the lines are the subgraph's edges.
+export data TreeLine { export prefix String, export parent usize, export node usize, export seen bool }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+empty_lists : usize -> Vec<Vec<usize>>
+empty_lists n =
+  mut out = Vec::new () : Vec<Vec<usize>>
+  for _ in 0 .. n
+    out.push (Vec::new ())
+  out
+
+-- The graph of `root`'s closure from its rows: every member as (database id,
+-- path, narSize), every reference as (referrer id, reference id). Edges to
+-- ids outside the members are dropped. None when `root` is not a member.
+export build : &str -> Vec<(i64, String, u64)> -> Vec<(i64, i64)> -> Option<Graph>
+build root nodes edges =
+  mut rows = nodes
+  rows.sort_by (\a b -> a.1.cmp (&b.1))
+  rows.dedup_by (\a b -> a.1 == b.1)
+  mut index = HashMap::new () : HashMap<i64, usize>
+  mut paths = Vec::new () : Vec<String>
+  mut sizes = Vec::new () : Vec<u64>
+  for row in rows
+    (id, path, size) = row
+    index.insert id (paths.len ())
+    paths.push path
+    sizes.push size
+  mut refs = empty_lists (paths.len ())
+  for e in edges
+    (a, b) = e
+    if (index.get (&a)) is Some i
+      if (index.get (&b)) is Some j
+        refs[*i].push (*j)
+  for rs in refs.iter_mut ()
+    rs.sort ()
+    rs.dedup ()
+  case paths.binary_search_by (\p -> p.as_str () |> .cmp root) of
+    Ok r -> Some (Graph { paths, sizes, refs, root = r })
+    Err _ -> None
+
+-- The node of a full store path.
+export index_of : &Graph -> &str -> Option<usize>
+index_of g path = g.paths.binary_search_by (\p -> p.as_str () |> .cmp path) |> .ok
+
+-- The referrers of every node.
+export referrers : &Graph -> Vec<Vec<usize>>
+referrers g =
+  mut out = empty_lists (g.paths.len ())
+  for pair in g.refs.iter () |> .enumerate
+    (i, rs) = pair
+    for r in rs
+      out[*r].push i
+  out
+
+-- Every node's distance (in references) to `dep`; None when `dep` is not in
+-- its closure. Self-references never shorten anything, so they are skipped.
+export distances : &Graph -> usize -> Vec<Option<usize>>
+distances g dep =
+  back = referrers g
+  mut dist = Vec::new () : Vec<Option<usize>>
+  for _ in 0 .. g.paths.len ()
+    dist.push None
+  dist[dep] := Some 0
+  mut queue = VecDeque::new () : VecDeque<usize>
+  queue.push_back dep
+  while (queue.pop_front ()) is Some n
+    d = dist[n] |> .unwrap_or 0
+    for r in &back[n]
+      if dist[*r].is_none ()
+        dist[*r] := Some (d + 1)
+        queue.push_back (*r)
+  dist
+
+-- The references of `n` that lead to the dependency, nearest first, then in
+-- path order (nix's multimap over a sorted reference set). A self-reference
+-- counts only when the package is the dependency, as in nix.
+export toward : &Graph -> &[Option<usize>] -> usize -> bool -> Vec<usize>
+toward g dist n self_too =
+  mut out = Vec::new () : Vec<(usize, usize)>
+  for r in &g.refs[n]
+    if *r != n || self_too
+      if dist[*r] is Some d
+        out.push ((d, *r))
+  out.sort ()
+  out.iter () |> .map (\p -> p.1) |> .collect
+
+-- The chain from the package (the graph's root) to `dep`, the package first,
+-- or None when the package does not depend on it. Where the package is the
+-- dependency, nix shows its self-reference when it has one.
+export shortest : &Graph -> usize -> Option<Vec<usize>>
+shortest g dep =
+  dist = distances g dep
+  if dist[g.root].is_none ()
+    None
+  else if g.root == dep
+    if g.refs[dep].contains (&dep)
+      Some (.to_vec ([dep, dep]))
+    else
+      Some (.to_vec ([dep]))
+  else
+    mut chain = .to_vec ([g.root])
+    mut at = g.root
+    while at != dep
+      at := toward g (&dist) at false |> .first |> .copied |> .unwrap_or dep
+      chain.push at
+    Some chain
+
+const CONN : &str = "├───"
+const LAST : &str = "└───"
+const LINE : &str = "│   "
+const NULL : &str = "    "
+
+-- nix's `printNode` for `--all`, without the colour: each reference toward the
+-- dependency is printed under its referrer, and a node is expanded below the
+-- first line that shows it only.
+expand : &Graph -> &[Option<usize>] -> usize -> usize -> &str -> &mut Vec<bool> -> &mut Vec<TreeLine> -> ()
+expand g dist dep n pad visited out =
+  if !(visited[n])
+    self_too = g.root == dep
+    next = toward g dist n self_too
+    count = next.len ()
+    for pair in next.iter () |> .enumerate
+      (k, r) = pair
+      last = k + 1 == count
+      branch = if last
+        LAST
+      else
+        CONN
+      out.push (TreeLine { prefix = "#{pad}#{branch}", parent = n, node = *r, seen = visited[*r] })
+      visited[n] := true
+      deeper = if last
+        NULL
+      else
+        LINE
+      child_pad = "#{pad}#{deeper}"
+      expand g dist dep (*r) (&child_pad) visited out
+  ()
+
+-- Every edge on a path from the package to `dep`, as `nix why-depends --all`
+-- prints them (the package's own line is not included). Empty when the
+-- package does not depend on `dep`.
+export tree : &Graph -> usize -> Vec<TreeLine>
+tree g dep =
+  dist = distances g dep
+  mut out = Vec::new () : Vec<TreeLine>
+  if dist[g.root].is_some ()
+    mut visited = Vec::new () : Vec<bool>
+    for _ in 0 .. g.paths.len ()
+      visited.push false
+    expand g (&dist) dep g.root "" (&mut visited) (&mut out)
+  out
+
+count_from : &Graph -> &[Option<usize>] -> usize -> usize -> &mut Vec<Option<u64>> -> u64
+count_from g dist dep n memo =
+  if n == dep
+    1
+  else if (memo[n]) is Some c
+    c
+  else
+    mut total = 0 : u64
+    for r in toward g dist n false
+      total := total.saturating_add (count_from g dist dep r memo)
+    memo[n] := Some total
+    total
+
+-- How many distinct chains lead from the package to `dep` (saturating at
+-- u64::MAX: a system closure can hold more than that).
+export chain_count : &Graph -> usize -> u64
+chain_count g dep =
+  dist = distances g dep
+  if dist[g.root].is_none ()
+    0
+  else
+    mut memo = Vec::new () : Vec<Option<u64>>
+    for _ in 0 .. g.paths.len ()
+      memo.push None
+    count_from g (&dist) dep g.root (&mut memo)
+
+-- The nodes in reverse postorder of a depth-first walk from the root, with
+-- each node's position in it (usize::MAX for a node the walk never reaches).
+-- An explicit stack: a closure's depth is the program's to bound, not the
+-- thread's.
+export reverse_postorder : &Graph -> (Vec<usize>, Vec<usize>)
+reverse_postorder g =
+  n = g.paths.len ()
+  mut seen = Vec::new () : Vec<bool>
+  for _ in 0 .. n
+    seen.push false
+  mut post = Vec::new () : Vec<usize>
+  mut stack = .to_vec ([(g.root, 0)]) : Vec<(usize, usize)>
+  seen[g.root] := true
+  while (stack.pop ()) is Some top
+    (node, k) = top
+    if k < g.refs[node].len ()
+      stack.push ((node, k + 1))
+      r = g.refs[node][k]
+      if !(seen[r])
+        seen[r] := true
+        stack.push ((r, 0))
+    else
+      post.push node
+  post.reverse ()
+  mut order = Vec::new () : Vec<usize>
+  for _ in 0 .. n
+    order.push usize::MAX
+  for pair in post.iter () |> .enumerate
+    (k, v) = pair
+    order[*v] := k
+  (post, order)
+
+-- Two dominator candidates' nearest common dominator (Cooper, Harvey and
+-- Kennedy's `intersect`, over reverse-postorder positions).
+meet : &[Option<usize>] -> &[usize] -> usize -> usize -> usize
+meet idom order a b =
+  mut x = a
+  mut y = b
+  while x != y
+    while order[x] > order[y]
+      x := idom[x] |> .unwrap_or y
+    while order[y] > order[x]
+      y := idom[y] |> .unwrap_or x
+  x
+
+-- Every node's immediate dominator in the closure, from the root: the last
+-- path every chain from the root to that node passes through. The root has
+-- itself. Cooper, Harvey and Kennedy's iteration, to its fixed point.
+export dominators : &Graph -> Vec<Option<usize>>
+dominators g =
+  (post, order) = reverse_postorder g
+  back = referrers g
+  mut idom = Vec::new () : Vec<Option<usize>>
+  for _ in 0 .. g.paths.len ()
+    idom.push None
+  idom[g.root] := Some g.root
+  mut changed = true
+  while changed
+    changed := false
+    for b in &post
+      if *b != g.root
+        mut pick = None : Option<usize>
+        for p in &back[*b]
+          if idom[*p].is_some () && order[*p] != usize::MAX
+            pick := case pick of
+              None -> Some (*p)
+              Some q -> Some (meet (&idom) (&order) (*p) q)
+        if pick.is_some () && idom[*b] != pick
+          idom[*b] := pick
+          changed := true
+  idom
+
+-- Every node's unique size: its own narSize plus that of every node it
+-- dominates. The root's is the whole closure's.
+export unique_sizes : &Graph -> Vec<u64>
+unique_sizes g =
+  idom = dominators g
+  (post, _) = reverse_postorder g
+  mut sizes = g.sizes.clone ()
+  for b in post.iter () |> .rev
+    if *b != g.root
+      if (idom[*b]) is Some d
+        add = sizes[*b]
+        sizes[d] := sizes[d].saturating_add add
+  sizes
+
+-- The sum of every member's narSize (`nix path-info -S`).
+export closure_size : &Graph -> u64
+closure_size g = g.sizes.iter () |> .fold 0 (\a b -> a.saturating_add (*b))
+
+-- A graph from (path, narSize, references) rows, for tests.
+#[cfg(test)]
+export fixture : &str -> Vec<(&str, u64, Vec<&str>)> -> Graph
+fixture root rows =
+  mut nodes = Vec::new () : Vec<(i64, String, u64)>
+  mut ids = HashMap::new () : HashMap<String, i64>
+  mut next = 1 : i64
+  for row in &rows
+    (p, size, _) = row
+    nodes.push ((next, p.to_string (), *size))
+    ids.insert (p.to_string ()) next
+    next := next + 1
+  mut edges = Vec::new () : Vec<(i64, i64)>
+  for row in &rows
+    (p, _, rs) = row
+    for r in rs
+      edges.push ((ids[*p], ids[*r]))
+  build root nodes edges |> .expect "the root is a member"
+
+-- top -> a, b; a -> c; b -> c, d; c -> e (self too); d -> e. Sizes are
+-- powers of two, so every sum names its members.
+#[cfg(test)]
+diamond : Graph
+diamond = fixture "t" (.to_vec ([("t", 1, .to_vec (["a", "b"])), ("a", 2, .to_vec (["c"])), ("b", 4, .to_vec (["c", "d"])), ("c", 8, .to_vec (["c", "e"])), ("d", 16, .to_vec (["e"])), ("e", 32, Vec::new ())]))
+
+#[cfg(test)]
+at : &Graph -> &str -> usize
+at g p = index_of g p |> .expect "a member"
+
+#[cfg(test)]
+names : &Graph -> Vec<usize> -> Vec<String>
+names g chain = chain.iter () |> .map (\i -> g.paths[*i].clone ()) |> .collect
+
+#[cfg(test)]
+shown_line : &Graph -> &TreeLine -> String
+shown_line g l =
+  mark = if l.seen
+    "*"
+  else
+    ""
+  "#{l.prefix}#{g.paths[l.node]}#{mark}"
+
+test "nodes sort by path and edges outside the closure are dropped"
+  g = build "b" (.to_vec ([(7, .to_string "b", 1), (3, .to_string "a", 2)])) (.to_vec ([(7, 3), (7, 99), (3, 3)]))
+  g2 = g.expect "b is a member"
+  assert_eq! \-> g2.paths \-> .to_vec ([.to_string "a", .to_string "b"])
+  assert_eq! \-> g2.root \-> 1
+  assert_eq! \-> g2.refs \-> .to_vec ([.to_vec ([0]), .to_vec ([0])])
+  assert! \-> build "z" (.to_vec ([(1, .to_string "a", 0)])) (Vec::new ()) |> .is_none
+
+test "distances run over the reversed edges and skip what cannot reach"
+  g = diamond ()
+  dist = distances (&g) (at (&g) "e")
+  assert_eq! \-> dist \-> .to_vec ([Some 2, Some 2, Some 1, Some 1, Some 0, Some 3])
+  dist_d = distances (&g) (at (&g) "d")
+  assert_eq! \-> dist_d[at (&g) "a"] \-> None
+
+test "the shortest chain takes the nearest reference, the first by path on a tie"
+  g = diamond ()
+  assert_eq! \-> shortest (&g) (at (&g) "e") |> .map (\c -> names (&g) c) \-> Some (.to_vec ([.to_string "t", .to_string "a", .to_string "c", .to_string "e"]))
+  assert_eq! \-> shortest (&g) (at (&g) "d") |> .map (\c -> names (&g) c) \-> Some (.to_vec ([.to_string "t", .to_string "b", .to_string "d"]))
+
+test "a package is its own chain, through its self-reference if it has one"
+  g = fixture "c" (.to_vec ([("c", 8, .to_vec (["c", "e"])), ("e", 32, Vec::new ())]))
+  assert_eq! \-> shortest (&g) (at (&g) "c") |> .map (\c -> c.len ()) \-> Some 2
+  h = fixture "e" (.to_vec ([("e", 32, Vec::new ())]))
+  assert_eq! \-> shortest (&h) 0 |> .map (\c -> c.len ()) \-> Some 1
+
+test "no chain when the package does not depend on the path"
+  g = fixture "a" (.to_vec ([("a", 1, Vec::new ()), ("b", 1, .to_vec (["a"]))]))
+  assert_eq! \-> shortest (&g) (at (&g) "b") \-> None
+  assert! \-> tree (&g) (at (&g) "b") |> .is_empty
+  assert_eq! \-> chain_count (&g) (at (&g) "b") \-> 0
+
+test "the --all tree is nix's: nearest first, each node expanded once"
+  g = diamond ()
+  lines = tree (&g) (at (&g) "e")
+  shown = lines.iter () |> .map (\l -> shown_line (&g) l) |> .collect : Vec<String>
+  want = .to_vec (["├───a", "│   └───c", "│       └───e", "└───b", "    ├───c*", "    └───d", "        └───e"]) |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  assert_eq! \-> shown \-> want
+
+test "chains are counted, not listed"
+  g = diamond ()
+  assert_eq! \-> chain_count (&g) (at (&g) "e") \-> 3
+  assert_eq! \-> chain_count (&g) (at (&g) "c") \-> 2
+  assert_eq! \-> chain_count (&g) (at (&g) "t") \-> 1
+
+test "dominators: what every chain passes through"
+  g = diamond ()
+  idom = dominators (&g)
+  named = idom.iter () |> .map (\d -> d.map (\i -> g.paths[i].clone ())) |> .collect : Vec<Option<String>>
+  assert_eq! \-> named \-> .to_vec ([Some (.to_string "t"), Some (.to_string "t"), Some (.to_string "t"), Some (.to_string "b"), Some (.to_string "t"), Some (.to_string "t")])
+
+test "unique size is own size plus everything dominated"
+  g = diamond ()
+  unique = unique_sizes (&g)
+  assert_eq! \-> unique[at (&g) "b"] \-> 4 + 16
+  assert_eq! \-> unique[at (&g) "c"] \-> 8
+  assert_eq! \-> unique[at (&g) "t"] \-> 63
+  assert_eq! \-> closure_size (&g) \-> 63
+
+test "a chain through a dominator counts it once"
+  g = fixture "r" (.to_vec ([("r", 1, .to_vec (["m"])), ("m", 2, .to_vec (["x", "y"])), ("x", 4, .to_vec (["z"])), ("y", 8, .to_vec (["z"])), ("z", 16, Vec::new ())]))
+  unique = unique_sizes (&g)
+  assert_eq! \-> unique[at (&g) "m"] \-> 30
+  assert_eq! \-> unique[at (&g) "x"] \-> 4
