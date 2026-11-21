@@ -16,9 +16,10 @@
 #
 # The cache is the first entry of common/fleet.nix's `binaryCaches` that is not this
 # host, never a host name here. A host never pushes to itself: on a cache host (drakkar)
-# enabling this is an evaluation error. profiles/base.nix switches it on where
-# `fleet.pushesToCache` says so (a builder-role host with `pushToCache = true` that is
-# not a cache); today that is no host.
+# enabling this is an evaluation error. profiles/base.nix switches it on automatically
+# wherever `fleet.pushesToCache` holds: every builder-role host that is not a cache
+# (huginn and muninn today; drakkar is the cache). Nothing is opt-in. Rollback, per host
+# or profile, is the one option `features.nix.vpush.enable = lib.mkForce false;`.
 #
 # Trust: which mode the fleet uses. vpush connects as the operator (settings.username),
 # with the operator's own key (~/.ssh/id_ed25519, whose public half is the host's

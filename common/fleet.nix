@@ -20,9 +20,6 @@
 #                  start and never leaves it; the public half is copied here so
 #                  clients trust it at eval time. null/absent = the host serves no
 #                  cache (yet), and clients leave it out.
-#   pushToCache  — true to push this host's builds to the fleet cache (features/nix/vpush).
-#                  Honoured only on a builder-role host that is not a cache itself; see
-#                  `pushesToCache`. Absent = false.
 #
 # Host names double as MagicDNS short names on the tailnet.
 let
@@ -93,13 +90,15 @@ let
     builtins.elem "builder" (h.roles or []) && h ? tailscaleIp && (h.cacheKey or null) != null;
 
   # Whether `name` pushes its builds to the fleet cache (features/nix/vpush, switched on
-  # from profiles/base.nix): a builder-role host that asks for it with
-  # `pushToCache = true` and is not a cache host itself. A cache never pushes to itself:
-  # it IS the cache. Takes the host set, so the rule is testable on another inventory.
+  # from profiles/base.nix): every builder-role host that is not a cache itself, as long
+  # as some other host is one. Automatic, not opt-in; the rollback is the one option
+  # `features.nix.vpush.enable = lib.mkForce false`. A cache never pushes to itself: it
+  # IS the cache. Takes the host set, so the rule is testable on another inventory.
   pushesToCacheIn = hs: name: let
     h = hs.${name} or {};
+    otherCaches = builtins.filter (n: n != name && isCacheIn hs n) (builtins.attrNames hs);
   in
-    builtins.elem "builder" (h.roles or []) && (h.pushToCache or false) && !(isCacheIn hs name);
+    builtins.elem "builder" (h.roles or []) && !(isCacheIn hs name) && otherCaches != [];
 in {
   inherit hosts order hasRole withRole cachePort isCacheIn pushesToCacheIn;
 

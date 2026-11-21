@@ -106,7 +106,6 @@ features/cli/nix-output-monitor
 
 # --- Switched on by fleet data, not a literal `enable = true`. -----------------------
 # profiles/base.nix sets features.nix.vpush.enable = lib.mkDefault (fleet.pushesToCache
-# <host>): on for a builder-role host with `pushToCache = true` in common/fleet.nix that is
-# not a cache. No host sets it yet (drakkar is the cache; huginn and muninn are offline),
-# so no closure reaches it today (GH-154).
+# <host>): on for every builder-role host that is not a cache (huginn, muninn), which this
+# text-only check cannot see. profiles/base.assay.nix proves the selection (GH-154).
 features/nix/vpush

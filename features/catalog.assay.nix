@@ -10,6 +10,9 @@ let
       modules = [
         (../hosts + "/${h}/configuration.nix")
         {disabledModules = map (f: ../hosts + "/${h}/${f}") ["disko.nix" "filesystems.nix" "hardware.nix"];}
+        # What features/nixos/networking sets from settings.hostname on a real host; the
+        # base profile's vpush switch reads it (fleet.pushesToCache).
+        {networking.hostName = h;}
       ];
     }))
   (import ../common/fleet.nix).names);
