@@ -28,9 +28,9 @@ let
       description = "desktop and gaming station";
       roles = ["desktop" "builder" "nfs-client"];
       tailscaleIp = "100.69.213.35";
-      # Copy in from `journalctl -u vcache` (the ExecStartPre logs it) after the first
-      # deploy of features.nix.vcache; until then no client substitutes from drakkar.
-      cacheKey = null;
+      # Public half of /var/lib/private/vcache/secret-key, logged by vcache-ensure-key
+      # (`journalctl -u vcache`). Rotating that key means updating this line.
+      cacheKey = "drakkar-vcache-1:WtADMHunhHX0O8Et3619eHQwtbl4EkFEfwrujjaYMv8=";
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAtviEPSAz5PlJ8K8mFzSQz/Y6WqzqrBA5PzXkhjZ2/y tom@drakkar";
       builder = {
         maxJobs = 8;
