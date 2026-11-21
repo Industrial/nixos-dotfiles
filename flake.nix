@@ -377,6 +377,8 @@
       // {lanzaboote-vm = import ./features/nixos/boot/test.nix {inherit pkgs inputs;};}
       # features/nix/vdaemon-proxy in a VM (#157).
       // {vdaemon-proxy-vm = import ./features/nix/vdaemon-proxy/test.nix {inherit pkgs;};}
+      # features/nix/vpush's VM test: builds pushed to vcache, substituted by a fresh store.
+      // {vpush-vm = import ./features/nix/vpush/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

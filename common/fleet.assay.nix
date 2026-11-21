@@ -50,4 +50,17 @@ in
     binaryCachesUseTheFleetPort = assay.eq (lib.all (c: lib.hasSuffix ":${toString fleet.cachePort}" c.url) fleet.binaryCaches) true;
 
     everyHostEnrolled = assay.eq (builtins.length fleet.operatorKeys) (builtins.length fleet.names);
+
+    # vpush: a host pushes to the cache exactly when it is a builder, asks for it
+    # (pushToCache) and is not a cache itself. On an inventory where every host asks,
+    # that is the builders minus the caches (and never drakkar, the cache); on this one,
+    # where none asks yet, it is nobody.
+    pushersAreNonCacheBuilders = let
+      everyoneAsks = builtins.mapAttrs (_: h: h // {pushToCache = true;}) fleet.hosts;
+      expected = lib.filter (n: !(builtins.elem n (map (c: c.name) fleet.binaryCaches))) (fleet.withRole "builder");
+    in
+      assay.eq [(lib.filter (fleet.pushesToCacheIn everyoneAsks) fleet.order) (expected != [])] [expected true];
+    cacheNeverPushes = assay.eq (lib.filter (c: fleet.pushesToCacheIn (builtins.mapAttrs (_: h: h // {pushToCache = true;}) fleet.hosts) c.name) fleet.binaryCaches) [];
+    nonBuilderNeverPushes = assay.eq (lib.filter (fleet.pushesToCacheIn (builtins.mapAttrs (_: h: h // {pushToCache = true;}) fleet.hosts)) (lib.filter (n: !(fleet.hasRole "builder" n)) fleet.order)) [];
+    noHostPushesYet = assay.eq fleet.cachePushers [];
   }

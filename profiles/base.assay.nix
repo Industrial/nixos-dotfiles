@@ -24,4 +24,42 @@ in
     enablesStigSurface = assay.eq (has "security.stig") true;
     enablesExternalEvidence = assay.eq (has "security.stig.profiles.external-evidence") true;
     leavesBaseSafeOff = assay.eq (has "security.stig.profiles.base-safe") false;
+
+    # vpush follows common/fleet.nix: on exactly where `pushesToCache` says (a builder
+    # that asks for it and is not a cache), for every fleet host; so off on the cache.
+    vpushFollowsTheFleet = let
+      fleet = import ../common/fleet.nix;
+      onFor = name:
+        (features.evalSelection {
+          modules = [
+            {
+              profiles.base.enable = true;
+              networking.hostName = name;
+            }
+          ];
+        })
+        .features
+        .nix
+        .vpush
+        .enable;
+    in
+      assay.eq (map onFor fleet.names) (map fleet.pushesToCache fleet.names);
+    vpushOffOnTheCache = let
+      fleet = import ../common/fleet.nix;
+      cache = (builtins.head fleet.binaryCaches).name;
+    in
+      assay.eq
+      (features.evalSelection {
+        modules = [
+          {
+            profiles.base.enable = true;
+            networking.hostName = cache;
+          }
+        ];
+      })
+      .features
+      .nix
+      .vpush
+      .enable
+      false;
   }
