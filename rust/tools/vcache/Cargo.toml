@@ -13,19 +13,17 @@ build = "build.rs"
 
 [dependencies]
 axum = "0.8.9"
-base64 = "0.22"
-bytes = "1"
-ed25519-dalek = "2"
 # One id_effect version per build (types do not unify): pinned exactly, like
-# rust/Cargo.toml's [workspace.dependencies].
+# rust/Cargo.toml's [workspace.dependencies] and nix-store-core.
 id_effect = "=0.13.0"
 id_effect_axum = "=0.13.0"
 id_effect_cli = "=0.13.0"
 id_effect_config = "=0.13.0"
+# The store primitives (store paths, nix32, NAR, narinfo, signing, the store
+# database). default.nix roots its source at rust/tools so the path resolves.
+nix-store-core = { path = "../nix-store-core" }
+# The pooled connections' type; the same version nix-store-core's db opens.
 rusqlite = { version = "0.37", features = ["bundled"] }
-
-[dev-dependencies]
-sha2 = "0.10"
 
 # Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
 # exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.

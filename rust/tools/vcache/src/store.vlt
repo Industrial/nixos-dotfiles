@@ -7,8 +7,8 @@
 import std::sync::{Arc, Mutex}
 import rusqlite::Connection
 import id_effect::{Effect, HNil, Pool, fail, succeed, suspend}
-import crate::db
-import crate::narinfo::NarInfo
+import nix_store_core::db
+import nix_store_core::narinfo::NarInfo
 
 -- Why a lookup failed. One variant: whatever went wrong with the database,
 -- the caller's only answer is "not now" (a 503) and an operator's attention.
@@ -89,7 +89,7 @@ export data MemoryStore { paths Vec<NarInfo> }
 instance PathInfos MemoryStore
   lookup : &self -> String -> Effect<Option<NarInfo>, StoreError, HNil>
   lookup self hash =
-    found = self.paths |> .iter |> .find (\p -> crate::storepath::hash_part_of (&p.store_path) == Some (hash.as_str ())) |> .cloned
+    found = self.paths |> .iter |> .find (\p -> nix_store_core::storepath::hash_part_of (&p.store_path) == Some (hash.as_str ())) |> .cloned
     succeed found
 
 export memory : Vec<NarInfo> -> PathInfoStore
