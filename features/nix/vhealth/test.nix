@@ -110,8 +110,10 @@ in
           machine.wait_until_succeeds("grep -qx 'vhealth_probe_up{probe=\"liar\",kind=\"tcp\",critical=\"true\"} 0' ${dir}/vhealth.prom", timeout=60)
           machine.succeed("grep -qx 'vhealth_probe_up{probe=\"node-exporter\",kind=\"http\",critical=\"true\"} 1' ${dir}/vhealth.prom")
           machine.succeed("stat -c %a ${dir}/vhealth.prom | grep -qx 644")
-          machine.succeed("curl -sf http://127.0.0.1:9100/metrics | grep -qx 'vhealth_healthy 0'")
-          machine.succeed("curl -sf http://127.0.0.1:9100/metrics | grep -q '^vhealth_probe_up{.*probe=\"liar\".*} 0$'")
+          # Fetched to a file first: `curl | grep -q` fails under pipefail when grep exits early.
+          machine.succeed("curl -sf -o /tmp/metrics http://127.0.0.1:9100/metrics")
+          machine.succeed("grep -qx 'vhealth_healthy 0' /tmp/metrics")
+          machine.succeed("grep -q '^vhealth_probe_up{.*probe=\"liar\".*} 0$' /tmp/metrics")
 
       with subtest("a settle window waits for a service that comes up late"):
           machine.succeed("systemd-run --unit late-listener --on-active=4 ${pkgs.socat}/bin/socat TCP-LISTEN:${toString liarPort},bind=127.0.0.1,reuseaddr,fork /dev/null")
