@@ -40,5 +40,7 @@
   # The fleet binary cache (GH-147); its cacheKey in common/fleet.nix is filled in
   # from the first start's journal.
   features.nix.vcache.enable = true;
+  # vgc (Voltaic) replaces nix-collect-garbage for the weekly GC.
+  features.nixos.vgc.enable = true;
   features.storage.nfs-client.enable = true;
 }
