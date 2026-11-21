@@ -8,7 +8,8 @@
 # lib/mk-host.nix, common/assay/nixos.nix and a bare `import` in a suite.
 #
 # Fields per host:
-#   roles        — tags features select on (see `withRole`).
+#   roles        — tags features select on (see `withRole`). "vdeploy": vdeploy deploys
+#                  the host instead of comin (features/nix/vdeploy, GH-160).
 #   builder      — present when the host accepts remote nix builds; consumed by
 #                  features/fleet/nix-remote-builder-client.nix.
 #   operatorKey  — the host's ~/.ssh/id_ed25519.pub, installed fleet-wide by
@@ -26,7 +27,9 @@ let
   hosts = {
     drakkar = {
       description = "desktop and gaming station";
-      roles = ["desktop" "builder" "nfs-client"];
+      # vdeploy: vdeploy deploys this host, health-checked with rollback, and comin is
+      # retired (features/nix/vdeploy, GH-160).
+      roles = ["desktop" "builder" "nfs-client" "vdeploy"];
       tailscaleIp = "100.69.213.35";
       # Public half of /var/lib/private/vcache/secret-key, logged by vcache-ensure-key
       # (`journalctl -u vcache`). Rotating that key means updating this line.
