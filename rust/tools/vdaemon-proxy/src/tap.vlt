@@ -1,0 +1,390 @@
+-- The tap: follows one client's conversation with the daemon from the bytes
+-- the proxy relays, without changing a byte of it.
+--
+-- The proxy copies both directions verbatim, so every op the daemon knows
+-- passes, including ones this code has never heard of. The tap is told each
+-- chunk before it is forwarded and works out, with nix_store_core::worker's
+-- decoders, where each op starts, which op it is and which store paths it
+-- names, and how the daemon's stderr stream for it ends (LAST, or ERROR and
+-- its message).
+--
+-- It needs only the starts of requests and the stderr streams, because the
+-- protocol is strictly one op at a time:
+--
+-- * the daemon sends LAST (or ERROR) only once it has read the whole request,
+--   uploads included, so every client byte after it belongs to the next op;
+-- * the client sends the next op only after it has read the whole reply, so
+--   every daemon byte after LAST, until the next op starts, is reply (a NAR,
+--   a path info) and can be passed over without being understood.
+--
+-- When the bytes stop making sense to the decoders the tap is lost: it says
+-- so once and stops following, and the relay carries on regardless.
+
+import std::time::{Duration, Instant}
+import nix_store_core::worker::Short::{Bad, More}
+import nix_store_core::worker::StderrMsg::{Failed, Last}
+import nix_store_core::worker::{Request, Short, WORKER_MAGIC_1, WORKER_MAGIC_2, minor, op_of_code, take_request, take_stderr, take_string, take_strings, take_u64}
+
+-- The most of an op's start the tap holds while it waits for the paths. A
+-- longer start (a huge path list) is logged with its paths cut.
+export const REQUEST_CAP : usize = 1048576
+
+-- Where the client's side of the conversation is: in its hello, in the rest
+-- of the handshake, between ops, or inside an op.
+export data ClientSide = CHello | CWait | CIdle | CInOp
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- Where the daemon's side is: in its hello, in the handshake's stderr
+-- stream, in a reply, or in an op's stderr stream.
+export data DaemonSide = SHello | SHelloStderr | SReply | SStderr
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+data Current { request Request, truncated bool, started Instant }
+
+-- One finished op.
+export data Finished
+  { export request Request
+  , export truncated bool
+  , export elapsed Duration
+  , export error Option<String>
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Event
+  = OpStarted Request
+  | OpEnded Finished
+  | TapLost String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Tap
+  { client ClientSide
+  , daemon DaemonSide
+  , cbuf Vec<u8>
+  , sbuf Vec<u8>
+  , export client_version Option<u64>
+  , export daemon_version Option<u64>
+  , first_byte Option<Instant>
+  , current Option<Current>
+  , export ops u64
+  , export lost bool
+  }
+
+export new_tap : Tap
+new_tap = Tap { client = CHello, daemon = SHello, cbuf = Vec::new (), sbuf = Vec::new (), client_version = None, daemon_version = None, first_byte = None, current = None, ops = 0, lost = false }
+
+-- The version both sides speak, once both hellos are seen.
+export version : &Tap -> Option<u64>
+version t =
+  case (t.client_version, t.daemon_version) of
+    (Some c, Some d) -> Some (c.min d)
+    _ -> None
+
+lose : &mut Tap -> String -> &mut Vec<Event> -> ()
+lose t why events =
+  if !t.lost
+    t.lost := true
+    t.cbuf := Vec::new ()
+    t.sbuf := Vec::new ()
+    events.push (TapLost why)
+  ()
+
+-- Bytes the client sent, seen at `now`, before they are forwarded.
+export client_bytes : &mut Tap -> &[u8] -> Instant -> Vec<Event>
+client_bytes t bytes now =
+  mut events = Vec::new () : Vec<Event>
+  if t.lost
+    return events
+  case t.client of
+    CHello ->
+      t.cbuf.extend_from_slice bytes
+      client_hello t (&mut events)
+    CIdle ->
+      if t.first_byte.is_none () && !bytes.is_empty ()
+        t.first_byte := Some now
+      t.cbuf.extend_from_slice bytes
+      start_op t (&mut events)
+    _ -> ()
+  events
+
+-- WORKER_MAGIC_1 and the client's version. The rest of its handshake
+-- (features, the obsolete affinity and reserve-space words) needs no reading.
+client_hello : &mut Tap -> &mut Vec<Event> -> ()
+client_hello t events =
+  if t.cbuf.len () < 16
+    return ()
+  case (take_u64 (&t.cbuf) 0, take_u64 (&t.cbuf) 8) of
+    (Ok (magic, _), Ok (v, _)) ->
+      if magic != WORKER_MAGIC_1
+        lose t (.to_string "the client did not open with WORKER_MAGIC_1") events
+      else
+        t.client_version := Some v
+        t.client := CWait
+        t.cbuf.clear ()
+    _ -> lose t (.to_string "short client hello") events
+  ()
+
+start_op : &mut Tap -> &mut Vec<Event> -> ()
+start_op t events =
+  v = version t |> .unwrap_or 0
+  case take_request v (&t.cbuf) 0 of
+    Ok (req, _) -> begin t req false events
+    Err More ->
+      if t.cbuf.len () > REQUEST_CAP
+        code = take_u64 (&t.cbuf) 0 |> .map (\p -> p.0) |> .unwrap_or 0
+        begin t (Request { code, op = op_of_code code, paths = Vec::new () }) true events
+    Err (Bad why) -> lose t why events
+  ()
+
+begin : &mut Tap -> Request -> bool -> &mut Vec<Event> -> ()
+begin t req truncated events =
+  started = t.first_byte |> .unwrap_or_else Instant::now
+  events.push (OpStarted (req.clone ()))
+  t.current := Some (Current { request = req, truncated, started })
+  t.first_byte := None
+  t.client := CInOp
+  t.cbuf.clear ()
+  t.daemon := SStderr
+  t.sbuf.clear ()
+  ()
+
+-- Bytes the daemon sent, seen at `now`, before they are forwarded.
+export daemon_bytes : &mut Tap -> &[u8] -> Instant -> Vec<Event>
+daemon_bytes t bytes now =
+  mut events = Vec::new () : Vec<Event>
+  if t.lost || t.daemon == SReply
+    return events
+  t.sbuf.extend_from_slice bytes
+  mut more = true
+  while more && !t.lost && t.daemon != SReply
+    more := daemon_step t now (&mut events)
+  events
+
+-- One step over the daemon's buffered bytes; false when it needs more.
+daemon_step : &mut Tap -> Instant -> &mut Vec<Event> -> bool
+daemon_step t now events =
+  case t.daemon of
+    SHello -> daemon_hello t events
+    SHelloStderr -> daemon_stderr t now events
+    SStderr -> daemon_stderr t now events
+    SReply -> false
+
+-- WORKER_MAGIC_2, the daemon's version, then (by the version both speak)
+-- its features, its Nix version and its trust in the client.
+daemon_hello : &mut Tap -> &mut Vec<Event> -> bool
+daemon_hello t events =
+  case hello_end t of
+    Ok (end, dv) ->
+      t.daemon_version := Some dv
+      t.sbuf.drain (0 .. end) |> .for_each drop
+      t.daemon := SHelloStderr
+      true
+    Err More -> false
+    Err (Bad why) ->
+      lose t why events
+      false
+
+hello_end : &Tap -> Result<(usize, u64), Short>
+hello_end t =
+  b = t.sbuf.as_slice ()
+  (magic, p1) = (take_u64 b 0)?
+  if magic != WORKER_MAGIC_2
+    return Err (Bad (.to_string "the daemon did not answer with WORKER_MAGIC_2"))
+  (dv, p2) = (take_u64 b p1)?
+  -- The rest follows the client's version, which the daemon has read by now.
+  cv = (t.client_version |> .ok_or More)?
+  v = cv.min dv
+  mut pos = p2
+  if minor v >= 38
+    (_features, next) = (take_strings b pos)?
+    pos := next
+  if minor v >= 33
+    (_nix, next) = (take_string b pos)?
+    pos := next
+  if minor v >= 35
+    (_trust, next) = (take_u64 b pos)?
+    pos := next
+  Ok ((pos, dv))
+
+-- Stderr messages, up to the LAST or ERROR that ends the stream.
+daemon_stderr : &mut Tap -> Instant -> &mut Vec<Event> -> bool
+daemon_stderr t now events =
+  v = version t |> .unwrap_or 0
+  case take_stderr v (&t.sbuf) 0 of
+    Ok (msg, end) ->
+      t.sbuf.drain (0 .. end) |> .for_each drop
+      case msg of
+        Last -> stream_ended t now None events
+        Failed f -> stream_ended t now (Some f.message) events
+        _ -> ()
+      true
+    Err More -> false
+    Err (Bad why) ->
+      lose t why events
+      false
+
+-- The stream ended: the handshake is done, or an op is.
+stream_ended : &mut Tap -> Instant -> Option<String> -> &mut Vec<Event> -> ()
+stream_ended t now error events =
+  if t.daemon == SHelloStderr
+    if error is Some why
+      lose t ("the daemon refused the handshake: #{why}") events
+  else if t.current.take () is Some cur
+    t.ops += 1
+    events.push (OpEnded (Finished { request = cur.request, truncated = cur.truncated, elapsed = now.saturating_duration_since cur.started, error }))
+  t.daemon := SReply
+  t.sbuf.clear ()
+  t.client := CIdle
+  t.cbuf.clear ()
+  ()
+
+------------------------------------------------------------------------
+-- Tests: whole conversations, encoded with nix-store-core's encoders and fed
+-- in small pieces in the order a relay sees them.
+
+#[cfg(test)]
+import nix_store_core::worker::{DaemonFailure, Op, StderrMsg, op_code, put_bool, put_str, put_stderr, put_strings, put_u64}
+
+#[cfg(test)]
+bytes_of : given <F: Fn(&mut Vec<u8>) -> ()> F -> Vec<u8>
+bytes_of f =
+  mut out = Vec::new () : Vec<u8>
+  f (&mut out)
+  out
+
+#[cfg(test)]
+client_hello_bytes : u64 -> Vec<u8>
+client_hello_bytes v =
+  bytes_of (move \o -> client_hello_into o v)
+
+#[cfg(test)]
+client_hello_into : &mut Vec<u8> -> u64 -> ()
+client_hello_into o v =
+  put_u64 o WORKER_MAGIC_1
+  put_u64 o v
+  if minor v >= 38
+    put_strings o (&Vec::new ())
+  put_u64 o 0
+  put_u64 o 0
+  ()
+
+#[cfg(test)]
+daemon_hello_bytes : u64 -> u64 -> Vec<u8>
+daemon_hello_bytes dv cv =
+  bytes_of (move \o -> daemon_hello_into o dv cv)
+
+#[cfg(test)]
+daemon_hello_into : &mut Vec<u8> -> u64 -> u64 -> ()
+daemon_hello_into o dv cv =
+  v = dv.min cv
+  put_u64 o WORKER_MAGIC_2
+  put_u64 o dv
+  if minor v >= 38
+    put_strings o (&[.to_string "f"])
+  put_str o "2.31.0"
+  put_u64 o 1
+  put_stderr o v (&StderrMsg::Last)
+  ()
+
+#[cfg(test)]
+op_bytes : Op -> &str -> Vec<u8>
+op_bytes op path =
+  p = path.to_string ()
+  bytes_of (move \o -> op_into o op (&p))
+
+#[cfg(test)]
+op_into : &mut Vec<u8> -> Op -> &str -> ()
+op_into o op path =
+  put_u64 o (op_code op)
+  put_str o path
+  ()
+
+#[cfg(test)]
+reply_ok : Vec<u8> -> Vec<u8>
+reply_ok tail =
+  mut out = Vec::new () : Vec<u8>
+  put_stderr (&mut out) 293 (&StderrMsg::LogNext (.to_string "a log line"))
+  put_stderr (&mut out) 293 (&StderrMsg::Last)
+  out.extend_from_slice (&tail)
+  out
+
+#[cfg(test)]
+reply_error : Vec<u8>
+reply_error =
+  mut out = Vec::new () : Vec<u8>
+  put_stderr (&mut out) 293 (&StderrMsg::Failed (DaemonFailure { message = .to_string "path is not valid", level = 0, traces = Vec::new () }))
+  out
+
+-- Feed `bytes` in pieces of `step`, collecting events.
+#[cfg(test)]
+feed : &mut Tap -> bool -> &[u8] -> usize -> Vec<Event>
+feed t from_client bytes step =
+  mut events = Vec::new () : Vec<Event>
+  for piece in bytes.chunks step
+    now = Instant::now ()
+    if from_client
+      events.extend (client_bytes t piece now)
+    else
+      events.extend (daemon_bytes t piece now)
+  events
+
+#[cfg(test)]
+ended : &[Event] -> Vec<(Option<Op>, Vec<String>, Option<String>)>
+ended events =
+  events |> .iter |> .filter_map (\e -> ended_one e) |> .collect
+
+#[cfg(test)]
+ended_one : &Event -> Option<(Option<Op>, Vec<String>, Option<String>)>
+ended_one e =
+  case e of
+    OpEnded f -> Some ((f.request.op, f.request.paths.clone (), f.error.clone ()))
+    _ -> None
+
+#[cfg(test)]
+conversation : u64 -> u64 -> usize -> (Tap, Vec<Event>)
+conversation cv dv step =
+  mut t = new_tap ()
+  mut events = Vec::new () : Vec<Event>
+  events.extend (feed (&mut t) true (&client_hello_bytes cv) step)
+  events.extend (feed (&mut t) false (&daemon_hello_bytes dv cv) step)
+  events.extend (feed (&mut t) true (&op_bytes Op::IsValidPath "/nix/store/a") step)
+  mut valid = Vec::new () : Vec<u8>
+  put_bool (&mut valid) true
+  events.extend (feed (&mut t) false (&reply_ok valid) step)
+  -- A NAR-like reply after LAST: opaque, skipped.
+  events.extend (feed (&mut t) true (&op_bytes Op::NarFromPath "/nix/store/b") step)
+  events.extend (feed (&mut t) false (&reply_ok (.to_vec ([13, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3]))) step)
+  events.extend (feed (&mut t) true (&op_bytes Op::QueryPathFromHashPart "cccc") step)
+  events.extend (feed (&mut t) false (&reply_error ()) step)
+  (t, events)
+
+test "a conversation's ops, their paths and their outcomes"
+  for step in [1, 3, 8, 64, 4096]
+    (t, events) = conversation 293 294 step
+    assert! \-> !t.lost
+    assert_eq! \-> version (&t) \-> Some 293
+    assert_eq! \-> t.ops \-> 3
+    assert_eq! \-> ended (&events) \-> .to_vec ([(Some Op::IsValidPath, .to_vec ([.to_string "/nix/store/a"]), None), (Some Op::NarFromPath, .to_vec ([.to_string "/nix/store/b"]), None), (Some Op::QueryPathFromHashPart, .to_vec ([.to_string "cccc"]), Some (.to_string "path is not valid"))])
+
+test "at 1.38 the daemon's features are passed over"
+  (t, events) = conversation 294 294 5
+  assert! \-> !t.lost
+  assert_eq! \-> ended (&events) |> .len \-> 3
+
+test "an op the tap does not know is still logged by its code"
+  mut t = new_tap ()
+  _h = feed (&mut t) true (&client_hello_bytes 293) 64
+  _d = feed (&mut t) false (&daemon_hello_bytes 293 293) 64
+  started = feed (&mut t) true (&bytes_of (\o -> put_u64 o 99)) 64
+  assert_eq! \-> started \-> .to_vec ([OpStarted (Request { code = 99, op = None, paths = Vec::new () })])
+  done = feed (&mut t) false (&reply_ok (Vec::new ())) 64
+  assert_eq! \-> ended (&done) \-> .to_vec ([(None, Vec::new (), None)])
+
+test "garbage loses the tap once, and it stops following"
+  mut t = new_tap ()
+  first = feed (&mut t) true (&bytes_of (\o -> put_u64 o 7)) 64
+  assert_eq! \-> first \-> Vec::new () : Vec<Event>
+  lost = feed (&mut t) true (&bytes_of (\o -> put_u64 o 293)) 64
+  assert_eq! \-> lost.len () \-> 1
+  assert! \-> t.lost
+  after = feed (&mut t) false (&daemon_hello_bytes 293 293) 64
+  assert! \-> after.is_empty ()

@@ -1,0 +1,115 @@
+-- The program edge: configuration, the listener, and the proxy, as one
+-- effect over the config provider, run by id_effect_cli's `run_main` (exit
+-- codes 0 / 1 / 101 / 130, Ctrl-C and SIGTERM interrupt with finalizers).
+--
+-- VDAEMON_UPSTREAM is the real daemon's socket (default
+-- /nix/var/nix/daemon-socket-upstream/socket). The listener is the socket
+-- systemd passes (socket activation: LISTEN_FDS=1 for this pid), or else a
+-- socket bound at VDAEMON_LISTEN (default /nix/var/nix/daemon-socket/socket).
+
+import std::os::fd::FromRawFd
+import std::os::unix::fs::PermissionsExt
+import id_effect::{Effect, HNil, effect, fail, succeed, suspend}
+import id_effect_config::{Config, ConfigEnv, ConfigError}
+import crate::policy::allow_all
+import crate::proxy::{ProxyError, Settings, serve}
+
+export const DEFAULT_UPSTREAM : &str = "/nix/var/nix/daemon-socket-upstream/socket"
+
+export const DEFAULT_LISTEN : &str = "/nix/var/nix/daemon-socket/socket"
+
+-- The first socket systemd passes.
+const SD_LISTEN_FDS_START : i32 = 3
+
+export errors AppError
+  from ConfigError as Configuration  "configuration: #{0}"
+  from ProxyError as Proxy           "#{0}"
+  Listen String                      "listening: #{0}"
+
+export data Paths { export listen String, export upstream String }
+  deriving (Clone, Debug)
+
+export paths_config : Config<Paths>
+paths_config =
+  Config::all ((Config::string "VDAEMON_LISTEN" |> .with_default (DEFAULT_LISTEN.to_string ()), Config::string "VDAEMON_UPSTREAM" |> .with_default (DEFAULT_UPSTREAM.to_string ()))) |> .map paths_of
+
+paths_of : (String, String) -> Paths
+paths_of fields =
+  (listen, upstream) = fields
+  Paths { listen, upstream }
+
+-- Whether systemd passed this process exactly one socket.
+socket_activated : bool
+socket_activated =
+  pid = std::env::var "LISTEN_PID" |> .ok
+  fds = std::env::var "LISTEN_FDS" |> .ok
+  pid == Some (std::process::id ().to_string ()) && fds == Some (.to_string "1")
+
+from_systemd : std::io::Result<std::os::unix::net::UnixListener>
+from_systemd =
+  l = unsafe
+    std::os::unix::net::UnixListener::from_raw_fd SD_LISTEN_FDS_START
+  Ok l
+
+-- Bind `path` (replacing a stale socket), open to every user like the
+-- daemon's own.
+bind_path : &str -> std::io::Result<std::os::unix::net::UnixListener>
+bind_path path =
+  _stale = std::fs::remove_file path
+  l = (std::os::unix::net::UnixListener::bind path)?
+  (std::fs::set_permissions path (std::fs::Permissions::from_mode 438))?
+  Ok l
+
+std_listener : &Paths -> std::io::Result<std::os::unix::net::UnixListener>
+std_listener p =
+  if socket_activated ()
+    from_systemd ()
+  else
+    bind_path (&p.listen)
+
+-- Inside the runtime (a fiber of the executor): tokio registers the socket.
+listener_of : Paths -> Result<tokio::net::UnixListener, AppError>
+listener_of p =
+  where_ = describe (&p)
+  l = (std_listener (&p) |> .map_err (\e -> Listen ("#{where_}: #{e}")))?
+  (l.set_nonblocking true |> .map_err (\e -> Listen (e.to_string ())))?
+  tokio::net::UnixListener::from_std l |> .map_err (\e -> Listen (e.to_string ()))
+
+lifted : given <A: Send + 'static> Result<A, AppError> -> Effect<A, AppError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+listen : Paths -> Effect<tokio::net::UnixListener, AppError, HNil>
+listen p = suspend (move \-> lifted (listener_of p))
+
+export program : Effect<(), AppError, ConfigEnv>
+program =
+  effect!
+    let paths = ~paths_config().run::<Paths, AppError, ConfigEnv, _>();
+    let listener = ~listen(paths.clone());
+    let settings = Settings { upstream: paths.upstream.clone(), policy: allow_all() };
+    eprintln!("vdaemon-proxy: relaying {} to {} (policy: allow all)", if socket_activated() { "systemd's socket".to_string() } else { paths.listen.clone() }, paths.upstream);
+    ~serve(listener, settings).map_err(AppError::from)
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the tokio context the sockets need, so the
+-- program runs as the root's child (vcache's pattern). An interrupt of the
+-- root interrupts and awaits the child and every client fiber.
+supervised : Effect<(), AppError, ConfigEnv>
+supervised =
+  effect!
+    let child = ~program().fork();
+    ~child.join::<ConfigEnv>()
+
+export main_code : std::process::ExitCode
+main_code =
+  id_effect_cli::run_main (supervised ().provide_layer (id_effect_config::EnvConfigProviderLive::layer ())) HNil (id_effect_cli::RunMainConfig::default ())
+
+describe : &Paths -> String
+describe p =
+  if socket_activated ()
+    .to_string "systemd's socket"
+  else
+    p.listen.clone ()

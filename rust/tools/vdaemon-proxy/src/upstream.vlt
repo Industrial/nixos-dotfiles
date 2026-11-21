@@ -1,0 +1,88 @@
+-- The connection to the real daemon, made as the client.
+--
+-- nix-daemon decides who a connection is from SO_PEERCRED, which the kernel
+-- takes from the connecting thread's effective uid and gid at connect(). A
+-- proxy that connected as itself would make every client root to the
+-- daemon (trusted, and allowed everything). So, running as root, the proxy
+-- connects with the client's effective uid and gid:
+--
+-- * setresgid / setresuid change only the effective ids (the real and saved
+--   ids stay 0, so they can be changed back). The raw syscalls act on the
+--   calling thread alone (glibc's wrappers would change every thread);
+-- * setfsuid / setfsgid put the filesystem ids back to 0, so the private
+--   upstream socket (in a root-only directory) can still be reached;
+-- * connect(), which is immediate on a local socket with a listen backlog;
+-- * setresuid / setresgid back to 0, which also restores the filesystem ids.
+--
+-- Nothing awaits in between, so no other task runs on the thread while its
+-- ids are the client's. If the ids cannot be restored the process aborts:
+-- a thread left with a client's ids must not serve anyone else.
+--
+-- Not root (a benchmark, a test run as a user): there is nothing to switch,
+-- and the connection is the proxy's own user, which is every client's.
+
+import std::os::unix::net::UnixStream
+import crate::record::Peer
+
+-- -1 to a set*id call: leave that id unchanged.
+const KEEP : libc::c_long = -1
+
+sys3 : libc::c_long -> libc::c_long -> libc::c_long -> libc::c_long -> libc::c_long
+sys3 nr a b c =
+  unsafe
+    libc::syscall nr a b c
+
+sys1 : libc::c_long -> libc::c_long -> libc::c_long
+sys1 nr a =
+  unsafe
+    libc::syscall nr a
+
+-- This thread's effective ids become `uid` / `gid`; filesystem ids stay root.
+become_peer : &Peer -> std::io::Result<()>
+become_peer peer =
+  if sys3 libc::SYS_setresgid KEEP (libc::c_long::from peer.gid) KEEP != 0
+    return Err (std::io::Error::last_os_error ())
+  if sys3 libc::SYS_setresuid KEEP (libc::c_long::from peer.uid) KEEP != 0
+    e = std::io::Error::last_os_error ()
+    back_to_root ()
+    return Err e
+  _fsuid = sys1 libc::SYS_setfsuid 0
+  _fsgid = sys1 libc::SYS_setfsgid 0
+  Ok ()
+
+-- Back to root on this thread, or abort.
+back_to_root : ()
+back_to_root =
+  if sys3 libc::SYS_setresuid KEEP 0 KEEP != 0 || sys3 libc::SYS_setresgid KEEP 0 KEEP != 0
+    eprintln! \-> "vdaemon-proxy: cannot restore root ids on a thread; aborting"
+    std::process::abort ()
+  ()
+
+-- Whether this process can connect as someone else.
+export can_switch : bool
+can_switch =
+  unsafe
+    libc::geteuid () == 0
+
+-- Connect to `path` so that the daemon sees `peer`.
+export connect_as : &Peer -> &str -> std::io::Result<UnixStream>
+connect_as peer path =
+  if !(can_switch ()) || (peer.uid == 0 && peer.gid == 0)
+    return UnixStream::connect path
+  (become_peer peer)?
+  r = UnixStream::connect path
+  back_to_root ()
+  r
+
+test "without root the connection is the proxy's own"
+  if !(can_switch ())
+    dir = std::env::temp_dir () |> .join ("vdaemon-proxy-upstream-#{std::process::id ()}")
+    _gone = std::fs::remove_dir_all (&dir)
+    std::fs::create_dir_all (&dir) |> .expect "dir"
+    sock = dir.join "s"
+    listener = std::os::unix::net::UnixListener::bind (&sock) |> .expect "bind"
+    peer = Peer { uid = 4242, gid = 4242, pid = 1 }
+    conn = connect_as (&peer) (sock.to_str () |> .expect "utf-8")
+    assert! \-> conn.is_ok ()
+    drop listener
+    _done = std::fs::remove_dir_all (&dir)

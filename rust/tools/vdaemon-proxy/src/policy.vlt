@@ -1,0 +1,53 @@
+-- The policy hook: what the proxy asks before each op is forwarded.
+--
+-- Phase 1 (#157) is observation only. The proxy asks the hook at the start of
+-- every op and logs the verdict next to the op, but forwards the op whatever
+-- the verdict; the only implementation is `AllowAll`.
+--
+-- #116's gated trust plugs in here: an implementation of `Policy` that reads
+-- its rules (which uids may add paths, build, or use trusted-only ops) and
+-- answers `Deny`. Enforcing it needs one change in the proxy: the client
+-- direction already shows the tap each chunk before forwarding it, so on a
+-- `Deny` it holds the op instead, writes the client a STDERR_ERROR carrying
+-- the reason (nix_store_core::worker::put_stderr with `Failed`) and closes the
+-- connection, which leaves the daemon's side of the conversation untouched.
+
+import std::sync::Arc
+import nix_store_core::worker::Request
+import crate::record::Peer
+
+export data Verdict = Allow | Deny String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export class Policy
+  decide : &self -> &Peer -> &Request -> Verdict
+
+-- The hook as a capability: whichever implementation the program provides.
+export newtype PolicyHook = PolicyHook (export Arc<dyn Policy + Send + Sync>)
+
+instance Clone PolicyHook
+  clone : &self -> Self
+  clone self = PolicyHook (Arc::clone (&self.0))
+
+-- Phase 1: every op is allowed.
+export data AllowAll = AllowAll
+
+instance Policy AllowAll
+  decide : &self -> &Peer -> &Request -> Verdict
+  decide self _peer _request = Allow
+
+export allow_all : PolicyHook
+allow_all = PolicyHook (Arc::new AllowAll)
+
+-- The verdict as the log spells it.
+export verdict_text : &Verdict -> String
+verdict_text v =
+  case v of
+    Allow -> .to_string "allow"
+    Deny why -> "deny: #{why}"
+
+test "phase 1 allows everything"
+  peer = Peer { uid = 1000, gid = 100, pid = 1 }
+  req = Request { code = 1, op = None, paths = Vec::new () }
+  assert_eq! \-> allow_all ().0.decide (&peer) (&req) \-> Allow
+  assert_eq! \-> verdict_text (&Allow) \-> "allow"
