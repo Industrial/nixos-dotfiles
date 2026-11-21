@@ -1,0 +1,527 @@
+-- Conformance mode: every read-only op is still forwarded, and the client
+-- still gets the daemon's answer, byte for byte. Alongside, the native
+-- answer (crate::native) is computed and compared with the daemon's reply,
+-- and every difference is logged and counted (vdaemon_conformance_diffs_total).
+--
+-- When an op starts, before its request reaches the daemon, the native
+-- answer is taken ("before"). When the daemon's reply is complete (decoded
+-- to its end), it is compared with "before"; if they differ, the native
+-- answer is taken again ("after"). The daemon read the store at some moment
+-- between the two, so if the store changed once in between (a build added
+-- the path, a GC took it), the daemon's reply equals one of them:
+--
+--   reply == before                match
+--   reply == after (!= before)     raced: a match, across a concurrent write
+--   neither                        diff
+--
+-- Declined asks (crate::native) are counted as skipped. A NAR is compared by
+-- its SHA-256 and size, hashed as the daemon's reply passes, against the NAR
+-- nix-store-core serialises from the store; that hash is computed on its own
+-- fiber once the reply has been forwarded, so the client never waits for it.
+--
+-- Nothing here touches the bytes the proxy relays.
+
+import std::collections::BTreeMap
+import std::sync::Mutex
+import rusqlite::Connection
+import serde_json::{Map, Value}
+import sha2::Digest
+import nix_store_core::db
+import nix_store_core::nar::nar_hash
+import nix_store_core::worker::{NarScan, Op, Request, Short, nar_scan, nar_step, op_name, take_bool, take_path_info_reply, take_string, take_strings}
+import nix_store_core::hash::{Sha256, from_bytes, to_base16}
+import crate::native::{Ask, Native, answer, answerable, op_of_ask, parse_ask, subject}
+
+-- The verdicts, as counted.
+export const MATCH : &str = "match"
+export const RACED : &str = "raced"
+export const SKIPPED : &str = "skipped"
+export const DIFF : &str = "diff"
+
+-- Shared by every connection: the database, opened on first use, and the
+-- counts by (op, verdict).
+export data Checker
+  { db_path String
+  , conn Mutex<Option<Connection>>
+  , counts Mutex<BTreeMap<(String, String), u64>>
+  , export metrics Option<String>
+  }
+
+export new_checker : String -> Option<String> -> Checker
+new_checker db_path metrics = Checker { db_path, conn = Mutex::new None, counts = Mutex::new (BTreeMap::new ()), metrics }
+
+-- Where one connection's check is.
+export data Watch
+  = Idle
+  -- The request is seen and the native answer taken, before the daemon's.
+  | Asked Ask Native
+  -- The daemon said LAST; its reply so far.
+  | Catching Ask Native Vec<u8>
+  -- NarFromPath: the daemon's NAR, hashed as it passes.
+  | Hashing NarRun
+
+export data NarRun { path String, scan NarScan, pending Vec<u8>, hasher sha2::Sha256, size u64 }
+
+-- What the proxy does after a step: nothing, log a difference, or check a
+-- NAR the daemon finished sending (on its own fiber).
+export data Outcome
+  = Quiet
+  | Differs (Map<String, Value>)
+  | NarDone NarJob
+
+export data NarJob { export path String, export hash Sha256, export size u64 }
+
+export new_watch : Watch
+new_watch = Idle
+
+-- The native answer, on the shared connection. A database error drops the
+-- connection, so the next ask opens a fresh one.
+export native_answer : &Checker -> &Ask -> Native
+native_answer c ask =
+  mut held = c.conn.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+  if held.is_none ()
+    case db::open (&c.db_path) of
+      Ok conn ->
+        _old = held.replace conn
+      Err e ->
+        return Native::Declined ("opening #{c.db_path}: #{e}")
+  n = case held.as_ref () of
+    Some conn -> answer conn ask
+    None -> Native::Declined (.to_string "no database")
+  if &n is Native::Declined why
+    if why.starts_with "the database:"
+      _gone = held.take ()
+  n
+
+count : &Checker -> &str -> &str -> ()
+count c op verdict =
+  mut counts = c.counts.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+  key = (op.to_string (), verdict.to_string ())
+  n = counts.get (&key) |> .copied |> .unwrap_or 0
+  counts.insert key (n + 1)
+  all = counts.values () |> .sum : u64
+  drop counts
+  -- Under load, the totals also go out every REPORT_EVERY verdicts, not only
+  -- on the reporter's clock.
+  if all.is_multiple_of REPORT_EVERY
+    crate::record::emit (totals_line c)
+    if write_metrics c is Err e
+      eprintln! \-> "vdaemon-proxy: writing the conformance metrics: #{e}"
+  ()
+
+const REPORT_EVERY : u64 = 1000
+
+-- The counts so far, by (op, verdict).
+export counts_of : &Checker -> BTreeMap<(String, String), u64>
+counts_of c = c.counts.lock () |> .map (\m -> m.clone ()) |> .unwrap_or_default
+
+-- The total for one verdict, over every op.
+export total : &Checker -> &str -> u64
+total c verdict =
+  counts_of c |> .iter |> .filter (\kv -> kv.0.1 == verdict) |> .map (\kv -> *kv.1) |> .sum
+
+name_of : Op -> String
+name_of op = op_name op
+
+-- An op started: the request (as the tap buffered it) and, if it is one this
+-- code answers, the native answer before the daemon's.
+export on_request : &Checker -> &mut Watch -> u64 -> &Request -> &[u8] -> ()
+on_request c w version req bytes =
+  next = asked c version req bytes
+  _old = std::mem::replace w next
+  ()
+
+asked : &Checker -> u64 -> &Request -> &[u8] -> Watch
+asked c version req bytes =
+  case req.op of
+    Some op ->
+      if !(answerable op)
+        return Idle
+      case parse_ask version bytes of
+        Some ask ->
+          before = native_answer c (&ask)
+          Asked ask before
+        None ->
+          count c (&name_of op) SKIPPED
+          Idle
+    None -> Idle
+
+-- The op's stderr stream ended (LAST, or ERROR with its message); `head` is
+-- what followed LAST in the same chunk.
+export on_op_end : &Checker -> &mut Watch -> Option<String> -> &[u8] -> Outcome
+on_op_end c w error head =
+  taken = std::mem::replace w Idle
+  case taken of
+    Asked ask before ->
+      op = name_of (op_of_ask (&ask))
+      if before is Native::Declined _
+        count c (&op) SKIPPED
+        return Quiet
+      if error is Some why
+        count c (&op) DIFF
+        return Differs (failed_fields (&ask) (&before) (&why))
+      case before of
+        Native::NarOf path ->
+          _old = std::mem::replace w (Hashing (NarRun { path, scan = nar_scan (), pending = Vec::new (), hasher = sha2::Sha256::new (), size = 0 }))
+          on_reply_bytes c w head
+        _ ->
+          _old = std::mem::replace w (Catching ask before (head.to_vec ()))
+          caught c w
+    other ->
+      _old = std::mem::replace w other
+      Quiet
+
+-- Bytes of a reply, after the chunk that carried LAST.
+export on_reply_bytes : &Checker -> &mut Watch -> &[u8] -> Outcome
+on_reply_bytes c w bytes =
+  case w of
+    Catching _ _ buf ->
+      buf.extend_from_slice bytes
+      caught c w
+    Hashing run ->
+      run.pending.extend_from_slice bytes
+      hashed c w
+    _ -> Quiet
+
+-- Where the daemon's reply to `op` ends, if all of it is in `b`.
+export reply_end : &Ask -> &[u8] -> Result<usize, Short>
+reply_end ask b =
+  case ask of
+    Ask::Valid _ -> take_bool b 0 |> .map (\r -> r.1)
+    Ask::ValidPaths _ _ -> take_strings b 0 |> .map (\r -> r.1)
+    Ask::Referrers _ -> take_strings b 0 |> .map (\r -> r.1)
+    Ask::FromHash _ -> take_string b 0 |> .map (\r -> r.1)
+    Ask::Info p -> take_path_info_reply (p.clone ()) b 0 |> .map (\r -> r.1)
+    Ask::Nar _ -> Err (Short::Bad (.to_string "a NAR is hashed, not caught"))
+
+caught : &Checker -> &mut Watch -> Outcome
+caught c w =
+  ended = case w of
+    Catching ask _ buf -> Some (reply_end ask (buf.as_slice ()))
+    _ -> None
+  case ended of
+    Some (Err (Short::More)) -> Quiet
+    Some (Err (Short::Bad why)) ->
+      taken = std::mem::replace w Idle
+      if taken is Catching ask before buf
+        count c (&name_of (op_of_ask (&ask))) DIFF
+        mut f = diff_fields (&ask) (&buf) (&before)
+        f.insert (.to_string "why") (Value::from ("the daemon's reply does not decode: #{why}"))
+        return Differs f
+      Quiet
+    Some (Ok end) ->
+      taken = std::mem::replace w Idle
+      if taken is Catching ask before buf
+        return judged c (&ask) (&buf) end (&before)
+      Quiet
+    None -> Quiet
+
+-- The daemon's whole reply against the native answers.
+judged : &Checker -> &Ask -> &[u8] -> usize -> &Native -> Outcome
+judged c ask buf end before =
+  op = name_of (op_of_ask ask)
+  reply = &buf[0 .. end]
+  whole = end == buf.len ()
+  if whole && before == &Native::Reply (reply.to_vec ())
+    count c (&op) MATCH
+    return Quiet
+  after = native_answer c ask
+  if whole && after == Native::Reply (reply.to_vec ())
+    count c (&op) RACED
+    return Quiet
+  if after is Native::Declined _
+    count c (&op) SKIPPED
+    return Quiet
+  count c (&op) DIFF
+  mut f = diff_fields ask buf (&after)
+  if !whole
+    f.insert (.to_string "why") (Value::from "bytes after the reply's end")
+  else
+    f.insert (.to_string "why") (Value::from "the native answer differs, before and after")
+  Differs f
+
+hashed : &Checker -> &mut Watch -> Outcome
+hashed c w =
+  step = case w of
+    Hashing run -> Some (hash_step run)
+    _ -> None
+  case step of
+    Some (Ok true) ->
+      taken = std::mem::replace w Idle
+      if taken is Hashing run
+        done = from_bytes (run.hasher.finalize ().as_slice ())
+        if done is Some hash
+          return NarDone (NarJob { path = run.path, hash, size = run.size })
+      Quiet
+    Some (Err why) ->
+      taken = std::mem::replace w Idle
+      if taken is Hashing run
+        count c "NarFromPath" DIFF
+        mut f = Map::new ()
+        f.insert (.to_string "op") (Value::from "NarFromPath")
+        f.insert (.to_string "path") (Value::from run.path)
+        f.insert (.to_string "why") (Value::from ("the daemon's NAR does not scan: #{why}"))
+        return Differs f
+      Quiet
+    _ -> Quiet
+
+-- Hash what of the pending bytes is NAR; true once the NAR has ended.
+hash_step : &mut NarRun -> Result<bool, String>
+hash_step run =
+  case nar_step (&mut run.scan) (run.pending.as_slice ()) 0 of
+    Ok pos ->
+      run.hasher.update (&run.pending[0 .. pos])
+      run.size += u64::try_from pos |> .unwrap_or 0
+      run.pending.drain (0 .. pos) |> .for_each drop
+      if run.scan.done && !run.pending.is_empty ()
+        return Err (.to_string "bytes after the NAR's end")
+      Ok run.scan.done
+    Err (Short::More) -> Ok false
+    Err (Short::Bad why) -> Err why
+
+-- The NAR the daemon sent, against nix-store-core's of the same path (a
+-- blocking read of the whole path: run it off the relay, on its own fiber).
+export check_nar : &Checker -> &NarJob -> Option<Map<String, Value>>
+check_nar c job =
+  native = nar_hash (std::path::Path::new (&job.path))
+  case native of
+    Ok d ->
+      if d.hash == job.hash && d.size == job.size
+        count c "NarFromPath" MATCH
+        None
+      else
+        count c "NarFromPath" DIFF
+        mut f = Map::new ()
+        f.insert (.to_string "op") (Value::from "NarFromPath")
+        f.insert (.to_string "path") (Value::from (job.path.clone ()))
+        f.insert (.to_string "daemon_nar") (Value::from ("#{to_base16 (&job.hash)} #{job.size}"))
+        f.insert (.to_string "native_nar") (Value::from ("#{to_base16 (&d.hash)} #{d.size}"))
+        f.insert (.to_string "why") (Value::from "the NARs differ")
+        Some f
+    Err _gone ->
+      -- Gone since (a GC): the daemon's NAR was of a path that was valid
+      -- when asked, so there is nothing to compare it with now.
+      count c "NarFromPath" SKIPPED
+      None
+
+------------------------------------------------------------------------
+-- What a difference logs
+
+const HEX_CAP : usize = 512
+
+hex_of : &[u8] -> String
+hex_of b =
+  cut = b.len ().min HEX_CAP
+  nix_store_core::nixbase32::encode_hex (&b[0 .. cut])
+
+first_difference : &[u8] -> &[u8] -> usize
+first_difference a b =
+  a.iter () |> .zip (b.iter ()) |> .position (\p -> p.0 != p.1) |> .unwrap_or (a.len ().min (b.len ()))
+
+subject_fields : &Ask -> Map<String, Value>
+subject_fields ask =
+  mut f = Map::new ()
+  f.insert (.to_string "op") (Value::from (name_of (op_of_ask ask)))
+  f.insert (.to_string "path") (Value::from (subject ask))
+  f
+
+native_text : &Native -> String
+native_text n =
+  case n of
+    Native::Reply b -> hex_of b
+    Native::NarOf p -> "the NAR of #{p}"
+    Native::Declined why -> "declined: #{why}"
+
+diff_fields : &Ask -> &[u8] -> &Native -> Map<String, Value>
+diff_fields ask daemon native =
+  mut f = subject_fields ask
+  f.insert (.to_string "daemon_len") (Value::from (daemon.len ()))
+  f.insert (.to_string "daemon_hex") (Value::from (hex_of daemon))
+  f.insert (.to_string "native") (Value::from (native_text native))
+  if native is Native::Reply b
+    f.insert (.to_string "native_len") (Value::from (b.len ()))
+    f.insert (.to_string "first_diff_at") (Value::from (first_difference daemon b))
+  f
+
+failed_fields : &Ask -> &Native -> &str -> Map<String, Value>
+failed_fields ask native why =
+  mut f = subject_fields ask
+  f.insert (.to_string "native") (Value::from (native_text native))
+  f.insert (.to_string "why") (Value::from ("the daemon failed and the native side answered: #{why}"))
+  f
+
+------------------------------------------------------------------------
+-- Totals: a journal line, and a Prometheus textfile when one is configured
+
+export totals_line : &Checker -> String
+totals_line c =
+  mut m = Map::new ()
+  m.insert (.to_string "event") (Value::from "conformance_totals")
+  m.insert (.to_string "checked") (Value::from (total c MATCH + total c RACED + total c DIFF))
+  m.insert (.to_string "matched") (Value::from (total c MATCH))
+  m.insert (.to_string "raced") (Value::from (total c RACED))
+  m.insert (.to_string "skipped") (Value::from (total c SKIPPED))
+  m.insert (.to_string "vdaemon_conformance_diffs_total") (Value::from (total c DIFF))
+  mut by_op = Map::new ()
+  for kv in counts_of c
+    ((op, verdict), n) = kv
+    by_op.insert ("#{op}/#{verdict}") (Value::from n)
+  m.insert (.to_string "by_op") (Value::Object by_op)
+  Value::Object m |> .to_string
+
+export metrics_text : &Checker -> String
+metrics_text c =
+  mut out = String::new ()
+  out.push_str "# HELP vdaemon_conformance_diffs_total Read-only ops whose native answer differed from nix-daemon's.\n"
+  out.push_str "# TYPE vdaemon_conformance_diffs_total counter\n"
+  out.push_str (&"vdaemon_conformance_diffs_total #{total c DIFF}\n")
+  out.push_str "# HELP vdaemon_conformance_checks_total Read-only ops checked against nix-daemon, by op and verdict (match, raced, skipped, diff).\n"
+  out.push_str "# TYPE vdaemon_conformance_checks_total counter\n"
+  for kv in counts_of c
+    ((op, verdict), n) = kv
+    out.push_str (&"vdaemon_conformance_checks_total{op=\"#{op}\",verdict=\"#{verdict}\"} #{n}\n")
+  out
+
+-- Write the textfile (whole, by a rename), if there is one.
+export write_metrics : &Checker -> std::io::Result<()>
+write_metrics c =
+  case &c.metrics of
+    None -> Ok ()
+    Some path ->
+      tmp = "#{path}.tmp"
+      (std::fs::write (&tmp) (metrics_text c))?
+      std::fs::rename (&tmp) path
+
+------------------------------------------------------------------------
+-- Tests: conversations against the in-memory database of crate::native.
+
+#[cfg(test)]
+import nix_store_core::worker::{op_code, put_bool, put_str, put_strings, put_u64}
+
+#[cfg(test)]
+const A : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+
+#[cfg(test)]
+const D : &str = "/nix/store/dddddddddddddddddddddddddddddddd-d"
+
+#[cfg(test)]
+checker_on_test_db : Checker
+checker_on_test_db =
+  c = new_checker (.to_string "/nonexistent") None
+  _held = c.conn.lock () |> .expect "lock" |> .replace (crate::native::test_db ())
+  c
+
+#[cfg(test)]
+request_of : Op -> &str -> (Request, Vec<u8>)
+request_of op path =
+  mut out = Vec::new () : Vec<u8>
+  put_u64 (&mut out) (op_code op)
+  put_str (&mut out) path
+  (Request { code = op_code op, op = Some op, paths = .to_vec ([path.to_string ()]) }, out)
+
+#[cfg(test)]
+is_quiet : &Outcome -> bool
+is_quiet o =
+  case o of
+    Quiet -> true
+    _ -> false
+
+#[cfg(test)]
+is_differs : &Outcome -> bool
+is_differs o =
+  case o of
+    Differs _ -> true
+    _ -> false
+
+test "a reply equal to the native answer is a match, even in pieces"
+  c = checker_on_test_db ()
+  mut w = new_watch ()
+  (req, bytes) = request_of Op::IsValidPath A
+  on_request (&c) (&mut w) 293 (&req) (&bytes)
+  mut reply = Vec::new () : Vec<u8>
+  put_bool (&mut reply) true
+  first = on_op_end (&c) (&mut w) None (&reply[0 .. 3])
+  assert! \-> is_quiet (&first)
+  rest = on_reply_bytes (&c) (&mut w) (&reply[3 .. 8])
+  assert! \-> is_quiet (&rest)
+  assert_eq! \-> total (&c) MATCH \-> 1
+  assert_eq! \-> total (&c) DIFF \-> 0
+
+test "a reply that differs is a diff, logged with both sides"
+  c = checker_on_test_db ()
+  mut w = new_watch ()
+  (req, bytes) = request_of Op::IsValidPath D
+  on_request (&c) (&mut w) 293 (&req) (&bytes)
+  mut reply = Vec::new () : Vec<u8>
+  put_bool (&mut reply) true
+  out = on_op_end (&c) (&mut w) None (&reply)
+  assert! \-> is_differs (&out)
+  assert_eq! \-> total (&c) DIFF \-> 1
+  assert! \-> metrics_text (&c) |> .contains "vdaemon_conformance_diffs_total 1\n"
+  assert! \-> totals_line (&c) |> .contains "\"vdaemon_conformance_diffs_total\":1"
+
+test "a path added between the two native answers is a race, not a diff"
+  c = checker_on_test_db ()
+  mut w = new_watch ()
+  (req, bytes) = request_of Op::IsValidPath D
+  on_request (&c) (&mut w) 293 (&req) (&bytes)
+  -- A build registers D while the daemon answers.
+  _added = c.conn.lock () |> .expect "lock" |> .as_ref () |> .expect "db" |> .execute_batch (&"INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('#{D}', 'sha256:00', 1);")
+  mut reply = Vec::new () : Vec<u8>
+  put_bool (&mut reply) true
+  out = on_op_end (&c) (&mut w) None (&reply)
+  assert! \-> is_quiet (&out)
+  assert_eq! \-> total (&c) RACED \-> 1
+
+test "ops not answered natively, declined asks and daemon errors"
+  c = checker_on_test_db ()
+  mut w = new_watch ()
+  (req, bytes) = request_of Op::AddTempRoot A
+  on_request (&c) (&mut w) 293 (&req) (&bytes)
+  assert! \-> is_quiet (&on_op_end (&c) (&mut w) None (&[]))
+  (odd, odd_bytes) = request_of Op::IsValidPath "/nix/store/x"
+  on_request (&c) (&mut w) 293 (&odd) (&odd_bytes)
+  assert! \-> is_quiet (&on_op_end (&c) (&mut w) (Some (.to_string "invalid")) (&[]))
+  assert_eq! \-> total (&c) SKIPPED \-> 1
+  (good, good_bytes) = request_of Op::IsValidPath A
+  on_request (&c) (&mut w) 293 (&good) (&good_bytes)
+  assert! \-> is_differs (&on_op_end (&c) (&mut w) (Some (.to_string "boom")) (&[]))
+  assert_eq! \-> total (&c) DIFF \-> 1
+
+test "path info and referrers match the daemon's encoding"
+  c = checker_on_test_db ()
+  mut w = new_watch ()
+  (req, bytes) = request_of Op::QueryPathInfo A
+  on_request (&c) (&mut w) 293 (&req) (&bytes)
+  native = native_answer (&c) (&Ask::Info (A.to_string ()))
+  if native is Native::Reply reply
+    assert! \-> is_quiet (&on_op_end (&c) (&mut w) None (&reply))
+  assert_eq! \-> total (&c) MATCH \-> 1
+  (r, r_bytes) = request_of Op::QueryReferrers A
+  on_request (&c) (&mut w) 293 (&r) (&r_bytes)
+  mut refs = Vec::new () : Vec<u8>
+  put_strings (&mut refs) (&[A.to_string ()])
+  assert! \-> is_quiet (&on_op_end (&c) (&mut w) None (&refs))
+  assert_eq! \-> total (&c) MATCH \-> 2
+
+test "a NAR is hashed as it passes, and compared with the store's"
+  dir = std::env::temp_dir () |> .join ("vdaemon-proxy-nar-#{std::process::id ()}")
+  _gone = std::fs::remove_dir_all (&dir)
+  std::fs::create_dir_all (dir.join "sub") |> .expect "dir"
+  std::fs::write (dir.join "sub/f") (&"0123456789".repeat 9000) |> .expect "file"
+  path = dir.to_str () |> .expect "utf-8" |> .to_string
+  mut nar = Vec::new () : Vec<u8>
+  nix_store_core::nar::dump (&mut nar) (&dir) |> .expect "nar"
+  c = checker_on_test_db ()
+  mut w = Hashing (NarRun { path = path.clone (), scan = nar_scan (), pending = Vec::new (), hasher = sha2::Sha256::new (), size = 0 })
+  mut done = None : Option<NarJob>
+  for piece in nar.chunks 777
+    if on_reply_bytes (&c) (&mut w) piece is NarDone job
+      done := Some job
+  job = done |> .expect "the NAR ends"
+  assert_eq! \-> job.size \-> u64::try_from (nar.len ()) |> .unwrap_or 0
+  assert! \-> check_nar (&c) (&job) |> .is_none
+  assert_eq! \-> total (&c) MATCH \-> 1
+  bad = NarJob { path = path.clone (), hash = job.hash, size = job.size + 1 }
+  assert! \-> check_nar (&c) (&bad) |> .is_some
+  _done = std::fs::remove_dir_all (&dir)

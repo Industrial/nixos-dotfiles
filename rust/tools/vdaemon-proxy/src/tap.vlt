@@ -67,10 +67,21 @@ export data Tap
   , current Option<Current>
   , export ops u64
   , export lost bool
+  -- The client's bytes buffered when the op in flight started: its request,
+  -- as far as it had arrived (moved out of the buffer, not copied).
+  , export request_bytes Vec<u8>
+  -- The daemon's bytes after the LAST that ended the last op, in the chunk
+  -- that carried it: the start of the reply.
+  , export reply_head Vec<u8>
   }
 
 export new_tap : Tap
-new_tap = Tap { client = CHello, daemon = SHello, cbuf = Vec::new (), sbuf = Vec::new (), client_version = None, daemon_version = None, first_byte = None, current = None, ops = 0, lost = false }
+new_tap = Tap { client = CHello, daemon = SHello, cbuf = Vec::new (), sbuf = Vec::new (), client_version = None, daemon_version = None, first_byte = None, current = None, ops = 0, lost = false, request_bytes = Vec::new (), reply_head = Vec::new () }
+
+-- Whether the daemon's side is in a reply: bytes after an op's LAST, which
+-- the tap passes over without reading.
+export in_reply : &Tap -> bool
+in_reply t = !t.lost && t.daemon == SReply && t.current.is_none () && t.ops > 0
 
 -- The version both sides speak, once both hellos are seen.
 export version : &Tap -> Option<u64>
@@ -142,7 +153,7 @@ begin t req truncated events =
   t.current := Some (Current { request = req, truncated, started })
   t.first_byte := None
   t.client := CInOp
-  t.cbuf.clear ()
+  t.request_bytes := std::mem::take (&mut t.cbuf)
   t.daemon := SStderr
   t.sbuf.clear ()
   ()
@@ -230,6 +241,7 @@ stream_ended t now error events =
       lose t ("the daemon refused the handshake: #{why}") events
   else if t.current.take () is Some cur
     t.ops += 1
+    t.reply_head := std::mem::take (&mut t.sbuf)
     events.push (OpEnded (Finished { request = cur.request, truncated = cur.truncated, elapsed = now.saturating_duration_since cur.started, error }))
   t.daemon := SReply
   t.sbuf.clear ()
@@ -388,3 +400,19 @@ test "garbage loses the tap once, and it stops following"
   assert! \-> t.lost
   after = feed (&mut t) false (&daemon_hello_bytes 293 293) 64
   assert! \-> after.is_empty ()
+
+test "the request and the head of the reply are kept for whoever checks the reply"
+  for step in [1, 5, 64, 4096]
+    mut t = new_tap ()
+    _h = feed (&mut t) true (&client_hello_bytes 293) step
+    _d = feed (&mut t) false (&daemon_hello_bytes 293 293) step
+    assert! \-> !(in_reply (&t))
+    req = op_bytes Op::IsValidPath "/nix/store/a"
+    _s = feed (&mut t) true (&req) 4096
+    assert_eq! \-> t.request_bytes \-> req
+    mut valid = Vec::new () : Vec<u8>
+    put_bool (&mut valid) true
+    events = feed (&mut t) false (&reply_ok (valid.clone ())) 4096
+    assert_eq! \-> ended (&events) |> .len \-> 1
+    assert_eq! \-> t.reply_head \-> valid
+    assert! \-> in_reply (&t)

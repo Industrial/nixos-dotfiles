@@ -1,0 +1,393 @@
+-- Native answers: what nix-daemon would send after LAST for a read-only op,
+-- computed from the store database (and, for a NAR, the store itself) with
+-- nix-store-core instead of asked of the daemon.
+--
+-- Six ops, as libstore 2.35's daemon.cc and local-store.cc answer them:
+--
+--   IsValidPath            bool                        SELECT id ... WHERE path = ?
+--   QueryValidPaths        sorted set of the valid     the same, per path (only
+--                          paths among those asked     without `substitute`)
+--   QueryPathInfo          bool, then the info         ValidPaths row + Refs
+--   QueryPathFromHashPart  the path, or ""             first path >= <store>/<hash>
+--   QueryReferrers         sorted set of referrers     Refs by reference
+--   NarFromPath            the NAR, unframed           nix_store_core::nar
+--
+-- Anything this code is not sure it would answer exactly as the daemon does
+-- is declined (a path that is not `/nix/store/<valid base>`, QueryValidPaths
+-- asked to substitute, a hash that is not SHA-256, an empty-string deriver),
+-- and a declined op is always the daemon's: it is never answered here.
+--
+-- The request is decoded whole (`parse_ask`): every argument, and nothing
+-- after the last one, so a request this code did not see the end of is not
+-- one it answers either.
+
+import std::collections::BTreeSet
+import rusqlite::Connection
+import nix_store_core::worker::{Op, PathInfo, Short, minor, op_of_code, put_bool, put_path_info, put_str, put_strings, take_bool, take_string, take_strings, take_u64}
+import nix_store_core::storepath::{STORE_DIR, STORE_PREFIX, HASH_LEN, valid_base}
+
+-- A read-only op, decoded whole.
+export data Ask
+  = Valid String
+  | ValidPaths (Vec<String>) bool
+  | Info String
+  | FromHash String
+  | Referrers String
+  | Nar String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What the native side makes of an ask: the reply's bytes, the store path
+-- whose NAR is the reply, or no answer (and why).
+export data Native
+  = Reply Vec<u8>
+  | NarOf String
+  | Declined String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The ops answered here.
+export answerable : Op -> bool
+answerable op =
+  case op of
+    Op::IsValidPath -> true
+    Op::QueryValidPaths -> true
+    Op::QueryPathInfo -> true
+    Op::QueryPathFromHashPart -> true
+    Op::QueryReferrers -> true
+    Op::NarFromPath -> true
+    _ -> false
+
+-- The ask's op.
+export op_of_ask : &Ask -> Op
+op_of_ask a =
+  case a of
+    Valid _ -> Op::IsValidPath
+    ValidPaths _ _ -> Op::QueryValidPaths
+    Info _ -> Op::QueryPathInfo
+    FromHash _ -> Op::QueryPathFromHashPart
+    Referrers _ -> Op::QueryReferrers
+    Nar _ -> Op::NarFromPath
+
+-- The ask's first path (or hash part), for logs.
+export subject : &Ask -> String
+subject a =
+  case a of
+    Valid p -> p.clone ()
+    ValidPaths ps _ -> ps.first () |> .cloned |> .unwrap_or_default
+    Info p -> p.clone ()
+    FromHash h -> h.clone ()
+    Referrers p -> p.clone ()
+    Nar p -> p.clone ()
+
+one_path : given <F: Fn(String) -> Ask> &[u8] -> usize -> F -> Result<(Ask, usize), Short>
+one_path b at make =
+  (p, end) = (take_string b at)?
+  Ok ((make p, end))
+
+ask_at : u64 -> &[u8] -> Result<(Ask, usize), Short>
+ask_at version b =
+  (code, at) = (take_u64 b 0)?
+  case op_of_code code of
+    Some (Op::IsValidPath) -> one_path b at Valid
+    Some (Op::QueryPathInfo) -> one_path b at Info
+    Some (Op::QueryPathFromHashPart) -> one_path b at FromHash
+    Some (Op::QueryReferrers) -> one_path b at Referrers
+    Some (Op::NarFromPath) -> one_path b at Nar
+    Some (Op::QueryValidPaths) ->
+      (ps, next) = (take_strings b at)?
+      if minor version >= 27
+        (substitute, end) = (take_bool b next)?
+        Ok ((ValidPaths ps substitute, end))
+      else
+        Ok ((ValidPaths ps false, next))
+    _ -> Err (Short::Bad (.to_string "not a read-only op"))
+
+-- The request in `bytes`, if they are exactly one whole read-only request.
+export parse_ask : u64 -> &[u8] -> Option<Ask>
+parse_ask version bytes =
+  case ask_at version bytes of
+    Ok (a, end) ->
+      if end == bytes.len ()
+        Some a
+      else
+        None
+    Err _ -> None
+
+-- `/nix/store/<valid base>`, exactly: what parseStorePath accepts unchanged.
+export plain_store_path : &str -> bool
+plain_store_path p =
+  case p.strip_prefix STORE_PREFIX of
+    Some base -> !(base.contains '/') && valid_base base
+    None -> false
+
+declined : given <T: std::fmt::Display> T -> Native
+declined why = Declined (why.to_string ())
+
+export is_declined : Native -> bool
+is_declined n =
+  case n of
+    Declined _ -> true
+    _ -> false
+
+-- The native reply to `ask`, from the database behind `conn`.
+export answer : &Connection -> &Ask -> Native
+answer conn ask =
+  case answer_in conn ask of
+    Ok n -> n
+    Err e -> declined ("the database: #{e}")
+
+answer_in : &Connection -> &Ask -> rusqlite::Result<Native>
+answer_in conn ask =
+  case ask of
+    Valid p ->
+      if !(plain_store_path p)
+        return Ok (declined ("not a plain store path: #{p}"))
+      valid = (is_valid conn p)?
+      Ok (Reply (bytes_of_bool valid))
+    ValidPaths ps substitute ->
+      if *substitute
+        return Ok (declined "QueryValidPaths with substitute")
+      if ps |> .iter |> .any (\p -> !(plain_store_path p))
+        return Ok (declined "not a plain store path among the paths")
+      mut valid = BTreeSet::new () : BTreeSet<String>
+      for p in ps
+        if (is_valid conn p)?
+          valid.insert (p.clone ())
+      out = valid |> .into_iter |> .collect : Vec<String>
+      Ok (Reply (bytes_of_strings (&out)))
+    Info p ->
+      if !(plain_store_path p)
+        return Ok (declined ("not a plain store path: #{p}"))
+      info_reply conn p
+    FromHash h ->
+      if h.len () != HASH_LEN
+        return Ok (declined "a hash part of the wrong length")
+      found = (from_hash_part conn h)?
+      mut out = Vec::new () : Vec<u8>
+      text = found |> .unwrap_or_default
+      put_str (&mut out) (&text)
+      Ok (Reply out)
+    Referrers p ->
+      if !(plain_store_path p)
+        return Ok (declined ("not a plain store path: #{p}"))
+      refs = (referrers conn p)?
+      Ok (Reply (bytes_of_strings (&refs)))
+    Nar p ->
+      if !(plain_store_path p)
+        return Ok (declined ("not a plain store path: #{p}"))
+      if (is_valid conn p)?
+        Ok (NarOf (p.clone ()))
+      else
+        Ok (declined "NarFromPath of a path that is not valid")
+
+bytes_of_bool : bool -> Vec<u8>
+bytes_of_bool v =
+  mut out = Vec::new () : Vec<u8>
+  put_bool (&mut out) v
+  out
+
+bytes_of_strings : &[String] -> Vec<u8>
+bytes_of_strings v =
+  mut out = Vec::new () : Vec<u8>
+  put_strings (&mut out) v
+  out
+
+------------------------------------------------------------------------
+-- The queries, as libstore's LocalStore states them
+
+const ID_OF : &str = "SELECT id FROM ValidPaths WHERE path = ?1"
+
+const INFO : &str = "SELECT id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca FROM ValidPaths WHERE path = ?1"
+
+const REFERENCES : &str = "SELECT path FROM Refs JOIN ValidPaths ON reference = id WHERE referrer = ?1 ORDER BY path"
+
+const REFERRERS : &str = "SELECT path FROM Refs JOIN ValidPaths ON referrer = id WHERE reference = (SELECT id FROM ValidPaths WHERE path = ?1) ORDER BY path"
+
+const FROM_HASH : &str = "SELECT path FROM ValidPaths WHERE path >= ?1 ORDER BY path LIMIT 1"
+
+is_valid : &Connection -> &str -> rusqlite::Result<bool>
+is_valid conn path =
+  mut stmt = (conn.prepare_cached ID_OF)?
+  stmt.exists ([path])
+
+paths_of : &Connection -> &str -> rusqlite::types::Value -> rusqlite::Result<Vec<String>>
+paths_of conn sql arg =
+  mut stmt = (conn.prepare_cached sql)?
+  mut rows = (stmt.query ([arg]))?
+  mut out = Vec::new () : Vec<String>
+  while (rows.next ())? is Some row
+    out.push ((row.get 0)?)
+  out.dedup ()
+  Ok out
+
+referrers : &Connection -> &str -> rusqlite::Result<Vec<String>>
+referrers conn path = paths_of conn REFERRERS (rusqlite::types::Value::Text (path.to_string ()))
+
+-- LocalStore::queryPathFromHashPart: the first valid path at or after
+-- `<store>/<hash part>`, if it starts with that.
+from_hash_part : &Connection -> &str -> rusqlite::Result<Option<String>>
+from_hash_part conn hash =
+  prefix = "#{STORE_DIR}/#{hash}"
+  mut stmt = (conn.prepare_cached FROM_HASH)?
+  mut rows = (stmt.query ([prefix.as_str ()]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok None
+    Some row ->
+      p = (row.get 0 : rusqlite::Result<String>)?
+      if p.starts_with (prefix.as_str ())
+        Ok (Some p)
+      else
+        Ok None
+
+-- QueryPathInfo's reply: 0, or 1 and the info (UnkeyedValidPathInfo, 1.16+).
+info_reply : &Connection -> &str -> rusqlite::Result<Native>
+info_reply conn path =
+  mut stmt = (conn.prepare_cached INFO)?
+  mut rows = (stmt.query ([path]))?
+  first = (rows.next ())?
+  case first of
+    None -> Ok (Reply (bytes_of_bool false))
+    Some row ->
+      id = (row.get 0 : rusqlite::Result<i64>)?
+      db_hash = (row.get 1 : rusqlite::Result<String>)?
+      registered = (row.get 2 : rusqlite::Result<i64>)?
+      deriver = (row.get 3 : rusqlite::Result<Option<String>>)?
+      nar_size = (row.get 4 : rusqlite::Result<Option<i64>>)?
+      ultimate = (row.get 5 : rusqlite::Result<Option<i64>>)?
+      sigs = (row.get 6 : rusqlite::Result<Option<String>>)?
+      ca = (row.get 7 : rusqlite::Result<Option<String>>)?
+      refs = (paths_of conn REFERENCES (rusqlite::types::Value::Integer id))?
+      Ok (info_of path (InfoRow { db_hash, registered, deriver, nar_size, ultimate, sigs, ca }) refs)
+
+-- A ValidPaths row, as read.
+data InfoRow { db_hash String, registered i64, deriver Option<String>, nar_size Option<i64>, ultimate Option<i64>, sigs Option<String>, ca Option<String> }
+
+-- The row as the daemon renders it; declined where the row is one it would
+-- not render plainly.
+info_of : &str -> InfoRow -> Vec<String> -> Native
+info_of path row refs =
+  InfoRow { db_hash, registered, deriver, nar_size, ultimate, sigs, ca } = row
+  parsed = nix_store_core::hash::parse (&db_hash)
+  if parsed.is_none ()
+    return declined ("a hash that is not SHA-256: #{db_hash}")
+  hash = parsed.unwrap_or_else (\-> nix_store_core::hash::digest (&[]))
+  if deriver == Some (String::new ())
+    return declined "an empty-string deriver"
+  -- tokenizeString<StringSet>(sigs, " "): split on spaces, empties dropped,
+  -- sorted and deduplicated.
+  sig_set = sigs |> .unwrap_or_default |> .split ' ' |> .filter (\s -> !s.is_empty ()) |> .map (\s -> s.to_string ()) |> .collect : BTreeSet<String>
+  info = PathInfo { path = path.to_string (), deriver, nar_hash = hash, references = refs, registration_time = u64::try_from registered |> .unwrap_or 0, nar_size = nar_size |> .and_then (\n -> u64::try_from n |> .ok) |> .unwrap_or 0, ultimate = ultimate == Some 1, sigs = sig_set |> .into_iter |> .collect, ca = ca |> .filter (\c -> !c.is_empty ()) }
+  mut out = Vec::new () : Vec<u8>
+  put_bool (&mut out) true
+  put_path_info (&mut out) (&info)
+  Reply out
+
+------------------------------------------------------------------------
+-- Tests: an in-memory database with Nix's schema for the two tables read.
+
+#[cfg(test)]
+import nix_store_core::worker::{op_code, put_u64, take_path_info_reply}
+
+#[cfg(test)]
+const H : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
+
+#[cfg(test)]
+const A : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+
+#[cfg(test)]
+const B : &str = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b"
+
+#[cfg(test)]
+const C : &str = "/nix/store/cccccccccccccccccccccccccccccccc-c"
+
+#[cfg(test)]
+const D : &str = "/nix/store/dddddddddddddddddddddddddddddddd-d"
+
+-- A -> {A, B}, B -> {C}; B has a deriver, signatures and a content address.
+#[cfg(test)]
+export test_db : Connection
+test_db =
+  conn = Connection::open_in_memory () |> .expect "an in-memory database"
+  conn.execute_batch "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference));" |> .expect "the schema"
+  rows = "INSERT INTO ValidPaths (path, hash, registrationTime, narSize, ultimate) VALUES ('#{A}', '#{H}', 7, 120, 1); INSERT INTO ValidPaths (path, hash, registrationTime, deriver, narSize, sigs, ca) VALUES ('#{B}', '#{H}', 9, '#{D}.drv', 8, 'k2:y  k1:x k2:y', 'fixed:r:sha256:1b8m03r63zqhnjf7l5wnldhh7c134ap5vpj0850ymkq1iyzicy5s'); INSERT INTO ValidPaths (path, hash, registrationTime) VALUES ('#{C}', '#{H}', 1); INSERT INTO Refs SELECT a.id, b.id FROM ValidPaths a, ValidPaths b WHERE (a.path = '#{A}' AND b.path IN ('#{A}', '#{B}')) OR (a.path = '#{B}' AND b.path = '#{C}');"
+  conn.execute_batch (&rows) |> .expect "the rows"
+  conn
+
+#[cfg(test)]
+request : Op -> &str -> Vec<u8>
+request op path =
+  mut out = Vec::new () : Vec<u8>
+  put_u64 (&mut out) (op_code op)
+  put_str (&mut out) path
+  out
+
+#[cfg(test)]
+reply_of : Native -> Vec<u8>
+reply_of n =
+  case n of
+    Reply b -> b
+    other -> panic! \-> "not a reply: #{other:?}"
+
+test "requests are decoded whole, and only whole"
+  r = request Op::QueryPathInfo A
+  assert_eq! \-> parse_ask 293 (&r) \-> Some (Info (A.to_string ()))
+  assert_eq! \-> parse_ask 293 (&r[0 .. r.len () - 1]) \-> None
+  mut longer = r.clone ()
+  longer.push 0
+  assert_eq! \-> parse_ask 293 (&longer) \-> None
+  assert_eq! \-> parse_ask 293 (&request Op::AddTempRoot A) \-> None
+  mut vp = Vec::new () : Vec<u8>
+  put_u64 (&mut vp) (op_code Op::QueryValidPaths)
+  put_strings (&mut vp) (&[A.to_string (), D.to_string ()])
+  put_bool (&mut vp) false
+  assert_eq! \-> parse_ask 293 (&vp) \-> Some (ValidPaths (.to_vec ([A.to_string (), D.to_string ()])) false)
+
+test "validity, of one path and of several, sorted"
+  conn = test_db ()
+  assert_eq! \-> reply_of (answer (&conn) (&Valid (B.to_string ()))) \-> bytes_of_bool true
+  assert_eq! \-> reply_of (answer (&conn) (&Valid (D.to_string ()))) \-> bytes_of_bool false
+  asked = ValidPaths (.to_vec ([D.to_string (), B.to_string (), A.to_string (), B.to_string ()])) false
+  assert_eq! \-> reply_of (answer (&conn) (&asked)) \-> bytes_of_strings (&[A.to_string (), B.to_string ()])
+  assert! \-> answer (&conn) (&ValidPaths (.to_vec ([A.to_string ()])) true) |> is_declined
+
+test "path info as the daemon writes it"
+  conn = test_db ()
+  bytes = reply_of (answer (&conn) (&Info (B.to_string ())))
+  (info, end) = take_path_info_reply (B.to_string ()) (&bytes) 0 |> .expect "a path info reply"
+  assert_eq! \-> end \-> bytes.len ()
+  i = info |> .expect "valid"
+  assert_eq! \-> i.deriver \-> Some ("#{D}.drv")
+  assert_eq! \-> i.references \-> .to_vec ([C.to_string ()])
+  assert_eq! \-> i.registration_time \-> 9
+  assert_eq! \-> i.nar_size \-> 8
+  assert! \-> !i.ultimate
+  assert_eq! \-> i.sigs \-> .to_vec ([.to_string "k1:x", .to_string "k2:y"])
+  assert! \-> i.ca.is_some ()
+  (a_info, _) = take_path_info_reply (A.to_string ()) (&reply_of (answer (&conn) (&Info (A.to_string ())))) 0 |> .expect "reply"
+  a = a_info |> .expect "valid"
+  assert! \-> a.ultimate
+  assert_eq! \-> a.references \-> .to_vec ([A.to_string (), B.to_string ()])
+  assert_eq! \-> a.deriver \-> None
+  assert_eq! \-> reply_of (answer (&conn) (&Info (D.to_string ()))) \-> bytes_of_bool false
+
+test "a hash part finds its path, or the empty string"
+  conn = test_db ()
+  mut want = Vec::new () : Vec<u8>
+  put_str (&mut want) B
+  assert_eq! \-> reply_of (answer (&conn) (&FromHash (.to_string "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))) \-> want
+  mut none = Vec::new () : Vec<u8>
+  put_str (&mut none) ""
+  assert_eq! \-> reply_of (answer (&conn) (&FromHash (.to_string "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbc"))) \-> none
+  assert! \-> answer (&conn) (&FromHash (.to_string "bbbb")) |> is_declined
+
+test "referrers, sorted; none for a path nobody refers to"
+  conn = test_db ()
+  assert_eq! \-> reply_of (answer (&conn) (&Referrers (B.to_string ()))) \-> bytes_of_strings (&[A.to_string ()])
+  assert_eq! \-> reply_of (answer (&conn) (&Referrers (D.to_string ()))) \-> bytes_of_strings (&Vec::new ())
+
+test "odd paths are declined, never guessed at"
+  conn = test_db ()
+  for p in ["/nix/store/../etc/x", "/nix/store//aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a", "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a/bin", "/tmp/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"]
+    assert! \-> answer (&conn) (&Valid (p.to_string ())) |> is_declined
+  assert_eq! \-> answer (&conn) (&Nar (A.to_string ())) \-> NarOf (A.to_string ())
+  assert! \-> answer (&conn) (&Nar (D.to_string ())) |> is_declined

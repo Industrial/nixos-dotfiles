@@ -77,6 +77,16 @@ lost_line conn peer why =
   m.insert (.to_string "error") (Value::from why)
   line m
 
+-- Conformance mode found the native answer to differ from the daemon's
+-- (crate::conform supplies the op, the path and both sides).
+export conformance_line : u64 -> &Peer -> Map<String, Value> -> String
+conformance_line conn peer fields =
+  mut m = base "conformance_diff" conn peer
+  for kv in fields
+    (k, v) = kv
+    m.insert k v
+  line m
+
 -- One line to stdout, whole.
 export emit : String -> ()
 emit text =

@@ -5,7 +5,10 @@
 //! grammar is nix-store-core's (`nix_store_core::worker`); what is the proxy's
 //! own is the `tap` that follows a conversation, the `record` it logs, the
 //! `policy` hook, the `upstream` connection made as the client, the `proxy`
-//! itself and the `app` edge. features/nix/vdaemon-proxy describes the deployment.
+//! itself and the `app` edge. `native` answers the read-only ops from the store
+//! database, and `conform` (conformance mode, off by default) compares those
+//! answers with the daemon's, which clients still get. features/nix/vdaemon-proxy
+//! describes the deployment.
 
 // The emitted Rust: `x <- f ...` then `x`, `_0` binders in `errors` Display
 // impls, `case`-to-bool tables, and the `()` that ends unit bodies.
@@ -35,6 +38,14 @@ pub mod record {
 
 pub mod policy {
     include!(concat!(env!("OUT_DIR"), "/policy.rs"));
+}
+
+pub mod native {
+    include!(concat!(env!("OUT_DIR"), "/native.rs"));
+}
+
+pub mod conform {
+    include!(concat!(env!("OUT_DIR"), "/conform.rs"));
 }
 
 pub mod upstream {

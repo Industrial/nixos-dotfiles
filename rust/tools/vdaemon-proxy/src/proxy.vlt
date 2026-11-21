@@ -16,8 +16,9 @@ import tokio::net::{UnixListener, UnixStream}
 import tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf}
 import id_effect::{Effect, HNil, Never, Scope, Stream, fail, from_async, succeed, suspend, zip_par}
 import crate::tap::Event::{OpEnded, OpStarted, TapLost}
-import crate::tap::{Event, Tap, client_bytes, daemon_bytes, new_tap}
-import crate::record::{Peer, connect_line, disconnect_line, emit, error_line, lost_line, op_line}
+import crate::tap::{Event, Tap, client_bytes, daemon_bytes, in_reply, new_tap, version}
+import crate::record::{Peer, conformance_line, connect_line, disconnect_line, emit, error_line, lost_line, op_line}
+import crate::conform::{Checker, NarJob, Outcome, Watch, check_nar, new_watch, on_op_end, on_reply_bytes, on_request, write_metrics}
 import crate::policy::{PolicyHook, verdict_text}
 import crate::upstream::connect_as
 
@@ -29,18 +30,19 @@ export errors ProxyError
 const CHUNK : usize = 65536
 
 -- What the proxy needs besides the listener.
-export data Settings { export upstream String, export policy PolicyHook }
+-- `checker` is conformance mode (crate::conform), when it is on.
+export data Settings { export upstream String, export policy PolicyHook, export checker Option<Arc<Checker>> }
 
 instance Clone Settings
   clone : &self -> Self
-  clone self = Settings { upstream = self.upstream.clone (), policy = self.policy.clone () }
+  clone self = Settings { upstream = self.upstream.clone (), policy = self.policy.clone (), checker = self.checker.clone () }
 
 export data Side = FromClient | FromDaemon
   deriving (Debug, Clone, Copy, PartialEq, Eq)
 
 -- One client connection: who it is, its tap, and the policy's verdict on
 -- the op in flight.
-export data Session { id u64, peer Peer, policy PolicyHook, tap Mutex<Tap>, verdict Mutex<String> }
+export data Session { id u64, peer Peer, policy PolicyHook, tap Mutex<Tap>, verdict Mutex<String>, checker Option<Arc<Checker>>, watch Mutex<Watch> }
 
 lifted : given <A: Send + 'static> Result<A, ProxyError> -> Effect<A, ProxyError, HNil>
 lifted r =
@@ -48,17 +50,68 @@ lifted r =
     Ok a -> succeed a
     Err e -> fail e
 
--- Show the tap a chunk and log what it makes of it.
-observe : &Session -> Side -> &[u8] -> ()
+-- Show the tap a chunk and log what it makes of it. In conformance mode the
+-- checker is shown it too; what it leaves to do after the chunk is written
+-- on (a NAR to compare) is returned.
+observe : &Session -> Side -> &[u8] -> Vec<NarJob>
 observe s side bytes =
   now = Instant::now ()
   mut tap = s.tap.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+  replying = in_reply (&tap)
   events = case side of
     FromClient -> client_bytes (&mut tap) bytes now
     FromDaemon -> daemon_bytes (&mut tap) bytes now
+  mut outcomes = Vec::new () : Vec<Outcome>
+  if &s.checker is Some c
+    mut w = s.watch.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+    v = version (&tap) |> .unwrap_or 0
+    if side == FromDaemon && replying
+      outcomes.push (on_reply_bytes c (&mut w) bytes)
+    for e in &events
+      case e of
+        OpStarted req -> on_request c (&mut w) v req (&tap.request_bytes)
+        OpEnded f -> outcomes.push (on_op_end c (&mut w) (f.error.clone ()) (&tap.reply_head))
+        _ -> ()
   drop tap
   for e in events
     log_event s e
+  mut jobs = Vec::new () : Vec<NarJob>
+  for o in outcomes
+    case o of
+      Outcome::Differs fields -> report_diff s fields
+      Outcome::NarDone job -> jobs.push job
+      Outcome::Quiet -> ()
+  jobs
+
+-- A difference: one line now, and the counters' textfile at once.
+report_diff : &Session -> serde_json::Map<String, serde_json::Value> -> ()
+report_diff s fields =
+  emit (conformance_line s.id (&s.peer) fields)
+  if &s.checker is Some c
+    if write_metrics c is Err e
+      eprintln! \-> "vdaemon-proxy: writing the conformance metrics: #{e}"
+  ()
+
+-- Compare the NARs the daemon finished sending, on a fiber of their own: the
+-- native side reads the whole path again, and the relay must not wait.
+nar_checks : Arc<Session> -> Vec<NarJob> -> Effect<(), ProxyError, HNil>
+nar_checks s jobs =
+  nar_work s jobs |> .fork_daemon |> .map (\_ -> ()) |> .widen
+
+nar_work : Arc<Session> -> Vec<NarJob> -> Effect<(), Never, HNil>
+nar_work s jobs = suspend (move \-> nar_now s jobs)
+
+nar_now : Arc<Session> -> Vec<NarJob> -> Effect<(), Never, HNil>
+nar_now s jobs =
+  run_nar_checks s jobs
+  succeed (())
+
+run_nar_checks : Arc<Session> -> Vec<NarJob> -> ()
+run_nar_checks s jobs =
+  if &s.checker is Some c
+    for job in &jobs
+      if check_nar c job is Some fields
+        report_diff (&s) fields
   ()
 
 log_event : &Session -> Event -> ()
@@ -110,8 +163,12 @@ forward s side w bytes =
 
 forward_now : Arc<Session> -> Side -> OwnedWriteHalf -> Vec<u8> -> Effect<OwnedWriteHalf, ProxyError, HNil>
 forward_now s side w bytes =
-  observe (&s) side (&bytes)
-  from_async (move \-> write_chunk w bytes)
+  jobs = observe (&s) side (&bytes)
+  written = from_async (move \-> write_chunk w bytes)
+  if jobs.is_empty ()
+    written
+  else
+    written |> .flat_map (move \w2 -> nar_checks s jobs |> .map (move \_ -> w2))
 
 -- One direction, until its reader ends; then the other side's write half
 -- is shut, so the end of the stream reaches it.
@@ -143,7 +200,7 @@ export serve_client : UnixStream -> u64 -> Settings -> Effect<(), Never, HNil>
 serve_client stream id settings =
   peer = peer_of (&stream)
   emit (connect_line id (&peer))
-  s = Arc::new (Session { id, peer, policy = settings.policy.clone (), tap = Mutex::new (new_tap ()), verdict = Mutex::new (String::new ()) })
+  s = Arc::new (Session { id, peer, policy = settings.policy.clone (), tap = Mutex::new (new_tap ()), verdict = Mutex::new (String::new ()), checker = settings.checker.clone (), watch = Mutex::new (new_watch ()) })
   upstream = settings.upstream.clone ()
   ended = Arc::clone (&s)
   failed = Arc::clone (&s)
