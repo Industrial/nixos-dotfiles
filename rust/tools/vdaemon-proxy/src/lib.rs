@@ -48,6 +48,10 @@ pub mod conform {
     include!(concat!(env!("OUT_DIR"), "/conform.rs"));
 }
 
+pub mod answer {
+    include!(concat!(env!("OUT_DIR"), "/answer.rs"));
+}
+
 pub mod upstream {
     include!(concat!(env!("OUT_DIR"), "/upstream.rs"));
 }

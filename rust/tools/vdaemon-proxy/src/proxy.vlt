@@ -10,7 +10,10 @@
 -- scope, so a shutdown interrupts and awaits all of them.
 
 import std::sync::{Arc, Mutex}
+import std::sync::atomic::{AtomicBool, Ordering}
 import std::time::Instant
+import nix_store_core::worker::Op
+import crate::answer::{Answer, NativeMode, decide, last_of}
 import tokio::io::{AsyncReadExt, AsyncWriteExt}
 import tokio::net::{UnixListener, UnixStream}
 import tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf}
@@ -18,7 +21,7 @@ import id_effect::{Effect, HNil, Never, Scope, Stream, fail, from_async, succeed
 import crate::tap::Event::{OpEnded, OpStarted, TapLost}
 import crate::tap::{Event, Tap, client_bytes, daemon_bytes, in_reply, new_tap, version}
 import crate::record::{Peer, conformance_line, connect_line, disconnect_line, emit, error_line, lost_line, op_line}
-import crate::conform::{Checker, NarJob, Outcome, Watch, check_nar, new_watch, on_op_end, on_reply_bytes, on_request, write_metrics}
+import crate::conform::{Checker, NarJob, Outcome, Watch, check_nar, count_native, new_watch, on_op_end, on_reply_bytes, on_request, write_metrics}
 import crate::policy::{PolicyHook, verdict_text}
 import crate::upstream::connect_as
 
@@ -30,19 +33,24 @@ export errors ProxyError
 const CHUNK : usize = 65536
 
 -- What the proxy needs besides the listener.
--- `checker` is conformance mode (crate::conform), when it is on.
-export data Settings { export upstream String, export policy PolicyHook, export checker Option<Arc<Checker>> }
+-- `checker` is conformance mode (crate::conform), `native` native answering
+-- (crate::answer), each when it is on.
+export data Settings { export upstream String, export policy PolicyHook, export checker Option<Arc<Checker>>, export native Option<Arc<NativeMode>> }
 
 instance Clone Settings
   clone : &self -> Self
-  clone self = Settings { upstream = self.upstream.clone (), policy = self.policy.clone (), checker = self.checker.clone () }
+  clone self = Settings { upstream = self.upstream.clone (), policy = self.policy.clone (), checker = self.checker.clone (), native = self.native.clone () }
+
+-- A write half shared by the direction that relays into it and, for the
+-- client's, by native answers.
+export type Out = Arc<tokio::sync::Mutex<OwnedWriteHalf>>
 
 export data Side = FromClient | FromDaemon
   deriving (Debug, Clone, Copy, PartialEq, Eq)
 
 -- One client connection: who it is, its tap, and the policy's verdict on
 -- the op in flight.
-export data Session { id u64, peer Peer, policy PolicyHook, tap Mutex<Tap>, verdict Mutex<String>, checker Option<Arc<Checker>>, watch Mutex<Watch> }
+export data Session { id u64, peer Peer, policy PolicyHook, tap Mutex<Tap>, verdict Mutex<String>, checker Option<Arc<Checker>>, watch Mutex<Watch>, native Option<Arc<NativeMode>>, answered AtomicBool }
 
 lifted : given <A: Send + 'static> Result<A, ProxyError> -> Effect<A, ProxyError, HNil>
 lifted r =
@@ -53,16 +61,37 @@ lifted r =
 -- Show the tap a chunk and log what it makes of it. In conformance mode the
 -- checker is shown it too; what it leaves to do after the chunk is written
 -- on (a NAR to compare) is returned.
-observe : &Session -> Side -> &[u8] -> Vec<NarJob>
+--
+-- In native mode (crate::answer) an op the proxy answers itself comes back
+-- as `answer`: those bytes go to the client, and the chunk (the whole
+-- request) does not go to the daemon. The tap is shown the answer's LAST, so
+-- the op ends and is logged as any other.
+export data Step { jobs Vec<NarJob>, answer Option<Answer> }
+
+observe : &Session -> Side -> &[u8] -> Step
 observe s side bytes =
   now = Instant::now ()
   mut tap = s.tap.lock () |> .unwrap_or_else (\p -> p.into_inner ())
   replying = in_reply (&tap)
-  events = case side of
+  mut events = case side of
     FromClient -> client_bytes (&mut tap) bytes now
     FromDaemon -> daemon_bytes (&mut tap) bytes now
+  mut answer = None : Option<Answer>
+  if side == FromClient && &s.native is Some m
+    v = version (&tap) |> .unwrap_or 0
+    mut started = None : Option<Op>
+    for e in &events
+      if e is OpStarted req
+        answer := decide m v req (&tap.request_bytes) bytes
+        started := req.op
+    if &answer is Some a
+      ended = daemon_bytes (&mut tap) (&last_of a) now
+      events.extend ended
+      s.answered.store true Ordering::SeqCst
+      if started is Some op
+        count_native (&m.store) op
   mut outcomes = Vec::new () : Vec<Outcome>
-  if &s.checker is Some c
+  if answer.is_none () && &s.checker is Some c
     mut w = s.watch.lock () |> .unwrap_or_else (\p -> p.into_inner ())
     v = version (&tap) |> .unwrap_or 0
     if side == FromDaemon && replying
@@ -81,7 +110,15 @@ observe s side bytes =
       Outcome::Differs fields -> report_diff s fields
       Outcome::NarDone job -> jobs.push job
       Outcome::Quiet -> ()
-  jobs
+  Step { jobs, answer }
+
+-- Who answered the op that just ended (and back to the daemon for the next).
+take_answered : &Session -> &str
+take_answered s =
+  if s.answered.swap false Ordering::SeqCst
+    "native"
+  else
+    "daemon"
 
 -- A difference: one line now, and the counters' textfile at once.
 report_diff : &Session -> serde_json::Map<String, serde_json::Value> -> ()
@@ -124,7 +161,7 @@ log_event s e =
       held.push_str (&verdict_text (&verdict))
     OpEnded f ->
       verdict = s.verdict.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
-      emit (op_line s.id (&s.peer) (&f) (&verdict))
+      emit (op_line s.id (&s.peer) (&f) (&verdict) (take_answered s))
     TapLost why -> emit (lost_line s.id (&s.peer) (&why))
   ()
 
@@ -143,38 +180,64 @@ read_chunk reader =
 read_step : OwnedReadHalf -> Effect<Option<(Vec<u8>, OwnedReadHalf)>, ProxyError, HNil>
 read_step r = from_async (move \-> read_chunk r)
 
-write_chunk : async OwnedWriteHalf -> Vec<u8> -> Result<OwnedWriteHalf, ProxyError>
-write_chunk writer bytes =
-  mut w = writer
+write_chunk : async Out -> Vec<u8> -> Result<Out, ProxyError>
+write_chunk out bytes =
+  written <- write_locked (Arc::clone (&out)) bytes
+  written?
+  Ok out
+
+write_locked : async Out -> Vec<u8> -> Result<(), ProxyError>
+write_locked out bytes =
+  held <- out.lock_owned ()
+  mut w = held
   r <- w.write_all (&bytes)
   r?
-  Ok w
+  Ok ()
 
-shutdown : async OwnedWriteHalf -> Result<(), ProxyError>
-shutdown writer =
-  mut w = writer
+shutdown : async Out -> Result<(), ProxyError>
+shutdown out =
+  held <- out.lock_owned ()
+  mut w = held
   _r <- w.shutdown ()
   Ok ()
 
--- One chunk: observed, then written on.
-forward : Arc<Session> -> Side -> OwnedWriteHalf -> Vec<u8> -> Effect<OwnedWriteHalf, ProxyError, HNil>
-forward s side w bytes =
-  suspend (move \-> forward_now s side w bytes)
+-- One chunk: observed, then written on; or, answered natively, the answer
+-- written back to the client instead.
+forward : Arc<Session> -> Side -> Out -> Out -> Vec<u8> -> Effect<Out, ProxyError, HNil>
+forward s side out back bytes =
+  suspend (move \-> forward_now s side out back bytes)
 
-forward_now : Arc<Session> -> Side -> OwnedWriteHalf -> Vec<u8> -> Effect<OwnedWriteHalf, ProxyError, HNil>
-forward_now s side w bytes =
-  jobs = observe (&s) side (&bytes)
-  written = from_async (move \-> write_chunk w bytes)
-  if jobs.is_empty ()
-    written
-  else
-    written |> .flat_map (move \w2 -> nar_checks s jobs |> .map (move \_ -> w2))
+forward_now : Arc<Session> -> Side -> Out -> Out -> Vec<u8> -> Effect<Out, ProxyError, HNil>
+forward_now s side out back bytes =
+  step = observe (&s) side (&bytes)
+  case step.answer of
+    Some (Answer::Bytes reply) -> from_async (move \-> write_locked back reply) |> .map (move \_ -> out)
+    Some (Answer::NarAfter last path) ->
+      first = Arc::clone (&back)
+      from_async (move \-> write_locked first last) |> .flat_map (move \_ -> send_nar back path) |> .map (move \_ -> out)
+    None ->
+      jobs = step.jobs
+      written = from_async (move \-> write_chunk out bytes)
+      if jobs.is_empty ()
+        written
+      else
+        written |> .flat_map (move \w2 -> nar_checks s jobs |> .map (move \_ -> w2))
+
+-- NarFromPath answered natively: the archive of the path, chunk by chunk
+-- (nix_store_core::nar::stream, one chunk of memory), to the client.
+send_nar : Out -> String -> Effect<(), ProxyError, HNil>
+send_nar back path =
+  nix_store_core::nar::stream (std::path::PathBuf::from path) |> .map_err ProxyError::Io |> .run_for_each_effect (move \chunk -> nar_chunk (Arc::clone (&back)) chunk)
+
+nar_chunk : Out -> bytes::Bytes -> Effect<(), ProxyError, HNil>
+nar_chunk back chunk = from_async (move \-> write_locked back (chunk.to_vec ()))
 
 -- One direction, until its reader ends; then the other side's write half
--- is shut, so the end of the stream reaches it.
-export pump : Arc<Session> -> Side -> OwnedReadHalf -> OwnedWriteHalf -> Effect<(), ProxyError, HNil>
-pump s side r w =
-  Stream::unfold_effect r read_step |> .run_fold_effect w (move \acc bytes -> forward (Arc::clone (&s)) side acc bytes) |> .flat_map (\w -> from_async (move \-> shutdown w))
+-- is shut, so the end of the stream reaches it. `back` is the reader's own
+-- side, for native answers.
+export pump : Arc<Session> -> Side -> OwnedReadHalf -> Out -> Out -> Effect<(), ProxyError, HNil>
+pump s side r out back =
+  Stream::unfold_effect r read_step |> .run_fold_effect out (move \acc bytes -> forward (Arc::clone (&s)) side acc (Arc::clone (&back)) bytes) |> .flat_map (\w -> from_async (move \-> shutdown w))
 
 peer_of : &UnixStream -> Peer
 peer_of stream =
@@ -193,14 +256,16 @@ relay : Arc<Session> -> UnixStream -> UnixStream -> Effect<(), ProxyError, HNil>
 relay s client daemon =
   (cr, cw) = client.into_split ()
   (dr, dw) = daemon.into_split ()
-  zip_par (pump (Arc::clone (&s)) FromClient cr dw) (pump s FromDaemon dr cw) |> .map (\_ -> ())
+  to_client = Arc::new (tokio::sync::Mutex::new cw) : Out
+  to_daemon = Arc::new (tokio::sync::Mutex::new dw) : Out
+  zip_par (pump (Arc::clone (&s)) FromClient cr (Arc::clone (&to_daemon)) (Arc::clone (&to_client))) (pump s FromDaemon dr to_client to_daemon) |> .map (\_ -> ())
 
 -- One client, start to end. Failures are logged here; nothing escapes.
 export serve_client : UnixStream -> u64 -> Settings -> Effect<(), Never, HNil>
 serve_client stream id settings =
   peer = peer_of (&stream)
   emit (connect_line id (&peer))
-  s = Arc::new (Session { id, peer, policy = settings.policy.clone (), tap = Mutex::new (new_tap ()), verdict = Mutex::new (String::new ()), checker = settings.checker.clone (), watch = Mutex::new (new_watch ()) })
+  s = Arc::new (Session { id, peer, policy = settings.policy.clone (), tap = Mutex::new (new_tap ()), verdict = Mutex::new (String::new ()), checker = settings.checker.clone (), watch = Mutex::new (new_watch ()), native = settings.native.clone (), answered = AtomicBool::new false })
   upstream = settings.upstream.clone ()
   ended = Arc::clone (&s)
   failed = Arc::clone (&s)

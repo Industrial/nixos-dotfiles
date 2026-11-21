@@ -50,6 +50,19 @@ export data Checker
 export new_checker : String -> Option<String> -> Checker
 new_checker db_path metrics = Checker { db_path, conn = Mutex::new None, counts = Mutex::new (BTreeMap::new ()), metrics }
 
+-- Use `conn` from now on (tests: an in-memory database).
+export install_db : &Checker -> Connection -> ()
+install_db c conn =
+  mut held = c.conn.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+  _old = held.replace conn
+  ()
+
+-- Count an op answered natively (crate::answer), for the totals.
+export count_native : &Checker -> Op -> ()
+count_native c op = count c (&name_of op) NATIVE
+
+export const NATIVE : &str = "native"
+
 -- Where one connection's check is.
 export data Watch
   = Idle

@@ -16,6 +16,7 @@ import id_effect_config::{Config, ConfigEnv, ConfigError}
 import crate::policy::allow_all
 import crate::proxy::{ProxyError, Settings, serve}
 import crate::conform::{Checker, new_checker, totals_line, write_metrics}
+import crate::answer::{DEFAULT_SWITCH_DIR, NativeMode, native_mode, ops_of}
 import crate::record::emit
 
 export const DEFAULT_UPSTREAM : &str = "/nix/var/nix/daemon-socket-upstream/socket"
@@ -66,6 +67,41 @@ switched_on flag =
     "true" -> true
     "yes" -> true
     _ -> false
+
+-- Native answering (crate::answer): VDAEMON_NATIVE names the ops ("all", or
+-- op names, comma separated; empty by default, so nothing is answered
+-- natively); VDAEMON_SWITCH_DIR holds the kill switches.
+export data NativeSettings { export ops String, export switch_dir String }
+  deriving (Clone, Debug)
+
+export native_config : Config<NativeSettings>
+native_config =
+  Config::all ((Config::string "VDAEMON_NATIVE" |> .with_default (String::new ()), Config::string "VDAEMON_SWITCH_DIR" |> .with_default (DEFAULT_SWITCH_DIR.to_string ()))) |> .map native_of
+
+native_of : (String, String) -> NativeSettings
+native_of fields =
+  (ops, switch_dir) = fields
+  NativeSettings { ops, switch_dir }
+
+-- The native mode, if any op is switched on; it reads the database through
+-- the conformance checker when there is one, or a checker of its own.
+native_of_settings : &NativeSettings -> &Conformance -> Option<Arc<Checker>> -> Option<Arc<NativeMode>>
+native_of_settings n c checker =
+  (ops, unknown) = ops_of (&n.ops)
+  for u in &unknown
+    eprintln! \-> "vdaemon-proxy: VDAEMON_NATIVE: #{u} is not an op answered natively; ignored"
+  if ops.is_empty ()
+    return None
+  store = checker |> .unwrap_or_else (\-> Arc::new (new_checker (c.db.clone ()) (c.metrics.clone ())))
+  Some (Arc::new (native_mode store (&ops) (n.switch_dir.clone ())))
+
+native_text : &Option<Arc<NativeMode>> -> String
+native_text m =
+  case m of
+    Some mode ->
+      names = mode.ops |> .iter |> .filter_map (\c -> nix_store_core::worker::op_of_code (*c)) |> .map nix_store_core::worker::op_name |> .collect : Vec<String>
+      "#{names.join ","} (kill switches in #{mode.switch_dir})"
+    None -> .to_string "off"
 
 checker_of : &Conformance -> Option<Arc<Checker>>
 checker_of c =
@@ -164,8 +200,11 @@ program =
     let paths = ~paths_config().run::<Paths, AppError, ConfigEnv, _>();
     let conformance = ~conformance_config().run::<Conformance, AppError, ConfigEnv, _>();
     let listener = ~listen(paths.clone());
-    let settings = Settings { upstream: paths.upstream.clone(), policy: allow_all(), checker: checker_of(&conformance) };
-    eprintln!("vdaemon-proxy: relaying {} to {} (policy: allow all; conformance: {})", if socket_activated() { "systemd's socket".to_string() } else { paths.listen.clone() }, paths.upstream, if conformance.on { format!("on, against {}", conformance.db) } else { "off".to_string() });
+    let native_settings = ~native_config().run::<NativeSettings, AppError, ConfigEnv, _>();
+    let checker = checker_of(&conformance);
+    let native = native_of_settings(&native_settings, &conformance, checker.clone());
+    eprintln!("vdaemon-proxy: relaying {} to {} (policy: allow all; conformance: {}; native: {})", if socket_activated() { "systemd's socket".to_string() } else { paths.listen.clone() }, paths.upstream, if conformance.on { format!("on, against {}", conformance.db) } else { "off".to_string() }, native_text(&native));
+    let settings = Settings { upstream: paths.upstream.clone(), policy: allow_all(), checker, native };
     ~serving(listener, settings).map_err(AppError::from)
 
 -- On a fiber of the runtime's executor: `run_main` polls its root fiber on

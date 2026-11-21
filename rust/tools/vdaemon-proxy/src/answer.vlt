@@ -1,0 +1,179 @@
+-- Native answering (#183, phase 3): a read-only op the proxy answers itself,
+-- from the store database and the store, instead of forwarding it.
+--
+-- Off for every op unless named in VDAEMON_NATIVE ("all", or op names, comma
+-- separated: IsValidPath, QueryValidPaths, QueryPathInfo,
+-- QueryPathFromHashPart, QueryReferrers, NarFromPath). Writes and builds are
+-- never in the list: only crate::native's six ops can be.
+--
+-- Kill switch, instant and per op: while `<switch dir>/forward-all` exists,
+-- or `<switch dir>/forward-<Op>` for that op, the op is forwarded again. It
+-- is looked at on every op (one stat), so `touch` takes effect at the next
+-- op, with no restart and no dropped connection.
+--
+-- An op is answered here only when all of these hold; otherwise it is
+-- forwarded, exactly as before:
+--
+-- * the op is switched on, and not killed;
+-- * its whole request arrived in one chunk with nothing before it (no byte
+--   of it has gone to the daemon), decoded to its last byte (crate::native);
+-- * crate::native answers it (does not decline).
+--
+-- The answer is what the daemon would send: STDERR_LAST, then the reply.
+
+import std::collections::BTreeSet
+import std::sync::Arc
+import nix_store_core::worker::{Op, Request, StderrMsg, op_name, put_stderr}
+import crate::conform::{Checker, native_answer}
+import crate::native::{Native, answerable, parse_ask}
+
+export const DEFAULT_SWITCH_DIR : &str = "/run/vdaemon-proxy"
+
+export data NativeMode { export store Arc<Checker>, export ops BTreeSet<u64>, export switch_dir String }
+
+-- What the proxy sends the client instead of forwarding: these bytes (LAST
+-- and the reply), or LAST and then the NAR of a store path.
+export data Answer
+  = Bytes Vec<u8>
+  | NarAfter Vec<u8> String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The ops a VDAEMON_NATIVE value names, and the names it has that are not
+-- ops answered here (ignored, and reported at startup).
+export ops_of : &str -> (Vec<Op>, Vec<String>)
+ops_of text =
+  mut ops = Vec::new () : Vec<Op>
+  mut unknown = Vec::new () : Vec<String>
+  for word in text.split ',' |> .map (\w -> w.trim ()) |> .filter (\w -> !w.is_empty ())
+    if word == "all"
+      for op in nix_store_core::worker::ALL_OPS
+        if answerable op && !(ops.contains (&op))
+          ops.push op
+    else
+      found = nix_store_core::worker::ALL_OPS |> .iter |> .copied |> .find (\op -> answerable (*op) && op_name (*op) == word)
+      case found of
+        Some op ->
+          if !(ops.contains (&op))
+            ops.push op
+        None -> unknown.push (word.to_string ())
+  (ops, unknown)
+
+export native_mode : Arc<Checker> -> &[Op] -> String -> NativeMode
+native_mode store ops switch_dir =
+  codes = ops |> .iter |> .map (\op -> nix_store_core::worker::op_code (*op)) |> .collect : BTreeSet<u64>
+  NativeMode { store, ops = codes, switch_dir }
+
+-- Whether `op` is answered here right now: switched on, and neither the
+-- op's kill file nor the global one is there.
+export switched_on : &NativeMode -> Op -> bool
+switched_on m op =
+  if !(m.ops.contains (&nix_store_core::worker::op_code op))
+    return false
+  dir = std::path::Path::new (&m.switch_dir)
+  !(dir.join "forward-all" |> .exists) && !(dir.join ("forward-#{op_name op}") |> .exists)
+
+-- STDERR_LAST, as the daemon sends it at `version`.
+last_bytes : u64 -> Vec<u8>
+last_bytes version =
+  mut out = Vec::new () : Vec<u8>
+  put_stderr (&mut out) version (&StderrMsg::Last)
+  out
+
+-- The answer to the op that `chunk` starts, if it is to be answered here.
+-- `buffered` is what the tap held when the op started: equal to `chunk`
+-- exactly when no earlier byte of the request was forwarded.
+export decide : &NativeMode -> u64 -> &Request -> &[u8] -> &[u8] -> Option<Answer>
+decide m version req buffered chunk =
+  op = (req.op)?
+  if !(switched_on m op) || buffered != chunk
+    return None
+  ask = (parse_ask version chunk)?
+  case native_answer (&m.store) (&ask) of
+    Native::Reply reply ->
+      mut out = last_bytes version
+      out.extend_from_slice (&reply)
+      Some (Bytes out)
+    Native::NarOf path -> Some (NarAfter (last_bytes version) path)
+    Native::Declined _ -> None
+
+-- Just the LAST, for the tap: the op ends as if the daemon had ended it.
+export last_of : &Answer -> Vec<u8>
+last_of a =
+  case a of
+    Bytes b -> b.get (0 .. 8) |> .map (\s -> s.to_vec ()) |> .unwrap_or_default
+    NarAfter last _ -> last.clone ()
+
+------------------------------------------------------------------------
+-- Tests
+
+#[cfg(test)]
+import nix_store_core::worker::{op_code, put_bool, put_str, put_u64}
+
+#[cfg(test)]
+const A : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a"
+
+#[cfg(test)]
+store_on_test_db : Arc<Checker>
+store_on_test_db =
+  c = crate::conform::new_checker (.to_string "/nonexistent") None
+  crate::conform::install_db (&c) (crate::native::test_db ())
+  Arc::new c
+
+#[cfg(test)]
+request_of : Op -> &str -> (Request, Vec<u8>)
+request_of op path =
+  mut out = Vec::new () : Vec<u8>
+  put_u64 (&mut out) (op_code op)
+  put_str (&mut out) path
+  (Request { code = op_code op, op = Some op, paths = .to_vec ([path.to_string ()]) }, out)
+
+#[cfg(test)]
+switch_dir : String
+switch_dir =
+  dir = std::env::temp_dir () |> .join ("vdaemon-proxy-switch-#{std::process::id ()}-#{rand_suffix ()}")
+  std::fs::create_dir_all (&dir) |> .expect "dir"
+  dir.to_str () |> .expect "utf-8" |> .to_string
+
+#[cfg(test)]
+rand_suffix : u128
+rand_suffix = std::time::SystemTime::now ().duration_since std::time::UNIX_EPOCH |> .map (\d -> d.as_nanos ()) |> .unwrap_or 0
+
+test "VDAEMON_NATIVE names ops, or all of the six; writes cannot be named"
+  (all, none) = ops_of "all"
+  assert_eq! \-> all.len () \-> 6
+  assert! \-> none.is_empty ()
+  (some, unknown) = ops_of " IsValidPath, QueryPathInfo ,AddToStore,BuildPaths,nonsense"
+  assert_eq! \-> some \-> .to_vec ([Op::IsValidPath, Op::QueryPathInfo])
+  assert_eq! \-> unknown \-> .to_vec ([.to_string "AddToStore", .to_string "BuildPaths", .to_string "nonsense"])
+  (empty, _) = ops_of ""
+  assert! \-> empty.is_empty ()
+
+test "an op switched on is answered: LAST, then the reply"
+  dir = switch_dir ()
+  m = native_mode (store_on_test_db ()) (&[Op::IsValidPath]) (dir.clone ())
+  (req, bytes) = request_of Op::IsValidPath A
+  mut want = last_bytes 293
+  put_bool (&mut want) true
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes) \-> Some (Bytes (want.clone ()))
+  assert_eq! \-> last_of (&Bytes want) \-> last_bytes 293
+  _gone = std::fs::remove_dir_all (&dir)
+
+test "forwarded instead: not switched on, killed, split, or declined"
+  dir = switch_dir ()
+  m = native_mode (store_on_test_db ()) (&[Op::IsValidPath]) (dir.clone ())
+  (info, info_bytes) = request_of Op::QueryPathInfo A
+  assert_eq! \-> decide (&m) 293 (&info) (&info_bytes) (&info_bytes) \-> None
+  (req, bytes) = request_of Op::IsValidPath A
+  -- Part of the request went out in an earlier chunk.
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes[8 .. bytes.len ()]) \-> None
+  (odd, odd_bytes) = request_of Op::IsValidPath "/nix/store/x"
+  assert_eq! \-> decide (&m) 293 (&odd) (&odd_bytes) (&odd_bytes) \-> None
+  -- The per-op kill switch, then the global one; removing them switches back.
+  std::fs::write ("#{dir}/forward-IsValidPath") "" |> .expect "kill"
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes) \-> None
+  std::fs::remove_file ("#{dir}/forward-IsValidPath") |> .expect "unkill"
+  std::fs::write ("#{dir}/forward-all") "" |> .expect "kill all"
+  assert_eq! \-> decide (&m) 293 (&req) (&bytes) (&bytes) \-> None
+  std::fs::remove_file ("#{dir}/forward-all") |> .expect "unkill all"
+  assert! \-> decide (&m) 293 (&req) (&bytes) (&bytes) |> .is_some
+  _gone = std::fs::remove_dir_all (&dir)
