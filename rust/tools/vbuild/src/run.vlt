@@ -1,0 +1,103 @@
+-- Child processes as a capability: ssh for the load probes, `nix copy` and
+-- `nix build --store` for the build. The live runner spawns through tokio
+-- (id_effect's runtime is tokio), so a child is an effect that a timeout or
+-- an interrupt can stop: `kill_on_drop` ends the process with its fiber.
+-- Tests provide a scripted runner behind the same class.
+
+import std::sync::Arc
+import id_effect::{Effect, HNil}
+
+-- What to run. `to_log` sends stdout and stderr to Nix's build log (the
+-- hook's fd 4) instead of capturing them. `detached` starts the child in a
+-- process group of its own, so the SIGTERM Nix sends the hook's group when the
+-- build ends does not reach it: an ssh ControlPersist master is meant to
+-- outlive the hook that started it.
+export data Cmd
+  { export program String
+  , export args Vec<String>
+  , export env Vec<(String, String)>
+  , export to_log bool
+  , export detached bool
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- A plain command: captured output, the hook's process group.
+export cmd : &str -> Vec<String> -> Cmd
+cmd program args = Cmd { program = program.to_string (), args, env = Vec::new (), to_log = false, detached = false }
+
+-- How a child ended. `status` is None when a signal killed it. Output sent to
+-- the build log is not captured, so it is empty here.
+export data Ran { export status Option<i32>, export stdout String, export stderr String }
+  deriving (Debug, Clone, PartialEq)
+
+export succeeded : &Ran -> bool
+succeeded r = r.status == Some 0
+
+-- The child could not be started at all (no such program, no permission).
+export data RunError = Spawn String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display RunError
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f =
+    case self of
+      Spawn why -> f.write_str why
+
+export class Runner
+  run : &self -> Cmd -> Effect<Ran, RunError, HNil>
+
+export newtype RunnerService = RunnerService (export Arc<dyn Runner + Send + Sync>)
+
+instance Clone RunnerService
+  clone : &self -> Self
+  clone self = RunnerService (Arc::clone (&self.0))
+
+-- The live runner. `log` is this process's handle on Nix's build log.
+export data Live { log Option<Arc<std::fs::File>> }
+
+instance Runner Live
+  run : &self -> Cmd -> Effect<Ran, RunError, HNil>
+  run self c = spawn_live c (self.log.clone ())
+
+export live : Option<Arc<std::fs::File>> -> RunnerService
+live log = RunnerService (Arc::new (Live { log }))
+
+rust """
+  /// One child, run to completion on the runtime's reactor. Dropping the
+  /// future (a timeout, an interrupt) kills the child.
+  fn spawn_live(c: Cmd, log: Option<Arc<std::fs::File>>) -> Effect<Ran, RunError, HNil> {
+      id_effect::from_async(move || async move {
+          use std::process::Stdio;
+          let mut command = tokio::process::Command::new(&c.program);
+          command.args(&c.args).stdin(Stdio::null()).kill_on_drop(true);
+          for (k, v) in &c.env {
+              command.env(k, v);
+          }
+          if c.detached {
+              command.process_group(0);
+          }
+          let logged = match (&log, c.to_log) {
+              (Some(f), true) => match (f.try_clone(), f.try_clone()) {
+                  (Ok(out), Ok(err)) => {
+                      command.stdout(out).stderr(err);
+                      true
+                  }
+                  _ => false,
+              },
+              _ => false,
+          };
+          if !logged {
+              command.stdout(Stdio::piped()).stderr(Stdio::piped());
+          }
+          let out = command
+              .output()
+              .await
+              .map_err(|e| RunError::Spawn(format!("starting {}: {e}", c.program)))?;
+          Ok(Ran {
+              status: out.status.code(),
+              stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+              stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+          })
+      })
+  }
+"""

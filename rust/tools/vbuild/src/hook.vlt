@@ -1,0 +1,508 @@
+-- The build hook protocol, as Nix 2.35.6 speaks it (`HookInstance`,
+-- `DerivationBuildingGoal::tryBuildHook`, and the C++ build-remote it
+-- replaces):
+--
+-- * argv: the `build-hook` setting's words, then the verbosity.
+-- * stdin: Nix's settings, `1 <name> <value>` each, then `0`. Then any number
+--   of requests: `try`, am-willing (1 when a local build slot is free), the
+--   system, the `.drv` path, the required features.
+-- * stderr: a reply line per request: `# decline` (build it yourself),
+--   `# postpone` (ask again later), `# decline-permanently` (stop asking
+--   this hook), or `# accept` and the machine name. Other lines are shown to
+--   the user. A declining hook stays alive for the next request; an accepting
+--   one owns that build and is never asked again.
+-- * after `# accept`: the input closure (a string list) and the wanted output
+--   names arrive, stdin closes, and the hook builds. Its build log goes to
+--   fd 4; its exit status is the build's.
+--
+-- The I/O is the `Channel` capability, so the whole exchange runs in tests
+-- against a scripted channel and fake probes, copier and remote.
+
+import std::collections::BTreeSet
+import std::io::Write
+import std::sync::{Arc, Mutex}
+import std::collections::VecDeque
+import id_effect::{Effect, HNil, Never, fail, succeed, suspend}
+import nix_store_core::drv
+import crate::wire::{WireError, read_string, read_strings, read_u64}
+import crate::wire::WireError::Eof
+import crate::machines::{Machine, suits}
+import crate::select::{Candidate, Decision, Probe, Want, could_build_locally, decide, reply_word}
+import crate::select::Decision::{Accept, Decline}
+import crate::slots::{Slot, holding, held_count, main_lock, take}
+import crate::copier::{BuildError, CopierService, RemoteBuildService}
+import crate::probe::{SshProbe, probe_all}
+
+-- Why the hook stopped. `Protocol`: Nix sent something this hook does not
+-- understand. `Local`: this host's lock files. `Build`: the remote build,
+-- whose exit status Nix turns into a failed build with the log tail.
+export data HookError
+  = Protocol String
+  | Local String
+  | Build String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display HookError
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&describe self)
+
+describe : &HookError -> String
+describe e =
+  case e of
+    Protocol why -> "hook protocol: #{why}"
+    Local why -> why.clone ()
+    Build why -> why.clone ()
+
+instance From BuildError HookError
+  from : BuildError -> Self
+  from e = Build (e.to_string ())
+
+-- The settings the hook acts on, out of everything Nix sends.
+export data Settings
+  { export builders String
+  , export this_system String
+  , export extra_platforms BTreeSet<String>
+  , export system_features BTreeSet<String>
+  , export max_jobs u64
+  , export substitute bool
+  }
+  deriving (Debug, Clone, PartialEq)
+
+words : &str -> BTreeSet<String>
+words s = s.split_whitespace () |> .map (\w -> w.to_string ()) |> .collect
+
+lookup : &[(String, String)] -> &str -> String
+lookup pairs name =
+  pairs.iter () |> .find (\p -> p.0 == name) |> .map (\p -> p.1.clone ()) |> .unwrap_or_default
+
+export settings_of : &[(String, String)] -> Settings
+settings_of pairs = Settings {
+    builders = lookup pairs "builders"
+    , this_system = lookup pairs "system"
+    , extra_platforms = words (&lookup pairs "extra-platforms")
+    , system_features = words (&lookup pairs "system-features")
+    , max_jobs = lookup pairs "max-jobs" |> .trim |> .parse |> .unwrap_or 1
+    , substitute = lookup pairs "builders-use-substitutes" == "true"
+    }
+
+export data Request
+  { export am_willing bool
+  , export system String
+  , export drv_path String
+  , export features BTreeSet<String>
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- The next request, or None when Nix is done with this hook (end of input,
+-- or anything but `try`, as build-remote reads it).
+export read_request : given <R: std::io::Read> &mut R -> Result<Option<Request>, WireError>
+read_request r =
+  case read_string r of
+    Err Eof -> Ok None
+    Err e -> Err e
+    Ok word ->
+      if word != "try"
+        Ok None
+      else
+        am_willing = (read_u64 r)? != 0
+        system = (read_string r)?
+        drv_path = (read_string r)?
+        features = (read_strings r)? |> .into_iter |> .collect
+        Ok (Some (Request { am_willing, system, drv_path, features }))
+
+-- The reply as Nix reads it.
+export reply_text : &Decision -> &str -> String
+reply_text d machine =
+  case d of
+    Accept _ -> "# accept\n#{machine}\n"
+    other -> "# #{reply_word other}\n"
+
+-- Talking to Nix.
+export class Channel
+  next : &self -> Effect<Option<Request>, HookError, HNil>
+  reply : &self -> String -> Effect<(), HookError, HNil>
+  accepted : &self -> Effect<(Vec<String>, Vec<String>), HookError, HNil>
+
+export newtype ChannelService = ChannelService (export Arc<dyn Channel + Send + Sync>)
+
+instance Clone ChannelService
+  clone : &self -> Self
+  clone self = ChannelService (Arc::clone (&self.0))
+
+protocol : WireError -> HookError
+protocol e = Protocol (e.to_string ())
+
+lifted : given <A: Send + 'static> Result<A, HookError> -> Effect<A, HookError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- stdin and stderr.
+export data StdChannel = StdChannel
+
+read_inputs : Result<(Vec<String>, Vec<String>), HookError>
+read_inputs =
+  stdin = std::io::stdin ()
+  mut lock = stdin.lock ()
+  inputs = (read_strings (&mut lock) |> .map_err protocol)?
+  wanted = (read_strings (&mut lock) |> .map_err protocol)?
+  Ok ((inputs, wanted))
+
+write_reply : String -> Result<(), HookError>
+write_reply text =
+  mut err = std::io::stderr ()
+  err.write_all (text.as_bytes ()) |> .and_then (\_ -> err.flush ()) |> .map_err (\e -> Protocol ("writing the reply: #{e}"))
+
+instance Channel StdChannel
+  next : &self -> Effect<Option<Request>, HookError, HNil>
+  next self = suspend (\-> lifted (read_request (&mut std::io::stdin ().lock ()) |> .map_err protocol))
+
+  reply : &self -> String -> Effect<(), HookError, HNil>
+  reply self text = suspend (move \-> lifted (write_reply text))
+
+  accepted : &self -> Effect<(Vec<String>, Vec<String>), HookError, HNil>
+  accepted self = suspend (\-> lifted (read_inputs ()))
+
+-- Asking builders how loaded they are.
+export class Prober
+  probe : &self -> Vec<Machine> -> Effect<Vec<Probe>, Never, HNil>
+
+export newtype ProberService = ProberService (export Arc<dyn Prober + Send + Sync>)
+
+instance Clone ProberService
+  clone : &self -> Self
+  clone self = ProberService (Arc::clone (&self.0))
+
+instance Prober SshProbe
+  probe : &self -> Vec<Machine> -> Effect<Vec<Probe>, Never, HNil>
+  probe self ms = probe_all (self.clone ()) ms
+
+-- Everything one hook process works with.
+export data Hook
+  { export machines Vec<Machine>
+  , export settings Settings
+  , export load_dir String
+  , export channel ChannelService
+  , export prober ProberService
+  , export copier CopierService
+  , export remote RemoteBuildService
+  , export log Option<Arc<std::fs::File>>
+  }
+
+-- What the decision needs from a request. `drv_features` are the `.drv`'s
+-- own `requiredSystemFeatures`, joined to the ones Nix sent (the same set for
+-- a plain derivation).
+export want_of : &Settings -> &Request -> &BTreeSet<String> -> Want
+want_of s req drv_features =
+  features = req.features.union drv_features |> .cloned |> .collect : BTreeSet<String>
+  local = could_build_locally s.max_jobs (&s.this_system) (&s.extra_platforms) (&req.system) (&s.system_features) (&features)
+  Want { system = req.system.clone (), features, local_ok = req.am_willing && local }
+
+-- The `.drv` as far as the hook needs it: its required features, and whether
+-- every output has a known path (a floating content-addressed one does not,
+-- and the CLI copier cannot fetch it back, so such builds are declined).
+export data DrvFacts { export features BTreeSet<String>, export outputs Vec<(String, String)>, export known bool }
+  deriving (Debug, Clone, PartialEq)
+
+export facts_of : &drv::Derivation -> DrvFacts
+facts_of d =
+  features = d.env.get "requiredSystemFeatures" |> .map (\s -> words s) |> .unwrap_or_default
+  outputs = d.outputs.iter () |> .map (\o -> (o.0.clone (), o.1.path.clone ())) |> .collect : Vec<(String, String)>
+  known = outputs.iter () |> .all (\o -> !o.1.is_empty ())
+  DrvFacts { features, outputs, known }
+
+read_facts : String -> DrvFacts
+read_facts path =
+  case drv::read (std::path::Path::new (&path)) of
+    Ok d -> facts_of (&d)
+    Err _ -> DrvFacts { features = BTreeSet::new (), outputs = Vec::new (), known = false }
+
+-- The output paths Nix asked for.
+export wanted_paths : &DrvFacts -> &[String] -> Vec<String>
+wanted_paths facts wanted =
+  facts.outputs.iter () |> .filter (\o -> wanted.contains (&o.0)) |> .map (\o -> o.1.clone ()) |> .collect
+
+-- Under build-remote's main lock: count held slots, decide, and take a slot
+-- of the chosen machine before anyone else can.
+choose : String -> Want -> Vec<Machine> -> Vec<Probe> -> Result<(Decision, Option<Slot>), HookError>
+choose dir want ms probes =
+  lock = (main_lock (&dir) |> .map_err Local)?
+  cands = ms.iter () |> .zip (probes.iter ()) |> .map (\mp -> Candidate { machine = mp.0.clone (), probe = mp.1.clone (), held = held_count (&dir) mp.0 }) |> .collect : Vec<Candidate>
+  d = decide (&want) (&cands)
+  chosen = case d of
+    Accept i ->
+      case take (&dir) (&ms[i]) of
+        Some slot -> (Accept i, Some slot)
+        None -> (Decline, None)
+    other -> (other, None)
+  drop lock
+  Ok chosen
+
+-- Serve requests until Nix is done or a build is accepted.
+export serve : Arc<Hook> -> Effect<(), HookError, HNil>
+serve hook =
+  h = hook.clone ()
+  hook.channel.0.next () |> .flat_map (move \r -> next_step h r)
+
+next_step : Arc<Hook> -> Option<Request> -> Effect<(), HookError, HNil>
+next_step hook r =
+  case r of
+    None -> succeed (())
+    Some req -> handle hook req
+
+handle : Arc<Hook> -> Request -> Effect<(), HookError, HNil>
+handle hook req =
+  path = req.drv_path.clone ()
+  suspend (move \-> succeed (read_facts path)) |> .flat_map (move \facts -> placed hook req facts)
+
+placed : Arc<Hook> -> Request -> DrvFacts -> Effect<(), HookError, HNil>
+placed hook req facts =
+  want = want_of (&hook.settings) (&req) (&facts.features)
+  suitable = hook.machines.iter () |> .filter (\m -> suits m (&want.system) (&want.features)) |> .cloned |> .collect : Vec<Machine>
+  if suitable.is_empty () || !facts.known
+    answer hook req facts (Decline, None) (Vec::new ())
+  else
+    h = hook.clone ()
+    dir = hook.load_dir.clone ()
+    ms = suitable.clone ()
+    hook.prober.0.probe suitable |> .widen |> .flat_map (move \probes -> chosen h req facts dir want ms probes)
+
+chosen : Arc<Hook> -> Request -> DrvFacts -> String -> Want -> Vec<Machine> -> Vec<Probe> -> Effect<(), HookError, HNil>
+chosen hook req facts dir want ms probes =
+  ms2 = ms.clone ()
+  suspend (move \-> lifted (choose dir want ms probes)) |> .flat_map (move \c -> answer hook req facts c ms2)
+
+answer : Arc<Hook> -> Request -> DrvFacts -> (Decision, Option<Slot>) -> Vec<Machine> -> Effect<(), HookError, HNil>
+answer hook req facts c ms =
+  (d, slot) = c
+  case (d, slot) of
+    (Accept i, Some s) ->
+      m = ms[i].clone ()
+      h = hook.clone ()
+      hook.channel.0.reply (reply_text (&Accept i) (&m.store_uri)) |> .flat_map (move \_ -> holding s (accepted h req facts m))
+    (other, _) ->
+      h = hook.clone ()
+      hook.channel.0.reply (reply_text (&other) "") |> .flat_map (move \_ -> serve h)
+
+-- The accepted build, start to end.
+accepted : Arc<Hook> -> Request -> DrvFacts -> Machine -> Effect<(), HookError, HNil>
+accepted hook req facts m =
+  h = hook.clone ()
+  hook.channel.0.accepted () |> .flat_map (move \io -> remote_build h req facts m io)
+
+remote_build : Arc<Hook> -> Request -> DrvFacts -> Machine -> (Vec<String>, Vec<String>) -> Effect<(), HookError, HNil>
+remote_build hook req facts m io =
+  (inputs, wanted) = io
+  mut send = inputs
+  send.push (req.drv_path.clone ())
+  outputs = wanted_paths (&facts) (&wanted)
+  copier = hook.copier.clone ()
+  copier2 = hook.copier.clone ()
+  remote = hook.remote.clone ()
+  m2 = m.clone ()
+  m3 = m.clone ()
+  drv_path = req.drv_path.clone ()
+  log = hook.log.clone ()
+  steps = copier.0.copy_to m send |> .flat_map (move \_ -> remote.0.build m2 drv_path) |> .flat_map (move \_ -> copier2.0.copy_from m3 outputs)
+  steps |> .map_err (\e -> HookError::from e) |> .catch (move \e -> reported log e)
+
+-- A failed build: say why in the build log (all Nix shows of a hook's
+-- output at this point), then fail, so the exit status reports it.
+reported : Option<Arc<std::fs::File>> -> HookError -> Effect<(), HookError, HNil>
+reported log e =
+  suspend (move \-> to_log log e)
+
+to_log : Option<Arc<std::fs::File>> -> HookError -> Effect<(), HookError, HNil>
+to_log log e =
+  if &log is Some f
+    _ = (&**f).write_all ((format! \-> "vbuild: {e}\n") |> .as_bytes)
+  fail e
+
+-- A scripted channel, for tests: the requests to hand out, and every reply.
+export data Script { requests Mutex<VecDeque<Request>>, export replies Mutex<Vec<String>>, inputs (Vec<String>, Vec<String>) }
+
+instance Channel Script
+  next : &self -> Effect<Option<Request>, HookError, HNil>
+  next self = succeed (pop (&self.requests))
+
+  reply : &self -> String -> Effect<(), HookError, HNil>
+  reply self text =
+    record (&self.replies) text
+    succeed (())
+
+  accepted : &self -> Effect<(Vec<String>, Vec<String>), HookError, HNil>
+  accepted self = succeed (self.inputs.clone ())
+
+rust """
+  fn pop(q: &Mutex<VecDeque<Request>>) -> Option<Request> {
+      q.lock().ok().and_then(|mut g| g.pop_front())
+  }
+
+  fn record(rs: &Mutex<Vec<String>>, text: String) {
+      if let Ok(mut g) = rs.lock() {
+          g.push(text);
+      }
+  }
+"""
+
+export script : Vec<Request> -> (Vec<String>, Vec<String>) -> Arc<Script>
+script requests inputs = Arc::new (Script { requests = Mutex::new (VecDeque::from requests), replies = Mutex::new (Vec::new ()), inputs })
+
+rust """
+  /// The replies a script recorded, for assertions.
+  pub fn replies_of(s: &Script) -> Vec<String> {
+      s.replies.lock().map(|g| g.clone()).unwrap_or_default()
+  }
+"""
+
+-- Fakes for the flow tests: fixed probes by store URI, and a copier and a
+-- remote that record what they were asked to do.
+#[cfg(test)]
+data FixedProbes { probes Vec<(String, Probe)> }
+
+#[cfg(test)]
+instance Prober FixedProbes
+  probe : &self -> Vec<Machine> -> Effect<Vec<Probe>, Never, HNil>
+  probe self ms = succeed (ms.iter () |> .map (\m -> self.probes.iter () |> .find (\p -> p.0 == m.store_uri) |> .map (\p -> p.1.clone ()) |> .unwrap_or (Probe::Down (.to_string "unknown"))) |> .collect)
+
+#[cfg(test)]
+data Recorder { calls Mutex<Vec<String>> }
+
+#[cfg(test)]
+rust """
+  impl Recorder {
+      fn note(&self, what: String) {
+          if let Ok(mut g) = self.calls.lock() {
+              g.push(what);
+          }
+      }
+      fn seen(&self) -> Vec<String> {
+          self.calls.lock().map(|g| g.clone()).unwrap_or_default()
+      }
+  }
+"""
+
+#[cfg(test)]
+instance crate::copier::Copier Recorder
+  copy_to : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_to self m paths =
+    joined = paths.join " "
+    self.note ("to #{m.store_uri} #{joined}")
+    succeed (())
+
+  copy_from : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_from self m paths =
+    joined = paths.join " "
+    self.note ("from #{m.store_uri} #{joined}")
+    succeed (())
+
+#[cfg(test)]
+instance crate::copier::RemoteBuild Recorder
+  build : &self -> Machine -> String -> Effect<(), BuildError, HNil>
+  build self m drv =
+    self.note ("build #{m.store_uri} #{drv}")
+    succeed (())
+
+#[cfg(test)]
+const DRV_TEXT : &str = "Derive([(\"out\",\"/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x\",\"\",\"\")],[],[],\"x86_64-linux\",\"/bin/sh\",[],[(\"requiredSystemFeatures\",\"kvm\")])"
+
+#[cfg(test)]
+scratch : &str -> String
+scratch name =
+  dir = std::env::temp_dir () |> .join ("vbuild-hook-#{name}-#{std::process::id ()}")
+  _ = std::fs::remove_dir_all (&dir)
+  _ = std::fs::create_dir_all (&dir)
+  dir.to_string_lossy ().into_owned ()
+
+#[cfg(test)]
+machines_for_test : Vec<Machine>
+machines_for_test =
+  none = BTreeSet::new () : BTreeSet<String>
+  plain = crate::machines::parse_line (&none) "ssh://tom@plain x86_64-linux - 4 2" |> .unwrap
+  kvm = crate::machines::parse_line (&none) "ssh://tom@kvm x86_64-linux - 2 1 kvm" |> .unwrap
+  .to_vec ([plain, kvm])
+
+#[cfg(test)]
+local_settings : Settings
+local_settings = Settings { builders = String::new (), this_system = .to_string "x86_64-linux", extra_platforms = BTreeSet::new (), system_features = BTreeSet::new (), max_jobs = 4, substitute = false }
+
+#[cfg(test)]
+request : String -> &[&str] -> Request
+request drv_path features = Request { am_willing = true, system = .to_string "x86_64-linux", drv_path, features = features.iter () |> .map (\f -> f.to_string ()) |> .collect }
+
+-- One hook process over a script; the replies and the recorded calls.
+#[cfg(test)]
+run_hook : String -> Vec<Request> -> Vec<(String, Probe)> -> (Vec<String>, Vec<String>, bool)
+run_hook name requests probes =
+  dir = scratch (&name)
+  ch = script requests ((.to_vec ([.to_string "/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-in"]), .to_vec ([.to_string "out"])))
+  rec = Arc::new (Recorder { calls = Mutex::new (Vec::new ()) })
+  hook = Hook { machines = machines_for_test (), settings = local_settings (), load_dir = dir, channel = ChannelService (ch.clone ()), prober = ProberService (Arc::new (FixedProbes { probes })), copier = CopierService (rec.clone ()), remote = RemoteBuildService (rec.clone ()), log = None }
+  exit = id_effect::testing::run_test (serve (Arc::new hook))
+  (replies_of (&ch), rec.seen (), exit.into_result () |> .is_ok)
+
+#[cfg(test)]
+up : f64 -> Probe
+up load1 = Probe::Up (crate::select::Load { load1, cpus = 4, jobs = 0 })
+
+test "a try request reads off the wire"
+  mut bytes = Vec::new () : Vec<u8>
+  crate::wire::encode_string (&mut bytes) "try"
+  crate::wire::encode_u64 (&mut bytes) 1
+  crate::wire::encode_string (&mut bytes) "x86_64-linux"
+  crate::wire::encode_string (&mut bytes) "/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x.drv"
+  crate::wire::encode_strings (&mut bytes) (&[.to_string "kvm"])
+  got = read_request (&mut bytes.as_slice ())
+  assert_eq! \-> got \-> Ok (Some (request (.to_string "/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x.drv") (&["kvm"])))
+
+test "end of input, or another word, ends the conversation"
+  empty = Vec::new () : Vec<u8>
+  assert_eq! \-> read_request (&mut empty.as_slice ()) \-> Ok None
+  mut bytes = Vec::new () : Vec<u8>
+  crate::wire::encode_string (&mut bytes) "done"
+  assert_eq! \-> read_request (&mut bytes.as_slice ()) \-> Ok None
+
+test "settings Nix sends become the hook's"
+  pairs = .to_vec ([(.to_string "builders", .to_string "@/etc/nix/machines"), (.to_string "system", .to_string "x86_64-linux"), (.to_string "system-features", .to_string "kvm big-parallel"), (.to_string "max-jobs", .to_string "8"), (.to_string "builders-use-substitutes", .to_string "true")])
+  s = settings_of (&pairs)
+  assert_eq! \-> s.builders \-> .to_string "@/etc/nix/machines"
+  assert_eq! \-> s.max_jobs \-> 8
+  assert! \-> s.substitute
+  assert! \-> s.system_features.contains "big-parallel"
+
+test "replies are the lines Nix parses"
+  assert_eq! \-> reply_text (&Accept 0) "ssh://tom@b" \-> .to_string "# accept\nssh://tom@b\n"
+  assert_eq! \-> reply_text (&Decline) "" \-> .to_string "# decline\n"
+
+test "the drv's own requiredSystemFeatures count, and its outputs are known"
+  d = drv::parse DRV_TEXT |> .unwrap
+  f = facts_of (&d)
+  assert! \-> f.features.contains "kvm"
+  assert! \-> f.known
+  assert_eq! \-> wanted_paths (&f) (&[.to_string "out"]) \-> .to_vec ([.to_string "/nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x"])
+
+test "a build that needs a feature lands on the builder that has it, inputs out and outputs back"
+  dir = scratch "drv-accept"
+  drv_path = "#{dir}/x.drv"
+  _ = std::fs::write (&drv_path) DRV_TEXT
+  (replies, calls, ok) = run_hook (.to_string "accept") (.to_vec ([request (drv_path.clone ()) (&["kvm"])])) (.to_vec ([(.to_string "ssh://tom@plain", up 0.0), (.to_string "ssh://tom@kvm", up 3.0)]))
+  assert! \-> ok
+  assert_eq! \-> replies \-> .to_vec ([.to_string "# accept\nssh://tom@kvm\n"])
+  assert_eq! \-> calls \-> .to_vec (["to ssh://tom@kvm /nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-in #{drv_path}", "build ssh://tom@kvm #{drv_path}", .to_string "from ssh://tom@kvm /nix/store/sfvyavxai6qvzmv9p9x6mp4wwdz4v41m-x"])
+
+test "every builder down: decline at once and keep serving, then end"
+  dir = scratch "drv-down"
+  drv_path = "#{dir}/x.drv"
+  _ = std::fs::write (&drv_path) DRV_TEXT
+  r = request (drv_path.clone ()) (&[])
+  (replies, calls, ok) = run_hook (.to_string "down") (.to_vec ([r.clone (), r])) (.to_vec ([(.to_string "ssh://tom@plain", Probe::Down (.to_string "no answer within 3000 ms")), (.to_string "ssh://tom@kvm", Probe::Down (.to_string "no answer within 3000 ms"))]))
+  assert! \-> ok
+  assert_eq! \-> replies \-> .to_vec ([.to_string "# decline\n", .to_string "# decline\n"])
+  assert! \-> calls.is_empty ()
+
+test "a drv that cannot be read is declined, not guessed at"
+  (replies, calls, ok) = run_hook (.to_string "unreadable") (.to_vec ([request (.to_string "/nonexistent/x.drv") (&[])])) (.to_vec ([(.to_string "ssh://tom@plain", up 0.0)]))
+  assert! \-> ok
+  assert_eq! \-> replies \-> .to_vec ([.to_string "# decline\n"])
+  assert! \-> calls.is_empty ()

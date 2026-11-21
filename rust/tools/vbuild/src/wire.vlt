@@ -1,0 +1,204 @@
+-- Nix's wire format, the part the build hook protocol uses (libutil's
+-- `serialise.hh`): an integer is eight bytes little-endian; a string is its
+-- length as an integer, the bytes, then zero padding to a multiple of eight;
+-- a list of strings is a count, then the strings.
+--
+-- The hook reads these from its stdin; `encode_*` are what Nix writes, used
+-- by the tests to build requests byte for byte.
+
+import std::io::Read
+
+const ZEROS : [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0]
+
+-- Longest string the hook accepts: a settings value (the `builders` line can
+-- be long) or a store path. Anything bigger is a corrupt stream, not data.
+const MAX_STRING : u64 = 16777216
+
+-- Most strings in one list (inputs of a derivation can number thousands).
+const MAX_LIST : u64 = 1048576
+
+-- Why a read failed. `Eof` is a clean end of the stream before a value
+-- started, which is how Nix tells the hook it is done.
+export data WireError
+  = Eof
+  | Io String
+  | Corrupt String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+instance std::fmt::Display WireError
+  fmt : &self -> &mut std::fmt::Formatter -> std::fmt::Result
+  fmt self f = f.write_str (&describe self)
+
+describe : &WireError -> String
+describe e =
+  case e of
+    Eof -> .to_string "end of input"
+    Io why -> "reading from Nix: #{why}"
+    Corrupt why -> "corrupt hook protocol stream: #{why}"
+
+-- Fill `buf`, or say why not. A stream that ends before the first byte is
+-- `Eof`; one that ends in the middle of a value is corrupt.
+fill : given <R: Read> &mut R -> &mut [u8] -> Result<(), WireError>
+fill r buf =
+  end = buf.len ()
+  mut got = 0 : usize
+  mut open = true
+  mut failed = None : Option<String>
+  while open && got < end
+    case r.read (&mut buf[got .. end]) of
+      Ok 0 ->
+        open := false
+      Ok n ->
+        got := got + n
+      Err e ->
+        if e.kind () != std::io::ErrorKind::Interrupted
+          failed := Some (e.to_string ())
+          open := false
+  if failed is Some why
+    Err (Io why)
+  else if got == end
+    Ok ()
+  else if got == 0
+    Err Eof
+  else
+    Err (Corrupt ("stream ended inside a value (#{got} of #{buf.len ()} bytes)"))
+
+export read_u64 : given <R: Read> &mut R -> Result<u64, WireError>
+read_u64 r =
+  mut buf = ZEROS
+  (fill r (&mut buf))?
+  Ok (u64::from_le_bytes buf)
+
+-- A length as a usize, refusing anything past `max`.
+length : u64 -> u64 -> Result<usize, WireError>
+length n max =
+  if n > max
+    Err (Corrupt ("a length of #{n} is past the limit of #{max}"))
+  else
+    usize::try_from n |> .map_err (\_ -> Corrupt ("a length of #{n} does not fit"))
+
+-- Zero bytes after a string of `len` bytes.
+export padding : usize -> usize
+padding len = (8 - len % 8) % 8
+
+export read_bytes : given <R: Read> &mut R -> Result<Vec<u8>, WireError>
+read_bytes r =
+  n = (length ((read_u64 r)?) MAX_STRING)?
+  mut out = Vec::new () : Vec<u8>
+  out.resize (n + padding n) 0
+  (fill r (&mut out) |> .map_err (\e -> mid_value e))?
+  out.truncate n
+  Ok out
+
+-- Inside a value, even the first missing byte is corruption.
+mid_value : WireError -> WireError
+mid_value e =
+  case e of
+    Eof -> Corrupt (.to_string "stream ended inside a string")
+    other -> other
+
+export read_string : given <R: Read> &mut R -> Result<String, WireError>
+read_string r =
+  bytes = (read_bytes r)?
+  String::from_utf8 bytes |> .map_err (\e -> Corrupt ("a string is not UTF-8: #{e}"))
+
+export read_strings : given <R: Read> &mut R -> Result<Vec<String>, WireError>
+read_strings r =
+  n = (length ((read_u64 r)?) MAX_LIST)?
+  mut out = Vec::with_capacity (n.min 4096) : Vec<String>
+  for _ in 0 .. n
+    out.push ((read_string r |> .map_err (\e -> mid_value e))?)
+  Ok out
+
+-- The settings Nix sends first: `1 name value` per setting, then `0`.
+export read_settings : given <R: Read> &mut R -> Result<Vec<(String, String)>, WireError>
+read_settings r =
+  mut out = Vec::new () : Vec<(String, String)>
+  mut more = (read_u64 r)? != 0
+  while more
+    name = (read_string r |> .map_err (\e -> mid_value e))?
+    value = (read_string r |> .map_err (\e -> mid_value e))?
+    out.push ((name, value))
+    more := (read_u64 r |> .map_err (\e -> mid_value e))? != 0
+  Ok out
+
+export encode_u64 : &mut Vec<u8> -> u64 -> ()
+encode_u64 out n =
+  out.extend_from_slice (&n.to_le_bytes ())
+  ()
+
+export encode_string : &mut Vec<u8> -> &str -> ()
+encode_string out s =
+  n = u64::try_from (s.len ()) |> .unwrap_or u64::MAX
+  encode_u64 out n
+  out.extend_from_slice (s.as_bytes ())
+  out.extend_from_slice (&ZEROS[0 .. padding (s.len ())])
+  ()
+
+export encode_strings : &mut Vec<u8> -> &[String] -> ()
+encode_strings out ss =
+  encode_u64 out (u64::try_from (ss.len ()) |> .unwrap_or u64::MAX)
+  for s in ss
+    encode_string out s
+  ()
+
+#[cfg(test)]
+corrupt : Result<String, WireError> -> bool
+corrupt r =
+  case r of
+    Err (Corrupt _) -> true
+    _ -> false
+
+test "an integer is eight little-endian bytes"
+  mut out = Vec::new () : Vec<u8>
+  encode_u64 (&mut out) 258
+  assert_eq! \-> out \-> .to_vec ([2, 1, 0, 0, 0, 0, 0, 0])
+  assert_eq! \-> read_u64 (&mut out.as_slice ()) \-> Ok 258
+
+test "a string is padded to a multiple of eight and reads back"
+  mut out = Vec::new () : Vec<u8>
+  encode_string (&mut out) "try"
+  assert_eq! \-> out.len () \-> 16
+  assert_eq! \-> read_string (&mut out.as_slice ()) \-> Ok (.to_string "try")
+
+test "an empty string is a bare zero length"
+  mut out = Vec::new () : Vec<u8>
+  encode_string (&mut out) ""
+  assert_eq! \-> out.len () \-> 8
+  assert_eq! \-> read_string (&mut out.as_slice ()) \-> Ok (String::new ())
+
+test "a string of exactly eight bytes has no padding"
+  mut out = Vec::new () : Vec<u8>
+  encode_string (&mut out) "abcdefgh"
+  assert_eq! \-> out.len () \-> 16
+
+test "a list of strings reads back in order"
+  mut out = Vec::new () : Vec<u8>
+  items = .to_vec ([.to_string "kvm", .to_string "big-parallel"]) : Vec<String>
+  encode_strings (&mut out) (&items)
+  assert_eq! \-> read_strings (&mut out.as_slice ()) \-> Ok items
+
+test "settings are name/value pairs ended by a zero"
+  mut out = Vec::new () : Vec<u8>
+  encode_u64 (&mut out) 1
+  encode_string (&mut out) "builders"
+  encode_string (&mut out) "@/etc/nix/machines"
+  encode_u64 (&mut out) 1
+  encode_string (&mut out) "max-jobs"
+  encode_string (&mut out) "4"
+  encode_u64 (&mut out) 0
+  got = read_settings (&mut out.as_slice ())
+  assert_eq! \-> got \-> Ok (.to_vec ([(.to_string "builders", .to_string "@/etc/nix/machines"), (.to_string "max-jobs", .to_string "4")]))
+
+test "an empty stream is a clean end, a cut one is corrupt"
+  empty = Vec::new () : Vec<u8>
+  assert_eq! \-> read_string (&mut empty.as_slice ()) \-> Err Eof
+  mut out = Vec::new () : Vec<u8>
+  encode_string (&mut out) "x86_64-linux"
+  cut = out[0 .. 12].to_vec ()
+  assert_eq! \-> corrupt (read_string (&mut cut.as_slice ())) \-> true
+
+test "an absurd length is refused before anything is allocated"
+  mut out = Vec::new () : Vec<u8>
+  encode_u64 (&mut out) u64::MAX
+  assert_eq! \-> corrupt (read_string (&mut out.as_slice ())) \-> true

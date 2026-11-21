@@ -1,0 +1,277 @@
+-- The live load of a builder: one ssh round trip, bounded by a timeout,
+-- cached briefly on disk so the next hook process (Nix starts one per
+-- accepted build) does not ask again.
+--
+-- The probe runs `sh -c` explicitly: the fleet's login shell is nushell, and
+-- the script is POSIX. It prints the load average line, the CPU count and the
+-- number of distinct `nixbld*` users with processes, which is how many builds
+-- the builder is running.
+--
+-- The ssh it runs is a ControlPersist master (`ControlMaster=auto`) in a
+-- process group of its own, with no stdio of the hook's: the `nix copy` and
+-- `nix build` that follow multiplex over it (`NIX_SSHOPTS`), so a build pays
+-- one ssh handshake, and the master never holds Nix's log pipe open.
+
+import std::time::{Duration, SystemTime}
+import id_effect::{Effect, HNil, Never, Concurrency, for_each_par, succeed, suspend}
+import crate::machines::{Machine, escape_uri, ssh_target}
+import crate::run::{Cmd, RunnerService, succeeded}
+import crate::select::{Load, Probe}
+import crate::select::Probe::{Up, Down}
+
+export const SCRIPT : &str = "cat /proc/loadavg; nproc; ps -eo user= | sort -u | grep -c '^nixbld' || true"
+
+-- The probe's output, three lines. A missing job count is zero.
+export parse_output : &str -> Result<Load, String>
+parse_output text =
+  lines = text.lines () |> .collect : Vec<&str>
+  first = (lines.first () |> .ok_or (.to_string "empty probe output"))?
+  load1 = (first.split_whitespace () |> .next |> .and_then (\w -> w.parse () |> .ok) |> .ok_or ("no load average in '#{first}'"))?
+  cpus = (lines.get 1 |> .and_then (\l -> l.trim () |> .parse () |> .ok) |> .ok_or (.to_string "no CPU count"))?
+  jobs = lines.get 2 |> .and_then (\l -> l.trim () |> .parse () |> .ok) |> .unwrap_or 0
+  Ok (Load { load1, cpus, jobs })
+
+-- The cache line for a probe, and back.
+export encode : &Probe -> String
+encode p =
+  case p of
+    Up l -> "up #{l.load1} #{l.cpus} #{l.jobs}"
+    Down why ->
+      flat = why.replace '\n' " "
+      "down #{flat}"
+
+export decode : &str -> Option<Probe>
+decode line =
+  if line.strip_prefix "down " is Some why
+    Some (Down (why.to_string ()))
+  else if line.strip_prefix "up " is Some rest
+    words = rest.split_whitespace () |> .collect : Vec<&str>
+    if words.len () == 3
+      decode_up (&words)
+    else
+      None
+  else
+    None
+
+decode_up : &[&str] -> Option<Probe>
+decode_up words =
+  load1 = (words[0].parse () |> .ok)?
+  cpus = (words[1].parse () |> .ok)?
+  jobs = (words[2].parse () |> .ok)?
+  Some (Up (Load { load1, cpus, jobs }))
+
+-- How long a cached probe stays good: a load briefly, an unreachable builder
+-- longer (it is the expensive answer to find out again).
+export data Ttl { export up Duration, export down Duration }
+  deriving (Debug, Clone, Copy, PartialEq)
+
+export fresh : &Ttl -> &Probe -> Duration -> bool
+fresh ttl p age =
+  case p of
+    Up _ -> age < ttl.up
+    Down _ -> age < ttl.down
+
+-- Everything the live prober needs.
+export data SshProbe
+  { export ssh String
+  , export control_dir String
+  , export cache_dir String
+  , export known_hosts_dir String
+  , export timeout Duration
+  , export ttl Ttl
+  , export runner RunnerService
+  }
+
+instance Clone SshProbe
+  clone : &self -> Self
+  clone self = SshProbe { ssh = self.ssh.clone (), control_dir = self.control_dir.clone (), cache_dir = self.cache_dir.clone (), known_hosts_dir = self.known_hosts_dir.clone (), timeout = self.timeout, ttl = self.ttl, runner = self.runner.clone () }
+
+cache_path : &SshProbe -> &Machine -> String
+cache_path cfg m = "#{cfg.cache_dir}/#{escape_uri (&m.store_uri)}"
+
+-- A cached probe still fresh, if any. A missing or unreadable file is a miss.
+read_cache : SshProbe -> Machine -> Option<Probe>
+read_cache cfg m =
+  path = cache_path (&cfg) (&m)
+  text = (std::fs::read_to_string (&path) |> .ok)?
+  modified = (std::fs::metadata (&path) |> .and_then (\md -> md.modified ()) |> .ok)?
+  age = SystemTime::now () |> .duration_since modified |> .unwrap_or (Duration::ZERO)
+  p = (decode (text.trim ()))?
+  if fresh (&cfg.ttl) (&p) age
+    Some p
+  else
+    None
+
+-- Best effort: a cache that cannot be written only costs the next probe.
+-- Written to a temporary name and renamed, so a reader never sees half.
+write_cache : &SshProbe -> &Machine -> &Probe -> ()
+write_cache cfg m p =
+  path = cache_path cfg m
+  tmp = "#{path}.#{std::process::id ()}"
+  _ = std::fs::create_dir_all (&cfg.cache_dir)
+  if std::fs::write (&tmp) (encode p) |> .is_ok
+    _ = std::fs::rename (&tmp) (&path)
+  ()
+
+-- The host name ssh checks the host key against: the target without a user.
+host_of : &str -> String
+host_of target =
+  case target.rsplit_once '@' of
+    Some (_, h) -> h.to_string ()
+    None -> target.to_string ()
+
+-- A known_hosts file for a machine that names its host key, as Nix writes one
+-- (`SSHMaster::addCommonSSHOpts`). None: no key given, use the system's.
+known_hosts : &SshProbe -> &Machine -> &str -> Option<String>
+known_hosts cfg m target =
+  if m.host_key.is_empty ()
+    None
+  else
+    key = (decode_host_key (&m.host_key))?
+    path = "#{cfg.known_hosts_dir}/#{escape_uri (&m.store_uri)}"
+    _ = std::fs::create_dir_all (&cfg.known_hosts_dir)
+    line = "#{host_of target} #{key}\n"
+    if std::fs::write (&path) line |> .is_ok
+      Some path
+    else
+      None
+
+decode_host_key : &str -> Option<String>
+decode_host_key b64 =
+  bytes = (base64::Engine::decode (&base64::engine::general_purpose::STANDARD) b64 |> .ok)?
+  String::from_utf8 bytes |> .ok |> .map (\s -> s.trim ().to_string ())
+
+-- The ssh options every connection to a builder shares: batch mode, no
+-- forwarding, the control socket. `master` makes this connection the
+-- ControlPersist master; `nix copy` and `nix build` only ever join one.
+export ssh_options : &str -> &str -> bool -> Vec<String>
+ssh_options control_dir key master =
+  mut out = .to_vec (["-x", "-a", "-oBatchMode=yes"]) |> .into_iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+  out.push ("-oControlPath=#{control_dir}/%C")
+  if master
+    out.push (.to_string "-oControlMaster=auto")
+    out.push (.to_string "-oControlPersist=120")
+    -- A master on a connection that died (a builder gone offline) would
+    -- hang every probe until the timeout; this ends it within ~15 s.
+    out.push (.to_string "-oServerAliveInterval=5")
+    out.push (.to_string "-oServerAliveCountMax=3")
+  else
+    out.push (.to_string "-oControlMaster=no")
+  if !key.is_empty ()
+    out.push (.to_string "-i")
+    out.push (key.to_string ())
+  out
+
+-- The probe command for a machine, or why there is none.
+export probe_cmd : &SshProbe -> &Machine -> Result<Cmd, String>
+probe_cmd cfg m =
+  target = (ssh_target m |> .ok_or ("not an ssh store: #{m.store_uri}"))?
+  secs = cfg.timeout.as_secs ().max 1
+  mut args = ssh_options (&cfg.control_dir) (&m.ssh_key) true
+  args.push ("-oConnectTimeout=#{secs}")
+  if known_hosts cfg m (&target) is Some file
+    args.push ("-oUserKnownHostsFile=#{file}")
+    args.push (.to_string "-oStrictHostKeyChecking=yes")
+  args.push (target)
+  args.push (.to_string "--")
+  args.push ("sh -c \"#{SCRIPT}\"")
+  Ok (Cmd { program = cfg.ssh.clone (), args, env = Vec::new (), to_log = false, detached = true })
+
+-- What one ssh run says about a builder.
+export interpret : Result<crate::run::Ran, crate::run::RunError> -> Probe
+interpret r =
+  case r of
+    Err e -> Down (e.to_string ())
+    Ok ran ->
+      if succeeded (&ran)
+        case parse_output (&ran.stdout) of
+          Ok l -> Up l
+          Err why -> Down why
+      else
+        how = exit_text ran.status
+        Down ("ssh exited #{how}: #{ran.stderr.trim ()}")
+
+exit_text : Option<i32> -> String
+exit_text status =
+  case status of
+    Some c -> c.to_string ()
+    None -> .to_string "on a signal"
+
+-- Ask the builder, bounded by the timeout. Never fails: a builder that does
+-- not answer in time is `Down`.
+export ask : SshProbe -> Machine -> Effect<Probe, Never, HNil>
+ask cfg m =
+  limit = cfg.timeout
+  case probe_cmd (&cfg) (&m) of
+    Err why -> succeed (Down why)
+    Ok c ->
+      cfg.runner.0.run c |> .map (\ran -> interpret (Ok ran)) |> .catch (\e -> succeed (interpret (Err e))) |> .timeout limit |> .map (move \o -> o.unwrap_or (Down ("no answer within #{limit.as_millis ()} ms")))
+
+-- One machine: the cache if fresh, else ask and remember.
+export probe_one : SshProbe -> Machine -> Effect<Probe, Never, HNil>
+probe_one cfg m =
+  c1 = cfg.clone ()
+  m1 = m.clone ()
+  suspend (move \-> succeed (read_cache c1 m1)) |> .flat_map (move \cached -> from_cache_or_ask cfg m cached)
+
+from_cache_or_ask : SshProbe -> Machine -> Option<Probe> -> Effect<Probe, Never, HNil>
+from_cache_or_ask cfg m cached =
+  case cached of
+    Some p -> succeed p
+    None ->
+      c2 = cfg.clone ()
+      m2 = m.clone ()
+      ask cfg m |> .flat_map (move \p -> remembered c2 m2 p)
+
+remembered : SshProbe -> Machine -> Probe -> Effect<Probe, Never, HNil>
+remembered cfg m p =
+  suspend (move \-> succeed (keep cfg m p))
+
+keep : SshProbe -> Machine -> Probe -> Probe
+keep cfg m p =
+  write_cache (&cfg) (&m) (&p)
+  if &p is Down why
+    eprintln! \-> "vbuild: builder '#{m.store_uri}' is out: #{why}"
+  p
+
+-- Every machine at once, each bounded by the timeout, in input order.
+export probe_all : SshProbe -> Vec<Machine> -> Effect<Vec<Probe>, Never, HNil>
+probe_all cfg ms =
+  for_each_par ms (move \m -> probe_one (cfg.clone ()) m) Concurrency::Unbounded
+
+test "the probe output parses"
+  got = parse_output "0.52 0.58 0.59 1/1234 5678\n16\n3\n"
+  assert_eq! \-> got \-> Ok (Load { load1 = 0.52, cpus = 16, jobs = 3 })
+
+test "a missing job count is zero, missing CPUs is an error"
+  assert_eq! \-> parse_output "1.00 0.5 0.2 1/2 3\n4\n" \-> Ok (Load { load1 = 1.0, cpus = 4, jobs = 0 })
+  assert! \-> parse_output "1.00 0.5 0.2 1/2 3\n" |> .is_err
+  assert! \-> parse_output "" |> .is_err
+
+test "cache lines round-trip"
+  up = Up (Load { load1 = 0.25, cpus = 8, jobs = 1 })
+  assert_eq! \-> decode (&encode (&up)) \-> Some up
+  down = Down (.to_string "no answer within 3000 ms")
+  assert_eq! \-> decode (&encode (&down)) \-> Some down
+  assert_eq! \-> decode "garbage" \-> None
+
+test "freshness differs for up and down"
+  ttl = Ttl { up = Duration::from_secs 5, down = Duration::from_secs 30 }
+  up = Up (Load { load1 = 0.0, cpus = 1, jobs = 0 })
+  down = Down (.to_string "x")
+  assert_eq! \-> fresh (&ttl) (&up) (Duration::from_secs 10) \-> false
+  assert_eq! \-> fresh (&ttl) (&down) (Duration::from_secs 10) \-> true
+
+test "a failed or garbled ssh run is down"
+  bad = crate::run::Ran { status = Some 255, stdout = String::new (), stderr = .to_string "Connection timed out" }
+  assert_eq! \-> interpret (Ok bad) \-> Down (.to_string "ssh exited 255: Connection timed out")
+  garbled = crate::run::Ran { status = Some 0, stdout = .to_string "?", stderr = String::new () }
+  assert_eq! \-> interpret (Ok garbled) \-> Down (.to_string "no load average in '?'")
+
+test "the master options and the joiners' differ only in ControlMaster"
+  m = ssh_options "/run/vbuild" "/k" true
+  j = ssh_options "/run/vbuild" "" false
+  assert! \-> m.contains (&.to_string "-oControlPersist=120")
+  assert! \-> j.contains (&.to_string "-oControlMaster=no")
+  assert! \-> j.contains (&.to_string "-oControlPath=/run/vbuild/%C")
+  assert! \-> !(j.contains (&.to_string "-i"))
