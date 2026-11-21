@@ -1,0 +1,38 @@
+[package]
+name = "vfiles"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "A declarative file linker: places NixOS-declared user files atomically, owns them through a manifest, removes what it owned, and reports hand edits instead of clobbering them"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# every other rust/tools consumer.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The spec (written by the NixOS module), the manifest and the report.
+serde_json = "1"
+# Content fingerprints of copied files.
+sha2 = "0.10"
+# FS_IOC_GETFLAGS / FS_IOC_SETFLAGS for the immutable attribute.
+libc = "0.2"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vfiles"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vfiles"
+path = "src/main.rs"

@@ -1,0 +1,247 @@
+-- The decision table: what to do at one path, from what is declared, what
+-- the manifest says vfiles left there, and what is there now. Pure, so every
+-- case is a unit test; `app` carries the decisions out.
+--
+-- Fingerprints name what a path holds: `link:<target>` for a symlink,
+-- `sha256:<hex>` for a regular file, `dir`, or `other`. vfiles owns a path
+-- when the manifest records it, and a path it owns is *unmodified* while its
+-- fingerprint is still the recorded one.
+--
+--   declared, nothing there                 -> Place
+--   declared, already as declared           -> Keep (and own it)
+--   declared, ours and unmodified           -> Replace
+--   declared, ours but edited by hand       -> Drift (reported, left alone)
+--   declared, not ours, a symlink           -> Replace (a link holds no data)
+--   declared, not ours, a real file or dir  -> Adopt (moved to .backup first)
+--   seed: nothing there                     -> Place; anything there -> left
+--   dropped, ours and unmodified            -> Remove
+--   dropped, edited by hand                 -> Left (reported, no longer owned)
+
+import crate::spec::{Entry, Mode, Record}
+
+-- What is at a path now.
+export data Observed
+  = Missing
+  -- Its fingerprint.
+  | Present String
+  deriving (Clone, Debug, PartialEq)
+
+-- What to do at a path.
+export data Action
+  -- Already as declared: nothing to do (and owned from now on).
+  = Keep
+  -- A seeded file: the user's; nothing to do, ownership unchanged.
+  | Hold
+  -- Nothing there: create it.
+  | Place
+  -- Ours and unmodified, or a stray symlink: overwrite it atomically.
+  | Replace
+  -- A real file or directory not yet ours: move it to a backup, then place.
+  | Adopt
+  -- Edited by hand since vfiles placed it: reported and left alone.
+  | Drift String
+  -- A seed target that was already there and was never ours: left alone.
+  | Unowned
+  -- Neither the source nor the fallback exists: nothing changes.
+  | Skip String
+  -- Dropped from the spec (or declared absent) and unmodified: deleted.
+  | Remove
+  -- Dropped from the spec and already gone.
+  | Forget
+  -- Dropped from the spec but edited by hand: left alone, no longer owned.
+  | Left String
+  deriving (Clone, Debug, PartialEq)
+
+export link_fingerprint : &str -> String
+link_fingerprint target = "link:#{target}"
+
+export is_symlink : &Observed -> bool
+is_symlink o =
+  case o of
+    Observed::Present f -> f.starts_with "link:"
+    Observed::Missing -> false
+
+matches : &Observed -> &str -> bool
+matches o fp =
+  case o of
+    Observed::Present f -> f == fp
+    Observed::Missing -> false
+
+absent : &Observed -> Action
+absent observed =
+  case observed of
+    Observed::Missing -> Action::Keep
+    Observed::Present _ ->
+      if is_symlink observed
+        Action::Remove
+      else
+        Action::Drift (.to_string "declared absent, but a real file is there; left in place")
+
+seeded : Option<&String> -> Option<&Record> -> &Observed -> Action
+seeded want record observed =
+  case observed of
+    Observed::Missing ->
+      if want.is_some ()
+        Action::Place
+      else
+        Action::Skip (.to_string "neither the source nor the fallback exists")
+    Observed::Present _ ->
+      if record.is_some ()
+        Action::Hold
+      else
+        Action::Unowned
+
+owned_against : &str -> bool -> Option<&Record> -> &Observed -> Action
+owned_against fp force record observed =
+  if matches observed fp
+    return Action::Keep
+  case observed of
+    Observed::Missing -> Action::Place
+    Observed::Present now ->
+      case record of
+        Some r ->
+          if force || matches observed (&r.fingerprint)
+            Action::Replace
+          else
+            Action::Drift ("edited by hand (expected #{r.fingerprint}, found #{now}); left in place")
+        None ->
+          if is_symlink observed
+            Action::Replace
+          else
+            Action::Adopt
+
+owned : Option<&String> -> bool -> Option<&Record> -> &Observed -> Action
+owned want force record observed =
+  case want of
+    None -> Action::Skip (.to_string "neither the source nor the fallback exists")
+    Some fp -> owned_against (fp.as_str ()) force record observed
+
+-- The action for a declared file. `want` is the fingerprint the declared
+-- source would leave (None: neither source nor fallback exists); `record` is
+-- the manifest's, if vfiles owns the path.
+export decide : &Entry -> Option<&String> -> Option<&Record> -> &Observed -> Action
+decide entry want record observed =
+  case entry.mode of
+    Mode::Absent -> absent observed
+    Mode::Seed -> seeded want record observed
+    _ -> owned want entry.force record observed
+
+-- The action for an owned file that left the spec.
+export dropped : &Record -> &Observed -> Action
+dropped record observed =
+  case observed of
+    Observed::Missing -> Action::Forget
+    Observed::Present now ->
+      if matches observed (&record.fingerprint)
+        Action::Remove
+      else
+        Action::Left ("edited by hand (expected #{record.fingerprint}, found #{now}); left in place, no longer owned")
+
+-- What the manifest records for a declared file after `action`.
+export kept_record : &Entry -> Option<&String> -> Option<&Record> -> &Action -> Option<Record>
+kept_record entry want record action =
+  if entry.mode == Mode::Absent
+    return None
+  fresh = want |> .map (\fp -> Record { path = entry.path.clone (), mode = entry.mode, fingerprint = fp.clone () })
+  case action of
+    Action::Keep -> fresh
+    Action::Place -> fresh
+    Action::Replace -> fresh
+    Action::Adopt -> fresh
+    Action::Hold -> record.cloned ()
+    Action::Drift _ -> record.cloned ()
+    Action::Skip _ -> record.cloned ()
+    _ -> None
+
+#[cfg(test)]
+entry : Mode -> Entry
+entry mode = Entry { path = .to_string "/home/u/.config/x", mode, source = Some (.to_string "/nix/store/new-x"), fallback = None, user = .to_string "u", group = .to_string "users", perms = 420, immutable = false, force = false }
+
+#[cfg(test)]
+record : &str -> Record
+record fp = Record { path = .to_string "/home/u/.config/x", mode = Mode::Link, fingerprint = fp.to_string () }
+
+#[cfg(test)]
+present : &str -> Observed
+present fp = Observed::Present (fp.to_string ())
+
+test "a declared link: placed, kept, replaced while untouched"
+  e = entry Mode::Link
+  want = link_fingerprint "/nix/store/new-x"
+  old = record "link:/nix/store/old-x"
+  assert_eq! \-> decide (&e) (Some (&want)) None (&Observed::Missing) \-> Action::Place
+  assert_eq! \-> decide (&e) (Some (&want)) None (&present (&want)) \-> Action::Keep
+  assert_eq! \-> decide (&e) (Some (&want)) (Some (&old)) (&present "link:/nix/store/old-x") \-> Action::Replace
+
+test "a hand edit of an owned file is drift, never overwritten"
+  e = entry Mode::Copy
+  want = .to_string "sha256:new"
+  mine = record "sha256:old"
+  a = decide (&e) (Some (&want)) (Some (&mine)) (&present "sha256:edited")
+  assert! \-> is_drift (&a)
+  assert_eq! \-> kept_record (&e) (Some (&want)) (Some (&mine)) (&a) \-> Some (mine.clone ())
+  repointed = decide (&e) (Some (&want)) (Some (&mine)) (&present "link:/elsewhere")
+  assert! \-> is_drift (&repointed)
+
+test "a forced file is replaced even when its program rewrote it"
+  mut e = entry Mode::Copy
+  e.force := true
+  want = .to_string "sha256:generated"
+  mine = record "sha256:generated-before"
+  assert_eq! \-> decide (&e) (Some (&want)) (Some (&mine)) (&present "sha256:rewritten-on-exit") \-> Action::Replace
+  assert_eq! \-> decide (&e) (Some (&want)) None (&present "sha256:not-ours-yet") \-> Action::Adopt
+
+test "the first run adopts a real file with a backup, and replaces a stray link"
+  e = entry Mode::Link
+  want = link_fingerprint "/nix/store/new-x"
+  assert_eq! \-> decide (&e) (Some (&want)) None (&present "sha256:handwritten") \-> Action::Adopt
+  assert_eq! \-> decide (&e) (Some (&want)) None (&present "dir") \-> Action::Adopt
+  assert_eq! \-> decide (&e) (Some (&want)) None (&present "link:/nix/store/legacy") \-> Action::Replace
+  assert_eq! \-> kept_record (&e) (Some (&want)) None (&Action::Adopt) |> .map (\r -> r.fingerprint) \-> Some want
+
+test "a missing source and fallback change nothing"
+  e = entry Mode::Link
+  mine = record "link:/home/u/checkout/x"
+  a = decide (&e) None (Some (&mine)) (&present "link:/home/u/checkout/x")
+  assert! \-> is_skip (&a)
+  assert_eq! \-> kept_record (&e) None (Some (&mine)) (&a) \-> Some mine
+
+test "a seed is placed once and is the user's after"
+  e = entry Mode::Seed
+  want = .to_string "sha256:seed"
+  mine = record "sha256:seed"
+  assert_eq! \-> decide (&e) (Some (&want)) None (&Observed::Missing) \-> Action::Place
+  assert_eq! \-> decide (&e) (Some (&want)) (Some (&mine)) (&present "sha256:edited-in-the-ui") \-> Action::Hold
+  assert_eq! \-> decide (&e) (Some (&want)) None (&present "sha256:theirs") \-> Action::Unowned
+  assert_eq! \-> kept_record (&e) (Some (&want)) None (&Action::Unowned) \-> None
+
+test "absent removes a stray link and reports a real file"
+  e = entry Mode::Absent
+  assert_eq! \-> decide (&e) None None (&present "link:/nix/store/old-starship.toml") \-> Action::Remove
+  assert_eq! \-> decide (&e) None None (&Observed::Missing) \-> Action::Keep
+  assert! \-> is_drift (&decide (&e) None None (&present "sha256:mine"))
+  assert_eq! \-> kept_record (&e) None None (&Action::Remove) \-> None
+
+test "a dropped file is removed while untouched, and left once edited"
+  mine = record "link:/nix/store/x"
+  assert_eq! \-> dropped (&mine) (&present "link:/nix/store/x") \-> Action::Remove
+  assert_eq! \-> dropped (&mine) (&Observed::Missing) \-> Action::Forget
+  assert! \-> is_left (&dropped (&mine) (&present "sha256:edited"))
+
+export is_drift : &Action -> bool
+is_drift a =
+  case a of
+    Action::Drift _ -> true
+    _ -> false
+
+export is_left : &Action -> bool
+is_left a =
+  case a of
+    Action::Left _ -> true
+    _ -> false
+
+export is_skip : &Action -> bool
+is_skip a =
+  case a of
+    Action::Skip _ -> true
+    _ -> false

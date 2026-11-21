@@ -1,0 +1,249 @@
+-- The filesystem steps: observing what is at a path, and changing it. Every
+-- write is atomic for whoever reads the path: the new link or file is made
+-- beside it under a temporary name, owned and moded, synced, and renamed
+-- over the old one, so a shell starting mid-switch sees the old config or
+-- the new one, never a half-written file or a missing one.
+
+import std::collections::HashMap
+import std::fs
+import std::io::Write
+import std::os::unix::fs::PermissionsExt
+import std::path::{Path, PathBuf}
+import std::time::{SystemTime, UNIX_EPOCH}
+import sha2::{Digest, Sha256}
+import crate::plan::{Observed, link_fingerprint}
+import crate::spec::{Entry, Mode}
+
+-- The `sha256:<hex>` fingerprint of some bytes.
+export digest_hex : &[u8] -> String
+digest_hex bytes =
+  d = Sha256::digest bytes
+  hex = d.iter () |> .map (\b -> "#{b:02x}") |> .collect : String
+  "sha256:#{hex}"
+
+export digest_file : &Path -> std::io::Result<String>
+digest_file path =
+  bytes = (fs::read path)?
+  Ok (digest_hex (&bytes))
+
+fingerprint : &Path -> &fs::Metadata -> std::io::Result<String>
+fingerprint path meta =
+  ft = meta.file_type ()
+  if ft.is_symlink ()
+    target = (fs::read_link path)?
+    return Ok (link_fingerprint (&target.to_string_lossy ()))
+  if ft.is_file ()
+    return digest_file path
+  if ft.is_dir ()
+    return Ok (.to_string "dir")
+  Ok (.to_string "other")
+
+-- What is at `path`, without following a symlink there.
+export observe : &Path -> Result<Observed, String>
+observe path =
+  case fs::symlink_metadata path of
+    Err e ->
+      if e.kind () == std::io::ErrorKind::NotFound
+        Ok Observed::Missing
+      else
+        Err "#{path.display ()}: #{e}"
+    Ok meta -> fingerprint path (&meta) |> .map Observed::Present |> .map_err (\e -> "#{path.display ()}: #{e}")
+
+want_of : &Entry -> &str -> Result<String, String>
+want_of entry src =
+  case entry.mode of
+    Mode::Link -> Ok (link_fingerprint src)
+    _ -> digest_file (Path::new src) |> .map_err (\e -> "reading #{src}: #{e}")
+
+-- The source an entry places (its `source`, or its `fallback` when the
+-- source is missing) with the fingerprint placing it leaves; None when
+-- neither exists.
+export resolve : &Entry -> Result<Option<(String, String)>, String>
+resolve entry =
+  chosen = [entry.source.clone (), entry.fallback.clone ()].into_iter () |> .flatten |> .find (\s -> Path::new s |> .exists)
+  case chosen of
+    None -> Ok None
+    Some src ->
+      fp = (want_of entry (&src))?
+      Ok (Some ((src, fp)))
+
+-- Names to ids, from /etc/passwd or /etc/group text.
+export parse_ids : &str -> HashMap<String, u32>
+parse_ids text = text.lines () |> .filter_map id_line |> .collect
+
+id_line : &str -> Option<(String, u32)>
+id_line line =
+  mut fields = line.split ":"
+  name = (fields.next ())?
+  (fields.next ())?
+  id = (fields.next () |> .and_then (\s -> s.parse () |> .ok))?
+  Some ((name.to_string (), id))
+
+export data Ids { export users HashMap<String, u32>, export groups HashMap<String, u32> }
+  deriving (Clone, Debug, Default)
+
+-- The uid and gid an entry's file is owned by.
+export owner : &Ids -> &Entry -> Result<(u32, u32), String>
+owner ids entry =
+  uid = (ids.users.get (&entry.user) |> .copied |> .ok_or ("no such user: #{entry.user}"))?
+  gid = (ids.groups.get (&entry.group) |> .copied |> .ok_or ("no such group: #{entry.group}"))?
+  Ok ((uid, gid))
+
+-- FS_IMMUTABLE_FL on or off (chattr +i / -i), through FS_IOC_GETFLAGS and
+-- FS_IOC_SETFLAGS on an open regular file.
+export set_immutable : &Path -> bool -> std::io::Result<()>
+set_immutable path on =
+  rust """
+    {
+      use std::os::unix::io::AsRawFd;
+      const FS_IOC_GETFLAGS: u64 = 0x8008_6601;
+      const FS_IOC_SETFLAGS: u64 = 0x4008_6602;
+      const FS_IMMUTABLE_FL: libc::c_int = 0x10;
+      let file = std::fs::File::open(path)?;
+      let mut flags: libc::c_int = 0;
+      // SAFETY: both requests read or write one c_int through a valid pointer.
+      if unsafe { libc::ioctl(file.as_raw_fd(), FS_IOC_GETFLAGS as _, &mut flags) } != 0 {
+        return Err(std::io::Error::last_os_error());
+      }
+      let wanted = if on { flags | FS_IMMUTABLE_FL } else { flags & !FS_IMMUTABLE_FL };
+      if wanted != flags && unsafe { libc::ioctl(file.as_raw_fd(), FS_IOC_SETFLAGS as _, &wanted) } != 0 {
+        return Err(std::io::Error::last_os_error());
+      }
+      Ok(())
+    }
+  """
+
+-- Clear the immutable bit of a regular file at `path`, if one is there; a
+-- filesystem without attributes has nothing to clear.
+loosened : &Path -> ()
+loosened path =
+  if fs::symlink_metadata path |> .map (\m -> m.file_type ().is_file ()) |> .unwrap_or false
+    set_immutable path false |> .ok ()
+  ()
+
+-- Every missing directory above `target`, made top down and owned by the
+-- file's owner (a root-owned ~/.config/<app> would lock the user out of it).
+export ensure_parents : &Path -> u32 -> u32 -> std::io::Result<()>
+ensure_parents target uid gid =
+  missing = target.ancestors () |> .skip 1 |> .take_while (\a -> fs::symlink_metadata a |> .is_err) |> .collect : Vec<&Path>
+  missing.iter () |> .rev () |> .try_for_each (\d -> made_dir d uid gid)
+
+made_dir : &Path -> u32 -> u32 -> std::io::Result<()>
+made_dir dir uid gid =
+  (fs::create_dir dir)?
+  std::os::unix::fs::lchown dir (Some uid) (Some gid)
+
+sibling : &Path -> &str -> PathBuf
+sibling target suffix = PathBuf::from ("#{target.display ()}#{suffix}")
+
+temp_beside : &Path -> PathBuf
+temp_beside target =
+  dir = target.parent () |> .unwrap_or (Path::new "/")
+  name = target.file_name () |> .map (\n -> n.to_string_lossy () |> .into_owned) |> .unwrap_or_default
+  dir.join (".#{name}.vfiles-tmp")
+
+write_copy : &str -> &Path -> u32 -> std::io::Result<()>
+write_copy source tmp perms =
+  bytes = (fs::read source)?
+  mut out = (fs::File::create tmp)?
+  (out.write_all (&bytes))?
+  (out.set_permissions (fs::Permissions::from_mode perms))?
+  out.sync_all ()
+
+made_temp : &Entry -> &str -> &Path -> std::io::Result<()>
+made_temp entry source tmp =
+  fs::remove_file tmp |> .ok ()
+  case entry.mode of
+    Mode::Link -> std::os::unix::fs::symlink source tmp
+    _ -> write_copy source tmp entry.perms
+
+-- Place `source` at the entry's path as a link or a copy, owned by uid:gid.
+export place : &Entry -> &str -> u32 -> u32 -> std::io::Result<()>
+place entry source uid gid =
+  target = Path::new (&entry.path)
+  (ensure_parents target uid gid)?
+  tmp = temp_beside target
+  (made_temp entry source (&tmp))?
+  (std::os::unix::fs::lchown (&tmp) (Some uid) (Some gid))?
+  loosened target
+  (fs::rename (&tmp) target)?
+  if entry.immutable
+    (set_immutable target true)?
+  Ok ()
+
+now_secs : u64
+now_secs =
+  SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_secs ()) |> .unwrap_or 0
+
+-- Move what is at `target` aside: to `<name>.backup`, or, when an older
+-- backup is already there, to `<name>.backup.<unix seconds>`.
+export backup : &Path -> std::io::Result<String>
+backup target =
+  plain = sibling target ".backup"
+  taken = fs::symlink_metadata (&plain) |> .is_ok
+  mut chosen = plain
+  if taken
+    chosen := sibling target (&".backup.#{now_secs ()}")
+  loosened target
+  (fs::rename target (&chosen))?
+  Ok (chosen.to_string_lossy ().into_owned ())
+
+-- Delete the file or link at `target`.
+export remove : &Path -> std::io::Result<()>
+remove target =
+  loosened target
+  fs::remove_file target
+
+-- Replace `file` with `text`, atomically.
+export write_atomic : &Path -> &str -> std::io::Result<()>
+write_atomic file text =
+  tmp = temp_beside file
+  mut out = (fs::File::create (&tmp))?
+  (out.write_all (text.as_bytes ()))?
+  (out.sync_all ())?
+  fs::rename (&tmp) file
+
+#[cfg(test)]
+scratch : &str -> PathBuf
+scratch name =
+  dir = std::env::temp_dir () |> .join ("vfiles-fsops-#{name}-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok ()
+  fs::create_dir_all (&dir) |> .expect "a scratch dir"
+  dir
+
+test "a fingerprint names a link's target and a file's content"
+  dir = scratch "observe"
+  file = dir.join "f"
+  fs::write (&file) "hello" |> .expect "a file"
+  link = dir.join "l"
+  std::os::unix::fs::symlink "/nix/store/x" (&link) |> .expect "a link"
+  assert_eq! \-> observe (&dir.join "nothing") \-> Ok Observed::Missing
+  assert_eq! \-> observe (&link) \-> Ok (Observed::Present (.to_string "link:/nix/store/x"))
+  assert_eq! \-> observe (&file) \-> Ok (Observed::Present (digest_hex (b"hello")))
+  assert_eq! \-> observe (&dir) \-> Ok (Observed::Present (.to_string "dir"))
+  assert! \-> digest_hex (b"hello") |> .starts_with "sha256:2cf24dba"
+  fs::remove_dir_all (&dir) |> .expect "cleanup"
+
+test "ids are read from passwd and group text"
+  ids = parse_ids "root:x:0:0::/root:/bin/sh\nalice:x:1000:100::/home/alice:/bin/sh\nbroken\n"
+  assert_eq! \-> ids.get "alice" \-> Some (&1000)
+  assert_eq! \-> ids.get "root" \-> Some (&0)
+  assert_eq! \-> ids.len () \-> 2
+
+test "missing parents are made, and a backup never overwrites an older one"
+  dir = scratch "backup"
+  target = dir.join "a/b/c.conf"
+  me = fs::metadata (&dir) |> .expect "the dir"
+  uid = std::os::unix::fs::MetadataExt::uid (&me)
+  gid = std::os::unix::fs::MetadataExt::gid (&me)
+  ensure_parents (&target) uid gid |> .expect "parents"
+  assert! \-> dir.join "a/b" |> .is_dir
+  fs::write (&target) "one" |> .expect "a file"
+  first = backup (&target) |> .expect "a backup"
+  assert! \-> first.ends_with "c.conf.backup"
+  fs::write (&target) "two" |> .expect "a file"
+  second = backup (&target) |> .expect "a second backup"
+  assert! \-> second.contains "c.conf.backup."
+  assert_eq! \-> fs::read_to_string (&first) |> .expect "the first" \-> "one"
+  assert_eq! \-> fs::read_to_string (&second) |> .expect "the second" \-> "two"
+  fs::remove_dir_all (&dir) |> .expect "cleanup"

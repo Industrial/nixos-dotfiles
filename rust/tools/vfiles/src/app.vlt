@@ -1,0 +1,356 @@
+-- The program: load the spec, the manifest and the user database, reconcile
+-- every path, then persist the manifest and the report. Each load and the
+-- reconcile pass are one blocking `suspend` step of one effect; `main` runs
+-- it under id_effect_cli's `run_main`, so the exit code follows the 0 / 1 /
+-- 101 / 130 taxonomy.
+--
+--   vfiles --spec FILE [--state-dir DIR] [--dry-run]
+--
+-- Run by the NixOS activation (lib/vfiles.nix) on every switch and boot.
+-- Exits 1 when a path could not be placed or removed; drift (a file edited by
+-- hand) is reported and warned about, and is not a failure: the switch goes
+-- on, the file is left as the user made it. `--dry-run` changes nothing and
+-- prints the report as JSON: the health probe.
+
+import std::collections::{HashMap, HashSet}
+import std::fs
+import std::path::Path
+import id_effect::{Effect, HNil, effect, fail, succeed, suspend}
+import crate::fsops::{Ids, backup, observe, owner, parse_ids, place, remove, resolve, write_atomic}
+import crate::plan::{Action, decide, dropped, kept_record}
+import crate::report::{Settled, failures, json, notices, summary}
+import crate::spec::{Entry, Record, parse_manifest, parse_spec, render_manifest}
+
+export const USAGE : &str = "usage: vfiles --spec FILE [--state-dir DIR] [--dry-run]"
+
+export const STATE_DIR : &str = "/var/lib/vfiles"
+
+-- Why a run stopped short.
+export errors VfError
+  Usage String     "#{0}"
+  Spec String      "spec: #{0}"
+  Manifest String  "manifest: #{0}"
+  Users String     "users and groups: #{0}"
+  Publish String   "publishing: #{0}"
+  Failed usize     "#{0} file(s) could not be placed or removed (see the report)"
+
+export data Options { export spec String, export state_dir String, export dry_run bool }
+  deriving (Clone, Debug, PartialEq)
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- The options in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut spec = None
+  mut o = Options { spec = String::new (), state_dir = STATE_DIR.to_string (), dry_run = false }
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--spec" ->
+        spec := Some ((value (it.next ()) "--spec")?)
+      "--state-dir" ->
+        o.state_dir := (value (it.next ()) "--state-dir")?
+      "--dry-run" ->
+        o.dry_run := true
+      other ->
+        return Err "unknown argument: #{other}"
+  o.spec := (spec.ok_or (.to_string "--spec is required"))?
+  Ok o
+
+-- Both halves of a reconciled run: what happened at each path, and the
+-- manifest it leaves.
+export data Reconciled { export settled Vec<Settled>, export records Vec<Record> }
+  deriving (Clone, Debug, PartialEq)
+
+placed : &Entry -> Option<&str> -> &Ids -> Result<(), String>
+placed entry source ids =
+  src = (source.ok_or (.to_string "no source to place"))?
+  (uid, gid) = (owner ids entry)?
+  place entry src uid gid |> .map_err (\e -> "placing: #{e}")
+
+-- Carry an action out; an adoption answers where the old file went.
+carried_out : &Entry -> Option<&str> -> &Ids -> &Action -> Result<Option<String>, String>
+carried_out entry source ids action =
+  target = Path::new (&entry.path)
+  case action of
+    Action::Place -> placed entry source ids |> .map (\_ -> None)
+    Action::Replace -> placed entry source ids |> .map (\_ -> None)
+    Action::Adopt ->
+      saved = (backup target |> .map_err (\e -> "moving the old file aside: #{e}"))?
+      (placed entry source ids)?
+      Ok (Some saved)
+    Action::Remove -> remove target |> .map (\_ -> None) |> .map_err (\e -> "removing: #{e}")
+    _ -> Ok None
+
+attempt : &Entry -> Option<&Record> -> &Ids -> bool -> Result<(Settled, Option<Record>), String>
+attempt entry record ids execute =
+  resolved = (resolve entry)?
+  observed = (observe (Path::new (&entry.path)))?
+  want = resolved.as_ref () |> .map (\r -> &r.1)
+  action = decide entry want record (&observed)
+  next = kept_record entry want record (&action)
+  mut saved_as = None
+  if execute
+    saved_as := (carried_out entry (resolved.as_ref () |> .map (\r -> r.0.as_str ())) ids (&action))?
+  Ok ((Settled { path = entry.path.clone (), outcome = Ok action, backup = saved_as }, next))
+
+-- A declared path. A failure keeps the manifest's record: what vfiles owned
+-- stays owned until a run succeeds there.
+settle : &Entry -> Option<&Record> -> &Ids -> bool -> (Settled, Option<Record>)
+settle entry record ids execute =
+  case attempt entry record ids execute of
+    Ok done -> done
+    Err e -> (Settled { path = entry.path.clone (), outcome = Err e, backup = None }, record.cloned ())
+
+released : &Path -> Action -> bool -> Result<Action, String>
+released path action execute =
+  if execute && action == Action::Remove
+    (remove path |> .map_err (\e -> "removing: #{e}"))?
+  Ok action
+
+-- An owned path that left the spec.
+release : &Record -> bool -> (Settled, Option<Record>)
+release record execute =
+  path = Path::new (&record.path)
+  outcome = observe path |> .and_then (\o -> released path (dropped record (&o)) execute)
+  kept = case &outcome of
+    Err _ -> Some (record.clone ())
+    Ok _ -> None
+  (Settled { path = record.path.clone (), outcome, backup = None }, kept)
+
+-- Every declared path and every owned one: the dropped ones first, so a
+-- removal never races a placement.
+export reconcile : &[Entry] -> &[Record] -> &Ids -> bool -> Reconciled
+reconcile entries records ids execute =
+  owned = records.iter () |> .map (\r -> (r.path.clone (), r)) |> .collect : HashMap<String, &Record>
+  declared = entries.iter () |> .map (\e -> e.path.clone ()) |> .collect : HashSet<String>
+  gone = records.iter () |> .filter (\r -> !(declared.contains (&r.path))) |> .map (\r -> release r execute) |> .collect : Vec<(Settled, Option<Record>)>
+  current = entries.iter () |> .map (\e -> settle e (owned.get (&e.path) |> .copied) ids execute) |> .collect : Vec<(Settled, Option<Record>)>
+  all = gone.into_iter () |> .chain current |> .collect : Vec<(Settled, Option<Record>)>
+  kept = all.iter () |> .filter_map (\p -> p.1.clone ()) |> .collect : Vec<Record>
+  settled = all.into_iter () |> .map (\p -> p.0) |> .collect : Vec<Settled>
+  Reconciled { settled, records = kept }
+
+-- An effect for a computed result: the planned failure stays typed.
+lifted : given <A: Send + 'static> Result<A, VfError> -> Effect<A, VfError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+read_spec : String -> Result<Vec<Entry>, VfError>
+read_spec file =
+  text = (fs::read_to_string (&file) |> .map_err (\e -> Spec ("#{file}: #{e}")))?
+  parse_spec (&text) |> .map_err (\e -> Spec ("#{file}: #{e}"))
+
+-- No manifest yet owns nothing. An unreadable one stops the run: treating it
+-- as empty would adopt every owned file again, backups and all.
+read_manifest : String -> Result<Vec<Record>, VfError>
+read_manifest file =
+  case fs::read_to_string (&file) of
+    Err e ->
+      if e.kind () == std::io::ErrorKind::NotFound
+        Ok (Vec::new ())
+      else
+        Err (Manifest ("#{file}: #{e}"))
+    Ok text -> parse_manifest (&text) |> .map_err (\e -> Manifest ("#{file}: #{e}"))
+
+read_ids : Result<Ids, VfError>
+read_ids =
+  users = (fs::read_to_string "/etc/passwd" |> .map_err (\e -> Users ("/etc/passwd: #{e}")))?
+  groups = (fs::read_to_string "/etc/group" |> .map_err (\e -> Users ("/etc/group: #{e}")))?
+  Ok (Ids { users = parse_ids (&users), groups = parse_ids (&groups) })
+
+manifest_file : &str -> String
+manifest_file dir = Path::new dir |> .join "manifest.json" |> .to_string_lossy |> .into_owned
+
+loaded_spec : String -> Effect<Vec<Entry>, VfError, HNil>
+loaded_spec file = suspend (move \-> lifted (read_spec file))
+
+loaded_manifest : String -> Effect<Vec<Record>, VfError, HNil>
+loaded_manifest file = suspend (move \-> lifted (read_manifest file))
+
+loaded_ids : Effect<Ids, VfError, HNil>
+loaded_ids = suspend (move \-> lifted (read_ids ()))
+
+reconciled : Vec<Entry> -> Vec<Record> -> Ids -> bool -> Effect<Reconciled, VfError, HNil>
+reconciled entries records ids execute =
+  suspend (move \-> succeed (reconcile (&entries) (&records) (&ids) execute))
+
+written : &Path -> &str -> Result<(), VfError>
+written file text =
+  write_atomic file text |> .map_err (\e -> Publish ("#{file.display ()}: #{e}"))
+
+-- The manifest and the report into the state directory (not with
+-- `--dry-run`), the summary and every warning on stderr, the JSON report on
+-- stdout with `--dry-run`.
+published : Options -> Reconciled -> Result<Reconciled, VfError>
+published o r =
+  report = json (&r.settled) o.dry_run
+  if !o.dry_run
+    dir = Path::new (&o.state_dir)
+    (fs::create_dir_all dir |> .map_err (\e -> Publish ("#{o.state_dir}: #{e}")))?
+    manifest = dir.join "manifest.json"
+    (written (&manifest) (&render_manifest (&r.records)))?
+    report_file = dir.join "report.json"
+    (written (&report_file) (&"#{report}\n"))?
+  if o.dry_run
+    println! \-> "#{report}"
+  eprintln! \-> "#{summary (&r.settled)}"
+  for line in notices (&r.settled)
+    eprintln! \-> "#{line}"
+  Ok r
+
+judged : usize -> Effect<(), VfError, HNil>
+judged n =
+  if n == 0
+    succeed (())
+  else
+    fail (Failed n)
+
+-- One run for parsed options.
+export run : Options -> Effect<(), VfError, HNil>
+run o =
+  effect!
+    let entries = ~loaded_spec(o.spec.clone());
+    let records = ~loaded_manifest(manifest_file(&o.state_dir));
+    let ids = ~loaded_ids();
+    let r = ~reconciled(entries, records, ids, !o.dry_run);
+    let r = ~lifted(published(o.clone(), r));
+    ~judged(failures(&r.settled))
+
+-- The program for parsed options (or the usage error).
+export program : Result<Options, String> -> Effect<(), VfError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok o -> run o
+
+-- The process.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  id_effect_cli::run_main (program (parse_args (&args))) HNil (id_effect_cli::RunMainConfig::default ())
+
+#[cfg(test)]
+strings : &[&str] -> Vec<String>
+strings xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "the command line"
+  o = parse_args (&strings (&["--spec", "/etc/vfiles/spec.json"])) |> .expect "options"
+  assert_eq! \-> o \-> Options { spec = .to_string "/etc/vfiles/spec.json", state_dir = .to_string "/var/lib/vfiles", dry_run = false }
+  o2 = parse_args (&strings (&["--dry-run", "--spec", "s", "--state-dir", "/tmp/v"])) |> .expect "options"
+  assert_eq! \-> (o2.dry_run, o2.state_dir) \-> (true, .to_string "/tmp/v")
+  assert_eq! \-> parse_args (&strings (&[])) \-> Err (.to_string "--spec is required")
+  assert_eq! \-> parse_args (&strings (&["--spec"])) \-> Err (.to_string "--spec needs a value")
+  assert_eq! \-> parse_args (&strings (&["--spec", "s", "-x"])) \-> Err (.to_string "unknown argument: -x")
+
+#[cfg(test)]
+data Scratch { dir std::path::PathBuf, ids Ids }
+
+#[cfg(test)]
+scratch : &str -> Scratch
+scratch name =
+  dir = std::env::temp_dir () |> .join ("vfiles-app-#{name}-#{std::process::id ()}")
+  fs::remove_dir_all (&dir) |> .ok ()
+  fs::create_dir_all (dir.join "src") |> .expect "a scratch dir"
+  me = fs::metadata (&dir) |> .expect "the dir"
+  mut ids = Ids::default ()
+  ids.users.insert (.to_string "me") (std::os::unix::fs::MetadataExt::uid (&me))
+  ids.groups.insert (.to_string "users") (std::os::unix::fs::MetadataExt::gid (&me))
+  fs::write (dir.join "src/a") "A" |> .expect "a source"
+  fs::write (dir.join "src/b") "B" |> .expect "a source"
+  Scratch { dir, ids }
+
+#[cfg(test)]
+at : &Scratch -> &str -> String
+at s rel = s.dir.join rel |> .to_string_lossy |> .into_owned
+
+#[cfg(test)]
+declared : &Scratch -> &str -> crate::spec::Mode -> &str -> Option<String> -> Entry
+declared s rel mode src fallback = Entry { path = at s rel, mode, source = Some (at s src), fallback, user = .to_string "me", group = .to_string "users", perms = 420, immutable = false, force = false }
+
+#[cfg(test)]
+kinds : &Reconciled -> Vec<(String, String)>
+kinds r = r.settled.iter () |> .map (\x -> (x.path.clone (), crate::report::kind x)) |> .collect
+
+#[cfg(test)]
+kind_of : &Reconciled -> &str -> String
+kind_of r path = r.settled.iter () |> .find (\x -> x.path == path) |> .map (\x -> crate::report::kind x) |> .unwrap_or_default
+
+test "placed, kept, drift reported and untouched, dropped removed"
+  s = scratch "lifecycle"
+  link = declared (&s) "home/.config/a" crate::spec::Mode::Link "src/a" None
+  copy = declared (&s) "home/.config/b" crate::spec::Mode::Copy "src/b" None
+  first = reconcile (&[link.clone (), copy.clone ()]) (&[]) (&s.ids) true
+  assert_eq! \-> kind_of (&first) (&link.path) \-> "placed"
+  assert_eq! \-> kind_of (&first) (&copy.path) \-> "placed"
+  assert_eq! \-> fs::read_link (&link.path) |> .expect "a link" \-> s.dir.join "src/a"
+  assert_eq! \-> fs::read_to_string (&copy.path) |> .expect "a copy" \-> "B"
+  assert_eq! \-> first.records.len () \-> 2
+  again = reconcile (&[link.clone (), copy.clone ()]) (&first.records) (&s.ids) true
+  assert_eq! \-> kinds (&again) |> .iter () |> .all (\k -> k.1 == "kept") \-> true
+  fs::write (&copy.path) "edited by hand" |> .expect "an edit"
+  edited = reconcile (&[link.clone (), copy.clone ()]) (&again.records) (&s.ids) true
+  assert_eq! \-> kind_of (&edited) (&copy.path) \-> "drift"
+  assert_eq! \-> fs::read_to_string (&copy.path) |> .expect "the edit" \-> "edited by hand"
+  still = reconcile (&[link.clone (), copy.clone ()]) (&edited.records) (&s.ids) true
+  assert_eq! \-> kind_of (&still) (&copy.path) \-> "drift"
+  dropped_link = reconcile (&[copy.clone ()]) (&still.records) (&s.ids) true
+  assert_eq! \-> kind_of (&dropped_link) (&link.path) \-> "removed"
+  assert! \-> fs::symlink_metadata (&link.path) |> .is_err
+  assert_eq! \-> dropped_link.records.len () \-> 1
+  fs::remove_dir_all (&s.dir) |> .expect "cleanup"
+
+test "the first run adopts a real file with a backup"
+  s = scratch "adopt"
+  link = declared (&s) "home/c" crate::spec::Mode::Link "src/a" None
+  fs::create_dir_all (s.dir.join "home") |> .expect "a home"
+  fs::write (&link.path) "the user's own" |> .expect "a real file"
+  r = reconcile (&[link.clone ()]) (&[]) (&s.ids) true
+  assert_eq! \-> kind_of (&r) (&link.path) \-> "adopted"
+  assert_eq! \-> fs::read_to_string (&"#{link.path}.backup") |> .expect "the backup" \-> "the user's own"
+  assert_eq! \-> fs::read_link (&link.path) |> .expect "a link" \-> s.dir.join "src/a"
+  fs::remove_dir_all (&s.dir) |> .expect "cleanup"
+
+test "the fallback stands in for a missing out-of-store source, and yields to it"
+  s = scratch "fallback"
+  checkout = at (&s) "checkout/h.conf"
+  e = declared (&s) "home/h.conf" crate::spec::Mode::Link "checkout/h.conf" (Some (at (&s) "src/a"))
+  first = reconcile (&[e.clone ()]) (&[]) (&s.ids) true
+  assert_eq! \-> fs::read_link (&e.path) |> .expect "a link" \-> s.dir.join "src/a"
+  fs::create_dir_all (s.dir.join "checkout") |> .expect "a checkout"
+  fs::write (&checkout) "H" |> .expect "the checkout file"
+  second = reconcile (&[e.clone ()]) (&first.records) (&s.ids) true
+  assert_eq! \-> kind_of (&second) (&e.path) \-> "replaced"
+  assert_eq! \-> fs::read_link (&e.path) |> .expect "a link" \-> std::path::PathBuf::from (&checkout)
+  fs::remove_dir_all (&s.dir) |> .expect "cleanup"
+
+test "a dry run decides and changes nothing"
+  s = scratch "dry"
+  link = declared (&s) "home/a" crate::spec::Mode::Link "src/a" None
+  r = reconcile (&[link.clone ()]) (&[]) (&s.ids) false
+  assert_eq! \-> kind_of (&r) (&link.path) \-> "placed"
+  assert! \-> fs::symlink_metadata (&link.path) |> .is_err
+  fs::remove_dir_all (&s.dir) |> .expect "cleanup"
+
+test "an unknown user fails that path only, and keeps its record"
+  s = scratch "user"
+  mut bad = declared (&s) "home/a" crate::spec::Mode::Link "src/a" None
+  bad.user := .to_string "nobody-here"
+  good = declared (&s) "home/b" crate::spec::Mode::Copy "src/b" None
+  r = reconcile (&[bad.clone (), good.clone ()]) (&[]) (&s.ids) true
+  assert_eq! \-> kind_of (&r) (&bad.path) \-> "failed"
+  assert_eq! \-> kind_of (&r) (&good.path) \-> "placed"
+  assert_eq! \-> failures (&r.settled) \-> 1
+  fs::remove_dir_all (&s.dir) |> .expect "cleanup"
+
+test "a usage error carries the usage line"
+  exit = id_effect::testing::run_test (program (Err (.to_string "unknown argument: -x")))
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains USAGE) |> .unwrap_or false
