@@ -49,6 +49,7 @@
   features.cli.vbump.enable = true;
   # vfetch, the concurrent closure fetcher vdeploy (#159) calls (GH-155). A CLI only:
   # nothing substitutes through it yet.
+  # vfetch, the concurrent closure fetcher vdeploy (#159) calls (GH-155), as a CLI.
   features.cli.vfetch.enable = true;
   # vfetch serve: the first substituter, so every substitution here fetches through
   # vfetch (GH-155). Rollback: `lib.mkForce false`, and Nix substitutes directly.
