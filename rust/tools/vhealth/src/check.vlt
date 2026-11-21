@@ -165,10 +165,12 @@ test "a TCP probe is up while something listens, and down once it stops"
   assert! \-> up.up
   assert_eq! \-> (up.kind.as_str (), up.detail.clone ()) \-> ("tcp", "connected to 127.0.0.1:#{port}")
   drop listener
-  down = one (probe "t" (Kind::Tcp (.to_string "127.0.0.1") port) 2000)
+  -- Not the freed port: a connect to a free ephemeral port can pick it as its own source
+  -- port and self-connect (TCP simultaneous open), which reads as up. Port 1 is below the
+  -- ephemeral range and nothing listens on it.
+  down = one (probe "t" (Kind::Tcp (.to_string "127.0.0.1") 1) 2000)
   assert! \-> !(down.up)
-  prefix = "127.0.0.1:#{port}: "
-  assert! \-> down.detail.starts_with (prefix.as_str ())
+  assert! \-> down.detail.starts_with "127.0.0.1:1: "
 
 test "a unix socket probe connects, or reports the path"
   dir = std::env::temp_dir () |> .join (format! \-> "vhealth-unix-#{std::process::id ()}")
