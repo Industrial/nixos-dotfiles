@@ -43,6 +43,9 @@
   # vdaemon-proxy (GH-157): every nix-daemon op logged to the journal as JSON.
   # Rollback: lib.mkForce false, or at runtime the fallback keeps Nix reachable.
   features.nix.vdaemon-proxy.enable = true;
+  # ... in conformance mode (GH-183): native answers checked against the daemon's, which
+  # clients still get. Counters: /run/vdaemon-proxy/conformance.prom. Rollback: delete.
+  features.nix.vdaemon-proxy.conformance = true;
   # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
   features.nix.vverify.enable = true;
   # vbump (Voltaic): per-input flake.lock bumps, one PR each; bin/update/flake runs it (GH-189).
