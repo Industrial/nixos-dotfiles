@@ -50,6 +50,9 @@
   # vfetch, the concurrent closure fetcher vdeploy (#159) calls (GH-155). A CLI only:
   # nothing substitutes through it yet.
   features.cli.vfetch.enable = true;
+  # vfetch serve: the first substituter, so every substitution here fetches through
+  # vfetch (GH-155). Rollback: `lib.mkForce false`, and Nix substitutes directly.
+  features.nix.vfetch.enable = true;
   features.storage.nfs-client.enable = true;
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.
