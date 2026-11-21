@@ -145,6 +145,7 @@
   ./network/searx
 
   # nix
+  ./nix/vcache
   ./nix/vcache/client.nix
 
   # nixos

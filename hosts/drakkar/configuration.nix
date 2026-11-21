@@ -37,5 +37,8 @@
   features.fleet.remote-access.enable = true;
   features.monitoring.prometheus-exporter.enable = true;
   features.nixos.graphics.amd.enable = true;
+  # The fleet binary cache (GH-147); its cacheKey in common/fleet.nix is filled in
+  # from the first start's journal.
+  features.nix.vcache.enable = true;
   features.storage.nfs-client.enable = true;
 }
