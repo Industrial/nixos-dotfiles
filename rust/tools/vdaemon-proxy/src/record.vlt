@@ -1,0 +1,107 @@
+-- What the proxy logs: one JSON object per line on stdout (the journal).
+--
+--   {"event":"op","conn":3,"uid":1000,"gid":100,"pid":4242,"op":"QueryPathInfo",
+--    "code":26,"paths":["/nix/store/…"],"paths_truncated":false,
+--    "duration_us":412,"result":"ok","policy":"allow","ts_ms":1763712000000}
+--
+-- plus "connect" and "disconnect" lines per client, "error" when a
+-- connection fails, and "tap_lost" when the conversation stopped making
+-- sense to the tap (the bytes are still relayed). `duration_us` runs from
+-- the op's first byte to the daemon's LAST or ERROR, so a NAR streamed after
+-- LAST is not in it.
+
+import serde_json::{Map, Value}
+import nix_store_core::worker::op_name
+import crate::tap::Finished
+
+-- Who is on the other end of a client connection (SO_PEERCRED).
+export data Peer { export uid u32, export gid u32, export pid i32 }
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+now_ms : u64
+now_ms =
+  std::time::SystemTime::now ().duration_since std::time::UNIX_EPOCH |> .map (\d -> u64::try_from (d.as_millis ()) |> .unwrap_or u64::MAX) |> .unwrap_or 0
+
+-- The fields every line carries.
+base : &str -> u64 -> &Peer -> Map<String, Value>
+base event conn peer =
+  mut m = Map::new ()
+  m.insert (.to_string "event") (Value::from event)
+  m.insert (.to_string "conn") (Value::from conn)
+  m.insert (.to_string "uid") (Value::from peer.uid)
+  m.insert (.to_string "gid") (Value::from peer.gid)
+  m.insert (.to_string "pid") (Value::from peer.pid)
+  m
+
+line : Map<String, Value> -> String
+line fields =
+  mut m = fields
+  m.insert (.to_string "ts_ms") (Value::from (now_ms ()))
+  Value::Object m |> .to_string
+
+export op_line : u64 -> &Peer -> &Finished -> &str -> String
+op_line conn peer f verdict =
+  mut m = base "op" conn peer
+  name = f.request.op |> .map op_name |> .unwrap_or_else (\-> .to_string "Unknown")
+  m.insert (.to_string "op") (Value::from name)
+  m.insert (.to_string "code") (Value::from f.request.code)
+  m.insert (.to_string "paths") (Value::from (f.request.paths.clone ()))
+  m.insert (.to_string "paths_truncated") (Value::from f.truncated)
+  m.insert (.to_string "duration_us") (Value::from (u64::try_from (f.elapsed.as_micros ()) |> .unwrap_or u64::MAX))
+  case &f.error of
+    None -> m.insert (.to_string "result") (Value::from "ok")
+    Some why ->
+      m.insert (.to_string "result") (Value::from "error")
+      m.insert (.to_string "error") (Value::from (why.as_str ()))
+  m.insert (.to_string "policy") (Value::from verdict)
+  line m
+
+export connect_line : u64 -> &Peer -> String
+connect_line conn peer = line (base "connect" conn peer)
+
+export disconnect_line : u64 -> &Peer -> u64 -> String
+disconnect_line conn peer ops =
+  mut m = base "disconnect" conn peer
+  m.insert (.to_string "ops") (Value::from ops)
+  line m
+
+export error_line : u64 -> &Peer -> &str -> String
+error_line conn peer why =
+  mut m = base "error" conn peer
+  m.insert (.to_string "error") (Value::from why)
+  line m
+
+export lost_line : u64 -> &Peer -> &str -> String
+lost_line conn peer why =
+  mut m = base "tap_lost" conn peer
+  m.insert (.to_string "error") (Value::from why)
+  line m
+
+-- One line to stdout, whole.
+export emit : String -> ()
+emit text =
+  println! \-> "#{text}"
+  ()
+
+#[cfg(test)]
+import nix_store_core::worker::{Op, Request}
+
+test "an op line is one JSON object with the op, the uid and the paths"
+  peer = Peer { uid = 1000, gid = 100, pid = 42 }
+  f = Finished { request = Request { code = 26, op = Some Op::QueryPathInfo, paths = .to_vec ([.to_string "/nix/store/a"]) }, truncated = false, elapsed = std::time::Duration::from_micros 412, error = None }
+  text = op_line 3 (&peer) (&f) "allow"
+  assert! \-> !(text.contains "\n")
+  v = serde_json::from_str (&text) |> .expect "JSON" : Value
+  assert_eq! \-> v.get "op" |> .and_then (\x -> x.as_str ()) \-> Some "QueryPathInfo"
+  assert_eq! \-> v.get "uid" |> .and_then (\x -> x.as_u64 ()) \-> Some 1000
+  assert_eq! \-> v.get "duration_us" |> .and_then (\x -> x.as_u64 ()) \-> Some 412
+  assert_eq! \-> v.get "result" |> .and_then (\x -> x.as_str ()) \-> Some "ok"
+  assert_eq! \-> v.get "paths" |> .and_then (\x -> x.as_array ()) |> .map (\a -> a.len ()) \-> Some 1
+
+test "a failed op carries the daemon's message"
+  peer = Peer { uid = 0, gid = 0, pid = 1 }
+  f = Finished { request = Request { code = 99, op = None, paths = Vec::new () }, truncated = true, elapsed = std::time::Duration::from_micros 1, error = Some (.to_string "no") }
+  v = serde_json::from_str (&op_line 1 (&peer) (&f) "allow") |> .expect "JSON" : Value
+  assert_eq! \-> v.get "op" |> .and_then (\x -> x.as_str ()) \-> Some "Unknown"
+  assert_eq! \-> v.get "error" |> .and_then (\x -> x.as_str ()) \-> Some "no"
+  assert_eq! \-> v.get "paths_truncated" |> .and_then (\x -> x.as_bool ()) \-> Some true

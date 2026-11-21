@@ -375,6 +375,8 @@
       # features/nixos/boot's Secure Boot path (GH-184): systemd-boot -> lanzaboote -> reboot
       # -> rollback to systemd-boot -> reboot, through OVMF and the ESP.
       // {lanzaboote-vm = import ./features/nixos/boot/test.nix {inherit pkgs inputs;};}
+      # features/nix/vdaemon-proxy in a VM (#157).
+      // {vdaemon-proxy-vm = import ./features/nix/vdaemon-proxy/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;

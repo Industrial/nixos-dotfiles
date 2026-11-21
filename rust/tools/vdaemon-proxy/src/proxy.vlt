@@ -1,0 +1,183 @@
+-- The proxy: accept each client as a fiber, connect upstream as that
+-- client, relay both directions byte for byte, and log what the tap sees.
+--
+-- Each direction is a stream of chunks read from one socket and folded into
+-- the other (Stream::unfold_effect over reads, run_fold_effect over writes).
+-- The tap is shown every chunk before it is written on, and its events
+-- become log lines. The two directions run as two fibers (zip_par); when the
+-- client closes, its direction shuts the daemon's write side and the
+-- daemon's direction then ends too. The client fibers are forked into one
+-- scope, so a shutdown interrupts and awaits all of them.
+
+import std::sync::{Arc, Mutex}
+import std::time::Instant
+import tokio::io::{AsyncReadExt, AsyncWriteExt}
+import tokio::net::{UnixListener, UnixStream}
+import tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf}
+import id_effect::{Effect, HNil, Never, Scope, Stream, fail, from_async, succeed, suspend, zip_par}
+import crate::tap::Event::{OpEnded, OpStarted, TapLost}
+import crate::tap::{Event, Tap, client_bytes, daemon_bytes, new_tap}
+import crate::record::{Peer, connect_line, disconnect_line, emit, error_line, lost_line, op_line}
+import crate::policy::{PolicyHook, verdict_text}
+import crate::upstream::connect_as
+
+export errors ProxyError
+  from std::io::Error as Io  "#{0}"
+  Upstream String            "connecting to the daemon: #{0}"
+
+-- Bytes per read.
+const CHUNK : usize = 65536
+
+-- What the proxy needs besides the listener.
+export data Settings { export upstream String, export policy PolicyHook }
+
+instance Clone Settings
+  clone : &self -> Self
+  clone self = Settings { upstream = self.upstream.clone (), policy = self.policy.clone () }
+
+export data Side = FromClient | FromDaemon
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- One client connection: who it is, its tap, and the policy's verdict on
+-- the op in flight.
+export data Session { id u64, peer Peer, policy PolicyHook, tap Mutex<Tap>, verdict Mutex<String> }
+
+lifted : given <A: Send + 'static> Result<A, ProxyError> -> Effect<A, ProxyError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- Show the tap a chunk and log what it makes of it.
+observe : &Session -> Side -> &[u8] -> ()
+observe s side bytes =
+  now = Instant::now ()
+  mut tap = s.tap.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+  events = case side of
+    FromClient -> client_bytes (&mut tap) bytes now
+    FromDaemon -> daemon_bytes (&mut tap) bytes now
+  drop tap
+  for e in events
+    log_event s e
+  ()
+
+log_event : &Session -> Event -> ()
+log_event s e =
+  case e of
+    OpStarted req ->
+      verdict = s.policy.0.decide (&s.peer) (&req)
+      mut held = s.verdict.lock () |> .unwrap_or_else (\p -> p.into_inner ())
+      held.clear ()
+      held.push_str (&verdict_text (&verdict))
+    OpEnded f ->
+      verdict = s.verdict.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+      emit (op_line s.id (&s.peer) (&f) (&verdict))
+    TapLost why -> emit (lost_line s.id (&s.peer) (&why))
+  ()
+
+read_chunk : async OwnedReadHalf -> Result<Option<(Vec<u8>, OwnedReadHalf)>, ProxyError>
+read_chunk reader =
+  mut r = reader
+  mut buf = Vec::new () : Vec<u8>
+  buf.resize CHUNK 0
+  n <- r.read (&mut buf)
+  k = n?
+  if k == 0
+    return Ok None
+  buf.truncate k
+  Ok (Some ((buf, r)))
+
+read_step : OwnedReadHalf -> Effect<Option<(Vec<u8>, OwnedReadHalf)>, ProxyError, HNil>
+read_step r = from_async (move \-> read_chunk r)
+
+write_chunk : async OwnedWriteHalf -> Vec<u8> -> Result<OwnedWriteHalf, ProxyError>
+write_chunk writer bytes =
+  mut w = writer
+  r <- w.write_all (&bytes)
+  r?
+  Ok w
+
+shutdown : async OwnedWriteHalf -> Result<(), ProxyError>
+shutdown writer =
+  mut w = writer
+  _r <- w.shutdown ()
+  Ok ()
+
+-- One chunk: observed, then written on.
+forward : Arc<Session> -> Side -> OwnedWriteHalf -> Vec<u8> -> Effect<OwnedWriteHalf, ProxyError, HNil>
+forward s side w bytes =
+  suspend (move \-> forward_now s side w bytes)
+
+forward_now : Arc<Session> -> Side -> OwnedWriteHalf -> Vec<u8> -> Effect<OwnedWriteHalf, ProxyError, HNil>
+forward_now s side w bytes =
+  observe (&s) side (&bytes)
+  from_async (move \-> write_chunk w bytes)
+
+-- One direction, until its reader ends; then the other side's write half
+-- is shut, so the end of the stream reaches it.
+export pump : Arc<Session> -> Side -> OwnedReadHalf -> OwnedWriteHalf -> Effect<(), ProxyError, HNil>
+pump s side r w =
+  Stream::unfold_effect r read_step |> .run_fold_effect w (move \acc bytes -> forward (Arc::clone (&s)) side acc bytes) |> .flat_map (\w -> from_async (move \-> shutdown w))
+
+peer_of : &UnixStream -> Peer
+peer_of stream =
+  case stream.peer_cred () of
+    Ok c -> Peer { uid = c.uid (), gid = c.gid (), pid = c.pid () |> .unwrap_or 0 }
+    Err _ -> Peer { uid = u32::MAX, gid = u32::MAX, pid = 0 }
+
+-- The daemon, connected as `peer` (crate::upstream), as a tokio stream.
+connect_upstream : Peer -> String -> Result<UnixStream, ProxyError>
+connect_upstream peer path =
+  std = (connect_as (&peer) (&path) |> .map_err (\e -> Upstream ("#{path}: #{e}")))?
+  (std.set_nonblocking true)?
+  UnixStream::from_std std |> .map_err Io
+
+relay : Arc<Session> -> UnixStream -> UnixStream -> Effect<(), ProxyError, HNil>
+relay s client daemon =
+  (cr, cw) = client.into_split ()
+  (dr, dw) = daemon.into_split ()
+  zip_par (pump (Arc::clone (&s)) FromClient cr dw) (pump s FromDaemon dr cw) |> .map (\_ -> ())
+
+-- One client, start to end. Failures are logged here; nothing escapes.
+export serve_client : UnixStream -> u64 -> Settings -> Effect<(), Never, HNil>
+serve_client stream id settings =
+  peer = peer_of (&stream)
+  emit (connect_line id (&peer))
+  s = Arc::new (Session { id, peer, policy = settings.policy.clone (), tap = Mutex::new (new_tap ()), verdict = Mutex::new (String::new ()) })
+  upstream = settings.upstream.clone ()
+  ended = Arc::clone (&s)
+  failed = Arc::clone (&s)
+  suspend (move \-> lifted (connect_upstream peer upstream)) |> .flat_map (move \daemon -> relay s stream daemon) |> .catch (move \e -> log_failure failed e) |> .map (move \_ -> log_end ended)
+
+log_failure : Arc<Session> -> ProxyError -> Effect<(), Never, HNil>
+log_failure s e =
+  emit (error_line s.id (&s.peer) (&e.to_string ()))
+  succeed (())
+
+log_end : Arc<Session> -> ()
+log_end s =
+  ops = s.tap.lock () |> .map (\t -> t.ops) |> .unwrap_or 0
+  emit (disconnect_line s.id (&s.peer) ops)
+  ()
+
+accept_next : async (Arc<UnixListener>, u64) -> Result<Option<((UnixStream, u64), (Arc<UnixListener>, u64))>, ProxyError>
+accept_next state =
+  (listener, id) = state
+  r <- listener.accept ()
+  (stream, _addr) = r?
+  Ok (Some (((stream, id), (listener, id + 1))))
+
+accept_step : (Arc<UnixListener>, u64) -> Effect<Option<((UnixStream, u64), (Arc<UnixListener>, u64))>, ProxyError, HNil>
+accept_step state = from_async (move \-> accept_next state)
+
+spawn : &Scope -> (UnixStream, u64) -> Settings -> Effect<(), ProxyError, HNil>
+spawn scope accepted settings =
+  (stream, id) = accepted
+  scope.fork_in (serve_client stream id settings) |> .map (\_ -> ()) |> .widen
+
+-- Accept clients until interrupted (or until accept fails, which ends the
+-- program for systemd to restart; the listening socket stays systemd's).
+export serve : UnixListener -> Settings -> Effect<(), ProxyError, HNil>
+serve listener settings =
+  l = Arc::new listener
+  Effect::scoped (move \scope -> Stream::unfold_effect (l, 1) accept_step |> .run_for_each_effect (move \accepted -> spawn (&scope) accepted (settings.clone ())))
