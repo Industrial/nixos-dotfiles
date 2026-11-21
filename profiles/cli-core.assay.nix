@@ -5,6 +5,13 @@ let
   features = import ../lib/features.nix {inherit (nixos) lib;};
   on = features.enabledFeatures (features.evalSelection {modules = [{profiles.cli-core.enable = true;}];});
   has = f: builtins.elem f on;
+  # The rollback for vwhy's take-over (GH-182): one option, set beside the profile.
+  rolledBack = features.enabledFeatures (features.evalSelection {
+    modules = [
+      {profiles.cli-core.enable = true;}
+      {features.cli.nix-tree.enable = true;}
+    ];
+  });
 in
   assay.suite "cli-core" {
     # The multiplexer is the load-bearing core entry: an ssh-only host that loses zellij loses
@@ -49,6 +56,12 @@ in
       });
     in
       assay.eq [(builtins.elem "cli.vmon" off) (builtins.elem "cli.nix-output-monitor" off)] [false true];
+
+    # vwhy answers "why is this in my closure" and "what makes it big" (GH-182): it is on the
+    # default path and nix-tree is not. `features.cli.nix-tree.enable = true` is the one-option
+    # rollback, and it keeps vwhy installed beside nix-tree.
+    carriesVwhyNotNixTree = assay.eq [(has "cli.vwhy") (has "cli.nix-tree")] [true false];
+    nixTreeRollsBack = assay.eq [(builtins.elem "cli.vwhy" rolledBack) (builtins.elem "cli.nix-tree" rolledBack)] [true true];
 
     # cli-core is CLI only: nothing outside features/cli.
     onlyCliFeatures = assay.eq (builtins.filter (f: builtins.substring 0 4 f != "cli.") on) [];

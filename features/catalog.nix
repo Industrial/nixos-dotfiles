@@ -95,6 +95,7 @@
   ./cli/vbump
   ./cli/vdiff
   ./cli/vmon
+  ./cli/vwhy
   ./cli/yazi
   ./cli/zellij
   ./cli/zoxide
