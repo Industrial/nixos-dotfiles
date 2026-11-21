@@ -7,8 +7,8 @@
 --
 -- `list` shows the system profiles (`system` and every one in
 -- `system-profiles/`, comin's among them) with each generation's date, the
--- system it boots, whether it is current, booted, running or pinned, and a
--- vdiff summary against the generation before it. `pin` and `unpin` add and
+-- system it boots, whether it is current, booted, running, the boot menu's
+-- default or pinned, and a vdiff summary against the generation before it. `pin` and `unpin` add and
 -- remove a generation's GC root (`pin.vlt`); with no `--profile` they act on
 -- the system profile switched last. `prune` removes generations by policy
 -- (`policy.vlt`) from the system profiles (with `--all-profiles`, from every
@@ -30,7 +30,7 @@ import nix_store_core::generations::cutoff_of
 import nix_store_core::storepath::base_name
 import vdiff::closure::{lifted, resolve, walk}
 import vdiff::report::{Closure, diff, render_bytes}
-import crate::boot::{boot_default, current_gen, install, remove_generations}
+import crate::boot::{ESP, boot_default, current_gen, install, link_booting, menu_default, remove_generations}
 import crate::pin::{PIN_DIR, pin, pinned, unpin}
 import crate::policy::{Plan, Policy, Protect, decide}
 import crate::profile::{PROFILES_DIR, Gen, Profile, all_profiles, is_system_profile, profile_path, read_profile, resolved, system_profiles}
@@ -183,7 +183,7 @@ every_profile root =
 
 -- What protects a generation of `profile`, read now.
 protection : &Path -> &[Gen] -> Protect
-protection profile gens = Protect { booted = resolved "/run/booted-system", running = resolved "/run/current-system", pinned = pinned (Path::new PIN_DIR) (Path::new PROFILES_DIR) profile gens }
+protection profile gens = Protect { booted = resolved "/run/booted-system", running = resolved "/run/current-system", boot_default = menu_default (Path::new ESP), pinned = pinned (Path::new PIN_DIR) (Path::new PROFILES_DIR) profile gens }
 
 -- The system profile switched last: its current generation's link is the newest.
 active_profile : &[Profile] -> Option<PathBuf>
@@ -247,9 +247,12 @@ export data Listing { export profiles Vec<Profile>, export protect Vec<Protect>,
 
 read_listing : &Options -> Listing
 read_listing o =
-  (paths, notes) = chosen o false
+  (paths, unread) = chosen o false
   profiles = paths.iter () |> .map (\p -> read_profile p) |> .collect : Vec<Profile>
   protect = profiles.iter () |> .map (\p -> protection (&p.path) (&p.gens)) |> .collect : Vec<Protect>
+  mut notes = unread.iter () |> .map (\n -> "#{n} (comin's profile is root-only: run vgen as root to see it)") |> .collect : Vec<String>
+  if menu_default (Path::new ESP) |> .is_none
+    notes.push ("boot default unknown: #{ESP}/loader is unreadable (run as root) or names no single entry")
   Listing { profiles, protect, notes }
 
 -- Every generation's link, in listing order.
@@ -302,6 +305,8 @@ flags_of g current protect =
     marks.push "booted"
   if protect.running.as_deref () == Some (g.toplevel.as_str ()) || protect.running.as_deref () == Some (g.target.as_str ())
     marks.push "running"
+  if protect.boot_default.as_deref () == Some (g.toplevel.as_str ()) || protect.boot_default.as_deref () == Some (g.target.as_str ())
+    marks.push "boot default"
   if protect.pinned.contains (&g.number)
     marks.push "pinned"
   if marks.is_empty ()
@@ -331,7 +336,7 @@ render_listing l cs =
       i := i + 1
       j := j + 1
   for n in l.notes.iter ()
-    note = "note: #{n} (comin's profile is root-only: run vgen as root to see it)\n"
+    note = "note: #{n}\n"
     out.push_str (&note)
   out
 
@@ -448,7 +453,12 @@ active_boot =
   root = Path::new PROFILES_DIR
   (paths, _) = system_profiles root
   read = paths.iter () |> .map (\p -> read_profile p) |> .collect : Vec<Profile>
-  boot_default root (&read)
+  kept_default (&read) |> .or_else (\-> boot_default root (&read))
+
+-- The menu's current default, if it is one of these generations: a prune
+-- keeps it (policy), so the rewrite can keep it the default.
+kept_default : &[Profile] -> Option<PathBuf>
+kept_default read = menu_default (Path::new ESP) |> .and_then (\t -> link_booting read (&t))
 
 -- After the removals: the boot menu, if a system profile changed.
 rewrite_boot : &Options -> Vec<bool> -> Result<(), VgenError>
@@ -550,10 +560,10 @@ test "the listing marks current, booted and pinned generations"
   g1 = Gen { number = 1, mtime = 0, link = PathBuf::from "/p/system-1-link", target = .to_string "/nix/store/aaaa-nixos-system-1", toplevel = .to_string "/nix/store/aaaa-nixos-system-1" }
   g2 = Gen { number = 2, mtime = 86400, link = PathBuf::from "/p/system-2-link", target = .to_string "/nix/store/bbbb-nixos-system-2", toplevel = .to_string "/nix/store/bbbb-nixos-system-2" }
   p = Profile { path = PathBuf::from "/p/system", current = Some 2, gens = vec![g1, g2] }
-  protect = Protect { booted = Some (.to_string "/nix/store/aaaa-nixos-system-1"), running = Some (.to_string "/nix/store/bbbb-nixos-system-2"), pinned = vec![1] }
+  protect = Protect { booted = Some (.to_string "/nix/store/aaaa-nixos-system-1"), running = Some (.to_string "/nix/store/bbbb-nixos-system-2"), boot_default = Some (.to_string "/nix/store/bbbb-nixos-system-2"), pinned = vec![1] }
   l = Listing { profiles = vec![p], protect = vec![protect], notes = Vec::new () }
   none = Vec::new () : Vec<Option<Closure>>
   text = render_listing (&l) (&none)
-  assert_eq! \-> text \-> "/p/system\n      1  1970-01-01 00:00  nixos-system-1  [booted, pinned]\n      2  1970-01-02 00:00  nixos-system-2  [current, running]\n"
+  assert_eq! \-> text \-> "/p/system\n      1  1970-01-01 00:00  nixos-system-1  [booted, pinned]\n      2  1970-01-02 00:00  nixos-system-2  [current, running, boot default]\n"
   unknown = .to_vec ([None, None]) : Vec<Option<Closure>>
   assert! \-> render_listing (&l) (&unknown) |> .contains "vs 1: ?"

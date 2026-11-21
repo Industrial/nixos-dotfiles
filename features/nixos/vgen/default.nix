@@ -7,9 +7,10 @@
 # vgc run (wanted by and ordered before vgc.service), with vgc's old policy: 30 days, by
 # Nix's own rule (nix-store-core's `generations`, lifted from vgc), over the same profiles
 # (`--all-profiles`). Unlike the flag it replaces, it never removes a profile's current
-# generation, the booted one, the running one or a pinned one, and when a system profile
-# loses generations it rewrites the boot entries through the system's own installer
-# (`switch-to-configuration boot`), never by editing /boot.
+# generation, the booted one, the running one, the one the boot menu defaults to (in
+# either profile: comin's or `system`) or a pinned one, and when a system profile loses
+# generations it rewrites the boot entries through the system's own installer
+# (`switch-to-configuration boot`), never by editing /boot, keeping that default.
 #
 # Pins are GC roots under /nix/var/nix/gcroots/vgen/ (`vgen pin <n>`); vgc and Nix walk
 # gcroots recursively, so they honour them as they are.
