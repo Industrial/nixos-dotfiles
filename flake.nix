@@ -218,7 +218,7 @@
   };
 
   outputs = inputs @ {self, ...}: let
-    lib = inputs.nixpkgs.lib;
+    inherit (inputs.nixpkgs) lib;
     system = "x86_64-linux";
     pkgs = inputs.nixpkgs.legacyPackages.${system};
     hosts = (import ./common/fleet.nix).names;
@@ -356,6 +356,9 @@
       // (builtins.removeAttrs self.stigVmTests ["passthru"])
       # features/nix/vverify's VM test: a corrupted store path is reported.
       // {vverify-vm = import ./features/nix/vverify/test.nix {inherit pkgs;};}
+      # features/nixos/users' VM test (GH-187): accounts, locked root, operator SSH, sudo and
+      # console login across a switch and a rollback, under perl, userborn, and perl -> userborn.
+      // lib.listToAttrs (map (mode: lib.nameValuePair "users-vm-${mode}" (import ./features/nixos/users/test.nix {inherit pkgs mode;})) ["perl" "userborn" "migrate"])
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
