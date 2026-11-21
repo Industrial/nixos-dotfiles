@@ -59,9 +59,9 @@ in
           )
           assert "127.0.0.1:5101" in out, out
           client.succeed("grep -qx 'substituted through vfetch serve' ${payload}")
-          log = client.succeed("journalctl -u vfetch-serve -o cat")
-          assert "narinfo ${payload} from http://cache:5000" in log, log
-          assert "nar http://cache:5000/nar/" in log, log
+          journal = client.succeed("journalctl -u vfetch-serve -o cat")
+          assert "narinfo ${payload} from http://cache:5000" in journal, journal
+          assert "nar http://cache:5000/nar/" in journal, journal
           client.succeed("nix-store --verify-path ${payload}")
     '';
   }
