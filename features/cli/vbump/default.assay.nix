@@ -76,6 +76,17 @@ in
     # By hand: bin/update/flake runs vbump against origin/main whenever vbump is
     # installed; with this feature off (no vbump on PATH) or UPDATE_LEGACY=1 it is the
     # old all-inputs `nix flake update`.
+    # The token: minted per run from the vbump app, pinned by commit, only when both
+    # secrets exist; the push and gh use it first and fall back to today's tokens.
+    appTokenPinned = assay.eq (lib.hasInfix "uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0\n" workflow) true;
+    appTokenOnlyWithBothSecrets = assay.eq [
+      (lib.hasInfix "HAS_APP: \${{ secrets.VBUMP_APP_ID != '' && secrets.VBUMP_APP_PRIVATE_KEY != '' }}\n" workflow)
+      (lib.hasInfix "        id: app\n        if: env.HAS_APP == 'true'\n" workflow)
+      (lib.hasInfix "        if: env.HAS_APP != 'true'\n" workflow)
+    ] [true true true];
+    appTokenFirstForPushAndGh =
+      assay.eq (builtins.length (lib.splitString "\${{ steps.app.outputs.token || secrets.FLAKE_LOCK_UPDATE_TOKEN || github.token }}" workflow)) 3;
+
     byHandRunsVbump = assay.eq (lib.hasInfix "\n  exec vbump run --rev origin/main \"$@\"\n" byHand) true;
     byHandFallsBack = assay.eq [
       (lib.hasInfix "if [ \"\${UPDATE_LEGACY:-0}\" != 1 ] && command -v vbump >/dev/null 2>&1; then" byHand)

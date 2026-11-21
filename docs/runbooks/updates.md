@@ -60,9 +60,10 @@ A legacy PR body's **What this bump changes** section, written by the workflow's
 
 Checks: the bump PR runs the regular `PR` workflow (`ci.yml`, with every
 `nixosConfigurations` host in its check matrix), and `main` requires `ci / all-green`.
-GitHub starts that workflow for the bot's PR only if the PR was opened with
-`FLAKE_LOCK_UPDATE_TOKEN`. If no checks appear, **close and reopen the PR**; until then it
-cannot merge.
+GitHub starts that workflow for the bot's PR only if the PR was opened with a token other
+than `GITHUB_TOKEN`: the vbump app's per-run token (§6), or `FLAKE_LOCK_UPDATE_TOKEN`. If
+no checks appear, **close and reopen the PR**; until then it cannot merge. A run without
+the app says so at the top of its job summary.
 
 Preview a diff locally without CI:
 
@@ -127,8 +128,49 @@ fleet-deploy).
 
 Run it by hand: `nixos-update-notifier --no-notify`.
 
+## 6. The vbump GitHub App (one-time setup)
+
+The `vbump` job mints a short-lived installation token at the start of each run with
+`actions/create-github-app-token`. The token is scoped to this repository and to the
+three permissions below, and it is revoked when the job ends. The job uses it for the
+branch pushes, the PRs and the label. Because the token is not `GITHUB_TOKEN`, each bump
+PR's `ci / all-green` starts on its own. Without the two secrets, the job falls back to
+`FLAKE_LOCK_UPDATE_TOKEN`, then to `GITHUB_TOKEN`, with a warning.
+
+1. **Create the app.** As **Industrial**, open GitHub → Settings → Developer settings →
+   GitHub Apps → **New GitHub App** (<https://github.com/settings/apps/new>) and fill in:
+   - **GitHub App name:** `vbump-nixos-dotfiles` (any unique name; it shows as
+     `<name>[bot]` on the PRs and commits).
+   - **Homepage URL:** `https://github.com/Industrial/nixos-dotfiles`.
+   - **Webhook:** untick **Active**. The app receives no events.
+   - **Repository permissions:** Contents **Read and write**, Pull requests **Read and
+     write**, Issues **Read and write** (for the `flake-lock` label). Metadata **Read-only**
+     is selected automatically. Leave every other permission at *No access*, and set no
+     organization or account permissions.
+   - **Where can this GitHub App be installed?** **Only on this account**.
+   - Click **Create GitHub App**.
+2. **Note the Client ID** shown on the app's page (`Iv…`). The numeric **App ID** works too.
+3. **Generate a private key.** On the same page, under **Private keys**, click **Generate a
+   private key**. A `.pem` file downloads.
+4. **Install it on this repository only.** Open the app's **Install App** tab, then
+   **Install** on Industrial, choose **Only select repositories**, and pick
+   **Industrial/nixos-dotfiles**.
+5. **Add the two secrets.** In Industrial/nixos-dotfiles, open Settings → Secrets and
+   variables → Actions → **New repository secret**:
+   - `VBUMP_APP_ID`: the Client ID (or App ID) from step 2;
+   - `VBUMP_APP_PRIVATE_KEY`: the whole `.pem` file, including the `-----BEGIN` and
+     `-----END` lines.
+
+   Then delete the local `.pem` file. GitHub keeps only the public half.
+6. **Check it.** Run `gh workflow run update-flake-lock.yml`. The *Mint the vbump app
+   token* step runs, the job summary has no warning, and the new PRs and commits are by
+   `<name>[bot]` with their checks started.
+
+Rotate the key by generating a second key, replacing `VBUMP_APP_PRIVATE_KEY`, then
+deleting the old key on the app page. Revoke all access by uninstalling the app; the job
+then falls back, as above.
+
 ## Needs operator (one-time)
 
-See ADR-0006 § Needs operator: the `FLAKE_LOCK_UPDATE_TOKEN` secret (without it, bump PRs
-are blocked on `ci / all-green` until someone closes and reopens them), or at minimum
-*Allow GitHub Actions to create and approve pull requests*.
+Set up the vbump app (§6). `FLAKE_LOCK_UPDATE_TOKEN` (ADR-0006 § Needs operator) is the
+older alternative and is still read as a fallback, and by the legacy job.
