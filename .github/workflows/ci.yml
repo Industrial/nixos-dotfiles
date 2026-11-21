@@ -214,6 +214,10 @@ jobs:
         run: bin/ci/cargo-standalone test "$CRATE"
       - name: Check Cargo.nix drift
         run: bin/ci/cargo-standalone drift "$CRATE"
+      # The crate's default.nix through a host's pkgs.callPackage, as the fleet builds it:
+      # cargo passing does not mean the Nix package links (vgc and -lsqlite3, #170).
+      - name: Nix package build
+        run: bin/ci/cargo-standalone package "$CRATE"
   # The check matrix comes from the flake, not from a list here: a hand-written matrix is
   # how muninn went unchecked. Every nixosConfigurations attribute (installer included)
   # gets a leg.

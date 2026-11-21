@@ -131,6 +131,10 @@ has "and nixos-update-notifier" '"nixos-update-notifier"'
 lacks "and not the workspace member oomkiller" 'oomkiller'
 expect "cargo-standalone rejects a bad crate name" 1 "not a crate name" "$CS" clippy 'x;y'
 expect "cargo-standalone rejects a crate it did not find" 1 "not a standalone crate" "$CS" test oomkiller
+expect "cargo-standalone package rejects a bad crate name" 1 "not a crate name" "$CS" package 'x;y'
+expect "cargo-standalone package rejects a bad host name" 1 "not a host name: 'x;y'" \
+    env CARGO_STANDALONE_HOST='x;y' "$CS" package vcache
+expect "cargo-standalone usage lists package" 64 'package <crate> +nix build its default.nix' "$CS"
 
 # --- argument errors ---------------------------------------------------------
 expect "test with an unknown feature exits 64" 64 "no path or feature named 'no-such-feature'" "$DEV" test no-such-feature
