@@ -33,6 +33,7 @@ let
     }
   ];
   rootUnlocked = evalWith [{features.hardening.lockRoot = false;}];
+  userborn = evalWith [{features.nixos.users.userborn.enable = true;}];
   untrustedWithoutSigning = evalWith [{features.hardening.operatorTrusted = false;}];
   signingWithoutKeys = evalWith [{features.hardening.storeSigning.enable = true;}];
 
@@ -81,4 +82,18 @@ in
     # Interlocks that stop a deploy-breaking combination.
     untrustRequiresSigning = assay.eq (failsWith untrustedWithoutSigning ".*needs features.hardening.storeSigning.enable.*") true;
     signingRequiresKeys = assay.eq (failsWith signingWithoutKeys ".*publicKeys is empty.*") true;
+
+    # userborn (GH-187): off by default; on, it replaces the perl script and root is still
+    # locked, by the activation snippet and by a unit that runs once userborn has written
+    # /etc/shadow (on a fresh boot the snippet runs first and finds no file).
+    userbornOffByDefault = assay.eq default.services.userborn.enable false;
+    noLockUnitByDefault = assay.eq (default.systemd.services ? lock-root-password) false;
+    userbornOptIn = assay.eq userborn.services.userborn.enable true;
+    userbornReplacesPerl = assay.eq userborn.system.activationScripts.users "";
+    userbornKeepsLockSnippet = assay.eq (userborn.system.activationScripts ? lockRootPassword) true;
+    userbornLocksAfterUserborn =
+      assay.eq userborn.systemd.services.lock-root-password.after ["userborn.service"];
+    lockToleratesMissingShadow =
+      assay.eq (builtins.match ".*if [[] -e /etc/shadow []]; then.*" default.system.activationScripts.lockRootPassword.text != null) true;
+    userbornEvaluatesCleanly = assay.eq (failedAssertions userborn) [];
   }
