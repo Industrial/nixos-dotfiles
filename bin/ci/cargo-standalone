@@ -5,7 +5,8 @@
 #   bin/ci/cargo-standalone clippy <crate>   cargo clippy --all-targets -- -D warnings
 #   bin/ci/cargo-standalone test <crate>     cargo test
 #   bin/ci/cargo-standalone drift <crate>    Cargo.nix against a fresh crate2nix (if it has one)
-#   bin/ci/cargo-standalone all [<crate>…]   all three, for every crate or the ones named
+#   bin/ci/cargo-standalone package <crate>  nix build its default.nix as the fleet does
+#   bin/ci/cargo-standalone all [<crate>…]   all four, for every crate or the ones named
 #
 # A standalone crate has its own Cargo.lock and an empty [workspace] table, so the
 # workspace jobs (`cd rust && cargo … --workspace`) never see it. The list is found, not
@@ -14,6 +15,16 @@
 #
 # --list fails when it finds no crate, and when a rust/tools/*/Cargo.toml is neither a
 # member of rust/Cargo.toml nor standalone: that crate would be checked by no job.
+#
+# `package` exists because cargo passing says nothing about the Nix package: vgc built and
+# linked under cargo, then failed in drakkar's build with `ld: cannot find -lsqlite3`
+# (nixpkgs' cargoUseSystemLibs hook turns libsqlite3-sys's `bundled` off; #170). It
+# callPackages default.nix exactly as the features do (`pkgs.callPackage
+# ../../../rust/tools/<crate> {}`), with a host's own pkgs: the flake's nixpkgs plus the
+# config and overlays features/nixos gives every host. CARGO_STANDALONE_HOST picks the
+# host (default drakkar, the one that deploys); the source is the flake's copy, so only
+# tracked files count, as in the fleet. The derivation's checkPhase runs the tests again,
+# in the sandbox.
 #
 # RUST_DIR (default rust/) points --list at another tree; bin/dev.d/test.sh uses it.
 #
@@ -127,6 +138,28 @@ drift_in() {
   echo "cargo-standalone: $dir/Cargo.nix is up to date"
 }
 
+# The expression `package` builds: the crate's default.nix, callPackage'd with the host's
+# pkgs, from the flake's copy of the tree.
+PACKAGE_EXPR='{ root, crate, host }:
+  let flake = builtins.getFlake root;
+  in flake.nixosConfigurations.${host}.pkgs.callPackage "${flake}/rust/tools/${crate}/default.nix" { }'
+
+package() {
+  local dir host="${CARGO_STANDALONE_HOST:-drakkar}"
+  dir="$(crate_dir "$1")" || return 1
+  [[ "$host" =~ ^[A-Za-z0-9_-]+$ ]] || {
+    echo "cargo-standalone: not a host name: '$host'" >&2
+    return 1
+  }
+  if [[ ! -f "$dir/default.nix" ]]; then
+    echo "cargo-standalone: $dir has no default.nix, no Nix package to build"
+    return 0
+  fi
+  echo "cargo-standalone: building $dir/default.nix with nixosConfigurations.$host.pkgs.callPackage"
+  nix build --impure --no-link -L --argstr root "$ROOT" --argstr crate "$1" --argstr host "$host" \
+    --expr "$PACKAGE_EXPR"
+}
+
 cmd="${1:-}"
 [[ $# -gt 0 ]] && shift
 case "$cmd" in
@@ -134,6 +167,7 @@ case "$cmd" in
   clippy) clippy "${1:?usage: bin/ci/cargo-standalone clippy <crate>}" ;;
   test) test_crate "${1:?usage: bin/ci/cargo-standalone test <crate>}" ;;
   drift) drift "${1:?usage: bin/ci/cargo-standalone drift <crate>}" ;;
+  package) package "${1:?usage: bin/ci/cargo-standalone package <crate>}" ;;
   all)
     if [[ $# -eq 0 ]]; then
       mapfile -t crates < <(list | jq -r '.[]')
@@ -143,12 +177,12 @@ case "$cmd" in
     failed=()
     for c in "${crates[@]}"; do
       echo "=== $c"
-      { clippy "$c" && test_crate "$c" && drift "$c"; } || failed+=("$c")
+      { clippy "$c" && test_crate "$c" && drift "$c" && package "$c"; } || failed+=("$c")
     done
     ((${#failed[@]} == 0)) || die "failed: ${failed[*]}"
     ;;
   *)
-    sed -n '2,9s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,10s/^# \{0,1\}//p' "$0" >&2
     exit 64
     ;;
 esac

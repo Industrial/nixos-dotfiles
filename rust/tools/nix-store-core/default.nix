@@ -26,6 +26,9 @@ rustPlatform.buildRustPackage {
 
   cargoLock.lockFile = ./Cargo.lock;
 
+  # Link rusqlite's bundled SQLite: nixpkgs' cargoUseSystemLibs hook would point libsqlite3-sys at a system libsqlite3 that is not there (`cannot find -lsqlite3`), as vcache and vgc opt out.
+  dontCargoUseSystemLibs = true;
+
   # A library: nothing to install but the proof that it built and passed.
   postInstall = ''
     mkdir -p $out
