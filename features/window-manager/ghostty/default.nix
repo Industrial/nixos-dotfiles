@@ -53,7 +53,15 @@ in {
   # Activation script names share one namespace across every feature, so this
   # one is named for its feature rather than the generic `linkFile`, which
   # features/window-manager/alacritty already defines.
-  system.activationScripts.linkGhosttyConfig = {
+  imports = [../../../lib/vfiles.nix];
+
+  vfiles.files."${settings.userdir}/.config/ghostty/config.ghostty" = {
+    source = ghosttyConfig;
+    user = settings.username;
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.linkGhosttyConfig = {
     text = ''
       mkdir -p ${settings.userdir}/.config/ghostty
       ln -sf ${ghosttyConfig} ${settings.userdir}/.config/ghostty/config.ghostty

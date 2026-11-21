@@ -8,6 +8,7 @@
 }: {
   # Import dconf configuration and workspace setup
   imports = [
+    ../../../lib/vfiles.nix
     ./dconf.nix
     ./workspace-setup.nix
   ];
@@ -191,7 +192,13 @@
   };
 
   # Match Hyprland monitor mode on DP-1 (Mutter reads ~/.config/monitors.xml).
-  system.activationScripts.gnome-monitors = lib.stringAfter ["etc"] ''
+  vfiles.files."${settings.userdir}/.config/monitors.xml" = {
+    source = ./monitors.xml;
+    user = settings.username;
+  };
+
+  # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+  vfiles.legacy.gnome-monitors = lib.stringAfter ["etc"] ''
     mkdir -p /home/${settings.username}/.config
     ln -sfn ${./monitors.xml} /home/${settings.username}/.config/monitors.xml
   '';

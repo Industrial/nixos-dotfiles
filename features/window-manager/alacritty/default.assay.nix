@@ -23,9 +23,9 @@ let
       };
     };
   mod = mkMod (args: args.name);
-  activation = mod.system.activationScripts.linkFile.text;
+  activation = mod.vfiles.legacy.linkFile.text;
 
-  generated = (mkMod (args: args.text)).system.activationScripts.linkFile.text;
+  generated = (mkMod (args: args.text)).vfiles.legacy.linkFile.text;
   # fromTOML doubles as the parse check: a malformed generated section fails the suite at
   # eval rather than silently at the next alacritty launch. The activation text is
   # `mkdir -p ...\nln -sf <toml> /home/alice/...`, so the TOML is what sits between.
@@ -103,4 +103,8 @@ in
     # Alacritty computes `dim` from `normal` when absent, and base16 specifies no dim range,
     # so inventing one here would be six colours the scheme does not contain.
     noInventedDimRange = assay.eq (cfg.colors ? dim) false;
+
+    # vfiles (GH-188): the generated config, linked and owned by the user.
+    vfilesLinksTheGeneratedConfig =
+      assay.eq (builtins.mapAttrs (_: f: [f.user f.source]) mod.vfiles.files) {"/home/alice/.config/alacritty/alacritty.toml" = ["alice" "alacritty.toml"];};
   }

@@ -68,4 +68,26 @@ in
     monitorsDrakkar = assay.eq (lib.hasInfix "7680x2160" (builtins.readFile ./monitors.drakkar.lua)) true;
     monitorsHuginn = assay.eq (lib.hasInfix "2160x1440" (builtins.readFile ./monitors.huginn.lua)) true;
     luaHasDwindle = assay.eq (lib.hasInfix ''layout = "dwindle"'' lua) true;
+
+    # vfiles (GH-188): every file the script linked, from the checkout, each with its
+    # committed copy as the fallback (hyprsunset.conf: the /etc copy, as before); drakkar's
+    # own monitor layout.
+    vfilesDeclaresEveryLink = assay.eq (builtins.attrNames cfg.vfiles.files) (map (r: "${nixos.defaultSettings.userdir}/.config/${r}") [
+      "ashell/config.toml"
+      "hypr/hyprland.conf.hyprlang"
+      "hypr/hyprland.lua"
+      "hypr/hyprlock.conf"
+      "hypr/hyprsunset.conf"
+      "hypr/hyprtoolkit.conf"
+      "hypr/monitors.lua"
+      "hypr/xdph.conf"
+    ]);
+    vfilesLinksTheCheckoutWithAFallback = let
+      f = cfg.vfiles.files."${nixos.defaultSettings.userdir}/.config/hypr/hyprland.lua";
+    in
+      assay.eq [f.source (f.fallback == ./hyprland.lua)] ["${nixos.defaultSettings.userdir}/.dotfiles/features/window-manager/hyprland/hyprland.lua" true];
+    vfilesPicksTheHostMonitors =
+      assay.eq (lib.hasSuffix "/monitors.drakkar.lua" cfg.vfiles.files."${nixos.defaultSettings.userdir}/.config/hypr/monitors.lua".source) true;
+    vfilesEveryCheckoutLinkHasAFallback =
+      assay.eq (lib.all (f: f.fallback != null) (lib.filter (f: lib.hasPrefix "${nixos.defaultSettings.userdir}/.dotfiles/" f.source) (builtins.attrValues cfg.vfiles.files))) true;
   }

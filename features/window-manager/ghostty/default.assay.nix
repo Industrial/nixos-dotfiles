@@ -162,4 +162,10 @@ in
     # Presentation matched to alacritty.toml.
     opacityMatchesAlacritty = assay.eq (get "background-opacity") ["0.85"];
     paddingMatchesAlacritty = assay.eq (get "window-padding-x" ++ get "window-padding-y") ["8" "8"];
+
+    # vfiles (GH-188): the generated config, linked from the same store file the script linked.
+    vfilesLinksTheGeneratedConfig = let
+      f = cfg.vfiles.files."${home}/.config/ghostty/config.ghostty";
+    in
+      assay.eq [f.mode (builtins.unsafeDiscardStringContext "${f.source}") (builtins.length (builtins.attrNames cfg.vfiles.files))] ["link" (builtins.head linkedPath) 1];
   }

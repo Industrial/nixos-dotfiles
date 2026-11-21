@@ -10,7 +10,7 @@
   inputs,
   ...
 }: let
-  system = pkgs.stdenv.hostPlatform.system;
+  inherit (pkgs.stdenv.hostPlatform) system;
   hyprPkgs = inputs.hyprland.packages.${system};
   hyprlandPkg = hyprPkgs.hyprland;
   hyprlandPortal = hyprPkgs.xdg-desktop-portal-hyprland;
@@ -78,8 +78,40 @@ in
       };
     };
 
-    system = {
-      activationScripts = {
+    imports = [../../../lib/vfiles.nix];
+
+    vfiles = {
+      # Linked from the mutable checkout, so an edit applies at `hyprctl reload` without a
+      # rebuild; the committed copy (a store path) stands in while the checkout file is
+      # missing. hyprsunset.conf links the /etc copy, as the script did.
+      files = let
+        home = "${settings.userdir}/.config";
+        fromCheckout = rel: committed: {
+          source = "${dotfilesHyprDir}/${rel}";
+          fallback = committed;
+          user = settings.username;
+        };
+        # The host's own monitor layout when the repo has one, else the default.
+        monitors =
+          if builtins.pathExists (./. + "/monitors.${settings.hostname}.lua")
+          then "monitors.${settings.hostname}.lua"
+          else "monitors.default.lua";
+      in {
+        "${home}/hypr/hyprland.lua" = fromCheckout "hyprland.lua" ./hyprland.lua;
+        "${home}/hypr/hyprland.conf.hyprlang" = fromCheckout "hyprland.conf.hyprlang" ./hyprland.conf.hyprlang;
+        "${home}/hypr/hyprsunset.conf" = {
+          source = "/etc/xdg/hypr/hyprsunset.conf";
+          user = settings.username;
+        };
+        "${home}/hypr/xdph.conf" = fromCheckout "xdph.conf" ./xdph.conf;
+        "${home}/hypr/monitors.lua" = fromCheckout monitors (./. + "/${monitors}");
+        "${home}/ashell/config.toml" = fromCheckout "ashell/config.toml" ./ashell/config.toml;
+        "${home}/hypr/hyprlock.conf" = fromCheckout "hyprlock.conf" ./hyprlock.conf;
+        "${home}/hypr/hyprtoolkit.conf" = fromCheckout "hyprtoolkit.conf" ./hyprtoolkit.conf;
+      };
+
+      # The pre-vfiles script, kept for the rollback (features.nixos.vfiles off, lib/vfiles.nix).
+      legacy = {
         hyprland-config = lib.stringAfter ["etc"] ''
           mkdir -p /home/${settings.username}/.config/hypr
           # Prefer the mutable checkout so edits apply after reload/restart without nixos-rebuild.
