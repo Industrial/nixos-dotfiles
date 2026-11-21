@@ -1,0 +1,153 @@
+-- The worker client against this machine's nix-daemon, compared with what
+-- the `nix` command reports for the same paths. Every test skips (passes
+-- vacuously) where there is no daemon socket or no `nix`, as in the build
+-- sandbox; they run on a NixOS host.
+
+import std::collections::BTreeMap
+import std::path::Path
+import std::process::Command
+import id_effect::{Effect, HNil}
+import crate::worker::{DEFAULT_SOCKET, PathInfo, WorkerError, connect, hello, is_valid_path, nar_from_path, nar_hash_from_path, query_path_from_hash_part, query_path_info, query_valid_paths, with_daemon, add_temp_root, CLIENT_VERSION, close}
+
+-- A runtime with a reactor, when there is a daemon to talk to.
+live : Option<id_effect::Runtime>
+live =
+  socket = Path::new DEFAULT_SOCKET
+  system = Path::new "/run/current-system"
+  nix = stdout_of "nix" (&["--version"])
+  if socket.exists () && system.exists () && nix.is_some ()
+    id_effect::Runtime::new () |> .ok
+  else
+    eprintln! \-> "worker_live: no daemon socket or nix here; skipping"
+    None
+
+stdout_of : &str -> &[&str] -> Option<String>
+stdout_of program args =
+  out = Command::new program |> .args args |> .output |> .ok
+  case out of
+    Some o ->
+      if o.status.success ()
+        Some ((String::from_utf8_lossy (&o.stdout)).into_owned ())
+      else
+        None
+    None -> None
+
+ok : given <A: Send + 'static> &id_effect::Runtime -> Effect<A, WorkerError, HNil> -> A
+ok rt eff =
+  -- On a fiber of the executor, so the socket is made inside the tokio
+  -- runtime (block_on polls its root on this thread, outside it).
+  handle = rt.fork eff
+  case rt.block_on (handle.join ()) |> .into_result of
+    Ok a -> a
+    Err cause -> panic! \-> "effect failed: #{cause:?}"
+
+-- Ten valid paths: the current system's first ten references.
+sample_paths : Vec<String>
+sample_paths =
+  text = stdout_of "nix-store" (&["-q", "--references", "/run/current-system"]) |> .unwrap_or_default
+  mut paths = text.lines () |> .map (\l -> l.trim ().to_string ()) |> .filter (\l -> !l.is_empty ()) |> .collect : Vec<String>
+  paths.sort ()
+  paths.truncate 10
+  paths
+
+-- `nix path-info --json` for `paths`, by path.
+path_info_json : &[String] -> BTreeMap<String, serde_json::Value>
+path_info_json paths =
+  mut args = .to_vec ([.to_string "path-info", .to_string "--json"]) : Vec<String>
+  args.extend (paths.iter ().cloned ())
+  refs = args |> .iter |> .map (\a -> a.as_str ()) |> .collect : Vec<&str>
+  text = stdout_of "nix" (&refs) |> .expect "nix path-info --json"
+  value = serde_json::from_str (&text) |> .expect "path-info JSON" : serde_json::Value
+  mut out = BTreeMap::new () : BTreeMap<String, serde_json::Value>
+  if value.as_object () is Some map
+    for entry in map
+      out.insert (entry.0.clone ()) (entry.1.clone ())
+  out
+
+field_str : &serde_json::Value -> &str -> Option<String>
+field_str v key = v.get key |> .and_then (\x -> x.as_str ()) |> .map (\s -> s.to_string ())
+
+-- One path's daemon info against its `nix path-info --json` entry.
+check_info : &PathInfo -> &serde_json::Value -> ()
+check_info info json =
+  sri = field_str json "narHash" |> .expect "narHash"
+  expected = crate::hash::parse (&sri) |> .expect "narHash parses"
+  assert_eq! \-> info.nar_hash \-> expected
+  assert_eq! \-> Some info.nar_size \-> json.get "narSize" |> .and_then (\x -> x.as_u64 ())
+  assert_eq! \-> info.deriver \-> field_str json "deriver"
+  mut refs = json.get "references" |> .and_then (\x -> x.as_array ()) |> .map (\a -> (a.iter ().filter_map (\r -> r.as_str ().map (\s -> s.to_string ()))).collect ()) |> .unwrap_or_default : Vec<String>
+  refs.sort ()
+  mut mine = info.references.clone ()
+  mine.sort ()
+  assert_eq! \-> mine \-> refs
+  ()
+
+test "live: the handshake with this machine's daemon"
+  if live () is Some rt
+    d = ok (&rt) (connect (DEFAULT_SOCKET.to_string ()))
+    h = ok (&rt) (hello (&d))
+    assert_eq! \-> h.version \-> CLIENT_VERSION
+    assert! \-> h.daemon_nix_version |> .is_some
+    closing = rt.fork (close d)
+    assert! \-> rt.block_on (closing.join ()) |> .into_result |> .is_ok
+
+test "live: IsValidPath and QueryValidPaths"
+  if live () is Some rt
+    paths = sample_paths ()
+    assert_eq! \-> paths.len () \-> 10
+    d = ok (&rt) (connect (DEFAULT_SOCKET.to_string ()))
+    for p in &paths
+      assert! \-> ok (&rt) (is_valid_path (&d) (p.clone ()))
+    bogus = .to_string "/nix/store/00000000000000000000000000000000-not-there"
+    assert! \-> !(ok (&rt) (is_valid_path (&d) (bogus.clone ())))
+    mut asked = paths.clone ()
+    asked.push bogus
+    mut valid = ok (&rt) (query_valid_paths (&d) asked false)
+    valid.sort ()
+    assert_eq! \-> valid \-> paths
+
+test "live: QueryPathInfo matches nix path-info --json for ten paths"
+  if live () is Some rt
+    paths = sample_paths ()
+    json = path_info_json (&paths)
+    d = ok (&rt) (connect (DEFAULT_SOCKET.to_string ()))
+    for p in &paths
+      info = ok (&rt) (query_path_info (&d) (p.clone ())) |> .expect "valid"
+      assert_eq! \-> &info.path \-> p
+      check_info (&info) (json.get p |> .expect "in path-info's JSON")
+    none = ok (&rt) (query_path_info (&d) (.to_string "/nix/store/00000000000000000000000000000000-not-there"))
+    assert! \-> none |> .is_none
+
+test "live: QueryPathFromHashPart finds a path by its hash part"
+  if live () is Some rt
+    paths = sample_paths ()
+    p = paths[0].clone ()
+    hash = crate::storepath::hash_part_of (&p) |> .expect "hash part" |> .to_string
+    d = ok (&rt) (connect (DEFAULT_SOCKET.to_string ()))
+    assert_eq! \-> ok (&rt) (query_path_from_hash_part (&d) hash) \-> Some p
+    assert_eq! \-> ok (&rt) (query_path_from_hash_part (&d) (.to_string "00000000000000000000000000000000")) \-> None
+
+test "live: NarFromPath hashes to what nix hash path says"
+  if live () is Some rt
+    paths = sample_paths ()
+    json = path_info_json (&paths)
+    -- The three smallest, so the test stays quick.
+    mut by_size = paths |> .iter |> .map (\p -> (json.get p |> .and_then (\v -> v.get "narSize") |> .and_then (\n -> n.as_u64 ()) |> .unwrap_or u64::MAX, p.clone ())) |> .collect : Vec<(u64, String)>
+    by_size.sort ()
+    d = ok (&rt) (connect (DEFAULT_SOCKET.to_string ()))
+    for sized in by_size |> .iter |> .take 3
+      (size, p) = sized
+      digest = ok (&rt) (nar_hash_from_path (&d) (p.clone ()))
+      expected = stdout_of "nix" (&["hash", "path", p.as_str ()]) |> .expect "nix hash path"
+      assert_eq! \-> Some digest.hash \-> crate::hash::parse (expected.trim ())
+      assert_eq! \-> digest.size \-> *size
+    (_, smallest) = by_size[0].clone ()
+    nar = ok (&rt) (nar_from_path (&d) (smallest.clone ()))
+    local = crate::nar::nar_hash (Path::new (&smallest)) |> .expect "local NAR hash"
+    assert_eq! \-> crate::hash::digest (&nar) \-> local.hash
+
+test "live: with_daemon holds a connection for AddTempRoot and releases it"
+  if live () is Some rt
+    paths = sample_paths ()
+    p = paths[0].clone ()
+    ok (&rt) (with_daemon (DEFAULT_SOCKET.to_string ()) (move \d -> add_temp_root (&d) p))

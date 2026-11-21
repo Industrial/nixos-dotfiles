@@ -1653,6 +1653,7 @@ dependencies = [
  "id_effect",
  "rusqlite",
  "sha2",
+ "tokio",
  "voltaic-diag",
  "voltaic-driver",
 ]

@@ -8,8 +8,9 @@ for the one streaming face (`nar::stream`).
 
 Everything here is a plain function over values, except the reads of the
 filesystem (`nar`, `drv::read`) and of the database (`db`), which are
-blocking calls. A tool that runs them inside an effect wraps them in
-`suspend`, as vcache's `store` does.
+blocking calls, and the daemon protocol client (`worker`), whose operations
+are id_effect effects over tokio I/O. A tool that runs the blocking ones inside
+an effect wraps them in `suspend`, as vcache's `store` does.
 
 ## Using it
 
@@ -166,6 +167,93 @@ them.
 
 None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in vgc.
 
+### `worker`: the nix-daemon worker protocol
+
+What `nix` speaks to nix-daemon over `/nix/var/nix/daemon-socket/socket`, and
+over `ssh host nix-daemon --stdio`. The client offers protocol 1.37
+(`CLIENT_VERSION = 293`) and accepts any daemon from 1.24 (`MIN_VERSION`); a
+newer daemon negotiates down. The server handshake and
+the decoders also handle 1.38's feature exchange.
+
+Three layers, each usable on its own:
+
+**Pure grammar.** Decoders `take_* : &[u8] -> usize -> Result<(T, usize), Short>`
+read one value at a position and return where the next starts; `Short::More`
+means the buffer ends early, `Short::Bad` that it is not the protocol (lengths
+are capped at `MAX_STRING` and `MAX_LIST`, so garbage is refused before it is
+allocated). Encoders `put_* : &mut Vec<u8> -> .. -> ()` write into a buffer.
+
+| Item | Meaning |
+|---|---|
+| `take_u64`, `take_bool`, `take_bytes`, `take_string`, `take_strings`, `take_optional` | u64 LE; padded strings (lossy UTF-8); string lists; `""` as none |
+| `put_u64`, `put_bool`, `put_bytes`, `put_str`, `put_strings`, `put_optional`, `put_frame` | the same, written. `put_frame` is one frame of a framed upload (unpadded; an empty frame ends it) |
+| `WORKER_MAGIC_1`, `WORKER_MAGIC_2`, `STDERR_*`, `minor`, `major` | the constants and version halves |
+| `Op` (44 variants), `ALL_OPS`, `op_code : Op -> u64`, `op_of_code : u64 -> Option<Op>`, `op_name : Op -> String` | every libstore op code, obsolete ones included |
+| `StderrMsg = LogNext String \| DataRead u64 \| DataWrite Vec<u8> \| Last \| Failed DaemonFailure \| StartActivity Activity \| StopActivity u64 \| ActivityResult u64 u64 (Vec<Field>)` | one message of the stderr stream |
+| `take_stderr : u64 -> &[u8] -> usize -> ..`, `put_stderr : &mut Vec<u8> -> u64 -> &StderrMsg -> ()` | by protocol version (the error format changed at 1.26) |
+| `DaemonFailure { message, level, traces }`, `Activity { id, level, kind, text, fields, parent }`, `Field = Int u64 \| Text String` | |
+| `Request { code, op: Option<Op>, paths }`, `take_request : u64 -> &[u8] -> usize -> ..` | the op and the store paths a request starts with, for logging (it does not find the request's end) |
+| `PathInfo { path, deriver, nar_hash: Sha256, references, registration_time, nar_size, ultimate, sigs, ca }` | `take_path_info`, `take_path_info_reply`, `put_path_info` |
+| `NarScan`, `nar_scan ()`, `nar_step : &mut NarScan -> &[u8] -> usize -> Result<usize, Short>` | finds the end of a NAR on the wire (NarFromPath's reply is an unframed NAR), passing file contents in pieces |
+
+**Buffered connection.** `Conn` holds a boxed `AsyncRead` and `AsyncWrite`
+(`conn_of : Reader -> Writer -> Conn`), a read buffer and the negotiated
+`version`. Async functions over it:
+
+| Item | Meaning |
+|---|---|
+| `next : &mut Conn -> F -> Result<T, WorkerError>` | run a decoder, reading as much as it needs |
+| `send : &mut Conn -> &[u8] -> Result<(), WorkerError>` | write and flush |
+| `pending : &Conn -> &[u8]` | bytes read but not yet decoded (hand them on before switching to a raw relay) |
+| `client_handshake : &mut Conn -> u64 -> ..`, `server_handshake : &mut Conn -> &ServerHello -> ..` | both sides; `ServerHello { version, nix_version, trusted, features }` |
+| `process_stderr : &mut Conn -> Result<(), WorkerError>` | up to `Last`; `Failed` becomes `WorkerError::Remote` |
+| `relay_stderr : &mut Conn -> &mut Conn -> Result<StderrEnd, WorkerError>` | relay one op's stderr stream from the daemon side to the client side, answering `DataRead` from the client; `StderrEnd = Done \| Errored DaemonFailure` |
+| `copy_nar : &mut Conn -> FnMut(&[u8]) -> ..` | pass the NAR after NarFromPath's `Last` to a sink, exactly as sent |
+| `is_valid_path_on`, `query_valid_paths_on`, `query_path_info_on`, `query_path_from_hash_part_on`, `nar_from_path_on`, `nar_hash_from_path_on`, `add_to_store_nar_on`, `add_to_store_nar_from_on`, `add_temp_root_on`, `add_signatures_on` | the ops below, on a `&mut Conn` |
+
+A proxy forwards an op by sending what it read (`take_request` names it,
+`pending` and the raw bytes carry the rest) and relaying the stderr stream
+with `relay_stderr`, or, as vdaemon-proxy does, by relaying both directions
+byte for byte and following the conversation with `take_request` and
+`take_stderr`. After an I/O or protocol error the connection is out of step,
+and every later use fails with `Broken`.
+
+**`Daemon`, the connection as an id_effect resource.** `Daemon` is a
+`Clone` handle (`Arc<tokio::sync::Mutex<Conn>>`); ops on it take turns. Every
+op is an `Effect<_, WorkerError, HNil>`.
+
+| Item | Meaning |
+|---|---|
+| `DEFAULT_SOCKET : &str` | `/nix/var/nix/daemon-socket/socket` |
+| `connect : String -> Effect<Daemon, ..>` | connect to a socket path and shake hands; release with `close` |
+| `open : S -> Effect<Daemon, ..>` | over any `AsyncRead + AsyncWrite + Send + Unpin + 'static` stream |
+| `open_halves : R -> W -> Effect<Daemon, ..>` | over separate halves: a child's stdout and stdin (`ssh host nix-daemon --stdio`) |
+| `close : Daemon -> Effect<(), Never, HNil>` | shut the write side; later ops fail with `Broken` |
+| `with_daemon : String -> (Daemon -> Effect<A, WorkerError, HNil>) -> Effect<A, ..>` | connect, use, close however the use ends (`acquire_use_release`) |
+| `scoped : &Scope -> String -> Effect<Daemon, ..>` | connect, with the close registered on the scope |
+| `hello : &Daemon -> Effect<Hello, ..>` | `Hello { version, daemon_nix_version, trusted }` from the handshake |
+| `is_valid_path : &Daemon -> String -> Effect<bool, ..>` | IsValidPath |
+| `query_valid_paths : &Daemon -> Vec<String> -> bool -> Effect<Vec<String>, ..>` | QueryValidPaths; the flag asks the daemon to substitute missing paths first |
+| `query_path_info : &Daemon -> String -> Effect<Option<PathInfo>, ..>` | QueryPathInfo; None when not valid |
+| `query_path_from_hash_part : &Daemon -> String -> Effect<Option<String>, ..>` | QueryPathFromHashPart |
+| `nar_from_path : &Daemon -> String -> Effect<Vec<u8>, ..>` | NarFromPath, the whole NAR in memory |
+| `nar_hash_from_path : &Daemon -> String -> Effect<NarDigest, ..>` | NarFromPath, hashed as it streams (one buffer) |
+| `add_to_store_nar : &Daemon -> PathInfo -> Vec<u8> -> bool -> bool -> Effect<(), ..>` | AddToStoreNar from a NAR in memory, framed; the flags are `repair`, `dont_check_sigs` |
+| `add_to_store_nar_from : &Daemon -> PathInfo -> PathBuf -> bool -> bool -> Effect<(), ..>` | AddToStoreNar from the NAR of a local path, archived and framed chunk by chunk |
+| `add_temp_root : &Daemon -> String -> Effect<(), ..>` | AddTempRoot: the path lives while the connection does |
+| `add_signatures : &Daemon -> String -> Vec<String> -> Effect<(), ..>` | AddSignatures |
+
+`WorkerError = Io io::Error | Connect String | Protocol String | Remote String | Broken String`.
+`Remote` is the daemon's own STDERR_ERROR (the connection stays usable).
+
+**Run it inside tokio.** `connect` creates a tokio `UnixStream`, which needs
+the tokio runtime's context. `Runtime::block_on` and id_effect_cli's
+`run_main` poll their root fiber on the calling thread, outside that context,
+so run the effect on a fiber of the executor: `rt.fork(eff)` then
+`rt.block_on(handle.join())`, or fork the program inside `run_main` as
+vcache's `supervised` does. `open` / `open_halves` over streams made inside
+the runtime (such as `tokio::process` pipes) work either way.
+
 ## Tests
 
 `cargo test` runs:
@@ -181,6 +269,17 @@ None means "not a valid path". GC roots and the `DerivationOutputs` walk stay in
   everywhere. The NAR hashes of real paths and the database's references and
   closures run over the fixture paths this machine has. Where it has none,
   such as the build sandbox, they pass vacuously.
+- `worker`: the grammar's round-trips (every value, every stderr message in
+  both error formats, every proper prefix is `More`), op codes, request
+  scanning, the NAR scanner fed in 7-byte pieces, and the client against a
+  scripted fake daemon over an in-memory pipe: both handshakes (1.37 and
+  1.38's features), log traffic, a `Remote` error that leaves the connection
+  usable, AddToStoreNar's frames and NarFromPath's NAR.
+- `worker_live`: the client against this machine's daemon. IsValidPath and
+  QueryValidPaths, QueryPathInfo against `nix path-info --json` for ten paths
+  (the current system's references), QueryPathFromHashPart, NarFromPath
+  against `nix hash path`, AddTempRoot under `with_daemon`. They skip where
+  there is no daemon socket or `nix`, such as the build sandbox.
 - `conformance`: up to 400 random valid paths, NAR-hashed and compared with
   the database's narHash. This test skips where there is no database.
 
