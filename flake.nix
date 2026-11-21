@@ -392,6 +392,8 @@
       # features/nixos/vgen's VM test: prunes keep the booted, current and pinned
       # generations, the boot menu follows, and pins survive vgc.
       // {vgen-vm = import ./features/nixos/vgen/test.nix {inherit pkgs;};}
+      # features/nix/vhealth's VM test: a service active per systemd with its port closed is down.
+      // {vhealth-vm = import ./features/nix/vhealth/test.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
