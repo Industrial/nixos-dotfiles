@@ -56,11 +56,8 @@ export loader_default : &str -> Option<String>
 loader_default text =
   mut found = None : Option<String>
   for line in text.lines ()
-    case line.trim ().strip_prefix "default " of
-      Some rest ->
-        found := Some (rest.trim ().to_string ())
-      None ->
-        ()
+    if line.trim ().strip_prefix "default " is Some rest
+      found := Some (rest.trim ().to_string ())
   found.filter (\id -> !(id.contains '*'))
 
 -- The system an entry boots: the directory of the `init=` on its options line.
@@ -70,11 +67,8 @@ entry_toplevel text =
   for line in text.lines ()
     if line.starts_with "options "
       for word in line.split_whitespace ()
-        case word.strip_prefix "init=" of
-          Some init ->
-            found := (init.strip_suffix "/init" |> .map (\s -> s.to_string ()))
-          None ->
-            ()
+        if word.strip_prefix "init=" is Some init
+          found := (init.strip_suffix "/init" |> .map (\s -> s.to_string ()))
   found
 
 -- An entry id as its file name under loader/entries.
