@@ -36,7 +36,10 @@ nix store prefetch-file --json <url> | jq -r .hash
 # Build the installer ISO
 nix build .#installer-iso
 
-# Why one store path depends on another
-nix why-depends <from> <to>
+# Why one store path depends on another (a path, or a name such as glibc)
+vwhy <from> <to>
+
+# What makes a closure big: its paths ranked by the size only they bring in
+vwhy --top <from>
 
 $ host: printf '%s\n' drakkar huginn mimir muninn installer
