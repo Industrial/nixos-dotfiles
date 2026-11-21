@@ -6,8 +6,10 @@
 # from that cache as it streams. Nix still checks the signatures and the NAR hash, and
 # does the import.
 #
-# Ordering: `Priority: 10` in its nix-cache-info puts it ahead of the fleet's vcache
-# (30) and cache.nixos.org (40). The other substituters stay in the list, so if vfetch
+# Ordering: Nix asks substituters lowest priority first, and `Priority: 1` in vfetch
+# serve's nix-cache-info puts it ahead of every cache that advertises one: the fleet's
+# vcache (30), cache.nixos.org (40), cachix (41). (A cache with no Priority line sorts
+# at 0, ahead of it; none of this host's do.) The other substituters stay in the list, so if vfetch
 # serve is down or answers 404/502, Nix moves on to them by itself.
 #
 # Rollback is this one switch: `features.nix.vfetch.enable = lib.mkForce false;` takes

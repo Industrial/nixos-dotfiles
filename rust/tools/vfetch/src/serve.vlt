@@ -32,10 +32,12 @@ import crate::fetch::{chunks, narinfo_text}
 import crate::plan::trusted
 import crate::remote::{RemoteService, lifted}
 
--- Ahead of cache.nixos.org (40) and the fleet's vcache (30).
-export const PRIORITY : i64 = 10
+-- Nix asks substituters in priority order, lowest first: this is ahead of
+-- every cache that advertises one (vcache 30, cache.nixos.org 40, cachix 41).
+-- A cache whose nix-cache-info has no Priority line sorts at 0, before this.
+export const PRIORITY : i64 = 1
 
-export const CACHE_INFO : &str = "StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 10\n"
+export const CACHE_INFO : &str = "StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 1\n"
 
 -- The caches behind this one, in nix.conf's order, and the keys it trusts.
 export data Upstreams { export caches Vec<String>, export keys Vec<PublicKey> }
@@ -125,7 +127,14 @@ first_answer remote up hash =
     succeed None
   else
     asks = up.caches.iter () |> .enumerate |> .map (\ic -> from_upstream (remote.clone ()) (up.keys.clone ()) ic.0 (ic.1.clone ()) (hash.clone ())) |> .collect : Vec<Effect<String, VfetchError, HNil>>
-    (race_all asks) |> .map (\t -> Some t) |> .catch (\_ -> succeed None)
+    h = hash.clone ()
+    (race_all asks) |> .map (\t -> Some t) |> .catch (move \e -> missed h e)
+
+-- No upstream had a trusted answer: a 404, and why, in the log.
+missed : String -> VfetchError -> Effect<Option<String>, VfetchError, HNil>
+missed hash e =
+  eprintln! \-> "vfetch serve: narinfo #{hash}: no upstream answered (#{e})"
+  succeed None
 
 text : &'static str -> String -> Response
 text content_type body =
@@ -225,5 +234,5 @@ test "a relayed narinfo points its NAR back here, unless the URL is absolute"
   assert! \-> vouched (&[]) 0 "http://up" "00000000000000000000000000000000" (Some (text.to_string ())) |> .is_err
 
 test "the cache info puts this cache first"
-  assert! \-> CACHE_INFO.contains "\nPriority: 10\n"
-  assert_eq! \-> PRIORITY \-> 10
+  assert! \-> CACHE_INFO.contains "\nPriority: 1\n"
+  assert_eq! \-> PRIORITY \-> 1

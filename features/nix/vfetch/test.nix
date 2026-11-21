@@ -45,6 +45,8 @@ in
           cache.succeed("nix-store --generate-binary-cache-key vfetch-test-cache-1 /run/cache-key/secret /run/cache-key/public")
           cache.succeed("nix --extra-experimental-features nix-command store sign --key-file /run/cache-key/secret ${payload} ${fallback}")
           cache.succeed("nix --extra-experimental-features nix-command copy --to file:///srv/cache ${payload} ${fallback}")
+          # As a real cache does; with no Priority line Nix would sort it at 0, first.
+          cache.succeed("echo 'Priority: 40' >> /srv/cache/nix-cache-info")
           cache.succeed("systemd-run --unit cache-http python3 -m http.server 5000 --directory /srv/cache")
           cache.wait_for_open_port(5000)
           cache.succeed("grep -q '^Sig: vfetch-test-cache-1:' /srv/cache/$(basename ${payload} | cut -c1-32).narinfo")
@@ -54,7 +56,7 @@ in
           client.succeed(f"echo '{public}' > /run/vfetch-test-key")
           client.succeed("systemctl restart vfetch-serve")
           client.wait_for_open_port(5101)
-          client.succeed("curl -sf http://127.0.0.1:5101/nix-cache-info | grep -qx 'Priority: 10'")
+          client.succeed("curl -sf http://127.0.0.1:5101/nix-cache-info | grep -qx 'Priority: 1'")
           client.succeed("grep -E '^substituters = http://127.0.0.1:5101 ' /etc/nix/nix.conf")
           client.fail("nix-store -q --hash ${payload}")
 
