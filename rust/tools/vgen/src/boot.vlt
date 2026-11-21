@@ -1,0 +1,113 @@
+-- Removing generation links, and bringing the boot menu in step after.
+--
+-- Removal is Nix's `deleteGeneration`: unlink `<profile>-<N>-link`, holding
+-- the profile's lock (`<profile>.lock`, an exclusive flock, as `lockProfile`
+-- takes it), so a concurrent `nix-env --set` or comin switch waits rather
+-- than racing. Under the lock the current generation is read again and never
+-- removed, whatever the plan said.
+--
+-- The boot menu is never edited by hand. It is rewritten by the system's own
+-- installer: `<generation>/bin/switch-to-configuration boot`, which runs
+-- `system.build.installBootLoader` (systemd-boot's builder, or lanzaboote's),
+-- and that lists every generation of every system profile, writes their
+-- entries, removes the entries of generations that are gone, and makes the
+-- given generation the default.
+
+import std::fs
+import std::os::unix::fs::OpenOptionsExt
+import std::path::{Path, PathBuf}
+import std::process::Command
+import crate::profile::{Gen, Profile, file_name_of, is_system_profile}
+
+-- The generation `profile` points at, if it has it.
+export current_gen : &Profile -> Option<&Gen>
+current_gen p = p.gens.iter () |> .find (\g -> Some g.number == p.current)
+
+-- The generation the boot menu defaults to after a prune: of the system
+-- profiles' current generations, the one set last (its link is the newest).
+-- That is the one whose switch last installed the bootloader, so the default
+-- does not move: comin's after a comin switch, `system`'s after
+-- nixos-rebuild or deploy-rs.
+export boot_default : &Path -> &[Profile] -> Option<PathBuf>
+boot_default root profiles =
+  mut best = None : Option<(i64, PathBuf)>
+  for p in profiles
+    if is_system_profile root (&p.path)
+      if current_gen p is Some g
+        if is_newer (&best) g.mtime
+          best := Some ((g.mtime, g.link.clone ()))
+  best.map (\b -> b.1)
+
+is_newer : &Option<(i64, PathBuf)> -> i64 -> bool
+is_newer best mtime =
+  case best of
+    Some b -> mtime > b.0
+    None -> true
+
+-- Unlink generations `doomed` of `profile` under its lock. Returns the ones
+-- removed; the current generation, read again under the lock, is skipped.
+export remove_generations : &Path -> &[u64] -> Result<Vec<u64>, String>
+remove_generations profile doomed =
+  lock_path = PathBuf::from ("#{profile.display ()}.lock")
+  opened = fs::OpenOptions::new () |> .read true |> .write true |> .create true |> .truncate false |> .mode 0o600 |> .open (&lock_path)
+  lock = (opened.map_err (\e -> "opening #{lock_path.display ()}: #{e}"))?
+  ((lock.lock ()).map_err (\e -> "locking #{lock_path.display ()}: #{e}"))?
+  name = file_name_of profile
+  dir = profile.parent () |> .unwrap_or (Path::new "/")
+  current = (fs::read_link profile).ok () |> .map (\t -> file_name_of (&t))
+  mut removed = Vec::new () : Vec<u64>
+  for n in doomed
+    link_name = "#{name}-#{n}-link"
+    if current.as_deref () != Some (link_name.as_str ())
+      (fs::remove_file (dir.join (&link_name)) |> .map_err (\e -> "removing #{dir.display ()}/#{link_name}: #{e}"))?
+      removed.push (*n)
+  drop lock
+  Ok removed
+
+-- The installer of the generation at `link`, as its command line.
+export installer : &Path -> (PathBuf, String)
+installer link = (link.join "bin/switch-to-configuration", .to_string "boot")
+
+-- Rewrite the boot menu through the installer of `link`.
+export install : &Path -> Result<(), String>
+install link =
+  (program, action) = installer link
+  ran = Command::new (&program) |> .arg (&action) |> .status
+  status = (ran.map_err (\e -> "running #{program.display ()} #{action}: #{e}"))?
+  if status.success ()
+    Ok ()
+  else
+    Err "#{program.display ()} #{action} failed (#{status})"
+
+#[cfg(test)]
+gen_at : u64 -> i64 -> &str -> Gen
+gen_at n mtime dir = Gen { number = n, mtime, link = PathBuf::from ("#{dir}-#{n}-link"), target = "/nix/store/x-#{n}", toplevel = "/nix/store/x-#{n}" }
+
+test "the boot default is the system profile switched last"
+  root = Path::new "/nix/var/nix/profiles"
+  system = Profile { path = root.join "system", current = Some 493, gens = vec![gen_at(493, 100, "/nix/var/nix/profiles/system")] }
+  comin = Profile { path = root.join "system-profiles/comin", current = Some 12, gens = vec![gen_at(11, 150, "/nix/var/nix/profiles/system-profiles/comin"), gen_at(12, 200, "/nix/var/nix/profiles/system-profiles/comin")] }
+  user = Profile { path = root.join "per-user/root/profile", current = Some 3, gens = vec![gen_at(3, 900, "/nix/var/nix/profiles/per-user/root/profile")] }
+  assert! \-> boot_default root (&(.to_vec ([system.clone (), comin.clone (), user.clone ()]))) == Some (PathBuf::from "/nix/var/nix/profiles/system-profiles/comin-12-link")
+  assert! \-> boot_default root (&(.to_vec ([system.clone (), user.clone ()]))) == Some (PathBuf::from "/nix/var/nix/profiles/system-493-link")
+  assert! \-> boot_default root (&(.to_vec ([user]))) == None
+
+test "the installer is the generation's own switch-to-configuration boot"
+  (program, action) = installer (Path::new "/nix/var/nix/profiles/system-493-link")
+  assert! \-> program == PathBuf::from "/nix/var/nix/profiles/system-493-link/bin/switch-to-configuration"
+  assert! \-> action == "boot"
+
+test "generations are unlinked under the profile lock, never the current one"
+  dir = std::env::temp_dir () |> .join "vgen-test-remove-#{std::process::id ()}"
+  fs::remove_dir_all (&dir) |> .ok
+  fs::create_dir_all (&dir) |> .unwrap
+  for n in [1, 2, 3]
+    std::os::unix::fs::symlink ("/nix/store/x-#{n}") (dir.join ("p-#{n}-link")) |> .unwrap
+  std::os::unix::fs::symlink "p-2-link" (dir.join "p") |> .unwrap
+  removed = remove_generations (&(dir.join "p")) (&(.to_vec ([1, 2]))) |> .unwrap
+  assert! \-> removed == vec![1]
+  assert! \-> !(dir.join "p-1-link" |> .exists) && (fs::symlink_metadata (dir.join "p-2-link") |> .is_ok)
+  assert! \-> dir.join "p.lock" |> .exists
+  assert! \-> remove_generations (&(dir.join "p")) (&(.to_vec ([3, 9]))) |> .is_err
+  fs::remove_dir_all (&dir) |> .ok
+  ()
