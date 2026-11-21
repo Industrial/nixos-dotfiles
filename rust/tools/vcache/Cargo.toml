@@ -1,0 +1,42 @@
+[package]
+name = "vcache"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "A Nix binary cache server (narinfo + NAR over HTTP) that reads the local store read-only"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+axum = "0.8.9"
+base64 = "0.22"
+bytes = "1"
+ed25519-dalek = "2"
+# One id_effect version per build (types do not unify): pinned exactly, like
+# rust/Cargo.toml's [workspace.dependencies].
+id_effect = "=0.13.0"
+id_effect_axum = "=0.13.0"
+id_effect_cli = "=0.13.0"
+id_effect_config = "=0.13.0"
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+[dev-dependencies]
+sha2 = "0.10"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vcache"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vcache"
+path = "src/main.rs"
