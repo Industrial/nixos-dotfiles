@@ -173,7 +173,7 @@ else
       };
     in
       measured.pkgs.writeText \"nushell-vendor-autoload-ref\"
-        measured.config.system.activationScripts.nushellVendorAutoload.text
+        measured.config.vfiles.legacy.nushellVendorAutoload.text
   ")"
   autoload="$(grep -oE '/nix/store/[a-z0-9]{32}-nushell-vendor-autoload' "$ref" | head -n1)"
 fi
