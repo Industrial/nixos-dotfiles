@@ -1,0 +1,398 @@
+-- The state of a run, folded from its events.
+--
+-- `apply` takes one event and the time it arrived (milliseconds since the
+-- run started, read by the caller) and updates the monitor: the activities
+-- still running, every build and fetch seen (with start and finish times,
+-- the last lines of each build's log, and whether it failed), the totals
+-- Nix announces, the errors, and the lines waiting to be printed.
+--
+-- How a build ended is known just before its activity stops: Nix bumps the
+-- `done` or the `failed` counter of its Builds activity first (and names a
+-- failed derivation in an error message after). At the stop, a count no
+-- stopped build has taken yet decides; with neither, the build was cancelled
+-- (Nix stopped it because another failed). The error message confirms a
+-- failure, or names one the counters missed.
+--
+-- Messages the daemon relays (STDERR_NEXT) reach the client's JSON as level 0
+-- with no `raw_msg`; under `-v` they are mostly the daemon's chatter
+-- (`linking … to /nix/store/.links/…` for every file the optimiser sees).
+-- Only the relayed warnings are shown; the rest are counted.
+--
+-- Plain functions only: the caller owns the clock and the output.
+
+import std::collections::BTreeMap
+import nix_store_core::worker::{Activity, DaemonFailure, Field, StderrMsg}
+import nix_store_core::worker::StderrMsg::{ActivityResult, Failed, LogNext, StartActivity, StopActivity}
+import crate::event::{Event, drvs_in, field_num, field_text, store_name, strip_ansi}
+import crate::event::Event::{Note, Raw, Wire}
+
+-- Nix's activity types (libutil/logging.hh `ActivityType`).
+export const ACT_COPY_PATH : u64 = 100
+export const ACT_FILE_TRANSFER : u64 = 101
+export const ACT_REALISE : u64 = 102
+export const ACT_COPY_PATHS : u64 = 103
+export const ACT_BUILDS : u64 = 104
+export const ACT_BUILD : u64 = 105
+export const ACT_SUBSTITUTE : u64 = 108
+export const ACT_POST_BUILD_HOOK : u64 = 110
+export const ACT_FETCH_TREE : u64 = 112
+
+-- Its result types (`ResultType`).
+export const RES_BUILD_LOG_LINE : u64 = 101
+export const RES_SET_PHASE : u64 = 104
+export const RES_PROGRESS : u64 = 105
+export const RES_SET_EXPECTED : u64 = 106
+export const RES_POST_BUILD_LOG_LINE : u64 = 107
+
+-- How many lines of each build's log are kept for the failure summary.
+export const TAIL : usize = 20
+
+-- Messages above this verbosity (`-v` and up: talkative, chatty, debug) are
+-- not shown. Errors, warnings, notices and info are.
+export const SHOWN_LEVEL : u64 = 3
+
+-- A running activity.
+export data Act
+  { export kind u64
+  , export text String
+  , export name String
+  , export parent u64
+  , export started u64
+  , export phase String
+  , export done u64
+  , export expected u64
+  , export build Option<usize>
+  , export fetch Option<usize>
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- A derivation built in this run. `finished` is None while it runs.
+export data Build
+  { export drv String
+  , export name String
+  , export machine String
+  , export started u64
+  , export finished Option<u64>
+  , export failed bool
+  , export cancelled bool
+  , export tail Vec<String>
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- A store path substituted (downloaded) in this run.
+export data Fetch
+  { export path String
+  , export name String
+  , export from String
+  , export started u64
+  , export finished Option<u64>
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- A line to print: `Step` is a plain-mode progress line (the live tree
+-- shows the same thing), `Log` is shown in both modes.
+export data Out = Step String | Log String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export data Monitor
+  { export acts BTreeMap<u64, Act>
+  , export builds Vec<Build>
+  , export fetches Vec<Fetch>
+  , export build_of BTreeMap<String, usize>
+  , export builds_expected u64
+  , export fetches_expected u64
+  , export builds_done u64
+  , export builds_failed u64
+  , export successes_seen u64
+  , export failures_seen u64
+  , export relayed u64
+  , export bytes_done u64
+  , export faults Vec<String>
+  , export out Vec<Out>
+  , export drawn usize
+  , export events u64
+  }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- One event, arrived at `now`.
+export apply : &mut Monitor -> u64 -> Event -> ()
+apply m now ev =
+  m.events := m.events + 1
+  case ev of
+    Raw line ->
+      if !(line.trim ().is_empty ())
+        m.out.push (Log line)
+    Note level text ->
+      if level <= SHOWN_LEVEL
+        m.out.push (Log text)
+    Wire msg -> wire m now msg
+  ()
+
+wire : &mut Monitor -> u64 -> StderrMsg -> ()
+wire m now msg =
+  case msg of
+    StartActivity a -> start m now a
+    StopActivity id -> stop m now id
+    ActivityResult id kind fields -> result m id kind fields
+    Failed f -> failed m f
+    LogNext text -> relayed m text
+    _ -> ()
+  ()
+
+start : &mut Monitor -> u64 -> Activity -> ()
+start m now a =
+  mut act = Act { kind = a.kind, text = a.text.clone (), name = act_name (&a), parent = a.parent, started = now, ...Act::default () }
+  if a.kind == ACT_BUILD
+    drv = field_text (&a.fields) 0
+    machine = field_text (&a.fields) 1
+    name = store_name (&drv)
+    i = m.builds.len ()
+    act.build := Some i
+    m.out.push (Step (building_line (&name) (&machine)))
+    m.build_of.insert (drv.clone ()) i
+    m.builds.push (Build { drv, name, machine, started = now, ...Build::default () })
+  else if a.kind == ACT_SUBSTITUTE
+    path = field_text (&a.fields) 0
+    from = field_text (&a.fields) 1
+    name = store_name (&path)
+    act.fetch := Some (m.fetches.len ())
+    m.out.push (Step ("↓ fetching #{name} from #{from}"))
+    m.fetches.push (Fetch { path, name, from, started = now, ...Fetch::default () })
+  m.acts.insert a.id act
+  ()
+
+-- What the tree calls an activity: the store path it works on, by name,
+-- else its text.
+act_name : &Activity -> String
+act_name a =
+  path = field_text (&a.fields) 0
+  if a.kind != ACT_FILE_TRANSFER && path.starts_with "/nix/store/"
+    store_name (&path)
+  else
+    strip_ansi (&a.text)
+
+building_line : &str -> &str -> String
+building_line name machine =
+  if machine.is_empty ()
+    "⏵ building #{name}"
+  else
+    "⏵ building #{name} on #{machine}"
+
+stop : &mut Monitor -> u64 -> u64 -> ()
+stop m now id =
+  if m.acts.remove (&id) is Some act
+    if act.build is Some i
+      finish_build m now i
+    if act.fetch is Some i
+      finish_fetch m now i
+    if act.kind == ACT_COPY_PATH
+      m.bytes_done := m.bytes_done + act.done.max act.expected
+  ()
+
+-- A build stopped: built if the Builds counter has a success no stopped build
+-- has taken yet, failed if it has such a failure, cancelled otherwise.
+finish_build : &mut Monitor -> u64 -> usize -> ()
+finish_build m now i =
+  if m.builds_done > m.successes_seen
+    m.successes_seen := m.successes_seen + 1
+  else if m.builds_failed > m.failures_seen
+    m.failures_seen := m.failures_seen + 1
+    m.builds[i].failed := true
+  else if !(m.builds[i].failed)
+    m.builds[i].cancelled := true
+  m.builds[i].finished := Some now
+  took = now.saturating_sub (m.builds[i].started)
+  name = m.builds[i].name.clone ()
+  if m.builds[i].failed
+    m.out.push (Step ("✗ failed #{name} after #{seconds took}"))
+  else if m.builds[i].cancelled
+    m.out.push (Step ("⊘ cancelled #{name} after #{seconds took}"))
+  else
+    m.out.push (Step ("✔ built #{name} in #{seconds took}"))
+  ()
+
+finish_fetch : &mut Monitor -> u64 -> usize -> ()
+finish_fetch m now i =
+  m.fetches[i].finished := Some now
+  name = m.fetches[i].name.clone ()
+  m.out.push (Step ("✔ fetched #{name}"))
+  ()
+
+result : &mut Monitor -> u64 -> u64 -> Vec<Field> -> ()
+result m id kind fields =
+  if m.acts.get (&id) is Some act
+    act_kind = act.kind
+    build = act.build
+    if kind == RES_BUILD_LOG_LINE || kind == RES_POST_BUILD_LOG_LINE
+      if build is Some i
+        keep_line (&mut m.builds[i]) (field_text (&fields) 0)
+    else if kind == RES_PROGRESS
+      progress m id act_kind (&fields)
+    else if kind == RES_SET_EXPECTED
+      expected m (&fields)
+    else if kind == RES_SET_PHASE
+      if m.acts.get_mut (&id) is Some a
+        a.phase := field_text (&fields) 0
+  ()
+
+keep_line : &mut Build -> String -> ()
+keep_line b line =
+  b.tail.push (strip_ansi (&line))
+  if b.tail.len () > TAIL
+    b.tail.remove 0
+  ()
+
+-- Progress is `[done, expected, running, failed]`: counts of builds on the
+-- Builds activity, of paths on CopyPaths, bytes on a CopyPath.
+progress : &mut Monitor -> u64 -> u64 -> &[Field] -> ()
+progress m id act_kind fields =
+  done = field_num fields 0
+  expect = field_num fields 1
+  if act_kind == ACT_BUILDS
+    m.builds_expected := expect
+    m.builds_done := m.builds_done.max done
+    m.builds_failed := m.builds_failed.max (field_num fields 3)
+  else if act_kind == ACT_COPY_PATHS
+    m.fetches_expected := expect
+  if m.acts.get_mut (&id) is Some a
+    a.done := done
+    a.expected := expect
+  ()
+
+-- SetExpected is `[activity type, count]`, on the Realise activity.
+expected : &mut Monitor -> &[Field] -> ()
+expected m fields =
+  of_kind = field_num fields 0
+  n = field_num fields 1
+  if of_kind == ACT_BUILD
+    m.builds_expected := m.builds_expected.max n
+  else if of_kind == ACT_COPY_PATH
+    m.fetches_expected := m.fetches_expected.max n
+  ()
+
+-- An error. Every build it names is marked failed (a build the counters
+-- called cancelled, or missed, included).
+failed : &mut Monitor -> DaemonFailure -> ()
+failed m f =
+  for drv in drvs_in (&f.message)
+    if m.build_of.get (&drv) is Some i
+      idx = *i
+      m.builds[idx].cancelled := false
+      m.builds[idx].failed := true
+  m.faults.push (strip_ansi (&f.message))
+  m.out.push (Log f.message)
+  ()
+
+-- A line the daemon relayed: shown when it is a warning, otherwise counted.
+relayed : &mut Monitor -> String -> ()
+relayed m text =
+  if strip_ansi (&text) |> .trim_start |> .starts_with "warning:"
+    m.out.push (Log text)
+  else
+    m.relayed := m.relayed + 1
+  ()
+
+------------------------------------------------------------------------
+-- Readings
+
+export built : &Monitor -> usize
+built m = m.builds.iter () |> .filter (\b -> b.finished.is_some () && !b.failed && !b.cancelled) |> .count
+
+export cancelled_builds : &Monitor -> usize
+cancelled_builds m = m.builds.iter () |> .filter (\b -> b.cancelled && !b.failed) |> .count
+
+export failed_builds : &Monitor -> usize
+failed_builds m = m.builds.iter () |> .filter (\b -> b.failed) |> .count
+
+export running_builds : &Monitor -> usize
+running_builds m = m.builds.iter () |> .filter (\b -> b.finished.is_none ()) |> .count
+
+export fetched : &Monitor -> usize
+fetched m = m.fetches.iter () |> .filter (\f -> f.finished.is_some ()) |> .count
+
+-- Bytes copied so far: finished copies and the running ones' progress.
+export bytes_copied : &Monitor -> u64
+bytes_copied m =
+  mut n = m.bytes_done
+  for a in m.acts.values ()
+    if a.kind == ACT_COPY_PATH
+      n := n + a.done
+  n
+
+-- Seconds with one decimal under a minute, then `1m02s`, then `1h03m`.
+export seconds : u64 -> String
+seconds ms =
+  s = ms / 1000
+  if s < 60
+    "#{s}.#{(ms % 1000) / 100}s"
+  else if s < 3600
+    "#{s / 60}m#{pad2 (s % 60)}s"
+  else
+    "#{s / 3600}h#{pad2 ((s % 3600) / 60)}m"
+
+pad2 : u64 -> String
+pad2 n =
+  if n < 10
+    "0#{n}"
+  else
+    n.to_string ()
+
+#[cfg(test)]
+events_of : &str -> Vec<Event>
+events_of text = text.lines () |> .map (\l -> crate::event::parse_line l) |> .collect
+
+#[cfg(test)]
+fed : &str -> Monitor
+fed text =
+  mut m = Monitor::default ()
+  mut t = 0 : u64
+  for ev in events_of text
+    t := t + 100
+    apply (&mut m) t ev
+  m
+
+#[cfg(test)]
+const FAIL : &str = "@nix {\"action\":\"start\",\"id\":1,\"level\":0,\"parent\":0,\"text\":\"\",\"type\":104}\n@nix {\"action\":\"result\",\"fields\":[0,1,0,0],\"id\":1,\"type\":105}\n@nix {\"action\":\"start\",\"fields\":[\"/nix/store/c7lg-vmon-fail-1.0.drv\",\"\",1,1],\"id\":2,\"level\":3,\"parent\":0,\"text\":\"building\",\"type\":105}\n@nix {\"action\":\"result\",\"fields\":[\"line one\"],\"id\":2,\"type\":101}\n@nix {\"action\":\"result\",\"fields\":[\"oops\"],\"id\":2,\"type\":101}\n@nix {\"action\":\"result\",\"fields\":[0,1,0,1],\"id\":1,\"type\":105}\n@nix {\"action\":\"stop\",\"id\":2}\n@nix {\"action\":\"stop\",\"id\":1}\n@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"error: Cannot build '/nix/store/c7lg-vmon-fail-1.0.drv'.\"}"
+
+test "a failed build is marked at its stop, kept with its log tail, and the error is kept"
+  m = fed FAIL
+  assert_eq! \-> m.builds.len () \-> 1
+  assert! \-> m.builds[0].failed
+  assert_eq! \-> m.builds[0].tail \-> .to_vec ([.to_string "line one", .to_string "oops"])
+  assert_eq! \-> (built (&m), failed_builds (&m), running_builds (&m)) \-> (0, 1, 0)
+  assert_eq! \-> m.faults.len () \-> 1
+  assert! \-> m.out.contains (&Step (.to_string "✗ failed vmon-fail-1.0 after 0.4s"))
+  assert! \-> m.acts.is_empty ()
+
+test "a build the counter missed is marked failed by the error naming it"
+  m = fed "@nix {\"action\":\"start\",\"fields\":[\"/nix/store/c7lg-a-1.0.drv\"],\"id\":2,\"level\":3,\"parent\":0,\"text\":\"\",\"type\":105}\n@nix {\"action\":\"stop\",\"id\":2}\n@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"error: builder for '/nix/store/c7lg-a-1.0.drv' failed\"}"
+  assert_eq! \-> failed_builds (&m) \-> 1
+  assert! \-> !(m.builds[0].cancelled)
+
+test "a successful build and a fetch are counted, with durations"
+  m = fed "@nix {\"action\":\"start\",\"id\":1,\"level\":0,\"parent\":0,\"text\":\"\",\"type\":104}\n@nix {\"action\":\"start\",\"fields\":[\"/nix/store/aaaa-hello-2.12.drv\",\"\"],\"id\":2,\"level\":3,\"parent\":0,\"text\":\"\",\"type\":105}\n@nix {\"action\":\"start\",\"fields\":[\"/nix/store/bbbb-zlib-1.3\",\"https://cache.nixos.org\"],\"id\":3,\"level\":4,\"parent\":0,\"text\":\"\",\"type\":108}\n@nix {\"action\":\"result\",\"fields\":[\"buildPhase\"],\"id\":2,\"type\":104}\n@nix {\"action\":\"stop\",\"id\":3}\n@nix {\"action\":\"result\",\"fields\":[1,1,0,0],\"id\":1,\"type\":105}\n@nix {\"action\":\"stop\",\"id\":2}"
+  assert_eq! \-> (built (&m), fetched (&m), failed_builds (&m)) \-> (1, 1, 0)
+  assert_eq! \-> m.builds[0].finished \-> Some 700
+  assert_eq! \-> m.builds[0].started \-> 200
+  assert! \-> m.out.contains (&Step (.to_string "✔ built hello-2.12 in 0.5s"))
+  assert! \-> m.out.contains (&Step (.to_string "↓ fetching zlib-1.3 from https://cache.nixos.org"))
+
+test "chatty messages are not shown, info and raw lines are"
+  m = fed "@nix {\"action\":\"msg\",\"level\":4,\"msg\":\"evaluating file\"}\n@nix {\"action\":\"msg\",\"level\":3,\"msg\":\"these 2 paths will be fetched\"}\n/nix/store/aaaa-hello"
+  assert_eq! \-> m.out \-> .to_vec ([Log (.to_string "these 2 paths will be fetched"), Log (.to_string "/nix/store/aaaa-hello")])
+
+test "durations read as seconds, minutes, hours"
+  assert_eq! \-> seconds 3250 \-> "3.2s"
+  assert_eq! \-> seconds 62000 \-> "1m02s"
+  assert_eq! \-> seconds 3780000 \-> "1h03m"
+
+test "a build stopped with neither counter moved was cancelled, not built"
+  m = fed "@nix {\"action\":\"start\",\"id\":1,\"level\":0,\"parent\":0,\"text\":\"\",\"type\":104}\n@nix {\"action\":\"start\",\"fields\":[\"/nix/store/aaaa-vverify-0.1.0.drv\",\"\"],\"id\":2,\"level\":3,\"parent\":0,\"text\":\"\",\"type\":105}\n@nix {\"action\":\"stop\",\"id\":2}"
+  assert_eq! \-> (built (&m), failed_builds (&m), cancelled_builds (&m)) \-> (0, 0, 1)
+  assert! \-> m.out.contains (&Step (.to_string "⊘ cancelled vverify-0.1.0 after 0.1s"))
+
+test "the daemon's relayed chatter is counted, its warnings shown"
+  m = fed "@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"linking \\\"/nix/store/x-source/a\\\" to \\\"/nix/store/.links/0vgv\\\"\"}\n@nix {\"action\":\"msg\",\"level\":0,\"msg\":\"warning: the daemon says so\"}"
+  assert_eq! \-> m.relayed \-> 1
+  assert_eq! \-> m.out \-> .to_vec ([Log (.to_string "warning: the daemon says so")])
+  assert! \-> m.faults.is_empty ()

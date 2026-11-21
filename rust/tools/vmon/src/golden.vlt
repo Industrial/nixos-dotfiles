@@ -1,0 +1,77 @@
+-- Replays of real logs, captured with `--log-format internal-json -v`
+-- (tests/fixtures):
+--
+--   drakkar-partial.jsonl  a drakkar system build (the 32 derivations main had
+--                          changed since the last switch), trimmed by
+--                          tests/trim.awk; vdiff failed in it (main's stale
+--                          Cargo.lock) and Nix cancelled vverify
+--   fail.jsonl             one derivation whose builder exits 3
+--   ok.jsonl               two derivations, one on the other, both built (the
+--                          Stage 6 probe replays it through the installed vmon)
+--
+-- Each is folded line by line, as the program does, in plain mode, and the
+-- summary is checked against what the log holds.
+
+import std::path::Path
+import crate::event::parse_line
+import crate::monitor::{Monitor, built, cancelled_builds, failed_builds}
+import crate::render::{closing, stepped}
+
+fixture : &str -> String
+fixture name =
+  file = Path::new (env!("CARGO_MANIFEST_DIR")) |> .join "tests/fixtures" |> .join name
+  std::fs::read_to_string file |> .expect "a fixture file"
+
+-- The plain output, the summary included, and the monitor after it.
+replayed : &str -> (String, Monitor)
+replayed name =
+  mut m = Monitor::default ()
+  mut out = String::new ()
+  mut t = 0 : u64
+  for line in (fixture name).lines ()
+    t := t + 10
+    (s, next) = stepped m t (parse_line line) false
+    out.push_str (&s)
+    m := next
+  (c, after) = closing m t false 0
+  out.push_str (&c.text)
+  (out, after)
+
+-- How many `start` lines of activity type `kind` the log has.
+starts : &str -> &str -> usize
+starts name kind =
+  needle = "\"type\":#{kind}}"
+  (fixture name).lines () |> .filter (\l -> l.contains "\"action\":\"start\"" && l.ends_with (&needle)) |> .count
+
+test "the drakkar build: vdiff fails (a stale Cargo.lock), vverify is cancelled, the tail says why"
+  (out, m) = replayed "drakkar-partial.jsonl"
+  assert_eq! \-> starts "drakkar-partial.jsonl" "105" \-> 2
+  assert_eq! \-> (built (&m), failed_builds (&m), cancelled_builds (&m)) \-> (0, 1, 1)
+  assert! \-> m.acts.is_empty ()
+  assert! \-> out.contains "vmon: 0 built, 0 fetched, 1 failed, 1 cancelled in "
+  assert! \-> out.contains "⏵ building vdiff-0.1.0\n"
+  assert! \-> out.contains "✗ failed vdiff-0.1.0 after "
+  assert! \-> out.contains "⊘ cancelled vverify-0.1.0 after "
+  assert! \-> out.contains "vmon: ✗ vdiff-0.1.0 (/nix/store/rrdd8a6qy82x3kd6cln2g1wcm0xfl6k6-vdiff-0.1.0.drv)\n"
+  assert! \-> out.contains "  > error: no matching package named `socket2` found\n"
+  assert! \-> out.contains "these 32 derivations will be built:"
+  assert_eq! \-> m.relayed \-> 20
+  assert! \-> !(out.contains "linking ")
+
+test "the failing build: marked failed, its log tail and Nix's error in the output"
+  (out, m) = replayed "fail.jsonl"
+  assert_eq! \-> (built (&m), failed_builds (&m)) \-> (0, 1)
+  assert! \-> out.contains "vmon: 0 built, 0 fetched, 1 failed in "
+  assert! \-> out.contains "vmon: ✗ vmon-fail-1.0 ("
+  assert! \-> out.contains "  > line one\n  > line two\n  > oops\n"
+  assert! \-> out.contains "error: Cannot build '/nix/store/"
+  assert_eq! \-> m.faults.len () \-> 1
+
+test "the successful build: both derivations built, in order, nothing failed"
+  (out, m) = replayed "ok.jsonl"
+  assert_eq! \-> (built (&m), failed_builds (&m), cancelled_builds (&m)) \-> (2, 0, 0)
+  assert! \-> out.contains "vmon: 2 built, 0 fetched, 0 failed in "
+  a_done = out.find "✔ built vmon-ok-a-1.0 in " |> .unwrap_or usize::MAX
+  b_start = out.find "⏵ building vmon-ok-b-1.0\n" |> .unwrap_or 0
+  assert! \-> a_done < b_start
+  assert! \-> m.faults.is_empty ()

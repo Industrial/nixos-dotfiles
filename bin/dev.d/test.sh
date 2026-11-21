@@ -156,6 +156,17 @@ has "and at the prerequisites" 'docs/development.md#prerequisites'
 expect "a host tool is reported as a host tool" 127 "'nix' comes from the host" \
     bare BIN_DEV_REEXEC=1 bash "$DEV" eval mimir
 
+# --- the build monitor (GH-181) ----------------------------------------------
+# vmon replaced nom: bin/dev builds through it (nom only where a host rolled vmon
+# back), and bin/update/system and bin/fleet build the closure through it first.
+expect "bin/dev build prefers vmon" 0 '^    builder=\(vmon -- nix\)$' cat "$DEV"
+has "and falls back to nom after it" '^  elif command -v nom >/dev/null 2>&1; then$'
+expect "bin/update/system builds the closure through vmon" 0 '^  vmon -- nix build --no-link "\$toplevel"$' \
+    cat "$DOT/bin/update/system"
+expect "bin/fleet builds each node's profile through vmon" 0 '^  vmon -- nix build --no-link ".#deploy.nodes.\$1.profiles.system.path"$' \
+    cat "$DOT/bin/fleet"
+has "and before every deploy" '^        if ! prebuild "\$h" \|\| ! deploy_cmd'
+
 # bin/with-devenv in a checkout with no .devenv link and no devenv installed.
 mkdir -p "$T/repo/bin"
 cp "$DOT/bin/with-devenv" "$T/repo/bin/with-devenv"

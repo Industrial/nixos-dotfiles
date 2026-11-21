@@ -56,6 +56,14 @@ if [ "$booted" != "$profile" ]; then
   echo "> update > system >   booted:  $booted"
   echo "> update > system >   profile: $profile"
 fi
+# Build the closure through vmon, the build monitor (GH-181), as this user: the switch
+# below then finds it in the store and only activates. Without vmon (a host that rolled
+# it back), nixos-rebuild builds it as before.
+if command -v vmon >/dev/null 2>&1; then
+  toplevel=".#nixosConfigurations.$(hostname).config.system.build.toplevel"
+  echo "> update > system > vmon -- nix build --no-link $toplevel"
+  vmon -- nix build --no-link "$toplevel"
+fi
 echo "> update > system > nixos-rebuild switch --flake \".#$(hostname)\""
 rebuild="cd '$host_dir' && nixos-rebuild switch --flake '.#$(hostname)' --show-trace --print-build-logs"
 if command -v script >/dev/null 2>&1; then

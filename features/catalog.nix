@@ -93,6 +93,7 @@
   ./cli/unzip
   ./cli/usbtree
   ./cli/vdiff
+  ./cli/vmon
   ./cli/yazi
   ./cli/zellij
   ./cli/zoxide
