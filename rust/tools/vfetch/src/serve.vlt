@@ -68,7 +68,8 @@ nar_ask rest =
 
 index_ask : &str -> &str -> Ask
 index_ask i url =
-  case (i.parse () : Result<usize, std::num::ParseIntError>) of
+  n = i.parse () : Result<usize, std::num::ParseIntError>
+  case n of
     Ok n -> Nar n (url.to_string ())
     Err _ -> Missing
 
