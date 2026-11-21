@@ -1,0 +1,81 @@
+-- Profile discovery for `--delete-older-than`, as `nix-collect-garbage` does it
+-- (`removeOldGenerations`, `findGenerations`): walk each profiles directory,
+-- treat every symlink whose target mentions `link` as a profile, and list its
+-- generations with their link times. Which ones go is `generations.vlt`'s call.
+
+import std::fs
+import std::os::unix::fs::MetadataExt
+import std::path::{Path, PathBuf}
+import crate::generations::{Generation, doomed, parse_generation}
+
+-- A profile and the generations that `--delete-older-than` would remove.
+-- `current` is None when the profile link does not name a generation, and
+-- such a profile is never touched.
+-- `blocked`: creation times are not monotonic below the kept generation, where
+-- Nix would abort; nothing is removed from such a profile.
+export data Profile { export path PathBuf, export current Option<u64>, export doomed Vec<u64>, export blocked bool }
+  deriving (Debug, Clone, PartialEq)
+
+-- Every profile under `dir`, recursively, the way `removeOldGenerations` finds them.
+export find_profiles : &Path -> Vec<PathBuf>
+find_profiles dir =
+  mut out = Vec::new () : Vec<PathBuf>
+  if fs::read_dir dir is Ok entries
+    for entry in entries
+      if entry is Ok e
+        p = e.path ()
+        if e.file_type () is Ok t
+          if t.is_symlink ()
+            if fs::read_link (&p) is Ok target
+              if target.to_string_lossy ().contains "link"
+                out.push p
+          else if t.is_dir ()
+            out.extend (find_profiles (&p))
+  out
+
+-- `findGenerations`: the generations beside a profile, with their link mtimes,
+-- and the current one as the profile link names it.
+export generations_of : &Path -> (Vec<Generation>, Option<u64>)
+generations_of profile =
+  dir = profile.parent () |> .unwrap_or (Path::new "/")
+  name = (profile.file_name ()).map (\n -> n.to_string_lossy ().into_owned ()) |> .unwrap_or_default
+  mut gens = Vec::new () : Vec<Generation>
+  if fs::read_dir dir is Ok entries
+    for entry in entries
+      if entry is Ok e
+        file = e.file_name ().to_string_lossy ().into_owned ()
+        if parse_generation (&name) (&file) is Some n
+          if fs::symlink_metadata (&(e.path ())) is Ok m
+            gens.push (Generation { number = n, mtime = m.mtime () })
+  current = (fs::read_link profile).ok () |> .and_then (\t -> parse_generation (&name) (&(t.to_string_lossy ())))
+  (gens, current)
+
+-- The plan for every profile in `dirs` (deduplicated), given the cutoff.
+export plan : &[PathBuf] -> i64 -> Vec<Profile>
+plan dirs cutoff =
+  mut seen = std::collections::BTreeSet::new () : std::collections::BTreeSet<PathBuf>
+  for d in dirs
+    for p in find_profiles d
+      seen.insert p
+  mut out = Vec::new () : Vec<Profile>
+  for p in seen
+    (gens, current) = generations_of (&p)
+    verdict = if current.is_some ()
+      doomed (&gens) current cutoff
+    else
+      Some (Vec::new ())
+    blocked = verdict.is_none ()
+    out.push (Profile { path = p, current, doomed = verdict.unwrap_or_default (), blocked })
+  out
+
+-- The directories `nix-collect-garbage` cleans when run as root: the state
+-- profiles directory (which holds per-user/root) and the parent of root's
+-- default profile.
+export root_dirs : Vec<PathBuf>
+root_dirs =
+  mut dirs = vec![PathBuf::from("/nix/var/nix/profiles"), PathBuf::from("/nix/var/nix/profiles/per-user/root")]
+  home = std::env::var "HOME" |> .unwrap_or_else (\_ -> "/root".to_string ())
+  if fs::read_link ("#{home}/.nix-profile") is Ok t
+    if t.parent () is Some parent
+      dirs.push (parent.to_path_buf ())
+  dirs

@@ -1,0 +1,93 @@
+-- Liveness, as Nix 2.35.6 `LocalStore::collectGarbage` decides it. Nix searches
+-- backwards from each candidate over referrers, derivers and outputs; that is
+-- the same relation as this forward closure from the roots, computed once:
+-- a path is alive exactly when some root reaches it over references, plus
+-- derivation -> outputs under keep-outputs and path -> deriver under
+-- keep-derivations.
+
+import std::collections::{HashSet, VecDeque}
+import crate::db::Graph
+import crate::storepath::{hash_part, valid_base}
+
+export data Keep { export outputs bool, export derivations bool }
+  deriving (Debug, Clone, Copy)
+
+-- What the store directory holds, judged. `dead`: valid paths no root
+-- reaches. `invalid`: entries named like store paths but not in the database
+-- (Nix deletes these too). `junk`: entries not named like store paths at all.
+export data Verdict { export dead Vec<String>, export invalid Vec<String>, export junk Vec<String>, export live usize }
+  deriving (Debug, Default)
+
+mark : &mut [bool] -> &mut VecDeque<usize> -> usize -> ()
+mark alive queue i =
+  if !alive[i]
+    alive[i] := true
+    queue.push_back i
+  ()
+
+-- The live set over graph indices, from the given root indices.
+export live : &Graph -> &[usize] -> Keep -> Vec<bool>
+live g roots keep =
+  mut alive = vec![false; g.paths.len()]
+  mut queue = VecDeque::new () : VecDeque<usize>
+  for r in roots
+    mark (&mut alive) (&mut queue) (*r)
+  mut more = true
+  while more
+    case queue.pop_front () of
+      None ->
+        more := false
+      Some i ->
+        for r in g.refs[i].iter ()
+          mark (&mut alive) (&mut queue) (*r)
+        if keep.outputs
+          for o in g.outputs[i].iter ()
+            mark (&mut alive) (&mut queue) (*o)
+        if keep.derivations
+          if g.deriver[i] is Some d
+            mark (&mut alive) (&mut queue) d
+  alive
+
+-- The root indices: every named root that is a valid path. Invalid ones are
+-- dropped, as Nix drops them.
+export root_indices : &Graph -> &[String] -> Vec<usize>
+root_indices g names =
+  names |> .iter |> .filter_map (\n -> (g.index.get n).copied ()) |> .collect
+
+-- Judge each store directory entry. `temp_hashes` are the hash parts of the
+-- temporary roots, which protect even an invalid path (Nix checks them by hash).
+export judge : &Graph -> &[bool] -> &HashSet<String> -> Vec<String> -> Verdict
+judge g alive temp_hashes entries =
+  mut v = Verdict::default ()
+  v.live := (alive.iter ()).filter (\a -> **a) |> .count
+  for name in entries
+    if name == ".links"
+      ()
+    else if !(valid_base (&name))
+      v.junk.push name
+    else if g.index.get (&name) is Some i
+      if !alive[*i]
+        v.dead.push name
+    else if !(temp_hashes.contains (hash_part (&name)))
+      v.invalid.push name
+  v.dead.sort ()
+  v.invalid.sort ()
+  v.junk.sort ()
+  v
+
+test "liveness follows references, outputs and derivers"
+  mut g = Graph::default ()
+  -- 0 root -> 1 lib; 2 drv of 1 (kept by keep-derivations); 3 output of 2
+  -- (kept by keep-outputs); 4 unreachable.
+  for n in ["a-root", "b-lib", "c-lib.drv", "d-doc", "e-junk"]
+    g.index.insert (n.to_string ()) (g.paths.len ())
+    g.paths.push (n.to_string ())
+  g.refs := vec![vec![1], vec![], vec![], vec![], vec![]]
+  g.deriver := vec![None, Some(2), None, Some(2), None]
+  g.outputs := vec![vec![], vec![], vec![1, 3], vec![], vec![]]
+  both = live (&g) (&[0]) (Keep { outputs = true, derivations = true })
+  assert! \-> both == vec![true, true, true, true, false]
+  neither = live (&g) (&[0]) (Keep { outputs = false, derivations = false })
+  assert! \-> neither == vec![true, true, false, false, false]
+  drv_only = live (&g) (&[0]) (Keep { outputs = false, derivations = true })
+  assert! \-> drv_only == vec![true, true, true, false, false]

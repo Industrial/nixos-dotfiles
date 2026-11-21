@@ -1,0 +1,314 @@
+-- Deleting garbage, as Nix 2.35.6 `collectGarbage` does it, run only while
+-- `lock.vlt` holds the GC lock:
+--
+--   1. invalidate the dead valid paths in one database transaction, referrers
+--      before references (the schema's `on delete restrict` enforces the
+--      order, so a dead set that is not referrer-closed aborts the whole
+--      transaction and nothing is deleted);
+--   2. then remove them from disk, with the invalid and non-store entries;
+--   3. then unlink every file in /nix/store/.links that nothing links to.
+--
+-- Invalidating before removing is Nix's order too: a crash in between leaves
+-- invalid directories, which the next collection deletes, never a valid path
+-- with missing contents.
+
+import rusqlite::Connection
+import std::collections::VecDeque
+import std::fs
+import std::io::ErrorKind
+import std::os::unix::fs::MetadataExt
+import std::path::Path
+import std::time::Duration
+import crate::db::Graph
+import crate::roots::normalize
+import crate::storepath::{STORE_DIR, full}
+
+export const LINKS_DIR : &str = "/nix/store/.links"
+
+-- Totals for the journal: paths removed, bytes freed, `.links` entries pruned.
+export data Freed { export paths u64, export bytes u64, export links u64, export link_bytes u64 }
+  deriving (Debug, Clone, Default, PartialEq)
+
+-- The dead indices, referrers first: Kahn's algorithm over the references
+-- between dead paths. Self-references are ignored (Nix's DeleteSelfRefs
+-- trigger drops them). Anything left over (a cycle, which the store cannot
+-- hold) goes last, where the database rejects it.
+export order : &Graph -> &[usize] -> Vec<usize>
+order g dead =
+  mut is_dead = vec![false; g.paths.len()]
+  for d in dead.iter ()
+    is_dead[*d] := true
+  mut pending = vec![0usize; g.paths.len()]
+  for d in dead.iter ()
+    for r in g.refs[*d].iter ()
+      if *r != *d && is_dead[*r]
+        pending[*r] += 1
+  mut ready = VecDeque::new () : VecDeque<usize>
+  for d in dead.iter ()
+    if pending[*d] == 0
+      ready.push_back (*d)
+  mut out = Vec::new () : Vec<usize>
+  mut placed = vec![false; g.paths.len()]
+  mut more = true
+  while more
+    case ready.pop_front () of
+      None ->
+        more := false
+      Some i ->
+        out.push i
+        placed[i] := true
+        for r in g.refs[i].iter ()
+          if *r != i && is_dead[*r]
+            pending[*r] -= 1
+            if pending[*r] == 0
+              ready.push_back (*r)
+  for d in dead.iter ()
+    if !placed[*d]
+      out.push (*d)
+  out
+
+-- The dead paths that may go, referrers first: those `ok` allows and whose
+-- dead referrers all go too. Cutting the dead set to an oracle's can leave a
+-- path whose referrer stays; deleting it would break the store's closure
+-- (and the database's restrict constraint), so it stays as well.
+export deletable : &Graph -> &[usize] -> &[bool] -> Vec<usize>
+deletable g dead ok =
+  ordered = order g dead
+  mut is_dead = vec![false; g.paths.len()]
+  for d in dead.iter ()
+    is_dead[*d] := true
+  -- `blocked[x]`: some dead referrer of x stays.
+  mut blocked = vec![false; g.paths.len()]
+  mut out = Vec::new () : Vec<usize>
+  for i in ordered.iter ()
+    goes = ok[*i] && !blocked[*i]
+    if goes
+      out.push (*i)
+    else
+      for r in g.refs[*i].iter ()
+        if *r != *i && is_dead[*r]
+          blocked[*r] := true
+  out
+
+sql : rusqlite::Error -> String
+sql e = "store database: #{e}"
+
+-- Invalidate `bases` (in the given order) in one immediate transaction,
+-- returning the ones actually invalidated. Each delete runs in its own
+-- savepoint: one the database refuses (a path registered during the hold
+-- references it, so `on delete restrict` fires) is kept on its own, as Nix
+-- skips a path in use, and since referrers come first the refusal carries
+-- through to everything that path references.
+export invalidate : &str -> &[String] -> Result<Vec<String>, String>
+invalidate db bases =
+  conn = ((Connection::open db).map_err sql)?
+  ((conn.busy_timeout (Duration::from_secs 60)).map_err sql)?
+  ((conn.execute_batch "PRAGMA foreign_keys = ON; BEGIN IMMEDIATE").map_err sql)?
+  outcome = delete_rows (&conn) bases
+  case outcome of
+    Ok done ->
+      ((conn.execute_batch "COMMIT").map_err sql)?
+      Ok done
+    Err e ->
+      _ := conn.execute_batch "ROLLBACK"
+      Err e
+
+delete_rows : &Connection -> &[String] -> Result<Vec<String>, String>
+delete_rows conn bases =
+  mut stmt = ((conn.prepare "DELETE FROM ValidPaths WHERE path = ?1").map_err sql)?
+  mut done = Vec::new () : Vec<String>
+  for b in bases.iter ()
+    p = full b
+    ((conn.execute_batch "SAVEPOINT vgc_path").map_err sql)?
+    case stmt.execute ([p.as_str ()]) of
+      Ok n ->
+        ((conn.execute_batch "RELEASE vgc_path").map_err sql)?
+        if n == 1
+          done.push (b.clone ())
+        else
+          eprintln! \-> "vgc: #{p} was not valid any more"
+      Err e ->
+        ((conn.execute_batch "ROLLBACK TO vgc_path; RELEASE vgc_path").map_err sql)?
+        eprintln! \-> "vgc: keeping #{p}: #{e}"
+  Ok done
+
+-- Bytes a file holds that no other link shares.
+own_bytes : &fs::Metadata -> u64
+own_bytes m =
+  if m.nlink () == 1
+    m.blocks () * 512
+  else
+    0
+
+-- What a store entry holds that no other link shares. Read-only: a
+-- directory swapped for a symlink mid-walk can only skew the count.
+export tree_bytes : &Path -> u64
+tree_bytes p =
+  case fs::symlink_metadata p of
+    Err _ -> 0
+    Ok m | m.is_dir () ->
+      mut total = 0 : u64
+      if fs::read_dir p is Ok entries
+        for entry in entries
+          if entry is Ok e
+            total += tree_bytes (&(e.path ()))
+      total
+    Ok m -> own_bytes (&m)
+
+-- Remove a store entry (directory, file or symlink), counting what it freed.
+-- Directories go through `remove_dir_all`, which on Linux works relative to
+-- open directory fds (openat/unlinkat, never following a symlink), as Nix's
+-- `deletePath` does: a writer inside the entry who swaps a directory for a
+-- symlink cannot steer root's deletion out of the store.
+export remove_tree : &Path -> std::io::Result<u64>
+remove_tree p =
+  m = (fs::symlink_metadata p)?
+  if m.is_dir ()
+    freed = tree_bytes p
+    (fs::remove_dir_all p)?
+    Ok freed
+  else
+    own = own_bytes (&m)
+    (fs::remove_file p)?
+    Ok own
+
+-- Remove each entry from the store directory; one already gone is fine.
+export remove_entries : &[String] -> Result<Freed, String>
+remove_entries names =
+  mut f = Freed::default ()
+  mut failure = None : Option<String>
+  for n in names.iter ()
+    if failure.is_none ()
+      path = Path::new STORE_DIR |> .join n
+      case remove_tree (&path) of
+        Ok b ->
+          f.paths += 1
+          f.bytes += b
+        Err e | e.kind () == ErrorKind::NotFound -> ()
+        Err e ->
+          failure := Some "deleting #{path.display ()}: #{e}"
+  case failure of
+    Some e -> Err e
+    None -> Ok f
+
+-- Whether vgc can delete from the store at all. /nix/store is normally a
+-- read-only bind mount, and finding that out after the database transaction
+-- would strand the invalidated paths on disk (safe, but nothing freed), so
+-- this is checked before anything is invalidated.
+export store_writable : Result<(), String>
+store_writable =
+  probe = Path::new STORE_DIR |> .join "tmp-vgc-write-probe-#{std::process::id ()}"
+  case fs::create_dir (&probe) of
+    Ok _ -> (fs::remove_dir (&probe)).map_err (\e -> "removing #{probe.display ()}: #{e}")
+    Err e -> Err "#{STORE_DIR} is not writable here (#{e}); run vgc in a mount namespace where it is (the vgc unit remounts it)"
+
+-- A `tmp-*` directory another process holds locked is in use (Nix skips it).
+export in_use : &str -> bool
+in_use name =
+  if name.starts_with "tmp-"
+    case fs::File::open (Path::new STORE_DIR |> .join name) of
+      Ok d -> (d.try_lock ()).is_err ()
+      Err _ -> true
+  else
+    false
+
+-- Every entry name in `.links`, read once; the checks are then split up.
+export link_names : Result<Vec<String>, String>
+link_names =
+  dir = ((fs::read_dir LINKS_DIR).map_err (\e -> "reading #{LINKS_DIR}: #{e}"))?
+  mut out = Vec::new () : Vec<String>
+  for entry in dir
+    if entry is Ok e
+      out.push (e.file_name ().to_string_lossy ().into_owned ())
+  Ok out
+
+-- `removeUnusedLinks` for some of the entries: unlink each `.links` file whose
+-- only link is its own.
+export prune_links : Vec<String> -> Result<Freed, String>
+prune_links names =
+  mut f = Freed::default ()
+  base = Path::new LINKS_DIR
+  for n in names.iter ()
+    p = base.join n
+    if fs::symlink_metadata (&p) is Ok m
+      if m.nlink () == 1
+        if (fs::remove_file (&p)).is_ok ()
+          f.links += 1
+          f.link_bytes += m.blocks () * 512
+  Ok f
+
+-- Split `items` into at most `n` runs of nearly equal length.
+export split : Vec<String> -> usize -> Vec<Vec<String>>
+split items n =
+  size = (items.len () / n.max 1) + 1
+  (items.chunks size).map (\c -> c.to_vec ()) |> .collect
+
+-- Sum of per-chunk totals.
+export total : Vec<Freed> -> Freed
+total parts =
+  mut t = Freed::default ()
+  for p in parts.iter ()
+    t.paths += p.paths
+    t.bytes += p.bytes
+    t.links += p.links
+    t.link_bytes += p.link_bytes
+  t
+
+-- A dangling link under gcroots/auto, unlinked only if it still dangles now.
+-- Checked again here, under the lock, because the scan may be minutes old and
+-- `nix build --out-link` may have recreated it with the same name since.
+export remove_if_stale : &Path -> ()
+remove_if_stale link =
+  if fs::read_link link is Ok target
+    parent = link.parent () |> .unwrap_or (Path::new "/")
+    abs = normalize (&(parent.join target))
+    if fs::symlink_metadata (&abs) |> .is_err
+      _ := fs::remove_file link
+  ()
+
+test "referrers come before what they reference"
+  mut g = Graph::default ()
+  for n in ["app", "lib", "libc", "alive"]
+    g.index.insert (n.to_string ()) (g.paths.len ())
+    g.paths.push (n.to_string ())
+  -- app -> lib -> libc, app -> libc, libc -> libc (self).
+  g.refs := vec![vec![1, 2], vec![2], vec![2], vec![]]
+  assert! \-> order (&g) (&[2, 1, 0]) == vec![0, 1, 2]
+  assert! \-> order (&g) (&[2, 1]) == vec![1, 2]
+  -- The oracle keeps app: lib and libc are still referenced, so they stay.
+  none = Vec::new () : Vec<usize>
+  assert! \-> deletable (&g) (&[0, 1, 2]) (&[false, true, true, true]) == none
+  -- The oracle keeps lib: app may go, libc may not.
+  assert! \-> deletable (&g) (&[0, 1, 2]) (&[true, false, true, true]) == vec![0]
+
+test "a path still referenced is kept on its own and the rest invalidated"
+  db = std::env::temp_dir () |> .join "vgc-invalidate-test.sqlite"
+  _ := fs::remove_file (&db)
+  conn = (Connection::open (&db)).unwrap ()
+  -- Nix's schema, the parts the constraint depends on (src/libstore/schema.sql).
+  _ := conn.execute_batch """
+    create table ValidPaths (id integer primary key autoincrement not null, path text unique not null);
+    create table Refs (referrer integer not null, reference integer not null, primary key (referrer, reference),
+      foreign key (referrer) references ValidPaths(id) on delete cascade,
+      foreign key (reference) references ValidPaths(id) on delete restrict);
+    create trigger DeleteSelfRefs before delete on ValidPaths begin delete from Refs where referrer = old.id and reference = old.id; end;
+    insert into ValidPaths (path) values ('/nix/store/aaaa-app'), ('/nix/store/bbbb-lib'), ('/nix/store/cccc-new'), ('/nix/store/dddd-solo');
+    insert into Refs values (1, 2), (3, 2), (4, 4);
+    """
+  drop conn
+  -- app and lib are doomed; `new` (registered during the hold) still references lib.
+  done = (invalidate (db.to_str ().unwrap ()) (&["aaaa-app".to_string (), "bbbb-lib".to_string (), "dddd-solo".to_string ()])).unwrap ()
+  assert! \-> done == vec!["aaaa-app".to_string(), "dddd-solo".to_string()]
+  _ := fs::remove_file (&db)
+
+test "removing a tree counts only bytes no other link shares"
+  base = std::env::temp_dir () |> .join "vgc-remove-tree-test"
+  _ := fs::remove_dir_all (&base)
+  _ := fs::create_dir_all (&(base.join "d"))
+  _ := fs::write (&(base.join "d/a")) "hello"
+  _ := fs::hard_link (&(base.join "d/a")) (&(base.join "b"))
+  _ := fs::write (&(base.join "d/c")) "world"
+  freed = (remove_tree (&(base.join "d"))).unwrap ()
+  assert! \-> freed > 0
+  assert! \-> (base.join "b").exists () && !((base.join "d").exists ())
+  _ := fs::remove_dir_all (&base)

@@ -1,0 +1,55 @@
+-- A writable store for this process only, as Nix 2.35.6 gets one
+-- (`makeStoreWritable` → `tryEnterPrivateMountNamespace` +
+-- `remountReadOnlyWritable`, src/libutil/linux/linux-namespaces.cc).
+--
+-- NixOS bind-mounts /nix/store read-only. When it is, vgc moves into a mount
+-- namespace of its own, makes propagation private (so nothing it does there
+-- reaches the host), and remounts the store bind read-write, carrying the
+-- mount's other flags across as Nix does. The host keeps its read-only store.
+-- This must run before vgc starts any thread: unshare(CLONE_NEWNS) refuses a
+-- process whose threads share a filesystem context.
+
+import nix::mount::{MsFlags, mount}
+import nix::sched::{CloneFlags, unshare}
+import nix::sys::statvfs::{FsFlags, statvfs}
+import crate::storepath::STORE_DIR
+
+-- MS_REMOUNT | MS_BIND, plus each flag the current mount has that a remount
+-- would otherwise drop.
+export carried : FsFlags -> MsFlags
+carried st =
+  mut f = MsFlags::MS_REMOUNT.union MsFlags::MS_BIND
+  if st.contains FsFlags::ST_NODEV
+    f := f.union MsFlags::MS_NODEV
+  if st.contains FsFlags::ST_NOSUID
+    f := f.union MsFlags::MS_NOSUID
+  if st.contains FsFlags::ST_NOEXEC
+    f := f.union MsFlags::MS_NOEXEC
+  if st.contains FsFlags::ST_NOATIME
+    f := f.union MsFlags::MS_NOATIME
+  if st.contains FsFlags::ST_NODIRATIME
+    f := f.union MsFlags::MS_NODIRATIME
+  if st.contains FsFlags::ST_RELATIME
+    f := f.union MsFlags::MS_RELATIME
+  if st.contains FsFlags::ST_SYNCHRONOUS
+    f := f.union MsFlags::MS_SYNCHRONOUS
+  f
+
+export writable_store : Result<(), String>
+writable_store =
+  st = ((statvfs STORE_DIR).map_err (\e -> "statvfs #{STORE_DIR}: #{e}"))?
+  flags = st.flags ()
+  if !(flags.contains FsFlags::ST_RDONLY)
+    Ok ()
+  else
+    none = None : Option<&str>
+    ((unshare CloneFlags::CLONE_NEWNS).map_err (\e -> "unshare(CLONE_NEWNS): #{e}"))?
+    ((mount none "/" none (MsFlags::MS_PRIVATE.union MsFlags::MS_REC) none).map_err (\e -> "making / private: #{e}"))?
+    ((mount none STORE_DIR none (carried flags) none).map_err (\e -> "remounting #{STORE_DIR} writable: #{e}"))?
+    Ok ()
+
+test "a remount keeps nodev and nosuid and adds nothing else"
+  f = carried (FsFlags::ST_RDONLY.union (FsFlags::ST_NODEV.union FsFlags::ST_NOSUID))
+  assert! \-> f.contains MsFlags::MS_REMOUNT && f.contains MsFlags::MS_BIND
+  assert! \-> f.contains MsFlags::MS_NODEV && f.contains MsFlags::MS_NOSUID
+  assert! \-> !(f.contains MsFlags::MS_RDONLY) && !(f.contains MsFlags::MS_NOEXEC)

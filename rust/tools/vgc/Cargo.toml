@@ -1,0 +1,46 @@
+# vgc — the Nix garbage collector, in Voltaic.
+#
+# Standalone crate (own Cargo.lock, empty [workspace]) so buildRustPackage vendors
+# it on its own and it never contends with rust/Cargo.toml's members or lockfile.
+[workspace]
+
+[package]
+name = "vgc"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial"]
+description = "Nix garbage collector: plans exactly what nix-collect-garbage would delete"
+license = "MIT"
+publish = false
+build = "build.rs"
+
+[dependencies]
+# Effects, typed errors and the run edge. Fleet-wide pin.
+id_effect = "=0.13.0"
+rusqlite = { version = "0.37", features = ["bundled"] }
+# Safe unshare / mount / statvfs: the private mount namespace in which the
+# read-only store bind is remounted writable (src/mounts.vlt).
+nix = { version = "0.30", default-features = false, features = [
+  "sched",
+  "mount",
+  "fs",
+] }
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Exact pin —
+# 0.2.0 has silent miscompiles that 0.2.1 fixes, and the surface still moves
+# between minors.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vgc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vgc"
+path = "src/main.rs"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

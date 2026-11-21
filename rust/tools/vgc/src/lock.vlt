@@ -1,0 +1,28 @@
+-- The big garbage-collector lock, as Nix 2.35.6 takes it (`openGCLock`,
+-- `lockFile`): an exclusive flock on /nix/var/nix/gc.lock, held for the whole
+-- collection. While vgc holds it, every Nix client's `addTempRoot` fails its
+-- shared lock, finds no GC socket to talk to, and waits; so no path can be
+-- rooted between vgc's root scan and its deletions. That is Nix's own
+-- stop-the-world guarantee without the socket, at the price of clients
+-- pausing for the few seconds vgc runs.
+
+import id_effect::{Effect, sync}
+import std::fs
+import std::os::unix::fs::OpenOptionsExt
+import crate::effects::{GcError, step}
+
+export const GC_LOCK : &str = "/nix/var/nix/gc.lock"
+
+-- Open (creating it if need be, mode 0600 as Nix does) and lock exclusively,
+-- waiting for any running collector.
+acquire : Result<fs::File, String>
+acquire =
+  opened = fs::OpenOptions::new () |> .read true |> .write true |> .create true |> .truncate false |> .mode 0o600 |> .open GC_LOCK
+  file = (opened.map_err (\e -> "opening #{GC_LOCK}: #{e}"))?
+  ((file.lock ()).map_err (\e -> "locking #{GC_LOCK}: #{e}"))?
+  Ok file
+
+-- Run `body` holding the GC lock; the lock is released however `body` ends.
+export locked : given <A: Send + 'static> Effect<A, GcError> -> Effect<A, GcError>
+locked body =
+  (step (\-> acquire ()) GcError::Lock) |> .flat_map (move \lock -> body.ensuring (sync (move \-> drop lock)))
