@@ -9,14 +9,14 @@ PawnCommon = {
 ["Debug"] = false,
 ["ColorTooltipBorder"] = true,
 ["ShowTooltipIcons"] = true,
-["ShowUpgradesOnTooltips"] = true,
-["ShowSocketingAdvisor"] = true,
 ["ShowSpecIcons"] = true,
-["LastVersion"] = 2.1316,
+["ShowSocketingAdvisor"] = true,
+["Scales"] = {
+},
+["IgnoreGemsWhileLeveling"] = true,
 ["ButtonPosition"] = 2,
 ["Digits"] = 1,
 ["ShowQuestUpgradeAdvisor"] = true,
-["IgnoreGemsWhileLeveling"] = true,
-["Scales"] = {
-},
+["LastVersion"] = 2.1316,
+["ShowUpgradesOnTooltips"] = true,
 }

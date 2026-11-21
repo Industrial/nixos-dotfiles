@@ -1,6 +1,11 @@
 
 CliqueDB = nil
 CliqueDB3 = {
+["profileKeys"] = {
+["Skelf Onyourshelf"] = "Skelf Onyourshelf",
+["Banknspank Saladfingers"] = "Banknspank Saladfingers",
+["Völundr Industrial"] = "Skelf Onyourshelf",
+},
 ["global"] = {
 ["profileBackups"] = {
 ["Banknspank Saladfingers"] = {
@@ -10,13 +15,8 @@ CliqueDB3 = {
 },
 },
 },
-["profileKeys"] = {
-["Skelf Onyourshelf"] = "Skelf Onyourshelf",
-["Banknspank Saladfingers"] = "Banknspank Saladfingers",
-["Völundr Industrial"] = "Skelf Onyourshelf",
-},
 ["profiles"] = {
-["Banknspank Saladfingers"] = {
+["Skelf Onyourshelf"] = {
 ["bindings"] = {
 {
 ["sets"] = {
@@ -35,7 +35,7 @@ CliqueDB3 = {
 },
 },
 },
-["Skelf Onyourshelf"] = {
+["Banknspank Saladfingers"] = {
 ["bindings"] = {
 {
 ["type"] = "target",

@@ -14,13 +14,14 @@ OPie_SavedData = {
 ["RotationTokens"] = {
 ["ABueUoBZOrf"] = "ABueUoBZOro",
 ["ABueUoBZOr3"] = "ABueUoBZOrt",
+["ABueUoBZOrd"] = "ABueUoBZOrw",
 },
 ["Bindings"] = {
-["HunterPet"] = "CTRL-F",
+["HunterPet"] = false,
 ["WorldMarkers"] = "ALT-W",
-["terAspects"] = "CTRL-S",
-["Hunter"] = "CTRL-D",
-["PetControl"] = "CTRL-E",
+["terAspects"] = false,
+["Hunter"] = "ALT-G",
+["PetControl"] = false,
 },
 },
 },
@@ -28,42 +29,42 @@ OPie_SavedData = {
 ["RingKeeper"] = {
 ["HunterPet"] = {
 {
-["sliceToken"] = "ABueUoBZOrr",
-["id"] = 883,
-},
-{
-["sliceToken"] = "ABueUoBZOr1",
-["id"] = 6991,
-},
-{
-["sliceToken"] = "ABueUoBZOrt",
 [3] = 16,
 ["id"] = 3661,
+["sliceToken"] = "ABueUoBZOrt",
 },
 {
-["sliceToken"] = "ABueUoBZOry",
-["id"] = 2641,
+["id"] = 883,
+["sliceToken"] = "ABueUoBZOrr",
 },
 {
-["sliceToken"] = "ABueUoBZOru",
 ["id"] = 982,
+["sliceToken"] = "ABueUoBZOru",
 },
-["name"] = "Hunter Pet",
+{
+["id"] = 2641,
+["sliceToken"] = "ABueUoBZOry",
+},
+{
+["id"] = 6991,
+["sliceToken"] = "ABueUoBZOr1",
+},
 ["save"] = true,
 ["limit"] = "Derpnschmerp-Gorkndork",
+["name"] = "Hunter Pet",
 },
 ["terAspects"] = {
 {
-["sliceToken"] = "ABueUoBZOrg",
 ["id"] = 14320,
+["sliceToken"] = "ABueUoBZOrg",
 },
 {
-["sliceToken"] = "ABueUoBZOri",
 ["id"] = 13163,
+["sliceToken"] = "ABueUoBZOri",
 },
 {
-["sliceToken"] = "ABueUoBZOro",
 ["id"] = 5118,
+["sliceToken"] = "ABueUoBZOro",
 },
 {
 [3] = 16,
@@ -80,9 +81,9 @@ OPie_SavedData = {
 ["id"] = 20190,
 ["sliceToken"] = "ABueUoBZOrs",
 },
-["name"] = "Hunter Aspects",
 ["save"] = true,
 ["limit"] = "Derpnschmerp-Gorkndork",
+["name"] = "Hunter Aspects",
 },
 ["Hunter"] = {
 {
@@ -100,12 +101,9 @@ OPie_SavedData = {
 "terAspects",
 ["sliceToken"] = "ABueUoBZOrf",
 },
-["limit"] = "Derpnschmerp-Gorkndork",
 ["save"] = true,
 ["name"] = "Hunter",
-},
-["OPieFlagStore"] = {
-["StoreVersion"] = 3,
+["limit"] = "Derpnschmerp-Gorkndork",
 },
 ["PetControl"] = {
 {
@@ -118,9 +116,12 @@ OPie_SavedData = {
 "pet",
 ["sliceToken"] = "ABueUoBZOrw",
 },
-["limit"] = "Derpnschmerp-Gorkndork",
 ["save"] = true,
 ["name"] = "Pet Control",
+["limit"] = "Derpnschmerp-Gorkndork",
+},
+["OPieFlagStore"] = {
+["StoreVersion"] = 3,
 },
 },
 },

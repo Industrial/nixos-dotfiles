@@ -1,3 +1,15 @@
+VER 3 010000000000000F "AoC" "134400"
+#showtooltip
+/use Aspect of the Cheetah
+END
+VER 3 010000000000000D "AoH" "134400"
+#showtooltip
+/use Aspect of the Hawk
+END
+VER 3 010000000000000E "AoM" "134400"
+#showtooltip
+/use Aspect of the Monkey
+END
 VER 3 010000000000000B "AS" "134400"
 #showtooltip
 /use Aimed Shot
@@ -14,6 +26,10 @@ END
 VER 3 0100000000000009 "CS" "134400"
 #showtooltip
 /use Concussive Shot
+END
+VER 3 0100000000000010 "FT" "134400"
+#showtooltip
+/use Freezing Trap
 END
 VER 3 0100000000000005 "MP" "134400"
 #showtooltip

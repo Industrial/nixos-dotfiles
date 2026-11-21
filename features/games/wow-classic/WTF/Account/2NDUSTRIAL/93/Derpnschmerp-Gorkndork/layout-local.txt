@@ -6,13 +6,6 @@ X: -510
 Y: -92
 W: 420
 H: 46
-Frame: BetterBagsBagBackpack
-FrameLevel: 500
-Anchor: CENTER
-X: -750
-Y: 79
-W: 200
-H: 200
 Frame: wowFLibro
 FrameLevel: 1
 Anchor: CENTER
@@ -34,3 +27,10 @@ X: 15
 Y: -61
 W: 887
 H: 598
+Frame: BetterBagsBagBackpack
+FrameLevel: 500
+Anchor: TOP
+X: -756
+Y: -174
+W: 630
+H: 486
