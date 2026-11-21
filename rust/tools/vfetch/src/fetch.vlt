@@ -16,7 +16,7 @@
 
 import std::collections::{BTreeMap, BTreeSet}
 import std::time::{Duration, Instant}
-import id_effect::{Concurrency, Effect, FiberHandle, HCons, HNil, Schedule, Semaphore, Stream, effect, fail, for_each_par, succeed, suspend, sync}
+import id_effect::{Concurrency, Deferred, Effect, FiberHandle, HCons, HNil, Schedule, Semaphore, Stream, all, effect, fail, for_each_par, succeed, suspend, sync}
 import id_effect_platform::http::HttpBody
 import nix_store_core::narinfo::{NarInfo, NarInfoFile, parse}
 import nix_store_core::signing::PublicKey
@@ -130,7 +130,7 @@ references_of s =
     Source::Fetch _ f -> f.info.references.clone ()
 
 -- What the walk has found so far, and the NAR fetches it has started.
-export data Walk { export known BTreeMap<String, Source>, export pending Vec<FiberHandle<u64, VfetchError>> }
+export data Walk { export known BTreeMap<String, Source>, export pending Vec<(String, FiberHandle<u64, VfetchError>)> }
 
 -- Fetch a NAR from now on, on its own fiber: a child of the run's fiber, so a
 -- failed or interrupted run interrupts and awaits it. At most `jobs` download
@@ -158,12 +158,13 @@ level ctx w found =
   fresh.sort_by_key (\a -> std::cmp::Reverse a.1.info.nar_size)
   frontier = next.into_iter () |> .filter (\r -> !seen.contains_key r) |> .collect : Vec<String>
   c = ctx.clone ()
-  (for_each_par fresh (move \t -> start (c.clone ()) t) Concurrency::Sequential) |> .flat_map (move \started -> continued ctx frontier seen pending started)
+  paths = fresh.iter () |> .map (\t -> t.1.info.store_path.clone ()) |> .collect : Vec<String>
+  (for_each_par fresh (move \t -> start (c.clone ()) t) Concurrency::Sequential) |> .flat_map (move \started -> continued ctx frontier seen pending paths started)
 
-continued : Ctx -> Vec<String> -> BTreeMap<String, Source> -> Vec<FiberHandle<u64, VfetchError>> -> Vec<FiberHandle<u64, VfetchError>> -> Effect<Walk, VfetchError, HNil>
-continued ctx frontier known pending started =
+continued : Ctx -> Vec<String> -> BTreeMap<String, Source> -> Vec<(String, FiberHandle<u64, VfetchError>)> -> Vec<String> -> Vec<FiberHandle<u64, VfetchError>> -> Effect<Walk, VfetchError, HNil>
+continued ctx frontier known pending paths started =
   mut all_pending = pending
-  all_pending.extend started
+  all_pending.extend (paths.into_iter () |> .zip started)
   walk ctx frontier (Walk { known, pending = all_pending })
 
 -- The closure of `frontier`, beyond what the walk has found.
@@ -183,7 +184,14 @@ chunks url body =
 
 pull : String -> HttpBody -> Effect<Option<(Vec<u8>, HttpBody)>, VfetchError, HNil>
 pull url b =
-  (b.next_chunk ()) |> .map_err (move \e -> VfetchError::Transient "#{url}: #{e}") |> .map (move \c -> c.map (move \bytes -> (bytes, b)))
+  u = url.clone ()
+  (b.next_chunk ()) |> .map_err (move \e -> VfetchError::Transient "#{url}: #{e}") |> .timeout_fail (stall ()) (move \-> VfetchError::Transient "#{u}: no data for #{stall ().as_secs ()}s") |> .map (move \c -> c.map (move \bytes -> (bytes, b)))
+
+-- How long a body may go without a chunk before the attempt is a transient
+-- failure (and retried): a connection that stalls mid-NAR, which the request's
+-- one-hour total timeout would otherwise wait out.
+export stall : Duration
+stall = Duration::from_secs 60
 
 drain : String -> HttpBody -> Sink -> Effect<Sink, VfetchError, HNil>
 drain url body sink =
@@ -205,9 +213,9 @@ fetch_one ctx cache f =
   Effect::retry (move \-> attempt (ctx.clone ()) (cache.clone ()) (f.clone ())) (backoff ())
 
 -- Every started fetch, awaited: the NARs' sizes, or the first failure.
-joined : Vec<FiberHandle<u64, VfetchError>> -> Effect<Vec<u64>, VfetchError, HNil>
+joined : Vec<(String, FiberHandle<u64, VfetchError>)> -> Effect<Vec<u64>, VfetchError, HNil>
 joined handles =
-  for_each_par handles (\h -> h.join ()) Concurrency::Sequential
+  for_each_par handles (\ph -> ph.1.join ()) Concurrency::Sequential
 
 -- The info of a path to import; None for one valid already.
 info_of : &Source -> Option<NarInfo>
@@ -258,8 +266,63 @@ imported importer batch known sizes =
   m = batch.len ()
   (now ()) |> .flat_map (move \t1 -> importer.0.add_all batch |> .map (move \_ -> phase "imported #{m} paths" t1 (summary (&known) sizes)))
 
+-- The NAR of a path, once its fetch is done (a staged path has none to wait for).
+fetched : Option<FiberHandle<u64, VfetchError>> -> Effect<u64, VfetchError, HNil>
+fetched handle =
+  case handle of
+    Some h -> h.join ()
+    None -> succeed 0
+
+-- Whether every reference a path has in the batch went in.
+refs_in : Vec<Deferred<bool, String>> -> Effect<bool, VfetchError, HNil>
+refs_in deps =
+  (for_each_par deps (\d -> d.wait ()) Concurrency::Sequential) |> .map_err (\e -> VfetchError::Import e) |> .map (\oks -> oks.iter () |> .all (\ok -> *ok))
+
+-- Add the path if its references are all in. If one is not, it failed on its
+-- own fiber, which fails the run; this path is skipped, not failed again.
+add_if : ImporterService -> NarInfo -> bool -> Effect<bool, VfetchError, HNil>
+add_if importer info ready =
+  if ready
+    importer.0.add_one info |> .map (\_ -> true)
+  else
+    succeed false
+
+-- One path's import, as soon as its NAR is verified and its references (in
+-- the batch) are in; `own` says whether it went in, for what refers to it.
+import_after : ImporterService -> NarInfo -> Option<FiberHandle<u64, VfetchError>> -> Vec<Deferred<bool, String>> -> Deferred<bool, String> -> Effect<u64, VfetchError, HNil>
+import_after importer info handle deps own =
+  o1 = own.clone ()
+  o2 = own.clone ()
+  body = (fetched handle) |> .flat_map (move \size -> refs_in deps |> .flat_map (move \ready -> add_if importer info ready) |> .map (move \added -> (size, added)))
+  body |> .flat_map (move \r -> o1.succeed (r.1) |> .map (move \_ -> r.0)) |> .catch (move \e -> o2.succeed (false) |> .flat_map (move \_ -> fail e))
+
+-- Fetch and import overlapped: every path gets an import fiber that waits for
+-- its own NAR and for its references' imports, so a path goes in while the
+-- rest of the closure is still downloading, and never before what it refers to.
+overlapped : ImporterService -> Walk -> Instant -> Effect<Report, VfetchError, HNil>
+overlapped importer w t0 =
+  batch = to_import (&w.known)
+  known = w.known
+  mut handles = w.pending.into_iter () |> .collect : BTreeMap<String, FiberHandle<u64, VfetchError>>
+  signals = batch.iter () |> .map (\i -> (i.store_path.clone (), Deferred::new ())) |> .collect : BTreeMap<String, Deferred<bool, String>>
+  mut jobs = Vec::new () : Vec<Effect<u64, VfetchError, HNil>>
+  for info in &batch
+    deps = info.references.iter () |> .filter (\r -> r.as_str () != info.store_path.as_str ()) |> .filter_map (\r -> signals.get r |> .cloned) |> .collect : Vec<Deferred<bool, String>>
+    own = signals.get (&info.store_path) |> .cloned |> .unwrap_or_default
+    jobs.push (import_after (importer.clone ()) (info.clone ()) (handles.remove (&info.store_path)) deps own)
+  n = batch.len ()
+  first = batch.first () |> .map (\i -> i.store_path.clone ())
+  (importer.0.prepare first) |> .flat_map (move \_ -> all jobs Concurrency::Unbounded) |> .map (move \sizes -> phase "fetched and imported #{n} paths" t0 (summary (&known) sizes))
+
 fetched_then_imported : ImporterService -> Walk -> Instant -> Effect<Report, VfetchError, HNil>
 fetched_then_imported importer w t0 =
+  if importer.0.streams ()
+    overlapped importer w t0
+  else
+    batched importer w t0
+
+batched : ImporterService -> Walk -> Instant -> Effect<Report, VfetchError, HNil>
+batched importer w t0 =
   batch = to_import (&w.known)
   n = w.pending.len ()
   known = w.known

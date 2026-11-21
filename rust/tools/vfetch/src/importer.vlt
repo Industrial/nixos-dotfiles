@@ -17,8 +17,15 @@ import crate::fault::VfetchError
 import crate::remote::lifted
 import crate::stage::{Staging, discard}
 
+-- `add_all` takes a whole batch, references first. An importer that `streams`
+-- also takes paths one at a time (`add_one`, each after its references), so
+-- the fetch can import a path while the rest of the closure downloads;
+-- `prepare` runs once before the first, given that path.
 export class Importer
   add_all : &self -> Vec<NarInfo> -> Effect<(), VfetchError, HNil>
+  streams : &self -> bool
+  prepare : &self -> Option<String> -> Effect<(), VfetchError, HNil>
+  add_one : &self -> NarInfo -> Effect<(), VfetchError, HNil>
 
 export newtype ImporterService = ImporterService (export Arc<dyn Importer + Send + Sync>)
 
@@ -61,6 +68,16 @@ instance Importer NixCopyImporter
       s = self.staging.clone ()
       (self.runtime.0.spawn_wait cmd) |> .map_err (\e -> VfetchError::Import "running nix: #{e}") |> .flat_map (move \status -> lifted (copied s infos status))
 
+  -- One `nix copy` per batch: a process per path would cost more than it overlaps.
+  streams : &self -> bool
+  streams self = false
+
+  prepare : &self -> Option<String> -> Effect<(), VfetchError, HNil>
+  prepare self _first = succeed (())
+
+  add_one : &self -> NarInfo -> Effect<(), VfetchError, HNil>
+  add_one self info = self.add_all (Vec::from ([info]))
+
 export nix_copy : Staging -> Option<String> -> Vec<String> -> ProcessRuntimeService -> ImporterService
 nix_copy staging to keys runtime =
   ImporterService (Arc::new (NixCopyImporter { staging, to, keys, runtime }))
@@ -75,6 +92,15 @@ instance Importer MemoryImporter
       for i in &infos
         added.push (i.store_path.clone ())
     succeed (())
+
+  streams : &self -> bool
+  streams self = true
+
+  prepare : &self -> Option<String> -> Effect<(), VfetchError, HNil>
+  prepare self _first = succeed (())
+
+  add_one : &self -> NarInfo -> Effect<(), VfetchError, HNil>
+  add_one self info = self.add_all (Vec::from ([info]))
 
 test "nix copy is asked for exactly the batch, from the staging cache"
   s = Staging { dir = std::path::PathBuf::from "/var/tmp/vfetch" }
