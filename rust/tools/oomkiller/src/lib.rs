@@ -9,6 +9,10 @@ pub mod policy {
     include!(concat!(env!("OUT_DIR"), "/policy.rs"));
 }
 
+// Voltaic 0.2 requires a unit body ending in `case` or `loop` to close with an
+// explicit `()` (VLT0113), and emits that `()` as a `();` statement. The
+// statement is inert, so clippy's no_effect lint is allowed here and nowhere else.
+#[allow(clippy::no_effect)]
 pub mod daemon {
     include!(concat!(env!("OUT_DIR"), "/daemon.rs"));
 }

@@ -26,10 +26,7 @@ export data ProcessInfo { export pid u32, export uid u32, export memory u64, exp
 -- figure scaled up first (a byte count, or used bytes times 100).
 decimal : u128 -> u128 -> u128 -> String
 decimal num den scale =
-  r = if den == 0
-    0
-  else
-    (num * scale + den / 2) / den
+  r = ((num * scale + den / 2).checked_div den).unwrap_or 0
   whole = r / scale
   frac = r % scale
   if scale == 100
