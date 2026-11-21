@@ -9,6 +9,8 @@ let
   features = import ../../../lib/features.nix {inherit lib;};
 
   cfg = nixos.eval {modules = [./default.nix];};
+  # The feature as a host gets it (wrapped by lib/features.nix), switched off.
+  offCfg = nixos.eval {modules = [(features.feature ./default.nix)];};
   inherit (cfg.systemd) sockets services;
   proxySocket = sockets.vdaemon-proxy;
   proxy = services.vdaemon-proxy;
@@ -73,4 +75,12 @@ in
     noConflicts = assay.eq [(proxySocket.conflicts or []) (fallback.conflicts or [])] [[] []];
     # A stop racing the other's bind must not delete the file.
     noRemoveOnStop = assay.eq (proxySocket.socketConfig.RemoveOnStop or false) false;
+
+    # A live switch (comin, nixos-rebuild) does not restart nix-daemon.socket; the
+    # rebind oneshot does, guarding the private path while the feature is on.
+    rebindsTheDaemonSocketOnSwitch = assay.eq services.nix-daemon-listen.environment.NIX_DAEMON_LISTEN upstream;
+    # ... and outside the feature's switch, so the rollback is covered too: with the
+    # feature wrapped and OFF, the oneshot is still there, guarding the public path.
+    rebindIsUngated = assay.eq (offCfg.systemd.services.nix-daemon-listen.environment.NIX_DAEMON_LISTEN or null) public;
+    offAddsNoProxy = assay.eq (offCfg.systemd.sockets ? vdaemon-proxy) false;
   }
