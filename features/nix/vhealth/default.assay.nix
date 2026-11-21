@@ -41,7 +41,7 @@ let
     };
   };
   cfg = nixos.eval {modules = [./default.nix declaring];};
-  inherit ((builtins.fromJSON cfg.features.nix.vhealth.probesJson)) probes;
+  inherit ((builtins.fromJSON (builtins.unsafeDiscardStringContext cfg.features.nix.vhealth.probesJson))) probes;
   byName = builtins.listToAttrs (map (p: lib.nameValuePair p.name p) probes);
 
   service = cfg.systemd.services.vhealth;
@@ -73,7 +73,7 @@ let
     ];
     settings.hostname = "drakkar";
   };
-  drakkarProbes = builtins.listToAttrs (map (p: lib.nameValuePair p.name p) (builtins.fromJSON drakkar.features.nix.vhealth.probesJson).probes);
+  drakkarProbes = builtins.listToAttrs (map (p: lib.nameValuePair p.name p) (builtins.fromJSON (builtins.unsafeDiscardStringContext drakkar.features.nix.vhealth.probesJson)).probes);
   ip = fleet.hosts.drakkar.tailscaleIp;
 
   # The option is declarable from a host that has vhealth off: lib/features.nix keeps the
@@ -93,7 +93,7 @@ let
 in
   assay.suite "vhealth-service" {
     # Every type reaches the JSON with exactly the fields config.vlt reads.
-    jsonHasEveryProbe = assay.eq (map (p: p.name) probes) ["cmd" "daemon" "ssh" "stamp" "web"];
+    jsonHasEveryProbe = assay.eq (map (p: p.name) probes) ["cmd" "daemon" "nix-daemon" "ssh" "stamp" "web"];
     httpFields = assay.eq byName.web {
       name = "web";
       type = "http";
@@ -157,10 +157,13 @@ in
     exporterReadsTheDirOnce = assay.eq (builtins.filter (lib.hasPrefix "--collector.textfile") drakkar.services.prometheus.exporters.node.extraFlags) ["--collector.textfile.directory=${dir}"];
 
     # What drakkar runs today, each declared by its own feature, at fleet.nix's address.
-    drakkarProbes = assay.eq (builtins.attrNames drakkarProbes) ["node-exporter" "sshd" "vcache" "vverify-metrics"];
+    drakkarProbes = assay.eq (builtins.attrNames drakkarProbes) ["nix-daemon" "node-exporter" "sshd" "vcache" "vverify-metrics"];
     vcacheProbe = assay.eq [drakkarProbes.vcache.url drakkarProbes.vcache.bodyContains] ["http://${ip}:${toString fleet.cachePort}/nix-cache-info" "StoreDir: /nix/store"];
     nodeExporterProbe = assay.eq drakkarProbes.node-exporter.url "http://${ip}:${toString drakkar.services.prometheus.exporters.node.port}/metrics";
     sshdProbe = assay.eq [drakkarProbes.sshd.host drakkarProbes.sshd.port] [ip 22];
+    # A store query through the daemon, not a connect: the socket can accept with no daemon.
+    nixDaemonAnswers =
+      assay.eq [drakkarProbes.nix-daemon.type drakkarProbes.nix-daemon.critical (lib.hasSuffix "/bin/nix-store" (builtins.head drakkarProbes.nix-daemon.argv)) (builtins.tail drakkarProbes.nix-daemon.argv)] ["command" true true ["--store" "daemon" "--query" "--hash" "/run/current-system"]];
     vverifyFreshness = assay.eq [drakkarProbes.vverify-metrics.path drakkarProbes.vverify-metrics.maxAgeSeconds drakkarProbes.vverify-metrics.critical] ["${dir}/vverify.prom" 691200 false];
     noLiteralAddresses = assay.eq (builtins.filter (p: lib.hasInfix "100.69." (builtins.toJSON p)) [(builtins.readFile ../vcache/default.nix) (builtins.readFile ../../network/ssh/default.nix) (builtins.readFile ../../monitoring/prometheus-exporter/default.nix)]) [];
 

@@ -111,6 +111,18 @@ in {
       })
       cfg.probes;
 
+    # The Nix daemon, on every vhealth host: a real query through the daemon socket, as a
+    # non-root user (vhealth's DynamicUser). A socket unit can be active, and a connect
+    # can succeed, while nothing behind it answers: on 2026-11-21 a proxy held the socket
+    # after a live switch and the daemon never re-bound, so every non-root `nix` call got
+    # "Connection reset by peer" while systemd reported nothing wrong.
+    features.nix.vhealth.probes.nix-daemon = {
+      type = "command";
+      argv = ["${config.nix.package}/bin/nix-store" "--store" "daemon" "--query" "--hash" "/run/current-system"];
+      timeout = 5000;
+      description = "the Nix daemon answers a non-root store query";
+    };
+
     environment.systemPackages = [vhealth];
     environment.etc."vhealth/probes.json".source = probesFile;
 
@@ -119,6 +131,8 @@ in {
       wantedBy = ["multi-user.target"];
       wants = ["network-online.target"];
       after = ["network-online.target" "systemd-tmpfiles-setup.service"];
+      # Command probes (nix-store) may want a cache directory; the sandbox's own /tmp.
+      environment.XDG_CACHE_HOME = "/tmp/cache";
       # A new probe set is a new ExecStart, so a switch restarts the daemon.
       serviceConfig = {
         Type = "simple";

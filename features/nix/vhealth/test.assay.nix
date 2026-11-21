@@ -28,7 +28,7 @@ in
     liarProbe = assay.eq [byName.liar.type byName.liar.host byName.liar.port byName.liar.critical] ["tcp" "127.0.0.1" 8081 true];
 
     # Every probe type is exercised.
-    everyType = assay.eq (builtins.sort builtins.lessThan (map (p: p.type) probes)) ["command" "command" "file" "http" "tcp" "unix"];
+    everyType = assay.eq (builtins.sort builtins.lessThan (map (p: p.type) probes)) ["command" "command" "command" "file" "http" "tcp" "unix"];
     slowIsNotCritical = assay.eq [byName.slow.critical byName.slow.timeoutMs] [false 500];
 
     exporterReadsTheTextfileDir =
