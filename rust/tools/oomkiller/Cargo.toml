@@ -8,7 +8,9 @@ description = "A daemon that monitors system memory and kills the highest memory
 build = "build.rs"
 
 [dependencies]
-sysinfo = "0.31"
+# 0.33: the version id_effect_cli 0.13.0 already pulls in (through id_effect's
+# default "compute" feature), so the build carries one sysinfo, not two.
+sysinfo = "0.33"
 # The same pin as rust/Cargo.toml's [workspace.dependencies]. Spelled out rather
 # than `workspace = true`, because the oomkiller-src flake input builds this crate
 # on its own, without the workspace.

@@ -371,7 +371,7 @@ dependencies = [
  "id_effect_proc_macro",
  "jiff",
  "rayon",
- "sysinfo 0.33.1",
+ "sysinfo",
  "tokio",
 ]
 
@@ -583,7 +583,7 @@ version = "0.1.0"
 dependencies = [
  "id_effect",
  "id_effect_cli",
- "sysinfo 0.31.4",
+ "sysinfo",
  "voltaic-diag",
  "voltaic-driver",
 ]
@@ -826,20 +826,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
-]
-
-[[package]]
-name = "sysinfo"
-version = "0.31.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "355dbe4f8799b304b05e1b0f05fc59b2a18d36645cf169607da45bde2f69a1be"
-dependencies = [
- "core-foundation-sys",
- "libc",
- "memchr",
- "ntapi",
- "rayon",
- "windows",
 ]
 
 [[package]]
