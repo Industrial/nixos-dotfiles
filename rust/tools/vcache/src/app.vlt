@@ -8,9 +8,9 @@ import std::convert::Infallible
 import id_effect::{Effect, HNil, effect, hlist, suspend}
 import id_effect_axum::{HostConfig, HostError, serve}
 import id_effect_config::{Config, ConfigEnv, ConfigError}
-import crate::db
+import nix_store_core::db
 import crate::http::{Settings, Signer, router}
-import crate::signing::parse_secret_key
+import nix_store_core::signing::parse_secret_key
 import crate::store::{StoreError, lifted, live}
 
 -- Why the program stopped: each is the operator's to fix before a restart.

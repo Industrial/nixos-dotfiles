@@ -1,4 +1,4 @@
--- The HTTP routes. One fallback handler: the pure `storepath::route` decides
+-- The HTTP routes. One fallback handler: the pure `route::route` decides
 -- what a request asks for, and the answer is an effect over the app's
 -- capabilities, run as a request fiber by id_effect_axum's `execute` (a
 -- disconnect interrupts it).
@@ -10,10 +10,10 @@ import axum::response::{IntoResponse, Response}
 import id_effect::{Effect, HCons, HNil, effect, succeed}
 import id_effect_axum::execute
 import id_effect_axum::body::stream_body
-import crate::nar
-import crate::narinfo::{NarInfo, cache_info, fingerprint, render}
-import crate::signing::{SecretKey, sign}
-import crate::storepath::{Route, route}
+import nix_store_core::nar
+import nix_store_core::narinfo::{NarInfo, cache_info, fingerprint, render}
+import nix_store_core::signing::{SecretKey, sign}
+import crate::route::{Route, route}
 import crate::store::{PathInfoStore, StoreError}
 
 -- What the routes read besides the store.

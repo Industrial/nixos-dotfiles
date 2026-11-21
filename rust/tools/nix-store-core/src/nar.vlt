@@ -11,7 +11,8 @@
 -- most about CHUNK bytes per pull, so a multi-gigabyte path costs one chunk of
 -- memory and nothing is produced before the consumer asks for it. `stream` is
 -- the id_effect face (an HTTP body pulls it); `dump` drives the same cursor
--- into any `Write`, which is what the conformance tests hash.
+-- into any `Write`, and `nar_hash` into a SHA-256, which is what the
+-- conformance and golden tests compare with Nix.
 
 import bytes::Bytes
 import id_effect::{Effect, HNil, Stream, fail, succeed, suspend}
@@ -22,6 +23,8 @@ import std::io::Write
 import std::path::{Path, PathBuf}
 import std::os::unix::ffi::OsStrExt
 import std::os::unix::fs::PermissionsExt
+import sha2::Digest
+import crate::hash::Sha256
 
 export const MAGIC : &str = "nix-archive-1"
 
@@ -201,6 +204,30 @@ dump w path =
   while (next_chunk (&mut c))? is Some chunk
     (w.write_all (&chunk))?
   w.flush ()
+
+-- A NAR's SHA-256 and length: what Nix registers as narHash and narSize, and
+-- what `nix hash path` prints.
+export data NarDigest { export hash Sha256, export size u64 }
+  deriving (Debug, Clone, Copy, PartialEq, Eq)
+
+-- The NAR hash of `path`, archived chunk by chunk and never held whole.
+export nar_hash : &Path -> std::io::Result<NarDigest>
+nar_hash path =
+  mut c = cursor path
+  mut hasher = sha2::Sha256::new ()
+  mut size = 0 : u64
+  while (next_chunk (&mut c))? is Some chunk
+    hasher.update (&chunk)
+    size += u64::try_from (chunk.len ()) |> .unwrap_or u64::MAX
+  bytes = hasher.finalize ().into () : [u8; 32]
+  Ok (NarDigest { hash = Sha256 { bytes }, size })
+
+-- The NAR hash of `path` as bare nix32, what `nix-hash --type sha256 --base32`
+-- prints. `hash::typed_nix32` of `nar_hash`'s digest is the `sha256:` form.
+export nar_hash_nix32 : &Path -> std::io::Result<String>
+nar_hash_nix32 path =
+  d = (nar_hash path)?
+  Ok (crate::hash::to_nix32 (&d.hash))
 
 test "padding rounds up to eight"
   assert_eq! \-> padding 0 \-> 0

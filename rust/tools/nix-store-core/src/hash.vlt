@@ -1,0 +1,98 @@
+-- SHA-256 digests and the forms Nix writes them in: base-16 (the store
+-- database), nix32 (narinfo files, store path hashes), and SRI
+-- (`sha256-<base64>`, what `nix path-info --json` and `nix hash path` print).
+-- Typed forms prefix the algorithm: `sha256:<base16>` or `sha256:<nix32>`.
+
+import base64::Engine
+import base64::engine::general_purpose::STANDARD
+import sha2::Digest
+import crate::nixbase32::{decode, decode_hex, encode, encode_hex}
+
+export const SHA256_LEN : usize = 32
+
+export data Sha256 { export bytes [u8; 32] }
+  deriving (Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)
+
+-- The SHA-256 of `input`.
+export digest : &[u8] -> Sha256
+digest input =
+  bytes = (sha2::Sha256::digest input).into () : [u8; 32]
+  Sha256 { bytes }
+
+-- A digest from exactly SHA256_LEN raw bytes.
+export from_bytes : &[u8] -> Option<Sha256>
+from_bytes raw =
+  (raw.try_into () : Result<[u8; 32], std::array::TryFromSliceError>) |> .ok |> .map (\bytes -> Sha256 { bytes })
+
+export to_base16 : &Sha256 -> String
+to_base16 h = encode_hex (&h.bytes)
+
+export to_nix32 : &Sha256 -> String
+to_nix32 h = encode (&h.bytes)
+
+export to_base64 : &Sha256 -> String
+to_base64 h = STANDARD.encode h.bytes
+
+-- `sha256-<base64>`.
+export to_sri : &Sha256 -> String
+to_sri h = "sha256-#{to_base64 h}"
+
+-- `sha256:<base16>`, as ValidPaths.hash stores it.
+export typed_base16 : &Sha256 -> String
+typed_base16 h = "sha256:#{to_base16 h}"
+
+-- `sha256:<nix32>`, as a narinfo's NarHash and a signature fingerprint carry it.
+export typed_nix32 : &Sha256 -> String
+typed_nix32 h = "sha256:#{to_nix32 h}"
+
+from_base64 : &str -> Option<Sha256>
+from_base64 s =
+  raw = (STANDARD.decode s |> .ok)?
+  from_bytes (&raw)
+
+-- A bare digest, told apart by length: 64 base-16, 52 nix32 or 44 base64.
+from_digest : &str -> Option<Sha256>
+from_digest d
+  | d.len () == 64 = decode_hex d |> .and_then (\raw -> from_bytes (&raw))
+  | d.len () == 52 = decode d |> .and_then (\raw -> from_bytes (&raw))
+  | d.len () == 44 = from_base64 d
+  | _ = None
+
+-- Any form Nix prints a SHA-256 in: SRI (`sha256-…`), typed (`sha256:…`) in
+-- base-16, nix32 or base64, or a bare digest in any of the three. Another
+-- algorithm's prefix is refused.
+export parse : &str -> Option<Sha256>
+parse s =
+  if s.strip_prefix "sha256-" is Some b64
+    from_base64 b64
+  else if s.strip_prefix "sha256:" is Some d
+    from_digest d
+  else if s.contains ':' || s.contains '-'
+    None
+  else
+    from_digest s
+
+test "the SHA-256 of nothing"
+  assert_eq! \-> to_base16 (&digest (&[])) \-> "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+test "every form parses back to the same digest"
+  h = digest b"nix-store-core"
+  assert_eq! \-> parse (&to_sri (&h)) \-> Some h
+  assert_eq! \-> parse (&typed_base16 (&h)) \-> Some h
+  assert_eq! \-> parse (&typed_nix32 (&h)) \-> Some h
+  assert_eq! \-> parse (&to_base16 (&h)) \-> Some h
+  assert_eq! \-> parse (&to_nix32 (&h)) \-> Some h
+  assert_eq! \-> parse ("sha256:#{to_base64 (&h)}".as_str ()) \-> Some h
+
+test "a known digest in all three encodings"
+  -- nix hash convert --hash-algo sha256 --to {nix32,sri} 044b88…a902
+  h = parse "044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
+  assert_eq! \-> h.map (\d -> to_nix32 (&d)) \-> Some (.to_string "00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4")
+  assert! \-> h.map (\d -> to_sri (&d)) |> .unwrap_or_default |> .starts_with "sha256-BEuIT849"
+
+test "other algorithms and malformed digests are refused"
+  assert_eq! \-> parse "sha512:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4" \-> None
+  assert_eq! \-> parse "sha256:abc" \-> None
+  assert_eq! \-> parse "sha256-!!!" \-> None
+  assert_eq! \-> parse "" \-> None
+  assert_eq! \-> from_bytes (&[0; 31]) \-> None

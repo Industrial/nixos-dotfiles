@@ -1,0 +1,127 @@
+-- Narinfo signatures: ed25519 over the fingerprint, in Nix's key format.
+-- A secret key file holds `<name>:<base64 of 64 bytes>` (seed, then public
+-- key), as `nix key generate-secret` writes it; a public key is
+-- `<name>:<base64 of 32 bytes>` (`trusted-public-keys`); a signature is
+-- `<name>:<base64 of 64 bytes>`.
+
+import base64::Engine
+import base64::engine::general_purpose::STANDARD
+import ed25519_dalek::Signer
+import ed25519_dalek::SigningKey
+import ed25519_dalek::VerifyingKey
+import crate::narinfo::{NarInfo, fingerprint}
+
+export data SecretKey { export name String, key SigningKey }
+  deriving (Clone)
+
+export data PublicKey { export name String, key VerifyingKey }
+  deriving (Clone, Debug, PartialEq, Eq)
+
+-- `<name>:<base64>`, both halves present.
+named : &str -> Result<(&str, Vec<u8>), String>
+named text =
+  (name, encoded) = (text.trim ().split_once ':' |> .ok_or (.to_string "a key is <name>:<base64>"))?
+  if name.is_empty ()
+    return Err (.to_string "a key needs a name")
+  bytes = (STANDARD.decode encoded |> .map_err (\e -> "the key is not base64: #{e}"))?
+  Ok ((name, bytes))
+
+-- Parse a secret key file's contents. Surrounding whitespace is ignored.
+export parse_secret_key : &str -> Result<SecretKey, String>
+parse_secret_key text =
+  (name, bytes) = (named text)?
+  arr = (bytes.try_into () : Result<[u8; 64], Vec<u8>>) |> .map_err (\_ -> .to_string "a secret key is 64 bytes")
+  pair = arr?
+  key = (SigningKey::from_keypair_bytes (&pair) |> .map_err (\e -> "the key's halves do not match: #{e}"))?
+  Ok (SecretKey { name = name.to_string (), key })
+
+-- Parse a public key (`trusted-public-keys` form).
+export parse_public_key : &str -> Result<PublicKey, String>
+parse_public_key text =
+  (name, bytes) = (named text)?
+  arr = (bytes.try_into () : Result<[u8; 32], Vec<u8>>) |> .map_err (\_ -> .to_string "a public key is 32 bytes")
+  raw = arr?
+  key = (VerifyingKey::from_bytes (&raw) |> .map_err (\e -> "not an ed25519 public key: #{e}"))?
+  Ok (PublicKey { name = name.to_string (), key })
+
+-- The `Sig:` value for a fingerprint.
+export sign : &SecretKey -> &str -> String
+sign secret fingerprint =
+  signature = secret.key.sign (fingerprint.as_bytes ())
+  "#{secret.name}:#{STANDARD.encode (signature.to_bytes ())}"
+
+-- The public half of a secret key.
+export public_of : &SecretKey -> PublicKey
+public_of secret = PublicKey { name = secret.name.clone (), key = secret.key.verifying_key () }
+
+-- The public key in Nix's format, for `trusted-public-keys`.
+export public_key : &SecretKey -> String
+public_key secret = render_public_key (&public_of secret)
+
+export render_public_key : &PublicKey -> String
+render_public_key k = "#{k.name}:#{STANDARD.encode (k.key.to_bytes ())}"
+
+-- Whether `sig` (`<name>:<base64>`) is this key's signature of `fingerprint`.
+-- A signature under another key name is not, whatever its bytes.
+export verify : &PublicKey -> &str -> &str -> bool
+verify k fingerprint sig =
+  case sig.split_once ':' of
+    None -> false
+    Some (name, encoded) -> name == k.name && verify_bytes k fingerprint encoded
+
+verify_bytes : &PublicKey -> &str -> &str -> bool
+verify_bytes k fingerprint encoded =
+  bytes = STANDARD.decode encoded |> .unwrap_or_default
+  arr = bytes.try_into () : Result<[u8; 64], Vec<u8>>
+  case arr of
+    Err _ -> false
+    Ok raw -> k.key.verify_strict (fingerprint.as_bytes ()) (&ed25519_dalek::Signature::from_bytes (&raw)) |> .is_ok
+
+-- How many of the narinfo's signatures one of `keys` made over its
+-- fingerprint: libstore's `checkSignatures`, and a substituter accepts a path
+-- when this is at least one.
+export valid_signatures : &[PublicKey] -> &NarInfo -> usize
+valid_signatures keys info =
+  fp = fingerprint info
+  info.sigs |> .iter |> .filter (\s -> keys.iter () |> .any (\k -> verify k (&fp) s)) |> .count
+
+-- A fixed test key: seed 0..31, so the expected values below are stable.
+#[cfg(test)]
+test_key : String
+test_key =
+  seed = (0 .. 32) |> .collect : Vec<u8>
+  seed_arr = (seed.try_into () : Result<[u8; 32], Vec<u8>>) |> .unwrap_or ([0; 32])
+  sk = SigningKey::from_bytes (&seed_arr)
+  mut both = seed_arr.to_vec ()
+  both.extend_from_slice (&sk.verifying_key ().to_bytes ())
+  "test-1:#{STANDARD.encode (&both)}"
+
+test "a key round-trips to its public half"
+  k = parse_secret_key (&test_key ())
+  assert! \-> k.is_ok ()
+  public = k.map (\s -> public_key (&s)) |> .unwrap_or_default
+  assert! \-> public.starts_with "test-1:"
+  assert_eq! \-> parse_public_key (&public) |> .map (\p -> render_public_key (&p)) \-> Ok (public.clone ())
+
+test "a signature verifies against the public key"
+  k = parse_secret_key (&test_key ())
+  assert! \-> k.as_ref () |> .map (\s -> verify (&public_of s) "1;/nix/store/x;sha256:y;1;" (&sign s "1;/nix/store/x;sha256:y;1;")) |> .unwrap_or false
+
+test "a signature over another fingerprint, or under another name, does not verify"
+  k = parse_secret_key (&test_key ())
+  assert! \-> k.is_ok ()
+  if k is Ok s
+    sig = sign (&s) "1;/nix/store/x;sha256:y;1;"
+    assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;2;" (&sig))
+    renamed = sig.replacen "test-1:" "other-1:" 1
+    assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;1;" (&renamed))
+    assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;1;" "test-1:AAAA")
+    assert! \-> !(verify (&public_of (&s)) "1;/nix/store/x;sha256:y;1;" "no-colon")
+
+test "malformed keys are refused"
+  assert! \-> parse_secret_key "no-colon" |> .is_err
+  assert! \-> parse_secret_key "name:!!!" |> .is_err
+  assert! \-> parse_secret_key "name:AAAA" |> .is_err
+  assert! \-> parse_secret_key ":AAAA" |> .is_err
+  assert! \-> parse_public_key "name:AAAA" |> .is_err
+  assert! \-> parse_public_key "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" |> .is_ok

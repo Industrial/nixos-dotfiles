@@ -1,0 +1,192 @@
+-- A store path's narinfo: what a substituter learns before it fetches a NAR.
+-- The text is the one nix-serve and Nix's own HTTP binary caches write, with
+-- `Compression: none` because NARs are served as they are archived.
+
+import crate::storepath::{base_name, hash_part_of}
+
+export data NarInfo
+  { export store_path String
+  , export nar_hash String
+  , export nar_size u64
+  , export references Vec<String>
+  , export deriver Option<String>
+  , export sigs Vec<String>
+  , export ca Option<String>
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- Where this cache serves the path's NAR, relative to the cache root.
+export nar_url : &NarInfo -> String
+nar_url info =
+  hash = hash_part_of (&info.store_path) |> .unwrap_or ""
+  "nar/#{hash}.nar"
+
+-- What a signature covers: `1;<path>;<nar hash>;<nar size>;<refs>`, the
+-- references as full store paths joined by commas (libstore's `fingerprint`).
+export fingerprint : &NarInfo -> String
+fingerprint info =
+  refs = info.references.join ","
+  "1;#{info.store_path};#{info.nar_hash};#{info.nar_size};#{refs}"
+
+-- A narinfo file as a binary cache serves it: the path's info plus where its
+-- (possibly compressed) NAR is. `file_hash` and `file_size` describe the file
+-- at `url`; Nix omits them for an uncompressed NAR.
+export data NarInfoFile
+  { export info NarInfo
+  , export url String
+  , export compression String
+  , export file_hash Option<String>
+  , export file_size Option<u64>
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- The narinfo text, as this cache serves it: `URL` is `nar_url` and the NAR
+-- is uncompressed. References and the deriver are base names.
+export render : &NarInfo -> String
+render info = render_parts info (&nar_url info) "none" None None
+
+-- Any narinfo file's text, in the field order libstore's `NarInfo::to_string`
+-- writes.
+export render_file : &NarInfoFile -> String
+render_file f = render_parts (&f.info) (&f.url) (&f.compression) (f.file_hash.as_deref ()) f.file_size
+
+render_parts : &NarInfo -> &str -> &str -> Option<&str> -> Option<u64> -> String
+render_parts info url compression file_hash file_size =
+  refs = info.references |> .iter |> .map (\r -> base_name r) |> .collect : Vec<&str>
+  mut out = String::with_capacity 512
+  out.push_str (&"StorePath: #{info.store_path}\n")
+  out.push_str (&"URL: #{url}\n")
+  out.push_str (&"Compression: #{compression}\n")
+  if file_hash is Some h
+    out.push_str (&"FileHash: #{h}\n")
+  if file_size is Some s
+    out.push_str (&"FileSize: #{s}\n")
+  out.push_str (&"NarHash: #{info.nar_hash}\n")
+  out.push_str (&"NarSize: #{info.nar_size}\n")
+  out.push_str (&"References: #{refs.join " "}\n")
+  if &info.deriver is Some d
+    out.push_str (&"Deriver: #{base_name d}\n")
+  for s in &info.sigs
+    out.push_str (&"Sig: #{s}\n")
+  if &info.ca is Some c
+    out.push_str (&"CA: #{c}\n")
+  out
+
+-- What /nix-cache-info answers.
+export cache_info : &str -> i64 -> String
+cache_info store_dir priority =
+  "StoreDir: #{store_dir}\nWantMassQuery: 1\nPriority: #{priority}\n"
+
+number : &str -> &str -> Result<u64, String>
+number key value =
+  (value.parse () : Result<u64, std::num::ParseIntError>) |> .map_err (\e -> "#{key}: #{e}")
+
+required : Option<String> -> &str -> Result<String, String>
+required v key = v |> .ok_or ("a narinfo needs #{key}")
+
+-- A base name in the store directory of `store_path`.
+in_dir_of : &str -> &str -> String
+in_dir_of store_path base =
+  case store_path.rsplit_once '/' of
+    Some (dir, _) -> "#{dir}/#{base}"
+    None -> base.to_string ()
+
+-- Parse a narinfo file, as libstore's `NarInfo` constructor does: StorePath,
+-- URL, NarHash and NarSize are required, Compression defaults to bzip2,
+-- unknown keys are ignored. References and the deriver come back as full
+-- paths in the StorePath's directory; a `Deriver: unknown-deriver` is none.
+export parse : &str -> Result<NarInfoFile, String>
+parse text =
+  mut store_path = None : Option<String>
+  mut url = None : Option<String>
+  mut compression = None : Option<String>
+  mut file_hash = None : Option<String>
+  mut file_size = None : Option<u64>
+  mut nar_hash = None : Option<String>
+  mut nar_size = None : Option<u64>
+  mut refs = Vec::new () : Vec<String>
+  mut deriver = None : Option<String>
+  mut sigs = Vec::new () : Vec<String>
+  mut ca = None : Option<String>
+  for line in text.lines ()
+    if !(line.trim ().is_empty ())
+      (key, raw) = (line.split_once ':' |> .ok_or ("not a `Key: value` line: #{line}"))?
+      value = raw.trim ()
+      if key == "StorePath"
+        store_path := Some (value.to_string ())
+      else if key == "URL"
+        url := Some (value.to_string ())
+      else if key == "Compression"
+        compression := Some (value.to_string ())
+      else if key == "FileHash"
+        file_hash := Some (value.to_string ())
+      else if key == "FileSize"
+        file_size := Some ((number key value)?)
+      else if key == "NarHash"
+        nar_hash := Some (value.to_string ())
+      else if key == "NarSize"
+        nar_size := Some ((number key value)?)
+      else if key == "References"
+        refs := value.split_whitespace () |> .map (\r -> r.to_string ()) |> .collect
+      else if key == "Deriver"
+        if value != "unknown-deriver"
+          deriver := Some (value.to_string ())
+      else if key == "Sig"
+        sigs.push (value.to_string ())
+      else if key == "CA"
+        ca := Some (value.to_string ())
+  path = (required store_path "StorePath")?
+  references = refs |> .iter |> .map (\r -> in_dir_of (&path) r) |> .collect
+  full_deriver = deriver.map (\d -> in_dir_of (&path) (&d))
+  info = NarInfo { store_path = path, nar_hash = (required nar_hash "NarHash")?, nar_size = (nar_size.ok_or (.to_string "a narinfo needs NarSize"))?, references, deriver = full_deriver, sigs, ca }
+  Ok (NarInfoFile { info, url = (required url "URL")?, compression = compression.unwrap_or (.to_string "bzip2"), file_hash, file_size })
+
+#[cfg(test)]
+sample : NarInfo
+sample = NarInfo {
+    store_path = .to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"
+    , nar_hash = .to_string "sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4"
+    , nar_size = 256
+    , references = .to_vec ([.to_string "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh", .to_string "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"])
+    , deriver = Some (.to_string "/nix/store/0000000000000000000000000000000a-x.drv")
+    , sigs = Vec::new ()
+    , ca = None
+    }
+
+test "the fingerprint joins full reference paths with commas"
+  assert_eq! \-> fingerprint (&sample ()) \-> "1;/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh;sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4;256;/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh,/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"
+
+test "the narinfo names references and the deriver by base name"
+  text = render (&sample ())
+  assert! \-> text.contains "\nReferences: shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh\n"
+  assert! \-> text.contains "\nDeriver: 0000000000000000000000000000000a-x.drv\n"
+  assert! \-> text.contains "\nURL: nar/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.nar\n"
+  assert! \-> text.starts_with "StorePath: /nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh\n"
+  assert! \-> !(text.contains "CA:")
+
+test "a rendered narinfo parses back to the same info"
+  parsed = parse (&render (&sample ()))
+  assert_eq! \-> parsed.as_ref () |> .map (\f -> f.info.clone ()) |> .ok \-> Some (sample ())
+  assert_eq! \-> parsed.as_ref () |> .map (\f -> f.compression.clone ()) |> .ok \-> Some (.to_string "none")
+
+test "a compressed narinfo keeps its file fields through parse and render"
+  text = "StorePath: /nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh\nURL: nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz\nCompression: xz\nFileHash: sha256:1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3\nFileSize: 124\nNarHash: sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4\nNarSize: 256\nReferences: \nDeriver: unknown-deriver\nSig: cache.nixos.org-1:abc\nSig: other-1:def\nCA: fixed:r:sha256:1w1f\nFuture: ignored\n"
+  parsed = parse text
+  assert! \-> parsed.is_ok ()
+  if parsed is Ok f
+    assert_eq! \-> f.file_size \-> Some 124
+    assert! \-> f.info.references.is_empty ()
+    assert_eq! \-> f.info.deriver \-> None
+    assert_eq! \-> f.info.sigs.len () \-> 2
+    assert_eq! \-> f.info.ca \-> Some (.to_string "fixed:r:sha256:1w1f")
+    assert_eq! \-> parse (&render_file (&f)) \-> Ok (f.clone ())
+
+test "a narinfo without its required fields is refused"
+  assert! \-> parse "URL: x\nNarHash: sha256:x\nNarSize: 1\n" |> .is_err
+  assert! \-> parse "StorePath: /nix/store/x\nURL: x\nNarHash: sha256:x\n" |> .is_err
+  assert! \-> parse "StorePath: /nix/store/x\nURL: x\nNarHash: sha256:x\nNarSize: big\n" |> .is_err
+  assert! \-> parse "no colon here\n" |> .is_err
+
+test "compression defaults to bzip2"
+  f = parse "StorePath: /nix/store/x\nURL: x\nNarHash: sha256:x\nNarSize: 1\n"
+  assert_eq! \-> f.map (\f -> f.compression) \-> Ok (.to_string "bzip2")

@@ -1,0 +1,36 @@
+[package]
+name = "nix-store-core"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Nix store primitives in Voltaic: store paths, nix32, hashes, NAR, narinfo, signing, .drv and the store database"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock, and no shared rust/Cargo.lock. Its
+# consumers (rust/tools/vcache and the other Voltaic store tools) take it as a
+# path dependency.
+[workspace]
+
+[dependencies]
+base64 = "0.22"
+bytes = "1"
+ed25519-dalek = "2"
+# One id_effect version per build (types do not unify): pinned exactly, like
+# every consumer pins it.
+id_effect = "=0.13.0"
+rusqlite = { version = "0.37", features = ["bundled"] }
+sha2 = "0.10"
+
+[dev-dependencies]
+serde_json = "1"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "nix_store_core"
+path = "src/lib.rs"

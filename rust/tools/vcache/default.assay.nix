@@ -35,6 +35,12 @@ in
     # aws-lc-sys (through id_effect_axum's rustls) builds its vendored sources.
     vendoredAwsLc = assay.eq (pkg.dontCargoUseSystemLibs or false) true;
 
+    # nix-store-core is a path dependency: the source is rooted at rust/tools,
+    # carries both crates, and the build runs in this one.
+    pathDependencyInSource =
+      assay.eq (map (f: builtins.pathExists "${pkg.src}/${f}") ["vcache/Cargo.lock" "nix-store-core/Cargo.toml" "nix-store-core/src/nar.vlt"]) [true true true];
+    buildsTheVcacheCrate = assay.eq [pkg.cargoRoot pkg.buildAndTestSubdir] ["vcache" "vcache"];
+
     mainProgram = assay.eq pkg.meta.mainProgram "vcache";
     linuxOnly =
       assay.eq [(builtins.all (lib.hasSuffix "-linux") pkg.meta.platforms) (builtins.elem "x86_64-linux" pkg.meta.platforms)] [true true];

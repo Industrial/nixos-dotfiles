@@ -1,0 +1,241 @@
+-- Golden vectors from C++ Nix (2.31.4, on drakkar), in tests/fixtures/:
+--
+--   paths.json     60 store paths: `nix path-info --json`, `nix hash path` in
+--                  SRI, base-16 and nix32 (`nix hash convert`), and
+--                  `nix-store -qR` as a count and a SHA-256 of the sorted list
+--                  (the list itself for the small closures)
+--   drvs.json      56 `.drv` files, ATerm text and `nix derivation show`
+--   nar-tree.json  `nix hash path` and `nix-store --dump | wc -c` of the tree
+--                  `synthetic_tree` builds
+--
+-- The conversions, fingerprints, signatures and the ATerm parser are checked
+-- everywhere. The checks against the store itself (NAR hashes of real paths,
+-- the database's references and closures) run over the fixture paths this
+-- machine has, and pass vacuously where it has none, such as the build sandbox.
+-- tests/gen-fixtures.sh regenerates the fixtures (see README.md).
+
+import serde_json::Value
+import std::collections::{BTreeMap, BTreeSet}
+import std::path::{Path, PathBuf}
+import std::os::unix::fs::PermissionsExt
+import crate::{db, drv, hash, nar, narinfo, nixbase32, signing, storepath}
+
+const CACHE_KEY : &str = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+
+fixture : &str -> Value
+fixture name =
+  file = Path::new (env!("CARGO_MANIFEST_DIR")) |> .join "tests/fixtures" |> .join name
+  text = std::fs::read_to_string (&file) |> .expect "a fixture file"
+  (serde_json::from_str (&text) : serde_json::Result<Value>) |> .expect "a JSON fixture"
+
+items : &Value -> &str -> Vec<Value>
+items v key = v[key].as_array () |> .cloned |> .unwrap_or_default
+
+text : &Value -> &str -> String
+text v key = v[key].as_str () |> .unwrap_or "" |> .to_string
+
+texts : &Value -> &str -> Vec<String>
+texts v key =
+  mut out = Vec::new () : Vec<String>
+  for x in items v key
+    if x.as_str () is Some s
+      out.push (s.to_string ())
+  out
+
+store_paths : Vec<Value>
+store_paths = items (&fixture "paths.json") "storePaths"
+
+derivations : Vec<Value>
+derivations = items (&fixture "drvs.json") "derivations"
+
+-- The path's info as a narinfo carries it, from `nix path-info --json`.
+info_of : &Value -> Option<narinfo::NarInfo>
+info_of p =
+  hash::parse (&text p "narHash") |> .map (\h -> narinfo_of p h)
+
+narinfo_of : &Value -> hash::Sha256 -> narinfo::NarInfo
+narinfo_of p h =
+  narinfo::NarInfo { store_path = text p "path", nar_hash = hash::typed_nix32 (&h), nar_size = p["narSize"].as_u64 () |> .unwrap_or 0, references = texts p "references", deriver = p["deriver"].as_str () |> .map (\s -> s.to_string ()), sigs = texts p "signatures", ca = p["ca"].as_str () |> .map (\s -> s.to_string ()) }
+
+-- The path's info, when cache.nixos.org signed it.
+cache_signed : &Value -> Option<narinfo::NarInfo>
+cache_signed p =
+  info_of p |> .filter (\i -> i.sigs.iter () |> .any (\s -> s.starts_with "cache.nixos.org-1:"))
+
+test "there are at least fifty golden store paths and derivations"
+  assert! \-> (store_paths ()).len () >= 50
+  assert! \-> (derivations ()).len () >= 50
+
+test "every golden path is a store path, and its hash part is found"
+  for p in store_paths ()
+    path = text (&p) "path"
+    base = storepath::store_base (&path)
+    assert! \-> base.is_some () \-> "#{path}"
+    assert! \-> base.map storepath::valid_base |> .unwrap_or false
+    assert_eq! \-> storepath::hash_part_of (&path) \-> base.map storepath::hash_part
+    assert! \-> storepath::in_store (&path)
+    assert_eq! \-> storepath::full (base.unwrap_or "") \-> path
+
+test "NAR hashes convert between SRI, base-16 and nix32 as nix hash convert does"
+  for p in store_paths ()
+    sri = text (&p) "narHash"
+    b16 = text (&p) "narHashBase16"
+    n32 = text (&p) "narHashNix32"
+    h = hash::parse (&sri)
+    assert! \-> h.is_some () \-> "#{sri}"
+    assert_eq! \-> h.map (\d -> hash::to_base16 (&d)) \-> Some (b16.clone ())
+    assert_eq! \-> h.map (\d -> hash::to_nix32 (&d)) \-> Some (n32.clone ())
+    assert_eq! \-> h.map (\d -> hash::to_sri (&d)) \-> Some (sri.clone ())
+    assert_eq! \-> hash::parse (&n32) \-> h
+    assert_eq! \-> hash::parse (&b16) \-> h
+    assert_eq! \-> hash::parse ("sha256:#{n32}".as_str ()) \-> h
+    assert_eq! \-> nixbase32::narinfo_hash ("sha256:#{b16}".as_str ()) \-> Some ("sha256:#{n32}")
+    assert_eq! \-> nixbase32::decode (&n32) \-> nixbase32::decode_hex (&b16)
+
+test "cache.nixos.org's signatures verify over the fingerprint, and a changed one does not"
+  key = signing::parse_public_key CACHE_KEY |> .expect "the cache.nixos.org key"
+  keys = .to_vec ([key])
+  mut signed = 0 : usize
+  for p in store_paths ()
+    if cache_signed (&p) is Some info
+      signed += 1
+      assert_eq! \-> signing::valid_signatures (&keys) (&info) \-> 1 \-> "#{narinfo::fingerprint (&info)}"
+      mut wrong = info.clone ()
+      wrong.nar_size += 1
+      assert_eq! \-> signing::valid_signatures (&keys) (&wrong) \-> 0
+  assert! \-> signed >= 30 \-> "only #{signed} signed fixture paths"
+
+test "narinfo text round-trips every golden path"
+  for p in store_paths ()
+    if info_of (&p) is Some info
+      assert_eq! \-> narinfo::parse (&narinfo::render (&info)) |> .map (\f -> f.info) \-> Ok (info.clone ())
+
+test "the ATerm parser agrees with nix derivation show"
+  for d in derivations ()
+    path = text (&d) "path"
+    parsed = drv::parse (&text (&d) "aterm")
+    assert! \-> parsed.is_ok () \-> "#{path}: #{parsed:?}"
+    if parsed is Ok got
+      assert_eq! \-> got.system \-> text (&d) "system"
+      assert_eq! \-> got.builder \-> text (&d) "builder"
+      assert_eq! \-> got.args \-> texts (&d) "args"
+      assert_eq! \-> got.input_srcs \-> BTreeSet::from_iter (texts (&d) "inputSrcs")
+      assert_eq! \-> plain_env (&got) \-> string_map (&d["env"]) \-> "#{path}"
+      assert_eq! \-> structured_attrs (&got) \-> d["structuredAttrs"].clone () \-> "#{path}"
+      assert_eq! \-> got.input_drvs \-> drv_inputs (&d["inputDrvs"])
+      assert_eq! \-> got.outputs \-> drv_outputs (&d["outputs"]) \-> "#{path}"
+
+-- `nix derivation show` lifts a structured-attrs derivation's `__json`
+-- variable out of env into its own `structuredAttrs` object (null otherwise).
+plain_env : &drv::Derivation -> BTreeMap<String, String>
+plain_env d =
+  mut env = d.env.clone ()
+  env.remove "__json"
+  env
+
+structured_attrs : &drv::Derivation -> Value
+structured_attrs d =
+  case d.env.get "__json" of
+    None -> Value::Null
+    Some j -> (serde_json::from_str j : serde_json::Result<Value>) |> .unwrap_or (Value::Null)
+
+string_map : &Value -> BTreeMap<String, String>
+string_map v =
+  mut out = BTreeMap::new () : BTreeMap<String, String>
+  if v.as_object () is Some o
+    for entry in o
+      (k, x) = entry
+      out.insert (k.clone ()) (x.as_str () |> .unwrap_or "" |> .to_string)
+  out
+
+drv_inputs : &Value -> BTreeMap<String, BTreeSet<String>>
+drv_inputs v =
+  mut out = BTreeMap::new () : BTreeMap<String, BTreeSet<String>>
+  if v.as_object () is Some o
+    for entry in o
+      (k, x) = entry
+      names = x.as_array () |> .map (\a -> a.iter () |> .filter_map (\n -> n.as_str ()) |> .map (\n -> n.to_string ()) |> .collect) |> .unwrap_or_default
+      out.insert (k.clone ()) names
+  out
+
+drv_outputs : &Value -> BTreeMap<String, drv::Output>
+drv_outputs v =
+  mut out = BTreeMap::new () : BTreeMap<String, drv::Output>
+  if v.as_object () is Some o
+    for entry in o
+      (k, x) = entry
+      out.insert (k.clone ()) (drv::Output { path = text x "path", hash_algo = text x "hashAlgo", hash = text x "hash" })
+  out
+
+-- The tree gen-fixtures builds, file for file and mode for mode.
+synthetic_tree : &Path -> std::io::Result<()>
+synthetic_tree root =
+  (std::fs::create_dir_all (root.join "bin"))?
+  (std::fs::create_dir_all (root.join "sub/deeper"))?
+  (std::fs::create_dir_all (root.join "emptydir"))?
+  (std::fs::write (root.join "a.txt") "hello\n")?
+  (std::fs::write (root.join "bin/run") "#!/bin/sh\necho hi\n")?
+  (std::fs::write (root.join "empty") "")?
+  (std::fs::write (root.join "sub/deeper/z") "z")?
+  (std::fs::write (root.join "B") "B")?
+  (std::fs::write (root.join "eight") "exactly8")?
+  (std::os::unix::fs::symlink "a.txt" (root.join "link"))?
+  (std::os::unix::fs::symlink "../a.txt" (root.join "sub/up"))?
+  for f in ["a.txt", "empty", "sub/deeper/z", "B", "eight"]
+    (std::fs::set_permissions (root.join f) (std::fs::Permissions::from_mode 0o644))?
+  std::fs::set_permissions (root.join "bin/run") (std::fs::Permissions::from_mode 0o755)
+
+test "a synthetic tree's NAR hashes to what nix hash path gives"
+  want = fixture "nar-tree.json"
+  root = std::env::temp_dir () |> .join ("nix-store-core-golden-#{std::process::id ()}")
+  cleared = std::fs::remove_dir_all (&root)
+  assert! \-> cleared.is_ok () || !root.exists ()
+  built = synthetic_tree (&root)
+  got = built.and_then (\_ -> nar::nar_hash (&root))
+  removed = std::fs::remove_dir_all (&root)
+  assert! \-> removed.is_ok ()
+  assert_eq! \-> got.as_ref () |> .map (\d -> hash::to_sri (&d.hash)) |> .ok \-> Some (text (&want) "narHash")
+  assert_eq! \-> got.as_ref () |> .map (\d -> d.size) |> .ok \-> want["narSize"].as_u64 ()
+
+test "real store paths' NARs hash to what Nix registered"
+  mut seen = 0 : usize
+  for p in store_paths ()
+    path = PathBuf::from (text (&p) "path")
+    if path.exists ()
+      seen += 1
+      got = nar::nar_hash (&path)
+      assert_eq! \-> got.as_ref () |> .map (\d -> hash::to_sri (&d.hash)) |> .ok \-> Some (text (&p) "narHash") \-> "#{path.display ()}"
+      assert_eq! \-> got.as_ref () |> .map (\d -> d.size) |> .ok \-> p["narSize"].as_u64 ()
+      assert_eq! \-> nar::nar_hash_nix32 (&path) |> .ok \-> Some (text (&p) "narHashNix32")
+  eprintln! \-> "golden: #{seen} store paths archived"
+
+test "the store database agrees with nix path-info and nix-store -qR"
+  if Path::new db::DEFAULT_DB |> .exists
+    conn = db::open db::DEFAULT_DB |> .expect "the store database opens read-only"
+    mut seen = 0 : usize
+    for p in store_paths ()
+      path = text (&p) "path"
+      found = db::path_info (&conn) (&path) |> .expect "a path-info query"
+      if found is Some info
+        seen += 1
+        assert_eq! \-> Some (info.clone ()) \-> info_of (&p)
+        closure = db::closure (&conn) (&path) |> .expect "a closure query" |> .unwrap_or_default
+        assert_eq! \-> closure.len () \-> p["closureSize"].as_u64 () |> .and_then (\n -> usize::try_from n |> .ok) |> .unwrap_or 0 \-> "#{path}"
+        listing = closure |> .iter |> .map (\c -> "#{c}\n") |> .collect : String
+        assert_eq! \-> hash::to_base16 (&hash::digest (listing.as_bytes ())) \-> text (&p) "closureSha256" \-> "#{path}"
+        if p["closure"].is_array ()
+          assert_eq! \-> closure \-> texts (&p) "closure"
+        assert_eq! \-> db::references (&conn) (&path) |> .expect "a references query" \-> Some (texts (&p) "references")
+    eprintln! \-> "golden: #{seen} store paths found in the database"
+
+test "real derivers parse, and list the path among their outputs"
+  mut seen = 0 : usize
+  for p in store_paths ()
+    deriver = text (&p) "deriver"
+    if Path::new (&deriver) |> .exists
+      seen += 1
+      parsed = drv::read (Path::new (&deriver))
+      assert! \-> parsed.is_ok () \-> "#{deriver}: #{parsed:?}"
+      outs = parsed.map (\d -> drv::output_paths (&d)) |> .unwrap_or_default
+      assert! \-> outs.values () |> .any (\o -> *o == text (&p) "path") \-> "#{deriver}"
+  eprintln! \-> "golden: #{seen} derivers parsed"
