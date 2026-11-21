@@ -141,7 +141,7 @@ judge_http h raw =
 export last_line : &[u8] -> String
 last_line bytes =
   text = String::from_utf8_lossy bytes
-  text.lines () |> .map (\l -> l.trim ()) |> .filter (\l -> !(l.is_empty ())) |> .next_back |> .map (\l -> l.chars ().take 200 |> .collect) |> .unwrap_or_default
+  text.lines () |> .map (\l -> l.trim ()) |> .rfind (\l -> !(l.is_empty ())) |> .map (\l -> l.chars ().take 200 |> .collect) |> .unwrap_or_default
 
 exit_of : i32 -> String -> Result<String, String>
 exit_of code why =

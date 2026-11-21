@@ -165,7 +165,16 @@ in
     nixDaemonAnswers =
       assay.eq [drakkarProbes.nix-daemon.type drakkarProbes.nix-daemon.critical (lib.hasSuffix "/bin/nix-store" (builtins.head drakkarProbes.nix-daemon.argv)) (builtins.tail drakkarProbes.nix-daemon.argv)] ["command" true true ["--store" "daemon" "--query" "--hash" "/run/current-system"]];
     vverifyFreshness = assay.eq [drakkarProbes.vverify-metrics.path drakkarProbes.vverify-metrics.maxAgeSeconds drakkarProbes.vverify-metrics.critical] ["${dir}/vverify.prom" 691200 false];
-    noLiteralAddresses = assay.eq (builtins.filter (p: lib.hasInfix "100.69." (builtins.toJSON p)) [(builtins.readFile ../vcache/default.nix) (builtins.readFile ../../network/ssh/default.nix) (builtins.readFile ../../monitoring/prometheus-exporter/default.nix)]) [];
+    # Not literals: evaluated as another host, the same features probe that host's address.
+    addressesFollowTheHost = let
+      mimir = nixos.eval {
+        modules = [./default.nix ../../monitoring/prometheus-exporter/default.nix ../../network/ssh/default.nix];
+        settings.hostname = "mimir";
+      };
+      p = builtins.listToAttrs (map (x: lib.nameValuePair x.name x) (builtins.fromJSON (builtins.unsafeDiscardStringContext mimir.features.nix.vhealth.probesJson)).probes);
+      m = fleet.hosts.mimir.tailscaleIp;
+    in
+      assay.eq [p.sshd.host p.node-exporter.url] [m "http://${m}:9002/metrics"];
 
     # Declarable from any feature, on a host where vhealth is off.
     declarableWhileOff =
