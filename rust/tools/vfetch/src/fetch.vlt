@@ -1,0 +1,283 @@
+-- A run: walk the closure, fetch what is missing, import it.
+--
+--   1. The walk is breadth-first. Each level's paths are looked up at once
+--      (at most `jobs` in flight): valid in the target (stop there), staged by
+--      an earlier run (read from disk), or asked of the caches in order. A
+--      narinfo no trusted key signed stops the run. The next level is the
+--      references nobody has looked up yet.
+--   2. A NAR not staged yet starts downloading as soon as its narinfo is
+--      accepted, on its own fiber, while the walk goes on: at most `jobs` at a
+--      time (a semaphore), each level's largest first. Each is streamed
+--      through its decompressor and hash check into the staging directory
+--      (`stage`). A transient fault restarts that NAR with exponential
+--      backoff; a corrupt one stops the run, and is never imported.
+--   3. Once every fetch is joined, everything staged is imported in one
+--      batch, references first.
+
+import std::collections::{BTreeMap, BTreeSet}
+import std::time::{Duration, Instant}
+import id_effect::{Concurrency, Effect, FiberHandle, HCons, HNil, Schedule, Semaphore, Stream, effect, fail, for_each_par, succeed, suspend, sync}
+import id_effect_platform::http::HttpBody
+import nix_store_core::narinfo::{NarInfo, NarInfoFile, parse}
+import nix_store_core::signing::PublicKey
+import crate::fault::{VfetchError, is_transient}
+import crate::importer::ImporterService
+import crate::plan::{nar_url, narinfo_url, topo, trusted}
+import crate::remote::{RemoteService, lifted}
+import crate::stage::{Sink, Staging, feed, finish, open_sink, prepare, staged}
+import crate::target::TargetService
+
+-- What a run reads: the caches, the target, the importer.
+export type FetchEnv = HCons<RemoteService, HCons<TargetService, HCons<ImporterService, HNil>>>
+
+-- What a run was asked for, after the command line and nix.conf.
+export data Request
+  { export paths Vec<String>
+  , export caches Vec<String>
+  , export keys Vec<PublicKey>
+  , export staging Staging
+  , export jobs usize
+  }
+  deriving (Clone)
+
+-- A request with its capabilities: what every step below is given.
+export data Ctx { export remote RemoteService, export target TargetService, export req Request, export slots Semaphore }
+  deriving (Clone)
+
+export ctx_of : RemoteService -> TargetService -> Request -> Ctx
+ctx_of remote target req =
+  slots = Semaphore::new (req.jobs)
+  Ctx { remote, target, req, slots }
+
+-- Where a path of the closure stands.
+export data Source
+  = Valid
+  | Staged NarInfo
+  | Fetch String NarInfoFile
+  deriving (Clone, Debug)
+
+export data Report
+  { export closure usize
+  , export valid usize
+  , export staged usize
+  , export fetched usize
+  , export nar_bytes u64
+  }
+  deriving (Clone, Debug, PartialEq)
+
+-- Transient faults only, five attempts, backoff from 250ms, jittered.
+backoff : Schedule<(Duration, u64), VfetchError>
+backoff =
+  Schedule::exponential (Duration::from_millis 250) |> .intersect (Schedule::recurs 4) |> .jittered |> .while_input (\e -> is_transient e)
+
+-- The narinfo text at `url`, or None when the cache does not have it.
+export narinfo_text : RemoteService -> String -> Effect<Option<String>, VfetchError, HNil>
+narinfo_text remote url =
+  Effect::retry (move \-> remote.0.text (url.clone ())) (backoff ())
+
+-- A cache's answer for `path`: parsed, about `path`, and trusted.
+accept : &[PublicKey] -> String -> String -> String -> Result<(String, Source), VfetchError>
+accept keys path cache text =
+  f = (parse (&text) |> .map_err (\e -> VfetchError::Refused "#{cache}: the narinfo of #{path}: #{e}"))?
+  if f.info.store_path != path
+    Err (VfetchError::Refused "#{cache}: asked for #{path}, the narinfo is #{f.info.store_path}")
+  else if !(trusted keys (&f.info))
+    Err (VfetchError::Untrusted "#{path} (from #{cache}) has no signature by a trusted key; its signatures: #{f.info.sigs.join ", "}")
+  else
+    Ok ((path, Source::Fetch cache f))
+
+-- Ask the caches for `path`, the `i`th and those after it.
+query : Ctx -> String -> usize -> Effect<(String, Source), VfetchError, HNil>
+query ctx path i =
+  case ctx.req.caches.get i |> .cloned of
+    None -> fail (VfetchError::Missing path)
+    Some cache ->
+      url = narinfo_url (&cache) (&path)
+      remote = ctx.remote.clone ()
+      (narinfo_text remote url) |> .flat_map (move \text -> answered ctx path i cache text)
+
+answered : Ctx -> String -> usize -> String -> Option<String> -> Effect<(String, Source), VfetchError, HNil>
+answered ctx path i cache text =
+  case text of
+    None -> query ctx path (i + 1)
+    Some t -> lifted (accept (&ctx.req.keys) path cache t)
+
+-- Not valid in the target: staged already, or from the caches.
+unknown : Ctx -> String -> Effect<(String, Source), VfetchError, HNil>
+unknown ctx path =
+  case staged (&ctx.req.staging) (&path) of
+    Some info -> succeed ((path, Source::Staged info))
+    None -> query ctx path 0
+
+after_validity : Ctx -> String -> bool -> Effect<(String, Source), VfetchError, HNil>
+after_validity ctx path valid =
+  if valid
+    succeed ((path, Source::Valid))
+  else
+    unknown ctx path
+
+export lookup : Ctx -> String -> Effect<(String, Source), VfetchError, HNil>
+lookup ctx path =
+  target = ctx.target.clone ()
+  p = path.clone ()
+  (target.0.valid path) |> .flat_map (move \valid -> after_validity ctx p valid)
+
+export references_of : &Source -> Vec<String>
+references_of s =
+  case s of
+    Source::Valid -> Vec::new ()
+    Source::Staged info -> info.references.clone ()
+    Source::Fetch _ f -> f.info.references.clone ()
+
+-- What the walk has found so far, and the NAR fetches it has started.
+export data Walk { export known BTreeMap<String, Source>, export pending Vec<FiberHandle<u64, VfetchError>> }
+
+-- Fetch a NAR from now on, on its own fiber: a child of the run's fiber, so a
+-- failed or interrupted run interrupts and awaits it. At most `jobs` download
+-- at once (the slots), however many have started.
+start : Ctx -> (String, NarInfoFile) -> Effect<FiberHandle<u64, VfetchError>, VfetchError, HNil>
+start ctx t =
+  slots = ctx.slots.clone ()
+  (slots.with_permit (fetch_one ctx t.0 t.1)) |> .fork |> .widen
+
+-- One level done: record it, start fetching its NARs (the largest first), and
+-- look up the references nobody has.
+level : Ctx -> Walk -> Vec<(String, Source)> -> Effect<Walk, VfetchError, HNil>
+level ctx w found =
+  mut seen = w.known
+  pending = w.pending
+  mut next = BTreeSet::new () : BTreeSet<String>
+  mut fresh = Vec::new () : Vec<(String, NarInfoFile)>
+  for entry in found
+    (p, s) = entry
+    for r in references_of (&s)
+      next.insert r
+    if &s is Source::Fetch cache f
+      fresh.push ((cache.clone (), f.clone ()))
+    seen.insert p s
+  fresh.sort_by_key (\a -> std::cmp::Reverse a.1.info.nar_size)
+  frontier = next.into_iter () |> .filter (\r -> !seen.contains_key r) |> .collect : Vec<String>
+  c = ctx.clone ()
+  (for_each_par fresh (move \t -> start (c.clone ()) t) Concurrency::Sequential) |> .flat_map (move \started -> continued ctx frontier seen pending started)
+
+continued : Ctx -> Vec<String> -> BTreeMap<String, Source> -> Vec<FiberHandle<u64, VfetchError>> -> Vec<FiberHandle<u64, VfetchError>> -> Effect<Walk, VfetchError, HNil>
+continued ctx frontier known pending started =
+  mut all_pending = pending
+  all_pending.extend started
+  walk ctx frontier (Walk { known, pending = all_pending })
+
+-- The closure of `frontier`, beyond what the walk has found.
+export walk : Ctx -> Vec<String> -> Walk -> Effect<Walk, VfetchError, HNil>
+walk ctx frontier w =
+  if frontier.is_empty ()
+    succeed w
+  else
+    c = ctx.clone ()
+    jobs = ctx.req.jobs
+    (for_each_par frontier (move \p -> lookup (c.clone ()) p) (Concurrency::Bounded jobs)) |> .flat_map (move \found -> level ctx w found)
+
+-- A body as a stream of chunks, pulled as the sink takes them.
+export chunks : String -> HttpBody -> Stream<Vec<u8>, VfetchError, HNil>
+chunks url body =
+  Stream::unfold_effect body (move \b -> pull (url.clone ()) b)
+
+pull : String -> HttpBody -> Effect<Option<(Vec<u8>, HttpBody)>, VfetchError, HNil>
+pull url b =
+  (b.next_chunk ()) |> .map_err (move \e -> VfetchError::Transient "#{url}: #{e}") |> .map (move \c -> c.map (move \bytes -> (bytes, b)))
+
+drain : String -> HttpBody -> Sink -> Effect<Sink, VfetchError, HNil>
+drain url body sink =
+  (chunks url body) |> .run_fold_effect sink (\s c -> lifted (feed s c))
+
+-- One attempt at one NAR, from its first byte.
+attempt : Ctx -> String -> NarInfoFile -> Effect<u64, VfetchError, HNil>
+attempt ctx cache f =
+  url = nar_url (&cache) (&f.url)
+  u = url.clone ()
+  s1 = ctx.req.staging.clone ()
+  s2 = ctx.req.staging.clone ()
+  f1 = f.clone ()
+  info = f.info.clone ()
+  (ctx.remote.0.body url) |> .flat_map (move \body -> suspend (move \-> lifted (open_sink (&s1) (&f1))) |> .flat_map (move \sink -> drain u body sink)) |> .flat_map (move \sink -> suspend (move \-> lifted (finish (&s2) (&info) sink)))
+
+fetch_one : Ctx -> String -> NarInfoFile -> Effect<u64, VfetchError, HNil>
+fetch_one ctx cache f =
+  Effect::retry (move \-> attempt (ctx.clone ()) (cache.clone ()) (f.clone ())) (backoff ())
+
+-- Every started fetch, awaited: the NARs' sizes, or the first failure.
+joined : Vec<FiberHandle<u64, VfetchError>> -> Effect<Vec<u64>, VfetchError, HNil>
+joined handles =
+  for_each_par handles (\h -> h.join ()) Concurrency::Sequential
+
+-- The info of a path to import; None for one valid already.
+info_of : &Source -> Option<NarInfo>
+info_of s =
+  case s of
+    Source::Valid -> None
+    Source::Staged info -> Some (info.clone ())
+    Source::Fetch _ f -> Some (f.info.clone ())
+
+-- What the import is given: every path not valid in the target, references first.
+export to_import : &BTreeMap<String, Source> -> Vec<NarInfo>
+to_import known =
+  mut infos = BTreeMap::new () : BTreeMap<String, NarInfo>
+  for entry in known
+    (p, s) = entry
+    if info_of (s) is Some info
+      infos.insert (p.clone ()) info
+      ()
+  topo (&infos) |> .iter |> .filter_map (\p -> infos.get p |> .cloned) |> .collect
+
+summary : &BTreeMap<String, Source> -> Vec<u64> -> Report
+summary known sizes =
+  mut valid = 0 : usize
+  mut staged = 0 : usize
+  mut fetched = 0 : usize
+  for s in known.values ()
+    case s of
+      Source::Valid ->
+        valid += 1
+      Source::Staged _ ->
+        staged += 1
+      Source::Fetch _ _ ->
+        fetched += 1
+  Report { closure = known.len (), valid, staged, fetched, nar_bytes = sizes.iter () |> .sum }
+
+-- A phase's end on stderr, with its wall time: what an operator (and the
+-- baseline on the issue) reads to see where a run's time went.
+phase : given <T> String -> Instant -> T -> T
+phase what t0 value =
+  eprintln! \-> "vfetch: #{what} in #{t0.elapsed ().as_millis ()}ms"
+  value
+
+now : Effect<Instant, VfetchError, HNil>
+now = sync (\-> Instant::now ())
+
+imported : ImporterService -> Vec<NarInfo> -> BTreeMap<String, Source> -> Vec<u64> -> Effect<Report, VfetchError, HNil>
+imported importer batch known sizes =
+  m = batch.len ()
+  (now ()) |> .flat_map (move \t1 -> importer.0.add_all batch |> .map (move \_ -> phase "imported #{m} paths" t1 (summary (&known) sizes)))
+
+fetched_then_imported : ImporterService -> Walk -> Instant -> Effect<Report, VfetchError, HNil>
+fetched_then_imported importer w t0 =
+  batch = to_import (&w.known)
+  n = w.pending.len ()
+  known = w.known
+  (joined w.pending) |> .map (move \sizes -> phase "fetched #{n} NARs" t0 sizes) |> .flat_map (move \sizes -> imported importer batch known sizes)
+
+-- The run over capabilities given as values.
+export run : Ctx -> ImporterService -> Effect<Report, VfetchError, HNil>
+run ctx importer =
+  staging = ctx.req.staging.clone ()
+  roots = ctx.req.paths.clone ()
+  c = ctx.clone ()
+  (suspend (move \-> lifted (prepare (&staging)))) |> .flat_map (move \_ -> now ()) |> .flat_map (move \t0 -> walk c roots (Walk { known = BTreeMap::new (), pending = Vec::new () }) |> .map (move \w -> phase "walked #{w.known.len ()} paths" t0 w) |> .flat_map (move \w -> fetched_then_imported importer w t0))
+
+-- The run, reading its capabilities from the environment.
+export program : Request -> Effect<Report, VfetchError, FetchEnv>
+program req =
+  effect!
+    let remote = ~RemoteService;
+    let target = ~TargetService;
+    let importer = ~ImporterService;
+    ~run(ctx_of((**remote).clone(), (**target).clone(), req), (**importer).clone())

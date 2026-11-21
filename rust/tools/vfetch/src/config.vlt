@@ -1,0 +1,273 @@
+-- What a run is asked to do: the command line, the trusted keys from
+-- nix.conf, and where the target store keeps its database. All pure.
+--
+--   vfetch <store-path>... --from <cache-url>[,<url>...] [--to <store>]
+--          [--jobs N] [--trusted-key <name:key>]... [--staging <dir>]
+--          [--nix-conf <file>]
+
+import nix_store_core::storepath::{full, store_base}
+
+export const USAGE : &str = "usage: vfetch <store-path>... --from <cache-url>[,<url>...] [--to <store>] [--jobs N] [--trusted-key <name:base64>]... [--staging <dir>] [--nix-conf <file>] [--importer worker|nix-copy]"
+
+-- How the verified NARs reach the target: AddToStoreNar over the daemon
+-- protocol (`worker`, the default), or one `nix copy --from file://` of the
+-- staging directory (`nix-copy`).
+export data ImporterKind = Worker | NixCopy
+  deriving (Debug, Clone, Copy, PartialEq)
+
+importer_of : &str -> Result<ImporterKind, String>
+importer_of s =
+  if s == "worker"
+    Ok ImporterKind::Worker
+  else if s == "nix-copy"
+    Ok ImporterKind::NixCopy
+  else
+    Err "--importer #{s}: expected worker or nix-copy"
+
+-- Fetches and narinfo queries in flight at once, unless --jobs says otherwise.
+export const DEFAULT_JOBS : usize = 16
+
+export const DEFAULT_NIX_CONF : &str = "/etc/nix/nix.conf"
+
+export data Options
+  { export paths Vec<String>
+  , export caches Vec<String>
+  , export to Option<String>
+  , export jobs usize
+  , export trusted_keys Vec<String>
+  , export staging Option<String>
+  , export nix_conf String
+  , export importer ImporterKind
+  , export help bool
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- The value after a flag, or why there is none.
+value_of : Option<&String> -> &str -> Result<String, String>
+value_of v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- Cache URLs from one --from: comma-separated, trailing slashes dropped.
+export cache_list : &str -> Vec<String>
+cache_list s =
+  s.split ',' |> .map (\c -> c.trim ().trim_end_matches '/' |> .to_string) |> .filter (\c -> !c.is_empty ()) |> .collect
+
+-- A store path from the command line: any path inside the store names the
+-- store path it is in.
+export store_path_arg : &str -> Result<String, String>
+store_path_arg a =
+  case store_base a of
+    Some base -> Ok (full base)
+    None -> Err "not a store path: #{a}"
+
+jobs_of : &str -> Result<usize, String>
+jobs_of s =
+  n = ((s.parse () : Result<usize, std::num::ParseIntError>) |> .map_err (\e -> "--jobs #{s}: #{e}"))?
+  if n == 0
+    Err (.to_string "--jobs must be at least 1")
+  else
+    Ok n
+
+-- argv, program name first.
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = Options { paths = Vec::new (), caches = Vec::new (), to = None, jobs = DEFAULT_JOBS, trusted_keys = Vec::new (), staging = None, nix_conf = DEFAULT_NIX_CONF.to_string (), importer = ImporterKind::Worker, help = false }
+  mut it = (args.iter ()).skip 1
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--from" ->
+          o.caches.extend (cache_list (&(value_of (it.next ()) "--from")?))
+        "--to" ->
+          o.to := Some ((value_of (it.next ()) "--to")?)
+        "--jobs" ->
+          o.jobs := (jobs_of (&(value_of (it.next ()) "--jobs")?))?
+        "--trusted-key" ->
+          o.trusted_keys.push ((value_of (it.next ()) "--trusted-key")?)
+        "--staging" ->
+          o.staging := Some ((value_of (it.next ()) "--staging")?)
+        "--nix-conf" ->
+          o.nix_conf := (value_of (it.next ()) "--nix-conf")?
+        "--importer" ->
+          o.importer := (importer_of (&(value_of (it.next ()) "--importer")?))?
+        "-h" ->
+          o.help := true
+        "--help" ->
+          o.help := true
+        s | s.starts_with '-' ->
+          return Err "unknown option #{s}"
+        s ->
+          o.paths.push ((store_path_arg s)?)
+  if !o.help && o.paths.is_empty ()
+    return Err (.to_string "no store paths given")
+  if !o.help && o.caches.is_empty ()
+    return Err (.to_string "--from needs at least one cache URL")
+  Ok o
+
+-- The keys a nix.conf trusts: `trusted-public-keys` (the last one wins, as
+-- in Nix) plus every `extra-trusted-public-keys`.
+export conf_keys : &str -> Vec<String>
+conf_keys text =
+  mut base = Vec::new () : Vec<String>
+  mut extra = Vec::new () : Vec<String>
+  for raw in text.lines ()
+    line = raw.split '#' |> .next |> .unwrap_or "" |> .trim
+    if line.split_once '=' is Some (k, v)
+      key = k.trim ()
+      keys = v.split_whitespace () |> .map (\s -> s.to_string ()) |> .collect : Vec<String>
+      if key == "trusted-public-keys"
+        base := keys
+      else if key == "extra-trusted-public-keys"
+        extra.extend keys
+  base.extend extra
+  base.dedup ()
+  base
+
+-- `vfetch serve [--listen HOST:PORT] [--from <url>[,<url>...]]
+--               [--trusted-key K]... [--nix-conf F]`
+export const SERVE_USAGE : &str = "usage: vfetch serve [--listen 127.0.0.1:5101] [--from <cache-url>[,<url>...]] [--trusted-key <name:base64>]... [--nix-conf <file>]"
+
+export const DEFAULT_LISTEN : &str = "127.0.0.1:5101"
+
+export data ServeOptions
+  { export listen String
+  , export caches Vec<String>
+  , export trusted_keys Vec<String>
+  , export nix_conf String
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- argv: program name, then `serve`, then the flags.
+export parse_serve : &[String] -> Result<ServeOptions, String>
+parse_serve args =
+  mut o = ServeOptions { listen = DEFAULT_LISTEN.to_string (), caches = Vec::new (), trusted_keys = Vec::new (), nix_conf = DEFAULT_NIX_CONF.to_string () }
+  mut it = (args.iter ()).skip 2
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--listen" ->
+          o.listen := (value_of (it.next ()) "--listen")?
+        "--from" ->
+          o.caches.extend (cache_list (&(value_of (it.next ()) "--from")?))
+        "--trusted-key" ->
+          o.trusted_keys.push ((value_of (it.next ()) "--trusted-key")?)
+        "--nix-conf" ->
+          o.nix_conf := (value_of (it.next ()) "--nix-conf")?
+        s ->
+          return Err "unknown argument #{s}"
+  (listen_parts (&o.listen))?
+  Ok o
+
+-- `HOST:PORT`.
+export listen_parts : &str -> Result<(String, u16), String>
+listen_parts s =
+  (host, port) = (s.rsplit_once ':' |> .ok_or ("--listen #{s}: expected HOST:PORT"))?
+  p = ((port.parse () : Result<u16, std::num::ParseIntError>) |> .map_err (\e -> "--listen #{s}: #{e}"))?
+  Ok ((host.to_string (), p))
+
+-- The caches a nix.conf substitutes from: `substituters` (the last one wins)
+-- and every `extra-substituters`, trailing slashes dropped, each once.
+export conf_substituters : &str -> Vec<String>
+conf_substituters text =
+  mut base = Vec::new () : Vec<String>
+  mut extra = Vec::new () : Vec<String>
+  for raw in text.lines ()
+    line = raw.split '#' |> .next |> .unwrap_or "" |> .trim
+    if line.split_once '=' is Some (k, v)
+      key = k.trim ()
+      urls = v.split_whitespace () |> .map (\s -> s.trim_end_matches '/' |> .to_string) |> .collect : Vec<String>
+      if key == "substituters"
+        base := urls
+      else if key == "extra-substituters"
+        extra.extend urls
+  base.extend extra
+  mut out = Vec::new () : Vec<String>
+  for u in base
+    if !(out.contains (&u))
+      out.push u
+  out
+
+-- The caches behind `vfetch serve` on `listen`: never itself.
+export upstreams_for : Vec<String> -> &str -> Vec<String>
+upstreams_for caches listen =
+  port = listen.rsplit_once ':' |> .map (\hp -> hp.1) |> .unwrap_or ""
+  own = .to_vec ([.to_string "http://#{listen}", .to_string "http://127.0.0.1:#{port}", .to_string "http://localhost:#{port}", .to_string "http://[::1]:#{port}"]) : Vec<String>
+  caches.into_iter () |> .filter (\c -> !(own.contains c)) |> .collect
+
+-- The SQLite database of the store `--to` names, when it is one vfetch can
+-- read: the system store (no --to, `daemon`, `local`, `auto`) or a local
+-- store rooted elsewhere (`/tmp/x`, `local?root=/tmp/x`). None for any other
+-- store URL: nothing there is known to be valid, and the import skips what is.
+export db_of_store : Option<&str> -> Option<String>
+db_of_store to =
+  case to of
+    None -> Some (nix_store_core::db::DEFAULT_DB.to_string ())
+    Some s -> db_of_url s
+
+db_of_url : &str -> Option<String>
+db_of_url s =
+  if s == "daemon" || s == "local" || s == "auto"
+    Some (nix_store_core::db::DEFAULT_DB.to_string ())
+  else if s.starts_with '/'
+    Some (rooted s)
+  else
+    s.strip_prefix "local?root=" |> .map (\root -> rooted root)
+
+rooted : &str -> String
+rooted root =
+  "#{root.trim_end_matches '/'}/nix/var/nix/db/db.sqlite"
+
+#[cfg(test)]
+argv : &[&str] -> Vec<String>
+argv xs = (["vfetch"].iter ()).chain (xs.iter ()) |> .map (\s -> s.to_string ()) |> .collect
+
+test "paths, caches and flags parse"
+  o = parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh/bin/x", "--from", "http://a:5100/,https://cache.nixos.org", "--to", "/tmp/s", "--jobs", "4", "--trusted-key", "k-1:abc"]))
+  assert! \-> o.is_ok ()
+  if o is Ok o
+    assert_eq! \-> o.paths \-> vec!["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh".to_string()]
+    assert_eq! \-> o.caches \-> vec!["http://a:5100".to_string(), "https://cache.nixos.org".to_string()]
+    assert_eq! \-> o.to \-> Some (.to_string "/tmp/s")
+    assert_eq! \-> o.jobs \-> 4
+    assert_eq! \-> o.trusted_keys \-> vec!["k-1:abc".to_string()]
+    assert_eq! \-> o.importer \-> ImporterKind::Worker
+  nc = parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from", "http://a", "--importer", "nix-copy"]))
+  assert_eq! \-> nc.map (\o -> o.importer) \-> Ok ImporterKind::NixCopy
+  assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from", "http://a", "--importer", "tar"])) |> .is_err
+
+test "bad command lines are refused"
+  assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh"])) |> .is_err
+  assert! \-> parse_args (&argv (&["--from", "http://a"])) |> .is_err
+  assert! \-> parse_args (&argv (&["/etc/passwd", "--from", "http://a"])) |> .is_err
+  assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from", "http://a", "--jobs", "0"])) |> .is_err
+  assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from", "http://a", "--bogus"])) |> .is_err
+  assert! \-> parse_args (&argv (&["/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh", "--from"])) |> .is_err
+
+test "nix.conf keys: the last trusted-public-keys plus every extra"
+  text = "substituters = https://cache.nixos.org\ntrusted-public-keys = old-1:x\ntrusted-public-keys = a-1:x b-1:y # comment\nextra-trusted-public-keys = c-1:z\n"
+  assert_eq! \-> conf_keys text \-> vec!["a-1:x".to_string(), "b-1:y".to_string(), "c-1:z".to_string()]
+
+test "serve: flags, the listen address, and nix.conf's substituters without itself"
+  o = parse_serve (&(["vfetch", "serve", "--listen", "127.0.0.1:5101", "--trusted-key", "k-1:x"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>))
+  assert_eq! \-> o.as_ref () |> .map (\o -> o.trusted_keys.clone ()) |> .ok \-> Some (vec!["k-1:x".to_string()])
+  assert! \-> parse_serve (&(["vfetch", "serve", "--listen", "nope"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>)) |> .is_err
+  assert_eq! \-> listen_parts "127.0.0.1:5101" \-> Ok ((.to_string "127.0.0.1", 5101))
+  conf = "substituters = http://127.0.0.1:5101 http://100.69.213.35:5100 https://cache.nixos.org/\nextra-substituters = https://cache.nixos.org https://x.cachix.org\n"
+  subs = conf_substituters conf
+  assert_eq! \-> subs.clone () \-> vec!["http://127.0.0.1:5101".to_string(), "http://100.69.213.35:5100".to_string(), "https://cache.nixos.org".to_string(), "https://x.cachix.org".to_string()]
+  assert_eq! \-> upstreams_for subs "127.0.0.1:5101" \-> vec!["http://100.69.213.35:5100".to_string(), "https://cache.nixos.org".to_string(), "https://x.cachix.org".to_string()]
+
+test "the target's database follows --to"
+  assert_eq! \-> db_of_store None \-> Some (.to_string "/nix/var/nix/db/db.sqlite")
+  assert_eq! \-> db_of_store (Some "daemon") \-> Some (.to_string "/nix/var/nix/db/db.sqlite")
+  assert_eq! \-> db_of_store (Some "/tmp/s/") \-> Some (.to_string "/tmp/s/nix/var/nix/db/db.sqlite")
+  assert_eq! \-> db_of_store (Some "local?root=/tmp/s") \-> Some (.to_string "/tmp/s/nix/var/nix/db/db.sqlite")
+  assert_eq! \-> db_of_store (Some "ssh://host") \-> None

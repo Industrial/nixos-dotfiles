@@ -1,0 +1,239 @@
+-- `vfetch serve`: a binary cache on localhost that every `nix build` asks
+-- first (features/nix/vfetch lists it ahead of the other substituters). It
+-- holds no store of its own:
+--
+--   * a narinfo request goes to every upstream cache at once (`race_all`:
+--     the first trusted answer wins, the rest are interrupted). An answer
+--     needs a signature by a trusted key (nix.conf's, as for the fetch) or a
+--     CA field, or it does not count. The winner is served with its own
+--     signatures, so Nix checks them again, and with its `URL` pointing back
+--     here: `nar/<upstream index>/<upstream URL>`.
+--   * a NAR request streams that upstream's (compressed) NAR through, chunk
+--     by chunk, never buffered. Nix decompresses it and checks the NAR hash
+--     against the narinfo it trusted, as for any substituter.
+--
+-- Nix still does the import; all of the fetching goes through vfetch. A miss
+-- everywhere, or every upstream failing, is a 404, so Nix moves on to its
+-- next substituter. Rollback is dropping this one from the list.
+
+import std::convert::Infallible
+import axum::extract::State
+import axum::http::{StatusCode, Uri, header}
+import axum::response::{IntoResponse, Response}
+import bytes::Bytes
+import id_effect::{Effect, HCons, HNil, effect, race_all, succeed}
+import id_effect_axum::{HostConfig, execute, serve}
+import id_effect_axum::body::stream_body
+import nix_store_core::narinfo::{NarInfoFile, parse, render_file}
+import nix_store_core::signing::PublicKey
+import nix_store_core::storepath::is_hash_part
+import crate::fault::VfetchError
+import crate::fetch::{chunks, narinfo_text}
+import crate::plan::trusted
+import crate::remote::{RemoteService, lifted}
+
+-- Nix asks substituters in priority order, lowest first: this is ahead of
+-- every cache that advertises one (vcache 30, cache.nixos.org 40, cachix 41).
+-- A cache whose nix-cache-info has no Priority line sorts at 0, before this.
+export const PRIORITY : i64 = 1
+
+export const CACHE_INFO : &str = "StoreDir: /nix/store\nWantMassQuery: 1\nPriority: 1\n"
+
+-- The caches behind this one, in nix.conf's order, and the keys it trusts.
+export data Upstreams { export caches Vec<String>, export keys Vec<PublicKey> }
+  deriving (Clone)
+
+export type ServeEnv = HCons<RemoteService, HCons<Upstreams, HNil>>
+
+-- What a request asks for.
+export data Ask
+  = Info
+  | NarInfo String
+  | Nar usize String
+  | Missing
+  deriving (Debug, Clone, PartialEq)
+
+-- An upstream-relative NAR URL this cache will relay: no `..`, no absolute
+-- path, only the characters binary caches use.
+export safe_url : &str -> bool
+safe_url url =
+  plain = url.chars () |> .all (\c -> c.is_ascii_alphanumeric () || c == '.' || c == '_' || c == '-' || c == '/' || c == '+' || c == '=')
+  plain && !url.is_empty () && !(url.starts_with '/') && !(url.contains "..")
+
+nar_ask : &str -> Ask
+nar_ask rest =
+  case rest.split_once '/' of
+    Some (i, url) | safe_url url -> index_ask i url
+    _ -> Missing
+
+index_ask : &str -> &str -> Ask
+index_ask i url =
+  n = i.parse () : Result<usize, std::num::ParseIntError>
+  case n of
+    Ok n -> Nar n (url.to_string ())
+    Err _ -> Missing
+
+-- The ask for a request target, query string ignored.
+export ask : &str -> Ask
+ask target =
+  path = case target.split_once '?' of
+    Some (p, _) -> p
+    None -> target
+  info = path.strip_prefix "/" |> .and_then (\p -> p.strip_suffix ".narinfo") |> .filter (\h -> is_hash_part h)
+  if path == "/nix-cache-info"
+    Info
+  else if path.strip_prefix "/nar/" is Some rest
+    nar_ask rest
+  else if info is Some h
+    NarInfo (h.to_string ())
+  else
+    Missing
+
+-- An upstream's narinfo as this cache serves it: the NAR fetched through here.
+export relayed : usize -> NarInfoFile -> NarInfoFile
+relayed i f =
+  if f.url.contains "://"
+    f
+  else
+    url = "nar/#{i}/#{f.url}"
+    NarInfoFile { url, ...f }
+
+-- An upstream's answer, if it counts: about this hash part, and trusted.
+export vouched : &[PublicKey] -> usize -> &str -> &str -> Option<String> -> Result<String, VfetchError>
+vouched keys i cache hash text =
+  case text of
+    None -> Err (VfetchError::Missing "#{hash} at #{cache}")
+    Some t -> vouch keys i cache hash (&t)
+
+vouch : &[PublicKey] -> usize -> &str -> &str -> &str -> Result<String, VfetchError>
+vouch keys i cache hash t =
+  f = (parse t |> .map_err (\e -> VfetchError::Refused "#{cache}: the narinfo of #{hash}: #{e}"))?
+  if !(f.info.store_path.contains hash)
+    Err (VfetchError::Refused "#{cache}: asked for #{hash}, the narinfo is #{f.info.store_path}")
+  else if !(trusted keys (&f.info))
+    Err (VfetchError::Untrusted "#{f.info.store_path} (from #{cache}) has no signature by a trusted key")
+  else
+    eprintln! \-> "vfetch serve: narinfo #{f.info.store_path} from #{cache}"
+    Ok (render_file (&relayed i f))
+
+from_upstream : RemoteService -> Vec<PublicKey> -> usize -> String -> String -> Effect<String, VfetchError, HNil>
+from_upstream remote keys i cache hash =
+  url = "#{cache}/#{hash}.narinfo"
+  (narinfo_text remote url) |> .flat_map (move \text -> lifted (vouched (&keys) i (&cache) (&hash) text))
+
+-- Every upstream at once; the first trusted answer, or None.
+export first_answer : RemoteService -> Upstreams -> String -> Effect<Option<String>, VfetchError, HNil>
+first_answer remote up hash =
+  if up.caches.is_empty ()
+    succeed None
+  else
+    asks = up.caches.iter () |> .enumerate |> .map (\ic -> from_upstream (remote.clone ()) (up.keys.clone ()) ic.0 (ic.1.clone ()) (hash.clone ())) |> .collect : Vec<Effect<String, VfetchError, HNil>>
+    h = hash.clone ()
+    (race_all asks) |> .map (\t -> Some t) |> .catch (move \e -> missed h e)
+
+-- No upstream had a trusted answer: a 404, and why, in the log.
+missed : String -> VfetchError -> Effect<Option<String>, VfetchError, HNil>
+missed hash e =
+  eprintln! \-> "vfetch serve: narinfo #{hash}: no upstream answered (#{e})"
+  succeed None
+
+text : &'static str -> String -> Response
+text content_type body =
+  (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response ()
+
+not_found : Response
+not_found = (StatusCode::NOT_FOUND, "not found\n").into_response ()
+
+-- An upstream failing mid-NAR is a 502: Nix tries its next substituter.
+instance IntoResponse VfetchError
+  into_response : self -> Response
+  into_response self =
+    eprintln! \-> "vfetch serve: #{self}"
+    (StatusCode::BAD_GATEWAY, "upstream failed\n").into_response ()
+
+narinfo_page : Option<String> -> Response
+narinfo_page found =
+  case found of
+    None -> not_found ()
+    Some t -> text "text/x-nix-narinfo" t
+
+nar_page : String -> id_effect_platform::http::HttpBody -> Response
+nar_page url body =
+  eprintln! \-> "vfetch serve: nar #{url}"
+  stream = chunks url body |> .map (\c -> Bytes::from c)
+  (StatusCode::OK, [(header::CONTENT_TYPE, "application/x-nix-nar")], stream_body stream).into_response ()
+
+-- The NAR at `url` of the `i`th upstream.
+nar_from : RemoteService -> Option<String> -> String -> Effect<Response, VfetchError, HNil>
+nar_from remote cache url =
+  case cache of
+    None -> succeed (not_found ())
+    Some c -> nar_of remote "#{c}/#{url}"
+
+nar_of : RemoteService -> String -> Effect<Response, VfetchError, HNil>
+nar_of remote full =
+  u = full.clone ()
+  (remote.0.body full) |> .map (move \body -> nar_page u body)
+
+narinfo_effect : String -> Effect<Response, VfetchError, ServeEnv>
+narinfo_effect hash =
+  effect!
+    let remote = ~RemoteService;
+    let up = ~Upstreams;
+    let found = ~first_answer((**remote).clone(), (**up).clone(), hash);
+    narinfo_page(found)
+
+nar_effect : usize -> String -> Effect<Response, VfetchError, ServeEnv>
+nar_effect i url =
+  effect!
+    let remote = ~RemoteService;
+    let up = ~Upstreams;
+    ~nar_from((**remote).clone(), up.caches.get(i).cloned(), url)
+
+export answer : Ask -> Effect<Response, VfetchError, ServeEnv>
+answer a =
+  case a of
+    Ask::Info -> succeed (text "text/x-nix-cache-info" (CACHE_INFO.to_string ()))
+    Ask::NarInfo hash -> narinfo_effect hash
+    Ask::Nar i url -> nar_effect i url
+    Ask::Missing -> succeed (not_found ())
+
+handle : State<ServeEnv> -> Uri -> impl std::future::Future<Output = Response> + Send
+handle st uri =
+  target = uri.path ().to_string ()
+  execute st (move \_env -> answer (ask (&target)))
+
+export router : ServeEnv -> axum::Router
+router env =
+  axum::Router::new () |> .fallback handle |> .with_state env
+
+-- Serve on `host` until interrupted.
+export serving : RemoteService -> Upstreams -> HostConfig -> Effect<Infallible, VfetchError, HNil>
+serving remote up host =
+  (serve (router (HCons::new remote (HCons::new up HNil)))) |> .provide host |> .map_err (\e -> VfetchError::Io "serving: #{e}")
+
+test "requests map to asks, and nothing outside the cache's URL space"
+  assert_eq! \-> ask "/nix-cache-info" \-> Ask::Info
+  assert_eq! \-> ask "/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo" \-> Ask::NarInfo (.to_string "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq")
+  assert_eq! \-> ask "/nar/1/nar/0abc.nar.xz?x=y" \-> Ask::Nar 1 (.to_string "nar/0abc.nar.xz")
+  assert_eq! \-> ask "/nar/1/../../etc/passwd" \-> Ask::Missing
+  assert_eq! \-> ask "/nar/x/nar/a.nar" \-> Ask::Missing
+  assert_eq! \-> ask "/ej1c3wf9c11a0qs6p3ymfvrnsdgsdcbq.narinfo" \-> Ask::Missing
+  assert_eq! \-> ask "/" \-> Ask::Missing
+
+test "a relayed narinfo points its NAR back here, unless the URL is absolute"
+  text = "StorePath: /nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh\nURL: nar/1w1f.nar.xz\nCompression: xz\nNarHash: sha256:00m9rmlp4446y79k0s295c61zxdbq9cmnwjgs1f9xn1xrr7qhjq4\nNarSize: 256\nReferences: \nCA: fixed:r:sha256:1w1f\n"
+  f = parse text
+  assert! \-> f.is_ok ()
+  if f is Ok f
+    assert_eq! \-> (relayed 2 (f.clone ())).url \-> "nar/2/nar/1w1f.nar.xz"
+    assert_eq! \-> (relayed 2 (NarInfoFile { url = .to_string "https://x/nar/a.nar", ...f })).url \-> "https://x/nar/a.nar"
+  -- CA-only, so trusted with no keys; the served text keeps compression and the hash.
+  served = vouched (&[]) 0 "http://up" "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq" (Some (text.to_string ()))
+  assert! \-> served.as_ref () |> .is_ok_and (\t -> t.contains "\nURL: nar/0/nar/1w1f.nar.xz\n" && t.contains "\nCompression: xz\n")
+  assert! \-> vouched (&[]) 0 "http://up" "vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq" None |> .is_err
+  assert! \-> vouched (&[]) 0 "http://up" "00000000000000000000000000000000" (Some (text.to_string ())) |> .is_err
+
+test "the cache info puts this cache first"
+  assert! \-> CACHE_INFO.contains "\nPriority: 1\n"
+  assert_eq! \-> PRIORITY \-> 1

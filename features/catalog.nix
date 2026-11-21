@@ -95,6 +95,7 @@
   ./cli/vbump
   ./cli/vdiff
   ./cli/vmon
+  ./cli/vfetch
   ./cli/yazi
   ./cli/zellij
   ./cli/zoxide
@@ -152,6 +153,7 @@
   ./nix/vcache
   ./nix/vcache/client.nix
   ./nix/vdaemon-proxy
+  ./nix/vfetch
   ./nix/vverify
   ./nix/vpush
 

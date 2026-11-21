@@ -1,0 +1,201 @@
+-- The staging directory: NARs as they arrive, laid out as a `file://`
+-- binary cache (`nix-cache-info`, `<hash>.narinfo`, `nar/<hash>.nar`).
+--
+-- A NAR streams through its decompressor into `nar/<hash>.nar.part`, hashed
+-- as it is written; nothing is held whole in memory. Only a NAR whose size
+-- and SHA-256 are the narinfo's is renamed to `nar/<hash>.nar`, and only
+-- then is its narinfo written (to a temporary name, renamed into place). So
+-- a narinfo in the directory always names a whole, verified NAR: an
+-- interrupted run leaves at most a `.part`, which is never imported and is
+-- truncated by the next attempt, and every NAR it finished is reused.
+
+import std::fs
+import std::io::{BufWriter, Write}
+import std::path::{Path, PathBuf}
+import sha2::Digest
+import liblzma::write::XzDecoder
+import nix_store_core::hash
+import nix_store_core::narinfo::{NarInfo, NarInfoFile, parse, render_file}
+import nix_store_core::storepath::hash_part_of
+import crate::fault::VfetchError
+
+export data Staging { export dir PathBuf }
+  deriving (Clone, Debug)
+
+export hash_of : &str -> String
+hash_of path = hash_part_of path |> .unwrap_or "" |> .to_string
+
+export narinfo_file : &Staging -> &str -> PathBuf
+narinfo_file s path = s.dir.join "#{hash_of path}.narinfo"
+
+export nar_file : &Staging -> &str -> PathBuf
+nar_file s path = s.dir.join "nar" |> .join "#{hash_of path}.nar"
+
+export part_file : &Staging -> &str -> PathBuf
+part_file s path = s.dir.join "nar" |> .join "#{hash_of path}.nar.part"
+
+io_at : given <T: std::fmt::Display> &Path -> T -> VfetchError
+io_at p e = VfetchError::Io "#{p.display ()}: #{e}"
+
+-- The directory, as a binary cache Nix can read.
+export prepare : &Staging -> Result<(), VfetchError>
+prepare s =
+  nar = s.dir.join "nar"
+  (fs::create_dir_all (&nar) |> .map_err (\e -> io_at (&nar) e))?
+  info = s.dir.join "nix-cache-info"
+  fs::write (&info) "StoreDir: /nix/store\n" |> .map_err (\e -> io_at (&info) e)
+
+-- What an earlier run staged for `path`: its narinfo, when the NAR beside it
+-- is whole.
+export staged : &Staging -> &str -> Option<NarInfo>
+staged s path =
+  text = (fs::read_to_string (narinfo_file s path) |> .ok)?
+  f = (parse (&text) |> .ok)?
+  len = fs::metadata (nar_file s path) |> .ok |> .map (\m -> m.len ())
+  if f.info.store_path == path && len == Some f.info.nar_size
+    Some f.info
+  else
+    None
+
+-- The narinfo a staged NAR is served with: uncompressed, beside it, with the
+-- signatures it came with (the import checks them again).
+export staged_text : &NarInfo -> String
+staged_text info =
+  render_file (&NarInfoFile { info = info.clone (), url = "nar/#{hash_of (&info.store_path)}.nar", compression = .to_string "none", file_hash = None, file_size = None })
+
+-- Forget a staged path once it is imported: the narinfo first, so the
+-- directory never names a NAR it does not have.
+export discard : &Staging -> &str -> ()
+discard s path =
+  fs::remove_file (narinfo_file s path) |> .ok
+  fs::remove_file (nar_file s path) |> .ok
+  ()
+
+-- The decompressed NAR's destination: the `.part` file, its SHA-256 and
+-- length, updated as bytes are written.
+export data HashFile { out BufWriter<fs::File>, hasher sha2::Sha256, size u64 }
+
+instance Write HashFile
+  write : &mut self -> &[u8] -> std::io::Result<usize>
+  write self buf =
+    n = (self.out.write buf)?
+    self.hasher.update (&buf[0 .. n])
+    self.size += u64::try_from n |> .unwrap_or 0
+    Ok n
+
+  flush : &mut self -> std::io::Result<()>
+  flush self = self.out.flush ()
+
+export data Decoder
+  = Plain HashFile
+  | Xz (XzDecoder<HashFile>)
+  | Zstd (zstd::stream::write::Decoder<'static, HashFile>)
+
+-- One NAR on its way in.
+export data Sink { decoder Decoder, path String, part PathBuf }
+
+decoder_for : &str -> HashFile -> Result<Decoder, VfetchError>
+decoder_for compression inner =
+  if compression == "none"
+    Ok (Plain inner)
+  else if compression == "xz"
+    Ok (Xz (XzDecoder::new_multi_decoder inner))
+  else if compression == "zstd"
+    zstd::stream::write::Decoder::new inner |> .map (\d -> Zstd d) |> .map_err (\e -> VfetchError::Io "zstd: #{e}")
+  else
+    Err (VfetchError::Unsupported "compression #{compression}: vfetch reads none, xz and zstd")
+
+-- Start a NAR: an empty `.part` (truncating any an earlier attempt left).
+export open_sink : &Staging -> &NarInfoFile -> Result<Sink, VfetchError>
+open_sink s f =
+  path = f.info.store_path.clone ()
+  part = part_file s (&path)
+  file = (fs::File::create (&part) |> .map_err (\e -> io_at (&part) e))?
+  inner = HashFile { out = BufWriter::with_capacity 262144 file, hasher = sha2::Sha256::new (), size = 0 }
+  decoder = (decoder_for (&f.compression) inner)?
+  Ok (Sink { decoder, path, part })
+
+-- A full, read-only or forbidden disk is the staging directory's fault;
+-- anything else a decoder says (xz and zstd report bad data with several
+-- error kinds) is the data's.
+decode_error : &str -> std::io::Error -> VfetchError
+decode_error path e =
+  k = e.kind ()
+  if k == std::io::ErrorKind::StorageFull || k == std::io::ErrorKind::ReadOnlyFilesystem || k == std::io::ErrorKind::PermissionDenied || k == std::io::ErrorKind::QuotaExceeded
+    VfetchError::Io "#{path}: #{e}"
+  else
+    VfetchError::Corrupt "#{path}: undecodable NAR: #{e}"
+
+write_into : &mut Decoder -> &[u8] -> std::io::Result<()>
+write_into d chunk =
+  case d of
+    Plain w -> w.write_all chunk
+    Xz w -> w.write_all chunk
+    Zstd w -> w.write_all chunk
+
+-- One chunk of the (compressed) body.
+export feed : Sink -> Vec<u8> -> Result<Sink, VfetchError>
+feed sink chunk =
+  mut s = sink
+  r = write_into (&mut s.decoder) (&chunk)
+  case r of
+    Ok _ -> Ok s
+    Err e -> Err (decode_error (&s.path) e)
+
+zstd_inner : zstd::stream::write::Decoder<'static, HashFile> -> std::io::Result<HashFile>
+zstd_inner d =
+  mut w = d
+  (w.flush ())?
+  Ok (w.into_inner ())
+
+inner_of : Decoder -> std::io::Result<HashFile>
+inner_of d =
+  case d of
+    Plain w -> Ok w
+    Xz w -> w.finish ()
+    Zstd w -> zstd_inner w
+
+-- The finished NAR against its narinfo: size first, then hash.
+check : &NarInfo -> HashFile -> Result<u64, VfetchError>
+check info hf =
+  mut f = hf
+  p = info.store_path.clone ()
+  (f.out.flush () |> .map_err (\e -> VfetchError::Io "#{p}: #{e}"))?
+  size = f.size
+  digest = f.hasher.finalize ()
+  got = (hash::from_bytes (digest.as_slice ()) |> .ok_or (VfetchError::Io "#{p}: digest"))?
+  want = (hash::parse (&info.nar_hash) |> .ok_or (VfetchError::Corrupt "#{p}: unreadable NarHash #{info.nar_hash}"))?
+  if size != info.nar_size
+    Err (VfetchError::Corrupt "#{p}: the NAR is #{size} bytes, the narinfo says #{info.nar_size}")
+  else if got != want
+    Err (VfetchError::Corrupt "#{p}: the NAR hashes to #{hash::typed_nix32 (&got)}, the narinfo says #{info.nar_hash}")
+  else
+    Ok size
+
+-- The verified NAR into place, then its narinfo.
+publish : &Staging -> &NarInfo -> Result<(), VfetchError>
+publish s info =
+  p = info.store_path.clone ()
+  nar = nar_file s (&p)
+  (fs::rename (part_file s (&p)) (&nar) |> .map_err (\e -> io_at (&nar) e))?
+  tmp = s.dir.join "#{hash_of (&p)}.narinfo.tmp"
+  (fs::write (&tmp) (staged_text info) |> .map_err (\e -> io_at (&tmp) e))?
+  dest = narinfo_file s (&p)
+  fs::rename (&tmp) (&dest) |> .map_err (\e -> io_at (&dest) e)
+
+verified : &Staging -> &NarInfo -> Sink -> Result<u64, VfetchError>
+verified s info sink =
+  path = sink.path.clone ()
+  inner = (inner_of sink.decoder |> .map_err (\e -> decode_error (&path) e))?
+  size = (check info inner)?
+  (publish s info)?
+  Ok size
+
+-- End a NAR: verified and published, or its `.part` removed. The NAR's size.
+export finish : &Staging -> &NarInfo -> Sink -> Result<u64, VfetchError>
+finish s info sink =
+  part = sink.part.clone ()
+  r = verified s info sink
+  if r.is_err ()
+    fs::remove_file (&part) |> .ok
+  r

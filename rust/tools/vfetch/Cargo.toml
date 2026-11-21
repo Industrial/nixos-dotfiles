@@ -1,0 +1,57 @@
+[package]
+name = "vfetch"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Concurrent closure substitution from Nix binary caches (a faster nix copy --from)"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# `vfetch serve`: the localhost substituter (axum under id_effect_axum, as
+# vcache serves), its bodies as bytes.
+axum = "0.8.9"
+bytes = "1"
+id_effect_axum = "=0.13.0"
+# One id_effect version per build (types do not unify): pinned exactly, like
+# nix-store-core and vcache.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The HTTP client (reqwest behind the HttpClient capability, streamed bodies)
+# and the subprocess port the temporary importer runs `nix copy` through.
+id_effect_platform = "=0.13.0"
+# xz and zstd NARs, decoded as they stream in.
+liblzma = "0.4"
+zstd = "0.13"
+# The store primitives: store paths, narinfo, signatures, hashes, the store
+# database. default.nix roots its source at rust/tools so the path resolves.
+nix-store-core = { path = "../nix-store-core" }
+# The target store's database, read-only; the same version nix-store-core opens.
+rusqlite = { version = "0.37", features = ["bundled"] }
+sha2 = "0.10"
+# The `nix daemon --stdio` children the worker importer talks to for a store
+# other than the system one (pipes for nix-store-core's worker::open_halves).
+tokio = { version = "1", features = ["process"] }
+
+[dev-dependencies]
+# A test signing key from a fixed seed, in Nix's key format.
+base64 = "0.22"
+ed25519-dalek = "2"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vfetch"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vfetch"
+path = "src/main.rs"

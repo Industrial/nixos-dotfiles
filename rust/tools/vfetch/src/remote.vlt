@@ -1,0 +1,138 @@
+-- The binary caches as a capability: "the text at this URL" (a narinfo) and
+-- "the body at this URL, chunk by chunk" (a NAR).
+--
+-- `Remote` is shaped to its one caller, the fetch. The live implementation is
+-- id_effect_platform's reqwest client; `MemoryRemote` is the fake cache the
+-- tests serve narinfos and NARs from, with a request log and injected faults.
+
+import std::collections::HashMap
+import std::sync::{Arc, Mutex}
+import std::time::Duration
+import id_effect::{Effect, HNil, fail, succeed}
+import id_effect_platform::error::HttpError
+import id_effect_platform::http::{HttpBody, HttpClientConfig, HttpClientService, HttpRequest, HttpResponse, ReqwestHttpClient, RetryPolicy, StreamingHttpResponse}
+import crate::fault::VfetchError
+
+export class Remote
+  text : &self -> String -> Effect<Option<String>, VfetchError, HNil>
+  body : &self -> String -> Effect<HttpBody, VfetchError, HNil>
+
+export newtype RemoteService = RemoteService (export Arc<dyn Remote + Send + Sync>)
+
+instance Clone RemoteService
+  clone : &self -> Self
+  clone self = RemoteService (Arc::clone (&self.0))
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static> Result<A, VfetchError> -> Effect<A, VfetchError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- A failure before any answer: the connection, DNS, a timeout, a reset body.
+-- A request the client's policy refuses is final.
+export transport : String -> HttpError -> VfetchError
+transport url e =
+  case e of
+    HttpError::InvalidRequest why -> VfetchError::Refused "#{url}: #{why}"
+    other -> VfetchError::Transient "#{url}: #{other}"
+
+-- An answer that is not a 200: 5xx and 429 are worth another attempt.
+export status_error : &str -> u16 -> VfetchError
+status_error url status =
+  if status == 429 || status >= 500
+    VfetchError::Transient "#{url}: HTTP #{status}"
+  else
+    VfetchError::Refused "#{url}: HTTP #{status}"
+
+-- A narinfo answer: 404 (and S3's 403) is "not in this cache".
+export text_of : String -> HttpResponse -> Result<Option<String>, VfetchError>
+text_of url resp =
+  if resp.status == 200
+    Ok (Some (String::from_utf8_lossy (&resp.body) |> .into_owned))
+  else if resp.status == 404 || resp.status == 403
+    Ok None
+  else
+    Err (status_error (&url) resp.status)
+
+body_of : String -> StreamingHttpResponse -> Result<HttpBody, VfetchError>
+body_of url resp =
+  if resp.status == 200
+    Ok resp.body
+  else
+    Err (status_error (&url) resp.status)
+
+export data HttpRemote { client HttpClientService }
+
+instance Remote HttpRemote
+  text : &self -> String -> Effect<Option<String>, VfetchError, HNil>
+  text self url =
+    u = url.clone ()
+    v = url.clone ()
+    (self.client.0.execute (HttpRequest::get url)) |> .map_err (move \e -> transport u e) |> .flat_map (move \resp -> lifted (text_of v resp))
+
+  body : &self -> String -> Effect<HttpBody, VfetchError, HNil>
+  body self url =
+    u = url.clone ()
+    v = url.clone ()
+    -- A NAR is streamed, never buffered, so the body has no size cap.
+    req = HttpRequest { max_body_bytes = Some usize::MAX, ...HttpRequest::get url }
+    (self.client.0.execute_stream req) |> .map_err (move \e -> transport u e) |> .flat_map (move \resp -> lifted (body_of v resp))
+
+-- The live caches. Retries are the fetch's (per NAR, from its first byte),
+-- so the client's own are off. Caches are on the tailnet and on localhost as
+-- often as on the internet, so the private-range guard is off: vfetch only
+-- ever asks the URLs it was given.
+export http : RemoteService
+http =
+  config = HttpClientConfig::default () |> .with_connect_timeout (Duration::from_secs 15) |> .with_timeout (Duration::from_secs 3600) |> .with_retry (RetryPolicy::none ()) |> .follow_redirects 5 |> .dangerous_allow_private_networks
+  RemoteService (Arc::new (HttpRemote { client = HttpClientService::new (ReqwestHttpClient::from_config (&config)) }))
+
+-- The fake cache: `files` by URL, every request logged in order, and
+-- `faults[url]` requests of that URL failing as transient before it answers.
+export data MemoryRemote { export files HashMap<String, Vec<u8>>, export log Arc<Mutex<Vec<String>>>, export faults Arc<Mutex<HashMap<String, usize>>> }
+
+-- Log a request; whether it is one of the failing ones.
+record : &MemoryRemote -> &str -> bool
+record m url =
+  for log in m.log.lock ().iter_mut ()
+    log.push (url.to_string ())
+  mut failing = false
+  for faults in m.faults.lock ().iter_mut ()
+    if faults.get_mut url is Some left
+      if *left > 0
+        *left -= 1
+        failing := true
+  failing
+
+instance Remote MemoryRemote
+  text : &self -> String -> Effect<Option<String>, VfetchError, HNil>
+  text self url =
+    if record self (&url)
+      fail (VfetchError::Transient "#{url}: injected fault")
+    else
+      succeed (self.files.get (&url) |> .map (\b -> String::from_utf8_lossy b |> .into_owned))
+
+  body : &self -> String -> Effect<HttpBody, VfetchError, HNil>
+  body self url =
+    if record self (&url)
+      fail (VfetchError::Transient "#{url}: injected fault")
+    else
+      case self.files.get (&url) of
+        Some b -> succeed (HttpBody::from_bytes b 4096)
+        None -> fail (VfetchError::Refused "#{url}: HTTP 404")
+
+-- The requests a fake cache has seen, in order.
+export requests : &MemoryRemote -> Vec<String>
+requests m =
+  m.log.lock () |> .map (\l -> l.clone ()) |> .unwrap_or_default
+
+test "a 404 or 403 narinfo is a miss, a 5xx is transient, a 4xx final"
+  miss = HttpResponse { status = 404, headers = Vec::new (), body = Vec::new () }
+  assert! \-> text_of (.to_string "u") miss |> .is_ok_and (\o -> o.is_none ())
+  hit = HttpResponse { status = 200, headers = Vec::new (), body = b"StorePath: x".to_vec () }
+  assert_eq! \-> text_of (.to_string "u") hit |> .ok |> .flatten \-> Some (.to_string "StorePath: x")
+  assert! \-> crate::fault::is_transient (&status_error "u" 502)
+  assert! \-> crate::fault::is_transient (&status_error "u" 429)
+  assert! \-> !(crate::fault::is_transient (&status_error "u" 410))
