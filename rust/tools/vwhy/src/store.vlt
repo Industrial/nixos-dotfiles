@@ -141,7 +141,10 @@ read_edges db_path root =
   conn = (connect (&db_path))?
   edge_rows (&conn) (&root) |> .map_err store_error
 
-assembled : String -> (Vec<(i64, String, u64)>, Vec<(i64, i64)>) -> Result<Graph, WhyError>
+-- A closure's rows: members (id, path, narSize) and references (referrer, reference).
+export type Rows = (Vec<(i64, String, u64)>, Vec<(i64, i64)>)
+
+assembled : String -> Rows -> Result<Graph, WhyError>
 assembled root rows =
   (nodes, edges) = rows
   build (&root) nodes edges |> .ok_or (Invalid root)
