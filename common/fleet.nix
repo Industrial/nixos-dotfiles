@@ -53,12 +53,14 @@ let
       description = "always-on file server";
       roles = ["server" "monitoring" "nfs-server" "remote-desktop-relay"];
       # vdeploy waits for main to sit still this long before it starts a plan (GH-221).
-      # mimir builds through drakkar and a generation takes hours, and vdeploy never
-      # cancels a build, so starting one on a commit superseded a minute later costs a
-      # whole build of lag. Over 48 h, 38 of 73 gaps between merges on main were under
-      # 10 min, and the longest run of such gaps was 18 min. So 10 min collapses a burst
-      # and costs at most about half an hour of waiting.
-      deployDebounce = "10m";
+      # vdeploy never cancels a plan, so a plan started on a commit that is superseded
+      # a minute later is a whole plan of lag. Measured 2026-11-21/22 over 48 h: 20 of
+      # 73 gaps between merges on main were under 2 min (agents merging back to back),
+      # and comin had each of mimir's generations ready a median 4 min after its merge,
+      # because mimir substitutes from drakkar's cache. 2 min collapses those bursts. A
+      # longer window (10 min would cover 38 of the 73 gaps) would cost more waiting than
+      # a plan takes.
+      deployDebounce = "2m";
       tailscaleIp = "100.103.79.41";
       operatorKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHaaBOy2a1WnlGy5B6WwEmVlf7s5VUgVIbsjdGZrsmK+ tom@mimir";
     };
