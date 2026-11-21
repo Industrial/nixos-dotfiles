@@ -148,10 +148,18 @@
       (builtins.readDir ../profiles))
   );
 
-  # Just the switches: one `features.<path>.enable` per catalog entry, no bodies.
+  # Just the switches: one `features.<path>.enable` per catalog entry, no bodies. A
+  # feature's own options (features.nix.vdaemon-proxy.native, say) land in the stub's
+  # freeform part, one key each, so a host may set several of them.
   optionStubs =
     map (p: {
-      options = lib.setAttrByPath (optionPath p) {enable = lib.mkEnableOption (lib.concatStringsSep "." (namePath p));};
+      options = lib.setAttrByPath (optionPath p) (lib.mkOption {
+        type = lib.types.submodule {
+          freeformType = lib.types.lazyAttrsOf lib.types.raw;
+          options.enable = lib.mkEnableOption (lib.concatStringsSep "." (namePath p));
+        };
+        default = {};
+      });
     })
     catalog;
 
