@@ -1324,6 +1324,7 @@ dependencies = [
  "id_effect_cli",
  "nix-store-core",
  "serde_json",
+ "tokio",
  "vdiff",
  "voltaic-diag",
  "voltaic-driver",

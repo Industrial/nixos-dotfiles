@@ -144,6 +144,10 @@ in
           # 9 commits in all; fewer plans than that, the rest skipped (latest-wins). A
           # commit the poller never saw (two between polls) is in neither count.
           assert started < 9 and skipped >= 1, (started, skipped)
+          # The poller keeps polling while a build runs (the build is an awaited child
+          # process, not a blocked executor thread): a 20 s build spans ~6 commits, and the
+          # poller sees them land, so most of them are counted as skipped.
+          assert skipped >= 3 and started <= 5, (started, skipped)
           assert started + skipped <= 9, (started, skipped)
           history = [json.loads(l) for l in machine.succeed("cat /var/lib/vdeploy/plans.jsonl").splitlines()]
           assert [h["commit"] for h in history][-1] == last, history

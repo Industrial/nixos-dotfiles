@@ -88,6 +88,37 @@ run c =
   else
     Err "#{shown c} failed (#{out.status}):\n#{tail_lines (&stderr) 20}"
 
+rust """
+  /// `c` to completion as a tokio child process, awaited on the runtime's
+  /// reactor, never on an executor thread: an evaluation or a build can take
+  /// an hour, and the poller fiber runs beside it. A non-zero exit is an error
+  /// carrying the last lines of its stderr. Dropping the future (an
+  /// interrupt) kills the child.
+  pub fn exec(c: Cmd) -> Effect<Ran, String, HNil> {
+      id_effect::from_async(move || async move {
+          let mut command = tokio::process::Command::new(&c.program);
+          command.args(&c.args).stdin(Stdio::null()).kill_on_drop(true);
+          if let Some(d) = &c.cwd {
+              command.current_dir(d);
+          }
+          for (k, v) in &c.env {
+              command.env(k, v);
+          }
+          let out = command
+              .output()
+              .await
+              .map_err(|e| format!("running {}: {e}", shown(&c)))?;
+          let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+          let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+          if out.status.success() {
+              Ok(Ran { stdout, stderr })
+          } else {
+              Err(format!("{} failed ({}):\n{}", shown(&c), out.status, tail_lines(&stderr, 20)))
+          }
+      })
+  }
+"""
+
 -- Run `c` as a yes/no question: exit 0 is yes, exit 1 is no, anything else
 -- (or not starting) is an error. `git merge-base --is-ancestor` answers so.
 export asked : &Cmd -> Result<bool, String>
