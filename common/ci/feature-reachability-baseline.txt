@@ -83,6 +83,11 @@ features/media/sonarr
 features/media/transmission
 features/media/whisparr
 
+# --- Replaced, kept as the one-line rollback. ----------------------------------------
+# nvd: vdiff took over in profiles/cli-core.nix (GH-153); `features.cli.nvd.enable = true`
+# on a host restores it (profiles/cli-core.assay.nix, nvdIsTheRollback).
+features/cli/nvd
+
 # --- Written, never wired. Referenced by no profile or host, commented or otherwise. --
 features/fleet/keepalived
 features/games/wow-forever

@@ -24,6 +24,23 @@ vdiff [--json] [--db PATH] --generations <profile>
 The two closure walks run concurrently, as two id_effect fibers (`zip_par`),
 each on its own read-only connection.
 
+## In the fleet: vdiff took over from nvd
+
+- `features.cli.vdiff` is on in `profiles/cli-core.nix`, so every host with
+  that profile has `vdiff` on its PATH. `features.cli.nvd` is off.
+- Callers: `bin/dev build <this host>` diffs the fresh closure against
+  `/run/current-system` with vdiff. Nothing else in the repo called nvd.
+- `nh` (4.5) prints its own diff with its built-in differ (dix). It has no
+  option to run an external one: `--diff` only takes
+  `auto|always|never|full`. Use `nh os switch --diff never` and
+  `vdiff --generations system` afterwards to get vdiff's report.
+- `nixos-update-notifier` diffs with `nix store diff-closures`, Nix's own
+  differ, not nvd's. It is left as it is.
+- Rollback: `features.cli.nvd.enable = true;` on a host installs nvd again
+  (the `nvdIsTheRollback` assay claim in `profiles/cli-core.assay.nix`).
+  `bin/dev build` uses nvd only where vdiff is missing, so a host that also
+  sets `features.cli.vdiff.enable = lib.mkForce false;` is fully back on nvd.
+
 ## The text
 
 The default output is `nvd --color=never diff`'s, byte for byte: the golden

@@ -21,9 +21,16 @@ in
     # builtin `du`, so the wrapper bought nothing.
     carriesDustNotDuWrapper = assay.eq [(has "cli.dust") (has "cli.du")] [true false];
 
-    # vdiff is what `bin/dev build` diffs a fresh closure with (GH-153); nvd stays installed
-    # alongside it, but nothing in the flow calls it any more.
-    carriesVdiff = assay.eq [(has "cli.vdiff") (has "cli.nvd")] [true true];
+    # vdiff took over from nvd (GH-153): it is what `bin/dev build` diffs a fresh closure with,
+    # and nvd is no longer installed by the profile.
+    vdiffReplacesNvd = assay.eq [(has "cli.vdiff") (has "cli.nvd")] [true false];
+
+    # The rollback is one option: a host that sets features.cli.nvd.enable gets nvd back,
+    # next to vdiff.
+    nvdIsTheRollback = let
+      rolledBack = features.enabledFeatures (features.evalSelection {modules = [{profiles.cli-core.enable = true;} {features.cli.nvd.enable = true;}];});
+    in
+      assay.eq [(builtins.elem "cli.vdiff" rolledBack) (builtins.elem "cli.nvd" rolledBack)] [true true];
 
     # cli-core is CLI only: nothing outside features/cli.
     onlyCliFeatures = assay.eq (builtins.filter (f: builtins.substring 0 4 f != "cli.") on) [];
