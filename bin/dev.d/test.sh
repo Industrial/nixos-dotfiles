@@ -76,13 +76,15 @@ for h in drakkar huginn mimir muninn; do has "check --hosts has $h" "^  check-$h
 expect "check --rust adds the cargo jobs" 0 '^  cargo-clippy ' "$DEV" check -n --rust
 has "check --rust has cargo-test" '^  cargo-test '
 has "check --rust has cargo-nix-drift" '^  cargo-nix-drift '
+has "check --rust has cargo-standalone, every standalone crate" '^  cargo-standalone +bin/ci/cargo-standalone all$'
 expect "check --flake-checks runs bin/ci/flake-checks" 0 '^  flake-checks +bin/ci/flake-checks$' "$DEV" check -n --no-rust --flake-checks
 expect "check --scans adds clamav, lynis, stig" 0 '^  stig +bin/ci/stig$' "$DEV" check -n --no-rust --scans
 expect "check --shell-budget adds it" 0 '^  shell-budget +bin/ci/shell-budget$' "$DEV" check -n --no-rust --shell-budget
 
-# --all is ci.yml's job list: every job there (bar the `hosts` lister and the
-# `all-green` gate) is a step here, and every step here is a job there.
-ci_jobs="$(sed -n '/^jobs:/,$p' "$DOT/.github/workflows/ci.yml" | grep -oE '^  [a-z][a-z0-9-]*:' | tr -d ' :' | grep -vxE 'hosts|all-green' | sort)"
+# --all is ci.yml's job list: every job there (bar the `hosts` and
+# `standalone-crates` listers and the `all-green` gate) is a step here, and every
+# step here is a job there.
+ci_jobs="$(sed -n '/^jobs:/,$p' "$DOT/.github/workflows/ci.yml" | grep -oE '^  [a-z][a-z0-9-]*:' | tr -d ' :' | grep -vxE 'hosts|standalone-crates|all-green' | sort)"
 expect "check --all prints the whole plan" 0 '^  check-mimir ' \
     env BIN_DEV_HOSTS="mimir" "$DEV" check -n --all
 plan_jobs="$(grep -oE '^  [a-z][a-z0-9-]* ' "$T/out" | tr -d ' ' | sed 's/^check-.*/check/' | sort -u)"
@@ -100,6 +102,35 @@ expect "pre-push is check" 0 '^  lint-fetch-pins ' "$DEV" pre-push -n --no-rust
 expect "check rejects a bad host name" 64 'not a host name' "$DEV" check -n --host 'x;y'
 expect "check rejects an unknown option" 64 "unknown option '--bogus'" "$DEV" check --bogus
 expect "check --only with no match is an error" 64 'left no steps' "$DEV" check -n --only nope
+
+# --- bin/ci/cargo-standalone --list (the cargo-standalone matrix) -------------
+# A fixture rust/ tree: a workspace member, two standalone crates, and later an
+# orphan that neither job would check.
+CS="$DOT/bin/ci/cargo-standalone"
+crate() { # crate <dir> <with [workspace]: 0|1>
+    mkdir -p "$1"
+    printf '[package]\nname = "%s"\nversion = "0.1.0"\n' "$(basename "$1")" >"$1/Cargo.toml"
+    if [ "$2" = 1 ]; then printf '\n[workspace]\n' >>"$1/Cargo.toml"; fi
+}
+mkdir -p "$T/rust"
+printf '[workspace]\nmembers = ["tools/member"]\n' >"$T/rust/Cargo.toml"
+crate "$T/rust/tools/member" 0
+crate "$T/rust/tools/alpha" 1
+crate "$T/rust/tools/beta" 1
+expect "cargo-standalone --list finds the standalone crates, sorted" 0 '^\["alpha", "beta"\]$' \
+    env RUST_DIR="$T/rust" "$CS" --list
+lacks "cargo-standalone --list leaves out workspace members" 'member'
+crate "$T/rust/tools/orphan" 0
+expect "cargo-standalone --list fails on a crate no job checks" 1 'orphan: neither a member' \
+    env RUST_DIR="$T/rust" "$CS" --list
+rm -rf "$T/rust/tools/orphan" "$T/rust/tools/alpha" "$T/rust/tools/beta"
+expect "cargo-standalone --list fails when it finds nothing" 1 'no standalone crate' \
+    env RUST_DIR="$T/rust" "$CS" --list
+expect "cargo-standalone --list on this tree has nixos-update-notifier and vcache" 0 '"vcache"' "$CS" --list
+has "and nixos-update-notifier" '"nixos-update-notifier"'
+lacks "and not the workspace member oomkiller" 'oomkiller'
+expect "cargo-standalone rejects a bad crate name" 1 "not a crate name" "$CS" clippy 'x;y'
+expect "cargo-standalone rejects a crate it did not find" 1 "not a standalone crate" "$CS" test oomkiller
 
 # --- argument errors ---------------------------------------------------------
 expect "test with an unknown feature exits 64" 64 "no path or feature named 'no-such-feature'" "$DEV" test no-such-feature
