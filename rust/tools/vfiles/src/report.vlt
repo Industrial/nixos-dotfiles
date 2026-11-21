@@ -1,0 +1,127 @@
+-- What a run did, path by path: the JSON report (state dir `report.json`,
+-- and stdout with `--dry-run`), the one-line summary, and the warnings for
+-- files edited by hand. Pure.
+
+import crate::plan::Action
+import crate::spec::quote
+
+-- One path's result: the action taken (or, with `--dry-run`, that would
+-- be), or why it failed; and where an adopted file was moved.
+export data Settled { export path String, export outcome Result<Action, String>, export backup Option<String> }
+  deriving (Clone, Debug, PartialEq)
+
+-- The report's groups, in order.
+export const GROUPS : [&str; 11] = ["placed", "replaced", "adopted", "kept", "drift", "unowned", "skipped", "removed", "forgotten", "left", "failed"]
+
+export kind : &Settled -> String
+kind s =
+  name = case &s.outcome of
+    Err _ -> "failed"
+    Ok a -> action_kind a
+  name.to_string ()
+
+action_kind : &Action -> &str
+action_kind a =
+  case a of
+    Action::Keep -> "kept"
+    Action::Hold -> "kept"
+    Action::Place -> "placed"
+    Action::Replace -> "replaced"
+    Action::Adopt -> "adopted"
+    Action::Drift _ -> "drift"
+    Action::Unowned -> "unowned"
+    Action::Skip _ -> "skipped"
+    Action::Remove -> "removed"
+    Action::Forget -> "forgotten"
+    Action::Left _ -> "left"
+
+-- The reason a path is reported: drift, left, skipped, failed.
+export reason : &Settled -> Option<String>
+reason s =
+  case &s.outcome of
+    Err e -> Some (e.clone ())
+    Ok a -> action_reason a
+
+action_reason : &Action -> Option<String>
+action_reason a =
+  case a of
+    Action::Drift why -> Some (why.clone ())
+    Action::Left why -> Some (why.clone ())
+    Action::Skip why -> Some (why.clone ())
+    _ -> None
+
+item_json : &Settled -> String
+item_json s =
+  if &s.backup is Some b
+    return "{\"path\":#{quote (&s.path)},\"backup\":#{quote b}}"
+  if reason s is Some why
+    return "{\"path\":#{quote (&s.path)},\"reason\":#{quote (&why)}}"
+  quote (&s.path)
+
+group : &[Settled] -> &str -> String
+group all k =
+  items = all.iter () |> .filter (\s -> kind s == k) |> .map item_json |> .collect : Vec<String>
+  inner = items.join ","
+  "#{quote k}:[#{inner}]"
+
+-- The report: one line of JSON, every path in exactly one group.
+export json : &[Settled] -> bool -> String
+json all dry_run =
+  groups = GROUPS.iter () |> .map (\k -> group all k) |> .collect : Vec<String>
+  body = groups.join ","
+  "{\"dry_run\":#{dry_run},#{body}}"
+
+count : &[Settled] -> &str -> usize
+count all k = all.iter () |> .filter (\s -> kind s == k) |> .count
+
+-- The paths that failed.
+export failures : &[Settled] -> usize
+failures all = count all "failed"
+
+-- `vfiles: 2 placed, 0 replaced, …`, the groups that are not empty.
+export summary : &[Settled] -> String
+summary all =
+  parts = GROUPS.iter () |> .map (\k -> (k, count all k)) |> .filter (\p -> p.1 > 0) |> .map (\p -> "#{p.1} #{p.0}") |> .collect : Vec<String>
+  body = parts.join ", "
+  "vfiles: #{all.len ()} file(s): #{body}"
+
+-- One warning line per path that needs a person: drift, left, skipped, failed.
+export notices : &[Settled] -> Vec<String>
+notices all =
+  all.iter () |> .filter_map (\s -> reason s |> .map (\why -> "vfiles: #{kind s}: #{s.path}: #{why}")) |> .collect
+
+#[cfg(test)]
+settled : &str -> Result<Action, String> -> Settled
+settled path outcome = Settled { path = path.to_string (), outcome, backup = None }
+
+#[cfg(test)]
+sample : Vec<Settled>
+sample =
+  mut adopted = settled "/h/a" (Ok Action::Adopt)
+  adopted.backup := Some (.to_string "/h/a.backup")
+  .to_vec ([settled "/h/p" (Ok Action::Place), adopted, settled "/h/k" (Ok Action::Keep), settled "/h/d\"q" (Ok (Action::Drift (.to_string "edited by hand"))), settled "/h/x" (Err (.to_string "no such user: bob")), settled "/h/r" (Ok Action::Remove)])
+
+test "the report puts every path in its group"
+  text = json (&sample ()) false
+  parsed = serde_json::from_str (&text) : Result<serde_json::Value, serde_json::Error>
+  v = parsed |> .expect "valid JSON"
+  assert_eq! \-> v["dry_run"] \-> false
+  assert_eq! \-> v["placed"][0] \-> "/h/p"
+  assert_eq! \-> v["adopted"][0]["backup"] \-> "/h/a.backup"
+  assert_eq! \-> v["kept"][0] \-> "/h/k"
+  assert_eq! \-> v["drift"][0]["path"] \-> "/h/d\"q"
+  assert_eq! \-> v["drift"][0]["reason"] \-> "edited by hand"
+  assert_eq! \-> v["failed"][0]["reason"] \-> "no such user: bob"
+  assert_eq! \-> v["removed"][0] \-> "/h/r"
+  assert_eq! \-> v["left"].as_array () |> .map (\a -> a.len ()) \-> Some 0
+
+test "the summary counts the non-empty groups and failures are counted"
+  s = sample ()
+  assert_eq! \-> summary (&s) \-> "vfiles: 6 file(s): 1 placed, 1 adopted, 1 kept, 1 drift, 1 removed, 1 failed"
+  assert_eq! \-> failures (&s) \-> 1
+
+test "drift and failures are warned about, the rest is quiet"
+  lines = notices (&sample ())
+  assert_eq! \-> lines.len () \-> 2
+  assert! \-> lines[0].starts_with "vfiles: drift: /h/d"
+  assert! \-> lines[1].contains "no such user: bob"
