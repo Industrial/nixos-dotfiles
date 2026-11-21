@@ -1,0 +1,323 @@
+-- The agent: two fibers over one shared Status (an id_effect Ref).
+--
+--   poller  every `interval`, on a spaced Schedule: fetch main (retried on a
+--           bounded exponential Schedule), record the head, read the running
+--           system's commit for the generation age, fast-forward the user's
+--           dotfiles checkout, and write the metrics;
+--   worker  every `tick`, on a spaced Schedule: read the Status and, when the
+--           decision core says so (watch.vlt `decide`), plan the newest head:
+--           verify, evaluate, realise (Fetcher, else Builder), diff, log.
+--
+-- The worker runs a plan to its end inside one step of its own repeat, and
+-- the poller only ever writes the Ref, so a plan in flight is never
+-- cancelled because main moved; the next step takes whatever head is newest
+-- then (latest-wins). The two race (`race_first`): in the daemon neither
+-- ends; in tests the worker's bounded Schedule ends it and the poller is
+-- interrupted. No loops, threads, sleeps or timers of vdeploy's own.
+
+import std::time::{Duration, Instant}
+import id_effect::{Effect, HNil, Never, Ref, Schedule, effect, fail, succeed}
+import crate::caps::{BuilderTool, Caps, DifferTool, SourceTool}
+import crate::common::{DeployError, now_secs}
+import crate::dotfiles::{Checkout, state_name}
+import crate::report::{Plan, SAME, json_of, line_of, publish_metrics, publish_plan}
+import crate::watch::{Decision, Head, Status, decide, failed_with, finished_with, observed, taken, unobserved}
+
+-- How the agent runs.
+export data Settings
+  { export host String
+  , export interval u64
+  , export quiet_polls u64
+  , export tick u64
+  , export textfile_dir Option<String>
+  , export state_dir Option<String>
+  , export dotfiles String
+  }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The fetch of main and the Fetcher get two more attempts, 10 s and 20 s
+-- later: the network is the step that flakes.
+export transient : Schedule<(Duration, u64), DeployError>
+transient = Schedule::exponential (Duration::from_secs 10) |> .intersect (Schedule::recurs 2)
+
+short : &str -> String
+short sha = sha.chars () |> .take 9 |> .collect
+
+warned : DeployError -> Effect<Option<Head>, Never, HNil>
+warned e =
+  eprintln! \-> "vdeploy: poll: #{e}"
+  succeed None
+
+-- The tip of main, or None when it could not be fetched (logged).
+fetched : SourceTool -> Effect<Option<Head>, Never, HNil>
+fetched source =
+  Effect::retry (move \-> source.0.head ()) transient |> .map (\h -> Some h) |> .catch warned
+
+-- Seconds since the commit `rev` was made, when it is known.
+age_of : SourceTool -> Option<String> -> u64 -> Effect<Option<u64>, Never, HNil>
+age_of source rev now =
+  case rev of
+    None -> succeed None
+    Some r -> source.0.commit_time r |> .map (move \t -> t |> .map (\c -> now.saturating_sub c))
+
+running_rev : Caps -> Effect<Option<String>, Never, HNil>
+running_rev caps =
+  caps.host.0.running () |> .map (\r -> r.rev) |> .catch (\_ -> succeed None)
+
+dotfiles_for : Caps -> Option<Head> -> Effect<Option<Checkout>, Never, HNil>
+dotfiles_for caps head =
+  case head of
+    None -> succeed None
+    Some h -> caps.host.0.dotfiles h.sha |> .map (\c -> Some c)
+
+-- What a poll learnt, folded into the Status. Returns the new head when main
+-- moved, and the checkout's state when it changed, for the journal.
+export polled : Status -> Option<Head> -> Option<String> -> Option<u64> -> Option<Checkout> -> u64 -> ((Option<String>, Option<Checkout>), Status)
+polled st head rev age dots now =
+  before = st.watch.changes
+  (watch, failures, last_poll) = case head of
+    Some h -> (observed (st.watch.clone ()) h, st.poll_failures, Some now)
+    None -> (unobserved (st.watch.clone ()), st.poll_failures + 1, st.last_poll)
+  moved = if watch.changes != before
+    watch.head |> .as_ref |> .map (\h -> h.sha.clone ())
+  else
+    None
+  dots_changed = case &dots of
+    Some d -> if st.dotfiles.as_ref () != Some d
+      Some (d.clone ())
+    else
+      None
+    None -> None
+  dotfiles = dots.or (st.dotfiles.clone ())
+  generation_age = age.or (st.generation_age)
+  ((moved, dots_changed), Status { watch, poll_failures = failures, last_poll, running_rev = rev, generation_age, dotfiles, ...st })
+
+said : Settings -> (Option<String>, Option<Checkout>) -> Effect<(), Never, HNil>
+said s news =
+  (moved, dots) = news
+  if &moved is Some sha
+    eprintln! \-> "vdeploy: main is at #{short sha}"
+  if &dots is Some c
+    eprintln! \-> "vdeploy: #{crate::dotfiles::describe (&s.dotfiles) "main" c} [#{state_name c}]"
+  succeed (())
+
+metered : Settings -> Status -> Effect<(), Never, HNil>
+metered s st =
+  if publish_metrics (s.textfile_dir.clone ()) (&st) is Err e
+    eprintln! \-> "vdeploy: #{e}"
+  succeed (())
+
+-- One poll.
+export poll : Caps -> Settings -> Ref<Status> -> Effect<(), Never, HNil>
+poll caps s state =
+  effect!
+    let head = ~fetched(caps.source.clone());
+    let rev = ~running_rev(caps.clone());
+    let now = now_secs();
+    let age = ~age_of(caps.source.clone(), rev.clone(), now);
+    let dots = ~dotfiles_for(caps.clone(), head.clone());
+    let news = ~state.modify::<(Option<String>, Option<Checkout>), Never, HNil>(move |st| polled(st, head, rev, age, dots, now));
+    ~said(s.clone(), news);
+    let st = ~state.get::<Never, HNil>();
+    ~metered(s, st)
+
+built_unless : BuilderTool -> Option<String> -> String -> Effect<(String, String), DeployError, HNil>
+built_unless builder got drv =
+  case got of
+    Some out -> succeed ((out, .to_string "fetched"))
+    None -> builder.0.build drv |> .map (\out -> (out, .to_string "built"))
+
+-- The derivation's output: substituted through the Fetcher, else built.
+export realised : Caps -> String -> Effect<(String, String), DeployError, HNil>
+realised caps drv =
+  fetcher = caps.fetcher.clone ()
+  builder = caps.builder.clone ()
+  d = drv.clone ()
+  Effect::retry (move \-> fetcher.0.fetch (d.clone ())) transient |> .flat_map (move \got -> built_unless builder got drv)
+
+-- The diff against the running system, or the note saying why there is none.
+diffed : DifferTool -> String -> String -> Effect<(Option<String>, String), Never, HNil>
+diffed differ old new =
+  if old == new
+    succeed ((Some (SAME.to_string ()), .to_string "already running"))
+  else
+    differ.0.json old new |> .map (\j -> (Some j, String::new ())) |> .catch (\e -> succeed ((None, e.to_string ())))
+
+-- One plan for `head`: everything but the switch.
+export planned : Caps -> Settings -> Head -> u64 -> Effect<Plan, DeployError, HNil>
+planned caps s head skipped =
+  effect!
+    ~caps.source.0.verify(head.sha.clone());
+    let running = ~caps.host.0.running();
+    let drv = ~caps.nix.0.drv(head.sha.clone());
+    let (out, how) = ~realised(caps.clone(), drv.clone());
+    let (diff, note) = ~diffed(caps.differ.clone(), running.toplevel.clone(), out.clone());
+    Plan { host: s.host.clone(), commit: head.sha.clone(), commit_time: head.time, signed: head.signed, skipped, running_rev: running.rev.clone(), running: running.toplevel.clone(), drv, switch: out != running.toplevel, out, realised: how, diff, note, planned_at: now_secs() }
+
+-- A plan's failure as a value: one bad commit never stops the agent.
+settled : Effect<Plan, DeployError, HNil> -> Effect<Result<Plan, DeployError>, Never, HNil>
+settled eff = eff |> .map (\p -> Ok p) |> .catch (\e -> succeed (Err e))
+
+reported : Settings -> Plan -> Effect<(), Never, HNil>
+reported s p =
+  println! \-> "#{json_of (&p) false}"
+  eprintln! \-> "#{line_of (&p)}"
+  if publish_plan (s.state_dir.clone ()) (&p) is Err e
+    eprintln! \-> "vdeploy: #{e}"
+  succeed (())
+
+-- Plan `head`, to its end, and record the outcome.
+export cycle : Caps -> Settings -> Ref<Status> -> Head -> u64 -> Effect<(), Never, HNil>
+cycle caps s state head changes =
+  effect!
+    let sha = head.sha.clone();
+    let skipped = ~state.modify::<u64, Never, HNil>(move |st| taken(st, sha, changes));
+    eprintln!("vdeploy: planning {} for {}", short(&head.sha), s.host);
+    let began = Instant::now();
+    let result = ~settled(planned(caps.clone(), s.clone(), head.clone(), skipped));
+    let secs = began.elapsed().as_secs_f64();
+    let at = now_secs();
+    match result {
+      Ok(plan) => {
+        let pending = plan.switch;
+        let out = plan.out.clone();
+        ~reported(s.clone(), plan);
+        ~state.update::<Never, HNil>(move |st| finished_with(st, pending, out, at, secs));
+      }
+      Err(e) => {
+        eprintln!("vdeploy: plan for {} failed: {}", short(&head.sha), e);
+        ~state.update::<Never, HNil>(move |st| failed_with(st, at, secs));
+      }
+    }
+
+acted : Caps -> Settings -> Ref<Status> -> Status -> Effect<(), Never, HNil>
+acted caps s state st =
+  case decide (&st.watch) (st.done.as_deref ()) s.quiet_polls of
+    Decision::Plan head changes -> cycle caps s state head changes
+    _ -> succeed (())
+
+-- One worker step: plan the newest head if it is due, else nothing.
+export step : Caps -> Settings -> Ref<Status> -> Effect<(), Never, HNil>
+step caps s state =
+  (state.get () : Effect<Status, Never, HNil>) |> .flat_map (move \st -> acted caps s state st)
+
+-- The agent: the worker on `work`, the poller on `polls`, raced.
+export agent : Caps -> Settings -> Ref<Status> -> Schedule<u64, ()> -> Schedule<u64, ()> -> Effect<(), Never, HNil>
+agent caps s state work polls =
+  c1 = caps.clone ()
+  s1 = s.clone ()
+  r1 = state.clone ()
+  worker = Effect::repeat (move \-> step (c1.clone ()) (s1.clone ()) (r1.clone ())) work |> .map (\_ -> ())
+  poller = Effect::repeat (move \-> poll (caps.clone ()) (s.clone ()) (state.clone ())) polls |> .map (\_ -> ())
+  worker.race_first poller
+
+-- The daemon's Schedules: the worker every `tick`, the poller every `interval`.
+export daemon : Caps -> Settings -> Effect<(), Never, HNil>
+daemon caps s =
+  eprintln! \-> "vdeploy: observe mode for #{s.host}: polling main every #{s.interval}s, debounce #{s.quiet_polls} poll(s); never switching"
+  work = Schedule::spaced (Duration::from_secs s.tick)
+  polls = Schedule::spaced (Duration::from_secs s.interval)
+  agent caps s (Ref::new (Status::default ())) work polls
+
+judged : Status -> Effect<(), DeployError, HNil>
+judged st =
+  if st.failed > 0
+    fail (DeployError::Eval (.to_string "the plan failed (see above)"))
+  else if st.watch.head.is_none ()
+    fail (DeployError::Fetch (.to_string "main could not be fetched (see above)"))
+  else
+    succeed (())
+
+-- `--once`: one poll and, without a debounce, one plan; fails when either did.
+export once : Caps -> Settings -> Effect<(), DeployError, HNil>
+once caps s =
+  effect!
+    let state = Ref::new(Status::default());
+    let now = Settings { quiet_polls: 0, ..s };
+    ~poll(caps.clone(), now.clone(), state.clone()).widen();
+    ~step(caps, now, state.clone()).widen();
+    let st = ~state.get::<DeployError, HNil>();
+    ~judged(st)
+
+#[cfg(test)]
+heads : u64 -> Vec<String>
+heads n = (1 .. n + 1) |> .map (\i -> "c#{i}") |> .collect
+
+#[cfg(test)]
+settings : u64 -> Settings
+settings quiet = Settings { host = .to_string "machine", interval = 1, quiet_polls = quiet, tick = 1, textfile_dir = None, state_dir = None, dotfiles = .to_string "~/.dotfiles" }
+
+#[cfg(test)]
+seconds : u64 -> Schedule<u64, ()>
+seconds n = Schedule::spaced (Duration::from_secs 1) |> .intersect (Schedule::recurs n) |> .map (\p -> p.0)
+
+#[cfg(test)]
+logged : &std::sync::Arc<std::sync::Mutex<Vec<String>>> -> Vec<String>
+logged log = log.lock () |> .map (\v -> v.clone ()) |> .unwrap_or_default
+
+#[cfg(test)]
+status_of : Ref<Status> -> Status
+status_of state =
+  id_effect::testing::run_test (state.get () : Effect<Status, Never, HNil>) |> .into_result |> .ok |> .unwrap_or_default
+
+#[cfg(test)]
+index : &str -> u64
+index sha = sha.trim_start_matches 'c' |> .parse |> .unwrap_or 0
+
+-- The GH-159 requirement: commits land every second, a build takes five,
+-- and the host still converges on the newest commit. No build is cancelled
+-- (every one started also finished), commits in between are skipped.
+test "commits faster than a build: no build cancelled, the newest one planned"
+  world = crate::caps::Scripted { heads = heads 10, build_secs = 5, ...crate::caps::Scripted::default () }
+  state = Ref::new (Status::default ())
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) (settings 0) (state.clone ()) (seconds 60) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  started = logged (&world.started)
+  assert_eq! \-> logged (&world.finished) \-> started.clone ()
+  assert_eq! \-> started.first () |> .cloned \-> Some (.to_string "c1")
+  assert_eq! \-> started.last () |> .cloned \-> Some (.to_string "c10")
+  assert! \-> started.len () < 10
+  idx = started.iter () |> .map (\s -> index s) |> .collect : Vec<u64>
+  assert! \-> idx.windows 2 |> .all (\w -> w[0] < w[1])
+  st = status_of state
+  n = u64::try_from (started.len ()) |> .unwrap_or 0
+  assert_eq! \-> (st.started, st.finished, st.failed) \-> (n, n, 0)
+  assert_eq! \-> st.done \-> Some (.to_string "c10")
+  assert_eq! \-> st.skipped + st.started \-> 10
+  assert! \-> st.pending
+
+test "with a debounce, a busy main is planned once, when it goes quiet"
+  world = crate::caps::Scripted { heads = heads 10, build_secs = 5, ...crate::caps::Scripted::default () }
+  state = Ref::new (Status::default ())
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) (settings 3) (state.clone ()) (seconds 40) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  assert_eq! \-> logged (&world.started) \-> .to_vec ([.to_string "c10"])
+  assert_eq! \-> logged (&world.finished) \-> .to_vec ([.to_string "c10"])
+
+test "a commit that fails to build is planned once, not retried until main moves"
+  world = crate::caps::Scripted { heads = heads 1, build_secs = 2, failing = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  state = Ref::new (Status::default ())
+  exit = id_effect::testing::run_test (agent (crate::caps::scripted (world.clone ())) (settings 0) (state.clone ()) (seconds 20) (Schedule::spaced (Duration::from_secs 1)))
+  assert! \-> exit |> .into_result |> .is_ok
+  assert_eq! \-> logged (&world.started) \-> .to_vec ([.to_string "c1"])
+  st = status_of state
+  assert_eq! \-> (st.started, st.finished, st.failed, st.pending) \-> (1, 1, 1, false)
+
+test "--once polls, plans, and fails only when the plan did"
+  ok = crate::caps::Scripted { heads = heads 1, ...crate::caps::Scripted::default () }
+  assert! \-> id_effect::testing::run_test (once (crate::caps::scripted (ok.clone ())) (settings 5)) |> .into_result |> .is_ok
+  assert_eq! \-> logged (&ok.finished) \-> .to_vec ([.to_string "c1"])
+  bad = crate::caps::Scripted { heads = heads 1, failing = .to_vec ([.to_string "c1"]), ...crate::caps::Scripted::default () }
+  assert! \-> id_effect::testing::run_test (once (crate::caps::scripted bad) (settings 0)) |> .into_result |> .is_err
+  none = crate::caps::Scripted::default ()
+  assert! \-> id_effect::testing::run_test (once (crate::caps::scripted none) (settings 0)) |> .into_result |> .is_err
+
+test "a poll records the head, the generation age and a changed checkout"
+  h = Head { sha = .to_string "abc", time = 1, signed = true }
+  ((moved, dots), st) = polled (Status::default ()) (Some (h.clone ())) (Some (.to_string "r")) (Some 60) (Some (Checkout::Dirty 1)) 100
+  assert_eq! \-> (moved, dots) \-> (Some (.to_string "abc"), Some (Checkout::Dirty 1))
+  assert_eq! \-> (st.generation_age, st.last_poll, st.running_rev.clone ()) \-> (Some 60, Some 100, Some (.to_string "r"))
+  ((moved2, dots2), st2) = polled st (Some h) None None (Some (Checkout::Dirty 1)) 160
+  assert_eq! \-> (moved2, dots2, st2.generation_age) \-> (None, None, Some 60)
+  ((_, _), st3) = polled st2 None None None None 220
+  assert_eq! \-> (st3.poll_failures, st3.last_poll, st3.watch.polls) \-> (1, Some 160, 3)

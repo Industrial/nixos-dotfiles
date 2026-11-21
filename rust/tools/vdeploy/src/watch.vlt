@@ -1,0 +1,172 @@
+-- The decision core, pure: what the poller has seen of main, and what the
+-- worker does next. No effects here, so every rule is a plain test.
+--
+-- The no-starvation rules (GH-159) live here:
+--
+--   * a plan in flight is never cancelled because main moved. The poller only
+--     records the newest head; the worker reads it between plans, never
+--     during one, so nothing can preempt a build;
+--   * latest-wins catch-up: when a plan finishes, the next one is for the
+--     newest head, and every commit in between is skipped (and counted);
+--   * debounce: optionally, main must have stayed on one commit for a number
+--     of polls before a plan starts. Counted in polls, not wall time, so it
+--     is deterministic under the test executor's clock.
+
+import crate::dotfiles::Checkout
+
+-- The tip of main as fetched: its sha, its commit time (Unix seconds), and
+-- whether GitHub signed it (a squash merge through the web UI is signed with
+-- GitHub's key; vdeploy records this, it does not enforce it).
+export data Head { export sha String, export time u64, export signed bool }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- What the poller has seen: the newest head, how many polls so far, the poll
+-- at which the head last moved, and how many times it has moved.
+export data Watch { export head Option<Head>, export polls u64, export changed_at u64, export changes u64 }
+  deriving (Debug, Clone, Default, PartialEq, Eq)
+
+-- The watch after one more poll saw `h`.
+export observed : Watch -> Head -> Watch
+observed w h =
+  polls = w.polls + 1
+  moved = w.head |> .as_ref |> .map (\o -> o.sha != h.sha) |> .unwrap_or true
+  if moved
+    Watch { head = Some h, polls, changed_at = polls, changes = w.changes + 1 }
+  else
+    Watch { polls, ...w }
+
+-- The watch after a poll that failed: time passes, nothing moves.
+export unobserved : Watch -> Watch
+unobserved w = Watch { polls = w.polls + 1, ...w }
+
+-- What the worker does now.
+export data Decision
+  = Idle
+  | Quiet u64
+  | Plan Head u64
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The decision for `w`, when the last head the worker took is `done` and main
+-- must be still for `quiet_polls` polls first. `Plan` carries the head and
+-- the change count it was taken at; `Quiet` the polls left to wait.
+export decide : &Watch -> Option<&str> -> u64 -> Decision
+decide w done quiet_polls =
+  case &w.head of
+    None -> Decision::Idle
+    Some h ->
+      if done == Some (h.sha.as_str ())
+        Decision::Idle
+      else
+        still = w.polls.saturating_sub w.changed_at
+        if still < quiet_polls
+          Decision::Quiet (quiet_polls - still)
+        else
+          Decision::Plan (h.clone ()) w.changes
+
+-- A debounce in seconds as polls of `interval` seconds, rounded up: a window
+-- of 0 is none, any other is at least one poll.
+export quiet_polls_of : u64 -> u64 -> u64
+quiet_polls_of debounce interval =
+  if debounce == 0
+    0
+  else
+    debounce.div_ceil (interval.max 1)
+
+-- Commits that landed between two plans and were never planned themselves.
+export skipped_between : Option<u64> -> u64 -> u64
+skipped_between last now =
+  case last of
+    None -> 0
+    Some l -> now.saturating_sub l |> .saturating_sub 1
+
+-- The agent's state, shared by the poller and the worker (one id_effect Ref).
+-- Counters are since the start of the process.
+export data Status
+  { export watch Watch
+  , export done Option<String>
+  , export done_changes Option<u64>
+  , export started u64
+  , export finished u64
+  , export failed u64
+  , export skipped u64
+  , export last_plan Option<u64>
+  , export last_duration f64
+  , export pending bool
+  , export planned_out Option<String>
+  , export running_rev Option<String>
+  , export generation_age Option<u64>
+  , export dotfiles Option<Checkout>
+  , export last_poll Option<u64>
+  , export poll_failures u64
+  }
+  deriving (Debug, Clone, Default, PartialEq)
+
+-- The worker took `head` (at change count `changes`): it is done whatever
+-- the plan's outcome, so a failing commit is not retried until main moves.
+-- Returns the commits skipped since the last plan.
+export taken : Status -> String -> u64 -> (u64, Status)
+taken st sha changes =
+  skipped = skipped_between st.done_changes changes
+  (skipped, Status { done = Some sha, done_changes = Some changes, started = st.started + 1, skipped = st.skipped + skipped, ...st })
+
+-- A plan finished: whether it would switch, to what, how long it took.
+export finished_with : Status -> bool -> String -> u64 -> f64 -> Status
+finished_with st pending out at secs =
+  Status { finished = st.finished + 1, last_plan = Some at, last_duration = secs, pending, planned_out = Some out, ...st }
+
+-- A plan failed.
+export failed_with : Status -> u64 -> f64 -> Status
+failed_with st at secs =
+  Status { finished = st.finished + 1, failed = st.failed + 1, last_plan = Some at, last_duration = secs, ...st }
+
+#[cfg(test)]
+head : &str -> Head
+head sha = Head { sha = sha.to_string (), time = 0, signed = false }
+
+test "a head that moves restarts the quiet count, one that stays does not"
+  w1 = observed (Watch::default ()) (head "a")
+  assert_eq! \-> (w1.polls, w1.changed_at, w1.changes) \-> (1, 1, 1)
+  w2 = observed w1 (head "a")
+  assert_eq! \-> (w2.polls, w2.changed_at, w2.changes) \-> (2, 1, 1)
+  w3 = observed w2 (head "b")
+  assert_eq! \-> (w3.polls, w3.changed_at, w3.changes) \-> (3, 3, 2)
+  w4 = unobserved w3
+  assert_eq! \-> (w4.polls, w4.changed_at, w4.head |> .map (\h -> h.sha)) \-> (4, 3, Some (.to_string "b"))
+
+test "nothing seen, or the head already taken, is idle"
+  assert_eq! \-> decide (&Watch::default ()) None 0 \-> Decision::Idle
+  w = observed (Watch::default ()) (head "a")
+  assert_eq! \-> decide (&w) (Some "a") 0 \-> Decision::Idle
+
+test "without a debounce the newest head is planned at once"
+  w = observed (observed (Watch::default ()) (head "a")) (head "b")
+  assert_eq! \-> decide (&w) (Some "a") 0 \-> Decision::Plan (head "b") 2
+
+test "with a debounce main must stay still first"
+  w = observed (Watch::default ()) (head "a")
+  assert_eq! \-> decide (&w) None 2 \-> Decision::Quiet 2
+  w2 = observed (observed w (head "a")) (head "a")
+  assert_eq! \-> decide (&w2) None 2 \-> Decision::Plan (head "a") 1
+  w3 = observed w2 (head "b")
+  assert_eq! \-> decide (&w3) (Some "a") 2 \-> Decision::Quiet 2
+
+test "a debounce in seconds is whole polls, rounded up"
+  assert_eq! \-> quiet_polls_of 0 60 \-> 0
+  assert_eq! \-> quiet_polls_of 1 60 \-> 1
+  assert_eq! \-> quiet_polls_of 600 60 \-> 10
+  assert_eq! \-> quiet_polls_of 601 60 \-> 11
+  assert_eq! \-> quiet_polls_of 5 0 \-> 5
+
+test "the commits between two plans are counted as skipped"
+  assert_eq! \-> skipped_between None 5 \-> 0
+  assert_eq! \-> skipped_between (Some 1) 2 \-> 0
+  assert_eq! \-> skipped_between (Some 1) 6 \-> 4
+  (n, st) = taken (Status::default ()) (.to_string "a") 1
+  (m, st2) = taken st (.to_string "e") 5
+  assert_eq! \-> (n, m, st2.started, st2.skipped, st2.done) \-> (0, 3, 2, 3, Some (.to_string "e"))
+
+test "a finished and a failed plan are both counted as finished"
+  st = finished_with (Status::default ()) true (.to_string "/nix/store/x") 9 1.5
+  assert_eq! \-> (st.finished, st.failed, st.pending, st.last_plan) \-> (1, 0, true, Some 9)
+  st2 = failed_with st 10 2.0
+  assert_eq! \-> (st2.finished, st2.failed, st2.pending, st2.last_plan) \-> (2, 1, true, Some 10)

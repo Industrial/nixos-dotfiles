@@ -1,0 +1,149 @@
+-- vdeploy's command line, parsed into `Options` by a pure function.
+--
+--   vdeploy --host NAME [--once] [--url URL] [--branch NAME] [--repo DIR]
+--           [--interval DURATION] [--debounce DURATION] [--tick DURATION]
+--           [--state-dir DIR] [--textfile-dir DIR] [--db FILE]
+--           [--git PROG] [--nix PROG]
+--           [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP]
+--            [--dotfiles-home DIR]]
+--
+-- Observe mode is the only mode: there is no flag that switches.
+-- Durations are bare seconds or a number with s, m, h or d.
+
+import nix_store_core::db
+
+export const USAGE : &str = "usage: vdeploy --host NAME [--once] [--url URL] [--branch NAME] [--repo DIR] [--interval DURATION] [--debounce DURATION] [--tick DURATION] [--state-dir DIR] [--textfile-dir DIR] [--db FILE] [--git PROG] [--nix PROG] [--dotfiles PATH [--dotfiles-user USER] [--dotfiles-group GROUP] [--dotfiles-home DIR]]"
+
+export const DEFAULT_URL : &str = "https://github.com/Industrial/nixos-dotfiles.git"
+
+export data Options
+  { export host String
+  , export once bool
+  , export url String
+  , export branch String
+  , export repo String
+  , export interval u64
+  , export debounce u64
+  , export tick u64
+  , export state_dir Option<String>
+  , export textfile_dir Option<String>
+  , export db String
+  , export git String
+  , export nix String
+  , export dotfiles Option<String>
+  , export dotfiles_user Option<String>
+  , export dotfiles_group Option<String>
+  , export dotfiles_home Option<String>
+  , export help bool
+  }
+  deriving (Clone, Debug, PartialEq)
+
+export defaults : Options
+defaults = Options { host = String::new (), once = false, url = DEFAULT_URL.to_string (), branch = .to_string "main", repo = .to_string "/var/lib/vdeploy/repo", interval = 60, debounce = 0, tick = 5, state_dir = None, textfile_dir = None, db = db::DEFAULT_DB.to_string (), git = .to_string "git", nix = .to_string "nix", dotfiles = None, dotfiles_user = None, dotfiles_group = None, dotfiles_home = None, help = false }
+
+-- A duration in seconds: bare seconds, or a number with s/m/h/d.
+export parse_duration : &str -> Option<u64>
+parse_duration s =
+  (digits, unit) = case s.char_indices () |> .find (\ic -> !(ic.1.is_ascii_digit ())) of
+    Some (i, _) -> s.split_at i
+    None -> (s, "")
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  scale = case unit of
+    "" -> Some 1
+    "s" -> Some 1
+    "m" -> Some 60
+    "h" -> Some 3600
+    "d" -> Some 86400
+    _ -> None
+  n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1)
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+positive : Option<&String> -> &str -> Result<u64, String>
+positive v flag =
+  text = (value v flag)?
+  parse_duration (&text) |> .filter (\n -> *n > 0) |> .ok_or ("#{flag}: not a positive duration: #{text}")
+
+-- The options in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Options, String>
+parse_args args =
+  mut o = defaults ()
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--host" ->
+        o.host := (value (it.next ()) "--host")?
+      "--once" ->
+        o.once := true
+      "--url" ->
+        o.url := (value (it.next ()) "--url")?
+      "--branch" ->
+        o.branch := (value (it.next ()) "--branch")?
+      "--repo" ->
+        o.repo := (value (it.next ()) "--repo")?
+      "--interval" ->
+        o.interval := (positive (it.next ()) "--interval")?
+      "--tick" ->
+        o.tick := (positive (it.next ()) "--tick")?
+      "--debounce" ->
+        v = (value (it.next ()) "--debounce")?
+        o.debounce := (parse_duration (&v) |> .ok_or ("--debounce: not a duration: #{v}"))?
+      "--state-dir" ->
+        o.state_dir := Some ((value (it.next ()) "--state-dir")?)
+      "--textfile-dir" ->
+        o.textfile_dir := Some ((value (it.next ()) "--textfile-dir")?)
+      "--db" ->
+        o.db := (value (it.next ()) "--db")?
+      "--git" ->
+        o.git := (value (it.next ()) "--git")?
+      "--nix" ->
+        o.nix := (value (it.next ()) "--nix")?
+      "--dotfiles" ->
+        o.dotfiles := Some ((value (it.next ()) "--dotfiles")?)
+      "--dotfiles-user" ->
+        o.dotfiles_user := Some ((value (it.next ()) "--dotfiles-user")?)
+      "--dotfiles-group" ->
+        o.dotfiles_group := Some ((value (it.next ()) "--dotfiles-group")?)
+      "--dotfiles-home" ->
+        o.dotfiles_home := Some ((value (it.next ()) "--dotfiles-home")?)
+      "-h" ->
+        o.help := true
+      "--help" ->
+        o.help := true
+      other ->
+        return Err "unknown argument: #{other}"
+  if !o.help && o.host.is_empty ()
+    return Err (.to_string "--host is required (the nixosConfigurations name of this host)")
+  if o.dotfiles.is_none () && (o.dotfiles_user.is_some () || o.dotfiles_group.is_some () || o.dotfiles_home.is_some ())
+    return Err (.to_string "--dotfiles-user, --dotfiles-group and --dotfiles-home need --dotfiles")
+  Ok o
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "a host is all it needs; the rest has defaults"
+  o = parse_args (&args (&["--host", "drakkar"])) |> .expect "options"
+  assert_eq! \-> o \-> Options { host = .to_string "drakkar", ...defaults () }
+  assert_eq! \-> (o.interval, o.debounce, o.tick, o.url.as_str (), o.branch.as_str ()) \-> (60, 0, 5, DEFAULT_URL, "main")
+
+test "every option is read"
+  o = parse_args (&args (&["--host", "h", "--once", "--url", "u", "--branch", "b", "--repo", "/r", "--interval", "5m", "--debounce", "10m", "--tick", "2", "--state-dir", "/s", "--textfile-dir", "/t", "--db", "/db", "--git", "/g", "--nix", "/n", "--dotfiles", "/home/tom/.dotfiles", "--dotfiles-user", "tom", "--dotfiles-group", "users", "--dotfiles-home", "/home/tom"])) |> .expect "options"
+  assert_eq! \-> (o.once, o.url.as_str (), o.branch.as_str (), o.repo.as_str (), o.interval, o.debounce, o.tick) \-> (true, "u", "b", "/r", 300, 600, 2)
+  assert_eq! \-> (o.state_dir, o.textfile_dir, o.db.as_str (), o.git.as_str (), o.nix.as_str ()) \-> (Some (.to_string "/s"), Some (.to_string "/t"), "/db", "/g", "/n")
+  assert_eq! \-> (o.dotfiles, o.dotfiles_user, o.dotfiles_group, o.dotfiles_home) \-> (Some (.to_string "/home/tom/.dotfiles"), Some (.to_string "tom"), Some (.to_string "users"), Some (.to_string "/home/tom"))
+
+test "bad command lines are refused with the reason"
+  assert! \-> parse_args (&args (&[])) |> .err |> .map (\e -> e.contains "--host is required") |> .unwrap_or false
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--interval", "0"])) \-> Err (.to_string "--interval: not a positive duration: 0")
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--debounce", "x"])) \-> Err (.to_string "--debounce: not a duration: x")
+  assert_eq! \-> parse_args (&args (&["--host", "h", "--switch"])) \-> Err (.to_string "unknown argument: --switch")
+  assert! \-> parse_args (&args (&["--host", "h", "--dotfiles-user", "tom"])) |> .is_err
+  assert! \-> parse_args (&args (&["--help"])) |> .map (\o -> o.help) |> .unwrap_or false
+
+test "durations"
+  assert_eq! \-> (parse_duration "0", parse_duration "90", parse_duration "2m", parse_duration "1h", parse_duration "1d", parse_duration "1w") \-> (Some 0, Some 90, Some 120, Some 3600, Some 86400, None)

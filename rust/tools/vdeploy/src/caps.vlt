@@ -1,0 +1,412 @@
+-- The capabilities the agent needs from the outside, each a class with a
+-- live implementation and a scripted one for tests:
+--
+--   Source   main as vdeploy's own clone sees it: fetch the tip, verify a
+--            commit is on main, read a commit's time;
+--   Nix      evaluate this host's toplevel derivation at a commit;
+--   Fetcher  realise a derivation by substitution only. The live one is
+--            temporary: `nix build --max-jobs 0`, C++ Nix substituting. It is
+--            swapped for vfetch (#155) when that lands; nothing else changes;
+--   Builder  realise it by building (`nix build`), what is left;
+--   Differ   vdiff's schema-1 report of two closures, vdiff's own code
+--            linked as a library (as rust/tools/vbump does);
+--   Host     the running system (its toplevel and the commit it was built
+--            from) and the user's dotfiles checkout.
+--
+-- Nothing here switches a system: observe mode has no such capability.
+
+import std::path::Path
+import std::sync::Arc
+import std::sync::Mutex
+import std::sync::atomic::{AtomicU64, Ordering}
+import std::time::Duration
+import id_effect::{Effect, HNil, Never, fail, sleep, succeed, suspend}
+import vdiff::closure::{both, resolve}
+import vdiff::report::{diff, render_json}
+import crate::common::{DeployError, cmd, first_line, lifted, run, asked, strs}
+import crate::common::DeployError::{Diff, Eval, Fetch, Realise, System, Unverified}
+import crate::dotfiles::{Checkout, Dotfiles, fast_forward}
+import crate::watch::Head
+
+-- The system this host runs: its toplevel store path, and the commit it was
+-- built from (`system.configurationRevision`), when it records one.
+export data Running { export rev Option<String>, export toplevel String }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+export class Source
+  head : &self -> Effect<Head, DeployError, HNil>
+  verify : &self -> String -> Effect<(), DeployError, HNil>
+  commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
+
+export class Nix
+  drv : &self -> String -> Effect<String, DeployError, HNil>
+
+export class Fetcher
+  fetch : &self -> String -> Effect<Option<String>, DeployError, HNil>
+
+export class Builder
+  build : &self -> String -> Effect<String, DeployError, HNil>
+
+export class Differ
+  json : &self -> String -> String -> Effect<String, DeployError, HNil>
+
+export class Host
+  running : &self -> Effect<Running, DeployError, HNil>
+  dotfiles : &self -> String -> Effect<Checkout, Never, HNil>
+
+export newtype SourceTool = SourceTool (export Arc<dyn Source + Send + Sync>)
+export newtype NixTool = NixTool (export Arc<dyn Nix + Send + Sync>)
+export newtype FetcherTool = FetcherTool (export Arc<dyn Fetcher + Send + Sync>)
+export newtype BuilderTool = BuilderTool (export Arc<dyn Builder + Send + Sync>)
+export newtype DifferTool = DifferTool (export Arc<dyn Differ + Send + Sync>)
+export newtype HostTool = HostTool (export Arc<dyn Host + Send + Sync>)
+
+instance Clone SourceTool
+  clone : &self -> Self
+  clone self = SourceTool (Arc::clone (&self.0))
+
+instance Clone NixTool
+  clone : &self -> Self
+  clone self = NixTool (Arc::clone (&self.0))
+
+instance Clone FetcherTool
+  clone : &self -> Self
+  clone self = FetcherTool (Arc::clone (&self.0))
+
+instance Clone BuilderTool
+  clone : &self -> Self
+  clone self = BuilderTool (Arc::clone (&self.0))
+
+instance Clone DifferTool
+  clone : &self -> Self
+  clone self = DifferTool (Arc::clone (&self.0))
+
+instance Clone HostTool
+  clone : &self -> Self
+  clone self = HostTool (Arc::clone (&self.0))
+
+-- Everything the agent needs, wired once at the edge.
+export data Caps
+  { export source SourceTool
+  , export nix NixTool
+  , export fetcher FetcherTool
+  , export builder BuilderTool
+  , export differ DifferTool
+  , export host HostTool
+  }
+  deriving (Clone)
+
+-- Live Source: vdeploy's own clone at `repo` (created on first use; never
+-- the user's checkout), fetched from `url`.
+export data LiveSource { export git String, export repo String, export url String, export branch String }
+
+git_in : &LiveSource -> &[&str] -> Result<String, String>
+git_in s args =
+  mut all = strs (&["-C", s.repo.as_str ()])
+  for a in args
+    all.push (a.to_string ())
+  run (&cmd (&s.git) all) |> .map (\r -> r.stdout)
+
+remote_ref : &LiveSource -> String
+remote_ref s = "refs/remotes/origin/#{s.branch}"
+
+-- Whether a raw commit object carries a signature made by GitHub (a merge
+-- through its web UI or API).
+export signed_by_github : &str -> bool
+signed_by_github raw =
+  header = raw.split_once "\n\n" |> .map (\p -> p.0) |> .unwrap_or raw
+  has_sig = header.lines () |> .any (\l -> l.starts_with "gpgsig ")
+  by_github = header.lines () |> .any (\l -> l.starts_with "committer GitHub <noreply@github.com>")
+  has_sig && by_github
+
+fetch_head : LiveSource -> Result<Head, DeployError>
+fetch_head s =
+  if !(Path::new (&s.repo) |> .join ".git" |> .exists)
+    (std::fs::create_dir_all (&s.repo) |> .map_err (\e -> Fetch ("creating #{s.repo}: #{e}")))?
+    (run (&cmd (&s.git) (strs (&["init", "--quiet", "--initial-branch", s.branch.as_str (), s.repo.as_str ()]))) |> .map_err Fetch)?
+  refspec = "+refs/heads/#{s.branch}:#{remote_ref (&s)}"
+  (git_in (&s) (&["fetch", "--no-recurse-submodules", "--quiet", s.url.as_str (), refspec.as_str ()]) |> .map_err Fetch)?
+  tip = "#{remote_ref (&s)}^{commit}"
+  sha = first_line (&(git_in (&s) (&["rev-parse", "--verify", tip.as_str ()]) |> .map_err Fetch)?)
+  -- The local branch follows main, so the clone's HEAD resolves for Nix.
+  local = "refs/heads/#{s.branch}"
+  (git_in (&s) (&["update-ref", local.as_str (), sha.as_str ()]) |> .map_err Fetch)?
+  time_text = (git_in (&s) (&["show", "-s", "--format=%ct", sha.as_str ()]) |> .map_err Fetch)?
+  time = first_line (&time_text) |> .parse |> .unwrap_or 0
+  raw = (git_in (&s) (&["cat-file", "commit", sha.as_str ()]) |> .map_err Fetch)?
+  Ok (Head { sha, time, signed = signed_by_github (&raw) })
+
+-- A commit is deployable only when it is on main as last fetched.
+verify_on_main : LiveSource -> String -> Result<(), DeployError>
+verify_on_main s sha =
+  mut all = strs (&["-C", s.repo.as_str (), "merge-base", "--is-ancestor", sha.as_str ()])
+  all.push (remote_ref (&s))
+  on_main = (asked (&cmd (&s.git) all) |> .map_err (\e -> Unverified ("#{sha}: #{e}")))?
+  if on_main
+    Ok ()
+  else
+    Err (Unverified ("#{sha} is not on #{remote_ref (&s)}"))
+
+time_of : LiveSource -> String -> Option<u64>
+time_of s rev =
+  git_in (&s) (&["show", "-s", "--format=%ct", rev.as_str ()]) |> .ok |> .and_then (\t -> first_line (&t) |> .parse |> .ok)
+
+instance Source LiveSource
+  head : &self -> Effect<Head, DeployError, HNil>
+  head self =
+    s = self.clone ()
+    suspend (move \-> lifted (fetch_head s))
+  verify : &self -> String -> Effect<(), DeployError, HNil>
+  verify self sha =
+    s = self.clone ()
+    suspend (move \-> lifted (verify_on_main s sha))
+  commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
+  commit_time self rev =
+    s = self.clone ()
+    suspend (move \-> succeed (time_of s rev))
+
+-- Every nix call gets the flake features, whatever the machine's nix.conf.
+export nix_args : &[&str] -> Vec<String>
+nix_args rest =
+  mut args = strs (&["--extra-experimental-features", "nix-command flakes"])
+  for a in rest
+    args.push (a.to_string ())
+  args
+
+-- The attribute of a host's toplevel derivation at a commit of `repo`. The
+-- flake is the commit (`?rev=`), never a work tree.
+export toplevel_attr : &str -> &str -> &str -> String
+toplevel_attr repo sha host = "git+file://#{repo}?rev=#{sha}#nixosConfigurations.\"#{host}\".config.system.build.toplevel.drvPath"
+
+export data LiveNix { export nix String, export repo String, export host String }
+
+eval_drv : String -> String -> Result<String, DeployError>
+eval_drv nix attr =
+  out = (run (&cmd (&nix) (nix_args (&["eval", "--raw", attr.as_str ()]))) |> .map_err (\e -> Eval ("evaluating #{attr}: #{e}")))?
+  Ok (out.stdout.trim () |> .to_string)
+
+instance Nix LiveNix
+  drv : &self -> String -> Effect<String, DeployError, HNil>
+  drv self sha =
+    nix = self.nix.clone ()
+    attr = toplevel_attr (&self.repo) (&sha) (&self.host)
+    suspend (move \-> lifted (eval_drv nix attr))
+
+-- The output to realise: a toplevel has one, `out`.
+export installable : &str -> String
+installable drv = "#{drv}^out"
+
+-- The temporary Fetcher: C++ Nix with no local build slots, so it can only
+-- substitute (or hand a build to the build hook, which declines where there
+-- are no remote builders). Anything it cannot fetch is the Builder's.
+export data NixFetcher { export nix String }
+
+substituted : String -> String -> Result<Option<String>, DeployError>
+substituted nix drv =
+  target = installable (&drv)
+  c = cmd (&nix) (nix_args (&["build", "--no-link", "--print-out-paths", "--max-jobs", "0", target.as_str ()]))
+  case run (&c) of
+    Ok ran -> Ok (Some (first_line (&ran.stdout)))
+    Err why ->
+      eprintln! \-> "vdeploy: fetcher: not every path is substitutable, building: #{first_line (&crate::common::tail_lines (&why) 1)}"
+      Ok None
+
+instance Fetcher NixFetcher
+  fetch : &self -> String -> Effect<Option<String>, DeployError, HNil>
+  fetch self drv =
+    nix = self.nix.clone ()
+    suspend (move \-> lifted (substituted nix drv))
+
+export data NixBuilder { export nix String }
+
+built : String -> String -> Result<String, DeployError>
+built nix drv =
+  target = installable (&drv)
+  c = cmd (&nix) (nix_args (&["build", "--no-link", "--print-out-paths", target.as_str ()]))
+  ran = (run (&c) |> .map_err (\e -> Realise ("building #{drv}: #{e}")))?
+  Ok (first_line (&ran.stdout))
+
+instance Builder NixBuilder
+  build : &self -> String -> Effect<String, DeployError, HNil>
+  build self drv =
+    nix = self.nix.clone ()
+    suspend (move \-> lifted (built nix drv))
+
+-- The live diff, on the store database at `db`.
+export data Vdiff { export db String }
+
+resolved : String -> String -> Result<(vdiff::closure::Root, vdiff::closure::Root), DeployError>
+resolved old new =
+  a = (resolve (&old) |> .map_err (\e -> Diff (e.to_string ())))?
+  b = (resolve (&new) |> .map_err (\e -> Diff (e.to_string ())))?
+  Ok ((a, b))
+
+walked : String -> (vdiff::closure::Root, vdiff::closure::Root) -> Effect<String, DeployError, HNil>
+walked db roots =
+  (a, b) = roots
+  both db a b |> .map_err (\e -> Diff (e.to_string ())) |> .map (\pair -> render_json (&diff (&pair.0) (&pair.1)))
+
+instance Differ Vdiff
+  json : &self -> String -> String -> Effect<String, DeployError, HNil>
+  json self old new =
+    db = self.db.clone ()
+    suspend (move \-> lifted (resolved old new)) |> .flat_map (move \roots -> walked db roots)
+
+-- The live host: the running system's link, its nixos-version, and the
+-- user's checkout when vdeploy manages one.
+export data LiveHost { export current String, export nixos_version String, export checkout Option<Dotfiles> }
+  deriving (Debug, Clone)
+
+running_now : String -> String -> Result<Running, DeployError>
+running_now current nixos_version =
+  path = (std::fs::canonicalize (&current) |> .map_err (\e -> System ("#{current}: #{e}")))?
+  toplevel = path.to_string_lossy () |> .to_string
+  rev = run (&cmd (&nixos_version) (strs (&["--configuration-revision"]))) |> .ok |> .map (\r -> first_line (&r.stdout)) |> .filter (\r -> !(r.is_empty ()) && r != "unknown")
+  Ok (Running { rev, toplevel })
+
+checked_out : Option<Dotfiles> -> String -> Effect<Checkout, Never, HNil>
+checked_out d head =
+  case d of
+    None -> succeed Checkout::Disabled
+    Some dots -> succeed (fast_forward (&dots) (&head))
+
+instance Host LiveHost
+  running : &self -> Effect<Running, DeployError, HNil>
+  running self =
+    current = self.current.clone ()
+    nv = self.nixos_version.clone ()
+    suspend (move \-> lifted (running_now current nv))
+  dotfiles : &self -> String -> Effect<Checkout, Never, HNil>
+  dotfiles self head =
+    d = self.checkout.clone ()
+    suspend (move \-> checked_out d head)
+
+-- The live capabilities.
+export data Wiring { export git String, export nix String, export repo String, export url String, export branch String, export host String, export db String, export checkout Option<Dotfiles> }
+  deriving (Debug, Clone)
+
+export live : Wiring -> Caps
+live w =
+  source = SourceTool (Arc::new (LiveSource { git = w.git.clone (), repo = w.repo.clone (), url = w.url.clone (), branch = w.branch.clone () }))
+  nix = NixTool (Arc::new (LiveNix { nix = w.nix.clone (), repo = w.repo.clone (), host = w.host.clone () }))
+  fetcher = FetcherTool (Arc::new (NixFetcher { nix = w.nix.clone () }))
+  builder = BuilderTool (Arc::new (NixBuilder { nix = w.nix.clone () }))
+  differ = DifferTool (Arc::new (Vdiff { db = w.db.clone () }))
+  host = HostTool (Arc::new (LiveHost { current = .to_string "/run/current-system", nixos_version = .to_string "/run/current-system/sw/bin/nixos-version", checkout = w.checkout }))
+  Caps { source, nix, fetcher, builder, differ, host }
+
+-- A scripted world, for tests. Poll n (from 1) sees `heads[n-1]`, or the
+-- last head once the list runs out: commits that arrive one per poll, then
+-- stop. Every build takes `build_secs` on the executor's clock and is
+-- recorded when it starts and when it finishes; a build of a derivation
+-- naming one of `failing` fails.
+export data Scripted
+  { export heads Vec<String>
+  , export polls Arc<AtomicU64>
+  , export build_secs u64
+  , export started Arc<Mutex<Vec<String>>>
+  , export finished Arc<Mutex<Vec<String>>>
+  , export failing Vec<String>
+  }
+  deriving (Clone, Default)
+
+pushed : Arc<Mutex<Vec<String>>> -> String -> Effect<(), DeployError, HNil>
+pushed log item =
+  case log.lock () of
+    Ok held ->
+      mut v = held
+      v.push item
+    Err _ -> ()
+  succeed (())
+
+export sha_of_drv : &str -> String
+sha_of_drv drv = drv.trim_start_matches "/nix/store/" |> .trim_end_matches ".drv" |> .to_string
+
+ended : Arc<Mutex<Vec<String>>> -> String -> bool -> Effect<String, DeployError, HNil>
+ended log drv fails =
+  sha = sha_of_drv (&drv)
+  if fails
+    pushed log (sha.clone ()) |> .flat_map (move \_ -> fail (Realise ("building #{drv}: scripted failure")))
+  else
+    pushed log (sha.clone ()) |> .map (move \_ -> "/nix/store/out-#{sha}")
+
+instance Source Scripted
+  head : &self -> Effect<Head, DeployError, HNil>
+  head self =
+    n = self.polls.fetch_add 1 Ordering::SeqCst
+    i = (usize::try_from n |> .unwrap_or 0).min (self.heads.len ().saturating_sub 1)
+    case self.heads.get i of
+      Some sha -> succeed (Head { sha = sha.clone (), time = n, signed = false })
+      None -> fail (Fetch (.to_string "no heads scripted"))
+  verify : &self -> String -> Effect<(), DeployError, HNil>
+  verify self _sha = succeed (())
+  commit_time : &self -> String -> Effect<Option<u64>, Never, HNil>
+  commit_time self _rev = succeed (Some 0)
+
+instance Nix Scripted
+  drv : &self -> String -> Effect<String, DeployError, HNil>
+  drv self sha = succeed ("/nix/store/#{sha}.drv")
+
+instance Fetcher Scripted
+  fetch : &self -> String -> Effect<Option<String>, DeployError, HNil>
+  fetch self _drv = succeed None
+
+instance Builder Scripted
+  build : &self -> String -> Effect<String, DeployError, HNil>
+  build self drv =
+    started = self.started.clone ()
+    finished = self.finished.clone ()
+    wait = Duration::from_secs self.build_secs
+    fails = self.failing.iter () |> .any (\f -> drv.contains (f.as_str ()))
+    sha = sha_of_drv (&drv)
+    pushed started sha |> .then (sleep wait : Effect<(), DeployError, HNil>) |> .flat_map (move \_ -> ended finished drv fails)
+
+instance Differ Scripted
+  json : &self -> String -> String -> Effect<String, DeployError, HNil>
+  json self _old _new = succeed (crate::report::SAME.to_string ())
+
+instance Host Scripted
+  running : &self -> Effect<Running, DeployError, HNil>
+  running self = succeed (Running { rev = Some (.to_string "c0"), toplevel = .to_string "/nix/store/old-system" })
+  dotfiles : &self -> String -> Effect<Checkout, Never, HNil>
+  dotfiles self head = succeed (Checkout::UpToDate head)
+
+export scripted : Scripted -> Caps
+scripted s =
+  Caps { source = SourceTool (Arc::new (s.clone ())), nix = NixTool (Arc::new (s.clone ())), fetcher = FetcherTool (Arc::new (s.clone ())), builder = BuilderTool (Arc::new (s.clone ())), differ = DifferTool (Arc::new (s.clone ())), host = HostTool (Arc::new s) }
+
+test "a GitHub-signed commit is told from an unsigned one"
+  signed = "tree t\nparent p\nauthor Tom <t@x> 1 +0000\ncommitter GitHub <noreply@github.com> 1 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----\n\nfeat: x\n"
+  unsigned = "tree t\nauthor Tom <t@x> 1 +0000\ncommitter Tom <t@x> 1 +0000\n\nfeat: x\n"
+  forged = "tree t\ncommitter GitHub <noreply@github.com> 1 +0000\n\ngpgsig in the message\n"
+  assert! \-> signed_by_github signed
+  assert! \-> !(signed_by_github unsigned)
+  assert! \-> !(signed_by_github forged)
+
+test "the toplevel attribute is this host's, at a commit, never the work tree"
+  assert_eq! \-> toplevel_attr "/var/lib/vdeploy/repo" "abc" "drakkar" \-> "git+file:///var/lib/vdeploy/repo?rev=abc#nixosConfigurations.\"drakkar\".config.system.build.toplevel.drvPath"
+  assert_eq! \-> installable "/nix/store/x.drv" \-> "/nix/store/x.drv^out"
+  assert_eq! \-> nix_args (&["eval"]) \-> strs (&["--extra-experimental-features", "nix-command flakes", "eval"])
+
+test "the live source fetches main into its own clone and verifies commits on it"
+  root = std::env::temp_dir () |> .join ("vdeploy-source-#{std::process::id ()}") |> .to_string_lossy |> .to_string
+  std::fs::remove_dir_all (&root) |> .ok
+  std::fs::create_dir_all (&root) |> .expect "scratch"
+  mut c = cmd "sh" (strs (&["-c", "git init -q -b main origin && cd origin && echo 1 > f && git add f && git commit -qm one && git checkout -qb side && echo 2 > f && git commit -qam side && git checkout -q main"]))
+  c.cwd := Some (root.clone ())
+  for kv in [("GIT_AUTHOR_NAME", "t"), ("GIT_AUTHOR_EMAIL", "t@t"), ("GIT_COMMITTER_NAME", "t"), ("GIT_COMMITTER_EMAIL", "t@t")]
+    c.env.push ((kv.0.to_string (), kv.1.to_string ()))
+  run (&c) |> .expect "origin"
+  s = LiveSource { git = .to_string "git", repo = "#{root}/clone", url = "#{root}/origin", branch = .to_string "main" }
+  h = fetch_head (s.clone ()) |> .expect "fetched"
+  assert_eq! \-> h.sha.len () \-> 40
+  assert! \-> h.time > 0 && !h.signed
+  assert! \-> verify_on_main (s.clone ()) (h.sha.clone ()) |> .is_ok
+  origin = "#{root}/origin"
+  side_ran = run (&cmd "git" (strs (&["-C", origin.as_str (), "rev-parse", "side"]))) |> .expect "side"
+  side = side_ran.stdout
+  -- The side branch's commit is not in the clone at all, let alone on main.
+  assert! \-> verify_on_main (s.clone ()) (first_line (&side)) |> .is_err
+  assert_eq! \-> time_of (s.clone ()) (h.sha.clone ()) \-> Some (h.time)
+  assert_eq! \-> fetch_head (s) |> .ok |> .map (\again -> again.sha) \-> Some (h.sha)
+  std::fs::remove_dir_all (&root) |> .ok
