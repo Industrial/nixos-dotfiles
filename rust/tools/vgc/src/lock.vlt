@@ -8,6 +8,7 @@
 
 import id_effect::{Effect, sync}
 import std::fs
+import std::os::unix::fs::OpenOptionsExt
 import crate::effects::{GcError, step}
 
 export const GC_LOCK : &str = "/nix/var/nix/gc.lock"
@@ -16,7 +17,7 @@ export const GC_LOCK : &str = "/nix/var/nix/gc.lock"
 -- waiting for any running collector.
 acquire : Result<fs::File, String>
 acquire =
-  opened = fs::OpenOptions::new () |> .read true |> .write true |> .create true |> .truncate false |> .open GC_LOCK
+  opened = fs::OpenOptions::new () |> .read true |> .write true |> .create true |> .truncate false |> .mode 0o600 |> .open GC_LOCK
   file = (opened.map_err (\e -> "opening #{GC_LOCK}: #{e}"))?
   ((file.lock ()).map_err (\e -> "locking #{GC_LOCK}: #{e}"))?
   Ok file

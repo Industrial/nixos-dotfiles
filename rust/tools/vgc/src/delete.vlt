@@ -93,28 +93,44 @@ deletable g dead ok =
 sql : rusqlite::Error -> String
 sql e = "store database: #{e}"
 
--- Invalidate `bases` (in the given order) in one immediate transaction.
-export invalidate : &str -> &[String] -> Result<(), String>
+-- Invalidate `bases` (in the given order) in one immediate transaction,
+-- returning the ones actually invalidated. Each delete runs in its own
+-- savepoint: one the database refuses (a path registered during the hold
+-- references it, so `on delete restrict` fires) is kept on its own, as Nix
+-- skips a path in use, and since referrers come first the refusal carries
+-- through to everything that path references.
+export invalidate : &str -> &[String] -> Result<Vec<String>, String>
 invalidate db bases =
   conn = ((Connection::open db).map_err sql)?
-  ((conn.busy_timeout (Duration::from_secs 600)).map_err sql)?
+  ((conn.busy_timeout (Duration::from_secs 60)).map_err sql)?
   ((conn.execute_batch "PRAGMA foreign_keys = ON; BEGIN IMMEDIATE").map_err sql)?
   outcome = delete_rows (&conn) bases
   case outcome of
-    Ok _ -> (conn.execute_batch "COMMIT").map_err sql
+    Ok done ->
+      ((conn.execute_batch "COMMIT").map_err sql)?
+      Ok done
     Err e ->
       _ := conn.execute_batch "ROLLBACK"
       Err e
 
-delete_rows : &Connection -> &[String] -> Result<(), String>
+delete_rows : &Connection -> &[String] -> Result<Vec<String>, String>
 delete_rows conn bases =
   mut stmt = ((conn.prepare "DELETE FROM ValidPaths WHERE path = ?1").map_err sql)?
+  mut done = Vec::new () : Vec<String>
   for b in bases.iter ()
     p = full b
-    n = ((stmt.execute ([p.as_str ()])).map_err sql)?
-    if n != 1
-      eprintln! \-> "vgc: #{p} was not valid any more"
-  Ok ()
+    ((conn.execute_batch "SAVEPOINT vgc_path").map_err sql)?
+    case stmt.execute ([p.as_str ()]) of
+      Ok n ->
+        ((conn.execute_batch "RELEASE vgc_path").map_err sql)?
+        if n == 1
+          done.push (b.clone ())
+        else
+          eprintln! \-> "vgc: #{p} was not valid any more"
+      Err e ->
+        ((conn.execute_batch "ROLLBACK TO vgc_path; RELEASE vgc_path").map_err sql)?
+        eprintln! \-> "vgc: keeping #{p}: #{e}"
+  Ok done
 
 -- Bytes a file holds that no other link shares.
 own_bytes : &fs::Metadata -> u64
@@ -124,16 +140,32 @@ own_bytes m =
   else
     0
 
+-- What a store entry holds that no other link shares. Read-only: a
+-- directory swapped for a symlink mid-walk can only skew the count.
+export tree_bytes : &Path -> u64
+tree_bytes p =
+  case fs::symlink_metadata p of
+    Err _ -> 0
+    Ok m | m.is_dir () ->
+      mut total = 0 : u64
+      if fs::read_dir p is Ok entries
+        for entry in entries
+          if entry is Ok e
+            total += tree_bytes (&(e.path ()))
+      total
+    Ok m -> own_bytes (&m)
+
 -- Remove a store entry (directory, file or symlink), counting what it freed.
+-- Directories go through `remove_dir_all`, which on Linux works relative to
+-- open directory fds (openat/unlinkat, never following a symlink), as Nix's
+-- `deletePath` does: a writer inside the entry who swaps a directory for a
+-- symlink cannot steer root's deletion out of the store.
 export remove_tree : &Path -> std::io::Result<u64>
 remove_tree p =
   m = (fs::symlink_metadata p)?
   if m.is_dir ()
-    mut freed = 0 : u64
-    for entry in (fs::read_dir p)?
-      sub = (entry?).path ()
-      freed += (remove_tree (&sub))?
-    (fs::remove_dir p)?
+    freed = tree_bytes p
+    (fs::remove_dir_all p)?
     Ok freed
   else
     own = own_bytes (&m)
@@ -176,7 +208,7 @@ in_use name =
   if name.starts_with "tmp-"
     case fs::File::open (Path::new STORE_DIR |> .join name) of
       Ok d -> (d.try_lock ()).is_err ()
-      Err _ -> false
+      Err _ -> true
   else
     false
 
@@ -248,6 +280,26 @@ test "referrers come before what they reference"
   assert! \-> deletable (&g) (&[0, 1, 2]) (&[false, true, true, true]) == none
   -- The oracle keeps lib: app may go, libc may not.
   assert! \-> deletable (&g) (&[0, 1, 2]) (&[true, false, true, true]) == vec![0]
+
+test "a path still referenced is kept on its own and the rest invalidated"
+  db = std::env::temp_dir () |> .join "vgc-invalidate-test.sqlite"
+  _ := fs::remove_file (&db)
+  conn = (Connection::open (&db)).unwrap ()
+  -- Nix's schema, the parts the constraint depends on (src/libstore/schema.sql).
+  _ := conn.execute_batch """
+    create table ValidPaths (id integer primary key autoincrement not null, path text unique not null);
+    create table Refs (referrer integer not null, reference integer not null, primary key (referrer, reference),
+      foreign key (referrer) references ValidPaths(id) on delete cascade,
+      foreign key (reference) references ValidPaths(id) on delete restrict);
+    create trigger DeleteSelfRefs before delete on ValidPaths begin delete from Refs where referrer = old.id and reference = old.id; end;
+    insert into ValidPaths (path) values ('/nix/store/aaaa-app'), ('/nix/store/bbbb-lib'), ('/nix/store/cccc-new'), ('/nix/store/dddd-solo');
+    insert into Refs values (1, 2), (3, 2), (4, 4);
+    """
+  drop conn
+  -- app and lib are doomed; `new` (registered during the hold) still references lib.
+  done = (invalidate (db.to_str ().unwrap ()) (&["aaaa-app".to_string (), "bbbb-lib".to_string (), "dddd-solo".to_string ()])).unwrap ()
+  assert! \-> done == vec!["aaaa-app".to_string(), "dddd-solo".to_string()]
+  _ := fs::remove_file (&db)
 
 test "removing a tree counts only bytes no other link shares"
   base = std::env::temp_dir () |> .join "vgc-remove-tree-test"

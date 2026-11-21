@@ -244,9 +244,10 @@ invalidated a oracle_dead =
     if oracle_dead.is_some ()
       println! \-> "verify: nix agrees on #{d.valid.len () + d.others.len ()} paths, #{d.dropped} kept because only vgc called them dead"
     t = Instant::now ()
-    (invalidate db::DB_PATH (&d.valid))?
-    eprintln! \-> "vgc: invalidated #{d.valid.len ()} paths in #{t.elapsed ().as_millis ()}ms"
-    mut all = d.valid.clone ()
+    -- Only what the database actually let go is removed from disk.
+    done = (invalidate db::DB_PATH (&d.valid))?
+    eprintln! \-> "vgc: invalidated #{done.len ()} of #{d.valid.len ()} paths in #{t.elapsed ().as_millis ()}ms"
+    mut all = done
     all.extend (d.others.iter ().cloned ())
     Ok all
 
