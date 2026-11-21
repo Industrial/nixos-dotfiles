@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# Wait until a merged commit is actually running on a fleet host, then probe it.
+#
+# Agent tooling (ticket-lifecycle Stage 6), not fleet runtime: nothing on a host calls
+# this. It is the dotfiles sibling of ticket-lifecycle's watch-deploy.sh, with the same
+# exit codes.
+#
+# comin on each host pulls origin/main and switches (features/fleet/comin.nix), so
+# "merged" is not "deployed". Every host records the commit it was built from in
+# system.configurationRevision (lib/mk-host.nix), and `nixos-version
+# --configuration-revision` reads it back. A host counts as deployed when that commit
+# CONTAINS ours: equal to it, or a descendant of it that is on origin/main. comin skips
+# straight to the newest main, so a later merge carrying ours is still ours deployed.
+#
+# The current host is asked directly; any other host over
+# `ssh -o BatchMode=yes tom@<host> bash -s` (the fleet's login shell is nushell, so the
+# command goes in on stdin, not as an ssh argument). The probe runs the same way.
+#
+# Usage:  watch-fleet <sha> [--host drakkar] [--probe '<cmd>'] [--interval 30] [--timeout-min 40]
+#
+# Exit:   0 deployed and healthy (the probe passed, or none was given)
+#         1 deployed, but the probe failed three times in a row
+#         2 timed out (the host never ran a commit containing <sha>)
+#         3 host unreachable on five attempts in a row
+#         64 usage
+set -uo pipefail
+
+usage() {
+    echo "usage: watch-fleet <sha> [--host drakkar] [--probe '<cmd>'] [--interval 30] [--timeout-min 40]" >&2
+    exit 64
+}
+
+sha=""; host=drakkar; probe=""; interval=30; timeout_min=40
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --host) host="${2:?}"; shift 2 ;;
+        --probe) probe="${2:?}"; shift 2 ;;
+        --interval) interval="${2:?}"; shift 2 ;;
+        --timeout-min) timeout_min="${2:?}"; shift 2 ;;
+        -h|--help) usage ;;
+        -*) echo "watch-fleet: unknown flag $1" >&2; usage ;;
+        *) [ -z "$sha" ] || usage; sha="$1"; shift ;;
+    esac
+done
+[ -n "$sha" ] || usage
+[[ "$interval" =~ ^[0-9]+$ && "$timeout_min" =~ ^[0-9]+$ ]] || usage
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.." || exit 64
+
+git fetch -q origin main || true
+sha="$(git rev-parse --verify --quiet "$sha^{commit}")" || {
+    echo "watch-fleet: $sha is not a commit known here (fetch origin main?)" >&2; exit 64; }
+
+# Run a bash script (given as $1) on the host: in place when it is this machine.
+on_host() {
+    if [ "$host" = "$(uname -n)" ]; then
+        bash -c "$1"
+    else
+        ssh -o BatchMode=yes -o ConnectTimeout=15 "tom@$host" bash -s <<<"$1"
+    fi
+}
+
+contains() {  # does deployed commit $1 contain our sha, on origin/main?
+    [[ "$1" =~ ^[0-9a-f]{40}$ ]] || return 1
+    git cat-file -e "$1^{commit}" 2>/dev/null || git fetch -q origin main || true
+    git merge-base --is-ancestor "$sha" "$1" 2>/dev/null &&
+        git merge-base --is-ancestor "$1" origin/main 2>/dev/null
+}
+
+deadline=$(( $(date +%s) + timeout_min * 60 ))
+echo "watch-fleet: waiting for ${sha:0:9} on $host (timeout ${timeout_min}m)"
+fails=0; probe_fails=0; last=""
+while :; do
+    # A system built before configurationRevision was set makes nixos-version exit 1;
+    # that is "not deployed yet", not "unreachable", so only ssh failing counts.
+    if ! rev="$(on_host 'nixos-version --configuration-revision 2>/dev/null || true')"; then
+        fails=$((fails + 1))
+        echo "watch-fleet: $host unreachable (attempt $fails)" >&2
+        [ "$fails" -ge 5 ] && exit 3
+    else
+        fails=0
+        [ "$rev" != "$last" ] && echo "watch-fleet: $host runs ${rev:-<no revision>}"
+        last="$rev"
+        if contains "$rev"; then
+            if [ -z "$probe" ]; then echo "DEPLOYED: $host runs ${rev:0:9}, no probe"; exit 0; fi
+            if on_host "$probe"; then echo "DEPLOYED: $host runs ${rev:0:9}, probe passed"; exit 0; fi
+            probe_fails=$((probe_fails + 1))
+            echo "watch-fleet: deployed but the probe failed (attempt $probe_fails)" >&2
+            [ "$probe_fails" -ge 3 ] && { echo "FAILED: probe on $host at ${rev:0:9}" >&2; exit 1; }
+        fi
+    fi
+    [ "$(date +%s)" -ge "$deadline" ] && { echo "TIMEOUT: $host runs ${last:-nothing known}, not ${sha:0:9}" >&2; exit 2; }
+    sleep "$interval"
+done
