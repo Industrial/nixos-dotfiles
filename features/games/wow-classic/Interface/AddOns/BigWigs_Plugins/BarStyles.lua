@@ -6,15 +6,44 @@
 do
 	local L = BigWigsAPI:GetLocale("BigWigs")
 	BigWigsAPI:RegisterBarStyle("Default", {
-		apiVersion = 1,
-		version = 1,
+		barDecorationEnabled = true,
 		--barSpacing = 1,
-		--barHeight = 16,
+		--barHeight = 18,
+		--expBarHeight = 22,
+		--barHeightOffset = 0,
+		--expBarHeightOffset = 0,
+		--texture = "BantoBar",
+		--fill = false,
+		--fontName = "Noto Sans Regular",
 		--fontSizeNormal = 10,
 		--fontSizeEmphasized = 13,
 		--fontOutline = "NONE",
-		spellIndicatorsOffset = 2,
-		--GetSpacing = function(bar) end,
+		--monochrome = false,
+		--borderName = "None",
+		--borderColor = { 0, 0, 0, 1 },
+		--borderOffset = 0,
+		--borderSize = 1,
+		--backgroundName = "None",
+		--backgroundColor = { 0, 0, 0, 1 },
+		--icon = true,
+		--iconPosition = "LEFT",
+		--detachedIcon = false,
+		--iconOffset = 2,
+		--iconWidthOffset = 0,
+		--iconZoom = 0.14,
+		--iconKeepAspectRatio = true,
+		--alignText = "LEFT",
+		--textOffsetX = 0,
+		--textOffsetY = 0,
+		--alignTime = "RIGHT",
+		--timeOffsetX = 0,
+		--timeOffsetY = 0,
+		--spellIndicatorsPosition = "LEFT",
+		--spellIndicatorsOffset = 2,
+		--spellIndicatorsSize = 4,
+		--barColor = { 0.25, 0.33, 0.68, 1 },
+		--barEmphasized = { 1, 0, 0, 1 },
+		--barBackground = { 0.5, 0.5, 0.5, 0.3 },
 		--ApplyStyle = function(bar) end,
 		--BarStopped = function(bar) end,
 		GetStyleName = function()
@@ -24,169 +53,98 @@ do
 end
 
 if BigWigsLoader.isModern then
-	--local atlasInfo = { -- from C_Texture.GetAtlasInfo
-	--	["UI-HUD-CoolDownManager-Bar"] = {"Interface/AddOns/BigWigs/Media/Textures/UICooldownManager2x", 0.341796875, 0.826177875, 00.16015625, 0.23828125, 0, 8, 10, 8, 8},
-	--	["UI-HUD-CoolDownManager-Bar-BG"] = {"Interface/AddOns/BigWigs/Media/Textures/UICooldownManager2x", 0.341796875, 0.857421875, 0.00390625, 0.15234375, 1, 242, 14, 20, 22},
-	--	["UI-HUD-CoolDownManager-IconOverlay"] = {"Interface/AddOns/BigWigs/Media/Textures/UICooldownManager2x", 0.001953125, 0.337890625, 0.00390625, 0.67578125},
-	--	["UI-HUD-CoolDownManager-Mask"] = {"Interface/AddOns/BigWigs/Media/Textures/UICooldownManagerMask", 0, 1, 0, 1},
-	--}
-	local function SetTexureFromAtlas(texture, atlas)
-		texture:SetAtlas(atlas)
-		-- XXX slice margins aren't saving so it's stretching the bg, statusbar is just fucked. not sure where things are getting messed up
-		-- local file, left, right, top, bottom, sliceMode, marginLeft, marginTop, marginRight, marginBottom = unpack(atlasInfo[atlas])
-		-- texture:SetTexture(file)
-		-- texture:SetTexCoord(left, right, top, bottom)
-		-- if sliceMode then
-		-- 	texture:SetTextureSliceMode(sliceMode)
-		-- 	texture:SetTextureSliceMargins(marginLeft, marginTop, marginRight, marginBottom)
-		-- end
-	end
-
-	local iconFramePool = {}
-
 	local function removeStyle(bar)
-		local iconFrame = bar:Get("bigwigs:blizzardtimeline:icon")
-		if iconFrame then
-			iconFrame:SetParent(nil)
-			iconFrame:ClearAllPoints()
-			iconFrame:Hide()
-			iconFramePool[#iconFramePool + 1] = iconFrame
+		if bar.blizzIconMask then
+			bar.candyBarIconFrame:RemoveMaskTexture(bar.blizzIconMask)
+			bar.blizzIconOverlay:Hide()
 		end
 
-		local barHeight = bar:GetHeight()
 		local statusbar = bar.candyBarBar
-
-		local barTexture = bar:Get("bigwigs:restorebartexture")
-		if barTexture then
-			bar:SetTexture(barTexture)
+		if statusbar.blizzSpark then
+			statusbar.blizzSpark:Hide()
 		end
-		statusbar:GetStatusBarTexture():SetTexCoord(0, 1, 0, 1)
-		statusbar:GetStatusBarTexture():ClearTextureSlice()
-		statusbar:GetStatusBarTexture():ClearVertexOffsets()
+
+		local statusBarTexture = statusbar:GetStatusBarTexture()
+		statusBarTexture:SetTexCoord(0, 1, 0, 1)
+		statusBarTexture:ClearTextureSlice()
+		statusBarTexture:ClearVertexOffsets()
 
 		local bg = bar.candyBarBackground
 		bg:SetTexCoord(0, 1, 0, 1)
 		bg:ClearTextureSlice()
 		bg:ClearVertexOffsets()
 		bg:SetAllPoints()
-		local bgColor = bar:Get("bigwigs:restorebarcolor")
-		if bgColor then
-			bar:SetBackgroundColor(bgColor[1], bgColor[2], bgColor[3], bgColor[4])
-		end
-
-		bar:SetHeight(barHeight) -- Note, calling SetHeight resets all the points for the statusbar and the icon, so we don't need to do it
-
-		local duration = bar.candyBarDuration
-		duration:ClearAllPoints()
-		duration:SetPoint("TOPLEFT", statusbar, "TOPLEFT", 2, 0)
-		duration:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", -2, 0)
-
-		local label = bar.candyBarLabel
-		label:ClearAllPoints()
-		label:SetPoint("TOPLEFT", statusbar, "TOPLEFT", 2, 0)
-		label:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", -2, 0)
 	end
 
 	local function styleBar(bar)
-		local barHeight = bar:GetHeight()
+		local icon = bar.candyBarIconFrame
+		if not bar.blizzIconMask then
+			local mask = bar:CreateMaskTexture(nil, "ARTWORK")
+			mask:SetPoint("TOPLEFT", icon, "TOPLEFT", 0, -1)
+			mask:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 0, 0)
+			mask:SetAtlas("UI-HUD-CoolDownManager-Mask")
+			bar.blizzIconMask = mask
 
-		-- Replicating the layering in the template was annoying, so just create our own icon frame
-		local iconTexture = bar:GetIcon()
-		bar.candyBarIconFrame:Hide()
-
-		local iconFrame = tremove(iconFramePool)
-		if not iconFrame then
-			iconFrame = CreateFrame("Frame")
-
-			local mask = iconFrame:CreateMaskTexture(nil, "ARTWORK")
-			mask:SetPoint("TOPLEFT", 0, -1)
-			mask:SetPoint("BOTTOMRIGHT", 0, 0)
-			-- mask:SetTexture("Interface/AddOns/BigWigs/Media/UICooldownManagerMask")
-			SetTexureFromAtlas(mask, "UI-HUD-CoolDownManager-Mask")
-
-			local icon = iconFrame:CreateTexture(nil, "ARTWORK")
-			icon:SetPoint("TOPLEFT", 0, 0)
-			icon:SetPoint("BOTTOMRIGHT", 0, 0)
-			icon:AddMaskTexture(mask)
-			iconFrame.icon = icon
-
-			local overlay = iconFrame:CreateTexture(nil, "OVERLAY")
-			overlay:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -7, 6)
-			overlay:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 7, -7)
-			SetTexureFromAtlas(overlay, "UI-HUD-CoolDownManager-IconOverlay")
+			local overlay = bar:CreateTexture(nil, "OVERLAY")
+			overlay:SetPoint("TOPLEFT", icon, "TOPLEFT", -7, 6)
+			overlay:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 7, -7)
+			overlay:SetAtlas("UI-HUD-CoolDownManager-IconOverlay")
+			bar.blizzIconOverlay = overlay
 		end
-		if bar.candyBarIconFrame:GetScript("OnEnter") then
-			iconFrame.icon.bwID = bar.candyBarIconFrame.bwID
-			iconFrame.icon:SetScript("OnEnter", bar.candyBarIconFrame:GetScript("OnEnter"))
-			iconFrame.icon:SetScript("OnLeave", bar.candyBarIconFrame:GetScript("OnLeave"))
+		if bar:IsIconVisible() then
+			icon:AddMaskTexture(bar.blizzIconMask)
+			bar.blizzIconOverlay:Show()
 		else
-			iconFrame.icon.bwID = nil
-			iconFrame.icon:SetScript("OnEnter", nil)
-			iconFrame.icon:SetScript("OnLeave", nil)
+			bar.blizzIconOverlay:Hide()
 		end
-		bar:Set("bigwigs:blizzardtimeline:icon", iconFrame)
-		iconFrame:SetParent(bar)
-		iconFrame:ClearAllPoints()
-		if bar:GetIconPosition() == "RIGHT" then
-			iconFrame:SetPoint("TOPRIGHT", bar, "TOPRIGHT", -2, 0)
-			iconFrame:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -2, 0)
-		else
-			iconFrame:SetPoint("TOPLEFT", bar, "TOPLEFT", 2, 0)
-			iconFrame:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 2, 0)
-		end
-		iconFrame:SetWidth(barHeight)
-		iconFrame.icon:SetTexture(iconTexture)
-		iconFrame:SetShown(bar:IsIconVisible())
 
 		local statusbar = bar.candyBarBar
-		statusbar:ClearAllPoints()
-		if bar:IsIconVisible() then
-			if bar:GetIconPosition() == "RIGHT" then
-				statusbar:SetPoint("TOPRIGHT", iconFrame, "TOPLEFT", -4, -4)
-				statusbar:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 4, 4)
-			else
-				statusbar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 4, -4)
-				statusbar:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -4, 4)
+		for i = 1, statusbar:GetNumPoints() do
+			local point, relFrame, relPoint, x, y = statusbar:GetPoint(i)
+			if point == "TOPLEFT" or point == "TOPRIGHT" then
+				statusbar:SetPoint(point, relFrame, relPoint, x, (y or 0) - 4)
+			elseif point == "BOTTOMLEFT" or point == "BOTTOMRIGHT" then
+				statusbar:SetPoint(point, relFrame, relPoint, x, (y or 0) + 4)
 			end
-		else
-			statusbar:SetPoint("TOPLEFT", bar, "TOPLEFT", 6, -4)
-			statusbar:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -4, 4)
 		end
-		-- statusbar:SetStatusBarTexture("UI-HUD-CoolDownManager-Bar")
-		SetTexureFromAtlas(statusbar:GetStatusBarTexture(), "UI-HUD-CoolDownManager-Bar")
+
+		local statusBarTexture = statusbar:GetStatusBarTexture()
+		statusBarTexture:SetAtlas("UI-HUD-CoolDownManager-Bar")
+
+		local spark = statusbar.blizzSpark
+		if not spark then
+			spark = statusbar:CreateTexture(nil, "OVERLAY")
+			spark:SetAtlas("UI-HUD-CoolDownManager-Bar-Pip", true)
+			spark:SetBlendMode("ADD")
+			spark:SetPoint("CENTER", statusBarTexture, "RIGHT", 0, 0)
+			statusbar.blizzSpark = spark
+		end
+		spark:Show()
 
 		local bg = bar.candyBarBackground
-		bar:Set("bigwigs:restorebartexture", bg:GetTexture())
-		bg:ClearAllPoints()
-		bg:SetPoint("LEFT", statusbar, "LEFT", -2, -2)
-		bg:SetPoint("RIGHT", statusbar, "RIGHT", 6, -2)
-		bar:Set("bigwigs:restorebarcolor", {bg:GetVertexColor()})
-		SetTexureFromAtlas(bg, "UI-HUD-CoolDownManager-Bar-BG")
-		bar:SetBackgroundColor(1, 1, 1, 1)
-		-- Since this is offset vertically, just scale the height instead of trying to adjust the points to match the texture
-		bg:SetHeight(barHeight * 1.06) -- 36/34
-
-		local duration = bar.candyBarDuration
-		duration:ClearAllPoints()
-		duration:SetPoint("RIGHT", statusbar, "RIGHT", -5, 0)
-
-		local name = bar.candyBarLabel
-		name:SetWordWrap(false) -- Force truncating since there is no height
-		name:ClearAllPoints()
-		name:SetPoint("LEFT", statusbar, "LEFT", 5, 0)
-		name:SetPoint("RIGHT", duration, "LEFT", -10, 0)
+		bg:SetPoint("TOPLEFT", statusbar, "TOPLEFT", -2, 3)
+		bg:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", 6, -7)
+		bg:SetAtlas("UI-HUD-CoolDownManager-Bar-BG")
 	end
 
 	local L = BigWigsAPI:GetLocale("BigWigs")
 	BigWigsAPI:RegisterBarStyle("Blizzard", {
-		apiVersion = 1,
-		version = 1,
+		barDecorationEnabled = true,
 		barSpacing = 2,
 		barHeight = 34,
+		expBarHeight = 34,
 		fontSizeNormal = 14,
 		fontSizeEmphasized = 14,
-		spellIndicatorsOffset = 2,
 		fontOutline = "OUTLINE",
+		detachedIcon = true,
+		iconOffset = 4,
+		iconZoom = 0,
+		textOffsetX = 3,
+		timeOffsetX = -3,
+		spellIndicatorsOffset = 6,
+		barColor = { 0.8, 0.1, 0.1, 1 },
+		barEmphasized = { 0.8, 0.1, 0.1, 1 },
+		barBackground = { 1, 1, 1, 1 },
 		ApplyStyle = styleBar,
 		BarStopped = removeStyle,
 		GetStyleName = function() return L.bigWigsBarStyleName_Blizzard end,
@@ -194,360 +152,74 @@ if BigWigsLoader.isModern then
 end
 
 do
-	-- !Beautycase styling, based on !Beatycase by Neal "Neave" @ WowI, texture made by Game92 "Aftermathh" @ WowI
-
-	local textureNormal = "Interface\\AddOns\\BigWigs\\Media\\Textures\\beautycase"
-
-	local backdropbc = {
-		bgFile = "Interface\\Buttons\\WHITE8x8",
-		insets = {top = 1, left = 1, bottom = 1, right = 1},
-	}
-
-	local function createBorder(self)
-		local border = UIParent:CreateTexture(nil, "OVERLAY")
-		border:SetParent(self)
-		border:SetTexture(textureNormal)
-		border:SetWidth(12)
-		border:SetHeight(12)
-		border:SetVertexColor(1, 1, 1)
-		return border
-	end
-
-	local freeBorderSets = {}
-
-	local function freeStyle(bar)
-		bar.candyBarBackdrop:Hide()
-		local borders = bar:Get("bigwigs:beautycase:borders")
-		if borders then
-			for i = 1, #borders do
-				local border = borders[i]
-				border:SetParent(UIParent)
-				border:Hide()
-			end
-			freeBorderSets[#freeBorderSets + 1] = borders
-		end
-	end
-
-	local function styleBar(bar)
-		local bd = bar.candyBarBackdrop
-		bd:ClearAllPoints()
-		bd:SetBackdrop(backdropbc)
-		bd:SetBackdropColor(.1, .1, .1, 1)
-		bd:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
-		bd:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
-		bd:Show()
-
-		local borders
-		if #freeBorderSets > 0 then
-			borders = tremove(freeBorderSets)
-			for i = 1, #borders do
-				local border = borders[i]
-				border:SetParent(bar.candyBarBar)
-				border:ClearAllPoints()
-				border:Show()
-			end
-		else
-			borders = {}
-			for i = 1, 8 do
-				borders[i] = createBorder(bar.candyBarBar)
-			end
-		end
-		for i = 1, #borders do
-			local border = borders[i]
-			if i == 1 then
-				border:SetTexCoord(0, 1/3, 0, 1/3)
-				border:SetPoint("TOPLEFT", bar, "TOPLEFT", -4, 4)
-			elseif i == 2 then
-				border:SetTexCoord(2/3, 1, 0, 1/3)
-				border:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 4, 4)
-			elseif i == 3 then
-				border:SetTexCoord(0, 1/3, 2/3, 1)
-				border:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", -4, -3)
-			elseif i == 4 then
-				border:SetTexCoord(2/3, 1, 2/3, 1)
-				border:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 4, -3)
-			elseif i == 5 then
-				border:SetTexCoord(1/3, 2/3, 0, 1/3)
-				border:SetPoint("TOPLEFT", borders[1], "TOPRIGHT")
-				border:SetPoint("TOPRIGHT", borders[2], "TOPLEFT")
-			elseif i == 6 then
-				border:SetTexCoord(1/3, 2/3, 2/3, 1)
-				border:SetPoint("BOTTOMLEFT", borders[3], "BOTTOMRIGHT")
-				border:SetPoint("BOTTOMRIGHT", borders[4], "BOTTOMLEFT")
-			elseif i == 7 then
-				border:SetTexCoord(0, 1/3, 1/3, 2/3)
-				border:SetPoint("TOPLEFT", borders[1], "BOTTOMLEFT")
-				border:SetPoint("BOTTOMLEFT", borders[3], "TOPLEFT")
-			elseif i == 8 then
-				border:SetTexCoord(2/3, 1, 1/3, 2/3)
-				border:SetPoint("TOPRIGHT", borders[2], "BOTTOMRIGHT")
-				border:SetPoint("BOTTOMRIGHT", borders[4], "TOPRIGHT")
-			end
-		end
-
-		bar:Set("bigwigs:beautycase:borders", borders)
-	end
-
-	BigWigsAPI:RegisterBarStyle("BeautyCase", {
-		apiVersion = 1,
-		version = 10,
-		barSpacing = 8,
+	-- Beautycase styling, based on Beautycase by Neal "Neave" @ WowI, texture made by Game92 "Aftermathh" @ WowI
+	BigWigsAPI:RegisterBarStyle("Beautycase", {
+		barDecorationEnabled = true,
+		barSpacing = 9,
+		borderName = "Beautycase",
+		borderColor = { 1, 1, 1, 1 },
+		borderOffset = 4,
+		borderSize = 12,
+		backgroundName = "Solid",
+		backgroundColor = { 0.1, 0.1, 0.1, 1 },
+		timeOffsetX = -3,
 		spellIndicatorsOffset = 6,
-		ApplyStyle = styleBar,
-		BarStopped = freeStyle,
-		GetStyleName = function() return "!Beautycase" end,
+		GetStyleName = function() return "Beautycase" end,
 	})
 end
 
 do
 	-- MonoUI
-	local backdropBorder = {
-		bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
-		edgeFile = "Interface\\ChatFrame\\ChatFrameBackground",
-		tile = false, tileSize = 0, edgeSize = 1,
-		insets = {left = 0, right = 0, top = 0, bottom = 0}
-	}
-
-	local function removeStyle(bar)
-		bar.candyBarBackdrop:Hide()
-		bar.candyBarIconFrameBackdrop:Hide()
-		local height = bar:Get("bigwigs:restoreheight")
-		if height then
-			bar:SetHeight(height) -- Note, calling SetHeight resets all the points for the statusbar and the icon, so we don't need to do it
-		end
-
-		local statusbar = bar.candyBarBar
-		local duration = bar.candyBarDuration
-		duration:ClearAllPoints()
-		duration:SetPoint("TOPLEFT", statusbar, "TOPLEFT", 2, 0)
-		duration:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", -2, 0)
-
-		local label = bar.candyBarLabel
-		label:ClearAllPoints()
-		label:SetPoint("TOPLEFT", statusbar, "TOPLEFT", 2, 0)
-		label:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", -2, 0)
-	end
-
-	local function styleBar(bar)
-		local barHeight = bar:GetHeight()
-
-		bar:Set("bigwigs:restoreheight", barHeight)
-		bar:SetHeight(barHeight / 2)
-
-		bar.candyBarLabel:ClearAllPoints()
-		bar.candyBarDuration:ClearAllPoints()
-		local statusbar = bar.candyBarBar
-		statusbar:ClearAllPoints()
-
-		local bd = bar.candyBarBackdrop
-		if bd.SetToDefaults then
-			bd:SetToDefaults()
-			bd:SetFrameLevel(0)
-		end
-		bd:ClearAllPoints()
-		bd:SetBackdrop(backdropBorder)
-		bd:SetBackdropColor(.1,.1,.1,1)
-		bd:SetBackdropBorderColor(0,0,0,1)
-		bd:SetPoint("TOPLEFT", statusbar, "TOPLEFT", -2, 2)
-		bd:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", 2, -2)
-		bd:Show()
-
-		local reApplyIcon
-		local iconFrame = bar.candyBarIconFrame
-		local iconBd = bar.candyBarIconFrameBackdrop
-		if iconFrame:IsAnchoringSecret() then
-			reApplyIcon = bar:GetIcon()
-			iconFrame:SetToDefaults()
-			iconBd:SetToDefaults()
-			iconBd:SetFrameLevel(0)
-		end
-
-		iconFrame:ClearAllPoints()
-		iconBd:ClearAllPoints()
-
-		if bar:GetIconPosition() == "RIGHT" then
-			iconFrame:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -2, 0)
-
-			statusbar:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 2, 0)
-			if bar:IsIconVisible() then
-				statusbar:SetPoint("TOPRIGHT", iconFrame, "LEFT", -6, 0)
-			else
-				statusbar:SetPoint("TOPRIGHT", iconFrame, "RIGHT", 0, 0)
-			end
-		else
-			iconFrame:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 2, 0)
-
-			statusbar:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -2, 0)
-			if bar:IsIconVisible() then
-				statusbar:SetPoint("TOPLEFT", iconFrame, "RIGHT", 6, 0)
-			else
-				statusbar:SetPoint("TOPLEFT", iconFrame, "LEFT", 0, 0)
-			end
-		end
-		iconFrame:SetSize(barHeight, barHeight)
-
-		iconBd:SetBackdrop(backdropBorder)
-		iconBd:SetBackdropColor(.1,.1,.1,1)
-		iconBd:SetBackdropBorderColor(0,0,0,1)
-		iconBd:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -2, 2)
-		iconBd:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 2, -2)
-		if bar:IsIconVisible() then
-			iconBd:Show()
-		end
-
-		if reApplyIcon then
-			iconFrame:SetTexture(reApplyIcon)
-			iconFrame:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		end
-
-		bar.candyBarLabel:SetPoint("BOTTOMLEFT", statusbar, "TOPLEFT", 2, 2)
-		bar.candyBarDuration:SetPoint("BOTTOMRIGHT", statusbar, "TOPRIGHT", -2, 2)
-	end
-
 	BigWigsAPI:RegisterBarStyle("MonoUI", {
-		apiVersion = 1,
-		version = 10,
+		barDecorationEnabled = true,
+		barSpacing = 6,
 		barHeight = 20,
-		fontSizeNormal = 10,
+		barHeightOffset = -10,
+		expBarHeightOffset = -11,
 		fontSizeEmphasized = 11,
-		spellIndicatorsOffset = 2,
-		GetSpacing = function(bar) return bar:GetHeight()+6 end,
-		ApplyStyle = styleBar,
-		BarStopped = removeStyle,
+		borderName = "Solid",
+		borderOffset = 2,
+		backgroundName = "Solid",
+		backgroundColor = { 0.1, 0.1, 0.1, 1 },
+		detachedIcon = true,
+		iconOffset = 6,
+		textOffsetY = 12,
+		timeOffsetY = 12,
+		spellIndicatorsOffset = 8,
 		GetStyleName = function() return "MonoUI" end,
 	})
 end
 
 do
 	-- NaowhUI
-	local backdropBorder = {
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		edgeSize = 1,
-	}
-
-	local function removeStyle(bar)
-		bar.candyBarBackdrop:Hide()
-		bar.candyBarIconFrameBackdrop:Hide()
-		local height = bar:Get("bigwigs:restoreheight")
-		if height then
-			bar:SetHeight(height) -- Note, calling SetHeight resets all the points for the statusbar and the icon, so we don't need to do it
-		end
-
-		local statusbar = bar.candyBarBar
-		local duration = bar.candyBarDuration
-		duration:ClearAllPoints()
-		duration:SetPoint("TOPLEFT", statusbar, "TOPLEFT", 2, 0)
-		duration:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", -2, 0)
-
-		local label = bar.candyBarLabel
-		label:ClearAllPoints()
-		label:SetPoint("TOPLEFT", statusbar, "TOPLEFT", 2, 0)
-		label:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", -2, 0)
-	end
-
-	local function styleBar(bar)
-		local barHeight = bar:GetHeight()
-
-		bar:Set("bigwigs:restoreheight", barHeight)
-		bar:SetHeight(barHeight / 2)
-
-		bar.candyBarLabel:ClearAllPoints()
-		bar.candyBarDuration:ClearAllPoints()
-		local statusbar = bar.candyBarBar
-		statusbar:ClearAllPoints()
-
-		local bd = bar.candyBarBackdrop
-		if bd.SetToDefaults then
-			bd:SetToDefaults()
-			bd:SetFrameLevel(0)
-		end
-		bd:ClearAllPoints()
-		bd:SetBackdrop(backdropBorder)
-		bd:SetBackdropColor(.1,.1,.1,1)
-		bd:SetBackdropBorderColor(0,0,0,1)
-		bd:SetPoint("TOPLEFT", statusbar, "TOPLEFT", -1, 1)
-		bd:SetPoint("BOTTOMRIGHT", statusbar, "BOTTOMRIGHT", 1, -1)
-		bd:Show()
-
-		local reApplyIcon
-		local iconFrame = bar.candyBarIconFrame
-		local iconBd = bar.candyBarIconFrameBackdrop
-		if iconFrame:IsAnchoringSecret() then
-			reApplyIcon = bar:GetIcon()
-			iconFrame:SetToDefaults()
-			iconBd:SetToDefaults()
-			iconBd:SetFrameLevel(0)
-		end
-
-		iconFrame:ClearAllPoints()
-		iconBd:ClearAllPoints()
-
-		if bar:GetIconPosition() == "RIGHT" then
-			iconFrame:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -2, 0)
-
-			statusbar:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 2, 0)
-			if bar:IsIconVisible() then
-				statusbar:SetPoint("TOPRIGHT", iconFrame, "LEFT", -4, -2)
-			else
-				statusbar:SetPoint("TOPRIGHT", iconFrame, "RIGHT", 0, -2)
-			end
-		else
-			iconFrame:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 2, 0)
-
-			statusbar:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -2, 0)
-			if bar:IsIconVisible() then
-				statusbar:SetPoint("TOPLEFT", iconFrame, "RIGHT", 4, -2)
-			else
-				statusbar:SetPoint("TOPLEFT", iconFrame, "LEFT", 0, -2)
-			end
-		end
-		iconFrame:SetSize(barHeight, barHeight)
-
-		iconBd:SetBackdrop(backdropBorder)
-		iconBd:SetBackdropColor(.1,.1,.1,1)
-		iconBd:SetBackdropBorderColor(0,0,0,1)
-		iconBd:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -1, 1)
-		iconBd:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 1, -1)
-		if bar:IsIconVisible() then
-			iconBd:Show()
-		end
-
-		if reApplyIcon then
-			iconFrame:SetTexture(reApplyIcon)
-			iconFrame:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		end
-
-		bar.candyBarLabel:SetPoint("BOTTOMLEFT", statusbar, "TOPLEFT", 2, -7)
-		bar.candyBarDuration:SetPoint("BOTTOMRIGHT", statusbar, "TOPRIGHT", -2, -7)
-	end
-
 	BigWigsAPI:RegisterBarStyle("NaowhUI", {
-		apiVersion = 1,
-		version = 10,
+		barDecorationEnabled = true,
+		barSpacing = 4,
 		barHeight = 20,
+		barHeightOffset = -12,
+		expBarHeightOffset = -13,
 		texture = "NaowhGradient",
 		fontName = "Naowh",
 		fontSizeNormal = 14,
 		fontSizeEmphasized = 14,
-		spellIndicatorsOffset = 2,
-		spellIndicatorsPosition = "RIGHT",
 		fontOutline = "OUTLINE",
+		borderName = "Solid",
+		borderOffset = 1,
+		backgroundName = "Solid",
+		backgroundColor = { 0.1, 0.1, 0.1, 1 },
 		iconPosition = "RIGHT",
-		GetSpacing = function(bar) return bar:GetHeight()+4 end,
-		ApplyStyle = styleBar,
-		BarStopped = removeStyle,
+		detachedIcon = true,
+		iconOffset = 4,
+		textOffsetY = 4,
+		timeOffsetY = 4,
+		spellIndicatorsOffset = 6,
+		spellIndicatorsPosition = "RIGHT",
 		GetStyleName = function() return "NaowhUI" end,
 	})
 end
 
 do
 	-- Tukui
-	local C = Tukui and Tukui[2]
-	local backdrop = {
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		tile = false, tileSize = 0, edgeSize = 1,
-	}
 	local borderBackdrop = {
 		edgeFile = "Interface\\Buttons\\WHITE8X8",
 		edgeSize = 1,
@@ -556,66 +228,69 @@ do
 
 	local function removeStyle(bar)
 		local bd = bar.candyBarBackdrop
-		bd:Hide()
 		if bd.tukiborder then
 			bd.tukiborder:Hide()
 			bd.tukoborder:Hide()
+		end
+		local iconBd = bar.candyBarIconFrameBackdrop
+		if iconBd.tukiborder then
+			iconBd.tukiborder:Hide()
+			iconBd.tukoborder:Hide()
 		end
 	end
 
 	local function styleBar(bar)
 		local bd = bar.candyBarBackdrop
-		bd:ClearAllPoints()
-		bd:SetBackdrop(backdrop)
-		if C then
-			bd:SetBackdropColor(unpack(C.Medias.BackdropColor))
-			bd:SetBackdropBorderColor(unpack(C.Medias.BorderColor))
-			bd:SetOutside(bar)
-		else
-			bd:SetBackdropColor(0.1,0.1,0.1)
-			bd:SetBackdropBorderColor(0.5,0.5,0.5)
-			bd:ClearAllPoints()
-			bd:SetPoint("TOPLEFT", bar, "TOPLEFT", -2, 2)
-			bd:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 2, -2)
-		end
-
 		if not bd.tukiborder then
-			local border = CreateFrame("Frame", nil, bd, "BackdropTemplate")
-			if C then
-				border:SetInside(bd, 1, 1)
-			else
-				border:SetPoint("TOPLEFT", bd, "TOPLEFT", 1, -1)
-				border:SetPoint("BOTTOMRIGHT", bd, "BOTTOMRIGHT", -1, 1)
-			end
-			border:SetBackdrop(borderBackdrop)
-			border:SetBackdropBorderColor(0, 0, 0)
-			bd.tukiborder = border
+			local tukiborder = CreateFrame("Frame", nil, bd, "BackdropTemplate")
+			tukiborder:SetPoint("TOPLEFT", bd, "TOPLEFT", 1, -1)
+			tukiborder:SetPoint("BOTTOMRIGHT", bd, "BOTTOMRIGHT", -1, 1)
+			tukiborder:SetBackdrop(borderBackdrop)
+			tukiborder:SetBackdropBorderColor(0, 0, 0)
+			bd.tukiborder = tukiborder
+
+			local tukoborder = CreateFrame("Frame", nil, bd, "BackdropTemplate")
+			tukoborder:SetPoint("TOPLEFT", bd, "TOPLEFT", -1, 1)
+			tukoborder:SetPoint("BOTTOMRIGHT", bd, "BOTTOMRIGHT", 1, -1)
+			tukoborder:SetBackdrop(borderBackdrop)
+			tukoborder:SetBackdropBorderColor(0, 0, 0)
+			bd.tukoborder = tukoborder
 		else
 			bd.tukiborder:Show()
-		end
-
-		if not bd.tukoborder then
-			local border = CreateFrame("Frame", nil, bd, "BackdropTemplate")
-			if C then
-				border:SetOutside(bd, 1, 1)
-			else
-				border:SetPoint("TOPLEFT", bd, "TOPLEFT", -1, 1)
-				border:SetPoint("BOTTOMRIGHT", bd, "BOTTOMRIGHT", 1, -1)
-			end
-			border:SetBackdrop(borderBackdrop)
-			border:SetBackdropBorderColor(0, 0, 0)
-			bd.tukoborder = border
-		else
 			bd.tukoborder:Show()
 		end
 
-		bd:Show()
+		local iconBd = bar.candyBarIconFrameBackdrop
+		if iconBd:IsShown() then
+			if not iconBd.tukiborder then
+				local iconTukiborder = CreateFrame("Frame", nil, iconBd, "BackdropTemplate")
+				iconTukiborder:SetPoint("TOPLEFT", iconBd, "TOPLEFT", 1, -1)
+				iconTukiborder:SetPoint("BOTTOMRIGHT", iconBd, "BOTTOMRIGHT", -1, 1)
+				iconTukiborder:SetBackdrop(borderBackdrop)
+				iconTukiborder:SetBackdropBorderColor(0, 0, 0)
+				iconBd.tukiborder = iconTukiborder
+
+				local iconTukoborder = CreateFrame("Frame", nil, iconBd, "BackdropTemplate")
+				iconTukoborder:SetPoint("TOPLEFT", iconBd, "TOPLEFT", -1, 1)
+				iconTukoborder:SetPoint("BOTTOMRIGHT", iconBd, "BOTTOMRIGHT", 1, -1)
+				iconTukoborder:SetBackdrop(borderBackdrop)
+				iconTukoborder:SetBackdropBorderColor(0, 0, 0)
+				iconBd.tukoborder = iconTukoborder
+			else
+				iconBd.tukiborder:Show()
+				iconBd.tukoborder:Show()
+			end
+		end
 	end
 
 	BigWigsAPI:RegisterBarStyle("TukUI", {
-		apiVersion = 1,
-		version = 10,
+		barDecorationEnabled = true,
 		barSpacing = 7,
+		borderName = "Solid",
+		borderColor = { 0.5, 0.5, 0.5, 1 },
+		borderOffset = 2,
+		backgroundName = "Solid",
+		backgroundColor = { 0.1, 0.1, 0.1, 1 },
 		spellIndicatorsOffset = 4,
 		ApplyStyle = styleBar,
 		BarStopped = removeStyle,
@@ -625,120 +300,17 @@ end
 
 do
 	-- ElvUI
-	local E = ElvUI and ElvUI[1]
-	local backdropBorder = {
-		bgFile = "Interface\\Buttons\\WHITE8X8",
-		edgeFile = "Interface\\Buttons\\WHITE8X8",
-		tile = false, tileSize = 0, edgeSize = 1,
-		insets = {left = 0, right = 0, top = 0, bottom = 0}
-	}
-
-	local function removeStyle(bar)
-		local bd = bar.candyBarBackdrop
-		bd:Hide()
-		if bd.iborder then
-			bd.iborder:Hide()
-			bd.oborder:Hide()
-		end
-
-		local iconBd = bar.candyBarIconFrameBackdrop
-		iconBd:Hide()
-		if iconBd.iborder then
-			iconBd.iborder:Hide()
-			iconBd.oborder:Hide()
-		end
-	end
-
-	local function styleBar(bar)
-		local bd = bar.candyBarBackdrop
-		bd:ClearAllPoints()
-		if E then
-			bd:SetTemplate("Transparent")
-			bd:SetOutside(bar)
-			if not E.PixelMode and bd.iborder then
-				bd.iborder:Show()
-				bd.oborder:Show()
-			end
-		else
-			bd:SetBackdrop(backdropBorder)
-			bd:SetBackdropColor(0.06, 0.06, 0.06, 0.8)
-			bd:SetBackdropBorderColor(0, 0, 0)
-			bd:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
-			bd:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
-		end
-		bd:Show()
-
-		local reApplyIcon
-		local statusbar = bar.candyBarBar
-		local iconFrame = bar.candyBarIconFrame
-		local iconBd = bar.candyBarIconFrameBackdrop
-		if iconFrame:IsAnchoringSecret() then
-			reApplyIcon = bar:GetIcon()
-			iconFrame:SetToDefaults()
-			iconBd:SetToDefaults()
-			iconBd:SetFrameLevel(0)
-		end
-		statusbar:ClearAllPoints()
-		iconFrame:ClearAllPoints()
-		iconBd:ClearAllPoints()
-
-		if bar:GetIconPosition() == "RIGHT" then
-			--iconFrame:SetPoint("BOTTOMLEFT", bar, "BOTTOMRIGHT", E and (E.PixelMode and 1 or 5) or 1, 0)
-			iconFrame:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-			iconFrame:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-
-			statusbar:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-			if bar:IsIconVisible() then
-				statusbar:SetPoint("TOPRIGHT", iconFrame, "TOPLEFT", -1, 0)
-			else
-				statusbar:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-			end
-		else
-			--iconFrame:SetPoint("BOTTOMRIGHT", bar, "BOTTOMLEFT", E and (E.PixelMode and -1 or -5) or -1, 0)
-			iconFrame:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
-			iconFrame:SetPoint("BOTTOMLEFT", bar, "BOTTOMLEFT", 0, 0)
-
-			statusbar:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-			if bar:IsIconVisible() then
-				statusbar:SetPoint("TOPLEFT", iconFrame, "TOPRIGHT", 1, 0)
-			else
-				statusbar:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, 0)
-			end
-		end
-		iconFrame:SetSize(bar:GetHeight(), bar:GetHeight())
-
-		if E then
-			iconBd:SetTemplate("Transparent")
-			iconBd:SetOutside(iconFrame)
-			if not E.PixelMode and iconBd.iborder then
-				iconBd.iborder:Show()
-				iconBd.oborder:Show()
-			end
-		else
-			iconBd:SetBackdrop(backdropBorder)
-			iconBd:SetBackdropColor(0.06, 0.06, 0.06, 0.8)
-			iconBd:SetBackdropBorderColor(0, 0, 0)
-			iconBd:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -1, 1)
-			iconBd:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", 1, -1)
-		end
-		if bar:IsIconVisible() then
-			iconBd:Show()
-		end
-
-		if reApplyIcon then
-			iconFrame:SetTexture(reApplyIcon)
-			iconFrame:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		end
-	end
-
 	BigWigsAPI:RegisterBarStyle("ElvUI", {
-		apiVersion = 1,
-		version = 10,
-		barSpacing = E and (E.PixelMode and 4 or 8) or 4,
+		barDecorationEnabled = true,
+		barSpacing = 4,
 		barHeight = 20,
-		spellIndicatorsOffset = 2,
-		ApplyStyle = styleBar,
-		BarStopped = removeStyle,
+		borderName = "Solid",
+		borderOffset = 1,
+		backgroundName = "Solid",
+		backgroundColor = { 0.06, 0.06, 0.06, 0.8 },
+		detachedIcon = true,
+		iconOffset = 1,
+		spellIndicatorsOffset = 4,
 		GetStyleName = function() return "ElvUI" end,
 	})
 end

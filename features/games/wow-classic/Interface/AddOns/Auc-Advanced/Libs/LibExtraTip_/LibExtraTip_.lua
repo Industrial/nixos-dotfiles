@@ -808,6 +808,36 @@ function lib:RegisterTooltip(tooltip)
 			hookscript(tooltip,"OnHide",OnTooltipCleared)
 			hookscript(tooltip,"OnSizeChanged",OnSizeChanged)
 			hookglobal("BattlePetTooltipTemplate_SetBattlePet", OnTooltipSetBattlePet) -- yes we hook the same function every time - hookglobal protects against multiple hooks
+		elseif modernTooltipRendering then
+			-- Forever: never write insecure handlers onto Blizzard's shared
+			-- GameTooltip. The legacy OnTooltipSet* widget scripts were removed
+			-- on modern clients -- SetScript() accepts them silently but they are
+			-- never called -- and replacing tooltip methods with addon functions
+			-- via hookmethod() taints the execution path Blizzard's secure frames
+			-- use. In combat, aura fields such as expirationTime are secret
+			-- values: Blizzard_BuffFrame compares them and throws "secret number
+			-- value, while execution tainted by 'Informant'" when our tainted
+			-- handler sits on that path (e.g. a Rogue poison buff drawing the
+			-- item tooltip for the weapon it is applied to).
+			--
+			-- Item tooltips are handled by the supported modern hook
+			-- (TooltipDataProcessor.AddTooltipPostCall -> ModernItemPostCall,
+			-- installed by RegisterModernHook above). The secure Show post-hook
+			-- below is the universal fallback for tooltips that bypass the data
+			-- processor. Both are hooksecurefunc post-hooks, so they stay secure.
+			--
+			-- ClearLines must also reset the registry. Blizzard re-renders a
+			-- modern item tooltip in more than one pass, and every ClearLines()
+			-- wipes the lines we appended in the previous pass. The classic
+			-- SetXItem pre-hooks did this by calling OnTooltipCleared(); without
+			-- an equivalent here, reg.modernLink still matches the item, so
+			-- ModernItemPostCall treats the next data-processor pass as a
+			-- duplicate and never re-adds the Informant lines -- the tooltip
+			-- shows full info for a frame, then collapses to the short base
+			-- version. OnTooltipCleared also releases the extraTip back to the
+			-- pool, which would otherwise leak a frame on every re-render.
+			hooksecure(tooltip, "ClearLines", OnTooltipCleared)
+			hooksecure(tooltip, "Show", ShowCalled)
 		else
 			hookscript(tooltip,"OnTooltipSetItem",OnTooltipSetItem)
 			hookscript(tooltip,"OnTooltipSetUnit",OnTooltipSetUnit)

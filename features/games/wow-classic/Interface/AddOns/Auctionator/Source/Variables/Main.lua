@@ -121,9 +121,12 @@ function Auctionator.Variables.InitializeDatabase()
 
   -- Check for current realm and initialize if not present
   if AUCTIONATOR_PRICE_DATABASE[realm] == nil then
-    if not ImportFromNotNormalizedName(realm) and not ImportFromConnectedRealm(realm) then
+    if not ImportFromNotNormalizedName(realm) and not ImportFromConnectedRealm(realm)then
       AUCTIONATOR_PRICE_DATABASE[realm] = {}
     end
+  elseif RegionalUniqueNamesEnabled and RegionalUniqueNamesEnabled() and AUCTIONATOR_PRICE_DATABASE[Auctionator.Variables.GetRegionalRulesetName()] then
+    AUCTIONATOR_PRICE_DATABASE[realm] = AUCTIONATOR_PRICE_DATABASE[Auctionator.Variables.GetRegionalRulesetName()]
+    AUCTIONATOR_PRICE_DATABASE[Auctionator.Variables.GetRegionalRulesetName()] = nil
   end
 
   C_Timer.After(0, function()

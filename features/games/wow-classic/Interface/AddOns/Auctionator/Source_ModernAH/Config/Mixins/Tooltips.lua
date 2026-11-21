@@ -8,7 +8,7 @@ function AuctionatorConfigTooltipsFrameMixin:OnLoad()
 
   self:SetupPanel()
 
-  if not Auctionator.Constants.IsRetail then
+  if not Auctionator.Constants.IsRetail or Auctionator.Constants.IsForever then
     self.EnchantTooltips:SetText(AUCTIONATOR_L_CONFIG_ENCHANT_GENERIC_TOOLTIP)
     self.ProspectTooltips:Show()
     self.MillTooltips:Show()

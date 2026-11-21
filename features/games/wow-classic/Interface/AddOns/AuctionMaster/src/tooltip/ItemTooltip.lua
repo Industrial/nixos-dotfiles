@@ -56,12 +56,6 @@ local function AddPriceLine(tooltip, label, price, labelColor)
     HIGHLIGHT_FONT_COLOR)
 end
 
--- The price at which a merchant sells the item: what a merchant was seen charging, or else
--- the derived price of the known vendor items.
-local function GetVendorPrice(itemId)
-  return AM.MerchantScanner.GetPrice(itemId) or AM.VendorItems.GetPrice(itemId)
-end
-
 AM.Tooltip.AddItemCallback(function(tooltip, itemId, location, count, itemDbKey)
   local mode = AM.Tooltip.GetMarketMode()
   if mode == "off" then
@@ -74,7 +68,7 @@ AM.Tooltip.AddItemCallback(function(tooltip, itemId, location, count, itemDbKey)
     listed, listedCount = AM.ItemStore.Get(itemDbKey)
   end
   local stackCount = count or (location and C_Item.GetStackCount(location)) or 1
-  local vendorPrice = GetVendorPrice(itemId)
+  local vendorPrice = AM.RecipeCost.GetVendorPrice(itemId)
   -- Market and lowest price are for the whole stack or for a single item (see GetPriceMode); Alt shows the other.
   local byStack = stackCount > 1 and IsAltKeyDown() == (AM.Tooltip.GetPriceMode() == "single")
   local multiplier = byStack and stackCount or 1

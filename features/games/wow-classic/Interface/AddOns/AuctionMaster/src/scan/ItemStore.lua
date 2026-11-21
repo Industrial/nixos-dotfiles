@@ -315,10 +315,18 @@ end
 
 -- Replaces the stats of a single item (one itemDbKey) with the result of a search for exactly that item (all its
 -- auctions, given as for Replace) and blends its market price. Blending by the time passed since
--- the last update keeps frequent searches from outweighing the other data.
+-- the last update keeps frequent searches from outweighing the other data. A search that found no auction is
+-- stored like a scan that did not see the item: its auctions are gone, its market price stays. The caller only passes
+-- an empty list for a complete answer (the game also fires empty ones while it restarts a search).
 function ItemStore.UpdateItem(itemDbKey, auctions)
   assert(type(itemDbKey) == "string", "ItemStore.UpdateItem needs an itemDbKey")
   if #auctions == 0 then
+    local items = Items()
+    if items[itemDbKey] then
+      items[itemDbKey] = nil
+      AM.DebugLog.Log("store", "UpdateItem %s: no auctions, removed", itemDbKey)
+      AM.Events.Fire("PRICES_CHANGED")
+    end
     return
   end
   local debug = AM.DebugLog.IsEnabled()

@@ -59,6 +59,56 @@ end
 AM.Events.Register("PRICES_CHANGED", RefreshWindow)
 AM.Events.Register("CRAFTERS_CHANGED", RefreshWindow)
 
+-- The "Scan" of the detail panel: searches the item of the selected recipe and every item its cost is made of, so its
+-- numbers are current without waiting for the next full scan. One recipe at a time, the results come in through
+-- PRICES_CHANGED like any search.
+local scanningRecipeId -- the recipe the running Scan searches
+
+-- The faction object "recipeScans": recipeId -> time() a Scan of the recipe started that searched all of its items.
+-- Only times after the last full scan say more than it does, older ones are dropped whenever one is added.
+local function GetRecipeScans()
+  return AM.Database.GetFactionObject("recipeScans")
+end
+
+local function OnRecipeScanComplete(started)
+  local scans = GetRecipeScans()
+  local fullScan = AM.Scan.GetLastSuccess() or 0
+  for recipeId, at in pairs(scans) do
+    if at <= fullScan then
+      scans[recipeId] = nil
+    end
+  end
+  if scanningRecipeId and started > fullScan then
+    scans[scanningRecipeId] = started
+  end
+end
+
+-- Since when the prices of the recipe and all its items are current: its last complete Scan or the last full scan,
+-- whichever is later. Nil if there was neither.
+local function GetPricesTime(recipeId)
+  local scanned = GetRecipeScans()[recipeId]
+  local fullScan = AM.Scan.GetLastSuccess()
+  if scanned and fullScan then
+    return math.max(scanned, fullScan)
+  end
+  return scanned or fullScan
+end
+
+-- "Prices just now", "Prices 3 min ago"; nil without any scan of the recipe's prices. The age in one unit, as the
+-- scan button shows it.
+local function PricesAgeText(recipeId)
+  local at = GetPricesTime(recipeId)
+  if not at then
+    return nil
+  end
+  local age = time() - at
+  return L["DETAIL_PRICES_AGO"]:format(age < 60 and L["BARGAINS_AGO_NOW"] or L["MAIN_AGO"]:format(SecondsToTime(age, true, false, 1)))
+end
+
+local recipeScan = AM.SearchQueue.Create({ log = "recipescan", portrait = "recipe", event = "RECIPE_SCAN_CHANGED",
+  onComplete = OnRecipeScanComplete })
+local UpdateScanButton
+
 local function EnsureBuilt()
   if builtVersion ~= AM.RecipeList.version then
     builtVersion = AM.RecipeList.version
@@ -473,6 +523,10 @@ local function BuildDetailItems(entry)
       label = (name or "...") .. " |cffffffffx" .. reagent.quantity .. "|r", sub = source, value = Money(reagent.price),
       icon = select(5, C_Item.GetItemInfoInstant(reagent.itemId)) }
   end
+  -- since when the prices above are current; the row works its text out itself, so it moves on with list.Render
+  if PricesAgeText(entry.recipeId) then
+    items[#items + 1] = { height = 24, kind = "note", recipeId = entry.recipeId }
+  end
   return items
 end
 
@@ -528,7 +582,7 @@ local function SetupDetailRow(row, item)
   row.label:SetShown(item.kind == "line" or item.kind == "header")
   row.value:SetShown(item.kind == "line" or item.kind == "reagent")
   row.name:SetShown(item.kind == "reagent")
-  row.sub:SetShown(item.kind == "reagent")
+  row.sub:SetShown(item.kind == "reagent" or item.kind == "note")
   row.icon:SetShown(item.kind == "reagent")
   row.line:SetShown(item.kind == "header" or item.kind == "separator")
   row.hover:SetShown(item.kind == "reagent")
@@ -542,6 +596,11 @@ local function SetupDetailRow(row, item)
     row.line:SetColorTexture(unpack(UI.buttonBorder))
   elseif item.kind == "separator" then
     row.line:SetColorTexture(0.17, 0.16, 0.18)
+  elseif item.kind == "note" then
+    row.sub:ClearAllPoints()
+    row.sub:SetPoint("BOTTOMLEFT", 0, 2)
+    row.sub:SetPoint("RIGHT")
+    row.sub:SetText(PricesAgeText(item.recipeId) or "")
   else
     row.icon:SetTexture(item.icon)
     row.value:SetText(item.value)
@@ -572,6 +631,35 @@ local function AddSelected()
     AddEntry(entry)
   end
 end
+
+local function ScanSelected()
+  local entry = GetSelected()
+  if entry and recipeScan.Start(AM.RecipeCost.GetPricedItems(AM.RecipeList.ToShoppingRecipe(entry))) then
+    scanningRecipeId = entry.recipeId
+  end
+end
+
+-- The Scan button: greyed out while it runs (showing how far it is) and while the full scan keeps the server busy.
+function UpdateScanButton()
+  local button = ui.detail and ui.detail.footer.scan
+  if not button then
+    return
+  end
+  if recipeScan.IsRunning() then
+    button:SetText(L["DETAIL_SCANNING"]:format(recipeScan.GetProgress()))
+  else
+    button:SetText(L["DETAIL_SCAN"])
+  end
+  button:SetEnabled(not recipeScan.IsRunning() and not AM.Scan.IsRunning())
+end
+AM.Events.Register("RECIPE_SCAN_CHANGED", function()
+  UpdateScanButton()
+  if not recipeScan.IsRunning() then
+    -- a complete Scan has just stored its time: the details show it
+    RefreshWindow()
+  end
+end)
+AM.Events.Register("SCAN_CHANGED", UpdateScanButton)
 
 local function CreateDetail()
   -- beside the auction house: the list keeps the whole width of the window. The close button closes the details.
@@ -638,13 +726,38 @@ local function CreateDetail()
   ui.settingQuantity = false
   footer.quantity = spinner
 
+  local scan = Widgets.CreateButton(footer, L["DETAIL_SCAN"], true, ScanSelected)
+  scan:ClearAllPoints()
+  -- both buttons share the width equally, as the game's pairs of buttons do
+  scan:SetPoint("BOTTOMLEFT", 8, -1)
+  scan:SetPoint("BOTTOMRIGHT", footer, "BOTTOM", -2, -1)
+  scan:SetHeight(20)
+  scan:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(L["DETAIL_SCAN"], 1, 1, 1)
+    GameTooltip:AddLine(L["DETAIL_SCAN_TIP"], nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  scan:SetScript("OnLeave", GameTooltip_Hide)
+  scan:SetMotionScriptsWhileDisabled(true)
+  footer.scan = scan
+
   local add = Widgets.CreateButton(footer, L["SHOPPING_ADD_TO_LIST"], true, AddSelected)
   add:ClearAllPoints()
-  add:SetPoint("BOTTOMLEFT", 8, -1)
+  add:SetPoint("BOTTOMLEFT", footer, "BOTTOM", 2, -1)
   add:SetPoint("BOTTOMRIGHT", -8, -1)
   add:SetHeight(20) -- the strip below the list is as narrow as the auction house's
   footer.flash = Widgets.CreateText(footer, "GameFontHighlightSmall")
   footer.flash:SetPoint("TOPLEFT", 70, -5)
+  -- the age of the prices below the reagents moves on while the details are open
+  local sinceUpdate = 0
+  footer:SetScript("OnUpdate", function(_, elapsed)
+    sinceUpdate = sinceUpdate + elapsed
+    if sinceUpdate >= 15 then
+      sinceUpdate = 0
+      body.list.Render()
+    end
+  end)
   body.footer = footer
 end
 
@@ -680,6 +793,7 @@ local function UpdateDetail()
   body.footer.quantity:SetValue(quantities[entry.key] or 1)
   ui.settingQuantity = false
   body.footer.flash:SetText(flash and flash.key == entry.key and (Widgets.Color(UI.gain, flash.text)) or "")
+  UpdateScanButton()
 end
 
 -- Tab ----------------------------------------------------------------------------------------------

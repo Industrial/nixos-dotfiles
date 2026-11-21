@@ -4,6 +4,21 @@ local addonName, AM = ...
 AM.ChangelogMarkdown = [====[
 # Changelog
 
+## 11.8.0
+
+- Sell tab: Before you post, see how the item sold for you so far, at which of your prices and what it really earned, so you stop sinking money into items that never sold
+- Profession window: The shopping and leveling recipes are no longer shown in the recipe list in gamepad mode, as they blocked crafting and navigating with the gamepad
+
+## 11.7.2
+
+- Recipes: Update the prices of one recipe and all its reagents with a click, without waiting for the next full scan
+- Prices: Fixed items that sold out keeping the price of their last listing after a search
+
+## 11.7.1
+
+- Recipes: Transmutes and other recipes with a cooldown no longer set the cost of their result as a reagent
+- Recipes: Merchants with limited stock, such as weekly vendors, no longer count as a source for reagents
+
 ## 11.7.0
 
 - Ledger tab: See what your auctions and vendor trades really earn, item by item, counting what you paid for bought, crafted and looted goods
@@ -202,6 +217,9 @@ AM.ChangelogMarkdown = [====[
 
 -- Chat message per version and language (enUS is the fallback).
 AM.ChangelogAnnounce = {
+  ["11.8.0"] = { enUS = "Sell tab: Know your past sales before you post, and stop losing gold on items that never sell", deDE = "Verkaufen-Tab: Kenne deine bisherigen Verkäufe und verliere kein Gold mehr an Unverkauftes" },
+  ["11.7.2"] = { silent = true },
+  ["11.7.1"] = { silent = true },
   ["11.7.0"] = { enUS = "New Ledger tab: see what your trading really earns", deDE = "Neuer Kassenbuch-Tab: Sieh, was dein Handel wirklich einbringt" },
   ["11.6.6"] = { silent = true },
   ["11.6.5"] = { enUS = "Full Scan button on every auction house tab, automatic scan off by default", deDE = "Komplettscan-Button auf jedem Tab des Auktionshauses, automatischer Scan standardmäßig aus" },

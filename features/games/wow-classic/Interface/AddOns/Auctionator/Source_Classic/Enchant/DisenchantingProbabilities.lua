@@ -9,7 +9,7 @@ Auctionator.Constants.DisenchantingProbabilityKeys = {
 
 Auctionator.Constants.DisenchantingProbability = {
   [ Enum.ItemClass.Armor ] = {
-    [ Enum.ItemQuality.Good ] = {
+    [ Enum.ItemQuality.Good or Enum.ItemQuality.Uncommon ] = {
       -- { 5, 15, 80, { 1, 2 }, MATS.STRANGE_DUST, 20, { 1, 2 }, MATS.LESSER_MAGIC },
       -- { 16, 20, 75, { 2, 3 }, MATS.STRANGE_DUST, 20, { 1, 2 }, MATS.GREATER_MAGIC, 5, 1, MATS.SMALL_GLIMMERING },
       -- { 21, 25, 75, { 4, 6 }, MATS.STRANGE_DUST, 15, { 1, 2 }, MATS.LESSER_ASTRAL, 10, 1, MATS.SMALL_GLIMMERING },
@@ -171,7 +171,7 @@ Auctionator.Constants.DisenchantingProbability = {
     }
   },
   [ Enum.ItemClass.Weapon ] = {
-    [ Enum.ItemQuality.Good ] = {
+    [ Enum.ItemQuality.Good or Enum.ItemQuality.Uncommon ] = {
       -- { 6, 15, 20, { 1, 2 }, MATS.STRANGE_DUST, 80, { 1, 2 }, MATS.LESSER_MAGIC },
       -- { 16, 20, 20, { 2, 3 }, MATS.STRANGE_DUST, 75, { 1, 2 }, MATS.GREATER_MAGIC, 5, 1, MATS.SMALL_GLIMMERING },
       -- { 21, 25, 15, { 4, 6 }, MATS.STRANGE_DUST, 75, { 1, 2 }, MATS.GREATER_MAGIC, 10, 1, MATS.SMALL_GLIMMERING },

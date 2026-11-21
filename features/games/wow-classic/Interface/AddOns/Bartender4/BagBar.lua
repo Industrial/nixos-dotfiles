@@ -6,15 +6,11 @@ local _, Bartender4 = ...
 
 local L = LibStub("AceLocale-3.0"):GetLocale("Bartender4")
 -- register module
-local BagBarMod = Bartender4:NewModule("BagBar", "AceHook-3.0")
+local BagBarMod = Bartender4:NewModule("BagBar")
 
 -- fetch upvalues
 local ButtonBar = Bartender4.ButtonBar.prototype
 local Masque = LibStub("Masque", true)
-
-local _G = _G
-local next, pairs, setmetatable = next, pairs, setmetatable
-local table_insert, table_remove = table.insert, table.remove
 
 -- create prototype information
 local BagBar = setmetatable({}, {__index = ButtonBar})
@@ -37,17 +33,51 @@ end
 
 local noopFunc = function() end
 
+-- anchor a bag button through the original functions of its frame type, see detachButtonFromBagsBar
+local function clearSetPoint(btn, ...)
+	local methods = getmetatable(btn).__index
+	methods.ClearAllPoints(btn)
+	methods.SetPoint(btn, ...)
+end
+
+-- The bags bar of the Blizzard UI anchors every bag button to itself whenever it runs its layout: on every update of
+-- the edit mode layout, when the bag bar expands or collapses, and from callbacks that hold on to the layout function
+-- directly, which cannot be hooked. Instead of moving the buttons back afterwards, they are made immune to it, once:
+-- their SetPoint and ClearAllPoints do nothing, and the bar positions them through the original functions.
+local function detachButtonFromBagsBar(button)
+	button.SetPoint = noopFunc
+	button.ClearAllPoints = noopFunc
+	button.ClearSetPoint = clearSetPoint
+
+	-- the bag bar of the Blizzard UI hides the bag slots when it is collapsed
+	if button.SetBarExpanded then
+		button.SetBarExpanded = noopFunc
+	end
+
+	-- The layout also rotates the keyring to follow the orientation of the edit mode. Reset it to the horizontal
+	-- orientation, in case a vertical layout was applied already, and keep it there. The keyring is only set up for
+	-- this on clients that use it.
+	if button.UpdateOrientation and button.initialWidth then
+		button:UpdateOrientation(true)
+		button.UpdateOrientation = noopFunc
+	end
+end
+
 function BagBarMod:OnEnable()
 	if not self.bar then
 		self.bar = setmetatable(Bartender4.ButtonBar:Create("BagBar", self.db.profile, L["Bag Bar"]), {__index = BagBar})
 
+		detachButtonFromBagsBar(MainMenuBarBackpackButton)
+		detachButtonFromBagsBar(CharacterBag0Slot)
+		detachButtonFromBagsBar(CharacterBag1Slot)
+		detachButtonFromBagsBar(CharacterBag2Slot)
+		detachButtonFromBagsBar(CharacterBag3Slot)
 		if CharacterReagentBag0Slot then
-			CharacterReagentBag0Slot.SetBarExpanded = noopFunc
+			detachButtonFromBagsBar(CharacterReagentBag0Slot)
 		end
-		CharacterBag3Slot.SetBarExpanded = noopFunc
-		CharacterBag2Slot.SetBarExpanded = noopFunc
-		CharacterBag1Slot.SetBarExpanded = noopFunc
-		CharacterBag0Slot.SetBarExpanded = noopFunc
+		if KeyRingButton then
+			detachButtonFromBagsBar(KeyRingButton)
+		end
 	end
 
 	if Bartender4.Features.Keyring and KeyRingButton then
@@ -57,19 +87,10 @@ function BagBarMod:OnEnable()
 	self.bar:Enable()
 	self:ToggleOptions()
 	self:ApplyConfig()
-
-	if BagsBar and BagsBar.Layout then
-		self:SecureHook(BagsBar, "Layout", "BagsBar_Layout")
-		EventRegistry:UnregisterCallback("MainMenuBarManager.OnExpandChanged", BagsBar);
-	end
 end
 
 function BagBarMod:ApplyConfig()
 	self.bar:ApplyConfig(self.db.profile)
-end
-
-function BagBarMod:BagsBar_Layout()
-	self.bar:UpdateButtonLayout()
 end
 
 function BagBar:ApplyConfig(config)
@@ -82,11 +103,6 @@ function BagBar:ApplyConfig(config)
 
 	self:FeedButtons()
 	self:UpdateButtonLayout()
-end
-
-local function clearSetPoint(btn, ...)
-	btn:ClearAllPoints()
-	btn:SetPoint(...)
 end
 
 local function MasqueButtonType(button)
@@ -108,10 +124,10 @@ function BagBar:FeedButtons()
 
 	if self.buttons then
 		while next(self.buttons) do
-			local btn = table_remove(self.buttons)
+			local btn = table.remove(self.buttons)
+			-- park it on the hidden frame, so that it stays invisible even if the Blizzard UI shows it again
 			btn:Hide()
-			btn:SetParent(UIParent)
-			btn:ClearSetPoint("CENTER")
+			btn:SetParent(Bartender4.UIHider)
 
 			if btn ~= KeyRingButton then
 				if group and btn.MasqueButtonData then
@@ -124,28 +140,29 @@ function BagBar:FeedButtons()
 	end
 
 	if Bartender4.Features.Keyring and KeyRingButton and self.config.keyring then
-		table_insert(self.buttons, KeyRingButton)
+		table.insert(self.buttons, KeyRingButton)
 		count = count + 1
 	elseif KeyRingButton then
+		-- the classic clients show the keyring again on every bag update
 		KeyRingButton:Hide()
-		KeyRingButton:ClearAllPoints()
+		KeyRingButton:SetParent(Bartender4.UIHider)
 	end
 
 	if Bartender4.Features.ReagentBag and CharacterReagentBag0Slot and (not self.config.onebag or self.config.onebagreagents) then
-		table_insert(self.buttons, CharacterReagentBag0Slot)
+		table.insert(self.buttons, CharacterReagentBag0Slot)
 		count = count + 1
 	end
 
 	if not self.config.onebag then
-		table_insert(self.buttons, CharacterBag3Slot)
-		table_insert(self.buttons, CharacterBag2Slot)
-		table_insert(self.buttons, CharacterBag1Slot)
-		table_insert(self.buttons, CharacterBag0Slot)
+		table.insert(self.buttons, CharacterBag3Slot)
+		table.insert(self.buttons, CharacterBag2Slot)
+		table.insert(self.buttons, CharacterBag1Slot)
+		table.insert(self.buttons, CharacterBag0Slot)
 
 		count = count + 4
 	end
 
-	table_insert(self.buttons, MainMenuBarBackpackButton)
+	table.insert(self.buttons, MainMenuBarBackpackButton)
 
 	for i,v in pairs(self.buttons) do
 		v:SetParent(self)
@@ -166,8 +183,6 @@ function BagBar:FeedButtons()
 				group:AddButton(v, v.MasqueButtonData, MasqueButtonType(v))
 			end
 		end
-
-		v.ClearSetPoint = clearSetPoint
 	end
 
 	BagBarMod.button_count = count

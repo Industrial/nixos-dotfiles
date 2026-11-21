@@ -693,10 +693,20 @@ local function initUI()
 	end
 
 	-- prompt buttons
+	-- Forever: No and Ignore were created with UICheckButtonTemplate, a *checkbox*
+	-- template whose label is a Layer fontstring (parentKey "Text"), not a
+	-- ButtonText region. SetText() on those never showed, so they rendered as two
+	-- empty 32x32 squares. They now use UIPanelButtonTemplate (a real ButtonText
+	-- region) with an explicit uniform size, so all three buttons are labelled.
+	--
+	-- The Yes button deliberately keeps its original construction: an invisible
+	-- dummy whose visuals are copied onto a bare SecureActionButtonTemplate.
+	-- That dummy MUST stay a UICheckButtonTemplate -- of the two templates it is
+	-- the one with a <PushedTexture>, which copyButtonVisuals reads via
+	-- source:GetPushedTexture(). A UIPanelButtonTemplate dummy has no
+	-- PushedTexture and would pass nil to SetPushedTexture (login error).
 
-	-- there is no secure version of OptionsButton, so create an invisible
-	-- OptionsButton (auto_de_prompt.DummyYes) and copy its visual settings across to a
-	-- SecureActionButton (auto_de_prompt.Yes) to perform the spellcast
+	local BUTTON_W, BUTTON_H = 80, 22
 
 	local function copyButtonVisuals(dest, source)
 
@@ -715,24 +725,33 @@ local function initUI()
 		dest:SetHighlightFontObject(GameFontHighlight);
 	end
 
-	-- create an invisible "Yes" OptionsButton, then copy its settings
+	-- create an invisible "Yes" dummy, then copy its settings
 	-- across to the secure button
 	auto_de_prompt.DummyYes = CreateFrame("Button", "", auto_de_prompt, "UICheckButtonTemplate")
+	auto_de_prompt.DummyYes:SetSize(BUTTON_W, BUTTON_H)
 	auto_de_prompt.DummyYes:SetText(_ENCH("GuiYes"))
 	auto_de_prompt.DummyYes:SetPoint("BOTTOMRIGHT", auto_de_prompt, "BOTTOMRIGHT", -10, 10)
 	auto_de_prompt.DummyYes:Hide()
 
 	auto_de_prompt.Yes = CreateFrame("Button", "AutoDEPromptYes", auto_de_prompt, "SecureActionButtonTemplate")
 	copyButtonVisuals(auto_de_prompt.Yes, auto_de_prompt.DummyYes)
+	-- Forever: SecureActionButton_OnClick only performs the action on key-down
+	-- when "useOnKeyDown" is enabled (the ActionButtonUseKeyDown CVar defaults to
+	-- on). A Lua-created button registered for Up clicks then does nothing at all.
+	-- Force the up-click path so the spell cast is deterministic regardless of CVar.
+	auto_de_prompt.Yes:RegisterForClicks("AnyUp")
+	auto_de_prompt.Yes:SetAttribute("useOnKeyDown", false)
 	auto_de_prompt.Yes:SetAttribute("unit", "none")
 	auto_de_prompt.Yes:SetAttribute("type", "spell")
 
-	auto_de_prompt.No = CreateFrame("Button", "AutoDEPromptNo", auto_de_prompt, "UICheckButtonTemplate")
+	auto_de_prompt.No = CreateFrame("Button", "AutoDEPromptNo", auto_de_prompt, "UIPanelButtonTemplate")
+	auto_de_prompt.No:SetSize(BUTTON_W, BUTTON_H)
 	auto_de_prompt.No:SetText(_ENCH("GuiNo"))
 	auto_de_prompt.No:SetPoint("BOTTOMRIGHT", auto_de_prompt.Yes, "BOTTOMLEFT", -5, 0)
 	auto_de_prompt.No:SetScript("OnClick", promptNo)
 
-	auto_de_prompt.Ignore = CreateFrame("Button", "AutoDEPromptIgnore", auto_de_prompt, "UICheckButtonTemplate")
+	auto_de_prompt.Ignore = CreateFrame("Button", "AutoDEPromptIgnore", auto_de_prompt, "UIPanelButtonTemplate")
+	auto_de_prompt.Ignore:SetSize(BUTTON_W, BUTTON_H)
 	auto_de_prompt.Ignore:SetText(_ENCH("GuiIgnore"))
 	auto_de_prompt.Ignore:SetPoint("BOTTOMRIGHT", auto_de_prompt.No, "BOTTOMLEFT", -5, 0)
 	auto_de_prompt.Ignore:SetScript("OnClick", promptIgnore)

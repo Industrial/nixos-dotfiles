@@ -56,27 +56,19 @@ end
 --
 
 do
-	local currentAPIVersion = 1
-	local errorWrongAPI = "The bar style API version is now %d; the bar style %q needs to be updated for this version of BigWigs."
 	local errorAlreadyExist = "Trying to register %q as a bar styler, but it already exists."
 	local function noop() end
 	local barStyles = {}
 	-- For more on bar styles, visit: https://github.com/BigWigsMods/BigWigs/wiki/Custom-Bar-Styles
 	function API:RegisterBarStyle(key, styleData)
-		if type(key) ~= "string" then error("Bar style must be a string.") end
-		if type(styleData) ~= "table" then error("Bar style data must be a table.") end
-		if type(styleData.version) ~= "number" then error("Bar style version must be a number.") end
-		if type(styleData.apiVersion) ~= "number" then error("Bar style apiVersion must be a number.") end
-		if type(styleData.GetStyleName) ~= "function" then error("Bar style GetStyleName must be a function.") end
-		if type(styleData:GetStyleName()) ~= "string" then error("Bar style GetStyleName() return must be a string.") end
-		if styleData.apiVersion ~= currentAPIVersion then error(errorWrongAPI:format(currentAPIVersion, key)) end
-		if barStyles[key] and barStyles[key].version == styleData.version then error(errorAlreadyExist:format(key)) end
-		if not barStyles[key] or barStyles[key].version < styleData.version then
-			if not styleData.ApplyStyle then styleData.ApplyStyle = noop end
-			if not styleData.BarStopped then styleData.BarStopped = noop end
-			if not styleData.GetSpacing then styleData.GetSpacing = noop end
-			barStyles[key] = styleData
-		end
+		if type(key) ~= "string" then error("Bar style must be a string.") return end
+		if type(styleData) ~= "table" then error("Bar style data must be a table.") return end
+		if type(styleData.GetStyleName) ~= "function" then error("Bar style GetStyleName must be a function.") return end
+		if type(styleData:GetStyleName()) ~= "string" then error("Bar style GetStyleName() return must be a string.") return end
+		if barStyles[key] then error(errorAlreadyExist:format(key)) return end
+		if not styleData.ApplyStyle then styleData.ApplyStyle = noop end
+		if not styleData.BarStopped then styleData.BarStopped = noop end
+		barStyles[key] = styleData
 	end
 	function API:GetBarStyle(key)
 		if type(key) ~= "string" then error("Bar style must be a string.") end
@@ -492,17 +484,28 @@ end
 do -- Plugins (Tabs)
 	local tbl = {}
 	-- Get all AceGUI option tables for custom tabs under the "Plugins" category
-	function API.GetPluginOptionsCustomTabs()
-		return CopyTable(tbl)
+	function API.GetPluginOptionsCustomTabs(moduleName)
+		local tableToFill = {}
+		if tbl[moduleName] then
+			for key, func in next, tbl[moduleName] do
+				tableToFill[key] = func()
+			end
+		end
+		return tableToFill
 	end
 
 	-- Register a custom tab to already existing Plugins, using AceGUI option tables
-	function PrivateAPI.RegisterPluginOptionsCustomTab(moduleName, tabTableKey, settingsTable)
+	function PrivateAPI.RegisterPluginOptionsCustomTab(moduleName, tabTableKey, settingsFunc)
 		if type(moduleName) ~= "string" then error("The module name needs to be a string.") return end
 		if type(tabTableKey) ~= "string" then error("The tab table key needs to be a string.") return end
-		if type(settingsTable) ~= "table" then error("The settings table needs to be a table.") return end
+		if type(settingsFunc) ~= "function" then error("The settings table needs to be returned by a function.") return end
 		if not tbl[moduleName] then
-			tbl[moduleName] = {tabTableKey, settingsTable}
+			tbl[moduleName] = {}
+		end
+		if not tbl[moduleName][tabTableKey] then
+			tbl[moduleName][tabTableKey] = settingsFunc
+		else
+			error("Tab '"..tabTableKey.."' already exists for module '"..moduleName.."'.")
 		end
 	end
 end
@@ -513,6 +516,18 @@ end
 
 do
 	local bwTooltip = CreateFrame("GameTooltip", "BigWigsTooltip", UIParent, "GameTooltipTemplate")
+	bwTooltip:SetScript("OnUpdate", function(self, elapsed)
+		self.updateTooltipTimer = (self.updateTooltipTimer or 0.2) - elapsed
+		if self.updateTooltipTimer > 0 then return end
+		self.updateTooltipTimer = 0.2
+
+		local owner = self:GetOwner()
+		if owner and owner.UpdateTooltip then
+			owner:UpdateTooltip()
+		elseif self.shouldRefreshData then -- TOOLTIP_DATA_UPDATE
+			self:RefreshData()
+		end
+	end)
 	function API.GetTooltip()
 		return bwTooltip
 	end

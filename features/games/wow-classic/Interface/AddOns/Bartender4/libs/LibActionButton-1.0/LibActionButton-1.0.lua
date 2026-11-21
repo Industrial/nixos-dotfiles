@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ]]
 local MAJOR_VERSION = "LibActionButton-1.0"
-local MINOR_VERSION = 170
+local MINOR_VERSION = 171
 
 if not LibStub then error(MAJOR_VERSION .. " requires LibStub.") end
 local lib, oldversion = LibStub:NewLibrary(MAJOR_VERSION, MINOR_VERSION)
@@ -84,6 +84,8 @@ lib.NumChargeCooldowns = lib.NumChargeCooldowns or 0
 lib.FlyoutInfo = lib.FlyoutInfo or {}
 lib.FlyoutButtons = lib.FlyoutButtons or {}
 
+lib.customOverlayGlowSpells = lib.customOverlayGlowSpells or {}
+
 lib.ACTION_HIGHLIGHT_MARKS = lib.ACTION_HIGHLIGHT_MARKS or setmetatable({}, { __index = ACTION_HIGHLIGHT_MARKS })
 
 lib.callbacks = lib.callbacks or CBH:New(lib)
@@ -120,9 +122,10 @@ local type_meta_map = {
 }
 
 local ButtonRegistry, ActiveButtons, ActionButtons, NonActionButtons, ActionButtonsNonUI, OnUpdateButtons, ButtonsByAction = lib.buttonRegistry, lib.activeButtons, lib.actionButtons, lib.nonActionButtons, lib.actionButtonsNonUI, lib.onUpdateButtons, lib.buttonsByAction
+local CustomOverlayGlowSpells = lib.customOverlayGlowSpells
 
 local Update, UpdateButtonState, UpdateUsable, UpdateCount, UpdateCooldown, UpdateCooldownNumberHidden, UpdateTooltip, UpdateNewAction, UpdateSpellHighlight, ClearNewActionHighlight, UpdateAssistedCombatRotationFrame, UpdatedAssistedHighlightFrame
-local StartFlash, StopFlash, UpdateFlash, UpdateHotkeys, UpdateRangeTimer, UpdateOverlayGlow
+local StartFlash, StopFlash, UpdateFlash, UpdateHotkeys, UpdateRangeTimer, UpdateOverlayGlow, UpdateOverlayGlowForSpell
 local UpdateFlyout, ShowGrid, HideGrid, UpdateGrid, SetupSecureSnippets, WrapOnClick
 local ShowOverlayGlow, HideOverlayGlow
 local ClearChargeCooldown
@@ -592,6 +595,32 @@ function lib:GetAllButtons()
 		buttons[button] = true
 	end
 	return buttons
+end
+
+--- Show the overlay glow on all buttons with the given spell, independent of the spell activation overlays of the game.
+-- The glow remains active until it is hidden again with :HideSpellOverlayGlow
+-- @param spellID The spell ID to show the glow for
+function lib:ShowSpellOverlayGlow(spellID)
+	if type(spellID) ~= "number" then
+		error("Usage: ShowSpellOverlayGlow(spellID): spellID must be a number", 2)
+	end
+	if CustomOverlayGlowSpells[spellID] then return end
+
+	CustomOverlayGlowSpells[spellID] = true
+	UpdateOverlayGlowForSpell(spellID)
+end
+
+--- Hide an overlay glow previously shown with :ShowSpellOverlayGlow
+-- If the spell has an active spell activation overlay from the game, the glow remains visible.
+-- @param spellID The spell ID to hide the glow for
+function lib:HideSpellOverlayGlow(spellID)
+	if type(spellID) ~= "number" then
+		error("Usage: HideSpellOverlayGlow(spellID): spellID must be a number", 2)
+	end
+	if not CustomOverlayGlowSpells[spellID] then return end
+
+	CustomOverlayGlowSpells[spellID] = nil
+	UpdateOverlayGlowForSpell(spellID)
 end
 
 function Generic:ClearSetPoint(...)
@@ -1637,33 +1666,9 @@ function OnEvent(frame, event, arg1, ...)
 			UpdateFlyoutSpells()
 		end
 	elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" then
-		for button in next, ActiveButtons do
-			local spellId = button:GetSpellId()
-			if spellId and spellId == arg1 then
-				ShowOverlayGlow(button)
-			else
-				if button._state_type == "action" then
-					local actionType, id = GetActionInfo(button._state_action)
-					if actionType == "flyout" and FlyoutHasSpell(id, arg1) then
-						ShowOverlayGlow(button)
-					end
-				end
-			end
-		end
+		UpdateOverlayGlowForSpell(arg1, true)
 	elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
-		for button in next, ActiveButtons do
-			local spellId = button:GetSpellId()
-			if spellId and spellId == arg1 then
-				HideOverlayGlow(button)
-			else
-				if button._state_type == "action" then
-					local actionType, id = GetActionInfo(button._state_action)
-					if actionType == "flyout" and FlyoutHasSpell(id, arg1) then
-						HideOverlayGlow(button)
-					end
-				end
-			end
-		end
+		UpdateOverlayGlowForSpell(arg1, false)
 	elseif event == "PLAYER_EQUIPMENT_CHANGED" then
 		for button in next, ActiveButtons do
 			if button._state_type == "item" then
@@ -2399,12 +2404,46 @@ function HideOverlayGlow(self)
 end
 
 local IsSpellOverlayed = C_SpellActivationOverlay and C_SpellActivationOverlay.IsSpellOverlayed or IsSpellOverlayed
+if Feat_DisableOverlayGlow or not IsSpellOverlayed then
+	-- no spell activation overlays from the game, only custom glows
+	IsSpellOverlayed = function() return false end
+end
+
 function UpdateOverlayGlow(self)
 	local spellId = self:GetSpellId()
-	if spellId and IsSpellOverlayed(spellId) then
+	if spellId and (CustomOverlayGlowSpells[spellId] or IsSpellOverlayed(spellId)) then
 		ShowOverlayGlow(self)
 	else
 		HideOverlayGlow(self)
+	end
+end
+
+-- Update the glow on all buttons for a spell, including action flyouts containing the spell
+-- overlayed is the spell activation overlay state of the game, if already known by the caller
+function UpdateOverlayGlowForSpell(spellID, overlayed)
+	if not spellID then return end
+
+	if CustomOverlayGlowSpells[spellID] then
+		overlayed = true
+	elseif overlayed == nil then
+		overlayed = IsSpellOverlayed(spellID)
+	end
+
+	for button in next, ActiveButtons do
+		local buttonSpellId = button:GetSpellId()
+		local match = buttonSpellId and buttonSpellId == spellID
+		if not match and button._state_type == "action" then
+			local actionType, id = GetActionInfo(button._state_action)
+			match = actionType == "flyout" and FlyoutHasSpell(id, spellID)
+		end
+
+		if match then
+			if overlayed then
+				ShowOverlayGlow(button)
+			else
+				HideOverlayGlow(button)
+			end
+		end
 	end
 end
 
@@ -3050,11 +3089,6 @@ Custom.IsUnitInRange           = function(self, unit) return nil end
 Custom.SetTooltip              = function(self) return GameTooltip:SetText(self._state_action.tooltip) end
 Custom.GetSpellId              = function(self) return nil end
 Custom.RunCustom               = function(self, unit, button) return self._state_action.func(self, unit, button) end
-
---- WoW Classic overrides
-if Feat_DisableOverlayGlow then
-	UpdateOverlayGlow = function() end
-end
 
 -----------------------------------------------------------
 --- Update old Buttons

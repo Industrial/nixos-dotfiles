@@ -10,12 +10,6 @@ local StanceBarMod = Bartender4:NewModule("StanceBar", "AceEvent-3.0")
 -- fetch upvalues
 local ButtonBar = Bartender4.ButtonBar.prototype
 
-local _G = _G
-local format, setmetatable, min, select = string.format, setmetatable, min, select
-
--- GLOBALS: CreateFrame, InCombatLockdown, ClearOverrideBindings, GetBindingKey, GetBindingText, SetOverrideBindingClick, SetBinding
--- GLOBALS: GetNumShapeshiftForms, GetShapeshiftFormInfo, GetShapeshiftFormCooldown, CooldownFrame_Set
-
 -- create prototype information
 local StanceBar = setmetatable({}, {__index = ButtonBar})
 local StanceButtonPrototype = CreateFrame("CheckButton")
@@ -178,7 +172,7 @@ end
 local actionTmpl = "Stance Button %d (%s)"
 function StanceButtonPrototype:GetActionName()
 	local id = self:GetID()
-	local name = Bartender4.Compat.GetSpellName(select(4, GetShapeshiftFormInfo(id)))
+	local name = C_Spell.GetSpellName(select(4, GetShapeshiftFormInfo(id)))
 	return format(actionTmpl, id, name)
 end
 

@@ -23,6 +23,8 @@ local Ledger = AM.Ledger
 -- event types
 Ledger.CREATED = 1
 Ledger.SOLD = 2
+-- canceled and expired: price is what the units that came back were posted for (empty without a buyout, and in events
+-- booked before it was stored). Not money that moved: only the price they did not sell at (GetPriceRanges).
 Ledger.CANCELED = 3
 Ledger.EXPIRED = 4
 -- ended without us seeing how (its mail was never taken, or not recognized): neither sold nor lost, left out of Net
@@ -489,6 +491,8 @@ local function BookReturn(kind, label, guid, item, count, sentAt, fits)
     return false
   end
   local lost = best[OPEN_DEPOSIT]
+  -- what the units that came back were posted for (nil without a buyout): the price they did not sell at
+  local posted = best[OPEN_PRICE]
   if count >= best[OPEN_COUNT] then
     state.open[bestId] = nil
   else
@@ -498,10 +502,13 @@ local function BookReturn(kind, label, guid, item, count, sentAt, fits)
       lost = lost - kept
       best[OPEN_DEPOSIT] = kept
     end
-    best[OPEN_PRICE] = best[OPEN_PRICE] and math.floor(best[OPEN_PRICE] * left / best[OPEN_COUNT] + 0.5)
+    if posted then
+      best[OPEN_PRICE] = math.floor(posted * left / best[OPEN_COUNT] + 0.5)
+      posted = posted - best[OPEN_PRICE]
+    end
     best[OPEN_COUNT] = left
   end
-  state.events[#state.events + 1] = { sentAt, kind, char, item, count, nil, lost }
+  state.events[#state.events + 1] = { sentAt, kind, char, item, count, posted, lost }
   AM.DebugLog.Log("ledger", "%s auction %s: %s x%s deposit %s", label, bestId, item, count, lost)
   AM.Events.Fire("LEDGER_CHANGED")
   return true
@@ -561,8 +568,8 @@ function Ledger.ReconcileOwned(guid, owned)
     if open[OPEN_CHAR] == char and not listed[auctionId] then
       if cancelRequests[auctionId] then
         cancelRequests[auctionId] = nil
-        state.events[#state.events + 1] = { now, Ledger.CANCELED, char, open[OPEN_ITEM], open[OPEN_COUNT], nil,
-          open[OPEN_DEPOSIT] }
+        state.events[#state.events + 1] = { now, Ledger.CANCELED, char, open[OPEN_ITEM], open[OPEN_COUNT],
+          open[OPEN_PRICE], open[OPEN_DEPOSIT] }
         state.open[auctionId] = nil
         changed = true
         AM.DebugLog.Log("ledger", "canceled auction %s: %s x%s deposit %s", auctionId, open[OPEN_ITEM],
@@ -740,6 +747,10 @@ local function AddEvent(totals, event, basis)
     totals.cost = totals.cost + basis.costs[event]
     totals.uncostedCount = totals.uncostedCount + basis.uncosted[event]
     totals.soldCount = totals.soldCount + event[COUNT]
+    -- not a figure of the combined rows: only the sales kept as events
+    if not totals.lastSold or event[TIME] > totals.lastSold then
+      totals.lastSold = event[TIME]
+    end
   elseif kind == Ledger.VENDOR_SOLD then
     totals.revenue = totals.revenue + event[PRICE]
     totals.vendorRevenue = totals.vendorRevenue + event[PRICE]
@@ -984,6 +995,8 @@ end
 --   openCount      items in the auctions open now (not limited to the time range; for a part sold commodity the
 --                  rest)
 --   sellRate       soldCount / (soldCount + unsoldCount), nil when nothing sold or came back
+--   lastSold       the time of the latest sale at the auction house among the events kept, nil without one (sales
+--                  only in combined days are not dated)
 --   tiedUp         the known deposits of the auctions open now (not limited to the time range); tiedUpUnknown: open
 --                  auctions whose deposit is not known
 function Ledger.GetSummary(from, to, guid)
@@ -1588,6 +1601,71 @@ function Ledger.GetEvent(index)
     return nil
   end
   return event[TIME], event[TYPE], state.chars[event[CHAR]], event[ITEM], event[COUNT], Money(event)
+end
+
+-- How the auctions of the item (itemDbKey, every character of this auction house) did by their price per unit: the
+-- span from the lowest to the highest price split into `count` ranges of equal width, each with the units sold and
+-- the units that came back (canceled or expired) at a price in it. Only the events kept (combined days have no prices)
+-- and returns with a known price (stored since that was added). A table { low, high, ranges = { { from, to, sold,
+-- unsold }, ... } } (prices in copper per unit, from/to rounded down, the last range includes high); nil when fewer
+-- than two different prices are known: no span to show. Prices more than PRICE_OUTLIER_FACTOR times above or below
+-- the median price of the units are left out: a single absurd post would squeeze all the others into one range.
+local PRICE_OUTLIER_FACTOR = 5
+
+-- The price per unit that half of the units were posted at or below (points sorted by unit).
+local function MedianUnit(points, units)
+  local seen = 0
+  for _, point in ipairs(points) do
+    seen = seen + point.count
+    if seen * 2 >= units then
+      return point.unit
+    end
+  end
+end
+
+function Ledger.GetPriceRanges(item, count)
+  local all = {}
+  local units = 0
+  for _, event in ipairs(State().events) do
+    local kind = event[TYPE]
+    if event[ITEM] == item and event[PRICE] and event[COUNT] > 0
+      and (kind == Ledger.SOLD or kind == Ledger.CANCELED or kind == Ledger.EXPIRED) then
+      all[#all + 1] = { unit = event[PRICE] / event[COUNT], count = event[COUNT], sold = kind == Ledger.SOLD }
+      units = units + event[COUNT]
+    end
+  end
+  if #all == 0 then
+    return nil
+  end
+  table.sort(all, function(a, b) return a.unit < b.unit end)
+  local median = MedianUnit(all, units)
+  local points = {}
+  local low, high
+  for _, point in ipairs(all) do
+    if point.unit <= median * PRICE_OUTLIER_FACTOR and point.unit * PRICE_OUTLIER_FACTOR >= median then
+      points[#points + 1] = point
+      low = math.min(low or point.unit, point.unit)
+      high = math.max(high or point.unit, point.unit)
+    end
+  end
+  if high - low < 1 then
+    return nil
+  end
+  local ranges = {}
+  for index = 1, count do
+    ranges[index] = { from = math.floor(low + (high - low) * (index - 1) / count),
+      to = math.floor(low + (high - low) * index / count), sold = 0, unsold = 0 }
+  end
+  for _, point in ipairs(points) do
+    local index = math.min(count, math.floor((point.unit - low) / (high - low) * count) + 1)
+    local range = ranges[index]
+    if point.sold then
+      range.sold = range.sold + point.count
+    else
+      range.unsold = range.unsold + point.count
+    end
+  end
+  return { low = math.floor(low), high = math.floor(high), ranges = ranges }
 end
 
 -- character GUID, itemDbKey, count, price, deposit, time created, duration of a running auction; nil if unknown.

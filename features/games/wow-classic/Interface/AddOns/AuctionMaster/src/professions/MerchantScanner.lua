@@ -5,7 +5,8 @@ local addonName, AM = ...
 -- itemId) and the available count in the faction object "vendorStock" (-1 if unlimited).
 -- Only items bought for gold alone are recorded; items that cost tokens or other
 -- currencies have no meaningful copper price. Only a lower price replaces a known one, so
--- a reputation discount of any character of the faction is reflected in it.
+-- a reputation discount of any character of the faction is reflected in it. The price of an
+-- unlimited merchant replaces that of a limited one.
 local MerchantScanner = {}
 AM.MerchantScanner = MerchantScanner
 
@@ -39,7 +40,12 @@ local function Scan()
       local itemId = C_Item.GetItemInfoInstant(link)
       if itemId then
         local perItem = price / math.max(quantity or 1, 1)
-        if not prices[itemId] or perItem < prices[itemId] then
+        local unlimited = (numAvailable or -1) == -1
+        -- The price of a limited merchant only stands until one without a limit is seen, which may charge more;
+        -- otherwise the lowest of the same kind wins.
+        if unlimited and stock[itemId] ~= -1 then
+          prices[itemId] = perItem
+        elseif unlimited == (stock[itemId] == -1) and (not prices[itemId] or perItem < prices[itemId]) then
           prices[itemId] = perItem
         end
         -- Unlimited (-1) sticks, as another merchant may offer it without limit; otherwise
@@ -52,16 +58,16 @@ local function Scan()
   end
 end
 
--- Returns the price per item in copper at which a merchant sells the item, nil if no
--- merchant selling it for gold is known.
+-- Returns price, stock: the price per item in copper at which a merchant sells the item and
+-- how many it had available when last seen (-1 if unlimited), nil if no merchant selling it
+-- for gold is known. Whether a limited merchant counts is up to the caller
+-- (RecipeCost.GetVendorPrice for buying).
 function MerchantScanner.GetPrice(itemId)
-  return AM.Database.GetFactionObject("vendorPrices")[itemId]
-end
-
--- Returns how many items a merchant had available when last seen, -1 if unlimited, nil if
--- no merchant selling it for gold is known.
-function MerchantScanner.GetStock(itemId)
-  return AM.Database.GetFactionObject("vendorStock")[itemId]
+  local price = AM.Database.GetFactionObject("vendorPrices")[itemId]
+  if not price then
+    return nil
+  end
+  return price, AM.Database.GetFactionObject("vendorStock")[itemId] or -1
 end
 
 local frame = CreateFrame("Frame")

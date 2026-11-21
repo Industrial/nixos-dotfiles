@@ -43,9 +43,8 @@ end
 -- Called before ItemStore.UpdateItem, whose PRICES_CHANGED event makes the panels read it.
 local function StoreSellPrice(itemDbKey, auctions)
   local price = ItemSearch.PostPrice(auctions)
-  if price then
-    sellPrices[itemDbKey] = { price, time() }
-  end
+  -- nothing listed (a complete empty answer): the price of the listings gone is no price to post at any more
+  sellPrices[itemDbKey] = price and { price, time() } or nil
   if AM.DebugLog.IsEnabled() then
     -- PostPrice sorted the listings: the cheapest few as price x quantity show why it chose its price
     local cheapest = {}
@@ -115,13 +114,20 @@ local function OnCommodityResults(itemId)
     end
   end
   if #auctions == 0 then
-    NoteEmpty(itemId, C_AuctionHouse.HasFullCommoditySearchResults(itemId))
+    -- Blizzard fires the event with no results while it restarts the search, which says nothing: only a complete
+    -- answer says that nothing is listed
+    local complete = C_AuctionHouse.HasFullCommoditySearchResults(itemId)
+    NoteEmpty(itemId, complete)
+    if not complete then
+      -- the answer after the restart is a new one, even when it equals the last
+      processed[itemDbKey] = nil
+      return
+    end
   end
   if IsRepeat(itemDbKey, table.concat(parts, ",")) then
     return
   end
   AM.DebugLog.Log("search", "commodity results %s: %d listings", itemDbKey, #listed)
-  -- Blizzard fires the event with no results while it restarts the search, which says nothing.
   StoreSellPrice(itemDbKey, listed)
   AM.ItemStore.UpdateItem(itemDbKey, auctions)
   if #auctions > 0 then
@@ -158,8 +164,15 @@ local function OnItemResults(searchedKey)
   if skipped > 0 then
     AM.DebugLog.Log("search", "item results %d: %d auctions without a key left out", searchedKey.itemID, skipped)
   end
-  if #order == 0 and skipped == 0 then
-    NoteEmpty(searchedKey.itemID, C_AuctionHouse.HasFullItemSearchResults(searchedKey))
+  if #order == 0 and skipped == 0 and C_AuctionHouse.HasFullItemSearchResults(searchedKey) then
+    NoteEmpty(searchedKey.itemID, true)
+    -- an item whose key is its itemId alone has nothing listed any more; equipment lists every level under one search,
+    -- which of its keys were meant is not known, so they stay
+    local itemDbKey = AM.ItemDbKey.ForItem(searchedKey.itemID)
+    if itemDbKey and not IsRepeat(itemDbKey, "") then
+      StoreSellPrice(itemDbKey, {})
+      AM.ItemStore.UpdateItem(itemDbKey, {})
+    end
   end
   for _, itemDbKey in ipairs(order) do
     local group = groups[itemDbKey]

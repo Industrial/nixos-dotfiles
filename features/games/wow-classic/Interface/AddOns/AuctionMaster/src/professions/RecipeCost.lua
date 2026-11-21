@@ -32,10 +32,17 @@ end
 RecipeCost.GetAuctionPrice = GetAuctionPrice
 RecipeCost.AH_CUT = AH_CUT
 
--- What a merchant charges for one item, nil if no merchant selling it is known.
+-- What a merchant charges for one item, nil if no merchant selling it without a limit is known: one that has only a
+-- few (a weekly or traveling merchant) is no way to get every one needed. A merchant seen wins over the derived price
+-- of the known vendor items.
 local function GetVendorPrice(itemId)
-  return AM.MerchantScanner.GetPrice(itemId) or AM.VendorItems.GetPrice(itemId)
+  local price, stock = AM.MerchantScanner.GetPrice(itemId)
+  if price and stock == -1 then
+    return price
+  end
+  return AM.VendorItems.GetPrice(itemId)
 end
+RecipeCost.GetVendorPrice = GetVendorPrice
 
 -- A reagent that is crafted from reagents that are crafted... stops here, deeper chains are not
 -- followed.
@@ -83,7 +90,8 @@ end
 
 -- What one of the item costs when crafted by a character of this faction knowing a recipe for it:
 -- { price, source = "crafted", age }, the cheapest of the recipes, nil if there is none or a reagent
--- of each has no price.
+-- of each has no price. A recipe with a cooldown (a transmute) does not count: it makes only a few now and then,
+-- not every one needed.
 local function GetCraftPrice(itemId, visited, depth)
   if depth >= MAX_CRAFT_DEPTH or visited[itemId] then
     return nil
@@ -92,7 +100,7 @@ local function GetCraftPrice(itemId, visited, depth)
   local best
   for _, recipe in ipairs(AM.ProfessionScanner.GetRecipes(itemId)) do
     local total, age
-    if not onlyCrafter or RecipeCost.IsCraftedBy(recipe, onlyCrafter) then
+    if not recipe.cooldown and (not onlyCrafter or RecipeCost.IsCraftedBy(recipe, onlyCrafter)) then
       total, age = GetReagentsPrice(recipe.reagents, visited, depth + 1)
     end
     if total then
@@ -131,6 +139,39 @@ function RecipeCost.GetBuyPrice(itemId, crafter)
   local buy = GetBuyPrice(itemId, {}, 0)
   onlyCrafter = nil
   return buy
+end
+
+-- Adds the reagents (every quality) to items and, for a reagent that can be crafted, the reagents of its recipes, as
+-- deep as GetCraftPrice follows them.
+local function AddReagentItems(reagents, items, visited, depth)
+  for _, reagent in ipairs(reagents) do
+    for _, itemId in ipairs(reagent.itemIds or { reagent.itemId }) do
+      items[#items + 1] = itemId
+      if depth < MAX_CRAFT_DEPTH and not visited[itemId] then
+        visited[itemId] = true
+        for _, recipe in ipairs(AM.ProfessionScanner.GetRecipes(itemId)) do
+          if not recipe.cooldown and (not onlyCrafter or RecipeCost.IsCraftedBy(recipe, onlyCrafter)) then
+            AddReagentItems(recipe.reagents, items, visited, depth + 1)
+          end
+        end
+        visited[itemId] = nil
+      end
+    end
+  end
+end
+
+-- The itemIds whose prices Calculate uses for the recipe: the item it makes first, then every reagent and the reagents
+-- of the reagents that can be crafted (vendor reagents too, the auction house may be cheaper). An item can be listed
+-- more than once. With a crafter (GUID) only the recipes that character knows count as crafting a reagent.
+function RecipeCost.GetPricedItems(recipe, crafter)
+  onlyCrafter = crafter
+  local items = {}
+  if recipe.outputItemId then
+    items[1] = recipe.outputItemId
+  end
+  AddReagentItems(recipe.reagents, items, { [recipe.outputItemId or 0] = true }, 0)
+  onlyCrafter = nil
+  return items
 end
 
 -- Reagents with several qualities (retail) cost what their cheapest quality does.

@@ -49,8 +49,7 @@ config.maxValueLength = 1000
 -- `dataPrefix` is the filename prefix inside that directory.
 -- `rules` selects legacy ordering and fallback constants, not authored input ownership.
 -- Flavor-specific constant tables take precedence over that fallback.
--- `gameType` is the default native persona; `gameTypeAliases` adds names for the same flavor.
--- `aliases` names byte-identical Baked TOCs, independently of native file-condition tokens.
+-- `gameType` is the native game-type token.
 -- `interface` records the supported client Interface values.
 
 ---Legacy rules ordering, not flavor ownership. Forever selects Classic through `rules`.
@@ -63,7 +62,7 @@ config.flavors = {
   { name = "Wrath",   suffix = "_Wrath",   expansion = "Wotlk",   dataPrefix = "wotlk",   rules = "Wotlk", gameType = "wrath", interface = "30405, 38000, 38001, 38002" },
   { name = "Cata",    suffix = "_Cata",    expansion = "Cata",    dataPrefix = "cata",    rules = "Cata", gameType = "cata", interface = "40402" },
   { name = "Mists",   suffix = "_Mists",   expansion = "MoP",     dataPrefix = "mop",     rules = "MoP", gameType = "mists", interface = "50503, 50504" },
-  { name = "Forever", suffix = "_Forever", aliases = { "_Camelot" }, expansion = "Forever", dataPrefix = "forever", rules = "Classic", gameType = "camelot", gameTypeAliases = { "forever" }, interface = "16001" },
+  { name = "Forever", suffix = "_Forever", expansion = "Forever", dataPrefix = "forever", rules = "Classic", gameType = "forever", interface = "16001" },
 }
 
 config.flavorByName = {}
@@ -377,9 +376,6 @@ function config.sourceFileEntries()
     if flavor then
       for _, token in ipairs(entry.gameTypes) do if token == flavor.gameType then return end end
       entry.gameTypes[#entry.gameTypes + 1] = flavor.gameType
-      for _, alias in ipairs(flavor.gameTypeAliases or {}) do
-        entry.gameTypes[#entry.gameTypes + 1] = alias
-      end
     end
   end
   for _, path in ipairs(config.runtimeFiles.head) do add(path) end
@@ -466,7 +462,7 @@ function config.sourceFileList(flavor)
       if #entry.gameTypes > 0 then
         local directive, tokens = "AllowLoadGameType", entry.gameTypes
         local forever = config.flavorByName.Forever
-        if tokens[1] == forever.gameType and #tokens == 1 + #(forever.gameTypeAliases or {}) then
+        if tokens[1] == forever.gameType and #tokens == 1 then
           -- An all-unknown allow list passes on older clients, loading Forever over TBC.
           -- Exclude known legacy types instead. Deliberately do not exclude mainline.
           directive = "ExcludeLoadGameType"

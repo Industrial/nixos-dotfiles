@@ -488,8 +488,32 @@ function lib.AddTab(tabButton, tabFrame)
 			PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
 			ahFrame.currentCustomTab = self
 			SetRetailTabChecked(self, true)
-			-- Let Blizzard handle hiding built-in content
-			pcall(function() ahFrame:SetDisplayMode("") end)
+			-- Hide Blizzard's built-in AH content so the custom tab frame shows.
+			-- Forever: never call AuctionHouseFrame:SetDisplayMode from addon
+			-- code. SetDisplayMode assigns self.displayMode
+			-- (Blizzard_AuctionHouseFrame.lua:564) from this insecure call chain,
+			-- which taints that field. Blizzard's secure
+			-- ContainerFrameItemButton_OnClick reads it through
+			-- IsListingAuctions() -> GetDisplayMode() (:600) immediately before
+			-- the protected C_Container.UseContainerItem call
+			-- (ContainerFrame.lua:1559/1611), so a tainted displayMode blocks
+			-- using/learning items from bags ("attempted to call a forbidden
+			-- function (UseContainerItem()) from a tainted execution path",
+			-- attributed to Auc-Advanced -- confirmed in Logs/taint.log).
+			-- Hide the subframes directly instead: the same effect as
+			-- SetDisplayMode's :573-577, with no write to the secure frame.
+			if AuctionHouseFrameDisplayMode then
+				for _, displayMode in pairs(AuctionHouseFrameDisplayMode) do
+					if type(displayMode) == "table" then
+						for _, subframeName in ipairs(displayMode) do
+							local subframe = ahFrame[subframeName]
+							if subframe and subframe.Hide then
+								subframe:Hide()
+							end
+						end
+					end
+				end
+			end
 			-- Call the module's original OnClick handler
 			if moduleOnClick then
 				moduleOnClick(self)
@@ -501,7 +525,33 @@ function lib.AddTab(tabButton, tabFrame)
 		if not private.displayModeHooked then
 			private.displayModeHooked = true
 			hooksecurefunc(ahFrame, "SetDisplayMode", function(_, mode)
-				if mode and #mode > 0 then
+				if type(mode) == "table" and #mode > 0 then
+					-- Re-show Blizzard's built-in content. A custom tab hides
+					-- these subframes directly instead of writing the tainted
+					-- self.displayMode field, so this also covers Blizzard's
+					-- early-return at :560 when the mode is unchanged -- the
+					-- case the old SetDisplayMode("") call used to force.
+					-- Use the authoritative final mode: Blizzard may rewrite
+					-- it at :543-558 (e.g. an item already queued for posting).
+					local displayMode = ahFrame.GetDisplayMode and ahFrame:GetDisplayMode()
+					if type(displayMode) ~= "table" then displayMode = mode end
+					for _, subframeName in ipairs(displayMode) do
+						local subframe = ahFrame[subframeName]
+						if subframe and subframe.Show then
+							subframe:Show()
+						end
+					end
+					-- Re-select the built-in tab. Our custom-tab handler
+					-- deselects every built-in tab (and clears selectedTab), and
+					-- Blizzard only re-selects it at SetDisplayMode :586. When
+					-- the mode is unchanged Blizzard returns early at :560 and
+					-- never gets there -- the case the old SetDisplayMode("")
+					-- sentinel used to force. Restore the highlight here.
+					local tab = ahFrame.tabsForDisplayMode and ahFrame.tabsForDisplayMode[displayMode]
+					if tab and PanelTemplates_SetTab then
+						PanelTemplates_SetTab(ahFrame, tab)
+						if ahFrame.UpdateTitle then ahFrame:UpdateTitle() end
+					end
 					-- A built-in display mode was selected, hide all custom content
 					lib.HideAllRetailTabs()
 					if ahFrame.currentCustomTab then

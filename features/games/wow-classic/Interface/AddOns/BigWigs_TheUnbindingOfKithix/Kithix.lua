@@ -44,7 +44,7 @@ mod:SetRenames({
 	[1304930] = {CL.tank_bomb, CL.cast:format(CL.tank_bomb), notes = {CL.generalNote, CL.castTimerNote}, original = {mod:SpellName(1304930), CL.cast:format(mod:SpellName(1304930))}}, -- Dark Devastation
 	[1304424] = {1304424}, -- Extinguish
 	[1304508] = {CL.orbs}, -- Light's Embrace
-	[1304045] = {CL.debuffs}, -- Unspeakable Horrors
+	[1304045] = {CL.debuffs, CL.you:format(CL.fear), notes = {CL.generalNote, CL.messageOnYouNote}, original = {mod:SpellName(1304045), CL.you:format(mod:SpellName(1304045))}}, -- Unspeakable Horrors
 	[1302951] = {CL.intermission}, -- Suffocating Darkness XXX Full Energy?
 	[1303169] = {CL.stage:format(1)}, -- Divine Radiance XXX Full Energy? Weakened? Boss Stunned?
 	[1303406] = {CL.heal_absorbs}, -- Abyssal Grasp
@@ -58,7 +58,7 @@ mod:SetRenames({
 --
 
 mod:SetAuraData({
-	{1304045, soundOnApplied = "alarm", note = CL.preDebuffNote, header = CL.important}, -- Unspeakable Horrors
+	{1304045, soundOnApplied = "warning", note = CL.preDebuffNote, header = CL.important}, -- Unspeakable Horrors
 	{1304046, soundOnApplied = "info", note = CL.postDebuffNote:format(mod:SpellName(1304045)), mechanic = "fleeing"}, -- Overwhelming Fear
 	{1303406, soundOnApplied = "warning"}, -- Abyssal Grasp
 	{1304948, soundOnApplied = "alarm"}, -- Devastated (tank)
@@ -88,7 +88,7 @@ function mod:GetOptions()
 		1301511, -- Voidswarm
 		1304424, -- Extinguish
 		1304508, -- Light's Embrace
-		1304045, -- Unspeakable Horrors
+		{1304045, "ME_ONLY_EMPHASIZE"}, -- Unspeakable Horrors
 		1303681, -- Twisted Appendage
 		{1304930, "CASTBAR"}, -- Dark Devastation
 
@@ -179,7 +179,7 @@ function mod:MythicTimeline(_, eventInfo)
 
 	if stage == 1 then
 		if rounded == 5 then
-			barInfo = self:Voidswarm()
+			barInfo = self:Voidswarm(duration)
 		elseif rounded == 12 or rounded == 15 or rounded == 16 or rounded == 18 then
 			barInfo = self:TwistedAppendage()
 		elseif rounded == 19 or rounded == 20 or rounded == 23 or rounded == 66 then
@@ -216,7 +216,7 @@ function mod:MythicTimeline(_, eventInfo)
 			durationEventCount[rounded] = (durationEventCount[rounded] or 0) + 1
 			local count = durationEventCount[rounded]
 			if count % 2 == 1 then
-				barInfo = self:Voidswarm()
+				barInfo = self:Voidswarm(duration)
 			else
 				barInfo = self:SuffocatingDarkness()
 			end
@@ -258,7 +258,7 @@ function mod:HeroicTimeline(_, eventInfo)
 
 	if stage == 1 then
 		if rounded == 5 then
-			barInfo = self:Voidswarm()
+			barInfo = self:Voidswarm(duration)
 		elseif rounded == 12 or rounded == 15 or rounded == 18 or rounded == 32 then
 			barInfo = self:TwistedAppendage()
 		elseif rounded == 20 or rounded == 22 or rounded == 69 then
@@ -295,7 +295,7 @@ function mod:HeroicTimeline(_, eventInfo)
 			durationEventCount[rounded] = (durationEventCount[rounded] or 0) + 1
 			local count = durationEventCount[rounded]
 			if count % 2 == 1 then
-				barInfo = self:Voidswarm()
+				barInfo = self:Voidswarm(duration)
 			else
 				barInfo = self:SuffocatingDarkness()
 			end
@@ -339,7 +339,7 @@ function mod:EasyTimeline(_, eventInfo)
 
 	if stage == 1 then
 		if rounded == 5 then
-			barInfo = self:Voidswarm()
+			barInfo = self:Voidswarm(duration)
 		elseif rounded == 15 or rounded == 21 or rounded == 34 then
 			barInfo = self:TwistedAppendage()
 		elseif rounded == 20 or rounded == 22 or rounded == 77 then
@@ -374,7 +374,7 @@ function mod:EasyTimeline(_, eventInfo)
 			durationEventCount[rounded] = (durationEventCount[rounded] or 0) + 1
 			local count = durationEventCount[rounded]
 			if count % 2 == 1 then
-				barInfo = self:Voidswarm()
+				barInfo = self:Voidswarm(duration)
 			else
 				barInfo = self:SuffocatingDarkness()
 			end
@@ -560,16 +560,21 @@ end
 
 -- Stage One
 
-function mod:Voidswarm()
+function mod:Voidswarm(duration)
 	local barText = CL.count:format(self:GetRename(1301511), voidswarmCount)
 	voidswarmCount = voidswarmCount + 1
 	return {
 		msg = barText,
 		key = 1301511,
+		timer = self:ShouldShowBars() and self:ScheduleTimer(function() self:StopBlizzMessages(1) end, duration - 0.5), -- block +/- 0.5s around the event, can fire before sometimes but is usually ~0.2 after
 		onFinished = function()
-			self:StopBlizzMessages(1)
 			self:Message(1301511, "cyan", CL.incoming:format(barText))
 			self:PlaySound(1301511, "info")
+		end,
+		onCanceled = function(this)
+			if this.timer then
+				self:CancelTimer(this.timer)
+			end
 		end,
 	}
 end
@@ -637,11 +642,14 @@ function mod:UnspeakableHorrors()
 		msg = barText,
 		key = 1304045,
 		onFinished = function()
-			-- self:PersonalMessageFromBlizzMessage
-			self:Message(1304045, "orange", barText)
-			if self:Healer() then
-				self:PlaySound(1304045, "alert")
-			end
+			local timer = self:ScheduleTimer(function()
+				self:Message(1304045, "orange", barText)
+				if self:Healer() then
+					self:PlaySound(1304045, "alert")
+				end
+			end, 0.45)
+			self:PersonalMessageFromBlizzMessage(1304045, 0.4, false, self:GetRename(1304045, 2), nil, true, function() self:CancelTimer(timer) end)
+			--self:PlaySound(1304045, "warning") -- Aura sound
 		end,
 	}
 end

@@ -3,8 +3,9 @@ local addonName, AM = ...
 -- Learns the recipes of every profession window that is opened, so that a reagent which can be
 -- crafted can be priced by its recipe. The recipes are kept in the faction object "recipes" (keyed
 -- by the id of the crafted item, a list as several recipes may make the same item). A recipe is
--- { id, outputCount, reagents, crafters }, crafters being the GUIDs of the characters of this faction
--- that know it. Recipes nobody knows are not kept. The profession APIs only answer while the window is open,
+-- { id, outputCount, reagents, crafters, cooldown }, crafters being the GUIDs of the characters of this faction
+-- that know it, cooldown true once the recipe is seen to have one (transmutes; it never goes away, as the game
+-- only tells while the recipe is on cooldown on some clients). Recipes nobody knows are not kept. The profession APIs only answer while the window is open,
 -- and there is nothing to learn from chat messages or events about learning a recipe: the recipe
 -- shows up in the window the next time it is opened.
 local ProfessionScanner = {}
@@ -206,12 +207,42 @@ local function Record(recipes, recipe, character, known)
     end
   end
   entry.reagents = CopyReagents(recipe.reagents)
+  if recipe.cooldown then
+    entry.cooldown = true
+  end
   for _, name in ipairs(entry.crafters) do
     if name == character then
       return
     end
   end
   entry.crafters[#entry.crafters + 1] = character
+end
+
+-- Whether the recipe (its id is the spell id, a name on Classic when it has no link) has a cooldown. The base
+-- cooldown of the spell shows it at any time where the game has one; a shared cooldown (transmutes on some clients)
+-- only shows while it runs, or as charges.
+local function HasSpellCooldown(recipeId)
+  if type(recipeId) ~= "number" or not GetSpellBaseCooldown then
+    return false
+  end
+  local cooldownMs = GetSpellBaseCooldown(recipeId)
+  return cooldownMs ~= nil and cooldownMs > 0
+end
+
+local function HasRetailCooldown(recipeId)
+  if HasSpellCooldown(recipeId) then
+    return true
+  end
+  local cooldown, _, _, maxCharges = C_TradeSkillUI.GetRecipeCooldown(recipeId)
+  return (cooldown ~= nil and cooldown > 0) or (maxCharges ~= nil and maxCharges > 0)
+end
+
+local function HasClassicCooldown(recipeId, index)
+  if HasSpellCooldown(recipeId) then
+    return true
+  end
+  local cooldown = GetTradeSkillCooldown and GetTradeSkillCooldown(index)
+  return cooldown ~= nil and cooldown > 0
 end
 
 -- Retail lists all recipes of the profession, known or not, so forgotten ones can be removed too.
@@ -221,6 +252,7 @@ local function ScanRetail(recipes, character)
     if info and not info.isRecraft and not info.isSalvageRecipe then
       local recipe = AM.ShoppingList.ReadRetailRecipe(recipeId)
       if recipe and recipe.outputItemId then
+        recipe.cooldown = info.learned and HasRetailCooldown(recipeId)
         -- the ranks of a recipe are separate recipes that all count as learned, only the highest counts
         local next = info.nextRecipeID and C_TradeSkillUI.GetRecipeInfo(info.nextRecipeID)
         Record(recipes, recipe, character, info.learned and not (next and next.learned))
@@ -235,6 +267,7 @@ local function ScanClassic(recipes, character)
   for index = 1, GetNumTradeSkills() do
     local recipe = AM.ShoppingList.ReadClassicRecipe(index)
     if recipe and recipe.outputItemId then
+      recipe.cooldown = HasClassicCooldown(recipe.id, index)
       Record(recipes, recipe, character, true)
     end
   end
@@ -321,8 +354,8 @@ local function ScanSoon()
 end
 
 -- Returns the recipes that make the item and are known by at least one character of this faction:
--- { id, outputCount, reagents = { itemId, itemIds (nil for a single item), quantity }, crafters }.
--- Empty if there is none.
+-- { id, outputCount, reagents = { itemId, itemIds (nil for a single item), quantity }, crafters, cooldown (true for
+-- a recipe with a cooldown, a transmute) }. Empty if there is none.
 function ProfessionScanner.GetRecipes(itemId)
   local known = {}
   for _, entry in ipairs(AM.Database.GetFactionObject("recipes")[itemId] or {}) do
@@ -330,7 +363,7 @@ function ProfessionScanner.GetRecipes(itemId)
     if #crafters > 0 then
       -- without the crafters who ignore it, a copy so that the stored one stays whole
       known[#known + 1] = crafters == entry.crafters and entry or { id = entry.id, outputCount = entry.outputCount,
-        reagents = entry.reagents, skillLine = entry.skillLine, crafters = crafters }
+        reagents = entry.reagents, skillLine = entry.skillLine, crafters = crafters, cooldown = entry.cooldown }
     end
   end
   return known
