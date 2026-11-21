@@ -396,6 +396,10 @@
       // {vgen-vm = import ./features/nixos/vgen/test.nix {inherit pkgs;};}
       # features/nix/vhealth's VM test: a service active per systemd with its port closed is down.
       // {vhealth-vm = import ./features/nix/vhealth/test.nix {inherit pkgs;};}
+      # vdeploy deploy mode (#160): a forced-failing health check rolls back; and the LIVE
+      # take-over from comin (comin applies the change that retires it) and back.
+      // {vdeploy-rollback-vm = import ./features/nix/vdeploy/test-rollback.nix {inherit pkgs;};}
+      // {vdeploy-takeover-vm = import ./features/nix/vdeploy/test-takeover.nix {inherit pkgs;};}
       // {flake-lock-follows = flakeLockFollows;};
 
     formatter.${system} = pkgs.alejandra;
