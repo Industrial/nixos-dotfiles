@@ -9,8 +9,9 @@
 --                  left alone, as Nix aborts there.
 --   --keep N       the newest N generations stay.
 -- Whatever the policies say, these always stay: the profile's current
--- generation, the generation the machine booted, the one it is running, and
--- every pinned one (`pin.vlt`).
+-- generation, the generation the machine booted, the one it is running, the
+-- one the bootloader defaults to (in whichever profile), and every pinned one
+-- (`pin.vlt`).
 
 import nix_store_core::generations::{Generation, doomed}
 import crate::profile::Gen
@@ -18,9 +19,9 @@ import crate::profile::Gen
 export data Policy { export keep Option<usize>, export cutoff Option<i64> }
   deriving (Debug, Clone, PartialEq)
 
--- What must stay: the booted and the running system (store paths), and the
--- pinned generation numbers of this profile.
-export data Protect { export booted Option<String>, export running Option<String>, export pinned Vec<u64> }
+-- What must stay: the booted and the running system and the boot menu's
+-- default (store paths), and the pinned generation numbers of this profile.
+export data Protect { export booted Option<String>, export running Option<String>, export boot_default Option<String>, export pinned Vec<u64> }
   deriving (Debug, Clone, Default, PartialEq)
 
 -- The verdict for one profile: what goes (ascending), what a policy would
@@ -73,6 +74,8 @@ running_reason g protect =
     Some (.to_string "booted")
   else if names (&protect.running) g
     Some (.to_string "running")
+  else if names (&protect.boot_default) g
+    Some (.to_string "boot default")
   else
     None
 
@@ -134,7 +137,7 @@ test "with both policies a generation goes only when both let it"
   assert! \-> plan.doomed == vec![1, 2]
 
 test "the booted, running and pinned generations are never removed"
-  protect = Protect { booted = Some (.to_string "/nix/store/t-2"), running = Some (.to_string "/nix/store/x-3"), pinned = vec![4] }
+  protect = Protect { booted = Some (.to_string "/nix/store/t-2"), running = Some (.to_string "/nix/store/x-3"), boot_default = None, pinned = vec![4] }
   plan = decide (&ten ()) (Some 10) (&protect) (&Policy { keep = Some 1, cutoff = None })
   assert! \-> plan.doomed == vec![1, 5, 6, 7, 8, 9]
   assert! \-> plan.spared == vec![(2, "booted".to_string()), (3, "running".to_string()), (4, "pinned".to_string())]
@@ -147,3 +150,9 @@ test "a touched old generation stops the days policy, as Nix's assert does"
 test "the current generation stays even when it is the oldest"
   plan = decide (&ten ()) (Some 1) (&nothing ()) (&Policy { keep = Some 0, cutoff = None })
   assert! \-> plan.doomed == vec![2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+test "the boot menu's default is never removed, in any profile"
+  protect = Protect { boot_default = Some (.to_string "/nix/store/t-6"), ...Protect::default () }
+  plan = decide (&ten ()) (Some 10) (&protect) (&Policy { keep = Some 1, cutoff = None })
+  assert! \-> plan.doomed == vec![1, 2, 3, 4, 5, 7, 8, 9]
+  assert! \-> plan.spared == vec![(6, "boot default".to_string())]

@@ -44,6 +44,66 @@ is_newer best mtime =
     Some b -> mtime > b.0
     None -> true
 
+-- The bootloader's own default, read from systemd-boot's menu: the entry
+-- `loader.conf` names, and the system its `init=` lives in. That is the
+-- generation the machine boots next, in whichever profile, so a prune keeps
+-- it and the rewrite keeps it the default. None when the menu cannot be read
+-- (not root; a lanzaboote ESP, which has no entries) or the default is a glob.
+export const ESP : &str = "/boot"
+
+-- `default <id>` in loader.conf, unless the id is a glob (`nixos-*`).
+export loader_default : &str -> Option<String>
+loader_default text =
+  mut found = None : Option<String>
+  for line in text.lines ()
+    case line.trim ().strip_prefix "default " of
+      Some rest ->
+        found := Some (rest.trim ().to_string ())
+      None ->
+        ()
+  found.filter (\id -> !(id.contains '*'))
+
+-- The system an entry boots: the directory of the `init=` on its options line.
+export entry_toplevel : &str -> Option<String>
+entry_toplevel text =
+  mut found = None : Option<String>
+  for line in text.lines ()
+    if line.starts_with "options "
+      for word in line.split_whitespace ()
+        case word.strip_prefix "init=" of
+          Some init ->
+            found := (init.strip_suffix "/init" |> .map (\s -> s.to_string ()))
+          None ->
+            ()
+  found
+
+-- An entry id as its file name under loader/entries.
+entry_file : String -> String
+entry_file id =
+  if id.ends_with ".conf"
+    id
+  else
+    "#{id}.conf"
+
+-- The toplevel of the menu's default entry on `esp`, if it can be read.
+export menu_default : &Path -> Option<String>
+menu_default esp =
+  conf = (fs::read_to_string (esp.join "loader/loader.conf")).ok ()
+  id = (conf |> .and_then (\t -> loader_default (&t)))?
+  entry = esp.join "loader/entries" |> .join (entry_file id)
+  text = ((fs::read_to_string (&entry)).ok ())?
+  entry_toplevel (&text)
+
+-- The generation link, among `profiles`, that boots `toplevel`.
+export link_booting : &[Profile] -> &str -> Option<PathBuf>
+link_booting profiles toplevel =
+  mut found = None : Option<PathBuf>
+  for p in profiles
+    for g in p.gens.iter ()
+      if g.toplevel == toplevel || g.target == toplevel
+        found := Some (g.link.clone ())
+  found
+
 -- Unlink generations `doomed` of `profile` under its lock. Returns the ones
 -- removed; the current generation, read again under the lock, is skipped.
 export remove_generations : &Path -> &[u64] -> Result<Vec<u64>, String>
@@ -91,6 +151,31 @@ test "the boot default is the system profile switched last"
   assert! \-> boot_default root (&(.to_vec ([system.clone (), comin.clone (), user.clone ()]))) == Some (PathBuf::from "/nix/var/nix/profiles/system-profiles/comin-12-link")
   assert! \-> boot_default root (&(.to_vec ([system.clone (), user.clone ()]))) == Some (PathBuf::from "/nix/var/nix/profiles/system-493-link")
   assert! \-> boot_default root (&(.to_vec ([user]))) == None
+
+test "the menu's default is the loader.conf entry, unless it is a glob"
+  conf = "timeout 5\ndefault nixos-4f8a05ab.conf\nconsole-mode keep\n"
+  assert! \-> loader_default conf == Some (.to_string "nixos-4f8a05ab.conf")
+  assert! \-> loader_default "timeout 5\ndefault nixos-*\n" == None
+  assert! \-> loader_default "timeout 5\n" == None
+  assert! \-> entry_file (.to_string "nixos-a") == "nixos-a.conf" && entry_file (.to_string "nixos-a.conf") == "nixos-a.conf"
+
+test "an entry boots the system its init lives in"
+  entry = "title NixOS\nversion Generation 12 NixOS 26.11\nlinux /EFI/nixos/k.efi\noptions init=/nix/store/aaaa-nixos-system-x/init root=fstab loglevel=4\n"
+  assert! \-> entry_toplevel entry == Some (.to_string "/nix/store/aaaa-nixos-system-x")
+  assert! \-> entry_toplevel "title NixOS\n" == None
+
+test "the menu default is read from an ESP and found among the generations"
+  esp = std::env::temp_dir () |> .join "vgen-test-esp-#{std::process::id ()}"
+  fs::remove_dir_all (&esp) |> .ok
+  fs::create_dir_all (esp.join "loader/entries") |> .unwrap
+  fs::write (esp.join "loader/loader.conf") "default nixos-b.conf\n" |> .unwrap
+  fs::write (esp.join "loader/entries/nixos-b.conf") "options init=/nix/store/x-11/init\n" |> .unwrap
+  assert! \-> menu_default (&esp) == Some (.to_string "/nix/store/x-11")
+  comin = Profile { path = PathBuf::from "/p/system-profiles/comin", current = Some 12, gens = vec![gen_at(11, 1, "/p/system-profiles/comin"), gen_at(12, 2, "/p/system-profiles/comin")] }
+  assert! \-> link_booting (&(.to_vec ([comin]))) "/nix/store/x-11" == Some (PathBuf::from "/p/system-profiles/comin-11-link")
+  assert! \-> menu_default (&(esp.join "missing")) == None
+  fs::remove_dir_all (&esp) |> .ok
+  ()
 
 test "the installer is the generation's own switch-to-configuration boot"
   (program, action) = installer (Path::new "/nix/var/nix/profiles/system-493-link")

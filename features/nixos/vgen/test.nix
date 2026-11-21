@@ -83,7 +83,7 @@ in
           lines = {int(l.split()[0]): l for l in listing.splitlines() if re.match(r"^\s+\d+\s", l)}
           assert "booted" in lines[1] and "running" in lines[1], lines[1]
           assert "pinned" in lines[3], lines[3]
-          assert "current" in lines[5], lines[5]
+          assert "current" in lines[5] and "boot default" in lines[5], lines[5]
           assert "vs 4:" in lines[5] and "changed" in lines[5], lines[5]
 
       with subtest("a dry run changes nothing"):
@@ -102,12 +102,26 @@ in
           assert default_entry_generation() == 5
           machine.succeed("test -e /run/booted-system/init")
 
-      with subtest("unpinned, the generation goes; booted and current still stay"):
+      with subtest("the boot menu's default stays, even when it is no profile's current"):
+          # Boot generation 3 next, as `switch-to-configuration boot` from an older link does.
+          machine.succeed(f"{P}-3-link/bin/switch-to-configuration boot")
+          assert default_entry_generation() == 3
           machine.succeed("vgen unpin 3 --profile system")
           machine.fail("test -L /nix/var/nix/gcroots/vgen/system-3-link")
+          listed = machine.succeed("vgen list --profile system --no-diff")
+          assert any(l.split()[0] == "3" and "boot default" in l for l in listed.splitlines() if l.startswith("  ")), listed
+          out = machine.succeed("vgen prune --keep 0")
+          assert "keeping generation 3 of /nix/var/nix/profiles/system: boot default" in out, out
+          assert generations(P) == [1, 3, 5], generations(P)
+          assert menu() == [1, 3, 5], menu()
+          assert default_entry_generation() == 3
+
+      with subtest("once it is no longer the default, the generation goes; booted and current still stay"):
+          machine.succeed(f"{P}/bin/switch-to-configuration boot")
           machine.succeed("vgen prune --keep 0")
           assert generations(P) == [1, 5], generations(P)
           assert menu() == [1, 5], menu()
+          assert default_entry_generation() == 5
 
       with subtest("a pinned generation survives vgc; an unpinned one does not"):
           paths = []
