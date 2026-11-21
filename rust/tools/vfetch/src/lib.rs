@@ -8,7 +8,8 @@
 // Lints on the *shape* of Voltaic's emitted Rust, not on decisions in the
 // source (the same set as rust/tools/vgc): `();` after a unit body and `()`
 // arms, `_0` binders in the Display impl `errors` derives, one `if let` per
-// `is` test, nullary lambdas around zero-argument functions, `return` as an
+// `is` test, `case` where Rust has `matches!`, nullary lambdas around
+// zero-argument functions, `return` as an
 // early exit, and the effect types spelled out in signatures. `Decoder`'s
 // variants differ in size on purpose: one per NAR in flight, never boxed.
 #![allow(
@@ -20,6 +21,7 @@
     clippy::collapsible_if,
     clippy::collapsible_else_if,
     clippy::manual_flatten,
+    clippy::match_like_matches_macro,
     clippy::redundant_closure,
     clippy::needless_borrows_for_generic_args,
     clippy::field_reassign_with_default,

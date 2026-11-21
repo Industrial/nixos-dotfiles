@@ -126,10 +126,8 @@ db_of_url s =
     Some (nix_store_core::db::DEFAULT_DB.to_string ())
   else if s.starts_with '/'
     Some (rooted s)
-  else if s.strip_prefix "local?root=" is Some root
-    Some (rooted root)
   else
-    None
+    s.strip_prefix "local?root=" |> .map (\root -> rooted root)
 
 rooted : &str -> String
 rooted root =

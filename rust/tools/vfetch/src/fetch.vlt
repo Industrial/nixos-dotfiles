@@ -155,7 +155,7 @@ level ctx w found =
     if &s is Source::Fetch cache f
       fresh.push ((cache.clone (), f.clone ()))
     seen.insert p s
-  fresh.sort_by (\a b -> b.1.info.nar_size.cmp (&a.1.info.nar_size))
+  fresh.sort_by_key (\a -> std::cmp::Reverse a.1.info.nar_size)
   frontier = next.into_iter () |> .filter (\r -> !seen.contains_key r) |> .collect : Vec<String>
   c = ctx.clone ()
   (for_each_par fresh (move \t -> start (c.clone ()) t) Concurrency::Sequential) |> .flat_map (move \started -> continued ctx frontier seen pending started)

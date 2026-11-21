@@ -11,7 +11,7 @@
 
 import std::fs
 import std::io::{BufWriter, Write}
-import std::path::PathBuf
+import std::path::{Path, PathBuf}
 import sha2::Digest
 import liblzma::write::XzDecoder
 import nix_store_core::hash
@@ -34,7 +34,7 @@ nar_file s path = s.dir.join "nar" |> .join "#{hash_of path}.nar"
 export part_file : &Staging -> &str -> PathBuf
 part_file s path = s.dir.join "nar" |> .join "#{hash_of path}.nar.part"
 
-io_at : given <T: std::fmt::Display> &PathBuf -> T -> VfetchError
+io_at : given <T: std::fmt::Display> &Path -> T -> VfetchError
 io_at p e = VfetchError::Io "#{p.display ()}: #{e}"
 
 -- The directory, as a binary cache Nix can read.
