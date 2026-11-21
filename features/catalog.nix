@@ -153,6 +153,7 @@
   ./nix/vcache
   ./nix/vcache/client.nix
   ./nix/vdaemon-proxy
+  ./nix/vfetch
   ./nix/vverify
   ./nix/vpush
 
