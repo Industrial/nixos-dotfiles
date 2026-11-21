@@ -21,6 +21,7 @@ in
     namesUnique = assay.eq (lib.length names) (lib.length (lib.unique names));
 
     # Parked entries cost every host an evaluation. Only creative's three may be listed
-    # without a host enabling them — profiles/creative.nix is commented out everywhere.
-    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["creative.gimp" "creative.obs-studio" "creative.openpencil"];
+    # without a host enabling them — profiles/creative.nix is commented out everywhere —
+    # and nvd, kept as vdiff's one-option rollback (GH-153, profiles/cli-core.assay.nix).
+    onlyCreativeParked = assay.eq (lib.filter (n: !builtins.elem n enabledSomewhere) names) ["cli.nvd" "creative.gimp" "creative.obs-studio" "creative.openpencil"];
   }
