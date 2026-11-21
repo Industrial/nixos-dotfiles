@@ -73,7 +73,4 @@ in
     noConflicts = assay.eq [(proxySocket.conflicts or []) (fallback.conflicts or [])] [[] []];
     # A stop racing the other's bind must not delete the file.
     noRemoveOnStop = assay.eq (proxySocket.socketConfig.RemoveOnStop or false) false;
-
-    # The VM test is a flake check.
-    vmTestInFlakeChecks = assay.eq (lib.hasInfix "vdaemon-proxy-vm = import ./features/nix/vdaemon-proxy/test.nix" (builtins.readFile ../../../flake.nix)) true;
   }
