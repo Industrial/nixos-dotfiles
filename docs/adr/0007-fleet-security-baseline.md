@@ -232,6 +232,12 @@ following ours) is in `flake.nix` since GH-184. `features/nixos/boot` imports it
 every host, where it stays inert until the option is on. With the option on, lanzaboote's
 `lzbt` replaces the Python systemd-boot installer: it reads each generation's bootspec,
 writes signed UKIs to `/boot/EFI/Linux/`, and keeps the same 10-generation limit.
+`lzbt` runs through our own install hook, `lzbt-all-profiles` in `features/nixos/boot`, not
+upstream's. Upstream's hook only sees `/nix/var/nix/profiles/system-*-link` and leaves
+`default nixos-*`, so the highest version number wins. comin deploys through
+`system-profiles/comin`, so on drakkar that would boot the stale `system-493`. Our hook
+passes every profile's generations, as the Python installer does, and writes the
+generation being switched to as `default` in `loader.conf`.
 `checks.x86_64-linux.lanzaboote-vm` (`features/nixos/boot/test.nix`) runs this whole runbook
 in a VM: switch, reboot into the lanzaboote generation, roll back, reboot.
 
@@ -250,7 +256,8 @@ switch if the keys are missing. So **step 1 happens before the enable merges.**
 3. **Enable.** Set `features.hardening.secureBoot.enable = true` for the host, and merge.
    comin switches the host, and `lzbt` installs signed UKIs for every generation it keeps.
    Then check: `sudo sbctl verify` lists `/boot/EFI/Linux/nixos-generation-*.efi` as signed,
-   and `/boot/loader/loader.conf` has `default nixos-*`.
+   and `/boot/loader/loader.conf` has `default nixos-generation-<N>-….efi`, where N is
+   comin's newest generation (`ls /nix/var/nix/profiles/system-profiles/`), not 493.
 4. **First reboot, at the machine.**
    - Remove the Python installer's entries:
      `sudo rm -f /boot/loader/entries/nixos-*.conf` (it names them by content hash,
