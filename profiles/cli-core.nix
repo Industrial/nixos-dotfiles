@@ -59,7 +59,6 @@
     features.cli.assay.enable = true;
     features.cli.nh.enable = true;
     features.cli.nix-index.enable = true;
-    features.cli.nix-tree.enable = true;
     features.cli.nixdrv.enable = true;
     features.cli.nixfetch.enable = true;
     features.cli.nixq.enable = true;
@@ -70,6 +69,9 @@
     # only when a host turns vmon off (`features.cli.vmon.enable = lib.mkForce false;`).
     features.cli.vmon.enable = true;
     features.cli.nix-output-monitor.enable = lib.mkDefault (!config.features.cli.vmon.enable);
+    # vwhy replaces nix-tree and `nix why-depends` (GH-182). Rollback: a host sets
+    # `features.cli.nix-tree.enable = true;` and has nix-tree back beside it.
+    features.cli.vwhy.enable = true;
 
     # Archives
     features.cli.p7zip.enable = true;

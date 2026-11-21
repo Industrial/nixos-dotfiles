@@ -1,0 +1,225 @@
+-- vwhy's answers as text and as `--json`. Plain functions over the graph.
+--
+-- The chain and the `--all` tree are `nix why-depends`'s text without its
+-- colour codes: the package on the first line, then one line per reference,
+-- `└───` / `├───` under `    ` / `│   `. The `--top` table is sizes in binary
+-- units, largest first.
+
+import serde_json::{Map, Value}
+import vdiff::version::parse_name
+import crate::graph::{Graph, TreeLine, closure_size, unique_sizes}
+
+-- The JSON schema version. Bump it on any change a reader could notice.
+export const SCHEMA : u64 = 1
+
+-- One answer to `vwhy <package> <dependency>`: the dependency, its chain, and
+-- with `--all` the tree and the number of distinct chains.
+export data Answer { export dep usize, export chain Vec<usize>, export tree Option<Vec<TreeLine>>, export count Option<u64> }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- One row of `--top`.
+export data Row { export node usize, export own u64, export unique u64 }
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- The shortest chain, as `nix why-depends` prints it.
+export chain_text : &Graph -> &[usize] -> String
+chain_text g chain =
+  mut out = String::new ()
+  for pair in chain.iter () |> .enumerate
+    (k, n) = pair
+    if k == 0
+      out.push_str (&g.paths[*n])
+    else
+      out.push_str (&"    ".repeat (k - 1))
+      out.push_str "└───"
+      out.push_str (&g.paths[*n])
+    out.push '\n'
+  out
+
+-- The `--all` tree, as `nix why-depends --all` prints it.
+export tree_text : &Graph -> &[TreeLine] -> String
+tree_text g lines =
+  mut out = g.paths[g.root].clone ()
+  out.push '\n'
+  for l in lines
+    out.push_str (&l.prefix)
+    out.push_str (&g.paths[l.node])
+    out.push '\n'
+  out
+
+-- Every answer, one after the other, a blank line between.
+export answers_text : &Graph -> &[Answer] -> String
+answers_text g answers =
+  parts = answers.iter () |> .map (\a -> answer_text g a) |> .collect : Vec<String>
+  parts.join "\n"
+
+answer_text : &Graph -> &Answer -> String
+answer_text g a =
+  case (&a.tree, a.count) of
+    (Some lines, Some n) -> "#{tree_text g lines}(#{n} chain(s))\n"
+    _ -> chain_text g (&a.chain)
+
+object : Vec<(&str, Value)> -> Value
+object fields =
+  mut m = Map::new ()
+  for f in fields
+    (k, v) = f
+    m.insert (k.to_string ()) v
+  Value::Object m
+
+path_list : &Graph -> &[usize] -> Value
+path_list g nodes = Value::Array (nodes.iter () |> .map (\n -> Value::from (g.paths[*n].clone ())) |> .collect)
+
+edge_json : &Graph -> &TreeLine -> Value
+edge_json g l = Value::Array (.to_vec ([Value::from (g.paths[l.parent].clone ()), Value::from (g.paths[l.node].clone ())]))
+
+answer_json : &Graph -> &Answer -> Value
+answer_json g a =
+  mut fields = .to_vec ([("path", Value::from (g.paths[a.dep].clone ())), ("chain", path_list g (&a.chain))])
+  if (a.count) is Some n
+    fields.push (("chainCount", Value::from n))
+  if (&a.tree) is Some lines
+    fields.push (("edges", Value::Array (lines.iter () |> .map (\l -> edge_json g l) |> .collect)))
+  object fields
+
+-- `vwhy --json <package> <dependency>`, documented in README.md (schema 1).
+export answers_json : &Graph -> &str -> &[Answer] -> String
+answers_json g query answers =
+  deps = Value::Array (answers.iter () |> .map (\a -> answer_json g a) |> .collect)
+  doc = object (.to_vec ([("schema", Value::from SCHEMA), ("package", Value::from (g.paths[g.root].clone ())), ("query", Value::from query), ("dependencies", deps)]))
+  "#{serde_json::to_string_pretty (&doc) |> .unwrap_or_default}\n"
+
+-- Every member but the root, ranked by unique size (or by own size), the
+-- larger first, then by path; `limit` rows (0 for all of them).
+export ranked : &Graph -> bool -> usize -> Vec<Row>
+ranked g by_own limit =
+  unique = unique_sizes g
+  mut rows = Vec::new () : Vec<Row>
+  for pair in unique.iter () |> .enumerate
+    (n, u) = pair
+    if n != g.root
+      rows.push (Row { node = n, own = g.sizes[n], unique = *u })
+  if by_own
+    rows.sort_by (\a b -> b.own.cmp (&a.own) |> .then (b.unique.cmp (&a.unique)) |> .then (a.node.cmp (&b.node)))
+  else
+    rows.sort_by (\a b -> b.unique.cmp (&a.unique) |> .then (b.own.cmp (&a.own)) |> .then (a.node.cmp (&b.node)))
+  if limit > 0
+    rows.truncate limit
+  rows
+
+const UNITS : &str = "KMGTPE"
+
+-- A size as `1.5 GiB`: binary units, one decimal, rounded down.
+export human : u64 -> String
+human bytes =
+  if bytes < 1024
+    "#{bytes} B"
+  else
+    mut unit = 1024 : u128
+    mut k = 0 : usize
+    big = u128::from bytes
+    while big >= unit * 1024 && k + 1 < UNITS.len ()
+      unit := unit * 1024
+      k := k + 1
+    tenths = big * 10 / unit
+    letter = UNITS.get (k .. k + 1) |> .unwrap_or "?"
+    "#{tenths / 10}.#{tenths % 10} #{letter}iB"
+
+pad_left : &str -> usize -> String
+pad_left s width =
+  n = s.chars () |> .count
+  if n >= width
+    s.to_string ()
+  else
+    spaces = " ".repeat (width - n)
+    "#{spaces}#{s}"
+
+-- One table row: unique size, own size, path; tab-free, so `--tui` can add its own.
+export row_text : &Graph -> &Row -> String
+row_text g r = "#{pad_left (&human r.unique) 10}  #{pad_left (&human r.own) 10}  #{g.paths[r.node]}"
+
+-- `vwhy --top`.
+export top_text : &Graph -> &[Row] -> String
+top_text g rows =
+  total = closure_size g
+  mut out = "#{g.paths[g.root]}: #{g.paths.len ()} paths, #{human total}\n"
+  out.push_str "    UNIQUE         OWN  PATH\n"
+  for r in rows
+    out.push_str (&row_text g r)
+    out.push '\n'
+  out
+
+row_json : &Graph -> &Row -> Value
+row_json g r =
+  name = parse_name (&g.paths[r.node])
+  version = case name.version of
+    Some v -> Value::from v
+    None -> Value::Null
+  object (.to_vec ([("path", Value::from (g.paths[r.node].clone ())), ("name", Value::from name.pname), ("version", version), ("narSize", Value::from r.own), ("uniqueSize", Value::from r.unique)]))
+
+-- `vwhy --top --json`, documented in README.md (schema 1).
+export top_json : &Graph -> bool -> &[Row] -> String
+top_json g by_own rows =
+  sort = if by_own
+    "own"
+  else
+    "unique"
+  doc = object (.to_vec ([("schema", Value::from SCHEMA), ("root", Value::from (g.paths[g.root].clone ())), ("paths", Value::from (g.paths.len ())), ("narSize", Value::from (closure_size g)), ("sort", Value::from sort), ("top", Value::Array (rows.iter () |> .map (\r -> row_json g r) |> .collect))]))
+  "#{serde_json::to_string_pretty (&doc) |> .unwrap_or_default}\n"
+
+
+#[cfg(test)]
+const T : &str = "/nix/store/tttttttttttttttttttttttttttttttt-top-1.0"
+
+#[cfg(test)]
+const A : &str = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-a-2.0"
+
+#[cfg(test)]
+const B : &str = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-b"
+
+#[cfg(test)]
+const C : &str = "/nix/store/cccccccccccccccccccccccccccccccc-c-3"
+
+#[cfg(test)]
+sample : Graph
+sample = crate::graph::fixture T (.to_vec ([(T, 1, .to_vec ([A, B])), (A, 2048, .to_vec ([C])), (B, 4096, .to_vec ([C])), (C, 3145728, Vec::new ())]))
+
+test "the chain prints as nix why-depends prints it"
+  g = sample ()
+  c = crate::graph::shortest (&g) (crate::graph::index_of (&g) C |> .expect "c") |> .expect "a chain"
+  want = "#{T}\n└───#{A}\n    └───#{C}\n"
+  assert_eq! \-> chain_text (&g) (&c) \-> want
+
+test "the --all tree prints as nix why-depends --all prints it"
+  g = sample ()
+  lines = crate::graph::tree (&g) (crate::graph::index_of (&g) C |> .expect "c")
+  want = "#{T}\n├───#{A}\n│   └───#{C}\n└───#{B}\n    └───#{C}\n"
+  assert_eq! \-> tree_text (&g) (&lines) \-> want
+
+test "the json answer carries the chain, and the count and edges with --all"
+  g = sample ()
+  dep = crate::graph::index_of (&g) C |> .expect "c"
+  a = Answer { dep, chain = crate::graph::shortest (&g) dep |> .expect "a chain", tree = Some (crate::graph::tree (&g) dep), count = Some (crate::graph::chain_count (&g) dep) }
+  v = (serde_json::from_str (&answers_json (&g) "c" (&[a])) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> v["schema"] \-> Value::from 1
+  assert_eq! \-> v["dependencies"][0]["chain"] \-> serde_json::json!([T, A, C])
+  assert_eq! \-> v["dependencies"][0]["chainCount"] \-> Value::from 2
+  assert_eq! \-> v["dependencies"][0]["edges"][3] \-> serde_json::json!([B, C])
+
+test "top ranks by unique size, or own size, and skips the root"
+  g = sample ()
+  by_unique = ranked (&g) false 0 |> .iter |> .map (\r -> g.paths[r.node].clone ()) |> .collect : Vec<String>
+  assert_eq! \-> by_unique \-> .to_vec ([C.to_string (), B.to_string (), A.to_string ()])
+  first = ranked (&g) true 1
+  assert_eq! \-> first.len () \-> 1
+  v = (serde_json::from_str (&top_json (&g) true (&first)) : serde_json::Result<Value>) |> .expect "json"
+  assert_eq! \-> v["top"][0]["name"] \-> Value::from "c"
+  assert_eq! \-> v["top"][0]["version"] \-> Value::from "3"
+  assert_eq! \-> v["narSize"] \-> Value::from 3151873
+
+test "sizes print in binary units, one decimal"
+  assert_eq! \-> human 0 \-> "0 B"
+  assert_eq! \-> human 1023 \-> "1023 B"
+  assert_eq! \-> human 1536 \-> "1.5 KiB"
+  assert_eq! \-> human 3145728 \-> "3.0 MiB"
+  assert_eq! \-> human u64::MAX \-> "15.9 EiB"

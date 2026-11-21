@@ -1,0 +1,234 @@
+-- The closure graph, read from the store database (nix-store-core's `db`
+-- opens it read-only: no daemon, no root), and the arguments resolved.
+--
+-- A closure is two reads: its members (id, path, narSize) and the `Refs` rows
+-- out of them. They are independent, so they run as two id_effect fibers
+-- (`zip_par`), each a blocking read in `suspend` on its own connection (a
+-- connection is `Send` but not `Sync`). Two recursive queries in all, where
+-- nix-store-core's `closure` plus one `references` per member would be one per
+-- path: a system closure is about 3,600 of those.
+
+import std::path::Path
+import id_effect::{Effect, HNil, fail, succeed, suspend, zip_par}
+import rusqlite::Connection
+import nix_store_core::db
+import nix_store_core::storepath::{STORE_PREFIX, full, hash_part_of, store_base}
+import vdiff::version::parse_name
+import crate::graph::{Graph, build, index_of}
+
+-- Why vwhy could not answer. Each is the operator's to fix.
+export errors WhyError
+  Usage String        "#{0}"
+  Missing String      "path does not exist: #{0}"
+  NotInStore String   "not in the Nix store: #{0}"
+  Invalid String      "not a valid store path: #{0}"
+  NoMatch String      "#{0}"
+  Independent String  "#{0}"
+  Store String        "store database: #{0}"
+  Output String       "writing the output: #{0}"
+  Tui String          "--tui: #{0}"
+
+-- What the dependency argument names: a store path, or a name to look up in
+-- the closure (a base name, a hash part, or a package name as vdiff parses it).
+export data Target
+  = ByPath String
+  | ByName String
+  deriving (Debug, Clone, PartialEq, Eq)
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static, E: Send + 'static> Result<A, E> -> Effect<A, E, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- The store path of a canonical path, if it is inside the store.
+store_path_of : &Path -> Option<String>
+store_path_of path =
+  text = path.to_string_lossy () |> .to_string
+  store_base (&text) |> .map (\b -> full b)
+
+-- An argument that names a path: follow its links to the store path.
+-- `/run/current-system`, a profile link, `./result`, a file inside a store path.
+export resolve : &str -> Result<String, WhyError>
+resolve arg =
+  canonical = (std::fs::canonicalize arg |> .map_err (\_ -> Missing (arg.to_string ())))?
+  shown = canonical.to_string_lossy () |> .to_string
+  store_path_of (&canonical) |> .ok_or (NotInStore shown)
+
+-- The dependency argument. A path in the store is taken as written (it need
+-- not exist on this machine to be named); another path is followed into the
+-- store; anything without a `/` is a name.
+export target_of : &str -> Result<Target, WhyError>
+target_of arg =
+  if arg.starts_with STORE_PREFIX
+    store_base arg |> .map (\b -> ByPath (full b)) |> .ok_or (NotInStore (arg.to_string ()))
+  else if arg.contains '/'
+    resolve arg |> .map ByPath
+  else
+    Ok (ByName (arg.to_string ()))
+
+-- Whether a closure member answers to a name.
+named : &str -> &str -> bool
+named path name =
+  base = path.strip_prefix STORE_PREFIX |> .unwrap_or path
+  rest = base.split_once '-' |> .map (\p -> p.1) |> .unwrap_or base
+  rest == name || hash_part_of path == Some name || (parse_name path).pname == name
+
+-- The closure members the target names, in path order. A path outside the
+-- closure, or a name nothing answers to, is an error that says so.
+export matches : &Graph -> &Target -> Result<Vec<usize>, WhyError>
+matches g target =
+  package = g.paths[g.root].clone ()
+  case target of
+    ByPath p -> index_of g p |> .map (\i -> .to_vec ([i])) |> .ok_or (Independent ("'#{package}' does not depend on '#{p}'"))
+    ByName n -> by_name g package n
+
+by_name : &Graph -> String -> &str -> Result<Vec<usize>, WhyError>
+by_name g package name =
+  found = g.paths.iter () |> .enumerate |> .filter (\p -> named p.1 name) |> .map (\p -> p.0) |> .collect : Vec<usize>
+  if found.is_empty ()
+    Err (NoMatch ("nothing named '#{name}' in the closure of '#{package}'"))
+  else
+    Ok found
+
+-- Every member of a closure: its id, path and narSize. UNION, not UNION ALL,
+-- so self-references and cycles end the recursion.
+const MEMBERS : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT v.id, v.path, v.narSize FROM c JOIN ValidPaths v ON v.id = c.id"
+
+-- Every reference out of a closure's members. CROSS JOIN fixes the loop order
+-- (members outside, Refs by its primary key inside): with a plain JOIN,
+-- SQLite's planner scans all of Refs against a Bloom filter of the members,
+-- 150 ms on drakkar's store even for a closure of one path.
+const EDGES : &str = "WITH RECURSIVE c(id) AS (SELECT id FROM ValidPaths WHERE path = ?1 UNION SELECT r.reference FROM Refs r JOIN c ON r.referrer = c.id) SELECT r.referrer, r.reference FROM c CROSS JOIN Refs r ON r.referrer = c.id"
+
+store_error : rusqlite::Error -> WhyError
+store_error e = Store (e.to_string ())
+
+connect : &str -> Result<Connection, WhyError>
+connect db_path = db::open db_path |> .map_err (\e -> Store ("opening #{db_path}: #{e}"))
+
+export member_rows : &Connection -> &str -> rusqlite::Result<Vec<(i64, String, u64)>>
+member_rows conn root =
+  mut stmt = (conn.prepare MEMBERS)?
+  mut rows = (stmt.query ([root]))?
+  mut out = Vec::new () : Vec<(i64, String, u64)>
+  while (rows.next ())? is Some row
+    id = (row.get 0 : rusqlite::Result<i64>)?
+    path = (row.get 1 : rusqlite::Result<String>)?
+    size = (row.get 2 : rusqlite::Result<Option<u64>>)?
+    out.push ((id, path, size.unwrap_or 0))
+  Ok out
+
+export edge_rows : &Connection -> &str -> rusqlite::Result<Vec<(i64, i64)>>
+edge_rows conn root =
+  mut stmt = (conn.prepare EDGES)?
+  mut rows = (stmt.query ([root]))?
+  mut out = Vec::new () : Vec<(i64, i64)>
+  while (rows.next ())? is Some row
+    a = (row.get 0 : rusqlite::Result<i64>)?
+    b = (row.get 1 : rusqlite::Result<i64>)?
+    out.push ((a, b))
+  Ok out
+
+read_members : String -> String -> Result<Vec<(i64, String, u64)>, WhyError>
+read_members db_path root =
+  conn = (connect (&db_path))?
+  member_rows (&conn) (&root) |> .map_err store_error
+
+read_edges : String -> String -> Result<Vec<(i64, i64)>, WhyError>
+read_edges db_path root =
+  conn = (connect (&db_path))?
+  edge_rows (&conn) (&root) |> .map_err store_error
+
+-- A closure's rows: members (id, path, narSize) and references (referrer, reference).
+export type Rows = (Vec<(i64, String, u64)>, Vec<(i64, i64)>)
+
+assembled : String -> Rows -> Result<Graph, WhyError>
+assembled root rows =
+  (nodes, edges) = rows
+  build (&root) nodes edges |> .ok_or (Invalid root)
+
+-- The graph of `root`'s closure: members and references read concurrently.
+export closure_graph : String -> String -> Effect<Graph, WhyError, HNil>
+closure_graph db_path root =
+  (d1, r1, r2) = (db_path.clone (), root.clone (), root.clone ())
+  members = suspend (move \-> lifted (read_members d1 r1))
+  edges = suspend (move \-> lifted (read_edges db_path r2))
+  zip_par members edges |> .flat_map (move \rows -> lifted (assembled root rows))
+
+test "a path outside the store is refused, a missing one too"
+  assert_eq! \-> resolve "/" |> .err |> .map (\e -> e.to_string ()) \-> Some (.to_string "not in the Nix store: /")
+  assert_eq! \-> resolve "/nonexistent/vwhy" |> .err |> .map (\e -> e.to_string ()) \-> Some (.to_string "path does not exist: /nonexistent/vwhy")
+
+test "a store path is a path, as written; a word is a name"
+  assert_eq! \-> target_of "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57/lib/libc.so.6" |> .ok \-> Some (ByPath (.to_string "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"))
+  assert_eq! \-> target_of "glibc" |> .ok \-> Some (ByName (.to_string "glibc"))
+  assert! \-> target_of "/nix/store/short" |> .is_err
+
+#[cfg(test)]
+const GLIBC : &str = "/nix/store/r3hvhzl5fxhrgn0rfy5g7rda17702pj4-glibc-2.44-57"
+
+#[cfg(test)]
+const GLIBC_BIN : &str = "/nix/store/53wag47axb3bjnwn0imzksh4c9w3mgx7-glibc-2.44-57-bin"
+
+#[cfg(test)]
+const SYSTEM : &str = "/nix/store/rdyar9w45ifi45866ig3fsa8bni2l3dx-nixos-system-drakkar-26.11.20261120.9996594"
+
+#[cfg(test)]
+small : Graph
+small = crate::graph::fixture SYSTEM (.to_vec ([(SYSTEM, 1, .to_vec ([GLIBC_BIN])), (GLIBC_BIN, 2, .to_vec ([GLIBC])), (GLIBC, 4, Vec::new ())]))
+
+test "a name matches by package name, base name or hash part"
+  g = small ()
+  assert_eq! \-> matches (&g) (&ByName (.to_string "glibc")) |> .ok \-> Some (.to_vec ([0, 1]))
+  assert_eq! \-> matches (&g) (&ByName (.to_string "glibc-2.44-57-bin")) |> .ok \-> Some (.to_vec ([0]))
+  assert_eq! \-> matches (&g) (&ByName (.to_string "r3hvhzl5fxhrgn0rfy5g7rda17702pj4")) |> .ok \-> Some (.to_vec ([1]))
+
+test "a dependency outside the closure says so, as nix does"
+  g = small ()
+  e = matches (&g) (&ByPath (.to_string "/nix/store/00000000000000000000000000000000-x")) |> .err |> .map (\e -> e.to_string ())
+  assert_eq! \-> e \-> Some ("'#{SYSTEM}' does not depend on '/nix/store/00000000000000000000000000000000-x'")
+  assert! \-> matches (&g) (&ByName (.to_string "openssl")) |> .is_err
+
+-- Nix's schema for the two tables read here, with its index on references.
+#[cfg(test)]
+const SCHEMA : &str = "CREATE TABLE ValidPaths (id integer primary key autoincrement not null, path text unique not null, hash text not null, registrationTime integer not null, deriver text, narSize integer, ultimate integer, sigs text, ca text); CREATE TABLE Refs (referrer integer not null, reference integer not null, primary key (referrer, reference)); CREATE INDEX IndexReference on Refs(reference);"
+
+#[cfg(test)]
+memory : Connection
+memory =
+  conn = Connection::open_in_memory () |> .expect "an in-memory database"
+  conn.execute_batch SCHEMA |> .expect "the schema"
+  conn.execute_batch "INSERT INTO ValidPaths (id, path, hash, registrationTime, narSize) VALUES (1, 'a', 'h', 0, 10), (2, 'b', 'h', 0, NULL), (3, 'c', 'h', 0, 30), (4, 'd', 'h', 0, 40); INSERT INTO Refs VALUES (1, 1), (1, 2), (2, 3), (4, 1);" |> .expect "the rows"
+  conn
+
+test "a closure's rows: its members with their sizes, the references out of them"
+  conn = memory ()
+  mut members = member_rows (&conn) "a" |> .expect "members"
+  members.sort ()
+  assert_eq! \-> members \-> .to_vec ([(1, .to_string "a", 10), (2, .to_string "b", 0), (3, .to_string "c", 30)])
+  mut edges = edge_rows (&conn) "a" |> .expect "edges"
+  edges.sort ()
+  assert_eq! \-> edges \-> .to_vec ([(1, 1), (1, 2), (2, 3)])
+  assert! \-> member_rows (&conn) "z" |> .expect "no members" |> .is_empty
+
+test "the reference query walks Refs by its key, never scanning it"
+  conn = memory ()
+  sql = "EXPLAIN QUERY PLAN #{EDGES}"
+  mut stmt = conn.prepare (&sql) |> .expect "a plan"
+  plan = stmt.query_map (["a"]) (\row -> row.get 3) |> .expect "plan rows" |> .filter_map (\r -> r.ok ()) |> .collect : Vec<String>
+  assert! \-> !(plan.iter () |> .any (\step -> step.starts_with "SCAN r"))
+
+test "the closure graph reads from the database, both reads agreeing"
+  if Path::new db::DEFAULT_DB |> .exists
+    if (resolve "/run/current-system") is Ok root
+      exit = id_effect::testing::run_test (closure_graph (db::DEFAULT_DB.to_string ()) (root.clone ()))
+      g = id_effect::testing::expect_exit_success exit
+      assert_eq! \-> g.paths[g.root] \-> root
+      conn = db::open db::DEFAULT_DB |> .expect "the database"
+      want = db::closure (&conn) (&root) |> .expect "a closure" |> .expect "a valid root"
+      assert_eq! \-> g.paths \-> want
+      refs = db::references (&conn) (&root) |> .expect "references" |> .unwrap_or_default
+      mine = g.refs[g.root].iter () |> .map (\i -> g.paths[*i].clone ()) |> .collect : Vec<String>
+      assert_eq! \-> mine \-> refs

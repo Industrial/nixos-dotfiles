@@ -1,0 +1,42 @@
+[package]
+name = "vwhy"
+version = "0.1.0"
+edition = "2024"
+authors = ["Industrial <tom.wieland@gmail.com>"]
+description = "Why one Nix store path depends on another, and what a closure's size is made of (replaces nix why-depends and nix-tree)"
+license = "MIT"
+build = "build.rs"
+
+# Standalone crate: its own Cargo.lock for buildRustPackage, and no shared
+# rust/Cargo.lock with the other rust/tools/* in flight.
+[workspace]
+
+[dependencies]
+# One id_effect version per build (types do not unify): pinned exactly, like
+# nix-store-core, vdiff and vcache.
+id_effect = "=0.13.0"
+id_effect_cli = "=0.13.0"
+# The store primitives: store paths and the read-only store database.
+# default.nix roots its source at rust/tools so both path dependencies resolve.
+nix-store-core = { path = "../nix-store-core" }
+# vdiff's package-name parser (`vdiff::version::parse_name`), shared rather
+# than copied (GH-182 starts after GH-153 for that reason).
+vdiff = { path = "../vdiff" }
+# The connection type nix-store-core's db opens; the same version.
+rusqlite = { version = "0.37", features = ["bundled"] }
+# `--json`.
+serde_json = "1"
+
+# Voltaic as a library: build.rs compiles src/*.vlt into OUT_DIR. Pinned
+# exactly; 0.2.0 has silent miscompiles that 0.2.1 fixes.
+[build-dependencies]
+voltaic-driver = "=0.2.1"
+voltaic-diag = "=0.2.1"
+
+[lib]
+name = "vwhy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "vwhy"
+path = "src/main.rs"
