@@ -1,0 +1,286 @@
+-- The program: `hook` spools a build's out paths, `daemon` drains the spool
+-- to the cache. Both run under id_effect_cli's `run_main`; the hook's exit
+-- code is always 0, whatever happened (Nix fails a build whose
+-- post-build-hook fails, and a cache problem must never fail a build).
+--
+-- A drain takes the spool's items oldest first. Each push is retried on an
+-- id_effect Schedule, exponential from 2s and bounded at four retries, for
+-- transient errors only. An item whose closure arrived is removed; one the
+-- cache refused moves to `failed/`; one that still failed transiently stays,
+-- and the drain stops there (the cache is down: the next items would wait
+-- out the same backoff). The daemon reruns the drain every `--interval` on a
+-- spaced Schedule, so an item left behind goes up once the cache is back.
+
+import std::collections::VecDeque
+import std::path::PathBuf
+import std::time::{Duration, Instant}
+import id_effect::{Effect, HNil, Never, Schedule, effect, fail, succeed, suspend}
+import nix_store_core::signing::{SecretKey, parse_secret_key}
+import crate::cli::{Command, Options, USAGE, is_hook, parse_args}
+import crate::push::{PushError, Pusher, Report, lifted, push, transient}
+import crate::spool::{Item, enqueue, items, out_paths, remove, set_aside}
+
+export errors AppError
+  Usage String     "#{0}"
+  SignKey String   "signing key: #{0}"
+  Spool String     "spool: #{0}"
+  Pending usize    "#{0} item(s) left in the spool"
+
+-- The hook: `$OUT_PATHS` into the spool. Every failure is logged, none is
+-- returned.
+export hook : String -> String -> Effect<(), Never, HNil>
+hook spool paths_text =
+  paths = out_paths (&paths_text)
+  suspend (move \-> succeed (spooled spool paths))
+
+spooled : String -> Vec<String> -> ()
+spooled spool paths =
+  case enqueue (&PathBuf::from (&spool)) (&paths) of
+    Ok (Some file) -> eprintln! \-> "vpush: spooled #{paths.len ()} path(s) as #{file.display ()}"
+    Ok None -> ()
+    Err e -> eprintln! \-> "vpush: could not spool #{paths.len ()} path(s) into #{spool}: #{e} (the build is unaffected)"
+  ()
+
+read_key : Option<String> -> Result<Option<SecretKey>, AppError>
+read_key file =
+  case file of
+    None -> Ok None
+    Some path ->
+      text = (std::fs::read_to_string (&path) |> .map_err (\e -> SignKey ("#{path}: #{e}")))?
+      key = (parse_secret_key (&text) |> .map_err (\e -> SignKey ("#{path}: #{e}")))?
+      Ok (Some key)
+
+-- The spool's items, read in one blocking step.
+listed : PathBuf -> Effect<Vec<Item>, AppError, HNil>
+listed dir = suspend (move \-> lifted (items (&dir) |> .map_err (\e -> Spool ("#{dir.display ()}: #{e}"))))
+
+-- Retries of one push: 2s, 4s, 8s, 16s, transient errors only.
+export backoff : Schedule<(std::time::Duration, u64), PushError>
+backoff =
+  Schedule::exponential (Duration::from_secs 2) |> .intersect (Schedule::recurs 4) |> .while_input transient
+
+-- What became of one item.
+export data Outcome = Pushed Report | SetAside | Deferred
+  deriving (Clone, Debug, PartialEq)
+
+-- A drain's counts.
+export data Drained { export pushed usize, export set_aside usize, export left usize }
+  deriving (Clone, Debug, Default, PartialEq)
+
+done_with : Item -> Report -> Outcome
+done_with item r =
+  if remove (&item) is Err e
+    eprintln! \-> "vpush: #{item.name}: pushed, but not removed from the spool: #{e}"
+  eprintln! \-> "vpush: #{item.name}: closure of #{r.closure} path(s), #{r.uploaded} uploaded (#{r.bytes} NAR bytes), mode #{r.mode:?}"
+  Pushed r
+
+failed_with : PathBuf -> Item -> PushError -> Outcome
+failed_with dir item e =
+  if transient (&e)
+    eprintln! \-> "vpush: #{item.name}: #{e}; kept in the spool for the next drain"
+    Deferred
+  else
+    case set_aside (&dir) (&item) of
+      Ok placed -> eprintln! \-> "vpush: #{item.name}: #{e}; moved to #{placed.display ()}"
+      Err m -> eprintln! \-> "vpush: #{item.name}: #{e}; and could not be moved aside: #{m}"
+    SetAside
+
+-- One item: pushed with retries, then removed, set aside or kept.
+settled : Pusher -> PathBuf -> Item -> Effect<Outcome, Never, HNil>
+settled p dir item =
+  roots = item.paths.clone ()
+  ok_item = item.clone ()
+  attempt = move \-> push (p.clone ()) (roots.clone ())
+  Effect::retry attempt (backoff ()) |> .map (move \r -> done_with ok_item r) |> .catch (move \e -> succeed (failed_with dir item e))
+
+counted : Drained -> &Outcome -> Drained
+counted d o =
+  mut out = d
+  case o of
+    Pushed _ -> out.pushed += 1
+    SetAside -> out.set_aside += 1
+    Deferred -> out.left += 1
+  out
+
+-- The items in order, stopping at the first one kept back.
+drain_items : Pusher -> PathBuf -> VecDeque<Item> -> Drained -> Effect<Drained, Never, HNil>
+drain_items p dir queue d =
+  mut rest = queue
+  case rest.pop_front () of
+    None -> succeed d
+    Some item ->
+      here = p.clone ()
+      at = dir.clone ()
+      settled p dir item |> .flat_map (move \o -> next_items here at rest (counted d (&o)) (o == Deferred))
+
+next_items : Pusher -> PathBuf -> VecDeque<Item> -> Drained -> bool -> Effect<Drained, Never, HNil>
+next_items p dir rest d stop =
+  if stop
+    succeed (Drained { left = d.left + rest.len (), ...d })
+  else
+    drain_items p dir rest d
+
+-- One drain of the spool.
+export drain : Pusher -> PathBuf -> Effect<Drained, AppError, HNil>
+drain p dir =
+  at = dir.clone ()
+  listed dir |> .flat_map (move \found -> drain_items p at (found.into_iter ().collect ()) (Drained::default ()) |> .widen)
+
+-- A daemon drain never stops the daemon: a spool it cannot read is logged.
+logged_drain : Pusher -> PathBuf -> Effect<(), Never, HNil>
+logged_drain p dir =
+  drain p dir |> .map (\_ -> ()) |> .catch (\e -> succeed (log_failure e))
+
+log_failure : AppError -> ()
+log_failure e =
+  eprintln! \-> "vpush: drain failed: #{e}"
+  ()
+
+-- `--once`: one drain, failing when an item is left.
+judged : Drained -> Effect<(), AppError, HNil>
+judged d =
+  if d.left == 0
+    succeed (())
+  else
+    fail (Pending d.left)
+
+once : Pusher -> PathBuf -> Effect<(), AppError, HNil>
+once p dir =
+  effect!
+    let started = Instant::now();
+    let d = ~drain(p, dir);
+    eprintln!("vpush: drained in {:.3}s: {} pushed, {} set aside, {} left", started.elapsed().as_secs_f64(), d.pushed, d.set_aside, d.left);
+    ~judged(d)
+
+-- The daemon: a drain now, then one every `interval`.
+export daemon : Pusher -> PathBuf -> u64 -> Effect<u64, Never, HNil>
+daemon p dir interval =
+  eprintln! \-> "vpush: draining #{dir.display ()} every #{interval}s"
+  Effect::repeat (move \-> logged_drain (p.clone ()) (dir.clone ())) (Schedule::spaced (Duration::from_secs interval))
+
+pusher_of : Options -> Result<Pusher, AppError>
+pusher_of o =
+  key = (read_key (o.sign_key_file.clone ()))?
+  Ok (Pusher { link = o.link.clone (), key, jobs = o.jobs, db = o.db.clone () })
+
+run_daemon : Options -> Effect<(), AppError, HNil>
+run_daemon o =
+  case pusher_of (o.clone ()) of
+    Err e -> fail e
+    Ok p ->
+      dir = PathBuf::from (&o.spool)
+      if o.once
+        once p dir
+      else
+        daemon p dir o.interval |> .map (\_ -> ()) |> .widen
+
+-- The program for a parsed command line.
+export program : Result<Command, String> -> Effect<(), AppError, HNil>
+program parsed =
+  case parsed of
+    Err why -> fail (Usage ("#{why}\n#{USAGE}"))
+    Ok (Command::Hook spool) -> hook spool (std::env::var "OUT_PATHS" |> .unwrap_or_default) |> .widen
+    Ok (Command::Daemon o) -> run_daemon o
+
+-- On a fiber of the runtime's executor: `run_main` polls its root fiber on
+-- the calling thread, outside the tokio context the ssh child, the daemon
+-- socket and the timers need, so the program runs as the root's child, and
+-- an interrupt (SIGINT, systemd's stop) interrupts and awaits it.
+supervised : Effect<(), AppError, HNil> -> Effect<(), AppError, HNil>
+supervised eff =
+  effect!
+    let child = ~eff.fork();
+    ~child.join::<HNil>()
+
+-- The process. The hook's exit is 0 whatever `run_main` reports.
+export main_code : std::process::ExitCode
+main_code =
+  args = std::env::args () |> .skip 1 |> .collect : Vec<String>
+  parsed = parse_args (&args)
+  hooked = parsed |> .as_ref |> .map (\c -> is_hook c) |> .unwrap_or (args.first () |> .map (\a -> a == "hook") |> .unwrap_or false)
+  code = id_effect_cli::run_main (supervised (program parsed)) HNil (id_effect_cli::RunMainConfig::default ())
+  if hooked
+    std::process::ExitCode::SUCCESS
+  else
+    code
+
+test "the backoff retries a transient failure four times, 30s in all"
+  attempts = std::sync::Arc::new (std::sync::atomic::AtomicU64::new 0)
+  seen = attempts.clone ()
+  make = move \-> failing (seen.clone ()) (PushError::Unreachable (.to_string "down"))
+  exit = id_effect::testing::run_test (Effect::retry make (backoff ()))
+  assert! \-> exit |> .into_result |> .is_err
+  assert_eq! \-> attempts.load (std::sync::atomic::Ordering::SeqCst) \-> 5
+
+test "a refusal is not retried"
+  attempts = std::sync::Arc::new (std::sync::atomic::AtomicU64::new 0)
+  seen = attempts.clone ()
+  make = move \-> failing (seen.clone ()) (PushError::Rejected (.to_string "lacks a signature"))
+  exit = id_effect::testing::run_test (Effect::retry make (backoff ()))
+  assert! \-> exit |> .into_result |> .is_err
+  assert_eq! \-> attempts.load (std::sync::atomic::Ordering::SeqCst) \-> 1
+
+#[cfg(test)]
+failing : std::sync::Arc<std::sync::atomic::AtomicU64> -> PushError -> Effect<Report, PushError, HNil>
+failing n e =
+  suspend (move \-> bump_fail n e)
+
+#[cfg(test)]
+bump_fail : std::sync::Arc<std::sync::atomic::AtomicU64> -> PushError -> Effect<Report, PushError, HNil>
+bump_fail n e =
+  n.fetch_add 1 std::sync::atomic::Ordering::SeqCst
+  fail e
+
+#[cfg(test)]
+scratch : &str -> PathBuf
+scratch tag =
+  dir = std::env::temp_dir () |> .join "vpush-app-#{tag}-#{std::process::id ()}"
+  _r = std::fs::remove_dir_all (&dir)
+  dir
+
+#[cfg(test)]
+unreachable_pusher : String -> Pusher
+unreachable_pusher db = Pusher { link = crate::cli::Link { target = crate::cli::Target::Socket (.to_string "/nonexistent/vpush.socket"), ssh_program = .to_string "ssh", ssh_args = Vec::new (), remote_command = .to_string "nix-daemon --stdio" }, key = None, jobs = 2, db }
+
+test "the hook spools OUT_PATHS and never fails"
+  dir = scratch "hook"
+  spool = dir.to_string_lossy () |> .into_owned
+  exit = id_effect::testing::run_test (hook (spool.clone ()) (.to_string "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-hello-2.12.1 junk"))
+  assert! \-> exit |> .into_result |> .is_ok
+  found = items (&dir) |> .expect "listed"
+  assert_eq! \-> found.len () \-> 1
+  assert_eq! \-> found[0].paths \-> .to_vec ([.to_string "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-hello-2.12.1"])
+  -- A spool that cannot be created (under a file) is logged, not returned.
+  blocked = found[0].file.join "spool" |> .to_string_lossy |> .into_owned
+  exit2 = id_effect::testing::run_test (hook blocked (.to_string "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-hello-2.12.1"))
+  assert! \-> exit2 |> .into_result |> .is_ok
+  _r = std::fs::remove_dir_all (&dir)
+
+test "an item whose push keeps failing stays in the spool, and the drain stops there"
+  dir = scratch "deferred"
+  enqueue (&dir) (&[.to_string "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-hello-2.12.1"]) |> .expect "spooled"
+  enqueue (&dir) (&[.to_string "/nix/store/1v4s0mlgyhw2m1rcf4yw8pyab6mbwnpn-hello-2.12.1-man"]) |> .expect "spooled"
+  -- No database: the push fails locally (transient), on every retry.
+  exit = id_effect::testing::run_test (drain (unreachable_pusher (.to_string "/nonexistent/db.sqlite")) (dir.clone ()))
+  d = exit |> .into_result |> .ok |> .expect "a drain never fails on a push"
+  assert_eq! \-> d \-> Drained { pushed = 0, set_aside = 0, left = 2 }
+  assert_eq! \-> items (&dir) |> .expect "listed" |> .len \-> 2
+  exit2 = id_effect::testing::run_test (judged d)
+  assert! \-> exit2 |> .into_result |> .is_err
+  _r = std::fs::remove_dir_all (&dir)
+
+test "an empty spool drains to nothing"
+  dir = scratch "empty"
+  exit = id_effect::testing::run_test (drain (unreachable_pusher (.to_string "/unused")) (dir.clone ()))
+  assert_eq! \-> exit |> .into_result |> .ok \-> Some (Drained::default ())
+
+test "a usage error carries the usage line"
+  exit = id_effect::testing::run_test (program (Err (.to_string "no command")))
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains USAGE) |> .unwrap_or false
+
+test "an unreadable signing key stops the daemon before it starts"
+  o = Options { spool = .to_string "/tmp/unused", link = crate::cli::Link { target = crate::cli::Target::Socket (.to_string "/x"), ssh_program = .to_string "ssh", ssh_args = Vec::new (), remote_command = .to_string "nix-daemon --stdio" }, sign_key_file = Some (.to_string "/nonexistent/key"), jobs = 1, interval = 10, db = .to_string "/db", once = true }
+  exit = id_effect::testing::run_test (run_daemon o)
+  err = exit |> .into_result |> .err |> .and_then (\c -> c.fail_option ()) |> .map (\e -> e.to_string ())
+  assert! \-> err |> .map (\e -> e.contains "/nonexistent/key") |> .unwrap_or false

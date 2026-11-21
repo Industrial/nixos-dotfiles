@@ -1,0 +1,176 @@
+-- vpush's command line, parsed by a pure function.
+--
+--   vpush hook [--spool DIR]
+--   vpush daemon (--ssh DEST | --socket PATH) [--ssh-program P] [--ssh-arg ARG]...
+--                [--remote-command CMD] [--sign-key-file FILE] [--jobs N]
+--                [--interval DURATION] [--db FILE] [--spool DIR] [--once]
+--
+-- `hook` is the post-build-hook: it reads `$OUT_PATHS` and spools them.
+-- `daemon` drains the spool to the cache: over `<ssh-program> <ssh-arg>...
+-- DEST <remote-command>` (default `ssh`, `nix-daemon --stdio`), or a daemon
+-- socket (`--socket`, for a cache on this machine and for tests). It rescans
+-- the spool every `--interval` (default 10s); `--once` drains once and
+-- exits, non-zero when an item is left.
+
+import nix_store_core::db
+
+export const USAGE : &str = "usage: vpush hook [--spool DIR] | vpush daemon (--ssh DEST | --socket PATH) [--ssh-program P] [--ssh-arg ARG]... [--remote-command CMD] [--sign-key-file FILE] [--jobs N] [--interval DURATION] [--db FILE] [--spool DIR] [--once]"
+
+export const DEFAULT_SPOOL : &str = "/var/lib/vpush/spool"
+
+-- Where the cache's daemon is.
+export data Target = Ssh String | Socket String
+  deriving (Clone, Debug, PartialEq)
+
+-- How to reach the cache's daemon.
+export data Link
+  { export target Target
+  , export ssh_program String
+  , export ssh_args Vec<String>
+  , export remote_command String
+  }
+  deriving (Clone, Debug, PartialEq)
+
+export data Options
+  { export spool String
+  , export link Link
+  , export sign_key_file Option<String>
+  , export jobs usize
+  , export interval u64
+  , export db String
+  , export once bool
+  }
+  deriving (Clone, Debug, PartialEq)
+
+export data Command = Hook String | Daemon Options
+  deriving (Clone, Debug, PartialEq)
+
+export is_hook : &Command -> bool
+is_hook c =
+  case c of
+    Hook _ -> true
+    Daemon _ -> false
+
+-- A duration in seconds: bare seconds, or a number with s/m/h.
+export parse_interval : &str -> Option<u64>
+parse_interval s =
+  (digits, unit) = case s.char_indices () |> .find (\ic -> !(ic.1.is_ascii_digit ())) of
+    Some (i, _) -> s.split_at i
+    None -> (s, "")
+  n = (digits.parse () : Result<u64, std::num::ParseIntError>) |> .ok
+  scale = case unit of
+    "" -> Some 1
+    "s" -> Some 1
+    "m" -> Some 60
+    "h" -> Some 3600
+    _ -> None
+  n |> .zip scale |> .and_then (\p -> p.0.checked_mul p.1) |> .filter (\secs -> *secs > 0)
+
+value : Option<&String> -> &str -> Result<String, String>
+value v flag =
+  case v of
+    Some s -> Ok (s.clone ())
+    None -> Err "#{flag} needs a value"
+
+-- `hook`'s arguments.
+parse_hook : &[String] -> Result<Command, String>
+parse_hook args =
+  mut spool = DEFAULT_SPOOL.to_string ()
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--spool" ->
+        spool := (value (it.next ()) "--spool")?
+      other ->
+        return Err "unknown argument: #{other}"
+  Ok (Hook spool)
+
+-- `daemon`'s arguments.
+parse_daemon : &[String] -> Result<Command, String>
+parse_daemon args =
+  mut spool = DEFAULT_SPOOL.to_string ()
+  mut target = None : Option<Target>
+  mut ssh_program = .to_string "ssh"
+  mut ssh_args = Vec::new () : Vec<String>
+  mut remote_command = .to_string "nix-daemon --stdio"
+  mut sign_key_file = None : Option<String>
+  mut jobs = 2 : usize
+  mut interval = 10 : u64
+  mut db_path = db::DEFAULT_DB.to_string ()
+  mut once = false
+  mut it = args.iter ()
+  while it.next () is Some a
+    case a.as_str () of
+      "--spool" ->
+        spool := (value (it.next ()) "--spool")?
+      "--ssh" ->
+        target := Some (Ssh ((value (it.next ()) "--ssh")?))
+      "--socket" ->
+        target := Some (Socket ((value (it.next ()) "--socket")?))
+      "--ssh-program" ->
+        ssh_program := (value (it.next ()) "--ssh-program")?
+      "--ssh-arg" ->
+        ssh_args.push ((value (it.next ()) "--ssh-arg")?)
+      "--remote-command" ->
+        remote_command := (value (it.next ()) "--remote-command")?
+      "--sign-key-file" ->
+        sign_key_file := Some ((value (it.next ()) "--sign-key-file")?)
+      "--jobs" ->
+        v = (value (it.next ()) "--jobs")?
+        n = (v.parse () : Result<usize, std::num::ParseIntError>) |> .ok |> .filter (\n -> *n > 0)
+        jobs := (n.ok_or ("--jobs: not a positive number: #{v}"))?
+      "--interval" ->
+        v = (value (it.next ()) "--interval")?
+        interval := (parse_interval (&v) |> .ok_or ("--interval: not a duration: #{v}"))?
+      "--db" ->
+        db_path := (value (it.next ()) "--db")?
+      "--once" ->
+        once := true
+      other ->
+        return Err "unknown argument: #{other}"
+  t = (target.ok_or (.to_string "daemon needs --ssh DEST or --socket PATH"))?
+  Ok (Daemon (Options { spool, link = Link { target = t, ssh_program, ssh_args, remote_command }, sign_key_file, jobs, interval, db = db_path, once }))
+
+-- The command in `args` (argv without the program name).
+export parse_args : &[String] -> Result<Command, String>
+parse_args args =
+  case args.split_first () of
+    None -> Err (.to_string "no command")
+    Some (first, rest) ->
+      case first.as_str () of
+        "hook" -> parse_hook rest
+        "daemon" -> parse_daemon rest
+        other -> Err "unknown command: #{other}"
+
+#[cfg(test)]
+args : &[&str] -> Vec<String>
+args xs = xs.iter () |> .map (\s -> s.to_string ()) |> .collect
+
+test "hook defaults to the service's spool"
+  assert_eq! \-> parse_args (&args (&["hook"])) \-> Ok (Hook (DEFAULT_SPOOL.to_string ()))
+  assert_eq! \-> parse_args (&args (&["hook", "--spool", "/tmp/s"])) \-> Ok (Hook (.to_string "/tmp/s"))
+  assert! \-> is_hook (&Hook (.to_string "/x"))
+
+test "daemon over ssh, with defaults"
+  c = parse_args (&args (&["daemon", "--ssh", "tom@100.69.213.35"])) |> .expect "options"
+  case c of
+    Daemon o ->
+      assert_eq! \-> o.link \-> Link { target = Ssh (.to_string "tom@100.69.213.35"), ssh_program = .to_string "ssh", ssh_args = Vec::new (), remote_command = .to_string "nix-daemon --stdio" }
+      assert_eq! \-> (o.jobs, o.interval, o.once, o.sign_key_file.clone ()) \-> (2, 10, false, None)
+      assert_eq! \-> o.db \-> "/nix/var/nix/db/db.sqlite"
+      assert_eq! \-> o.spool \-> DEFAULT_SPOOL
+    Hook _ -> panic! \-> "not the daemon"
+
+test "every daemon option is read"
+  c = parse_args (&args (&["daemon", "--socket", "/run/s", "--ssh-program", "/bin/ssh", "--ssh-arg", "-i", "--ssh-arg", "/k", "--remote-command", "/bin/nix-daemon --stdio", "--sign-key-file", "/sk", "--jobs", "4", "--interval", "2m", "--db", "/db", "--spool", "/sp", "--once"])) |> .expect "options"
+  expected = Options { spool = .to_string "/sp", link = Link { target = Socket (.to_string "/run/s"), ssh_program = .to_string "/bin/ssh", ssh_args = args (&["-i", "/k"]), remote_command = .to_string "/bin/nix-daemon --stdio" }, sign_key_file = Some (.to_string "/sk"), jobs = 4, interval = 120, db = .to_string "/db", once = true }
+  assert_eq! \-> c \-> Daemon expected
+
+test "bad arguments are refused with the reason"
+  assert_eq! \-> parse_args (&args (&[])) \-> Err (.to_string "no command")
+  assert_eq! \-> parse_args (&args (&["push"])) \-> Err (.to_string "unknown command: push")
+  assert_eq! \-> parse_args (&args (&["daemon"])) \-> Err (.to_string "daemon needs --ssh DEST or --socket PATH")
+  assert_eq! \-> parse_args (&args (&["daemon", "--ssh", "h", "--jobs", "0"])) \-> Err (.to_string "--jobs: not a positive number: 0")
+  assert_eq! \-> parse_args (&args (&["daemon", "--ssh"])) \-> Err (.to_string "--ssh needs a value")
+  assert_eq! \-> parse_args (&args (&["daemon", "--ssh", "h", "--interval", "1w"])) \-> Err (.to_string "--interval: not a duration: 1w")
+  assert_eq! \-> parse_args (&args (&["hook", "--verbose"])) \-> Err (.to_string "unknown argument: --verbose")

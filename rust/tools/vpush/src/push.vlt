@@ -1,0 +1,178 @@
+-- One push: a spool item's closure onto the cache.
+--
+--   1. The closure of the item's out paths, with each path's info, from the
+--      local store database (one blocking read).
+--   2. A main session to the cache's daemon. It holds a temp root on every
+--      closure path (AddTempRoot) for as long as the push runs, so the
+--      cache's garbage collector cannot take a path we rely on between the
+--      query and the uploads of the paths that reference it.
+--   3. QueryValidPaths: what the cache already has is skipped.
+--   4. The rest goes up in layers, references first (plan::layers). Within a
+--      layer, `jobs` uploads run at once, each on a session checked out of a
+--      pool of at most `jobs` sessions (one AddToStoreNar at a time per
+--      session: the protocol is one op at a time). Every session, main and
+--      pooled, is closed when the push ends, however it ends.
+--
+-- Errors are split by what the drain does next: `Unreachable` and `Local`
+-- are retried (the cache or the database will be back), `Rejected` is not
+-- (the cache's daemon said no: a missing signature, a bad path).
+
+import std::path::PathBuf
+import id_effect::{Concurrency, Effect, HNil, Pool, Scope, effect, fail, for_each_par, succeed, suspend}
+import nix_store_core::db
+import nix_store_core::narinfo::NarInfo
+import nix_store_core::signing::SecretKey
+import nix_store_core::worker::{WorkerError, add_temp_root, add_to_store_nar_from, hello, query_valid_paths}
+import crate::cli::Link
+import crate::plan::{Mode, layers, missing, mode_of, path_info, prepared, width}
+import crate::remote::{Session, closed, opened}
+
+export errors PushError
+  Unreachable String  "cache unreachable: #{0}"
+  Rejected String     "the cache refused: #{0}"
+  Local String        "local store: #{0}"
+
+instance PartialEq PushError
+  eq : &self -> &Self -> bool
+  eq self other = self.to_string () == other.to_string ()
+
+-- Whether a later attempt may succeed without an operator.
+export transient : &PushError -> bool
+transient e =
+  case e of
+    Rejected _ -> false
+    _ -> true
+
+-- The daemon's own error is a refusal; anything else (connect, I/O, a
+-- broken or garbled session) means the cache could not be reached properly.
+export classify : WorkerError -> PushError
+classify e =
+  case e of
+    WorkerError::Remote why -> Rejected why
+    other -> Unreachable (other.to_string ())
+
+-- What one push did.
+export data Report { export closure usize, export uploaded usize, export bytes u64, export mode Option<Mode> }
+  deriving (Clone, Debug, PartialEq)
+
+-- What a push needs besides the item.
+export data Pusher { export link Link, export key Option<SecretKey>, export jobs usize, export db String }
+  deriving (Clone)
+
+-- An effect for a computed result: the planned failure stays typed.
+export lifted : given <A: Send + 'static, E: Send + 'static> Result<A, E> -> Effect<A, E, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- The closure of `roots` with each path's info. Roots that are no longer
+-- valid (collected since the build) are skipped.
+export closure_infos : String -> Vec<String> -> Result<Vec<NarInfo>, PushError>
+closure_infos db_path roots =
+  conn = (db::open (&db_path) |> .map_err (\e -> Local ("opening #{db_path}: #{e}")))?
+  all = (db::closure_of_all (&conn) (&roots) |> .map_err (\e -> Local ("closure: #{e}")))?
+  mut out = Vec::new () : Vec<NarInfo>
+  for p in all
+    found = (db::path_info (&conn) (&p) |> .map_err (\e -> Local ("path info of #{p}: #{e}")))?
+    if found is Some i
+      out.push i
+  Ok out
+
+local_closure : String -> Vec<String> -> Effect<Vec<NarInfo>, PushError, HNil>
+local_closure db_path roots = suspend (move \-> lifted (closure_infos db_path roots))
+
+-- A session closed with `scope`.
+session_in : Scope -> Link -> Effect<Session, PushError, HNil>
+session_in scope link =
+  opened link |> .map_err classify |> .flat_map (move \s -> scope.add_finalizer (closed (s.clone ())) |> .map (move \_ -> s))
+
+-- Temp roots on every path, one op at a time on the main session.
+held : Session -> Vec<String> -> Effect<(), PushError, HNil>
+held s paths =
+  for_each_par paths (move \p -> add_temp_root (&s.daemon) p |> .map_err classify) Concurrency::Sequential |> .map (\_ -> ())
+
+-- One path up, on a pooled session.
+upload_on : Session -> Mode -> NarInfo -> Effect<u64, PushError, HNil>
+upload_on s mode n =
+  case path_info (&n) of
+    Err why -> fail (Local why)
+    Ok info ->
+      size = info.nar_size
+      add_to_store_nar_from (&s.daemon) info (PathBuf::from (&n.store_path)) false (mode == Mode::Trusted) |> .map_err classify |> .map (move \_ -> size)
+
+upload_one : Pool<Session, PushError> -> Mode -> NarInfo -> Effect<u64, PushError, HNil>
+upload_one pool mode n =
+  Effect::scoped (move \scope -> pool.get (&scope) |> .flat_map (move \s -> upload_on s mode n))
+
+-- One layer, `jobs` at a time.
+upload_layer : Pool<Session, PushError> -> Mode -> usize -> Vec<NarInfo> -> Effect<u64, PushError, HNil>
+upload_layer pool mode jobs layer =
+  for_each_par layer (move \n -> upload_one (pool.clone ()) mode n) (Concurrency::Bounded jobs) |> .map (\sizes -> sizes.iter () |> .sum)
+
+-- Every layer, in order.
+upload_all : Pool<Session, PushError> -> Mode -> usize -> Vec<Vec<NarInfo>> -> Effect<u64, PushError, HNil>
+upload_all pool mode jobs order =
+  for_each_par order (move \layer -> upload_layer (pool.clone ()) mode jobs layer) Concurrency::Sequential |> .map (\sizes -> sizes.iter () |> .sum)
+
+-- The paths in `n` as the mode wants them.
+prepared_all : Mode -> Option<SecretKey> -> Vec<NarInfo> -> Vec<NarInfo>
+prepared_all mode key todo_paths =
+  todo_paths |> .into_iter |> .map (\n -> prepared mode (key.as_ref ()) n) |> .collect
+
+-- A pool of at most `jobs` sessions, shut down (and every session closed)
+-- with `scope`.
+session_pool : Scope -> Link -> usize -> Effect<Pool<Session, PushError>, PushError, HNil>
+session_pool scope link jobs =
+  pool = Pool::new (jobs.max 1) (move \-> opened (link.clone ()) |> .map_err classify) |> .with_release closed
+  scope.add_finalizer (pool.shutdown ()) |> .map (move \_ -> pool)
+
+-- The cache side of a push, in one scope.
+on_cache : Scope -> Pusher -> Vec<NarInfo> -> Effect<Report, PushError, HNil>
+on_cache scope p closure =
+  effect!
+    let main = ~session_in(scope.clone(), p.link.clone());
+    let paths: Vec<String> = closure.iter().map(|n| n.store_path.clone()).collect();
+    ~held(main.clone(), paths.clone());
+    let valid = ~query_valid_paths(&main.daemon, paths, false).map_err(classify);
+    let greeting = ~hello(&main.daemon).map_err(classify);
+    let mode = mode_of(greeting.trusted, p.key.is_some());
+    let wanted = prepared_all(mode, p.key.clone(), missing(closure.clone(), &valid));
+    let uploaded = wanted.len();
+    let order = ~lifted(layers(wanted).map_err(PushError::Local));
+    let jobs = p.jobs.min(width(&order)).max(1);
+    let pool = ~session_pool(scope.clone(), p.link.clone(), jobs);
+    let bytes = ~upload_all(pool, mode, jobs, order);
+    Report { closure: closure.len(), uploaded, bytes, mode: Some(mode) }
+
+-- Push the closure of `roots` to the cache.
+export push : Pusher -> Vec<String> -> Effect<Report, PushError, HNil>
+push p roots =
+  db_path = p.db.clone ()
+  local_closure db_path roots |> .flat_map (move \closure -> pushed p closure)
+
+pushed : Pusher -> Vec<NarInfo> -> Effect<Report, PushError, HNil>
+pushed p closure =
+  if closure.is_empty ()
+    succeed (Report { closure = 0, uploaded = 0, bytes = 0, mode = None })
+  else
+    Effect::scoped (move \scope -> on_cache scope p closure)
+
+test "only the cache's own refusal is permanent"
+  assert! \-> !(transient (&Rejected (.to_string "lacks a signature by a trusted key")))
+  assert! \-> transient (&Unreachable (.to_string "connection refused"))
+  assert! \-> transient (&Local (.to_string "database is locked"))
+  assert_eq! \-> classify (WorkerError::Remote (.to_string "no")) \-> Rejected (.to_string "no")
+  assert_eq! \-> classify (WorkerError::Connect (.to_string "refused")) \-> Unreachable (.to_string "connecting to the daemon: refused")
+
+test "a missing database is a local, retryable failure that names it"
+  r = closure_infos (.to_string "/nonexistent/vpush.sqlite") (.to_vec ([.to_string "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-x"]))
+  e = r |> .err |> .expect "an error"
+  assert! \-> transient (&e)
+  assert! \-> e.to_string () |> .contains "/nonexistent/vpush.sqlite"
+
+test "nothing valid to push is an empty report, with no connection made"
+  p = Pusher { link = crate::cli::Link { target = crate::cli::Target::Socket (.to_string "/nonexistent/socket"), ssh_program = .to_string "ssh", ssh_args = Vec::new (), remote_command = .to_string "nix-daemon --stdio" }, key = None, jobs = 2, db = .to_string "/unused" }
+  exit = id_effect::testing::run_test (pushed p (Vec::new ()))
+  r = exit |> .into_result |> .ok |> .expect "succeeds"
+  assert_eq! \-> (r.closure, r.uploaded, r.bytes, r.mode) \-> (0, 0, 0, None)

@@ -1,0 +1,154 @@
+-- The spool: one file per finished build, holding its out paths, one per
+-- line. The hook writes an item to a hidden temporary name and renames it
+-- into place, so the daemon never reads half an item; the daemon removes an
+-- item once its closure is on the cache, or moves it to `failed/` when the
+-- cache refuses it. Names sort in arrival order: nanoseconds since the epoch,
+-- zero-padded, then the writer's pid.
+
+import std::fs
+import std::io::ErrorKind
+import std::path::{Path, PathBuf}
+import std::time::{SystemTime, UNIX_EPOCH}
+import nix_store_core::storepath::{STORE_PREFIX, valid_base}
+
+-- Where refused items go, inside the spool.
+export const FAILED : &str = "failed"
+
+export data Item { export file PathBuf, export name String, export paths Vec<String> }
+  deriving (Clone, Debug, PartialEq)
+
+-- The store paths in `$OUT_PATHS` (whitespace separated). Anything that is
+-- not a top-level store path is dropped.
+export out_paths : &str -> Vec<String>
+out_paths text =
+  text.split_whitespace () |> .filter (\p -> p.strip_prefix STORE_PREFIX |> .map (\b -> valid_base b) |> .unwrap_or false) |> .map (\p -> p.to_string ()) |> .collect
+
+-- An item's name: arrival time, then the writer.
+export item_name : u128 -> u32 -> String
+item_name nanos pid = "#{nanos:020}-#{pid}"
+
+-- Whether a directory entry is an item (not a temporary, not `failed`).
+export is_item_name : &str -> bool
+is_item_name name = !(name.starts_with ".") && name != FAILED
+
+-- Write `paths` as a new item in `dir`, creating the directory if needed.
+write_item : &Path -> &[String] -> std::io::Result<PathBuf>
+write_item dir paths =
+  (fs::create_dir_all dir)?
+  nanos = SystemTime::now () |> .duration_since UNIX_EPOCH |> .map (\d -> d.as_nanos ()) |> .unwrap_or 0
+  name = item_name nanos (std::process::id ())
+  tmp = dir.join ".#{name}.tmp"
+  placed = dir.join (&name)
+  joined = paths.join "\n"
+  (fs::write (&tmp) "#{joined}\n")?
+  (fs::rename (&tmp) (&placed))?
+  Ok placed
+
+-- Spool `paths`; nothing is written for none.
+export enqueue : &Path -> &[String] -> std::io::Result<Option<PathBuf>>
+enqueue dir paths =
+  if paths.is_empty ()
+    Ok None
+  else
+    write_item dir paths |> .map Some
+
+-- The text of an item that may have been taken meanwhile.
+read_item : &Path -> std::io::Result<Option<String>>
+read_item file =
+  case fs::read_to_string file of
+    Ok text -> Ok (Some text)
+    Err e ->
+      if e.kind () == ErrorKind::NotFound
+        Ok None
+      else
+        Err e
+
+-- Every item in `dir`, oldest first. A spool that does not exist yet is empty.
+export items : &Path -> std::io::Result<Vec<Item>>
+items dir =
+  mut names = Vec::new () : Vec<String>
+  if dir.is_dir ()
+    entries = (fs::read_dir dir)?
+    for entry in entries
+      e = entry?
+      name = e.file_name () |> .to_string_lossy |> .into_owned
+      if is_item_name (&name) && e.path ().is_file ()
+        names.push name
+  names.sort ()
+  mut out = Vec::new () : Vec<Item>
+  for name in names
+    file = dir.join (&name)
+    if (read_item (&file))? is Some text
+      out.push (Item { file, name, paths = out_paths (&text) })
+  Ok out
+
+-- The item is done: its closure is on the cache.
+export remove : &Item -> std::io::Result<()>
+remove item =
+  case fs::remove_file (&item.file) of
+    Ok _ -> Ok ()
+    Err e ->
+      if e.kind () == ErrorKind::NotFound
+        Ok ()
+      else
+        Err e
+
+-- The cache refused the item: keep it for an operator, out of the queue.
+export set_aside : &Path -> &Item -> std::io::Result<PathBuf>
+set_aside dir item =
+  failed = dir.join FAILED
+  (fs::create_dir_all (&failed))?
+  placed = failed.join (&item.name)
+  (fs::rename (&item.file) (&placed))?
+  Ok placed
+
+#[cfg(test)]
+scratch : &str -> PathBuf
+scratch tag =
+  dir = std::env::temp_dir () |> .join "vpush-test-#{tag}-#{std::process::id ()}"
+  _r = fs::remove_dir_all (&dir)
+  dir
+
+#[cfg(test)]
+const A : &str = "/nix/store/0c2jw7x0rbdd0p56jnlsbq3bs9dmz0yp-hello-2.12.1"
+
+#[cfg(test)]
+const B : &str = "/nix/store/1v4s0mlgyhw2m1rcf4yw8pyab6mbwnpn-hello-2.12.1-man"
+
+test "OUT_PATHS keeps store paths only"
+  assert_eq! \-> out_paths (&"#{A} #{B}\n") \-> .to_vec ([A.to_string (), B.to_string ()])
+  assert_eq! \-> out_paths (&"  /etc/passwd #{A} /nix/store/short #{A}/bin/hello") \-> .to_vec ([A.to_string ()])
+  assert! \-> out_paths "" |> .is_empty
+
+test "names sort in arrival order and skip temporaries"
+  assert_eq! \-> item_name 42 7 \-> "00000000000000000042-7"
+  assert! \-> item_name 9 1 < item_name 10 1
+  assert! \-> is_item_name "00000000000000000042-7"
+  assert! \-> !(is_item_name ".00000000000000000042-7.tmp")
+  assert! \-> !(is_item_name FAILED)
+
+test "an item round-trips through the spool, and is removed"
+  dir = scratch "roundtrip"
+  assert! \-> items (&dir) |> .expect "a missing spool is empty" |> .is_empty
+  assert_eq! \-> enqueue (&dir) (&[]) |> .expect "nothing" \-> None
+  first = enqueue (&dir) (&[A.to_string (), B.to_string ()]) |> .expect "written" |> .expect "an item"
+  second = enqueue (&dir) (&[B.to_string ()]) |> .expect "written" |> .expect "an item"
+  fs::write (dir.join ".half.tmp") "garbage" |> .expect "a temporary"
+  found = items (&dir) |> .expect "listed"
+  files = found |> .iter |> .map (\i -> i.file.clone ()) |> .collect : Vec<PathBuf>
+  assert_eq! \-> files \-> .to_vec ([first.clone (), second.clone ()])
+  assert_eq! \-> found[0].paths \-> .to_vec ([A.to_string (), B.to_string ()])
+  remove (&found[0]) |> .expect "removed"
+  remove (&found[0]) |> .expect "removing twice is fine"
+  assert_eq! \-> items (&dir) |> .expect "listed" |> .len \-> 1
+  _r = fs::remove_dir_all (&dir)
+
+test "a refused item leaves the queue for failed/"
+  dir = scratch "failed"
+  enqueue (&dir) (&[A.to_string ()]) |> .expect "written"
+  found = items (&dir) |> .expect "listed"
+  placed = set_aside (&dir) (&found[0]) |> .expect "moved"
+  assert! \-> placed.starts_with (dir.join FAILED)
+  assert! \-> placed.is_file ()
+  assert! \-> items (&dir) |> .expect "listed" |> .is_empty
+  _r = fs::remove_dir_all (&dir)
