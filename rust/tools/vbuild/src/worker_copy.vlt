@@ -1,0 +1,239 @@
+-- The default `Copier`: the nix-daemon worker protocol (nix-store-core's
+-- `worker`, #157), with no `nix` CLI in between.
+--
+-- * To the builder: `ssh <builder> nix-daemon --stdio` (joining the probe's
+--   ControlPersist master), QueryValidPaths for what it lacks, the missing
+--   paths' info from the local daemon, then AddToStoreNar for each, archived
+--   from the local store chunk by chunk, references first.
+-- * Back: the outputs this host lacks, their info and NAR from the builder,
+--   AddToStoreNar into the local daemon, references first. The outputs'
+--   `.lock` files are unlinked first (see copier.vlt): the local daemon's
+--   addToStore runs in another process than the goal that holds them.
+--
+-- Both daemon connections and the ssh child are id_effect resources:
+-- released (connection closed, child reaped) however the copy ends.
+
+import std::collections::{BTreeMap, BTreeSet}
+import std::path::PathBuf
+import std::sync::Arc
+import id_effect::{Effect, HNil, Concurrency, acquire_use_release, all, fail, succeed, suspend}
+import nix_store_core::worker::{Daemon, PathInfo, WorkerError, add_to_store_nar, add_to_store_nar_from, close, nar_from_path, open_halves, query_path_info, query_valid_paths, with_daemon}
+import crate::machines::Machine
+import crate::copier::{BuildError, Copier, build_error, release_output_locks}
+import crate::probe::{SshProbe, join_args}
+
+-- `infos` in an order where every path comes after the ones it references
+-- (among `infos`; references outside it are already valid on the target).
+-- Self-references are ignored. Input order is kept where it is free.
+export ordered : Vec<PathInfo> -> Vec<PathInfo>
+ordered infos =
+  by = infos.iter () |> .map (\i -> (i.path.clone (), i.clone ())) |> .collect : BTreeMap<String, PathInfo>
+  mut seen = BTreeSet::new () : BTreeSet<String>
+  mut out = Vec::new () : Vec<PathInfo>
+  for i in infos.iter ()
+    visit (&by) (&mut seen) (&mut out) (&i.path)
+  out
+
+visit : &BTreeMap<String, PathInfo> -> &mut BTreeSet<String> -> &mut Vec<PathInfo> -> &str -> ()
+visit by seen out p =
+  if !seen.contains p
+    seen.insert (p.to_string ())
+    if by.get p is Some info
+      for r in info.references.iter ()
+        if r != p
+          visit by seen out r
+      out.push (info.clone ())
+  ()
+
+-- The paths of `wanted` not in `valid`.
+export missing : &[String] -> &[String] -> Vec<String>
+missing wanted valid =
+  have = valid.iter () |> .cloned |> .collect : BTreeSet<String>
+  wanted.iter () |> .filter (\p -> !have.contains (*p)) |> .cloned |> .collect
+
+export data WorkerCopier
+  { export probe SshProbe
+  , export socket String
+  , export substitute bool
+  , export log Option<Arc<std::fs::File>>
+  }
+
+instance Clone WorkerCopier
+  clone : &self -> Self
+  clone self = WorkerCopier { probe = self.probe.clone (), socket = self.socket.clone (), substitute = self.substitute, log = self.log.clone () }
+
+wire : WorkerError -> BuildError
+wire e = build_error (e.to_string ())
+
+lifted : given <A: Send + 'static> Result<A, BuildError> -> Effect<A, BuildError, HNil>
+lifted r =
+  case r of
+    Ok a -> succeed a
+    Err e -> fail e
+
+-- Every path's info from `d`; a path it does not know is an error (the
+-- caller asked for a path that should be valid there).
+infos_of : Daemon -> Vec<String> -> Effect<Vec<PathInfo>, BuildError, HNil>
+infos_of d paths =
+  asks = paths.into_iter () |> .map (\p -> info_of (d.clone ()) p) |> .collect : Vec<Effect<PathInfo, BuildError, HNil>>
+  all asks Concurrency::Sequential
+
+info_of : Daemon -> String -> Effect<PathInfo, BuildError, HNil>
+info_of d p =
+  q = p.clone ()
+  query_path_info (&d) p |> .map_err wire |> .flat_map (move \o -> lifted (o |> .ok_or (build_error ("#{q} is not valid where it should be"))))
+
+-- Upload `infos` to `remote`, NARs archived from the local store.
+upload : Daemon -> Vec<PathInfo> -> Effect<(), BuildError, HNil>
+upload remote infos =
+  steps = ordered infos |> .into_iter |> .map (\i -> add_to_store_nar_from (&remote) (i.clone ()) (PathBuf::from (&i.path)) false true |> .map_err wire) |> .collect : Vec<Effect<(), BuildError, HNil>>
+  all steps Concurrency::Sequential |> .map (\_ -> ())
+
+-- Fetch `infos` from `remote` into `local`, NAR by NAR.
+download : Daemon -> Daemon -> Vec<PathInfo> -> Effect<(), BuildError, HNil>
+download remote local infos =
+  steps = ordered infos |> .into_iter |> .map (\i -> fetch_one (remote.clone ()) (local.clone ()) i) |> .collect : Vec<Effect<(), BuildError, HNil>>
+  all steps Concurrency::Sequential |> .map (\_ -> ())
+
+fetch_one : Daemon -> Daemon -> PathInfo -> Effect<(), BuildError, HNil>
+fetch_one remote local info =
+  nar_from_path (&remote) (info.path.clone ()) |> .flat_map (move \nar -> add_to_store_nar (&local) info nar false true) |> .map_err wire
+
+push : WorkerCopier -> Daemon -> Vec<String> -> Effect<(), BuildError, HNil>
+push cfg remote paths =
+  r = remote.clone ()
+  socket = cfg.socket.clone ()
+  query_valid_paths (&remote) (paths.clone ()) cfg.substitute |> .map_err wire |> .flat_map (move \valid -> push_missing socket r (missing (&paths) (&valid)))
+
+push_missing : String -> Daemon -> Vec<String> -> Effect<(), BuildError, HNil>
+push_missing socket remote needed =
+  if needed.is_empty ()
+    succeed (())
+  else
+    with_daemon socket (move \local -> infos_of local needed |> .map_err (\e -> WorkerError::Protocol (e.to_string ())) |> .flat_map (move \infos -> upload remote infos |> .map_err (\e -> WorkerError::Protocol (e.to_string ())))) |> .map_err wire
+
+pull : WorkerCopier -> Daemon -> Vec<String> -> Effect<(), BuildError, HNil>
+pull cfg remote paths =
+  with_daemon (cfg.socket.clone ()) (move \local -> pull_with remote local paths |> .map_err (\e -> WorkerError::Protocol (e.to_string ()))) |> .map_err wire
+
+pull_with : Daemon -> Daemon -> Vec<String> -> Effect<(), BuildError, HNil>
+pull_with remote local paths =
+  l = local.clone ()
+  r = remote.clone ()
+  query_valid_paths (&local) (paths.clone ()) false |> .map_err wire |> .flat_map (move \valid -> pull_missing r l (missing (&paths) (&valid)))
+
+pull_missing : Daemon -> Daemon -> Vec<String> -> Effect<(), BuildError, HNil>
+pull_missing remote local needed =
+  r = remote.clone ()
+  infos_of remote needed |> .flat_map (move \infos -> download r local infos)
+
+-- The builder's daemon over ssh, for the length of `body`.
+on_builder : given <A: Send + 'static, U: FnOnce(Daemon) -> Effect<A, BuildError, HNil> + Send + 'static> WorkerCopier -> Machine -> U -> Effect<A, BuildError, HNil>
+on_builder cfg m body =
+  case join_args (&cfg.probe) (&m) "nix-daemon --stdio" of
+    Err why -> fail (build_error why)
+    Ok args -> acquire_use_release (remote_daemon (cfg.probe.ssh.clone ()) args (cfg.log.clone ())) (move \r -> body (r.daemon.clone ())) (\r _ -> release_remote r)
+
+instance Copier WorkerCopier
+  copy_to : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_to self m paths =
+    cfg = self.clone ()
+    on_builder (self.clone ()) m (move \remote -> push cfg remote paths)
+
+  copy_from : &self -> Machine -> Vec<String> -> Effect<(), BuildError, HNil>
+  copy_from self m paths =
+    cfg = self.clone ()
+    cfg2 = self.clone ()
+    held = paths.clone ()
+    suspend (move \-> lifted (release_output_locks (&held))) |> .flat_map (move \_ -> on_builder cfg2 m (move \remote -> pull cfg remote paths))
+
+rust """
+  /// The builder's `nix-daemon --stdio`, and the ssh child that carries it.
+  #[derive(Clone)]
+  pub struct Remote {
+      pub daemon: Daemon,
+      child: Arc<std::sync::Mutex<Option<tokio::process::Child>>>,
+  }
+
+  /// Start `ssh <args>` (stdin and stdout piped to the protocol, stderr to
+  /// the build log) and shake hands over its pipes.
+  fn remote_daemon(
+      ssh: String,
+      args: Vec<String>,
+      log: Option<Arc<std::fs::File>>,
+  ) -> Effect<Remote, BuildError, HNil> {
+      id_effect::from_async(move || async move {
+          use std::process::Stdio;
+          let mut command = tokio::process::Command::new(&ssh);
+          command
+              .args(&args)
+              .stdin(Stdio::piped())
+              .stdout(Stdio::piped())
+              .kill_on_drop(true);
+          match log.as_ref().map(|f| f.try_clone()) {
+              Some(Ok(f)) => command.stderr(f),
+              _ => command.stderr(Stdio::null()),
+          };
+          let mut child = command
+              .spawn()
+              .map_err(|e| build_error(format!("starting {ssh}: {e}")))?;
+          match (child.stdout.take(), child.stdin.take()) {
+              (Some(out), Some(inp)) => Ok((out, inp, child)),
+              _ => Err(build_error("ssh without pipes".to_string())),
+          }
+      })
+      .flat_map(|(out, inp, child)| {
+          let child = Arc::new(std::sync::Mutex::new(Some(child)));
+          open_halves(out, inp)
+              .map_err(wire)
+              .map(move |daemon| Remote { daemon, child })
+      })
+  }
+
+  /// Close the connection (the remote daemon sees EOF and exits, and so does
+  /// ssh), then reap the child, killing it if it lingers.
+  fn release_remote(r: Remote) -> Effect<(), id_effect::Never, HNil> {
+      let child = r.child.clone();
+      close(r.daemon).flat_map(move |_| {
+          id_effect::from_async(move || async move {
+              let taken = child.lock().ok().and_then(|mut g| g.take());
+              if let Some(mut c) = taken {
+                  let _ = c.kill().await;
+                  let _ = c.wait().await;
+              }
+              Ok::<(), id_effect::Never>(())
+          })
+      })
+  }
+"""
+
+#[cfg(test)]
+info : &str -> &[&str] -> PathInfo
+info path refs = PathInfo {
+    path = path.to_string ()
+    , deriver = None
+    , nar_hash = nix_store_core::hash::digest (&[])
+    , references = refs.iter () |> .map (\r -> r.to_string ()) |> .collect
+    , registration_time = 0
+    , nar_size = 0
+    , ultimate = false
+    , sigs = Vec::new ()
+    , ca = None
+    }
+
+#[cfg(test)]
+paths_of : Vec<PathInfo> -> Vec<String>
+paths_of infos = infos.into_iter () |> .map (\i -> i.path) |> .collect
+
+test "references come first, self-references and outside ones ignored"
+  got = ordered (.to_vec ([info "/nix/store/c" (&["/nix/store/b", "/nix/store/c", "/nix/store/glibc"]), info "/nix/store/a" (&[]), info "/nix/store/b" (&["/nix/store/a"])]))
+  assert_eq! \-> paths_of got \-> .to_vec ([.to_string "/nix/store/a", .to_string "/nix/store/b", .to_string "/nix/store/c"])
+
+test "independent paths keep their order"
+  got = ordered (.to_vec ([info "/nix/store/x" (&[]), info "/nix/store/y" (&[])]))
+  assert_eq! \-> paths_of got \-> .to_vec ([.to_string "/nix/store/x", .to_string "/nix/store/y"])
+
+test "only what the target lacks is sent"
+  want = .to_vec ([.to_string "/nix/store/a", .to_string "/nix/store/b"]) : Vec<String>
+  have = .to_vec ([.to_string "/nix/store/a"]) : Vec<String>
+  assert_eq! \-> missing (&want) (&have) \-> .to_vec ([.to_string "/nix/store/b"])

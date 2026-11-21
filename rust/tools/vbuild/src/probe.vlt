@@ -177,6 +177,21 @@ probe_cmd cfg m =
   args.push ("sh -c \"#{SCRIPT}\"")
   Ok (Cmd { program = cfg.ssh.clone (), args, env = Vec::new (), to_log = false, detached = true })
 
+-- An ssh command line that joins the probe's master (or connects on its own
+-- when there is none) and runs `command` on the builder: what the worker
+-- copier uses for `nix-daemon --stdio`.
+export join_args : &SshProbe -> &Machine -> &str -> Result<Vec<String>, String>
+join_args cfg m command =
+  target = (ssh_target m |> .ok_or ("not an ssh store: #{m.store_uri}"))?
+  mut args = ssh_options (&cfg.control_dir) (&m.ssh_key) false
+  if known_hosts cfg m (&target) is Some file
+    args.push ("-oUserKnownHostsFile=#{file}")
+    args.push (.to_string "-oStrictHostKeyChecking=yes")
+  args.push (target)
+  args.push (.to_string "--")
+  args.push (command.to_string ())
+  Ok args
+
 -- What one ssh run says about a builder.
 export interpret : Result<crate::run::Ran, crate::run::RunError> -> Probe
 interpret r =

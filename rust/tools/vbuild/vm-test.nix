@@ -118,6 +118,14 @@ in
           client.succeed(f"nix-store --check-validity {out}")
           client.succeed(f"nix path-info --extra-experimental-features nix-command --json {out} | grep -q narHash")
 
+      with subtest("the nix-copy fallback copier works too"):
+          hook = client.succeed("sed -n 's/^build-hook = //p' /etc/nix/nix.conf").strip()
+          t, out2 = ms(client, nb + f" -A remote --argstr seed fallback --option build-hook '{hook} --copier nix-copy'")
+          out2 = out2.strip().split("\n")[-1]
+          builder.succeed(f"nix-store --check-validity {out2}")
+          client.succeed(f"nix-store --verify-path {out2}")
+          print(f"vbuild-bench accept-nix-copy ms={t}")
+
       with subtest("builder down: vbuild declines at once and the build runs here"):
           builder.block()
           client.succeed("rm -rf /nix/var/nix/vbuild/probe")

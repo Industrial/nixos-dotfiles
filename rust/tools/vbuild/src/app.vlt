@@ -16,6 +16,7 @@ import crate::probe::{SshProbe, Ttl, ssh_options}
 import crate::copier::{CopierService, NixCli, RemoteBuildService}
 import crate::hook::{ChannelService, Hook, HookError, ProberService, Settings, StdChannel, serve, settings_of}
 import crate::wire::read_settings
+import crate::worker_copy::WorkerCopier
 
 export data Options
   { export nix String
@@ -24,14 +25,24 @@ export data Options
   , export probe_timeout_ms u64
   , export load_ttl_s u64
   , export down_ttl_s u64
+  , export copier String
   }
   deriving (Debug, Clone, PartialEq)
 
 export defaults : Options
-defaults = Options { nix = .to_string "nix", ssh = .to_string "ssh", state_dir = .to_string "/nix/var/nix", probe_timeout_ms = 3000, load_ttl_s = 5, down_ttl_s = 30 }
+defaults = Options { nix = .to_string "nix", ssh = .to_string "ssh", state_dir = .to_string "/nix/var/nix", probe_timeout_ms = 3000, load_ttl_s = 5, down_ttl_s = 30, copier = .to_string "worker" }
 
 number : &str -> &str -> Result<u64, String>
 number flag v = v.parse () |> .map_err (\_ -> "#{flag} wants a number, not '#{v}'")
+
+-- How closures move: `worker` (the daemon protocol, the default) or
+-- `nix-copy` (the `nix copy` CLI, the fallback).
+copier_name : &str -> Result<String, String>
+copier_name v =
+  if v == "worker" || v == "nix-copy"
+    Ok (v.to_string ())
+  else
+    Err ("--copier is worker or nix-copy, not '#{v}'")
 
 -- argv without the program name. Unknown flags are errors; a lone trailing
 -- word is Nix's verbosity, and is ignored.
@@ -56,6 +67,8 @@ parse_args args =
           o.load_ttl_s := (number flag v)?
         "--down-ttl-s" ->
           o.down_ttl_s := (number flag v)?
+        "--copier" ->
+          o.copier := (copier_name v)?
         _ ->
           (Err ("unknown option #{flag}"))?
       i := i + 2
@@ -135,13 +148,18 @@ hook_of o s machines log =
     }
   path = std::env::var "PATH" |> .unwrap_or_default
   cli = NixCli { nix = o.nix.clone (), env = child_env (&o) path, substitute = s.substitute, runner }
+  worker = WorkerCopier { probe = probe.clone (), socket = nix_store_core::worker::DEFAULT_SOCKET.to_string (), substitute = s.substitute, log = log.clone () }
+  copier = if o.copier == "nix-copy"
+    CopierService (Arc::new (cli.clone ()))
+  else
+    CopierService (Arc::new worker)
   Hook {
     machines
     , settings = s
     , load_dir = "#{o.state_dir}/current-load"
     , channel = ChannelService (Arc::new StdChannel)
     , prober = ProberService (Arc::new probe)
-    , copier = CopierService (Arc::new (cli.clone ()))
+    , copier
     , remote = RemoteBuildService (Arc::new cli)
     , log
     }
@@ -206,6 +224,12 @@ test "argv: an unknown flag or a missing value is refused"
   assert! \-> parse_args (&[.to_string "--frob", .to_string "1"]) |> .is_err
   assert! \-> parse_args (&[.to_string "--nix"]) |> .is_err
   assert! \-> parse_args (&[.to_string "--load-ttl-s", .to_string "soon"]) |> .is_err
+  assert! \-> parse_args (&[.to_string "--copier", .to_string "rsync"]) |> .is_err
+
+test "argv: the worker copier is the default, nix copy the fallback"
+  assert_eq! \-> defaults ().copier \-> .to_string "worker"
+  o = parse_args (&[.to_string "--copier", .to_string "nix-copy"]) |> .unwrap
+  assert_eq! \-> o.copier \-> .to_string "nix-copy"
 
 test "children join the ssh master and find the same ssh"
   mut o = defaults ()

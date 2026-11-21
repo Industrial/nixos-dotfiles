@@ -179,3 +179,7 @@ test "releasing output locks removes them and tolerates missing ones"
   missing = dir.join "missing" |> .to_string_lossy |> .into_owned
   assert_eq! \-> release_output_locks (&[out.clone (), missing]) \-> Ok ()
   assert! \-> !(std::path::Path::new (&format! \-> "{out}.lock") |> .exists)
+
+-- A BuildError from outside this module.
+export build_error : String -> BuildError
+build_error why = BuildError why

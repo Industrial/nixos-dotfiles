@@ -5,8 +5,16 @@
 //! is nix-store-core's (`../nix-store-core`).
 
 // Lints on the *shape* of Voltaic's emitted Rust, not on decisions in the
-// source (the same list as rust/tools/vgc/src/lib.rs).
+// source (vgc's list, plus: `:=` reassignment emits `x = x + n`; `mut v =
+// Vec::new ()` + `resize` is the only zero-fill spelling; interpolated
+// strings emit `format!` even with nothing to interpolate; `case` emits
+// `match` where `matches!` would do; tests compare bools with `assert_eq!`).
 #![allow(
+    clippy::assign_op_pattern,
+    clippy::slow_vector_initialization,
+    clippy::useless_format,
+    clippy::match_like_matches_macro,
+    clippy::bool_assert_comparison,
     clippy::no_effect,
     clippy::unused_unit,
     clippy::collapsible_if,
@@ -33,5 +41,6 @@ voltaic!(select);
 voltaic!(probe);
 voltaic!(slots);
 voltaic!(copier);
+voltaic!(worker_copy);
 voltaic!(hook);
 voltaic!(app);
