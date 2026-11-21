@@ -1,0 +1,91 @@
+-- The link to the cache host's nix-daemon: a worker-protocol session over
+-- `ssh <dest> nix-daemon --stdio` (the child's stdout and stdin), or over a
+-- daemon socket. This is the one file that touches the network; everything
+-- it hands back is nix-store-core's `Daemon`.
+--
+-- Closing a session shuts its write side, so the remote daemon ends the
+-- session and ssh exits; the child is then reaped, and killed (kill_on_drop)
+-- if it has not gone within ten seconds.
+
+import std::process::Stdio
+import std::sync::Arc
+import std::time::Duration
+import tokio::process::{Child, ChildStdin, ChildStdout, Command}
+import tokio::sync::Mutex
+import id_effect::{Effect, HNil, Never, from_async, succeed}
+import nix_store_core::worker::{Daemon, WorkerError, close, connect, open_halves}
+import crate::cli::{Link, Target}
+
+-- One open session. Sessions are pooled, so they compare by identity.
+export data Session { export daemon Daemon, child Option<Arc<Mutex<Child>>> }
+
+instance Clone Session
+  clone : &self -> Self
+  clone self = Session { daemon = self.daemon.clone (), child = self.child.clone () }
+
+instance PartialEq Session
+  eq : &self -> &Self -> bool
+  eq self other = Arc::ptr_eq (&self.daemon.0) (&other.daemon.0)
+
+-- The argv of the ssh child: `<args>... <dest> <remote command>`.
+export ssh_argv : &Link -> String -> Vec<String>
+ssh_argv link dest =
+  mut argv = link.ssh_args.clone ()
+  argv.push dest
+  argv.push (link.remote_command.clone ())
+  argv
+
+spawned : async String -> Vec<String> -> Result<(Child, ChildStdout, ChildStdin), WorkerError>
+spawned program argv =
+  mut cmd = Command::new (&program)
+  cmd.args (&argv)
+  cmd.stdin (Stdio::piped ())
+  cmd.stdout (Stdio::piped ())
+  cmd.stderr (Stdio::inherit ())
+  cmd.kill_on_drop true
+  mut child = (cmd.spawn () |> .map_err (\e -> WorkerError::Connect ("#{program}: #{e}")))?
+  out = (child.stdout.take () |> .ok_or_else (\-> WorkerError::Connect (.to_string "ssh: no stdout pipe")))?
+  inp = (child.stdin.take () |> .ok_or_else (\-> WorkerError::Connect (.to_string "ssh: no stdin pipe")))?
+  Ok ((child, out, inp))
+
+over_child : (Child, ChildStdout, ChildStdin) -> Effect<Session, WorkerError, HNil>
+over_child parts =
+  (child, out, inp) = parts
+  shared = Arc::new (Mutex::new child)
+  open_halves out inp |> .map (move \d -> Session { daemon = d, child = Some shared })
+
+over_ssh : Link -> String -> Effect<Session, WorkerError, HNil>
+over_ssh link dest =
+  program = link.ssh_program.clone ()
+  argv = ssh_argv (&link) dest
+  from_async (move \-> spawned program argv) |> .flat_map over_child
+
+over_socket : String -> Effect<Session, WorkerError, HNil>
+over_socket path =
+  connect path |> .map (\d -> Session { daemon = d, child = None })
+
+-- Open a session to the cache's daemon and shake hands.
+export opened : Link -> Effect<Session, WorkerError, HNil>
+opened link =
+  case link.target.clone () of
+    Target::Ssh dest -> over_ssh link dest
+    Target::Socket path -> over_socket path
+
+reap_io : async Arc<Mutex<Child>> -> Result<(), Never>
+reap_io child =
+  locked <- child.lock ()
+  mut g = locked
+  _w <- g.wait ()
+  Ok ()
+
+reaped : Option<Arc<Mutex<Child>>> -> Effect<(), Never, HNil>
+reaped child =
+  case child of
+    None -> succeed (())
+    Some c -> from_async (move \-> reap_io c) |> .timeout (Duration::from_secs 10) |> .map (\_ -> ())
+
+-- Close a session and reap its ssh child.
+export closed : Session -> Effect<(), Never, HNil>
+closed s =
+  child = s.child.clone ()
+  close (s.daemon.clone ()) |> .flat_map (move \_ -> reaped child)

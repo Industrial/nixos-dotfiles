@@ -1,0 +1,176 @@
+-- The upload plan for one spool item, as plain functions: which paths of the
+-- closure the cache lacks, the order they go in (references first), how each
+-- is declared to the cache's daemon, and whether it is signed.
+--
+-- A daemon accepts a path only when every path it references is already
+-- valid there, so the missing paths go up in layers: a layer references only
+-- paths that are on the cache or in an earlier layer, and the paths within a
+-- layer are independent of each other, so they can go up concurrently.
+
+import std::collections::BTreeSet
+import nix_store_core::hash
+import nix_store_core::narinfo::{NarInfo, fingerprint}
+import nix_store_core::signing::{SecretKey, sign}
+import nix_store_core::worker::PathInfo
+
+-- How the cache's daemon will judge our uploads.
+--   Trusted:  it trusts this client (a trusted user), so the upload says
+--             `dont_check_sigs` and nothing is signed.
+--   Signed:   it does not, but we hold a signing key: every path carries our
+--             signature, which its `trusted-public-keys` must list.
+--   Unsigned: neither. Paths go up with the signatures they already have,
+--             and the daemon refuses any that lacks a trusted one.
+export data Mode = Trusted | Signed | Unsigned
+  deriving (Clone, Copy, Debug, PartialEq)
+
+-- The mode for the daemon's reported trust (None: it did not say, which a
+-- daemon older than protocol 1.35 does) and whether a key is configured.
+export mode_of : Option<bool> -> bool -> Mode
+mode_of trusted have_key =
+  if trusted == Some true
+    Trusted
+  else if have_key
+    Signed
+  else
+    Unsigned
+
+-- The paths of `closure` that are not in `valid` (what the cache has).
+export missing : Vec<NarInfo> -> &[String] -> Vec<NarInfo>
+missing closure valid =
+  have = valid.iter () |> .cloned |> .collect : BTreeSet<String>
+  closure |> .into_iter |> .filter (\n -> !(have.contains (&n.store_path))) |> .collect
+
+-- Whether every reference of `p` other than itself is either not being
+-- uploaded at all (the cache has it) or already uploaded.
+ready : &NarInfo -> &BTreeSet<String> -> &BTreeSet<String> -> bool
+ready p pending done =
+  p.references.iter () |> .all (\r -> r == &p.store_path || !(pending.contains r) || done.contains r)
+
+-- The missing paths in upload layers, references first. A reference cycle
+-- (which a store never has) is refused rather than half uploaded.
+export layers : Vec<NarInfo> -> Result<Vec<Vec<NarInfo>>, String>
+layers todo_paths =
+  pending = todo_paths.iter () |> .map (\p -> p.store_path.clone ()) |> .collect : BTreeSet<String>
+  mut done = BTreeSet::new () : BTreeSet<String>
+  mut left = todo_paths
+  mut out = Vec::new () : Vec<Vec<NarInfo>>
+  mut stuck = false
+  while !left.is_empty () && !stuck
+    (now, later) = left |> .into_iter |> .partition (\p -> ready p (&pending) (&done)) : (Vec<NarInfo>, Vec<NarInfo>)
+    for p in &now
+      done.insert (p.store_path.clone ())
+    stuck := now.is_empty ()
+    left := later
+    if !stuck
+      out.push now
+  if stuck
+    Err "a reference cycle among #{left.len ()} paths"
+  else
+    Ok out
+
+-- The widest layer: how many uploads can usefully run at once.
+export width : &[Vec<NarInfo>] -> usize
+width order = order.iter () |> .map (\l -> l.len ()) |> .max |> .unwrap_or 0
+
+-- `n` with this key's signature added, unless it already carries it.
+export signed : &SecretKey -> NarInfo -> NarInfo
+signed key n =
+  sig = sign key (&fingerprint (&n))
+  mut out = n
+  if !(out.sigs.contains (&sig))
+    out.sigs.push sig
+  out
+
+-- `n` as the mode needs it on the wire.
+export prepared : Mode -> Option<&SecretKey> -> NarInfo -> NarInfo
+prepared mode key n =
+  case (mode, key) of
+    (Mode::Signed, Some k) -> signed k n
+    _ -> n
+
+-- What an AddToStoreNar declares for `n`. The registration time is left to
+-- the cache (0: "now"), and the path is not `ultimate` there: the cache did
+-- not build it.
+export path_info : &NarInfo -> Result<PathInfo, String>
+path_info n =
+  nar_hash = (hash::parse (&n.nar_hash) |> .ok_or_else (\-> "#{n.store_path}: unparsable narHash #{n.nar_hash}"))?
+  Ok (PathInfo { path = n.store_path.clone (), deriver = n.deriver.clone (), nar_hash, references = n.references.clone (), registration_time = 0, nar_size = n.nar_size, ultimate = false, sigs = n.sigs.clone (), ca = n.ca.clone () })
+
+#[cfg(test)]
+const H : &str = "sha256:044b884fce3dd89e5cd04f725b59c2abf51f0c2b496830d3f186107269cda902"
+
+#[cfg(test)]
+const KEY : &str = "vpush-test-1:IFEvFyihMh7uaDgocj2UDqgTjy54WGCb9RWht58jqYVbw7AJn0qyKoHwl69jFL7JhFJn1pDt30yRxJRxHzTYMA=="
+
+#[cfg(test)]
+sp : &str -> String
+sp name = "/nix/store/#{name}"
+
+#[cfg(test)]
+info : &str -> &[&str] -> NarInfo
+info name refs = NarInfo { store_path = sp name, nar_hash = H.to_string (), nar_size = 120, references = refs.iter () |> .map (\r -> sp r) |> .collect, deriver = None, sigs = Vec::new (), ca = None }
+
+#[cfg(test)]
+names : &[Vec<NarInfo>] -> Vec<Vec<String>>
+names order = order.iter () |> .map (\l -> l.iter () |> .map (\n -> n.store_path.clone ()) |> .collect) |> .collect
+
+test "the cache's trust decides the mode"
+  assert_eq! \-> mode_of (Some true) true \-> Mode::Trusted
+  assert_eq! \-> mode_of (Some true) false \-> Mode::Trusted
+  assert_eq! \-> mode_of (Some false) true \-> Mode::Signed
+  assert_eq! \-> mode_of None true \-> Mode::Signed
+  assert_eq! \-> mode_of (Some false) false \-> Mode::Unsigned
+  assert_eq! \-> mode_of None false \-> Mode::Unsigned
+
+test "what the cache has is not uploaded"
+  closure = .to_vec ([info "a" (&[]), info "b" (&["a"]), info "c" (&["b"])]) : Vec<NarInfo>
+  left = missing closure (&[sp "a", sp "zzz"])
+  got = left |> .iter |> .map (\n -> n.store_path.clone ()) |> .collect : Vec<String>
+  assert_eq! \-> got \-> .to_vec ([sp "b", sp "c"])
+
+test "references go up before the paths that need them"
+  -- d -> b, c; b -> a; c -> a, and a self-reference on c.
+  todo_paths = .to_vec ([info "d" (&["b", "c"]), info "c" (&["a", "c"]), info "b" (&["a"]), info "a" (&[])]) : Vec<NarInfo>
+  order = layers todo_paths |> .expect "acyclic"
+  assert_eq! \-> names (&order) \-> .to_vec ([.to_vec ([sp "a"]), .to_vec ([sp "c", sp "b"]), .to_vec ([sp "d"])])
+  assert_eq! \-> width (&order) \-> 2
+
+test "a reference already on the cache does not hold a path back"
+  -- b references a, which is not being uploaded: the cache has it.
+  order = layers (.to_vec ([info "b" (&["a"]), info "c" (&[])])) |> .expect "acyclic"
+  assert_eq! \-> names (&order) \-> .to_vec ([.to_vec ([sp "b", sp "c"])])
+
+test "nothing to upload is no layers"
+  order = layers (Vec::new ()) |> .expect "empty"
+  assert! \-> order.is_empty ()
+  assert_eq! \-> width (&order) \-> 0
+
+test "a reference cycle is refused"
+  r = layers (.to_vec ([info "x" (&["y"]), info "y" (&["x"]), info "z" (&[])]))
+  assert_eq! \-> r \-> Err (.to_string "a reference cycle among 2 paths")
+
+test "a signed path carries one verifiable signature by our key"
+  key = nix_store_core::signing::parse_secret_key KEY |> .expect "test key"
+  public = nix_store_core::signing::public_of (&key)
+  n = info "b" (&["a"])
+  once = signed (&key) n
+  assert_eq! \-> once.sigs.len () \-> 1
+  assert! \-> once.sigs[0].starts_with "vpush-test-1:"
+  assert! \-> nix_store_core::signing::verify (&public) (&fingerprint (&once)) (&once.sigs[0])
+  twice = signed (&key) (once.clone ())
+  assert_eq! \-> twice.sigs \-> once.sigs
+
+test "only the Signed mode signs"
+  key = nix_store_core::signing::parse_secret_key KEY |> .expect "test key"
+  trusted = prepared Mode::Trusted (Some (&key)) (info "a" (&[]))
+  unsigned = prepared Mode::Unsigned None (info "a" (&[]))
+  signed_one = prepared Mode::Signed (Some (&key)) (info "a" (&[]))
+  assert_eq! \-> (trusted.sigs.len (), unsigned.sigs.len (), signed_one.sigs.len ()) \-> (0, 0, 1)
+
+test "the declared path info is the database's"
+  n = NarInfo { store_path = sp "b", nar_hash = H.to_string (), nar_size = 7, references = .to_vec ([sp "a"]), deriver = Some (sp "b.drv"), sigs = .to_vec ([.to_string "k:sig"]), ca = None }
+  p = path_info (&n) |> .expect "parses"
+  assert_eq! \-> (p.path.clone (), p.nar_size, p.references.clone (), p.deriver.clone (), p.sigs.clone (), p.ultimate) \-> (sp "b", 7, .to_vec ([sp "a"]), Some (sp "b.drv"), .to_vec ([.to_string "k:sig"]), false)
+  assert_eq! \-> Some p.nar_hash \-> hash::parse H
+  bad = NarInfo { nar_hash = .to_string "md5:nope", ...n }
+  assert! \-> path_info (&bad) |> .is_err

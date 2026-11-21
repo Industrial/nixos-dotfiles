@@ -16,6 +16,8 @@ let
       modules = [
         (hostDir name + "/configuration.nix")
         {disabledModules = map (f: hostDir name + "/${f}") ["disko.nix" "filesystems.nix" "hardware.nix"];}
+        # As features/nixos/networking sets it from settings.hostname (read by vpush's switch).
+        {networking.hostName = name;}
       ];
     };
   enabled = lib.genAttrs fleet.names (name: features.enabledFeatures (selection name));
@@ -50,4 +52,19 @@ in
     binaryCachesUseTheFleetPort = assay.eq (lib.all (c: lib.hasSuffix ":${toString fleet.cachePort}" c.url) fleet.binaryCaches) true;
 
     everyHostEnrolled = assay.eq (builtins.length fleet.operatorKeys) (builtins.length fleet.names);
+
+    # vpush pushes automatically from every builder-role host that is not a cache: today
+    # that is every builder but drakkar. Never the cache, never a non-builder, and nobody
+    # at all on an inventory with no other cache to push to.
+    pushersAreNonCacheBuilders = let
+      expected = lib.filter (n: !(builtins.elem n (map (c: c.name) fleet.binaryCaches))) (fleet.withRole "builder");
+    in
+      assay.eq [fleet.cachePushers (expected != [])] [expected true];
+    cacheNeverPushes = assay.eq (lib.filter (c: fleet.pushesToCache c.name) fleet.binaryCaches) [];
+    nonBuilderNeverPushes = assay.eq (lib.filter fleet.pushesToCache (lib.filter (n: !(fleet.hasRole "builder" n)) fleet.order)) [];
+    vpushRunsOnThePushers = assay.eq (runs "nix.vpush") fleet.cachePushers;
+    noCacheNoPushers = let
+      noKeys = builtins.mapAttrs (_: h: removeAttrs h ["cacheKey"]) fleet.hosts;
+    in
+      assay.eq (lib.filter (fleet.pushesToCacheIn noKeys) fleet.order) [];
   }

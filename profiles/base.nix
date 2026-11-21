@@ -4,7 +4,9 @@
   config,
   lib,
   ...
-}: {
+}: let
+  fleet = import ../common/fleet.nix;
+in {
   options.profiles.base.enable = lib.mkEnableOption "the base profile";
 
   config = lib.mkIf config.profiles.base.enable {
@@ -39,6 +41,12 @@
     # Substitute from the fleet's vcache servers (common/fleet.nix binaryCaches) first.
     # Rollback: features.nix.vcache.client.enable = lib.mkForce false;
     features.nix.vcache.client.enable = true;
+
+    # Push this host's builds to the fleet cache (features/nix/vpush), automatically, on
+    # every builder-role host that is not a cache (common/fleet.nix `pushesToCache`): the
+    # post-build-hook is the default path into vcache. Off on the cache (drakkar).
+    # Rollback: features.nix.vpush.enable = lib.mkForce false;
+    features.nix.vpush.enable = lib.mkDefault (fleet.pushesToCache (config.networking.hostName or ""));
 
     # Performance Optimization
     features.performance.environment.enable = true;

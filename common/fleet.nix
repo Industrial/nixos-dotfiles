@@ -81,8 +81,31 @@ let
 
   # vcache's TCP port, on every serving host's tailnet address.
   cachePort = 5100;
+
+  # A cache host, by the same test as binaryCaches below: a builder with a tailnet
+  # address and a published cacheKey.
+  isCacheIn = hs: name: let
+    h = hs.${name} or {};
+  in
+    builtins.elem "builder" (h.roles or []) && h ? tailscaleIp && (h.cacheKey or null) != null;
+
+  # Whether `name` pushes its builds to the fleet cache (features/nix/vpush, switched on
+  # from profiles/base.nix): every builder-role host that is not a cache itself, as long
+  # as some other host is one. Automatic, not opt-in; the rollback is the one option
+  # `features.nix.vpush.enable = lib.mkForce false`. A cache never pushes to itself: it
+  # IS the cache. Takes the host set, so the rule is testable on another inventory.
+  pushesToCacheIn = hs: name: let
+    h = hs.${name} or {};
+    otherCaches = builtins.filter (n: n != name && isCacheIn hs n) (builtins.attrNames hs);
+  in
+    builtins.elem "builder" (h.roles or []) && !(isCacheIn hs name) && otherCaches != [];
 in {
-  inherit hosts order hasRole withRole cachePort;
+  inherit hosts order hasRole withRole cachePort isCacheIn pushesToCacheIn;
+
+  pushesToCache = pushesToCacheIn hosts;
+
+  # The hosts that push their builds to the cache, in fleet order.
+  cachePushers = builtins.filter (pushesToCacheIn hosts) order;
 
   # The fleet's binary caches (features/nix/vcache), in builder preference order:
   # builder-role hosts with a tailnet address and a published cacheKey.

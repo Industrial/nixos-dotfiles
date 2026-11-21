@@ -103,3 +103,9 @@ features/window-manager/slock
 # that sets `features.cli.vmon.enable = lib.mkForce false;` (profiles/cli-core.assay.nix,
 # rollbackRestoresNom). Remove this entry when nom is deleted.
 features/cli/nix-output-monitor
+
+# --- Switched on by fleet data, not a literal `enable = true`. -----------------------
+# profiles/base.nix sets features.nix.vpush.enable = lib.mkDefault (fleet.pushesToCache
+# <host>): on for every builder-role host that is not a cache (huginn, muninn), which this
+# text-only check cannot see. profiles/base.assay.nix proves the selection (GH-154).
+features/nix/vpush
