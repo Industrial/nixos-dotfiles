@@ -69,6 +69,10 @@
     exit 1
   '';
 in {
+  # A live switch moves nix-daemon.socket only if something restarts it; this does,
+  # on the way in and (being outside features/, so ungated) on the way back out.
+  imports = [../../../common/nix-daemon-listen.nix];
+
   environment.systemPackages = [proxy];
 
   # The real daemon's socket, moved somewhere only root can reach. The empty entry
