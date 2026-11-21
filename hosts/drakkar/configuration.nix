@@ -40,6 +40,9 @@
   # The fleet binary cache (GH-147); its cacheKey in common/fleet.nix is filled in
   # from the first start's journal.
   features.nix.vcache.enable = true;
+  # vdaemon-proxy (GH-157): every nix-daemon op logged to the journal as JSON.
+  # Rollback: lib.mkForce false, or at runtime the fallback keeps Nix reachable.
+  features.nix.vdaemon-proxy.enable = true;
   # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
   features.nix.vverify.enable = true;
   features.storage.nfs-client.enable = true;
