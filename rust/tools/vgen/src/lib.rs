@@ -12,8 +12,10 @@
 // source (see rust/tools/vgc/src/lib.rs and rust/tools/vdiff/src/lib.rs): `_0`
 // binders in the Display impl of `errors` declarations, one `if let` per `is`
 // test, nullary lambdas around zero-argument functions, borrows Voltaic writes
-// at every call site, and `x = x + 1` for every `x := x + 1`.
+// at every call site, `x = x + 1` for every `x := x + 1`, and `&(.to_vec ([a, b]))`
+// where Rust would borrow an array (Voltaic's `vec!` takes one expression).
 #![allow(
+    clippy::unnecessary_to_owned,
     clippy::assign_op_pattern,
     clippy::no_effect,
     clippy::unused_unit,
