@@ -21,5 +21,15 @@ in
   lib.nixosSystem {
     inherit (settings) system;
     specialArgs = {inherit inputs settings;};
-    modules = features.modules ++ [../hosts/${hostname}/configuration.nix];
+    modules =
+      features.modules
+      ++ [
+        # The commit this system was built from, so `nixos-version
+        # --configuration-revision` can tell which commit a host runs (bin/watch-fleet).
+        # comin evaluates `git+file://<checkout>?rev=<commit>`, a clean locked ref, so on
+        # a pulled host this is the commit comin fetched. A local build from a dirty tree
+        # gets `<rev>-dirty`; an evaluation with no flake `self` (assay suites) "unknown".
+        {system.configurationRevision = inputs.self.rev or inputs.self.dirtyRev or "unknown";}
+        ../hosts/${hostname}/configuration.nix
+      ];
   }
