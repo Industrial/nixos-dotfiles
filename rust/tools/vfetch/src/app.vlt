@@ -8,7 +8,10 @@ import std::process::ExitCode
 import id_effect::{Effect, HNil, effect, hlist, suspend}
 import id_effect_platform::command::{ProcessRuntimeService, TokioProcessRuntime}
 import nix_store_core::signing::{PublicKey, parse_public_key}
-import crate::config::{ImporterKind, Options, USAGE, conf_keys, db_of_store, parse_args}
+import std::convert::Infallible
+import id_effect_axum::HostConfig
+import crate::config::{ImporterKind, Options, SERVE_USAGE, ServeOptions, USAGE, conf_keys, conf_substituters, db_of_store, listen_parts, parse_args, parse_serve, upstreams_for}
+import crate::serve::{Upstreams, serving}
 import crate::daemon::worker
 import crate::fault::VfetchError
 import crate::fetch::{Report, Request, program}
@@ -79,10 +82,71 @@ supervised o =
     let child = ~live(o).fork();
     ~child.join::<HNil>()
 
+-- A key file named by VFETCH_TRUSTED_KEY_FILE (whitespace-separated keys): how
+-- a unit or a test hands `vfetch serve` a key that is not in nix.conf.
+key_file_keys : Vec<String>
+key_file_keys =
+  case std::env::var "VFETCH_TRUSTED_KEY_FILE" of
+    Ok f -> std::fs::read_to_string f |> .map (\t -> t.split_whitespace () |> .map (\s -> s.to_string ()) |> .collect) |> .unwrap_or_default
+    Err _ -> Vec::new ()
+
+-- The caches behind `vfetch serve` (--from, else nix.conf's substituters
+-- without itself) and the keys it trusts (nix.conf's, --trusted-key, the key file).
+serve_upstreams : &ServeOptions -> Result<Upstreams, VfetchError>
+serve_upstreams o =
+  conf = std::fs::read_to_string (&o.nix_conf) |> .unwrap_or_default
+  mut texts = conf_keys (&conf)
+  texts.extend (o.trusted_keys.iter () |> .cloned)
+  texts.extend (key_file_keys ())
+  keys = (parse_keys (&texts))?
+  caches = upstreams_for (if_empty (o.caches.clone ()) (conf_substituters (&conf))) (&o.listen)
+  Ok (Upstreams { caches, keys })
+
+if_empty : Vec<String> -> Vec<String> -> Vec<String>
+if_empty chosen fallback =
+  if chosen.is_empty ()
+    fallback
+  else
+    chosen
+
+host_of : &str -> Result<HostConfig, VfetchError>
+host_of listen =
+  (host, port) = (listen_parts listen |> .map_err (\e -> VfetchError::Usage e))?
+  Ok (HostConfig { bind_host = host, bind_port = port, http3 = false, ...HostConfig::default () })
+
+serve_live : ServeOptions -> Effect<Infallible, VfetchError, HNil>
+serve_live o =
+  effect!
+    let up = ~suspend({ let o = o.clone(); move || lifted(serve_upstreams(&o)) });
+    let host = ~suspend({ let l = o.listen.clone(); move || lifted(host_of(&l)) });
+    eprintln!("vfetch serve: on http://{} for {}", o.listen, up.caches.join(" "));
+    ~serving(http(), up, host)
+
+serve_supervised : ServeOptions -> Effect<Infallible, VfetchError, HNil>
+serve_supervised o =
+  effect!
+    let child = ~serve_live(o).fork();
+    ~child.join::<HNil>()
+
+serve_main : &[String] -> ExitCode
+serve_main args =
+  case parse_serve args of
+    Err e ->
+      eprintln! \-> "vfetch serve: #{e}\n#{SERVE_USAGE}"
+      ExitCode::from 2
+    Ok o -> id_effect_cli::run_main (serve_supervised o) HNil (id_effect_cli::RunMainConfig::default ())
+
 export main_code : ExitCode
 main_code =
   args = std::env::args () |> .collect : Vec<String>
-  case parse_args (&args) of
+  if args.get 1 |> .is_some_and (\a -> a == "serve")
+    serve_main (&args)
+  else
+    fetch_main (&args)
+
+fetch_main : &[String] -> ExitCode
+fetch_main args =
+  case parse_args args of
     Err e ->
       eprintln! \-> "vfetch: #{e}\n#{USAGE}"
       ExitCode::from 2

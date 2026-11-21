@@ -12,6 +12,11 @@ build = "build.rs"
 [workspace]
 
 [dependencies]
+# `vfetch serve`: the localhost substituter (axum under id_effect_axum, as
+# vcache serves), its bodies as bytes.
+axum = "0.8.9"
+bytes = "1"
+id_effect_axum = "=0.13.0"
 # One id_effect version per build (types do not unify): pinned exactly, like
 # nix-store-core and vcache.
 id_effect = "=0.13.0"

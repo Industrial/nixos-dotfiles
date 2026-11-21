@@ -71,7 +71,7 @@ backoff =
   Schedule::exponential (Duration::from_millis 250) |> .intersect (Schedule::recurs 4) |> .jittered |> .while_input (\e -> is_transient e)
 
 -- The narinfo text at `url`, or None when the cache does not have it.
-narinfo_text : RemoteService -> String -> Effect<Option<String>, VfetchError, HNil>
+export narinfo_text : RemoteService -> String -> Effect<Option<String>, VfetchError, HNil>
 narinfo_text remote url =
   Effect::retry (move \-> remote.0.text (url.clone ())) (backoff ())
 
@@ -177,7 +177,7 @@ walk ctx frontier w =
     (for_each_par frontier (move \p -> lookup (c.clone ()) p) (Concurrency::Bounded jobs)) |> .flat_map (move \found -> level ctx w found)
 
 -- A body as a stream of chunks, pulled as the sink takes them.
-chunks : String -> HttpBody -> Stream<Vec<u8>, VfetchError, HNil>
+export chunks : String -> HttpBody -> Stream<Vec<u8>, VfetchError, HNil>
 chunks url body =
   Stream::unfold_effect body (move \b -> pull (url.clone ()) b)
 

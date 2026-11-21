@@ -128,6 +128,80 @@ conf_keys text =
   base.dedup ()
   base
 
+-- `vfetch serve [--listen HOST:PORT] [--from <url>[,<url>...]]
+--               [--trusted-key K]... [--nix-conf F]`
+export const SERVE_USAGE : &str = "usage: vfetch serve [--listen 127.0.0.1:5101] [--from <cache-url>[,<url>...]] [--trusted-key <name:base64>]... [--nix-conf <file>]"
+
+export const DEFAULT_LISTEN : &str = "127.0.0.1:5101"
+
+export data ServeOptions
+  { export listen String
+  , export caches Vec<String>
+  , export trusted_keys Vec<String>
+  , export nix_conf String
+  }
+  deriving (Debug, Clone, PartialEq)
+
+-- argv: program name, then `serve`, then the flags.
+export parse_serve : &[String] -> Result<ServeOptions, String>
+parse_serve args =
+  mut o = ServeOptions { listen = DEFAULT_LISTEN.to_string (), caches = Vec::new (), trusted_keys = Vec::new (), nix_conf = DEFAULT_NIX_CONF.to_string () }
+  mut it = (args.iter ()).skip 2
+  mut more = true
+  while more
+    case it.next () of
+      None ->
+        more := false
+      Some a -> case a.as_str () of
+        "--listen" ->
+          o.listen := (value_of (it.next ()) "--listen")?
+        "--from" ->
+          o.caches.extend (cache_list (&(value_of (it.next ()) "--from")?))
+        "--trusted-key" ->
+          o.trusted_keys.push ((value_of (it.next ()) "--trusted-key")?)
+        "--nix-conf" ->
+          o.nix_conf := (value_of (it.next ()) "--nix-conf")?
+        s ->
+          return Err "unknown argument #{s}"
+  (listen_parts (&o.listen))?
+  Ok o
+
+-- `HOST:PORT`.
+export listen_parts : &str -> Result<(String, u16), String>
+listen_parts s =
+  (host, port) = (s.rsplit_once ':' |> .ok_or ("--listen #{s}: expected HOST:PORT"))?
+  p = ((port.parse () : Result<u16, std::num::ParseIntError>) |> .map_err (\e -> "--listen #{s}: #{e}"))?
+  Ok ((host.to_string (), p))
+
+-- The caches a nix.conf substitutes from: `substituters` (the last one wins)
+-- and every `extra-substituters`, trailing slashes dropped, each once.
+export conf_substituters : &str -> Vec<String>
+conf_substituters text =
+  mut base = Vec::new () : Vec<String>
+  mut extra = Vec::new () : Vec<String>
+  for raw in text.lines ()
+    line = raw.split '#' |> .next |> .unwrap_or "" |> .trim
+    if line.split_once '=' is Some (k, v)
+      key = k.trim ()
+      urls = v.split_whitespace () |> .map (\s -> s.trim_end_matches '/' |> .to_string) |> .collect : Vec<String>
+      if key == "substituters"
+        base := urls
+      else if key == "extra-substituters"
+        extra.extend urls
+  base.extend extra
+  mut out = Vec::new () : Vec<String>
+  for u in base
+    if !(out.contains (&u))
+      out.push u
+  out
+
+-- The caches behind `vfetch serve` on `listen`: never itself.
+export upstreams_for : Vec<String> -> &str -> Vec<String>
+upstreams_for caches listen =
+  port = listen.rsplit_once ':' |> .map (\hp -> hp.1) |> .unwrap_or ""
+  own = .to_vec ([.to_string "http://#{listen}", .to_string "http://127.0.0.1:#{port}", .to_string "http://localhost:#{port}", .to_string "http://[::1]:#{port}"]) : Vec<String>
+  caches.into_iter () |> .filter (\c -> !(own.contains c)) |> .collect
+
 -- The SQLite database of the store `--to` names, when it is one vfetch can
 -- read: the system store (no --to, `daemon`, `local`, `auto`) or a local
 -- store rooted elsewhere (`/tmp/x`, `local?root=/tmp/x`). None for any other
@@ -180,6 +254,16 @@ test "bad command lines are refused"
 test "nix.conf keys: the last trusted-public-keys plus every extra"
   text = "substituters = https://cache.nixos.org\ntrusted-public-keys = old-1:x\ntrusted-public-keys = a-1:x b-1:y # comment\nextra-trusted-public-keys = c-1:z\n"
   assert_eq! \-> conf_keys text \-> vec!["a-1:x".to_string(), "b-1:y".to_string(), "c-1:z".to_string()]
+
+test "serve: flags, the listen address, and nix.conf's substituters without itself"
+  o = parse_serve (&(["vfetch", "serve", "--listen", "127.0.0.1:5101", "--trusted-key", "k-1:x"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>))
+  assert_eq! \-> o.as_ref () |> .map (\o -> o.trusted_keys.clone ()) |> .ok \-> Some (vec!["k-1:x".to_string()])
+  assert! \-> parse_serve (&(["vfetch", "serve", "--listen", "nope"] |> .iter |> .map (\s -> s.to_string ()) |> .collect : Vec<String>)) |> .is_err
+  assert_eq! \-> listen_parts "127.0.0.1:5101" \-> Ok ((.to_string "127.0.0.1", 5101))
+  conf = "substituters = http://127.0.0.1:5101 http://100.69.213.35:5100 https://cache.nixos.org/\nextra-substituters = https://cache.nixos.org https://x.cachix.org\n"
+  subs = conf_substituters conf
+  assert_eq! \-> subs.clone () \-> vec!["http://127.0.0.1:5101".to_string(), "http://100.69.213.35:5100".to_string(), "https://cache.nixos.org".to_string(), "https://x.cachix.org".to_string()]
+  assert_eq! \-> upstreams_for subs "127.0.0.1:5101" \-> vec!["http://100.69.213.35:5100".to_string(), "https://cache.nixos.org".to_string(), "https://x.cachix.org".to_string()]
 
 test "the target's database follows --to"
   assert_eq! \-> db_of_store None \-> Some (.to_string "/nix/var/nix/db/db.sqlite")

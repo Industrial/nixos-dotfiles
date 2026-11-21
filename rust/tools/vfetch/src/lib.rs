@@ -16,6 +16,7 @@
     clippy::no_effect,
     clippy::unused_unit,
     clippy::let_unit_value,
+    clippy::let_and_return,
     clippy::needless_return,
     clippy::just_underscores_and_digits,
     clippy::collapsible_if,
@@ -46,6 +47,7 @@ voltaic!(stage);
 voltaic!(importer);
 voltaic!(daemon);
 voltaic!(fetch);
+voltaic!(serve);
 voltaic!(app);
 
 #[cfg(test)]
