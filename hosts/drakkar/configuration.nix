@@ -42,6 +42,8 @@
   features.nix.vcache.enable = true;
   # vverify (Voltaic): the store checked against its database weekly, into node_exporter (GH-158).
   features.nix.vverify.enable = true;
+  # vbump (Voltaic): per-input flake.lock bumps, one PR each; bin/update/flake runs it (GH-189).
+  features.cli.vbump.enable = true;
   features.storage.nfs-client.enable = true;
   # vbuild (Voltaic) replaces build-remote as the Nix build hook (GH-156). drakkar
   # has no remote builders, so its visible effect is an immediate decline.
